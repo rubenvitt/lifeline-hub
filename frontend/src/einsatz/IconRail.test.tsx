@@ -214,11 +214,11 @@ describe('IconRail · Dichte', () => {
   });
 
   it('trägt ZWEI Angaben, nicht eine (LFH-365)', () => {
-    // Konkreter Wert als LITERAL: `paddingXS` der Stufe (7) senkrecht, waagerecht 2 px —
+    // Konkreter Wert als LITERAL: `paddingXS` der Stufe (8) senkrecht, waagerecht 2 px —
     // die 60-px-Rail hat für eine mitwachsende Seitenpolsterung keinen Platz.
     const stil = railZielStil(tokenFuer('handschuh'), { aktiv: false });
     expect(stil.minHeight).toBe(72);
-    expect(stil.padding).toBe('7px 2px');
+    expect(stil.padding).toBe('8px 2px');
   });
 });
 

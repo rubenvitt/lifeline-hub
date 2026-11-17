@@ -1,7 +1,7 @@
 # BearbeitbaresPaneel (offen und gesperrt)
 
-BearbeitbaresPaneel — „Bearbeiten in der Ansicht“ (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten
-in der Ansicht“; Spec `formularseiten`, „Eine offene Bearbeitung je Ansicht“). Der EINE Baustein
+BearbeitbaresPaneel — „Bearbeiten in der Ansicht“ (`frontend/AGENTS.md`, „Bearbeiten
+in der Ansicht“). Der EINE Baustein
 für paneel- und ansichtsweises Speichern; Fach-Seiten bauen keinen eigenen.
 
 - **Modus `paneel`** (Stufe Paneel): ein `Paneel` mit `Datenraster`; „Bearbeiten“ im Kopf schaltet
@@ -24,7 +24,7 @@ für paneel- und ansichtsweises Speichern; Fach-Seiten bauen keinen eigenen.
 - **Tastatur:** Enter speichert (Knopf `submit` im `<form>`, Erfassungs-Norm), Escape bricht ab
   (eine offene Auswahl schluckt Escape selbst: rc-select stoppt die Ausbreitung). Fokus beim
   Öffnen ins erste Feld, beim Schließen zurück auf „Bearbeiten“ bzw. `ausloeserRef`.
-- **Fehler am Ort** (LFH-1077): Prüffehler unter der Zelle, eine Ablehnung als `SpeicherFehler`
+- **Fehler am Ort**: Prüffehler unter der Zelle, eine Ablehnung als `SpeicherFehler`
   am Paneel, der 409 als Rückfrage „Zwischenzeitlich geändert“. Kein Toast.
 
 Quelle: `frontend/src/components/instrument/BearbeitbaresPaneel.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus

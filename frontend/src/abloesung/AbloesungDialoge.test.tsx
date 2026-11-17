@@ -24,6 +24,11 @@ import {
  * der Ablösung lesen die eingegebene Uhrzeit in der Anzeigezone. Getippt wird taktisch und mit
  * Enter übernommen (LLH-1077); es ist 14:00 Berliner Zeit.
  */
+
+/** Sichtbare Treffer: die Segmentleiste trägt den Grund einer Sperre zusätzlich verborgen als
+ *  Beschreibung des Segments (`aria-describedby`). */
+const sichtbar = (knoten: HTMLElement[]) => knoten.filter((k) => k.closest('[hidden]') == null);
+
 describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
   mitProzessZone('UTC');
   const BERLIN = { zeitzone: 'Europe/Berlin' };
@@ -516,10 +521,7 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
     const dialog = await screen.findByRole('dialog');
     // „Danach“ (LLH-1308) nur bei der ganzen Einheit, vorbelegt mit „In Ruhe“.
     expect(felder(dialog)).toEqual(['Art', 'Ablösende Einheiten', 'Zeitpunkt', 'Danach']);
-    // Der Knopf der Radiogruppe trägt den Klick am Label, das Eingabefeld liegt darunter.
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     await waitFor(() => expect(felder(dialog)).toEqual(['Art', 'Neue Besatzung', 'Zeitpunkt']));
     expect(within(dialog).queryByRole('checkbox')).toBeNull();
     expect(dialog.querySelector('[data-lfh="vollzug-bisherige-besatzung"]')).toHaveTextContent(
@@ -561,7 +563,7 @@ describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
     const onErfassen = oeffne(undefined, 'Modul Personal gesperrt');
     const dialog = await screen.findByRole('dialog');
     const wechsel = within(dialog).getByRole('radio', { name: 'Besatzungswechsel' });
-    expect(wechsel).toBeDisabled();
+    expect(wechsel).toHaveAttribute('aria-disabled', 'true');
     expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
       'Modul Personal gesperrt',
     );
@@ -654,7 +656,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
       ),
     );
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
-    expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
+    expect(sichtbar(within(dialog).getAllByText('Modul Einheiten gesperrt'))).toHaveLength(1);
     // Hinaus geht der Besatzungswechsel (der Server lehnt ihn ab), nie ein Vollzug der Einheit.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalled());
@@ -665,9 +667,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
   it('verteilt im Klappteil auf Gruppe und Fahrzeug; der Kopf nennt die Abweichung', async () => {
     const { onErfassen } = vollzug();
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     // Ohne gewählte Person gibt es nichts zu verteilen.
     expect(kopf(dialog)).toBeNull();
     await waehle('Neue Besatzung', 'Cora Neu', 'Dirk Neu');
@@ -689,9 +689,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
   it('ohne Erben und Fahrzeuge kein Klappteil', async () => {
     vollzug({ verteilung: null });
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     await waehle('Neue Besatzung', 'Cora Neu');
     expect(kopf(dialog)).toBeNull();
   });
@@ -716,12 +714,8 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
   it('belegt auch vor, wenn die Art vor dem Laden hin- und zurückgewechselt wurde', async () => {
     const { neu } = vollzug({ schicht: geplant, personen: null });
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
-    );
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ganze Einheit' }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     neu({ schicht: geplant, personen });
     await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
   });
@@ -730,13 +724,9 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     const { onErfassen, neu } = vollzug({ schicht: geplant, verteilung: undefined });
     const dialog = await screen.findByRole('dialog');
     await waehle('Neue Besatzung', 'Dirk Neu');
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ganze Einheit' }));
     neu({ schicht: geplant, verteilung });
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({
@@ -776,9 +766,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     const onErfassen = planung();
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked();
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     expect(within(dialog).queryByText('Zeitpunkt')).toBeNull();
     await waehle('Neue Besatzung', 'Dirk Neu');
     await userEvent.click(kopf(dialog)!);
@@ -808,9 +796,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
     await waitFor(() => expect(kopf(dialog)).toHaveTextContent('Verteilen · 1 verteilt'));
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ganze Einheit' }));
     await waehle('Ablösende Einheiten', 'Florian 2');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
@@ -826,9 +812,7 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     const onErfassen = planung({ schicht: nurEntlassene });
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeChecked();
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ganze Einheit' }));
     await waehle('Ablösende Einheiten', 'Florian 2');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
@@ -894,7 +878,10 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
     await waitFor(() =>
       expect(within(dialog).getByRole('radio', { name: 'Ganze Einheit' })).toBeChecked(),
     );
-    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeDisabled();
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
     expect(onErfassen).not.toHaveBeenCalled();
@@ -903,7 +890,10 @@ describe('Ablösung — Besatzungswechsel verteilen und planen (LLH-1319)', () =
   it('Planen gesperrt: nur die Ablöser gehen hinaus, die Planung bleibt unberührt', async () => {
     const onErfassen = planung({ besatzungGesperrt: 'Modul Personal gesperrt' });
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeDisabled();
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
       'Modul Personal gesperrt',
     );
@@ -1031,7 +1021,7 @@ describe('Ablösung — Ablöser ohne Freigabe des Moduls Einheiten (LLH-1542)',
       within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
     ).toHaveAccessibleDescription(GRUND);
     expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(GRUND);
-    expect(within(dialog).getAllByText(GRUND)).toHaveLength(1);
+    expect(sichtbar(within(dialog).getAllByText(GRUND))).toHaveLength(1);
     // Mit Namen, nicht als nackte ID: ohne die Option stünde „12“ im Feld.
     expect(await gewaehlteOptionen('Ablösende Einheiten')).toEqual(['Florian 2']);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
@@ -1058,8 +1048,11 @@ describe('Ablösung — Ablöser ohne Freigabe des Moduls Einheiten (LLH-1542)',
       within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
     ).toHaveAccessibleDescription(GRUND);
     expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(GRUND);
-    expect(within(dialog).getAllByText(GRUND)).toHaveLength(1);
-    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toBeDisabled();
+    expect(sichtbar(within(dialog).getAllByText(GRUND))).toHaveLength(1);
+    expect(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('Planen: die geplanten bleiben aufhebbar', async () => {
@@ -1219,9 +1212,7 @@ describe('Ablösung — Vollzug laut Schichtplan (LLH-1555)', () => {
   it('lädt die Vorlage noch, geht eine selbst gewählte Art', async () => {
     const { onErfassen } = oeffne(null);
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     expect(within(dialog).getByRole('button', { name: 'Vollziehen' })).toBeEnabled();
     expect(onErfassen).not.toHaveBeenCalled();
   });
@@ -1255,9 +1246,7 @@ describe('Ablösung — Vollzug laut Schichtplan (LLH-1555)', () => {
   it('die anderen Arten bleiben wählbar und schicken nichts aus dem Plan', async () => {
     const { onErfassen } = oeffne(vorlage);
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Ganze Einheit' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ganze Einheit' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalled());
     const body = onErfassen.mock.calls[0][0];

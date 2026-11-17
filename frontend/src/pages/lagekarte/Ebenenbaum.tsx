@@ -1,7 +1,7 @@
-import { Button, Input, Modal, Radio, Space, Tooltip, Typography } from 'antd';
+import { Button, Input, Modal, Space, Typography } from 'antd';
 import { useId, useState } from 'react';
 import { IconHaken, IconLupe, IconMinus, IconSchloss } from '../../icons';
-import { useRollen, schriftGroesse, zahlStil } from '../../components/instrument';
+import { Segmentleiste, useRollen, schriftGroesse, zahlStil } from '../../components/instrument';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { fachebeneFarbe } from '../../theme/statusFarben';
@@ -619,21 +619,16 @@ export default function Ebenenbaum(props: SidebarProps) {
                     >
                       Karten-Design
                     </Typography.Text>
-                    <Radio.Group
-                      value={props.kartenTheme}
-                      onChange={(e) =>
-                        props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)
-                      }
-                      optionType="button"
-                      aria-label="Karten-Design"
-                      name="lagekarte-karten-design"
-                    >
-                      <Tooltip title="folgt dem App-Design">
-                        <Radio.Button value="auto">Auto</Radio.Button>
-                      </Tooltip>
-                      <Radio.Button value="light">Hell</Radio.Button>
-                      <Radio.Button value="dark">Dunkel</Radio.Button>
-                    </Radio.Group>
+                    <Segmentleiste<KartenThemeWahl>
+                      beschriftung="Karten-Design"
+                      wert={props.kartenTheme}
+                      onWechsel={props.onKartenThemeWechsel}
+                      optionen={[
+                        { wert: 'auto', label: 'Auto', name: 'Auto, folgt dem App-Design' },
+                        { wert: 'light', label: 'Hell' },
+                        { wert: 'dark', label: 'Dunkel' },
+                      ]}
+                    />
                   </div>
                 )}
               </Space>

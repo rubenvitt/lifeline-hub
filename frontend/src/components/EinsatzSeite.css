@@ -118,7 +118,7 @@
        Browser ohne Ersatztext (Safari vor 17.4, Bauziel `safari16.4`), dort steht es im Namen. */
     content: '‹';
     content: '‹' / '';
-    margin-inline-end: 4px;
+    margin-inline-end: var(--lfh-luft-1);
   }
 }
 

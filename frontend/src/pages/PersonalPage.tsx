@@ -47,7 +47,6 @@ import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensic
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KATEGORIE_WERTE, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
 import DemoMarke from '../components/DemoMarke';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -620,7 +619,7 @@ export default function PersonalPage() {
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
       aktionen={
         darfSchreiben && (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
           <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
             <Button type="primary" onClick={() => setDisponierenOffen(true)}>
@@ -639,7 +638,7 @@ export default function PersonalPage() {
           und verliert nichts. (Die Positionsangabe bleibt bedienbar — `POSITION_OPTIONEN` ist
           ein lokales Enum.) */}
       {darfSchreiben && statusQuery.isError && (
-        <div style={{ marginBottom: abstand.md }}>
+        <div style={{ marginBottom: token.margin }}>
           <SeitenFehler
             text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
             ursache={statusQuery.error}

@@ -12,7 +12,7 @@ import {
 // `useRef<Map<string, Drawing>>` nutzt. `import * as ns, { type X }` ist kein gültiges ES,
 // daher zwei Zeilen.
 import * as maplibregl from 'maplibre-gl';
-import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl';
+import type { StyleSpecification, GeoJSONSource } from 'maplibre-gl';
 // Worker-URL vor der ersten Map (Begründung in `maplibreWorker.ts`).
 import './maplibreWorker';
 import type { Drawing } from '@einsatzzeichen/schema';
@@ -116,15 +116,17 @@ import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 import { escGehoertOverlay } from './zeichnenEsc';
 import { zonenPlakette } from './plakette';
 import { useRollen } from '../../components/instrument/rollenwerte';
+import { UEBERLAGERUNG_RAND, kartenKnopfBreite } from './KartenUeberlagerung';
 import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLayer';
 import { sorgeFuerSuchnadelLayer, suchnadelFc } from './suchnadelLayer';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import type { Eigenposition } from './useEigenposition';
 import {
-  ANFLUG_ZOOM,
   AUTOMATISCH,
   BEDIENUNG,
+  anflugZoom,
   fliegeEigenpositionAn,
+  nachfuehrVersatz,
   hoereAufBedienung,
 } from './kamera';
 import { fokussiereRahmen, stelleKameraHer, type KameraStand } from './fokusKamera';
@@ -140,6 +142,18 @@ interface KartenAnfrage {
  * Zusicherungen prüfen den ersten Lauf.
  */
 const ANFRAGEN_DECKEL = 40;
+
+/**
+ * Rand, innerhalb dessen ein per Tipp gewählter Marker nach dem Öffnen der Leiste sichtbar
+ * bleiben muss (LLH-1751, Review): halbe Trefferzone im Handschuh plus Luft.
+ */
+const NACHFUEHR_RAND = 48;
+
+/** Luft zwischen nachgeführtem Marker und Knopfblock (LLH-1751, Review). */
+const NACHFUEHR_LUFT = 24;
+
+/** So lange nach einem Marker-Tipp wartet das Nachführen auf das `resize` der aufgehenden Leiste. */
+const NACHFUEHR_FRIST_MS = 1000;
 
 /**
  * `transformRequest` der Karte — plus DEV-Mitschnitt unter `window.__lfhKartenAnfragen`.
@@ -204,10 +218,17 @@ export interface KartenflaecheProps {
   /** Marker-Klick → Inspector öffnen. */
   onMarkerKlick?: (schluessel: string) => void;
   /**
-   * Beim Setzen sanft hinfliegen. Zählt als Bedienung (`onBedienung`): die Seite setzt es nur auf
-   * eine Handlung hin (Auswahl, Deeplink, Ortssuche).
+   * Beim Setzen sanft hinfliegen, nur heran, nie heraus (`anflugZoom`). Zählt als Bedienung
+   * (`onBedienung`): die Seite setzt es nur auf eine Handlung hin (Listentreffer, Deeplink,
+   * Ortssuche); ein Tipp auf einen Marker setzt es nicht (LLH-1751).
    */
   flyToZiel?: { lng: number; lat: number } | null;
+  /**
+   * Ziel eines Marker-Tipps (LLH-1751, Review): kein Anflug. Liegt es nach dem Öffnen der Leiste
+   * außerhalb des Bildes, schiebt die Karte es gerade so weit herein (`nachfuehrVersatz`), der Zoom
+   * bleibt. Je Tipp ein neues Objekt.
+   */
+  sichtZiel?: { lng: number; lat: number } | null;
   /**
    * Erster Anflug der Eigenposition (LFH-766): rahmt den Genauigkeitskreis ein, höchstens bis
    * `ANFLUG_ZOOM`. Je Anflug ein neues Objekt. Keine Bedienung — er sperrt sich nicht selbst.
@@ -432,6 +453,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onKarteKlick,
     onMarkerKlick,
     flyToZiel,
+    sichtZiel,
     eigenpositionAnflug,
     onBedienung,
     onStyleFehler,
@@ -1022,15 +1044,64 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
   }, [startAnsicht]);
 
-  // fly-to bei Auswahl.
+  // Marker-Tipp: im Bild halten, nie zoomen (LLH-1751). Nachgeführt wird NUR, wenn die Karte nach
+  // dem Tipp kleiner wird — die Auswahl öffnet die Leiste, MapLibres ResizeObserver meldet danach
+  // `resize` mit der neuen Größe. Ohne Größenänderung (Leiste schon offen) bewegt sich nichts; ein
+  // Frame-Callback sähe noch die alte Größe (Review). Bedient die Person die Karte vorher selbst,
+  // entfällt das Nachführen; nach einer Sekunde ohne `resize` ebenso.
+  const sichtRandRechts = kartenKnopfBreite(token) + UEBERLAGERUNG_RAND + NACHFUEHR_LUFT;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !sichtZiel) return;
+    const beiResize = () => {
+      aufraeumen();
+      const canvas = map.getCanvas();
+      const versatz = nachfuehrVersatz(
+        map.project([sichtZiel.lng, sichtZiel.lat]),
+        { breite: canvas.clientWidth, hoehe: canvas.clientHeight },
+        {
+          oben: NACHFUEHR_RAND,
+          rechts: sichtRandRechts,
+          unten: NACHFUEHR_RAND,
+          links: NACHFUEHR_RAND,
+        },
+      );
+      if (versatz) map.panBy(versatz, { duration: 300 }, BEDIENUNG);
+    };
+    const beiBewegung = (e: { originalEvent?: unknown }) => {
+      if (e.originalEvent != null) aufraeumen();
+    };
+    const frist = window.setTimeout(() => aufraeumen(), NACHFUEHR_FRIST_MS);
+    function aufraeumen() {
+      window.clearTimeout(frist);
+      map!.off('resize', beiResize);
+      map!.off('movestart', beiBewegung);
+    }
+    map.on('resize', beiResize);
+    map.on('movestart', beiBewegung);
+    return aufraeumen;
+    // Der Rand rechts hängt an der Dichte; ein Wechsel mitten im Tipp ist kein neuer Anlass.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sichtZiel]);
+
+  // Anflug auf ein gewähltes Ziel: nur heran, nie heraus (LLH-1751, `anflugZoom`). Folgt ein
+  // Anflug auf einen noch fliegenden, zählt dessen Zielzoom statt des Zwischenzooms der Kurve.
+  const anflugZielZoomRef = useRef<number | null>(null);
+  const anflugNrRef = useRef(0);
   useEffect(() => {
     const map = mapRef.current;
     if (map && flyToZiel) {
       startAufKarteRef.current = map;
-      map.flyTo(
-        { center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: ANFLUG_ZOOM },
-        BEDIENUNG,
-      );
+      const laufend = map.isMoving() ? anflugZielZoomRef.current : null;
+      const zoom = anflugZoom(map.getZoom(), laufend);
+      const nr = ++anflugNrRef.current;
+      anflugZielZoomRef.current = zoom;
+      map.flyTo({ center: [flyToZiel.lng, flyToZiel.lat], zoom }, BEDIENUNG);
+      // Erst NACH dem Start: das `moveend` des abgebrochenen Vorgängers gehört nicht zu diesem.
+      // Gelandet oder abgebrochen gilt das Ziel nicht mehr — außer ein neuerer Anflug läuft.
+      map.once('moveend', () => {
+        if (anflugNrRef.current === nr) anflugZielZoomRef.current = null;
+      });
     }
   }, [flyToZiel]);
 

@@ -17,6 +17,7 @@ import {
 import { useDemoDatenStatus } from './useDemoDaten';
 import DatentraegerWarnung, { useDatentraeger } from './DatentraegerWarnung';
 import { bringIntoView } from '../components/bringIntoView';
+import { flaeche } from '../theme/tokens';
 
 const { Sider, Content } = Layout;
 
@@ -148,7 +149,7 @@ export default function AdminLayout() {
 
   if (laedt) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

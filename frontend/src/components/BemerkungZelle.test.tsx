@@ -471,9 +471,9 @@ describe('wertKnopfStil (LFH-650)', () => {
   it('zieht Höhe UND Polsterung über die Stufen mit, statt auf einer zu kleben', () => {
     const k = wertKnopfStil(tokenFuer('kompakt'));
     const h = wertKnopfStil(tokenFuer('handschuh'));
-    expect(k.paddingBlock).toBe(3);
-    expect(h.paddingBlock).toBe(7);
-    expect(k.paddingInline).toBe(7);
+    expect(k.paddingBlock).toBe(4);
+    expect(h.paddingBlock).toBe(8);
+    expect(k.paddingInline).toBe(8);
     expect(h.paddingInline).toBe(16);
     expect(Number(k.minHeight)).toBeLessThan(Number(h.minHeight));
   });

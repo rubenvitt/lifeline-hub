@@ -340,17 +340,17 @@ describe('ModulPanel · Dichte', () => {
 
   it('traegt neben der Hoehe eine mitziehende Polsterung', () => {
     // Die ZWEITE Angabe (LFH-365): `minHeight` allein klebt den Text an die Kante.
-    expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).padding).toBe('7px 11px');
-    expect(modulZeilenStil(tokenFuer('handschuh'), farben, frei).padding).toBe('16px 26px');
+    expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).padding).toBe('8px 12px');
+    expect(modulZeilenStil(tokenFuer('handschuh'), farben, frei).padding).toBe('16px 24px');
   });
 
   it('liest beide Abstaende aus der Staffel', () => {
-    expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).gap).toBe(7);
+    expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).gap).toBe(8);
     expect(modulZeilenStil(tokenFuer('handschuh'), farben, frei).gap).toBe(16);
     // Die Liste trägt ihre Luft oben/unten aus `marginXS` — mit der Dichte, nicht aus dem
     // statischen `abstand`-Export (der ist die eingefrorene kompakte Stufe).
-    expect(modulListenStil(tokenFuer('kompakt')).paddingBlock).toBe(6);
-    expect(modulListenStil(tokenFuer('handschuh')).paddingBlock).toBe(14);
+    expect(modulListenStil(tokenFuer('kompakt')).paddingBlock).toBe(8);
+    expect(modulListenStil(tokenFuer('handschuh')).paddingBlock).toBe(16);
   });
 
   it('aktiv: Fläche flaeche3 und Text, dazu die Marke in bedien (Neuentwurf, LFH-618)', () => {
@@ -394,7 +394,7 @@ describe('ModulPanel · Dichte', () => {
     });
     // Die Linie reicht durch die Polsterung der Zeile, damit Marken untereinander eine
     // durchgehende Linie bilden.
-    expect(linie('kompakt').marginBlock).toBe(-7);
+    expect(linie('kompakt').marginBlock).toBe(-8);
     expect(linie('handschuh').marginBlock).toBe(-16);
     // Fester Einzug statt `padding` der Dichte: gesperrt (Schloss) kürzte sonst in komfortabel
     // und Handschuh die Namen („Entscheidu…“), Review-Befund LLH-1733.

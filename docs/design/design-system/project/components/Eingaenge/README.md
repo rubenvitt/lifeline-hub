@@ -1,6 +1,6 @@
 # Eingänge (Knopf im Kopf und Eingangsband)
 
-Knopf „Eingänge“ in der Kommandoleiste (LLH-1143, design.md D6): das Zeichen des Posteingangs
+Knopf „Eingänge“ in der Kommandoleiste (design.md D6): das Zeichen des Posteingangs
 (die Glocke trägt schon Ton und Erinnerungen) mit der Zahl der ungelesenen Eingänge als
 Plakette (`EingaengeZahl`, nimmt keine Breite). Ab `md` öffnet er eine Klappfläche.
 

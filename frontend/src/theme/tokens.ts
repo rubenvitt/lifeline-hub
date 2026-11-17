@@ -651,13 +651,18 @@ export const schadenAusmassFarben: Record<SchadenAusmassTon, string> = {
   unbekannt: '#8c8c8c',
 };
 
-/** Abstandsraster einer Dichtestufe. Komponenten importieren diese Werte, statt Pixel zu
- *  erfinden. */
+/** Abstandsraster einer Dichtestufe (Spec `abstandsraster`): die einzige Quelle für Innen- und
+ *  Außenabstände und Lücken. Jeder Wert ist ein Vielfaches von 4. Bausteine lesen es über die
+ *  antd-Tokens der aktiven Dichte (`padding*`/`margin*`, Abbildung in `antdToken`) oder in CSS über
+ *  `--lfh-luft-0…5`, statt Pixel zu erfinden. */
 export interface Abstandsraster {
+  /** Fest 4 in jeder Stufe: antds XXS wirkte schon so (Symbol-Text-Lücke). */
+  xxs: number;
   xs: number;
   sm: number;
   md: number;
   lg: number;
+  xl: number;
 }
 
 /** Bediendichte nach A1 Festlegung 4. `kompakt` ist der Fükw und die ortsfeste
@@ -738,7 +743,8 @@ interface Dichtestufe {
 }
 
 /**
- * Die Staffel, Werte aus A1 Festlegung 4. `antdToken()` nimmt die Stufe als Parameter,
+ * Die Staffel, Werte aus A1 Festlegung 4 (die Abstände auf Vielfache von 4 gerundet, Spec
+ * `abstandsraster`). `antdToken()` nimmt die Stufe als Parameter,
  * `rollen.css` spiegelt sie als `[data-dichte='…']`. `componentSize` scheidet als Träger aus:
  * dessen `large` endet bei 40 px. Die Grundschrift ist die Stufe `text` mal Dichtefaktor
  * (LLH-1774; vorher 13,5 / 15 / 15 mit der Begründung „der Handschuh ändert die Hand, nicht das
@@ -755,27 +761,25 @@ export const dichten: Record<Dichte, Dichtestufe> = {
     zeilenhoehe: 30,
     kleineZeilenhoehe: 24,
     schriftgroesse: schriftPx('text', 'kompakt'),
-    // md/lg stehen so in A1; xs/sm sind [abgeleitet] (× 1,6 / × 2,4 der md-Stufe, gerundet).
-    abstand: { xs: 3, sm: 7, md: 11, lg: 18 },
+    // A1 Festlegung 4 (3/7/11/18) auf Vielfache von 4 gerundet (Change `m113c8ln-abstandsraster`,
+    // design.md D1): 18 → 16, damit die 16er-Literale in `kompakt` unverändert umziehen; xl neu.
+    abstand: { xxs: 4, xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
   },
   komfortabel: {
     zeilenhoehe: 48,
     kleineZeilenhoehe: 48,
     schriftgroesse: schriftPx('text', 'komfortabel'),
-    // xs/sm [abgeleitet] nach demselben Faktor wie kompakt.
-    abstand: { xs: 5, sm: 11, md: 18, lg: 28 },
+    // Aus 5/11/18/28 gerundet; 18 → 20 hält sichtbare Schritte zwischen sm, md und lg.
+    abstand: { xxs: 4, xs: 4, sm: 12, md: 20, lg: 28, xl: 40 },
   },
   handschuh: {
     zeilenhoehe: 72,
     kleineZeilenhoehe: 72,
     schriftgroesse: schriftPx('text', 'handschuh'),
-    // xs/sm [abgeleitet] nach demselben Faktor wie kompakt.
-    abstand: { xs: 7, sm: 16, md: 26, lg: 44 },
+    // Aus 7/16/26/44 gerundet; sm bleibt 16 (Untergrenze aus `einsatztauglichkeit-layout`).
+    abstand: { xxs: 4, xs: 8, sm: 16, md: 24, lg: 44, xl: 64 },
   },
 };
-
-/** Das Abstandsraster der kompakten Stufe, für Konsumenten ohne Dichte. */
-export const abstand: Abstandsraster = dichten.kompakt.abstand;
 
 /**
  * Wiederkehrende Flächen- und Breitenmaße statt verstreuter Inline-Pixel. Norm für Neues und
@@ -1301,14 +1305,25 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     // (siehe `dichten`); so hebelt auch antds erzwungene Kleingröße (z. B. in einer
     // Bestätigungsblase) die Dichteachse nicht aus.
     controlHeightSM: stufe.kleineZeilenhoehe,
-    padding: stufe.abstand.md,
-    paddingSM: stufe.abstand.sm,
+    // Jedes Abstandstoken aus dem Raster der Stufe, keines auf antds fester Vorgabe (design.md D2
+    // der Change `m113c8ln-abstandsraster`). antds MD liegt zwischen Basis und LG; das Raster hat
+    // dort keine Stufe, MD fällt deshalb mit LG zusammen. `marginXXL` bleibt bei antd (ungenutzt).
+    // Die `size*`-Tokens bleiben antds: Space und Flex lesen ihre Lücken aus `paddingXS`/`padding`/
+    // `paddingLG` (antd 6.7, `space/style`, `flex/style`), nicht aus `size*` (geprüft 16.11.2026).
+    paddingXXS: stufe.abstand.xxs,
     paddingXS: stufe.abstand.xs,
+    paddingSM: stufe.abstand.sm,
+    padding: stufe.abstand.md,
+    paddingMD: stufe.abstand.lg,
     paddingLG: stufe.abstand.lg,
-    margin: stufe.abstand.md,
-    marginSM: stufe.abstand.sm,
+    paddingXL: stufe.abstand.xl,
+    marginXXS: stufe.abstand.xxs,
     marginXS: stufe.abstand.xs,
+    marginSM: stufe.abstand.sm,
+    margin: stufe.abstand.md,
+    marginMD: stufe.abstand.lg,
     marginLG: stufe.abstand.lg,
+    marginXL: stufe.abstand.xl,
 
     motionDurationMid: '120ms',
     motionDurationSlow: '150ms',

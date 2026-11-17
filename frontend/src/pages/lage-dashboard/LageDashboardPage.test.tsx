@@ -1333,6 +1333,9 @@ describe('LageDashboardPage — Sichtung', () => {
     // Die BBK-Farbe steht im Farbfeld, das Kürzel ist der zweite Kanal.
     expect(zeilen[0].querySelector('[data-lfh="sichtung-feld"]')).not.toBeNull();
     expect(zeilen[0]).toHaveTextContent('SK I');
+    // Dasselbe Wort wie Betroffenenliste und Sichtungswahl (`SK_WORT`, LLH-1752).
+    expect(zeilen[3]).toHaveTextContent('abwartend');
+    expect(zeilen[3]).not.toHaveTextContent('Überlebenschance');
     expect(within(box).getByText('Ohne Sichtung')).toBeInTheDocument();
     // Ohne jeden Verbleib: niemand unterwegs, alle fünf angetroffen und offen.
     expect(box.querySelector('[data-lfh="transport-bilanz"]')).toHaveTextContent(
@@ -1583,6 +1586,21 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     setzeLiveStatusFuerTest('lost');
     render();
     await waitFor(() => expect(live()?.textContent).toBe('Verbindung unterbrochen'));
+  });
+
+  it('ohne Netz steht „offline“, auch wenn die Leitung noch als offen gilt (LLH-1752)', async () => {
+    // Eine bestehende EventSource meldet beim Netzverlust nicht sofort einen Fehler; der Browser
+    // weiß es früher. Ohne Netz sagte das Paneel sonst weiter „live“.
+    setzeLiveStatusFuerTest('open');
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      mockEndpunkte({ etb: [etb(1)] });
+      render();
+      const live = () => paneel('Jüngste ETB-Einträge').querySelector('[data-lfh="strom-live"]');
+      await waitFor(() => expect(live()?.textContent).toBe('offline'));
+    } finally {
+      onLine.mockRestore();
+    }
   });
 
   it('ein gescheiterter ETB-Abruf ist ein Fehler, kein leerer Strom', async () => {

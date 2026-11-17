@@ -114,11 +114,14 @@
   --lfh-radius-marke: 0;
 
   /* ── Raster und Dichte (kompakt — die Stufe aus dem B-Entwurf) ─────────── */
-  /* Die beiden anderen Stufen stehen unten unter `[data-dichte='…']`. */
-  --lfh-luft-1: 3px;
-  --lfh-luft-2: 7px;
-  --lfh-luft-3: 11px;
-  --lfh-luft-4: 18px;
+  /* Die beiden anderen Stufen stehen unten unter `[data-dichte='…']`. Abstandsraster
+     `--lfh-luft-0…5` = xxs…xl (Spec `abstandsraster`, Vielfache von 4). */
+  --lfh-luft-0: 4px;
+  --lfh-luft-1: 4px;
+  --lfh-luft-2: 8px;
+  --lfh-luft-3: 12px;
+  --lfh-luft-4: 16px;
+  --lfh-luft-5: 24px;
   --lfh-zeilenhoehe: 30px;
   --lfh-schriftgroesse: 14px;
 
@@ -306,20 +309,24 @@
    ======================================================================== */
 
 [data-dichte='komfortabel'] {
-  --lfh-luft-1: 5px;
-  --lfh-luft-2: 11px;
-  --lfh-luft-3: 18px;
+  --lfh-luft-0: 4px;
+  --lfh-luft-1: 4px;
+  --lfh-luft-2: 12px;
+  --lfh-luft-3: 20px;
   --lfh-luft-4: 28px;
+  --lfh-luft-5: 40px;
   --lfh-zeilenhoehe: 48px;
   --lfh-schriftgroesse: 16.1px;
   --lfh-schrift-faktor: 1.15;
 }
 
 [data-dichte='handschuh'] {
-  --lfh-luft-1: 7px;
+  --lfh-luft-0: 4px;
+  --lfh-luft-1: 8px;
   --lfh-luft-2: 16px;
-  --lfh-luft-3: 26px;
+  --lfh-luft-3: 24px;
   --lfh-luft-4: 44px;
+  --lfh-luft-5: 64px;
   --lfh-zeilenhoehe: 72px;
   --lfh-schriftgroesse: 17.5px;
   --lfh-schrift-faktor: 1.25;
