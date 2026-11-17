@@ -65,6 +65,12 @@ MUST die Rückfrage „Zwischenzeitlich geändert“ kommen.
 - **THEN** fragt die Seite „Zwischenzeitlich geändert“ mit „Meine Änderung übernehmen“ und
   „Verwerfen und neu laden“
 
+#### Scenario: Bereichswechsel mit offener Änderung
+- **WHEN** im offenen Paneel „Angaben“ die Notiz geändert ist und jemand den Bereich „Material“
+  wählt
+- **THEN** fragt die Seite „Ungespeicherte Änderungen“; nach „Bleiben“ steht die Eingabe
+  unverändert im Paneel
+
 #### Scenario: Notiz leeren
 - **WHEN** im offenen Paneel die Notiz geleert und gespeichert wird
 - **THEN** geht die Notiz als `null`, und das Paneel zeigt bei der Notiz „—“

@@ -85,7 +85,8 @@ gleichwertig, weicht aber vom UHS-Muster ab, und das Muster ist die Vorlage der 
 nicht betroffen.
 
 **D6 — Zusatzhandlungen im Paneelkopf.** `BearbeitbaresPaneel` bekommt `zusatz?: ReactNode`. Im
-Lesezustand steht er im Kopf vor „Bearbeiten“ (`Space`/`Flex` mit `token.marginXS`). Im
+Lesezustand steht er im Kopf vor „Bearbeiten“ (`Flex` mit `token.marginSM`, dem Abstand zweier
+Ziele nach der Leitlinie, LLH-1273). Im
 Bearbeiten-Zustand fehlt er, denn eine zweite Handlung neben einer offenen Bearbeitung
 widerspräche „eine offene Bearbeitung“. Ohne `zusatz` bleibt der Kopf wie heute. Der BR übergibt
 `AufKarteVerorten` nur, wenn der Raum bearbeitbar ist (wie heute).
@@ -93,7 +94,8 @@ Verworfen: *„Auf Karte verorten“ ins ⋮ des Seitenkopfs*. Das wäre ein Ort
 Bedienung ohne Not.
 
 **D7 — BR-Paneel „Raumdaten“.** Es ersetzt `SektionHeader` und `Datenraster` an derselben Stelle,
-mit `spalten={3}` und den Feldern Bezeichnung, Standort, Notiz (Notiz breit). Die Regeln
+mit `spalten={3}` und den Feldern Bezeichnung, Standort, Notiz in einer Zeile (die Notiz nicht
+breit: drei Felder füllen die drei Spalten, das Paneel bleibt so niedrig wie der alte Abschnitt). Die Regeln
 (`zeichenRegel`, `ortZeichenRegel`, `zeichenGrenze`) kommen aus dem Modal. Bezeichnung steht damit
 auch im Lesezustand im Paneel, doppelt zum Titel. Das nehmen wir hin, damit Lese- und
 Bearbeitungszustand dieselben Zellen zeigen (Bausteinvertrag). `onNeuLaden` ist
@@ -105,6 +107,26 @@ Bearbeitungszustand dieselben Zellen zeigen (Bausteinvertrag). `onNeuLaden` ist
 Baustein legt dann seinen eigenen an, und der Verlassen-Schutz gilt. Weitere Bearbeitungen derselben
 Seite (Grundriss-Bearbeiten-Modus, Belegungszeilen) laufen nicht über den Merker. Daran ändert diese
 Change nichts.
+
+**D9 — Sperrkonflikt ausgezeichnet (Review vor dem PR).** UHS und BR antworten auch auf eine
+doppelte Bezeichnung (UNIQUE) und auf „storniert“ mit 409. Seit der Client immer
+`basis_geaendert_at` mitschickt, hätte das Paneel jeden 409 als „Zwischenzeitlich geändert“
+gefragt. Der Server meldet den Sperrkonflikt deshalb als `AppError::Veraltet` (409 mit
+`grund: "veraltet"`, Muster `NichtInListe`), `BearbeitbaresPaneel` nimmt `istSperrkonflikt`
+(Vorgabe `istKonflikt`, damit die übrigen CAS-Seiten unverändert bleiben), UHS und BR geben
+`istVeraltet`. Verworfen: den Status der doppelten Bezeichnung auf 422 ändern. Das wäre ein
+Wire-Bruch für alle Clients, und „storniert“ bliebe nach der Statuscode-Konvention ohnehin 409.
+
+**D10 — Merker der UHS-Seite (Review vor dem PR).** Die Bereichsleiste ändert nur den Suchteil
+der Adresse, den der Router nicht abfragt. Ohne Merker der Seite hängte ein Bereichswechsel das
+Paneel samt geänderter Eingabe still aus. `UhsDetailPage` legt deshalb einen
+`OffeneBearbeitungProvider` um die ganze Seite (Schlüssel: die UHS). Leiste und Kopfzahl wechseln
+über `useWechselNachRueckfrage` (`components/offeneBearbeitung.tsx`, LLH-1415).
+
+**D11 — Stand nach dem Speichern (Review vor dem PR).** `onSpeichern` legt die PATCH-Antwort
+gleich in den Detail-Cache (`setQueryData`, zusammengeführt mit Plätzen, Belegung und Kräften des
+Details). Sonst zeigte das Paneel bis zum Neuabruf den alten Stand, und ein gleich wieder
+geöffnetes fröre das alte `geaendert_at` ein (falscher 409).
 
 ## Risks / Trade-offs
 

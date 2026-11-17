@@ -20,6 +20,8 @@ import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { listePersonen } from '../../api/einsatzPerson';
 import type { Person } from '../../api/types';
 import { ApiError } from '../../api/client';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../test/server';
 
 // Auto-Mocks: bei ungültiger ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
 vi.mock('../../api/einsaetze');
@@ -696,6 +698,37 @@ describe('UhsDetailPage — Stammdaten im Bereich „Angaben“ (LLH-1407, LLH-1
     );
     expect(await screen.findByText('MATERIAL-TAB')).toBeInTheDocument();
     expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=material');
+  });
+
+  it('am gekoppelten UHS-Gerät: kein Bereich „Angaben“, `?bereich=angaben` zeigt die Belegung', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({
+          id: 9,
+          anzeigename: 'UHS Nord · Laptop',
+          benutzername: 'geraet-3',
+          system_rolle: 'keiner',
+          org_rolle: 'keine',
+          aktiv: true,
+          erstellt_at: '2026-10-04',
+          totp_aktiviert: false,
+          passwort_gesetzt: false,
+          geraet: {
+            kopplung_id: 3,
+            einsatz_id: 1,
+            ansicht: 'uhs-laptop',
+            uhs_id: 9,
+            stelle: 'UHS Nord',
+            bezeichnung: 'Laptop',
+            laeuft_ab_at: '2026-10-05 12:00:00',
+          },
+        }),
+      ),
+    );
+    zeige('aktiv');
+    expect(await screen.findByText('GRUNDRISS')).toBeInTheDocument();
+    expect(screen.queryByText(/ANGABEN/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Angaben' })).not.toBeInTheDocument();
   });
 
   it('ohne Schreibrecht: Angaben nur zum Lesen', async () => {

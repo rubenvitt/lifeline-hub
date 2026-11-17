@@ -44,8 +44,9 @@ MUST nur als Paar und nur bei einer Änderung gehen.
 ### Requirement: Kollisionsschutz beim Speichern der Raumdaten
 `PATCH /api/einsaetze/{id}/bereitstellungsraeume/{bid}` SHALL ein optionales Feld
 `basis_geaendert_at` annehmen. Weicht der gespeicherte Stand davon ab, MUST der Server mit 409
-antworten und nichts ändern. Fehlt das Feld, MUST er wie bisher schreiben. Die Oberfläche MUST auf
-den 409 „Zwischenzeitlich geändert“ fragen.
+antworten und nichts ändern. Fehlt das Feld, MUST er wie bisher schreiben. Den Sperrkonflikt
+MUST der Server mit `grund: "veraltet"` auszeichnen; nur auf ihn MUST die Oberfläche
+„Zwischenzeitlich geändert“ fragen.
 
 #### Scenario: Veralteter Stand
 - **WHEN** ein PATCH mit `basis_geaendert_at` eines älteren Stands die Notiz ändern will
@@ -58,6 +59,11 @@ den 409 „Zwischenzeitlich geändert“ fragen.
 #### Scenario: Ohne Basisstand
 - **WHEN** die Lagekarte den Raum verortet und dabei kein `basis_geaendert_at` sendet
 - **THEN** speichert der Server die Koordinate ohne Prüfung des Stands
+
+#### Scenario: Doppelte Bezeichnung ist kein Sperrkonflikt
+- **WHEN** an „BR West“ die Bezeichnung „BR Ost“ gespeichert wird, die im Einsatz schon vergeben ist
+- **THEN** antwortet der Server mit 409 ohne `grund: "veraltet"`, und das Paneel zeigt den Grund
+  statt „Zwischenzeitlich geändert“; die Eingabe bleibt stehen
 
 #### Scenario: Rückfrage in der Oberfläche
 - **WHEN** nach dem Öffnen des Paneels ein anderer Arbeitsplatz den Standort speichert und hier
