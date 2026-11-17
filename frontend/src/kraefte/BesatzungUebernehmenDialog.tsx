@@ -153,7 +153,7 @@ export default function BesatzungUebernehmenDialog({
         }
       >
         <Checkbox.Group style={{ display: 'block' }}>
-          {/* Abstand der Zeilen aus der Dichte-Staffel (7 / 11 / 16 px): am Finger ≥ 8, im
+          {/* Abstand der Zeilen aus der Dichte-Staffel (8 / 12 / 16 px): am Finger ≥ 8, im
               Handschuh ≥ 16 px zwischen zwei Kästchen (Bedien-Leitlinie, Kriterium 2). */}
           <Space orientation="vertical" size={token.marginSM}>
             {vorschlag.kandidaten.map((p) => {

@@ -1,13 +1,14 @@
-import { Breadcrumb, Tabs } from 'antd';
+import { Breadcrumb, theme } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
 import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { Segmentleiste } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { parseAuftraegeReiter } from '../routing/deeplinks';
@@ -21,6 +22,15 @@ export default function AuftraegePage() {
   // aus einem Befehl landen so auf „Einsatzbefehle", nicht auf der Vorgabe.
   const [searchParams, setSearchParams] = useSearchParams();
   const reiter = parseAuftraegeReiter(searchParams);
+  const reiterflaecheId = useId();
+  // Welche Fläche schon einmal offen war: sie bleibt danach montiert (siehe unten).
+  const [besuchtListe, setBesuchtListe] = useState<readonly string[]>([reiter]);
+  if (!besuchtListe.includes(reiter)) setBesuchtListe([...besuchtListe, reiter]);
+  const besucht = {
+    auftraege: besuchtListe.includes('auftraege'),
+    befehle: besuchtListe.includes('befehle'),
+  };
+  const { token } = theme.useToken();
   const reiterWechseln = (neu: string) =>
     setSearchParams(
       (alt) => {
@@ -96,33 +106,47 @@ export default function AuftraegePage() {
         />
       }
     >
-      <Tabs
-        activeKey={reiter}
-        onChange={reiterWechseln}
-        items={[
-          // Die Reiternamen grenzen die zwei Objekte ab (LFH-972, LFH-1078): ein Einzelauftrag geht
-          // an einen Empfänger und wird quittiert und vollzogen, ein Einsatzbefehl ist ein Dokument
-          // mit Fassungen und Freigabe. Kein Erklärsatz darunter.
-          {
-            key: 'auftraege',
-            label: 'Einzelaufträge',
-            children: (
-              <AuftraegeListe
-                einsatzId={einsatzId}
-                darfSchreiben={darfSchreiben}
-                onSeitenFehler={setSeitenFehler}
-                erteilenAngefordert={erteilenAngefordert}
-                onErteilenAngenommen={() => setErteilenAngefordert(false)}
-              />
-            ),
-          },
-          {
-            key: 'befehle',
-            label: 'Einsatzbefehle',
-            children: <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />,
-          },
+      {/* Fläche umschalten: Segmentleiste als Reiter (Spec `bedien-umschalten`). Die Reiternamen
+          grenzen die zwei Objekte ab (LFH-972, LFH-1078): ein Einzelauftrag geht an einen
+          Empfänger und wird quittiert und vollzogen, ein Einsatzbefehl ist ein Dokument mit
+          Fassungen und Freigabe. Kein Erklärsatz darunter. */}
+      <Segmentleiste
+        rolle="tablist"
+        beschriftung="Aufträge und Befehle"
+        wert={reiter}
+        onWechsel={reiterWechseln}
+        optionen={[
+          { wert: 'auftraege', label: 'Einzelaufträge', steuert: `${reiterflaecheId}-auftraege` },
+          { wert: 'befehle', label: 'Einsatzbefehle', steuert: `${reiterflaecheId}-befehle` },
         ]}
+        style={{ marginBottom: token.margin }}
       />
+      {/* Eine besuchte Fläche bleibt montiert und ist nur verborgen, wie vorher bei antds Tabs:
+          Ansicht, Filter, Suche und Auswahl einer Liste überstehen den Wechsel zur anderen. */}
+      <div
+        role="tabpanel"
+        id={`${reiterflaecheId}-auftraege`}
+        aria-label="Einzelaufträge"
+        hidden={reiter !== 'auftraege'}
+      >
+        {besucht.auftraege && (
+          <AuftraegeListe
+            einsatzId={einsatzId}
+            darfSchreiben={darfSchreiben}
+            onSeitenFehler={setSeitenFehler}
+            erteilenAngefordert={erteilenAngefordert}
+            onErteilenAngenommen={() => setErteilenAngefordert(false)}
+          />
+        )}
+      </div>
+      <div
+        role="tabpanel"
+        id={`${reiterflaecheId}-befehle`}
+        aria-label="Einsatzbefehle"
+        hidden={reiter !== 'befehle'}
+      >
+        {besucht.befehle && <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />}
+      </div>
     </EinsatzSeite>
   );
 }

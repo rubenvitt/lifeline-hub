@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { theme } from 'antd';
 import { meldeKinderAlsUntereLeisten } from '../../components/untereLeiste';
-import { UEBERLAGERUNG_RAND, kartenKnopfKante } from './KartenUeberlagerung';
+import { UEBERLAGERUNG_RAND, kartenKnopfBreite } from './KartenUeberlagerung';
 
 /** Abstand der Fußleiste zum Kartenrand und zwischen ihren Bändern (px). */
 export const FUSS_ABSTAND = 12;
@@ -36,13 +36,14 @@ export function bandStil(
  * Rechts endet der Fuß vor der Knopfspalte: Knopfblock und Fuß lagen beide auf `zIndex: 5`, und der
  * Fuß verdeckte Kartenknöpfe vollständig (Zeiger und Tastatur). Die Abhilfe ist eine Aufteilung der
  * Breite, kein `zIndex`: zwei Flächen, die sich die Breite teilen, überschneiden sich bei keiner
- * Höhe. Der Preis ist ein um die Knopfspalte schmaleres Band.
+ * Höhe. Der Preis ist ein um die Knopfspalte schmaleres Band. Maßgeblich ist die Breite des Blocks
+ * ({@link kartenKnopfBreite}), seit die Knöpfe ein Wort tragen breiter als die Kante (LLH-1751).
  */
-export function fussStil(knopfKante: number): CSSProperties {
+export function fussStil(knopfBreite: number): CSSProperties {
   return {
     position: 'absolute',
     left: FUSS_ABSTAND,
-    right: UEBERLAGERUNG_RAND + knopfKante + FUSS_ABSTAND,
+    right: UEBERLAGERUNG_RAND + knopfBreite + FUSS_ABSTAND,
     bottom: FUSS_ABSTAND,
     zIndex: 5,
     display: 'flex',
@@ -84,7 +85,7 @@ export function KartenFuss({ children }: { children?: ReactNode }) {
     <div
       ref={meldeKinderAlsUntereLeisten}
       data-lfh="karten-fuss"
-      style={fussStil(kartenKnopfKante(token))}
+      style={fussStil(kartenKnopfBreite(token))}
     >
       {children}
     </div>

@@ -1,6 +1,6 @@
 # Schrift: Rollen der Skala und Feldetikett
 
-Schrift — Text in einer Rolle der Schriftskala (LLH-1775, Spec `schriftskala`). Die Größe ist
+Schrift — Text in einer Rolle der Schriftskala. Die Größe ist
 die CSS-Variable der Stufe und wächst mit der Dichte; jede Rolle setzt gleich breite Ziffern.
 Für Stellen ohne eigenen Baustein, die eine Größe brauchen: statt `fontSize` mit einer Zahl
 (macht `theme/schriftLiteral.guard.test.ts` rot). Ein antd-Element, das nur einen `style`

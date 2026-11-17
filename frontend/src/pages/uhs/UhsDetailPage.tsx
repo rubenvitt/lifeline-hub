@@ -45,6 +45,7 @@ import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { MenueAusloeser } from '../../components/MenueAusloeser';
 import UhsBearbeitenModal from './UhsBearbeitenModal';
+import { flaeche } from '../../theme/tokens';
 
 /**
  * Die Bereiche der Seite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
@@ -207,7 +208,7 @@ export default function UhsDetailPage() {
   }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

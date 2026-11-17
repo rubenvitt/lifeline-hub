@@ -76,6 +76,7 @@ import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/Meldunge
 import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
+import { flaeche } from '../theme/tokens';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
@@ -695,7 +696,7 @@ export default function MeldungenPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

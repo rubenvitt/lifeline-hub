@@ -77,7 +77,7 @@ import '../theme/sprache.css';
  *   `OnlineQuellenVerwaltung.test.tsx`).
  *
  * **Kopfwerkzeuge folgen der Dichte** (LLH-1227, Kriterium 2). Die Werkzeugzeile hält zwischen
- * Suche und Spaltenschalter `paddingSM` (7 / 11 / 16 px, {@link werkzeugAbstand}). antds
+ * Suche und Spaltenschalter `paddingSM` (8 / 12 / 16 px, {@link werkzeugAbstand}). antds
  * Spaltenfilter-Auslöser ist ein `span` mit `tabIndex=-1` in Schriftgröße (20 × 23 px in jeder
  * Stufe): er bekommt den Boden `controlHeightSM` über {@link filterKopfStil} und `sprache.css`,
  * und {@link useFilterTastatur} nimmt ihn in die Tab-Folge (Enter/Leertaste öffnen, Escape
@@ -267,7 +267,7 @@ export function suchfeldStil(
 /**
  * Abstand zwischen den Werkzeugen über der Tabelle, rein und exportiert (LLH-1227). Die Leitlinie
  * verlangt zwischen zwei Zielen ≥ 8 px in `komfortabel` und ≥ 16 px in `handschuh`; `paddingXS`
- * lag bei 3 / 5 / 7 px, `paddingSM` hält 7 / 11 / 16 (`kompakt` hat die Spacing-Ausnahme).
+ * lag bei 3 / 5 / 7 px, `paddingSM` hält 8 / 12 / 16 (`kompakt` hat die Spacing-Ausnahme).
  */
 export function werkzeugAbstand(token: { paddingSM: number }): number {
   return token.paddingSM;
@@ -1287,7 +1287,7 @@ export default function KatalogTabelle<T extends object>({
           ref={werkzeugWurzel}
           data-lfh="katalog-werkzeuge"
           style={{
-            marginBlockEnd: 8,
+            marginBlockEnd: token.marginSM,
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
@@ -1322,7 +1322,12 @@ export default function KatalogTabelle<T extends object>({
       {eingeschraenkt && (
         <div
           data-lfh="katalog-einschraenkung"
-          style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBlockEnd: 8 }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: token.marginSM,
+            marginBlockEnd: token.marginSM,
+          }}
         >
           <Filterhinweis
             treffer={trefferZahl}

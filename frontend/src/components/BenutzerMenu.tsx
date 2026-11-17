@@ -184,7 +184,12 @@ export default function BenutzerMenu({
       label: (
         <div
           data-testid="benutzermenue-kopf"
-          style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '4px 0' }}
+          style={{
+            display: 'flex',
+            gap: token.margin,
+            alignItems: 'flex-start',
+            paddingBlock: token.paddingXS,
+          }}
         >
           <Avatar
             shape="square"
@@ -204,14 +209,14 @@ export default function BenutzerMenu({
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 columnGap: 6,
-                rowGap: 4,
+                rowGap: token.marginXS,
               }}
             >
               <Typography.Text strong style={{ fontSize: schriftGroesse('text'), lineHeight: 1.3 }}>
                 {benutzer.anzeigename}
               </Typography.Text>
               {isKnapp && rollenTags.length > 0 && (
-                <Space size={4} wrap>
+                <Space size={token.marginXS} wrap>
                   {rollenTags}
                 </Space>
               )}
@@ -226,14 +231,18 @@ export default function BenutzerMenu({
             {funktion && (
               <Typography.Text
                 data-lfh="benutzermenue-funktion"
-                style={{ display: 'block', fontSize: schriftGroesse('klein'), marginTop: 4 }}
+                style={{
+                  display: 'block',
+                  fontSize: schriftGroesse('klein'),
+                  marginTop: token.marginXS,
+                }}
               >
                 {funktion}
               </Typography.Text>
             )}
             {!isKnapp && rollenTags.length > 0 && (
               <div style={{ marginTop: 6 }}>
-                <Space size={4} wrap>
+                <Space size={token.marginXS} wrap>
                   {rollenTags}
                 </Space>
               </div>
@@ -281,7 +290,7 @@ export default function BenutzerMenu({
                 display: 'inline-block',
                 width: 8,
                 height: 8,
-                marginLeft: 8,
+                marginLeft: token.marginSM,
                 borderRadius: '50%',
                 backgroundColor: token.colorPrimary,
                 verticalAlign: 'middle',

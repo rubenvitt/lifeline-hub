@@ -1,6 +1,6 @@
 # Verbindungen (Funk und Telefon getrennt; Liste offen)
 
-Baustein „Verbindungen“ (LLH-1134, Entscheidung LLH-1126 Option B): Telefon und weitere
+Baustein „Verbindungen“ (Entscheidung LLH-1126 Option B): Telefon und weitere
 Verbindungen außerhalb des Funks als Liste „Mittel · Wert · Hinweis“, wie die Stellen des
 Kommunikationsplans. Abschnitt, Einheit und eigene Führungsstelle nehmen ihn unter
 „Telefon und weitere Verbindungen“; Funk (Rufname, Sprechgruppen) steht getrennt davon.
@@ -11,7 +11,7 @@ Kommunikationsplans. Abschnitt, Einheit und eigene Führungsstelle nehmen ihn un
   (`kennungsLinkStil`, ein `<a>` erbt keine Steuerhöhe).
 - **Bearbeiten** (`VerbindungenAngabe`): eine `InlineAngabe` über die ganze Liste, mit
   `bearbeitenDaneben` — die Verweise stehen nicht im Wertknopf, „Bearbeiten“ steht daneben
-  (LLH-1426: der Klick auf die Nummer wählt). Der Server ersetzt die Liste vollständig
+  (der Klick auf die Nummer wählt). Der Server ersetzt die Liste vollständig
   (`verbindungen`). Leere Zeilen fallen beim Speichern weg, ein Hinweis ohne Nummer wird nicht
   gesendet. Höchstens `VERBINDUNGEN_MAX` Einträge, Wert und Hinweis je höchstens
   `VERBINDUNG_TEXT_MAX` Zeichen (Spiegel der Servergrenzen).

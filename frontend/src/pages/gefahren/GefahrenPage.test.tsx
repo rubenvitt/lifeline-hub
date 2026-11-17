@@ -729,8 +729,8 @@ describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
    * Text an der Kante.
    */
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
-    expect(gebietszeileStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
-    expect(gebietszeileStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+    expect(gebietszeileStil(tokenFuer('kompakt')).padding).toBe('8px 12px');
+    expect(gebietszeileStil(tokenFuer('handschuh')).padding).toBe('16px 24px');
   });
 });
 
