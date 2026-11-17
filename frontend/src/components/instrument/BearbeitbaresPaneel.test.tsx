@@ -125,6 +125,32 @@ describe('BearbeitbaresPaneel · Umschalten', () => {
   });
 });
 
+describe('BearbeitbaresPaneel · Zusatzhandlungen im Kopf (LLH-1920)', () => {
+  it('stehen im Lesezustand vor „Bearbeiten“, fehlen während der Bearbeitung', async () => {
+    const user = userEvent.setup();
+    rendern(<FunkPaneel zusatz={<Button>Auf Karte verorten</Button>} />);
+    const paneel = screen.getByRole('region', { name: 'Funk' });
+    const verorten = within(paneel).getByRole('button', { name: 'Auf Karte verorten' });
+    const bearbeiten = within(paneel).getByRole('button', { name: 'Funk bearbeiten' });
+    expect(
+      verorten.compareDocumentPosition(bearbeiten) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(bearbeiten);
+    await screen.findByRole('textbox', { name: 'Rufname' });
+    expect(screen.queryByRole('button', { name: 'Auf Karte verorten' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(screen.getByRole('button', { name: 'Auf Karte verorten' })).toBeInTheDocument();
+  });
+
+  it('auch ohne „Bearbeiten“ (ohne Schreibrecht, ohne Grund) bleibt der Zusatz stehen', () => {
+    rendern(<FunkPaneel darfSchreiben={false} zusatz={<Button>Drucken</Button>} />);
+    expect(screen.getByRole('button', { name: 'Drucken' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Funk bearbeiten' })).toBeNull();
+  });
+});
+
 describe('BearbeitbaresPaneel · Speichern', () => {
   it('schickt nur geänderte Felder mit der Basis der Sitzung und schließt', async () => {
     const user = userEvent.setup();

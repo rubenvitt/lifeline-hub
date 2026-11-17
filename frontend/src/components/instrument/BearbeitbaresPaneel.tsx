@@ -51,6 +51,9 @@ import { useRollen, schriftGroesse } from './rollenwerte';
  *   Öffnen ins erste Feld, beim Schließen zurück auf „Bearbeiten“ bzw. `ausloeserRef`.
  * - **Fehler am Ort** (LFH-1077): Prüffehler unter der Zelle, eine Ablehnung als `SpeicherFehler`
  *   am Paneel, der 409 als Rückfrage „Zwischenzeitlich geändert“. Kein Toast.
+ * - **Zusatzhandlungen** (`zusatz`, LLH-1920): weitere Handlungen am Datensatz im Paneelkopf vor
+ *   „Bearbeiten“, etwa „Auf Karte verorten“ an den Raumdaten. Nur im Lesezustand: neben einer
+ *   offenen Bearbeitung steht keine zweite Handlung.
  */
 
 export interface BearbeitbaresFeld<W> {
@@ -98,6 +101,8 @@ export interface BearbeitbaresPaneelProps<W extends object, P = Partial<W>> {
   ausloeserRef?: RefObject<HTMLElement | null>;
   /** Spalten des Rasters; Vorgabe 3. */
   spalten?: number;
+  /** Weitere Handlungen im Paneelkopf vor „Bearbeiten“, nur im Lesezustand (Modus `paneel`). */
+  zusatz?: ReactNode;
 }
 
 /** Wertgleichheit nach Inhalt (Zahlen, Texte, Listen, Objekte, Zeitpunkte über `toJSON`). */
@@ -155,6 +160,7 @@ function Innen<W extends object, P = Partial<W>>({
   form: formVonAussen,
   ausloeserRef,
   spalten = 3,
+  zusatz,
 }: BearbeitbaresPaneelProps<W, P>) {
   const { token, rollen } = useRollen();
   const [eigeneForm] = Form.useForm<W>();
@@ -385,23 +391,32 @@ function Innen<W extends object, P = Partial<W>>({
 
   const sperrGrund = !darfSchreiben ? grund : belegung.gesperrt;
   const zeigeKnopf = darfSchreiben || grund != null;
+  const bearbeitenKnopf = zeigeKnopf && (
+    <Button
+      ref={knopfRef}
+      aria-label={`${titel} bearbeiten`}
+      aria-describedby={sperrGrund ? grundId : undefined}
+      disabled={sperrGrund != null}
+      onClick={() => setOffen(true)}
+    >
+      Bearbeiten
+    </Button>
+  );
   return (
     <Paneel
       titel={titel}
       ueberschrift={ueberschrift}
       meta={meta}
       aktion={
-        zeigeKnopf ? (
-          <Button
-            ref={knopfRef}
-            aria-label={`${titel} bearbeiten`}
-            aria-describedby={sperrGrund ? grundId : undefined}
-            disabled={sperrGrund != null}
-            onClick={() => setOffen(true)}
-          >
-            Bearbeiten
-          </Button>
-        ) : undefined
+        zusatz != null ? (
+          // Zwei Ziele mit dem Abstand der Leitlinie (≥ 8 / 16 px, `token.marginSM`, LLH-1273).
+          <Flex wrap gap={token.marginSM} align="center">
+            {zusatz}
+            {bearbeitenKnopf}
+          </Flex>
+        ) : (
+          bearbeitenKnopf || undefined
+        )
       }
     >
       {zeigeKnopf && sperrGrund && (
