@@ -10,9 +10,9 @@ Jede Aufgabe per `superpowers:test-driven-development`: erst den roten Test, dan
 
 ## 2. Server-Regel
 
-- [ ] 2.1 `MaterialStatus::ist_ausfall()` und eine Funktion für „aufgebraucht“ in `src/material/` anlegen. Prüfen: Unit-Test über alle fünf Status und den Fall „aufgebraucht“ ist grün.
-- [ ] 2.2 Reinen Kern `einheiten_mit_ausfall` in `src/einsatz/ausfall.rs` nach design.md D1 und D4 bauen und im Fixture-Test `tests/verdichtung_fixture.rs` gegen den Abschnitt `ausfall` prüfen. Prüfen: `cargo test --test verdichtung_fixture` ist erst rot, dann grün.
-- [ ] 2.3 Lader `load_einheiten_mit_ausfall(pool, einsatz_id)` (Einheiten über `einheit::repo::liste`, schmale Abfragen für Personal, Fahrzeuge und Material, ohne Personennamen) samt Repo-Test mit echter DB: aufgelöste Einheit, beendetes Fahrzeug mit Beladung, Material an UHS, Handstatus „nicht verfügbar“. Prüfen: `cargo test einsatz::ausfall` ist grün.
+- [x] 2.1 `MaterialStatus::ist_ausfall()` und eine Funktion für „aufgebraucht“ in `src/material/` anlegen. Prüfen: Unit-Test über alle fünf Status und den Fall „aufgebraucht“ ist grün.
+- [x] 2.2 Reinen Kern `einheiten_mit_ausfall` in `src/einsatz/ausfall.rs` nach design.md D1 und D4 bauen und im Fixture-Test `tests/verdichtung_fixture.rs` gegen den Abschnitt `ausfall` prüfen. Prüfen: `cargo test --test verdichtung_fixture` ist erst rot, dann grün.
+- [x] 2.3 Lader `load_einheiten_mit_ausfall(pool, einsatz_id)` (Einheiten über `einheit::repo::liste`, schmale Abfragen für Personal, Fahrzeuge und Material, ohne Personennamen) samt Repo-Test mit echter DB: aufgelöste Einheit, beendetes Fahrzeug mit Beladung, Material an UHS, Handstatus „nicht verfügbar“. Prüfen: `cargo test einsatz::ausfall` ist grün.
 
 ## 3. Lagemonitor
 

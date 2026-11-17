@@ -151,39 +151,42 @@ interface Fixture {
     erwartet_einheiten: Tripel;
   };
   ausfall: {
-    einheiten: Array<{
-      id: number;
+    faelle: Array<{
       name: string;
-      sortier: number;
-      aufgeloest: boolean;
-      status_kategorie: StatusKategorie | null;
+      einheiten: Array<{
+        id: number;
+        name: string;
+        sortier: number;
+        aufgeloest: boolean;
+        status_kategorie: StatusKategorie | null;
+      }>;
+      personal: Array<{
+        name: string;
+        einheit_id: number | null;
+        status_kategorie: StatusKategorie | null;
+        beendet: boolean;
+      }>;
+      fahrzeuge: Array<{
+        id: number;
+        einheit_id: number | null;
+        status_kategorie: StatusKategorie | null;
+        beendet: boolean;
+      }>;
+      material: Array<
+        Pick<
+          EinsatzMaterial,
+          | 'einheit_id'
+          | 'einsatz_fahrzeug_id'
+          | 'uhs_id'
+          | 'br_id'
+          | 'status'
+          | 'art'
+          | 'menge'
+          | 'ausgegeben'
+        > & { name: string; beendet: boolean }
+      >;
+      erwartet: string[];
     }>;
-    personal: Array<{
-      name: string;
-      einheit_id: number | null;
-      status_kategorie: StatusKategorie | null;
-      beendet: boolean;
-    }>;
-    fahrzeuge: Array<{
-      id: number;
-      einheit_id: number | null;
-      status_kategorie: StatusKategorie | null;
-      beendet: boolean;
-    }>;
-    material: Array<
-      Pick<
-        EinsatzMaterial,
-        | 'einheit_id'
-        | 'einsatz_fahrzeug_id'
-        | 'uhs_id'
-        | 'br_id'
-        | 'status'
-        | 'art'
-        | 'menge'
-        | 'ausgegeben'
-      > & { name: string; beendet: boolean }
-    >;
-    erwartet: string[];
   };
 }
 
@@ -441,63 +444,58 @@ describe('Versorgung und Lagesichtung wie das Fixture', () => {
  * nennen dieselben Einheiten in der Folge der Einheitenliste.
  */
 describe('Fixture: Ausfall je Einheit (LLH-1929)', () => {
-  const a = fixture.ausfall;
   const BEENDET = '2026-11-17 10:00:00';
-  const einheiten = a.einheiten.map(
-    (e) =>
-      ({
-        id: e.id,
-        einsatz_id: 1,
-        name: e.name,
-        sortier: e.sortier,
-        ueber_einheit_id: null,
-        abschnitt_id: null,
-        aufgeloest_at: e.aufgeloest ? BEENDET : null,
-        fahrzeug_mitglieder: [],
-        status: e.status_kategorie
-          ? { quelle: 'hand', kategorie: e.status_kategorie, verteilung: [] }
-          : { quelle: 'ohne', verteilung: [] },
-      }) as unknown as Einheit,
-  );
-  const personal = a.personal.map(
-    (p, i) =>
-      ({
-        id: i + 1,
-        name: p.name,
-        einheit_id: p.einheit_id,
-        fahrzeug_id: null,
-        status_kategorie: p.status_kategorie,
-        beendet_at: p.beendet ? BEENDET : null,
-      }) as unknown as EinsatzPersonal,
-  );
-  const fahrzeuge = a.fahrzeuge.map(
-    (f) =>
-      ({
-        id: f.id,
-        funkrufname: `Fahrzeug ${f.id}`,
-        einheit_id: f.einheit_id,
-        status_kategorie: f.status_kategorie,
-        beendet_at: f.beendet ? BEENDET : null,
-      }) as unknown as EinsatzFahrzeug,
-  );
-  const material = a.material.map(
-    (m, i) =>
-      ({
-        ...m,
-        id: i + 1,
-        bezeichnung: m.name,
-        beendet_at: m.beendet ? BEENDET : null,
-      }) as unknown as EinsatzMaterial,
-  );
+  const rohdaten = (a: Fixture['ausfall']['faelle'][number]) => ({
+    abschnitte: [],
+    einheiten: a.einheiten.map(
+      (e) =>
+        ({
+          id: e.id,
+          einsatz_id: 1,
+          name: e.name,
+          sortier: e.sortier,
+          ueber_einheit_id: null,
+          abschnitt_id: null,
+          aufgeloest_at: e.aufgeloest ? BEENDET : null,
+          fahrzeug_mitglieder: [],
+          status: e.status_kategorie
+            ? { quelle: 'hand', kategorie: e.status_kategorie, verteilung: [] }
+            : { quelle: 'ohne', verteilung: [] },
+        }) as unknown as Einheit,
+    ),
+    personal: a.personal.map(
+      (p, i) =>
+        ({
+          id: i + 1,
+          name: p.name,
+          einheit_id: p.einheit_id,
+          fahrzeug_id: null,
+          status_kategorie: p.status_kategorie,
+          beendet_at: p.beendet ? BEENDET : null,
+        }) as unknown as EinsatzPersonal,
+    ),
+    fahrzeuge: a.fahrzeuge.map(
+      (f) =>
+        ({
+          id: f.id,
+          funkrufname: `Fahrzeug ${f.id}`,
+          einheit_id: f.einheit_id,
+          status_kategorie: f.status_kategorie,
+          beendet_at: f.beendet ? BEENDET : null,
+        }) as unknown as EinsatzFahrzeug,
+    ),
+    material: a.material.map(
+      (m, i) =>
+        ({
+          ...m,
+          id: i + 1,
+          bezeichnung: m.name,
+          beendet_at: m.beendet ? BEENDET : null,
+        }) as unknown as EinsatzMaterial,
+    ),
+  });
 
-  it('nennt dieselben Einheiten in derselben Folge wie der Server', () => {
-    const namen = einheitenMitAusfall({
-      abschnitte: [],
-      einheiten,
-      personal,
-      fahrzeuge,
-      material,
-    }).map((e) => e.name);
-    expect(namen).toEqual(a.erwartet);
+  it.each(fixture.ausfall.faelle.map((f) => [f.name, f] as const))('%s', (_name, f) => {
+    expect(einheitenMitAusfall(rohdaten(f)).map((e) => e.name)).toEqual(f.erwartet);
   });
 });
