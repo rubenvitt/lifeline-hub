@@ -74,7 +74,8 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
 
 1. In der Kopfzeile auf den Namen des Einsatzes tippen. Das Menü listet die laufenden Einsätze;
    unter jedem Namen stehen Einsatzart, Einsatznummer und Ort, soweit sie vorliegen. Bei einer
-   Übung entfällt die Einsatzart, die Marke „ÜBUNG“ nennt sie schon.
+   Übung entfällt die Einsatzart, die Marke „ÜBUNG“ nennt sie schon. Hat ein Einsatz keine
+   Nummer, steht an ihrer Stelle sein Beginn, etwa „seit 14nov26“.
 2. Einen anderen Einsatz wählen, oder „Alle Einsätze …“ für die Einsatzliste. Der andere Einsatz
    öffnet in demselben Modul, auf dessen Startseite: wer in „Fahrzeuge“ wechselt, sieht dort die
    Fahrzeugliste des anderen Einsatzes. Ein geöffnetes Fahrzeug, eine Auswahl oder ein Filter

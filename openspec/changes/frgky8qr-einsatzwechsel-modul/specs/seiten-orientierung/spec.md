@@ -9,7 +9,7 @@ ist. Ein Klick darauf SHALL
 das Menü schließen, ohne die Seite zu wechseln. Jeder Einsatz SHALL eine Nebenzeile mit
 Einsatzart, Einsatznummer und Ort tragen, soweit sie vorliegen; bei einer Übung entfällt die
 Einsatzart, weil die Übungsmarke sie schon nennt, und fehlt jede Nummer, steht an ihrer Stelle
-das Beginndatum. Der Wechsler SHALL keinen Eintrag zur Verwaltung oder zu den Stammdaten führen.
+„seit“ mit dem Beginndatum in der Zeitdarstellung der App. Der Wechsler SHALL keinen Eintrag zur Verwaltung oder zu den Stammdaten führen.
 
 #### Scenario: Klick auf den eigenen Einsatz
 
@@ -21,7 +21,8 @@ das Beginndatum. Der Wechsler SHALL keinen Eintrag zur Verwaltung oder zu den St
 - **WHEN** zwei aktive Einsätze „Stadtfest“ heißen, einer als Sanitätsdienst mit Nummer
   E-2026-0431 am Ort „Markt“, einer als Übung ohne Nummer, begonnen am 14.11.
 - **THEN** zeigt der Wechsler beim ersten „Sanitätsdienst · E-2026-0431 · Markt“ und beim zweiten
-  die Marke „ÜBUNG“ mit der Nebenzeile „seit 14.11.“
+  die Marke „ÜBUNG“ mit der Nebenzeile „seit 14nov26“ (bei der Darstellung „Datum und Uhrzeit“
+  „seit 14.11.26“)
 
 ## ADDED Requirements
 

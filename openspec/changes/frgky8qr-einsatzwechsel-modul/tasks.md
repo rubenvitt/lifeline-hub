@@ -13,7 +13,7 @@ per TDD.
 
 ## 2. Nebenzeile (D2)
 
-- [ ] 2.1 Reiner Helfer für die Nebenzeile (Art außer bei Übung, Kennung oder „seit TT.MM.“, Ort) mit Unit-Tests; Wechsler nutzt ihn; `EinsatzSwitcher.test.tsx` für Sanitätsdienst mit Nummer und Übung ohne Nummer
+- [x] 2.1 Reiner Helfer für die Nebenzeile (Art außer bei Übung, Kennung oder „seit TT.MM.“, Ort) mit Unit-Tests; Wechsler nutzt ihn; `EinsatzSwitcher.test.tsx` für Sanitätsdienst mit Nummer und Übung ohne Nummer
 
 ## 3. Doku und Verifikation
 

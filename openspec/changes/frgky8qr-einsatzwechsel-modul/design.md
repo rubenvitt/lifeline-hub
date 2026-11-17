@@ -52,8 +52,11 @@ sichtbar in einer Sackgasse. Verworfen.
 ### D2 — Nebenzeile
 
 `nebenzeile(e)` = `[art, nummer, ort]` mit `art = isUebung(e) ? null : EINSATZART_LABELS[e.einsatzart]`,
-`nummer = einsatzKennung(e) ?? \`seit ${datum(e.begonnen_at)}\``, `ort = e.einsatzort?.trim()`.
-Das Datum in Zone und Darstellung der App (vorhandener Zeit-Helfer, Format „TT.MM.“). Ein
+`nummer = einsatzKennung(e) ?? \`seit ${datum(e.begonnen_at, konv)}\``, `ort = e.einsatzort?.trim()`.
+Das Datum kommt aus der Rolle `datum` des Zeitkerns (`anzeige/zeitDarstellung.ts`), in Zone und
+Darstellung der App: taktisch `14nov26`, sonst `14.11.26`. Eine eigene Form „TT.MM.“ wäre eine
+zweite Schreibweise, die der Zeitdarstellungs-Wächter zu Recht verbietet (Umsetzung 17.11.2026).
+Ein
 gemeinsamer reiner Helfer, den die Palette für ihre Einsatz-Zeilen mitnutzen kann, falls sie
 eine Nebenzeile zeigt.
 

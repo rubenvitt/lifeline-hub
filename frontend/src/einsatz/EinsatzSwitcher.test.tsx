@@ -231,11 +231,12 @@ describe('EinsatzSwitcher', () => {
         .getByRole('menuitem', { name })
         .querySelector('[data-lfh="wechsler-nebenzeile"]')?.textContent;
     expect(neben(/E-2026-0431/)).toBe('Sanitätsdienst · E-2026-0431 · Markt');
-    // Die Übung trägt schon die Marke „ÜBUNG“: keine zweite Nennung der Art.
-    expect(neben(/Stadtfest Probe/)).toBe('Markt');
+    // Die Übung trägt schon die Marke „ÜBUNG“: keine zweite Nennung der Art. Ohne Nummer steht
+    // der Beginn in der Zeitdarstellung der App (Vorgabe taktisch) an ihrer Stelle.
+    expect(neben(/Stadtfest Probe/)).toBe('seit 23mai26 · Markt');
   });
 
-  it('nennt je Einsatz Nummer und Ort in einer Nebenzeile, soweit vorhanden', async () => {
+  it('nennt je Einsatz Nummer und Ort, ohne Nummer den Beginn', async () => {
     server.use(
       http.get('/api/einsaetze', () =>
         HttpResponse.json([
@@ -255,8 +256,8 @@ describe('EinsatzSwitcher', () => {
     expect(
       within(menue)
         .getByRole('menuitem', { name: /Ohne Angaben/ })
-        .querySelector('[data-lfh="wechsler-nebenzeile"]'),
-    ).toBeNull();
+        .querySelector('[data-lfh="wechsler-nebenzeile"]')?.textContent,
+    ).toMatch(/seit 23mai26$/);
   });
 
   /**

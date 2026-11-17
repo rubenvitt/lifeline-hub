@@ -7,6 +7,7 @@ import { globalKeys } from '../api/queryKeys';
 import { einsatzPfad } from '../routing/deeplinks';
 import { farbenDunkel } from '../theme/tokens';
 import { einsatzNebenzeile } from './einsatzNebenzeile';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { isUebung } from './einsatzart';
 import { modulAusPfad } from './modulRegistry';
 import { UebungsMarke, schriftGroesse } from '../components/instrument';
@@ -45,6 +46,7 @@ export default function EinsatzSwitcher({
   const { token } = theme.useToken();
   // Das Menü folgt dem Modus, nicht dem dunklen Kopf: Farben aus den Rollen des Modus.
   const farben = useModusFarben();
+  const { konventionen } = useAnzeigeKonventionen();
   const { data: einsaetze = [] } = useQuery({
     queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
@@ -57,8 +59,8 @@ export default function EinsatzSwitcher({
   const eigenerKey = `einsatz-${aktuellId}`;
   const items: MenuProps['items'] = [
     ...aktive.map((e) => {
-      // Nebenzeile „Einsatzart · Nummer · Ort“ (LFH-954, LLH-1821 D2).
-      const neben = einsatzNebenzeile(e);
+      // Nebenzeile „Einsatzart · Nummer · Ort“, ohne Nummer „seit <Beginn>“ (LFH-954, LLH-1821 D2).
+      const neben = einsatzNebenzeile(e, konventionen);
       // Eine Übung trägt die Übungsmarke vor dem Namen (LLH-1725, Spec `uebungsmarke`).
       const name = isUebung(e) ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
