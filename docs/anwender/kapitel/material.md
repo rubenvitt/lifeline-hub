@@ -334,10 +334,11 @@ Lagebericht. Erneut disponiert, steht er wieder in der Liste, mit
 derselben Menge und demselben Status, aber ohne Ort. „Material disponieren“
 legt dagegen immer eine neue Zeile an.
 
-„Rückgängig“ direkt nach dem Herausnehmen nimmt es zurück, als wäre nichts geschehen: dieselbe
-Menge, derselbe Status, derselbe Ort und dieselbe Dispositionszeit. Ist die Einheit inzwischen
-aufgelöst, das Fahrzeug entlassen oder die UHS oder der Bereitstellungsraum nicht mehr aktiv, kommt
-der Posten ohne Ort zurück; der Hinweis über der Liste und das Einsatztagebuch nennen den Ort. Das
+„Rückgängig“ direkt nach dem Herausnehmen holt den Posten zurück, wie er war: dieselbe Menge,
+derselbe Status, derselbe Ort und dieselbe Dispositionszeit. Stornieren lässt er sich danach nicht
+mehr, und das Einsatztagebuch behält das Herausnehmen. Ist die Einheit inzwischen aufgelöst, das
+Fahrzeug entlassen oder die UHS oder der Bereitstellungsraum nicht mehr aktiv, kommt der Posten ohne
+Ort zurück; der Hinweis über der Liste und das Einsatztagebuch nennen den Ort. Das
 gelingt nur der Person, die herausgenommen hat, und nur in den ersten zehn Minuten. Ein Gerät mit
 Bestandsnummer, das inzwischen neu disponiert ist, kommt so nicht zurück; die Meldung nennt den
 Grund. Danach führt nur „Erneut disponieren“ zurück.
@@ -369,8 +370,8 @@ Stornieren stehen im Einsatztagebuch, mit alter und neuer Menge bzw. altem und n
   Tauchpumpen für Keller Hauptstraße»“.
 - Von einer Nachforderung lösen: „Material «Tauchpumpe THW» (×1) von Nachforderung «3 Tauchpumpen
   für Keller Hauptstraße» gelöst“.
-- Rückgängig nach dem Herausnehmen: „Material «Wolldecke» (×20): Herausnahme zurückgenommen“,
-  ohne Ort „…, ohne Einheit «Staffel A» (inzwischen aufgelöst)“.
+- Rückgängig nach dem Herausnehmen: „Material «Wolldecke» (×20): Herausnahme zurückgenommen, Ort
+  Einheit «Staffel A»“, ohne Ort „…, ohne Einheit «Staffel A» (inzwischen aufgelöst)“.
 
 Eine Bemerkung ändert das Einsatztagebuch nicht.
 

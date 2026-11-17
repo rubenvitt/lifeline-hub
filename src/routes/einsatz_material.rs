@@ -764,6 +764,10 @@ pub async fn zuruecknehmen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let ort = match ergebnis.ort {
+            Some(o) => Some(ort::ort_text_tx(conn, einsatz_id, Some(o)).await?),
+            None => None,
+        };
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
@@ -772,6 +776,7 @@ pub async fn zuruecknehmen(
             &crate::material::etb_text_herausnahme_zurueckgenommen(
                 &anzeige.bezeichnung,
                 anzeige.menge,
+                ort.as_deref(),
                 &ergebnis.ausgelassen,
             ),
         )

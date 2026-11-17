@@ -509,13 +509,19 @@ pub fn etb_text_aus_einsatz_genommen(
 }
 
 /// System-ETB der Rücknahme einer Herausnahme (LLH-1923, Spec `kraefte-entlassung`): nennt den
-/// Ort, der nicht zurückkam.
+/// Ort, an den der Posten zurückkam (`ort`, im Wortlaut von `ort::ort_text_tx`), und den, der
+/// nicht zurückkam. Der Ort kommt aus dem Vorzustand des Clients; im ETB steht er darum immer,
+/// wie bei jedem Ortswechsel (Spec `material-modell`).
 pub fn etb_text_herausnahme_zurueckgenommen(
     bezeichnung: &str,
     menge: i64,
+    ort: Option<&str>,
     ausgelassen: &[crate::fahrzeug::RuecknahmeAusgelassen],
 ) -> String {
-    let text = format!("Material «{bezeichnung}» (×{menge}): Herausnahme zurückgenommen");
+    let mut text = format!("Material «{bezeichnung}» (×{menge}): Herausnahme zurückgenommen");
+    if let Some(ort) = ort {
+        text.push_str(&format!(", Ort {ort}"));
+    }
     if ausgelassen.is_empty() {
         return text;
     }
@@ -688,13 +694,18 @@ mod etb_text_tests {
     #[test]
     fn herausnahme_zurueckgenommen_nennt_den_ausgelassenen_ort() {
         assert_eq!(
-            etb_text_herausnahme_zurueckgenommen("Wolldecke", 20, &[]),
+            etb_text_herausnahme_zurueckgenommen("Wolldecke", 20, None, &[]),
             "Material «Wolldecke» (×20): Herausnahme zurückgenommen"
+        );
+        assert_eq!(
+            etb_text_herausnahme_zurueckgenommen("Wolldecke", 20, Some("Einheit «Staffel A»"), &[]),
+            "Material «Wolldecke» (×20): Herausnahme zurückgenommen, Ort Einheit «Staffel A»"
         );
         assert_eq!(
             etb_text_herausnahme_zurueckgenommen(
                 "Wolldecke",
                 20,
+                None,
                 &[crate::fahrzeug::RuecknahmeAusgelassen {
                     bezeichnung: "Einheit «Staffel A»".into(),
                     grund: "inzwischen aufgelöst".into(),

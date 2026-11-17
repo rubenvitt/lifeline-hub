@@ -1082,35 +1082,59 @@ pub async fn zuruecknehmen_tx(
     let Some(ziel) = ort_davor else {
         return Ok(ergebnis);
     };
+    let (art, grund) = match ziel {
+        MaterialOrt::Einheit(_) => ("Einheit", "inzwischen aufgelöst"),
+        MaterialOrt::Fahrzeug(_) => ("Fahrzeug", "inzwischen entlassen oder storniert"),
+        MaterialOrt::Uhs(_) => ("UHS", "nimmt kein Material mehr auf"),
+        MaterialOrt::Bereitstellungsraum(_) => {
+            ("Bereitstellungsraum", "nimmt kein Material mehr auf")
+        }
+    };
+    let fehlt = |bezeichnung: String, grund: &str| crate::fahrzeug::RuecknahmeAusgelassen {
+        bezeichnung,
+        grund: grund.into(),
+    };
+    // Eine spurlos aufgelöste Einheit ist gelöscht, und ihre ID kann an eine danach gebildete
+    // gehen (`einsatz_einheit.id` ohne AUTOINCREMENT; UHS und Raum zählen weiter, Fahrzeuge
+    // bleiben stehen). Eine Einheit, die jünger ist als das Herausnehmen, war nie der Ort davor
+    // (Review vor dem PR).
+    if let MaterialOrt::Einheit(id) = ziel {
+        let juenger: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM einsatz_einheit \
+             WHERE id = ? AND einsatz_id = ? AND angelegt_at > ?)",
+        )
+        .bind(id)
+        .bind(einsatz_id)
+        .bind(&vorzustand.entlassen_at)
+        .fetch_one(&mut *conn)
+        .await?;
+        if juenger {
+            ergebnis
+                .ausgelassen
+                .push(fehlt(art.into(), NICHT_MEHR_VORHANDEN));
+            return Ok(ergebnis);
+        }
+    }
     match ort::set_ort_tx(conn, einsatz_id, em_id, Some(ziel)).await {
         Ok(_) => ergebnis.ort = Some(ziel),
         Err(AppError::Conflict(_) | AppError::UnprocessableEntity(_) | AppError::NotFound) => {
-            let (art, grund) = match ziel {
-                MaterialOrt::Einheit(_) => ("Einheit", "inzwischen aufgelöst"),
-                MaterialOrt::Fahrzeug(_) => ("Fahrzeug", "inzwischen entlassen oder storniert"),
-                MaterialOrt::Uhs(_) => ("UHS", "nimmt kein Material mehr auf"),
-                MaterialOrt::Bereitstellungsraum(_) => {
-                    ("Bereitstellungsraum", "nimmt kein Material mehr auf")
-                }
-            };
-            // Spurlos aufgelöst und darum gelöscht: den Namen kennt niemand mehr, die Lücke
-            // steht trotzdem in der Antwort (wie beim Fahrzeug).
-            let bezeichnung = match ort::ort_text_tx(conn, einsatz_id, Some(ziel)).await {
-                Ok(text) => text,
-                Err(AppError::NotFound) => art.to_string(),
+            // Gelöscht oder nie im Einsatz: den Namen kennt niemand, die Lücke steht trotzdem in
+            // der Antwort, ohne einen Grund zu erfinden.
+            let eintrag = match ort::ort_text_tx(conn, einsatz_id, Some(ziel)).await {
+                Ok(text) => fehlt(text, grund),
+                Err(AppError::NotFound) => fehlt(art.into(), NICHT_MEHR_VORHANDEN),
                 Err(e) => return Err(e),
             };
-            ergebnis
-                .ausgelassen
-                .push(crate::fahrzeug::RuecknahmeAusgelassen {
-                    bezeichnung,
-                    grund: grund.into(),
-                });
+            ergebnis.ausgelassen.push(eintrag);
         }
         Err(e) => return Err(e),
     }
     Ok(ergebnis)
 }
+
+/// Grund für einen Ort, den es nicht mehr gibt (gelöscht, oder seine ID gehört inzwischen einem
+/// anderen Ort).
+const NICHT_MEHR_VORHANDEN: &str = "nicht mehr vorhanden";
 
 /// Nimmt Material, das aus dem Einsatz genommen oder storniert war, wieder auf (design.md D7):
 /// Endzustand weg, Dispositionszeit neu. Menge und Status bleiben, sie beschreiben das Material
@@ -3061,6 +3085,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (einsatz, einheit, uhs, fahrzeug, em) = decken_an_der_einheit(&pool).await;
         let benutzer = erster_benutzer(&pool).await;
+        let br = br_nord(&pool, einsatz, benutzer).await;
         let fall =
             |ort: MaterialOrt, sql: &'static str, id: i64, bez: &'static str, gr: &'static str| {
                 (ort, sql, id, bez, gr)
@@ -3086,6 +3111,13 @@ mod tests {
                 "UPDATE uhs SET status = 'aufgeloest' WHERE id = ?",
                 uhs,
                 "UHS «Turnhalle»",
+                "nimmt kein Material mehr auf",
+            ),
+            fall(
+                MaterialOrt::Bereitstellungsraum(br),
+                "UPDATE bereitstellungsraum SET status = 'aufgeloest' WHERE id = ?",
+                br,
+                "Bereitstellungsraum «BR Nord»",
                 "nimmt kein Material mehr auf",
             ),
         ] {
@@ -3151,5 +3183,63 @@ mod tests {
         }
         let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.beendet_at.as_deref(), Some(RAUS));
+    }
+
+    async fn br_nord(pool: &SqlitePool, einsatz: i64, benutzer: i64) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'BR Nord', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Review vor dem PR: eine spurlos aufgelöste Einheit ist gelöscht. Ihre ID kann an eine
+    /// danach gebildete Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT); der Posten
+    /// landet dann nie dort, sondern kommt ohne Ort zurück, und `ausgelassen` nennt keinen
+    /// fremden Namen.
+    #[tokio::test]
+    async fn ruecknahme_nimmt_keine_neue_einheit_mit_der_alten_id() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, einheit, _, _, em) = decken_an_der_einheit(&pool).await;
+        let benutzer = erster_benutzer(&pool).await;
+        let nur_einheit = crate::fahrzeug::RuecknahmeAusgelassen {
+            bezeichnung: "Einheit".into(),
+            grund: "nicht mehr vorhanden".into(),
+        };
+
+        // Gelöscht, ohne Nachfolger: der Ort fehlt, ohne Namen.
+        let v = nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let r = nimm_zurueck(&pool, einsatz, em, benutzer, KURZ_DANACH, &v)
+            .await
+            .unwrap();
+        assert_eq!((r.ort, r.ausgelassen), (None, vec![nur_einheit.clone()]));
+
+        // Dieselbe ID an einer danach gebildeten Einheit: der Posten bleibt ohne Ort.
+        nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (id, einsatz_id, name, angelegt_at) \
+             VALUES (?, ?, 'Trupp B', '2026-11-17 10:03:00')",
+        )
+        .bind(einheit)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let r = nimm_zurueck(&pool, einsatz, em, benutzer, KURZ_DANACH, &v)
+            .await
+            .unwrap();
+        assert_eq!((r.ort, r.ausgelassen), (None, vec![nur_einheit]));
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!((a.ort(), a.beendet_at), (None, None));
     }
 }

@@ -32,13 +32,14 @@ zurücknehmen“, beim Material „Herausnahme von Material zurücknehmen“.
 
 „Rückgängig“ nach „Aus dem Einsatz nehmen“ SHALL den Posten in einer Transaktion in den Zustand
 davor zurücknehmen: aktiv, mit Menge, Status, Dispositionszeit und seinem Ort. Der Storno MUST danach
-gesperrt bleiben. Die Rücknahme MUST einen ETB-Eintrag „Herausnahme zurückgenommen“ schreiben und
-MUST dieselben Live-Meldungen senden wie das Herausnehmen. Sie MUST kein Schreibrecht über das Recht
+gesperrt bleiben. Die Rücknahme MUST einen ETB-Eintrag „Herausnahme zurückgenommen“ schreiben, der
+den Ort nennt, an den der Posten zurückkam, und MUST dieselben Live-Meldungen senden wie das
+Herausnehmen. Sie MUST kein Schreibrecht über das Recht
 auf Material hinaus verlangen.
 
 #### Scenario: Herausnehmen und Rückgängig
 - **WHEN** der Posten „Wolldecke“ mit Menge 20, Status „im Einsatz“, an der Einheit „Staffel A“ aus dem Einsatz genommen wird und direkt danach „Rückgängig“ gewählt wird
-- **THEN** steht er wieder in der Liste, mit Menge 20 und Status „im Einsatz“ an „Staffel A“, mit der Dispositionszeit von vorher, und im ETB steht „Material «Wolldecke» (×20): Herausnahme zurückgenommen“
+- **THEN** steht er wieder in der Liste, mit Menge 20 und Status „im Einsatz“ an „Staffel A“, mit der Dispositionszeit von vorher, und im ETB steht „Material «Wolldecke» (×20): Herausnahme zurückgenommen, Ort Einheit «Staffel A»“
 
 #### Scenario: Storno nach der Rücknahme
 - **WHEN** ein Posten kurz nach dem Disponieren aus dem Einsatz genommen und zurückgenommen wird und danach jemand ihn stornieren will
@@ -47,9 +48,10 @@ auf Material hinaus verlangen.
 ### Requirement: Rücknahme von Material lässt einen veränderten Ort aus
 
 Nimmt der Ort des Postens ihn nicht mehr auf (Einheit aufgelöst, Fahrzeug entlassen oder storniert,
-UHS oder Bereitstellungsraum nicht mehr aktiv), MUST die Rücknahme den Posten trotzdem aktiv machen,
-ohne Ort, und den Ort mit Grund in ihrer Antwort nennen. Der Hinweis MUST ihn in Worten zeigen, das
-ETB MUST ihn nach „ohne“ nennen.
+UHS oder Bereitstellungsraum nicht mehr aktiv) oder gibt es ihn nicht mehr, MUST die Rücknahme den
+Posten trotzdem aktiv machen, ohne Ort, und den Ort mit Grund in ihrer Antwort nennen. Der Hinweis
+MUST ihn in Worten zeigen, das ETB MUST ihn nach „ohne“ nennen. Eine Einheit, die nach dem
+Herausnehmen gebildet wurde, MUST NOT den Posten bekommen.
 
 #### Scenario: Fahrzeug inzwischen entlassen
 - **WHEN** ein Posten auf dem Fahrzeug „Florian 1-83-1“ aus dem Einsatz genommen, danach das Fahrzeug entlassen und dann „Rückgängig“ gewählt wird
@@ -58,6 +60,10 @@ ETB MUST ihn nach „ohne“ nennen.
 #### Scenario: Einheit inzwischen aufgelöst
 - **WHEN** die Einheit eines herausgenommenen Postens aufgelöst wird und danach „Rückgängig“ gewählt wird
 - **THEN** ist der Posten aktiv ohne Ort, und das ETB nennt die Einheit nach „ohne“
+
+#### Scenario: Einheit spurlos aufgelöst, eine neue gebildet
+- **WHEN** die Einheit eines herausgenommenen Postens spurlos aufgelöst und danach eine neue Einheit gebildet wird und dann „Rückgängig“ gewählt wird
+- **THEN** ist der Posten aktiv ohne Ort, nicht in der neuen Einheit, und der Hinweis nennt „Einheit (nicht mehr vorhanden)“
 
 ### Requirement: Rücknahme von Material nur direkt nach dem Herausnehmen
 

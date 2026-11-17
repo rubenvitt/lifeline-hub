@@ -71,9 +71,16 @@ vorzustand)`:
    `zuletzt_entlassen_at` bleiben; Letzteres hält die Storno-Sperre wie beim Fahrzeug.
 4. **Ort:** Ist im Vorzustand einer gesetzt, `ort::set_ort_tx(conn, einsatz_id, em_id, Some(ort))`.
    `Conflict`, `UnprocessableEntity` und `NotFound` des Ziels → Posten bleibt ohne Ort, Eintrag in
-   `ausgelassen` mit dem Ortsnamen (`ort_text_tx`, bei gelöschter Einheit nur „Einheit“) und einem
-   Grund je Art: „inzwischen aufgelöst“ (Einheit), „inzwischen entlassen oder storniert“ (Fahrzeug),
-   „nimmt kein Material mehr auf“ (UHS, Raum). Ein anderer Fehler bricht die Transaktion ab.
+   `ausgelassen` mit dem Ortsnamen (`ort_text_tx`) und einem Grund je Art: „inzwischen aufgelöst“
+   (Einheit), „inzwischen entlassen oder storniert“ (Fahrzeug), „nimmt kein Material mehr auf“ (UHS,
+   Raum). Gibt es den Ort nicht mehr (`ort_text_tx` → `NotFound`, etwa eine spurlos aufgelöste und
+   darum gelöschte Einheit), nur die Art mit „nicht mehr vorhanden“: kein erfundener Grund. Ein
+   anderer Fehler bricht die Transaktion ab.
+5. **Neue Einheit mit alter ID** (Review vor dem PR): `einsatz_einheit.id` hat kein AUTOINCREMENT,
+   eine gelöschte Einheit gibt ihre ID an die nächste. Ist die Einheit des Vorzustands jünger als
+   `entlassen_at` (`angelegt_at`), war sie nie der Ort davor: ausgelassen mit „nicht mehr
+   vorhanden“, ohne ihren Namen. UHS und Raum zählen mit AUTOINCREMENT, Fahrzeugzeilen bleiben
+   stehen. Dasselbe Loch hat der Einheit-Zweig der Fahrzeug-Rücknahme (Folgeaufgabe).
 
 Weil `set_ort_tx` bei einem Fehler nichts schreibt und der Endzustand schon aufgehoben ist, bleibt der
 Posten bei einem ausgelassenen Ort aktiv ohne Ort (Entscheidung am Checkpoint: nicht 409).
@@ -87,8 +94,10 @@ den Riegel nicht kennt und dem Block dient.
 Gate `EinsatzSchreibzugriff<Material>` (ADR-0005), kein `fordere_zielmodul`: Den Ort setzt auch der
 PATCH nur mit dem Recht auf Material. In einer `write_retry!`-Transaktion: `zuruecknehmen_tx`, Anzeige
 laden, `system_audit_tx` mit `material::etb_text_herausnahme_zurueckgenommen(bezeichnung, menge,
-ausgelassen)` → „Material «Wolldecke» (×20): Herausnahme zurückgenommen[, ohne Einheit «Staffel A»
-(inzwischen aufgelöst)]“. Nach dem Commit `sse_material` und `sse_ort` für den zurückgewonnenen Ort.
+ort, ausgelassen)` → „Material «Wolldecke» (×20): Herausnahme zurückgenommen[, Ort Einheit «Staffel
+A»][, ohne Einheit «Staffel A» (inzwischen aufgelöst)]“. Den Ort, an den der Posten zurückkam, nennt
+der Eintrag immer: Er kommt aus dem Vorzustand des Clients, und ein Ortswechsel ohne Spur im ETB
+widerspräche Spec `material-modell` (Review vor dem PR). Nach dem Commit `sse_material` und `sse_ort` für den zurückgewonnenen Ort.
 `notify_nachforderung` nicht: Das Herausnehmen meldet die Nachforderung auch nicht.
 
 ### D4 Oberfläche wie die Fahrzeugseite
