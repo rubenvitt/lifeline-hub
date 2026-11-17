@@ -232,6 +232,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | `src/aufbewahrung` | Lesender Archivpfad des Org-Admins: Übersicht, pseudonyme Archivakte, Wiederherstellen, Schwärzungsantrag, Download des verschlüsselten Archivs | `/api/aufbewahrung` |
 | `src/backup` | Konsistente Sicherung (auch verschlüsselt mit `age`), Download, Restore, Scheduler | `GET /api/backup`, CLI `backup`/`restore` |
 | `src/storno.rs` | Soft-Delete einer Zeile genau einmal, mit 404/409-Semantik | von den Fachmodulen genutzt |
+| `src/feld_cas.rs` | Feldvergleich beim Speichern (`erwartet`): Altwerte je Feld gegen den Stand prüfen, 409 bei fremder Änderung, 422 bei unvollständigem Paar | genutzt von Einsatzkopf, Einheit, Führungsstelle, Personendaten |
 
 ### Plattform & Infrastruktur
 
