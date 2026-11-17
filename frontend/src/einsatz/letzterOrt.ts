@@ -10,7 +10,7 @@
  * JE BENUTZER und MIT FRIST einer Schicht, aus demselben Grund wie `zuletztModule.ts`: am geteilten
  * Fükw-Rechner führte der Rückweg sonst in den Einsatz der vorigen Schicht.
  */
-import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
+import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 import { einsatzPfad } from '../routing/deeplinks';
 
 /** Lebensdauer ab dem letzten Besuch: eine Schichtlänge, wie `ZULETZT_FRIST_MS`. */
@@ -35,6 +35,20 @@ function gehoertZumEinsatz(ort: LetzterOrt): boolean {
 
 export function merkeLetztenOrt(benutzerId: number, ort: LetzterOrt, jetzt = Date.now()): void {
   sicherSchreiben(schluessel(benutzerId), JSON.stringify({ ...ort, at: jetzt }));
+}
+
+/**
+ * Setzt den gemerkten Ort auf `ort` zurück, `null` vergisst ihn. Für den Rahmen, wenn eine Seite
+ * erst nach dem Laden meldet, dass es ihr Objekt nicht (mehr) gibt (LLH-1827,
+ * `nichtGefundenContext.ts`): ihre Adresse hatte er bei der Ankunft schon gemerkt.
+ */
+export function stelleLetztenOrtWieder(
+  benutzerId: number,
+  ort: LetzterOrt | null,
+  jetzt = Date.now(),
+): void {
+  if (ort) merkeLetztenOrt(benutzerId, ort, jetzt);
+  else sicherEntfernen(schluessel(benutzerId));
 }
 
 /** Der gemerkte Ort, oder `null` (nichts gemerkt, abgelaufen, fremder Inhalt). */

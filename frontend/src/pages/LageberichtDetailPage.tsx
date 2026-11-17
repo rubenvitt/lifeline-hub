@@ -2,7 +2,7 @@ import { Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 
 import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -21,6 +21,7 @@ import DokumentEntwurf, { type AbschnittAktion } from '../entwurf/DokumentEntwur
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import { useDokumentFreigabe } from '../entwurf/useDokumentFreigabe';
 import FormularEingehaengt from '../components/FormularEingehaengt';
+import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
 import AbschnittUebernahme from '../lageberichte/AbschnittUebernahme';
 import LeereAbschnitteFuellen from '../lageberichte/LeereAbschnitteFuellen';
 import UebernahmeStand from '../lageberichte/UebernahmeStand';
@@ -265,10 +266,15 @@ function LageberichtDetail() {
     },
   });
 
-  // Ungültige Lagebericht-ID → zurück zur Liste.
-  if (!idGueltig) {
-    return <Navigate to={lageberichtePfad(einsatzId)} replace />;
-  }
+  // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`), ohne stille Weiterleitung.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diesen Lagebericht gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zu den Lageberichten', pfad: lageberichtePfad(einsatzId) }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || berichtQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -276,8 +282,24 @@ function LageberichtDetail() {
       </div>
     );
   }
-  if (berichtQuery.isError || !berichtQuery.data || !einsatzQuery.data) {
-    return <Typography.Text type="danger">Lagebericht nicht gefunden.</Typography.Text>;
+  if (istNichtGefunden(berichtQuery.error)) return nichtGefunden;
+  // Ein anderer Abruffehler, auch des Einsatzes (den fängt meist schon der Rahmen), bietet den
+  // neuen Versuch an.
+  if (!berichtQuery.data || !einsatzQuery.data) {
+    return (
+      <SeitenFehler
+        text={
+          einsatzQuery.isError
+            ? 'Einsatz nicht gefunden oder kein Zugriff'
+            : 'Lagebericht konnte nicht geladen werden'
+        }
+        ursache={einsatzQuery.isError ? einsatzQuery.error : berichtQuery.error}
+        onWiederholen={() => {
+          if (einsatzQuery.isError) void einsatzQuery.refetch();
+          void berichtQuery.refetch();
+        }}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const bericht = berichtQuery.data;

@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { LETZTER_ORT_FRIST_MS, leseLetztenOrt, merkeLetztenOrt } from './letzterOrt';
+import {
+  LETZTER_ORT_FRIST_MS,
+  leseLetztenOrt,
+  merkeLetztenOrt,
+  stelleLetztenOrtWieder,
+} from './letzterOrt';
 
 const A = 3;
 const B = 4;
@@ -50,5 +55,19 @@ describe('letzterOrt', () => {
     expect(leseLetztenOrt(A, 2)).toBeNull();
     merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/6/etb' }, 1);
     expect(leseLetztenOrt(A, 2)).toBeNull();
+  });
+
+  // Eine Detailseite erfährt erst nach dem Laden, dass es ihr Objekt nicht gibt (LLH-1827): der
+  // Rahmen stellt dann den Ort davor wieder her.
+  it('stellt einen früheren Ort wieder her', () => {
+    merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/5/personen/999' }, 1000);
+    stelleLetztenOrtWieder(A, { einsatzId: 5, pfad: '/einsaetze/5/ueberblick' }, 1000);
+    expect(leseLetztenOrt(A, 2000)).toEqual({ einsatzId: 5, pfad: '/einsaetze/5/ueberblick' });
+  });
+
+  it('vergisst den Ort, wenn davor keiner gemerkt war', () => {
+    merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/5/personen/999' }, 1000);
+    stelleLetztenOrtWieder(A, null);
+    expect(leseLetztenOrt(A, 2000)).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { erwarteNichtGefunden, MarkenRahmen } from '../test/nichtGefunden';
 import { waehle } from '../test/auswahlListe';
 import { adminFixture, benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import type { EinsatzAnzeige, EinsatzPersonal } from '../api/types';
@@ -67,6 +68,8 @@ interface Aufbau {
   perioden?: unknown[];
   /** Der Statuskatalog scheitert (500); `abgerufen` hält fest, dass er gefragt wurde. */
   statusFehler?: { abgerufen: boolean };
+  /** Marke „nicht als letzten Ort merken“ des Einsatzrahmens (`test/nichtGefunden.tsx`). */
+  marke?: { current: boolean };
 }
 
 let requests: string[];
@@ -137,10 +140,12 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
     }),
   );
   return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/personal/:epId" element={<EinsatzkraftPage />} />
-      <Route path="/einsaetze/:id/personal" element={<Ort />} />
-    </Routes>,
+    <MarkenRahmen marke={a.marke ?? { current: false }}>
+      <Routes>
+        <Route path="/einsaetze/:id/personal/:epId" element={<EinsatzkraftPage />} />
+        <Route path="/einsaetze/:id/personal" element={<Ort />} />
+      </Routes>
+    </MarkenRahmen>,
     { route },
   );
 }
@@ -208,9 +213,12 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
     );
   });
 
-  it('leitet eine ungültige ID zur Personalliste um', async () => {
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4): keine
+  // stille Weiterleitung, dasselbe Muster wie bei einer unbekannten Person.
+  it('meldet eine ungültige ID wie eine unbekannte, statt still zur Personalliste umzuleiten', async () => {
     renderAnsicht('/einsaetze/7/personal/abc');
-    expect(await screen.findByTestId('liste')).toHaveTextContent('/einsaetze/7/personal');
+    await erwarteNichtGefunden({ titel: 'Nicht (mehr) im Einsatz', knopf: 'Zur Personalliste' });
+    expect(screen.queryByTestId('liste')).toBeNull();
   });
 
   it('meldet eine unbekannte oder stornierte Person mit dem Weg zur Personalliste', async () => {
@@ -218,6 +226,20 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
     expect(await screen.findByText('Nicht (mehr) im Einsatz')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Zur Personalliste' }));
     expect(await screen.findByTestId('liste')).toHaveTextContent('/einsaetze/7/personal');
+  });
+
+  it('eine unbekannte Person setzt die Marke: der Rahmen merkt die Adresse nicht als letzten Ort', async () => {
+    const marke = { current: false };
+    renderAnsicht('/einsaetze/7/personal/99', { marke });
+    expect(await screen.findByText('Nicht (mehr) im Einsatz')).toBeVisible();
+    expect(marke.current).toBe(true);
+  });
+
+  it('eine vorhandene Person setzt die Marke nicht', async () => {
+    const marke = { current: false };
+    renderAnsicht('/einsaetze/7/personal/10', { marke });
+    await screen.findByRole('heading', { level: 1 });
+    expect(marke.current).toBe(false);
   });
 
   it('abgeschlossener Einsatz: nur lesen, Grund genannt, keine Bearbeitung', async () => {

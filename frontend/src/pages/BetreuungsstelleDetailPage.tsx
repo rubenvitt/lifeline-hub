@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { FormRule } from 'antd';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   aendereStelle,
   ladeBetreuung,
@@ -76,6 +76,7 @@ import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser'
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
@@ -145,7 +146,8 @@ function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
  *
  * Die Stelle kommt aus `GET …/betreuung` (derselbe Cache wie Übersicht und Gerät, live über das
  * `betreuung`-Ereignis); es gibt keinen Einzel-Endpunkt. Eine unbekannte, fremde oder stornierte
- * Stelle führt nach dem Laden zurück auf die Übersicht.
+ * Stelle zeigt nach dem Laden „Diese Betreuungsstelle gibt es nicht (mehr)“, ebenso eine unlesbare
+ * Kennung; die Adresse bleibt stehen (LLH-1827, `betreuung/StelleNichtGefunden.tsx`).
  *
  * Kopf: „Belegung melden" als Primäraktion, der Statuswechsel als Handlungsknopf
  * (`betreuung/stelleStatus.ts`), Karte und Stornieren im Menü. Bearbeiten steht am Paneel
@@ -155,7 +157,7 @@ export default function BetreuungsstelleDetailPage() {
   const { id, stelleId: stelleParam } = useParams();
   const einsatzId = Number(id);
   const stelleId = parseRouteId(stelleParam);
-  if (stelleId == null) return <Navigate replace to={betreuungPfad(einsatzId)} />;
+  if (stelleId == null) return <StelleNichtGefunden einsatzId={einsatzId} />;
   return <StelleInhalt einsatzId={einsatzId} stelleId={stelleId} />;
 }
 
@@ -330,7 +332,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     );
   }
   // Unbekannt, fremd oder storniert: die Übersicht trägt sie nicht.
-  if (!stelle) return <Navigate replace to={betreuungPfad(einsatzId)} />;
+  if (!stelle) return <StelleNichtGefunden einsatzId={einsatzId} />;
 
   const einsatz = einsatzQuery.data;
   const s = stelle;

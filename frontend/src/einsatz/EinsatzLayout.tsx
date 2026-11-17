@@ -1,6 +1,6 @@
 import { IconLupe, IconMenue } from '../icons';
 import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -30,11 +30,16 @@ import ModulPanel from './ModulPanel';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
-import { merkeLetztenOrt } from './letzterOrt';
+import {
+  leseLetztenOrt,
+  merkeLetztenOrt,
+  stelleLetztenOrtWieder,
+  type LetzterOrt,
+} from './letzterOrt';
 import { loadKategorieModul, rueckkehrModul, saveKategorieModul } from './kategorieModul';
 import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import { isUebung } from './einsatzart';
-import { NichtGefundenProvider } from './nichtGefundenContext';
+import { NichtGefundenProvider, type NichtGefundenMarke } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
@@ -357,14 +362,37 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Solange die Freigaben laden, ist die Sperre unbekannt (wie beim Modulwächter unten).
   const merkbar =
     benutzerId != null && !einsatzQuery.isError && !modulFreigabenQuery.isLoading && !gesperrt;
-  // Eine unbekannte Adresse (LLH-1729) wird ebenso wenig gemerkt: die Auffangseite meldet sich
-  // über diese Marke, sonst führte der Rückweg auf „Seite nicht gefunden“.
+  // Eine unbekannte Adresse (LLH-1729) und ein Objekt, das es nicht (mehr) gibt (LLH-1827), werden
+  // ebenso wenig gemerkt: die Seite meldet sich über diese Marke, sonst führte der Rückweg auf
+  // „gibt es nicht“. Meldet sie sich erst nach dem Laden, stellt `widerrufe` den Ort davor wieder
+  // her (`nichtGefundenContext.ts`); dafür hält `gemerkt` fest, was vor der Adresse gemerkt war.
   const nichtGefunden = useRef(false);
+  const gemerkt = useRef<{ benutzerId: number; pfad: string; vorher: LetzterOrt | null } | null>(
+    null,
+  );
   useEffect(() => {
     if (merkbar && benutzerId != null && !nichtGefunden.current) {
+      // Merkt der Rahmen dieselbe Adresse noch einmal, bleibt der Ort davor der von vorher.
+      const vorher =
+        gemerkt.current?.pfad === pathname && gemerkt.current.benutzerId === benutzerId
+          ? gemerkt.current.vorher
+          : leseLetztenOrt(benutzerId);
       merkeLetztenOrt(benutzerId, { einsatzId, pfad: pathname });
+      gemerkt.current = { benutzerId, pfad: pathname, vorher };
     }
   }, [merkbar, benutzerId, einsatzId, pathname]);
+  const nichtGefundenMarke = useMemo<NichtGefundenMarke>(
+    () => ({
+      marke: nichtGefunden,
+      widerrufe: (pfad) => {
+        const zuletzt = gemerkt.current;
+        if (zuletzt == null || zuletzt.pfad !== pfad) return;
+        gemerkt.current = null;
+        stelleLetztenOrtWieder(zuletzt.benutzerId, zuletzt.vorher);
+      },
+    }),
+    [],
+  );
   // Das zuletzt besuchte Modul je Kategorie für den Rail-Sprung (LLH-1734, `kategorieModul.ts`):
   // jede Ankunft zählt, unter derselben Bedingung wie der letzte Ort.
   useEffect(() => {
@@ -718,7 +746,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             <EinsatzRahmenProvider value={einsatz}>
               {/* Auch während des Ladens: die Seite zeigt unter `md` nur den Rückweg (LLH-1728, D6). */}
               <ImEinsatzRahmenProvider value>
-                <NichtGefundenProvider value={nichtGefunden}>
+                <NichtGefundenProvider value={nichtGefundenMarke}>
                   {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}

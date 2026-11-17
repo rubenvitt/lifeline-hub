@@ -389,6 +389,46 @@ describe('App-Routing', () => {
   });
 
   /**
+   * Profil-Rückweg (LLH-1827, Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht
+   * gibt“, Szenario „Profil-Rückweg“): eine Detailseite, deren Objekt es nicht (mehr) gibt, wird
+   * nicht als letzter Ort gemerkt. „Zurück zu …“ aus dem Profil führt an die Stelle davor.
+   */
+  describe('Profil-Rückweg nach einem Objekt, das es nicht gibt (LLH-1827)', () => {
+    it('führt nicht auf die Adresse einer unbekannten Person', async () => {
+      server.use(
+        meHandler(admin),
+        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+        http.get('/api/einsaetze/7/personen/999999', () =>
+          HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
+        ),
+      );
+      const { router } = renderApp('/einsaetze/7/ueberblick');
+      await waitFor(() =>
+        expect(leseLetztenOrt(admin.id)).toEqual({ einsatzId: 7, pfad: '/einsaetze/7/ueberblick' }),
+      );
+
+      await act(async () => {
+        await router.navigate('/einsaetze/7/personen/999999');
+      });
+      expect(await screen.findByText('Diese Person gibt es nicht (mehr)')).toBeInTheDocument();
+      // Im Rahmen: der Name des Einsatzes steht im Kopf, die Adresse bleibt in der Leiste.
+      expect((await screen.findAllByText('Hochwasser Nord')).length).toBeGreaterThan(0);
+      expect(router.state.location.pathname).toBe('/einsaetze/7/personen/999999');
+      expect(screen.getByRole('button', { name: 'Zu den Betroffenen' })).toBeInTheDocument();
+      expect(leseLetztenOrt(admin.id)).toEqual({ einsatzId: 7, pfad: '/einsaetze/7/ueberblick' });
+
+      await act(async () => {
+        await router.navigate('/profil');
+      });
+      const zurueck = await screen.findByRole('link', { name: 'Zurück zu Hochwasser Nord' });
+      expect(zurueck).toHaveAttribute('href', '/einsaetze/7/ueberblick');
+      await userEvent.click(zurueck);
+      await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
+    });
+  });
+
+  /**
    * Der BARE Einstellungs-Pfad (Ziel jedes Klicks aus der Modul-Navigation) landet auf der
    * ersten Sektion. Layout-Test und e2e springen direkt auf eine Sektion und sähen den Bruch nicht.
    */

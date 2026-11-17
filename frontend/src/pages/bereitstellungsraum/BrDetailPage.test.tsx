@@ -21,6 +21,7 @@ import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { einsatzKeys } from '../../api/queryKeys';
 import { setzeOnline } from '../../test/utils';
 import { warteAufMenueFokus } from '../../test/menue';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../../test/nichtGefunden';
 import { mitProzessZone } from '../../test/prozessZone';
 import { oeffne, optionenVon, waehle } from '../../test/auswahlListe';
 import {
@@ -242,14 +243,47 @@ function renderBrBei(route: string) {
   );
 }
 
+/** Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4). */
+const brMuster = {
+  titel: 'Diesen Bereitstellungsraum gibt es nicht (mehr)',
+  knopf: 'Zu den Bereitstellungsräumen',
+  liste: 'BR-LISTE',
+};
+
 describe('BrDetailPage — Deeplink-Robustheit (LFH-25)', () => {
-  it('leitet bei ungültiger BR-ID auf die Liste um', async () => {
+  it('zeigt bei ungültiger BR-ID das Muster statt still auf die Liste umzuleiten', async () => {
     // Der Einsatz lädt vor der Umleitung an (Hooks vor dem Rücksprung). Ohne Handler scheiterte
     // die Anfrage am Mock, und ein am Mock gescheiterter Abruf ist ein Rennen mit dem nächsten
     // Test derselben Datei (LLH-1518, wie LLH-1536).
     server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())));
     renderBrBei('/einsaetze/1/bereitstellungsraeume/abc');
-    expect(await screen.findByText('BR-LISTE')).toBeInTheDocument();
+    await erwarteNichtGefunden(brMuster);
+  });
+
+  it('zeigt bei 404 das Muster mit dem Weg zur Liste der Bereitstellungsräume', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/99', () =>
+        HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
+      ),
+    );
+    renderBrBei('/einsaetze/1/bereitstellungsraeume/99');
+    await erwarteNichtGefunden(brMuster);
+  });
+
+  it('behält bei 500 den Abruffehler mit „Erneut abrufen“', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/99', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderBrBei('/einsaetze/1/bereitstellungsraeume/99');
+    expect(
+      await screen.findByText('Bereitstellungsraum konnte nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText(brMuster.titel)).toBeNull();
   });
 });
 

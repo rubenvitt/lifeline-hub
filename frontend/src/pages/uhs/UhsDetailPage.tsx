@@ -3,7 +3,7 @@ import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperr
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
 import { Alert, App, Breadcrumb, Button, Flex, Modal, Space, Spin } from 'antd';
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
@@ -25,6 +25,11 @@ import { listePersonen } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+} from '../../components/SeitenZustand';
 import { useRollen } from '../../components/instrument/rollenwerte';
 import { useViewport } from '../../components/useViewport';
 import StatusTag from '../../components/StatusTag';
@@ -201,10 +206,15 @@ export default function UhsDetailPage() {
     setFrage(null);
   }, [uhsId, statusReset, stornoReset]);
 
-  // Ungültige UHS-ID → zurück zur Liste (nach allen Hooks).
-  if (!idGueltig) {
-    return <Navigate to={listenPfad} replace />;
-  }
+  // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diese Unfallhilfsstelle gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zu den Unfallhilfsstellen', pfad: listenPfad }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -215,8 +225,15 @@ export default function UhsDetailPage() {
   if (einsatzQuery.error || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
+  if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
   if (detailQuery.error || !detailQuery.data) {
-    return <Alert type="error" title="UHS konnte nicht geladen werden" showIcon />;
+    return (
+      <SeitenFehler
+        text="UHS konnte nicht geladen werden"
+        ursache={detailQuery.error}
+        onWiederholen={() => void detailQuery.refetch()}
+      />
+    );
   }
 
   const einsatz = einsatzQuery.data;

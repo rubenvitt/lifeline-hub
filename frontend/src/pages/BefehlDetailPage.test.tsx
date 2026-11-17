@@ -14,6 +14,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { ApiError } from '../api/client';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
+import { erwarteNichtGefunden } from '../test/nichtGefunden';
 
 vi.mock('../api/befehle');
 vi.mock('../api/einsaetze');
@@ -231,9 +232,17 @@ describe('BefehlDetailPage', () => {
     }
   });
 
-  it('leitet bei ungültiger Befehl-ID auf den Reiter Befehle um (LFH-25, LFH-972)', async () => {
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4): der
+  // Rückweg führt auf den Reiter Befehle, nicht auf die Vorgabe „Aufträge“ (LFH-972).
+  it('zeigt bei ungültiger Befehl-ID das Muster, der Rückweg führt auf den Reiter Befehle', async () => {
     const { router } = renderAt('abc');
-    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+    expect(await screen.findByText('Diesen Befehl gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/einsaetze/1/auftraege/befehle/abc');
+    await erwarteNichtGefunden({
+      titel: 'Diesen Befehl gibt es nicht (mehr)',
+      knopf: 'Zur Befehlsliste',
+      liste: 'AUFTRAEGE-LISTE',
+    });
     expect(router.state.location.search).toBe('?reiter=befehle');
   });
 
@@ -246,14 +255,25 @@ describe('BefehlDetailPage', () => {
     );
   });
 
-  it('ein unbekannter Befehl bietet den Rückweg zu den Befehlen an (LFH-972)', async () => {
-    vi.mocked(befehleApi.ladeBefehl).mockRejectedValue(new Error('Nicht gefunden'));
+  it('ein unbekannter Befehl (404) zeigt das Muster mit dem Rückweg zur Befehlsliste (LFH-972)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockRejectedValue(new ApiError(404, 'Nicht gefunden'));
+    const { router } = renderAt(99);
+    await erwarteNichtGefunden({
+      titel: 'Diesen Befehl gibt es nicht (mehr)',
+      knopf: 'Zur Befehlsliste',
+      liste: 'AUFTRAEGE-LISTE',
+    });
+    expect(router.state.location.search).toBe('?reiter=befehle');
+    // Der rote Text „Befehl nicht gefunden.“ (D6) ist weg.
+    expect(screen.queryByText(/Befehl nicht gefunden/)).toBeNull();
+  });
+
+  it('behält bei 500 den Abruffehler mit „Erneut abrufen“', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockRejectedValue(new ApiError(500, 'kaputt'));
     renderAt(99);
-    expect(await screen.findByText(/Befehl nicht gefunden/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Zu den Befehlen' })).toHaveAttribute(
-      'href',
-      '/einsaetze/1/auftraege?reiter=befehle',
-    );
+    expect(await screen.findByText('Befehl konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Diesen Befehl gibt es nicht (mehr)')).toBeNull();
   });
 
   it('verlinkt vom freigegebenen Befehl per ?eintrag= auf den ETB-Eintrag (LFH-25)', async () => {

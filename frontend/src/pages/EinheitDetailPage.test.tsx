@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useNavigate, useSearchParams } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { erwarteNichtGefunden, MarkenRahmen } from '../test/nichtGefunden';
 import { einsatzKeys } from '../api/queryKeys';
 import EinheitDetailPage from './EinheitDetailPage';
 import { einsatzFixture, freigabenFixture } from '../test/fixtures';
@@ -111,12 +112,14 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
   ];
 }
 
-function rendere(route = '/einsaetze/1/einheiten/10') {
+function rendere(route = '/einsaetze/1/einheiten/10', marke = { current: false }) {
   return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
-      <Route path="/einsaetze/:id/einheiten" element={<div>Gliederung</div>} />
-    </Routes>,
+    <MarkenRahmen marke={marke}>
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+        <Route path="/einsaetze/:id/einheiten" element={<div>Gliederung</div>} />
+      </Routes>
+    </MarkenRahmen>,
     { route },
   );
 }
@@ -352,6 +355,33 @@ describe('EinheitDetailPage · die Route selbst', () => {
     expect(screen.getByRole('button', { name: 'Zur Gliederung' })).toBeInTheDocument();
     // Titel und Rückweg genügen; keine Vermutung über die Ursache als Satz (LFH-1078).
     expect(screen.queryByText(/aufgelöst worden/)).not.toBeInTheDocument();
+  });
+
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4).
+  it('eine unbekannte Einheit setzt die Marke: der Rahmen merkt die Adresse nicht als letzten Ort', async () => {
+    const marke = { current: false };
+    server.use(...handlers());
+    rendere('/einsaetze/1/einheiten/999', marke);
+    expect(await screen.findByText('Diese Einheit gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(marke.current).toBe(true);
+  });
+
+  it('eine vorhandene Einheit setzt die Marke nicht', async () => {
+    const marke = { current: false };
+    server.use(...handlers());
+    rendere('/einsaetze/1/einheiten/10', marke);
+    await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+    expect(marke.current).toBe(false);
+  });
+
+  it('eine ungültige Kennung zeigt das Muster, statt still zur Gliederung umzuleiten', async () => {
+    server.use(...handlers());
+    rendere('/einsaetze/1/einheiten/abc');
+    await erwarteNichtGefunden({
+      titel: 'Diese Einheit gibt es nicht (mehr)',
+      knopf: 'Zur Gliederung',
+      liste: 'Gliederung',
+    });
   });
 
   it('trägt das Stärke-Etikett in BOS-Fachsprache', async () => {

@@ -25,9 +25,9 @@ import {
 import { SPEZIES_META, TIER_STATUS, TIER_VERBLEIB, halterVorbelegung } from './tiere/tierHelfer';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
-import { SeitenFehler } from '../components/SeitenZustand';
+import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -293,10 +293,15 @@ export default function TiereDetailPage() {
     abschlussForm.resetFields();
   }, [tierId, editReset, statusReset, stornoReset, beendeSitzung, abschlussForm]);
 
-  // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
-  if (!idGueltig) {
-    return <Navigate to={tierePfad(einsatzId)} replace />;
-  }
+  // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks (Rules-of-Hooks).
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Dieses Tier gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zu den Tieren', pfad: tierePfad(einsatzId) }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -310,7 +315,10 @@ export default function TiereDetailPage() {
   const einsatz = einsatzQuery.data;
   const zurueck = tierePfad(einsatzId);
 
-  if (detailQuery.isError) {
+  if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
+  // Ein anderer Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den
+  // neuen Versuch an.
+  if (detailQuery.isError || !detailQuery.data) {
     return (
       <SeitenFehler
         text="Tier konnte nicht geladen werden"
@@ -318,9 +326,6 @@ export default function TiereDetailPage() {
         onWiederholen={() => void detailQuery.refetch()}
       />
     );
-  }
-  if (!detailQuery.data) {
-    return <Alert type="error" title="Tier nicht gefunden" showIcon />;
   }
   const t = detailQuery.data;
 

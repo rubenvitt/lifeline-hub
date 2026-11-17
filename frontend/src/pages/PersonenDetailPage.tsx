@@ -17,9 +17,9 @@ import {
   Typography,
 } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
-import { SeitenFehler } from '../components/SeitenZustand';
+import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
@@ -323,11 +323,16 @@ export default function PersonenDetailPage() {
   // ['einsatz-tiere', …, 'halter', personId] bzw. ['einsatz-schaeden', …, 'geschaedigt', personId]
   // mit ab.
 
-  // Strukturell ungültige Personen-ID → zurück zur Liste, statt mit NaN zu laden. Steht nach allen
+  // Eine Person, die es nicht (mehr) gibt: ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`). Keine stille Weiterleitung, die Adresse bleibt stehen. Steht nach allen
   // Hooks (Rules-of-Hooks).
-  if (!idGueltig) {
-    return <Navigate to={pfade.personenListe(einsatzId)} replace />;
-  }
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diese Person gibt es nicht (mehr)"
+      rueckweg={{ label: pfade.personenListeLabel, pfad: pfade.personenListe(einsatzId) }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
 
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
@@ -342,7 +347,10 @@ export default function PersonenDetailPage() {
   const einsatz = einsatzQuery.data;
   const zurueck = pfade.personenListe(einsatzId);
 
-  if (detailQuery.isError) {
+  if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
+  // Ein anderer Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den
+  // neuen Versuch an.
+  if (detailQuery.isError || !detailQuery.data) {
     return (
       <SeitenFehler
         text="Person konnte nicht geladen werden"
@@ -350,9 +358,6 @@ export default function PersonenDetailPage() {
         onWiederholen={() => void detailQuery.refetch()}
       />
     );
-  }
-  if (!detailQuery.data) {
-    return <Alert type="error" title="Person nicht gefunden" showIcon />;
   }
   const p = detailQuery.data;
 

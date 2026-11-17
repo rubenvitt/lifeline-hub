@@ -1,7 +1,7 @@
 import { App, Breadcrumb, Button } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, useRollen } from '../components/instrument';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -40,7 +40,7 @@ import {
   parseRouteId,
 } from '../routing/deeplinks';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
-import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
 import {
   schreibeSprechgruppen,
   type SprechgruppenAenderung,
@@ -83,7 +83,6 @@ export default function EinheitDetailPage() {
   const einsatzId = Number(id);
   const einheitId = Number(einheitIdParam);
   const idGueltig = parseRouteId(einheitIdParam) != null;
-  const navigate = useNavigate();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -109,8 +108,15 @@ export default function EinheitDetailPage() {
   const aufgeloest = aufgeloesteQuery.data?.find((e) => e.id === einheitId) ?? null;
   const freigaben = useModulFreigaben(einsatzId);
 
-  // Ungültige Route-ID führt zurück zur Liste.
-  if (!idGueltig) return <Navigate to={einheitenPfad(einsatzId)} replace />;
+  // Gibt es nicht (mehr), eine ungültige Kennung in der Adresse eingeschlossen (LLH-1827): das
+  // Muster statt einer stillen Weiterleitung, die Adresse bleibt.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diese Einheit gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zur Gliederung', pfad: einheitenPfad(einsatzId) }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
 
   if (einsatzQuery.isLoading || einheitenQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
@@ -162,14 +168,7 @@ export default function EinheitDetailPage() {
    * Die Listen kamen an, die Einheit ist in keiner (gelöscht oder erfundene ID). Ein anderer Fall
    * als „Abruf gescheitert" und deshalb ein eigener Wortlaut samt Weg zurück.
    */
-  if (!aktuell) {
-    return (
-      <SeitenLeer
-        titel="Diese Einheit gibt es nicht (mehr)"
-        aktion={{ label: 'Zur Gliederung', onClick: () => void navigate(einheitenPfad(einsatzId)) }}
-      />
-    );
-  }
+  if (!aktuell) return nichtGefunden;
 
   return (
     <EinheitAnsicht

@@ -14,6 +14,7 @@ import { FakeEventSource } from '../test/eventSource';
 import { STATUS_META } from '../personen/personMeta';
 import { alsSchadenAuswahl } from '../api/einsatzSchaden';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 
 /** Die Schadenauswahl, wie der Server sie aus den Vollzeilen ableitet (LFH-1075). */
 const auswahlAus = (liste: readonly object[]) =>
@@ -127,9 +128,38 @@ function renderBei(route: string) {
 }
 
 describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
-  it('leitet bei ungültiger Personen-ID auf die Personen-Liste um', async () => {
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4).
+  it('zeigt bei ungültiger Personen-ID das Muster statt still auf die Liste umzuleiten', async () => {
     renderBei('/einsaetze/1/personen/abc');
-    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    await erwarteNichtGefunden({
+      titel: 'Diese Person gibt es nicht (mehr)',
+      knopf: 'Zu den Betroffenen',
+      liste: 'LISTE',
+    });
+  });
+
+  it('zeigt bei 404 „Diese Person gibt es nicht (mehr)“ mit dem Weg zu den Betroffenen', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () =>
+        HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
+      ),
+    ]);
+    await erwarteNichtGefunden({
+      titel: 'Diese Person gibt es nicht (mehr)',
+      knopf: 'Zu den Betroffenen',
+      liste: 'LISTE',
+    });
+  });
+
+  it('behält bei 500 den Abruffehler mit „Erneut abrufen“', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Diese Person gibt es nicht (mehr)')).toBeNull();
   });
 
   it('verlinkt den Schadenbezug auf die Schaden-Detailseite (LFH-148)', async () => {

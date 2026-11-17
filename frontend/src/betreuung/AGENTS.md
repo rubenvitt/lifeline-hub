@@ -19,7 +19,9 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
 - **Detailseite eines Bezirks** (LLH-1076, Spec `betreuung-evakuierung`; gilt auch für
   `pages/EvakuierungsbezirkPage.tsx`): Item-Route `…/evakuierung/:bezirkId`
   (`evakuierungsbezirkPfad`), gegatet über das Segment `evakuierung`. Kein Einzel-GET: gelesen
-  wird aus `einsatzKeys.evakuierung`; unbekannt, fremd oder storniert → `Navigate` zur Übersicht.
+  wird aus `einsatzKeys.evakuierung`; unbekannt, fremd, storniert oder unlesbar →
+  `SeitenNichtGefunden` (LLH-1827, Adresse bleibt), nach dem eigenen Stornieren auf die Übersicht
+  (`useBezirkHandlungen`, `nachStorno`).
   `?bezirk=` und der Sprung „Im Fachmodul öffnen“ der Lagekarte landen dort. Räumungsschritte nur
   aus `raeumungSchritte.ts` (`raeumungPlan`), gesendet über `useBezirkHandlungen.setzeRaeumung`
   (gleicht mit dem Live-Stand ab, „aufgehoben“ nur nach Rückfrage). Stammdaten in der Ansicht
@@ -40,7 +42,8 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
 - **Detailseite der Betreuungsstelle** (LLH-1044, Spec `betreuung-evakuierung`,
   `pages/BetreuungsstelleDetailPage.tsx`, Route `betreuung/:stelleId`, Pfad nur über
   `betreuungsstellePfad`): liest die Stelle aus `GET …/betreuung` (`einsatzKeys.betreuung`), es
-  gibt keinen Einzel-Endpunkt; unbekannt, fremd oder storniert → `<Navigate>` auf die Übersicht.
+  gibt keinen Einzel-Endpunkt; unbekannt, fremd, storniert oder unlesbar →
+  `betreuung/StelleNichtGefunden.tsx` (LLH-1827, auch „Unterkunft planen“; Adresse bleibt).
   `?stelle=` ist eine Altadresse und leitet in `BetreuungPage` um, vor jedem Abruf. Bearbeiten
   (Datenraster, dreiseitiger PATCH über `stellePatchDreiseitig`) und Status (Handlungen aus
   `betreuung/stelleStatus.ts`, Schließen einer belegten Stelle über `StelleSchliessenDialog` mit

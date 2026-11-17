@@ -44,25 +44,25 @@
 
 ## 3. qick1bpd (LLH-1827): Ein Muster für „gibt es nicht (mehr)“
 
-- [ ] 3.1 `components/SeitenZustand.tsx`: `SeitenNichtGefunden({ titel, rueckweg })` (neutrale
+- [x] 3.1 `components/SeitenZustand.tsx`: `SeitenNichtGefunden({ titel, rueckweg })` (neutrale
   Form, ein Knopf, `useMarkNichtGefunden`) und `istNichtGefunden(error)`. Vitests:
   - kein „Erneut abrufen“, genau ein Knopf mit Ziel
   - die Marke ist gesetzt, solange der Baustein steht
   - `istNichtGefunden` ist nur bei `ApiError` 404 wahr
-- [ ] 3.2 Detailseiten Person, Tier, Schaden auf das Muster umstellen (404 →
+- [x] 3.2 Detailseiten Person, Tier, Schaden auf das Muster umstellen (404 →
   `SeitenNichtGefunden`, sonst `SeitenFehler`, ungültige Kennung → Muster statt `Navigate`).
   Belegt je Seite durch einen Vitest für 404 (Text, Rückweg, kein „Erneut abrufen“, keine Zeile
   „Nicht gefunden“) und für 500 („Erneut abrufen“ bleibt).
-- [ ] 3.3 UHS und Bereitstellungsraum (bloßer `Alert`), Lagebericht und Befehl (roter Text)
+- [x] 3.3 UHS und Bereitstellungsraum (bloßer `Alert`), Lagebericht und Befehl (roter Text)
   umstellen, mit denselben zwei Tests je Seite. `BefehlDetailPage.test.tsx` zieht den neuen
   Wortlaut nach.
-- [ ] 3.4 Betreuungsstelle, Evakuierungsbezirk und Unterkunft: Das stille `Navigate` entfällt
+- [x] 3.4 Betreuungsstelle, Evakuierungsbezirk und Unterkunft: Das stille `Navigate` entfällt
   zugunsten des Musters. Ein Vitest je Seite zeigt, dass die Adresse bleibt und das Muster
   erscheint.
-- [ ] 3.5 Einheit, Zeitfenster (`AusgabeAnsicht`) und Einsatzkraft auf `SeitenNichtGefunden`
+- [x] 3.5 Einheit, Zeitfenster (`AusgabeAnsicht`) und Einsatzkraft auf `SeitenNichtGefunden`
   umstellen, Wortlaut unverändert. Die vorhandenen Tests bleiben grün, dazu ein neuer Test, der
   die Marke für den letzten Ort prüft.
-- [ ] 3.6 Profil-Rückweg: Integrationstest, dass nach einer Nicht-gefunden-Detailseite „Zurück“
+- [x] 3.6 Profil-Rückweg: Integrationstest, dass nach einer Nicht-gefunden-Detailseite „Zurück“
   aus dem Profil nicht auf deren Adresse führt.
 
 ## 4. qick1bpd (LLH-1827): Deeplink auf Unbekanntes
