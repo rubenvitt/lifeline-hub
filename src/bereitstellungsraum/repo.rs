@@ -229,7 +229,7 @@ pub async fn create_tx(
 /// zerreißen zwei gleichzeitige Teiländerungen (nur `lat`, nur `lon`) das Paar nicht.
 ///
 /// Mit `basis_geaendert_at` schreibt das UPDATE nur, solange `geaendert_at` unverändert ist,
-/// sonst `Conflict` (409, LLH-1920).
+/// sonst `Veraltet` (409 mit `grund`, LLH-1920).
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,

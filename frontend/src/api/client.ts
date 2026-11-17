@@ -198,7 +198,7 @@ export const GRUND_VERALTET = 'veraltet';
  * er fragt „Zwischenzeitlich geändert“. Ein anderer 409 derselben Route (storniert, doppelte
  * Bezeichnung) ist ein Grund, keine Rückfrage. Routen ohne Auszeichnung trennt nur `istKonflikt`.
  */
-export function istVeraltet(e: unknown): e is ApiError {
+export function isVeraltet(e: unknown): e is ApiError {
   return istKonflikt(e) && e.grund === GRUND_VERALTET;
 }
 

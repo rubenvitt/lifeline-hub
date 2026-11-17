@@ -46,10 +46,11 @@
 
 ## 8. Befunde des Reviews vor dem PR
 
-- [x] 8.1 Sperrkonflikt ausgezeichnet (D9): `AppError::Veraltet` (409, `grund: "veraltet"`), UHS- und BR-Repo, `istVeraltet` im Client, `istSperrkonflikt` am Baustein; Tests: `error::tests::veraltet_ist_409_mit_grund`, Repo-Tests, Routen-Test mit `grund`, Paneel-Tests, BR/UHS „doppelte Bezeichnung“ rot→grün; Mutationsprobe (ohne `istSperrkonflikt` rot); Statuscode-Konvention in `src/AGENTS.md`
-- [x] 8.2 Merker der UHS-Seite (D10): Bereichswechsel mit geänderter Bearbeitung fragt nach; `UhsDetailPage.test.tsx` „geänderte Angaben: ein Bereichswechsel fragt erst nach“ rot→grün
+- [x] 8.1 Sperrkonflikt ausgezeichnet (D9): `AppError::Veraltet` (409, `grund: "veraltet"`), UHS- und BR-Repo, `isVeraltet` im Client, `isSperrkonflikt` am Baustein; Tests: `error::tests::veraltet_ist_409_mit_grund`, Repo-Tests, Routen-Test mit `grund`, Paneel-Tests, BR/UHS „doppelte Bezeichnung“ rot→grün; Mutationsprobe (ohne `isSperrkonflikt` rot); Statuscode-Konvention in `src/AGENTS.md`
+- [x] 8.2 Merker der UHS-Seite (D10): Bereichswechsel mit geänderter Bearbeitung fragt nach; `UhsDetailPage.test.tsx` „geänderte Angaben: ein Bereichswechsel fragt erst nach“ und „… auch die Kopfzahl des Materials fragt erst nach“ rot→grün (Kopfzahl über `handleLinkKlick`)
 - [x] 8.3 Stand nach dem Speichern (D11): PATCH-Antwort in den Detail-Cache; Tests „gleich wieder geöffnet“ (BR) und „legt die Antwort … in den Cache“ (UHS) rot→grün
 - [x] 8.4 Gerätefall „Gerät ohne Angaben“ getestet (`UhsDetailPage.test.tsx`, Mutationsprobe rot); `design.md` D6/D7 an den Code angeglichen
+- [x] 8.5 Nachprüfung der Fix-Commits: zehn leere Dateien unter `src/` entfernt (im Plattenengpass entstanden, mitcommittet); neue Bezeichner nach LFH-1312 (`isVeraltet`, `isSperrkonflikt`); Doc-Kommentare, `frontend/AGENTS.md` Punkt 4, D8, UHS-Spec (Sperrkonflikt ausgezeichnet) nachgezogen; Sprungpalette auf dieselbe UHS als Grenze in D10 vermerkt; Neuabruf-Fehler als LLH-1947, Aufgelöstes als LLH-1948
 
 ## Workflow follow-up
 

@@ -103,25 +103,29 @@ Bearbeitungszustand dieselben Zellen zeigen (Bausteinvertrag). `onNeuLaden` ist
 `brDetail`, `geraete`; UHS: `uhs`, `uhsDetail`, `lagemonitor`), und die Erfolgsmeldung bleibt
 (`message.success`).
 
-**D8 — Seitenmerker.** Weder UHS- noch BR-Seite hat einen `OffeneBearbeitungProvider`. Der
-Baustein legt dann seinen eigenen an, und der Verlassen-Schutz gilt. Weitere Bearbeitungen derselben
-Seite (Grundriss-Bearbeiten-Modus, Belegungszeilen) laufen nicht über den Merker. Daran ändert diese
+**D8 — Seitenmerker.** Die BR-Seite hat keinen `OffeneBearbeitungProvider`; das Paneel legt
+seinen eigenen an, und der Verlassen-Schutz gilt. Die UHS-Seite bekommt einen (D10), weil ihre
+Bereichsleiste nur den Suchteil ändert. Weitere Bearbeitungen derselben Seite
+(Grundriss-Bearbeiten-Modus, Belegungszeilen) laufen nicht über den Merker; daran ändert diese
 Change nichts.
 
 **D9 — Sperrkonflikt ausgezeichnet (Review vor dem PR).** UHS und BR antworten auch auf eine
 doppelte Bezeichnung (UNIQUE) und auf „storniert“ mit 409. Seit der Client immer
 `basis_geaendert_at` mitschickt, hätte das Paneel jeden 409 als „Zwischenzeitlich geändert“
 gefragt. Der Server meldet den Sperrkonflikt deshalb als `AppError::Veraltet` (409 mit
-`grund: "veraltet"`, Muster `NichtInListe`), `BearbeitbaresPaneel` nimmt `istSperrkonflikt`
+`grund: "veraltet"`, Muster `NichtInListe`), `BearbeitbaresPaneel` nimmt `isSperrkonflikt`
 (Vorgabe `istKonflikt`, damit die übrigen CAS-Seiten unverändert bleiben), UHS und BR geben
-`istVeraltet`. Verworfen: den Status der doppelten Bezeichnung auf 422 ändern. Das wäre ein
+`isVeraltet`. Verworfen: den Status der doppelten Bezeichnung auf 422 ändern. Das wäre ein
 Wire-Bruch für alle Clients, und „storniert“ bliebe nach der Statuscode-Konvention ohnehin 409.
 
 **D10 — Merker der UHS-Seite (Review vor dem PR).** Die Bereichsleiste ändert nur den Suchteil
 der Adresse, den der Router nicht abfragt. Ohne Merker der Seite hängte ein Bereichswechsel das
 Paneel samt geänderter Eingabe still aus. `UhsDetailPage` legt deshalb einen
 `OffeneBearbeitungProvider` um die ganze Seite (Schlüssel: die UHS). Leiste und Kopfzahl wechseln
-über `useWechselNachRueckfrage` (`components/offeneBearbeitung.tsx`, LLH-1415).
+über `useWechselNachRueckfrage` (`components/offeneBearbeitung.tsx`, LLH-1415). Grenze: Ein
+Sprung auf dieselbe UHS mit anderem `?bereich=` von außerhalb der Seite (etwa die Sprungpalette)
+ändert nur den Suchteil, den `VerlassenRueckfrage` nicht abfragt; er hängt eine offene Änderung
+ohne Rückfrage aus. Selten (die eigene Stelle über die Palette anspringen), deshalb hingenommen.
 
 **D11 — Stand nach dem Speichern (Review vor dem PR).** `onSpeichern` legt die PATCH-Antwort
 gleich in den Detail-Cache (`setQueryData`, zusammengeführt mit Plätzen, Belegung und Kräften des

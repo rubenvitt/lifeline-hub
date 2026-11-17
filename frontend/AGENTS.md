@@ -436,7 +436,9 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    und Bemerkungen verweisen darauf, statt ihn unter jede Zelle jeder Zeile zu schreiben.
 4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
    Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
-   übernehmen“ / „Verwerfen und neu laden“.
+   übernehmen“ / „Verwerfen und neu laden“. Zeichnet die Route den Sperrkonflikt aus
+   (`grund: "veraltet"`, `isVeraltet`, `src/AGENTS.md`, Statuscode-Konvention), fragt nur er;
+   ein anderer 409 steht als Grund am Paneel (`isSperrkonflikt`, LLH-1920).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.

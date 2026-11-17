@@ -43,14 +43,15 @@ import { useRollen, schriftGroesse } from './rollenwerte';
  *   `renderMitProviders(…, { datenRouter: true })`).
  * - **CAS:** `useEditSitzung` friert `geaendert_at` und die Werte beim Öffnen ein; ein
  *   Hintergrund-Refetch ändert weder die Eingaben noch die Basis. `onSpeichern(patch, basis)`;
- *   `basis` `undefined` heißt „Meine Änderung übernehmen“ nach einem 409.
+ *   `basis` `undefined` heißt „Meine Änderung übernehmen“ nach dem Sperrkonflikt.
  * - **Nur Geändertes:** der Patch enthält nur Felder, deren Wert sich nach Inhalt geändert hat
  *   (`bearbeitetePatch`, oder `patch` des Aufrufers); ein leerer Patch sendet nichts und schließt.
  * - **Tastatur:** Enter speichert (Knopf `submit` im `<form>`, Erfassungs-Norm), Escape bricht ab
  *   (eine offene Auswahl schluckt Escape selbst: rc-select stoppt die Ausbreitung). Fokus beim
  *   Öffnen ins erste Feld, beim Schließen zurück auf „Bearbeiten“ bzw. `ausloeserRef`.
  * - **Fehler am Ort** (LFH-1077): Prüffehler unter der Zelle, eine Ablehnung als `SpeicherFehler`
- *   am Paneel, der 409 als Rückfrage „Zwischenzeitlich geändert“. Kein Toast.
+ *   am Paneel, der Sperrkonflikt (`isSperrkonflikt`, Vorgabe jeder 409) als Rückfrage
+ *   „Zwischenzeitlich geändert“. Kein Toast.
  * - **Zusatzhandlungen** (`zusatz`, LLH-1920): weitere Handlungen am Datensatz im Paneelkopf vor
  *   „Bearbeiten“, etwa „Auf Karte verorten“ an den Raumdaten. Nur im Lesezustand: neben einer
  *   offenen Bearbeitung steht keine zweite Handlung.
@@ -84,16 +85,16 @@ export interface BearbeitbaresPaneelProps<W extends object, P = Partial<W>> {
   felder: readonly BearbeitbaresFeld<W>[];
   /** Abbildung auf den Patch; Vorgabe: nur geänderte Felder (`bearbeitetePatch`). */
   patch?: (vorher: W, nachher: W) => P;
-  /** Lehnt bei Ablehnung ab (`mutateAsync`); ein 409 öffnet die Rückfrage. */
+  /** Lehnt bei Ablehnung ab (`mutateAsync`); der Sperrkonflikt öffnet die Rückfrage. */
   onSpeichern: (patch: P, basis: CasBasis | undefined) => Promise<unknown>;
-  /** „Verwerfen und neu laden“ nach einem 409, etwa `query.refetch`. */
+  /** „Verwerfen und neu laden“ nach dem Sperrkonflikt, etwa `query.refetch`. */
   onNeuLaden?: () => void;
   /**
    * Welcher Fehler der Sperrkonflikt ist, der „Zwischenzeitlich geändert“ fragt; Vorgabe jeder 409
-   * (`istKonflikt`). Eine Route, die ihn auszeichnet, gibt `istVeraltet`: ihr übriger 409
+   * (`istKonflikt`). Eine Route, die ihn auszeichnet, gibt `isVeraltet`: ihr übriger 409
    * (storniert, doppelte Bezeichnung) steht dann als Grund am Paneel (LLH-1920).
    */
-  istSperrkonflikt?: (e: unknown) => boolean;
+  isSperrkonflikt?: (e: unknown) => boolean;
   darfSchreiben: boolean;
   /** Kurzgrund ohne Schreibrecht; ohne Grund entfällt „Bearbeiten“. */
   grund?: string;
@@ -158,7 +159,7 @@ function Innen<W extends object, P = Partial<W>>({
   patch: zuPatch,
   onSpeichern,
   onNeuLaden,
-  istSperrkonflikt = istKonflikt,
+  isSperrkonflikt = istKonflikt,
   darfSchreiben,
   grund,
   modus = 'paneel',
@@ -239,7 +240,7 @@ function Innen<W extends object, P = Partial<W>>({
       setLaeuft(false);
       // Nur der Sperrkonflikt MIT Basis fragt nach; beim Übernehmen zeigt ein weiterer 409 die
       // Servermeldung, sonst wäre „Meine Änderung übernehmen“ ein toter Knopf.
-      if (istSperrkonflikt(e) && basis !== undefined) setKonflikt({ patch });
+      if (isSperrkonflikt(e) && basis !== undefined) setKonflikt({ patch });
       else setFehler(e);
     }
   };

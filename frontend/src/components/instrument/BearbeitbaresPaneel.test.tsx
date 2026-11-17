@@ -256,11 +256,11 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
     await waitFor(() => expect(screen.queryByRole('spinbutton')).toBeNull());
   });
 
-  it('mit `istSperrkonflikt`: ein anderer 409 steht als Grund am Paneel, keine Rückfrage (LLH-1920)', async () => {
+  it('mit `isSperrkonflikt`: ein anderer 409 steht als Grund am Paneel, keine Rückfrage (LLH-1920)', async () => {
     const user = userEvent.setup();
     rendern(
       <FunkPaneel
-        istSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
+        isSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
         onSpeichern={async () => {
           throw new ApiError(409, 'Rufname schon vergeben');
         }}
@@ -276,11 +276,11 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
     expect(screen.getByRole('spinbutton', { name: 'Kanal' })).toHaveValue('43');
   });
 
-  it('mit `istSperrkonflikt`: der Sperrkonflikt fragt weiter nach', async () => {
+  it('mit `isSperrkonflikt`: der Sperrkonflikt fragt weiter nach', async () => {
     const user = userEvent.setup();
     rendern(
       <FunkPaneel
-        istSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
+        isSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
         onSpeichern={async () => {
           throw new ApiError(409, 'geändert', { grund: 'veraltet' });
         }}

@@ -52,7 +52,8 @@ Eingaben werden, mit „Speichern“ und „Abbrechen“ im Paneelfuß. Einen Di
 Das Speichern SHALL nur die geänderten Angaben senden, zusammen mit dem Stand, der beim Öffnen galt.
 Ein geleertes optionales Feld MUST als `null` gehen; die Koordinate des Standorts MUST nur als Paar
 und nur bei einer Änderung gehen. Hat ein anderer Arbeitsplatz die UHS seit dem Öffnen gespeichert,
-MUST die Rückfrage „Zwischenzeitlich geändert“ kommen.
+MUST der Server mit 409 und `grund: "veraltet"` antworten und die Rückfrage „Zwischenzeitlich
+geändert“ kommen; nur bei diesem Grund.
 
 #### Scenario: Nur die Soll-Anzahl
 - **WHEN** im offenen Paneel nur die Soll-Anzahl von 6 auf 8 geändert und gespeichert wird
@@ -64,6 +65,11 @@ MUST die Rückfrage „Zwischenzeitlich geändert“ kommen.
   danach die Notiz gespeichert wird
 - **THEN** fragt die Seite „Zwischenzeitlich geändert“ mit „Meine Änderung übernehmen“ und
   „Verwerfen und neu laden“
+
+#### Scenario: Doppelte Bezeichnung ist kein Sperrkonflikt
+- **WHEN** die Bezeichnung einer anderen UHS desselben Einsatzes gespeichert wird
+- **THEN** antwortet der Server mit 409 ohne `grund: "veraltet"`, und das Paneel zeigt den Grund
+  statt „Zwischenzeitlich geändert“; die Eingabe bleibt stehen
 
 #### Scenario: Bereichswechsel mit offener Änderung
 - **WHEN** im offenen Paneel „Angaben“ die Notiz geändert ist und jemand den Bereich „Material“

@@ -700,6 +700,39 @@ describe('UhsDetailPage — Stammdaten im Bereich „Angaben“ (LLH-1407, LLH-1
     expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=material');
   });
 
+  it('geänderte Angaben: auch die Kopfzahl des Materials fragt erst nach', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      status: 'aktiv',
+      material: [
+        {
+          id: 1,
+          bezeichnung: 'Posten 1',
+          art: 'geraet',
+          menge: 1,
+          ausgegeben: 0,
+          status: 'defekt',
+          uhs_id: 9,
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
+    await userEvent.click(await screen.findByRole('button', { name: 'ÄNDERN' }));
+    await userEvent.click(await screen.findByRole('link', { name: '1 Posten · 1 Ausfall' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }),
+    ).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
+    vi.mocked(ladeModulFreigaben).mockReset();
+  });
+
   it('am gekoppelten UHS-Gerät: kein Bereich „Angaben“, `?bereich=angaben` zeigt die Belegung', async () => {
     server.use(
       http.get('/api/auth/me', () =>

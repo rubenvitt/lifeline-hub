@@ -45,6 +45,7 @@ import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { MenueAusloeser } from '../../components/MenueAusloeser';
 import UhsAngaben from './UhsAngaben';
+import { handleLinkKlick } from '../../routing/linkModifier';
 import {
   OffeneBearbeitungProvider,
   useWechselNachRueckfrage,
@@ -277,11 +278,7 @@ function UhsDetailInhalt() {
         replace
         // Wie die Bereichsleiste über den Merker: ein Wechsel nur des Suchteils fragt der Router
         // nicht nach. Die Adresse bleibt für „In neuem Tab öffnen“.
-        onClick={(e) => {
-          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-          e.preventDefault();
-          waehleBereich('material');
-        }}
+        onClick={(e) => handleLinkKlick(e, () => waehleBereich('material'))}
       >
         {materialKopfzahl(uhs.material)}
       </KennungsLink>

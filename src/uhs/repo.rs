@@ -162,8 +162,9 @@ pub async fn anlegen_tx(
 /// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
 ///
 /// Optimistisches Lock (LFH-241/F10): `erwartet_geaendert_at` trägt den beim Laden gelesenen
-/// Stand; das UPDATE schreibt nur, solange `geaendert_at` unverändert ist — sonst `Conflict`
-/// (409) statt stillem Overwrite. `None` = bewusstes Overwrite (Escape-Hatch des Dialogs).
+/// Stand; das UPDATE schreibt nur, solange `geaendert_at` unverändert ist — sonst `Veraltet`
+/// (409 mit `grund`, LLH-1920) statt stillem Overwrite. `None` = bewusstes Overwrite („Meine
+/// Änderung übernehmen“).
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -533,7 +534,7 @@ mod tests {
         .unwrap_err();
         assert!(
             matches!(err, AppError::Veraltet),
-            "veralteter Stand muss 409 (Conflict) sein, war: {err:?}"
+            "veralteter Stand muss 409 (Veraltet) sein, war: {err:?}"
         );
 
         aktualisiere(
