@@ -389,12 +389,70 @@ export interface components {
             stelle_id: number;
         };
         /**
+         * @description Ein offener Punkt der Kurzliste: Kennung, laufende Nummer des Moduls (Auftrag, Meldung,
+         *     Registriernummer einer Person), Bezeichnung.
+         */
+        AbschlussEintrag: {
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Laufende Nummer im Modul; fehlt, wo das Modul keine kennt.
+             */
+            nummer?: number | null;
+        };
+        /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).
          *     String = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur
          *     ("Tier T-001 (Hund): an Tierarzt übergeben").
          * @enum {string}
          */
         AbschlussGrund: "uebergabe_halter" | "uebergabe_tierarzt" | "uebergabe_tierheim" | "verstorben" | "freilauf" | "sonstiges";
+        /** @description Eine Gruppe offener Punkte: alle gezählt, höchstens [`KURZLISTE_MAX`] genannt. */
+        AbschlussGruppe: {
+            /** Format: int64 */
+            anzahl: number;
+            eintraege: components["schemas"]["AbschlussEintrag"][];
+        };
+        /**
+         * @description Nicht entlassene Kräfte. `anzahl` zählt alle: die Einheiten und Fahrzeuge der Kurzliste
+         *     (ein Fahrzeug in einer aktiven Einheit steht nur über seine Einheit) und die Einsatzkräfte,
+         *     die `personal` noch einmal für sich nennt.
+         */
+        AbschlussKraefte: {
+            /** Format: int64 */
+            anzahl: number;
+            eintraege: components["schemas"]["AbschlussKraft"][];
+            /**
+             * Format: int64
+             * @description Davon nicht entlassene Einsatzkräfte (`einsatz_personal`).
+             */
+            personal: number;
+        };
+        /** @description Eine nicht entlassene Einheit oder ein nicht entlassenes Fahrzeug mit aktuellem Status. */
+        AbschlussKraft: {
+            art: components["schemas"]["AbschlussKraftArt"];
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Statustext („3 – Auf Anfahrt“); fehlt ohne Status. */
+            status?: string | null;
+        };
+        /**
+         * @description Art einer nicht entlassenen Kraft in der Kurzliste der Abschlussprüfung.
+         * @enum {string}
+         */
+        AbschlussKraftArt: "einheit" | "fahrzeug";
+        /** @description Antwort von `GET /api/einsaetze/{id}/abschluss/pruefung`: die offenen Punkte je Gruppe. */
+        AbschlussPruefung: {
+            auftraege: components["schemas"]["AbschlussGruppe"];
+            /** @description Betroffene mit offenem oder unterwegs befindlichem Verbleib, vermisste eingeschlossen. */
+            betroffene: components["schemas"]["AbschlussGruppe"];
+            kraefte: components["schemas"]["AbschlussKraefte"];
+            meldungen: components["schemas"]["AbschlussGruppe"];
+            nachforderungen: components["schemas"]["AbschlussGruppe"];
+        };
         /**
          * @description Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft
          *     die Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt" ist KEIN

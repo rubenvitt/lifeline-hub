@@ -274,6 +274,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // [`EINSATZ_WURZEL`].
     (EINSATZ_WURZEL, None),
     ("/api/einsaetze/{id}/abschliessen", None),
+    // LLH-1814: Prüfung vor dem Abschluss, ohne Modul.
+    ("/api/einsaetze/{id}/abschluss", None),
     ("/api/einsaetze/{id}/aufbewahrungsfrist", None),
     // Nachbereitungsfrist (LLH-1494): wie die Aufbewahrungsfrist.
     ("/api/einsaetze/{id}/nachbereitung", None),

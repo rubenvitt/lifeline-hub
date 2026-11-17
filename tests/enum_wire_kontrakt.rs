@@ -372,6 +372,8 @@ fn serde_wire_gleich_as_str() {
         Hand,
         Ohne,
     });
+    // LLH-1814: Art einer Kraft in der Kurzliste der Abschlussprüfung.
+    enum_wire_as_str!(lifeline_hub::einsatz::abschluss::AbschlussKraftArt { Einheit, Fahrzeug });
     enum_wire_as_str!(lifeline_hub::katalog::StatusKategorie {
         Verfuegbar,
         Gebunden,

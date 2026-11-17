@@ -258,6 +258,23 @@ pub async fn abschliessen(
     )))
 }
 
+/// GET /api/einsaetze/{id}/abschluss/pruefung — offene Punkte vor dem Abschluss (LLH-1814, Spec
+/// `einsatz-abschluss`, „Offene Punkte vor dem Abschluss“). Nur Einsatzleitung eines aktiven
+/// Einsatzes; gezählt wird über den ganzen Einsatz, ohne Filter nach Modulfreigabe.
+pub async fn abschluss_pruefung(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+) -> Result<Json<crate::einsatz::abschluss::AbschlussPruefung>, AppError> {
+    Ok(Json(
+        crate::einsatz::abschluss::load_pruefung(
+            &state.pool,
+            ctx.einsatz.id,
+            &crate::zeit::jetzt(),
+        )
+        .await?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct FristSetzen {
     /// Neue Aufbewahrungsfrist (ISO-8601/RFC3339 oder SQLite-Format); `null`/leer

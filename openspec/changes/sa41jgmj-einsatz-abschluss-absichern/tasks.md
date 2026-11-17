@@ -10,9 +10,9 @@ per TDD: erst der rote Test, dann der Code.
 
 ## 2. Prüfung offener Punkte (D1)
 
-- [ ] 2.1 Response-DTO `AbschlussPruefung` (Gruppen `kraefte`, `auftraege`, `meldungen`, `nachforderungen`, `betroffene` mit `anzahl` und Kurzliste ≤ 5) und Repo-Funktion, die die „offen“-Regeln aus `einsatz/zaehler.rs` wiederverwendet (gemeinsame Funktion bzw. Prädikat, kein zweiter Wortlaut); Unit-Test der Kurzliste und Grenzen
-- [ ] 2.2 Route `GET /api/einsaetze/{id}/abschluss/pruefung` mit `EinsatzLeitungszugriff`, in `src/app.rs` und `src/api_doc.rs`; Integrationstest: Einheit „3 – Auf Anfahrt“ und Betroffene ohne Verbleib erscheinen, entlassene Einheit nicht, Zählung trotz ausgeblendetem Modul, Führungspersonal/Beobachter 403, abgeschlossener Einsatz 409
-- [ ] 2.3 `scripts/check-typ-codegen.sh` laufen lassen, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten; Gate grün
+- [x] 2.1 Response-DTO `AbschlussPruefung` (Gruppen `kraefte`, `auftraege`, `meldungen`, `nachforderungen`, `betroffene` mit `anzahl` und Kurzliste ≤ 5) und Repo-Funktion, die die „offen“-Regeln aus `einsatz/zaehler.rs` wiederverwendet (gemeinsame Funktion bzw. Prädikat, kein zweiter Wortlaut); Unit-Test der Kurzliste und Grenzen
+- [x] 2.2 Route `GET /api/einsaetze/{id}/abschluss/pruefung` mit `EinsatzLeitungszugriff`, in `src/app.rs` und `src/api_doc.rs`; Integrationstest: Einheit „3 – Auf Anfahrt“ und Betroffene ohne Verbleib erscheinen, entlassene Einheit nicht, Zählung trotz ausgeblendetem Modul, Führungspersonal/Beobachter 403, abgeschlossener Einsatz 409
+- [x] 2.3 `scripts/check-typ-codegen.sh` laufen lassen, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten; Gate grün
 
 ## 3. Wiederöffnen im Backend (D4, D5)
 
