@@ -12,7 +12,7 @@ import BearbeitbaresPaneel, {
 } from '../../components/instrument/BearbeitbaresPaneel';
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import AufKarteVerorten from './AufKarteVerorten';
-import { brPatch, brRaumdatenWerte, type BrRaumdatenWerte } from './brRaumdaten';
+import { brPatch, brRaumdatenWerte, type BrRaumdatenWerte } from './brPatch';
 
 /**
  * Paneel „Raumdaten“ eines Bereitstellungsraums (LFH-1147), bearbeitet in der Ansicht (LLH-1920,

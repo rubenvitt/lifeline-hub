@@ -62,8 +62,8 @@ heute im Kopf.
 `brPatchAus(basis: Bereitstellungsraum, werte)` vergleichen heute mit dem Datensatz. Die
 `patch`-Prop des Bausteins vergleicht dagegen zwei Formularstände (`vorher`, `nachher`). Beide
 Funktionen werden auf `(vorher: W, nachher: W)` umgestellt und ziehen mit der Formularabbildung
-(`werteAus(uhs)`) in eine reine Datei je Modul (`pages/uhs/uhsAngaben.ts`,
-`pages/bereitstellungsraum/brRaumdaten.ts`). Die vorhandenen Tests der Patch-Funktionen ziehen mit
+(`werteAus(uhs)`) in eine reine Datei je Modul (`pages/uhs/uhsPatch.ts`,
+`pages/bereitstellungsraum/brPatch.ts`). Die vorhandenen Tests der Patch-Funktionen ziehen mit
 um. Die Koordinate vergleicht `ortFelder(vorher.standort)` mit `ortFelder(nachher.standort)`. Weil
 `vorher` aus `ortsfeldAusGespeichert` desselben Stands stammt, bleibt das Ergebnis dem bisherigen
 gleich.

@@ -18,7 +18,7 @@
 
 ## 4. Bereitstellungsraum: Paneel „Raumdaten“ (D3, D7)
 
-- [x] 4.1 `pages/bereitstellungsraum/brRaumdaten.ts`: `brRaumdatenWerte(br)` und `brPatch(vorher, nachher)` (Werte gegen Werte, leer = `null`, Koordinate als Paar); Tests aus `BrBearbeitenModal.test.ts` nach `brRaumdaten.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
+- [x] 4.1 `pages/bereitstellungsraum/brPatch.ts`: `brRaumdatenWerte(br)` und `brPatch(vorher, nachher)` (Werte gegen Werte, leer = `null`, Koordinate als Paar); Tests aus `BrBearbeitenModal.test.ts` nach `brPatch.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
 - [x] 4.2 `BrDetailPage.tsx`: `SektionHeader` + `Datenraster` „Raumdaten“ durch `BearbeitbaresPaneel` (Bezeichnung, Standort, Notiz; Regeln aus dem Modal) ersetzen, `zusatz` = `AufKarteVerorten` nur bei `bearbeitbar`, `onSpeichern` mit `basis_geaendert_at`, `onNeuLaden` = Refetch, Invalidierung und Erfolgsmeldung wie bisher; `BrBearbeitenModal` und `bearbeitenOffen` entfernen
 - [x] 4.3 `BrDetailPage.test.tsx` rot→grün: „Bearbeiten“ im Paneel „Raumdaten“ öffnet Eingaben an Ort und Stelle (kein Dialog), Speichern sendet nur die Notiz samt `basis_geaendert_at`, 409 → „Zwischenzeitlich geändert“, aufgelöster Raum ohne „Bearbeiten“, „Auf Karte verorten“ nur im Lesezustand
 - [x] 4.4 `BrBearbeitenModal.tsx` und `BrBearbeitenModal.test.ts` löschen; `grep -rn BrBearbeitenModal` außerhalb von `openspec/changes/archive` und `docs/superpowers` leer (bis auf die Altstellenliste, Aufgabe 6.1)
@@ -26,7 +26,7 @@
 ## 5. UHS: Bereich „Angaben“ (D1–D3)
 
 - [x] 5.1 `routing/deeplinks.ts`: `UhsBereich` um `angaben`; `deeplinks.test.ts` (`parseUhsBereich`, `uhsBereichSuche`) um `angaben` rot→grün
-- [x] 5.2 `pages/uhs/uhsAngaben.ts`: `uhsAngabenWerte(uhs)` und `uhsPatch(vorher, nachher)` (inkl. Soll-Anzahl und Qualifikationssoll wie `uhsPatchAus`); Tests aus `UhsBearbeitenModal.test.tsx` nach `uhsAngaben.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
+- [x] 5.2 `pages/uhs/uhsPatch.ts`: `uhsAngabenWerte(uhs)` und `uhsPatch(vorher, nachher)` (inkl. Soll-Anzahl und Qualifikationssoll wie `uhsPatchAus`); Tests aus `UhsBearbeitenModal.test.tsx` nach `uhsPatch.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
 - [x] 5.3 `pages/uhs/UhsAngaben.tsx`: Paneel „Angaben“ über `BearbeitbaresPaneel` (Felder aus D2, Lesewerte mit „—“ und `qualiSollText`), `onSpeichern` mit `basis_geaendert_at`, Invalidierung (`uhs`, `uhsDetail`, `lagemonitor`) und Erfolgsmeldung wie bisher; Tests in `UhsAngaben.test.tsx` rot→grün: Lesen mit „—“, nur geänderte Soll-Anzahl samt Basis, Notiz leeren → `null`, 409-Rückfrage, ohne Verwaltungsrecht und aufgelöst kein „Bearbeiten“
 - [x] 5.4 `UhsDetailPage.tsx`: Bereich „Angaben“ in `BEREICH_NAME` und `bereichListe` (nicht am Gerät), Inhalt `UhsAngaben` mit `key={uhs.id}`; „Bearbeiten“ aus dem Kopf und `UhsBearbeitenModal`/`bearbeitenOffen` entfernen; `UhsDetailPage.test.tsx` rot→grün (Kopf ohne „Bearbeiten“ geplant und aktiv, `?bereich=angaben` zeigt das Paneel, Gerät fällt auf Belegung zurück)
 - [x] 5.5 `UhsBearbeitenModal.tsx` und `UhsBearbeitenModal.test.tsx` löschen; `grep -rn UhsBearbeitenModal` wie 4.4 leer
@@ -35,7 +35,7 @@
 ## 6. Regeln, Doku, Bilder
 
 - [x] 6.1 `frontend/AGENTS.md`: In „Ort von ‚Bearbeiten‘ und Form des Anlegens“ die Altstellen auf die Anlegen-Drawer kürzen (LLH-1921); in „Bearbeiten in der Ansicht“ „Bereitstellungsraum“ aus der Liste der umzustellenden Seiten streichen; `BearbeitbaresPaneel` im Bausteinkatalog um den Zusatzplatz ergänzen; Prettier grün
-- [x] 6.2 `docs/anwender/kapitel/unfallhilfsstellen.md`: Abschnitt zum Bearbeiten auf den Bereich „Angaben“ umschreiben, `quellen` (`UhsBearbeitenModal.tsx` → `UhsAngaben.tsx`, `uhsAngaben.ts`); `docs/anwender/kapitel/bereitstellungsraeume.md`: Schritte auf das Paneel „Raumdaten“, `quellen` nachziehen; Wächter von `docs/anwender/AGENTS.md` grün
+- [x] 6.2 `docs/anwender/kapitel/unfallhilfsstellen.md`: Abschnitt zum Bearbeiten auf den Bereich „Angaben“ umschreiben, `quellen` (`UhsBearbeitenModal.tsx` → `UhsAngaben.tsx`, `uhsPatch.ts`); `docs/anwender/kapitel/bereitstellungsraeume.md`: Schritte auf das Paneel „Raumdaten“, `quellen` nachziehen; Wächter von `docs/anwender/AGENTS.md` grün
 - [x] 6.3 `e2e/doku-bilder/bereitstellungsraeume.bilder.ts`: „Dialog … bearbeiten“ → offenes Paneel „Raumdaten“; Bild `bereitstellungsraeume/bearbeiten.png` im Bildlauf neu aufnehmen (gebautes Backend); geht das nicht, Text angepasst lassen und Nachzug als Aufgabe anlegen
 - [x] 6.4 Mitänderungsregel `docs/architektur/AGENTS.md` prüfen (Kapitel zu Bausteinen/Querschnitt); `scripts/adr-fuer.sh` für die geänderten Pfade gelesen und eingehalten
 

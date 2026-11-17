@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Bereitstellungsraum } from '../../api/types';
-import { brPatch, brRaumdatenWerte } from './brRaumdaten';
+import { brPatch, brRaumdatenWerte } from './brPatch';
 
 /**
  * Teil-Patch der Raumdaten (LFH-1147, LLH-1920) mit dem Standort als Ortsfeld (LLH-1114, Spec

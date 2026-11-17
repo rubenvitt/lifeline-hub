@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Uhs } from '../../api/types';
-import { uhsAngabenWerte, uhsPatch } from './uhsAngaben';
+import { uhsAngabenWerte, uhsPatch } from './uhsPatch';
 
 /**
  * Teil-Patch der UHS-Stammdaten (LLH-1407, LLH-1920): verglichen werden die Werte beim Öffnen mit

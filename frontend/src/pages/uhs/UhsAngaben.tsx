@@ -12,7 +12,7 @@ import BearbeitbaresPaneel, {
 } from '../../components/instrument/BearbeitbaresPaneel';
 import QualiSollFeld from '../../kraefte/QualiSollFeld';
 import { qualiSollText } from '../../kraefte/qualiSoll';
-import { uhsAngabenWerte, uhsPatch, type UhsAngabenWerte } from './uhsAngaben';
+import { uhsAngabenWerte, uhsPatch, type UhsAngabenWerte } from './uhsPatch';
 
 /**
  * Paneel „Angaben“ einer Unfallhilfsstelle im gleichnamigen Bereich der Detailseite (LLH-1920,
