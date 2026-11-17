@@ -236,6 +236,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     an Form und Wort (schraffiertes Band, gefüllter Chip, immer „ÜBUNG“), nicht am Farbton: violett
     sind auch die ETB-Entscheidung, die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
     Quellen der Kopfhöhe, über einem klebenden Seitenkopf (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
+  - **Sprunglink zum Inhalt** (nufmon70, Spec `einsatztauglichkeit-layout`, „Ein Sprunglink führt
+    zum Inhalt“, WCAG 2.4.1): einmal in `BetriebsLayout` (`App.tsx`), vor der Betriebszeile
+    (`components/SprungZumInhalt.tsx`); die Hilfe liegt außerhalb und bindet ihn selbst ein. Jeder
+    Rahmen markiert sein Ziel mit `sprungzielInhalt` (`data-lfh="sprungziel-inhalt"`,
+    `tabIndex -1`), der Link nimmt das letzte in DOM-Reihenfolge: das `main` von Einsatz, Ebene 1
+    und Hilfe, in der Verwaltung den Inhalt neben dem Menü (ein `div`, kein zweites `<main>`). Ein
+    neuer Rahmen markiert sein Ziel mit (Wächter `components/SprungZumInhalt.rahmen.test.tsx`). Ohne
+    Fokus aus dem Bild, mit Fokus `fixed` oben links über `RAHMEN_EBENE` (`.lfh-sprung-inhalt`, von
+    den Fokusabständen in `index.css` ausgenommen). Die Gerätehülle hat keinen. Nachweis
+    `e2e/sprung-zum-inhalt.spec.ts`.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**

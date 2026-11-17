@@ -185,6 +185,35 @@
   white-space: nowrap;
 }
 
+/* Sprunglink zum Inhalt (nufmon70 D4, `components/SprungZumInhalt.tsx`, WCAG 2.4.1): ohne Fokus
+   wie „Zum Detail“ aus dem Bild genommen, aber erster Tab-Halt. Mit Fokus liegt er fest oben links
+   über Betriebszeile und Kopf; `fixed` nimmt keinen Platz im Fluss, der Rahmen springt nicht. Höhe,
+   Polsterung und die Stapelebene über `RAHMEN_EBENE` setzt der Baustein aus den Tokens. Der Ring
+   liegt innen, weil der Link am Fensterrand steht und ein äußerer dort abgeschnitten wäre. */
+.lfh-sprung-inhalt:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.lfh-sprung-inhalt:focus {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: var(--lfh-paneel);
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+/* Das Ziel des Sprungs ist ein Inhaltsgebiet mit `tabIndex -1`, kein Bedienelement: kein Ring um
+   die ganze Fläche, der nächste Tab-Halt zeigt den Fokus ohnehin (nufmon70, Risiken). */
+[data-lfh='sprungziel-inhalt']:focus {
+  outline: none;
+}
+
 /* Vorschaubild eines Anhangs (LFH-759): handgebautes Bedienziel, Fokusring in `bedien` wie oben. */
 .lfh-anhang-vorschau:focus-visible {
   outline: 2px solid var(--lfh-bedien);

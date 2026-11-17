@@ -5,6 +5,7 @@ import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
+import SprungZumInhalt from './components/SprungZumInhalt';
 import { SeitenSkeleton } from './components/SeitenZustand';
 import LoginPage from './pages/LoginPage';
 import AppAnmeldungPage from './pages/AppAnmeldungPage';
@@ -264,6 +265,9 @@ function BetriebsLayout() {
   useOrgLiveStream(benutzer != null);
   return (
     <>
+      {/* Erster Tab-Halt jeder Rahmen-Seite, auch vor den Knöpfen einer gestörten Betriebszeile
+          (nufmon70 D1, `frontend/AGENTS.md`, Rahmen, „Sprunglink zum Inhalt“). */}
+      <SprungZumInhalt />
       <LiveStatusBanner benutzerId={benutzer?.id} klebend />
       <Outlet />
     </>

@@ -84,6 +84,10 @@ test('Selbstbeweis (LFH-373): Zusatzkandidaten machen einen ABSOLUTEN Verdecker 
   const laufMitAttrappe = async (optionen?: { zusatzKandidaten: string[] }) => {
     await page.goto('/admin/benutzer');
     await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
+    // Der Lauf beginnt hinter dem Sprunglink zum Inhalt (nufmon70): er liegt mit Fokus über dem
+    // Kopf und darum ganz in dessen Rechteck; unter der Attrappe (z-index 2000) wäre er ein
+    // Befund der Attrappe, nicht der Vorgabe. Seine Verdeckung misst `e2e/sprung-zum-inhalt.spec.ts`.
+    await page.locator('[data-lfh="sprung-zum-inhalt"]').focus();
     // Über das GANZE Dokument, sonst hinge der Befund an der Scrollposition.
     await page.evaluate(() => {
       const hoehe = document.scrollingElement!.scrollHeight;
@@ -392,7 +396,9 @@ async function kopfStopp(page: Page) {
       unten: r.bottom,
       hoehe: r.height,
       kopfUnten: kr.bottom,
-      imKopf: kopf.contains(fokus),
+      // Der Sprunglink zum Inhalt liegt mit Fokus `fixed` ÜBER dem Kopf (nufmon70 D4) und zählt
+      // wie ein Ziel im Kopf; dass er nicht verdeckt ist, misst `e2e/sprung-zum-inhalt.spec.ts`.
+      imKopf: kopf.contains(fokus) || fokus.closest('[data-lfh="sprung-zum-inhalt"]') != null,
       scrollY: window.scrollY,
     };
   });

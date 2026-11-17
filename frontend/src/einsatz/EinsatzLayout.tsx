@@ -82,6 +82,7 @@ import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import SpiegelBand from './spiegel/SpiegelBand';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useWarnsperre } from '../theme/ThemeModeProvider';
+import { sprungzielInhalt } from '../components/SprungZumInhalt';
 
 const { Header, Content } = Layout;
 
@@ -711,7 +712,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             onSprungKlick={onSprungKlick}
           />
         )}
-        <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
+        {/* Ziel des Sprunglinks zum Inhalt (nufmon70 D2): Kopf, Rail und Modulpanel liegen davor. */}
+        <Content {...sprungzielInhalt} style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
             <EinsatzRahmenProvider value={einsatz}>
               {/* Auch während des Ladens: die Seite zeigt unter `md` nur den Rückweg (LLH-1728, D6). */}
