@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -154,5 +155,41 @@ describe('UHS anlegen · Notiz unter „Weitere Angaben“ (LLH-1921)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(rumpfe).toHaveLength(1));
     expect(rumpfe[0]).toMatchObject({ bezeichnung: 'Nord', notiz: 'Zugang Ost' });
+  });
+});
+
+/**
+ * „Weitere Angaben“ beginnt bei jedem Öffnen zugeklappt (Review LLH-1921): der Dialog bleibt bei
+ * Liste und Switcher eingehängt, ohne Zurücksetzen öffnete er nach einem Abbruch mit vier Feldern.
+ */
+describe('UHS anlegen · „Weitere Angaben“ beginnt zugeklappt', () => {
+  function Harness() {
+    const [offen, setOffen] = useState(true);
+    return (
+      <>
+        <button type="button" onClick={() => setOffen(true)}>
+          Öffnen
+        </button>
+        <UhsAnlegenModal einsatzId={1} open={offen} onClose={() => setOffen(false)} />
+      </>
+    );
+  }
+
+  it('nach Abbrechen und erneutem Öffnen wieder drei Felder', async () => {
+    renderMitProviders(<Harness />);
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByLabelText('Bezeichnung');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await waitFor(() => expect(sichtbareFelder(dialog)).toBe(4));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    const neu = await screen.findByRole('dialog');
+    await within(neu).findByLabelText('Bezeichnung');
+    await waitFor(() =>
+      expect(within(neu).getByRole('button', { name: /Weitere Angaben/ })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      ),
+    );
   });
 });

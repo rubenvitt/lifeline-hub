@@ -3,7 +3,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from './SeitenZustand';
 
-/** Der Drawer liefert den angelegten Datensatz, nicht einen Listeneintrag (beim BR trägt die
+/** Der Dialog liefert den angelegten Datensatz, nicht einen Listeneintrag (beim BR trägt die
  *  Liste mehr als die Anlage, LLH-1095); geführt wird nur über die Kennung. */
 interface AnlegenSlot {
   open: boolean;

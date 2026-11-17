@@ -148,7 +148,10 @@ export default function LagemeldungenPage() {
     setFilter(LEERER_FILTER);
     zeitraumWaehlen({ von: undefined, bis: undefined });
   };
-  const [formOffen, setFormOffen] = useState(false);
+  // Offen ist der Dialog nur für den Einsatz, in dem er geöffnet wurde (Review LLH-1921): ein
+  // Wechsel des Einsatzes rendert sonst einmal mit offenem Dialog, bevor ein Effekt ihn schließt.
+  const [formOffenFuer, setFormOffenFuer] = useState<number | null>(null);
+  const formOffen = formOffenFuer === einsatzId;
   // Die Zeile, deren Lage-Angaben gerade bearbeitet werden (Kennung der Meldung).
   const [bearbeitetId, setBearbeitetId] = useState<number | null>(null);
   const { benutzer } = useAuth();
@@ -172,9 +175,16 @@ export default function LagemeldungenPage() {
     if (searchParams.get('neu') !== '1') return;
     if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading || !freigabenBekannt) return;
-    if (darfErfassenRoh) setFormOffen(true);
+    if (darfErfassenRoh) setFormOffenFuer(einsatzId);
     neuAuftrag.raeume('neu');
-  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, freigabenBekannt, darfErfassenRoh]);
+  }, [
+    searchParams,
+    neuAuftrag,
+    einsatzQuery.isLoading,
+    freigabenBekannt,
+    darfErfassenRoh,
+    einsatzId,
+  ]);
   const lageQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
@@ -252,7 +262,8 @@ export default function LagemeldungenPage() {
   useEffect(() => {
     leere();
     alleGesehenReset();
-    setFormOffen(false);
+    // Zurück im vorigen Einsatz steht der Dialog nicht wieder offen.
+    setFormOffenFuer(null);
     setBearbeitetId(null);
   }, [einsatzId, leere, alleGesehenReset]);
 
@@ -433,7 +444,7 @@ export default function LagemeldungenPage() {
         titel="Noch keine Lagemeldungen"
         aktion={
           darfErfassen
-            ? { label: 'Lagemeldung erfassen', onClick: () => setFormOffen(true) }
+            ? { label: 'Lagemeldung erfassen', onClick: () => setFormOffenFuer(einsatzId) }
             : undefined
         }
       />
@@ -484,7 +495,7 @@ export default function LagemeldungenPage() {
       }
       aktionen={
         darfErfassen && (
-          <Button type="primary" icon={<IconPlus />} onClick={() => setFormOffen(true)}>
+          <Button type="primary" icon={<IconPlus />} onClick={() => setFormOffenFuer(einsatzId)}>
             Lagemeldung erfassen
           </Button>
         )
@@ -509,11 +520,11 @@ export default function LagemeldungenPage() {
           dialog={{
             offen: formOffen,
             titel: 'Lagemeldung erfassen',
-            onAbbrechen: () => setFormOffen(false),
+            onAbbrechen: () => setFormOffenFuer(null),
           }}
           artVorgabe="lagemeldung"
           serie={false}
-          onFertig={() => setFormOffen(false)}
+          onFertig={() => setFormOffenFuer(null)}
           einsatzId={einsatzId}
           senden={erfassenSpeicherung.isPending}
           // mutateAsync: die Erfassungshülle leert nur, wenn die Meldung angekommen ist.

@@ -37,6 +37,11 @@ export default function UhsAnlegenModal(props: AnlegenModalSlot<Uhs>) {
   return (
     <AnlegenModal<Uhs, UhsFormular>
       {...props}
+      // Der Dialog bleibt bei Liste und Switcher eingehängt; jedes Öffnen beginnt zugeklappt.
+      onClose={() => {
+        setWeitereOffen(false);
+        props.onClose();
+      }}
       titel="Unfallhilfsstelle anlegen"
       erfolgText="UHS angelegt"
       legeAn={(einsatzId, w) => legeUhsAn(einsatzId, uhsEingabe(w))}

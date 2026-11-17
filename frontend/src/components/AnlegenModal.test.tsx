@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { ApiError } from '../api/client';
 import AnlegenModal from './AnlegenModal';
+import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 
 interface Eingabe {
   bezeichnung: string;
@@ -15,8 +16,9 @@ interface Eingabe {
 function Harness({ legeAn }: { legeAn: (einsatzId: number, d: Eingabe) => Promise<unknown> }) {
   const [offen, setOffen] = useState(true);
   const [einsatzId, setEinsatzId] = useState(1);
+  // Escape erreicht den Abbruch nur über die Tastatur-Registry der Sprungpalette.
   return (
-    <>
+    <CommandPaletteProvider>
       <button type="button" onClick={() => setOffen(true)}>
         Öffnen
       </button>
@@ -37,7 +39,7 @@ function Harness({ legeAn }: { legeAn: (einsatzId: number, d: Eingabe) => Promis
           <Input />
         </Form.Item>
       </AnlegenModal>
-    </>
+    </CommandPaletteProvider>
   );
 }
 
@@ -84,6 +86,16 @@ describe('AnlegenModal (LFH-1077, LLH-1921)', () => {
     expect(within(offenerDialog()).queryByText('Bezeichnung schon vergeben')).toBeNull();
   });
 
+  // Positivkontrolle zur Sperre unten: ohne laufendes Anlegen schließt Escape.
+  it('schließt per Escape, solange nichts gespeichert wird', async () => {
+    renderMitProviders(<Harness legeAn={vi.fn()} />);
+    await waitFor(() =>
+      expect(within(offenerDialog()).getByLabelText('Bezeichnung')).toHaveFocus(),
+    );
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.getByLabelText('Zustand')).toHaveTextContent('zu'));
+  });
+
   it('lässt sich während des Anlegens nicht schließen, schließt beim Erfolg', async () => {
     let antworte: (v: unknown) => void = () => {};
     const lege = vi.fn().mockImplementation(() => new Promise((r) => (antworte = r)));
@@ -94,7 +106,8 @@ describe('AnlegenModal (LFH-1077, LLH-1921)', () => {
     const dialog = offenerDialog();
     expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
     await userEvent.keyboard('{Escape}');
-    expect(offenerDialog()).toBe(dialog);
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(screen.getByLabelText('Zustand')).toHaveTextContent('offen');
 
     await act(async () => antworte({ id: 1 }));
     expect(await screen.findByText('Ding angelegt')).toBeInTheDocument();

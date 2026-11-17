@@ -773,6 +773,23 @@ describe('MeldungFormular als Dialog (LLH-1921)', () => {
     await waitFor(() => expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue(''));
   });
 
+  // Das Formular bleibt bei geschlossenem Dialog eingehängt (Review LLH-1921): jedes Öffnen
+  // beginnt zugeklappt, nach einem Abbruch wie nach einer erfassten Meldung.
+  it('beginnt nach Abbrechen und nach dem Erfassen wieder zugeklappt', async () => {
+    render(<DialogHarness onAnlegen={anlegenMock()} />);
+    await userEvent.click(klappkopf());
+    expect(klappkopf()).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
+
+    await userEvent.click(klappkopf());
+    await fuellePflichtfelder('ELW 1', 'Lage ruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
+  });
+
   it('klappt „Weitere Angaben“ auch im Dialog auf, wenn die Prüfung dort scheitert', async () => {
     const onAnlegen = anlegenMock();
     render(<DialogHarness onAnlegen={onAnlegen} />);

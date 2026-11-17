@@ -528,11 +528,19 @@ export default function MeldungFormular({
   // Escape laufen über dessen Abbruch und leeren das Formular.
   if (dialog) {
     return (
+      // Das Formular bleibt bei geschlossenem Dialog eingehängt: jedes Öffnen beginnt zugeklappt.
       <ErfassungsModal<MeldungFormWerte>
         offen={dialog.offen}
         titel={dialog.titel}
-        onAbbrechen={dialog.onAbbrechen}
         {...huelle}
+        onAbbrechen={() => {
+          setWeitereOffen(false);
+          dialog.onAbbrechen();
+        }}
+        onFertig={() => {
+          setWeitereOffen(false);
+          huelle.onFertig();
+        }}
       >
         {felder}
       </ErfassungsModal>

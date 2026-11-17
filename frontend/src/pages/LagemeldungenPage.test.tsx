@@ -545,7 +545,9 @@ describe('LagemeldungenPage', () => {
       );
       // Die Maske liegt über dem Link; der Wechsel kommt im Einsatz etwa über die Sprungpalette.
       fireEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
-      await vi.waitFor(() => expect(erfassenOffen()).toBe(false));
+      // Der Dialog des neuen Einsatzes öffnet nicht einmal kurz (Review LLH-1921): wäre er offen
+      // eingehängt, stünde er jetzt im Ausblenden im Baum. Ein nie geöffneter rendert nichts.
+      expect(document.querySelectorAll('.ant-modal')).toHaveLength(0);
       // Der schließende Dialog bleibt in jsdom stehen, sein Knopf heißt wie der im Seitenkopf.
       const kopfKnopf = screen
         .getAllByRole('button', { name: 'Lagemeldung erfassen' })

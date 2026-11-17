@@ -7,7 +7,8 @@
 Ein neuer Datensatz MUST in einem Erfassungsdialog angelegt werden. Eine eigene Seite MUST es nur
 für einen Ablauf oder mehr als etwa fünf Pflichtfelder geben, ein eingeklapptes Formular über der
 Liste nur, wo dort in Serie erfasst wird („Speichern und nächste“). Eine Seitenleiste (Drawer)
-MUST NOT zum Anlegen dienen. Jeder Einstieg desselben Datensatzes MUST dieselbe Form öffnen.
+MUST NOT zum Anlegen dienen. Die Erfassungsleiste des ETB und die Schnellanlage in
+Ein- und Zweifeld-Katalogen sind eigene, bestehende Formen und bleiben.
 
 #### Scenario: Unfallhilfsstelle anlegen
 - **WHEN** jemand mit Schreibrecht in der Liste der Unfallhilfsstellen „Neu“ wählt
@@ -17,10 +18,6 @@ MUST NOT zum Anlegen dienen. Jeder Einstieg desselben Datensatzes MUST dieselbe 
 - **WHEN** jemand im Dialog „Unfallhilfsstelle anlegen“ eine Bezeichnung einträgt und „Anlegen“ wählt
 - **THEN** schließt der Dialog, und die Seite zeigt die neue Unfallhilfsstelle
 
-#### Scenario: Bereitstellungsraum aus der Sprungpalette
-- **WHEN** jemand mit Schreibrecht in der Sprungpalette „Bereitstellungsraum anlegen“ wählt
-- **THEN** öffnet sich der Dialog „Bereitstellungsraum anlegen“, derselbe wie über „Neu“ in der Liste und „+ Neuer BR“ im Switcher
-
 #### Scenario: Lagemeldung erfassen
 - **WHEN** jemand mit Schreibrecht auf der Seite Lagemeldungen „Lagemeldung erfassen“ wählt
 - **THEN** öffnet sich ein Dialog mit dem Meldungsformular, die Art „Lagemeldung“ vorbelegt, und nach dem Erfassen schließt er, die neue Lagemeldung steht oben in der Zeitachse
@@ -28,3 +25,18 @@ MUST NOT zum Anlegen dienen. Jeder Einstieg desselben Datensatzes MUST dieselbe 
 #### Scenario: Meldungen in Serie
 - **WHEN** jemand mit Schreibrecht auf der Seite Meldungen „Meldung erfassen“ wählt
 - **THEN** klappt das Formular über der Liste auf, und „Speichern und nächste“ hält es nach dem Erfassen offen
+
+### Requirement: Die Einstiege eines Moduls legen in derselben Form an
+
+Führt ein Modul mehrere Einstiege in dasselbe Anlegen (Liste, Leerzustand, Switcher,
+Sprungpalette), MUST jeder davon dieselbe Form öffnen. Ein anderes Modul, das einen Datensatz aus
+seinem eigenen Zusammenhang anlegt (etwa eine Erinnerung als Wiedervorlage aus dem ETB), darf eine
+eigene Form haben.
+
+#### Scenario: Bereitstellungsraum aus der Sprungpalette
+- **WHEN** jemand mit Schreibrecht in der Sprungpalette „Bereitstellungsraum anlegen“ wählt
+- **THEN** öffnet sich der Dialog „Bereitstellungsraum anlegen“, derselbe wie über „Neu“ in der Liste und „+ Neuer BR“ im Switcher
+
+#### Scenario: Lagemeldung aus dem Leerzustand
+- **WHEN** jemand mit Schreibrecht auf der leeren Seite Lagemeldungen „Lagemeldung erfassen“ wählt
+- **THEN** öffnet sich derselbe Dialog „Lagemeldung erfassen“ wie über den Knopf im Seitenkopf

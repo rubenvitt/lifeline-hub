@@ -23,7 +23,7 @@ function brEingabe({ standort, ...rest }: BrFormular): BrEingabe {
 }
 
 /**
- * Wiederverwendbarer Drawer zum Anlegen eines Bereitstellungsraums (Liste, Leerzustand, Switcher).
+ * Dialog zum Anlegen eines Bereitstellungsraums (Liste, Leerzustand, Switcher).
  * Der Standort ist ein Ortsfeld (LLH-1114, Spec `ortsfeld`) und verortet den Raum gleich mit.
  */
 export default function BrAnlegenModal(props: AnlegenModalSlot<Bereitstellungsraum>) {

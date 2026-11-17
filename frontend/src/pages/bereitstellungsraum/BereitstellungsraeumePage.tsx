@@ -104,8 +104,8 @@ export default function BereitstellungsraeumePage() {
   // Schnellaktion: ?neu=1 öffnet den Anlege-Dialog (Sprungpalette, LFH-506). Gelesen auf der
   // LISTEN-Route — `BereitstellungsraeumeDefault` am baren Modulpfad liest den Parameter nicht,
   // deshalb zeigt `bereitstellungsraeumeListePfad` hierher. Warten bis der Einsatz geladen ist;
-  // Param immer löschen, Drawer nur bei Schreibrecht. Einmal je Verlaufseintrag
-  // (`useLinkAuftrag`, LLH-1558): ein neu geladenes Schreibrecht öffnete den geschlossenen Drawer
+  // Param immer löschen, Dialog nur bei Schreibrecht. Einmal je Verlaufseintrag
+  // (`useLinkAuftrag`, LLH-1558): ein neu geladenes Schreibrecht öffnete den geschlossenen Dialog
   // sonst ein zweites Mal, solange der Router die Räumung noch nicht committet hat.
   const [searchParams] = useSearchParams();
   const neuAuftrag = useLinkAuftrag();
