@@ -276,7 +276,9 @@ nicht, sagt die Seite „Person nicht gefunden“.
 ### Aufenthalt und Bezüge pflegen
 
 1. Steht die Person in keiner Unfallhilfsstelle, im Kopf „In UHS aufnehmen“ wählen und die UHS
-   wählen. Steht sie schon in einer, verlegen „Verlegen“ und „Austragen“ sie.
+   wählen. Steht sie schon in einer, verlegen „Verlegen“ und „Austragen“ sie. Nach „Austragen“
+   holt „Rückgängig“ im Hinweis sie mit Platz und bisheriger Wartezeit zurück, solange sie nicht
+   weiter gebucht ist und höchstens zehn Minuten vergangen sind.
 2. Gehört der Person ein Tier oder ist sie bei einem Schaden geschädigt, „Bezüge“ aufklappen und
    „Bezug hinzufügen“ wählen.
 3. Im Feld „Tier oder Schaden“ nach Kennung, Art, Name oder Ort suchen, den Treffer wählen und

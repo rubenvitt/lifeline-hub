@@ -43,14 +43,18 @@ import { useRollen } from './rollenwerte';
  *   `renderMitProviders(…, { datenRouter: true })`).
  * - **CAS:** `useEditSitzung` friert `geaendert_at` und die Werte beim Öffnen ein; ein
  *   Hintergrund-Refetch ändert weder die Eingaben noch die Basis. `onSpeichern(patch, basis)`;
- *   `basis` `undefined` heißt „Meine Änderung übernehmen“ nach einem 409.
+ *   `basis` `undefined` heißt „Meine Änderung übernehmen“ nach dem Sperrkonflikt.
  * - **Nur Geändertes:** der Patch enthält nur Felder, deren Wert sich nach Inhalt geändert hat
  *   (`bearbeitetePatch`, oder `patch` des Aufrufers); ein leerer Patch sendet nichts und schließt.
  * - **Tastatur:** Enter speichert (Knopf `submit` im `<form>`, Erfassungs-Norm), Escape bricht ab
  *   (eine offene Auswahl schluckt Escape selbst: rc-select stoppt die Ausbreitung). Fokus beim
  *   Öffnen ins erste Feld, beim Schließen zurück auf „Bearbeiten“ bzw. `ausloeserRef`.
  * - **Fehler am Ort** (LFH-1077): Prüffehler unter der Zelle, eine Ablehnung als `SpeicherFehler`
- *   am Paneel, der 409 als Rückfrage „Zwischenzeitlich geändert“. Kein Toast.
+ *   am Paneel, der Sperrkonflikt (`isSperrkonflikt`, Vorgabe jeder 409) als Rückfrage
+ *   „Zwischenzeitlich geändert“. Kein Toast.
+ * - **Zusatzhandlungen** (`zusatz`, LLH-1920): weitere Handlungen am Datensatz im Paneelkopf vor
+ *   „Bearbeiten“, etwa „Auf Karte verorten“ an den Raumdaten. Nur im Lesezustand: neben einer
+ *   offenen Bearbeitung steht keine zweite Handlung.
  */
 
 export interface BearbeitbaresFeld<W> {
@@ -81,10 +85,16 @@ export interface BearbeitbaresPaneelProps<W extends object, P = Partial<W>> {
   felder: readonly BearbeitbaresFeld<W>[];
   /** Abbildung auf den Patch; Vorgabe: nur geänderte Felder (`bearbeitetePatch`). */
   patch?: (vorher: W, nachher: W) => P;
-  /** Lehnt bei Ablehnung ab (`mutateAsync`); ein 409 öffnet die Rückfrage. */
+  /** Lehnt bei Ablehnung ab (`mutateAsync`); der Sperrkonflikt öffnet die Rückfrage. */
   onSpeichern: (patch: P, basis: CasBasis | undefined) => Promise<unknown>;
-  /** „Verwerfen und neu laden“ nach einem 409, etwa `query.refetch`. */
+  /** „Verwerfen und neu laden“ nach dem Sperrkonflikt, etwa `query.refetch`. */
   onNeuLaden?: () => void;
+  /**
+   * Welcher Fehler der Sperrkonflikt ist, der „Zwischenzeitlich geändert“ fragt; Vorgabe jeder 409
+   * (`istKonflikt`). Eine Route, die ihn auszeichnet, gibt `isVeraltet`: ihr übriger 409
+   * (storniert, doppelte Bezeichnung) steht dann als Grund am Paneel (LLH-1920).
+   */
+  isSperrkonflikt?: (e: unknown) => boolean;
   darfSchreiben: boolean;
   /** Kurzgrund ohne Schreibrecht; ohne Grund entfällt „Bearbeiten“. */
   grund?: string;
@@ -98,6 +108,8 @@ export interface BearbeitbaresPaneelProps<W extends object, P = Partial<W>> {
   ausloeserRef?: RefObject<HTMLElement | null>;
   /** Spalten des Rasters; Vorgabe 3. */
   spalten?: number;
+  /** Weitere Handlungen im Paneelkopf vor „Bearbeiten“, nur im Lesezustand (Modus `paneel`). */
+  zusatz?: ReactNode;
 }
 
 /** Wertgleichheit nach Inhalt (Zahlen, Texte, Listen, Objekte, Zeitpunkte über `toJSON`). */
@@ -147,6 +159,7 @@ function Innen<W extends object, P = Partial<W>>({
   patch: zuPatch,
   onSpeichern,
   onNeuLaden,
+  isSperrkonflikt = istKonflikt,
   darfSchreiben,
   grund,
   modus = 'paneel',
@@ -155,6 +168,7 @@ function Innen<W extends object, P = Partial<W>>({
   form: formVonAussen,
   ausloeserRef,
   spalten = 3,
+  zusatz,
 }: BearbeitbaresPaneelProps<W, P>) {
   const { token, rollen } = useRollen();
   const [eigeneForm] = Form.useForm<W>();
@@ -224,9 +238,9 @@ function Innen<W extends object, P = Partial<W>>({
       schliesse();
     } catch (e) {
       setLaeuft(false);
-      // Nur der 409 MIT Basis ist der Sperrkonflikt; beim Übernehmen zeigt ein weiterer 409 die
+      // Nur der Sperrkonflikt MIT Basis fragt nach; beim Übernehmen zeigt ein weiterer 409 die
       // Servermeldung, sonst wäre „Meine Änderung übernehmen“ ein toter Knopf.
-      if (istKonflikt(e) && basis !== undefined) setKonflikt({ patch });
+      if (isSperrkonflikt(e) && basis !== undefined) setKonflikt({ patch });
       else setFehler(e);
     }
   };
@@ -385,23 +399,32 @@ function Innen<W extends object, P = Partial<W>>({
 
   const sperrGrund = !darfSchreiben ? grund : belegung.gesperrt;
   const zeigeKnopf = darfSchreiben || grund != null;
+  const bearbeitenKnopf = zeigeKnopf && (
+    <Button
+      ref={knopfRef}
+      aria-label={`${titel} bearbeiten`}
+      aria-describedby={sperrGrund ? grundId : undefined}
+      disabled={sperrGrund != null}
+      onClick={() => setOffen(true)}
+    >
+      Bearbeiten
+    </Button>
+  );
   return (
     <Paneel
       titel={titel}
       ueberschrift={ueberschrift}
       meta={meta}
       aktion={
-        zeigeKnopf ? (
-          <Button
-            ref={knopfRef}
-            aria-label={`${titel} bearbeiten`}
-            aria-describedby={sperrGrund ? grundId : undefined}
-            disabled={sperrGrund != null}
-            onClick={() => setOffen(true)}
-          >
-            Bearbeiten
-          </Button>
-        ) : undefined
+        zusatz != null ? (
+          // Zwei Ziele mit dem Abstand der Leitlinie (≥ 8 / 16 px, `token.marginSM`, LLH-1273).
+          <Flex wrap gap={token.marginSM} align="center">
+            {zusatz}
+            {bearbeitenKnopf}
+          </Flex>
+        ) : (
+          bearbeitenKnopf || undefined
+        )
       }
     >
       {zeigeKnopf && sperrGrund && (

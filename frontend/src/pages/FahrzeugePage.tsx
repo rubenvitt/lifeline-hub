@@ -3,7 +3,7 @@ import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, darfVerwaltung, isEinsatzGesperrt } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -81,6 +81,7 @@ import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 import { fmsEtikett } from '../kraefte/meldebildRaster';
 import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { useHoldGeloest } from '../components/useHoldGeloest';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
   OffeneBearbeitungGrundZeile,
@@ -99,7 +100,7 @@ import {
   buildEinheitOptions,
 } from '../kraefte/kraeftebaumKern';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
-import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { schliesseRueckgaengig, zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import EigeneEinheitDialog from '../kraefte/EigeneEinheitDialog';
@@ -154,6 +155,10 @@ function BesatzungsBlock({
   freiInhalt,
   onZuordnen,
   onFreigeben,
+  crewZeilen,
+  laeuft,
+  onZurueck,
+  haltenProps,
   zuordnenFehler,
   freigebenFehler,
   uebernehmen,
@@ -171,6 +176,17 @@ function BesatzungsBlock({
   freiInhalt: string;
   onZuordnen: (epId: number) => void;
   onFreigeben: (epId: number, name: string) => void;
+  /**
+   * Die Besatzung dieses Fahrzeugs samt gehaltener Zeilen (LLH-1924, Spec `bedien-muster`,
+   * „Gelöste Zeile hält ihre Stelle“): eine gelöste Person steht als „Gelöst“ an ihrer Stelle,
+   * „Rückgängig“ an der ihrer Angabe.
+   */
+  crewZeilen: readonly { p: EinsatzPersonal; isGeloest: boolean }[];
+  /** Läuft für diese Person gerade ein Lösen oder Rückgängig? Ein zweiter Tipp schickt nichts. */
+  laeuft: (epId: number) => boolean;
+  onZurueck: (p: EinsatzPersonal) => void;
+  /** Handler der gehaltenen Zeilen: Zeiger und Fokus im Block halten sie. */
+  haltenProps: ReturnType<typeof useHoldGeloest<EinsatzPersonal>>['rootProps'];
   /** Grund des letzten abgelehnten Zuordnens an diesem Fahrzeug. */
   zuordnenFehler: ZeilenGrund | null;
   /** Grund des letzten abgelehnten Freigebens je Kraft. */
@@ -208,9 +224,11 @@ function BesatzungsBlock({
     );
   }
   const crew = personal.filter((p) => p.fahrzeug_id === ef.id);
-  const frei = personal.filter((p) => p.fahrzeug_id == null);
+  // Gehaltene Personen sind nicht frei zu wählen, bis ihre Zeile fällt.
+  const gehalten = new Set(crewZeilen.filter((z) => z.isGeloest).map((z) => z.p.id));
+  const frei = personal.filter((p) => p.fahrzeug_id == null && !gehalten.has(p.id));
   return (
-    <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
+    <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }} {...haltenProps}>
       <Space size={token.marginSM} style={{ marginBottom: token.marginSM }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
         <BesatzungsStaerkeBadge crew={crew} soll={ef.soll_besatzung ?? null} />
@@ -226,13 +244,14 @@ function BesatzungsBlock({
           )}
         </Space>
       )}
-      {crew.length === 0 ? (
+      {crewZeilen.length === 0 ? (
         <div>
           <Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text>
         </div>
       ) : (
-        crew.map((m) => {
+        crewZeilen.map(({ p: m, isGeloest: geloest }) => {
           const grund = freigebenFehler(m.id);
+          const nurPlatz = geloest ? ({ visibility: 'hidden' } as const) : undefined;
           // Position und Funktion je Person (LLH-1073, design.md D13): die Position als Wort
           // (LFH-946), die Funktion wie überall über `funktionText` (LLH-1067).
           const angabe = [
@@ -248,23 +267,67 @@ function BesatzungsBlock({
                 style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
               >
                 <Space size={token.marginSM} wrap>
-                  <span>{m.name}</span>
-                  {angabe && <Typography.Text type="secondary">{angabe}</Typography.Text>}
-                  {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
-                    <Tag style={{ margin: 0 }}>andere Einheit</Tag>
-                  )}
+                  <Typography.Text type={geloest ? 'secondary' : undefined}>
+                    {m.name}
+                  </Typography.Text>
+                  {/* Gehalten steht hier „Rückgängig“, weit weg vom Knopf, den ein zweiter Tipp
+                      trifft (LLH-1924). */}
+                  <span style={{ display: 'inline-grid' }}>
+                    <span style={{ gridArea: '1 / 1', ...nurPlatz }}>
+                      {angabe && <Typography.Text type="secondary">{angabe}</Typography.Text>}
+                      {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
+                        <Tag style={{ margin: 0, marginInlineStart: angabe ? 8 : 0 }}>
+                          andere Einheit
+                        </Tag>
+                      )}
+                    </span>
+                    {geloest && darfSchreiben && (
+                      <span style={{ gridArea: '1 / 1' }}>
+                        <Button
+                          aria-label={`Rückgängig: ${m.name} zurück auf das Fahrzeug`}
+                          loading={laeuft(m.id)}
+                          onClick={() => {
+                            if (!laeuft(m.id)) onZurueck(m);
+                          }}
+                        >
+                          Rückgängig
+                        </Button>
+                      </span>
+                    )}
+                  </span>
                 </Space>
                 {/* Umkehrbar: `danger` mit Abstand, ohne Rückfrage, mit Rückgängig-Hinweis (D13,
                     LLH-1722). Einzige Handlung der Zeile, deshalb ein Knopf. Der Name nennt
-                    Handlung und Person. */}
+                    Handlung und Person. Gehalten steht „Gelöst“ träge an seiner Stelle. */}
                 {darfSchreiben && (
-                  <Button
-                    danger
-                    aria-label={`${m.name} vom Fahrzeug lösen`}
-                    onClick={() => onFreigeben(m.id, m.name)}
-                  >
-                    Vom Fahrzeug lösen
-                  </Button>
+                  <span style={{ display: 'inline-grid', justifyItems: 'end' }}>
+                    <span style={{ gridArea: '1 / 1', ...nurPlatz }}>
+                      <Button
+                        danger
+                        aria-label={`${m.name} vom Fahrzeug lösen`}
+                        aria-hidden={geloest || undefined}
+                        tabIndex={geloest ? -1 : undefined}
+                        loading={!geloest && laeuft(m.id)}
+                        onClick={() => {
+                          if (!geloest && !laeuft(m.id)) onFreigeben(m.id, m.name);
+                        }}
+                      >
+                        Vom Fahrzeug lösen
+                      </Button>
+                    </span>
+                    {geloest && (
+                      <span style={{ gridArea: '1 / 1' }}>
+                        <Button
+                          type="text"
+                          aria-label={`${m.name} gelöst`}
+                          aria-disabled
+                          style={{ cursor: 'default' }}
+                        >
+                          <Typography.Text type="secondary">Gelöst</Typography.Text>
+                        </Button>
+                      </span>
+                    )}
+                  </span>
                 )}
               </Space>
               {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
@@ -634,25 +697,72 @@ function FahrzeugeInhalt() {
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     await qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
   }
+  // Eine gelöste Besatzungszeile hält ihre Stelle (LLH-1924, Spec `bedien-muster`): sonst rückt
+  // „Vom Fahrzeug lösen“ der nächsten Person unter den Finger. Quelle ist die Besatzung aller
+  // Fahrzeuge; eine gelöste Person fällt aus ihr heraus, ihre Zeile steht weiter unter ihrem
+  // Fahrzeug. Der Block baut sich beim Zuklappen neu; wer zuklappt, hat ihn verlassen.
+  const besatzungQuelle = useMemo(
+    () => (personalQuery.data ?? []).filter((p) => p.fahrzeug_id != null),
+    [personalQuery.data],
+  );
+  const besatzungHalten = useHoldGeloest(besatzungQuelle, String(einsatzId));
+  const [besatzungRueckFehler, setBesatzungRueckFehler] = useState<{
+    fehler: unknown;
+    epId: number;
+  } | null>(null);
+  // Der Grund einer abgelehnten Rücknahme, deren Zeile nicht mehr steht.
+  const besatzungRueckOhneZeile =
+    besatzungRueckFehler != null &&
+    !besatzungHalten.rows.some((r) => r.p.id === besatzungRueckFehler.epId)
+      ? besatzungRueckFehler.fehler
+      : null;
+  const [besatzungLaufend, setBesatzungLaufend] = useState<ReadonlySet<number>>(new Set());
+  const markiereBesatzung = (epId: number, an: boolean) =>
+    setBesatzungLaufend((alt) => {
+      const neu = new Set(alt);
+      if (an) neu.add(epId);
+      else neu.delete(epId);
+      return neu;
+    });
   // „Rückgängig“ setzt die Person wieder auf das Fahrzeug (LLH-1722, `frontend/AGENTS.md`, „Beenden:
-  // Verb, Ort und Sicherung je Art“); die Ablehnung steht im Seitenhinweis wie beim Entlassen.
+  // Verb, Ort und Sicherung je Art“), aber nur, wenn sie nicht inzwischen auf einem anderen sitzt
+  // (LLH-1924). Die Ablehnung steht an der gehaltenen Zeile; ist die gefallen, im Seitenhinweis.
   const besatzungZurueckMutation = useMutation({
-    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
-    onMutate: () => setRueckgaengigFehler(null),
-    onSuccess: invalidate,
-    onError: (e) => setRueckgaengigFehler(e),
+    mutationFn: (v: { efId: number; epId: number }) =>
+      ordneBesatzungZu(einsatzId, v.efId, v.epId, { nurWennFrei: true }),
+    onMutate: (v) => {
+      setRueckgaengigFehler(null);
+      setBesatzungRueckFehler(null);
+      freigebenFehler.beginne(v.epId);
+      markiereBesatzung(v.epId, true);
+    },
+    onSuccess: (_d, v) => {
+      besatzungHalten.release(v.epId);
+      invalidate();
+    },
+    // An der gehaltenen Zeile; fällt sie, steht der Grund im Seitenhinweis (`besatzungRueckFehler`).
+    onError: (e, v) => {
+      freigebenFehler.melde(v.epId, e, 'Nicht zurückgenommen');
+      setBesatzungRueckFehler({ fehler: e, epId: v.epId });
+    },
+    onSettled: (_d, _e, v) => markiereBesatzung(v.epId, false),
   });
   const besatzungFreiMutation = useMutation({
-    mutationFn: (v: { efId: number; epId: number; name: string }) =>
-      gibBesatzungFrei(einsatzId, v.efId, v.epId),
-    onMutate: (v) => freigebenFehler.beginne(v.epId),
+    mutationFn: (v: { efId: number; person: EinsatzPersonal }) =>
+      gibBesatzungFrei(einsatzId, v.efId, v.person.id),
+    onMutate: (v) => {
+      freigebenFehler.beginne(v.person.id);
+      markiereBesatzung(v.person.id, true);
+    },
     onSuccess: (_d, v) => {
+      besatzungHalten.add(v.person);
       invalidate();
-      zeigeRueckgaengig(message, `${v.name} vom Fahrzeug gelöst`, () =>
-        besatzungZurueckMutation.mutate({ efId: v.efId, epId: v.epId }),
+      zeigeRueckgaengig(message, `${v.person.name} vom Fahrzeug gelöst`, () =>
+        besatzungZurueckMutation.mutate({ efId: v.efId, epId: v.person.id }),
       );
     },
-    onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Nicht vom Fahrzeug gelöst'),
+    onError: (e, v) => freigebenFehler.melde(v.person.id, e, 'Nicht vom Fahrzeug gelöst'),
+    onSettled: (_d, _e, v) => markiereBesatzung(v.person.id, false),
   });
 
   if (einsatzQuery.isLoading) {
@@ -1116,12 +1226,15 @@ function FahrzeugeInhalt() {
         </Space>
       }
       hinweis={
-        nurAnsicht || rueckgaengigFehler != null || ausgelassenText != null ? (
+        nurAnsicht ||
+        rueckgaengigFehler != null ||
+        besatzungRueckOhneZeile != null ||
+        ausgelassenText != null ? (
           <>
             <SeitenHinweise
               rechteText={einsatzRechteGrund(einsatz)}
               rechteFehlt={nurAnsicht}
-              fehler={rueckgaengigFehler}
+              fehler={rueckgaengigFehler ?? besatzungRueckOhneZeile}
               fehlerTitel="Nicht zurückgenommen"
               fehlerFallback="Rückgängig fehlgeschlagen"
             />
@@ -1247,9 +1360,18 @@ function FahrzeugeInhalt() {
                       darfSchreiben={darfSchreiben}
                       freiInhalt={besatzungInhalt}
                       onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-                      onFreigeben={(epId, name) =>
-                        besatzungFreiMutation.mutate({ efId: ef.id, epId, name })
-                      }
+                      onFreigeben={(epId) => {
+                        const person = personal.find((p) => p.id === epId);
+                        if (person) besatzungFreiMutation.mutate({ efId: ef.id, person });
+                      }}
+                      crewZeilen={besatzungHalten.rows.filter((z) => z.p.fahrzeug_id === ef.id)}
+                      laeuft={(epId) => besatzungLaufend.has(epId)}
+                      onZurueck={(p) => {
+                        // Derselbe Rückweg wie im Hinweis: der schließt sich (Review LLH-1924).
+                        schliesseRueckgaengig(message);
+                        besatzungZurueckMutation.mutate({ efId: ef.id, epId: p.id });
+                      }}
+                      haltenProps={besatzungHalten.rootProps}
                       zuordnenFehler={zuordnenFehler.grund(ef.id)}
                       freigebenFehler={freigebenFehler.grund}
                       gesperrt={personalGesperrt}

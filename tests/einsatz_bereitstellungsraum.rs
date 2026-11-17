@@ -4021,6 +4021,44 @@ async fn abruf_fahrzeug_sendet_fahrzeug() {
     );
 }
 
+/// Raumdaten mit Basisstand (LLH-1920, Spec `bereitstellungsraum-bearbeitung`): ein veralteter
+/// `basis_geaendert_at` gibt 409 und ändert nichts, der aktuelle speichert.
+#[tokio::test]
+async fn patch_mit_veraltetem_basisstand_gibt_409() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Stand").await;
+    sqlx::query("UPDATE bereitstellungsraum SET geaendert_at = '2000-01-01 00:00:00' WHERE id = ?")
+        .bind(br_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (s, v409) = patch_br(
+        &app,
+        &cookie,
+        eid,
+        br_id,
+        json!({"notiz": "alt", "basis_geaendert_at": "1999-12-31 23:59:59"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    // Eigener Grund: der Client fragt nur beim Sperrkonflikt „Zwischenzeitlich geändert“.
+    assert_eq!(v409["grund"], "veraltet", "{v409}");
+
+    let (s, v) = patch_br(
+        &app,
+        &cookie,
+        eid,
+        br_id,
+        json!({"notiz": "neu", "basis_geaendert_at": "2000-01-01 00:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["notiz"], "neu");
+}
+
 // ---------- Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`) ----------
 
 async fn patch_br(
@@ -4932,4 +4970,73 @@ async fn von_br_id_ausserhalb_des_wechsels_400() {
             .await
             .unwrap();
     assert_eq!(raum, Some(a));
+}
+
+/// LLH-1924 (Spec `bereitstellungsraum-belegung`, „Austritt zurücknehmen“): das Rückgängig nach
+/// „Austragen“ bringt die Kraft mit ihrer Wartezeit zurück, schreibt einen ETB-Eintrag und
+/// erscheint im Verlauf als Rücknahme; steht die Kraft inzwischen in einem anderen Raum, ist es
+/// 409 ohne Änderung.
+#[tokio::test]
+async fn austragen_zuruecknehmen() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let sportplatz = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let schule = br_anlegen_und_aktivieren(&app, &cookie, eid, "Schule").await;
+    let hlf = einheit_bilden(&app, &cookie, eid, "HLF 20").await;
+    let ein = belegen(&app, &cookie, eid, sportplatz, "einheit", hlf, "eintritt").await;
+    sqlx::query("UPDATE br_belegung SET zeitpunkt_at = '2026-05-28 11:42:00' WHERE id = ?")
+        .bind(ein["id"].as_i64().unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let aus = belegen(&app, &cookie, eid, sportplatz, "einheit", hlf, "austritt").await;
+    let pfad = |br: i64, id: &serde_json::Value| {
+        format!("{}/belegung/{id}/zuruecknehmen", br_pfad(eid, br))
+    };
+
+    let (s, v) = anfrage_json(&app, "POST", &pfad(sportplatz, &aus["id"]), &cookie, None).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["art"], "eintritt");
+    assert_eq!(v["ruecknahme_von"], aus["id"]);
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, sportplatz)).await;
+    assert_eq!(d["einheiten"][0]["id"], hlf, "{d}");
+    assert_eq!(d["einheiten"][0]["seit_at"], "2026-05-28 11:42:00", "{d}");
+    assert_eq!(d["belegung"]["laengste_seit_at"], "2026-05-28 11:42:00");
+    let etb = etb_inhalte(&app, &cookie, eid).await;
+    assert!(
+        etb.iter()
+            .any(|t| t
+                == "HLF 20 wieder im Bereitstellungsraum Sportplatz: Austragen zurückgenommen"),
+        "{etb:?}"
+    );
+    let verlauf = fetch_json(
+        &app,
+        &cookie,
+        &format!("{}/verlauf", br_pfad(eid, sportplatz)),
+    )
+    .await;
+    let arten: Vec<&str> = verlauf
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["art"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        arten,
+        ["austritt_zurueckgenommen", "austritt", "eintritt"],
+        "{verlauf}"
+    );
+
+    // Ausgetragen, inzwischen in der Schule: 409, sie bleibt dort.
+    let aus = belegen(&app, &cookie, eid, sportplatz, "einheit", hlf, "austritt").await;
+    belegen(&app, &cookie, eid, schule, "einheit", hlf, "eintritt").await;
+    let (s, v) = anfrage_json(&app, "POST", &pfad(sportplatz, &aus["id"]), &cookie, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let d = fetch_json(&app, &cookie, &br_pfad(eid, schule)).await;
+    assert_eq!(d["einheiten"][0]["id"], hlf, "{d}");
+
+    // Fremder Raum oder unbekanntes Ereignis: 404.
+    let (s, _) = anfrage_json(&app, "POST", &pfad(schule, &aus["id"]), &cookie, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 }

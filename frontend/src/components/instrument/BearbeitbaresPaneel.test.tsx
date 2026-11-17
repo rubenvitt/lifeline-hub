@@ -125,6 +125,32 @@ describe('BearbeitbaresPaneel · Umschalten', () => {
   });
 });
 
+describe('BearbeitbaresPaneel · Zusatzhandlungen im Kopf (LLH-1920)', () => {
+  it('stehen im Lesezustand vor „Bearbeiten“, fehlen während der Bearbeitung', async () => {
+    const user = userEvent.setup();
+    rendern(<FunkPaneel zusatz={<Button>Auf Karte verorten</Button>} />);
+    const paneel = screen.getByRole('region', { name: 'Funk' });
+    const verorten = within(paneel).getByRole('button', { name: 'Auf Karte verorten' });
+    const bearbeiten = within(paneel).getByRole('button', { name: 'Funk bearbeiten' });
+    expect(
+      verorten.compareDocumentPosition(bearbeiten) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(bearbeiten);
+    await screen.findByRole('textbox', { name: 'Rufname' });
+    expect(screen.queryByRole('button', { name: 'Auf Karte verorten' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(screen.getByRole('button', { name: 'Auf Karte verorten' })).toBeInTheDocument();
+  });
+
+  it('auch ohne „Bearbeiten“ (ohne Schreibrecht, ohne Grund) bleibt der Zusatz stehen', () => {
+    rendern(<FunkPaneel darfSchreiben={false} zusatz={<Button>Drucken</Button>} />);
+    expect(screen.getByRole('button', { name: 'Drucken' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Funk bearbeiten' })).toBeNull();
+  });
+});
+
 describe('BearbeitbaresPaneel · Speichern', () => {
   it('schickt nur geänderte Felder mit der Basis der Sitzung und schließt', async () => {
     const user = userEvent.setup();
@@ -228,6 +254,46 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
     await waitFor(() => expect(onSpeichern).toHaveBeenCalledTimes(2));
     expect(onSpeichern).toHaveBeenLastCalledWith({ kanal: 43 }, undefined);
     await waitFor(() => expect(screen.queryByRole('spinbutton')).toBeNull());
+  });
+
+  it('mit `isSperrkonflikt`: ein anderer 409 steht als Grund am Paneel, keine Rückfrage (LLH-1920)', async () => {
+    const user = userEvent.setup();
+    rendern(
+      <FunkPaneel
+        isSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
+        onSpeichern={async () => {
+          throw new ApiError(409, 'Rufname schon vergeben');
+        }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    await user.clear(kanal);
+    await user.type(kanal, '43');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Rufname schon vergeben')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Zwischenzeitlich geändert' })).toBeNull();
+    expect(screen.getByRole('spinbutton', { name: 'Kanal' })).toHaveValue('43');
+  });
+
+  it('mit `isSperrkonflikt`: der Sperrkonflikt fragt weiter nach', async () => {
+    const user = userEvent.setup();
+    rendern(
+      <FunkPaneel
+        isSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
+        onSpeichern={async () => {
+          throw new ApiError(409, 'geändert', { grund: 'veraltet' });
+        }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    await user.clear(kanal);
+    await user.type(kanal, '43');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' }),
+    ).toBeInTheDocument();
   });
 
   it('„Verwerfen und neu laden“ schließt und lädt neu', async () => {

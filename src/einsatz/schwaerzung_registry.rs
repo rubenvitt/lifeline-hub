@@ -523,6 +523,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("notiz", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_von", G_FK),
+            // Rücknahme eines Austritts (LLH-1924): Bezug auf den Austritt.
+            retain("ruecknahme_von", G_FK),
         ],
     },
     TabellenRegel {
@@ -2165,6 +2167,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("ziel_anzeige", G_OP_LABEL),
             retain("auftrag_id", G_FK),
             retain("mit_abruf_id", G_FK),
+            // Rücknahme eines Austritts (LLH-1924): Bezug auf den Austritt.
+            retain("ruecknahme_von", G_FK),
         ],
     },
     TabellenRegel {

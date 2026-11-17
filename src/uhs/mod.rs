@@ -196,6 +196,18 @@ pub struct BelegungAnzeige {
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,
     pub erfasst_von: i64,
+    /// Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie
+    /// zurücknimmt. Wartezeit und Aufenthalt übergehen das Paar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ruecknahme_von: Option<i64>,
+}
+
+/// Antwort auf die Rücknahme eines Austritts (LLH-1924, design.md D3): das neue Ereignis und ob
+/// die Person ihren Platz davor nicht zurückbekam und im Wartebereich steht.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct BelegungRuecknahme {
+    pub ereignis: BelegungAnzeige,
+    pub ohne_platz: bool,
 }
 
 /// Wo eine Person gerade in einer UHS steht (LLH-1129): für den Patientenkopf im Personen-Detail,

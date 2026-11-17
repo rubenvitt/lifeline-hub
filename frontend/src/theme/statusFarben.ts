@@ -361,6 +361,20 @@ export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
   austritt: { rolle: 'achtung', label: 'Austritt' },
 };
 
+/** Die Rücknahme eines Austritts (LLH-1924): ein Eintritt, der keiner ist. */
+export const austragenZurueckgenommen: StatusDarstellung = {
+  rolle: 'normal',
+  label: 'Austragen zurückgenommen',
+};
+
+/** Darstellung einer Bewegung: die Rücknahme eines Austritts heißt so, nicht „Eintritt“. */
+export function belegungsDarstellung(b: {
+  art: BelegungsArt;
+  ruecknahme_von?: number | null;
+}): StatusDarstellung {
+  return b.ruecknahme_von != null ? austragenZurueckgenommen : belegungsArt[b.art];
+}
+
 /**
  * Warnstufe als **Objektsignatur auf der Karte**.
  *

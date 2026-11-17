@@ -397,6 +397,10 @@ pub struct PatchBody {
     pub lat: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub lon: Option<Option<f64>>,
+    /// Optimistisches Lock (LLH-1920, Muster UHS): der beim Öffnen gelesene `geaendert_at`.
+    /// Stimmt er nicht mehr → 409. Fehlt er (Lagekarte, „Meine Änderung übernehmen“), wird
+    /// ohne Prüfung geschrieben.
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/bereitstellungsraeume/{bid}
@@ -420,6 +424,7 @@ pub async fn update(
         notiz: notiz.as_ref().map(|o| o.as_deref()),
         lat: body.lat,
         lon: body.lon,
+        basis_geaendert_at: body.basis_geaendert_at.as_deref(),
     };
     // Storniert (409), fremd (404) und das Koordinatenpaar (422) prüft `update_tx` gegen den
     // Stand dieser Transaktion.
@@ -565,6 +570,42 @@ pub async fn belegung(
     for (einheit_id, _) in &belegt.mitgenommen {
         super::einsatz_einheit::sse_einheit(&state, einsatz_id, *einheit_id);
     }
+    Ok((StatusCode::CREATED, Json(event)))
+}
+
+/// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung/{belegung_id}/zuruecknehmen —
+/// einen Austritt zurücknehmen (LLH-1924, Spec `bereitstellungsraum-belegung`, „Austritt
+/// zurücknehmen“, design.md D3). Rechte wie das Austragen, auch am Gerät des Raums. ETB und Live
+/// wie eine Belegung.
+pub async fn belegung_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id, belegung_id)): PfadParam<(i64, i64, i64)>,
+) -> Result<(StatusCode, Json<BrBelegungAnzeige>), AppError> {
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    let einsatz_id = ctx.einsatz.id;
+    let event = belegung_repo::nimm_austritt_zurueck(
+        &state.pool,
+        einsatz_id,
+        br_id,
+        belegung_id,
+        ctx.benutzer.id,
+    )
+    .await?;
+    let br = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
+    if let Some(etb_text) =
+        belegungs_etb_text(&state.pool, einsatz_id, &br.bezeichnung, &event, None).await?
+    {
+        super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &etb_text).await;
+    }
+    sse_br(&state, einsatz_id, br_id);
+    let objekt_event = match event.objekt_typ.as_str() {
+        "einheit" => LiveEvent::Einheit,
+        _ => LiveEvent::Fahrzeug,
+    };
+    let data =
+        serde_json::json!({ "einsatz_id": einsatz_id, "objekt_id": event.objekt_id }).to_string();
+    state.live.publiziere_event(einsatz_id, objekt_event, data);
     Ok((StatusCode::CREATED, Json(event)))
 }
 
@@ -1026,6 +1067,11 @@ async fn belegungs_etb_text(
     };
 
     let text = match event.art.as_str() {
+        // Rücknahme eines Austritts (LLH-1924): kein neues Eintreffen.
+        "eintritt" if event.ruecknahme_von.is_some() => format!(
+            "{} wieder im Bereitstellungsraum {}: Austragen zurückgenommen",
+            obj_name, br_bezeichnung
+        ),
         "eintritt" => crate::bereitstellungsraum::etb_text_eintritt(&obj_name, br_bezeichnung),
         "wechsel" => format!(
             "{} wechselt zu Bereitstellungsraum {}",

@@ -96,6 +96,11 @@ export interface BrPatch {
   /** Koordinate (LLH-1107): beide `null` entfernen die Verortung; ein halbes Paar ist 422. */
   lat?: number | null;
   lon?: number | null;
+  /**
+   * Optimistisches Lock (LLH-1920): `geaendert_at` beim Öffnen; ein anderer Stand gibt 409. Fehlt
+   * er, schreibt der Server ohne Prüfung.
+   */
+  basis_geaendert_at?: string;
 }
 
 export function aktualisiereBr(
@@ -148,6 +153,22 @@ export function belegeBr(
     `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/belegung`,
     'POST',
     daten,
+  );
+}
+
+/**
+ * Nimmt einen Austritt zurück (LLH-1924, Spec `bereitstellungsraum-belegung`, „Austritt
+ * zurücknehmen“): die Kraft steht wieder im Raum, ihre Wartezeit läuft weiter. 409 mit Grund,
+ * wenn sie inzwischen weiter gebucht ist oder das Austragen zu lange zurückliegt.
+ */
+export function nimmBrAustrittZurueck(
+  einsatzId: number,
+  brId: number,
+  belegungId: number,
+): Promise<BrBelegung> {
+  return apiSend<BrBelegung>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/belegung/${belegungId}/zuruecknehmen`,
+    'POST',
   );
 }
 

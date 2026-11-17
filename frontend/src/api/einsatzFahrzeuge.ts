@@ -5,7 +5,7 @@ import type {
   EntlassungVorzustand,
 } from './types';
 import { apiGet, apiSend } from './client';
-import type { PositionPatch } from './einheiten';
+import { zuruecknahmeQuery, type PositionPatch, type ZuruecknahmeFilter } from './einheiten';
 
 export interface AdhocEingabe {
   funkrufname: string;
@@ -127,9 +127,21 @@ export function verorteFahrzeug(
   );
 }
 
-/** LFH-9: Ordnet eine Kraft (einsatz_personal.id) einem Fahrzeug als Besatzung zu. */
-export function ordneBesatzungZu(einsatzId: number, efId: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}`, 'PUT');
+/**
+ * LFH-9: Ordnet eine Kraft (einsatz_personal.id) einem Fahrzeug als Besatzung zu. Das Rückgängig
+ * nach „Vom Fahrzeug lösen“ schickt `nurWennFrei` (LLH-1924): sitzt sie inzwischen auf einem
+ * anderen Fahrzeug, 409 statt Umsetzen.
+ */
+export function ordneBesatzungZu(
+  einsatzId: number,
+  efId: number,
+  epId: number,
+  optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}${zuruecknahmeQuery(optionen)}`,
+    'PUT',
+  );
 }
 
 /**

@@ -54,8 +54,8 @@ Ausführung, nicht beim Anzeigen eines Ziels.
 Das System MUST NOT ein Modul in „Zuletzt besucht" aufnehmen, wenn es angesteuert wurde, ohne
 dass jemand genau dieses Modul gewählt hat. Das betrifft den Rail-Sprung in ein Modul einer
 Kategorie (das zuletzt besuchte oder das erste), den Einsatz-Switcher mit der Weiterleitung auf
-das Standardmodul, das Öffnen einer Adresse von außen (Lesezeichen, eingefügter Link, neuer Tab)
-und Querverweise innerhalb von Modulinhalten.
+das Standardmodul oder auf dasselbe Modul im Ziel-Einsatz, das Öffnen einer Adresse von außen
+(Lesezeichen, eingefügter Link, neuer Tab) und Querverweise innerhalb von Modulinhalten.
 
 #### Scenario: Rail-Sprung
 
@@ -68,6 +68,12 @@ und Querverweise innerhalb von Modulinhalten.
 - **WHEN** eine Person über den Einsatz-Switcher einen Einsatz öffnet und auf dessen
   Standardmodul weitergeleitet wird
 - **THEN** enthält „Zuletzt besucht" dieses Standardmodul nicht
+
+#### Scenario: Einsatzwechsel im selben Modul
+
+- **WHEN** eine Person aus den Fahrzeugen von Einsatz 7 über den Einsatz-Switcher in die
+  Fahrzeuge von Einsatz 8 wechselt
+- **THEN** enthält „Zuletzt besucht" in Einsatz 8 die Fahrzeuge nicht
 
 #### Scenario: Adresse von außen
 

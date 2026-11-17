@@ -154,8 +154,8 @@ describe('UhsKraefte', () => {
         aufrufe.push(`DELETE ${params.kid}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/1/uhs/2/kraefte/:kid', ({ params }) => {
-        aufrufe.push(`PUT ${params.kid}`);
+      http.put('/api/einsaetze/1/uhs/2/kraefte/:kid', ({ params, request }) => {
+        aufrufe.push(`PUT ${params.kid}${new URL(request.url).search}`);
         return HttpResponse.json({ id: Number(params.kid) });
       }),
     );
@@ -167,10 +167,11 @@ describe('UhsKraefte', () => {
       '.ant-message-notice',
     ) as HTMLElement;
     await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(aufrufe).toEqual(['DELETE 12', 'PUT 12']));
+    // Nimmt sie keiner anderen UHS weg (LLH-1924).
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 12', 'PUT 12?nur_wenn_frei=1']));
   });
 
-  it('scheitert das Rückgängig, steht der Grund über der Liste (LLH-1722)', async () => {
+  it('scheitert das Rückgängig, steht der Grund an der gehaltenen Zeile (LLH-1924)', async () => {
     mitFreien();
     server.use(
       http.delete(
@@ -178,19 +179,79 @@ describe('UhsKraefte', () => {
         () => new HttpResponse(null, { status: 204 }),
       ),
       http.put('/api/einsaetze/1/uhs/2/kraefte/:kid', () =>
-        HttpResponse.json({ error: 'Kraft ist entlassen' }, { status: 409 }),
+        HttpResponse.json({ error: 'Bernd Berg steht inzwischen an UHS «Zelt»' }, { status: 409 }),
       ),
     );
     renderMitProviders(
       <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Bernd Berg abziehen' }));
-    const hinweis = (await screen.findByText('Bernd Berg abgezogen')).closest(
-      '.ant-message-notice',
-    ) as HTMLElement;
-    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
-    expect(await screen.findByText('Kraft ist entlassen')).toBeInTheDocument();
-    expect(screen.getByText('Bernd Berg nicht zurückgenommen')).toBeInTheDocument();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Rückgängig: Bernd Berg zurück an die UHS' }),
+    );
+    const zeile = screen.getByRole('button', { name: 'Bernd Berg gelöst' }).closest('tr')!;
+    expect(
+      await within(zeile).findByText('Bernd Berg steht inzwischen an UHS «Zelt»'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Bernd Berg nicht zurückgenommen')).toBeNull();
+  });
+
+  describe('gehaltene Zeile nach dem Abziehen (LLH-1924, Spec `bedien-muster`)', () => {
+    it('zwei schnelle Tipps: nur Bernd geht, an der Stelle des Knopfs steht „Gelöst“', async () => {
+      mitFreien();
+      const geloest: string[] = [];
+      server.use(
+        http.delete('/api/einsaetze/1/uhs/2/kraefte/:kid', async ({ params }) => {
+          geloest.push(String(params.kid));
+          await delay(20);
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      renderMitProviders(
+        <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+      );
+      const knopf = screen.getByRole('button', { name: 'Bernd Berg abziehen' });
+      await userEvent.click(knopf);
+      await userEvent.click(knopf);
+      const marke = await screen.findByRole('button', { name: 'Bernd Berg gelöst' });
+      await userEvent.click(marke);
+      await userEvent.click(knopf);
+      expect(geloest).toEqual(['12']);
+      expect(marke).toHaveAttribute('aria-disabled', 'true');
+      // „Rückgängig“ steht an der Stelle der Funktion, nicht an der des Knopfs.
+      const zeile = marke.closest('tr')!;
+      const rueck = within(zeile).getByRole('button', {
+        name: 'Rückgängig: Bernd Berg zurück an die UHS',
+      });
+      expect(rueck.closest('td')).not.toBe(marke.closest('td'));
+      expect(screen.getByRole('button', { name: 'Anna Arzt abziehen' })).toBeEnabled();
+    });
+
+    it('„Rückgängig“ in der Zeile ordnet die Kraft wieder zu, nur wenn frei', async () => {
+      mitFreien();
+      const aufrufe: string[] = [];
+      server.use(
+        http.delete(
+          '/api/einsaetze/1/uhs/2/kraefte/:kid',
+          () => new HttpResponse(null, { status: 204 }),
+        ),
+        http.put('/api/einsaetze/1/uhs/2/kraefte/:kid', ({ params, request }) => {
+          aufrufe.push(`PUT ${params.kid}${new URL(request.url).search}`);
+          return HttpResponse.json({ id: Number(params.kid) });
+        }),
+      );
+      renderMitProviders(
+        <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Bernd Berg abziehen' }));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Rückgängig: Bernd Berg zurück an die UHS' }),
+      );
+      await waitFor(() => expect(aufrufe).toEqual(['PUT 12?nur_wenn_frei=1']));
+      expect(
+        await screen.findByRole('button', { name: 'Bernd Berg abziehen' }),
+      ).toBeInTheDocument();
+    });
   });
 
   it('der Laptop ordnet keine Einheit zu; ohne freie Kraft ist „Kraft zuordnen“ gesperrt', async () => {

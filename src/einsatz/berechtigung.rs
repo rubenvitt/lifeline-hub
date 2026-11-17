@@ -493,6 +493,7 @@ mod tests {
             naechste_lagebesprechung_at: None,
             abgeschlossen_at: None,
             abgeschlossen_von: None,
+            abgeschlossen_von_name: None,
             einsatzart: crate::einsatz::Einsatzart::Realeinsatz,
             einsatznummer_intern: None,
             angelegt_at: "2026-05-23".into(),

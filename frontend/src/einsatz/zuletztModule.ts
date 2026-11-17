@@ -24,6 +24,9 @@
  * |                                                 |       | drei Rail-Klicks überschrieben die     |
  * |                                                 |       | ganze Liste                            |
  * | Einsatz-Switcher / Standardmodul                | nein  | Ankunft, das Ziel wählt `standard_modul`|
+ * | Einsatzwechsel ins selbe Modul (Kopf, Palette)  | nein  | Ankunft über die Index-Weiche          |
+ * |                                                 |       | (`?modul=`, LLH-1821), keine Wahl im   |
+ * |                                                 |       | Ziel-Einsatz                           |
  * | Adresse von außen, neuer Tab                    | nein  | kein Klick in der App                  |
  * | Querverweise in Modulinhalten                   | nein  | folgt einem Datensatz, keiner Modulwahl|
  *

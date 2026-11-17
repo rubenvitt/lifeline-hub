@@ -8,7 +8,7 @@ import type { Person, UhsBelegung, UhsDetail, BelegungsArt } from '../../api/typ
 import Datensicht, { spaltenFuer } from '../../components/Datensicht';
 import StatusTag from '../../components/StatusTag';
 import { monoStil } from '../../components/instrument';
-import { belegungsArt } from '../../theme/statusFarben';
+import { belegungsArt, belegungsDarstellung } from '../../theme/statusFarben';
 import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
 import { KennungsLink } from '../../components/kennungsLink';
 
@@ -107,7 +107,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           title: 'Art',
           dataIndex: 'art',
           filter: { werte: ART_WERTE, trifft: (b, w) => b.art === w },
-          render: (art: BelegungsArt) => <StatusTag darstellung={belegungsArt[art]} />,
+          render: (_art: BelegungsArt, b) => <StatusTag darstellung={belegungsDarstellung(b)} />,
         },
         {
           key: 'platz_id',
@@ -157,7 +157,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           // Kartentitel ist die Person (wer hat sich bewegt), Tabellenspalte 0 die Zeit
           // (chronologisch verglichen). Die Rollen sind unabhängig von der Spaltenreihenfolge.
           titel: { spalte: 'person_id' },
-          status: (b) => belegungsArt[b.art],
+          status: (b) => belegungsDarstellung(b),
           sekundaer: ['zeitpunkt_at', 'platz_id', 'notiz'],
         }}
       />

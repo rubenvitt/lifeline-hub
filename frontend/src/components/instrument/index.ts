@@ -36,7 +36,7 @@ export {
 export { default as Sammelbanner, sammelbannerKurz } from './Sammelbanner';
 export { default as Filterhinweis } from './Filterhinweis';
 export { default as Schnellerfassungszeile } from './Schnellerfassungszeile';
-export { rollenwerte, useRollen, monoStil } from './rollenwerte';
+export { rollenwerte, useRollen, monoStil, schriftStil } from './rollenwerte';
 export { default as Datenraster, Datenfeld } from './Datenraster';
 export { default as DatenfeldEingabe, type DatenfeldEingabeProps } from './DatenfeldEingabe';
 export {

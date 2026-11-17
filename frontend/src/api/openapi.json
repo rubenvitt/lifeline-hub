@@ -863,6 +863,31 @@
           }
         }
       },
+      "AbschlussEintrag": {
+        "type": "object",
+        "description": "Ein offener Punkt der Kurzliste: Kennung, laufende Nummer des Moduls (Auftrag, Meldung,\nRegistriernummer einer Person), Bezeichnung.",
+        "required": [
+          "id",
+          "bezeichnung"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nummer": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer im Modul; fehlt, wo das Modul keine kennt."
+          }
+        }
+      },
       "AbschlussGrund": {
         "type": "string",
         "description": "Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).\nString = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur\n(\"Tier T-001 (Hund): an Tierarzt übergeben\").",
@@ -874,6 +899,119 @@
           "freilauf",
           "sonstiges"
         ]
+      },
+      "AbschlussGruppe": {
+        "type": "object",
+        "description": "Eine Gruppe offener Punkte: alle gezählt, höchstens [`KURZLISTE_MAX`] genannt.",
+        "required": [
+          "anzahl",
+          "eintraege"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eintraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbschlussEintrag"
+            },
+            "description": "Leer, wenn die Person das Modul nicht lesen darf; `anzahl` zählt trotzdem alle."
+          }
+        }
+      },
+      "AbschlussKraefte": {
+        "type": "object",
+        "description": "Nicht entlassene Kräfte. `anzahl` zählt alle: die Einheiten und Fahrzeuge der Kurzliste\n(ein Fahrzeug in einer aktiven Einheit steht nur über seine Einheit) und die Einsatzkräfte,\ndie `personal` noch einmal für sich nennt.",
+        "required": [
+          "anzahl",
+          "eintraege",
+          "personal"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eintraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbschlussKraft"
+            },
+            "description": "Einheiten nur mit lesbarem Modul `einheiten`, Fahrzeuge nur mit `fahrzeuge`."
+          },
+          "personal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon nicht entlassene Einsatzkräfte (`einsatz_personal`)."
+          }
+        }
+      },
+      "AbschlussKraft": {
+        "type": "object",
+        "description": "Eine nicht entlassene Einheit oder ein nicht entlassenes Fahrzeug mit aktuellem Status.",
+        "required": [
+          "art",
+          "id",
+          "bezeichnung"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/AbschlussKraftArt"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Statustext („3 – Auf Anfahrt“); fehlt ohne Status."
+          }
+        }
+      },
+      "AbschlussKraftArt": {
+        "type": "string",
+        "description": "Art einer nicht entlassenen Kraft in der Kurzliste der Abschlussprüfung.",
+        "enum": [
+          "einheit",
+          "fahrzeug"
+        ]
+      },
+      "AbschlussPruefung": {
+        "type": "object",
+        "description": "Antwort von `GET /api/einsaetze/{id}/abschluss/pruefung`: die offenen Punkte je Gruppe.",
+        "required": [
+          "kraefte",
+          "auftraege",
+          "meldungen",
+          "nachforderungen",
+          "betroffene"
+        ],
+        "properties": {
+          "auftraege": {
+            "$ref": "#/components/schemas/AbschlussGruppe"
+          },
+          "betroffene": {
+            "$ref": "#/components/schemas/AbschlussGruppe",
+            "description": "Betroffene mit offenem oder unterwegs befindlichem Verbleib, vermisste eingeschlossen."
+          },
+          "kraefte": {
+            "$ref": "#/components/schemas/AbschlussKraefte"
+          },
+          "meldungen": {
+            "$ref": "#/components/schemas/AbschlussGruppe"
+          },
+          "nachforderungen": {
+            "$ref": "#/components/schemas/AbschlussGruppe"
+          }
+        }
       },
       "AbschnittLagezustand": {
         "type": "string",
@@ -3261,6 +3399,14 @@
             ],
             "format": "int64"
           },
+          "ruecknahme_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie\nzurücknimmt. Wartezeit und Aufenthalt übergehen das Paar."
+          },
           "uhs_id": {
             "type": "integer",
             "format": "int64"
@@ -3341,6 +3487,22 @@
           "meldung",
           "registrierung"
         ]
+      },
+      "BelegungRuecknahme": {
+        "type": "object",
+        "description": "Antwort auf die Rücknahme eines Austritts (LLH-1924, design.md D3): das neue Ereignis und ob\ndie Person ihren Platz davor nicht zurückbekam und im Wartebereich steht.",
+        "required": [
+          "ereignis",
+          "ohne_platz"
+        ],
+        "properties": {
+          "ereignis": {
+            "$ref": "#/components/schemas/BelegungAnzeige"
+          },
+          "ohne_platz": {
+            "type": "boolean"
+          }
+        }
       },
       "BelegungVerlaufEintrag": {
         "type": "object",
@@ -4302,6 +4464,14 @@
           "objekt_typ": {
             "$ref": "#/components/schemas/ObjektTyp"
           },
+          "ruecknahme_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie\nzurücknimmt."
+          },
           "zeitpunkt_at": {
             "type": "string"
           },
@@ -4578,7 +4748,8 @@
           "wechsel_hinaus",
           "austritt",
           "abruf",
-          "abruf_aufgehoben"
+          "abruf_aufgehoben",
+          "austritt_zurueckgenommen"
         ]
       },
       "BrVerlaufEintrag": {
@@ -6352,6 +6523,13 @@
               "null"
             ],
             "format": "int64"
+          },
+          "abgeschlossen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der Person, die abgeschlossen hat (LLH-1814, Paneel „Einsatzabschluss“);\nfehlt am aktiven Einsatz, ohne Konto und bei einer Gerätesitzung."
           },
           "angelegt_at": {
             "type": "string"

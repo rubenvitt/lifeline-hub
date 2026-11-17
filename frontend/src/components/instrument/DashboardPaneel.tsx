@@ -1,6 +1,8 @@
+import { Button } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import Paneel, { type PaneelUeberschrift } from './Paneel';
 import PaneelZustand, { PaneelLink, type PaneelDatenzustand } from './PaneelZustand';
+import { useRollen } from './rollenwerte';
 
 /**
  * DashboardPaneel — der Rahmen jedes Paneels einer Dashboard-Fläche (Regel „Dashboard-Baukasten“,
@@ -20,6 +22,10 @@ import PaneelZustand, { PaneelLink, type PaneelDatenzustand } from './PaneelZust
  *
  * Meta und Fuß reicht der Aufrufer durch, wie er sie je Zustand braucht — der Rahmen erfindet
  * keinen Zähler.
+ *
+ * KOPF-AKTION (LLH-1815): eine Handlung am Paneel selbst, kein Sprung ins Modul („Ausblenden“ der
+ * Startliste im Überblick). Sie steht als Knopf ohne „↗“ hinter dem Sprung und in jedem Zustand,
+ * auch gesperrt: sie führt in kein Modul.
  */
 
 /** Datenzustand eines Dashboard-Paneels: die vier des `PaneelZustand` plus `gesperrt`. */
@@ -42,6 +48,8 @@ export interface DashboardPaneelBasis {
   meta?: ReactNode;
   /** Sprung „… ↗“ ins Modul; entfällt bei `gesperrt`. */
   sprung?: DashboardAktion;
+  /** Handlung am Paneel selbst, ohne „↗“, in jedem Zustand (siehe Dateikopf). */
+  kopfAktion?: DashboardAktion;
   leerText: string;
   /** Grund im Zustand `gesperrt` („Modul Personen nicht freigegeben.“). */
   gesperrtText: string;
@@ -63,6 +71,7 @@ export default function DashboardPaneel({
   zustand,
   meta,
   sprung,
+  kopfAktion,
   leerText,
   gesperrtText,
   leerAktion,
@@ -72,15 +81,36 @@ export default function DashboardPaneel({
   style,
   children,
 }: DashboardPaneelBasis & { children: ReactNode }) {
+  const { token } = useRollen();
   const gesperrt = zustand === 'gesperrt';
+  const sprungLink =
+    gesperrt || sprung == null ? null : (
+      <PaneelLink label={sprung.label} onKlick={sprung.onKlick} />
+    );
+  const aktionKnopf =
+    kopfAktion == null ? null : (
+      <Button
+        type="link"
+        data-lfh="paneel-kopf-aktion"
+        onClick={kopfAktion.onKlick}
+        style={{ paddingInline: token.paddingXS, fontSize: 12 }}
+      >
+        {kopfAktion.label}
+      </Button>
+    );
   return (
     <Paneel
       titel={titel}
       ueberschrift={ueberschrift}
       meta={meta}
       aktion={
-        gesperrt || sprung == null ? undefined : (
-          <PaneelLink label={sprung.label} onKlick={sprung.onKlick} />
+        sprungLink && aktionKnopf ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingXS }}>
+            {sprungLink}
+            {aktionKnopf}
+          </span>
+        ) : (
+          (sprungLink ?? aktionKnopf ?? undefined)
         )
       }
       fuss={fuss}

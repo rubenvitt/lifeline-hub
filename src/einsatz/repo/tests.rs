@@ -220,7 +220,8 @@ async fn schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis() {
     let inhalt = "Dokument abgelegt: Foto Familie Müller (Foto)";
     let etb_id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
-             VALUES (?, 1, 'system', ?, ?, datetime('now')) RETURNING id",
+             VALUES (?1, (SELECT COALESCE(MAX(lfd_nr), 0) + 1 FROM etb_eintrag WHERE einsatz_id = ?1), \
+                     'system', ?2, ?3, datetime('now')) RETURNING id",
     )
     .bind(einsatz.id)
     .bind(inhalt)

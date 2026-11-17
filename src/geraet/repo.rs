@@ -417,6 +417,34 @@ pub async fn widerrufen(
     kopplung_id: i64,
     von: i64,
 ) -> Result<bool, AppError> {
+    widerrufen_durch(conn, kopplung_id, Some(von)).await
+}
+
+/// Widerruft jede offene Kopplung eines Spiegels, ohne handelnde Person (LLH-1814, Spec
+/// `einsatz-abschluss`, „Kopplung bleibt beendet“): Kopplungen werden nicht gespiegelt, und eine,
+/// die eine Führungsübergabe am abgebenden Ende stehen ließ, lebte sonst mit dem Wiederöffnen
+/// beim Führer wieder auf. Aufrufer ist die Übernahme (`instanz::spiegel::uebernehmen`).
+pub async fn widerrufe_am_spiegel(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
+    let offene: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM geraet_kopplung WHERE einsatz_id = ? AND widerrufen_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in offene {
+        widerrufen_durch(&mut *conn, id, None).await?;
+    }
+    Ok(())
+}
+
+async fn widerrufen_durch(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    von: Option<i64>,
+) -> Result<bool, AppError> {
     let geaendert = sqlx::query(
         "UPDATE geraet_kopplung SET widerrufen_at = datetime('now'), widerrufen_von = ? \
          WHERE id = ? AND widerrufen_at IS NULL",
@@ -447,7 +475,7 @@ pub async fn widerrufen(
         &mut *conn,
         kopplung_id,
         KopplungEreignis::Widerrufen,
-        Some(von),
+        von,
         None,
     )
     .await?;

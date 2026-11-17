@@ -72,7 +72,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
   `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
-  einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
+  einzige Baustein dafür, siehe „UI-Form-Leitlinie“; weitere Handlungen am Datensatz über
+  `zusatz` vor „Bearbeiten“, nur im Lesezustand, LLH-1920) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
   (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `AlarmZeile` („Was brennt“, LLH-1743,
@@ -233,15 +234,23 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
   am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
   Quellen, Sprungziele aus `lage/alarmZiel.ts`. Sie zeigt Zustände, die Alarmzone Ereignisse; keine
-  Seite baut eine zweite Sammlung. Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band
-  „Lage in Zahlen“ des Lagebilds, der Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
+  Seite baut eine zweite Sammlung. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**
+  (LLH-1815, Spec `ueberblick-startliste`): eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
+  Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
+  ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über dem
+  Band steht, warten sie, Band und Paneelreihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
+  Alarmzeile nicht. Später hängt eine erstmals ladende Quelle nichts aus, und ein gescheiterter
+  Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
+  Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds, der
+  Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
   Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
   `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
   (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
   Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband
   „Stand“ des Lagebilds (Lagebericht, UHS aktiv) als `Kennzahlenband` mit `groesse="klein"`. Jedes Paneel geht durch
-  `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, `PaneelZustand`; `gesperrt` nennt
-  den Grund, ohne Sprung und Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
+  `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, Kopf-Aktion ohne „↗“ für eine
+  Handlung am Paneel selbst, `PaneelZustand`; `gesperrt` nennt den Grund, ohne Sprung und
+  Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
   Anteilsbalken je Kategorie: Sichtung, FMS-Status), `MatrixPaneel` (Stufenmatrix: Gefahren),
   `StromPaneel` (Zeitachseneinträge mit Sammelbanner), `ListenPaneel` (kurze Liste mit
   „n weitere ↗“) oder `GliederungsPaneel` (Teile mit Lagekante, Kopf, Zahlspalte). Mehrere kurze
@@ -252,11 +261,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   ergänzen die Zahl, nie ersetzen sie; Farben kommen aufgelöst vom Aufrufer, der Baustein trägt
   keine Statuskarte. Ein neuer Paneeltyp kommt als Baustein hierher, nicht lokal in eine Seite.
 - **Rollen der Übersichten** (LLH-1743, Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt
-  die Lage“): der Überblick sagt, was zu tun ist (Aufträge, Meldungen, Abschnitte, offene
-  Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los ist (Betroffene, Kräfte,
-  Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Kennzahl steht auf genau
-  einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Beide verweisen im Seitenkopf
-  aufeinander. Herleitung: `openspec/changes/archive/2026-11-16-t9jjrajy-alarmzeile-was-brennt/design.md` (D8).
+  die Lage“): der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, Aufträge,
+  Meldungen, Abschnitte, offene Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los
+  ist (Betroffene, Kräfte, Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine
+  Kennzahl steht auf genau einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Die
+  Startliste zeigt Haken, keine Zahl (LLH-1815). Beide verweisen im Seitenkopf aufeinander.
+  Herleitung: `openspec/changes/archive/2026-11-16-t9jjrajy-alarmzeile-was-brennt/design.md` (D8).
 - **Eine Heimat je Zahl** (LFH-550,
   `openspec/changes/archive/2026-09-30-lfh-550-lagebesprechung-eine-verdichtung/design.md`):
   Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig,
@@ -406,7 +416,9 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    und Bemerkungen verweisen darauf, statt ihn unter jede Zelle jeder Zeile zu schreiben.
 4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
    Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
-   übernehmen“ / „Verwerfen und neu laden“.
+   übernehmen“ / „Verwerfen und neu laden“. Zeichnet die Route den Sperrkonflikt aus
+   (`grund: "veraltet"`, `isVeraltet`, `src/AGENTS.md`, Statuscode-Konvention), fragt nur er;
+   ein anderer 409 steht als Grund am Paneel (`isSperrkonflikt`, LLH-1920).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
@@ -415,8 +427,8 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    die Liste mit erneutem Öffnen.
 
 Kein Fach-Modul baut einen zweiten Baustein dafür; die Seiten stellen ihre Fach-Tickets um
-(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte,
-Bereitstellungsraum, Betreuung).
+(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte, Betreuung).
+UHS (Bereich „Angaben“) und Bereitstellungsraum („Raumdaten“) sind umgestellt (LLH-1920).
 
 **Ort von „Bearbeiten“ und Form des Anlegens** (LLH-1722, D8): „Bearbeiten“ eines Paneels steht
 im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
@@ -426,8 +438,7 @@ Serienerfassung neben einer Liste; **kein Drawer zum Anlegen** (Spec `bedien-mus
 Datensatz anlegen“). Einsatzgebundene Datensätze legen über `components/AnlegenModal.tsx` an
 (UHS, Bereitstellungsraum), jeder Einstieg öffnet denselben Dialog. Eingeklappt über der Liste
 bleiben, weil dort in Serie erfasst wird: Nachforderung, Meldungen, Erinnerungen (geprüft
-LLH-1921); die Lagemeldung erfasst im Dialog. Altstelle mit Folgeaufgabe (LLH-1920): UHS und
-Bereitstellungsraum bearbeiten im Modal (`UhsBearbeitenModal`, `BrBearbeitenModal`).
+LLH-1921); die Lagemeldung erfasst im Dialog.
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
@@ -867,16 +878,23 @@ anwendbar), „nicht geprüft" ist keins.
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
   Rückweg. Die übrigen Teile der Zeile bleiben unsichtbar an ihrem Platz, damit eine umgebrochene
   Zeile ihre Höhe hält. Eine Person, die im Einheit-Detail über ihr ⋮ aus der Einheit gelöst wird,
-  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Fahrzeug und Person nehmen
-  das Entlassen vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort
-  des Entlassens; die Person ohne neue Periode, LLH-1922). **Bekannte Lücke:** Material „Aus dem
+  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Hat eine Zeile keinen
+  Regler (UHS-Kräfte, Besatzungsblock der Fahrzeugliste), steht „Rückgängig“ an der Stelle ihrer
+  Funktion bzw. Angabe (LLH-1924,
+  `openspec/changes/archive/2026-11-17-bq8dvx19-loesen-nachziehen/design.md` D4).
+
+  Jedes Rückgängig einer gelösten Zuordnung schickt `?nur_wenn_frei=1` (Einheit, Material am Ort,
+  Besatzung, UHS-Kraft): steht der Datensatz inzwischen woanders, lehnt der Server mit 409 ab und
+  nennt den Ort, statt ihn dort still wegzunehmen; das bewusste Zuordnen schickt den Schalter
+  nicht (D1). „Austragen“ am Bereitstellungsraum und an der UHS (auch „zurückweisen“ im
+  Grundriss) nimmt der Rückweg über `…/{belegung_id}/zuruecknehmen` zurück: ein Eintritt mit
+  `ruecknahme_von`, den „seit“, längste Wartezeit und „wartet seit“ übergehen; nur solange der
+  Austritt der jüngste Schritt ist und höchstens zehn Minuten zurückliegt, nie nach dem Ausrücken
+  und nie für einen Austritt mit Anlass (D2/D3). Fahrzeug und Person nehmen das Entlassen
+  vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort des
+  Entlassens; die Person ohne neue Periode, LLH-1922). **Bekannte Lücke:** Material „Aus dem
   Einsatz nehmen“ macht beim Rückgängig nur den Posten wieder aktiv, ohne seinen Ort; bis zu seiner
   Folgeaufgabe (LLH-1923) bleibt das so, ohne Rückfrage.
-  Ebenso noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
-  Person; und das Rückgängig von Material am Ort, Besatzung und UHS-Kraft prüft noch nicht, ob der
-  Datensatz inzwischen anders gebunden ist. „Abziehen“ an der UHS und „Vom Fahrzeug lösen“ in
-  der Fahrzeugliste halten die gelöste Zeile noch nicht, und Material am Ort zeigt „Lösen“ noch
-  als Knopf neben „Ausgeben“ (alles LLH-1924).
 
 - **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
   `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,
@@ -1165,7 +1183,12 @@ anwendbar), „nicht geprüft" ist keins.
   im Menü der Trenner.
   **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**
   (LFH-960, Spec `bedien-wortlaut`): der Einsatzabschluss steht als letzter Abschnitt auf den
-  Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.
+  Einsatzdaten, am aktiven Einsatz nur für die Einsatzleitung. Er ist die Ausnahme von
+  „Unumkehrbares → `Popconfirm`“ (LLH-1814, Spec `einsatz-abschluss`): ein Dialog
+  (`pages/einsatzdaten/EinsatzAbschlussDialog.tsx`) nennt die offenen Punkte, sperrt aber nicht,
+  und sein roter Knopf „Einsatz abschließen“ wird erst aktiv, wenn Einsatznummer oder Bezeichnung
+  eingetippt sind (geprüft nur im Client). Binnen 24 Stunden öffnen Einsatzleitung und System-Admin
+  der Einsatz-Org ihn mit Pflicht-Grund wieder (`darfEinsatzWiedereroeffnen`).
 - **Ein Iconsatz** (LFH-595, Spec `iconsatz`,
   `openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/design.md`): Icons8
   „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IconPaar`, heute Rail und Stern).

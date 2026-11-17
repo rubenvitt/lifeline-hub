@@ -18,14 +18,18 @@ für paneel- und ansichtsweises Speichern; Fach-Seiten bauen keinen eigenen.
   `renderMitProviders(…, { datenRouter: true })`).
 - **CAS:** `useEditSitzung` friert `geaendert_at` und die Werte beim Öffnen ein; ein
   Hintergrund-Refetch ändert weder die Eingaben noch die Basis. `onSpeichern(patch, basis)`;
-  `basis` `undefined` heißt „Meine Änderung übernehmen“ nach einem 409.
+  `basis` `undefined` heißt „Meine Änderung übernehmen“ nach dem Sperrkonflikt.
 - **Nur Geändertes:** der Patch enthält nur Felder, deren Wert sich nach Inhalt geändert hat
   (`bearbeitetePatch`, oder `patch` des Aufrufers); ein leerer Patch sendet nichts und schließt.
 - **Tastatur:** Enter speichert (Knopf `submit` im `<form>`, Erfassungs-Norm), Escape bricht ab
   (eine offene Auswahl schluckt Escape selbst: rc-select stoppt die Ausbreitung). Fokus beim
   Öffnen ins erste Feld, beim Schließen zurück auf „Bearbeiten“ bzw. `ausloeserRef`.
 - **Fehler am Ort**: Prüffehler unter der Zelle, eine Ablehnung als `SpeicherFehler`
-  am Paneel, der 409 als Rückfrage „Zwischenzeitlich geändert“. Kein Toast.
+  am Paneel, der Sperrkonflikt (`isSperrkonflikt`, Vorgabe jeder 409) als Rückfrage
+  „Zwischenzeitlich geändert“. Kein Toast.
+- **Zusatzhandlungen** (`zusatz`): weitere Handlungen am Datensatz im Paneelkopf vor
+  „Bearbeiten“, etwa „Auf Karte verorten“ an den Raumdaten. Nur im Lesezustand: neben einer
+  offenen Bearbeitung steht keine zweite Handlung.
 
 Quelle: `frontend/src/components/instrument/BearbeitbaresPaneel.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
