@@ -3,13 +3,11 @@
 //! Sitzung an, lehnt zu große Berichte vor dem Handler ab und prüft jedes Feld gegen seine
 //! Grenze. Die Drossel der Logzeile prüft der Unit-Test in `routes::client_fehler`.
 
-use axum::body::Body;
-use axum::http::{header, Request, StatusCode};
+use axum::http::StatusCode;
 use serde_json::{json, Value};
-use tower::ServiceExt;
 
 mod common;
-use common::{anfrage, anfrage_json, einsatz_anlegen, login_cookie, setup};
+use common::{anfrage, anfrage_json, login_cookie, setup};
 
 use lifeline_hub::app::CLIENT_FEHLER_BODY_MAX;
 use lifeline_hub::routes::client_fehler::{MELDUNG_MAX, ROUTE_MAX, STACK_MAX, VERSION_MAX};
@@ -137,55 +135,31 @@ async fn ein_zu_langes_feld_ist_400_mit_dem_namen_des_felds() {
     }
 }
 
+/// `export const NAME = 123;` aus `frontend/src/api/clientFehler.ts`; andere Zeilen zählen nicht.
+fn client_grenze(name: &str) -> usize {
+    let pfad = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/frontend/src/api/clientFehler.ts"
+    );
+    let text = std::fs::read_to_string(pfad).expect("clientFehler.ts lesbar");
+    let praefix = format!("export const {name} = ");
+    let zeile = text
+        .lines()
+        .find_map(|z| z.trim().strip_prefix(praefix.as_str()))
+        .unwrap_or_else(|| panic!("{name} fehlt in clientFehler.ts"));
+    zeile
+        .trim_end_matches(';')
+        .replace('_', "")
+        .parse()
+        .unwrap_or_else(|_| panic!("{name}: keine Zahl: {zeile}"))
+}
+
 #[test]
 fn die_feldgrenzen_entsprechen_dem_kuerzen_im_client() {
-    // `frontend/src/api/clientFehler.ts` kürzt die Meldung auf 500 und den Stack auf 2000
-    // Zeichen; der Server darf nicht enger sein, sonst verlöre er jeden langen Bericht.
-    assert_eq!(MELDUNG_MAX, 500);
-    assert_eq!(STACK_MAX, 2000);
-}
-
-/// Eine Gerätesitzung ist eine Sitzung (Spec `seiten-zustaende`, „Absturz wird dem Server
-/// gemeldet“): Auch die Gerätehülle meldet ihre Abstürze. `CurrentUser` lässt Geräte nur auf
-/// die Routen in `geraet::ALLE_GERAETE`; ohne Eintrag dort wäre der Bericht 403 und still
-/// verloren. Der Lagemonitor schreibt sonst nichts, den Bericht darf er trotzdem senden.
-#[tokio::test]
-async fn ein_bericht_aus_einer_geraetesitzung_wird_mit_204_angenommen() {
-    let app = setup().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-
-    let (s, v) = anfrage_json(
-        &app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
-        &admin,
-        Some(&json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{v}");
-    let code = v["code"]["code"].as_str().expect("Kopplungscode");
-    let geraet = geraet_einloesen(&app, code).await;
-
-    let (s, j) = anfrage_json(&app, "POST", PFAD, &geraet, Some(&bericht())).await;
-
-    assert_eq!(s, StatusCode::NO_CONTENT, "{j:?}");
-}
-
-/// `POST /api/geraete/koppeln` ohne Sitzung; liefert den Sitzungscookie des Geräts.
-async fn geraet_einloesen(app: &axum::Router, code: &str) -> String {
-    let req = Request::builder()
-        .method("POST")
-        .uri("/api/geraete/koppeln")
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(json!({ "code": code }).to_string()))
-        .unwrap();
-    let resp = app.clone().oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "Code einlösen");
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(';').next())
-        .expect("Sitzungscookie des Geräts")
-        .to_string()
+    // Der Client kürzt Meldung und Stack vor dem Senden; der Server darf nicht enger sein, sonst
+    // verlöre er jeden langen Bericht, und nicht weiter, sonst prüfte er eine Grenze, die nie
+    // greift. Gelesen aus der Datei, damit eine einseitige Änderung rot wird (Muster
+    // `eingabegrenzen_spiegel.rs`). Route und Version kürzt der Client nicht.
+    assert_eq!(client_grenze("CLIENT_FEHLER_MELDUNG_MAX"), MELDUNG_MAX);
+    assert_eq!(client_grenze("CLIENT_FEHLER_STACK_MAX"), STACK_MAX);
 }

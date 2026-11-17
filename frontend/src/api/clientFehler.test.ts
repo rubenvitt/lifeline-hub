@@ -75,24 +75,24 @@ describe('meldeClientFehler', () => {
     expect(berichte()[0].route).toBe('');
   });
 
-  it('trägt Version, Meldung und Stack, gekürzt auf 500 und 2000 Zeichen', async () => {
+  // Die Grenzen selbst koppelt `tests/client_fehler.rs` an den Server: er liest sie aus dieser
+  // Datei, eine einseitige Änderung wird dort rot.
+  it('trägt Version, Meldung und Stack, gekürzt auf ihre Grenzen', async () => {
     const fehler = new Error('m'.repeat(CLIENT_FEHLER_MELDUNG_MAX + 100));
     fehler.stack = 's'.repeat(CLIENT_FEHLER_STACK_MAX + 100);
     await meldeClientFehler(fehler, '/einsaetze/7/etb');
 
     const [bericht] = berichte();
-    expect(CLIENT_FEHLER_MELDUNG_MAX).toBe(500);
-    expect(CLIENT_FEHLER_STACK_MAX).toBe(2000);
     expect(bericht.version).toBe(__APP_VERSION__);
-    expect(bericht.meldung).toBe('m'.repeat(500));
-    expect(bericht.stack).toBe('s'.repeat(2000));
+    expect(bericht.meldung).toBe('m'.repeat(CLIENT_FEHLER_MELDUNG_MAX));
+    expect(bericht.stack).toBe('s'.repeat(CLIENT_FEHLER_STACK_MAX));
   });
 
   it('kürzt nach Zeichen und zerteilt kein Zeichen außerhalb der Grundebene', async () => {
     const fehler = new Error('🚑'.repeat(CLIENT_FEHLER_MELDUNG_MAX + 1));
     await meldeClientFehler(fehler, '/einsaetze/7/etb');
 
-    expect(berichte()[0].meldung).toBe('🚑'.repeat(500));
+    expect(berichte()[0].meldung).toBe('🚑'.repeat(CLIENT_FEHLER_MELDUNG_MAX));
   });
 
   it('sendet per POST mit keepalive, Sitzungscookie und den Schreibköpfen', async () => {
