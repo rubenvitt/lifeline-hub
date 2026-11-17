@@ -28,13 +28,7 @@ import {
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
-import type {
-  EinsatzFahrzeug,
-  EinsatzPersonal,
-  EntlassungRuecknahmeAntwort,
-  EntlassungVorzustand,
-  Staerke,
-} from '../api/types';
+import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -63,6 +57,7 @@ import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
+import { KennungMitZusatz } from '../components/KennungMitZusatz';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
@@ -105,6 +100,7 @@ import {
 } from '../kraefte/kraeftebaumKern';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import EigeneEinheitDialog from '../kraefte/EigeneEinheitDialog';
 import BesatzungUebernehmenDialog from '../kraefte/BesatzungUebernehmenDialog';
@@ -341,6 +337,10 @@ const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
   { key: 'seit', sortWert: true },
   { key: 'besatzung', sortWert: true },
   { key: 'kennzeichen', sortWert: true },
+  // Ohne Sortierung und Filter, aber voreingestellt aus: fehlte sie hier, fiele sie aus der
+  // gemerkten Spaltenwahl, stünde nach dem Neuladen unverlangt da, und der Schalter meldete eine
+  // eigene Wahl (LLH-1790).
+  { key: 'bemerkung' },
 ];
 const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
   'typ',
@@ -358,15 +358,6 @@ const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
  * hängt die Liste aus. Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie schreiben darf;
  * ohne Schreibrecht meldet keine Angabe einen Entwurf.
  */
-/**
- * Der Satz zu einer Rücknahme, die nicht alles zurückbekam (LLH-1722): „83-1 zurück, ohne: Anna
- * Müller (inzwischen auf einem anderen Fahrzeug)“.
- */
-export function ausgelassenSatz(name: string, antwort: EntlassungRuecknahmeAntwort): string {
-  const teile = antwort.ausgelassen.map((a) => `${a.bezeichnung} (${a.grund})`);
-  return `${name} zurück, ohne: ${teile.join(', ')}`;
-}
-
 export default function FahrzeugePage() {
   return (
     <OffeneBearbeitungProvider>
@@ -902,15 +893,24 @@ function FahrzeugeInhalt() {
       suchText: (ef) => ef.funkrufname,
       // `wrap`: die Marken dürfen unter den Funkrufnamen rutschen, statt die Fließspalte über ihr
       // Maß zu drücken (wie `PersonalPage`, LFH-975).
+      // Steht die Spalte „Typ“ nicht (unter `xxl` oder per Hand verborgen), steht der Typ als zweite
+      // Zeile darunter (LLH-1790, Spec `fahrzeug-bearbeitung`, „Typ eines Fahrzeugs in der Liste“);
+      // steht sie, nur dort. Der Kartentitel nimmt dasselbe `render`: am Handy steht er in der Karte.
       render: (_, ef) => (
-        <Space wrap>
-          {/* Funkrufname in Mono. */}
-          <span data-schrift="kennung" style={zahlStil('text')}>
-            {ef.funkrufname}
-          </span>
-          {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
-          {ef.ist_demo && <DemoMarke />}
-        </Space>
+        <KennungMitZusatz
+          kennung={
+            <Space wrap>
+              {/* Funkrufname in Mono. */}
+              <span data-schrift="kennung" style={zahlStil('text')}>
+                {ef.funkrufname}
+              </span>
+              {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
+              {ef.ist_demo && <DemoMarke />}
+            </Space>
+          }
+          zusatz={ef.fahrzeugtyp}
+          ausSpalte="typ"
+        />
       ),
     },
     {
@@ -1063,6 +1063,8 @@ function FahrzeugeInhalt() {
             key: 'aktionen' as const,
             width: aktionenBreite,
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             // Nur der Menüauslöser (Entscheidung 14.10.2026): Entlassen, Angaben, Stamm und
             // Stornieren stehen im Menü; Stornieren fragt im `<Modal>` nach (LLH-1079).
             render: (_: unknown, ef: EinsatzFahrzeug) => (
@@ -1301,10 +1303,8 @@ function FahrzeugeInhalt() {
                 // Der Bedienweg sitzt am `status`-Slot, nie am `aktion`-Slot (`frontend/AGENTS.md`,
                 // „Statuswechsel in Kräfte-Listen“).
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
-                // Einheit und Seit aus denselben Zellen (D5); ohne Freigabe der Typ statt der Einheit.
-                sekundaer: einheitenFrei
-                  ? ['einheit', 'seit', 'besatzung']
-                  : ['typ', 'seit', 'besatzung'],
+                // Einheit und Seit aus denselben Zellen (D5). Den Typ trägt der Titel (LLH-1790).
+                sekundaer: einheitenFrei ? ['einheit', 'seit', 'besatzung'] : ['seit', 'besatzung'],
                 // Keine Primäraktion: „Entlassen“ ist nie Hauptaktion einer Karte (LLH-1722, Spec
                 // `fahrzeug-bearbeitung`); es steht wie in der Tabelle zuerst im Menü.
                 weitere: darfSchreiben

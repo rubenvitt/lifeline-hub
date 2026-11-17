@@ -16636,6 +16636,99 @@
           }
         }
       },
+      "PersonalEntlassungAntwort": {
+        "type": "object",
+        "description": "Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922).",
+        "required": [
+          "personal",
+          "vorzustand"
+        ],
+        "properties": {
+          "personal": {
+            "$ref": "#/components/schemas/EinsatzPersonalAnzeige"
+          },
+          "vorzustand": {
+            "$ref": "#/components/schemas/PersonalEntlassungVorzustand"
+          }
+        }
+      },
+      "PersonalEntlassungRuecknahmeAntwort": {
+        "type": "object",
+        "description": "Antwort von `POST …/personal/{ep_id}/entlassen/zuruecknehmen` (LLH-1922).",
+        "required": [
+          "personal",
+          "ausgelassen"
+        ],
+        "properties": {
+          "ausgelassen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuecknahmeAusgelassen"
+            }
+          },
+          "personal": {
+            "$ref": "#/components/schemas/EinsatzPersonalAnzeige"
+          }
+        }
+      },
+      "PersonalEntlassungVorzustand": {
+        "type": "object",
+        "description": "Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer\nPerson zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das\nEntlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.",
+        "required": [
+          "entlassen_at"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einsatzleiter_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "War die Person Einsatzleiter: der Name, den die Führungsstelle für sie eingefroren hat. Die\nRücknahme erkennt daran den Vermerk „nicht mehr disponiert“ wieder, auch wenn der Name der\nPerson inzwischen berichtigt wurde. `None` = war nicht Einsatzleiter."
+          },
+          "entlassen_at": {
+            "type": "string",
+            "description": "Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt."
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fahrzeug, dessen Besatzung die Person war."
+          },
+          "gefuehrte_einheiten": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Einheiten, die die Person führte."
+          },
+          "geleitete_abschnitte": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Einsatzabschnitte, die die Person leitete."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "PersonalStatus": {
         "type": "object",
         "description": "Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`.",
@@ -18214,7 +18307,7 @@
       },
       "RuecknahmeAusgelassen": {
         "type": "object",
-        "description": "Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten.",
+        "description": "Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten\n(LLH-1722 für das Fahrzeug, LLH-1922 für die Person).",
         "required": [
           "bezeichnung",
           "grund"

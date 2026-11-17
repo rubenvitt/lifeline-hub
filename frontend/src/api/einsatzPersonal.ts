@@ -1,4 +1,11 @@
-import type { EinsatzPersonal, FuehrungskraftKarte, StaerkePosition } from './types';
+import type {
+  EinsatzPersonal,
+  FuehrungskraftKarte,
+  PersonalEntlassungAntwort,
+  PersonalEntlassungRuecknahmeAntwort,
+  PersonalEntlassungVorzustand,
+  StaerkePosition,
+} from './types';
 import { apiGet, apiSend } from './client';
 import type { PositionPatch } from './einheiten';
 
@@ -70,10 +77,35 @@ export function listEntlassenesPersonal(einsatzId: number): Promise<EinsatzPerso
 
 /**
  * Aus dem Einsatz entlassen (LLH-1079): die Zeile bleibt mit ihrer Zeitachse, Bindungen gehen.
- * Umkehrbar über {@link reaktiviereDisposition}, deshalb ohne Rückfrage.
+ * Die Antwort trägt den Vorzustand, mit dem {@link nimmEntlassungZurueck} alles zurücknimmt
+ * (LLH-1922); deshalb ohne Rückfrage.
  */
-export function entlasseDisposition(einsatzId: number, epId: number): Promise<EinsatzPersonal> {
-  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal/${epId}/entlassen`, 'POST');
+export function entlasseDisposition(
+  einsatzId: number,
+  epId: number,
+): Promise<PersonalEntlassungAntwort> {
+  return apiSend<PersonalEntlassungAntwort>(
+    `/api/einsaetze/${einsatzId}/personal/${epId}/entlassen`,
+    'POST',
+  );
+}
+
+/**
+ * „Rückgängig“ nach dem Entlassen (LLH-1922, Spec `kraefte-entlassung`): stellt den Zustand davor
+ * her, ohne neue Periode in der Zeitachse; was inzwischen anders gebunden ist, steht in
+ * `ausgelassen`. Nur direkt danach, nur für die entlassende Person und nur bei unberichtigter
+ * Zeitachse, sonst 409; danach bleibt {@link reaktiviereDisposition}.
+ */
+export function nimmEntlassungZurueck(
+  einsatzId: number,
+  epId: number,
+  vorzustand: PersonalEntlassungVorzustand,
+): Promise<PersonalEntlassungRuecknahmeAntwort> {
+  return apiSend<PersonalEntlassungRuecknahmeAntwort>(
+    `/api/einsaetze/${einsatzId}/personal/${epId}/entlassen/zuruecknehmen`,
+    'POST',
+    vorzustand,
+  );
 }
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Bindung und Spur in den ersten 15 Minuten. */
@@ -81,7 +113,7 @@ export function storniereDisposition(einsatzId: number, epId: number): Promise<v
   return apiSend<void>(`/api/einsaetze/${einsatzId}/personal/${epId}/stornieren`, 'POST');
 }
 
-/** Eine entlassene oder stornierte Kraft erneut disponieren (Rückgängig, Block „Entlassen“). */
+/** Eine entlassene oder stornierte Kraft erneut disponieren (Block „Entlassen“). */
 export function reaktiviereDisposition(einsatzId: number, epId: number): Promise<EinsatzPersonal> {
   return apiSend<EinsatzPersonal>(
     `/api/einsaetze/${einsatzId}/personal/${epId}/reaktivieren`,

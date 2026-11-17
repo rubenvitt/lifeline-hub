@@ -58,9 +58,63 @@ pub fn is_in_storno_frist(disponiert_at: &str, jetzt: &str) -> bool {
     }
 }
 
+/// Wie lange nach dem Entlassen die Rücknahme gelingt (LLH-1722 D5, LLH-1922): deckt den Hinweis
+/// (6 s), Latenz und den Seitenhinweis; danach bleibt „Erneut disponieren“. Gilt für Fahrzeug und
+/// Person.
+pub const RUECKNAHME_FRIST_MINUTEN: i64 = 10;
+
+/// Streichgrund der Entlassung, die die Rücknahme einer Person streicht (LLH-1922, design.md D3).
+pub const GRUND_RUECKNAHME: &str = "Entlassung zurückgenommen";
+
+/// Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten
+/// (LLH-1722 für das Fahrzeug, LLH-1922 für die Person).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+pub struct RuecknahmeAusgelassen {
+    /// Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“).
+    pub bezeichnung: String,
+    /// Warum („inzwischen aufgelöst“, „sitzt inzwischen auf einem anderen Fahrzeug“).
+    pub grund: String,
+}
+
+impl RuecknahmeAusgelassen {
+    pub fn new(bezeichnung: impl Into<String>, grund: &str) -> Self {
+        Self {
+            bezeichnung: bezeichnung.into(),
+            grund: grund.into(),
+        }
+    }
+}
+
+/// Der Zusatz „, ohne A (Grund), B (Grund)“ der ETB-Texte einer Rücknahme; leer ohne Auslassung.
+pub fn ohne_text(ausgelassen: &[RuecknahmeAusgelassen]) -> String {
+    if ausgelassen.is_empty() {
+        return String::new();
+    }
+    let ohne: Vec<String> = ausgelassen
+        .iter()
+        .map(|a| format!("{} ({})", a.bezeichnung, a.grund))
+        .collect();
+    format!(", ohne {}", ohne.join(", "))
+}
+
+/// Liegt `entlassen_at` höchstens [`RUECKNAHME_FRIST_MINUTEN`] vor `jetzt`? Beide im kanonischen
+/// Format (`crate::zeit::FORMAT`); ein unlesbarer Zeitpunkt gilt als abgelaufen.
+pub fn is_in_ruecknahme_frist(entlassen_at: &str, jetzt: &str) -> bool {
+    crate::zeit::plus_minuten(entlassen_at, RUECKNAHME_FRIST_MINUTEN)
+        .is_some_and(|grenze| jetzt <= grenze.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ruecknahme_frist_endet_nach_zehn_minuten() {
+        let e = "2026-11-17 10:00:00";
+        assert!(is_in_ruecknahme_frist(e, "2026-11-17 10:10:00"));
+        assert!(!is_in_ruecknahme_frist(e, "2026-11-17 10:10:01"));
+        assert!(!is_in_ruecknahme_frist("kaputt", "2026-11-17 10:00:00"));
+    }
 
     #[test]
     fn frist_endet_nach_fuenfzehn_minuten() {

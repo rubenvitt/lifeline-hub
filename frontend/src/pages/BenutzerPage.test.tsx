@@ -498,8 +498,10 @@ describe('BenutzerPage', () => {
 
     const koerper = container.querySelector<HTMLTableElement>('.ant-table-body table')!;
     // Σ der Zahlbreiten + Mindestmaß der Fließspalte, als Literal (zurückgerechnet prüfte die Zahl
-    // die Rechnung gegen sich selbst).
-    expect(koerper.style.width).toBe('644px');
+    // die Rechnung gegen sich selbst). 662 statt 644: die Spalte „Aktionen“ wächst auf die
+    // Mindestbreite ihres Kopfs (LLH-1788, Kopfschrift Stufe `fein`, 11 px in `kompakt`); ohne
+    // Leinwand schätzt jsdom die Schrift großzügig.
+    expect(koerper.style.width).toBe('662px');
     expect(koerper.style.tableLayout).toBe('auto');
     // Spalte 0 trägt ihre Zahl; unter `auto` ist sie Vorzugsbreite, der Umbruch hält sie dort.
     expect(koerper.querySelector('col')).toHaveStyle({ width: '136px' });

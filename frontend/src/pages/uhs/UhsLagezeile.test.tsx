@@ -60,8 +60,11 @@ describe('UhsLagezeile (LLH-1136)', () => {
   it('als Zeile über dem Grundriss: dieselben vier Zahlen in einer Schriftzeile, ohne Sprung', async () => {
     renderMitProviders(<UhsLagezeile einsatzId={1} uhs={uhs} />);
     const zeile = screen.getByRole('group', { name: 'Lage der Stelle' });
-    expect(await within(zeile).findByText('1 / 3')).toBeInTheDocument();
-    expect(zeile.textContent).toMatch(/In der Stelle\s*2/);
+    await within(zeile).findByText('1 in Aufbereitung');
+    // Zahl vor Farbfeld und Kürzel, Gruppen mit Trenner (LLH-1793): die Zahl klebt nie am
+    // Farbfeld der nächsten Kategorie.
+    expect(zeile.textContent).toMatch(/In der Stelle\s*2\s+1\s*SK I · 1\s*SK II/);
+    expect(zeile.textContent).toMatch(/1 von 3 Plätzen frei · 1 in Aufbereitung/);
     expect(zeile.querySelectorAll('[data-sichtung]')).toHaveLength(2);
     expect(within(zeile).getByText('1 in Aufbereitung')).toBeInTheDocument();
     expect(within(zeile).getByText('längste 34 min')).toBeInTheDocument();
@@ -72,7 +75,7 @@ describe('UhsLagezeile (LLH-1136)', () => {
     expect(zeile.style.whiteSpace).toBe('nowrap');
     expect(zeile).toHaveAttribute(
       'title',
-      'In der Stelle 2 SK I 1 · SK II 1 · Plätze frei 1 / 3 1 in Aufbereitung · Wartend 1 längste 34 min · Unterwegs 1',
+      'In der Stelle 2 1 SK I · 1 SK II · 1 von 3 Plätzen frei · 1 in Aufbereitung · Wartend 1 längste 34 min · Unterwegs 1',
     );
   });
 
@@ -85,8 +88,8 @@ describe('UhsLagezeile (LLH-1136)', () => {
         name: /^In der Stelle nach Sichtung: SK I 1, SK II 1/,
       }),
     ).toBeInTheDocument();
-    expect(within(zeile).getByText('SK I 1 · SK II 1')).toBeInTheDocument();
-    expect(within(zeile).getByText('1 / 3')).toBeInTheDocument();
+    expect(within(zeile).getByText('1 SK I · 1 SK II')).toBeInTheDocument();
+    expect(within(zeile).getByText('von 3')).toBeInTheDocument();
     expect(within(zeile).getByText('1 in Aufbereitung')).toBeInTheDocument();
     expect(within(zeile).getByText('längste 34 min')).toBeInTheDocument();
     expect(within(zeile).getByText('Unterwegs')).toBeInTheDocument();

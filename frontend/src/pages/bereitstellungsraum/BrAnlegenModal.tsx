@@ -1,7 +1,7 @@
 import { Form, Input } from 'antd';
 import { BR_BEZEICHNUNG_MAX, BR_NOTIZ_MAX, BR_STANDORT_MAX } from '../../api/eingabegrenzen';
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
-import AnlegenDrawer, { type AnlegenDrawerSlot } from '../../components/AnlegenDrawer';
+import AnlegenModal, { type AnlegenModalSlot } from '../../components/AnlegenModal';
 import { legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum } from '../../api/types';
@@ -23,12 +23,12 @@ function brEingabe({ standort, ...rest }: BrFormular): BrEingabe {
 }
 
 /**
- * Wiederverwendbarer Drawer zum Anlegen eines Bereitstellungsraums (Liste, Leerzustand, Switcher).
+ * Dialog zum Anlegen eines Bereitstellungsraums (Liste, Leerzustand, Switcher).
  * Der Standort ist ein Ortsfeld (LLH-1114, Spec `ortsfeld`) und verortet den Raum gleich mit.
  */
-export default function BrAnlegenDrawer(props: AnlegenDrawerSlot<Bereitstellungsraum>) {
+export default function BrAnlegenModal(props: AnlegenModalSlot<Bereitstellungsraum>) {
   return (
-    <AnlegenDrawer<Bereitstellungsraum, BrFormular>
+    <AnlegenModal<Bereitstellungsraum, BrFormular>
       {...props}
       titel="Bereitstellungsraum anlegen"
       erfolgText="Bereitstellungsraum angelegt"
@@ -63,6 +63,6 @@ export default function BrAnlegenDrawer(props: AnlegenDrawerSlot<Bereitstellungs
       >
         <Input.TextArea rows={3} count={zeichenGrenze(BR_NOTIZ_MAX)} />
       </Form.Item>
-    </AnlegenDrawer>
+    </AnlegenModal>
   );
 }

@@ -79,6 +79,32 @@ export function sichtbareSpalten<K extends string, S extends SchaltbareSpalte<K>
   return { spalten: sichtbar, anzahlVerborgen };
 }
 
+/**
+ * Weicht die Spaltenwahl von der Vorgabe ab (LLH-1790, Spec `katalogtabelle-spaltenschalter`,
+ * „Der Zähler erscheint erst nach eigener Wahl“; design.md D3)? Vorgabe ist, was die Seite
+ * voreingestellt ausblendet, und was auf der aktuellen Breite wegfällt. Abweichung ist jede
+ * Handwahl: `verborgen` ist nicht die Voreinstellung, oder eine Spalte ist gegen die Breite
+ * eingeblendet. Gezählt wird am Zustand, nicht an der Sichtbarkeit: eine per Hand abgewählte
+ * Spalte, die danach auch nach Breite wegfiele, bleibt eine eigene Wahl.
+ */
+export function weichtVonVorgabeAb<K extends string>(args: {
+  verborgen: ReadonlySet<K>;
+  eingeblendet?: ReadonlySet<K>;
+  voreinstellung: readonly K[];
+}): boolean {
+  const { verborgen, eingeblendet, voreinstellung } = args;
+  if ((eingeblendet?.size ?? 0) > 0) return true;
+  const vor = new Set(voreinstellung);
+  if (vor.size !== verborgen.size) return true;
+  for (const k of verborgen) if (!vor.has(k)) return true;
+  return false;
+}
+
+/** Name des Schalters: der Zähler steht erst nach eigener Wahl im Namen (LLH-1790). */
+export function schalterBeschriftung(anzahlVerborgen: number, weichtAb: boolean): string {
+  return weichtAb && anzahlVerborgen > 0 ? `Spalten · ${anzahlVerborgen} ausgeblendet` : 'Spalten';
+}
+
 /** Die abwählbaren Spalten: alles außer der Kennungsspalte und den `immerSichtbar`-Spalten. */
 function waehlbareSpalten<K extends string>(
   spalten: readonly SchaltbareSpalte<K>[],
@@ -111,6 +137,8 @@ export function hatWaehlbareSpalten<K extends string>(
  */
 export interface SpaltenSchalterZustand<K extends string = string> {
   aus: readonly K[];
+  /** Die voreingestellt ausgeblendeten Spalten; sie zählen nicht als eigene Wahl (LLH-1790). */
+  voreinstellung: readonly K[];
   onAus: (schluessel: K[]) => void;
   an: readonly K[];
   onAn: (schluessel: K[]) => void;
@@ -131,10 +159,13 @@ export function useSpaltenSchalterZustand<K extends string>(
   const [an, setAn] = useState<readonly K[]>([]);
   const [offen, setOffen] = useState(false);
   return useMemo(
-    () => ({ aus, onAus: setAus, an, onAn: setAn, offen, onOffen: setOffen }),
-    [aus, an, offen],
+    () => ({ aus, voreinstellung, onAus: setAus, an, onAn: setAn, offen, onOffen: setOffen }),
+    [aus, voreinstellung, an, offen],
   );
 }
+
+/** Leere Voreinstellung als feste Referenz. */
+const KEINE: readonly never[] = [];
 
 /** Der Schalter für Seiten, die ihn EINMAL über mehreren Sichten zeigen. */
 export function SpaltenSchalter<K extends string>(props: {
@@ -155,8 +186,23 @@ export function SpaltenSchalter<K extends string>(props: {
    */
   an?: readonly K[];
   onAn?: (schluessel: K[]) => void;
+  /**
+   * Die voreingestellt ausgeblendeten Spalten der Seite (`spaltenAusVoreinstellung`). Solange die
+   * Wahl ihnen und der Breite folgt, heißt der Schalter nur „Spalten“ (LLH-1790).
+   */
+  voreinstellung?: readonly K[];
 }): ReactNode {
-  const { bezeichnung, spalten, aus, onAus, offen, onOffen, an = [], onAn } = props;
+  const {
+    bezeichnung,
+    spalten,
+    aus,
+    onAus,
+    offen,
+    onOffen,
+    an = [],
+    onAn,
+    voreinstellung = KEINE,
+  } = props;
   // Der Schalter stellt die Breitenfrage SELBST, statt den Zähler übergeben zu bekommen — sonst
   // gäbe es zwei Stellen, an denen „wie viele sind ausgeblendet" gerechnet wird.
   const { abBreite } = useViewport();
@@ -194,10 +240,13 @@ export function SpaltenSchalter<K extends string>(props: {
    * und Rot bedient nichts (Kriterium 7).
    *
    * Er zählt BEIDE Ursachen (Handauswahl UND `abBreite`) aus {@link sichtbareSpalten}, nicht bloß
-   * `aus.length` (Kriterium 14).
+   * `aus.length` (Kriterium 14), steht aber erst nach eigener Wahl im Namen (LLH-1790): ohne
+   * sie meldete der Schalter „6 ausgeblendet“, obwohl niemand etwas ausgeblendet hat.
    */
-  const beschriftung =
-    anzahlVerborgen === 0 ? 'Spalten' : `Spalten · ${anzahlVerborgen} ausgeblendet`;
+  const beschriftung = schalterBeschriftung(
+    anzahlVerborgen,
+    weichtVonVorgabeAb({ verborgen: new Set(aus), eingeblendet: new Set(an), voreinstellung }),
+  );
 
   return (
     <Dropdown
