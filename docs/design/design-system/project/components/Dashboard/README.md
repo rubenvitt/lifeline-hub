@@ -16,7 +16,7 @@ Paneelreihen steht, warten sie und die Reihen beim ersten Aufbau gemeinsam auf i
 Alarmzeile nicht. Später hängt eine erstmals ladende Quelle nichts aus, und ein gescheiterter
 Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
 Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds). Der
-Überblick hat keins (Change `wf7l9axn-ueberblick-ohne-band`): seine erste
+Überblick hat keins: seine erste
 Paneelreihe trägt „Nächste Marken“ und „Offene Vorgänge“, die zweite „Einsatzabschnitte“ und
 die Entscheidungen, damit Fristen über der Falz und am Handy zuerst stehen. Beim ersten Aufbau
 warten die Reihen auf die Quellen der Gliederung und der Marken, sonst rückt alles darunter.

@@ -563,10 +563,11 @@ export default function UeberblickPage() {
   const gliederungLaedt = [abschnitteQ, einheitenQ, personalQ, fahrzeugeQ, materialQ].some(
     (q) => q.isLoading,
   );
-  // Ebenso die Quellen der Marken (LLH-1748, design.md D3): „Nächste Marken“ steht seit dem Wegfall
-  // des Bands zuoberst, am Handy als erstes Paneel. Wie viele Marken kommen, sagt keine Zahl vorher;
-  // aus „wird abgerufen“ wuchs das Paneel und schob „Offene Vorgänge“ und alles darunter (390 px:
-  // CLS 0,12 bis 0,20). Eine abgeschaltete Quelle (gesperrtes Modul) lädt nicht und hält nichts auf.
+  // Ebenso die Quellen der Marken (LLH-1748, Change `wf7l9axn-ueberblick-ohne-band`, D3):
+  // „Nächste Marken“ steht seit dem Wegfall des Bands zuoberst, am Handy als erstes Paneel. Wie
+  // viele Marken kommen, sagt keine Zahl vorher; aus „wird abgerufen“ wuchs das Paneel und schob
+  // „Offene Vorgänge“ und alles darunter (390 px: CLS 0,12 bis 0,20). Eine abgeschaltete Quelle
+  // (gesperrtes Modul) lädt nicht und hält nichts auf.
   const markenLaedt = [auftraegeQ, erinnerungenQ, abloesungenQ, programmQ, pegelQ, wetterQ].some(
     (q) => q.isLoading,
   );
