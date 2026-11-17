@@ -105,8 +105,9 @@ Pegel erscheint ganz unten; beim nächsten Öffnen steht er oben.
 
 ### Wetter
 
-- Das Wetter gilt für den Einsatzort. Ist er nicht verortet, steht „Einsatzort nicht verortet“
-  mit dem Knopf „Einsatzort in den Einsatzdaten verorten“.
+- Das Wetter gilt für den Einsatzort. Ist er nicht verortet, steht einmal über den Paneelen
+  „Einsatzort nicht verortet“ mit dem Knopf „Einsatzort in den Einsatzdaten verorten“; Warnungen,
+  Vorhersage und aktuelle Bedingungen sagen dann nur „ohne Einsatzort“.
 - „Aktuelle Bedingungen“ ist eine Messung naher Stationen, keine Modellrechnung; ihr Stand ist die
   Messzeit. „Vorhersage 24 h“ zeigt Dreistundenschritte. Datenbasis ist der Deutsche Wetterdienst,
   bezogen über Bright Sky.

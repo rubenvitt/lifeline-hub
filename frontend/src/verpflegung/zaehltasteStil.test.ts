@@ -40,8 +40,8 @@ describe('zaehltasteStil (LLH-1032, design.md D9)', () => {
   });
 
   it('Abstand ist `marginSM`: 16 px in `handschuh`', () => {
-    expect(zaehltastenAbstand(token('kompakt'))).toBe(7);
-    expect(zaehltastenAbstand(token('komfortabel'))).toBe(11);
+    expect(zaehltastenAbstand(token('kompakt'))).toBe(8);
+    expect(zaehltastenAbstand(token('komfortabel'))).toBe(12);
     expect(zaehltastenAbstand(token('handschuh'))).toBe(16);
   });
 });

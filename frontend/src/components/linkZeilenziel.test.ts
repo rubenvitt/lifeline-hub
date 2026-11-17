@@ -29,8 +29,8 @@ describe('linkZeilenzielStil', () => {
   });
 
   it('trägt die ZWEITE Angabe (Polsterung) dichteabhängig mit (LFH-365)', () => {
-    expect(linkZeilenzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
-    expect(linkZeilenzielStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+    expect(linkZeilenzielStil(tokenFuer('kompakt')).padding).toBe('8px 12px');
+    expect(linkZeilenzielStil(tokenFuer('handschuh')).padding).toBe('16px 24px');
   });
 
   it('steht inline in der Textzeile', () => {

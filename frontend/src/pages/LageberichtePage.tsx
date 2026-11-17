@@ -27,6 +27,7 @@ import LageberichtUebersicht from '../lageberichte/LageberichtUebersicht';
 import { loadStartinhalt } from '../lageberichte/startinhalt';
 import { hatNachfolger, teileUebersicht, titelVorschlag } from '../lageberichte/uebersicht';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { flaeche } from '../theme/tokens';
 
 /**
  * Lageberichte: Übersicht und Anlegen (LLH-1064).
@@ -147,7 +148,7 @@ export default function LageberichtePage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

@@ -439,7 +439,7 @@ export default function FahrzeugeBesatzung({
 
   /**
    * Bedienziel-Boden einer handgebauten Zeile (LFH-365): Steuerhöhe plus Polsterung. Zwei Zeilen
-   * und die Teile einer umbrochenen Zeile stehen `marginSM` auseinander (7/11/16 px), damit Link
+   * und die Teile einer umbrochenen Zeile stehen `marginSM` auseinander (8/12/16 px), damit Link
    * und Aktion untereinander den Aktionsabstand halten (Leitlinie ≥ 8 / ≥ 16).
    */
   const rowStyle = {

@@ -1,4 +1,5 @@
-import { Checkbox, Collapse, Form, Input, Radio, Typography, type FormInstance } from 'antd';
+import { Checkbox, Collapse, Form, Input, Typography, type FormInstance } from 'antd';
+import { SegmentFeld } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -601,13 +602,14 @@ export function VollzugDialog({
       onAbbrechen={onSchliessen}
     >
       <Form.Item<VollzugWerte> name="art" label="Art">
-        <Radio.Group
-          optionType="button"
-          onChange={() => setArtGewaehlt(true)}
-          aria-describedby={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
-          options={[...(mitPlan ? [PLAN_OPTION] : []), ...ART_OPTIONEN].map((o) => ({
-            ...o,
-            disabled: o.value === 'besatzung' && besatzungGesperrt != null,
+        <SegmentFeld<VollzugArt>
+          beschriftung="Art"
+          onWahl={() => setArtGewaehlt(true)}
+          beschreibungId={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
+          optionen={[...(mitPlan ? [PLAN_OPTION] : []), ...ART_OPTIONEN].map((o) => ({
+            wert: o.value,
+            label: o.label,
+            gesperrt: o.value === 'besatzung' ? besatzungGesperrt : undefined,
           }))}
         />
       </Form.Item>
@@ -810,12 +812,13 @@ export function AbloeserDialog({
       onAbbrechen={onSchliessen}
     >
       <Form.Item<AbloeserWerte> name="art" label="Art">
-        <Radio.Group
-          optionType="button"
-          aria-describedby={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
-          options={ART_OPTIONEN.map((o) => ({
-            ...o,
-            disabled: o.value === 'besatzung' && gesperrt,
+        <SegmentFeld<AbloesungArt>
+          beschriftung="Art"
+          beschreibungId={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
+          optionen={ART_OPTIONEN.map((o) => ({
+            wert: o.value,
+            label: o.label,
+            gesperrt: o.value === 'besatzung' ? besatzungGesperrt : undefined,
           }))}
         />
       </Form.Item>

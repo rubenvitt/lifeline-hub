@@ -1,9 +1,8 @@
-import { Button, Collapse, Space, Typography } from 'antd';
+import { Button, Collapse, Space, Typography, theme } from 'antd';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { KennungsLink } from '../components/kennungsLink';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { abstand } from '../theme/tokens';
 
 /** Ein beendeter Eintrag des Blocks: Kennung, Zusatz (Funktion o. ä.) und Ende. */
 export interface BeendeterEintrag {
@@ -58,6 +57,7 @@ export default function EntlassenBlock({
   aufgeklappt,
 }: EntlassenBlockProps) {
   const { zeitKurz } = useAnzeigeKonventionen();
+  const { token } = theme.useToken();
   if (eintraege.length === 0) return null;
   const sortiert = [...eintraege].sort((a, b) =>
     (b.beendetAt ?? '').localeCompare(a.beendetAt ?? ''),
@@ -66,7 +66,7 @@ export default function EntlassenBlock({
     <Collapse
       ghost
       data-lfh="entlassen-block"
-      style={{ marginTop: abstand.md }}
+      style={{ marginTop: token.margin }}
       {...(aufgeklappt ? { activeKey: ['entlassen'] } : {})}
       items={[
         {
@@ -75,7 +75,13 @@ export default function EntlassenBlock({
           children: (
             <ul
               aria-label={titel}
-              style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: abstand.sm }}
+              style={{
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'grid',
+                gap: token.marginSM,
+              }}
             >
               {sortiert.map((e) => (
                 <li key={e.schluessel ?? e.id}>

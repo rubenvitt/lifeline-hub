@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { untereLeisten } from '../../components/untereLeiste';
+import { renderMitProviders } from '../../test/utils';
 import { KartenFuss, bandStil, fussStil, FUSS_ABSTAND } from './KartenFuss';
+import KartenUeberlagerung, { UEBERLAGERUNG_RAND } from './KartenUeberlagerung';
+import { erzeugeZeigerQuelle } from './mausPosition';
 
 /**
  * Geprüft wird die Struktur, aus der die Zusicherung folgt, nicht ein Pixel. Dass sich die Bänder
@@ -19,7 +22,7 @@ describe('KartenFuss — Rahmen', () => {
   });
 
   /**
-   * Der Fuß endet rechts vor der Knopfspalte. Die Zahl ist Rand des Knopfblocks + Kante + Abstand,
+   * Der Fuß endet rechts vor der Knopfspalte. Die Zahl ist Rand des Knopfblocks + Breite + Abstand,
    * als Literal. Die Überschneidung im Browser misst `e2e/fokus-verdeckung.spec.ts`.
    */
   it.each([
@@ -27,11 +30,30 @@ describe('KartenFuss — Rahmen', () => {
     [48, 72],
     [72, 96],
   ])(
-    'lässt bei Knopfkante %i rechts %i px frei — die Knopfspalte gehört nicht dem Fuß',
-    (kante, rechts) => {
-      expect(fussStil(kante).right).toBe(rechts);
+    'lässt bei Blockbreite %i rechts %i px frei — die Knopfspalte gehört nicht dem Fuß',
+    (breite, rechts) => {
+      expect(fussStil(breite).right).toBe(rechts);
     },
   );
+
+  // LLH-1751: mit Wort ist der Block breiter als die Kante; der Fuß endet an der Blockbreite.
+  it('endet an der Breite der Kartenknöpfe, nicht an ihrer Kante', () => {
+    renderMitProviders(
+      <>
+        <KartenUeberlagerung
+          grundlage={null}
+          zeigerQuelle={erzeugeZeigerQuelle()}
+          onZoomRein={() => {}}
+          onZoomRaus={() => {}}
+          onNorden={() => {}}
+        />
+        <KartenFuss />
+      </>,
+    );
+    const breite = parseInt(screen.getByRole('button', { name: 'Hineinzoomen' }).style.width, 10);
+    const fuss = document.querySelector<HTMLElement>('[data-lfh="karten-fuss"]')!;
+    expect(fuss.style.right).toBe(`${UEBERLAGERUNG_RAND + breite + FUSS_ABSTAND}px`);
+  });
 
   /**
    * Oben endet der Fuß an der Karte; unten verankert ohne Obergrenze ragte er in den Seitenkopf.
