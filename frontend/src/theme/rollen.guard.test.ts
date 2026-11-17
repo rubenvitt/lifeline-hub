@@ -26,10 +26,6 @@ import {
   etbTypFarbenHell,
   rahmenFarben,
   schriftskala,
-  dichteFaktor,
-  groessenstufen,
-  WACHSENDE_STUFEN,
-  type Groessenstufe,
   warnstufeFarbenDunkel,
   warnstufeFarbenHell,
   type EtbTypTon,
@@ -86,7 +82,6 @@ const DICHTE_PROPERTIES = [
   ...Object.values(LUFT_ABBILDUNG),
   '--lfh-zeilenhoehe',
   '--lfh-schriftgroesse',
-  '--lfh-schrift-faktor',
 ];
 
 /** Rollenname in TS → Property-Name in CSS. */
@@ -176,11 +171,8 @@ const RAHMEN_ABBILDUNG: Record<keyof typeof rahmenFarben, string> = {
 const TYPO_ABBILDUNG: Record<Schriftstufenname, string> = {
   ueberschrift: '--lfh-typo-ueberschrift',
   seitentitel: '--lfh-typo-seitentitel',
-  uhr: '--lfh-typo-uhr',
   text: '--lfh-typo-text',
-  warnung: '--lfh-typo-warnung',
   textKlein: '--lfh-typo-text-klein',
-  etikett: '--lfh-typo-etikett',
   augenbraue: '--lfh-typo-augenbraue',
   railEtikett: '--lfh-typo-rail-etikett',
   meta: '--lfh-typo-meta',
@@ -272,8 +264,6 @@ describe('Dichte-Staffel — CSS und TS tragen dieselben Stufen (LFH-328 · A2)'
     }
     expect(css_['--lfh-zeilenhoehe']).toBe(`${ts.zeilenhoehe}px`);
     expect(css_['--lfh-schriftgroesse']).toBe(`${ts.schriftgroesse}px`);
-    // Der Faktor der Schrift (LLH-1774): `kompakt` trägt ihn unter `:root`.
-    expect(css_['--lfh-schrift-faktor']).toBe(String(dichteFaktor[stufe]));
   });
 
   it('die beiden Nicht-:root-Stufen überschreiben genau die Dichte-Properties', () => {
@@ -410,38 +400,17 @@ describe('Rahmen — modusunabhängig dunkel (Neuentwurf, 21.09.2026)', () => {
   });
 });
 
-describe('Schriftskala — CSS und TS tragen dieselben Stufen (LLH-1773/LLH-1775)', () => {
-  it.each(Object.keys(groessenstufen) as Groessenstufe[])(
-    'Größenstufe %s stimmt überein und wächst nur, wenn sie soll',
-    (stufe) => {
-      const px = groessenstufen[stufe];
-      expect(hell[`--lfh-groesse-${stufe}`]).toBe(
-        WACHSENDE_STUFEN.has(stufe) ? `calc(${px}px * var(--lfh-schrift-faktor))` : `${px}px`,
-      );
-    },
-  );
-
-  it('die CSS-Seite trägt keine Größenstufe, die TS nicht kennt', () => {
-    const bekannt = new Set(Object.keys(groessenstufen).map((s) => `--lfh-groesse-${s}`));
-    const fremd = Object.keys(hell).filter(
-      (k) => k.startsWith('--lfh-groesse-') && !bekannt.has(k),
-    );
-    expect(fremd).toEqual([]);
+describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09.2026)', () => {
+  it.each(Object.keys(TYPO_ABBILDUNG) as Schriftstufenname[])('%s stimmt überein', (stufe) => {
+    const praefix = TYPO_ABBILDUNG[stufe];
+    const ts: { groesse: number; gewicht: number; sperrung?: string } = schriftskala[stufe];
+    expect(hell[`${praefix}-groesse`]).toBe(`${ts.groesse}px`);
+    expect(hell[`${praefix}-gewicht`]).toBe(String(ts.gewicht));
+    // Auch die ABWESENHEIT wird geprüft: eine Sperrung nur auf einer Seite ist Drift.
+    expect(hell[`${praefix}-sperrung`]).toBe(ts.sperrung);
   });
 
-  it.each(Object.keys(TYPO_ABBILDUNG) as Schriftstufenname[])(
-    'Rolle %s stimmt überein',
-    (rolle) => {
-      const praefix = TYPO_ABBILDUNG[rolle];
-      const ts: { stufe: Groessenstufe; gewicht: number; sperrung?: string } = schriftskala[rolle];
-      expect(hell[`${praefix}-groesse`]).toBe(`var(--lfh-groesse-${ts.stufe})`);
-      expect(hell[`${praefix}-gewicht`]).toBe(String(ts.gewicht));
-      // Auch die ABWESENHEIT wird geprüft: eine Sperrung nur auf einer Seite ist Drift.
-      expect(hell[`${praefix}-sperrung`]).toBe(ts.sperrung);
-    },
-  );
-
-  it('die CSS-Seite trägt keine Rolle, die TS nicht kennt', () => {
+  it('die CSS-Seite trägt keine Schriftstufe, die TS nicht kennt', () => {
     const bekannt = new Set(
       Object.values(TYPO_ABBILDUNG).flatMap((p) => [
         `${p}-groesse`,
@@ -453,42 +422,24 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (LLH-1773/LLH-1775
     expect(fremd).toEqual([]);
   });
 
-  it('pinnt die Werte als Literale (umgekehrt 15.11.2026 gegenüber umsetzung.md § Form & Typografie)', () => {
-    expect(groessenstufen).toEqual({
-      fein: 11,
-      klein: 12,
-      text: 14,
-      titel: 16,
-      wert: 22,
-      gross: 32,
-    });
-    expect(dichteFaktor).toEqual({ kompakt: 1, komfortabel: 1.15, handschuh: 1.25 });
+  it('pinnt die Entwurfswerte als Literale (umsetzung.md § Form & Typografie)', () => {
     expect(schriftskala.augenbraue).toEqual({
-      stufe: 'fein',
+      groesse: 10,
       gewicht: 600,
       familie: 'text',
-      sperrung: '0.08em',
+      sperrung: '0.14em',
       versal: true,
     });
-    expect(schriftskala.seitentitel).toMatchObject({ stufe: 'titel', gewicht: 600 });
-    // Die Uhr ist Daueranzeige und steht hinter dem Einsatznamen (LLH-1726): Stufe `text`, sonst
-    // bricht der Kopf am Handy in `handschuh` auf zwei Zeilen um (Merge mit alpha, 16.11.2026).
-    expect(schriftskala.uhr).toMatchObject({ stufe: 'text', gewicht: 500, familie: 'zahl' });
-    expect(schriftskala.meta).toMatchObject({ stufe: 'klein', familie: 'text' });
-    expect(schriftskala.warnung).toMatchObject({ stufe: 'text', gewicht: 600 });
+    expect(schriftskala.seitentitel).toMatchObject({ groesse: 14, gewicht: 600 });
     expect(
       [schriftskala.datenwertKlein, schriftskala.datenwert, schriftskala.datenwertGross].map(
-        (s) => [s.stufe, s.gewicht, s.familie],
+        (s) => [s.groesse, s.gewicht, s.familie],
       ),
     ).toEqual([
-      ['wert', 500, 'zahl'],
-      ['gross', 500, 'zahl'],
-      ['gross', 500, 'zahl'],
+      [22, 500, 'zahl'],
+      [32, 500, 'zahl'],
+      [40, 500, 'zahl'],
     ]);
-  });
-
-  it('keine Stufe liegt unter 11 px (Spec `schriftskala`, Boden)', () => {
-    expect(Math.min(...Object.values(groessenstufen))).toBe(11);
   });
 
   it('jeder Schnitt der Skala wird lokal ausgeliefert — kein künstlicher Fettdruck', () => {

@@ -5,6 +5,8 @@ import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
+import SprungZumInhalt from './components/SprungZumInhalt';
+import Fehlergrenze from './components/Fehlergrenze';
 import { SeitenSkeleton } from './components/SeitenZustand';
 import LoginPage from './pages/LoginPage';
 import AppAnmeldungPage from './pages/AppAnmeldungPage';
@@ -264,6 +266,9 @@ function BetriebsLayout() {
   useOrgLiveStream(benutzer != null);
   return (
     <>
+      {/* Erster Tab-Halt jeder Rahmen-Seite, auch vor den Knöpfen einer gestörten Betriebszeile
+          (nufmon70 D1, `frontend/AGENTS.md`, Rahmen, „Sprunglink zum Inhalt“). */}
+      <SprungZumInhalt />
       <LiveStatusBanner benutzerId={benutzer?.id} klebend />
       <Outlet />
     </>
@@ -294,7 +299,8 @@ function SitzungsLayout() {
 
 /** Eine Routenquelle für Browser und Integrationstests; keine nachgelagerten Routes. */
 export const appRouten = createRoutesFromElements(
-  <Route element={<App />}>
+  // Letztes Netz (LLH-1822, D1): fängt, was ein Rahmen selbst wirft, ohne `AuthProvider`.
+  <Route element={<App />} errorElement={<Fehlergrenze rahmen="wurzel" />}>
     <Route path="/login" element={<LoginPage />} />
     {/* Hilfe (LFH-1096): ohne Sitzung offen, das Kapitel „Anmelden“ braucht man davor. */}
     {[HILFE_PFAD, `${HILFE_PFAD}/:kapitel`].map((pfad) => (
@@ -323,224 +329,250 @@ export const appRouten = createRoutesFromElements(
     <Route element={<RequireAuth />}>
       {/* Hülle eines gekoppelten Geräts; die Ansichten hängen darunter (LFH-892, design.md D9). */}
       <Route path={GERAET_START_PFAD} element={<GeraeteLayout />}>
-        <Route index element={<GeraetStart />} />
-        <Route path=":id" element={<GeraetEinsatzRahmen />}>
+        {/* Fehlergrenze je Rahmen (LLH-1822, D1): pfadlos, damit die Hülle stehen bleibt. */}
+        <Route errorElement={<Fehlergrenze rahmen="geraet" />}>
           <Route index element={<GeraetStart />} />
-          <Route path="monitor" element={<GeraetMonitor />} />
-          {/* Bereitstellungsraum (LFH-1042): der eigene Raum und die Meldungen. */}
-          <Route path="br/:brId" element={<GeraetBr />} />
-          <Route path="meldungen" element={<GeraetMeldungen />} />
-          <Route path="verpflegung" element={<GeraetVerpflegung />} />
-          {/* Ausgabeansicht je Zeitfenster (LLH-1032); die Startseite bleibt die Liste. */}
-          <Route path="verpflegung/:zeitfensterId/ausgabe" element={<GeraetVerpflegungAusgabe />} />
-          {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
-          <Route element={<GeraetUhsRahmen />}>
-            <Route path="patienten" element={<GeraetPatientenPage />} />
-            <Route path="patienten/:personId" element={<PersonenDetailPage />} />
-            <Route path="aufnahme" element={<GeraetAufnahme />} />
-            <Route path="uhs/:uhsId" element={<GeraetUhs />} />
-            <Route path="stelle" element={<GeraetStelle />} />
-          </Route>
-          {/* Betreuungsstelle (LFH-1041); jede andere Ansicht landet auf ihrer Startseite. */}
-          <Route element={<GeraetBetreuungRahmen />}>
-            <Route path="betroffene" element={<GeraetBetroffenePage />} />
-            <Route path="betroffene/aufnahme" element={<GeraetBetroffenAufnahme />} />
-            <Route path="betroffene/:personId" element={<PersonenDetailPage />} />
-            <Route path="betreuung" element={<GeraetBetreuungsstellePage />} />
-            {/* Registrierliste der eigenen Stelle drucken (LLH-1616). */}
-            <Route
-              path="betreuung/registrierliste/druck"
-              element={<GeraetRegistrierlisteDruckPage />}
-            />
-          </Route>
-          {/* Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */}
-          <Route element={<GeraetAbschnittRahmen />}>
-            <Route path="abschnitt" element={<GeraetAbschnittPage />} />
-            <Route
-              path="karte"
-              element={
-                <Suspense fallback={<div>Karte wird geladen…</div>}>
-                  <GeraetAbschnittKarte />
-                </Suspense>
-              }
-            />
-          </Route>
-          {/* Aufträge und Melden: Abschnittsgerät und Einheitengerät (LLH-1579). */}
-          <Route element={<GeraetFuehrungRahmen />}>
-            <Route path="auftraege" element={<GeraetAuftraegePage />} />
-            <Route path="melden" element={<GeraetMeldenPage />} />
-          </Route>
-          {/* Status und Kontakte der eigenen Einheit (LLH-1579, LLH-1580). */}
-          <Route element={<GeraetEinheitRahmen />}>
-            <Route path="status" element={<GeraetStatusPage />} />
-            <Route path="kontakte" element={<GeraetKontaktePage />} />
+          <Route path=":id" element={<GeraetEinsatzRahmen />}>
+            <Route errorElement={<Fehlergrenze rahmen="geraet" />}>
+              <Route index element={<GeraetStart />} />
+              <Route path="monitor" element={<GeraetMonitor />} />
+              {/* Bereitstellungsraum (LFH-1042): der eigene Raum und die Meldungen. */}
+              <Route path="br/:brId" element={<GeraetBr />} />
+              <Route path="meldungen" element={<GeraetMeldungen />} />
+              <Route path="verpflegung" element={<GeraetVerpflegung />} />
+              {/* Ausgabeansicht je Zeitfenster (LLH-1032); die Startseite bleibt die Liste. */}
+              <Route
+                path="verpflegung/:zeitfensterId/ausgabe"
+                element={<GeraetVerpflegungAusgabe />}
+              />
+              {/* UHS-Ansichten; ein Lagemonitor landet hier auf seiner Startseite. */}
+              <Route element={<GeraetUhsRahmen />}>
+                <Route path="patienten" element={<GeraetPatientenPage />} />
+                <Route path="patienten/:personId" element={<PersonenDetailPage />} />
+                <Route path="aufnahme" element={<GeraetAufnahme />} />
+                <Route path="uhs/:uhsId" element={<GeraetUhs />} />
+                <Route path="stelle" element={<GeraetStelle />} />
+              </Route>
+              {/* Betreuungsstelle (LFH-1041); jede andere Ansicht landet auf ihrer Startseite. */}
+              <Route element={<GeraetBetreuungRahmen />}>
+                <Route path="betroffene" element={<GeraetBetroffenePage />} />
+                <Route path="betroffene/aufnahme" element={<GeraetBetroffenAufnahme />} />
+                <Route path="betroffene/:personId" element={<PersonenDetailPage />} />
+                <Route path="betreuung" element={<GeraetBetreuungsstellePage />} />
+                {/* Registrierliste der eigenen Stelle drucken (LLH-1616). */}
+                <Route
+                  path="betreuung/registrierliste/druck"
+                  element={<GeraetRegistrierlisteDruckPage />}
+                />
+              </Route>
+              {/* Abschnittsansicht (LFH-1043); jede andere Ansicht landet auf ihrer Startseite. */}
+              <Route element={<GeraetAbschnittRahmen />}>
+                <Route path="abschnitt" element={<GeraetAbschnittPage />} />
+                <Route
+                  path="karte"
+                  element={
+                    <Suspense fallback={<div>Karte wird geladen…</div>}>
+                      <GeraetAbschnittKarte />
+                    </Suspense>
+                  }
+                />
+              </Route>
+              {/* Aufträge und Melden: Abschnittsgerät und Einheitengerät (LLH-1579). */}
+              <Route element={<GeraetFuehrungRahmen />}>
+                <Route path="auftraege" element={<GeraetAuftraegePage />} />
+                <Route path="melden" element={<GeraetMeldenPage />} />
+              </Route>
+              {/* Status und Kontakte der eigenen Einheit (LLH-1579, LLH-1580). */}
+              <Route element={<GeraetEinheitRahmen />}>
+                <Route path="status" element={<GeraetStatusPage />} />
+                <Route path="kontakte" element={<GeraetKontaktePage />} />
+              </Route>
+              <Route path="*" element={<GeraetStart />} />
+            </Route>
           </Route>
           <Route path="*" element={<GeraetStart />} />
         </Route>
-        <Route path="*" element={<GeraetStart />} />
       </Route>
       {/* Bestätigung im Systembrowser für die Mac-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
       <Route path="/app-anmeldung" element={<AppAnmeldungPage />} />
       <Route element={<BetriebsLayout />}>
         {/* Ebene 1 — globale Shell */}
         <Route element={<AppLayout />}>
-          <Route path="/einsaetze" element={<EinsaetzePage />} />
-          <Route path="/neuigkeiten" element={<NeuigkeitenPage />} />
-          <Route
-            path="/planungen"
-            element={
-              <NurMitPlanungsrecht>
-                <PlanungenPage />
-              </NurMitPlanungsrecht>
-            }
-          />
-          <Route
-            path="/planungen/:planungId"
-            element={
-              <NurMitPlanungsrecht>
-                <PlanungPage />
-              </NurMitPlanungsrecht>
-            }
-          />
-          <Route
-            path="/planungen/:planungId/druck"
-            element={
-              <NurMitPlanungsrecht>
-                <PlanungDruckPage />
-              </NurMitPlanungsrecht>
-            }
-          />
-          {/* Alt-Link bleibt als Redirect in die Admin-Sidebar. */}
-          <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
-          <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
-          <Route path="/profil" element={<ProfilPage />} />
-          <Route path={BENACHRICHTIGUNGEN_PFAD} element={<BenachrichtigungenPage />} />
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
-            {adminGruppen.map((g) => (
-              <Fragment key={g.key}>
-                {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}
-                <Route path={g.key} element={<Navigate to={ersteSektionPfad(g.key)} replace />} />
-                {g.sektionen.map((s) => (
-                  <Route key={s.key} path={`${g.key}/${s.key}`} element={s.element} />
-                ))}
-              </Fragment>
-            ))}
-            <Route path="benutzer" element={<BenutzerPage />} />
-            {/* Demo-Daten (LFH-690): die Seite schützt sich selbst (System-Admin UND Status 200). */}
-            <Route path="demo-daten" element={<DemoDatenPage />} />
-            {/* Aufbewahrung (LFH-23): nur für den System-Admin, beide Seiten schützen sich selbst;
-               eine ungültige id leitet auf die Übersicht. */}
-            <Route path="aufbewahrung" element={<AufbewahrungUebersicht />} />
+          {/* Fehlergrenze je Rahmen (LLH-1822, D1): pfadlos, damit Kopf und Menü stehen bleiben. */}
+          <Route errorElement={<Fehlergrenze rahmen="ebene1" />}>
+            <Route path="/einsaetze" element={<EinsaetzePage />} />
+            <Route path="/neuigkeiten" element={<NeuigkeitenPage />} />
             <Route
-              path="aufbewahrung/:einsatzId"
+              path="/planungen"
               element={
-                <Suspense fallback={<SeitenSkeleton />}>
-                  <ArchivAktePage />
-                </Suspense>
+                <NurMitPlanungsrecht>
+                  <PlanungenPage />
+                </NurMitPlanungsrecht>
               }
             />
-            {/* Zugangsprotokoll (LFH-1097): nur für den System-Admin, die Seite schützt sich selbst. */}
-            <Route path="zugangsprotokoll" element={<ZugangsprotokollPage />} />
-            {/* Stammdaten-Detailrouten liegen IM `AdminLayout`, damit die Sidebar als Rückweg bleibt,
+            <Route
+              path="/planungen/:planungId"
+              element={
+                <NurMitPlanungsrecht>
+                  <PlanungPage />
+                </NurMitPlanungsrecht>
+              }
+            />
+            <Route
+              path="/planungen/:planungId/druck"
+              element={
+                <NurMitPlanungsrecht>
+                  <PlanungDruckPage />
+                </NurMitPlanungsrecht>
+              }
+            />
+            {/* Alt-Link bleibt als Redirect in die Admin-Sidebar. */}
+            <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
+            <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
+            <Route path="/profil" element={<ProfilPage />} />
+            <Route path={BENACHRICHTIGUNGEN_PFAD} element={<BenachrichtigungenPage />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              {/* Fehlergrenze je Rahmen (LLH-1822, D1): pfadlos, das Verwaltungsmenü bleibt stehen. */}
+              <Route errorElement={<Fehlergrenze rahmen="verwaltung" />}>
+                <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
+                {adminGruppen.map((g) => (
+                  <Fragment key={g.key}>
+                    {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}
+                    <Route
+                      path={g.key}
+                      element={<Navigate to={ersteSektionPfad(g.key)} replace />}
+                    />
+                    {g.sektionen.map((s) => (
+                      <Route key={s.key} path={`${g.key}/${s.key}`} element={s.element} />
+                    ))}
+                  </Fragment>
+                ))}
+                <Route path="benutzer" element={<BenutzerPage />} />
+                {/* Demo-Daten (LFH-690): die Seite schützt sich selbst (System-Admin UND Status 200). */}
+                <Route path="demo-daten" element={<DemoDatenPage />} />
+                {/* Aufbewahrung (LFH-23): nur für den System-Admin, beide Seiten schützen sich selbst;
+               eine ungültige id leitet auf die Übersicht. */}
+                <Route path="aufbewahrung" element={<AufbewahrungUebersicht />} />
+                <Route
+                  path="aufbewahrung/:einsatzId"
+                  element={
+                    <Suspense fallback={<SeitenSkeleton />}>
+                      <ArchivAktePage />
+                    </Suspense>
+                  }
+                />
+                {/* Zugangsprotokoll (LFH-1097): nur für den System-Admin, die Seite schützt sich selbst. */}
+                <Route path="zugangsprotokoll" element={<ZugangsprotokollPage />} />
+                {/* Stammdaten-Detailrouten liegen IM `AdminLayout`, damit die Sidebar als Rückweg bleibt,
                und neben der `adminGruppen`-Schleife, weil die Registry keine Detailadressen führt. */}
-            <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
-            <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
-            <Route path="stammdaten/einheiten/:vorlageId" element={<EinheitVorlageDetailPage />} />
-            {/* Ansicht einer Anbindung (LLH-1652); die Seite schützt die Schreibwege selbst. */}
-            <Route path="einstellungen/anbindungen/:zugangId" element={<AnbindungAnsicht />} />
+                <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<FahrzeugDetailPage />} />
+                <Route path="stammdaten/personal/:personalId" element={<PersonalDetailPage />} />
+                <Route
+                  path="stammdaten/einheiten/:vorlageId"
+                  element={<EinheitVorlageDetailPage />}
+                />
+                {/* Ansicht einer Anbindung (LLH-1652); die Seite schützt die Schreibwege selbst. */}
+                <Route path="einstellungen/anbindungen/:zugangId" element={<AnbindungAnsicht />} />
+              </Route>
+            </Route>
           </Route>
         </Route>
         {/* Ebene 2 — Einsatz-Workspace */}
         <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
-          <Route index element={<DefaultModulRedirect />} />
-          {modulRegistry.map((m) => (
-            <Route
-              key={m.key}
-              path={m.route}
-              element={
-                m.verweistAuf ? (
-                  <ModulRedirect to={m.verweistAuf} />
-                ) : (
-                  (MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />)
-                )
-              }
-            >
-              {/* Die Einstellungs-Sektionen hängen HIER statt unter einem eigenen
+          {/* Fehlergrenze je Rahmen (LLH-1822, D1): pfadlos, damit Kopf, Rail und Modulleiste
+              stehen bleiben; ein `errorElement` am Layout selbst ersetzte den Rahmen. */}
+          <Route errorElement={<Fehlergrenze rahmen="einsatz" />}>
+            <Route index element={<DefaultModulRedirect />} />
+            {modulRegistry.map((m) => (
+              <Route
+                key={m.key}
+                path={m.route}
+                element={
+                  m.verweistAuf ? (
+                    <ModulRedirect to={m.verweistAuf} />
+                  ) : (
+                    (MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />)
+                  )
+                }
+              >
+                {/* Die Einstellungs-Sektionen hängen HIER statt unter einem eigenen
                  <Route path="einstellungen">, sonst stünden zwei Routen mit demselben Pfad nebeneinander. */}
-              {m.key === 'einsatz-einstellungen' && EINSTELLUNGEN_ROUTEN}
-            </Route>
-          ))}
-          <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
-          <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-          <Route path="bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
-          <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
-          <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
-          <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
-          {/* Druckansicht eines Auftrags (LLH-1171): das Detail führt hierher, Modul aus `auftraege/`. */}
-          <Route path="auftraege/:auftragId/druck" element={<AuftragDruckPage />} />
-          {/* Druckansicht des Schichtplans (LLH-1557): Unterroute der Ablösung. */}
-          <Route path="abloesung/schichtplan/druck" element={<SchichtplanDruckPage />} />
-          <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
-          {/* Einheit aus Vorlage bilden (LLH-1049): Ziel des Dialogs „Einheit bilden“. */}
-          <Route path="einheiten/aus-vorlage/:vorlageId" element={<EinheitAusVorlagePage />} />
-          {/* Personenansicht einer Einsatzkraft (LLH-1060); `?personal=` bleibt Zeilenmarke der Liste. */}
-          <Route path="personal/:epId" element={<EinsatzkraftPage />} />
-          {/* Statisches Segment vor der dynamischen Detail-Route (React Router rankt ohnehin statisch höher). */}
-          <Route path="personen/aufnahme" element={<AufnahmePage />} />
-          {/* ETB-Druckansicht (LFH-22), Filter aus der Adresse. */}
-          <Route path="etb/druck" element={<EtbDruckPage />} />
-          {/* Druckansichten der Modul-Listen (LFH-727), Seitenfilter aus der Adresse. */}
-          <Route path="personen/druck" element={<PersonenDruckPage />} />
-          <Route path="tiere/druck" element={<TiereDruckPage />} />
-          <Route path="schaeden/druck" element={<SchaedenDruckPage />} />
-          {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder
+                {m.key === 'einsatz-einstellungen' && EINSTELLUNGEN_ROUTEN}
+              </Route>
+            ))}
+            <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
+            <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+            <Route path="bereitstellungsraeume/liste" element={<BereitstellungsraeumePage />} />
+            <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
+            <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
+            <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
+            {/* Druckansicht eines Auftrags (LLH-1171): das Detail führt hierher, Modul aus `auftraege/`. */}
+            <Route path="auftraege/:auftragId/druck" element={<AuftragDruckPage />} />
+            {/* Druckansicht des Schichtplans (LLH-1557): Unterroute der Ablösung. */}
+            <Route path="abloesung/schichtplan/druck" element={<SchichtplanDruckPage />} />
+            <Route path="einheiten/:einheitId" element={<EinheitDetailPage />} />
+            {/* Einheit aus Vorlage bilden (LLH-1049): Ziel des Dialogs „Einheit bilden“. */}
+            <Route path="einheiten/aus-vorlage/:vorlageId" element={<EinheitAusVorlagePage />} />
+            {/* Personenansicht einer Einsatzkraft (LLH-1060); `?personal=` bleibt Zeilenmarke der Liste. */}
+            <Route path="personal/:epId" element={<EinsatzkraftPage />} />
+            {/* Statisches Segment vor der dynamischen Detail-Route (React Router rankt ohnehin statisch höher). */}
+            <Route path="personen/aufnahme" element={<AufnahmePage />} />
+            {/* ETB-Druckansicht (LFH-22), Filter aus der Adresse. */}
+            <Route path="etb/druck" element={<EtbDruckPage />} />
+            {/* Druckansichten der Modul-Listen (LFH-727), Seitenfilter aus der Adresse. */}
+            <Route path="personen/druck" element={<PersonenDruckPage />} />
+            <Route path="tiere/druck" element={<TiereDruckPage />} />
+            <Route path="schaeden/druck" element={<SchaedenDruckPage />} />
+            {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder
               gesperrt sind; die Rechte prüft der Bericht je Quelle selbst. */}
-          <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
-          {/* Kommunikationsplan S6 (LFH-848): Unterroute des Moduls Fernmeldewesen (LLH-1180). */}
-          <Route path="fernmeldewesen/kommunikationsplan" element={<KommunikationsplanPage />} />
-          {/* Ausgabeansicht eines Zeitfensters (LLH-1032): Unterroute des Moduls Verpflegung,
+            <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
+            {/* Kommunikationsplan S6 (LFH-848): Unterroute des Moduls Fernmeldewesen (LLH-1180). */}
+            <Route path="fernmeldewesen/kommunikationsplan" element={<KommunikationsplanPage />} />
+            {/* Ausgabeansicht eines Zeitfensters (LLH-1032): Unterroute des Moduls Verpflegung,
               `modulAusPfad` gatet sie über das Segment `verpflegung`. */}
-          <Route path="verpflegung/:zeitfensterId/ausgabe" element={<AusgabeAnsicht />} />
-          {/* Tag aus Vorlage anlegen (LLH-1058): Unterroute des Moduls; `modulAusPfad`
+            <Route path="verpflegung/:zeitfensterId/ausgabe" element={<AusgabeAnsicht />} />
+            {/* Tag aus Vorlage anlegen (LLH-1058): Unterroute des Moduls; `modulAusPfad`
               gatet sie über das Segment `verpflegung`. */}
-          <Route path="verpflegung/aus-vorlage" element={<TagAusVorlage />} />
-          {/* Altadressen der S6-Werkzeuge unter dem Stab leiten dauerhaft um, samt `?ansicht=`
+            <Route path="verpflegung/aus-vorlage" element={<TagAusVorlage />} />
+            {/* Altadressen der S6-Werkzeuge unter dem Stab leiten dauerhaft um, samt `?ansicht=`
               (LLH-1180, design.md D7). `modulAusPfad` gatet sie nach dem Fernmeldewesen. */}
-          <Route path="stab/funkplan" element={<AltpfadWeiterleitung modul="fernmeldewesen" />} />
-          <Route
-            path="stab/kommunikationsplan"
-            element={<AltpfadWeiterleitung modul="fernmeldewesen" unterpfad="kommunikationsplan" />}
-          />
-          {/* Altadresse des Informationstelefons (i6k6mzed, design.md D3/D8): leitet dauerhaft auf
+            <Route path="stab/funkplan" element={<AltpfadWeiterleitung modul="fernmeldewesen" />} />
+            <Route
+              path="stab/kommunikationsplan"
+              element={
+                <AltpfadWeiterleitung modul="fernmeldewesen" unterpfad="kommunikationsplan" />
+              }
+            />
+            {/* Altadresse des Informationstelefons (i6k6mzed, design.md D3/D8): leitet dauerhaft auf
               das eigene Modul um, samt `?anruf=` und `?neu=1`; `modulAusPfad` gatet sie danach. */}
-          <Route path="stab/infotelefon" element={<AltpfadWeiterleitung modul="infotelefon" />} />
-          {/* Altadressen des entfernten Stabs samt Presse (i6k6mzed, design.md D8): führen in den
+            <Route path="stab/infotelefon" element={<AltpfadWeiterleitung modul="infotelefon" />} />
+            {/* Altadressen des entfernten Stabs samt Presse (i6k6mzed, design.md D8): führen in den
               Einsatz statt auf die Einsatzliste, ohne eigene Hinweisseite. `..` ist relativ zur
               Route, also `/einsaetze/:id`. */}
-          <Route path="stab" element={<Navigate to=".." replace />} />
-          <Route path="stab/presse" element={<Navigate to=".." replace />} />
-          <Route
-            path="stab/presse/mitteilungen/:mitteilungId"
-            element={<Navigate to=".." replace />}
-          />
-          <Route path="personen/:personId" element={<PersonenDetailPage />} />
-          <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
-          <Route path="tiere/:tierId" element={<TiereDetailPage />} />
-          <Route path="betreuung/:stelleId" element={<BetreuungsstelleDetailPage />} />
-          {/* Unterkunftsrechner der Stelle (LLH-1520); gegatet über das Segment `betreuung`. */}
-          <Route path="betreuung/:stelleId/unterkunft" element={<UnterkunftPlanenPage />} />
-          {/* Registrierliste drucken (LLH-1616); gegatet über das Segment `betreuung`. */}
-          <Route
-            path="betreuung/:stelleId/registrierliste/druck"
-            element={<RegistrierlisteDruckPage />}
-          />
-          <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
-          {/* Detailseite eines Evakuierungsbezirks; gegatet über das Segment `evakuierung`. */}
-          <Route path="evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />
-          {/* Unbekannte Adresse im Einsatz (LLH-1729): bleibt im Rahmen und sagt „Seite nicht
+            <Route path="stab" element={<Navigate to=".." replace />} />
+            <Route path="stab/presse" element={<Navigate to=".." replace />} />
+            <Route
+              path="stab/presse/mitteilungen/:mitteilungId"
+              element={<Navigate to=".." replace />}
+            />
+            <Route path="personen/:personId" element={<PersonenDetailPage />} />
+            <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
+            <Route path="tiere/:tierId" element={<TiereDetailPage />} />
+            <Route path="betreuung/:stelleId" element={<BetreuungsstelleDetailPage />} />
+            {/* Unterkunftsrechner der Stelle (LLH-1520); gegatet über das Segment `betreuung`. */}
+            <Route path="betreuung/:stelleId/unterkunft" element={<UnterkunftPlanenPage />} />
+            {/* Registrierliste drucken (LLH-1616); gegatet über das Segment `betreuung`. */}
+            <Route
+              path="betreuung/:stelleId/registrierliste/druck"
+              element={<RegistrierlisteDruckPage />}
+            />
+            <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
+            {/* Detailseite eines Evakuierungsbezirks; gegatet über das Segment `evakuierung`. */}
+            <Route path="evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />
+            {/* Unbekannte Adresse im Einsatz (LLH-1729): bleibt im Rahmen und sagt „Seite nicht
               gefunden“, statt bis zur globalen Auffangroute auf die Einsatzliste durchzufallen. */}
-          <Route path="*" element={<SeiteNichtGefunden />} />
+            <Route path="*" element={<SeiteNichtGefunden />} />
+          </Route>
         </Route>
       </Route>
     </Route>

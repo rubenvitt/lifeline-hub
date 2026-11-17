@@ -9,7 +9,8 @@ import { darfImEinsatzSchreiben, darfVerwaltung, isEinsatzGesperrt } from '../ei
 import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
 import {
@@ -32,7 +33,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } 
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Segmentleiste, schriftStil, zahlStil } from '../components/instrument';
+import { monoStil, Segmentleiste } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   parseFahrzeugeAnsicht,
@@ -123,7 +124,7 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
   return (
     <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <StatusTag darstellung={besatzungsUrteil[urteil]} />
-      <span style={schriftStil('meta')}>
+      <span style={monoStil(12)}>
         {urteil !== 'nicht_erfasst' && (
           <>
             Ist <StaerkeAnzeige wert={ist} />
@@ -564,12 +565,20 @@ function FahrzeugeInhalt() {
 
   // Cross-Modul-Deeplink ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort). Im Tableau gibt
   // es keine Zeile, `scrolleZurZeile` liefe still ins Leere; der Deeplink schaltet deshalb auf die
-  // Liste.
-  useQueryParamSelektion('fahrzeug', efQuery.isSuccess, (fid) => {
-    if (!(efQuery.data ?? []).some((f) => f.id === fid)) return;
-    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
-    setHighlightId(fid);
-  });
+  // Liste. Ein Fahrzeug, das nicht im Einsatz steht, meldet die Hinweisleiste (LLH-1827); geprüft
+  // gegen den frischen Stand, nicht gegen einen alten Cache. Ein entlassenes steht im Block
+  // „Entlassen“ derselben Seite und bekommt keinen Hinweis.
+  const deeplinkHinweis = useQueryParamSelektion(
+    'fahrzeug',
+    deeplinkStand([efQuery], [entlasseneQuery]),
+    (fid) => {
+      if (!(efQuery.data ?? []).some((f) => f.id === fid)) {
+        return (entlasseneQuery.data ?? []).some((f) => f.id === fid) ? undefined : false;
+      }
+      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
+      setHighlightId(fid);
+    },
+  );
   useEffect(() => {
     if (highlightId == null) return;
     scrolleZurZeile(highlightId);
@@ -1011,9 +1020,7 @@ function FahrzeugeInhalt() {
           kennung={
             <Space wrap>
               {/* Funkrufname in Mono. */}
-              <span data-schrift="kennung" style={zahlStil('text')}>
-                {ef.funkrufname}
-              </span>
+              <span style={monoStil(13)}>{ef.funkrufname}</span>
               {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
               {ef.ist_demo && <DemoMarke />}
             </Space>
@@ -1291,6 +1298,7 @@ function FahrzeugeInhalt() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
+          <DeeplinkHinweis lage={deeplinkHinweis} sache="Fahrzeug" />
           <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {ansicht === 'tableau' ? (
             <FmsTableau

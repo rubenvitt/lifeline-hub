@@ -30,9 +30,9 @@ import {
   Sammelbanner,
   Segmentleiste,
   Zeitachseneintrag,
+  monoStil,
   useRollen,
   type KennzahlZustand,
-  zahlStil,
 } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -55,6 +55,8 @@ import { ANLIEGEN_LABEL, ANLIEGEN_REIHENFOLGE } from '../infotelefon/labels';
 import { personenPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
+import { istNichtGefunden } from '../components/SeitenZustand';
 import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { infotelefonStatus } from '../theme/statusFarben';
@@ -167,7 +169,7 @@ export default function InfotelefonPage() {
     });
   }, [pages]);
 
-  useQueryParamSelektion('anruf', anrufeQuery.isSuccess, (aid) => {
+  const deeplinkHinweis = useQueryParamSelektion('anruf', anrufeQuery.isSuccess, (aid) => {
     setSicht('alle');
     setGefroren(null);
     setHervorgehoben(aid);
@@ -180,6 +182,16 @@ export default function InfotelefonPage() {
     enabled: frei && linkedId != null,
   });
   const linked = linkedId != null && linkedQuery.data?.id === linkedId ? linkedQuery.data : null;
+  // Antwortet der Einzelabruf mit 404, gibt es den Anruf nicht (mehr): die Hinweisleiste über der
+  // Liste nennt ihn (LLH-1827), nichts bleibt hervorgehoben.
+  const { melde: meldeUnbekannt } = deeplinkHinweis;
+  const linkedFehlt = linkedQuery.isError && istNichtGefunden(linkedQuery.error);
+  useEffect(() => {
+    if (linkedId == null || !linkedFehlt) return;
+    meldeUnbekannt(linkedId);
+    setLinkedId(null);
+    setHervorgehoben((h) => (h === linkedId ? null : h));
+  }, [linkedId, linkedFehlt, meldeUnbekannt]);
 
   // Schnellaktion „Anruf erfassen“ (LLH-1127): ?neu=1 legt den Fokus in die Erfassung. Das Literal
   // `searchParams.get('neu')` muss in dieser Datei stehen: `schnellaktionen.guard.test.ts` verlangt
@@ -380,7 +392,7 @@ export default function InfotelefonPage() {
               }}
             >
               <span>{ANLIEGEN_LABEL[x.anliegen]}</span>
-              <span style={zahlStil('text')}>{x.anzahl}</span>
+              <span style={monoStil(14)}>{x.anzahl}</span>
             </PaneelZeile>
           </li>
         ))}
@@ -485,6 +497,7 @@ export default function InfotelefonPage() {
           </>
         )}
         {statusMutation.error != null && <SpeicherFehler fehler={statusMutation.error} />}
+        <DeeplinkHinweis lage={deeplinkHinweis} sache="Anruf" />
         {anrufeQuery.isError ? (
           <SeitenFehler
             text="Anrufe konnten nicht geladen werden"

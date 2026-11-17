@@ -7,7 +7,6 @@ import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import { useOnline } from '../offline/useOnline';
 import { GERAET_START_PFAD, KOPPELN_PFAD } from '../routing/deeplinks';
 import { GeraeteKarte } from './GeraeteKarte';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /**
  * „Kopplung beendet“ statt der Anmeldung (LFH-892, Spec `feldgeraet-bedienung`): Ziel jedes 401
@@ -53,7 +52,7 @@ export default function KopplungBeendetPage() {
 
   return (
     <GeraeteKarte untertitel="Gerät">
-      <Typography.Title level={2} style={{ fontSize: schriftGroesse('titel'), marginTop: 0 }}>
+      <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
         {online ? 'Kopplung beendet' : 'Keine Verbindung'}
       </Typography.Title>
       {online && <Typography.Paragraph>Neuen Code gibt die Einsatzleitung.</Typography.Paragraph>}

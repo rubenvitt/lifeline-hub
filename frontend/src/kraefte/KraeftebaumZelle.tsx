@@ -2,13 +2,7 @@ import type { ReactNode } from 'react';
 import { POSITION_KUERZEL, POSITION_LABELS } from '../api/personal';
 import { kraefteText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
-import {
-  Augenbraue,
-  useRollen,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
-} from '../components/instrument';
+import { Augenbraue, monoStil, useRollen } from '../components/instrument';
 import { einheitDetailPfad, fahrzeugePfad, personalPfad } from '../routing/deeplinks';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 import { fremdText } from './kraeftebaumKern';
@@ -26,7 +20,7 @@ import type { PersonAnzeige, RasterZeile } from './meldebildRaster';
  * | Fahrzeug    | Fahrzeugzeichen 22 px           | Funkrufname Mono        |
  * | Person      | Positionsmarke F/UF/M (+ „EF“)  | Name normal             |
  * | Gruppe      | —                               | Augenbraue (Versalien)  |
- * | Material    | Kurzwort „Mtl.“ (Textschrift)   | Bezeichnung normal      |
+ * | Material    | Kurzwort „Mtl.“                 | Bezeichnung normal      |
  *
  * Den Einzug zeichnet die `Datensicht` (eine Einzugsrechnung, LFH-977). `data-art` trägt die
  * Zeilenart für Druck-CSS und Prüfungen.
@@ -46,7 +40,7 @@ export function Marke({ text, titel }: { text: string; titel: string }) {
       data-lfh="kraeftebaum-marke"
       title={titel}
       style={{
-        ...zahlStil('fein'),
+        ...monoStil(11),
         display: 'inline-flex',
         justifyContent: 'center',
         minWidth: 24,
@@ -119,7 +113,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
     return text ? (
       <span
         data-lfh="kraeftebaum-nebentext"
-        style={{ display: 'block', fontSize: schriftGroesse('fein'), color: rollen.gedaempft }}
+        style={{ display: 'block', fontSize: 11, color: rollen.gedaempft }}
       >
         {text}
       </span>
@@ -167,9 +161,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         z.fahrzeugTz ? <FahrzeugZeichen tz={z.fahrzeugTz} /> : null,
         <>
-          <span data-schrift="kennung" style={zahlStil('klein')}>
-            {name(z.bezeichnung, ziel)}
-          </span>
+          <span style={monoStil(12)}>{name(z.bezeichnung, ziel)}</span>
           {nebentext([z.zusatz, z.besatzung ? fremdText(z.besatzung) : null])}
         </>,
       );
@@ -200,25 +192,13 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
             gap: token.marginXS,
           }}
         >
-          <Augenbraue style={{ fontSize: schriftGroesse('fein') }}>{z.bezeichnung}</Augenbraue>
-          {/* Zahl samt Zählwort („3 Posten“): Textschrift mit gleich breiten Ziffern (LLH-1777). */}
-          <span
-            style={{
-              ...schriftStil('meta'),
-              fontSize: schriftGroesse('fein'),
-              color: rollen.gedaempft,
-            }}
-          >
-            · {anzahl}
-          </span>
+          <Augenbraue style={{ fontSize: 11 }}>{z.bezeichnung}</Augenbraue>
+          {/* Zahlen in Mono (Regel „Zahlen immer Mono“), samt ihrem Zählwort. */}
+          <span style={{ ...monoStil(11), color: rollen.gedaempft }}>· {anzahl}</span>
           {ausfall && (
             <span
               data-lfh="kraeftebaum-ausfall"
-              style={{
-                ...schriftStil('meta'),
-                fontSize: schriftGroesse('fein'),
-                color: rollen.alarmText,
-              }}
+              style={{ ...monoStil(11), color: rollen.alarmText }}
             >
               · {ausfall}
             </span>
@@ -230,16 +210,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         // Das Kürzel schrumpft nicht: im Druck ließ die Zellregel `overflow-wrap: anywhere` es
         // sonst als „Mtl“ über „.“ brechen (LFH-1007).
-        <span
-          style={{
-            ...schriftStil('meta'),
-            fontSize: schriftGroesse('fein'),
-            color: rollen.schwach,
-            flexShrink: 0,
-          }}
-        >
-          Mtl.
-        </span>,
+        <span style={{ ...monoStil(11), color: rollen.schwach, flexShrink: 0 }}>Mtl.</span>,
         <>{z.bezeichnung}</>,
       );
   }

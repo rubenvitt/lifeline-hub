@@ -2,7 +2,7 @@ import { Button, Flex } from 'antd';
 import { useId } from 'react';
 import type { SchichtplanBlock, SchichtplanWechselpunkt } from '../../api/types';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
-import { Augenbraue, StatusChip, useRollen, zahlStil } from '../../components/instrument';
+import { Augenbraue, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import type { StatusTon } from '../../components/instrument/statusFlaeche';
 
 /**
@@ -113,7 +113,7 @@ export default function SchichtplanWechselLeiste({
                 borderColor: vorbei && offen > 0 ? rollen.achtung : undefined,
               }}
             >
-              <span style={zahlStil('text', 500)}>{formatZeit(ms(w))}</span>
+              <span style={monoStil(13, 500)}>{formatZeit(ms(w))}</span>
               <span aria-hidden="true">·</span>
               <span>
                 {w.eintraege.length === 1 ? '1 Wechsel' : `${w.eintraege.length} Wechsel`}

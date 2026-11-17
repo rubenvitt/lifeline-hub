@@ -20,10 +20,8 @@ import {
   Kennzahl,
   Kennzahlenband,
   Zeitachseneintrag,
+  monoStil,
   useRollen,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import type { VorgemerkteAusgabe } from '../offline/useVorgemerkteAusgaben';
@@ -297,13 +295,10 @@ export default function ZeitfensterKarte({
         style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
       >
         <Flex align="baseline" gap={token.marginSM} wrap style={{ minWidth: 0 }}>
-          <Text strong style={{ fontSize: schriftGroesse('text'), overflowWrap: 'anywhere' }}>
+          <Text strong style={{ fontSize: 15, overflowWrap: 'anywhere' }}>
             {zf.bezeichnung}
           </Text>
-          <span
-            data-lfh="verpflegung-zeitraum"
-            style={{ ...zahlStil('klein'), color: rollen.text2 }}
-          >
+          <span data-lfh="verpflegung-zeitraum" style={{ ...monoStil(12), color: rollen.text2 }}>
             {zeitraumText(zf, konventionen)}
           </span>
           {zf.verpflegungsart && (
@@ -400,7 +395,7 @@ export default function ZeitfensterKarte({
                         </span>
                       ))}
                       {' · '}
-                      <span style={zahlStil('text', 500)}>{z.ausgegeben} EP</span>
+                      <span style={monoStil(13, 500)}>{z.ausgegeben} EP</span>
                     </span>
                     {sprungJeStelle && waehlbar && (
                       <SprungKnopf
@@ -438,14 +433,13 @@ export default function ZeitfensterKarte({
                       }}
                     >
                       <span style={{ minWidth: '12ch' }}>{KOSTFORM_LABEL[k]}</span>
-                      <span style={{ ...schriftStil('meta'), color: rollen.text2 }}>
+                      <span style={{ ...monoStil(12), color: rollen.text2 }}>
                         Bedarf {zf.bedarf.sonderkost[k]} · ausgegeben {zf.ausgegeben.sonderkost[k]}
                       </span>
                       <span
                         data-lfh="sonderkost-fehlt"
                         style={{
-                          ...schriftStil('meta'),
-                          fontWeight: fehlt > 0 ? 500 : 400,
+                          ...monoStil(12, fehlt > 0 ? 500 : 400),
                           color:
                             fehlt > 0 && stufe === 'unterdeckung' ? rollen.alarmText : rollen.text2,
                         }}
@@ -504,7 +498,7 @@ export default function ZeitfensterKarte({
                     }
                   >
                     <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
-                      <span style={zahlStil('text', 500)}>{a.menge} EP</span>
+                      <span style={monoStil(13, 500)}>{a.menge} EP</span>
                       {anText(a)}
                       {woText(a.verpflegungsstelle_id, a.ort)}
                       {sk ? ` · ${sk}` : ''}
@@ -532,7 +526,7 @@ export default function ZeitfensterKarte({
                     hinweis={v.antrag ? 'Beantragt' : 'Offline vorgemerkt'}
                   >
                     <span style={{ color: rollen.text2 }}>
-                      <span style={zahlStil('text', 500)}>{d.menge} EP</span>
+                      <span style={monoStil(13, 500)}>{d.menge} EP</span>
                       {anText(d)}
                       {woText(d.verpflegungsstelle_id, d.ort)}
                       {sk ? ` · ${sk}` : ''}

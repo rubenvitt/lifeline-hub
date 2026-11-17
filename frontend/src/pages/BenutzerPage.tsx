@@ -10,7 +10,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, zahlStil } from '../components/instrument';
+import { StatusChip, monoStil } from '../components/instrument';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
@@ -380,11 +380,7 @@ export default function BenutzerPage() {
       mindestBreite: 160,
       abBreite: 'md',
       // Kennung in Mono.
-      render: (t) => (
-        <span data-schrift="kennung" style={{ ...zahlStil('text'), overflowWrap: 'anywhere' }}>
-          @{t}
-        </span>
-      ),
+      render: (t) => <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>@{t}</span>,
     },
     {
       title: 'Rollen',

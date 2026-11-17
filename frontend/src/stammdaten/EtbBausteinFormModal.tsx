@@ -11,7 +11,6 @@ import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 interface FormWerte {
   label: string;
@@ -107,7 +106,7 @@ export default function EtbBausteinFormModal({
         name="inhalt"
         rules={[{ required: true, whitespace: true }]}
         extra={
-          <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             Automatisch:{' '}
             {AUTO_PLATZHALTER.map((p, i) => (
               <span key={p.name}>

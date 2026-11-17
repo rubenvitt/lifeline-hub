@@ -583,7 +583,7 @@ describe('EinheitenPage', () => {
     expect(await screen.findByText('Detail von Einheit')).toBeInTheDocument();
   });
 
-  it('eine unbekannte Kennung in ?einheit= bleibt auf der Gliederung', async () => {
+  it('eine unbekannte Kennung in ?einheit= bleibt auf der Gliederung und zeigt den Hinweis', async () => {
     // Gegenprobe: ohne sie wäre die Weiterleitung auch grün, wenn sie jede Zahl in eine Detailroute
     // übersetzte — die dann einen Leerzustand zeigte.
     server.use(...handlers());
@@ -596,6 +596,35 @@ describe('EinheitenPage', () => {
     );
     expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
     expect(screen.queryByText('Detail von Einheit')).toBeNull();
+    // Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827).
+    expect(await screen.findByText('Einheit #999 gibt es nicht (mehr)')).toBeInTheDocument();
+  });
+
+  // Review a12ms7g9 (F7): scheitert die Liste der aufgelösten, steht nicht fest, dass es die Einheit
+  // nicht gibt; still statt eines falschen Hinweises.
+  it('eine Kennung in ?einheit= bei gescheiterter Liste der aufgelösten zeigt keinen Hinweis', async () => {
+    server.use(...handlers());
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', ({ request }) =>
+        new URL(request.url).searchParams.has('aufgeloeste')
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json(einheiten),
+      ),
+    );
+    renderMitProviders(
+      <>
+        <Ortsanzeige />
+        <Routes>
+          <Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/einheiten?einheit=999' },
+    );
+    expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/einheiten$/),
+    );
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
   });
 
   it('zeigt „Einheit bilden" bei Schreibrecht', async () => {
@@ -876,3 +905,9 @@ describe('EinheitenPage · Kennzeichen „nicht übernommen“ (LLH-1075, design
     expect(within(await zeileVon('1. Zug')).queryByText('nicht übernommen')).toBeNull();
   });
 });
+
+/** Die aktuelle Adresse samt Suche. */
+function Ortsanzeige() {
+  const l = useLocation();
+  return <output data-testid="ort">{`${l.pathname}${l.search}`}</output>;
+}

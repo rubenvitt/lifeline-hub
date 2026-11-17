@@ -1,10 +1,9 @@
 import { theme, type GlobalToken } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import Markdown from '../../components/Markdown';
+import { monoStil } from '../../components/instrument';
 import type { Abschnitt, Einsatzbericht, Inhalt } from './verdichtung';
 import { BEGINNT_MIT_ZIFFER, Titelfolge, ZeilenListe, type Titel } from '../ZeilenListe';
-import { zahlStil } from '../../components/instrument/rollenwerte';
-
 import '../druckansichtSchmal.css';
 
 /**
@@ -145,7 +144,7 @@ function TabellenAnzeige({
                   style={{
                     ...zelle,
                     whiteSpace: NUR_ZAHL_ODER_ZEIT.test(wert) ? 'nowrap' : 'pre-wrap',
-                    ...(BEGINNT_MIT_ZIFFER.test(wert) ? zahlStil('text') : {}),
+                    ...(BEGINNT_MIT_ZIFFER.test(wert) ? monoStil(token.fontSize) : {}),
                   }}
                 >
                   {/* Die Hülle verliert im Firefox-Druck ihre Höhe, nicht ihre Breite. Inline,

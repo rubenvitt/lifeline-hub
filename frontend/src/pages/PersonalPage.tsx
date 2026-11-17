@@ -3,7 +3,8 @@ import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { ladeEinsatz } from '../api/einsaetze';
 import { PERSONAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
@@ -35,6 +36,7 @@ import { abrufZustand } from '../api/abrufZustand';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { monoStil } from '../components/instrument';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
 import PersonalDisponierenModal from '../kraefte/PersonalDisponierenModal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -67,7 +69,6 @@ import { abschnittDerEinheit, buildEinheitOptions } from '../kraefte/kraeftebaum
 import { POSITION_LABELS } from '../api/personal';
 import type { StaerkePosition } from '../api/types';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
-import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Die Personalliste eines Einsatzes (LLH-1060, Spec `personal-ansicht`): gruppiert nach Einheit,
@@ -192,10 +193,20 @@ export default function PersonalPage() {
   const { konventionen } = useAnzeigeKonventionen();
 
   // `?personal=<id>` bleibt Zeilenmarke (D2): Lagekarte und Schaden springen hierher, um die Person
-  // im Vergleich zu sehen; die Zeile wird hervorgehoben und ins Bild gerollt (best-effort).
-  useQueryParamSelektion('personal', epQuery.isSuccess, (pid) => {
-    if ((epQuery.data ?? []).some((p) => p.id === pid)) setHighlightId(pid);
-  });
+  // im Vergleich zu sehen; die Zeile wird hervorgehoben und ins Bild gerollt (best-effort). Steht
+  // die Kraft nicht (mehr) in der Liste, meldet das die Hinweisleiste (LLH-1827), geprüft gegen den
+  // frischen Stand. Eine entlassene Kraft steht im Block „Entlassen“ derselben Seite (Brotkrume
+  // ihrer Personenansicht) und bekommt keinen Hinweis.
+  const deeplinkHinweis = useQueryParamSelektion(
+    'personal',
+    deeplinkStand([epQuery], [entlasseneQuery]),
+    (pid) => {
+      if (!(epQuery.data ?? []).some((p) => p.id === pid)) {
+        return (entlasseneQuery.data ?? []).some((p) => p.id === pid) ? undefined : false;
+      }
+      setHighlightId(pid);
+    },
+  );
   useEffect(() => {
     if (highlightId == null) return;
     scrolleZurZeile(highlightId);
@@ -359,7 +370,7 @@ export default function PersonalPage() {
   /** Dauerzelle: leer ohne Daten, „—" ohne Ereignis (keine erfundene 0). */
   const dauerZelle = (minuten: number | null | undefined) =>
     periodenBereit ? (
-      <span style={{ ...zahlStil('klein'), whiteSpace: 'nowrap' }}>
+      <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
         {minuten == null ? '—' : dauerText(minuten)}
       </span>
     ) : null;
@@ -662,6 +673,7 @@ export default function PersonalPage() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
+          <DeeplinkHinweis lage={deeplinkHinweis} sache="Einsatzkraft" />
           <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {/* `zufluss` bleibt `sammelbanner`: Einheitswechsel, Status und Position sind Bedienziele
               der Zeile. Wechselt eine Person unter Fokus oder Zeiger die Einheit, hält die

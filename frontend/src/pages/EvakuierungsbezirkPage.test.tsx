@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import EvakuierungsbezirkPage from './EvakuierungsbezirkPage';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EvakuierungUebersicht, Evakuierungsbezirk, LageZone } from '../api/types';
@@ -9,6 +9,7 @@ import { http, HttpResponse } from 'msw';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
+import { erwarteNichtGefunden } from '../test/nichtGefunden';
 import {
   EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX,
   EVAKUIERUNG_BEZIRK_NOTIZ_MAX,
@@ -110,12 +111,25 @@ const verlaufEintrag = (id: number, evakuiert: number, zeit: string, aktuell = f
   aktuell,
 });
 
+/** Zeigt die Adresse, auf der die Seite steht. */
+function Adresse() {
+  return <span data-testid="adresse">{useLocation().pathname}</span>;
+}
+
 function renderSeite(pfad = '/einsaetze/1/evakuierung/5') {
   server.use(meHandler(benutzerFixture({ id: 1, anzeigename: 'Leitung' })));
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/evakuierung" element={<div>UEBERSICHT</div>} />
-      <Route path="/einsaetze/:id/evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />
+      <Route
+        path="/einsaetze/:id/evakuierung/:bezirkId"
+        element={
+          <>
+            <Adresse />
+            <EvakuierungsbezirkPage />
+          </>
+        }
+      />
       <Route path="/einsaetze/:id/lagekarte" element={<div>LAGEKARTE</div>} />
     </Routes>,
     // Data Router: der Verlassen-Schutz der Stammdaten nutzt `useBlocker`.
@@ -590,12 +604,22 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       ).toBeNull();
     });
 
+    // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4): kein
+    // stilles `Navigate` mehr, die Adresse bleibt stehen.
     it.each([
       ['ungültige', '/einsaetze/1/evakuierung/abc'],
       ['unbekannte', '/einsaetze/1/evakuierung/99'],
-    ])('eine %s Kennung führt zurück zur Übersicht', async (_, pfad) => {
+    ])('eine %s Kennung zeigt das Muster, die Adresse bleibt', async (_, pfad) => {
       renderSeite(pfad);
-      expect(await screen.findByText('UEBERSICHT')).toBeInTheDocument();
+      expect(
+        await screen.findByText('Diesen Evakuierungsbezirk gibt es nicht (mehr)'),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('adresse')).toHaveTextContent(pfad);
+      await erwarteNichtGefunden({
+        titel: 'Diesen Evakuierungsbezirk gibt es nicht (mehr)',
+        knopf: 'Zur Evakuierung',
+        liste: 'UEBERSICHT',
+      });
     });
   });
 });

@@ -20,8 +20,8 @@ import { anmeldenPerApi } from './anmelde-kern';
  *
  * DER NAVIGATIONSRAHMEN FOLGT DER STAFFEL AUF BEIDEN ACHSEN (LFH-384). Die vier Stellen, die
  * bis dahin ausgenommen waren — IconRail, Hamburger, Drawer-Schließer, Akkordeon-Kopf —
- * rechnen `Math.max(48, controlHeight)`; die Rail-Spalte wächst mit der Schrift (64 / 74 / 80 px)
- * (nie unter 72 Ziel + Haarlinie), statt ihre Breite als Dauerausnahme zu behalten (Entscheidung vom
+ * rechnen `Math.max(48, controlHeight)`; die Rail-Spalte wächst in `handschuh` auf 73 px
+ * (72 Ziel + Haarlinie), statt ihre Breite als Dauerausnahme zu behalten (Entscheidung vom
  * 29.09.2026, Nachtrag Z2 in `docs/superpowers/specs/2026-07-28-rahmen-pruefliste.md`).
  * Rail und Modul-Panel misst der Durchgang am Tablet QUER (1024, inline-Rahmen), Hamburger,
  * Akkordeon und Schließer der Durchgang HOCHKANT (768, unter antds `lg` — der Drawer-Zweig).

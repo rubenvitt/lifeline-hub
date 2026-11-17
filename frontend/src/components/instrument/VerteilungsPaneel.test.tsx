@@ -94,6 +94,6 @@ describe('VerteilungsPaneel', () => {
     );
     const werte = container.querySelectorAll<HTMLElement>('[data-lfh="fms-wert"]');
     expect(werte).toHaveLength(3);
-    expect(werte[0].style.fontSize).toBe('var(--lfh-groesse-text)');
+    expect(werte[0].style.fontSize).toBe('15px');
   });
 });

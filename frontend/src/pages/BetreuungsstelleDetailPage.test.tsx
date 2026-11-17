@@ -15,6 +15,7 @@ import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 import { waehleMenueEintrag } from '../test/menue';
 import { waehle } from '../test/auswahlListe';
+import { erwarteNichtGefunden } from '../test/nichtGefunden';
 import {
   BETREUUNG_STELLE_BEZEICHNUNG_MAX,
   BETREUUNG_STELLE_NOTIZ_MAX,
@@ -144,7 +145,7 @@ function renderPage(pfad = '/einsaetze/1/betreuung/8') {
       </AntApp>
     </QueryClientProvider>,
   );
-  return { ...ergebnis, client };
+  return { ...ergebnis, client, router };
 }
 
 /** Ziel eines Sprungs: zeigt die angesteuerte Adresse. */
@@ -711,14 +712,26 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     expect(screen.getByText(/Nur Ansicht/)).toBeInTheDocument();
   });
 
-  it('eine unbekannte oder stornierte Stelle führt auf die Übersicht; eine unlesbare ID ebenso', async () => {
-    const { unmount } = renderPage('/einsaetze/1/betreuung/77');
+  // Spec `seiten-zustaende`, „Unbekannte Betreuungsstelle“ (LLH-1827, D4): kein stilles
+  // `Navigate` mehr, die Adresse bleibt stehen und die Seite zeigt das Muster.
+  it.each([
+    ['unbekannte oder stornierte', '/einsaetze/1/betreuung/77'],
+    ['unlesbare', '/einsaetze/1/betreuung/abc'],
+  ])('eine %s Stelle zeigt das Muster, die Adresse bleibt', async (_, pfad) => {
+    const { router } = renderPage(pfad);
+    expect(
+      await screen.findByText('Diese Betreuungsstelle gibt es nicht (mehr)'),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(pfad);
+    expect(screen.queryByTestId('ziel-uebersicht')).toBeNull();
+    await erwarteNichtGefunden({
+      titel: 'Diese Betreuungsstelle gibt es nicht (mehr)',
+      knopf: 'Zur Betreuung',
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Zur Betreuung' }));
     expect(await screen.findByTestId('ziel-uebersicht')).toHaveTextContent(
       /^\/einsaetze\/1\/betreuung$/,
     );
-    unmount();
-    renderPage('/einsaetze/1/betreuung/abc');
-    expect(await screen.findByTestId('ziel-uebersicht')).toBeInTheDocument();
   });
 
   describe('Belegungsverlauf (LLH-1347)', () => {

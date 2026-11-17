@@ -17,7 +17,8 @@ import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad } from '../../routing/deeplinks';
-import { useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../../components/DeeplinkHinweis';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import StatusTag from '../../components/StatusTag';
@@ -98,9 +99,15 @@ export default function GefahrenPage() {
   // Eigener Effekt, getaktet nur über die Adresse: hinge er an `gewaehlt`, wendete ein Klick das
   // Ziel erneut an, solange der Data Router das Räumen noch nicht übernommen hat — die Auswahl
   // sprang zurück (LFH-1153).
-  useQueryParamSelektion('gefahrengebiet', gebieteQuery.isSuccess, (ziel) => {
-    if (gebiete.some((g) => g.id === ziel)) setGewaehlt(ziel);
-  });
+  // Ein unbekanntes Gebiet meldet die Hinweisleiste (LLH-1827); die Wahl eines Gebiets schließt sie.
+  const deeplinkHinweis = useQueryParamSelektion(
+    'gefahrengebiet',
+    deeplinkStand([gebieteQuery]),
+    (ziel) => {
+      if (!gebiete.some((g) => g.id === ziel)) return false;
+      setGewaehlt(ziel);
+    },
+  );
   // Default aufs erste Gebiet bzw. korrigieren, wenn das gewählte verschwindet. Solange die Adresse
   // ein Ziel trägt, entscheidet der Deeplink (StrictMode-fest, LFH-150).
   const zielInAdresse = searchParams.has('gefahrengebiet');
@@ -192,6 +199,9 @@ export default function GefahrenPage() {
         />
       }
     >
+      <div className="gefahren-no-print">
+        <DeeplinkHinweis lage={deeplinkHinweis} sache="Gefahrengebiet" />
+      </div>
       {inhalt}
     </EinsatzSeite>
   );
@@ -264,7 +274,10 @@ export default function GefahrenPage() {
           dataSource={gebiete}
           renderItem={(g, i) => (
             <ListenEintrag
-              onClick={() => setGewaehlt(g.id)}
+              onClick={() => {
+                setGewaehlt(g.id);
+                deeplinkHinweis.schliesse();
+              }}
               style={{
                 // Trefflächenboden zuerst, die Färbung danach — `ListenEintrag` spreizt `style`
                 // zuletzt, damit `padding` gegen die Längsformen der Liste gewinnt.
