@@ -2,18 +2,18 @@
 
 ## 1. c11mj7y1 (LLH-1822): Bericht an den Server
 
-- [ ] 1.1 `src/routes/client_fehler.rs` mit `POST /api/client-fehler`: Sitzungspflicht
+- [x] 1.1 `src/routes/client_fehler.rs` mit `POST /api/client-fehler`: Sitzungspflicht
   (`CurrentUser`), `CLIENT_FEHLER_BODY_MAX` als `DefaultBodyLimit` an der Route in `src/app.rs`,
   `*_MAX` für `route`/`version`/`meldung`/`stack` mit 400 nach `src/AGENTS.md`
   „Eingabegrenzen“, `static Sammelzeile` und `tracing::warn!` ohne Benutzer und Organisation,
   Antwort 204. Belegt durch Integrationstests in `tests/`: 204 mit Sitzung, 401 ohne, 413 bei
   übergroßem Body, 400 bei zu langem Feld. Ein Unit-Test zeigt, dass die Sammelzeile die zweite
   Zeile in derselben Minute zurückhält.
-- [ ] 1.2 `frontend/src/api/clientFehler.ts` (`meldeClientFehler`): Routenmuster über
+- [x] 1.2 `frontend/src/api/clientFehler.ts` (`meldeClientFehler`): Routenmuster über
   `routenMuster`, `__APP_VERSION__`, Kürzen auf 500/2000 Zeichen, `fetch` mit `keepalive`, den
   Schreibköpfen des API-Clients, Dedup per `WeakSet`, verschluckte Fehler. Ein Vitest belegt:
   ein Aufruf je Fehlerobjekt, keine Kennungen im Pfad, kein Wurf bei Netzfehler.
-- [ ] 1.3 Kapitel 5/8 der Architekturdoku nachziehen (neues Modul `routes/client_fehler`;
+- [x] 1.3 Kapitel 5/8 der Architekturdoku nachziehen (neues Modul `routes/client_fehler`;
   Abschnitt „Fehlergrenze und Client-Fehlerbericht“, Verweis aus 8.16) und den Wächter der
   Architekturdoku grün sehen (`scripts/check-all.sh --nur <Schritt der Architekturdoku>` bzw.
   der zugehörige Test).

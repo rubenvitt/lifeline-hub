@@ -41,6 +41,23 @@ function schreibKoepfe(): Record<string, string> {
     : { [ERWARTETER_BENUTZER_HEADER]: String(erwarteterBenutzer) };
 }
 
+/**
+ * Schickt einen Bericht, der das Ende der Seite überleben soll (Absturzbericht, LLH-1822,
+ * `api/clientFehler.ts`): POST mit `keepalive`, Sitzungscookie und den Schreibköpfen. Anders als
+ * `apiSend` ohne Zeitlimit, Fehleranzeige, Benutzerprüfung oder Warteschlange; die Antwort wird
+ * nicht gelesen. Ein Netzfehler wirft wie bei `fetch`, der Aufrufer verschluckt ihn. Liegt hier,
+ * weil jeder Schreibweg über diese Datei läuft (`api/schreibwege.guard.test.ts`).
+ */
+export async function apiSendKeepalive(pfad: string, body: unknown): Promise<void> {
+  await fetch(pfad, {
+    method: 'POST',
+    credentials: 'same-origin',
+    keepalive: true,
+    headers: { ...schreibKoepfe(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 /** `undefined` statt eines leeren Objekts — ein Upload ohne Kopf bleibt wie bisher kopflos. */
 function oderNichts(koepfe: Record<string, string>): Record<string, string> | undefined {
   return Object.keys(koepfe).length > 0 ? koepfe : undefined;

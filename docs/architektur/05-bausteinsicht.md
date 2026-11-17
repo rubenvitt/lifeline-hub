@@ -1,6 +1,6 @@
 # 5. Bausteinsicht
 
-Stand: 12.11.2026 (Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
+Stand: 17.11.2026 (Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
 
 Dieses Kapitel nennt jeden Baustein des Repos mit einem Satz Zweck und seinen Schnittstellen.
 Der Wächter `scripts/check-architektur.sh` verlangt, dass jedes Modul unter `src/`, jedes
@@ -242,7 +242,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | `src/config.rs` | CLI- und ENV-Konfiguration (`clap`), maskierte Geheimnisse, Subkommandos | `LIFELINE_*`-Variablen |
 | `src/lizenz.rs` | Lizenztext aus `LICENSE`, eingebettet; Hinweis bei `--help` und jedem Start, Volltext beim ersten Start | Subkommando `lifeline-hub lizenz` |
 | `src/app.rs` | `AppState`, Router mit allen Routen und Layern, statischer Fallback | `build_router`, `build_router_mit` |
-| `src/routes` | HTTP-Handler je Ressource, gemeinsame Helfer in `support.rs` | alle `/api`-Routen |
+| `src/routes` | HTTP-Handler je Ressource, gemeinsame Helfer in `support.rs`; `client_fehler.rs` nimmt den Absturzbericht des Clients an und schreibt ihn nur gedrosselt ins Log ([Kapitel 8](08-querschnittliche-konzepte.md), Abschnitt 8.30) | alle `/api`-Routen, darunter `POST /api/client-fehler` |
 | `src/extract.rs` | Extractors mit `{error}`-Vertrag (`JsonBody`, `PfadParam`) und Quell-IP hinter vertrauten Proxys | von allen Handlern genutzt |
 | `src/error.rs` | `AppError` → JSON `{ "error": … }` mit Statuscode, Zeilenfehler (422) | Statuscode-Konvention in `src/AGENTS.md` |
 | `src/db.rs` | SQLite-Pool (WAL, Foreign Keys, `secure_delete`), Migrationen, Test-Pools | `connect`, `migrate` |
@@ -309,7 +309,7 @@ flowchart TB
 | --- | --- | --- |
 | `frontend/src/routing` | Deeplink-Builder an einer Stelle, Pfadwahl Stabsoberfläche/Gerätehülle, Query-Param-Selektion | Routen des Routers |
 | `frontend/src/routes` | `RequireAuth`: Weiterleitung ohne Sitzung, Gerätehülle abschirmen | `src/auth`, `src/geraet` |
-| `frontend/src/api` | API-Client, Ressourcen-Module, generierte Typen, `openapi.json`, Eingabegrenzen-Spiegel | `src/routes`, `src/api_doc.rs` |
+| `frontend/src/api` | API-Client, Ressourcen-Module, generierte Typen, `openapi.json`, Eingabegrenzen-Spiegel, Absturzbericht (`clientFehler.ts`) | `src/routes`, `src/api_doc.rs` |
 | `frontend/src/live` | Live-Strom, gesammelte Invalidierung, Statusbanner, Benachrichtigungs- und Org-Listener | `src/live`, `src/routes/live.rs` |
 | `frontend/src/offline` | Lagebild ohne Netz, Schreiben ohne Netz, Sync, Serveruhr ([AGENTS.md](../../frontend/src/offline/AGENTS.md)) | offlinefähige Schreibrouten |
 | `frontend/src/pwa` | App-Aktualisierung nach Bedienerklick | Service Worker aus `vite-plugin-pwa` |
