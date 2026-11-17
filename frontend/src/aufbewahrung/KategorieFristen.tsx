@@ -11,7 +11,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
-import { Datenfeld, Datenraster, zahlStil } from '../components/instrument';
+import { Datenfeld, Datenraster, monoStil } from '../components/instrument';
 import { aufbewahrungZustand } from '../theme/statusFarben';
 import { fristAusEingabe, istFristverkuerzung } from './fristModell';
 import { KATEGORIE_TEXT, vorgabeSatz } from './kategorieText';
@@ -56,7 +56,7 @@ export function KategorieWert({
 }) {
   const { token } = theme.useToken();
   // Zeiten immer Mono mit `tabular-nums` (frontend/AGENTS.md, Gestaltungssprache).
-  const zeitStil = zahlStil('text');
+  const zeitStil = monoStil(13);
   return (
     <Flex vertical gap={token.marginXXS}>
       <Flex gap={token.marginXS} wrap align="center">

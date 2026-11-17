@@ -10,6 +10,7 @@ import SchaedenDetailPage from './SchaedenDetailPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 
@@ -624,9 +625,27 @@ describe('SchaedenDetailPage — Fotos und Dateien (LFH-21)', () => {
 });
 
 describe('SchaedenDetailPage — Robustheit', () => {
-  it('leitet bei ungültiger Schaden-ID auf die Liste um', async () => {
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4).
+  it('zeigt bei ungültiger Schaden-ID das Muster statt still auf die Liste umzuleiten', async () => {
     render(einsatzAktiv, basisSchaden(), [], '/einsaetze/1/schaeden/abc');
-    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    await erwarteNichtGefunden({
+      titel: 'Diesen Schaden gibt es nicht (mehr)',
+      knopf: 'Zu den Schäden',
+      liste: 'LISTE',
+    });
+  });
+
+  it('zeigt bei 404 „Diesen Schaden gibt es nicht (mehr)“ mit dem Weg zu den Schäden', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.get('/api/einsaetze/1/schaeden/10', () =>
+        HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
+      ),
+    ]);
+    await erwarteNichtGefunden({
+      titel: 'Diesen Schaden gibt es nicht (mehr)',
+      knopf: 'Zu den Schäden',
+      liste: 'LISTE',
+    });
   });
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
@@ -637,6 +656,7 @@ describe('SchaedenDetailPage — Robustheit', () => {
     ]);
     expect(await screen.findByText('Schaden konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Diesen Schaden gibt es nicht (mehr)')).toBeNull();
   });
 });
 

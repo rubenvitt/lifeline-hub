@@ -1825,7 +1825,7 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
     expect(screen.getByRole('radio', { name: 'Beendet' })).toBeChecked();
   });
 
-  it('eine unbekannte Schicht ändert nichts', async () => {
+  it('eine unbekannte Schicht ändert die Ansicht nicht und zeigt den Hinweis (LLH-1827)', async () => {
     renderPage('/einsaetze/1/abloesung?schicht=99');
     await screen.findByRole('article', { name: 'Schicht Florian 1' });
     await waitFor(() => expect(adresse.suche).toBe(''));
@@ -1833,6 +1833,7 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
     await waitFor(() => expect(listeAbloesungen).toHaveBeenCalledWith(1, 'abgeloest'));
     expect(screen.getByRole('radio', { name: /^Laufend/ })).toBeChecked();
     expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+    expect(await screen.findByText('Schicht #99 gibt es nicht (mehr)')).toBeInTheDocument();
   });
 
   it('ein Sprung auf der offenen Seite gibt eine zurückgehaltene Schicht frei und hebt sie hervor', async () => {

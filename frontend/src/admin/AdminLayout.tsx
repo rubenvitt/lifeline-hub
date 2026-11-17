@@ -17,9 +17,10 @@ import {
 import { useDemoDatenStatus } from './useDemoDaten';
 import DatentraegerWarnung, { useDatentraeger } from './DatentraegerWarnung';
 import { bringIntoView } from '../components/bringIntoView';
+import { sprungzielInhalt } from '../components/SprungZumInhalt';
 import { flaeche } from '../theme/tokens';
 
-const { Sider, Content } = Layout;
+const { Sider } = Layout;
 
 /**
  * Admin-Shell: eine linke Sidebar (gruppiertes `Menu`) als EINZIGE Nav-Ebene für `/admin`, plus
@@ -277,7 +278,8 @@ export default function AdminLayout() {
             </div>
           )}
         </nav>
-        {inhalt}
+        {/* Ziel des Sprunglinks zum Inhalt (nufmon70 D2): hinter dem Menü, nicht das Menü. */}
+        <div {...sprungzielInhalt}>{inhalt}</div>
       </div>
     );
   }
@@ -297,7 +299,16 @@ export default function AdminLayout() {
           {menue}
         </nav>
       </Sider>
-      <Content style={{ paddingInlineStart: token.paddingLG }}>{inhalt}</Content>
+      {/* Der Inhalt neben dem Menü ist ein `div`, kein zweites antd-`Content`: das wäre ein
+         `<main>` im `<main>` des Ebene-1-Rahmens (nufmon70 D3). Den Stil von `.ant-layout-content`
+         in einem Layout mit Sider (wachsen, Breite 0 als Basis) trägt er selbst. Zugleich das Ziel
+         des Sprunglinks zum Inhalt (D2). */}
+      <div
+        {...sprungzielInhalt}
+        style={{ flex: 'auto', width: 0, minHeight: 0, paddingInlineStart: token.paddingLG }}
+      >
+        {inhalt}
+      </div>
     </Layout>
   );
 }

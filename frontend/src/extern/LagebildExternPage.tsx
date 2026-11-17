@@ -15,7 +15,6 @@ import {
   UebungsBand,
   UebungsMarke,
   useRollen,
-  schriftGroesse,
 } from '../components/instrument';
 import { EINSATZART_LABELS, isUebung } from '../einsatz/einsatzart';
 import { spiegelStand } from '../einsatz/spiegel/spiegelText';
@@ -207,11 +206,7 @@ export default function LagebildExternPage() {
           einen Ernstfall halten. Das Band klebt beim Rollen oben, die Marke steht vor dem Namen. */}
       <UebungsBand einsatz={e} />
       <header style={{ display: 'grid', gap: token.marginXXS }}>
-        <Typography.Title
-          level={1}
-          style={{ margin: 0, fontSize: schriftGroesse('wert') }}
-          data-lfh="extern-titel"
-        >
+        <Typography.Title level={1} style={{ margin: 0, fontSize: 24 }} data-lfh="extern-titel">
           {isUebung(e) && (
             <UebungsMarke einsatz={e} style={{ marginInlineEnd: 8, verticalAlign: 'middle' }} />
           )}

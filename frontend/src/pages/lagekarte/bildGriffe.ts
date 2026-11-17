@@ -55,7 +55,7 @@ export function griffStil(art: GriffArt, k: GriffKontext): { container: string; 
       container,
       kern:
         `width:22px;height:22px;background:${k.bedien};border:2px solid #fff;border-radius:50%;` +
-        'display:flex;align-items:center;justify-content:center;color:#fff;font-size:var(--lfh-groesse-klein);' +
+        'display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;' +
         'line-height:1;box-shadow:0 0 3px rgba(0,0,0,.5)',
     };
   }

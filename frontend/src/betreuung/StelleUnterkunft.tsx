@@ -1,6 +1,6 @@
 import { Typography } from 'antd';
 import { useNavigate } from 'react-router';
-import { Paneel, PaneelLink } from '../components/instrument';
+import { Paneel, PaneelLink, monoStil } from '../components/instrument';
 import { unterkunftPlanenPfad } from '../routing/deeplinks';
 import { personenZahl } from './betreuungText';
 
@@ -32,8 +32,7 @@ export default function StelleUnterkunft({
     >
       {kapazitaet != null ? (
         <Typography.Text>
-          Kapazität{' '}
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{personenZahl(kapazitaet)}</span>
+          Kapazität <span style={monoStil(14)}>{personenZahl(kapazitaet)}</span>
         </Typography.Text>
       ) : (
         <Typography.Text type="secondary">keine Kapazität festgelegt</Typography.Text>

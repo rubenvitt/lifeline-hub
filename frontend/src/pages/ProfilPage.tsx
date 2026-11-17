@@ -5,8 +5,8 @@ import {
   Datenfeld,
   Datenraster,
   Paneel,
+  monoStil,
   useRollen,
-  zahlStil,
 } from '../components/instrument';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -300,12 +300,11 @@ export default function ProfilPage() {
                           einmal.
                         </Typography.Paragraph>
                         <pre
-                          data-schrift="kennung"
                           style={{
                             background: rollen.flaeche2,
                             padding: 12,
                             borderRadius: 0,
-                            ...zahlStil('text'),
+                            ...monoStil(13),
                             marginBottom: 8,
                             whiteSpace: 'pre-wrap',
                           }}

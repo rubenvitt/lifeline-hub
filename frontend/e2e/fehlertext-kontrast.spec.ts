@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { evakuierungsbezirkPfad } from '../src/routing/deeplinks';
 import { farbenDunkel, farbenHell } from '../src/theme/tokens';
 import { pruefe } from './kontrast-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
@@ -10,8 +11,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * `src/theme/fehlertextKontrast.test.ts`; hier zählt, was der Browser zeichnet.
  *
  * GEMESSEN:
- *  · „Befehl nicht gefunden.“ auf dem Seitengrund (Befehl mit unbekannter Nummer). Vorher am Tag
- *    5,67.
+ *  · „Gebiet konnte nicht geladen werden“ im Paneel „Gebiet“ eines Evakuierungsbezirks, dessen
+ *    Zonenabruf mit 500 scheitert (LLH-1827, Change `a12ms7g9-seitenzustaende`, D6). Bis dahin
+ *    stand hier „Befehl nicht gefunden.“ (vorher am Tag 5,67); ein unbekannter Befehl zeigt jetzt
+ *    die neutrale Form „Diesen Befehl gibt es nicht (mehr)“.
  *  · „Überfällig“ auf der Karte eines offenen Auftrags mit abgelaufener Frist, also auf der
  *    alarmierten Kartenfläche. Vorher am Tag 5,52.
  *
@@ -49,11 +52,46 @@ for (const modus of ['light', 'dark'] as const) {
       frist_at: '2026-06-01 10:00:00',
     });
 
-    await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/999999`);
+    // Ein Bezirk mit einer Fläche: nur dann ruft das Paneel „Gebiet“ die Zonen ab.
+    const bezirkId = await post(page, `/api/einsaetze/${einsatzId}/evakuierung/bezirke`, {
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 120,
+      plan_erhebung: 'geschaetzt',
+    });
+    const [w, o, s, n] = [9.354, 9.358, 52.103, 52.105];
+    await post(page, `/api/einsaetze/${einsatzId}/zonen`, {
+      typ: 'evakuierungsbezirk',
+      geometrie_typ: 'Polygon',
+      geometrie: JSON.stringify({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [w, s],
+            [o, s],
+            [o, n],
+            [w, n],
+            [w, s],
+          ],
+        ],
+      }),
+      evakuierungsbezirk_id: bezirkId,
+    });
+    // Der Abruf des Gebiets scheitert am Server; alles andere läuft echt.
+    await page.route(`**/api/einsaetze/${einsatzId}/zonen`, (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({
+            status: 500,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'Interner Fehler' }),
+          })
+        : route.continue(),
+    );
+
+    await page.goto(evakuierungsbezirkPfad(einsatzId, bezirkId));
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
-    const nichtGefunden = page.getByText('Befehl nicht gefunden.', { exact: true });
-    await expect(nichtGefunden).toHaveClass(/ant-typography-danger/);
-    await pruefe(nichtGefunden, TEXT[modus], `${modus}/Befehl nicht gefunden`);
+    const gebietFehlt = page.getByText('Gebiet konnte nicht geladen werden', { exact: true });
+    await expect(gebietFehlt).toHaveClass(/ant-typography-danger/);
+    await pruefe(gebietFehlt, TEXT[modus], `${modus}/Gebiet konnte nicht geladen werden`);
 
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);
     const karte = page.locator('[data-auftrag-id][data-ueberfaellig="true"]');

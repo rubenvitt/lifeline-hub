@@ -203,3 +203,24 @@ overrides:
   # Der Kommentar bleibt als Beleg für das Muster, auf das js-yaml und fast-uri oben
   # verweisen. Kehrt der Fund zurück (neue Schwelle über postcss' Range), wird der Override
   # mit BEIDEN Grenzen neu gesetzt.
+
+# Advisories OHNE Fix, bewertet nach Regel 3 oben (Muster: .cargo/audit.toml). Hier steht nur,
+# was weder ein Override noch ein Upgrade erreicht; jeder Eintrag sagt, warum kein Upgrade
+# möglich ist, warum das Risiko in DIESEM Code nicht trägt und woran man merkt, dass sich
+# das ändert. Eingeführt mit Zustimmung des Menschen am 17.11.2026 (LLH-1954).
+auditConfig:
+  ignoreGhsas:
+    # GHSA-fc5q-39xc-vjpf (high): ReDoS in picomatch über Muster mit einem einzigen Zweig
+    # (betrifft <= 4.0.7, gepatcht laut Advisory ab 4.0.8). Fund 2026-11-17, alpha ohne
+    # eigenes Zutun rot.
+    # Kein Upgrade möglich: 4.0.7 ist die neueste veröffentlichte Version (npm, dist-tag
+    # latest, 17.11.2026); eine 4.0.8 gibt es nicht, ein Override hätte kein Ziel.
+    # Warum das Risiko hier nicht trägt: picomatch kommt nur über Bau- und Testwerkzeuge
+    # herein (vite, vite → tinyglobby → fdir, vitest → @vitest/mocker → msw → vite;
+    # `pnpm why picomatch --prod` ist leer) und liegt nicht im ausgelieferten Bündel. Die
+    # Muster, die es dort auswertet, stehen in unserer eigenen Konfiguration (Vite, Vitest,
+    # Workbox); keine Eingabe von außen erreicht sie.
+    # Neu bewerten, wenn: picomatch >= 4.0.8 erscheint (dann Eintrag streichen und, falls die
+    # Kette es nicht selbst hebt, einen Override mit beiden Grenzen setzen) oder picomatch in
+    # eine Laufzeitkette gerät (`pnpm why picomatch --prod` nicht mehr leer).
+    - GHSA-fc5q-39xc-vjpf

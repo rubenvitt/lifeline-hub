@@ -31,8 +31,6 @@ import { anmelden, einsatzAnlegen } from './trefflaeche-kern';
 
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const SUBPIXEL = 0.5;
-/** Spiel der einzeiligen Zeilenbox über der Stufenhöhe; ein Umbruch läge eine Zeile darüber. */
-const ZEILENBOX_SPIEL = 4;
 const HANDSCHIRM = { width: 390, height: 844 };
 /** Noch Kartenzweig (unter `md`), aber breit genug für drei Felder in einer Reihe. */
 const KARTE_BREIT = { width: 720, height: 900 };
@@ -119,9 +117,7 @@ async function knopffuge(page: Page, bereich: Locator, ziel: number, lauf: strin
 /**
  * Kleinste Lücke zwischen zwei Zielen in den Feldern der einen Personalkarte. Vorbedingung ist die
  * gesäte Folge: gefüllt, Aufforderung, gefüllt — sonst mäße der Lauf den Fall nicht, um den es geht.
- * Bei 720 px ist Platz genug: dort steht jeder Wert einzeilig, also in der Stufenhöhe; die Zeilenbox
- * der Schrift der Stufe (14 px, LLH-1774) darf sie um wenige Pixel überragen, ein Umbruch kostet
- * eine ganze Zeile (rund 22 px).
+ * Bei 720 px ist Platz genug: dort steht jeder Wert einzeilig, also genau in der Stufenhöhe.
  */
 async function kartenfelder(
   page: Page,
@@ -160,7 +156,7 @@ async function kartenfelder(
       expect(
         k.height,
         `Kartenfeld ${i + 1} (${lauf}): ${k.height}px hoch, Soll ${soll} — der Wert bricht um`,
-      ).toBeLessThanOrEqual(soll + ZEILENBOX_SPIEL);
+      ).toBeLessThanOrEqual(soll + SUBPIXEL);
     }
   }
   return kleinste;

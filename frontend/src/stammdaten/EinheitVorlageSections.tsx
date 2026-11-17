@@ -2,7 +2,7 @@ import { Button, InputNumber, Space, Typography, theme } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DemoMarke from '../components/DemoMarke';
-import { Paneel, PaneelZeile, StatusChip, zahlStil } from '../components/instrument';
+import { Paneel, PaneelZeile, StatusChip, monoStil } from '../components/instrument';
 import { KennungsLink } from '../components/kennungsLink';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -198,11 +198,7 @@ export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
               )
             }
           >
-            <KennungsLink
-              to={fahrzeugDetailPfad(f.fahrzeug_id)}
-              data-schrift="kennung"
-              style={zahlStil('text')}
-            >
+            <KennungsLink to={fahrzeugDetailPfad(f.fahrzeug_id)} style={monoStil(13)}>
               {f.funkrufname}
             </KennungsLink>
             {f.fahrzeugtyp && <span>{f.fahrzeugtyp}</span>}
@@ -538,7 +534,7 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
               }
             >
               <span>{m.bezeichnung}</span>
-              {m.bestandsnummer && <span style={zahlStil('text')}>{m.bestandsnummer}</span>}
+              {m.bestandsnummer && <span style={monoStil(13)}>{m.bestandsnummer}</span>}
               <Typography.Text type="secondary">{ART_LABEL[m.art]}</Typography.Text>
               {m.ist_demo && <DemoMarke />}
               {m.dienststatus === 'ausser_dienst' && (

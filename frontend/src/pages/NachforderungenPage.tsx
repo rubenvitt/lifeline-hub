@@ -72,7 +72,8 @@ import {
 } from '../nachforderungen/materialUebernahme';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -781,23 +782,28 @@ export default function NachforderungenPage() {
   /*
    * `?nachforderung=<id>` (D10, Sprung aus der Materialzeile): ihre Stufe gewählt und aufgeklappt
    * (Abgelehnt, ältere Eingetroffene), die Karte hervorgehoben und einmal ins Bild gerollt; der
-   * Parameter wird geräumt (`useQueryParamSelektion`). Eine unbekannte Kennung ändert nichts.
+   * Parameter wird geräumt (`useQueryParamSelektion`). Eine unbekannte Kennung ändert nichts an
+   * der Ansicht; über dem Board steht dann die Hinweisleiste (LLH-1827).
    */
   const [hervorgehobenId, setHervorgehobenId] = useState<number | null>(null);
   const [scrollZiel, setScrollZiel] = useState<number | null>(null);
   // Erst wenn auch der Einsatz da ist: vorher stehen statt der Karten nur der Ladekreis, und der
   // Bildlauf fände keine Karte, bis ein späterer Datenstand den Effekt erneut anstößt (Review).
-  useQueryParamSelektion('nachforderung', nfQuery.isSuccess && einsatzQuery.isSuccess, (nfId) => {
-    const n = nfQuery.data?.find((x) => x.id === nfId);
-    if (!n) return;
-    const gruppe = boardGruppe(n, jetzt);
-    setGewaehlteStufe(gruppe === 'eingetroffen-aelter' ? 'eingetroffen' : gruppe);
-    if (gruppe === 'abgelehnt') setAbgelehntOffen(true);
-    if (gruppe === 'zurueckgezogen') setZurueckgezogenOffen(true);
-    if (gruppe === 'eingetroffen-aelter') setAeltereOffen(true);
-    setHervorgehobenId(nfId);
-    setScrollZiel(nfId);
-  });
+  const deeplinkHinweis = useQueryParamSelektion(
+    'nachforderung',
+    deeplinkStand([nfQuery, einsatzQuery]),
+    (nfId) => {
+      const n = nfQuery.data?.find((x) => x.id === nfId);
+      if (!n) return false;
+      const gruppe = boardGruppe(n, jetzt);
+      setGewaehlteStufe(gruppe === 'eingetroffen-aelter' ? 'eingetroffen' : gruppe);
+      if (gruppe === 'abgelehnt') setAbgelehntOffen(true);
+      if (gruppe === 'zurueckgezogen') setZurueckgezogenOffen(true);
+      if (gruppe === 'eingetroffen-aelter') setAeltereOffen(true);
+      setHervorgehobenId(nfId);
+      setScrollZiel(nfId);
+    },
+  );
   useEffect(() => {
     if (scrollZiel == null) return;
     const karte = document.querySelector(`[data-nachforderung-id="${scrollZiel}"]`);
@@ -1054,6 +1060,7 @@ export default function NachforderungenPage() {
           title="Nachforderungen konnten nicht geladen werden"
         />
       )}
+      <DeeplinkHinweis lage={deeplinkHinweis} sache="Nachforderung" />
       {stellenOptionen.length > 0 && (
         <div style={{ marginBottom: token.margin }}>
           <Select<number>
