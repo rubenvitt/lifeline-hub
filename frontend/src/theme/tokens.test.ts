@@ -5,7 +5,7 @@
  */
 import { theme as antdTheme, type CheckboxProps, type RadioProps } from 'antd';
 import { describe, expect, it } from 'vitest';
-import { antdToken, dichten, farbenHell, flaeche, schriftPx, type Dichte } from './tokens';
+import { antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
 import { navDrawerBreite, navDrawerRand } from './tokens';
 import {
@@ -38,19 +38,10 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
     expect(dichten.handschuh.zeilenhoehe).toBe(72);
   });
 
-  it('lässt die Grundschrift mit dem Faktor der Stufe wachsen (LLH-1774, umgekehrt 15.11.2026)', () => {
-    expect(dichten.kompakt.schriftgroesse).toBe(14);
-    expect(dichten.komfortabel.schriftgroesse).toBe(16.1);
-    expect(dichten.handschuh.schriftgroesse).toBe(17.5);
-  });
-
-  it('rechnet die Pixelzahl einer Stufe; Datenwerte wachsen nicht (LLH-1774)', () => {
-    expect(schriftPx('fein', 'kompakt')).toBe(11);
-    expect(schriftPx('klein', 'komfortabel')).toBe(13.8);
-    expect(schriftPx('klein', 'handschuh')).toBe(15);
-    expect(schriftPx('titel', 'handschuh')).toBe(20);
-    expect(schriftPx('wert', 'handschuh')).toBe(22);
-    expect(schriftPx('gross', 'komfortabel')).toBe(32);
+  it('lässt die Grundschrift nur einmal steigen — Handschuh ändert die Hand, nicht das Auge', () => {
+    expect(dichten.kompakt.schriftgroesse).toBe(13.5);
+    expect(dichten.komfortabel.schriftgroesse).toBe(15);
+    expect(dichten.handschuh.schriftgroesse).toBe(15);
   });
 
   // Literale statt Rechnung: das Raster ist eine Festlegung (Change `m113c8ln-abstandsraster`,
@@ -88,21 +79,7 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
 
   it('setzt controlHeight und fontSize aus der gewählten Stufe', () => {
     expect(tokenFuer('handschuh').controlHeight).toBe(72);
-    expect(tokenFuer('komfortabel').fontSize).toBe(16.1);
-  });
-
-  it('setzt antds übrige Schriftgrößen aus der Skala, mit der Dichte (LLH-1775)', () => {
-    const k = tokenFuer('kompakt');
-    expect([k.fontSizeSM, k.fontSize, k.fontSizeLG, k.fontSizeXL]).toEqual([12, 14, 16, 22]);
-    expect([
-      k.fontSizeHeading1,
-      k.fontSizeHeading2,
-      k.fontSizeHeading3,
-      k.fontSizeHeading4,
-      k.fontSizeHeading5,
-    ]).toEqual([32, 22, 16, 16, 14]);
-    const h = tokenFuer('handschuh');
-    expect([h.fontSizeSM, h.fontSize, h.fontSizeLG, h.fontSizeXL]).toEqual([15, 17.5, 20, 22]);
+    expect(tokenFuer('komfortabel').fontSize).toBe(15);
   });
 
   /**

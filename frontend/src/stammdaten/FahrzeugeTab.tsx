@@ -1,6 +1,7 @@
 import { Button, Space } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -29,7 +30,6 @@ import {
 import { staerkeSumme, staerkeText } from '../anzeige/staerke';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
-import { zahlStil } from '../components/instrument/rollenwerte';
 
 export default function FahrzeugeTab() {
   const { benutzer } = useAuth();
@@ -98,8 +98,7 @@ export default function FahrzeugeTab() {
         <Space size={4} wrap>
           <KennungsLink
             to={fahrzeugDetailPfad(f.id)}
-            data-schrift="kennung"
-            style={{ ...zahlStil('text'), overflowWrap: 'anywhere' }}
+            style={{ ...monoStil(13), overflowWrap: 'anywhere' }}
           >
             {f.funkrufname}
           </KennungsLink>
@@ -136,14 +135,14 @@ export default function FahrzeugeTab() {
       key: 'kennzeichen',
       abBreite: 'lg',
       sorter: nachText((f: Fahrzeug) => f.kennzeichen),
-      render: (t) => (t ? <span style={zahlStil('klein')}>{t}</span> : '—'),
+      render: (t) => (t ? <span style={monoStil(12)}>{t}</span> : '—'),
     },
     {
       title: 'Stärke',
       key: 'staerke',
       // Nach der Gesamtstärke (Σ), wie sie hinter „//“ steht.
       sorter: nachZahl((f: Fahrzeug) => staerkeSumme(f.staerke)),
-      render: (_, f) => <span style={zahlStil('klein')}>{staerkeText(f.staerke)}</span>,
+      render: (_, f) => <span style={monoStil(12)}>{staerkeText(f.staerke)}</span>,
     },
     ...dienststatusSpalten<Fahrzeug>(dienstOptionen),
   ];

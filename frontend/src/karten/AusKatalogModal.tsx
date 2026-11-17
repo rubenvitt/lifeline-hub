@@ -12,7 +12,6 @@ import {
 } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import { globalKeys } from '../api/queryKeys';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /**
  * Server-autoritativer Vorschlagskatalog: je Eintrag „Hinzufügen" = POST. Bereits (per URL)
@@ -119,10 +118,7 @@ export default function AusKatalogModal({
                   }
                   description={
                     <>
-                      <Typography.Text
-                        type="secondary"
-                        style={{ fontSize: schriftGroesse('klein') }}
-                      >
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                         {eintrag.url}
                       </Typography.Text>
                       {eintrag.hinweis && (

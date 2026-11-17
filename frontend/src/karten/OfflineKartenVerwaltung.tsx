@@ -44,7 +44,6 @@ import OfflineVorhandeneModal from './OfflineVorhandeneModal';
 import { globalKeys } from '../api/queryKeys';
 import StatusTag from '../components/StatusTag';
 import { kartenBauStatus, offlineKarteStatus, type StatusDarstellung } from '../theme/statusFarben';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /** Bau-Status-Werte, während derer die Bau-Status-Zeile pollt (2 s) — analog Download-Polling. */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -196,12 +195,12 @@ export default function OfflineKartenVerwaltung() {
             {(stand || seit || k.update_verfuegbar) && (
               <Space size={6} wrap style={{ marginTop: 2 }}>
                 {stand && (
-                  <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     Stand {stand}
                   </Typography.Text>
                 )}
                 {seit && (
-                  <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     auf dem Gerät seit {seit}
                   </Typography.Text>
                 )}
@@ -284,7 +283,7 @@ export default function OfflineKartenVerwaltung() {
             {prozent != null ? (
               <Progress percent={prozent} size="small" style={{ width: 120, marginBottom: 0 }} />
             ) : k.geladen != null ? (
-              <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {formatGroesse(k.geladen)}
               </Typography.Text>
             ) : null}

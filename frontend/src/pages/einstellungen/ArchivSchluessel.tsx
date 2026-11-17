@@ -3,7 +3,7 @@ import { Alert, App, Button, Form, Input, Modal, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconHaken, IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
-import { Paneel, schriftStil, useRollen, zahlStil } from '../../components/instrument';
+import { Paneel, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -203,7 +203,7 @@ export default function ArchivSchluessel() {
                     title={<span data-lfh="archiv-schluessel-titel">{s.bezeichnung}</span>}
                     description={
                       <span
-                        style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
+                        style={{ ...monoStil(13), color: rollen.gedaempft }}
                         data-lfh="archiv-schluessel-zustand"
                       >
                         {schluesselZustand(s, zeit)}
@@ -252,13 +252,7 @@ export default function ArchivSchluessel() {
           name="schluessel"
           rules={[{ required: true, whitespace: true, message: 'Schlüssel angeben' }]}
         >
-          <Input
-            placeholder="age1…"
-            data-schrift="kennung"
-            spellCheck={false}
-            autoComplete="off"
-            style={zahlStil('text')}
-          />
+          <Input placeholder="age1…" spellCheck={false} autoComplete="off" style={monoStil(14)} />
         </Form.Item>
       </ErfassungsModal>
 
@@ -283,12 +277,7 @@ export default function ArchivSchluessel() {
         {probe?.probe && (
           <div data-lfh="archiv-schluessel-probe" style={{ marginBlockEnd: token.marginSM }}>
             <KopierbarerText text={probe.probe} bezeichnung="Probe">
-              <pre
-                data-schrift="kennung"
-                style={{ ...zahlStil('klein'), margin: 0, overflowX: 'auto' }}
-              >
-                {probe.probe}
-              </pre>
+              <pre style={{ ...monoStil(12), margin: 0, overflowX: 'auto' }}>{probe.probe}</pre>
             </KopierbarerText>
           </div>
         )}
@@ -302,7 +291,7 @@ export default function ArchivSchluessel() {
             autoComplete="off"
             maxLength={8}
             placeholder="8 Ziffern"
-            style={{ ...zahlStil('text'), maxWidth: 200 }}
+            style={{ ...monoStil(14), maxWidth: 200 }}
           />
         </Form.Item>
       </ErfassungsModal>
@@ -323,9 +312,7 @@ export default function ArchivSchluessel() {
         destroyOnHidden
       >
         {entfernenFuer && (
-          <p data-schrift="kennung" style={{ ...zahlStil('text'), color: rollen.gedaempft }}>
-            {entfernenFuer.fingerabdruck}
-          </p>
+          <p style={{ ...monoStil(14), color: rollen.gedaempft }}>{entfernenFuer.fingerabdruck}</p>
         )}
         {letzterGeprueft && <p>Danach archiviert der Hub keine Einsätze mehr.</p>}
         <SpeicherFehler fehler={entfernen.error} titel="Nicht entfernt" />

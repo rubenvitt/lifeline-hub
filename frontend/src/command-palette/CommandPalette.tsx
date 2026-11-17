@@ -5,7 +5,7 @@ import { Button, Modal, Input, theme, type InputRef } from 'antd';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
-import { paletteMaske, schrift } from '../theme/tokens';
+import { paletteMaske, schrift, schriftskala } from '../theme/tokens';
 import { istApplePlattform } from './befehle';
 import { sichtbareDatensaetze } from './datensaetze';
 import {
@@ -30,7 +30,7 @@ import {
 import { Vorschau } from './Vorschau';
 import Fundstellen from '../components/Fundstellen';
 import { palettenZeilenStil, schliessKnopfMass, vorschauZielStil } from './zeilenStil';
-import { UebungsMarke, schriftGroesse } from '../components/instrument';
+import { UebungsMarke } from '../components/instrument';
 
 /**
  * Frist der Meldung nach außen, Wert und Bauform wie in `etb/EtbFilterleiste.tsx`; ein zweiter
@@ -62,11 +62,7 @@ function kernId(b: Befehl): string {
  * und eine mitwachsende Polsterung bräche die Fußzeile in `komfortabel` auf zwei Zeilen. Ein-Zeichen-
  * Tasten (↵, →, >, #, @) werden gleich breite Quadrate, damit die Legende nicht flattert.
  */
-const tasteStil = {
-  padding: '0 4px',
-  fontSize: schriftGroesse('fein'),
-  lineHeight: '16px',
-} as const;
+const tasteStil = { padding: '0 4px', fontSize: 11, lineHeight: '16px' } as const;
 /** Label und Nebenzeile enden einzeilig in „…“. */
 const einzeilig = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
 const tasteQuadrat = { ...tasteStil, minWidth: 18, justifyContent: 'center' } as const;
@@ -510,7 +506,7 @@ export function CommandPalette({
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
-            fontSize: schriftGroesse('text'),
+            fontSize: schriftskala.text.groesse,
           }}
         >
           <span style={einzeilig}>
@@ -529,7 +525,7 @@ export function CommandPalette({
               data-lfh="cmd-nebenzeile"
               style={{
                 ...einzeilig,
-                fontSize: schriftGroesse('klein'),
+                fontSize: schriftskala.textKlein.groesse,
                 color: farben.schwach,
               }}
             >
@@ -543,7 +539,7 @@ export function CommandPalette({
             aria-hidden="true"
             style={{
               flexShrink: 0,
-              fontSize: schriftGroesse('klein'),
+              fontSize: schriftskala.textKlein.groesse,
               color: farben.schwach,
               whiteSpace: 'nowrap',
             }}
@@ -664,13 +660,7 @@ export function CommandPalette({
             // 16 px: kleiner zoomt iOS beim Fokus die Seite. KEIN eigener Fokusrahmen: die Palette
             // hat genau dieses eine Feld, ihr Rahmen in Bedienfarbe und die Schreibmarke zeigen den
             // Fokus; ein zweiter Kasten in der Kopfzeile wäre Kasten im Kasten.
-            style={{
-              flex: 1,
-              padding: 0,
-              fontSize: schriftGroesse('titel'),
-              outline: 'none',
-              boxShadow: 'none',
-            }}
+            style={{ flex: 1, padding: 0, fontSize: 16, outline: 'none', boxShadow: 'none' }}
           />
           {/*
            * Die Modusanzeige: solange ein Präfix steht, nennt sie ihn; ohne sie wäre ein Filter, der
@@ -684,7 +674,7 @@ export function CommandPalette({
                 flexShrink: 0,
                 padding: `0 ${token.paddingXS}px`,
                 lineHeight: 1.6,
-                fontSize: schriftGroesse('klein'),
+                fontSize: schriftskala.textKlein.groesse,
                 color: farben.bedienText,
                 background: farben.bedienFlaeche,
                 whiteSpace: 'nowrap',
@@ -745,7 +735,7 @@ export function CommandPalette({
               <Button type="text" icon={<IconPfeilLinks />} onClick={zurueckZurListe}>
                 Zurück
               </Button>
-              <span style={{ flex: 1, minWidth: 0, fontSize: schriftGroesse('text') }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: schriftskala.text.groesse }}>
                 <Fundstellen
                   text={vorschau.label}
                   begriff={vorschau.fundstellen?.begriff}
@@ -756,7 +746,7 @@ export function CommandPalette({
                 <span
                   style={{
                     flexShrink: 0,
-                    fontSize: schriftGroesse('klein'),
+                    fontSize: schriftskala.textKlein.groesse,
                     color: farben.schwach,
                   }}
                 >
@@ -789,7 +779,7 @@ export function CommandPalette({
             {sucheAktiv && flach.map((b) => optionsZeile(b))}
             {gruppen.map((x) => (
               <div key={x.gruppe} role="group" aria-label={GRUPPEN_LABEL[x.gruppe]}>
-                {/* Gruppen-Augenbraue (fein/600/.08em, Versalien) — `schriftskala.augenbraue`. */}
+                {/* Gruppen-Augenbraue (10/600/.14em, Versalien) — `schriftskala.augenbraue`. */}
                 <div
                   style={{
                     ...augenbraueStil(farben.schwach),
@@ -852,7 +842,7 @@ export function CommandPalette({
               padding: `${token.paddingXS}px ${token.paddingSM}px`,
               borderTop: `1px solid ${token.colorBorderSecondary}`,
               fontFamily: schrift.text,
-              fontSize: schriftGroesse('klein'),
+              fontSize: schriftskala.textKlein.groesse,
             }}
           >
             {vorschau ? (
@@ -896,7 +886,7 @@ export function CommandPalette({
               padding: '6px 16px',
               borderTop: `1px solid ${token.colorBorderSecondary}`,
               fontFamily: schrift.text,
-              fontSize: schriftGroesse('klein'),
+              fontSize: schriftskala.textKlein.groesse,
               color: farben.schwach,
             }}
           >

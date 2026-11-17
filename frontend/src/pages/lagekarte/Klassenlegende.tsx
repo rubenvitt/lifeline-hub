@@ -1,4 +1,4 @@
-import { useRollen, schriftGroesse } from '../../components/instrument';
+import { useRollen } from '../../components/instrument';
 import { rollenFarbe } from '../../theme/statusFarben';
 import type { KlassenEintrag } from './fachebenen';
 
@@ -40,7 +40,7 @@ export default function Klassenlegende({
         flexWrap: 'wrap',
         columnGap: token.marginSM,
         rowGap: token.marginXXS,
-        fontSize: schriftGroesse('fein'),
+        fontSize: 11,
         color: rollen.text2,
       }}
     >

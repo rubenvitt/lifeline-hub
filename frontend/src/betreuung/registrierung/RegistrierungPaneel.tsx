@@ -25,9 +25,8 @@ import {
   Kennzahlenband,
   Paneel,
   PaneelZustand,
-  schriftStil,
+  monoStil,
   useRollen,
-  zahlStil,
 } from '../../components/instrument';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
@@ -303,13 +302,12 @@ export default function RegistrierungPaneel({
           borderTop: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        <Link to={pfade.personDetail(einsatzId, p.id)} style={zahlStil('text')}>
+        <Link to={pfade.personDetail(einsatzId, p.id)} style={monoStil(14)}>
           {kennung}
         </Link>
         <span style={{ fontWeight: 600 }}>{name}</span>
         {istBezugsperson && <Typography.Text type="secondary">Bezugsperson</Typography.Text>}
-        {/* „ca. 40 J.“ trägt Wörter: Textschrift (LLH-1777). */}
-        {alterText(p, heute) && <span style={schriftStil('text')}>{alterText(p, heute)}</span>}
+        {alterText(p, heute) && <span style={monoStil(14)}>{alterText(p, heute)}</span>}
         <Typography.Text type="secondary">
           {p.kostform ? KOSTFORM_WORT[p.kostform] : 'Kostform ohne Angabe'}
         </Typography.Text>
@@ -444,9 +442,7 @@ export default function RegistrierungPaneel({
       aktion={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
           {sperrGrund && (
-            // Der Grund ist Meta neben der Aktion (LLH-1777): in der Lauftextgröße lief der Kopf bei
-            // 390 px 6 px über (`e2e/gate1-ueberlauf.spec.ts`, Beobachter).
-            <Typography.Text id={grundId} type="secondary" style={schriftStil('meta')}>
+            <Typography.Text id={grundId} type="secondary">
               {sperrGrund}
             </Typography.Text>
           )}

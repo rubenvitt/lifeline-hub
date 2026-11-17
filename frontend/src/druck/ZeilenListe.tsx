@@ -1,7 +1,6 @@
 import { theme } from 'antd';
 import type { CSSProperties } from 'react';
-import { zahlStil } from '../components/instrument/rollenwerte';
-
+import { monoStil } from '../components/instrument';
 import './druckansichtSchmal.css';
 
 /**
@@ -66,7 +65,7 @@ function ZeilenEintraege({ zeilen }: { zeilen: Zeile[] }) {
             style={{
               margin: 0,
               whiteSpace: 'pre-wrap',
-              ...(BEGINNT_MIT_ZIFFER.test(z.wert) ? zahlStil('text') : {}),
+              ...(BEGINNT_MIT_ZIFFER.test(z.wert) ? monoStil(token.fontSize) : {}),
             }}
           >
             {z.wert}

@@ -35,6 +35,7 @@ import { abrufZustand } from '../api/abrufZustand';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { monoStil } from '../components/instrument';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
 import PersonalDisponierenModal from '../kraefte/PersonalDisponierenModal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -67,7 +68,6 @@ import { abschnittDerEinheit, buildEinheitOptions } from '../kraefte/kraeftebaum
 import { POSITION_LABELS } from '../api/personal';
 import type { StaerkePosition } from '../api/types';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
-import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Die Personalliste eines Einsatzes (LLH-1060, Spec `personal-ansicht`): gruppiert nach Einheit,
@@ -359,7 +359,7 @@ export default function PersonalPage() {
   /** Dauerzelle: leer ohne Daten, „—" ohne Ereignis (keine erfundene 0). */
   const dauerZelle = (minuten: number | null | undefined) =>
     periodenBereit ? (
-      <span style={{ ...zahlStil('klein'), whiteSpace: 'nowrap' }}>
+      <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
         {minuten == null ? '—' : dauerText(minuten)}
       </span>
     ) : null;
