@@ -17,6 +17,15 @@ fn pfad(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/fuehrungsstelle")
 }
 
+/// Die Antwort ohne den Änderungsvermerk (LLH-1834, eigene Tests in
+/// `tests/fuehrungsstelle_konflikt.rs`), für Vergleiche des ganzen Objekts.
+fn ohne_vermerke(mut json: Value) -> Value {
+    if let Some(o) = json.as_object_mut() {
+        o.remove("vermerke");
+    }
+    json
+}
+
 async fn lesen(app: &axum::Router, cookie: &str, einsatz: i64) -> (StatusCode, Value) {
     anfrage(app, "GET", &pfad(einsatz), cookie, None).await
 }
@@ -408,7 +417,7 @@ async fn fahrzeuge_ersetzen_die_zuordnung_und_liefern_nur_ids() {
     .await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
-        json,
+        ohne_vermerke(json),
         json!({"art": "mobil", "sprechgruppen": [], "verbindungen": [],
                "fahrzeug_ids": [elw.min(kdow), elw.max(kdow)]}),
         "nur IDs, aufsteigend, entdoppelt"
@@ -736,7 +745,7 @@ async fn nur_die_art_macht_die_stelle_nicht_erfasst() {
     let (status, json) = patchen(&app, &admin, einsatz, json!({"art": "ortsfest"})).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     assert_eq!(
-        json,
+        ohne_vermerke(json),
         json!({"art": "ortsfest", "sprechgruppen": [], "verbindungen": [], "fahrzeug_ids": []}),
         "keine weitere Angabe gesetzt"
     );

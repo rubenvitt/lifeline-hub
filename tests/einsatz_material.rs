@@ -4,7 +4,8 @@ use serde_json::Value;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, objekt_ereignisse,
-    rolle_setzen, setup, setup_mit_live, system_etb_anzahl, system_etb_inhalte,
+    rolle_setzen, setup, setup_mit_live, setup_mit_pool_und_live, system_etb_anzahl,
+    system_etb_inhalte,
 };
 
 // ---------- Zusatz-Helfer ----------
@@ -1044,7 +1045,7 @@ async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
 
     let (s, json) = aktion(&app, &admin, einsatz, decke, "entlassen").await;
     assert_eq!(s, StatusCode::OK, "{json}");
-    assert_eq!(json["beendet_als"], "entlassen");
+    assert_eq!(json["material"]["beendet_als"], "entlassen");
     assert_eq!(bezeichnungen(&app, &admin, einsatz, "").await, ["Trage"]);
     assert_eq!(
         bezeichnungen(&app, &admin, einsatz, "?entlassene=1").await,
@@ -1087,6 +1088,164 @@ async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
     // Wer einmal herausgenommen war, lässt sich nicht stornieren.
     let (s, json) = aktion(&app, &admin, einsatz, decke, "stornieren").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+}
+
+/// Spec `kraefte-entlassung`, „Herausnahme von Material zurücknehmen“ (LLH-1923): die Antwort
+/// des Herausnehmens trägt den Vorzustand; mit ihm kommt der Posten an seinen Ort zurück, mit
+/// Menge, Status und Dispositionszeit von vorher, und das ETB nennt die Rücknahme.
+#[tokio::test]
+async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 20).await;
+    let einheit = einheit_bilden(&app, &admin, einsatz, "Staffel A").await;
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"einheit_id":{einheit},"status":"im_einsatz"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    // Zwei Minuten zurück: setzte die Rücknahme die Dispositionszeit neu, fiele es auf.
+    sqlx::query(
+        "UPDATE einsatz_material SET disponiert_at = datetime('now', '-2 minutes') WHERE id = ?",
+    )
+    .bind(em)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let vorher = material_zeile(&app, &admin, einsatz, em).await;
+
+    let (s, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let vorzustand = json["vorzustand"].clone();
+    assert_eq!(vorzustand["einheit_id"], einheit, "{json}");
+    assert_eq!(vorzustand["uhs_id"], Value::Null);
+
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&vorzustand.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["ausgelassen"], serde_json::json!([]));
+    let nachher = material_zeile(&app, &admin, einsatz, em).await;
+    for feld in [
+        "einheit_id",
+        "menge",
+        "status",
+        "disponiert_at",
+        "beendet_als",
+    ] {
+        assert_eq!(nachher[feld], vorher[feld], "{feld}");
+    }
+    assert_eq!(
+        objekt_ereignisse(&mut rx, FREMD),
+        vec![ereignis("einheit", einheit)],
+        "der Ort bekommt ein Ereignis"
+    );
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t
+            == "Material «Wolldecke» (×20): Herausnahme zurückgenommen, Ort Einheit «Staffel A»"));
+    // Ein zweites Mal ist der Riegel zu; mehr als ein Ort im Body ist eine Feld-Kombination.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&vorzustand.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let mut zwei_orte = vorzustand.clone();
+    zwei_orte["uhs_id"] = 1.into();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&zwei_orte.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// Spec „Rücknahme von Material lässt einen veränderten Ort aus“ und „… nur direkt nach dem
+/// Herausnehmen“: ein inzwischen entlassenes Fahrzeug bleibt aus, der Posten kommt ohne Ort; eine
+/// andere Person bekommt 409.
+#[tokio::test]
+async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = adhoc_fahrzeug(&app, &admin, einsatz, "Florian 1/83-1").await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Tauchpumpe", 1).await;
+    let (s, json) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"einsatz_fahrzeug_id":{ef}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let (_, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    let vorzustand = json["vorzustand"].to_string();
+
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let zurueck = |cookie: String| {
+        let (app, vorzustand) = (app.clone(), vorzustand.clone());
+        async move {
+            anfrage(
+                &app,
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+                &cookie,
+                Some(&vorzustand),
+            )
+            .await
+        }
+    };
+    assert_eq!(zurueck(frieda).await.0, StatusCode::CONFLICT);
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    let (s, json) = zurueck(admin.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(
+        json["ausgelassen"],
+        serde_json::json!([{
+            "bezeichnung": "Fahrzeug «Florian 1/83-1»",
+            "grund": "inzwischen entlassen oder storniert"
+        }])
+    );
+    let zeile = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(zeile["einsatz_fahrzeug_id"], Value::Null);
+    assert!(zeile.get("beendet_als").is_none(), "{zeile}");
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t
+            == "Material «Tauchpumpe» (×1): Herausnahme zurückgenommen, ohne Fahrzeug \
+            «Florian 1/83-1» (inzwischen entlassen oder storniert)"));
 }
 
 // ── Material-Liste (LLH-1093 Teil I) ────────────────────────────────────────────────────

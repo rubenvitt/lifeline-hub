@@ -269,9 +269,14 @@
 .lfh-segment:hover {
   color: var(--lfh-text);
 }
+/* Gewählt: Fläche UND eine 2-px-Bedienkante unten (Change `eon26eat-farbe-entlasten`, D6). Die
+   Fläche allein hob sich nachts nur mit 1,07 : 1 ab und verschwand bei gedimmter Anzeige; der
+   Strich an genau einem Segment trägt auch dort. Unten statt ringsum, sonst sähe die Wahl aus
+   wie der Fokusring. Eine Option mit eigener `kante` (ETB-Typ) ersetzt sie inline. */
 .lfh-segment--aktiv {
   background: var(--lfh-flaeche-3);
   color: var(--lfh-text);
+  box-shadow: inset 0 -2px 0 var(--lfh-bedien);
 }
 /* Gesperrt: sichtbar, fokussierbar (den Grund nennt die Leiste), aber ohne Hover-Aufhellung.
    Die Farbe ist nicht der einzige Kanal: `Segmentleiste` nennt den Grund, und das Segment trägt
@@ -300,6 +305,13 @@
 .lfh-sichtungswahl__flaeche:focus-visible {
   outline: 2px solid var(--lfh-bedien);
   outline-offset: 2px;
+}
+/* Startfokus auf der GRUPPE (eon26eat D8): ein eigener Ring um alle Kacheln, damit keine einzelne
+   wie vorausgewählt aussieht. Nur `:focus-visible`: ein Tipp in die Lücke zwischen zwei Kacheln
+   (oder Safari, das den Fokus beim Tipp an die Gruppe gibt) zeichnet keinen Ring. */
+.lfh-sichtungswahl:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: 4px;
 }
 
 /* Schnellerfassungszeile: die ZEILE trägt Rahmen und Grund, das Feld darin nicht.

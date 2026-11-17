@@ -11,9 +11,9 @@
 
 use crate::app::AppState;
 use crate::einsatz::fuehrungsstelle::{
-    self, EinsatzleiterArt, EinsatzleiterEingabe, FuehrungsstelleAnzeige, FuehrungsstellePatch,
-    FuehrungsstellenArt, Schreiber, EINSATZLEITER_NAME_MAX, FUEHRUNGSSTELLE_ADRESSE_MAX,
-    FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+    self, EinsatzleiterArt, EinsatzleiterEingabe, EinsatzleiterKern, FuehrungsstelleAnzeige,
+    FuehrungsstelleErwartung, FuehrungsstellePatch, FuehrungsstellenArt, Schreiber,
+    EINSATZLEITER_NAME_MAX, FUEHRUNGSSTELLE_ADRESSE_MAX, FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
 };
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzVerwaltungszugriff};
 use crate::einsatz::verbindungen::{self, VerbindungBody};
@@ -65,6 +65,41 @@ pub struct FuehrungsstellePatchBody {
     /// Der Einsatzleiter (LFH-1199); `null` leert ihn.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub einsatzleiter: Option<Option<EinsatzleiterBody>>,
+    /// Feld-CAS (LLH-1831, Spec `einsatz-fuehrungsstelle`, „Angabe der Führungsstelle mit Altwert
+    /// speichern“): je Feld der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<FuehrungsstelleErwartet>,
+}
+
+/// Altwerte der Führungsstelle, dreiwertig wie [`FuehrungsstellePatchBody`]; die Koordinate nur als
+/// Paar, Listen als Ganzes, der Einsatzleiter ohne „seit“.
+#[derive(Debug, Default, Deserialize)]
+pub struct FuehrungsstelleErwartet {
+    pub art: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bezeichnung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_adresse: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort_lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub rufname: Option<Option<String>>,
+    pub verbindungen: Option<Vec<VerbindungBody>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub fahrzeug_ids: Option<Option<Vec<i64>>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einsatzleiter: Option<Option<EinsatzleiterErwartet>>,
+}
+
+/// Wer Einsatzleiter war: `personal` mit `personal_id` oder `extern` mit `name`.
+#[derive(Debug, Deserialize)]
+pub struct EinsatzleiterErwartet {
+    pub art: String,
+    #[serde(default)]
+    pub personal_id: Option<i64>,
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 /// Ein neuer Einsatzleiter: `personal` mit `personal_id` oder `extern` mit `name`; `seit` fehlt =
@@ -155,9 +190,24 @@ pub async fn lesen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
 ) -> Result<Json<FuehrungsstelleAnzeige>, AppError> {
-    Ok(Json(
-        fuehrungsstelle::load(&state.pool, ctx.einsatz.id).await?,
-    ))
+    let mut anzeige = fuehrungsstelle::load(&state.pool, ctx.einsatz.id).await?;
+    // Wer welche Angabe zuletzt geändert hat (LLH-1834): nicht an Gerätesitzungen.
+    if ctx.geraet.is_none() {
+        anzeige.vermerke = vermerke(&state, ctx.einsatz.id).await?;
+    }
+    Ok(Json(anzeige))
+}
+
+async fn vermerke(
+    state: &AppState,
+    einsatz_id: i64,
+) -> Result<crate::einsatz::feld_vermerk::Vermerke, AppError> {
+    crate::einsatz::feld_vermerk::load(
+        &state.pool,
+        einsatz_id,
+        crate::einsatz::feld_vermerk::Objekt::Fuehrungsstelle,
+    )
+    .await
 }
 
 /// PATCH /api/einsaetze/{id}/fuehrungsstelle — echter Teil-Patch. Prüfungen vor dem Schreiben,
@@ -212,6 +262,87 @@ pub async fn aendern(
         .einsatzleiter
         .map(|e| e.map(check_einsatzleiter).transpose())
         .transpose()?;
+    // Feld-CAS (LLH-1831, design.md D1/D2): Altwert nur mit Änderung desselben Felds, die
+    // Koordinate nur als Paar (422); aufbereitet wie der Patch.
+    let erwartet = body.erwartet.unwrap_or_default();
+    // Lage je Feld vor den Einzelprüfungen festhalten; die Kombination (422) prüft erst danach,
+    // damit ein 400 je Feld vorgeht (`src/AGENTS.md`, Statuscode-Konvention).
+    let erwartet_lage: &[crate::feld_cas::FeldLage] = &[
+        ("art", erwartet.art.is_some(), art.is_some()),
+        (
+            "bezeichnung",
+            erwartet.bezeichnung.is_some(),
+            bezeichnung.is_some(),
+        ),
+        (
+            "standort_adresse",
+            erwartet.standort_adresse.is_some(),
+            adresse.is_some(),
+        ),
+        (
+            "standort_lat",
+            erwartet.standort_lat.is_some(),
+            body.standort_lat.is_some(),
+        ),
+        (
+            "standort_lon",
+            erwartet.standort_lon.is_some(),
+            body.standort_lon.is_some(),
+        ),
+        ("rufname", erwartet.rufname.is_some(), rufname.is_some()),
+        (
+            "verbindungen",
+            erwartet.verbindungen.is_some(),
+            neue_verbindungen.is_some(),
+        ),
+        (
+            "fahrzeug_ids",
+            erwartet.fahrzeug_ids.is_some(),
+            fahrzeug_ids.is_some(),
+        ),
+        (
+            "einsatzleiter",
+            erwartet.einsatzleiter.is_some(),
+            einsatzleiter.is_some(),
+        ),
+    ];
+    let erwartet_art = erwartet
+        .art
+        .map(|a| {
+            parse_enum(
+                FuehrungsstellenArt::parse,
+                a.trim(),
+                format!("Unbekannte Art der Führungsstelle: {a}"),
+            )
+        })
+        .transpose()?;
+    let erwartet_bezeichnung = trimme_tri(erwartet.bezeichnung);
+    let erwartet_adresse = trimme_tri(erwartet.standort_adresse);
+    let erwartet_rufname = trimme_tri(erwartet.rufname);
+    let erwartet_verbindungen = erwartet
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
+    let erwartet_fahrzeuge: Option<Vec<i64>> = erwartet.fahrzeug_ids.map(Option::unwrap_or_default);
+    let erwartet_leiter: Option<Option<(EinsatzleiterArt, Option<i64>, Option<String>)>> = erwartet
+        .einsatzleiter
+        .map(|e| {
+            e.map(|e| {
+                EinsatzleiterArt::try_from(e.art)
+                    .map(|art| (art, e.personal_id, e.name.map(|n| n.trim().to_string())))
+                    .map_err(AppError::Validation)
+            })
+            .transpose()
+        })
+        .transpose()?;
+    crate::feld_cas::pruefe_felder(
+        erwartet_lage,
+        &[(
+            "standort_lat",
+            "standort_lon",
+            "erwartet trägt den Standort nur als Paar (standort_lat und standort_lon)",
+        )],
+    )?;
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
     if art.is_none()
         && bezeichnung.is_none()
@@ -263,6 +394,23 @@ pub async fn aendern(
                     },
                 })
         }),
+        erwartung: FuehrungsstelleErwartung {
+            art: erwartet_art,
+            bezeichnung: erwartet_bezeichnung.as_ref().map(|v| v.as_deref()),
+            standort_adresse: erwartet_adresse.as_ref().map(|v| v.as_deref()),
+            standort: erwartet.standort_lat.zip(erwartet.standort_lon),
+            rufname: erwartet_rufname.as_ref().map(|v| v.as_deref()),
+            verbindungen: erwartet_verbindungen.as_deref(),
+            fahrzeug_ids: erwartet_fahrzeuge.as_deref(),
+            einsatzleiter: erwartet_leiter.as_ref().map(|e| {
+                e.as_ref().map(|(art, pid, name)| match art {
+                    EinsatzleiterArt::Personal => EinsatzleiterKern::Personal(*pid),
+                    EinsatzleiterArt::Extern => {
+                        EinsatzleiterKern::Extern(name.as_deref().unwrap_or_default())
+                    }
+                })
+            }),
+        },
     };
     let schreiber = Schreiber {
         benutzer_id: ctx.benutzer.id,
@@ -286,6 +434,8 @@ pub async fn aendern(
     if let Some(etb_id) = etb_id {
         state.live.publiziere(einsatz_id, etb_id);
     }
+    let mut anzeige = anzeige;
+    anzeige.vermerke = vermerke(&state, einsatz_id).await?;
     Ok(Json(anzeige))
 }
 

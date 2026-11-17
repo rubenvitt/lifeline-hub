@@ -1,3 +1,4 @@
+import type { FeldVermerk } from '../api/types';
 import { Button, Flex, Input } from 'antd';
 import { VERBINDUNGEN_MAX, VERBINDUNG_TEXT_MAX } from '../api/eingabegrenzen';
 import type { KommunikationsVerbindung, NeueVerbindung, Verbindungsmittel } from '../api/types';
@@ -159,17 +160,22 @@ export function VerbindungenAngabe({
   darfSchreiben,
   onSpeichern,
   gesperrt,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   etikett: string;
   verbindungen: readonly KommunikationsVerbindung[] | null | undefined;
   darfSchreiben: boolean;
-  onSpeichern: (liste: NeueVerbindung[]) => Promise<unknown>;
+  /** `alt`: die Liste beim Öffnen, bereinigt (Feld-CAS, LLH-1831). */
+  onSpeichern: (liste: NeueVerbindung[], alt: NeueVerbindung[]) => Promise<unknown>;
   gesperrt?: string | { beschreibungId: string };
 }) {
   const wert = alsEingabe(verbindungen);
   return (
     <InlineAngabe<NeueVerbindung[]>
       etikett={etikett}
+      vermerk={vermerk}
       wert={wert}
       anzeige={<VerbindungenListe verbindungen={wert} />}
       leer={(l) => l.length === 0}
@@ -178,7 +184,9 @@ export function VerbindungenAngabe({
       gesperrt={gesperrt}
       bearbeitenDaneben
       pruefe={pruefeVerbindungen}
-      onSpeichern={(l) => onSpeichern(bereinigeVerbindungen(l))}
+      onSpeichern={(l, { beimOeffnen }) =>
+        onSpeichern(bereinigeVerbindungen(l), bereinigeVerbindungen(beimOeffnen))
+      }
       eingabe={(p) => <VerbindungenEingabe {...p} />}
     />
   );

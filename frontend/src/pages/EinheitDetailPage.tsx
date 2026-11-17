@@ -52,7 +52,16 @@ import {
   mitGehaltenenFahrzeugen,
   visibleBesatzungRows,
 } from './einheit/einheitAnsichtKern';
-import EinheitKopf from './einheit/EinheitKopf';
+import EinheitKopf, { type EinheitPatchHandler } from './einheit/EinheitKopf';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import { ausschnitt, ausschnittLeer, ausschnittText, vermerkFuer } from '../components/feldVermerk';
+import {
+  alsEingabe as alsVerbindungsEingabe,
+  bereinigeVerbindungen,
+} from '../components/verbindungen';
+import { qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
+import { staerkeText } from '../anzeige/staerke';
+import { vollstaendig } from '../kraefte/QualiSollFeld';
 import EinheitFunk from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
 import EinheitAufgeloestAnsicht from './einheit/EinheitAufgeloestAnsicht';
@@ -78,6 +87,49 @@ import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
  * gefundene nur lesend (LLH-1266, `EinheitAufgeloestAnsicht`). Wird die geöffnete Einheit
  * anderswo aufgelöst, verliert die aktive Liste sie, und die Seite fällt von selbst dorthin.
  */
+/**
+ * Die Einheit in der Wire-Form des PATCH (LLH-1831): Vergleichswert des Feld-CAS nach einem 409.
+ * Soll-Stärke und Qualifikationssoll wirksam (eigener oder vom Typ), wie die Zeilen sie zeigen und
+ * der Server sie prüft; Verbindungen ohne Kennung.
+ */
+function einheitWire(e: Einheit): Record<string, unknown> {
+  return {
+    name: e.name,
+    typ_id: e.typ_id ?? null,
+    abschnitt_id: e.abschnitt_id ?? null,
+    ueber_einheit_id: e.ueber_einheit_id ?? null,
+    fuehrer_id: e.fuehrer_id ?? null,
+    soll_fuehrer: e.soll?.fuehrer ?? null,
+    soll_unterfuehrer: e.soll?.unterfuehrer ?? null,
+    soll_mannschaft: e.soll?.mannschaft ?? null,
+    quali_soll: vollstaendig(qualiSollEingabe(e.quali_soll)),
+    bemerkung: e.bemerkung ?? null,
+    funkrufname: e.funkrufname ?? null,
+    verbindungen: bereinigeVerbindungen(alsVerbindungsEingabe(e.verbindungen)),
+  };
+}
+
+/**
+ * Der aktuelle Wert einer Angabe lesbar für die Rückfrage (Review LLH-1831): Namen statt
+ * Kennungen, Soll-Stärke und Qualifikationssoll als Text; sonst die Wire-Werte.
+ */
+function einheitAnzeige(
+  e: Einheit,
+  patch: EinheitPatch,
+  alle: readonly Einheit[],
+): string | undefined {
+  if ('fuehrer_id' in patch) return e.fuehrer_name ?? undefined;
+  if ('abschnitt_id' in patch) return e.abschnitt_name ?? undefined;
+  if ('typ_id' in patch) return e.typ_label ?? undefined;
+  if ('ueber_einheit_id' in patch) {
+    return alle.find((x) => x.id === e.ueber_einheit_id)?.name ?? undefined;
+  }
+  if ('soll_fuehrer' in patch) return staerkeText(e.soll);
+  if ('quali_soll' in patch) return qualiSollText(e.quali_soll);
+  if ('verbindungen' in patch) return e.verbindungen.map((v) => v.wert).join(', ');
+  return undefined;
+}
+
 export default function EinheitDetailPage() {
   const { id, einheitId: einheitIdParam } = useParams();
   const einsatzId = Number(id);
@@ -296,8 +348,8 @@ function EinheitAnsicht({
    * Einheitsführers und der Abschnittszuordnung ins Tagebuch, deshalb auch `etb`.
    */
   const patch = useMutation({
-    mutationFn: (v: { etikett: string; patch: EinheitPatch }) =>
-      patcheEinheit(einsatzId, einheitId, v.patch),
+    mutationFn: (v: { etikett: string; patch: EinheitPatch; erwartet?: Partial<EinheitPatch> }) =>
+      patcheEinheit(einsatzId, einheitId, v.patch, v.erwartet),
     onSuccess: (neu, v) => {
       setInCache(neu);
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
@@ -381,9 +433,45 @@ function EinheitAnsicht({
     },
   });
 
-  /** „Als Einheitsführer“ im Menü einer Person: derselbe Weg wie die Kopfzeile (D1). */
+  /*
+   * Feld-CAS mit dem einen Konfliktablauf (LLH-1831, `components/useFeldKonflikt`): die Schlüssel des
+   * Patches gehen mit ihrem Wert beim Öffnen als `erwartet` mit; nach einem 409 vergleicht die Seite
+   * mit der Wire-Form des frisch geladenen Stands.
+   */
+  const konflikt = useFeldKonflikt();
+  const onPatch: EinheitPatchHandler = (etikett, p, alt) =>
+    konflikt({
+      etikett,
+      erwartet: alt ? ausschnitt(alt, p) : undefined,
+      speichern: async (erwartet) => {
+        await patch.mutateAsync({ etikett, patch: p, erwartet });
+      },
+      ladeFrisch: async () => {
+        const liste = await qc.fetchQuery({
+          queryKey: einsatzKeys.einheiten(einsatzId),
+          queryFn: () => listeEinheiten(einsatzId),
+          staleTime: 0,
+        });
+        return liste.find((x) => x.id === einheitId);
+      },
+      // Eine inzwischen aufgelöste Einheit fehlt in der Liste: dann kein Feldkonflikt, der Grund
+      // des Servers steht an der Angabe (Review LLH-1831).
+      aktuell: (frisch) =>
+        frisch && {
+          wert: ausschnitt(einheitWire(frisch), p),
+          vermerk: vermerkFuer(frisch.vermerke, p),
+          anzeige: einheitAnzeige(frisch, p, einheiten),
+        },
+      text: ausschnittText,
+      leer: ausschnittLeer,
+    });
+
+  /**
+   * „Als Einheitsführer“ im Menü einer Person: derselbe Weg wie die Kopfzeile (D1). Ohne Öffnen ist
+   * der Altwert der gezeigte Führer.
+   */
   const setFuehrer = (epId: number) =>
-    patch.mutateAsync({ etikett: 'Einheitsführer', patch: { fuehrer_id: epId } });
+    onPatch('Einheitsführer', { fuehrer_id: epId }, { fuehrer_id: aktuell?.fuehrer_id ?? null });
 
   return (
     <EinsatzSeite
@@ -439,7 +527,7 @@ function EinheitAnsicht({
           abschnitte={abschnitteQuery}
           canEdit={rechte.canEditEinheit}
           orgDefault={orgDefault}
-          onPatch={(etikett, p) => patch.mutateAsync({ etikett, patch: p })}
+          onPatch={onPatch}
           onSetHandStatus={(statusId) => handStatus.mutateAsync(statusId)}
           nachforderungPfad={
             aktuell.nachforderung_id != null && istKeyFreigegeben('nachforderungen', freigaben)
@@ -532,7 +620,7 @@ function EinheitAnsicht({
           einheit={aktuell}
           einsatzId={einsatzId}
           canEdit={rechte.canEditEinheit}
-          onPatch={(etikett, p) => patch.mutateAsync({ etikett, patch: p })}
+          onPatch={onPatch}
           onSprechgruppen={(aenderung, onSchritt) =>
             sprechgruppen.mutateAsync({ aenderung, onSchritt })
           }

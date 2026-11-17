@@ -169,12 +169,16 @@ describe('EinheitFunk', () => {
       screen.getByRole('button', { name: 'Telefon und weitere Verbindungen speichern' }),
     );
     await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Telefon und weitere Verbindungen', {
-        verbindungen: [
-          { mittel: 'mobil', wert: '0151 23456' },
-          { mittel: 'email', wert: 'zug1@drk.de' },
-        ],
-      }),
+      expect(onPatch).toHaveBeenCalledWith(
+        'Telefon und weitere Verbindungen',
+        {
+          verbindungen: [
+            { mittel: 'mobil', wert: '0151 23456' },
+            { mittel: 'email', wert: 'zug1@drk.de' },
+          ],
+        },
+        expect.anything(),
+      ),
     );
   });
 
@@ -189,9 +193,13 @@ describe('EinheitFunk', () => {
       screen.getByRole('button', { name: 'Telefon und weitere Verbindungen speichern' }),
     );
     await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Telefon und weitere Verbindungen', {
-        verbindungen: [],
-      }),
+      expect(onPatch).toHaveBeenCalledWith(
+        'Telefon und weitere Verbindungen',
+        {
+          verbindungen: [],
+        },
+        expect.anything(),
+      ),
     );
   });
 

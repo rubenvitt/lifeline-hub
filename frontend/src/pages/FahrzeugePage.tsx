@@ -72,7 +72,7 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
+import { besatzungsUrteil, kategorieDarstellung } from '../theme/statusFarben';
 import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
 import StatusTag from '../components/StatusTag';
@@ -890,7 +890,7 @@ function FahrzeugeInhalt() {
     wert: s.id,
     // Ein FMS-Format überall, „S4 · Am Einsatzort“ (LFH-973), wie Meldebild und FMS-Tableau.
     label: fmsEtikett(s.label, s.fms_anker),
-    darstellung: s.kategorie ? statusKategorie[s.kategorie] : undefined,
+    darstellung: s.kategorie ? kategorieDarstellung(s.kategorie, s.fms_anker) : undefined,
     farbe: s.farbe,
   }));
 

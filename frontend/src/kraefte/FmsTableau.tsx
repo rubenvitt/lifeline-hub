@@ -14,8 +14,8 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StatusWahl, { type StatusBedienung } from '../components/StatusWahl';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { monoStil, Paneel, Sammelbanner, StatusChip, useRollen } from '../components/instrument';
-import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
+import { Paneel, Sammelbanner, StatusChip, monoStil, useRollen } from '../components/instrument';
+import { kategorieDarstellung, type StatusDarstellung } from '../theme/statusFarben';
 import {
   baueFmsTableau,
   fmsStatusOptionen,
@@ -75,9 +75,13 @@ const KACHEL = 'fms-kachel';
 const OVERLAY = '.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown';
 const ZIFFER_HINWEIS = 'fms-tableau-ziffer';
 
-function darstellungVon(ef: EinsatzFahrzeug): StatusDarstellung | null {
+function darstellungVon(
+  ef: EinsatzFahrzeug,
+  katalogNach: ReadonlyMap<number, FahrzeugStatus>,
+): StatusDarstellung | null {
   if (!ef.status_label || !ef.status_kategorie) return null;
-  return { ...statusKategorie[ef.status_kategorie], label: ef.status_label };
+  const anker = ef.status_id != null ? katalogNach.get(ef.status_id)?.fms_anker : null;
+  return { ...kategorieDarstellung(ef.status_kategorie, anker), label: ef.status_label };
 }
 
 /** Kachelraster — rein. `min(100%, …)` hält die Spalte am 390-px-Schirm. */
@@ -297,7 +301,7 @@ export default function FmsTableau({
                     {...bedienung}
                     optionen={optionen}
                     onWaehlen={(w) => waehle(ef, bedienung, Number(w))}
-                    darstellung={darstellungVon(ef)}
+                    darstellung={darstellungVon(ef, katalogNach)}
                     etikett={
                       <StatusChip ton={status.ton} code={status.code} wort={status.wort} trenner />
                     }

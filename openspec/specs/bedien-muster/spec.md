@@ -24,9 +24,9 @@ davor herstellt, sonst MUST es eine Rückfrage zeigen.
 - **WHEN** jemand auf der Detailseite einer Person „Entlassen“ wählt und im Hinweis „Rückgängig“
 - **THEN** wirkt das Entlassen ohne Rückfrage, und die Person steht wieder mit ihren Bindungen da; was nicht zurückkam, nennt der Seitenhinweis in Worten
 
-#### Scenario: Bekannte Lücke bei Personal und Material
-- **WHEN** ein Posten aus dem Einsatz genommen wird
-- **THEN** wirkt es bis zur Nachrüstung seines Rückwegs ohne Rückfrage, und „Rückgängig“ macht den Posten wieder aktiv, ohne seinen Ort herzustellen; bei der Person ist die Lücke geschlossen (Szenario „Person entlassen und Rückgängig“)
+#### Scenario: Material aus dem Einsatz nehmen und Rückgängig
+- **WHEN** jemand einen Posten an einer Einheit über sein ⋮ aus dem Einsatz nimmt und im Hinweis „Rückgängig“ wählt
+- **THEN** wirkt das Herausnehmen ohne Rückfrage, und der Posten steht wieder an seiner Einheit; einen Ort, der ihn nicht mehr aufnimmt, nennt der Seitenhinweis in Worten
 
 ### Requirement: Ein Gebilde auflösen oder schließen
 

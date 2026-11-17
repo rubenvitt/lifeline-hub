@@ -37,11 +37,13 @@ pub struct PersonalZuordnung {
 /// zugeordnete Kraft wechselt; war sie dort Führer, endet diese Führung, und das Ergebnis nennt
 /// sie. Dieselbe Einheit noch einmal schreibt nichts, auch die Führung bleibt (LLH-1262, wie
 /// LLH-1073 D2 am Fahrzeug). `NotFound`, falls Dispozeile oder Einheit nicht zum Einsatz gehören.
+/// Mit `von` trägt jede Einheit, deren Führung endet, den Änderungsvermerk am Führer (LLH-1834).
 pub async fn zuordnen_personal_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ep_id: i64,
+    von: Option<i64>,
 ) -> Result<PersonalZuordnung, AppError> {
     pruefe_einheit_tx(conn, einsatz_id, einheit_id).await?;
     let zeile: Option<(String, Option<i64>, Option<String>)> = sqlx::query_as(
@@ -76,6 +78,18 @@ pub async fn zuordnen_personal_tx(
     .fetch_all(&mut *conn)
     .await?;
     fuehrung_endet.sort_by_key(|(id, _)| *id);
+    if let Some(von) = von {
+        for (eid, _) in &fuehrung_endet {
+            crate::einsatz::feld_vermerk::setze_tx(
+                conn,
+                einsatz_id,
+                crate::einsatz::feld_vermerk::Objekt::Einheit(*eid),
+                &["fuehrer_id"],
+                von,
+            )
+            .await?;
+        }
+    }
     sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(ep_id)
@@ -90,7 +104,7 @@ pub async fn zuordnen_personal_tx(
     })
 }
 
-/// Pool-Wrapper (eigene Tx, hält die beiden UPDATEs atomar).
+/// Pool-Wrapper (eigene Tx, hält die beiden UPDATEs atomar), ohne Änderungsvermerk.
 pub async fn zuordnen_personal(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -98,19 +112,21 @@ pub async fn zuordnen_personal(
     ep_id: i64,
 ) -> Result<PersonalZuordnung, AppError> {
     let mut tx = pool.begin().await?;
-    let zuordnung = zuordnen_personal_tx(&mut tx, einsatz_id, einheit_id, ep_id).await?;
+    let zuordnung = zuordnen_personal_tx(&mut tx, einsatz_id, einheit_id, ep_id, None).await?;
     tx.commit().await?;
     Ok(zuordnung)
 }
 
 /// Gibt eine Personal-Dispozeile aus ihrer Einheit frei (`einheit_id = NULL`), auf offener
 /// Connection/Tx. War sie Führer dieser Einheit, wird `fuehrer_id` geleert. `NotFound`, falls
-/// nicht zu dieser Einheit gehörend. Liefert den Namen.
+/// nicht zu dieser Einheit gehörend. Liefert den Namen. Endet dabei die Führung, trägt die
+/// Einheit mit `von` den Änderungsvermerk am Führer (LLH-1834).
 pub async fn freigeben_personal_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ep_id: i64,
+    von: Option<i64>,
 ) -> Result<String, AppError> {
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
@@ -122,11 +138,24 @@ pub async fn freigeben_personal_tx(
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
 
-    sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE id = ? AND fuehrer_id = ?")
-        .bind(einheit_id)
-        .bind(ep_id)
-        .execute(&mut *conn)
+    let fuehrung_endet =
+        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE id = ? AND fuehrer_id = ?")
+            .bind(einheit_id)
+            .bind(ep_id)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected()
+            > 0;
+    if let (true, Some(von)) = (fuehrung_endet, von) {
+        crate::einsatz::feld_vermerk::setze_tx(
+            conn,
+            einsatz_id,
+            crate::einsatz::feld_vermerk::Objekt::Einheit(einheit_id),
+            &["fuehrer_id"],
+            von,
+        )
         .await?;
+    }
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE id = ?")
         .bind(ep_id)
         .execute(&mut *conn)
@@ -912,7 +941,7 @@ mod tests {
 
         // Freigeben.
         assert_eq!(
-            freigeben_personal_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep)
+            freigeben_personal_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep, None)
                 .await
                 .unwrap(),
             "Anna"
@@ -928,7 +957,7 @@ mod tests {
         zuordnen_personal(&pool, einsatz, a, ep).await.unwrap();
         // Freigeben aus B (gehört aber zu A) → NotFound.
         assert!(matches!(
-            freigeben_personal_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep)
+            freigeben_personal_tx(&mut *pool.acquire().await.unwrap(), einsatz, b, ep, None)
                 .await
                 .unwrap_err(),
             AppError::NotFound
@@ -948,7 +977,7 @@ mod tests {
             .await
             .unwrap();
 
-        freigeben_personal_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ep)
+        freigeben_personal_tx(&mut *pool.acquire().await.unwrap(), einsatz, a, ep, None)
             .await
             .unwrap();
         let fuehrer: Option<i64> =

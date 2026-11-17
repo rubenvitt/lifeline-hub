@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stehendeAuswahl } from './auswahl-kern';
-import { flaeche, kontrast, stehend, verhaeltnis } from './kontrast-kern';
+import { flaeche, kontrast, stehend, verhaeltnis, type Farbe } from './kontrast-kern';
 import { anlegen, anmelden, einsatzAnlegen } from './trefflaeche-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 
@@ -103,6 +103,43 @@ for (const modus of ['light', 'dark'] as const) {
         .toBe(true);
       await expect(gewaehlt, 'Vorbedingung Zeiger').toHaveClass(/ant-dropdown-menu-item-active/);
       await haelt(gewaehlt, modus, `${modus}/Statuswahl, Zeiger`);
+    });
+
+    test('Segmentleiste: das gewählte Segment trägt eine Bedienkante ≥ 3 : 1 (eon26eat D6)', async ({
+      page,
+    }) => {
+      // Spec `farbrollen-kontrast`, „Das gewählte Segment trägt eine Bedienkante“: nachts hob sich
+      // das gewählte Segment nur mit 1,07 : 1 über die Fläche ab. Gemessen, was der Browser zeichnet.
+      await anmelden(page);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+      const einsatzId = await einsatzAnlegen(page, `E2E Segment ${Date.now()} ${modus}`);
+      await page.goto(`/einsaetze/${einsatzId}/personen`);
+      const leiste = page.getByRole('radiogroup', { name: 'Ansicht' });
+      const gewaehlt = leiste.getByRole('radio', { checked: true });
+      await expect(gewaehlt, 'Vorbedingung: genau ein gewähltes Segment').toHaveCount(1);
+      await page.mouse.move(0, 0);
+      const stil = await gewaehlt.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { schatten: s.boxShadow, grund: s.backgroundColor };
+      });
+      expect(stil.schatten, 'Kante innen, 2 px, unten').toContain('inset');
+      expect(stil.schatten).toContain('-2px');
+      const rgb = (t: string): Farbe => {
+        const [r, g, b] = t
+          .match(/rgba?\(([^)]+)\)/)![1]
+          .split(',')
+          .map(Number);
+        return [r, g, b, 1];
+      };
+      const k = verhaeltnis(rgb(stil.schatten), rgb(stil.grund));
+      expect(
+        k,
+        `${modus}: Kante gegen Segmentfläche ${JSON.stringify(stil)}`,
+      ).toBeGreaterThanOrEqual(3);
+      // Gegenprobe: die übrigen Segmente tragen keine Kante.
+      for (const anderes of await leiste.getByRole('radio', { checked: false }).all()) {
+        expect(await anderes.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
+      }
     });
 
     test('Auswahlliste: gewählte Option der Einsatzart', async ({ page }) => {

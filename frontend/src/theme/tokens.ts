@@ -1,20 +1,36 @@
 import { theme as antdTheme, type ConfigProviderProps, type ThemeConfig } from 'antd';
 import type { MappingAlgorithm } from 'antd';
 
-/** Fachliche Sichtungskennzeichnung nach BBK (SK I–IV, EX), unabhängig von A0-Statusrollen
- * (LFH-455). Die Farbfelder behalten nachts ihren Farbton (insbesondere schwarz); Umrandung und
- * Beschriftung lesen die Textfarbe des aktiven Modus. Nur TSX konsumiert diese Palette;
- * unverletzt hat keine eigene Farbe. */
-export const sichtungsfarben = {
-  rot: '#f5222d',
-  gelb: '#fadb14',
-  gruen: '#52c41a',
-  blau: '#1677ff',
-  schwarz: '#000000',
+/**
+ * Die EINE Sichtungspalette nach BBK (SK I–IV, tot), je Kategorie ein Objekt (Change
+ * `eon26eat-farbe-entlasten`, D8): `punkt` ist die Anzeigefarbe (Farbfeld, Karte, Donut, Legende,
+ * Innenrahmen der nicht gewählten Wahlkachel), `flaeche`/`schrift` die gefüllte Fläche der WAHL —
+ * bis zum Textboden abgedunkelt und in BEIDEN Modi gleich (LLH-1083, Option B: Weiß auf
+ * `#f5222d` hielte nur 4,08 : 1). „unverletzt“ hat keine eigene Farbe. Gerechnet in
+ * `sichtungKontrast.test.ts`.
+ */
+export const sichtungsPalette = {
+  rot: { punkt: '#f5222d', flaeche: '#a8071a', schrift: '#ffffff' },
+  gelb: { punkt: '#fadb14', flaeche: '#fadb14', schrift: '#000000' },
+  gruen: { punkt: '#52c41a', flaeche: '#135200', schrift: '#ffffff' },
+  blau: { punkt: '#1677ff', flaeche: '#003eb3', schrift: '#ffffff' },
+  schwarz: { punkt: '#000000', flaeche: '#000000', schrift: '#ffffff' },
 } as const;
 
 /** Sichtungskategorien mit eigener Farbe (alle außer „unverletzt“). */
-export type SichtungsFarbe = keyof typeof sichtungsfarben;
+export type SichtungsFarbe = keyof typeof sichtungsPalette;
+
+/** Fachliche Sichtungskennzeichnung nach BBK (SK I–IV, EX), unabhängig von A0-Statusrollen
+ * (LFH-455): die Anzeigefarbe aus {@link sichtungsPalette}. Die Farbfelder behalten nachts ihren
+ * Farbton (insbesondere schwarz); Umrandung und Beschriftung lesen die Textfarbe des aktiven
+ * Modus. Nur TSX konsumiert diese Palette. */
+export const sichtungsfarben = {
+  rot: sichtungsPalette.rot.punkt,
+  gelb: sichtungsPalette.gelb.punkt,
+  gruen: sichtungsPalette.gruen.punkt,
+  blau: sichtungsPalette.blau.punkt,
+  schwarz: sichtungsPalette.schwarz.punkt,
+} as const;
 
 /**
  * Flächenpalette der Sichtungs-WAHL (LLH-1083, Option B; `personen/SichtungsWahl.tsx`): eine
@@ -24,12 +40,51 @@ export type SichtungsFarbe = keyof typeof sichtungsfarben;
  * Druck) bleibt bei `sichtungsfarben`. Gerechnet in `sichtungKontrast.test.ts`.
  */
 export const sichtungsflaechen: Record<SichtungsFarbe, { flaeche: string; schrift: string }> = {
-  rot: { flaeche: '#a8071a', schrift: '#ffffff' },
-  gelb: { flaeche: '#fadb14', schrift: '#000000' },
-  gruen: { flaeche: '#135200', schrift: '#ffffff' },
-  blau: { flaeche: '#003eb3', schrift: '#ffffff' },
-  schwarz: { flaeche: '#000000', schrift: '#ffffff' },
+  rot: { flaeche: sichtungsPalette.rot.flaeche, schrift: sichtungsPalette.rot.schrift },
+  gelb: { flaeche: sichtungsPalette.gelb.flaeche, schrift: sichtungsPalette.gelb.schrift },
+  gruen: { flaeche: sichtungsPalette.gruen.flaeche, schrift: sichtungsPalette.gruen.schrift },
+  blau: { flaeche: sichtungsPalette.blau.flaeche, schrift: sichtungsPalette.blau.schrift },
+  schwarz: { flaeche: sichtungsPalette.schwarz.flaeche, schrift: sichtungsPalette.schwarz.schrift },
 };
+
+/** Deckkraft der Anzeigefarbe in der Tönung einer nicht gewählten Wahlkachel (eon26eat D8). */
+export const SICHTUNG_TOENUNG_DECKKRAFT = 0.18;
+/** Deckkraft der Striche in der Schraffur von „tot“ (eon26eat D8). */
+export const SICHTUNG_SCHRAFFUR_DECKKRAFT = 0.2;
+
+function hexZuRgb(hex: string): [number, number, number] {
+  return [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+/** `oben` mit Deckkraft `alpha` über `unten`, als deckender Hexwert (für Fläche UND Kontrastnachweis). */
+export function mischeFarbe(oben: string, unten: string, alpha: number): string {
+  const o = hexZuRgb(oben);
+  const u = hexZuRgb(unten);
+  return `#${o
+    .map((c, i) => Math.round(c * alpha + u[i] * (1 - alpha)))
+    .map((c) => c.toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/**
+ * Getönte Fläche einer NICHT gewählten Wahlkachel nach einer Wahl: die Anzeigefarbe leicht über
+ * dem Grund der Maske. Die Kategorie bleibt an ihrer Farbe erkennbar (Spec `sichtungswahl`), der
+ * Text steht in der Textfarbe des Modus.
+ */
+export function sichtungsToenung(farbe: SichtungsFarbe, grund: string): string {
+  return mischeFarbe(sichtungsPalette[farbe].punkt, grund, SICHTUNG_TOENUNG_DECKKRAFT);
+}
+
+/**
+ * Schraffur von „tot“ in jedem Zustand (Spec `sichtungswahl`, „tot und unverletzt sind ohne Lesen
+ * unterscheidbar“): 45°-Striche in `strich` mit {@link SICHTUNG_SCHRAFFUR_DECKKRAFT}. Gefüllt
+ * nimmt der Aufrufer die Schrift der Fläche (Weiß), getönt die Textfarbe des Modus.
+ */
+export function sichtungsSchraffur(strich: string): string {
+  const [r, g, b] = hexZuRgb(strich);
+  const farbe = `rgba(${r}, ${g}, ${b}, ${SICHTUNG_SCHRAFFUR_DECKKRAFT})`;
+  return `repeating-linear-gradient(45deg, ${farbe} 0 2px, transparent 2px 7px)`;
+}
 
 /**
  * Die Kante jeder Sichtungsfläche: die Textfarbe des Modus. Ohne sie verschwänden Gelb auf hellem
@@ -233,15 +288,15 @@ export interface Farbrollen {
  * `gesperrtKontrast.test.ts`, gemessen in `e2e/gesperrt-kontrast.spec.ts`.
  */
 export const farbenHell: Farbrollen = {
-  grund: '#e9ebee',
+  grund: '#e6e7e9',
   flaeche: '#ffffff',
-  flaeche2: '#f5f6f8',
+  flaeche2: '#f2f3f5',
   linie: '#d4d8dd',
   linieStark: '#b9bfc6',
   rasterLinie: 'rgba(26, 95, 160, 0.07)',
   text: '#111418',
-  gedaempft: '#363d45',
-  schwach: '#424a53',
+  gedaempft: '#323941',
+  schwach: '#3d454e',
   bedien: '#154e84',
   alarm: '#b02318',
   achtung: '#7a5200',
@@ -253,24 +308,24 @@ export const farbenHell: Farbrollen = {
   achtungFuellung: 'rgba(122, 82, 0, 0.08)',
   achtungFuellungStark: 'rgba(122, 82, 0, 0.2)',
   normalFuellung: 'rgba(28, 102, 64, 0.07)',
-  kopf: '#eef0f2',
-  paneel: '#f4f5f7',
-  flaeche3: '#e1e4e8',
-  text2: '#2b3138',
-  steuerRahmen: '#79818a',
+  kopf: '#e6e7e9',
+  paneel: '#f2f3f5',
+  flaeche3: '#dbdcde',
+  text2: '#272d34',
+  steuerRahmen: '#747c85',
   bedienHover: '#185895',
-  bedienText: '#144779',
+  bedienText: '#114577',
   aufBedien: '#ffffff',
   normalText: '#155234',
   achtungText: '#604200',
-  alarmText: '#8f1c12',
+  alarmText: '#88140d',
   alarmHover: '#7d1810',
   normalFlaeche: '#e3f1e8',
   achtungFlaeche: '#f7efd5',
   alarmFlaeche: '#f9e3e3',
   bedienFlaeche: '#e4edf7',
   auswahlFlaeche: '#dbe7f5',
-  gesperrt: '#565e67',
+  gesperrt: '#525a63',
   bannerGrund: '#e6eef8',
   bannerLinie: '#9dbbe0',
   berichtigungZeile: '#fbeaea',
@@ -323,14 +378,14 @@ export const farbenHell: Farbrollen = {
  */
 export const farbenDunkel: Farbrollen = {
   grund: '#08090b',
-  flaeche: '#0f1215',
-  flaeche2: '#14171b',
+  flaeche: '#151719',
+  flaeche2: '#1f2123',
   linie: '#22262b',
   linieStark: '#2e343a',
   rasterLinie: 'rgba(77, 148, 214, 0.055)',
   text: '#e8ebee',
-  gedaempft: '#9aa2ab',
-  schwach: '#838b94',
+  gedaempft: '#9fa7b0',
+  schwach: '#9199a2',
   bedien: '#4d94d6',
   alarm: '#ff6b6b',
   achtung: '#e8cc3a',
@@ -342,11 +397,11 @@ export const farbenDunkel: Farbrollen = {
   achtungFuellung: 'rgba(232, 204, 58, 0.1)',
   achtungFuellungStark: 'rgba(232, 204, 58, 0.24)',
   normalFuellung: 'rgba(82, 196, 26, 0.1)',
-  kopf: '#0c0e11',
-  paneel: '#0a0c0e',
-  flaeche3: '#16191d',
+  kopf: '#151719',
+  paneel: '#08090b',
+  flaeche3: '#27292b',
   text2: '#c6ccd2',
-  steuerRahmen: '#626a73',
+  steuerRahmen: '#6c747d',
   bedienHover: '#7db3e8',
   bedienText: '#8ec2f0',
   aufBedien: '#08090b',
@@ -359,7 +414,7 @@ export const farbenDunkel: Farbrollen = {
   alarmFlaeche: '#1c0a0d',
   bedienFlaeche: '#0d1620',
   auswahlFlaeche: '#08172b',
-  gesperrt: '#8f97a0',
+  gesperrt: '#9ca4ad',
   bannerGrund: '#0d1520',
   bannerLinie: '#1d3a5c',
   berichtigungZeile: '#160d0f',
@@ -386,11 +441,11 @@ export const farbenDunkel: Farbrollen = {
  * aus), die Sperre trägt zusätzlich ein Zeichen ohne Farbe. Gerechnet in `rahmenKontrast.test.ts`.
  */
 export const rahmenFarben = {
-  grund: farbenDunkel.kopf,
+  grund: '#0c0e11',
   /** Aktive Rail-Kategorie. */
-  aktiv: farbenDunkel.flaeche3,
+  aktiv: '#16191d',
   /** Suchfeld in der Kommandoleiste. */
-  feld: farbenDunkel.flaeche2,
+  feld: '#14171b',
   linie: farbenDunkel.linie,
   text: farbenDunkel.text,
   /**
@@ -400,13 +455,18 @@ export const rahmenFarben = {
    */
   gedaempft: '#a0a8b1',
   /** NUR für gesperrte Einträge, nie für bedienbaren Text (LFH-434). */
-  gesperrt: farbenDunkel.schwach,
+  gesperrt: '#838b94',
   /**
    * Störungswort (GETRENNT/OFFLINE/PRÜFEN). Eigener Wert statt `farbenDunkel.alarm` (`#ff6b6b`,
    * 6,96 auf `grund`): hier 7,18 (LFH-434).
    */
   alarm: '#ff7070',
-  marke: farbenDunkel.marke,
+  /**
+   * Ortsmarke: aktive Rail-Kategorie, aktiver Reiter der Gerätehülle. Die Bedienfarbe wie die
+   * Marke des aktiven Moduls im Modulpanel (Spec `farbrollen-kontrast`, Change
+   * `eon26eat-farbe-entlasten` D7; vorher Markenrot, 2,28 : 1 auf `aktiv`). 5,48 auf `aktiv`.
+   */
+  bedien: farbenDunkel.bedien,
 } as const;
 
 /**
@@ -445,7 +505,7 @@ export const etbTypFarbenDunkel: Record<EtbTypTon, EtbTypFarbe> = {
   anordnung: { kante: '#d46b08', wort: '#e8852a' },
   entscheidung: { kante: '#8f4be3', wort: '#a57ff0' },
   lage: { kante: '#13c2c2', wort: '#13c2c2' },
-  berichtigung: { kante: '#cf1322', wort: farbenDunkel.alarm },
+  berichtigung: { kante: '#d41b25', wort: farbenDunkel.alarm },
   system: { kante: farbenDunkel.schwach, wort: farbenDunkel.gedaempft },
 };
 

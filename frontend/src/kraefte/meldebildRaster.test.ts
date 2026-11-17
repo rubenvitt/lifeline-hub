@@ -574,18 +574,43 @@ describe('fahrzeugStatus', () => {
 
   it('trägt den FMS-Code und das Wort ohne doppelte Ziffer', () => {
     expect(fahrzeugStatus(fz(1, null, 104, 'gebunden'), katalog)).toEqual({
-      ton: 'achtung',
+      ton: 'neutral',
       wort: 'Am Einsatzort',
       code: 'S4',
     });
   });
 
-  it('Ton NUR aus der Kategorie — „am Einsatzort" wird nicht blau', () => {
-    // Der Vertrag (`statusKategorie.gebunden`) sagt `achtung`, wie auf der Fahrzeugseite; eine
-    // Abbildung Anker → Rolle gibt es nicht.
-    expect(fahrzeugStatus(fz(1, null, 104), katalog).ton).toBe('achtung');
+  it('Ton aus der Kategorie — „am Einsatzort" ist neutral, weder gelb noch blau', () => {
+    // Der Vertrag (`statusKategorie.gebunden`) sagt `neutral`, wie auf der Fahrzeugseite
+    // (Spec `statusrollen`, eon26eat D1).
+    expect(fahrzeugStatus(fz(1, null, 104), katalog).ton).toBe('neutral');
     expect(fahrzeugStatus(fz(1, null, 101), katalog).ton).toBe('normal');
     expect(fahrzeugStatus(fz(1, null, 106), katalog).ton).toBe('alarm');
+  });
+
+  it('Sprechwunsch (S5, S0) ist gelb, gleich welche Kategorie (eon26eat D2)', () => {
+    // Die einzige Ausnahme vom Ton aus der Kategorie: FMS 5 und 0 verlangen eine Antwort, ihre
+    // Bedeutung legt der Funkstandard fest, nicht der Mandant.
+    const mitSprechwunsch = new Map(
+      [
+        ...KATALOG,
+        { id: 105, label: '5 – Sprechwunsch', kategorie: 'gebunden', fms_anker: 5, sortier: 50 },
+        {
+          id: 100,
+          label: '0 – Prio. Sprechwunsch',
+          kategorie: 'gebunden',
+          fms_anker: 0,
+          sortier: 1,
+        },
+      ].map((s) => [s.id, s as FahrzeugStatus]),
+    );
+    expect(fahrzeugStatus(fz(1, null, 105), mitSprechwunsch)).toMatchObject({
+      ton: 'achtung',
+      code: 'S5',
+    });
+    expect(fahrzeugStatus(fz(1, null, 100), mitSprechwunsch).ton).toBe('achtung');
+    // Gegenprobe: derselbe Katalog, S4 bleibt neutral.
+    expect(fahrzeugStatus(fz(1, null, 104), mitSprechwunsch).ton).toBe('neutral');
   });
 
   it('ohne Anker kein Code, ohne Status neutral mit Wort', () => {
@@ -604,7 +629,7 @@ describe('fahrzeugStatus', () => {
   it('fällt ohne Katalog auf Label und Kategorie am Fahrzeug zurück', () => {
     const f = { ...fz(1, null, 104, 'gebunden'), status_label: '4 – Am Einsatzort' };
     expect(fahrzeugStatus(f, new Map())).toEqual({
-      ton: 'achtung',
+      ton: 'neutral',
       wort: '4 – Am Einsatzort',
       code: null,
     });
@@ -654,7 +679,7 @@ const st = {
 describe('einheitStatusAnzeige', () => {
   it('abgeleitet und von Hand: Code, Wort ohne Ziffernpräfix, Ton aus der Kategorie', () => {
     expect(einheitStatusAnzeige(st.fahrzeuge(S4))).toEqual({
-      ton: 'achtung',
+      ton: 'neutral',
       code: 'S4',
       wort: 'Am Einsatzort',
       verteilung: null,
@@ -670,8 +695,10 @@ describe('einheitStatusAnzeige', () => {
       wort: 'gemischt',
       verteilung: '1× S3 · 2× S4 · 1× ohne Status',
     });
-    // Eine GEMEINSAME Kategorie trägt den Ton — S3 und S4 sind beide gebunden.
-    expect(einheitStatusAnzeige(st.gemischt('gebunden')).ton).toBe('achtung');
+    // Eine GEMEINSAME Kategorie trägt den Ton — S3 und S4 sind beide gebunden, also neutral
+    // (Spec `statusrollen`); eine gemeinsame Kategorie mit eigenem Ton färbt dagegen.
+    expect(einheitStatusAnzeige(st.gemischt('gebunden')).ton).toBe('neutral');
+    expect(einheitStatusAnzeige(st.gemischt('nicht_verfuegbar')).ton).toBe('alarm');
   });
 
   it('ohne Status: neutral und so benannt', () => {
@@ -727,7 +754,7 @@ describe('einheitBand', () => {
     expect(band.map((z) => [z.code, z.wert, z.wort, z.ton])).toEqual([
       [null, 1, 'Werkstatt', 'alarm'],
       ['S2', 1, 'Frei auf Wache', 'normal'],
-      ['S4', 2, 'Am Einsatzort', 'achtung'],
+      ['S4', 2, 'Am Einsatzort', 'neutral'],
       ['S6', 1, 'Nicht einsatzbereit', 'alarm'],
       [null, 1, 'gemischt', 'neutral'],
       [null, 1, 'ohne Status', 'neutral'],

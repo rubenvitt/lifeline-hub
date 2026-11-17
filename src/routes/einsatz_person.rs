@@ -1398,11 +1398,6 @@ fn leer_als_null(wert: Option<Option<String>>) -> Option<Option<String>> {
 /// muss im selben PATCH geändert werden. Beides ist eine Feldkombination, also 422
 /// (`src/AGENTS.md`, Statuscode-Konvention; design.md D1).
 fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppError> {
-    if erwartet.antreff_lat.is_some() != erwartet.antreff_lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "erwartet trägt die Koordinate nur als Paar (antreff_lat und antreff_lon)".into(),
-        ));
-    }
     let felder = [
         ("name", erwartet.name.is_some(), body.name.is_some()),
         (
@@ -1487,12 +1482,14 @@ fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppE
             body.unvertraeglichkeiten.is_some(),
         ),
     ];
-    if let Some((feld, _, _)) = felder.iter().find(|(_, alt, neu)| *alt && !*neu) {
-        return Err(AppError::UnprocessableEntity(format!(
-            "erwartet nennt {feld}, der PATCH ändert {feld} aber nicht"
-        )));
-    }
-    Ok(())
+    crate::feld_cas::pruefe_felder(
+        &felder,
+        &[(
+            "antreff_lat",
+            "antreff_lon",
+            "erwartet trägt die Koordinate nur als Paar (antreff_lat und antreff_lon)",
+        )],
+    )
 }
 
 /// Spielraum für ein Geburtsdatum am Tagesrand (design.md D6): die Oberfläche prüft „nicht nach

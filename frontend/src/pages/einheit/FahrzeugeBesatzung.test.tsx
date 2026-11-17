@@ -114,7 +114,8 @@ const KATALOG = [
   {
     id: 103,
     label: '3 – Einsatz übernommen',
-    kategorie: 'im_einsatz',
+    // Eine der drei Kategorien, die die Datenbank zulässt (CHECK in migrations/0008).
+    kategorie: 'gebunden',
     farbe: null,
     fms_anker: 3,
     sortier: 3,

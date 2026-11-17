@@ -15,6 +15,8 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../../anzeige/StaerkeEingabe';
 import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../../kraefte/QualiSollFeld';
+import { juengsterVermerk } from '../../components/feldVermerk';
+import { PaneelVermerk, VermerkZeile } from '../../components/FeldVermerkAnzeige';
 import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../../kraefte/qualiSoll';
 import { mitVorgabe } from '../../components/vorgabeText';
 import { InlineAngabe } from '../../components/InlineAngabe';
@@ -38,7 +40,7 @@ import NichtUebernommenMarke from '../../kraefte/NichtUebernommenMarke';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../../kraefte/fmsTableauKern';
 import { einheitStaerkeUrteilVon } from '../../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
-import { einheitStaerkeUrteil, statusKategorie } from '../../theme/statusFarben';
+import { einheitStaerkeUrteil, kategorieDarstellung } from '../../theme/statusFarben';
 import { collectNachfahren } from './einheitAnsichtKern';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
@@ -47,7 +49,15 @@ import { zeitKurz } from '../../anzeige/zeitDarstellung';
  * Erfolgsmeldung, der Patch trägt genau ihr Feld (die Soll-Stärke ihre drei). Erfüllt erst, wenn
  * der neue Stand im Cache steht; lehnt bei Ablehnung ab, dann zeigt die Zeile den Grund.
  */
-export type EinheitPatchHandler = (etikett: string, patch: EinheitPatch) => Promise<unknown>;
+/**
+ * Speichert eine Angabe der Einheit. `alt` = der Wert der Zeile beim Öffnen in Patch-Form; daraus
+ * gehen die Schlüssel des Patches als `erwartet` mit (Feld-CAS, LLH-1831).
+ */
+export type EinheitPatchHandler = (
+  etikett: string,
+  patch: EinheitPatch,
+  alt?: Partial<EinheitPatch>,
+) => Promise<unknown>;
 
 /** Setzt oder leert den Handstatus einer Einheit ohne Fahrzeug; lehnt bei Ablehnung ab. */
 export type HandStatusHandler = (statusId: number | null) => Promise<unknown>;
@@ -97,6 +107,19 @@ const isSameStaerke = (a: Staerke | null, b: Staerke | null) =>
  * womit man sie erreicht, steht in den Paneelen „Funk“ und „Telefon und weitere Verbindungen“
  * (D2, LLH-1134). Die Einsatzdauer steht nur im Paneel „Zeitachse“ (eine Heimat je Zahl).
  */
+/** Die Angaben der Kopfdaten mit Vermerk, für den Paneelkopf (LLH-1834). */
+const KOPF_FELDER = [
+  'name',
+  'typ_id',
+  'funkrufname',
+  'abschnitt_id',
+  'ueber_einheit_id',
+  'fuehrer_id',
+  'soll',
+  'quali_soll',
+  'bemerkung',
+] as const;
+
 export default function EinheitKopf({
   einheit: e,
   einheiten,
@@ -121,6 +144,7 @@ export default function EinheitKopf({
   ) => (
     <InlineAngabe<string>
       etikett={etikett}
+      vermerk={e.vermerke?.[feld]}
       wert={e[feld] ?? ''}
       anzeige={
         <span style={feld === 'funkrufname' ? monoStil(13) : { whiteSpace: 'pre-wrap' }}>
@@ -136,7 +160,9 @@ export default function EinheitKopf({
           ? `${etikett} darf höchstens ${grenzeText(max)} Zeichen lang sein`
           : null
       }
-      onSpeichern={(w) => onPatch(etikett, { [feld]: leerZuNull(w) })}
+      onSpeichern={(w, { beimOeffnen }) =>
+        onPatch(etikett, { [feld]: leerZuNull(w) }, { [feld]: leerZuNull(beimOeffnen) })
+      }
       eingabe={({ feld: f, value, onChange }) =>
         mehrzeilig ? (
           <Input.TextArea
@@ -171,7 +197,12 @@ export default function EinheitKopf({
   return (
     <Paneel
       titel="Kopfdaten"
-      meta={e.nicht_uebernommen_seit != null ? <NichtUebernommenMarke /> : undefined}
+      meta={
+        <>
+          {e.nicht_uebernommen_seit != null ? <NichtUebernommenMarke /> : null}
+          <PaneelVermerk vermerk={juengsterVermerk(e.vermerke, KOPF_FELDER)} />
+        </>
+      }
       koerperPolster
     >
       <div
@@ -197,13 +228,16 @@ export default function EinheitKopf({
             <Datenfeld label="Name">
               <InlineAngabe<string>
                 etikett="Name"
+                vermerk={e.vermerke?.name}
                 wert={e.name}
                 anzeige={e.name}
                 leer={isEmptyText}
                 gleich={isSameText}
                 darfSchreiben={canEdit}
                 pflicht
-                onSpeichern={(w) => onPatch('Name', { name: w.trim() })}
+                onSpeichern={(w, { beimOeffnen }) =>
+                  onPatch('Name', { name: w.trim() }, { name: beimOeffnen.trim() })
+                }
                 eingabe={({ feld, value, onChange }) => (
                   <Input
                     {...feld}
@@ -213,15 +247,19 @@ export default function EinheitKopf({
                   />
                 )}
               />
+              <VermerkZeile vermerk={e.vermerke?.name} />
             </Datenfeld>
             <Datenfeld label="Typ">
               <InlineAngabe<number | null>
                 etikett="Typ"
+                vermerk={e.vermerke?.typ_id}
                 wert={e.typ_id ?? null}
                 anzeige={e.typ_label}
                 leer={(w) => w == null}
                 darfSchreiben={canEdit}
-                onSpeichern={(w) => onPatch('Typ', { typ_id: w })}
+                onSpeichern={(w, { beimOeffnen }) =>
+                  onPatch('Typ', { typ_id: w }, { typ_id: beimOeffnen })
+                }
                 eingabe={({ feld, popup, value, onChange }) => (
                   // Der Typkatalog ist eine Fremdquelle: fällt er aus, steht der Ausfall im Feld,
                   // statt dass die Auswahl stumm leer bleibt.
@@ -239,6 +277,7 @@ export default function EinheitKopf({
                   />
                 )}
               />
+              <VermerkZeile vermerk={e.vermerke?.typ_id} />
             </Datenfeld>
             {/* Der Rufname der Einheit, nicht eines ihrer Fahrzeuge. Leer zeigt das Meldebild
                 höchstens den Rufnamen des einzigen Fahrzeugs. */}
@@ -250,15 +289,19 @@ export default function EinheitKopf({
                 false,
                 'z. B. Florian HM 12/44',
               )}
+              <VermerkZeile vermerk={e.vermerke?.funkrufname} />
             </Datenfeld>
             <Datenfeld label="Abschnitt">
               <InlineAngabe<number | null>
                 etikett="Abschnitt"
+                vermerk={e.vermerke?.abschnitt_id}
                 wert={e.abschnitt_id ?? null}
                 anzeige={e.abschnitt_name}
                 leer={(w) => w == null}
                 darfSchreiben={canEdit}
-                onSpeichern={(w) => onPatch('Abschnitt', { abschnitt_id: w })}
+                onSpeichern={(w, { beimOeffnen }) =>
+                  onPatch('Abschnitt', { abschnitt_id: w }, { abschnitt_id: beimOeffnen })
+                }
                 eingabe={({ feld, popup, value, onChange }) => (
                   <Select<number>
                     {...feld}
@@ -274,15 +317,23 @@ export default function EinheitKopf({
                   />
                 )}
               />
+              <VermerkZeile vermerk={e.vermerke?.abschnitt_id} />
             </Datenfeld>
             <Datenfeld label="Über-Einheit">
               <InlineAngabe<number | null>
                 etikett="Über-Einheit"
+                vermerk={e.vermerke?.ueber_einheit_id}
                 wert={e.ueber_einheit_id ?? null}
                 anzeige={ueberName}
                 leer={(w) => w == null}
                 darfSchreiben={canEdit}
-                onSpeichern={(w) => onPatch('Über-Einheit', { ueber_einheit_id: w })}
+                onSpeichern={(w, { beimOeffnen }) =>
+                  onPatch(
+                    'Über-Einheit',
+                    { ueber_einheit_id: w },
+                    { ueber_einheit_id: beimOeffnen },
+                  )
+                }
                 eingabe={({ feld, popup, value, onChange }) => (
                   <Select<number>
                     {...feld}
@@ -295,6 +346,7 @@ export default function EinheitKopf({
                   />
                 )}
               />
+              <VermerkZeile vermerk={e.vermerke?.ueber_einheit_id} />
             </Datenfeld>
             {/* Herkunft (LLH-1383 D9): fest, nicht änderbar; ein Sprung ist keine Handlung. */}
             {e.nachforderung_id != null && (
@@ -315,11 +367,14 @@ export default function EinheitKopf({
             <Datenfeld label="Einheitsführer">
               <InlineAngabe<number | null>
                 etikett="Einheitsführer"
+                vermerk={e.vermerke?.fuehrer_id}
                 wert={e.fuehrer_id ?? null}
                 anzeige={e.fuehrer_name}
                 leer={(w) => w == null}
                 darfSchreiben={canEdit}
-                onSpeichern={(w) => onPatch('Einheitsführer', { fuehrer_id: w })}
+                onSpeichern={(w, { beimOeffnen }) =>
+                  onPatch('Einheitsführer', { fuehrer_id: w }, { fuehrer_id: beimOeffnen })
+                }
                 eingabe={({ feld, popup, value, onChange }) => (
                   <Select<number>
                     {...feld}
@@ -333,12 +388,14 @@ export default function EinheitKopf({
                   />
                 )}
               />
+              <VermerkZeile vermerk={e.vermerke?.fuehrer_id} />
             </Datenfeld>
             {/* BOS-Fachsprache: Soll-Stärke (Führer / Unterführer / Mannschaft). Die drei gehen in
                 EINER Anfrage: der Server verlangt alle drei oder keinen. */}
             <Datenfeld label="Soll-Stärke (F/UF/M)">
               <InlineAngabe<Staerke | null>
                 etikett="Soll-Stärke"
+                vermerk={e.vermerke?.soll}
                 wert={e.soll ?? null}
                 anzeige={
                   <span style={monoStil(13)}>
@@ -348,12 +405,21 @@ export default function EinheitKopf({
                 leer={(w) => w == null}
                 gleich={isSameStaerke}
                 darfSchreiben={canEdit}
-                onSpeichern={(w) =>
-                  onPatch('Soll-Stärke', {
-                    soll_fuehrer: w?.fuehrer ?? null,
-                    soll_unterfuehrer: w?.unterfuehrer ?? null,
-                    soll_mannschaft: w?.mannschaft ?? null,
-                  })
+                onSpeichern={(w, { beimOeffnen }) =>
+                  onPatch(
+                    'Soll-Stärke',
+                    {
+                      soll_fuehrer: w?.fuehrer ?? null,
+                      soll_unterfuehrer: w?.unterfuehrer ?? null,
+                      soll_mannschaft: w?.mannschaft ?? null,
+                    },
+                    // Der wirksame Wert beim Öffnen (eigener oder vom Typ); so prüft ihn der Server.
+                    {
+                      soll_fuehrer: beimOeffnen?.fuehrer ?? null,
+                      soll_unterfuehrer: beimOeffnen?.unterfuehrer ?? null,
+                      soll_mannschaft: beimOeffnen?.mannschaft ?? null,
+                    },
+                  )
                 }
                 eingabe={({ feld, value, onChange }) => (
                   <div role="group" id={feld.id} aria-label={feld['aria-label']}>
@@ -361,12 +427,14 @@ export default function EinheitKopf({
                   </div>
                 )}
               />
+              <VermerkZeile vermerk={e.vermerke?.soll} />
             </Datenfeld>
             {/* Qualifikationssoll (LLH-1553): ohne eigenes gilt das des Typs, mit „(Vorgabe)“.
                 Leere Zeilen gehen zurück auf den Typ. */}
             <Datenfeld label="Qualifikationssoll">
               <InlineAngabe<QualiSollZeile[]>
                 etikett="Qualifikationssoll"
+                vermerk={e.vermerke?.quali_soll}
                 wert={qualiSollEingabe(e.quali_soll)}
                 anzeige={
                   e.quali_soll_eigen
@@ -376,13 +444,20 @@ export default function EinheitKopf({
                 leer={(w) => vollstaendig(w).length === 0}
                 gleich={(a, b) => gleichesQualiSoll(vollstaendig(a), vollstaendig(b))}
                 darfSchreiben={canEdit}
-                onSpeichern={(w) => onPatch('Qualifikationssoll', { quali_soll: vollstaendig(w) })}
+                onSpeichern={(w, { beimOeffnen }) =>
+                  onPatch(
+                    'Qualifikationssoll',
+                    { quali_soll: vollstaendig(w) },
+                    { quali_soll: vollstaendig(beimOeffnen) },
+                  )
+                }
                 eingabe={({ feld, value, onChange }) => (
                   <div role="group" id={feld.id} aria-label={feld['aria-label']}>
                     <QualiSollFeld value={value} onChange={onChange} bekannt={e.quali_soll} />
                   </div>
                 )}
               />
+              <VermerkZeile vermerk={e.vermerke?.quali_soll} />
             </Datenfeld>
             <Datenfeld label="Ist (F/UF/M//Σ)">
               <IstAnzeige
@@ -396,6 +471,7 @@ export default function EinheitKopf({
             </Datenfeld>
             <Datenfeld label="Bemerkung" breit>
               {textRow('Bemerkung', 'bemerkung', EINHEIT_BEMERKUNG_MAX, true)}
+              <VermerkZeile vermerk={e.vermerke?.bemerkung} />
             </Datenfeld>
           </Datenraster>
         </div>
@@ -481,7 +557,7 @@ function StatusZeile({
         darstellung={
           hand
             ? {
-                ...statusKategorie[hand.kategorie],
+                ...kategorieDarstellung(hand.kategorie, hand.fms_anker),
                 label: s.code ? `${s.code} · ${s.wort}` : s.wort,
               }
             : null

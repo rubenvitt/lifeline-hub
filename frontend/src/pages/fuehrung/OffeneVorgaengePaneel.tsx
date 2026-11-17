@@ -325,10 +325,9 @@ export default function OffeneVorgaengePaneel({
                     ? wort('SOFORT', 'alarm')
                     : meldungsStufe(m) === 2
                       ? wort('DRINGEND', 'achtung')
-                      : wort(
-                          (MELDUNG_STATUS[m.status]?.label ?? m.status).toLowerCase(),
-                          m.status === 'neu' ? 'achtung' : null,
-                        )}
+                      : // Der Eingang („neu“) ist neutral wie das Etikett in der Liste; Dringliches
+                        // zeigen DRINGEND/SOFORT darüber (Spec `statusrollen`, eon26eat D4).
+                        wort((MELDUNG_STATUS[m.status]?.label ?? m.status).toLowerCase(), null)}
               </Link>
             );
           },

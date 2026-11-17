@@ -389,7 +389,14 @@ pub async fn disponiere_personal_tx(
         .await?;
         disposition_repo::start_zeitachse_tx(conn, einsatz_id, kontext.benutzer_id, d.id).await?;
         if let Some(e) = &einheit {
-            mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, e.id, d.id).await?;
+            mitglied_repo::zuordnen_personal_tx(
+                conn,
+                einsatz_id,
+                e.id,
+                d.id,
+                Some(kontext.benutzer_id),
+            )
+            .await?;
         }
         if let Some(f) = &fahrzeug {
             besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, f.id, d.id).await?;

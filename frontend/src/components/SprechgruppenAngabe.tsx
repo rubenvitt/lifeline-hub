@@ -121,6 +121,8 @@ export default function SprechgruppenAngabe({
       onOeffnen={() => {
         idsAtOpenRef.current = ids;
       }}
+      // Eigene Teilschritte ändern den Live-Wert schon (Teilablehnung); kein „fremder“ Hinweis.
+      ohneFremdHinweis
       onSpeichern={save}
       eingabe={({ feld, popup, value, onChange }) => (
         <SprechgruppenPicker

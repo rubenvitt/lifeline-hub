@@ -286,7 +286,7 @@ function feldAufWire<K extends PersonFeld>(feld: K, wert: PersonFeldEingabe[K]):
 /**
  * Ein Feld der Personendaten schreiben, mit Feld-CAS (design.md D1): `erwartet` ist der Wert beim
  * Öffnen (`null` = leer); weicht der gespeicherte ab, antwortet der Server mit 409 und schreibt
- * nichts. `erwartet` `undefined` schreibt ohne Vergleich („Überschreiben“ nach der Rückfrage).
+ * nichts. `erwartet` `undefined` schreibt ohne Vergleich („Meine Änderung übernehmen“ nach der Rückfrage).
  * Der Body nennt nur dieses Feld, kein anderes wird geleert; `aktualisierePerson` bleibt für den
  * Kopf (Zustand, PAT) und andere Aufrufer.
  */

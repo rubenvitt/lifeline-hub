@@ -5,7 +5,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * Kopie je Spec driftete still auseinander und machte beide Nachweise wertlos.
  */
 
-type Farbe = [number, number, number, number];
+export type Farbe = [number, number, number, number];
 
 interface Auftrag {
   /** CSS-Eigenschaft des Vordergrunds, z. B. `color`, `border-left-color` oder `box-shadow`. */

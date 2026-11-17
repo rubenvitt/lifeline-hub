@@ -401,7 +401,7 @@ describe('MeldungKarte · Eingangszustand', () => {
     );
     expect(screen.getByText('Neu').closest('[data-lfh="status-chip"]')).toHaveAttribute(
       'data-ton',
-      'achtung',
+      'neutral',
     );
 
     rerender(
@@ -437,7 +437,7 @@ describe('MeldungKarte · Eingangszustand', () => {
     // Das ETIKETT bleibt trotzdem das der neuen Meldung — nur der Rand ist vergeben.
     expect(screen.getByText('Neu').closest('[data-lfh="status-chip"]')).toHaveAttribute(
       'data-ton',
-      'achtung',
+      'neutral',
     );
   });
 

@@ -93,9 +93,10 @@ describe('VerbindungenAngabe (LLH-1134)', () => {
     await user.type(screen.getByRole('textbox', { name: 'Hinweis 1' }), 'Lagedienst');
     await user.click(screen.getByRole('button', { name: `${ETIKETT} speichern` }));
     await waitFor(() =>
-      expect(onSpeichern).toHaveBeenCalledWith([
-        { mittel: 'mobil', wert: '0511 22', hinweis: 'Lagedienst' },
-      ]),
+      expect(onSpeichern).toHaveBeenCalledWith(
+        [{ mittel: 'mobil', wert: '0511 22', hinweis: 'Lagedienst' }],
+        [],
+      ),
     );
   });
 
@@ -107,7 +108,14 @@ describe('VerbindungenAngabe (LLH-1134)', () => {
     await user.click(screen.getByRole('button', { name: 'Verbindung hinzufügen' }));
     await user.click(screen.getByRole('button', { name: `${ETIKETT} speichern` }));
     await waitFor(() =>
-      expect(onSpeichern).toHaveBeenCalledWith([{ mittel: 'fax', wert: '0511 9' }]),
+      // Zweites Argument: die Liste beim Öffnen, der Altwert des Feld-CAS (LLH-1831).
+      expect(onSpeichern).toHaveBeenCalledWith(
+        [{ mittel: 'fax', wert: '0511 9' }],
+        [
+          { mittel: 'mobil', wert: '0170 1' },
+          { mittel: 'fax', wert: '0511 9' },
+        ],
+      ),
     );
   });
 

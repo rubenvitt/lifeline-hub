@@ -2,6 +2,23 @@
 
 use super::*;
 
+/// Der Kopf-Patch ohne Altwerte und ohne Vermerk, wie ihn die Tests dieser Datei vor LLH-1831
+/// riefen (Feld-CAS und Vermerk prüfen `tests/einsatz_kopf_konflikt.rs` über die Route).
+async fn patche_kopf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    patch: KopfPatch<'_>,
+) -> Result<Einsatz, AppError> {
+    super::patche_kopf(
+        pool,
+        einsatz_id,
+        patch,
+        &crate::feld_cas::ExpectedValues::new(),
+        None,
+    )
+    .await
+}
+
 /// Kurzform für die Testfälle dieser Datei: legt einen Einsatz mit den beiden
 /// Pflichtangaben an. Einsatzart und Alarmzeit spielen hier nirgends eine Rolle —
 /// die deckt `tests/einsatz.rs` über die Route ab, wo sie auch validiert werden.

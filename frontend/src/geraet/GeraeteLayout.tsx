@@ -278,7 +278,8 @@ function NavZiel({
         textDecoration: 'none',
         fontSize: 13,
         background: isActive ? rahmenFarben.aktiv : 'transparent',
-        boxShadow: isActive ? `inset 0 3px 0 ${rahmenFarben.marke}` : 'none',
+        // Ortsmarke in der Bedienfarbe wie Rail und Modulpanel (eon26eat D7).
+        boxShadow: isActive ? `inset 0 3px 0 ${rahmenFarben.bedien}` : 'none',
         color: isActive ? rahmenFarben.text : rahmenFarben.gedaempft,
       })}
     >

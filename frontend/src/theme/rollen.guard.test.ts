@@ -164,7 +164,7 @@ const RAHMEN_ABBILDUNG: Record<keyof typeof rahmenFarben, string> = {
   gedaempft: '--lfh-rahmen-gedaempft',
   gesperrt: '--lfh-rahmen-gesperrt',
   alarm: '--lfh-rahmen-alarm',
-  marke: '--lfh-rahmen-marke',
+  bedien: '--lfh-rahmen-bedien',
 };
 
 /** Schriftstufe → Präfix der Properties (`-groesse`, `-gewicht`, `-sperrung`). */
@@ -388,7 +388,11 @@ describe('Rahmen — modusunabhängig dunkel (Neuentwurf, 21.09.2026)', () => {
     // `rahmenFarben` auf `farbenHell` umbiegt.
     expect(rahmenFarben.grund).toBe('#0c0e11');
     expect(rahmenFarben.text).toBe('#e8ebee');
-    expect(rahmenFarben.grund).toBe(farbenDunkel.kopf);
+    // Der Rahmen ist keine Inhaltsfläche: seit den vier Flächenstufen (Change
+    // `eon26eat-farbe-entlasten`, D5) hält er seine Werte selbst, statt auf `kopf`, `flaeche3`
+    // und `flaeche2` zu zeigen. #0c0e11 ist zugleich das Kopf-Schwarz von Bildmarke und PWA.
+    expect(rahmenFarben.aktiv).toBe('#16191d');
+    expect(rahmenFarben.feld).toBe('#14171b');
   });
 
   it('der Kopf-Vordergrund ist der Rahmentext — eine Vordergrundfarbe, nicht zwei', () => {

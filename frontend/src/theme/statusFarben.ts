@@ -136,9 +136,13 @@ export const personStatus: Record<PersonStatus, StatusDarstellung> = {
   abgemeldet: { label: 'abgemeldet', rolle: 'neutral' },
 };
 
-/** Übergabe ist eine aktive Beziehung, wie Material im Einsatz oder UHS-Zuordnung. */
+/**
+ * Übergabe ist eine aktive Beziehung, wie Material im Einsatz oder UHS-Zuordnung. `offen` ist der
+ * Eingang wie beim Auftrag und deshalb `neutral` (Spec `statusrollen`, eon26eat D3); Dringliches
+ * zeigt das Ausmaß.
+ */
 export const schadenStatus: Record<SchadenStatus, StatusDarstellung> = {
-  offen: { label: 'offen', rolle: 'achtung' },
+  offen: { label: 'offen', rolle: 'neutral' },
   uebergeben: { label: 'übergeben', rolle: 'bedien' },
   abgeschlossen: { label: 'abgeschlossen', rolle: 'neutral' },
 };
@@ -172,12 +176,49 @@ export const sichtung: Record<Sichtungskategorie, SichtungsDarstellung> = {
   unverletzt: { label: 'unverletzt', farbe: null },
 };
 
-/** Kräfte-Statuskategorie (Fallback-Achse für Fahrzeug- und Personalstatus). */
+/**
+ * Kräfte-Statuskategorie (Fallback-Achse für Fahrzeug- und Personalstatus).
+ *
+ * `gebunden` (auf Anfahrt, am Einsatzort, alarmiert, im Einsatz) ist Normalbetrieb und deshalb
+ * `neutral`, an JEDER Stelle (Spec `statusrollen`, Change `eon26eat-farbe-entlasten` D1). Vorher
+ * `achtung`: im laufenden Einsatz war die Kräfte-Seite fast ganz gelb. Wer den Status eines
+ * einzelnen Fahrzeugs färbt, geht über {@link fahrzeugStatusRolle}.
+ */
 export const statusKategorie: Record<StatusKategorie, StatusDarstellung> = {
   verfuegbar: { rolle: 'normal', label: 'verfügbar' },
-  gebunden: { rolle: 'achtung', label: 'gebunden' },
+  gebunden: { rolle: 'neutral', label: 'gebunden' },
   nicht_verfuegbar: { rolle: 'alarm', label: 'nicht verfügbar' },
 };
+
+/**
+ * FMS-Anker, deren Status eine Antwort verlangt: 5 Sprechwunsch, 0 Priorisierter Sprechwunsch.
+ * Ihre Bedeutung legt der Funkstandard fest, nicht der Mandant (eon26eat D2).
+ */
+const FMS_SPRECHWUNSCH: ReadonlySet<number> = new Set([5, 0]);
+
+/**
+ * Rolle des Status EINES Fahrzeugs: ein Sprechwunsch ist `achtung` (jemand muss antworten),
+ * sonst die Rolle der Kategorie. Ein Status ohne Anker bleibt bei seiner Kategorie. Zählungen
+ * nach Kategorie (Verdichtung, Verteilung) gehen nicht hier durch.
+ */
+export function fahrzeugStatusRolle(
+  kategorie: StatusKategorie,
+  fmsAnker: number | null | undefined,
+): Statusrolle {
+  if (fmsAnker != null && FMS_SPRECHWUNSCH.has(fmsAnker)) return 'achtung';
+  return statusKategorie[kategorie].rolle;
+}
+
+/**
+ * Darstellung des Status EINES Fahrzeugs oder einer Einheit aus Kategorie und FMS-Anker: das
+ * Kategorie-Etikett mit der Rolle aus {@link fahrzeugStatusRolle}. Der Aufrufer setzt `label`.
+ */
+export function kategorieDarstellung(
+  kategorie: StatusKategorie,
+  fmsAnker: number | null | undefined,
+): StatusDarstellung {
+  return { ...statusKategorie[kategorie], rolle: fahrzeugStatusRolle(kategorie, fmsAnker) };
+}
 
 /** Verfügbarkeit eines UHS-Platzes. `gesperrt` ist `neutral`, nicht `alarm`: ein bewusster
  *  Zustand, keine Gefahr. */
@@ -198,7 +239,8 @@ export const verfuegbarkeit: Record<Verfuegbarkeit, StatusDarstellung> = {
  */
 export const etbTyp: Record<EtbTyp, StatusDarstellung> = {
   meldung: { rolle: 'bedien', label: 'Meldung' },
-  anordnung: { rolle: 'achtung', label: 'Anordnung' },
+  // Ein Eintragstyp ist eine Kategorie, keine Dringlichkeit (eon26eat D3): `neutral`.
+  anordnung: { rolle: 'neutral', label: 'Anordnung' },
   lage: { rolle: 'neutral', label: 'Lage' },
   entscheidung: { rolle: 'neutral', label: 'Entscheidung' },
   system: { rolle: 'neutral', label: 'System' },
@@ -323,11 +365,12 @@ export const uebernahmeOffen: StatusDarstellung = { rolle: 'achtung', label: 'ni
 
 /**
  * Eine abgerufene, noch nicht ausgerückte Kraft im Bereitstellungsraum (LLH-1085 Teil II): sie
- * wartet auf das Ausrücken, das der Einweiser bucht. Hinweis, keine Gefahr, darum `achtung` wie
- * {@link uebernahmeOffen}. Eine einzelne Darstellung, keine Karte über einem Enum: „abgerufen“
- * leitet der Server aus dem jüngsten Belegungsereignis ab.
+ * wartet auf das Ausrücken, das der Einweiser bucht. Normalbetrieb, deshalb `neutral` (Spec
+ * `statusrollen`, eon26eat D3; vorher `achtung` wie {@link uebernahmeOffen}). Eine einzelne
+ * Darstellung, keine Karte über einem Enum: „abgerufen“ leitet der Server aus dem jüngsten
+ * Belegungsereignis ab.
  */
-export const brAbgerufen: StatusDarstellung = { rolle: 'achtung', label: 'abgerufen' };
+export const brAbgerufen: StatusDarstellung = { rolle: 'neutral', label: 'abgerufen' };
 
 /**
  * Kontamination „ja“ an einer Person (LLH-1326, Change `y18v58dt-pat-kern`, design.md D11): eine
@@ -354,11 +397,11 @@ export const transportDurch: Record<TransportDurch, StatusDarstellung> = {
  */
 export const uebergabeOffen: StatusDarstellung = { rolle: 'achtung', label: 'Übergabe offen' };
 
-/** Bewegungsart einer UHS-Belegung. */
+/** Bewegungsart einer UHS-Belegung. `austritt` ist eine Buchungsart, kein Zustand (eon26eat D3). */
 export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
   eintritt: { rolle: 'normal', label: 'Eintritt' },
   wechsel: { rolle: 'bedien', label: 'Wechsel' },
-  austritt: { rolle: 'achtung', label: 'Austritt' },
+  austritt: { rolle: 'neutral', label: 'Austritt' },
 };
 
 /** Die Rücknahme eines Austritts (LLH-1924): ein Eintritt, der keiner ist. */
@@ -541,13 +584,14 @@ export const verpflegungsstelleStatus: Record<VerpflegungsstelleStatus, StatusDa
 };
 
 /**
- * Räumungszustand eines Evakuierungsbezirks (LFH-639). „angeordnet“ und „läuft“ teilen sich
- * `achtung`; „geräumt“ ist der Sollzustand (`normal`), „aufgehoben“ ist beendet (`neutral`) und
- * zählt in der Kennzahl nicht mehr mit. Kein `bedien`: das ist eine Beziehung, kein Zustand.
+ * Räumungszustand eines Evakuierungsbezirks (LFH-639). „angeordnet“ ist `achtung`, dort muss
+ * jemand anfangen; „läuft“ ist der planmäßige Ablauf und `neutral` (Spec `statusrollen`, eon26eat
+ * D3). „geräumt“ ist der Sollzustand (`normal`), „aufgehoben“ ist beendet (`neutral`) und zählt in
+ * der Kennzahl nicht mehr mit. Kein `bedien`: das ist eine Beziehung, kein Zustand.
  */
 export const raeumungszustand: Record<Raeumungszustand, StatusDarstellung> = {
   angeordnet: { rolle: 'achtung', label: 'angeordnet' },
-  laeuft: { rolle: 'achtung', label: 'läuft' },
+  laeuft: { rolle: 'neutral', label: 'läuft' },
   geraeumt: { rolle: 'normal', label: 'geräumt' },
   aufgehoben: { rolle: 'neutral', label: 'aufgehoben' },
 };

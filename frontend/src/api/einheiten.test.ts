@@ -8,6 +8,7 @@ import {
   createEinheitAusVorlage,
   loadEinheitAusVorlage,
   patchEinheitZeichen,
+  patcheEinheit,
   uebernehmeEinheit,
   weiseEinheitAb,
 } from './einheiten';
@@ -142,5 +143,20 @@ describe('api/einheiten — Übernehmen und Abweisen (LLH-1075, design.md D10, D
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue(undefined as never);
     await weiseEinheitAb(5, 7);
     expect(send).toHaveBeenCalledWith('/api/einsaetze/5/einheiten/7/abweisen', 'POST');
+  });
+});
+
+/** Feld-CAS an der Einheit (LLH-1831): `erwartet` nur, wenn übergeben. */
+describe('patcheEinheit mit Altwert', () => {
+  it('schickt den Altwert unter `erwartet`, ohne ihn nicht', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => Promise.resolve(new Response('{}', { status: 200 })));
+    await patcheEinheit(4, 9, { bemerkung: 'Tor 5' }, { bemerkung: 'Tor 3' });
+    await patcheEinheit(4, 9, { bemerkung: 'Tor 6' });
+    const daten = (i: number) =>
+      JSON.parse(String((fetchMock.mock.calls[i][1] as RequestInit).body));
+    expect(daten(0)).toEqual({ bemerkung: 'Tor 5', erwartet: { bemerkung: 'Tor 3' } });
+    expect(daten(1)).toEqual({ bemerkung: 'Tor 6' });
   });
 });
