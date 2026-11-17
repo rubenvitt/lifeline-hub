@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Form, Input, Radio, Typography, Upload, type UploadFile } from 'antd';
+import { Alert, Button, Flex, Form, Input, Typography, Upload, type UploadFile } from 'antd';
+import { SegmentFeld } from '../components/instrument';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { spieleArchivEin, type ArchivEinspielenEingabe } from '../api/archivEinspielen';
@@ -146,10 +147,13 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
         </Upload>
       </Form.Item>
       <Form.Item name="schluesselArt" label="Privater Archiv-Schlüssel">
-        <Radio.Group optionType="button">
-          <Radio value="datei">Datei</Radio>
-          <Radio value="text">Eingefügt</Radio>
-        </Radio.Group>
+        <SegmentFeld<'datei' | 'text'>
+          beschriftung="Privater Archiv-Schlüssel"
+          optionen={[
+            { wert: 'datei', label: 'Datei' },
+            { wert: 'text', label: 'Eingefügt' },
+          ]}
+        />
       </Form.Item>
       {art === 'datei' ? (
         <Form.Item

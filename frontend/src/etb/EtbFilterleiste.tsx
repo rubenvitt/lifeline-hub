@@ -1,7 +1,6 @@
 import { Input, theme } from 'antd';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
-import { abstand } from '../theme/tokens';
 
 /**
  * Filterleiste des Einsatztagebuchs (LLH-1065, Spec `etb-filterleiste`, „Eine Filterleiste über
@@ -89,7 +88,7 @@ export default function EtbFilterleiste({ onChange, startWerte, vorn, mitte }: P
         alignItems: 'center',
         columnGap: token.margin,
         rowGap: token.marginXS,
-        marginBottom: abstand.lg,
+        marginBottom: token.marginLG,
       }}
     >
       {vorn != null && (

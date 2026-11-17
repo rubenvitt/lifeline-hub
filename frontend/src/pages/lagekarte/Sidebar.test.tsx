@@ -1011,8 +1011,8 @@ describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
    * aber mitziehen, sonst klebt der Text an der Kante.
    */
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
-    expect(bedienzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
-    expect(bedienzielStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+    expect(bedienzielStil(tokenFuer('kompakt')).padding).toBe('8px 12px');
+    expect(bedienzielStil(tokenFuer('handschuh')).padding).toBe('16px 24px');
   });
 });
 
@@ -1227,8 +1227,8 @@ describe('Sidebar: Ebenen-Zeile als Bedienziel', () => {
     expect(ebenenZeileStil(tokenFuer('kompakt')).minHeight).toBe(30);
     expect(ebenenZeileStil(tokenFuer('komfortabel')).minHeight).toBe(48);
     expect(ebenenZeileStil(tokenFuer('handschuh')).minHeight).toBe(72);
-    expect(ebenenZeileStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
-    expect(ebenenZeileStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+    expect(ebenenZeileStil(tokenFuer('kompakt')).padding).toBe('8px 12px');
+    expect(ebenenZeileStil(tokenFuer('handschuh')).padding).toBe('16px 24px');
   });
 });
 

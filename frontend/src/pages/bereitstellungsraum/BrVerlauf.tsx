@@ -11,7 +11,6 @@ import {
   PANEEL_FEHLER_TITEL,
   PANEEL_NEULADEN,
 } from '../../components/instrument/PaneelZustand';
-import { abstand } from '../../theme/tokens';
 import { verlaufText } from './brBelegungKern';
 
 interface BrVerlaufProps {
@@ -90,7 +89,7 @@ export default function BrVerlauf({ einsatzId, brId, bezeichnung }: BrVerlaufPro
   return (
     <Collapse
       data-lfh="br-verlauf"
-      style={{ marginTop: abstand.lg }}
+      style={{ marginTop: token.marginLG }}
       activeKey={isOpen ? ['verlauf'] : []}
       onChange={(keys) => setOpen((Array.isArray(keys) ? keys : [keys]).includes('verlauf'))}
       items={[

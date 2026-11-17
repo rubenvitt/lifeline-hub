@@ -1,4 +1,4 @@
-import { App, Button, Form, Input, Space, Typography } from 'antd';
+import { App, Button, Form, Input, Space, Typography, theme } from 'antd';
 import { useEffect, useReducer } from 'react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -10,7 +10,6 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { serverJetzt } from '../offline/serveruhr';
 import { SCHNELLWAHL_TERMIN, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
-import { abstand } from '../theme/tokens';
 import type { EtbEintragAnzeige } from '../api/types';
 
 const { TextArea } = Input;
@@ -64,6 +63,7 @@ export default function WiedervorlageModal({
   naechsteLagebesprechungAt?: string | null;
 }) {
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const [form] = Form.useForm<FormWerte>();
   const [zeitPruefung, pruefeZeit] = useReducer((wert: number) => wert + 1, 0);
@@ -141,13 +141,13 @@ export default function WiedervorlageModal({
       >
         <Input />
       </Form.Item>
-      <Form.Item label="Fällig am" required style={{ marginBottom: abstand.md }}>
+      <Form.Item label="Fällig am" required style={{ marginBottom: token.margin }}>
         {/*
           Die Schnellwahl steht ÜBER dem Feld, in demselben `Form.Item`: sie ist eine
           Vorbelegung desselben Wertes, kein eigenes Feld — das Budget bleibt bei drei
           (LFH-19). Das Zeitfeld darunter trägt weiter den freien Fall.
         */}
-        <Space wrap style={{ marginBottom: abstand.sm }}>
+        <Space wrap style={{ marginBottom: token.marginSM }}>
           <Typography.Text type="secondary">Schnellwahl</Typography.Text>
           {SCHNELLWAHL.map((s) => (
             <Button

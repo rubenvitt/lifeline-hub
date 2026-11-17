@@ -794,7 +794,7 @@ describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH
    * polstert der Kartenkopf selbst.
    */
   it('trägt neben der Höhe eine mitziehende senkrechte Polsterung', () => {
-    expect(kartenTitelStil(tokenFuer('kompakt')).padding).toBe('7px 0');
+    expect(kartenTitelStil(tokenFuer('kompakt')).padding).toBe('8px 0');
     expect(kartenTitelStil(tokenFuer('handschuh')).padding).toBe('16px 0');
   });
 });

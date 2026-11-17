@@ -370,7 +370,7 @@
    `--lfh-filter-ziel` (`filterKopfStil` in `KatalogTabelle.tsx`), 24 / 48 / 72 px. Er ragt um
    die Kopfzellen-Polsterung (`--lfh-filter-einzug`) nach oben und unten, so wächst der Kopf nur
    auf die Steuerhöhe. Rechts kein negativer Rand wie bei antd: die volle Zellpolsterung
-   (11 / 18 / 26 px) trennt ihn von der nächsten, oft sortierbaren Kopfzelle. Den Fokusring
+   (12 / 20 / 24 px) trennt ihn von der nächsten, oft sortierbaren Kopfzelle. Den Fokusring
    nach innen versetzt, wie `.lfh-segment`. */
 .ant-table-wrapper.lfh-katalog .ant-table-thead .ant-table-filter-trigger {
   box-sizing: border-box;
@@ -387,7 +387,7 @@
 /* Sortierbare Kopfzelle (LLH-1273, Kriterium 2). antd hängt den Klick an die ganze Zelle samt
    Polsterung, zwei sortierbare Köpfe stießen deshalb ohne Lücke aneinander. Ziel ist hier nur ihr
    Inhalt (`.ant-table-column-sorters`, mit Filter auch der Auslöser); einen Klick in die Polsterung
-   (11 / 18 / 26 px je Seite) hält `polsterKlickRiegel` in `KatalogTabelle.tsx` an, der Zeiger zeigt
+   (12 / 20 / 24 px je Seite) hält `polsterKlickRiegel` in `KatalogTabelle.tsx` an, der Zeiger zeigt
    dort keine Hand. `position` fängt antds Klickfläche `::after` (`inset: 0`) im Inhalt statt in
    der Zelle. Senkrecht reicht der Inhalt bis an den Zellrand, mindestens auf die Steuerhöhe
    (`--lfh-sortier-ziel`, 30 / 48 / 72 px, `sortierKopfStyle`), wie der Filter-Auslöser um den

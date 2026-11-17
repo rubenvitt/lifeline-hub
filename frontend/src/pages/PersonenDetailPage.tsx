@@ -63,6 +63,7 @@ import {
   type ZeilenGrund,
 } from '../components/useZeilenFehler';
 import { registrierNummer } from '../anzeige/registrierNummer';
+import { flaeche } from '../theme/tokens';
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
@@ -331,7 +332,7 @@ export default function PersonenDetailPage() {
 
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

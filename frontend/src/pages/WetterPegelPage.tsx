@@ -22,6 +22,7 @@ import {
 } from '../wetter/WetterPaneele';
 import { teileWarnungen } from '../wetter/wetterStand';
 import { modulName } from '../einsatz/modulRegistry';
+import { flaeche } from '../theme/tokens';
 
 /** „1 Warnung" · „n Warnungen" (Seitenkopf). Rein. */
 export function warnungenMeta(n: number): string {
@@ -120,7 +121,7 @@ export default function WetterPegelPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

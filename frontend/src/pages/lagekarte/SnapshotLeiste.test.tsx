@@ -498,14 +498,14 @@ describe('SnapshotLeiste — zwei Gruppen, Abstände aus der Staffel (LFH-899)',
 
   it('Gruppenlücke `margin`, Lücke in der Gruppe `marginSM`, Polsterung `paddingSM`', () => {
     const s = bandStile(HANDSCHUH);
-    // Literale statt Rechnung: 26 / 16 / 16 ist die Handschuh-Stufe aus `theme/tokens.ts`.
-    expect(s.band.gap).toBe(26);
+    // Literale statt Rechnung: 24 / 16 / 16 ist die Handschuh-Stufe aus `theme/tokens.ts`.
+    expect(s.band.gap).toBe(24);
     expect(s.band.padding).toBe(16);
     expect(s.wiedergabe.gap).toBe(16);
     expect(s.stand.gap).toBe(16);
     expect(s.schieber.marginInline).toBe(16);
     // Gegenprobe: die Abstände wachsen mit der Stufe.
-    expect(bandStile(KOMPAKT).band.padding).toBe(7);
+    expect(bandStile(KOMPAKT).band.padding).toBe(8);
   });
 
   it('jede Gruppe bleibt in einer Zeile, das Band bricht zwischen den Gruppen um', () => {

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -12,13 +12,19 @@ import {
 } from '../scripts/design-system/tokens';
 import { cleanDoc, docBefore, firstSentence, memberDocs } from '../scripts/design-system/jsdoc';
 import {
+  abdeckung,
+  BAUSTEINWAHL_HEAD,
   buildReadme,
   cutBullet,
   cutSection,
   DESIGN_SYSTEM_COMMAND,
+  kartenDerBausteinwahl,
+  ohneVerweise,
+  pruefeOhneTicket,
   README_RULES,
   README_SECTIONS,
 } from '../scripts/design-system/readme';
+import { PREVIEWS } from '../scripts/design-system/previews';
 import {
   checkComponentReadme,
   checkFonts,
@@ -182,15 +188,19 @@ describe('Regelabschnitte aus frontend/AGENTS.md', () => {
 
 describe('README des Design Systems', () => {
   const prozessRegel = 'Größere UI-Entwürfe über das Design System';
-  // Der Ablauf steht als Spiegelstrich im ersten Abschnitt, der Gestaltungssprache.
+  // Der Ablauf steht als Spiegelstrich im Abschnitt, dessen `skip` ihn nennt (Gestaltungssprache).
+  const mitAblauf = README_SECTIONS.findIndex((s) => s.skip?.includes(prozessRegel));
   const agents = README_SECTIONS.map(({ head }, i) =>
     [
       `${head} (Kopfzeile)`,
       '',
-      ...(i === 0
+      ...(i === mitAblauf
         ? [
             `- **${prozessRegel}** (Ruben): Ablauf für Agenten,`,
             '  Veröffentlichen nach dem Merge.',
+            ...(README_SECTIONS[i].skip ?? [])
+              .filter((kopf) => kopf !== prozessRegel)
+              .map((kopf) => `- **${kopf}**: ohne Gestaltungsbezug.`),
             '',
           ]
         : []),
@@ -208,6 +218,22 @@ describe('README des Design Systems', () => {
     expect(readme).toContain('**Gestaltungsregel**');
     expect(readme).not.toContain(prozessRegel);
     expect(readme).not.toContain('Veröffentlichen nach dem Merge');
+    expect(readme).not.toContain('ohne Gestaltungsbezug');
+  });
+
+  it('bricht ab, wenn nach dem Filter ein Verweis übrig bleibt, auch über einen Umbruch', () => {
+    expect(() => pruefeOhneTicket('Satz.\nseit LLH-12 so.\n')).toThrow(/README.md:2/);
+    expect(() => pruefeOhneTicket('Satz\n(Spec\n `x`).\n')).toThrow(/README.md:2/);
+    expect(() => pruefeOhneTicket('Satz.\nHerleitung: `openspec/changes/a`.\n')).toThrow(
+      /README.md:2/,
+    );
+    expect(() => pruefeOhneTicket('Satz ohne.\n')).not.toThrow();
+  });
+
+  it('beginnt mit der Bausteinwahl, vor der Liste der Karten', () => {
+    const koepfe = readme.split('\n').filter((z) => z.startsWith('## '));
+    expect(koepfe[0]).toBe(`## ${README_SECTIONS[0].title}`);
+    expect(koepfe.indexOf('## Bausteine')).toBeGreaterThan(0);
   });
 
   it('trägt die einzelnen Regeln aus anderen Abschnitten (Zeitdarstellung, LLH-1053)', () => {
@@ -321,5 +347,120 @@ describe('Ausgabe im Format des Typs', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('Bausteinwahl und Karten (Spec `design-system-artifact`, LLH-1807)', () => {
+  const tabelle = [
+    BAUSTEINWAHL_HEAD,
+    '',
+    'Einleitung.',
+    '',
+    '| Bedarf | Baustein | Karte |',
+    '| --- | --- | --- |',
+    '| **Rahmen** | | |',
+    '| Fläche | `Paneel` | `Paneel` |',
+    '| Lagebild | Dashboard | `Dashboard`, `DashboardListen` |',
+    '| Navigation | `IconRail` | — |',
+    '',
+    '## Frontend — Nächstes',
+  ].join('\n');
+
+  it('liest die Karten aus der dritten Spalte, ohne Gruppenzeilen und Striche', () => {
+    expect(kartenDerBausteinwahl(tabelle)).toEqual(['Paneel', 'Dashboard', 'DashboardListen']);
+  });
+
+  it('meldet eine Karte ohne Bausteinwahl und einen Verweis ohne Karte', () => {
+    expect(abdeckung(['Paneel'], ['Paneel', 'Knopf'])).toEqual([
+      'Karte „Knopf“ fehlt in der Bausteinwahl von frontend/AGENTS.md',
+    ]);
+    expect(abdeckung(['Paneel', 'Weg'], ['Paneel'])).toEqual([
+      'Bausteinwahl nennt die Karte „Weg“, die es im Design System nicht gibt',
+    ]);
+    expect(abdeckung(['Paneel'], ['Paneel', 'Cover'])).toEqual([]);
+  });
+
+  it('Bausteinwahl und PREVIEWS sind deckungsgleich', () => {
+    const agents = readFileSync(
+      join(process.cwd().replace(/\/frontend$/, ''), 'frontend', 'AGENTS.md'),
+      'utf8',
+    );
+    const meldungen = abdeckung(
+      kartenDerBausteinwahl(agents),
+      PREVIEWS.map((p) => p.name),
+    );
+    expect(meldungen, meldungen.join('\n')).toEqual([]);
+  });
+
+  it('die README beginnt mit der Bausteinwahl', () => {
+    expect(README_SECTIONS[0].head).toBe(BAUSTEINWAHL_HEAD);
+  });
+});
+
+describe('Verweise fallen aus der README (Spec `design-system-artifact`)', () => {
+  it('streicht reine Verweisklammern samt Leerzeichen davor', () => {
+    expect(ohneVerweise('- **Gesperrt** (LLH-1233): gesperrte Knöpfe.')).toBe(
+      '- **Gesperrt**: gesperrte Knöpfe.',
+    );
+    expect(ohneVerweise('Rolle (LFH-652, Spec `textkontrast-rollen`) gilt.')).toBe('Rolle gilt.');
+    expect(ohneVerweise('Satz (LFH-618, `docs/superpowers/specs/x.md`).')).toBe('Satz.');
+    expect(ohneVerweise('Kopf (y3zh5ymv D7, löst LFH-965 D1 ab) weiter.')).toBe('Kopf weiter.');
+    expect(ohneVerweise('Neu (Epic LFH-606…617) hier.')).toBe('Neu hier.');
+    expect(ohneVerweise('Wort (LLH-1722, D2).')).toBe('Wort.');
+    expect(ohneVerweise('Staffel (LFH-328 · A2) gilt.')).toBe('Staffel gilt.');
+    expect(ohneVerweise('Platz 1\n  (LFH-606), Rückmeldung')).toBe('Platz 1, Rückmeldung');
+    expect(ohneVerweise('Wert (`f()`, LFH-593:\n  Ebenen-Identität)')).toBe(
+      'Wert (`f()`, Ebenen-Identität)',
+    );
+    expect(ohneVerweise('Text (früher „A (noch 2)“, jetzt im ⋮; LLH-1722)')).toBe(
+      'Text (früher „A (noch 2)“, jetzt im ⋮)',
+    );
+    // Eine Umkehr mit Datum und dem umgekehrten Ticket ist Historie.
+    expect(
+      ohneVerweise(
+        '- **Der Zoom ist frei** (LLH-1774, Spec `schriftskala`; umgekehrt\n  15.11.2026 gegenüber LLH-1328 „Kein Zoom wie in einer App“): der Viewport',
+      ),
+    ).toBe('- **Der Zoom ist frei**: der Viewport');
+  });
+
+  it('behält den Inhalt gemischter Klammern', () => {
+    expect(ohneVerweise('Band (über einer Liste, Achtungsrolle, LLH-1071) steht.')).toBe(
+      'Band (über einer Liste, Achtungsrolle) steht.',
+    );
+    expect(ohneVerweise('Zahl (offen, je Stufe, überfällig; LLH-1145).')).toBe(
+      'Zahl (offen, je Stufe, überfällig).',
+    );
+    expect(ohneVerweise('Ort (`lfh-ortspfad--einsatz`, LLH-1728) bleibt.')).toBe(
+      'Ort (`lfh-ortspfad--einsatz`) bleibt.',
+    );
+    expect(
+      ohneVerweise(
+        'Kopf (LLH-1139, Spec `formularseiten`, „Eine offene Bearbeitung“; schreibt LFH-19 und LFH-979 fort)',
+      ),
+    ).toBe('Kopf');
+  });
+
+  // Review vor dem PR (LLH-1807): Wörter aus acht Kleinbuchstaben sind keine Zunder-Kennung.
+  it('hält ein Wort aus acht Buchstaben nicht für eine Kennung', () => {
+    expect(ohneVerweise('Höhe (gemessen, Oberkante im Fenster)')).toBe(
+      'Höhe (gemessen, Oberkante im Fenster)',
+    );
+    expect(ohneVerweise('Kopf (zjt7c073 D2) klebt.')).toBe('Kopf klebt.');
+    expect(ohneVerweise('Wahl (gyidpati D2) gilt.')).toBe('Wahl gilt.');
+  });
+
+  it('erkennt Spec- und Herleitungsverweise auch über einen Zeilenumbruch', () => {
+    expect(
+      ohneVerweise('Zone (Spec\n  `benachrichtigungen`, Herleitung\n  `openspec/x.md`) bleibt.'),
+    ).toBe('Zone bleibt.');
+    expect(ohneVerweise('Zone (Spec\n  `x`, „Anforderung“) bleibt.')).toBe('Zone bleibt.');
+    expect(ohneVerweise('Regel gilt. Herleitung: `openspec/changes/archive/x/design.md`.')).toBe(
+      'Regel gilt.',
+    );
+  });
+
+  it('lässt Klammern ohne Verweis und Text ohne Klammer unverändert', () => {
+    const satz = 'Zahlen (Mono, `tabular-nums`) und Ränder.';
+    expect(ohneVerweise(satz)).toBe(satz);
   });
 });

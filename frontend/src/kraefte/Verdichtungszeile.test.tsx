@@ -140,7 +140,7 @@ describe('Meldebild-Link — Bedienziel auf der Dichte-Staffel (LFH-515)', () =>
 
   /** ZWEI Angaben, und die Polsterung liegt auf BEIDEN Achsen (hier polstert niemand sonst). */
   it('trägt neben der Höhe eine mitziehende Polsterung auf beiden Achsen', () => {
-    expect(verdichtungsLinkStil(tokenFuer('kompakt')).padding).toBe('7px');
+    expect(verdichtungsLinkStil(tokenFuer('kompakt')).padding).toBe('8px');
     expect(verdichtungsLinkStil(tokenFuer('handschuh')).padding).toBe('16px');
   });
 

@@ -1,6 +1,15 @@
 import { Breadcrumb, Button, Flex, Space, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState, type Key, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type Key,
+  type ReactNode,
+} from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AbrufZustand } from '../api/abrufZustand';
@@ -73,7 +82,9 @@ import { skizzenRechte, useSkizzenAktionen } from '../fernmeldewesen/useSkizzenA
 import { useNetzQuellen, useQuelle } from '../fernmeldewesen/useNetzQuellen';
 import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { modulName } from '../einsatz/modulRegistry';
-import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
+import FernmeldewesenReiter, {
+  FERNMELDEWESEN_REITER,
+} from '../fernmeldewesen/FernmeldewesenReiter';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './funkplanPrint.css';
 import { isUebung } from '../einsatz/einsatzart';
@@ -578,6 +589,7 @@ function SkizzenBereich({
 }
 
 export default function FunkplanPage() {
+  const reiterflaecheId = useId();
   const { id } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
@@ -900,11 +912,15 @@ export default function FunkplanPage() {
           aktiv={ansicht}
           onDarstellung={setzeAnsicht}
           className="funkplan-no-print"
+          flaecheId={reiterflaecheId}
         />
         {/* Das Blatt: Druckkopf, Lücken und Darstellung. In der Skizze trägt es die Klasse des
             Papierformats (A3/A4 quer, `fernmeldewesen/skizze/skizzeDruck.css`); die Anlage steht dahinter. */}
         <div
           ref={blatt}
+          role="tabpanel"
+          id={reiterflaecheId}
+          aria-label={FERNMELDEWESEN_REITER.find((r) => r.key === ansicht)?.label}
           data-lfh="funkplan-blatt"
           className={ansicht === 'skizze' ? skizzenDruckKlasse(druckFormat) : undefined}
         >

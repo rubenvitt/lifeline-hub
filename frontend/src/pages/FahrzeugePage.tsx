@@ -78,7 +78,6 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
 import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
 import StatusTag from '../components/StatusTag';
@@ -121,10 +120,11 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
  * zweite Kanal, nicht die Farbe.
  */
 function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll: Staerke | null }) {
+  const { token } = theme.useToken();
   const ist = besatzungsStaerke(crew);
   const urteil = besatzungsUrteilVon(crew.length, ist, soll);
   return (
-    <Space size={abstand.sm} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
+    <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <StatusTag darstellung={besatzungsUrteil[urteil]} />
       <span style={schriftStil('meta')}>
         {urteil !== 'nicht_erfasst' && (
@@ -195,10 +195,11 @@ function BesatzungsBlock({
    */
   unbekannt?: string;
 }) {
+  const { token } = theme.useToken();
   if (gesperrt || unbekannt) {
     return (
       <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
-        <Space size={abstand.sm}>
+        <Space size={token.marginSM}>
           <Typography.Text type="secondary">Besatzung</Typography.Text>
           <Typography.Text
             type="secondary"
@@ -214,13 +215,13 @@ function BesatzungsBlock({
   const frei = personal.filter((p) => p.fahrzeug_id == null);
   return (
     <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
-      <Space size={abstand.sm} style={{ marginBottom: abstand.sm }}>
+      <Space size={token.marginSM} style={{ marginBottom: token.marginSM }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
         <BesatzungsStaerkeBadge crew={crew} soll={ef.soll_besatzung ?? null} />
       </Space>
       {darfSchreiben && uebernehmen && (
         // Gesperrt steht der Grund sichtbar daneben, nicht nur im Tooltip (D12).
-        <Space size={abstand.sm} wrap style={{ display: 'flex', marginBottom: abstand.sm }}>
+        <Space size={token.marginSM} wrap style={{ display: 'flex', marginBottom: token.marginSM }}>
           <Button disabled={uebernehmen.kandidaten === 0} onClick={uebernehmen.onOeffnen}>
             Personal der Einheit übernehmen
           </Button>
@@ -250,7 +251,7 @@ function BesatzungsBlock({
                 size="middle"
                 style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
               >
-                <Space size={abstand.sm} wrap>
+                <Space size={token.marginSM} wrap>
                   <span>{m.name}</span>
                   {angabe && <Typography.Text type="secondary">{angabe}</Typography.Text>}
                   {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
@@ -286,7 +287,7 @@ function BesatzungsBlock({
         />
       )}
       {zuordnenFehler && (
-        <div style={{ maxWidth: 420, marginTop: abstand.sm }}>
+        <div style={{ maxWidth: 420, marginTop: token.marginSM }}>
           <SpeicherFehler
             fehler={zuordnenFehler.fehler}
             titel="Nicht zugeordnet"
@@ -1094,7 +1095,7 @@ function FahrzeugeInhalt() {
       }
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
         // `paddingXS` ließ 3 / 5 / 7 px.
         <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
@@ -1151,7 +1152,7 @@ function FahrzeugeInhalt() {
           An `darfSchreiben` gekoppelt: wer nur liest, sieht `StatusBadge` aus den Zeilendaten
           und verliert nichts. */}
       {darfSchreiben && (statusQuery.isError || statusFehler.gescheitert) && (
-        <div style={{ marginBottom: abstand.md }}>
+        <div style={{ marginBottom: token.margin }}>
           <SeitenFehler
             text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
             ursache={statusFehler.fehler}
@@ -1269,7 +1270,7 @@ function FahrzeugeInhalt() {
                     {materialFrei && (
                       <div
                         data-lfh="beladung-block"
-                        style={{ paddingLeft: 8, marginTop: abstand.md }}
+                        style={{ paddingLeft: 8, marginTop: token.margin }}
                       >
                         <MaterialAmOrt
                           einsatzId={einsatzId}

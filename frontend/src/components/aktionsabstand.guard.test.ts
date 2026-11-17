@@ -4,12 +4,12 @@
  *
  * ── Warum ───────────────────────────────────────────────────────────────────────
  * Der Vorgabe-Abstand eines `<Space>` ist hier NICHT antds 8 px: antd mappt
- * `spaceGapSmallSize` auf `token.paddingXS`, und `theme/tokens.ts` setzt das auf `abstand.xs` =
- * 3/5/7 px. Drei Pixel zwischen einem neutralen und einem roten Knopf sind im Handschuh-Betrieb
+ * `spaceGapSmallSize` auf `token.paddingXS`, und `theme/tokens.ts` setzt das auf Raster `xs` =
+ * 4/4/8 px. Vier Pixel zwischen einem neutralen und einem roten Knopf sind im kompakten Betrieb
  * keine Trennung.
  *
- * `size="middle"` führt auf `token.padding` = `abstand.md` = 11/18/26 px und liegt in JEDER
- * Stufe über `token.marginSM` (`abstand.sm` = 7/11/16). Der Test unten beweist diese Ordnung aus
+ * `size="middle"` führt auf `token.padding` = `abstand.md` = 12/20/24 px und liegt in JEDER
+ * Stufe über `token.marginSM` (`abstand.sm` = 8/12/16). Der Test unten beweist diese Ordnung aus
  * `theme/tokens.ts` heraus.
  *
  * ── Warum Quelltext und nicht Pixel ─────────────────────────────────────────────
