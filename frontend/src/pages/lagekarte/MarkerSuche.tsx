@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Input, Typography, theme } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
-import { SegmentUmschalter, useRollen, zahlStil } from '../../components/instrument';
+import { monoStil, SegmentUmschalter, useRollen } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { erkenneKoordinate } from '../../anzeige/koordinatenErkennung';
 import {
@@ -210,7 +210,7 @@ export default function MarkerSuche({
   const ortEintrag = (ort: GefundenerOrt) => (
     <ListenEintrag style={bedienzielStil(token)} onClick={() => ortssuche?.onOrtWaehlen(ort)}>
       {ort.art === 'koordinate' ? (
-        <span style={zahlStil('text')}>{ort.beschriftung}</span>
+        <span style={monoStil(token.fontSize)}>{ort.beschriftung}</span>
       ) : ort.ausOfflineKarte ? (
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ overflowWrap: 'anywhere' }}>{ort.beschriftung}</span>
@@ -392,9 +392,7 @@ function ObjektZeile({
         </>
       ) : eintrag.typ === 'fahrzeug' ? (
         // Funkrufnamen immer Mono (Gestaltungssprache).
-        <span data-schrift="kennung" style={zahlStil('text')}>
-          {eintrag.label}
-        </span>
+        <span style={monoStil(token.fontSize)}>{eintrag.label}</span>
       ) : (
         eintrag.label
       )}

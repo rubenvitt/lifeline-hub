@@ -1,6 +1,6 @@
 import { Button, Flex, Popconfirm, Space, Typography } from 'antd';
 import { useMemo } from 'react';
-import { StatusChip, useRollen, schriftGroesse, schriftStil } from '../components/instrument';
+import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
@@ -26,12 +26,7 @@ export function Quittungsstand({ anzahl, quittiert }: { anzahl: number; quittier
   return (
     <Text
       type="secondary"
-      style={{
-        ...schriftStil('meta'),
-        fontSize: schriftGroesse('fein'),
-        color: rollen.gedaempft,
-        whiteSpace: 'nowrap',
-      }}
+      style={{ ...monoStil(11), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
     >
       {anzahl} Empfänger · {quittiert}/{anzahl} quittiert
     </Text>
@@ -116,7 +111,7 @@ export default function EmpfaengerQuittung({
           ))}
           {/* „+n" zählt nur verborgene QUITTIERTE — das ✓ sagt es ohne Farbe (WCAG 1.4.1). */}
           {restQuittierte > 0 && (
-            <Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
               +{restQuittierte} ✓
             </Text>
           )}
@@ -128,10 +123,7 @@ export default function EmpfaengerQuittung({
          quittiert, steht im zugänglichen Namen. */}
       {offene.length > 0 && (
         <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
-          <Text
-            type="secondary"
-            style={{ fontSize: schriftGroesse('klein'), whiteSpace: 'nowrap' }}
-          >
+          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
             {offenLabel}
           </Text>
           {offene.map((e) => {
@@ -147,7 +139,7 @@ export default function EmpfaengerQuittung({
             );
             return (
               <Space key={e.id} size={4}>
-                <Text style={{ fontSize: schriftGroesse('text') }}>{e.name}</Text>
+                <Text style={{ fontSize: 13 }}>{e.name}</Text>
                 {canQuittieren &&
                   (canQuittierenFor?.(e.id) ?? true) &&
                   (rueckfrage ? (

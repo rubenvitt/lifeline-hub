@@ -1,6 +1,6 @@
 import { Button } from 'antd';
 import { IconHaken } from '../icons';
-import { useRollen, schriftGroesse, schriftStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import { statusFlaeche } from '../components/instrument/statusFlaeche';
 import type { PufferZustand } from './zeitachseModell';
 
@@ -28,7 +28,7 @@ export default function EtbSendestatus({ puffer, onSprung }: Props) {
           display: 'inline-flex',
           alignItems: 'center',
           gap: token.marginXXS,
-          fontSize: schriftGroesse('klein'),
+          fontSize: 12,
           color: rollen.normalText,
           whiteSpace: 'nowrap',
         }}
@@ -55,7 +55,7 @@ export default function EtbSendestatus({ puffer, onSprung }: Props) {
       data-zustand={puffer.art}
       title="Zu den vorgemerkten Einträgen"
       onClick={onSprung}
-      style={{ background: f.grund, color: f.text, ...schriftStil('meta'), fontWeight: 500 }}
+      style={{ background: f.grund, color: f.text, ...monoStil(12, 500) }}
     >
       {text}
     </Button>

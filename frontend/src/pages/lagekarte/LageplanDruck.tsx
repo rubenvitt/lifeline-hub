@@ -13,12 +13,6 @@ import {
   type LegendenZone,
 } from './lageplan';
 import type { LageplanBlatt } from './useLageplan';
-
-/**
- * Das „N“ im Nordpfeil des Druckblatts: Teil des Zeichens in dessen eigenem 40er-Maßstab, auf
- * Papier; nicht die Bildschirmskala (Spec `schriftskala` nimmt den Druck aus).
- */
-const NORDPFEIL_SCHRIFT = 9;
 import './lageplanDruck.css';
 
 /** CSS-Pixel je Millimeter (96 dpi). */
@@ -57,14 +51,7 @@ function Nordpfeil({ peilung }: { peilung: number }) {
       <circle cx="20" cy="20" r="18" fill="white" stroke="currentColor" strokeWidth="1.5" />
       <g transform={`rotate(${nordpfeilDrehung(peilung)} 20 20)`}>
         <path d="M20 4 L26 24 L20 20 L14 24 Z" fill="currentColor" />
-        <text
-          x="20"
-          y="33"
-          textAnchor="middle"
-          fontSize={NORDPFEIL_SCHRIFT}
-          fontWeight="700"
-          fill="currentColor"
-        >
+        <text x="20" y="33" textAnchor="middle" fontSize="9" fontWeight="700" fill="currentColor">
           N
         </text>
       </g>
