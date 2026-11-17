@@ -29,7 +29,7 @@
 
 ## 6. Integration
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; e2e `lagemeldungen.spec.ts` einzeln grün
+- [x] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; e2e `lagemeldungen.spec.ts` einzeln grün
 
 ## Workflow follow-up
 
