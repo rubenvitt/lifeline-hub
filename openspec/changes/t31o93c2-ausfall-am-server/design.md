@@ -108,7 +108,11 @@ als leere Liste. `alarmAusMonitor` macht daraus
 Quelle `null`. Der Monitor meldet sich dann nicht als unvollständig, wie bisher.
 
 Rechte: Der Block prüft wie bisher keine Modulrechte (Change `kcjecn9e`, D12). Er trägt nur
-Einheitsbezeichnungen, wie schon bei der Rückmeldung. Lagebild für Externe und API v1 nutzen
+Einheitsbezeichnungen, wie schon bei der Rückmeldung. Auch die Modulfreigaben des Einsatzes
+beachtet er nicht, wie bei allen übrigen Arten des Blocks: Ist etwa das Modul Material im
+Einsatz ausgeblendet, fehlt der Material-Ausfall in Überblick und Lagebild, auf dem Monitor
+steht er (Review 17.11.2026). „Gleiche Einheiten wie im Überblick“ gilt deshalb bei voller
+Freigabe. Ob der ganze Block ausgeblendete Module weglassen soll, ist eine eigene Aufgabe. Lagebild für Externe und API v1 nutzen
 `verdichte` ohne `alarm` und bleiben unverändert.
 
 ## Risks / Trade-offs
