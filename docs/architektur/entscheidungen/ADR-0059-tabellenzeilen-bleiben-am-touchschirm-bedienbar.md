@@ -12,7 +12,7 @@ gilt_fuer:
   - frontend/src/components/kopfBreite.ts
   - frontend/src/components/angabeForm.tsx
 herleitung:
-  - openspec/changes/archive/2026-11-16-lsug0joq-tabellen-touch/design.md
+  - openspec/changes/archive/2026-11-17-lsug0joq-tabellen-touch/design.md
 ---
 
 # ADR-0059: Tabellenzeilen bleiben am Touchschirm bedienbar, die Primitive tragen es
