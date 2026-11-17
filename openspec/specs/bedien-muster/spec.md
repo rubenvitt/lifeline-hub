@@ -66,9 +66,13 @@ davor herstellt, sonst MUST es eine Rückfrage zeigen.
 - **WHEN** die Fahrzeugliste am Handy als Karten erscheint
 - **THEN** trägt keine Karte einen Knopf „Entlassen“, und „Entlassen“ steht in ihrem ⋮
 
+#### Scenario: Person entlassen und Rückgängig
+- **WHEN** jemand auf der Detailseite einer Person „Entlassen“ wählt und im Hinweis „Rückgängig“
+- **THEN** wirkt das Entlassen ohne Rückfrage, und die Person steht wieder mit ihren Bindungen da; was nicht zurückkam, nennt der Seitenhinweis in Worten
+
 #### Scenario: Bekannte Lücke bei Personal und Material
-- **WHEN** eine Person entlassen oder ein Posten aus dem Einsatz genommen wird
-- **THEN** wirkt es bis zur Nachrüstung ihres Rückwegs ohne Rückfrage, und „Rückgängig“ macht die Kraft wieder aktiv, ohne ihre Bindungen herzustellen
+- **WHEN** ein Posten aus dem Einsatz genommen wird
+- **THEN** wirkt es bis zur Nachrüstung seines Rückwegs ohne Rückfrage, und „Rückgängig“ macht den Posten wieder aktiv, ohne seinen Ort herzustellen; bei der Person ist die Lücke geschlossen (Szenario „Person entlassen und Rückgängig“)
 
 ### Requirement: Ein Gebilde auflösen oder schließen
 

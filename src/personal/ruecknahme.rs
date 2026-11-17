@@ -1,5 +1,5 @@
 //! Rücknahme der Entlassung einer Person (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer
-//! Person zurücknehmen“; `openspec/changes/u131h4rq-personal-entlassung-zuruecknehmen/design.md`).
+//! Person zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`).
 //! Vorbild ist die Rücknahme beim Fahrzeug (`fahrzeug::disposition_repo::zuruecknehmen_tx`);
 //! dazu kommen die Zeitachse und die Rollen außerhalb der eigenen Zeile.
 

@@ -16673,7 +16673,7 @@
       },
       "PersonalEntlassungVorzustand": {
         "type": "object",
-        "description": "Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer\nPerson zurücknehmen“; `openspec/changes/u131h4rq-personal-entlassung-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das\nEntlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.",
+        "description": "Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer\nPerson zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das\nEntlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.",
         "required": [
           "entlassen_at"
         ],

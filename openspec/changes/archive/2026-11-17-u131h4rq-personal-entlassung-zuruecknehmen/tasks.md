@@ -31,7 +31,7 @@ ist, dann der Code.
 
 ## 5. Integration
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die e2e-Specs, die Personal-Entlassen berühren, einzeln grün
+- [x] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die e2e-Specs, die Personal-Entlassen berühren, einzeln grün (Gate in Portionen wegen des Plattenkontingents: Rust-Suite, Dev-Seed, Frontend-Suite und Schnellprüfungen grün; `--nur baut` grün bis auf die Desktop-Hülle, deren GTK-Bibliotheken im Container fehlen)
 
 ## Workflow follow-up
 

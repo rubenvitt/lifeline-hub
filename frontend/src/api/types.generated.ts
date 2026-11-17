@@ -6707,7 +6707,7 @@ export interface components {
         };
         /**
          * @description Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer
-         *     Person zurücknehmen“; `openspec/changes/u131h4rq-personal-entlassung-zuruecknehmen/design.md`
+         *     Person zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`
          *     D1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
          *     zurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das
          *     Entlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.
