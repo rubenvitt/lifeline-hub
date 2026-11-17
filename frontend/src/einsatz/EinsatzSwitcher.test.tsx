@@ -214,7 +214,12 @@ describe('EinsatzSwitcher', () => {
             einsatznummer_intern: 'E-2026-0431',
             einsatzort: 'Markt',
           }),
-          einsatz({ id: 9, bezeichnung: 'Stadtfest Probe', einsatzart: 'uebung', einsatzort: 'Markt' }),
+          einsatz({
+            id: 9,
+            bezeichnung: 'Stadtfest Probe',
+            einsatzart: 'uebung',
+            einsatzort: 'Markt',
+          }),
         ]),
       ),
     );

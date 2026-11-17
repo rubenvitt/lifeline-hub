@@ -9,10 +9,7 @@ import { EINSATZART_LABELS, isUebung } from './einsatzart';
  * Zeile zeigen können. `null`, wenn nichts davon vorliegt.
  */
 export function einsatzNebenzeile(
-  e: Pick<
-    EinsatzAnzeige,
-    'einsatzart' | 'einsatznummer_intern' | 'leitstellen_nr' | 'einsatzort'
-  >,
+  e: Pick<EinsatzAnzeige, 'einsatzart' | 'einsatznummer_intern' | 'leitstellen_nr' | 'einsatzort'>,
 ): string | null {
   // Art aus der Tabelle; ein Einsatz ohne Art (Altbestand) bekommt keine.
   const art = isUebung(e) || !e.einsatzart ? null : (EINSATZART_LABELS[e.einsatzart] ?? null);
