@@ -311,6 +311,13 @@ pub async fn wiedereroeffnen(
         repo::wiedereroeffnen(&state.pool, id, ctx.benutzer.id, &grund, chrono::Utc::now()).await?;
     kopf_geaendert(&state, id).await;
     etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    // Wie jeder andere Widerruf einer Kopplung an einer Verpflegungsstelle (LLH-1316,
+    // `routes::geraet`): die Stellenliste zieht `geraet_gekoppelt` live nach.
+    if ergebnis.verpflegung_geaendert {
+        state
+            .live
+            .publiziere_einsatz(id, crate::live::LiveEvent::Verpflegung);
+    }
     Ok(Json(ergebnis.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,

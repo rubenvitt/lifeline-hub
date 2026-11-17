@@ -902,6 +902,16 @@ async fn system_eintrag_tx(
 
 /// Status, abgeschlossen am, Anzeigename der abschließenden Person, Spiegel, Aufbewahrungsfrist
 /// samt Setzzeitpunkt, Nachbereitung.
+/// Ergebnis von [`wiedereroeffnen`]: der Einsatz, die geschriebenen ETB-Einträge und ob eine
+/// widerrufene Kopplung an einer Verpflegungsstelle hing (dann meldet der Aufrufer
+/// `verpflegung`).
+#[derive(Debug)]
+pub struct Wiedereroeffnet {
+    pub einsatz: Einsatz,
+    pub etb_eintrag_ids: Vec<i64>,
+    pub verpflegung_geaendert: bool,
+}
+
 type WiedereroeffnenKopf = (
     String,
     Option<String>,
@@ -930,10 +940,10 @@ pub async fn wiedereroeffnen(
     von_benutzer_id: i64,
     grund: &str,
     jetzt: chrono::DateTime<Utc>,
-) -> Result<MitEtbEintraegen, AppError> {
+) -> Result<Wiedereroeffnet, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
-    let etb_eintrag_ids = crate::write_retry!(pool, |conn| {
+    let (etb_eintrag_ids, verpflegung_geaendert) = crate::write_retry!(pool, |conn| {
         let kopf: Option<WiedereroeffnenKopf> = sqlx::query_as(concat!(
             "SELECT e.status, e.abgeschlossen_at, ",
             abgeschlossen_von_name_spalte!(),
@@ -1009,14 +1019,19 @@ pub async fn wiedereroeffnen(
         // `kontext_wenn_gueltig` verlangt einen aktiven Einsatz). Damit sie mit dem Rückweg nach
         // `aktiv` nicht wieder aufleben, widerruft das Wiederöffnen jede noch offene: das Gerät
         // muss neu gekoppelt werden (Spec `einsatz-abschluss`, „Kopplung bleibt beendet“).
-        let kopplungen: Vec<i64> = sqlx::query_scalar(
-            "SELECT id FROM geraet_kopplung WHERE einsatz_id = ? AND widerrufen_at IS NULL",
+        // Trug eine davon eine Verpflegungsstelle, meldet der Aufrufer nach dem Commit
+        // `verpflegung` (LLH-1316): deren Stellenliste zeigt `geraet_gekoppelt`.
+        let kopplungen: Vec<(i64, bool)> = sqlx::query_as(
+            "SELECT id, verpflegungsstelle_id IS NOT NULL FROM geraet_kopplung \
+             WHERE einsatz_id = ? AND widerrufen_at IS NULL",
         )
         .bind(einsatz_id)
         .fetch_all(&mut *conn)
         .await?;
-        for kopplung_id in kopplungen {
+        let mut verpflegung = false;
+        for (kopplung_id, an_stelle) in kopplungen {
             crate::geraet::repo::widerrufen(&mut *conn, kopplung_id, von_benutzer_id).await?;
+            verpflegung |= an_stelle;
         }
 
         let mut ids = Vec::new();
@@ -1102,11 +1117,12 @@ pub async fn wiedereroeffnen(
             )
             .await?,
         );
-        Ok(ids)
+        Ok((ids, verpflegung))
     })?;
-    Ok(MitEtbEintraegen {
+    Ok(Wiedereroeffnet {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
+        verpflegung_geaendert,
     })
 }
 
