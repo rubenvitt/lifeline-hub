@@ -17,7 +17,7 @@ per TDD.
 
 ## 3. Doku und Verifikation
 
-- [ ] 3.1 `docs/anwender/kapitel/einsatz-oberflaeche.md`, „Zwischen Einsätzen wechseln“: Modul bleibt, Rückfall aufs Standardmodul, Nebenzeile; Wächter der Anwenderdoku grün
+- [x] 3.1 `docs/anwender/kapitel/einsatz-oberflaeche.md`, „Zwischen Einsätzen wechseln“: Modul bleibt, Rückfall aufs Standardmodul, Nebenzeile; Wächter der Anwenderdoku grün
 - [ ] 3.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
