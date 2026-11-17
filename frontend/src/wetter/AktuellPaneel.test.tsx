@@ -159,9 +159,10 @@ describe('AktuellPaneel (LFH-864)', () => {
     expect(paneel()).not.toHaveTextContent('14,8');
   });
 
-  it('ohne Einsatzort erklärt das Paneel, was fehlt — ohne eigenen Knopf', () => {
+  it('ohne Einsatzort nennt das Paneel nur den Zustand — erklärt wird auf der Seite (LLH-1752)', () => {
     zeige({ zustand: 'kein_ort' });
-    expect(paneel()).toHaveTextContent('Einsatzort nicht verortet');
+    expect(paneel()).toHaveTextContent('ohne Einsatzort');
+    expect(paneel()).not.toHaveTextContent('Einsatzort nicht verortet');
     expect(within(paneel()).queryByRole('button')).toBeNull();
     expect(paneel().querySelector('[data-lfh="kennzahlenband"]')).toBeNull();
   });

@@ -1,10 +1,9 @@
 # Frei und gesperrt
 
-**Gesperrt trägt die Sperre ohne Farbe** (LLH-1233): gesperrte antd-Knöpfe und -Felder haben
+**Gesperrt trägt die Sperre ohne Farbe**: gesperrte antd-Knöpfe und -Felder haben
 einen gestrichelten Rand in `steuer-rahmen`, randlose Einträge (Menü, Auswahlliste, antds
 `Segmented`, eigene `Segmentleiste`) eine Strichlinie nach innen (`index.css`, `sprache.css`).
-Gestrichelt heißt nur gesperrt: die Knopfvariante `dashed` ist gesperrt
-(`theme/gesperrtZeichen.guard.test.ts`).
+Gestrichelt heißt nur gesperrt: die Knopfvariante `dashed` ist gesperrt.
 
 Aus `frontend/src/theme/gesperrtZeichen.guard.test.ts`:
 

@@ -673,7 +673,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
       within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'geräumt' }).closest('label')!);
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'geräumt' }));
     const neu = await einsatzAbrufeNach(async () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
       await waitFor(() =>
@@ -732,7 +732,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await waitFor(() =>
       expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
     );
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'läuft' }).closest('label')!);
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'läuft' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'laeuft' }),

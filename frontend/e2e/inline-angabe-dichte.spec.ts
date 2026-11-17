@@ -12,7 +12,7 @@ import { anmelden, einsatzAnlegen } from './trefflaeche-kern';
  *    zwischen beiden nur `padding − paddingSM` = 7 / 10 px. Gesät ist genau diese Folge (Einheit
  *    gefüllt, Fahrzeug leer, Position gefüllt), gemessen bei 720 px, wo alle drei Felder in einer
  *    Reihe stehen, und bei 390 px; jedes Paar von Zielen in den Feldern zählt.
- *  - **Speichern ↔ Abbrechen** der offenen Angabe: `size="middle"` (11 / 18 / 26). Die Klasse
+ *  - **Speichern ↔ Abbrechen** der offenen Angabe: `size="middle"` (12 / 20 / 24). Die Klasse
  *    prüft `InlineAngabe.test.tsx`; ob die Fuge im Browser ankommt, belegt nur dieser Lauf.
  *  - **Kein Querlauf** mit offener Angabe, bei 390 px und am Fükw (1366 × 768).
  *  - **Kein Umbruch des Werts** bei 720 px: der Wertknopf steht um `paddingSM` vor und durfte

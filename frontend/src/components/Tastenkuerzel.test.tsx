@@ -57,7 +57,7 @@ describe('tastenkuerzelStil', () => {
     const polster = (['kompakt', 'komfortabel', 'handschuh'] as const).map(
       (s) => tastenkuerzelStil(tokenFuer(s)).padding,
     );
-    expect(polster).toEqual(['0 3px', '0 5px', '0 7px']);
+    expect(polster).toEqual(['0 4px', '0 4px', '0 8px']);
   });
 });
 

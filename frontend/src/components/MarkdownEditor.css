@@ -6,7 +6,7 @@
 .markdown-editor__vorschau {
   border: 1px solid var(--lfh-linie);
   border-radius: var(--lfh-radius-flaeche);
-  padding: 8px 12px;
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
   overflow: auto;
 }
 

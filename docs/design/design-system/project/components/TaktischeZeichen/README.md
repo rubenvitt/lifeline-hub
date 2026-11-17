@@ -1,6 +1,6 @@
 # Taktische Zeichen (Einheit, Fahrzeug, Gefahr; Meldebildzeile)
 
-Das taktische Zeichen eines Fachobjekts als Inline-SVG über @einsatzzeichen (LFH-835). Übersetzt
+Das taktische Zeichen eines Fachobjekts als Inline-SVG über @einsatzzeichen. Übersetzt
 das Hub-Vokabular über `fachobjektZeichen` (mit Rückfall) und rendert nichts, wenn nicht einmal
 der Körper darstellbar ist — ein gespeicherter Unsinnswert bringt keine Zeile zum Absturz.
 Jede Instanz trägt einen eigenen `idPrefix`: der Vorgabepräfix der Bibliothek ergäbe in Listen

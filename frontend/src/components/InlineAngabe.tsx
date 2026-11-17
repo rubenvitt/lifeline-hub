@@ -708,7 +708,7 @@ export function InlineAngabe<T>({
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'flex-start',
-            // Ziele stehen ≥ 8 / ≥ 16 px auseinander, auch umgebrochen (LFH-630): `padding` 11/18/26.
+            // Ziele stehen ≥ 8 / ≥ 16 px auseinander, auch umgebrochen (LFH-630): `padding` 12/20/24.
             gap: token.padding,
             minWidth: 0,
           }}

@@ -8,7 +8,7 @@
    gegen „niedrig" in Mono 10 (≈ 42 px bei 0,6 em).
 
    Schmal (Paneel unter 332 px; breit braucht 64 + 184 + 52 + zwei Lücken `paddingSM`, das
-   sind 7 / 11 / 16 px je Dichtestufe, also höchstens 332 px): Name und Stufenwort in der ersten Zeile, der Balken darunter über die volle
+   sind 8 / 12 / 16 px je Dichtestufe, also höchstens 332 px): Name und Stufenwort in der ersten Zeile, der Balken darunter über die volle
    Breite — so behält jedes Segment seine Breite, statt dass die Zeile aus dem Paneel läuft.
    Die Legende folgt derselben Regel: ihr Raster steht in der Balkenspalte. */
 
