@@ -33,7 +33,7 @@ Jede Aufgabe entsteht per TDD: erst der Test, der ohne die Änderung rot ist.
 ## 5. Frontend: Material am Ort
 
 - [x] 5.1 `MaterialAmOrt`: bei `isAusgebbar` „Lösen“ ins ⋮ (`WeitereAktionen`, `ZeilenMenueAusloeser`, `useZeilenMenueKontext` am Namensteil), „Ausgeben“ bleibt Knopf, sonst Knopf „Lösen“; gehalten ⋮ unsichtbar und „Gelöst“ träge. Nachweis: `MaterialAmOrt.test.tsx` (Menü, Kontextmenü, gehaltene Zeile), Guards `menueFarbe`, `kontextMenue` grün
-- [ ] 5.2 Abhängige Tests nachziehen (`EinheitMaterial`, `MaterialTab`, `materialSchreibweg`, `BrDetailPage`) und e2e `material-am-ort.spec.ts`, `trefflaeche-pruefflaechen.spec.ts` (C15). Nachweis: Vitest grün, e2e-Specs lokal grün
+- [x] 5.2 Abhängige Tests nachziehen (`EinheitMaterial`, `MaterialTab`, `materialSchreibweg`, `BrDetailPage`) und e2e `material-am-ort.spec.ts`, `trefflaeche-pruefflaechen.spec.ts` (C15). Nachweis: Vitest grün, e2e-Specs lokal grün
 
 ## 6. Frontend: Austragen rückgängig
 
@@ -47,7 +47,7 @@ Jede Aufgabe entsteht per TDD: erst der Test, der ohne die Änderung rot ist.
 
 - [x] 7.0 Verweise auf die umbenannten Anforderungen („Eine gelöste Zeile hält ihre Stelle“ → „Gelöste Zeile hält ihre Stelle“, „Eine Zuordnung lösen“ → „Lösen einer Zuordnung“) in `useHoldGeloest.ts`, `FahrzeugeBesatzung.tsx`, `FahrzeugeBesatzung.test.tsx` und weiteren Treffern nachziehen. Nachweis: `grep -rn "„Eine gelöste Zeile hält ihre Stelle“" frontend src` leer (ein Prosasatz in `MaterialTab.tsx` ohne Spec-Verweis bleibt)
 - [x] 7.1 `frontend/AGENTS.md` „Beenden: Verb, Ort und Sicherung je Art“: LLH-1924-Lücken streichen, Rücknahme des Austritts und den Schalter `nur_wenn_frei` an allen Rückwegen nennen. Nachweis: Diff, Prettier grün
-- [ ] 7.2 Anwenderdoku (`fahrzeuge.md`, `geraet-uhs.md`, `bereitstellungsraeume.md`, Personen/UHS) nach `docs/anwender/AGENTS.md`, Bilder über den Bildlauf, wo sich eine abgebildete Stelle ändert. Nachweis: Doku-Wächter grün
+- [x] 7.2 Anwenderdoku (`fahrzeuge.md`, `geraet-uhs.md`, `bereitstellungsraeume.md`, Personen/UHS) nach `docs/anwender/AGENTS.md`, Bilder über den Bildlauf, wo sich eine abgebildete Stelle ändert. Nachweis: Doku-Wächter grün
 - [ ] 7.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün. Nachweis: Lauf im PR unter „Geprüft“
 
 ## Workflow follow-up
