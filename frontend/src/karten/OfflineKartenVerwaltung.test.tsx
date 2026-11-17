@@ -665,7 +665,8 @@ describe('OfflineKartenVerwaltung · Spaltenschalter', () => {
     const { container } = render();
     await screen.findByText('Deutschland – Bremen');
     expect(kopf(container)).not.toContain('Attribution');
-    expect(screen.getByRole('button', { name: /^Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    // Nach Breite verborgen ist Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
+    expect(screen.getByRole('button', { name: 'Spalten — Offline-Karten' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     const attribution = within(await offenesMenue()).getByRole('checkbox', {

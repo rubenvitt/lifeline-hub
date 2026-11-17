@@ -1000,7 +1000,7 @@ async fn find_storno_hindernis_tx(
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Ruecknahme {
     pub ort: Option<MaterialOrt>,
-    pub ausgelassen: Vec<crate::fahrzeug::RuecknahmeAusgelassen>,
+    pub ausgelassen: Vec<crate::entlassung::RuecknahmeAusgelassen>,
 }
 
 fn ruecknahme_conflict() -> AppError {
@@ -1043,11 +1043,7 @@ pub async fn zuruecknehmen_tx(
     let im_riegel = beendet_als.as_deref() == Some(BeendetAls::Entlassen.as_str())
         && beendet_von == Some(benutzer_id)
         && beendet_at.as_deref() == Some(vorzustand.entlassen_at.as_str())
-        && crate::zeit::plus_minuten(
-            &vorzustand.entlassen_at,
-            crate::fahrzeug::disposition_repo::RUECKNAHME_FRIST_MINUTEN,
-        )
-        .is_some_and(|grenze| jetzt <= grenze.as_str());
+        && crate::entlassung::is_in_ruecknahme_frist(&vorzustand.entlassen_at, jetzt);
     if !im_riegel {
         return Err(ruecknahme_conflict());
     }
@@ -1090,7 +1086,7 @@ pub async fn zuruecknehmen_tx(
             ("Bereitstellungsraum", "nimmt kein Material mehr auf")
         }
     };
-    let fehlt = |bezeichnung: String, grund: &str| crate::fahrzeug::RuecknahmeAusgelassen {
+    let fehlt = |bezeichnung: String, grund: &str| crate::entlassung::RuecknahmeAusgelassen {
         bezeichnung,
         grund: grund.into(),
     };
@@ -2903,8 +2899,11 @@ mod tests {
 
     // ── Rücknahme der Herausnahme (LLH-1923, Spec `kraefte-entlassung`) ─────────────────────
 
-    const RAUS: &str = "2026-11-17 10:00:00";
-    const KURZ_DANACH: &str = "2026-11-17 10:05:00";
+    // Fest und weit nach jeder echten Uhr: Was der Test anlegt (`angelegt_at`, `disponiert_at`),
+    // liegt so immer vor dem Herausnehmen, wie im Einsatz. Ein Zeitpunkt von heute würde rot,
+    // sobald die Uhr ihn überholt (die Einheit wäre dann „jünger“ als das Herausnehmen).
+    const RAUS: &str = "2999-11-17 10:00:00";
+    const KURZ_DANACH: &str = "2999-11-17 10:05:00";
 
     async fn nimm_heraus_um(
         pool: &SqlitePool,
@@ -3036,10 +3035,10 @@ mod tests {
             nimm_zurueck(&pool, einsatz, em, andere, KURZ_DANACH, &v).await
         ));
         assert!(ist_409(
-            nimm_zurueck(&pool, einsatz, em, benutzer, "2026-11-17 10:10:01", &v).await
+            nimm_zurueck(&pool, einsatz, em, benutzer, "2999-11-17 10:10:01", &v).await
         ));
         let fremder_zeitpunkt = crate::material::MaterialEntlassungVorzustand {
-            entlassen_at: "2026-11-17 09:59:59".into(),
+            entlassen_at: "2999-11-17 09:59:59".into(),
             ..v.clone()
         };
         assert!(ist_409(
@@ -3059,7 +3058,7 @@ mod tests {
             Some(RAUS),
             "abgelehnt ändert nichts"
         );
-        nimm_zurueck(&pool, einsatz, em, benutzer, "2026-11-17 10:10:00", &v)
+        nimm_zurueck(&pool, einsatz, em, benutzer, "2999-11-17 10:10:00", &v)
             .await
             .unwrap();
         assert!(ist_409(
@@ -3144,7 +3143,7 @@ mod tests {
             assert_eq!(r.ort, None, "{ort:?}");
             assert_eq!(
                 r.ausgelassen,
-                vec![crate::fahrzeug::RuecknahmeAusgelassen {
+                vec![crate::entlassung::RuecknahmeAusgelassen {
                     bezeichnung: bezeichnung.into(),
                     grund: grund.into(),
                 }]
@@ -3207,7 +3206,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (einsatz, einheit, _, _, em) = decken_an_der_einheit(&pool).await;
         let benutzer = erster_benutzer(&pool).await;
-        let nur_einheit = crate::fahrzeug::RuecknahmeAusgelassen {
+        let nur_einheit = crate::entlassung::RuecknahmeAusgelassen {
             bezeichnung: "Einheit".into(),
             grund: "nicht mehr vorhanden".into(),
         };
@@ -3228,7 +3227,7 @@ mod tests {
         nimm_heraus_um(&pool, einsatz, em, benutzer).await;
         sqlx::query(
             "INSERT INTO einsatz_einheit (id, einsatz_id, name, angelegt_at) \
-             VALUES (?, ?, 'Trupp B', '2026-11-17 10:03:00')",
+             VALUES (?, ?, 'Trupp B', '2999-11-17 10:03:00')",
         )
         .bind(einheit)
         .bind(einsatz)

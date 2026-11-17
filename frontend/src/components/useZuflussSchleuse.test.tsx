@@ -49,6 +49,13 @@ function Liste({ zeilen, mitMenue = false }: { zeilen: Zeile[]; mitMenue?: boole
           </div>,
           document.body,
         )}
+      {mitMenue &&
+        createPortal(
+          <div className="ant-popover">
+            <button type="button">Speichern im Popover</button>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -111,6 +118,18 @@ describe('useZuflussSchleuse', () => {
     const alpha = screen.getByRole('button', { name: 'Alpha' });
     fireEvent.focus(alpha);
     fireEvent.blur(alpha, { relatedTarget: screen.getByRole('button', { name: 'Menüeintrag' }) });
+    rerender(<Liste zeilen={[C, A, B]} mitMenue />);
+    expect(namen()).toBe('Alpha,Bravo');
+  });
+
+  // LLH-1795: die schwebende Bearbeitung einer Tabellenzelle liegt in einem `Popover` im Portal.
+  it('Fokus, der in die schwebende Bearbeitung (Popover) wandert, hält weiter', () => {
+    const { rerender } = render(<Liste zeilen={[A, B]} mitMenue />);
+    const alpha = screen.getByRole('button', { name: 'Alpha' });
+    fireEvent.focus(alpha);
+    fireEvent.blur(alpha, {
+      relatedTarget: screen.getByRole('button', { name: 'Speichern im Popover' }),
+    });
     rerender(<Liste zeilen={[C, A, B]} mitMenue />);
     expect(namen()).toBe('Alpha,Bravo');
   });

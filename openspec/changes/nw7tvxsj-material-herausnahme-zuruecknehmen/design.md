@@ -25,7 +25,7 @@ Beim Material liegt das Gegenstück halb vor:
 **Goals:**
 
 - Rückgängig stellt Ort, Dispositionszeit, Menge und Status her, mit demselben Riegel wie das Fahrzeug.
-- Wire-Form und Benennung bleiben nah am Fahrzeug, damit LLH-1922 (Personal) dasselbe Muster findet.
+- Wire-Form und Benennung bleiben nah am Fahrzeug und an der Person (LLH-1922).
 
 **Non-Goals:**
 
@@ -47,7 +47,8 @@ alle Ortsfelder `Option<i64>` mit `#[serde(default)]`. Gebaut aus `Entlassen.ort
 - Mehr als eine gesetzte Ortsspalte im Body ist eine Feld-Kombination → 422 vor der Transaktion
   (`src/AGENTS.md`, Statuscode-Konvention), wie `OrtPatch::validate`.
 - Der Typ heißt eigens für Material, weil `fahrzeug::EntlassungVorzustand` Fahrzeugfelder trägt.
-  `RuecknahmeAusgelassen` wird wiederverwendet: Er ist schon generisch (Bezeichnung, Grund).
+  `entlassung::RuecknahmeAusgelassen` und `entlassung::ohne_text` werden wiederverwendet: Sie sind
+  schon generisch (Bezeichnung, Grund).
 
 Antwort von `…/entlassen`: `MaterialEntlassungAntwort { material, vorzustand }`; Antwort der
 Rücknahme: `MaterialRuecknahmeAntwort { material, ausgelassen }`.
@@ -59,8 +60,8 @@ vorzustand)`:
 
 1. **Riegel** wie beim Fahrzeug: `beendet_als = entlassen`, `beendet_von` = Aufrufer, `beendet_at`
    = `vorzustand.entlassen_at`, `jetzt ≤ entlassen_at + RUECKNAHME_FRIST_MINUTEN`. Die Frist nimmt
-   die Konstante des Fahrzeugs (`fahrzeug::disposition_repo::RUECKNAHME_FRIST_MINUTEN`), keine
-   zweite Zahl. Sonst 409 „Die Herausnahme lässt sich nicht mehr zurücknehmen; das Material lässt
+   die gemeinsame Prüfung `entlassung::is_in_ruecknahme_frist` (mit LLH-1922 aus dem Fahrzeug
+   gezogen), keine zweite Zahl. Sonst 409 „Die Herausnahme lässt sich nicht mehr zurücknehmen; das Material lässt
    sich erneut disponieren“.
 2. **Bestimmtes Stück:** Hat die Zeile einen Stamm, prüft `stamm_stueck_tx` + die Logik von
    `check_stueck_frei_tx`, ob dasselbe Gerät in einer anderen Zeile aktiv ist → 409 mit dem Grund
@@ -107,9 +108,9 @@ widerspräche Spec `material-modell` (Review vor dem PR). Nach dem Commit `sse_m
 den Vorzustand aus der Antwort im Rückgängig-Hinweis; `rueckgaengigMutation` ruft die Rücknahme,
 invalidiert Liste und Einheiten (der Ort kann eine Einheit sein) und setzt bei `ausgelassen` einen
 `SeitenHinweis` „Wolldecke zurück, ohne: Einheit «Staffel A» (inzwischen aufgelöst)“. Der Satz
-kommt aus einer geteilten Funktion `ausgelassenSatz(name, ausgelassen)` in
-`kraefte/ruecknahme.ts`; `FahrzeugePage` nutzt sie auch (ihr Export bleibt als Weiterleitung nicht
-stehen, die Aufrufer ziehen mit). Eine Ablehnung (409) steht wie bisher im Seitenhinweis
+kommt aus der geteilten Funktion `ausgelassenSatz(name, antwort)` in `kraefte/ruecknahmeSatz.ts`,
+die LLH-1922 für Fahrzeug und Person angelegt hat, während diese Change lief; eine eigene Kopie
+(`kraefte/ruecknahme.ts`) fiel beim Merge von `alpha` weg. Eine Ablehnung (409) steht wie bisher im Seitenhinweis
 „Nicht zurückgenommen“.
 
 ## Risks / Trade-offs

@@ -10,8 +10,8 @@ mit 409 abgelehnt zu werden und MUST den Initialstatus neu setzen, sodass eine n
 beginnt; ein schon entlassenes Fahrzeug MUST beim Sammel-Disponieren mit dem Grund „entlassen“
 abgelehnt werden, ein storniertes reaktiviert werden. Material MUST beim Reaktivieren Menge und
 Status behalten; das Disponieren aus dem Stamm legt bei Material immer eine neue Zeile an.
-Gestrichene Ereignisse MUST gestrichen bleiben. „Rückgängig“ nach dem Entlassen einer Person MUST
-die Kraft auf diesem Weg wieder aktiv machen; beim Fahrzeug gilt „Entlassung eines Fahrzeugs
+Gestrichene Ereignisse MUST gestrichen bleiben. „Rückgängig“ führt nicht über diesen Weg: beim
+Fahrzeug gilt „Entlassung eines Fahrzeugs zurücknehmen“, bei der Person „Entlassung einer Person
 zurücknehmen“, beim Material „Herausnahme von Material zurücknehmen“.
 
 #### Scenario: Stamm-Person kommt zurück
@@ -19,8 +19,8 @@ zurücknehmen“, beim Material „Herausnahme von Material zurücknehmen“.
 - **THEN** ist sie aktiv, und ihre Zeitachse zeigt eine zweite Periode ab 18:00
 
 #### Scenario: Rückgängig nach Entlassen
-- **WHEN** die Person direkt nach dem Entlassen einer Einsatzkraft „Rückgängig“ wählt
-- **THEN** ist die Einsatzkraft wieder aktiv
+- **WHEN** die Person direkt nach dem Herausnehmen eines Postens „Rückgängig“ wählt
+- **THEN** ist der Posten wieder aktiv, mit seiner Dispositionszeit von vorher statt neu disponiert
 
 #### Scenario: Material kommt zurück
 - **WHEN** ein defekter Posten mit Menge 4 aus dem Einsatz genommen und erneut disponiert wird

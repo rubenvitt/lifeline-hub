@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/UhsBearbeitenModal.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenModal.tsx, frontend/src/components/AnlegenModal.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/uhs/UhsAngaben.tsx, frontend/src/pages/uhs/uhsPatch.ts]
 ---
 
 ## Überblick
@@ -21,14 +21,15 @@ Die Patienten selbst sind Betroffene; ihre Sichtung und ihren Verbleib führt da
 ### Eine Unfallhilfsstelle anlegen und in Betrieb nehmen
 
 1. In der Liste der Unfallhilfsstellen „Neu“ wählen, oder im Titel einer Unfallhilfsstelle den
-   Namen öffnen und „+ Neue UHS“ wählen.
-2. „Bezeichnung“ und „Typ“ angeben, bei Bedarf „Standort (optional)“ und „Notiz (optional)“. Den
-   Standort mit Enter oder „Ort suchen“ suchen und einen Treffer wählen, dann ist die Stelle gleich
-   verortet; ohne Treffer bleibt er freier Text.
+   Namen öffnen und „+ Neue UHS“ wählen. Der Dialog „Unfallhilfsstelle anlegen“ öffnet sich.
+2. „Bezeichnung“ und „Typ“ angeben, bei Bedarf „Standort (optional)“. Den Standort mit Enter oder
+   „Ort suchen“ suchen und einen Treffer wählen, dann ist die Stelle gleich verortet; ohne Treffer
+   bleibt er freier Text. Eine Notiz steht unter „Weitere Angaben“; ist eine eingetragen, zeigt der
+   Kopf „Weitere Angaben · Notiz“.
 
-   ![Seitenleiste „Unfallhilfsstelle anlegen“ mit Bezeichnung, Typ Patientenablage und Standort](../bilder/unfallhilfsstellen/anlegen.png)
+   ![Dialog „Unfallhilfsstelle anlegen“ mit Bezeichnung, Typ Patientenablage, Standort und eingeklappten „Weitere Angaben“](../bilder/unfallhilfsstellen/anlegen.png)
 
-3. „Anlegen“ wählen. Die neue Stelle steht auf „geplant“.
+3. „Anlegen“ wählen. Die App öffnet die neue Stelle; sie steht auf „geplant“.
 4. Die Stelle öffnen und „Plätze anlegen“ wählen: den Platz-Typ (etwa „Behandlungsplatz“,
    „Trage“, „Bett“) und die „Menge“ angeben, dann „Anlegen“. Die Plätze werden durchnummeriert.
 5. „In Betrieb nehmen“ wählen. Die Stelle steht auf „aktiv“ und nimmt Patienten auf.
@@ -39,17 +40,21 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
 
 ### Bezeichnung, Standort, Soll und Notiz ändern
 
-1. Die Stelle öffnen und oben „Bearbeiten“ wählen.
-2. „Bezeichnung“, „Standort (optional)“ oder „Notiz (optional)“ ändern. Den Standort mit Enter
-   oder „Ort suchen“ suchen und einen Treffer wählen, eine Koordinate eintippen oder den Punkt über
-   „Auf Karte wählen“ setzen; ein geleerter Standort löscht auch die Koordinate.
-3. Unter „Soll-Anzahl (optional)“ eintragen, wie viele Kräfte die Stelle braucht (1 bis 200), und
-   unter „Qualifikationssoll“ mit „Qualifikation fordern“, welche Qualifikationen mindestens dabei
-   sein müssen.
-4. „Speichern“ wählen. Gespeichert wird nur, was sich geändert hat. Das Soll steht im Kopf der
-   Stelle vor der Notiz.
+1. Die Stelle öffnen, den Bereich „Angaben“ wählen und dort „Bearbeiten“ wählen. Die Angaben
+   werden an Ort und Stelle zu Eingabefeldern.
+2. „Bezeichnung“, „Standort“ oder „Notiz“ ändern. Den Standort mit Enter oder „Ort suchen“ suchen
+   und einen Treffer wählen, eine Koordinate eintippen oder den Punkt über „Auf Karte wählen“
+   setzen; ein geleerter Standort löscht auch die Koordinate.
+3. Unter „Soll-Anzahl“ eintragen, wie viele Kräfte die Stelle braucht (1 bis 200), und unter
+   „Qualifikationssoll“ mit „Qualifikation fordern“, welche Qualifikationen mindestens dabei sein
+   müssen.
+4. „Speichern“ wählen, oder Enter; Escape oder „Abbrechen“ verwirft die Eingabe. Gespeichert wird
+   nur, was sich geändert hat. Das Soll steht auch im Kopf der Stelle vor der Notiz.
 
-Eine aufgelöste oder stornierte Stelle lässt sich nicht mehr bearbeiten.
+Hat jemand anderes die Stelle inzwischen geändert, fragt die App „Zwischenzeitlich geändert“:
+„Meine Änderung übernehmen“ speichert trotzdem, „Verwerfen und neu laden“ zeigt den neuen Stand.
+Eine aufgelöste oder stornierte Stelle lässt sich nicht mehr bearbeiten; ihre Angaben bleiben
+lesbar.
 
 ### Die Liste der Unfallhilfsstellen sortieren und filtern
 
@@ -74,7 +79,7 @@ hat.
 1. Im Modulpanel „Unfallhilfsstellen“ öffnen. Es öffnet sich die zuletzt besuchte oder eine
    aktive Stelle; andere wählt der Umschalter im Titel.
 
-   ![Unfallhilfsstelle mit der Leiste „Belegung“, „Material“, „Kräfte“, „Bewegungen“ und „Dateien“ über dem Grundriss, darin zwei belegte und mehrere freie Plätze, Wartebereich und Transport](../bilder/unfallhilfsstellen/grundriss.png)
+   ![Unfallhilfsstelle mit der Leiste „Belegung“, „Material“, „Kräfte“, „Bewegungen“, „Dateien“ und „Angaben“ über dem Grundriss, darin zwei belegte und mehrere freie Plätze, Wartebereich und Transport](../bilder/unfallhilfsstellen/grundriss.png)
 
 2. Die Fläche zeigt jeden Platz mit seiner Verfügbarkeit („frei“, „belegt“, „in Aufbereitung“,
    „defekt“, „gesperrt“) und dem Patienten darauf. Jede Patientenmarke trägt vorn die Sichtung
@@ -87,8 +92,9 @@ hat.
    verlassen hat und noch nicht übergeben ist, mit Fahrzeug, Ziel, Transportpriorität und der
    Zeit seit der Abfahrt; ab einer Stunde trägt die Zeile „Übergabe offen“.
 4. Die Leiste über dem Grundriss wechselt zwischen „Belegung“ (dem Grundriss), „Material“,
-   „Kräfte“, „Bewegungen“ und „Dateien“. Jeder Bereich füllt dieselbe Fläche bis zum unteren
-   Fensterrand; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und Platz.
+   „Kräfte“, „Bewegungen“, „Dateien“ und „Angaben“. Jeder Bereich füllt dieselbe Fläche bis zum
+   unteren Fensterrand; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und
+   Platz, „Angaben“ die Stammdaten der Stelle.
    Der gewählte Bereich steht in der Adresse, ein Lesezeichen öffnet ihn direkt.
 
 Auf einem breiten Bildschirm stehen Wartebereich, Fläche und „Unterwegs“ nebeneinander; dann
@@ -98,9 +104,10 @@ lassen sich Patienten auch mit der Maus auf einen Platz ziehen.
 
 1. Die Stelle öffnen. Über der Leiste steht die Lage der Stelle in vier Zahlen, ohne Namen.
 2. „In der Stelle“ ablesen: wer in der Stelle steht, auf einem Platz oder im Wartebereich,
-   darunter je Sichtung als Farbbalken und in Worten, etwa „SK I 1 · SK II 3“.
-3. „Plätze frei“ ablesen: freie von allen Plätzen, etwa „2 / 6“, dazu wie viele in Aufbereitung
-   sind.
+   darunter je Sichtung als Farbbalken und in Worten, die Zahl vor der Kategorie, etwa
+   „1 SK I · 3 SK II“.
+3. Die freien Plätze ablesen: freie von allen Plätzen, etwa „2 von 6 Plätzen frei“, dazu wie
+   viele belegt oder in Aufbereitung sind.
 4. „Wartend“ und „Unterwegs“ ablesen: wer im Wartebereich auf einen Platz wartet, mit der
    längsten Wartezeit, und wer die Stelle im Eigentransport verlassen hat und noch nicht
    übergeben ist.

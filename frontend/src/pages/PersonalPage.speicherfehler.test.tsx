@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
+import { offeneAngabe } from '../test/angabe';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import PersonalPage from './PersonalPage';
@@ -182,7 +183,12 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Position zu Thomas Müller speichern' }),
     );
-    expect(await within(zeile(container, 10)).findByText(/Position abgelehnt/)).toBeVisible();
+    // Die Bearbeitung schwebt an der Zelle (LLH-1795): der Grund steht in ihr. Sichtbar belegt
+    // es `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten ohne Sprung“); jsdom kennt die Einblendung
+    // des Popovers nicht.
+    expect(
+      await within(offeneAngabe('Position zu Thomas Müller')).findByText(/Position abgelehnt/),
+    ).toBeInTheDocument();
     const feld = screen
       .getByRole('combobox', { name: 'Position zu Thomas Müller' })
       .closest('.ant-select')!;
@@ -218,15 +224,19 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Fahrzeug zu Thomas Müller speichern' }),
     );
+    // Die Bearbeitung schwebt an der Zelle (LLH-1795): der Grund steht in ihr.
     expect(
-      await within(zeile(container, 10)).findByText(/Fahrzeug ist voll besetzt/),
-    ).toBeVisible();
+      await within(offeneAngabe('Fahrzeug zu Thomas Müller')).findByText(
+        /Fahrzeug ist voll besetzt/,
+      ),
+    ).toBeInTheDocument();
     const feld = screen
       .getByRole('combobox', { name: 'Fahrzeug zu Thomas Müller' })
       .closest('.ant-select')!;
     expect(feld).toHaveTextContent('Florian 1 (ELW)');
-    // Die Zeile meldet nichts doppelt: der Grund steht nur an der Angabe.
-    expect(within(zeile(container, 10)).getAllByText(/Fahrzeug ist voll besetzt/)).toHaveLength(1);
+    // Nichts doppelt: der Grund steht nur in der Bearbeitung, nicht zusätzlich in der Zeile.
+    expect(screen.getAllByText(/Fahrzeug ist voll besetzt/)).toHaveLength(1);
+    expect(within(zeile(container, 10)).queryByText(/Fahrzeug ist voll besetzt/)).toBeNull();
     expect(toasts()).toBe(0);
   });
 
@@ -239,7 +249,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Thomas Müller');
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
     await userEvent.click(
       within(zeile(container, 10)).getByRole('button', {
@@ -269,7 +279,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     );
     const { container } = render();
     await screen.findByText('Thomas Müller');
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
     await userEvent.click(
       within(zeile(container, 10)).getByRole('button', {

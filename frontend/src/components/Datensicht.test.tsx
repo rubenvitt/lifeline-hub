@@ -10,6 +10,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { dichten } from '../theme/tokens';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { wertAngabeStil } from './InlineAngabe';
+import { aktionsSpalte } from './aktionsSpalte';
 import Datensicht, {
   MAX_SEKUNDAER,
   TIEFE_DECKEL,
@@ -1443,7 +1444,8 @@ describe('Datensicht · Tabellenzweig', () => {
     );
     expect(kopfzellen).toEqual(['Funkrufname', 'Typ']);
 
-    const schalter = screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ });
+    // Voreinstellung und Breite sind die Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
+    const schalter = screen.getByRole('button', { name: /^Spalten —/ });
     expect(container.querySelector('.ant-badge-count')).toBeNull();
 
     await userEvent.click(schalter);
@@ -1476,7 +1478,7 @@ describe('Datensicht · Tabellenzweig', () => {
       [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
     expect(kopf()).not.toContain('Besatzung');
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
     const besatzung = await screen.findByRole('checkbox', { name: 'Besatzung' });
     expect(besatzung).not.toBeChecked();
 
@@ -2656,5 +2658,57 @@ describe('Datensicht · Kartenfuge neben einer InlineAngabe', () => {
     expect(luecke('kompakt')).toBeGreaterThanOrEqual(0);
     expect(luecke('komfortabel')).toBeGreaterThanOrEqual(8);
     expect(luecke('handschuh')).toBeGreaterThanOrEqual(16);
+  });
+});
+
+describe('Datensicht · Aktionsspalte (LLH-1789, amEnde)', () => {
+  const mitAktion = spaltenFuer<Fahrzeug>()([
+    ...spalten,
+    aktionsSpalte<Fahrzeug>({
+      dichte: 'kompakt',
+      schrift: '',
+      aktion: {
+        etikett: 'Stand melden',
+        onKlick: () => {},
+        zugaenglicherName: (f) => `Stand melden für ${f.funkrufname}`,
+      },
+    }),
+  ]);
+  type MitAktionKey = (typeof mitAktion)[number]['key'];
+  const zeige = (form: 'tabelle' | 'auto') =>
+    renderMitProviders(
+      <Datensicht<Fahrzeug, MitAktionKey>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={mitAktion}
+        daten={DREI}
+        zeilenSchluessel="id"
+        karte={karte}
+        form={form}
+      />,
+    );
+
+  it('ab md steht die Aktionsspalte rechts fixiert', () => {
+    setzeViewportBreite(1024);
+    const { container } = zeige('tabelle');
+    const kopf = [...container.querySelectorAll<HTMLElement>('th')].find(
+      (th) => th.textContent === 'Aktionen',
+    );
+    expect(kopf).toBeDefined();
+    expect(kopf!.className).toMatch(/ant-table-cell-fix-(end|right)/);
+    expect(container.querySelector('[data-lfh="datensicht-kennung-aktion"]')).toBeNull();
+  });
+
+  it('unter md zieht sie in die fixierte Kennung, die Spalte entfällt', () => {
+    setzeViewportBreite(390);
+    const { container } = zeige('tabelle');
+    expect([...container.querySelectorAll('th')].some((th) => th.textContent === 'Aktionen')).toBe(
+      false,
+    );
+    const kennung = container.querySelector<HTMLElement>(
+      'tr.ant-table-row [data-lfh="datensicht-kennung-aktion"]',
+    )!;
+    expect(kennung).not.toBeNull();
+    expect(kennung.closest('td')!.className).toMatch(/ant-table-cell-fix-(start|left)/);
+    expect(within(kennung).getByRole('button', { name: /^Stand melden für / })).toBeInTheDocument();
   });
 });

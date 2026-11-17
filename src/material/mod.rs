@@ -516,20 +516,14 @@ pub fn etb_text_herausnahme_zurueckgenommen(
     bezeichnung: &str,
     menge: i64,
     ort: Option<&str>,
-    ausgelassen: &[crate::fahrzeug::RuecknahmeAusgelassen],
+    ausgelassen: &[crate::entlassung::RuecknahmeAusgelassen],
 ) -> String {
     let mut text = format!("Material «{bezeichnung}» (×{menge}): Herausnahme zurückgenommen");
     if let Some(ort) = ort {
         text.push_str(&format!(", Ort {ort}"));
     }
-    if ausgelassen.is_empty() {
-        return text;
-    }
-    let ohne: Vec<String> = ausgelassen
-        .iter()
-        .map(|a| format!("{} ({})", a.bezeichnung, a.grund))
-        .collect();
-    format!("{text}, ohne {}", ohne.join(", "))
+    text.push_str(&crate::entlassung::ohne_text(ausgelassen));
+    text
 }
 
 /// Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
@@ -600,7 +594,7 @@ pub struct MaterialEntlassungAntwort {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct MaterialRuecknahmeAntwort {
     pub material: EinsatzMaterialAnzeige,
-    pub ausgelassen: Vec<crate::fahrzeug::RuecknahmeAusgelassen>,
+    pub ausgelassen: Vec<crate::entlassung::RuecknahmeAusgelassen>,
 }
 
 /// System-ETB beim Stornieren einer Fehldisposition (LLH-1079, design.md D3).
@@ -706,7 +700,7 @@ mod etb_text_tests {
                 "Wolldecke",
                 20,
                 None,
-                &[crate::fahrzeug::RuecknahmeAusgelassen {
+                &[crate::entlassung::RuecknahmeAusgelassen {
                     bezeichnung: "Einheit «Staffel A»".into(),
                     grund: "inzwischen aufgelöst".into(),
                 }]

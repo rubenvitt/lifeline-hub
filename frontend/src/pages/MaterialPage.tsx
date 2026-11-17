@@ -97,7 +97,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
-import { ausgelassenSatz } from '../kraefte/ruecknahme';
+import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { nachforderungName } from '../nachforderungen/nachforderungName';
 
@@ -527,7 +527,7 @@ function MaterialInhalt() {
     onSuccess: (antwort, v) => {
       invalidateMitEinheiten();
       if (antwort.ausgelassen.length > 0) {
-        setAusgelassenText(ausgelassenSatz(v.name, antwort.ausgelassen));
+        setAusgelassenText(ausgelassenSatz(v.name, antwort));
       }
     },
     onError: (e) => {
@@ -995,6 +995,8 @@ function MaterialInhalt() {
             key: 'aktionen' as const,
             width: menueSpaltenBreite(dichte),
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             // Alle Handlungen im Zeilenmenü (LLH-1722), zuerst „Aus dem Einsatz nehmen“; Stornieren
             // fragt nach (LLH-1079 D8, LLH-1093 D11, wie die Fahrzeugseite).
             render: (_: unknown, em: EinsatzMaterial) => (

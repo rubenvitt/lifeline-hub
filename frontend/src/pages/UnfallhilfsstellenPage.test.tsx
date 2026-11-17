@@ -13,7 +13,7 @@ import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { App as AntApp } from 'antd';
 import { useState, type ReactNode } from 'react';
-import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
+import UhsAnlegenModal from './uhs/UhsAnlegenModal';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -90,10 +90,10 @@ function renderPage(
   };
 }
 
-function UhsDrawerHarness(props: { onClose: () => void; onAngelegt: () => void }) {
+function UhsDialogHarness(props: { onClose: () => void; onAngelegt: () => void }) {
   const [open, setOpen] = useState(true);
   return (
-    <UhsAnlegenDrawer
+    <UhsAnlegenModal
       einsatzId={1}
       open={open}
       onClose={() => {
@@ -112,34 +112,34 @@ function UhsEinsatzWechselHarness() {
       <button type="button" onClick={() => setEinsatzId(2)}>
         Zu Einsatz B
       </button>
-      <UhsAnlegenDrawer einsatzId={einsatzId} open onClose={() => {}} />
+      <UhsAnlegenModal einsatzId={einsatzId} open onClose={() => {}} />
     </>
   );
 }
 
-function renderUhsDrawer(onClose: () => void, onAngelegt: () => void) {
+function renderUhsDialog(onClose: () => void, onAngelegt: () => void) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <CommandPaletteProvider>
-          <UhsDrawerHarness onClose={onClose} onAngelegt={onAngelegt} />
+          <UhsDialogHarness onClose={onClose} onAngelegt={onAngelegt} />
         </CommandPaletteProvider>
       </AntApp>
     </QueryClientProvider>,
   );
 }
 
-/** Schließt den Anlegen-Drawer über sein Kreuz und wartet, bis er zu ist. */
-async function schliesseDrawer() {
+/** Schließt den Anlegen-Dialog über sein Kreuz und wartet, bis er zu ist. */
+async function schliesseDialog() {
   await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
-  await waitFor(() => expect(document.querySelector('.ant-drawer-open')).toBeNull());
+  await waitFor(() => expect(document.querySelector('.ant-modal:not(.ant-zoom-leave)')).toBeNull());
 }
 
 describe('UnfallhilfsstellenPage', () => {
-  it('schließt den UHS-Drawer mit Provider per Escape genau einmal', async () => {
+  it('schließt den UHS-Dialog mit Provider per Escape genau einmal', async () => {
     const onClose = vi.fn();
-    renderUhsDrawer(onClose, vi.fn());
+    renderUhsDialog(onClose, vi.fn());
     await waitFor(() => expect(screen.getByLabelText('Bezeichnung')).toHaveFocus());
 
     await userEvent.keyboard('{Escape}');
@@ -147,7 +147,7 @@ describe('UnfallhilfsstellenPage', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('setzt beim Einsatzwechsel alle Werte des offenen UHS-Drawers zurück', async () => {
+  it('setzt beim Einsatzwechsel alle Werte des offenen UHS-Dialogs zurück', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
@@ -168,7 +168,7 @@ describe('UnfallhilfsstellenPage', () => {
     expect(screen.getByTitle('Behandlungsplatz')).toBeInTheDocument();
   });
 
-  it('öffnet via ?neu=1 den Anlegen-Drawer (aktiver Einsatz)', async () => {
+  it('öffnet via ?neu=1 den Anlegen-Dialog (aktiver Einsatz)', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
@@ -180,10 +180,10 @@ describe('UnfallhilfsstellenPage', () => {
   /**
    * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1` noch
    * in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu an
-   * (Einsatz lädt neu), öffnet der Drawer nicht noch einmal. Bisher schützte davor nur, dass die
+   * (Einsatz lädt neu), öffnet der Dialog nicht noch einmal. Bisher schützte davor nur, dass die
    * Seite den Parameter aus der Instanz des Routers löschte (gegen die Klon-Regel, LFH-156).
    */
-  it('ein hängender Router-Commit öffnet den geschlossenen Drawer nach neuem Recht nicht wieder (LLH-1558)', async () => {
+  it('ein hängender Router-Commit öffnet den geschlossenen Dialog nach neuem Recht nicht wieder (LLH-1558)', async () => {
     let rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung';
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort(rolle))),
@@ -193,7 +193,7 @@ describe('UnfallhilfsstellenPage', () => {
       adresseSteht: true,
     });
     expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
-    await schliesseDrawer();
+    await schliesseDialog();
     const knopf = () => screen.getByRole('button', { name: 'Neu' });
 
     rolle = 'beobachter';
@@ -202,10 +202,10 @@ describe('UnfallhilfsstellenPage', () => {
     rolle = 'einsatzleitung';
     await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
     await waitFor(() => expect(knopf()).toBeEnabled());
-    expect(document.querySelector('.ant-drawer-open')).toBeNull();
+    expect(document.querySelector('.ant-modal:not(.ant-zoom-leave)')).toBeNull();
   });
 
-  it('ein neuer Link ?neu=1 öffnet den Drawer wieder (LLH-1558)', async () => {
+  it('ein neuer Link ?neu=1 öffnet den Dialog wieder (LLH-1558)', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
@@ -219,10 +219,12 @@ describe('UnfallhilfsstellenPage', () => {
         /^\/einsaetze\/1\/unfallhilfsstellen\/liste$/,
       ),
     );
-    await schliesseDrawer();
+    await schliesseDialog();
 
     await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
-    await waitFor(() => expect(document.querySelector('.ant-drawer-open')).not.toBeNull());
+    await waitFor(() =>
+      expect(document.querySelector('.ant-modal:not(.ant-zoom-leave)')).not.toBeNull(),
+    );
     await waitFor(() =>
       expect(screen.getByTestId('liste-ort')).toHaveTextContent(
         /^\/einsaetze\/1\/unfallhilfsstellen\/liste$/,
@@ -321,7 +323,7 @@ describe('UnfallhilfsstellenPage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
-    // Leerzustand mit Weg hinaus: die Anlage öffnet denselben Drawer wie „Neu".
+    // Leerzustand mit Weg hinaus: die Anlage öffnet denselben Dialog wie „Neu".
     await userEvent.click(
       await screen.findByRole('button', { name: 'Erste Unfallhilfsstelle anlegen' }),
     );
@@ -336,6 +338,26 @@ describe('UnfallhilfsstellenPage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erste Unfallhilfsstelle anlegen' })).toBeNull();
+  });
+
+  // Nach dem Anlegen in die neue Ansicht (LLH-1921, design.md D3), wie Bereitstellungsraum und
+  // Switcher; `frontend/AGENTS.md`, „Bearbeiten in der Ansicht“, Punkt 7.
+  it('springt nach dem Anlegen in die neue UHS', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/uhs', () =>
+        HttpResponse.json({ ...bhp50, id: 42, bezeichnung: 'PA 1' }, { status: 201 }),
+      ),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu' }));
+    await userEvent.type(screen.getByPlaceholderText('z. B. BHP 50'), 'PA 1{Enter}');
+    await waitFor(() =>
+      expect(screen.getByTestId('liste-ort')).toHaveTextContent(
+        /^\/einsaetze\/1\/unfallhilfsstellen\/42/,
+      ),
+    );
   });
 
   it('fokussiert Bezeichnung und legt per Enter aus diesem Feld an', async () => {
@@ -373,7 +395,7 @@ describe('UnfallhilfsstellenPage', () => {
     await waitFor(() => expect(body).toMatchObject({ bezeichnung: 'PA 1' }));
   });
 
-  it('lässt den Drawer und die Bezeichnung bei einem Anlegefehler stehen', async () => {
+  it('lässt den Dialog und die Bezeichnung bei einem Anlegefehler stehen', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
@@ -392,7 +414,7 @@ describe('UnfallhilfsstellenPage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  // Schließen wartet auf die Antwort (LFH-1077, design.md D3): eine Ablehnung braucht den Drawer.
+  // Schließen wartet auf die Antwort (LFH-1077, design.md D3): eine Ablehnung braucht den Dialog.
   it('sperrt das Schließen, solange das Anlegen läuft, und schließt beim Erfolg', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
@@ -411,7 +433,7 @@ describe('UnfallhilfsstellenPage', () => {
         return HttpResponse.json(bhp50, { status: 201 });
       }),
     );
-    renderUhsDrawer(onClose, onAngelegt);
+    renderUhsDialog(onClose, onAngelegt);
 
     await userEvent.type(screen.getByPlaceholderText('z. B. BHP 50'), 'PA 1{Enter}');
     await postStart;

@@ -99,7 +99,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
   `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
-  einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
+  einzige Baustein dafür, siehe „UI-Form-Leitlinie“; weitere Handlungen am Datensatz über
+  `zusatz` vor „Bearbeiten“, nur im Lesezustand, LLH-1920) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
   (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `AlarmZeile` („Was brennt“, LLH-1743,
@@ -394,8 +395,8 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 - **Vollseite/eigene Route** (`/einsaetze/:einsatzId/<modul>/:id`): Sektionen/Tabs, > ~5 Felder,
   Workflow, deeplink-würdig (Muster `BefehlDetailPage`, `PersonenDetailPage`). **Modal**: kurze
   blockierende Aktion, ≤ ~3 Felder. **Inline/Expander**: Zusatz ohne Seitenwechsel.
-  **Drawer**: nur Quick-View (read-only) oder Schnellerfassung ≤ ~4 Felder (`PersonDetailDrawer`);
-  Tabs, großer Edit-Modus oder > ~480 px → eigene Route.
+  **Drawer**: nur Quick-View (read-only, `PersonDetailDrawer`), nie zum Anlegen (LLH-1921); Tabs,
+  großer Edit-Modus oder > ~480 px → eigene Route.
 - **Einzige Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
   `einsatz/ModulAkkordeon.tsx`): Navigation, keine Entität, schließt beim Modulklick, Inhalt erst
   beim Öffnen (kein `forceRender`). Ein zweiter braucht eine eigene Entscheidung.
@@ -412,10 +413,10 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 Ansicht“; schreibt LFH-19 und LFH-979 fort)
 
 1. **Ein bestehender Datensatz wird in seiner Ansicht bearbeitet**, nie in einem Formular, das die
-   Ansicht ersetzt oder verdeckt. Modal und Drawer bleiben fürs **Anlegen** (Erfassungs-Norm,
-   Feldbudget) und für kurze blockierende Aktionen. Ausnahme: ein Datensatz ohne eigene Ansicht
-   (eine Chat-Nachricht, die Metadaten eines Dokuments) darf in einem kurzen Modal mit höchstens
-   etwa drei Feldern bearbeitet werden (LLH-1808).
+   Ansicht ersetzt oder verdeckt. Der Erfassungsdialog bleibt fürs **Anlegen** (Erfassungs-Norm,
+   Feldbudget, Form unten) und für kurze blockierende Aktionen. Ausnahme: ein Datensatz ohne eigene
+   Ansicht (eine Chat-Nachricht, die Metadaten eines Dokuments) darf in einem kurzen Modal mit
+   höchstens etwa drei Feldern bearbeitet werden (LLH-1808).
 2. **Drei Stufen nach Umfang:** **Einzelwert** (Status, Lagezustand, Führer, Frist) über
    `InlineAngabe`/`BemerkungZelle` am Wert, speichert sofort genau dieses Feld · **Paneel**
    (zusammengehörige Werte, „Funk“, „Personendaten“) über `components/instrument/BearbeitbaresPaneel`
@@ -435,7 +436,9 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    und Bemerkungen verweisen darauf, statt ihn unter jede Zelle jeder Zeile zu schreiben.
 4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
    Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
-   übernehmen“ / „Verwerfen und neu laden“.
+   übernehmen“ / „Verwerfen und neu laden“. Zeichnet die Route den Sperrkonflikt aus
+   (`grund: "veraltet"`, `isVeraltet`, `src/AGENTS.md`, Statuscode-Konvention), fragt nur er;
+   ein anderer 409 steht als Grund am Paneel (`isSperrkonflikt`, LLH-1920).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
@@ -444,17 +447,18 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    die Liste mit erneutem Öffnen.
 
 Kein Fach-Modul baut einen zweiten Baustein dafür; die Seiten stellen ihre Fach-Tickets um
-(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte,
-Bereitstellungsraum, Betreuung).
+(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte, Betreuung).
+UHS (Bereich „Angaben“) und Bereitstellungsraum („Raumdaten“) sind umgestellt (LLH-1920).
 
 **Ort von „Bearbeiten“ und Form des Anlegens** (LLH-1722, D8): „Bearbeiten“ eines Paneels steht
 im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
 Kopfs). Anlegen geht über das `ErfassungsModal`; eine eigene Seite nur bei einem Ablauf oder mehr
 als ~5 Pflichtfeldern (Patient, Einheit aus Vorlage); ein eingeklapptes Formular nur bei
-Serienerfassung neben einer Liste; **kein Drawer zum Anlegen**. Altstellen mit Folgeaufgabe (LLH-1920, LLH-1921): UHS
-und Bereitstellungsraum bearbeiten im Modal und legen im Drawer an (`UhsBearbeitenModal`,
-`BrBearbeitenModal`, `UhsAnlegenDrawer`, `BrAnlegenDrawer`); die eingeklappten Formulare von
-Nachforderung, Meldungen, Lagemeldungen und Erinnerungen sind auf Serienerfassung zu prüfen.
+Serienerfassung neben einer Liste; **kein Drawer zum Anlegen** (Spec `bedien-muster`, „Einen
+Datensatz anlegen“). Einsatzgebundene Datensätze legen über `components/AnlegenModal.tsx` an
+(UHS, Bereitstellungsraum), jeder Einstieg öffnet denselben Dialog. Eingeklappt über der Liste
+bleiben, weil dort in Serie erfasst wird: Nachforderung, Meldungen, Erinnerungen (geprüft
+LLH-1921); die Lagemeldung erfasst im Dialog.
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
@@ -706,8 +710,14 @@ anwendbar), „nicht geprüft" ist keins.
 **Tabelle und Dichte**
 
 - **Tabelle nur, wenn verglichen wird**: stehende Kopfzeile, fixierte **menschenlesbare** Kennung
-  (nie DB-`id`), Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Auf schmalem Schirm
-  **angepasst, nicht in Karten aufgelöst**. Träger `KatalogTabelle`/`Datensicht`.
+  (nie DB-`id`), Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Der Zähler steht erst
+  nach eigener Wahl im Namen (LLH-1790, Spec `katalogtabelle-spaltenschalter`): solange die Wahl
+  der Voreinstellung der Seite und der Breite folgt, heißt der Schalter „Spalten“, danach
+  „Spalten · n ausgeblendet“ mit allen verborgenen (`weichtVonVorgabeAb` in
+  `components/SpaltenSchalter.tsx`; die Seite reicht `spaltenAusVoreinstellung` durch). Auf schmalem Schirm
+  **angepasst, nicht in Karten aufgelöst**; ausgenommen sind Flächen mit `form="auto"`, deren
+  Zeile am Handy nicht trägt (Fahrzeuge, Personal, die Einheitenliste mit Baum als Karten,
+  LLH-1787). Träger `KatalogTabelle`/`Datensicht`.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
@@ -743,6 +753,21 @@ anwendbar), „nicht geprüft" ist keins.
   Zeile hält ihre Stelle, LLH-1254).
   Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
   Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
+- **Die Hauptaktion einer Zeile bleibt im Bild** (LLH-1789, Spec `einsatztauglichkeit-layout`,
+  Change `lsug0joq-tabellen-touch` D1): die Aktionsspalte einer `Datensicht` trägt `amEnde` und
+  steht ab `md` rechts fixiert (direkte `KatalogTabelle`-Nutzer setzen `fixed: 'right'` selbst); unter `md` ziehen Primäraktion und ⋮ in die fixierte Kennung (`Datensicht`), eine
+  zweite fixierte Spalte gibt es dort nicht. Spalte mit Primäraktion über
+  `components/aktionsSpalte.tsx` (Breite je Stufe gerechnet, aus `PrimaerAktion`/`WeitereAktionen`
+  wie Karte und Kontextmenü); eine reine ⋮-Spalte (`menueSpaltenBreite`) setzt nur `amEnde`.
+  Nachweis `e2e/gate1-ueberlauf.spec.ts` („Aktion im Bild“), Fokus in
+  `e2e/fokus-verdeckung.spec.ts`.
+- **Kopf und Körper sind gleich breit** (LLH-1788): mit stehender Kopfzeile legt rc-table den
+  Kopf in eine eigene Tabelle; `theme/sprache.css` setzt sie auf `table-layout: fixed`, damit
+  sie die gemessenen Körperbreiten genau übernimmt. Damit der feste Kopf nie gekürzt wird, hebt
+  `KatalogTabelle` jede Zahlbreite und jedes `mindestBreite` auf die Mindestbreite ihres Kopfs
+  (`components/kopfBreite.ts`: längstes Wort des Titels in der Kopfschrift, Sortiersymbol,
+  Filterauslöser der Stufe, Zellpolster). Gerechnet, nicht gemessen, damit nichts springt.
+  Nachweis `e2e/gate1-ueberlauf.spec.ts` („Spaltenköpfe … stehen über ihren Spalten“).
 - **Kopfwerkzeuge der `KatalogTabelle` folgen der Dichte** (LLH-1227): Suche und Spaltenschalter
   stehen `paddingSM` auseinander, antds Spaltenfilter-Auslöser hält `controlHeightSM` und liegt
   in der Tab-Folge (Name „<Spalte> filtern“, Enter/Leertaste öffnen), beides im Primitiv, nie je
@@ -876,13 +901,11 @@ anwendbar), „nicht geprüft" ist keins.
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
   Rückweg. Die übrigen Teile der Zeile bleiben unsichtbar an ihrem Platz, damit eine umgebrochene
   Zeile ihre Höhe hält. Eine Person, die im Einheit-Detail über ihr ⋮ aus der Einheit gelöst wird,
-  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Fahrzeug und Material
-  nehmen vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort des
-  Entlassens; Material samt Ort, LLH-1923); den Satz zu Ausgelassenem bildet
-  `kraefte/ruecknahme.ts`. **Bekannte Lücke:** Personal-Entlassen macht beim Rückgängig nur die
-  Kraft wieder aktiv, ohne ihre Bindungen; bis zur Folgeaufgabe LLH-1922 bleibt das so, ohne
-  Rückfrage.
-  Ebenso noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
+  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Fahrzeug, Person und
+  Material nehmen vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort
+  des Entlassens; die Person ohne neue Periode, LLH-1922; das Material samt Ort, LLH-1923); den
+  Satz zu Ausgelassenem bildet `kraefte/ruecknahmeSatz.ts`.
+  Noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
   Person; und das Rückgängig von Material am Ort, Besatzung und UHS-Kraft prüft noch nicht, ob der
   Datensatz inzwischen anders gebunden ist. „Abziehen“ an der UHS und „Vom Fahrzeug lösen“ in
   der Fahrzeugliste halten die gelöste Zeile noch nicht, und Material am Ort zeigt „Lösen“ noch
@@ -944,7 +967,24 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Inline-Bearbeitung und Status**
 
-- **Ein leeres Feld muss sagen, dass man es schreiben kann:** optionale Inline-Angaben nehmen
+- **In einer Tabellenzelle schwebt die Bearbeitung** (LLH-1795, Spec `einsatztauglichkeit-layout`,
+  Change `lsug0joq-tabellen-touch` D2): `KatalogTabelle` setzt `AngabeFormProvider form="schwebend"`
+  (`components/angabeForm.tsx`) um den Körper, `fluss` um aufgeklappte Zeilen. Eine `InlineAngabe`
+  lässt dort ihre Anzeige stehen und öffnet Eingabe, Fehler und Knöpfe in einem Popover an ihr;
+  die Spalten bleiben stehen. Ein Klick daneben schließt nicht (Escape, „Abbrechen“, Speichern
+  schon), je Tabelle ist höchstens eine offen (eine unveränderte schließt, eine geänderte behält den
+  Fokus), der Fokus kehrt auf die Anzeige zurück. Tab aus dem Popover schließt eine unveränderte
+  Bearbeitung, eine geänderte hält den Fokus (Tab im Kreis, Shift+Tab auf die Anzeige, Enter dort
+  zurück). Eine offene hält die Zeilenfolge der `Datensicht` auch ohne Fokus (`onBearbeitungOffen`
+  in `halten`). Karten und Ansichten bearbeiten im Fluss;
+  `BemerkungZelle` liest den Kontext nicht. Nachweis `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten
+  ohne Sprung“).
+- **Ein leeres Feld muss sagen, dass man es schreiben kann** (Listenform LLH-1791, Spec
+  `personal-einsatzangaben`): steht in einer Listenzelle schon ein anderer Wert (die Qualifikation
+  neben der leeren Einsatzfunktion), sagt ein Stift-Knopf mit zugänglichem Namen (Etikett und
+  Zeilenkennung, „Funktion zu Anna eintragen“) und dem Boden der Stufe das Schreibbare, über
+  `InlineAngabe.ausloeser` (Vorbild `kraefte/EinsatzfunktionZelle.tsx`); ohne solchen Wert bleibt
+  die Aufforderung als Wort. Optionale Inline-Angaben nehmen
   `components/BemerkungZelle.tsx`, nicht `Typography.Text editable` (Platzhalter `Button type="link"`, Zeilenkennung im Namen,
   Lesezweig „—", Fehler an der Zelle per `data-fehler`, Fokusrückgabe und Wertgleichheits-Riegel
   im Primitiv). Falle: antds `Editable` wertet **legacy `keyCode`** aus — Tasten per `fireEvent`
@@ -1407,7 +1447,10 @@ Spec `bedien-arbeitsplatz`).
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
   „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026): fünf Felder, das fünfte ist der
   optionale Einsatzort; ein sechstes gehört in die Kopfdaten. Die Einsatz-Vorlage steht als
-  gedämpfte Zeile unter den Feldern, kein Feld (LLH-1375): das Stichwort stellt sie ein.
+  gedämpfte Zeile unter den Feldern, kein Feld (LLH-1375): das Stichwort stellt sie ein. Ausnahme
+  „Lagemeldung erfassen“ (LLH-1921, Entscheidung 17.11.2026, Change
+  `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
+  Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
   bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
   `einheit:<id>`). Einzige Ausnahme: ein Klappteil, der bei einem Prüffehler darin selbst aufgeht

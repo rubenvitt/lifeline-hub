@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from './SeitenZustand';
 
-/** Der Drawer liefert den angelegten Datensatz, nicht einen Listeneintrag (beim BR trägt die
+/** Der Dialog liefert den angelegten Datensatz, nicht einen Listeneintrag (beim BR trägt die
  *  Liste mehr als die Anlage, LLH-1095); geführt wird nur über die Kennung. */
 interface AnlegenSlot {
   open: boolean;
@@ -21,7 +21,7 @@ interface DirekteinstiegProps<T extends { id: number }> {
   fehlerText: string;
   leerTitel: string;
   leerAktionLabel: string;
-  /** Der Anlegen-Drawer des Moduls; er läuft über lokalen Zustand, nicht über eine Route. */
+  /** Der Anlegen-Dialog des Moduls; er läuft über lokalen Zustand, nicht über eine Route. */
   anlegen: (slot: AnlegenSlot) => ReactNode;
 }
 

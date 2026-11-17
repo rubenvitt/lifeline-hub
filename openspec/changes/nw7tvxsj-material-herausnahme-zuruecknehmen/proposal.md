@@ -28,7 +28,7 @@ vollständig zurück; Material zieht nach demselben Muster nach.
   „, ohne <Ort> (<Grund>)“. Live-Meldungen an Material und Ort wie beim Herausnehmen.
 - Materialseite: „Rückgängig“ im Hinweis ruft die Rücknahme; ein ausgelassener Ort steht im
   Seitenhinweis „<Posten> zurück, ohne: …“ wie auf der Fahrzeugseite.
-- `frontend/AGENTS.md`: Material verlässt die Liste der bekannten Lücken; Personal (LLH-1922) bleibt.
+- `frontend/AGENTS.md`: Material verlässt die Liste der bekannten Lücken; mit LLH-1922 (Personal) ist sie leer.
 - Anwenderdoku `material.md`, „Material aus dem Einsatz nehmen“: Rückgängig bringt den Posten an
   seinen Ort zurück.
 

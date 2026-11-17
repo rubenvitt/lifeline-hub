@@ -6728,6 +6728,46 @@ export interface components {
             telefon?: string | null;
             traegerorganisation?: string | null;
         };
+        /** @description Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922). */
+        PersonalEntlassungAntwort: {
+            personal: components["schemas"]["EinsatzPersonalAnzeige"];
+            vorzustand: components["schemas"]["PersonalEntlassungVorzustand"];
+        };
+        /** @description Antwort von `POST …/personal/{ep_id}/entlassen/zuruecknehmen` (LLH-1922). */
+        PersonalEntlassungRuecknahmeAntwort: {
+            ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
+            personal: components["schemas"]["EinsatzPersonalAnzeige"];
+        };
+        /**
+         * @description Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer
+         *     Person zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`
+         *     D1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+         *     zurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das
+         *     Entlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.
+         */
+        PersonalEntlassungVorzustand: {
+            /** Format: int64 */
+            einheit_id?: number | null;
+            /**
+             * @description War die Person Einsatzleiter: der Name, den die Führungsstelle für sie eingefroren hat. Die
+             *     Rücknahme erkennt daran den Vermerk „nicht mehr disponiert“ wieder, auch wenn der Name der
+             *     Person inzwischen berichtigt wurde. `None` = war nicht Einsatzleiter.
+             */
+            einsatzleiter_name?: string | null;
+            /** @description Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt. */
+            entlassen_at: string;
+            /**
+             * Format: int64
+             * @description Fahrzeug, dessen Besatzung die Person war.
+             */
+            fahrzeug_id?: number | null;
+            /** @description Einheiten, die die Person führte. */
+            gefuehrte_einheiten?: number[];
+            /** @description Einsatzabschnitte, die die Person leitete. */
+            geleitete_abschnitte?: number[];
+            /** Format: int64 */
+            uhs_id?: number | null;
+        };
         /** @description Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`. */
         PersonalStatus: {
             farbe?: string | null;
@@ -7343,7 +7383,10 @@ export interface components {
              */
             frist_min: number;
         };
-        /** @description Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten. */
+        /**
+         * @description Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten
+         *     (LLH-1722 für das Fahrzeug, LLH-1922 für die Person, LLH-1923 für den Ort eines Postens).
+         */
         RuecknahmeAusgelassen: {
             /** @description Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“). */
             bezeichnung: string;

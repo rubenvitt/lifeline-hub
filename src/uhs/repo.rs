@@ -162,8 +162,9 @@ pub async fn anlegen_tx(
 /// Ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
 ///
 /// Optimistisches Lock (LFH-241/F10): `erwartet_geaendert_at` trägt den beim Laden gelesenen
-/// Stand; das UPDATE schreibt nur, solange `geaendert_at` unverändert ist — sonst `Conflict`
-/// (409) statt stillem Overwrite. `None` = bewusstes Overwrite (Escape-Hatch des Dialogs).
+/// Stand; das UPDATE schreibt nur, solange `geaendert_at` unverändert ist — sonst `Veraltet`
+/// (409 mit `grund`, LLH-1920) statt stillem Overwrite. `None` = bewusstes Overwrite („Meine
+/// Änderung übernehmen“).
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -225,9 +226,9 @@ pub async fn aktualisiere(
                         .fetch_optional(pool)
                         .await?;
                 if existiert.is_some() {
-                    return Err(AppError::Conflict(
-                        "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
-                    ));
+                    // Eigener Grund (LLH-1920): der Client fragt nur hier „Zwischenzeitlich
+                    // geändert“, nicht bei einer doppelten Bezeichnung.
+                    return Err(AppError::Veraltet);
                 }
             }
             Err(AppError::NotFound)
@@ -532,8 +533,8 @@ mod tests {
         .await
         .unwrap_err();
         assert!(
-            matches!(err, AppError::Conflict(_)),
-            "veralteter Stand muss 409 (Conflict) sein, war: {err:?}"
+            matches!(err, AppError::Veraltet),
+            "veralteter Stand muss 409 (Veraltet) sein, war: {err:?}"
         );
 
         aktualisiere(

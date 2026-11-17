@@ -8,6 +8,7 @@ import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { useAngabeForm } from './angabeForm';
 import KatalogTabelle, {
   BLAETTER_SCHWELLE,
   KOPF_FREIRAUM,
@@ -15,6 +16,7 @@ import KatalogTabelle, {
   filterKopfStil,
   fliessBreite,
   setzeKopfFreiraum,
+  AKTION_FREIRAUM,
   polsterKlickRiegel,
   sortierKopfStyle,
   tabellenTokens,
@@ -86,6 +88,110 @@ describe('KatalogTabelle', () => {
     const koerper = container.querySelector<HTMLTableElement>('.ant-table-body table');
     expect(koerper).not.toBeNull();
     expect(koerper!.style.width).toBe('max-content');
+  });
+
+  it('Zellen bearbeiten schwebend, aufgeklappte Zeilen im Fluss (LLH-1795)', () => {
+    function Probe({ wo }: { wo: string }) {
+      return <span data-testid={wo}>{useAngabeForm().form}</span>;
+    }
+    renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          {
+            title: 'Funkrufname',
+            key: 'funkrufname',
+            render: () => <Probe wo="zelle" />,
+          },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+        expandable={{
+          expandedRowRender: () => <Probe wo="aufgeklappt" />,
+          defaultExpandAllRows: true,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('zelle')).toHaveTextContent('schwebend');
+    expect(screen.getByTestId('aufgeklappt')).toHaveTextContent('fluss');
+  });
+
+  /**
+   * Kopf und Körper gleich breit (LLH-1788): die Kopftabelle ist fest (`sprache.css`), also muss
+   * jede Spalte schon im Körper so breit sein, wie ihr Kopf mindestens braucht. Eine zu schmale
+   * Zahlbreite wächst auf die Mindestbreite des Kopfs; eine breitere bleibt.
+   */
+  it('hebt eine zu schmale Spalte auf die Mindestbreite ihres Kopfs (LLH-1788)', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname', width: 300 },
+          {
+            title: 'Position',
+            dataIndex: 'typ',
+            key: 'typ',
+            width: 20,
+            sorter: (a, b) => a.typ.localeCompare(b.typ),
+          },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
+    );
+    const breiten = [
+      ...container.querySelectorAll<HTMLTableColElement>('.ant-table-body colgroup col'),
+    ].map((c) => parseFloat(c.style.width));
+    expect(breiten[0]).toBe(300);
+    // Polster beidseits plus „POSITION“ plus Sortiersymbol: weit mehr als 20 px.
+    expect(breiten[1]).toBeGreaterThan(60);
+  });
+
+  it('eine Spalte ohne Breite hält die Mindestbreite ihres Kopfs an Kopf- und Körperzelle (LLH-1788)', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
+          {
+            title: 'Position',
+            dataIndex: 'typ',
+            key: 'typ',
+            sorter: (a, b) => a.typ.localeCompare(b.typ),
+          },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
+    );
+    const zelle = container.querySelectorAll<HTMLElement>(
+      '.ant-table-tbody tr.ant-table-row td',
+    )[1];
+    expect(parseFloat(zelle.style.minWidth)).toBeGreaterThan(60);
+  });
+
+  it('eine Fließspalte hält ihr Mindestmaß an Kopf- und Körperzelle, auch wenn Nachbarn wachsen (LLH-1788)', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          {
+            title: 'Funkrufname',
+            dataIndex: 'funkrufname',
+            key: 'funkrufname',
+            mindestBreite: 180,
+            onCell: () => ({ style: { minWidth: 40 } }),
+          },
+          { title: 'Typ', dataIndex: 'typ', key: 'typ', width: 100 },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
+    );
+    const zelle = container.querySelector<HTMLElement>('.ant-table-tbody tr.ant-table-row td')!;
+    expect(zelle.style.minWidth).toBe('180px');
+    const kopf = container.querySelector<HTMLElement>('thead th')!;
+    expect(kopf.style.minWidth).toBe('180px');
   });
 
   /**
@@ -973,6 +1079,16 @@ describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
     wurzel.appendChild(kopf);
     setzeKopfFreiraum(wurzel);
     expect(wurzel.style.getPropertyValue(KOPF_FREIRAUM)).toBe('39px');
+  });
+
+  it('misst die rechts fixierte Aktionsspalte für scroll-padding-inline-end (LLH-1789)', () => {
+    const wurzel = document.createElement('div');
+    const aktion = document.createElement('th');
+    aktion.className = 'ant-table-cell ant-table-cell-fix-end';
+    Object.defineProperty(aktion, 'offsetWidth', { value: 124 });
+    wurzel.appendChild(aktion);
+    setzeKopfFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(AKTION_FREIRAUM)).toBe('124px');
   });
 
   it('ohne stehende Kopfzeile ist der Freiraum 0, nicht ein alter Wert', () => {
