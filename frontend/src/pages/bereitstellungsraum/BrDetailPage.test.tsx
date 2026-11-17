@@ -1239,7 +1239,9 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
         const body = (await request.json()) as Record<string, unknown>;
         stand.bodies.push(body);
         if (patch) return patch(body);
-        const { basis_geaendert_at: _basis, ...felder } = body;
+        // Der Basisstand ist kein Feld des Raums: nicht in den Stand übernehmen.
+        const felder = { ...body };
+        delete felder.basis_geaendert_at;
         stand.br = { ...stand.br, ...felder, geaendert_at: `${stand.br.geaendert_at}+` };
         return HttpResponse.json(stand.br);
       }),
