@@ -3,12 +3,13 @@ pub mod quali_soll;
 pub mod qualifikation_deckung;
 pub mod qualifikation_repo;
 pub mod repo;
+pub mod ruecknahme;
 pub mod status_repo;
 
 use crate::katalog::{
     StatusKategorie, KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Default-Qualifikations-Katalog je neu angelegter Organisation (label, sortier).
@@ -232,6 +233,58 @@ impl EinsatzPersonalAnzeige {
     }
 }
 
+/// Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer
+/// Person zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`
+/// D1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+/// zurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das
+/// Entlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct PersonalEntlassungVorzustand {
+    /// Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt.
+    pub entlassen_at: String,
+    #[serde(default)]
+    pub einheit_id: Option<i64>,
+    /// Fahrzeug, dessen Besatzung die Person war.
+    #[serde(default)]
+    pub fahrzeug_id: Option<i64>,
+    #[serde(default)]
+    pub uhs_id: Option<i64>,
+    /// Einheiten, die die Person führte.
+    #[serde(default)]
+    pub gefuehrte_einheiten: Vec<i64>,
+    /// Einsatzabschnitte, die die Person leitete.
+    #[serde(default)]
+    pub geleitete_abschnitte: Vec<i64>,
+    /// War die Person Einsatzleiter: der Name, den die Führungsstelle für sie eingefroren hat. Die
+    /// Rücknahme erkennt daran den Vermerk „nicht mehr disponiert“ wieder, auch wenn der Name der
+    /// Person inzwischen berichtigt wurde. `None` = war nicht Einsatzleiter.
+    #[serde(default)]
+    pub einsatzleiter_name: Option<String>,
+}
+
+/// Höchstzahl je Liste im Vorzustand einer Rücknahme (`src/AGENTS.md`, „Eingabegrenzen“): so
+/// viele Einheiten führt oder Abschnitte leitet keine Person.
+pub const RUECKNAHME_LISTE_MAX: usize = 200;
+
+/// Höchstlänge des eingefrorenen Einsatzleiter-Namens im Vorzustand (`src/AGENTS.md`,
+/// „Eingabegrenzen“). Großzügig: der Name einer Stamm-Person hat keine eigene Grenze, und ein
+/// echter Vorzustand darf nie abgelehnt werden.
+pub const RUECKNAHME_NAME_MAX: usize = 2_000;
+
+/// Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct PersonalEntlassungAntwort {
+    pub personal: EinsatzPersonalAnzeige,
+    pub vorzustand: PersonalEntlassungVorzustand,
+}
+
+/// Antwort von `POST …/personal/{ep_id}/entlassen/zuruecknehmen` (LLH-1922).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct PersonalEntlassungRuecknahmeAntwort {
+    pub personal: EinsatzPersonalAnzeige,
+    pub ausgelassen: Vec<crate::entlassung::RuecknahmeAusgelassen>,
+}
+
 /// Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct FuehrungskraftKarte {
@@ -367,6 +420,19 @@ pub fn etb_text_entlassen(name: &str, funktion: Option<&str>, einheit: Option<&s
     }
 }
 
+/// System-ETB der Rücknahme einer Entlassung (LLH-1922): nennt, was nicht zurückkam.
+pub fn etb_text_entlassung_zurueckgenommen(
+    name: &str,
+    funktion: Option<&str>,
+    ausgelassen: &[crate::entlassung::RuecknahmeAusgelassen],
+) -> String {
+    format!(
+        "Person «{}»: Entlassung zurückgenommen{}",
+        etb_bezeichnung(name, funktion),
+        crate::entlassung::ohne_text(ausgelassen)
+    )
+}
+
 /// System-ETB beim Stornieren einer Fehldisposition (LLH-1079, design.md D3).
 pub fn etb_text_storniert(name: &str, funktion: Option<&str>) -> String {
     format!(
@@ -378,6 +444,43 @@ pub fn etb_text_storniert(name: &str, funktion: Option<&str>) -> String {
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
+
+    #[test]
+    fn entlassung_zurueckgenommen_nennt_ausgelassenes() {
+        assert_eq!(
+            etb_text_entlassung_zurueckgenommen("Anna Muster", Some("SAN"), &[]),
+            "Person «Anna Muster (SAN)»: Entlassung zurückgenommen"
+        );
+        let ohne = [
+            crate::entlassung::RuecknahmeAusgelassen::new(
+                "Einheit «Zug 1»",
+                "inzwischen aufgelöst",
+            ),
+            crate::entlassung::RuecknahmeAusgelassen::new(
+                "Einsatzleitung",
+                "inzwischen anders besetzt",
+            ),
+        ];
+        assert_eq!(
+            etb_text_entlassung_zurueckgenommen("Anna Muster", None, &ohne),
+            "Person «Anna Muster»: Entlassung zurückgenommen, ohne Einheit «Zug 1» \
+             (inzwischen aufgelöst), Einsatzleitung (inzwischen anders besetzt)"
+        );
+    }
+
+    #[test]
+    fn vorzustand_ohne_listen_ist_leer() {
+        let v: PersonalEntlassungVorzustand =
+            serde_json::from_str(r#"{"entlassen_at":"2026-11-17 10:00:00"}"#).unwrap();
+        assert_eq!(
+            v,
+            PersonalEntlassungVorzustand {
+                entlassen_at: "2026-11-17 10:00:00".into(),
+                ..Default::default()
+            }
+        );
+        assert!(serde_json::from_str::<PersonalEntlassungVorzustand>("{}").is_err());
+    }
 
     #[test]
     fn disponiert_mit_ohne_und_mit_leerer_funktion() {
