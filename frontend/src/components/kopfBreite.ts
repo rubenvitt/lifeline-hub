@@ -55,7 +55,8 @@ export function kopfMindestBreite({
   const wort = laengstesWort(titel);
   const text = wort ? messen(wort) : 0;
   const knoepfe =
-    (sortierbar ? token.fontSizeSM + SORTIER_ABSTAND : 0) + (filterbar ? token.controlHeightSM + FILTER_ABSTAND : 0);
+    (sortierbar ? token.fontSizeSM + SORTIER_ABSTAND : 0) +
+    (filterbar ? token.controlHeightSM + FILTER_ABSTAND : 0);
   return Math.ceil(2 * token.padding + text + knoepfe);
 }
 
