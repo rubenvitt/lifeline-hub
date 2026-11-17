@@ -155,7 +155,10 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
         );
       }),
       http.post('/api/einsaetze/1/material/11/entlassen', () =>
-        HttpResponse.json({ ...zweites, beendet_als: 'entlassen' }),
+        HttpResponse.json({
+          material: { ...zweites, beendet_als: 'entlassen' },
+          vorzustand: { entlassen_at: '2026-11-17 10:00:00' },
+        }),
       ),
     );
     const { container } = render();

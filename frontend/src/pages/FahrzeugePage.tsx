@@ -28,13 +28,7 @@ import {
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
-import type {
-  EinsatzFahrzeug,
-  EinsatzPersonal,
-  EntlassungRuecknahmeAntwort,
-  EntlassungVorzustand,
-  Staerke,
-} from '../api/types';
+import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -106,6 +100,7 @@ import {
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
+import { ausgelassenSatz } from '../kraefte/ruecknahme';
 import EigeneEinheitDialog from '../kraefte/EigeneEinheitDialog';
 import BesatzungUebernehmenDialog from '../kraefte/BesatzungUebernehmenDialog';
 import MaterialAmOrt from '../kraefte/MaterialAmOrt';
@@ -358,15 +353,6 @@ const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
  * hängt die Liste aus. Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie schreiben darf;
  * ohne Schreibrecht meldet keine Angabe einen Entwurf.
  */
-/**
- * Der Satz zu einer Rücknahme, die nicht alles zurückbekam (LLH-1722): „83-1 zurück, ohne: Anna
- * Müller (inzwischen auf einem anderen Fahrzeug)“.
- */
-export function ausgelassenSatz(name: string, antwort: EntlassungRuecknahmeAntwort): string {
-  const teile = antwort.ausgelassen.map((a) => `${a.bezeichnung} (${a.grund})`);
-  return `${name} zurück, ohne: ${teile.join(', ')}`;
-}
-
 export default function FahrzeugePage() {
   return (
     <OffeneBearbeitungProvider>
@@ -592,7 +578,8 @@ function FahrzeugeInhalt() {
     },
     onSuccess: (antwort, v) => {
       invalidateNachEntlassen();
-      if (antwort.ausgelassen.length > 0) setAusgelassenText(ausgelassenSatz(v.name, antwort));
+      if (antwort.ausgelassen.length > 0)
+        setAusgelassenText(ausgelassenSatz(v.name, antwort.ausgelassen));
     },
     onError: (e) => {
       setRueckgaengigFehler(e);

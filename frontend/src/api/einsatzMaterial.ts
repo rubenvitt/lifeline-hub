@@ -1,4 +1,11 @@
-import type { EinsatzMaterial, MaterialArt, MaterialStatus } from './types';
+import type {
+  EinsatzMaterial,
+  MaterialArt,
+  MaterialEntlassungAntwort,
+  MaterialEntlassungVorzustand,
+  MaterialRuecknahmeAntwort,
+  MaterialStatus,
+} from './types';
 import { apiGet, apiSend } from './client';
 
 export interface MaterialAdhocEingabe {
@@ -171,11 +178,36 @@ export function listEntlassenesMaterial(einsatzId: number): Promise<EinsatzMater
 }
 
 /**
- * Aus dem Einsatz nehmen (LLH-1079, Wortlaut LLH-1093): die Zeile bleibt, der Ort geht.
- * Umkehrbar über {@link reaktiviereDisposition}, deshalb ohne Rückfrage.
+ * Aus dem Einsatz nehmen (LLH-1079, Wortlaut LLH-1093): die Zeile bleibt, der Ort geht. Die
+ * Antwort trägt den Vorzustand, mit dem {@link nimmHerausnahmeZurueck} den Posten an seinen Ort
+ * zurückbringt (LLH-1923); deshalb ohne Rückfrage.
  */
-export function nimmAusDemEinsatz(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
-  return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material/${emId}/entlassen`, 'POST');
+export function nimmAusDemEinsatz(
+  einsatzId: number,
+  emId: number,
+): Promise<MaterialEntlassungAntwort> {
+  return apiSend<MaterialEntlassungAntwort>(
+    `/api/einsaetze/${einsatzId}/material/${emId}/entlassen`,
+    'POST',
+  );
+}
+
+/**
+ * „Rückgängig“ nach dem Herausnehmen (LLH-1923, Spec `kraefte-entlassung`): stellt Ort, Menge,
+ * Status und Dispositionszeit wieder her; ein Ort, der den Posten nicht mehr aufnimmt, steht in
+ * `ausgelassen`. Nur direkt danach und nur für die herausnehmende Person, sonst 409; danach bleibt
+ * {@link reaktiviereDisposition}.
+ */
+export function nimmHerausnahmeZurueck(
+  einsatzId: number,
+  emId: number,
+  vorzustand: MaterialEntlassungVorzustand,
+): Promise<MaterialRuecknahmeAntwort> {
+  return apiSend<MaterialRuecknahmeAntwort>(
+    `/api/einsaetze/${einsatzId}/material/${emId}/entlassen/zuruecknehmen`,
+    'POST',
+    vorzustand,
+  );
 }
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Ort (LLH-1224) in den ersten 15 Minuten. */
@@ -183,7 +215,7 @@ export function storniereDisposition(einsatzId: number, emId: number): Promise<v
   return apiSend<void>(`/api/einsaetze/${einsatzId}/material/${emId}/stornieren`, 'POST');
 }
 
-/** Herausgenommenes oder storniertes Material erneut disponieren (Rückgängig, Block). */
+/** Herausgenommenes oder storniertes Material erneut disponieren (Block „Aus dem Einsatz genommen“). */
 export function reaktiviereDisposition(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
     `/api/einsaetze/${einsatzId}/material/${emId}/reaktivieren`,

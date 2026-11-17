@@ -15,9 +15,9 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 2. Frontend: Rückgängig nimmt vollständig zurück
 
-- [ ] 2.1 `kraefte/ruecknahme.ts` mit `ausgelassenSatz(name, ausgelassen)` (D4) samt Test; `pages/FahrzeugePage.tsx` darauf umstellen, ihr Export entfällt; `pages/FahrzeugePage.test.tsx` grün
-- [ ] 2.2 `api/einsatzMaterial.ts`: `nimmAusDemEinsatz` liefert `MaterialEntlassungAntwort`, neu `nimmHerausnahmeZurueck`; Doc-Kommentare berichtigen
-- [ ] 2.3 `pages/MaterialPage.tsx`: Rückgängig aus dem Hinweis ruft die Rücknahme mit dem Vorzustand, invalidiert Liste und Einheiten, `ausgelassen` als `SeitenHinweis`; Kommentar an `herausnehmenMutation` berichtigen; Tests in `pages/MaterialPage.test.tsx` („bietet Rückgängig an“ ruft die Rücknahme mit dem Vorzustand, „nennt den ausgelassenen Ort“, „scheitert Rückgängig …“) rot→grün
+- [x] 2.1 `kraefte/ruecknahme.ts` mit `ausgelassenSatz(name, ausgelassen)` (D4) samt Test; `pages/FahrzeugePage.tsx` darauf umstellen, ihr Export entfällt; `pages/FahrzeugePage.test.tsx` grün
+- [x] 2.2 `api/einsatzMaterial.ts`: `nimmAusDemEinsatz` liefert `MaterialEntlassungAntwort`, neu `nimmHerausnahmeZurueck`; Doc-Kommentare berichtigen
+- [x] 2.3 `pages/MaterialPage.tsx`: Rückgängig aus dem Hinweis ruft die Rücknahme mit dem Vorzustand, invalidiert Liste und Einheiten, `ausgelassen` als `SeitenHinweis`; Kommentar an `herausnehmenMutation` berichtigen; Tests in `pages/MaterialPage.test.tsx` („bietet Rückgängig an“ ruft die Rücknahme mit dem Vorzustand, „nennt den ausgelassenen Ort“, „scheitert Rückgängig …“) rot→grün
 
 ## 3. Regel und Doku
 
