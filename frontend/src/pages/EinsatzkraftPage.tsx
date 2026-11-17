@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { Fragment, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import {
   entlasseDisposition,
   listeEinsatzPersonal,
   listEntlassenesPersonal,
+  nimmEntlassungZurueck,
   reaktiviereDisposition,
   storniereDisposition,
   updateDisposition,
@@ -22,7 +23,7 @@ import { listeQualifikationen } from '../api/qualifikationen';
 import { listePersonalPerioden } from '../api/kraefteZeitachse';
 import { PERSONAL_ADHOC_TEXT_MAX, PERSONAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { EinsatzPersonal } from '../api/types';
+import type { EinsatzPersonal, PersonalEntlassungVorzustand } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useUhr } from '../abloesung/useUhr';
@@ -62,6 +63,7 @@ import {
 } from '../kraefte/useOptimistischesZeilenUpdate';
 import { dauerText, kraftDauern } from '../kraefte/zeitachse';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import {
   einheitDetailPfad,
   kraefteuebersichtPfad,
@@ -203,18 +205,43 @@ export default function EinsatzkraftPage() {
   };
 
   const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
+  // Was die Rücknahme ausgelassen hat (LLH-1922): ein Teilerfolg, den niemand im Toast überliest.
+  const [ausgelassenText, setAusgelassenText] = useState<string | null>(null);
+  // Rückgängig nimmt mit dem Vorzustand aus der Antwort des Entlassens alles zurück: Bindungen,
+  // Status, Zeitachse ohne neue Periode (Spec `kraefte-entlassung`, „Entlassung einer Person
+  // zurücknehmen“). Die nächste Rücknahme räumt den Hinweis der vorigen.
   const rueckgaengigMutation = useMutation({
-    mutationFn: () => reaktiviereDisposition(einsatzId, epId),
-    onMutate: () => setRueckgaengigFehler(null),
-    onSuccess: (neu) => moveZeile(neu, 'aktiv'),
+    mutationFn: (vorzustand: PersonalEntlassungVorzustand) =>
+      nimmEntlassungZurueck(einsatzId, epId, vorzustand),
+    onMutate: () => {
+      setRueckgaengigFehler(null);
+      setAusgelassenText(null);
+    },
+    onSuccess: (antwort) => {
+      moveZeile(antwort.personal, 'aktiv');
+      for (const key of [
+        einsatzKeys.einheiten(einsatzId),
+        einsatzKeys.abschnitte(einsatzId),
+        einsatzKeys.fahrzeuge(einsatzId),
+        einsatzKeys.uhs(einsatzId),
+        einsatzKeys.kraefteZeitachsePersonal(einsatzId),
+      ]) {
+        void qc.invalidateQueries({ queryKey: key });
+      }
+      if (antwort.ausgelassen.length > 0) {
+        setAusgelassenText(ausgelassenSatz(antwort.personal.name, antwort));
+      }
+    },
     onError: (e) => setRueckgaengigFehler(e),
   });
   const entlassenMutation = useMutation({
     mutationFn: () => entlasseDisposition(einsatzId, epId),
     onMutate: () => orte.beginne('aus'),
-    onSuccess: (neu) => {
+    onSuccess: ({ personal: neu, vorzustand }) => {
       moveZeile(neu, 'entlassen');
-      zeigeRueckgaengig(message, `${neu.name} entlassen`, () => rueckgaengigMutation.mutate());
+      zeigeRueckgaengig(message, `${neu.name} entlassen`, () =>
+        rueckgaengigMutation.mutate(vorzustand),
+      );
     },
     onError: (e) => orte.melde('aus', e, 'Nicht entlassen'),
   });
@@ -421,14 +448,23 @@ export default function EinsatzkraftPage() {
         fahrzeugeQuery.dataUpdatedAt,
       )}
       hinweis={
-        !darfSchreiben || rueckgaengigFehler != null ? (
+        !darfSchreiben || rueckgaengigFehler != null || ausgelassenText != null ? (
           <Space orientation="vertical" style={{ width: '100%' }}>
             <RechteHinweis text={rechteText} sichtbar={!darfSchreiben} />
             <SeitenHinweise
               fehler={rueckgaengigFehler}
-              fehlerTitel="Nicht erneut disponiert"
+              fehlerTitel="Nicht zurückgenommen"
               fehlerFallback="Rückgängig fehlgeschlagen"
             />
+            {ausgelassenText != null && (
+              <Alert
+                type="warning"
+                showIcon
+                closable
+                message={ausgelassenText}
+                onClose={() => setAusgelassenText(null)}
+              />
+            )}
           </Space>
         ) : null
       }

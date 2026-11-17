@@ -388,20 +388,105 @@ describe('EinsatzkraftPage – Person (3.3)', () => {
 });
 
 describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
-  it('entlässt ohne Rückfrage, bietet Rückgängig und zeigt die Person als entlassen', async () => {
+  /** Vorzustand der Antwort von `…/entlassen` (LLH-1922). */
+  const VORZUSTAND = {
+    entlassen_at: '2026-11-17 11:00:00',
+    einheit_id: 3,
+    fahrzeug_id: 5,
+    uhs_id: null,
+    gefuehrte_einheiten: [3],
+    geleitete_abschnitte: [],
+    einsatzleiter: false,
+  };
+  /** Entlassen antwortet mit Person und Vorzustand; die Person wandert in die Entlassenen. */
+  function entlassenAntwortet() {
     const entlassen = kraft({ beendet_at: minutesAgo(0), einheit_id: null, fahrzeug_id: null });
-    renderAnsicht();
     server.use(
       http.post('/api/einsaetze/7/personal/10/entlassen', () => {
         serverState = { aktiv: [], entlassene: [entlassen] };
-        return HttpResponse.json(entlassen);
+        return HttpResponse.json({ personal: entlassen, vorzustand: VORZUSTAND });
       }),
     );
+  }
+
+  it('entlässt ohne Rückfrage, bietet Rückgängig und zeigt die Person als entlassen', async () => {
+    renderAnsicht();
+    entlassenAntwortet();
     await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
     expect(await screen.findByRole('button', { name: 'Rückgängig' })).toBeInTheDocument();
     const kopf = screen.getByRole('heading', { level: 1 });
     await waitFor(() => expect(within(kopf).getByText('entlassen')).toBeVisible());
     expect(screen.getByRole('button', { name: 'Erneut disponieren' })).toBeVisible();
+  });
+
+  it('Rückgängig nimmt mit dem Vorzustand zurück statt neu zu disponieren', async () => {
+    renderAnsicht();
+    entlassenAntwortet();
+    let reaktiviert = false;
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/reaktivieren', () => {
+        reaktiviert = true;
+        return HttpResponse.json(kraft());
+      }),
+      http.post('/api/einsaetze/7/personal/10/entlassen/zuruecknehmen', async ({ request }) => {
+        requests.push(`POST ${new URL(request.url).pathname}`);
+        bodies.push(await request.json());
+        serverState = { aktiv: [kraft()], entlassene: [] };
+        return HttpResponse.json({ personal: kraft(), ausgelassen: [] });
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(requests).toContain('POST /api/einsaetze/7/personal/10/entlassen/zuruecknehmen'),
+    );
+    expect(bodies).toContainEqual(VORZUSTAND);
+    const kopf = screen.getByRole('heading', { level: 1 });
+    await waitFor(() => expect(within(kopf).queryByText('entlassen')).toBeNull());
+    expect(reaktiviert).toBe(false);
+    expect(screen.queryByText(/zurück, ohne/)).toBeNull();
+  });
+
+  it('nennt im Seitenhinweis, was die Rücknahme ausgelassen hat', async () => {
+    renderAnsicht();
+    entlassenAntwortet();
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen/zuruecknehmen', () => {
+        serverState = { aktiv: [kraft()], entlassene: [] };
+        return HttpResponse.json({
+          personal: kraft(),
+          ausgelassen: [{ bezeichnung: 'Führung von «Zug 1»', grund: 'inzwischen anders besetzt' }],
+        });
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    expect(
+      await screen.findByText(
+        'Lena Beispiel zurück, ohne: Führung von «Zug 1» (inzwischen anders besetzt)',
+      ),
+    ).toBeVisible();
+  });
+
+  it('zeigt eine Ablehnung der Rücknahme im Seitenhinweis, die Person bleibt entlassen', async () => {
+    renderAnsicht();
+    entlassenAntwortet();
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen/zuruecknehmen', () =>
+        HttpResponse.json(
+          {
+            error:
+              'Die Zeitachse der Person ist seit dem Entlassen berichtigt; die Person lässt sich erneut disponieren',
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    expect(await screen.findByText(/Zeitachse der Person ist seit dem Entlassen/)).toBeVisible();
+    expect(screen.getByText('Nicht zurückgenommen')).toBeVisible();
+    expect(within(screen.getByRole('heading', { level: 1 })).getByText('entlassen')).toBeVisible();
   });
 
   it('zeigt eine Ablehnung des Entlassens im Abschnitt „Aus dem Einsatz“, die Person bleibt', async () => {
