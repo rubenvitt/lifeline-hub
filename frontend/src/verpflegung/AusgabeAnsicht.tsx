@@ -1026,11 +1026,19 @@ export default function AusgabeAnsicht() {
             borderBlockStart: `1px solid ${rollen.linie}`,
           }}
         >
-          {/* Der Grund gesperrter Tasten, sichtbar und als Beschreibung (LFH-966); fester Platz. */}
+          {/* Der Grund gesperrter Tasten, sichtbar und als Beschreibung (LFH-966); fester Platz:
+              eine Zeile in der Schrift der Stufe. Seit die Schrift mit der Dichte wächst (LLH-1774),
+              war eine feste Mindesthöhe von 18 px in `handschuh` kleiner als die Zeile, und das
+              Verschwinden des Grunds beim ersten Tipp verschob alle Tasten. */}
           <div
             id={grundId}
             data-lfh="zaehltasten-grund"
-            style={{ ...schriftStil('meta'), color: rollen.text2, minHeight: 18 }}
+            style={{
+              ...schriftStil('meta'),
+              color: rollen.text2,
+              lineHeight: 1.5,
+              minHeight: '1.5em',
+            }}
           >
             {grundText}
           </div>
