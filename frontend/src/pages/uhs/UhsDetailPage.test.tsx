@@ -174,7 +174,7 @@ describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
       zahlen.compareDocumentPosition(within(feld).getByText('GRUNDRISS')) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    for (const titel of ['In der Stelle', 'Plätze frei', 'Wartend', 'Unterwegs']) {
+    for (const titel of ['In der Stelle', /^von \d+ Plätzen? frei$/, 'Wartend', 'Unterwegs']) {
       expect(within(zahlen).getByText(titel)).toBeInTheDocument();
     }
     // Über dem Grundriss ist eine Zahl kein Sprung: die Fläche darunter zeigt dasselbe.

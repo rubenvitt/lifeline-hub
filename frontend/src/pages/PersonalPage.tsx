@@ -103,6 +103,8 @@ const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
   { key: 'status', sortWert: true, filter: { werte: KATEGORIE_WERTE } },
   { key: 'einsatzdauer', sortWert: true },
   { key: 'ruhe', sortWert: true },
+  // Voreingestellt aus, ohne Sortierung: gehört trotzdem in die gemerkte Spaltenwahl (LLH-1790).
+  { key: 'bemerkung' },
 ];
 const GEDAECHTNIS_AUS_DATEN: readonly PersonalSpalteKey[] = [
   'traeger',

@@ -970,6 +970,8 @@ function MaterialInhalt() {
             key: 'aktionen' as const,
             width: menueSpaltenBreite(dichte),
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             // Alle Handlungen im Zeilenmenü (LLH-1722), zuerst „Aus dem Einsatz nehmen“; Stornieren
             // fragt nach (LLH-1079 D8, LLH-1093 D11, wie die Fahrzeugseite).
             render: (_: unknown, em: EinsatzMaterial) => (

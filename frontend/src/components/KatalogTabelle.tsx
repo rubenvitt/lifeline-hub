@@ -1,4 +1,6 @@
 import { ConfigProvider, Input, Table, type InputRef, type TableProps, type TableRef } from 'antd';
+import { kopfMindestBreite, mitKopfMindestBreite, textBreiteKopf } from './kopfBreite';
+import { AngabeFormProvider } from './angabeForm';
 import {
   useCallback,
   useEffect,
@@ -22,6 +24,7 @@ import {
 } from './SpaltenSchalter';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { Farbrollen } from '../theme/tokens';
+import { useDichte } from '../theme/ThemeModeProvider';
 import { useRollen } from './instrument/rollenwerte';
 import { useDruckModus } from './druck/useDruckModus';
 import { useRahmenObenFuer } from './rahmenOben';
@@ -225,6 +228,12 @@ export type KatalogTabelleProps<T> = Omit<
    * ihr Kontextmenü selbst an.
    */
   zeilenMenue?: WeitereAktionen<T>;
+  /**
+   * Meldet, ob in einer Zelle eine schwebende Bearbeitung offen ist (`components/angabeForm.tsx`).
+   * `Datensicht` hält damit die Zeilenfolge (Spec `einsatztauglichkeit-layout`, „Bearbeiten in
+   * einer Tabellenzelle verschiebt die Tabelle nicht“).
+   */
+  onBearbeitungOffen?: (isOffen: boolean) => void;
 };
 
 /**
@@ -542,7 +551,17 @@ export function setzeKopfFreiraum(wurzel: HTMLElement): void {
   // Dieselbe Messung für die fixierte Kennung, siehe `SPALTEN_FREIRAUM`.
   const kennung = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-start');
   wurzel.style.setProperty(SPALTEN_FREIRAUM, `${kennung?.offsetWidth ?? 0}px`);
+  // Und für die rechts fixierte Aktionsspalte (LLH-1789), siehe `AKTION_FREIRAUM`.
+  const aktion = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-end');
+  wurzel.style.setProperty(AKTION_FREIRAUM, `${aktion?.offsetWidth ?? 0}px`);
 }
+
+/**
+ * CSS-Variable für den Freiraum NEBEN der rechts fixierten Aktionsspalte (LLH-1789); gelesen in
+ * `theme/sprache.css` (`scroll-padding-inline-end`). Vorwärts getabbt hielte der Browser ein Ziel
+ * im rechten Streifen unter der klebenden Spalte für sichtbar und rollte nicht.
+ */
+export const AKTION_FREIRAUM = '--lfh-tabellen-aktion-breite';
 
 /**
  * CSS-Variable für den Freiraum NEBEN der fixierten Kennung; gelesen in `theme/sprache.css`
@@ -571,6 +590,8 @@ export function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
     // Die Kennung wächst mit der Dichte, ohne dass sich die Wurzel ändern muss.
     const kennung = wurzel.querySelector('th.ant-table-cell-fix-start');
     if (kennung) beobachter.observe(kennung);
+    const aktion = wurzel.querySelector('th.ant-table-cell-fix-end');
+    if (aktion) beobachter.observe(aktion);
     return () => beobachter.disconnect();
   }, [tabelle]);
 }
@@ -796,6 +817,7 @@ export default function KatalogTabelle<T extends object>({
   gedaechtnis,
   mehrzahl,
   zeilenMenue,
+  onBearbeitungOffen,
   ...rest
 }: KatalogTabelleProps<T>) {
   const [suchbegriff, setSuchbegriff] = useState(() => gedaechtnis?.start.suche ?? '');
@@ -937,6 +959,15 @@ export default function KatalogTabelle<T extends object>({
    * {@link sichtbareSpalten}, das Spalte 0 nie entfernt. Die Schalterfelder werden vor antd
    * herausgelöst.
    */
+  const { dichte } = useDichte();
+  /** Schriftfamilie des Tabellenkopfs (`--lfh-schrift-text`), einmal je Montage gelesen. */
+  const kopfSchrift = useMemo(
+    () =>
+      typeof document === 'undefined'
+        ? ''
+        : getComputedStyle(document.documentElement).getPropertyValue('--lfh-schrift-text').trim(),
+    [],
+  );
   const gezeigteSpalten = useMemo(() => {
     if (!columns) return columns;
     let auswahl: readonly KatalogSpalte<T>[] = columns;
@@ -951,7 +982,6 @@ export default function KatalogTabelle<T extends object>({
     }
     return auswahl.map((spalte) => {
       const { etikett, immerSichtbar, abBreite: _ab, ...antd } = spalte;
-      void etikett;
       void immerSichtbar;
       void _ab;
       const gebaut = { ...antd } as KatalogSpalte<T> & {
@@ -977,9 +1007,53 @@ export default function KatalogTabelle<T extends object>({
         gebaut.sortOrder =
           sortStand?.spalte === k ? (sortStand.richtung === 'auf' ? 'ascend' : 'descend') : null;
       }
+      // Die Kopftabelle ist fest (`sprache.css`, LLH-1788): der Körper muss mindestens so breit
+      // sein, wie sein Kopf braucht, sonst würde der Kopf gekürzt.
+      const kopfTitel = etikett ?? (typeof spalte.title === 'string' ? spalte.title : undefined);
+      if (kopfTitel != null && !('children' in spalte)) {
+        const mindest = kopfMindestBreite({
+          titel: kopfTitel,
+          token,
+          messen: (text) => textBreiteKopf(text, kopfSchrift, dichte),
+          sortierbar: 'sorter' in gebaut && gebaut.sorter != null && gebaut.sorter !== false,
+          filterbar:
+            ('filters' in gebaut && gebaut.filters != null) ||
+            ('filterDropdown' in gebaut && gebaut.filterDropdown != null),
+        });
+        const withMinWidth = mitKopfMindestBreite(gebaut, mindest) as KatalogSpalte<T>;
+        if (withMinWidth.width != null) return withMinWidth;
+        // Ohne Zahlbreite trägt der Körper seine `max-content`-Breite, eine Fließspalte den Rest
+        // der Tabellenbreite (`fliessBreite`). Beides kann unter die Mindestbreite fallen: im
+        // Auto-Layout nimmt eine Nachbarspalte, deren Inhalt in `komfortabel`/`handschuh` breiter
+        // ist als ihre Zahl, den Platz der Fließspalte (gemessen 156 statt 180 px am Funkrufnamen,
+        // der Kopf brach im Wort). Die Mindestbreite steht deshalb als `min-width` an Kopf- und
+        // Körperzelle; ein größeres eigenes `minWidth` des Aufrufers bleibt.
+        const minWidth = withMinWidth.mindestBreite ?? mindest;
+        const withMin = (style: CSSProperties | undefined): CSSProperties => ({
+          ...style,
+          minWidth:
+            typeof style?.minWidth === 'number' ? Math.max(style.minWidth, minWidth) : minWidth,
+        });
+        const callerOnCell = withMinWidth.onCell;
+        const callerOnHeaderCell = withMinWidth.onHeaderCell;
+        return {
+          ...withMinWidth,
+          onCell: (zeile: T, i?: number) => {
+            const base = callerOnCell?.(zeile, i) ?? {};
+            return { ...base, style: withMin(base.style) };
+          },
+          onHeaderCell: (spalte: Parameters<NonNullable<typeof callerOnHeaderCell>>[0]) => {
+            const base = callerOnHeaderCell?.(spalte) ?? {};
+            return { ...base, style: withMin(base.style) };
+          },
+        } as KatalogSpalte<T>;
+      }
       return gebaut as KatalogSpalte<T>;
     });
   }, [
+    token,
+    kopfSchrift,
+    dichte,
     columns,
     spaltenSchalter,
     schaltbar,
@@ -1278,6 +1352,25 @@ export default function KatalogTabelle<T extends object>({
       ? { pageSize: BLAETTER_SCHWELLE, showSizeChanger: false }
       : (false as const));
 
+  /** Der Inhalt aufgeklappter Zeilen ist eine Ansicht: dort bearbeitet eine Angabe im Fluss. */
+  const aufklappen = rest.expandable;
+  const aufklappImFluss = useMemo(
+    () =>
+      aufklappen?.expandedRowRender
+        ? {
+            ...aufklappen,
+            expandedRowRender: (
+              ...args: Parameters<NonNullable<typeof aufklappen.expandedRowRender>>
+            ) => (
+              <AngabeFormProvider form="fluss">
+                {aufklappen.expandedRowRender!(...args)}
+              </AngabeFormProvider>
+            ),
+          }
+        : aufklappen,
+    [aufklappen],
+  );
+
   return (
     <>
       {(suche != null || schalterDa) && (
@@ -1352,38 +1445,43 @@ export default function KatalogTabelle<T extends object>({
       {/* Geschachtelter Provider nur für die Tabellen-Tokens: er erbt Algorithmus, Rollen und Dichte
           und färbt NUR diese Tabelle; `tokens.ts:antdKomponenten` bleibt die globale Stelle. */}
       <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
-        <Table<T>
-          {...rest}
-          onRow={zeilenProps}
-          onChange={beiAenderung}
-          ref={tabelleRef}
-          className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
-          style={{ ...filterKopfStil(token), ...sortierKopfStyle(token), ...rest.style }}
-          columns={antdSpalten}
-          dataSource={sichtbareZeilen}
-          loading={loading}
-          locale={wirkendesLocale}
-          pagination={blaetterung}
-          // `test/utils.tsx` montiert `ConfigProvider` ohne Locale; der Sortier-Tooltip wäre im Test
-          // englisch und in Produktion deutsch. Am Berührungsgerät trägt er ohnehin nichts.
-          showSorterTooltip={false}
-          scroll={{ x: scrollX }}
-          /*
-           * rc-table wählt das Layout selbst: `if (fixColumn) return mergedScrollX === 'max-content' ?
-           * 'auto' : 'fixed'`. Dieses Primitiv fixiert Spalte 0 immer; eine Zahl kippte das Layout still
-           * auf `fixed`, wo Spaltenbreiten BINDEND sind (ein 72-px-Knopf in einer 96-px-Aktionsspalte wurde
-           * angeschnitten). Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und
-           * bei einer Gruppe an Position 0 wäre ein hartes `auto` eine stille Änderung.
-           */
-          tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
-          /*
-           * Stehende Kopfzeile am Bildschirm, NICHT im Druck: mit `sticky` legt rc-table den Kopf in eine
-           * eigene Tabelle, der Körper trüge kein `thead`, und die Kopfwiederholung aus `druck/druck.css`
-           * griffe nicht. Umgeschaltet über `beforeprint`/`afterprint`. Der Kopf steht unter dem
-           * klebenden Rahmen, nicht an der Fensterkante (LFH-952, `frontend/AGENTS.md`, Rahmen).
-           */
-          sticky={druckt ? false : { offsetHeader: rahmenOben }}
-        />
+        {/* Inline-Angaben in Zellen schweben (LLH-1795): die Bearbeitung öffnet an der Zelle, die
+            Spalten bleiben stehen. Aufgeklappte Zeilen sind eine Ansicht und bleiben im Fluss. */}
+        <AngabeFormProvider form="schwebend" onOffen={onBearbeitungOffen}>
+          <Table<T>
+            {...rest}
+            expandable={aufklappImFluss}
+            onRow={zeilenProps}
+            onChange={beiAenderung}
+            ref={tabelleRef}
+            className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
+            style={{ ...filterKopfStil(token), ...sortierKopfStyle(token), ...rest.style }}
+            columns={antdSpalten}
+            dataSource={sichtbareZeilen}
+            loading={loading}
+            locale={wirkendesLocale}
+            pagination={blaetterung}
+            // `test/utils.tsx` montiert `ConfigProvider` ohne Locale; der Sortier-Tooltip wäre im Test
+            // englisch und in Produktion deutsch. Am Berührungsgerät trägt er ohnehin nichts.
+            showSorterTooltip={false}
+            scroll={{ x: scrollX }}
+            /*
+             * rc-table wählt das Layout selbst: `if (fixColumn) return mergedScrollX === 'max-content' ?
+             * 'auto' : 'fixed'`. Dieses Primitiv fixiert Spalte 0 immer; eine Zahl kippte das Layout still
+             * auf `fixed`, wo Spaltenbreiten BINDEND sind (ein 72-px-Knopf in einer 96-px-Aktionsspalte wurde
+             * angeschnitten). Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und
+             * bei einer Gruppe an Position 0 wäre ein hartes `auto` eine stille Änderung.
+             */
+            tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
+            /*
+             * Stehende Kopfzeile am Bildschirm, NICHT im Druck: mit `sticky` legt rc-table den Kopf in eine
+             * eigene Tabelle, der Körper trüge kein `thead`, und die Kopfwiederholung aus `druck/druck.css`
+             * griffe nicht. Umgeschaltet über `beforeprint`/`afterprint`. Der Kopf steht unter dem
+             * klebenden Rahmen, nicht an der Fensterkante (LFH-952, `frontend/AGENTS.md`, Rahmen).
+             */
+            sticky={druckt ? false : { offsetHeader: rahmenOben }}
+          />
+        </AngabeFormProvider>
       </ConfigProvider>
       {kontext.menue}
     </>
