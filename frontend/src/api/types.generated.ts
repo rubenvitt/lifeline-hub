@@ -2313,6 +2313,13 @@ export interface components {
              *     Personenbezogen: geschwärzt, nie im Lagebericht.
              */
             verbindungen: components["schemas"]["KommunikationsVerbindung"][];
+            /**
+             * @description Wer welche Angabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
+             *     `aenderungsvermerk`); fehlt, solange seit dem Anlegen keine Angabe geändert wurde.
+             */
+            vermerke?: {
+                [key: string]: components["schemas"]["FeldVermerk"];
+            };
         };
         /** @description Fahrzeug-Mitglied einer Einheit (leichtgewichtig). */
         EinheitMitgliedFahrzeug: {
@@ -2613,6 +2620,14 @@ export interface components {
              *     Nennt bewusst weder Person noch Zeitpunkt noch Modul.
              */
             teilschwaerzungen?: number | null;
+            /**
+             * @description Wer welche Kopfangabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
+             *     `aenderungsvermerk`). Nur das Detail und die Antwort des Kopf-PATCH füllen es; es fehlt
+             *     in der Liste, an Gerätesitzungen und ohne Änderung seit dem Anlegen.
+             */
+            vermerke?: {
+                [key: string]: components["schemas"]["FeldVermerk"];
+            };
             verwahrung?: components["schemas"]["EinsatzVerwahrungAnzeige"] | null;
         };
         /**
@@ -3746,6 +3761,14 @@ export interface components {
             fahrzeugtyp: string[];
             standort: string[];
             traegerorganisation: string[];
+        };
+        /**
+         * @description Der Vermerk einer Angabe: Zeitpunkt (SQLite-Format, UTC) und Anzeigename des Benutzers
+         *     (`None`, wenn der Benutzer fehlt).
+         */
+        FeldVermerk: {
+            at: string;
+            von?: string | null;
         };
         /**
          * @description Alles, was die Skizze selbst speichert. Zuordnungen von Abschnitt, Einheit, Führungsstelle und

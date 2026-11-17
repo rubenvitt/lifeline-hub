@@ -2311,6 +2311,24 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatzleiter_seit", G_ZEIT),
         ],
     },
+    // Änderungsvermerk je Einzelangabe (LLH-1834, Change `nvhnqynd-konflikt-und-aenderungsvermerk`,
+    // design.md D3): wer eine Angabe von Kopf, Einheit oder Führungsstelle zuletzt geändert hat.
+    // Der Benutzer ist ein System-Nutzer wie an jeder Einsatztabelle, `feld` ein fester Wire-Name.
+    TabellenRegel {
+        tabelle: "einsatz_feld_vermerk",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("objekt_art", G_ENUM),
+            retain("einheit_id", G_FK),
+            retain("feld", G_ENUM),
+            retain("geaendert_at", G_ZEIT),
+            retain("geaendert_von", G_FK),
+        ],
+    },
     TabellenRegel {
         tabelle: "einsatz_fuehrungsstelle_sprechgruppe",
         scoping: Scoping::EinsatzId,

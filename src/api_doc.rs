@@ -131,6 +131,7 @@ use utoipa::OpenApi;
         crate::dokument::DokumentAnzeige,
         crate::dokument::DokumentKategorie,
         crate::einheit::EinheitAnzeige,
+        crate::einsatz::feld_vermerk::FeldVermerk,
         crate::einheit::EinheitMitgliedFahrzeug,
         crate::einheit::EinheitStatus,
         crate::einheit::EinheitStatusQuelle,

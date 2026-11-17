@@ -5,26 +5,26 @@ Gliederung nach Unteraufgabe: `r9up3kp5` = LLH-1831 (Konfliktprüfung), `mdopfgq
 
 ## 1. Gemeinsamer Feld-CAS-Baustein im Backend (r9up3kp5)
 
-- [ ] 1.1 `ExpectedValue` und Suffix-Bau aus `person::repo` in `src/feld_cas.rs` lösen (eigener `refactor`-Commit); `person::repo::aktualisiere` nutzt ihn; verifiziert: bestehende Personen-Tests (`tests/einsatz_person*.rs`, `person::repo` Unit-Tests) grün ohne Änderung
-- [ ] 1.2 Gemeinsame Handler-Prüfung „Altwert nur mit Änderung desselben Felds, Koordinate als Paar“ als Funktion über eine Feldliste; `pruefe_erwartet` der Personen nutzt sie; verifiziert: Unit-Tests für 400 bei Altwert ohne Änderung und halbem Paar
+- [x] 1.1 `ExpectedValue` und Suffix-Bau aus `person::repo` in `src/feld_cas.rs` lösen (eigener `refactor`-Commit); `person::repo::aktualisiere` nutzt ihn; verifiziert: bestehende Personen-Tests (`tests/einsatz_person*.rs`, `person::repo` Unit-Tests) grün ohne Änderung
+- [x] 1.2 Gemeinsame Handler-Prüfung „Altwert nur mit Änderung desselben Felds, Koordinate als Paar“ als Funktion über eine Feldliste; `pruefe_erwartet` der Personen nutzt sie; verifiziert: Unit-Tests für 422 bei Altwert ohne Änderung und halbem Paar
 
 ## 2. Vermerk-Tabelle (mdopfgqk)
 
-- [ ] 2.1 Migration `einsatz_feld_vermerk` (Nummer > höchste auf `origin/alpha`) samt Spiegel-Triggern aus `spiegel::art::trigger_sql`; verifiziert: `scripts/check-migrationen.sh`, `db::tests::migrationsnummern_sind_eindeutig`
-- [ ] 2.2 Einordnung: `schwaerzung_registry::TABELLEN`, `instanz::spiegel::art` (`GESPIEGELT`), `spiegel::schema::VERWEISE_OHNE_FK` für `objekt_id`, Archiv-Klassifikation; verifiziert: `art::tests::jede_einsatztabelle_ist_eingeordnet`, `trigger_passen_zur_beschreibung`, `jede_gespiegelte_tabelle_hat_einen_primaerschluessel`, `schema::tests::*`, `jede_archivspalte_ist_retain` grün
-- [ ] 2.3 Repo `einsatz::feld_vermerk`: Upsert auf einer Transaktion (feste Feldliste je Objektart), Laden je Objekt und je Einsatz/Objektart (eine Abfrage, Anzeigename per Join); verifiziert: Unit-Tests für Upsert, kein Upsert ohne Wertänderung, Laden mit fehlendem Benutzer (`von: null`), CASCADE beim Löschen des Einsatzes
+- [x] 2.1 Migration `einsatz_feld_vermerk` (Nummer > höchste auf `origin/alpha`) samt Spiegel-Triggern aus `spiegel::art::trigger_sql`; verifiziert: `scripts/check-migrationen.sh`, `db::tests::migrationsnummern_sind_eindeutig`
+- [x] 2.2 Einordnung: `schwaerzung_registry::TABELLEN`, `instanz::spiegel::art` (`GESPIEGELT`, Kategorie `Fuehrung`), Archiv-Klassifikation; verifiziert: `art::tests::jede_einsatztabelle_ist_eingeordnet`, `trigger_passen_zur_beschreibung`, `jede_gespiegelte_tabelle_hat_einen_primaerschluessel`, `schema::tests::*`, `jede_archivspalte_ist_retain` grün
+- [x] 2.3 Repo `einsatz::feld_vermerk`: Upsert auf einer Transaktion (feste Feldliste je Objektart), Laden je Objekt und je Einsatz/Objektart (eine Abfrage, Anzeigename per Join); verifiziert: Unit-Tests für Upsert, kein Upsert ohne Wertänderung, Laden mit fehlendem Benutzer (`von: null`), CASCADE beim Löschen des Einsatzes
 - [ ] 2.4 `vermerke` in `EinsatzAnzeige`, `EinheitAnzeige` (Liste ohne N+1) und `FuehrungsstelleAnzeige`; `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten; verifiziert: Integrationstest „frisch angelegte Einheit liefert keine Vermerke“
 
 ## 3. Kopfdaten (r9up3kp5, mdopfgqk)
 
-- [ ] 3.1 `KopfdatenPatch.erwartet` + Prüfung (Paar, nur mit Änderung) und Suffix in `patche_kopf` auf einer Transaktion, Vermerk-Upsert für geänderte Felder (Koordinate als `einsatzort_koordinate`); verifiziert: Integrationstests in `tests/` für Szenarien „Leitstellen-Nr. mit veraltetem Stand“ (409, Wert bleibt, kein Vermerk), „Andere Zeile dazwischen“, „Adresse mit Treffer“, „Halbe Koordinate erwartet“ (400), „ohne erwartet wie bisher“, „gleicher Wert erneut gesendet“ (Vermerk unverändert)
-- [ ] 3.2 `patche_kopf_setzt_jede_spalte_an_ihren_platz` bleibt grün; Mutationsprobe: Suffix entfernen macht 3.1 rot
+- [x] 3.1 `KopfdatenPatch.erwartet` + Prüfung (Paar, nur mit Änderung) und Suffix in `patche_kopf` auf einer Transaktion, Vermerk-Upsert für geänderte Felder (Koordinate als `einsatzort_koordinate`); verifiziert: Integrationstests in `tests/` für Szenarien „Leitstellen-Nr. mit veraltetem Stand“ (409, Wert bleibt, kein Vermerk), „Andere Zeile dazwischen“, „Adresse mit Treffer“, „Halbe Koordinate erwartet“ (422), „ohne erwartet wie bisher“, „gleicher Wert erneut gesendet“ (Vermerk unverändert)
+- [x] 3.2 `patche_kopf_setzt_jede_spalte_an_ihren_platz` bleibt grün; Mutationsprobe: Suffix entfernen macht 3.1 rot
 
 ## 4. Einheit (r9up3kp5, mdopfgqk)
 
-- [ ] 4.1 `EinheitPatchBody.erwartet` (Spaltenfelder, `fuehrer_id`, Soll-Trio, `quali_soll`, `verbindungen`) + Prüfung; `patche`, Führerwechsel und Verbindungen in einer `BEGIN IMMEDIATE`-Transaktion mit Suffix bzw. Vergleich vor dem Schreiben; ETB und Live erst nach Commit; verifiziert: Integrationstests in `tests/einsatz_einheit.rs` für „Bemerkung mit veraltetem Stand“, „Verbindungen als Ganzes“, „Status dazwischen“, „Einheitsführer mit Altwert“ (ETB nur ein Eintrag), „Ein Feld veraltet, zwei gesendet“, „Altwert ohne Änderung“ (400)
-- [ ] 4.2 Vermerk-Upsert für jedes geänderte Feld (Sprechgruppen nicht); kein ETB-Eintrag aus dem Vermerk; verifiziert: Test „Bemerkung geändert → Vermerk, kein ETB-Eintrag“, bestehende ETB-Tests für Führer- und Abschnittswechsel grün
-- [ ] 4.3 Bestehender Vertrag LLH-1692 (Sprechgruppen nach `patche`) bleibt: bestehende Tests in `tests/einsatz_einheit.rs` grün
+- [x] 4.1 `EinheitPatchBody.erwartet` (Spaltenfelder, `fuehrer_id`, Soll-Trio, `quali_soll`, `verbindungen`) + Prüfung; `patche`, Führerwechsel und Verbindungen in einer `BEGIN IMMEDIATE`-Transaktion mit Suffix bzw. Vergleich vor dem Schreiben; ETB und Live erst nach Commit; verifiziert: Integrationstests in `tests/einsatz_einheit.rs` für „Bemerkung mit veraltetem Stand“, „Verbindungen als Ganzes“, „Status dazwischen“, „Einheitsführer mit Altwert“ (ETB nur ein Eintrag), „Ein Feld veraltet, zwei gesendet“, „Altwert ohne Änderung“ (422)
+- [x] 4.2 Vermerk-Upsert für jedes geänderte Feld (Sprechgruppen nicht); kein ETB-Eintrag aus dem Vermerk; verifiziert: Test „Bemerkung geändert → Vermerk, kein ETB-Eintrag“, bestehende ETB-Tests für Führer- und Abschnittswechsel grün
+- [x] 4.3 Bestehender Vertrag LLH-1692 (Sprechgruppen nach `patche`) bleibt: bestehende Tests in `tests/einsatz_einheit.rs` grün
 
 ## 5. Führungsstelle (r9up3kp5, mdopfgqk)
 

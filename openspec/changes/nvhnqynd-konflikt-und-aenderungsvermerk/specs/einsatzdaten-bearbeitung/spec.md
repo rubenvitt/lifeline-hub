@@ -23,12 +23,12 @@ Zeile „Adresse“ eine neue Koordinate mit, erwartet sie Adresse und Koordinat
 ### Requirement: Altwerte der Kopfdaten gemeinsam geprüft
 Der Server SHALL alle Altwerte einer Anfrage an die Kopfdaten zusammen mit dem Schreiben prüfen.
 Weicht einer ab, MUST er mit 409 antworten und nichts schreiben. Eine nur halb erwartete
-Koordinate MUST mit 400 abgelehnt werden, ebenso ein Altwert für ein Feld, das die Anfrage nicht
+Koordinate MUST mit 422 abgelehnt werden, ebenso ein Altwert für ein Feld, das die Anfrage nicht
 ändert.
 
 #### Scenario: Halbe Koordinate erwartet
 - **WHEN** eine Anfrage nur `erwartet: { einsatzort_lat: 52.5 }` trägt
-- **THEN** antwortet der Server mit 400
+- **THEN** antwortet der Server mit 422
 
 #### Scenario: Altwert stimmt
 - **WHEN** eine Anfrage die Bezeichnung mit dem gespeicherten Altwert sendet

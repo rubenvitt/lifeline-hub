@@ -76,25 +76,32 @@ und Live-Ereignisse entstehen erst nach dem Commit, also nie bei 409.
 
 ```
 einsatz_feld_vermerk(
+  id            INTEGER PRIMARY KEY,
   einsatz_id    INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,
   objekt_art    TEXT    NOT NULL CHECK (objekt_art IN ('einsatz','einheit','fuehrungsstelle')),
-  objekt_id     INTEGER NOT NULL,   -- einsatz.id bzw. einsatz_einheit.id
-  feld          TEXT    NOT NULL,   -- Wire-Feldname, Soll-Stärke als 'soll', Koordinate als 'einsatzort_koordinate'
+  einheit_id    INTEGER REFERENCES einsatz_einheit(id) ON DELETE CASCADE,  -- nur bei 'einheit'
+  feld          TEXT    NOT NULL,   -- Wire-Feldname; Soll-Stärke als 'soll', Koordinaten als
+                                    -- 'einsatzort_koordinate' bzw. 'standort_koordinate'
   geaendert_at  TEXT    NOT NULL,
   geaendert_von INTEGER REFERENCES benutzer(id),
-  PRIMARY KEY (einsatz_id, objekt_art, objekt_id, feld)
+  CHECK ((objekt_art = 'einheit') = (einheit_id IS NOT NULL))
 )
+UNIQUE INDEX (einsatz_id, objekt_art, IFNULL(einheit_id, 0), feld)
 ```
 
-Upsert im selben Schreibvorgang, nur für Felder, deren gespeicherter Wert sich wirklich ändert
-(Vergleich gegen den in der Transaktion gelesenen Vorher-Stand). Die Feldnamen kommen aus einer
-festen Liste je Route, nie aus der Anfrage.
+Eine echte, optionale `einheit_id` mit Fremdschlüssel statt einer polymorphen `objekt_id`: der
+Spiegel kennt Fremdschlüssel auf gespiegelte Tabellen ohne Sonderliste, und das Auflösen einer
+Einheit räumt ihre Vermerke mit ab. Geschrieben wird als „UPDATE, sonst INSERT“ in der
+Schreibtransaktion, nur für Felder, deren gespeicherter Wert sich wirklich ändert (Vergleich gegen
+den in der Transaktion gelesenen Vorher-Stand). Die Feldnamen kommen aus einer festen Liste je
+Route, nie aus der Anfrage.
 
 Pflichten einer neuen Einsatztabelle (`src/AGENTS.md`, „Instanzkopplung“ und „Aufbewahrung“):
-Eintrag in `einsatz::schwaerzung_registry::TABELLEN` (`geaendert_von` ist Personenbezug),
-`instanz::spiegel::art` als `GESPIEGELT` (Kategorie wie die Kopfdaten) mit Triggern aus
-`trigger_sql`, `objekt_id` in `spiegel::schema::VERWEISE_OHNE_FK` (polymorph), Archivspalten
-klassifiziert, Migration mit Nummer größer als jede auf `origin/alpha` (heute 0352).
+Eintrag in `einsatz::schwaerzung_registry::TABELLEN` (Scoping `EinsatzId`; `geaendert_von` als
+Benutzer-FK wie an den übrigen Einsatztabellen, `feld` als Enum-artiger Strukturwert),
+`instanz::spiegel::art` als `GESPIEGELT` mit Kategorie `Fuehrung` (wie Einsatz und Führungsstelle)
+samt Triggern aus `trigger_sql` in derselben Migration, Archivspalten klassifiziert, Migration mit
+Nummer größer als jede auf `origin/alpha` (heute 0352).
 
 *Alternativen:* Stempel je Datensatz (`kopf_geaendert_at/von`) — billiger, sagt aber nicht welche
 Angabe, und Einsatzdaten hat drei Paneele (vom Menschen verworfen); Ableitung aus dem ETB —

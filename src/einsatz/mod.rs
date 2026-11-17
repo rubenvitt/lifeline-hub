@@ -4,6 +4,7 @@ pub mod aufbewahrung_kategorie;
 pub mod berechtigung;
 pub mod effektiv;
 pub mod einstellungen;
+pub mod feld_vermerk;
 pub mod fuehrungsstelle;
 pub mod funktion;
 pub mod kontext;
@@ -249,6 +250,7 @@ impl Einsatz {
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
             fuehrung: self.fuehrung.anzeige(),
             spiegel: self.spiegel.anzeige(),
+            vermerke: Default::default(),
         }
     }
 }
@@ -359,6 +361,12 @@ pub struct EinsatzAnzeige {
     /// nur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spiegel: Option<crate::instanz::spiegel::EinsatzSpiegelAnzeige>,
+    /// Wer welche Kopfangabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
+    /// `aenderungsvermerk`). Nur das Detail und die Antwort des Kopf-PATCH füllen es; es fehlt
+    /// in der Liste, an Gerätesitzungen und ohne Änderung seit dem Anlegen.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[schema(required = false, value_type = HashMap<String, crate::einsatz::feld_vermerk::FeldVermerk>)]
+    pub vermerke: feld_vermerk::Vermerke,
 }
 
 /// Die benutzerbezogenen Felder des Kopfs aus der eigenen Mitgliedschaft (i6k6mzed,

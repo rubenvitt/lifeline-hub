@@ -353,6 +353,8 @@ async fn zu_anzeige_batch(
         return Ok(Vec::new());
     }
     let mut anreicherung = anreicherung_laden(pool, einsatz_id).await?;
+    // Vermerke aller Einheiten in einer Abfrage (LLH-1834, design.md D4).
+    let mut vermerke = crate::einsatz::feld_vermerk::load_einheiten(pool, einsatz_id).await?;
 
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
@@ -429,6 +431,7 @@ async fn zu_anzeige_batch(
             unangemeldet: row.unangemeldet,
             nachforderung_id: row.nachforderung_id,
             letzte_besetzung: None,
+            vermerke: vermerke.remove(&row.id).unwrap_or_default(),
         });
     }
     Ok(out)
@@ -806,11 +809,15 @@ pub async fn anlegen_tx(
     Ok(id)
 }
 
-/// Teil-Patch (Tri-State, ohne Führer): äußere `Option` = „im Patch?“, innere = Wert
-/// (`Some(None)` setzt NULL).
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“, innere = Wert (`Some(None)` setzt
+/// NULL).
 #[derive(Debug, Default)]
 pub struct EinheitPatch<'a> {
     pub name: Option<&'a str>,
+    /// Nur bei einem echten Führerwechsel gesetzt; Mitgliedschaft prüft der Aufrufer vorher
+    /// (`check_fuehrer`). Steht hier, damit Führer und übrige Angaben in EINEM UPDATE samt Feld-CAS
+    /// geschrieben werden (LLH-1831, design.md D2).
+    pub fuehrer_id: Option<Option<i64>>,
     pub abschnitt_id: Option<Option<i64>>,
     pub ueber_einheit_id: Option<Option<i64>>,
     pub typ_id: Option<Option<i64>>,
@@ -874,22 +881,107 @@ pub async fn soll_roh(
     .ok_or(AppError::NotFound)
 }
 
-/// Teil-Patch der editierbaren Felder (ohne Führer), Parent-Wechsel zyklenfrei; `NotFound`,
-/// falls die Einheit nicht zum Einsatz gehört.
-///
-/// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und
-/// eine verschobene Bind-Kette kann gleichtypige Nachbarn (`bemerkung`↔`funkrufname`,
-/// `abschnitt_id`↔`ueber_einheit_id`) nicht still vertauschen.
-pub async fn patche(
+/// Die per Zeile bearbeitbaren Werte einer Einheit, um geänderte Angaben für den Vermerk zu
+/// erkennen (LLH-1834, design.md D3).
+#[derive(Debug, PartialEq, sqlx::FromRow)]
+pub struct EinheitWerte {
+    name: String,
+    typ_id: Option<i64>,
+    abschnitt_id: Option<i64>,
+    ueber_einheit_id: Option<i64>,
+    fuehrer_id: Option<i64>,
+    soll_fuehrer: Option<i64>,
+    soll_unterfuehrer: Option<i64>,
+    soll_mannschaft: Option<i64>,
+    quali_soll: Option<String>,
+    bemerkung: Option<String>,
+    funkrufname: Option<String>,
+}
+
+impl EinheitWerte {
+    /// Wire-Namen der Angaben, die sich unterscheiden; die Soll-Stärke als eine Angabe `soll`.
+    pub fn geaenderte_felder(&self, nachher: &Self) -> Vec<&'static str> {
+        let mut felder = Vec::new();
+        let mut wenn = |anders: bool, feld: &'static str| {
+            if anders {
+                felder.push(feld);
+            }
+        };
+        wenn(self.name != nachher.name, "name");
+        wenn(self.typ_id != nachher.typ_id, "typ_id");
+        wenn(self.abschnitt_id != nachher.abschnitt_id, "abschnitt_id");
+        wenn(
+            self.ueber_einheit_id != nachher.ueber_einheit_id,
+            "ueber_einheit_id",
+        );
+        wenn(self.fuehrer_id != nachher.fuehrer_id, "fuehrer_id");
+        wenn(
+            (
+                self.soll_fuehrer,
+                self.soll_unterfuehrer,
+                self.soll_mannschaft,
+            ) != (
+                nachher.soll_fuehrer,
+                nachher.soll_unterfuehrer,
+                nachher.soll_mannschaft,
+            ),
+            "soll",
+        );
+        wenn(self.quali_soll != nachher.quali_soll, "quali_soll");
+        wenn(self.bemerkung != nachher.bemerkung, "bemerkung");
+        wenn(self.funkrufname != nachher.funkrufname, "funkrufname");
+        felder
+    }
+}
+
+/// Die Werte für [`EinheitWerte::geaenderte_felder`], auf der offenen Transaktion.
+pub async fn werte_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<EinheitWerte, AppError> {
+    sqlx::query_as(
+        "SELECT name, typ_id, abschnitt_id, ueber_einheit_id, fuehrer_id, soll_fuehrer, \
+                soll_unterfuehrer, soll_mannschaft, quali_soll, bemerkung, funkrufname \
+         FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Prüft die gesendeten Bezüge des Patches (Typ, Abschnitt, Über-Einheit zyklenfrei,
+/// Qualifikationssoll), vor der Schreibtransaktion. `NotFound`, falls die Einheit nicht zum
+/// Einsatz gehört.
+pub async fn pruefe_patch(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
     id: i64,
-    patch: EinheitPatch<'_>,
-) -> Result<EinheitAnzeige, AppError> {
+    patch: &EinheitPatch<'_>,
+) -> Result<(), AppError> {
     check_gehoert_zum_einsatz(pool, einsatz_id, id).await?;
-    validiere_patch(pool, einsatz_id, org_id, id, &patch).await?;
-    let resultat = sqlx::query(
+    validiere_patch(pool, einsatz_id, org_id, id, patch).await
+}
+
+/// Teil-Patch der editierbaren Felder samt Führer in EINEM UPDATE auf der offenen Transaktion
+/// (LLH-1831, design.md D1/D2): `erwartet` hängt je Spalte `AND <spalte> IS ?` an; ein Treffer auf
+/// 0 Zeilen ist bei genannten Altwerten ein Feldkonflikt (409), sonst `NotFound`. Bezüge prüft
+/// vorher [`pruefe_patch`].
+///
+/// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und
+/// eine verschobene Bind-Kette kann gleichtypige Nachbarn (`bemerkung`↔`funkrufname`,
+/// `abschnitt_id`↔`ueber_einheit_id`) nicht still vertauschen.
+pub async fn patche_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    patch: &EinheitPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
+) -> Result<(), AppError> {
+    let mut sql = String::from(
         "UPDATE einsatz_einheit SET \
             abschnitt_id = CASE WHEN ?1 IS NULL THEN abschnitt_id ELSE ?2 END, \
             ueber_einheit_id = CASE WHEN ?3 IS NULL THEN ueber_einheit_id ELSE ?4 END, \
@@ -901,39 +993,56 @@ pub async fn patche(
             bemerkung = CASE WHEN ?15 IS NULL THEN bemerkung ELSE ?16 END, \
             sortier = CASE WHEN ?17 IS NULL THEN sortier ELSE ?18 END, \
             funkrufname = CASE WHEN ?19 IS NULL THEN funkrufname ELSE ?20 END, \
-            quali_soll = CASE WHEN ?23 IS NULL THEN quali_soll ELSE ?24 END \
+            quali_soll = CASE WHEN ?23 IS NULL THEN quali_soll ELSE ?24 END, \
+            fuehrer_id = CASE WHEN ?25 IS NULL THEN fuehrer_id ELSE ?26 END \
          WHERE id = ?21 AND einsatz_id = ?22",
-    )
-    .bind(patch.abschnitt_id.map(|_| 1_i64))
-    .bind(patch.abschnitt_id.and_then(|v| v))
-    .bind(patch.ueber_einheit_id.map(|_| 1_i64))
-    .bind(patch.ueber_einheit_id.and_then(|v| v))
-    .bind(patch.typ_id.map(|_| 1_i64))
-    .bind(patch.typ_id.and_then(|v| v))
-    .bind(patch.name.map(|_| 1_i64))
-    .bind(patch.name)
-    .bind(patch.soll_fuehrer.map(|_| 1_i64))
-    .bind(patch.soll_fuehrer.and_then(|v| v))
-    .bind(patch.soll_unterfuehrer.map(|_| 1_i64))
-    .bind(patch.soll_unterfuehrer.and_then(|v| v))
-    .bind(patch.soll_mannschaft.map(|_| 1_i64))
-    .bind(patch.soll_mannschaft.and_then(|v| v))
-    .bind(patch.bemerkung.map(|_| 1_i64))
-    .bind(patch.bemerkung.and_then(|v| v))
-    .bind(patch.sortier.map(|_| 1_i64))
-    .bind(patch.sortier)
-    .bind(patch.funkrufname.map(|_| 1_i64))
-    .bind(patch.funkrufname.and_then(|v| v))
-    .bind(id)
-    .bind(einsatz_id)
-    .bind(patch.quali_soll.map(|_| 1_i64))
-    .bind(patch.quali_soll.flatten())
-    .execute(pool)
-    .await?;
-    if resultat.rows_affected() == 0 {
+    );
+    sql.push_str(&erwartet.sql_suffix(27));
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(patch.abschnitt_id.map(|_| 1_i64))
+        .bind(patch.abschnitt_id.and_then(|v| v))
+        .bind(patch.ueber_einheit_id.map(|_| 1_i64))
+        .bind(patch.ueber_einheit_id.and_then(|v| v))
+        .bind(patch.typ_id.map(|_| 1_i64))
+        .bind(patch.typ_id.and_then(|v| v))
+        .bind(patch.name.map(|_| 1_i64))
+        .bind(patch.name)
+        .bind(patch.soll_fuehrer.map(|_| 1_i64))
+        .bind(patch.soll_fuehrer.and_then(|v| v))
+        .bind(patch.soll_unterfuehrer.map(|_| 1_i64))
+        .bind(patch.soll_unterfuehrer.and_then(|v| v))
+        .bind(patch.soll_mannschaft.map(|_| 1_i64))
+        .bind(patch.soll_mannschaft.and_then(|v| v))
+        .bind(patch.bemerkung.map(|_| 1_i64))
+        .bind(patch.bemerkung.and_then(|v| v))
+        .bind(patch.sortier.map(|_| 1_i64))
+        .bind(patch.sortier)
+        .bind(patch.funkrufname.map(|_| 1_i64))
+        .bind(patch.funkrufname.and_then(|v| v))
+        .bind(id)
+        .bind(einsatz_id)
+        .bind(patch.quali_soll.map(|_| 1_i64))
+        .bind(patch.quali_soll.flatten())
+        .bind(patch.fuehrer_id.map(|_| 1_i64))
+        .bind(patch.fuehrer_id.flatten());
+    let getroffen = erwartet
+        .bind_all(q)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+    if getroffen == 0 {
+        let existiert: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        if existiert.is_some() && !erwartet.is_empty() {
+            return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+        }
         return Err(AppError::NotFound);
     }
-    laden(pool, einsatz_id, id).await
+    Ok(())
 }
 
 /// Ergebnis von [`setze_hand_status_tx`]: die Labels vor und nach dem Setzen.
@@ -3381,11 +3490,14 @@ mod tests {
     /// die letzte Besetzung (LLH-1266): sie entsteht erst beim Auflösen einer Einheit, die
     /// ohnehin stehen bleibt, und geht per Kaskade mit ihr. Ebenso die Kopplung eines
     /// Einheitengeräts (LLH-1579): das Auflösen widerruft sie samt ETB-Eintrag, und eine spurlos
-    /// gelöschte Einheit leert nur ihre Bindung (`ON DELETE SET NULL`).
+    /// gelöschte Einheit leert nur ihre Bindung (`ON DELETE SET NULL`). Ebenso der
+    /// Änderungsvermerk (LLH-1834): er hält nur fest, wer eine Angabe der Einheit zuletzt geändert
+    /// hat, und geht per Kaskade mit ihr.
     #[tokio::test]
     async fn jeder_verweis_auf_eine_einheit_ist_spur() {
         const KEINE_SPUR: &[(&str, &str)] = &[
             ("einsatz_einheit", "ueber_einheit_id"),
+            ("einsatz_feld_vermerk", "einheit_id"),
             ("einsatz_einheit_letzte_besetzung", "einheit_id"),
             ("einsatz_einheit_sprechgruppe", "einheit_id"),
             ("einsatz_verbindung", "einheit_id"),

@@ -24,7 +24,7 @@ taktisches Zeichen gehen nicht über diesen Weg.
 ### Requirement: Altwerte einer Einheit-Anfrage gemeinsam geprüft
 Der Server SHALL alle Altwerte einer Anfrage an die Einheit zusammen mit dem Schreiben prüfen.
 Weicht einer ab, MUST er mit 409 antworten und keine Angabe der Anfrage schreiben, auch keinen
-ETB-Eintrag. Ein Altwert für ein Feld, das die Anfrage nicht ändert, MUST mit 400 abgelehnt werden.
+ETB-Eintrag. Ein Altwert für ein Feld, das die Anfrage nicht ändert, MUST mit 422 abgelehnt werden.
 
 #### Scenario: Einheitsführer mit Altwert
 - **WHEN** zwei Arbeitsplätze denselben Einheitsführer sehen und nacheinander je eine andere Person als Führer setzen
@@ -36,4 +36,4 @@ ETB-Eintrag. Ein Altwert für ein Feld, das die Anfrage nicht ändert, MUST mit 
 
 #### Scenario: Altwert ohne Änderung
 - **WHEN** eine Anfrage `erwartet: { name: "Trupp 1" }` sendet, aber `name` nicht ändert
-- **THEN** antwortet der Server mit 400
+- **THEN** antwortet der Server mit 422

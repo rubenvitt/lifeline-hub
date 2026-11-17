@@ -67,9 +67,10 @@ unverändert.
 - **THEN** entsteht ein Vermerk an der Bemerkung und kein ETB-Eintrag
 
 ### Requirement: Vermerk folgt Spiegel und Aufbewahrung
-Vermerke SHALL wie die übrigen Daten des Einsatzes gespiegelt, geschwärzt und gelöscht werden: ein
-Spiegel zeigt die Vermerke des Führers, eine Schwärzung des Einsatzes entfernt den Personenbezug
-des Vermerks, und das Löschen des Einsatzes löscht seine Vermerke.
+Vermerke SHALL wie die übrigen Daten des Einsatzes gespiegelt und gelöscht werden: ein Spiegel
+zeigt die Vermerke des Führers, und das Löschen des Einsatzes oder der Einheit löscht ihre
+Vermerke. In der Schwärzung gilt der Benutzer des Vermerks wie jeder andere Benutzerverweis am
+Einsatz.
 
 #### Scenario: Einsatz gelöscht
 - **WHEN** ein Einsatz nach Ablauf der Aufbewahrung gelöscht wird

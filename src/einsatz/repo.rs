@@ -675,6 +675,7 @@ pub async fn liste_fuer(
                 einsatzleiter: r.einsatzleiter.anzeige(),
                 fuehrung: r.fuehrung.anzeige(),
                 spiegel: r.spiegel.anzeige(),
+                vermerke: Default::default(),
             }
         })
         .collect())
@@ -1523,8 +1524,13 @@ pub async fn patche_kopf(
     pool: &SqlitePool,
     einsatz_id: i64,
     patch: KopfPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
+    von: Option<i64>,
 ) -> Result<Einsatz, AppError> {
-    let ergebnis = sqlx::query(
+    // Feld-CAS (LLH-1831, Change `nvhnqynd-konflikt-und-aenderungsvermerk`, design.md D1): das
+    // Suffix hängt je erwarteter Spalte `AND <spalte> IS ?` an; Vorher-Stand, UPDATE und
+    // Vermerk (LLH-1834, D3) laufen in EINER Schreibtransaktion.
+    let mut sql = String::from(
         "UPDATE einsatz SET \
             bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
             stichwort = CASE WHEN ?3 IS NULL THEN stichwort ELSE ?4 END, \
@@ -1539,36 +1545,127 @@ pub async fn patche_kopf(
                 CASE WHEN ?19 IS NULL THEN anzahl_betroffene_initial ELSE ?20 END, \
             begonnen_at = CASE WHEN ?21 IS NULL THEN begonnen_at ELSE ?22 END \
          WHERE id = ?23",
-    )
-    .bind(patch.bezeichnung.map(|_| 1_i64))
-    .bind(patch.bezeichnung)
-    .bind(patch.stichwort.map(|_| 1_i64))
-    .bind(patch.stichwort.and_then(|v| v))
-    .bind(patch.einsatzart.map(|_| 1_i64))
-    .bind(patch.einsatzart)
-    .bind(patch.leitstellen_nr.map(|_| 1_i64))
-    .bind(patch.leitstellen_nr.and_then(|v| v))
-    .bind(patch.einsatzort.map(|_| 1_i64))
-    .bind(patch.einsatzort.and_then(|v| v))
-    .bind(patch.einsatzort_lat.map(|_| 1_i64))
-    .bind(patch.einsatzort_lat.and_then(|v| v))
-    .bind(patch.einsatzort_lon.map(|_| 1_i64))
-    .bind(patch.einsatzort_lon.and_then(|v| v))
-    .bind(patch.meldende_stelle.map(|_| 1_i64))
-    .bind(patch.meldende_stelle.and_then(|v| v))
-    .bind(patch.sachverhalt.map(|_| 1_i64))
-    .bind(patch.sachverhalt.and_then(|v| v))
-    .bind(patch.anzahl_betroffene_initial.map(|_| 1_i64))
-    .bind(patch.anzahl_betroffene_initial.and_then(|v| v))
-    .bind(patch.begonnen_at.map(|_| 1_i64))
-    .bind(patch.begonnen_at)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await;
-
-    ergebnis?;
+    );
+    sql.push_str(&erwartet.sql_suffix(24));
+    crate::write_retry!(pool, |conn| {
+        let vorher = kopf_werte(conn, einsatz_id).await?;
+        let q = sqlx::query(sqlx::AssertSqlSafe(sql.clone()))
+            .bind(patch.bezeichnung.map(|_| 1_i64))
+            .bind(patch.bezeichnung)
+            .bind(patch.stichwort.map(|_| 1_i64))
+            .bind(patch.stichwort.and_then(|v| v))
+            .bind(patch.einsatzart.map(|_| 1_i64))
+            .bind(patch.einsatzart)
+            .bind(patch.leitstellen_nr.map(|_| 1_i64))
+            .bind(patch.leitstellen_nr.and_then(|v| v))
+            .bind(patch.einsatzort.map(|_| 1_i64))
+            .bind(patch.einsatzort.and_then(|v| v))
+            .bind(patch.einsatzort_lat.map(|_| 1_i64))
+            .bind(patch.einsatzort_lat.and_then(|v| v))
+            .bind(patch.einsatzort_lon.map(|_| 1_i64))
+            .bind(patch.einsatzort_lon.and_then(|v| v))
+            .bind(patch.meldende_stelle.map(|_| 1_i64))
+            .bind(patch.meldende_stelle.and_then(|v| v))
+            .bind(patch.sachverhalt.map(|_| 1_i64))
+            .bind(patch.sachverhalt.and_then(|v| v))
+            .bind(patch.anzahl_betroffene_initial.map(|_| 1_i64))
+            .bind(patch.anzahl_betroffene_initial.and_then(|v| v))
+            .bind(patch.begonnen_at.map(|_| 1_i64))
+            .bind(patch.begonnen_at)
+            .bind(einsatz_id);
+        let getroffen = erwartet
+            .bind_all(q)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected();
+        if getroffen == 0 {
+            // Die Zeile gibt es (Vorher-Stand gelesen): mit Altwerten ist das ein Feldkonflikt.
+            if !erwartet.is_empty() {
+                return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+            }
+            return Err(AppError::NotFound);
+        }
+        if let Some(von) = von {
+            let nachher = kopf_werte(conn, einsatz_id).await?;
+            let felder = vorher.geaenderte_felder(&nachher);
+            crate::einsatz::feld_vermerk::setze_tx(
+                conn,
+                einsatz_id,
+                crate::einsatz::feld_vermerk::Objekt::Einsatz,
+                &felder,
+                von,
+            )
+            .await?;
+        }
+        Ok(())
+    })?;
 
     laden(pool, einsatz_id).await
+}
+
+/// Die per Zeile bearbeitbaren Kopfwerte, um geänderte Angaben für den Vermerk zu erkennen.
+#[derive(Debug, PartialEq, sqlx::FromRow)]
+struct KopfWerte {
+    bezeichnung: String,
+    stichwort: Option<String>,
+    einsatzart: String,
+    leitstellen_nr: Option<String>,
+    einsatzort: Option<String>,
+    einsatzort_lat: Option<f64>,
+    einsatzort_lon: Option<f64>,
+    meldende_stelle: Option<String>,
+    sachverhalt: Option<String>,
+    anzahl_betroffene_initial: Option<i64>,
+    begonnen_at: String,
+}
+
+impl KopfWerte {
+    /// Wire-Namen der Angaben, die sich zwischen `self` und `nachher` unterscheiden; die
+    /// Koordinate als eine Angabe `einsatzort_koordinate`.
+    fn geaenderte_felder(&self, nachher: &Self) -> Vec<&'static str> {
+        let mut felder = Vec::new();
+        let mut wenn = |anders: bool, feld: &'static str| {
+            if anders {
+                felder.push(feld);
+            }
+        };
+        wenn(self.bezeichnung != nachher.bezeichnung, "bezeichnung");
+        wenn(self.stichwort != nachher.stichwort, "stichwort");
+        wenn(self.einsatzart != nachher.einsatzart, "einsatzart");
+        wenn(
+            self.leitstellen_nr != nachher.leitstellen_nr,
+            "leitstellen_nr",
+        );
+        wenn(self.einsatzort != nachher.einsatzort, "einsatzort");
+        wenn(
+            self.einsatzort_lat != nachher.einsatzort_lat
+                || self.einsatzort_lon != nachher.einsatzort_lon,
+            "einsatzort_koordinate",
+        );
+        wenn(
+            self.meldende_stelle != nachher.meldende_stelle,
+            "meldende_stelle",
+        );
+        wenn(self.sachverhalt != nachher.sachverhalt, "sachverhalt");
+        wenn(
+            self.anzahl_betroffene_initial != nachher.anzahl_betroffene_initial,
+            "anzahl_betroffene_initial",
+        );
+        wenn(self.begonnen_at != nachher.begonnen_at, "begonnen_at");
+        felder
+    }
+}
+
+async fn kopf_werte(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<KopfWerte, AppError> {
+    sqlx::query_as(
+        "SELECT bezeichnung, stichwort, einsatzart, leitstellen_nr, einsatzort, einsatzort_lat, \
+                einsatzort_lon, meldende_stelle, sachverhalt, anzahl_betroffene_initial, begonnen_at \
+         FROM einsatz WHERE id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Die Personen, die sich in den Einsatz aufnehmen lassen (LFH-1141): aktive Personenkonten der
