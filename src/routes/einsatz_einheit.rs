@@ -924,7 +924,7 @@ pub async fn update(
             .as_ref()
             .is_some_and(|alt| *alt != verbindungen_vorher)
         {
-            return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+            return Err(AppError::Veraltet);
         }
         einheit_repo::patche_tx(conn, einsatz_id, eid, &patch, &altwerte).await?;
         let mut felder = Vec::new();

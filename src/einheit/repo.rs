@@ -1038,7 +1038,7 @@ pub async fn patche_tx(
                 .fetch_optional(&mut *conn)
                 .await?;
         if existiert.is_some() && !erwartet.is_empty() {
-            return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+            return Err(AppError::Veraltet);
         }
         return Err(AppError::NotFound);
     }

@@ -624,7 +624,7 @@ pub async fn patch_tx(
     let vorher = load_tx(conn, einsatz_id).await?;
     let verbindungen_vorher = super::verbindungen::liste_tx(conn, einsatz_id, bezug).await?;
     if !patch.erwartung.stimmt(&vorher, &verbindungen_vorher) {
-        return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+        return Err(AppError::Veraltet);
     }
     // Je Feld ein UPDATE: feste Statements statt eines zusammengesetzten SQL-Texts.
     if let Some(art) = patch.art {
