@@ -1222,9 +1222,10 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     expect(namen[2]).toContain('Person öffnen');
     expect(namen[3]).toContain('Zurück in den Wartebereich');
     expect(namen[namen.length - 1]).toContain('zurückweisen');
+    // Neutral seit LLH-1924: es hat ein Rückgängig (ADR-0055).
     expect(
       within(offenesMenue()).getByRole('menuitem', { name: /zurückweisen/ }).className,
-    ).toContain('danger');
+    ).not.toContain('danger');
   });
 
   it('zeigt das laufende Rettungsmittel am Platz und bietet keine zweite Anforderung an', async () => {
@@ -1384,7 +1385,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
 
   /**
    * Ein Live-Update, das die Belegung ändert, baut die Einträge um (aus „Patient zuweisen" würde
-   * „Verbleib / Entlassung erfassen", dazu ein `danger` „zurückweisen") — unter dem Finger. Das
+   * „Verbleib / Entlassung erfassen", dazu „zurückweisen") — unter dem Finger. Das
    * offene Menü gehört zu seinem Zustand und schließt, wenn der sich ändert.
    */
   it('schließt ein offenes Menü, wenn sich die Belegung des Platzes live ändert', async () => {
@@ -1626,7 +1627,8 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
         '—',
         'zurueckweisen',
       ]);
-      expect(gefahr(items)).toEqual(['zurueckweisen']);
+      // Neutral seit LLH-1924: es hat ein Rückgängig (ADR-0055).
+      expect(gefahr(items)).toEqual([]);
     });
 
     it('Bearbeiten-Modus, unbelegt: Verfügbarkeiten und Löschen, kein Zuweisen', () => {
@@ -1643,7 +1645,7 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
         bearbeitbar: true,
       });
       expect(folge(items).slice(-3)).toEqual(['—', 'zurueckweisen', 'storno']);
-      expect(gefahr(items)).toEqual(['zurueckweisen', 'storno']);
+      expect(gefahr(items)).toEqual(['storno']);
     });
 
     /** Sperren statt entfernen: gesperrt ist, was eine zweite Bewegung derselben Person anstößt. */

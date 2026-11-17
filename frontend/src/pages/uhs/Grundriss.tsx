@@ -280,7 +280,7 @@ export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps
             key: 'zurueckweisen',
             label: 'zurückweisen',
             icon: <IconAbmelden />,
-            danger: true,
+            // Neutral: es hat ein Rückgängig (LLH-1924, ADR-0055); hinter dem Trenner zuletzt.
             disabled: belegungLaeuft,
           },
         ]
@@ -822,7 +822,6 @@ function PlatzKarte({
               <Tooltip title="zurückweisen">
                 <Button
                   size="small"
-                  danger
                   aria-label="zurückweisen"
                   icon={<IconAbmelden />}
                   disabled={belegungLaeuft}

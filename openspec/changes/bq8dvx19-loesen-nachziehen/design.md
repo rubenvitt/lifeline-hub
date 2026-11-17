@@ -175,12 +175,15 @@ hat eine `StatusWahl`). Ohne „Ausgeben“ bleibt der Knopf „Lösen“. Gehal
 
 „Ausgeben“ ist häufig und zählt, also ein Tipp; „Lösen“ ist selten.
 
-### D6 „zurückweisen“ bleibt rot
+### D6 „zurückweisen“ steht neutral
 
-Der Grundriss führt „zurückweisen“ als Gefahrknopf bzw. Gefahreintrag (Spec `uhs-grundriss`).
-Mit dem Rückgängig wäre es nach D2 aus LLH-1722 (rot nur, was nicht umkehrbar ist) neutral. Es
-bleibt rot: Das Gewicht ist fachlich (ein Patient wird abgewiesen), und das Rückgängig hält nur
-zehn Minuten.
+Mit dem Rückgängig ist „zurückweisen“ umkehrbar; ADR-0055 („im ⋮ nur Unumkehrbares rot“) und
+`frontend/AGENTS.md` stellen es damit neutral, im Menü wie als Knopf der kompakten Zeile. Das
+Gewicht trägt die Stellung: hinter dem Trenner zuletzt.
+
+Verworfen: rot lassen wegen des fachlichen Gewichts (so zur Freigabe vorgelegt). Der Review vor
+dem PR fand den Widerspruch zu ADR-0055; am 17.11.2026 entschieden, neutral statt einer neuen ADR
+mit Ausnahme.
 
 ## Risks / Trade-offs
 
