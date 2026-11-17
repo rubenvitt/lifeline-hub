@@ -20,8 +20,8 @@ per TDD.
 - [x] 3.2 Paneel „Einsatz starten“ als `ListenPaneel` in eigener Reihe unter der Alarmzeile, Zeilen nach Zustand (Haken, offen mit Link, „—“ mit Grund, „nicht geladen“), sichtbar nur bei `darfImEinsatzSchreiben` und aktiv; Vitest: leerer Einsatz fünf offen, alles erledigt kein Paneel, Beobachter kein Paneel, Spiegel kein Paneel, gesperrtes Modul mit Grund
 - [x] 3.3 Ladeschranke: Paneelreihen und Startliste erscheinen gemeinsam (`startlisteBereit` neben `gliederungLaedt`); Vitest mit verzögerter ETB-Abfrage
 - [x] 3.4 „Ausblenden“ je Browser über `sichererSpeicher`, Schlüssel in `GERAETESPEICHER`; Vitest: ausgeblendet bleibt weg, Speicher wirft → bleibt bis Neuladen weg; Guard `sichererSpeicher.guard.test.ts` und Geräteräumungs-Test grün
-- [ ] 3.5 Falls `DashboardPaneel` keine Kopf-Aktion hat: als Prop ergänzen samt Test und Design-System-Vorschau (Generator neu laufen lassen, `designSystem.guard.test.ts` grün)
-- [ ] 3.6 `frontend/AGENTS.md`: Dashboard-Baukasten (Reihe „Einsatz starten“ unter der Alarmzeile) und „Rollen der Übersichten“ (Startliste gehört zum Überblick, Haken statt Zahl); Prettier grün
+- [x] 3.5 Falls `DashboardPaneel` keine Kopf-Aktion hat: als Prop ergänzen samt Test und Design-System-Vorschau (Generator neu laufen lassen, `designSystem.guard.test.ts` grün)
+- [x] 3.6 `frontend/AGENTS.md`: Dashboard-Baukasten (Reihe „Einsatz starten“ unter der Alarmzeile) und „Rollen der Übersichten“ (Startliste gehört zum Überblick, Haken statt Zahl); Prettier grün
 
 ## 4. e2e, Bilder, Doku
 
