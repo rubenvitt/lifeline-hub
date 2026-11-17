@@ -423,18 +423,19 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
    * ganze Navigation ins Leere, deshalb die Großform statt eines Banners.
    * Nur an `isError`, NICHT an „keine Daten": während des Abrufs ist `einsatz` regulär leer.
    * Auch die Sackgasse ist das Ziel des Sprunglinks (`SprungZumInhalt.tsx`): ohne Rahmen gäbe es
-   * sonst keins, und „Zum Inhalt springen“ täte nichts.
+   * sonst keins, und „Zum Inhalt springen“ täte nichts. Ein schlichtes `main` ohne Polsterung: die
+   * Sackgasse steht wie vorher.
    */
   if (einsatzQuery.isError) {
     return (
-      <Content {...sprungzielInhalt} style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
+      <main {...sprungzielInhalt}>
         <SeitenSackgasse
           titel="Einsatz konnte nicht geladen werden"
           ursache={einsatzQuery.error}
           onWiederholen={() => void einsatzQuery.refetch()}
           rueckweg={{ pfad: einsaetzePfad(), label: 'Zur Einsatzliste' }}
         />
-      </Content>
+      </main>
     );
   }
 
