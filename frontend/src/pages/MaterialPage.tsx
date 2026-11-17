@@ -970,6 +970,8 @@ function MaterialInhalt() {
             key: 'aktionen' as const,
             width: menueSpaltenBreite(dichte),
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             // Alle Handlungen im Zeilenmenü (LLH-1722), zuerst „Aus dem Einsatz nehmen“; Stornieren
             // fragt nach (LLH-1079 D8, LLH-1093 D11, wie die Fahrzeugseite).
             render: (_: unknown, em: EinsatzMaterial) => (
@@ -1027,7 +1029,7 @@ function MaterialInhalt() {
        * Dialog mit Absende-Knopf im `<form>`. Vorher stand hier eine Maske, die direkt absendete.
        */
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
         // `paddingXS` ließ 3 / 5 / 7 px.
         <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
           {/* Gruppierung (LLH-1225 D4): eine Segmentleiste darf im Kopf stehen

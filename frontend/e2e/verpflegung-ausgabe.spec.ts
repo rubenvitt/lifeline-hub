@@ -260,6 +260,44 @@ for (const { breite, hoehe, dichte } of [
   });
 }
 
+/**
+ * Gezählt, aber nie gebucht (LLH-1794): nach zweimal „+10“ ist die Seite gerollt. Zählerstand und
+ * „Buchen“ stehen in der klebenden Leiste neben „+1“ und bleiben im Bild.
+ *
+ * Mutationsprobe: die Sammelzeile zurück in den Kopf (`AusgabeAnsicht.tsx`) → „Buchen“ liegt
+ * gerollt über der Fensterkante, der Test wird rot.
+ */
+for (const { breite, hoehe, dichte } of [
+  { breite: 390, hoehe: 700, dichte: 'handschuh' },
+  { breite: 1024, hoehe: 600, dichte: 'komfortabel' },
+]) {
+  test(`gerollt: Sammlung und „Buchen“ bleiben in der Leiste im Bild (${breite}×${hoehe}, ${dichte})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: breite, height: hoehe });
+    const { e, zf } = await saeen(page, -10, 110, { kraefte: 140 });
+    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    await page.goto(`/einsaetze/${e}/verpflegung/${zf}/ausgabe`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+    const zehn = page.getByRole('button', { name: '+10', exact: true });
+    await zehn.click();
+    await zehn.click();
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const menge = page.locator('[data-lfh="sammlung-menge"]');
+    await expect(menge).toHaveText('20');
+    const buchen = page.getByRole('button', { name: 'Buchen', exact: true });
+    await expect(menge).toBeInViewport({ ratio: 1 });
+    await expect(buchen).toBeInViewport({ ratio: 1 });
+    await expect(plus1(page)).toBeInViewport({ ratio: 1 });
+    // Eine Reihe: „Buchen“ und „+1“ teilen sich die Höhe, kein eigener Streifen darüber.
+    const b = (await buchen.boundingBox())!;
+    const p = (await plus1(page).boundingBox())!;
+    expect(b.y + b.height).toBeGreaterThan(p.y);
+    expect(p.width).toBeGreaterThanOrEqual(72);
+    expect(p.height).toBeGreaterThanOrEqual(72);
+  });
+}
+
 test('4 × „+1“, dann sofort zur Modulseite: genau eine Ausgabe über 4 EP, kein Rückgängig-Toast', async ({
   page,
 }) => {

@@ -4,7 +4,7 @@ import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import { uhsDetailPfad } from '../routing/deeplinks';
 import Direkteinstieg from '../components/Direkteinstieg';
-import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
+import UhsAnlegenModal from './uhs/UhsAnlegenModal';
 import { liesLetzteUhs, waehleDefaultUhs } from './uhs/uhsAuswahl';
 
 /** Index-Route /einsaetze/:id/unfallhilfsstellen — UHS-Belegung von `Direkteinstieg`. */
@@ -23,7 +23,7 @@ export default function UnfallhilfsstellenDefault() {
       fehlerText="Unfallhilfsstellen konnten nicht geladen werden"
       leerTitel="Noch keine Unfallhilfsstellen erfasst"
       leerAktionLabel="Erste UHS anlegen"
-      anlegen={(slot) => <UhsAnlegenDrawer einsatzId={einsatzId} {...slot} />}
+      anlegen={(slot) => <UhsAnlegenModal einsatzId={einsatzId} {...slot} />}
     />
   );
 }

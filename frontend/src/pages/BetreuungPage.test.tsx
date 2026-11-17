@@ -14,6 +14,7 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 const einsatz = vi.hoisted(() => ({
@@ -498,6 +499,23 @@ describe('BetreuungPage (LFH-639)', () => {
       renderPage('/einsaetze/1/betreuung?stelle=abc');
       expect(await screen.findByText('Turnhalle Ost')).toBeInTheDocument();
     });
+  });
+
+  it('am Handy stehen „Belegung melden“ und ⋮ in der Kennung, ohne Aktionsspalte (LLH-1789)', async () => {
+    setzeViewportBreite(390);
+    const { container } = renderPage();
+    await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' });
+    expect(screen.queryByRole('columnheader', { name: 'Aktionen' })).toBeNull();
+    const kennungen = [
+      ...container.querySelectorAll<HTMLElement>('[data-lfh="datensicht-kennung-aktion"]'),
+    ];
+    const turnhalle = kennungen.find((k) => k.textContent?.includes('Turnhalle Ost'))!;
+    expect(
+      within(turnhalle).getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+    ).toBeInTheDocument();
+    expect(
+      within(turnhalle).getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }),
+    ).toBeInTheDocument();
   });
 
   describe('Rückgängig nach dem Melden (4.3)', () => {

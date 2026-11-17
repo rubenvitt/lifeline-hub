@@ -147,7 +147,8 @@ Für Einsatzleitung und Führungspersonal:
 
 1. Auf der Karte eines laufenden oder anstehenden Zeitfensters „Ausgabe öffnen“ wählen. Oben
    stehen „Soll“, „ausgegeben“ und „fehlt“, darunter die Leiste mit ausgegeben, Sammlung,
-   ausstehend und Rest; die Zähltasten stehen am unteren Rand.
+   ausstehend und Rest. Am unteren Rand stehen die Zähltasten und daneben die Sammlung mit
+   „Buchen“; sie bleiben im Bild, auch wenn die Seite rollt.
 2. Hat der Einsatz Stellen, unter den Zahlen die Stelle wählen, an der gezählt wird, oder „ohne
    Stelle“. Daneben steht, wie viel an der gewählten Stelle schon ausgegeben ist, etwa „an der
    Stelle 100 EP“.
@@ -166,7 +167,7 @@ Für Einsatzleitung und Führungspersonal:
 
 6. Verzählt oder fehlt jemand aus der Einheit: „−1“ nimmt die zuletzt gezählte Portion aus der
    Sammlung. Ohne Sammlung ist „−1“ gesperrt, der Grund „keine Sammlung“ steht über den Tasten.
-7. Die Sammlung bucht sich nach kurzer Ruhe selbst; „Buchen“ bucht sofort. Die Meldung „Gebucht:
+7. Die Sammlung bucht sich nach kurzer Ruhe selbst; „Buchen“ neben „+1“ bucht sofort. Die Meldung „Gebucht:
    … EP zu ‚…‘“ bietet „Rückgängig“, falls es das falsche Zeitfenster war. Unter „Letzte Buchungen“
    stehen die jüngsten Ausgaben, je mit ihrem Empfänger, etwa „9 EP · an 2. Gruppe“. Ausgaben
    eines anderen Geräts rücken dort nicht unter den Zeiger, sondern warten hinter dem Knopf

@@ -65,7 +65,11 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
       umrandung: token.colorTextTertiary,
     };
   });
-  const besetzt = segmente.filter((s) => s.wert > 0).map((s) => `${s.label} ${s.wert}`);
+  // Zahl vor dem Kürzel (LLH-1793), wie in der Zeile: „1 SK I · 3 SK II“.
+  const besetzt = segmente.filter((s) => s.wert > 0).map((s) => `${s.wert} ${s.label}`);
+  const plaetzeVon = `von ${lage.plaetze.gesamt}`;
+  const mitSk = SICHTUNGSBILD_REIHE.filter((k) => k !== 'ohne' && lage.sichtung[k] > 0);
+  const plaetzeText = `${plaetzeVon} ${lage.plaetze.gesamt === 1 ? 'Platz' : 'Plätzen'} frei`;
   const platzZusatz =
     lage.plaetze.inAufbereitung > 0
       ? `${lage.plaetze.inAufbereitung} in Aufbereitung`
@@ -79,39 +83,65 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
     // Ohne Daten keine Zahl: über einem Ladefehler stünden sonst Nullen, die niemand erhoben hat.
     const zahl = (wert: string | number) =>
       zustand === 'daten' ? wert : zustand === 'laden' ? '…' : '–';
-    const posten: { titel: string; wert: string | number; zusatz?: ReactNode }[] = [
+    /*
+     * Je Posten: Titel, Zahl, ein Nachsatz zur Zahl und ein abgesetzter Zusatz. „Plätze“ liest sich
+     * als „5 von 5 Plätzen frei · 0 belegt“ (LLH-1793), nicht als „Plätze frei 5 / 5 0 belegt“.
+     */
+    const posten: {
+      schluessel: string;
+      titel?: string;
+      wert: string | number;
+      nach?: string;
+      zusatz?: ReactNode;
+      zusatzText?: string;
+      /** Der Zusatz steht mit „ · “ abgesetzt hinter dem Nachsatz. */
+      abgesetzt?: boolean;
+    }[] = [
       {
+        schluessel: 'stelle',
         titel: 'In der Stelle',
         wert: lage.inDerStelle,
+        zusatzText: besetzt.length > 0 ? besetzt.join(' · ') : 'ohne Patienten',
         zusatz:
           besetzt.length > 0 ? (
             <span>
-              {SICHTUNGSBILD_REIHE.filter((k) => k !== 'ohne' && lage.sichtung[k] > 0).map((k) => (
+              {mitSk.map((k, i) => (
                 <span key={k} style={{ whiteSpace: 'nowrap' }}>
-                  <SichtungsTag form="kompakt" kategorie={k as Sichtungskategorie} />{' '}
-                  {lage.sichtung[k]}
+                  {i > 0 && ' · '}
+                  {lage.sichtung[k]}{' '}
+                  <SichtungsTag form="kompakt" kategorie={k as Sichtungskategorie} />
                 </span>
               ))}
-              {lage.sichtung.ohne > 0 && <span>ohne Sichtung {lage.sichtung.ohne}</span>}
+              {lage.sichtung.ohne > 0 && (
+                <span>
+                  {mitSk.length > 0 ? ' · ' : ''}
+                  {lage.sichtung.ohne} ohne Sichtung
+                </span>
+              )}
             </span>
           ) : (
             'ohne Patienten'
           ),
       },
       {
-        titel: 'Plätze frei',
-        wert: `${lage.plaetze.frei} / ${lage.plaetze.gesamt}`,
+        schluessel: 'plaetze',
+        // Ohne Daten keine Gesamtzahl: dann steht der Titel vor dem Strich.
+        titel: zustand === 'daten' ? undefined : 'Plätze frei',
+        wert: lage.plaetze.frei,
+        nach: zustand === 'daten' ? plaetzeText : undefined,
         zusatz: platzZusatz,
+        abgesetzt: true,
       },
-      { titel: 'Wartend', wert: lage.wartend, zusatz: warteZusatz },
-      { titel: 'Unterwegs', wert: lage.unterwegs },
+      { schluessel: 'wartend', titel: 'Wartend', wert: lage.wartend, zusatz: warteZusatz },
+      { schluessel: 'unterwegs', titel: 'Unterwegs', wert: lage.unterwegs },
     ];
     const volltext = posten
-      .map((p) =>
-        [p.titel, p.wert, p.titel === 'In der Stelle' ? besetzt.join(' · ') : p.zusatz]
-          .filter((t) => t != null && t !== '')
-          .join(' '),
-      )
+      .map((p) => {
+        const kopf = [p.titel, p.wert, p.nach].filter((t) => t != null && t !== '').join(' ');
+        const zusatz = p.zusatzText ?? p.zusatz;
+        if (zusatz == null || zusatz === '') return kopf;
+        return `${kopf}${p.abgesetzt ? ' · ' : ' '}${String(zusatz)}`;
+      })
       .join(' · ');
     return (
       <div
@@ -130,12 +160,22 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
         }}
       >
         {posten.map((p) => (
-          <span key={p.titel} style={{ marginInlineEnd: token.marginLG }}>
-            <span style={{ color: rollen.schwach }}>{p.titel}</span>{' '}
+          <span key={p.schluessel} style={{ marginInlineEnd: token.marginLG }}>
+            {p.titel != null && (
+              <>
+                <span style={{ color: rollen.schwach }}>{p.titel}</span>{' '}
+              </>
+            )}
             <b style={{ ...zahlStil('titel', 500) }}>{zahl(p.wert)}</b>
-            {zustand === 'daten' && p.zusatz != null && (
+            {p.nach != null && (
               <>
                 {' '}
+                <span style={{ color: rollen.schwach }}>{p.nach}</span>
+              </>
+            )}
+            {zustand === 'daten' && p.zusatz != null && (
+              <>
+                {p.abgesetzt ? ' · ' : ' '}
                 <span style={{ color: rollen.gedaempft }}>{p.zusatz}</span>
               </>
             )}
@@ -160,7 +200,8 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
       <Kennzahl
         titel="Plätze frei"
         groesse="klein"
-        wert={`${lage.plaetze.frei} / ${lage.plaetze.gesamt}`}
+        wert={lage.plaetze.frei}
+        einheit={plaetzeVon}
         zustand={zustand}
         ton="normal"
         notiz={platzZusatz}

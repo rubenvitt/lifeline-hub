@@ -1094,6 +1094,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_personal::entlassen),
         )
         .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/entlassen/zuruecknehmen",
+            post(routes::einsatz_personal::zuruecknehmen),
+        )
+        .route(
             "/api/einsaetze/{id}/personal/{ep_id}/stornieren",
             post(routes::einsatz_personal::stornieren),
         )

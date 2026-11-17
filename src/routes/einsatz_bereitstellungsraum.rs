@@ -397,6 +397,10 @@ pub struct PatchBody {
     pub lat: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub lon: Option<Option<f64>>,
+    /// Optimistisches Lock (LLH-1920, Muster UHS): der beim Öffnen gelesene `geaendert_at`.
+    /// Stimmt er nicht mehr → 409. Fehlt er (Lagekarte, „Meine Änderung übernehmen“), wird
+    /// ohne Prüfung geschrieben.
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/bereitstellungsraeume/{bid}
@@ -420,6 +424,7 @@ pub async fn update(
         notiz: notiz.as_ref().map(|o| o.as_deref()),
         lat: body.lat,
         lon: body.lon,
+        basis_geaendert_at: body.basis_geaendert_at.as_deref(),
     };
     // Storniert (409), fremd (404) und das Koordinatenpaar (422) prüft `update_tx` gegen den
     // Stand dieser Transaktion.

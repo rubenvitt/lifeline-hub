@@ -226,7 +226,7 @@ describe('BereitstellungsraeumePage', () => {
   /**
    * Schnellaktion der Sprungpalette (LFH-506). Die Route ist die LISTEN-Route, die
    * `bereitstellungsraeumeListePfad` baut — der Pin dazu steht in `routing/deeplinks.test.ts`.
-   * Als Paar: ohne den Parameter bleibt der Drawer zu.
+   * Als Paar: ohne den Parameter bleibt der Dialog zu.
    */
   describe('Schnellerfassung per ?neu=1', () => {
     function mitListe(e: EinsatzAnzeige = einsatz()) {
@@ -236,14 +236,14 @@ describe('BereitstellungsraeumePage', () => {
       );
     }
 
-    it('?neu=1 öffnet den Anlege-Drawer und räumt den Parameter', async () => {
+    it('?neu=1 öffnet den Anlege-Dialog und räumt den Parameter', async () => {
       mitListe();
       renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1');
       expect(await screen.findByPlaceholderText('z. B. BR Ost')).toBeInTheDocument();
       await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     });
 
-    it('ohne ?neu=1 bleibt der Drawer zu', async () => {
+    it('ohne ?neu=1 bleibt der Dialog zu', async () => {
       mitListe();
       renderPage();
       await screen.findByText('BR Ost');
@@ -253,7 +253,7 @@ describe('BereitstellungsraeumePage', () => {
       expect(screen.queryByPlaceholderText('z. B. BR Ost')).not.toBeInTheDocument();
     });
 
-    it('?neu=1 öffnet den Drawer NICHT für Beobachter', async () => {
+    it('?neu=1 öffnet den Dialog NICHT für Beobachter', async () => {
       mitListe(einsatz({ meine_rolle: 'beobachter' }));
       renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1');
       // Synchronisationspunkt ist das Räumen des Parameters — erst danach hat der Effekt
@@ -268,10 +268,10 @@ describe('BereitstellungsraeumePage', () => {
     /**
      * Einmal je Verlaufseintrag (LLH-1558): Bis der Router die Räumung committet, steht `?neu=1`
      * noch in der Adresse der Seite (`AdresseSteht`). Kommt das Schreibrecht nach dem Schließen neu
-     * an (Einsatz lädt neu), öffnet der Drawer nicht noch einmal. Die Positivhälfte (Knopf „Neu“
+     * an (Einsatz lädt neu), öffnet der Dialog nicht noch einmal. Die Positivhälfte (Knopf „Neu“
      * wieder da) steht vor der Negativaussage.
      */
-    it('ein hängender Router-Commit öffnet den geschlossenen Drawer nach neuem Recht nicht wieder (LLH-1558)', async () => {
+    it('ein hängender Router-Commit öffnet den geschlossenen Dialog nach neuem Recht nicht wieder (LLH-1558)', async () => {
       let e = einsatz();
       server.use(
         http.get('/api/einsaetze/1', () => HttpResponse.json(e)),
@@ -282,7 +282,9 @@ describe('BereitstellungsraeumePage', () => {
       });
       expect(await screen.findByPlaceholderText('z. B. BR Ost')).toBeInTheDocument();
       await userEvent.keyboard('{Escape}');
-      await waitFor(() => expect(document.querySelector('.ant-drawer-open')).toBeNull());
+      await waitFor(() =>
+        expect(document.querySelector('.ant-modal:not(.ant-zoom-leave)')).toBeNull(),
+      );
 
       e = einsatz({ meine_rolle: 'beobachter' });
       await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
@@ -290,10 +292,10 @@ describe('BereitstellungsraeumePage', () => {
       e = einsatz();
       await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
       await waitFor(() => expect(screen.getByRole('button', { name: 'Neu' })).toBeEnabled());
-      expect(document.querySelector('.ant-drawer-open')).toBeNull();
+      expect(document.querySelector('.ant-modal:not(.ant-zoom-leave)')).toBeNull();
     });
 
-    it('ein neuer Link ?neu=1 öffnet den Drawer wieder (LLH-1558)', async () => {
+    it('ein neuer Link ?neu=1 öffnet den Dialog wieder (LLH-1558)', async () => {
       mitListe();
       renderPage('/einsaetze/1/bereitstellungsraeume/liste?neu=1', {
         daneben: <Link to="/einsaetze/1/bereitstellungsraeume/liste?neu=1">neuer-link</Link>,
@@ -301,10 +303,14 @@ describe('BereitstellungsraeumePage', () => {
       expect(await screen.findByPlaceholderText('z. B. BR Ost')).toBeInTheDocument();
       await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
       await userEvent.keyboard('{Escape}');
-      await waitFor(() => expect(document.querySelector('.ant-drawer-open')).toBeNull());
+      await waitFor(() =>
+        expect(document.querySelector('.ant-modal:not(.ant-zoom-leave)')).toBeNull(),
+      );
 
       await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
-      await waitFor(() => expect(document.querySelector('.ant-drawer-open')).not.toBeNull());
+      await waitFor(() =>
+        expect(document.querySelector('.ant-modal:not(.ant-zoom-leave)')).not.toBeNull(),
+      );
       await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     });
   });
@@ -328,7 +334,7 @@ describe('BereitstellungsraeumePage', () => {
     await waitFor(() => expect(body).toMatchObject({ bezeichnung: 'BR West' }));
   });
 
-  it('setzt beim Einsatzwechsel alle Werte des offenen BR-Drawers zurück', async () => {
+  it('setzt beim Einsatzwechsel alle Werte des offenen BR-Dialogs zurück', async () => {
     server.use(
       http.get('/api/einsaetze/:einsatzId', ({ params }) =>
         HttpResponse.json(einsatz({ id: Number(params.einsatzId) })),
@@ -348,7 +354,7 @@ describe('BereitstellungsraeumePage', () => {
     expect(screen.getByLabelText('Notiz (optional)')).toHaveValue('');
   });
 
-  it('schließt den BR-Drawer mit Provider per Escape und setzt das Formular zurück', async () => {
+  it('schließt den BR-Dialog mit Provider per Escape und setzt das Formular zurück', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
@@ -363,7 +369,7 @@ describe('BereitstellungsraeumePage', () => {
     expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');
   });
 
-  it('lässt den Drawer und die Bezeichnung bei einem Anlegefehler stehen', async () => {
+  it('lässt den Dialog und die Bezeichnung bei einem Anlegefehler stehen', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
@@ -382,7 +388,7 @@ describe('BereitstellungsraeumePage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  // Schließen wartet auf die Antwort (LFH-1077, design.md D3): eine Ablehnung braucht den Drawer.
+  // Schließen wartet auf die Antwort (LFH-1077, design.md D3): eine Ablehnung braucht den Dialog.
   it('sperrt das Schließen, solange das Anlegen läuft, und öffnet dann den Raum', async () => {
     let postGestartet!: () => void;
     let antwortFreigeben!: () => void;
@@ -669,8 +675,9 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
     for (const bleibt of ['Stärke', 'Fahrzeuge', 'Einheiten', 'Längste Wartezeit']) {
       expect(screen.getByRole('columnheader', { name: bleibt })).toBeInTheDocument();
     }
+    // Nach Breite verborgen ist Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
     expect(
-      screen.getByRole('button', { name: /Spalten · 2 ausgeblendet.*Bereitstellungsräume/ }),
+      screen.getByRole('button', { name: /^Spalten — .*Bereitstellungsräume/ }),
     ).toBeInTheDocument();
   });
 

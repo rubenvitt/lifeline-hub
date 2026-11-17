@@ -1032,10 +1032,6 @@ pub async fn reaktivieren_tx(
 
 // ── Rücknahme der Entlassung (LLH-1722, Spec `kraefte-entlassung`) ─────────────────────────
 
-/// Wie lange nach dem Entlassen die Rücknahme gelingt (design.md D5): deckt den Hinweis (6 s),
-/// Latenz und den Seitenhinweis; danach bleibt „Erneut disponieren“.
-pub const RUECKNAHME_FRIST_MINUTEN: i64 = 10;
-
 /// Welche Module die Person beschreiben darf, in die die Rücknahme zurückbindet (D5). Ein Teil
 /// ohne Recht bleibt aus und wird genannt.
 #[derive(Debug, Clone, Copy)]
@@ -1077,7 +1073,7 @@ fn ruecknahme_conflict() -> AppError {
 /// Nimmt das Entlassen eines Fahrzeugs zurück (design.md D5), in der Transaktion des Aufrufers.
 ///
 /// Riegel: nur die entlassende Person, nur dieses Entlassen (`entlassen_at`), nur innerhalb von
-/// [`RUECKNAHME_FRIST_MINUTEN`]; sonst `Conflict`. Der Endzustand fällt, Status und „Status seit“
+/// [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`]; sonst `Conflict`. Der Endzustand fällt, Status und „Status seit“
 /// bleiben (das Entlassen hat sie nicht angefasst). Die Storno-Sperre (`zuletzt_entlassen_at`)
 /// bleibt auf diesem Entlassen stehen: wer einmal entlassen war, war im Einsatz, und ihr Wert
 /// davor käme nur ungeprüft vom Client (Review vor dem PR). Jede Bindung kommt nur zurück, wenn ihr Ziel frei ist und die Person das Recht des
@@ -1104,8 +1100,7 @@ pub async fn zuruecknehmen_tx(
     let im_riegel = beendet_als.as_deref() == Some(BeendetAls::Entlassen.as_str())
         && beendet_von == Some(benutzer_id)
         && beendet_at.as_deref() == Some(vorzustand.entlassen_at.as_str())
-        && crate::zeit::plus_minuten(&vorzustand.entlassen_at, RUECKNAHME_FRIST_MINUTEN)
-            .is_some_and(|grenze| jetzt <= grenze.as_str());
+        && crate::entlassung::is_in_ruecknahme_frist(&vorzustand.entlassen_at, jetzt);
     if !im_riegel {
         return Err(ruecknahme_conflict());
     }

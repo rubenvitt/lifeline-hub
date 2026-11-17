@@ -380,7 +380,8 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
   await expect(page.getByText('Verletztenablage', { exact: false })).toHaveCount(1);
   if (zusatz) {
     for (const [knopf, spalte] of [
-      [/^Spalten · 2 ausgeblendet/, 'Funkrufname'],
+      // Erst ohne Zähler (Vorgabe), nach der ersten eigenen Wahl mit (LLH-1790).
+      [/^Spalten — /, 'Funkrufname'],
       [/^Spalten · 1 ausgeblendet/, 'Fahrzeuge und Personal'],
     ] as const) {
       await page.getByRole('button', { name: knopf }).click();

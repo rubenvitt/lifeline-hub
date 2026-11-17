@@ -120,7 +120,7 @@ auslösen.
 ### Requirement: Die UHS-Seite gliedert sich in Bereiche
 
 Die Detailseite einer UHS SHALL direkt unter dem Seitenkopf eine Bereichsleiste mit „Belegung“,
-„Material“, „Kräfte“, „Bewegungen“ und „Dateien“ tragen. „Belegung“ (der Grundriss) MUST die
+„Material“, „Kräfte“, „Bewegungen“, „Dateien“ und „Angaben“ tragen. „Belegung“ (der Grundriss) MUST die
 Vorgabe sein. Jeder Bereich MUST dieselbe Fläche bis zur Fensterhöhe einnehmen, statt unter einem
 anderen zu hängen. Der gewählte Bereich MUST in der Adresse stehen, damit ein Link ihn direkt
 öffnet. Bei 1440 × 900 und 1280 × 800 MUST jeder Bereich ohne Bildlauf erreichbar sein.
@@ -136,6 +136,10 @@ anderen zu hängen. Der gewählte Bereich MUST in der Adresse stehen, damit ein 
 #### Scenario: Kopfzahl springt
 - **WHEN** jemand im Kopf der UHS auf „3 Posten · 1 Ausfall“ tippt
 - **THEN** ist der Bereich „Material“ gewählt
+
+#### Scenario: Angaben per Link
+- **WHEN** die Detailseite mit `?bereich=angaben` geöffnet wird
+- **THEN** ist der Bereich „Angaben“ gewählt und zeigt das Paneel „Angaben“
 
 ### Requirement: Personenzeile in „Noch nicht aufgenommen“ und „Wartebereich“
 Jede Zeile der Listen „Noch nicht aufgenommen“ und „Wartebereich“ SHALL Sichtung, Kennung und

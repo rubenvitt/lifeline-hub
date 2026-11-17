@@ -26,7 +26,7 @@ export function zaehltasteStil(
   return { minHeight: hoehe, minWidth: hoehe };
 }
 
-/** Abstand zwischen zwei Zähltasten: `marginSM` (7 / 11 / 16 px). */
+/** Abstand zwischen zwei Zähltasten: `marginSM` (8 / 12 / 16 px). */
 export function zaehltastenAbstand(token: { marginSM: number }): number {
   return token.marginSM;
 }

@@ -28,13 +28,7 @@ import {
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
-import type {
-  EinsatzFahrzeug,
-  EinsatzPersonal,
-  EntlassungRuecknahmeAntwort,
-  EntlassungVorzustand,
-  Staerke,
-} from '../api/types';
+import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -63,6 +57,7 @@ import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
+import { KennungMitZusatz } from '../components/KennungMitZusatz';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
@@ -78,7 +73,6 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
-import { abstand } from '../theme/tokens';
 import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
 import StatusTag from '../components/StatusTag';
@@ -107,6 +101,7 @@ import {
 } from '../kraefte/kraeftebaumKern';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { schliesseRueckgaengig, zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import EigeneEinheitDialog from '../kraefte/EigeneEinheitDialog';
 import BesatzungUebernehmenDialog from '../kraefte/BesatzungUebernehmenDialog';
@@ -122,10 +117,11 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
  * zweite Kanal, nicht die Farbe.
  */
 function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll: Staerke | null }) {
+  const { token } = theme.useToken();
   const ist = besatzungsStaerke(crew);
   const urteil = besatzungsUrteilVon(crew.length, ist, soll);
   return (
-    <Space size={abstand.sm} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
+    <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <StatusTag darstellung={besatzungsUrteil[urteil]} />
       <span style={schriftStil('meta')}>
         {urteil !== 'nicht_erfasst' && (
@@ -211,10 +207,11 @@ function BesatzungsBlock({
    */
   unbekannt?: string;
 }) {
+  const { token } = theme.useToken();
   if (gesperrt || unbekannt) {
     return (
       <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
-        <Space size={abstand.sm}>
+        <Space size={token.marginSM}>
           <Typography.Text type="secondary">Besatzung</Typography.Text>
           <Typography.Text
             type="secondary"
@@ -232,13 +229,13 @@ function BesatzungsBlock({
   const frei = personal.filter((p) => p.fahrzeug_id == null && !gehalten.has(p.id));
   return (
     <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }} {...haltenProps}>
-      <Space size={abstand.sm} style={{ marginBottom: abstand.sm }}>
+      <Space size={token.marginSM} style={{ marginBottom: token.marginSM }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
         <BesatzungsStaerkeBadge crew={crew} soll={ef.soll_besatzung ?? null} />
       </Space>
       {darfSchreiben && uebernehmen && (
         // Gesperrt steht der Grund sichtbar daneben, nicht nur im Tooltip (D12).
-        <Space size={abstand.sm} wrap style={{ display: 'flex', marginBottom: abstand.sm }}>
+        <Space size={token.marginSM} wrap style={{ display: 'flex', marginBottom: token.marginSM }}>
           <Button disabled={uebernehmen.kandidaten === 0} onClick={uebernehmen.onOeffnen}>
             Personal der Einheit übernehmen
           </Button>
@@ -269,7 +266,7 @@ function BesatzungsBlock({
                 size="middle"
                 style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
               >
-                <Space size={abstand.sm} wrap>
+                <Space size={token.marginSM} wrap>
                   <Typography.Text type={geloest ? 'secondary' : undefined}>
                     {m.name}
                   </Typography.Text>
@@ -349,7 +346,7 @@ function BesatzungsBlock({
         />
       )}
       {zuordnenFehler && (
-        <div style={{ maxWidth: 420, marginTop: abstand.sm }}>
+        <div style={{ maxWidth: 420, marginTop: token.marginSM }}>
           <SpeicherFehler
             fehler={zuordnenFehler.fehler}
             titel="Nicht zugeordnet"
@@ -403,6 +400,10 @@ const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
   { key: 'seit', sortWert: true },
   { key: 'besatzung', sortWert: true },
   { key: 'kennzeichen', sortWert: true },
+  // Ohne Sortierung und Filter, aber voreingestellt aus: fehlte sie hier, fiele sie aus der
+  // gemerkten Spaltenwahl, stünde nach dem Neuladen unverlangt da, und der Schalter meldete eine
+  // eigene Wahl (LLH-1790).
+  { key: 'bemerkung' },
 ];
 const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
   'typ',
@@ -420,15 +421,6 @@ const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
  * hängt die Liste aus. Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie schreiben darf;
  * ohne Schreibrecht meldet keine Angabe einen Entwurf.
  */
-/**
- * Der Satz zu einer Rücknahme, die nicht alles zurückbekam (LLH-1722): „83-1 zurück, ohne: Anna
- * Müller (inzwischen auf einem anderen Fahrzeug)“.
- */
-export function ausgelassenSatz(name: string, antwort: EntlassungRuecknahmeAntwort): string {
-  const teile = antwort.ausgelassen.map((a) => `${a.bezeichnung} (${a.grund})`);
-  return `${name} zurück, ohne: ${teile.join(', ')}`;
-}
-
 export default function FahrzeugePage() {
   return (
     <OffeneBearbeitungProvider>
@@ -1011,15 +1003,24 @@ function FahrzeugeInhalt() {
       suchText: (ef) => ef.funkrufname,
       // `wrap`: die Marken dürfen unter den Funkrufnamen rutschen, statt die Fließspalte über ihr
       // Maß zu drücken (wie `PersonalPage`, LFH-975).
+      // Steht die Spalte „Typ“ nicht (unter `xxl` oder per Hand verborgen), steht der Typ als zweite
+      // Zeile darunter (LLH-1790, Spec `fahrzeug-bearbeitung`, „Typ eines Fahrzeugs in der Liste“);
+      // steht sie, nur dort. Der Kartentitel nimmt dasselbe `render`: am Handy steht er in der Karte.
       render: (_, ef) => (
-        <Space wrap>
-          {/* Funkrufname in Mono. */}
-          <span data-schrift="kennung" style={zahlStil('text')}>
-            {ef.funkrufname}
-          </span>
-          {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
-          {ef.ist_demo && <DemoMarke />}
-        </Space>
+        <KennungMitZusatz
+          kennung={
+            <Space wrap>
+              {/* Funkrufname in Mono. */}
+              <span data-schrift="kennung" style={zahlStil('text')}>
+                {ef.funkrufname}
+              </span>
+              {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
+              {ef.ist_demo && <DemoMarke />}
+            </Space>
+          }
+          zusatz={ef.fahrzeugtyp}
+          ausSpalte="typ"
+        />
       ),
     },
     {
@@ -1172,6 +1173,8 @@ function FahrzeugeInhalt() {
             key: 'aktionen' as const,
             width: aktionenBreite,
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             // Nur der Menüauslöser (Entscheidung 14.10.2026): Entlassen, Angaben, Stamm und
             // Stornieren stehen im Menü; Stornieren fragt im `<Modal>` nach (LLH-1079).
             render: (_: unknown, ef: EinsatzFahrzeug) => (
@@ -1204,7 +1207,7 @@ function FahrzeugeInhalt() {
       }
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
         // `paddingXS` ließ 3 / 5 / 7 px.
         <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
@@ -1264,7 +1267,7 @@ function FahrzeugeInhalt() {
           An `darfSchreiben` gekoppelt: wer nur liest, sieht `StatusBadge` aus den Zeilendaten
           und verliert nichts. */}
       {darfSchreiben && (statusQuery.isError || statusFehler.gescheitert) && (
-        <div style={{ marginBottom: abstand.md }}>
+        <div style={{ marginBottom: token.margin }}>
           <SeitenFehler
             text="Statuskatalog konnte nicht geladen werden — Statuswechsel derzeit nicht möglich"
             ursache={statusFehler.fehler}
@@ -1391,7 +1394,7 @@ function FahrzeugeInhalt() {
                     {materialFrei && (
                       <div
                         data-lfh="beladung-block"
-                        style={{ paddingLeft: 8, marginTop: abstand.md }}
+                        style={{ paddingLeft: 8, marginTop: token.margin }}
                       >
                         <MaterialAmOrt
                           einsatzId={einsatzId}
@@ -1422,10 +1425,8 @@ function FahrzeugeInhalt() {
                 // Der Bedienweg sitzt am `status`-Slot, nie am `aktion`-Slot (`frontend/AGENTS.md`,
                 // „Statuswechsel in Kräfte-Listen“).
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
-                // Einheit und Seit aus denselben Zellen (D5); ohne Freigabe der Typ statt der Einheit.
-                sekundaer: einheitenFrei
-                  ? ['einheit', 'seit', 'besatzung']
-                  : ['typ', 'seit', 'besatzung'],
+                // Einheit und Seit aus denselben Zellen (D5). Den Typ trägt der Titel (LLH-1790).
+                sekundaer: einheitenFrei ? ['einheit', 'seit', 'besatzung'] : ['seit', 'besatzung'],
                 // Keine Primäraktion: „Entlassen“ ist nie Hauptaktion einer Karte (LLH-1722, Spec
                 // `fahrzeug-bearbeitung`); es steht wie in der Tabelle zuerst im Menü.
                 weitere: darfSchreiben

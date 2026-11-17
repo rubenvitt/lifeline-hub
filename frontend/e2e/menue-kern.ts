@@ -55,7 +55,9 @@ export async function klickeEintrag(eintrag: Locator): Promise<void> {
     const l = liste.getBoundingClientRect();
     const e = element.getBoundingClientRect();
     const sichtbar = e.top >= l.top && e.bottom <= Math.min(l.bottom, window.innerHeight);
-    if (!sichtbar) liste.scrollTop += e.top - l.top;
+    // Abgerundet: Chrome rollt ganzzahlig und rundet eine Bruchkoordinate (Zeilenhöhen wie
+    // 14 × 1,3 px) sonst auf, dann ragt der Eintrag Bruchteile eines Pixels über den Listenrand.
+    if (!sichtbar) liste.scrollTop += Math.floor(e.top - l.top);
   });
   // Ganz im Fenster: Playwright muss für den Klick nichts mehr rollen.
   await expect(eintrag).toBeInViewport({ ratio: 1 });

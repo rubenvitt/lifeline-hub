@@ -4021,6 +4021,44 @@ async fn abruf_fahrzeug_sendet_fahrzeug() {
     );
 }
 
+/// Raumdaten mit Basisstand (LLH-1920, Spec `bereitstellungsraum-bearbeitung`): ein veralteter
+/// `basis_geaendert_at` gibt 409 und ändert nichts, der aktuelle speichert.
+#[tokio::test]
+async fn patch_mit_veraltetem_basisstand_gibt_409() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR Stand").await;
+    sqlx::query("UPDATE bereitstellungsraum SET geaendert_at = '2000-01-01 00:00:00' WHERE id = ?")
+        .bind(br_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (s, v409) = patch_br(
+        &app,
+        &cookie,
+        eid,
+        br_id,
+        json!({"notiz": "alt", "basis_geaendert_at": "1999-12-31 23:59:59"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    // Eigener Grund: der Client fragt nur beim Sperrkonflikt „Zwischenzeitlich geändert“.
+    assert_eq!(v409["grund"], "veraltet", "{v409}");
+
+    let (s, v) = patch_br(
+        &app,
+        &cookie,
+        eid,
+        br_id,
+        json!({"notiz": "neu", "basis_geaendert_at": "2000-01-01 00:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["notiz"], "neu");
+}
+
 // ---------- Koordinate (LLH-1107, Spec `bereitstellungsraum-lagekarte`) ----------
 
 async fn patch_br(

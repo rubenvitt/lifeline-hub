@@ -5,7 +5,7 @@ use crate::benachrichtigung::{
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Bereitstellungsraeume, Einheiten, Fahrzeuge, Material, ModulMarker};
+use crate::einsatz::modul::{Bereitstellungsraeume, Einheiten, Fahrzeuge, Material};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -516,23 +516,10 @@ pub async fn entlassen(
     }))
 }
 
-/// Darf die Person in das Modul `Z` schreiben? Für die Rücknahme, die einen Teil ohne Recht
-/// auslässt statt abzulehnen (LLH-1722, design.md D5).
-async fn darf_zielmodul<Z: ModulMarker>(
-    state: &AppState,
-    ctx: &EinsatzSchreibzugriff<Fahrzeuge>,
-) -> Result<bool, AppError> {
-    match ctx.fordere_zielmodul::<Z>(&state.pool).await {
-        Ok(()) => Ok(true),
-        Err(AppError::Forbidden | AppError::ForbiddenMit(_)) => Ok(false),
-        Err(e) => Err(e),
-    }
-}
-
 /// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen/zuruecknehmen — „Rückgängig“ nach dem
 /// Entlassen (LLH-1722, Spec `kraefte-entlassung`, design.md D5): Body ist der Vorzustand aus der
 /// Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses Entlassen, höchstens
-/// [`disposition_repo::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders
+/// [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders
 /// gebunden ist oder wofür das Modulrecht fehlt, bleibt aus und steht in `ausgelassen`. Ein
 /// ETB-Eintrag, Live-Meldungen wie beim Entlassen, keine Benachrichtigung.
 pub async fn zuruecknehmen(
@@ -558,9 +545,11 @@ pub async fn zuruecknehmen(
         liste.dedup();
     }
     let rechte = disposition_repo::RuecknahmeRechte {
-        einheiten: darf_zielmodul::<Einheiten>(&state, &ctx).await?,
-        material: darf_zielmodul::<Material>(&state, &ctx).await?,
-        bereitstellungsraeume: darf_zielmodul::<Bereitstellungsraeume>(&state, &ctx).await?,
+        einheiten: ctx.darf_zielmodul::<Einheiten>(&state.pool).await?,
+        material: ctx.darf_zielmodul::<Material>(&state.pool).await?,
+        bereitstellungsraeume: ctx
+            .darf_zielmodul::<Bereitstellungsraeume>(&state.pool)
+            .await?,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();

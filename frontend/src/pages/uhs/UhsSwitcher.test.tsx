@@ -60,7 +60,7 @@ describe('UhsSwitcher', () => {
     expect(screen.getByTestId('loc')).toHaveTextContent('/einsaetze/1/unfallhilfsstellen/9');
   });
 
-  it('öffnet über „+ Neue UHS“ den Anlegen-Drawer', async () => {
+  it('öffnet über „+ Neue UHS“ den Anlegen-Dialog', async () => {
     renderSwitcher();
     await userEvent.click(screen.getByRole('button', { name: /UHS 3/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /Neue UHS/ }));

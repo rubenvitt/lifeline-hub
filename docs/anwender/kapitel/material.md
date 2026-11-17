@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 240
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts, frontend/src/components/aktionsSpalte.tsx]
 ---
 
 ## Überblick
@@ -15,7 +15,9 @@ wo der Posten liegt: bei einer Einheit, auf einem Fahrzeug, an einer UHS oder in
 Bereitstellungsraum, immer an höchstens einem Ort.
 
 Die Führung liest hier, was einsatzbereit, im Einsatz oder ausgefallen ist und wo es liegt.
-Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
+Das Menü „Weitere Aktionen“ steht am rechten Rand der Tabelle fest, auch wenn sie quer rollt; den
+Ort wählt die Auswahl an der Zelle, ohne dass die Tabelle springt. Disponieren und ändern dürfen
+Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 

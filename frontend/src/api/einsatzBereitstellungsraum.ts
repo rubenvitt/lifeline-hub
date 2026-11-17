@@ -96,6 +96,11 @@ export interface BrPatch {
   /** Koordinate (LLH-1107): beide `null` entfernen die Verortung; ein halbes Paar ist 422. */
   lat?: number | null;
   lon?: number | null;
+  /**
+   * Optimistisches Lock (LLH-1920): `geaendert_at` beim Öffnen; ein anderer Stand gibt 409. Fehlt
+   * er, schreibt der Server ohne Prüfung.
+   */
+  basis_geaendert_at?: string;
 }
 
 export function aktualisiereBr(

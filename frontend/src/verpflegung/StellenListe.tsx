@@ -269,7 +269,7 @@ export default function StellenListe({
         </div>
         {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
         {aktionen.length > 0 && (
-          // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen.
+          // `marginSM` = 8 / 12 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen.
           <Flex
             justify="flex-end"
             wrap

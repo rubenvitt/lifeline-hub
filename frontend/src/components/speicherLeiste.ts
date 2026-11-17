@@ -17,7 +17,7 @@ import { FOKUSABSTAND_SPEICHERLEISTE, useFokusabstandUnten } from './fokusabstan
  * Kein `<Space>`: auf den Formularseiten steht genau EIN Knopf, kein `danger`-Nachbar. Eine
  * Sitzung, die man abbrechen kann (Bearbeiten-Modus einer Detailseite, LLH-1101), trägt
  * „Speichern“ und „Abbrechen“: mit `hasAbbrechen` wird die Leiste eine umbrechende Reihe mit dem
- * Abstand `padding` (11/18/26 px), derselben Stufe wie der Fuß der Erfassungs-Hülle — die
+ * Abstand `padding` (12/20/24 px), derselben Stufe wie der Fuß der Erfassungs-Hülle — die
  * Leitlinie verlangt ≥ 8 px mit Maus, ≥ 16 px mit Touch (`frontend/AGENTS.md`, „Farbe und
  * Zeichen“). Ohne die Option bleibt die Leiste, wie sie war.
  */

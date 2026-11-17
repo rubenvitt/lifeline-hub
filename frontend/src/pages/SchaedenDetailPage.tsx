@@ -47,6 +47,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
+import { flaeche } from '../theme/tokens';
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
   value: t,
@@ -244,7 +245,7 @@ export default function SchaedenDetailPage() {
   }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );
@@ -361,7 +362,7 @@ export default function SchaedenDetailPage() {
          * Weg; nach dem Stornieren springt die Seite selbst zurück.
          */
         aktionenPlan && (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
           <Space wrap size={token.marginSM}>
             {primaer && (
