@@ -1,8 +1,9 @@
 # Prüfliste für einen Review
 
-Gegen diese Liste prüft ein Review, wenn der Mensch einen verlangt (`dev-zunder-ausfuehren`,
-Abschnitt „Review auf Wunsch“). Einen Pflicht-Review vor dem PR gibt es seit 17.11.2026 nicht
-mehr; die Liste bleibt im Stand dieses Tages und wird nicht mehr bei jedem Fehler erweitert.
+Gegen diese Liste prüft ein Review, wenn der Agent ihn für nötig hält (`dev-zunder-ausfuehren`,
+Abschnitt „Review nach Ermessen“). Einen Pflicht-Review vor jedem PR gibt es seit 17.11.2026
+nicht mehr; die Liste bleibt im Stand dieses Tages und wird nicht mehr bei jedem Fehler
+erweitert.
 
 **Herkunft:** Vom 08. bis 12.11.2026 lief CodeRabbit in der Testphase auf jedem PR. Die Klassen
 sind die Arten von Fehlern, die es dort gefunden hat und der eigene Review nicht

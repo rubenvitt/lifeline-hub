@@ -52,10 +52,10 @@ auch dann recht, wenn er den Main-Loop von breitem Lesen entlastet. Herleitung:
 | Lohnt sich | Lohnt sich nicht |
 |---|---|
 | Scope über mehr als ein Subsystem oder mehrere Subtasks | Was ein Grep oder ein Read beantwortet |
-| Ein Review, den der Mensch verlangt (Abschnitt „Review auf Wunsch“) | Route `trivial` |
+| Ein Review, wenn der Diff einen Anlass aus „Review nach Ermessen“ trifft | Route `trivial` |
 | Ursachensuche über viel unbekannten Code (`bug-unklar`) | Alles Interaktive: Checkpoint, Rückfrage, Freigabe |
 | Unabhängige Subtasks im autonomen Modus (`dev-zunder-orchestrieren`, Phase 3) | `/opsx:*`, TDD-Zyklus des Main-Loops |
-| Gegenlesen eines Entwurfs | Ein Review des eigenen Diffs, den niemand verlangt hat |
+| Gegenlesen eines Entwurfs | Ein Review ohne Anlass aus „Review nach Ermessen“ |
 
 **Agent oder Workflow:** Für einen bis drei unabhängige Jobs das Agent-Tool (kein Skript,
 gleich im Hintergrund). Ein Workflow, wenn es mehrstufig wird (finden → verifizieren) oder mehr
@@ -256,6 +256,9 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 ## Schritt 4: Abschluss
 
 - **`superpowers:verification-before-completion`** — vor jeder „fertig"-Aussage
+- **Review nach Ermessen** (Abschnitt unten): prüfen, ob der Diff einen Anlass trifft; wenn ja,
+  den Review selbst starten, er darf parallel zu den Gates laufen
+- Gates, CI und Merge abwarten nach „Warten ohne Wecken“ (Abschnitt unten)
 - **OpenSpec-Change archivieren, BEVOR der PR entsteht** (Entscheidung 30.09.2026): Ist die
   `tasks.md` der Change abgehakt, läuft **`/opsx:archive <name>` im selben Branch** — Spec-Sync
   nach `openspec/specs/`, Verschieben nach `openspec/changes/archive/<datum>-<name>/`, Verweise
@@ -323,18 +326,58 @@ in jedem PR. Mechanik: `scripts/AGENTS.md`, „Stau-Wächter“.
 - **Dein PR ist doppelt** (du hast selbst einen Fix mit `alpha-rot` geöffnet, ein älterer
   existiert): deinen PR schließen, oder das Label entfernen, wenn er etwas anderes repariert.
 
-## Review auf Wunsch
+## Review nach Ermessen
 
-**Festlegung des Users vom 17.11.2026: kein Pflicht-Review vor dem PR** (er kostete zu viele
-Tokens; Spec `review-vor-dem-pr`, Herleitung:
-`openspec/changes/archive/2026-11-17-review-vor-dem-pr-ausbauen/proposal.md`). Die Prüfung vor
-dem PR sind die Gates. Du startest von dir aus keinen Review-Agenten und keinen Workflow dafür.
+**Festlegung des Users vom 17.11.2026:** kein Pflicht-Review vor jedem PR, aber auch keiner auf
+Zuruf. Du entscheidest nach dem Diff, ob einer nötig ist, und startest ihn dann selbst, ohne zu
+fragen (Spec `review-vor-dem-pr`, Herleitung:
+`openspec/changes/archive/2026-11-17-review-vor-dem-pr-ausbauen/proposal.md`).
 
-Verlangt der Mensch einen Review: ein Agent mit frischem Kontext (nicht der Main-Loop) liest
-`git diff origin/alpha...HEAD`, die geltenden `AGENTS.md` und
-`references/review-pruefliste.md`, prüft die passenden Klassen und gibt je Befund Datei, Zeile
-und den konkreten Fall zurück; er ändert nichts. Bestätigte Befunde behebst du mit eigenem
-Commit, eine Gegenprüfung je Befund braucht es nicht.
+**Nötig**, wenn der Diff mindestens eins davon trifft:
+
+- Berechtigung, Org-Isolation oder Geltungsbereich (wer darf was sehen oder ändern)
+- Eingaben von außen: öffentliche API v1, Instanzkopplung, gekoppelte Geräte, Importe
+- Daten können still verloren gehen oder halb geschrieben werden: Migration, Löschen,
+  Zusammenführen, mehrere Schreibvorgänge ohne gemeinsame Transaktion
+- Schreiben ohne Netz, Sitzung und Anmeldung, Live-Verteilung
+- Größe: über etwa 600 geänderte Codezeilen (ohne Erzeugtes, Lockfiles, Bilder, Doku), oder
+  Backend und Frontend zugleich mit neuer oder geänderter Schnittstelle
+
+**Nicht nötig:** Doku, Anleitungen und Specs; reine Darstellung, Layout und Texte; eine kleine
+Änderung, deren Verhalten die neuen Tests vollständig festhalten; Route `trivial`.
+
+**Form:** ein Agent (Agent-Tool) mit frischem Kontext, nie der Main-Loop selbst, kein Workflow,
+keine Gegenprüfer. Er bekommt nicht, warum der Code so gebaut wurde, sondern: Diff
+`git diff origin/alpha...HEAD`, die geltenden `AGENTS.md`, die zutreffenden Klassen aus
+`references/review-pruefliste.md`, bei einer Change deren Delta-Spec, dazu die Pflichtpunkte
+jedes Worker-Prompts (Abschnitt „Agenten nach Bedarf“). Er liefert je Befund Datei, Zeile und den
+konkreten Fall und ändert nichts. Jeden Befund prüfst du selbst kurz an der Stelle; bestätigte
+behebst du mit eigenem Commit, mehrere vertretbare Auswege mit Wirkung für Anwender gehen an den
+Menschen, ein Fehler außerhalb des Diffs wird eine Aufgabe (`zunder-task-anlegen`).
+
+**Nachweis:** im PR unter „Geprüft“ eine Zeile: Review gelaufen (Anlass, Befunde und Verbleib)
+oder nicht nötig (warum).
+
+## Warten ohne Wecken
+
+**Festlegung des Users vom 17.11.2026.** Jede Runde liest den ganzen Kontext neu; in einer langen
+Sitzung (400.000 bis 800.000 Tokens) kostet schon ein „ich warte“ 0,10 bis 0,60 $, das Wecken
+nach mehr als einer Stunde Pause 3 bis 8 $. Geweckt wird, wenn etwas zu tun ist, nicht um
+nachzusehen.
+
+- **Gates in einem Aufruf.** `check-all.sh` läuft als ein Bash-Aufruf: im Vordergrund, wenn er
+  ins Zeitlimit passt, sonst einmal mit `run_in_background`, und du wartest auf die eine
+  Abschlussmeldung. Mehrere Bündel oder Portionen (etwa die Rust-Suite wegen des
+  Plattenkontingents) laufen hintereinander im selben Aufruf, nicht je Portion ein eigener.
+- **Kein Nachsehen:** kein Monitor, der Zwischenstände meldet, keine Abfrage-Schleife, kein
+  Wecker (`send_later`, `ScheduleWakeup`) als Rückfallnetz, solange das PR-Abo Ereignisse
+  liefert — auch wenn die Umgebung einen verlangt.
+- **Eine Meldung, die nichts verlangt** (Vorschau gebaut, Check läuft noch, Bot-Kommentar ohne
+  Befund): ohne Werkzeugaufruf und mit höchstens einem Satz beenden.
+- **Das PR-Abo bleibt** bis zum Merge: Konflikte und Hinweise des Stau-Wächters sollen die
+  Sitzung erreichen. **Weckt der Merge sie:** `done` setzen, falls noch reserviert
+  `release_task`, dann die Abschlussmeldung. Keine erneuten Gates, keine CI-Abfrage, kein
+  weiterer Schritt.
 
 ## Bilder der Änderung
 
@@ -406,7 +449,9 @@ hier** — der Orchestrator sammelt Bediensicht/Klickweg je Subtask ein und gibt
 - Komplexität nicht überspringen — auch „kleine" Features brauchen TDD.
 - Keine Agents für Interaktives, `/opsx:*` oder Triviales, und kein Worker-Prompt ohne die
   Pflichtpunkte aus „Agenten nach Bedarf“.
-- Keinen Review-Agenten oder -Workflow starten, den der Mensch nicht verlangt hat.
+- Keinen Review ohne Anlass aus „Review nach Ermessen“, keinen Review-Workflow, keine
+  Gegenprüfer-Agenten; den Review nicht selbst im Main-Loop machen.
+- Nicht wecken lassen, um nachzusehen („Warten ohne Wecken“).
 - Keinen neuen Task anlegen — das ist `zunder-task-anlegen`.
 - Nicht an einer Aufgabe arbeiten, die ein anderer Agent per `claim_task` hält.
 - Status nicht rückwärts oder redundant setzen — nur vorwärts entlang der Spur.

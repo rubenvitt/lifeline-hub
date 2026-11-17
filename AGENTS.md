@@ -121,9 +121,9 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   `test-driven-development`, `verification-before-completion`, `finishing-a-development-branch`.
 - **`/opsx:apply` bringt keine Disziplin mit:** jede Aufgabe per `test-driven-development`, vor
   jedem „fertig" `verification-before-completion`.
-- **Kein Pflicht-Review vor dem PR** (17.11.2026, Spec `review-vor-dem-pr`): die Gates sind die
-  Prüfung; einen Review-Agenten gibt es nur, wenn der Mensch ihn verlangt (`dev-zunder-ausfuehren`,
-  „Review auf Wunsch“).
+- **Review nach Ermessen, Warten ohne Wecken** (17.11.2026, Specs `review-vor-dem-pr`,
+  `warten-ohne-wecken`): der Agent entscheidet am Diff, ob ein Review nötig ist, und startet ihn
+  selbst; geweckt wird nur, wenn etwas zu tun ist. Ablauf: `dev-zunder-ausfuehren`.
 - **Mit dem Menschen** (08.11.2026): vor dem ersten Code den Lösungsweg gemeinsam ausarbeiten
   (außer `trivial`), am Ende Bilder der Änderung in PR und Meldung. Ablauf:
   `dev-zunder-ausfuehren`, „Gemeinsam ausarbeiten, bevor Code entsteht“ und „Bilder der Änderung“.

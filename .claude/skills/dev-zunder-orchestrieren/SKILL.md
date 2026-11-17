@@ -46,7 +46,7 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 | 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, Pflicht: Lösungsweg gemeinsam ausarbeiten** |
 | 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel (**Workflow** oder Subagents) als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
-| 4 Review | nur auf Wunsch des Menschen: ein Agent | Prüfliste, Befunde zurück in Phase 3 | — |
+| 4 Review | nach Ermessen: ein Agent (bei sehr großem Diff zwei) | Prüfliste, Befunde zurück in Phase 3 | — |
 | 5 Abschluss & Status | Main-Loop | Merge, Board-Status | — |
 
 Konkrete, adaptierbare Workflow-Skripte für Phase 1/2 stehen in
@@ -196,12 +196,14 @@ sammelst diese ein und legst sie dem User vor, statt zu raten.
 Im Zweifel sequenziell. Bei gemischter Lage: unabhängige Subtasks autonom bündeln, abhängige
 sequenziell — aber das nur, wenn der Schnitt sauber ist.
 
-## Phase 4 — Review (nur auf Wunsch)
+## Phase 4 — Review (nach Ermessen)
 
-Seit 17.11.2026 kein Pflicht-Review: du startest keinen Review-Agenten und keinen Workflow von
-dir aus. Verlangt der Mensch einen, läuft er einmal über den ganzen Branch, wie
-`dev-zunder-ausfuehren`, Abschnitt „Review auf Wunsch“, beschreibt; Befunde arbeitest du in
-Phase 3 ab. `superpowers:verification-before-completion` vor jeder „fertig"-Aussage.
+Höchstens **ein** Review über den ganzen Branch, nicht je Subtask. Ob er nötig ist und wie er
+läuft, entscheidest du nach `dev-zunder-ausfuehren`, Abschnitt „Review nach Ermessen“, ohne zu
+fragen. Ist der Diff so groß, dass ein Agent ihn nicht überblickt, dürfen es zwei sein, getrennt
+nach Backend und Frontend; kein Workflow, keine Gegenprüfer. Befunde arbeitest du in Phase 3 ab.
+`superpowers:verification-before-completion` vor jeder „fertig"-Aussage. Gates, CI und Merge
+wartest du ab wie in „Warten ohne Wecken“ dort.
 
 ## Phase 5 — Abschluss & Status
 
