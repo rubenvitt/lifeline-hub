@@ -1,4 +1,4 @@
-import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
+import { IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -26,7 +26,6 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
-  Paneel,
   Segmentleiste,
   StatusChip,
   useRollen,
@@ -240,7 +239,7 @@ export default function LagemeldungenPage() {
       message.success(`Lagemeldung #${ergebnis.daten.lfd_nr} erfasst`);
     },
   });
-  // Nur das Erfassen DIESES Einsatzes gehört ins Paneel.
+  // Nur das Erfassen DIESES Einsatzes gehört in den Dialog.
   const diesesErfassen = erfassenMutation.variables?.einsatzId === einsatzId;
   const erfassenSpeicherung: Speicherung = {
     error: diesesErfassen ? erfassenMutation.error : null,
@@ -433,7 +432,7 @@ export default function LagemeldungenPage() {
       <SeitenLeer
         titel="Noch keine Lagemeldungen"
         aktion={
-          darfErfassen && !formOffen
+          darfErfassen
             ? { label: 'Lagemeldung erfassen', onClick: () => setFormOffen(true) }
             : undefined
         }
@@ -485,15 +484,8 @@ export default function LagemeldungenPage() {
       }
       aktionen={
         darfErfassen && (
-          // Solange eine Lagemeldung unterwegs ist, bleibt das Paneel offen: die Antwort braucht
-          // ihren Ort.
-          <Button
-            type="primary"
-            icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
-            disabled={formOffen && erfassenSpeicherung.isPending}
-            onClick={() => setFormOffen(!formOffen)}
-          >
-            {formOffen ? 'Formular schließen' : 'Lagemeldung erfassen'}
+          <Button type="primary" icon={<IconPlus />} onClick={() => setFormOffen(true)}>
+            Lagemeldung erfassen
           </Button>
         )
       }
@@ -507,37 +499,31 @@ export default function LagemeldungenPage() {
         />
       }
     >
-      {darfErfassen && formOffen && (
-        <Paneel
-          titel="Lagemeldung erfassen"
-          koerperPolster
-          style={{ marginBlockEnd: token.margin }}
-          aktion={
-            <Button
-              type="text"
-              icon={<IconKreuz />}
-              disabled={erfassenSpeicherung.isPending}
-              onClick={() => setFormOffen(false)}
-              aria-label="Formular schließen"
-            />
-          }
-        >
-          <MeldungFormular
-            card={false}
-            artVorgabe="lagemeldung"
-            serie={false}
-            onFertig={() => setFormOffen(false)}
-            einsatzId={einsatzId}
-            senden={erfassenSpeicherung.isPending}
-            // mutateAsync: die Erfassungshülle leert nur, wenn die Meldung angekommen ist.
-            onAnlegen={(daten) => erfassenMutation.mutateAsync({ einsatzId, daten })}
-            speicherung={erfassenSpeicherung}
-            einheiten={einheitenQuery.data}
-            abschnitte={abschnitteQuery.data}
-            funktionsVorschlaege={funktionsVorschlaege}
-            vorschlagsquellen={vorschlagsquellen}
-          />
-        </Paneel>
+      {/* Erfassen im Dialog, nicht im Paneel über der Zeitachse (LLH-1921, Spec `bedien-muster`,
+          „Einen Datensatz anlegen“): eine einzelne Meldung, keine Serie neben der Liste. */}
+      {darfErfassen && (
+        <MeldungFormular
+          // Das Formular bleibt bei geschlossenem Dialog eingehängt; ein anderer Einsatz beginnt
+          // mit einem leeren.
+          key={einsatzId}
+          dialog={{
+            offen: formOffen,
+            titel: 'Lagemeldung erfassen',
+            onAbbrechen: () => setFormOffen(false),
+          }}
+          artVorgabe="lagemeldung"
+          serie={false}
+          onFertig={() => setFormOffen(false)}
+          einsatzId={einsatzId}
+          senden={erfassenSpeicherung.isPending}
+          // mutateAsync: die Erfassungshülle leert nur, wenn die Meldung angekommen ist.
+          onAnlegen={(daten) => erfassenMutation.mutateAsync({ einsatzId, daten })}
+          speicherung={erfassenSpeicherung}
+          einheiten={einheitenQuery.data}
+          abschnitte={abschnitteQuery.data}
+          funktionsVorschlaege={funktionsVorschlaege}
+          vorschlagsquellen={vorschlagsquellen}
+        />
       )}
       {angezeigteNeue.length > 0 && darfSchreiben && (
         <div

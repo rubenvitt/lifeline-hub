@@ -12,7 +12,7 @@ import { KONTEXT_FUNKRUFNAME, merkeZuletzt } from '../stammdaten/zuletztVerwende
 import { Select } from '../components/Select';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
 import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
-import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
+import { ErfassungsFormular, ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
@@ -149,6 +149,7 @@ export default function MeldungFormular({
   onFertig,
   einsatzId,
   vorschlagsquellen = KEINE_QUELLEN,
+  dialog,
 }: {
   senden: boolean;
   /**
@@ -184,6 +185,12 @@ export default function MeldungFormular({
    * Quellen wie ETB Von/An, mit „In Stammdaten übernehmen“. Leer: reiner Freitext ohne Marke.
    */
   vorschlagsquellen?: readonly Vorschlagsquelle[];
+  /**
+   * Erfassungsdialog statt Formular im Seitenfluss (LLH-1921: Seite Lagemeldungen). Anlegen ohne
+   * Serie geht über den Dialog (Spec `bedien-muster`, „Einen Datensatz anlegen“); `card` gilt dann
+   * nicht.
+   */
+  dialog?: { offen: boolean; titel: string; onAbbrechen: () => void };
 }) {
   const vorgaben = useMemo<MeldungFormWerte>(
     () => (artVorgabe ? { ...DEFAULTS, meldungsart: artVorgabe } : DEFAULTS),
@@ -318,27 +325,30 @@ export default function MeldungFormular({
       : undefined,
   ].filter((t): t is string => !!t);
 
-  const formular = (
-    <ErfassungsFormular<MeldungFormWerte>
-      form={form}
-      initialValues={vorgaben}
-      onErfassen={absenden}
-      // Das Inline-Formular schließt nach dem Senden NICHT — Zuklappen ist ausdrückliche
-      // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Meldung erfassen"
-      // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat. Ohne
-      // Serie schließt der Aufrufer über `onFertig`.
-      onFertig={onFertig ?? (() => {})}
-      laeuft={senden}
-      speicherung={speicherung}
-      speicherFehlerTitel="Meldung nicht erfasst"
-      speicherFehlerFallback="Erfassen fehlgeschlagen"
-      erfassenText={artVorgabe === 'lagemeldung' ? 'Lagemeldung erfassen' : 'Meldung erfassen'}
-      serie={serie}
-      uebernahme={UEBERNAHME}
-      onPruefungGescheitert={(felder) => {
-        if (felder.some((f) => EINGEKLAPPT.has(f))) setWeitereOffen(true);
-      }}
-    >
+  /** Was die Erfassungshülle trägt, ob als Formular im Paneel oder als Dialog. */
+  const huelle = {
+    form,
+    initialValues: vorgaben,
+    onErfassen: absenden,
+    // Das Inline-Formular schließt nach dem Senden NICHT — Zuklappen ist ausdrückliche
+    // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Meldung erfassen"
+    // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat. Ohne
+    // Serie schließt der Aufrufer über `onFertig`.
+    onFertig: onFertig ?? (() => {}),
+    laeuft: senden,
+    speicherung,
+    speicherFehlerTitel: 'Meldung nicht erfasst',
+    speicherFehlerFallback: 'Erfassen fehlgeschlagen',
+    erfassenText: artVorgabe === 'lagemeldung' ? 'Lagemeldung erfassen' : 'Meldung erfassen',
+    serie,
+    uebernahme: UEBERNAHME,
+    onPruefungGescheitert: (felder: string[]) => {
+      if (felder.some((f) => EINGEKLAPPT.has(f))) setWeitereOffen(true);
+    },
+  };
+
+  const felder = (
+    <>
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       {!artVorgabe && (
         <Space style={{ marginBottom: 16 }} wrap>
@@ -511,8 +521,25 @@ export default function MeldungFormular({
           },
         ]}
       />
-    </ErfassungsFormular>
+    </>
   );
+
+  // Dialog-Form (LLH-1921, design.md D4): dieselben Felder im Erfassungsdialog; Kreuz, Maske und
+  // Escape laufen über dessen Abbruch und leeren das Formular.
+  if (dialog) {
+    return (
+      <ErfassungsModal<MeldungFormWerte>
+        offen={dialog.offen}
+        titel={dialog.titel}
+        onAbbrechen={dialog.onAbbrechen}
+        {...huelle}
+      >
+        {felder}
+      </ErfassungsModal>
+    );
+  }
+
+  const formular = <ErfassungsFormular<MeldungFormWerte> {...huelle}>{felder}</ErfassungsFormular>;
 
   if (!card) return formular;
   return (

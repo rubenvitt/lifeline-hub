@@ -13,9 +13,9 @@
 
 ## 3. Lagemeldung im Dialog (D4)
 
-- [ ] 3.1 `MeldungFormular` Prop `dialog` rendert `ErfassungsModal` mit denselben Formular-Props; Test in `MeldungFormular.test.tsx`: Dialog mit Titel, Abbrechen und Kreuz leeren das Formular, Prüffehler unter „Weitere Angaben“ klappt auch im Dialog auf
-- [ ] 3.2 `LagemeldungenPage`: Paneel → Dialog „Lagemeldung erfassen“, Kopf-Knopf ohne „Formular schließen“, Leerzustand und `?neu=1` öffnen den Dialog; `LagemeldungenPage.test.tsx` prüft Dialog statt `region`, Schließen nach dem Erfassen, `?neu=1` und Nur-Ansicht, grün
-- [ ] 3.3 `e2e/lagemeldungen.spec.ts` sucht den Dialog statt der `region`; `frontend/src/etb/AGENTS.md` (Lagemeldungen) beschreibt den Dialog; Prettier über die geänderten Dateien grün
+- [x] 3.1 `MeldungFormular` Prop `dialog` rendert `ErfassungsModal` mit denselben Formular-Props; Test in `MeldungFormular.test.tsx`: Dialog mit Titel, Abbrechen und Kreuz leeren das Formular, Prüffehler unter „Weitere Angaben“ klappt auch im Dialog auf
+- [x] 3.2 `LagemeldungenPage`: Paneel → Dialog „Lagemeldung erfassen“, Kopf-Knopf ohne „Formular schließen“, Leerzustand und `?neu=1` öffnen den Dialog; `LagemeldungenPage.test.tsx` prüft Dialog statt `region`, Schließen nach dem Erfassen, `?neu=1` und Nur-Ansicht, grün
+- [x] 3.3 `e2e/lagemeldungen.spec.ts` sucht den Dialog statt der `region`; `frontend/src/etb/AGENTS.md` (Lagemeldungen) beschreibt den Dialog; Prettier über die geänderten Dateien grün
 
 ## 4. Regeln (D5, D6)
 
