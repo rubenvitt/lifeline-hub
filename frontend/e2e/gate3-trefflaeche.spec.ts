@@ -471,9 +471,9 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
       });
     }
     // 12 Angaben (LLH-1134: „Telefon und weitere Verbindungen“ statt Kommunikationsmittel und
-    // Erreichbarkeit), 7 Zuordnungsziele, „Personal der Einheit übernehmen“, „Einheit auflösen“
-    // und „Einheit stornieren“ (LLH-1881).
-    expect(ziele).toHaveLength(22);
+    // Erreichbarkeit), 8 Zuordnungsziele (Material: „Ausgeben“ und ⋮, LLH-1924), „Personal der
+    // Einheit übernehmen“, „Einheit auflösen“ und „Einheit stornieren“ (LLH-1881).
+    expect(ziele).toHaveLength(23);
     let minimum = Infinity;
     const miss = async (name: string, ziel: Locator) => {
       const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);
@@ -605,9 +605,9 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
         }
         for (const { name, ziel } of gesperrt.ziele) ziele.push({ name, ziel });
         // Beobachter: nur der Funkrufname. Führungspersonal: 12 Angaben, „Einheit auflösen“,
-        // „Einheit stornieren“ (LLH-1881) und sechs Zuordnungsziele; „Person zuordnen …“ zählt
-        // als gesperrtes Ziel extra.
-        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 20);
+        // „Einheit stornieren“ (LLH-1881) und sieben Zuordnungsziele (Material: „Ausgeben“ und ⋮,
+        // LLH-1924); „Person zuordnen …“ zählt als gesperrtes Ziel extra.
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 21);
 
         let kleinsteZeile = Infinity;
         for (const { name, zeile } of gesperrt.zeilen) {
