@@ -118,7 +118,14 @@ describe('startliste (LLH-1815)', () => {
     const extern = punkt(
       startliste(
         quellen({
-          einsatz: kopf({ einsatzleiter: { art: 'extern', name: 'KBM Weber', seit: anna.seit } }),
+          einsatz: kopf({
+            einsatzleiter: {
+              art: 'extern',
+              name: 'KBM Weber',
+              seit: anna.seit,
+              personal_noch_disponiert: false,
+            },
+          }),
         }),
       ),
       'einsatzleiter',

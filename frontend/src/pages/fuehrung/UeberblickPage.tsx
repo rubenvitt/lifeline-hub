@@ -112,6 +112,9 @@ import {
   type Marke,
 } from './ueberblickDaten';
 import OffeneVorgaengePaneel from './OffeneVorgaengePaneel';
+import StartlistePaneel from './StartlistePaneel';
+import { startliste, startlisteOffen, type StartQuelle } from './startliste';
+import { isStartlisteAusgeblendet, saveStartlisteAusgeblendet } from './startlisteSpeicher';
 import {
   VORGANGS_SICHT_PARAM,
   meineStelle,
@@ -157,6 +160,17 @@ import { leereUhrzeit, zeitKurz } from '../../anzeige/zeitDarstellung';
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
  *  eines Großeinsatzes sicher trägt. Konstante, damit der Query-Key stabil bleibt. */
 const ETB_ENTSCHEIDUNGEN = { typ: 'entscheidung' as const, limit: 50 };
+
+/** Die jüngste Lagefeststellung für die Startliste (LLH-1815, design.md D3): ein Eintrag genügt. */
+const ETB_ERSTE_LAGE = { typ: 'lage' as const, limit: 1 };
+
+/** Eine Quelle der Startliste aus ihrer Abfrage: Daten nur aus einem gelungenen Abruf. */
+function startQuelle<T>(q: UseQueryResult<T>, frei: boolean): StartQuelle<T> {
+  if (!frei) return { zustand: 'gesperrt' };
+  if (q.isError) return { zustand: 'fehler' };
+  if (q.data === undefined) return { zustand: 'laden' };
+  return { zustand: 'daten', daten: q.data };
+}
 
 /** `gesperrt`: das Modul der Quelle ist für die Person nicht freigegeben (LFH-669). */
 type Zustand = AbrufZustand;
@@ -251,6 +265,18 @@ export default function UeberblickPage() {
       },
       { replace: true },
     );
+
+  // Startliste „Einsatz starten“ je Browser ausgeblendet (LLH-1815, design.md D4): erst der State,
+  // dann der Speicher; scheitert das Schreiben, bleibt sie bis zum Neuladen weg.
+  const [ausgeblendetJetzt, setAusgeblendetJetzt] = useState<ReadonlySet<number>>(new Set());
+  const startlisteAusgeblendet = useMemo(
+    () => ausgeblendetJetzt.has(einsatzId) || isStartlisteAusgeblendet(einsatzId),
+    [ausgeblendetJetzt, einsatzId],
+  );
+  const blendeStartlisteAus = () => {
+    setAusgeblendetJetzt((alt) => new Set(alt).add(einsatzId));
+    saveStartlisteAusgeblendet(einsatzId);
+  };
 
   const einsatzQ = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -408,6 +434,15 @@ export default function UeberblickPage() {
    * Hinweis — ein beim Laden aufblitzender Grund wäre falsch.
    */
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Startliste (LLH-1815, Spec `ueberblick-startliste`): nur mit Schreibrecht am aktiven Einsatz
+  // (nicht am Spiegel, `darfImEinsatzSchreiben`) und solange nicht ausgeblendet. Nur dann fragt die
+  // Seite die jüngste Lagefeststellung ab (design.md, Risiken).
+  const startlisteMoeglich = darfSchreiben && !startlisteAusgeblendet;
+  const ersteLageQ = useQuery({
+    queryKey: einsatzKeys.etbListe(einsatzId, ETB_ERSTE_LAGE),
+    queryFn: () => listeEtb(einsatzId, ETB_ERSTE_LAGE),
+    enabled: startlisteMoeglich && etbFrei,
+  });
   // Ein ETB-Eintrag ist am Spiegel ein Antrag (LLH-1492, D13).
   const darfEtbErfassen = darfBeantragen(einsatz);
   // Daten nur aus freien Quellen: der Cache eines gesperrten Moduls kann einen Altstand tragen.
@@ -547,6 +582,44 @@ export default function UeberblickPage() {
   const gliederungLaedt = [abschnitteQ, einheitenQ, personalQ, fahrzeugeQ, materialQ].some(
     (q) => q.isLoading,
   );
+
+  // Startliste (LLH-1815, design.md D1/D3). Sie steht ÜBER dem Führungsstand: erschiene sie nach
+  // dem Band, schöbe sie es nach unten. Deshalb wartet der ganze Körper auf ihre Quellen, solange
+  // sie erscheinen kann (`startlisteLaedt`); die Paneelreihen warten ohnehin auf die Gliederung.
+  // Wie dort zählt nur das erste Laden. Die Freigaben hält der Rahmen vor dem ersten Bild der
+  // Seite bereit (`EinsatzLayout`); fehlen sie doch, steht die Liste erst mit ihnen (unten).
+  const startlisteLaedt =
+    startlisteMoeglich && [abschnitteQ, einheitenQ, personalQ, ersteLageQ].some((q) => q.isLoading);
+  const startPunkte = useMemo(
+    () =>
+      startliste({
+        einsatzId,
+        einsatz: einsatz ? { zustand: 'daten', daten: einsatz } : { zustand: 'laden' },
+        abschnitte: startQuelle(abschnitteQ, abschnitteFrei || freigabenStand !== 'da'),
+        einheiten: startQuelle(einheitenQ, einheitenFrei || freigabenStand !== 'da'),
+        personal: startQuelle(personalQ, personalFrei || freigabenStand !== 'da'),
+        lage: startQuelle(ersteLageQ, etbFrei || freigabenStand !== 'da'),
+        freigaben,
+      }),
+    [
+      einsatzId,
+      einsatz,
+      abschnitteQ,
+      einheitenQ,
+      personalQ,
+      ersteLageQ,
+      abschnitteFrei,
+      einheitenFrei,
+      personalFrei,
+      etbFrei,
+      freigabenStand,
+      freigaben,
+    ],
+  );
+  // Ohne bekannte Freigaben (sie laden noch) steht die Liste nicht: ihre gebundenen Quellen fragen
+  // dann gar nicht und wären „unbekannt“. Gescheiterte Freigaben zeigen sie mit „nicht geladen“.
+  const zeigeStartliste =
+    startlisteMoeglich && freigabenStand !== 'laden' && startlisteOffen(startPunkte);
 
   const zeile = listenZeileStil(rollen, token);
   // Rolle „kurz“ (LLH-1061): die Liste reicht über Mitternacht; eine Lücke hält Ziffernbreite.
@@ -694,11 +767,27 @@ export default function UeberblickPage() {
             ohnehin (Rail); ein Fehler oder „ohne Netz“ hält den Körper nicht auf (`isLoading`).
             Die Paneelreihen unter dem Band warten zusätzlich auf die Gliederung (`gliederungLaedt`,
             LLH-1481). */}
-        {einsatzQ.isLoading || zaehlerQ.isLoading ? null : (
+        {einsatzQ.isLoading || zaehlerQ.isLoading || startlisteLaedt ? null : (
           <DashboardFlaeche kennung="ueberblick">
             {/* Die Alarmzeile „Was brennt“ steht als erstes unter dem Seitenkopf, auf Überblick,
               Lagebild und Lagemonitor dieselbe (LLH-1743, Spec `lage-alarmzeile`). */}
             <AlarmZeile daten={wasBrenntDaten} ziel={(e) => alarmZiel(e, einsatzId, freigaben)} />
+            {/* Startliste „Einsatz starten“ (LLH-1815): eine eigene Reihe nur mit diesem Paneel
+              zwischen Alarmzeile und Führungsstand; fehlt sie, fehlt die ganze Reihe. */}
+            {zeigeStartliste && (
+              <PaneelReihe kennung="ueberblick-startliste">
+                <StartlistePaneel
+                  punkte={startPunkte}
+                  onAusblenden={blendeStartlisteAus}
+                  onNeuladen={() =>
+                    nachladen(qAbschnitte, qEinheiten, qPersonal, {
+                      q: ersteLageQ,
+                      frei: etbFrei,
+                    })
+                  }
+                />
+              </PaneelReihe>
+            )}
             {/* Führungsstand: nur Handlungszahlen (LLH-1743, Seitenrollen „Führen: was ist zu
               tun“, `frontend/AGENTS.md`). Betroffene, Kräfte und Einsatzdauer haben ihre Heimat im
               Lagebild. Notizplatz wie dort: unter `md` Boden (LFH-629), ab `md` drei Zeilen Boden

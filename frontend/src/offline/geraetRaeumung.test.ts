@@ -11,6 +11,10 @@ import type { EtbEntwurf } from '../etb/entwuerfe/entwurfModell';
 import { rohLesen } from '../test/rohIdb';
 import { ladeZuletzt, merkeZuletzt } from '../stammdaten/zuletztVerwendet';
 import { loadGemerkteStelle, saveGemerkteStelle } from '../verpflegung/stellenGedaechtnis';
+import {
+  isStartlisteAusgeblendet,
+  saveStartlisteAusgeblendet,
+} from '../pages/fuehrung/startlisteSpeicher';
 import { geraetFuerBenutzerRaeumen, geraetRaeumen } from './geraetRaeumung';
 import {
   queueEinreihen,
@@ -55,6 +59,7 @@ async function geraetBefuellen(): Promise<void> {
   await setzeOrt(ortKeyVon(51.16, 10.45), 'Hauptstr. 5, Musterstadt');
   schreibeErfassungsSitzungswert(7, 'person', 'antreff_ort', 'Sammelstelle Süd');
   saveGemerkteStelle(7, 21);
+  saveStartlisteAusgeblendet(7);
   sessionStorage.setItem('lfh:liste:personen:7', 'q=Meier');
   merkeZuletzt('funkrufname', 'Polizei vor Ort');
   blendeAus(40);
@@ -85,6 +90,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
     expect(loadGemerkteStelle(7)).toBeNull();
+    expect(isStartlisteAusgeblendet(7)).toBe(false);
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(ladeZuletzt('funkrufname')).toEqual([]);
     expect(istAusgeblendet(40)).toBe(false);
@@ -102,6 +108,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
     expect(loadGemerkteStelle(7)).toBeNull();
+    expect(isStartlisteAusgeblendet(7)).toBe(false);
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(ladeZuletzt('funkrufname')).toEqual([]);
     expect(istAusgeblendet(40)).toBe(false);
