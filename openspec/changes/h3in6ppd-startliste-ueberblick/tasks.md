@@ -25,7 +25,7 @@ per TDD.
 
 ## 4. e2e, Bilder, Doku
 
-- [ ] 4.1 e2e: leerer Einsatz zeigt die Startliste ohne Layoutsprung (Lage der Reihen vor und nach dem Laden gleich), Erfassen des Einsatzleiters über den Sprung setzt den Haken, letzter Punkt lässt das Paneel verschwinden; Lauf grün
+- [x] 4.1 e2e: leerer Einsatz zeigt die Startliste ohne Layoutsprung (Lage der Reihen vor und nach dem Laden gleich), Erfassen des Einsatzleiters über den Sprung setzt den Haken, letzter Punkt lässt das Paneel verschwinden; Lauf grün
 - [ ] 4.2 `docs/anwender/kapitel/ueberblick.md`: Abschnitt „Einsatz starten“ (Punkte, wann erledigt, Ausblenden) nach `docs/anwender/AGENTS.md`; Bild per `ueberblick.bilder.ts`; Wächter der Anwenderdoku grün
 
 ## 5. Verifikation
