@@ -1560,6 +1560,185 @@ async function tabellenUeberlauf(region: Locator): Promise<number> {
   });
 }
 
+/**
+ * Bearbeiten in der Zelle ohne Sprung (LLH-1795, Spec `einsatztauglichkeit-layout`, „Bearbeiten in
+ * einer Tabellenzelle verschiebt die Tabelle nicht“): der Stift der Einheit öffnet ein Popover an
+ * der Zelle; keine Spalte ändert ihre Breite um mehr als 1 px, die Zeile behält ihre Höhe. Vorher
+ * wuchs die Zeile von 45 auf rund 71 px, und alle Spalten verteilten sich neu.
+ *
+ * Mutationsprobe: `AngabeFormProvider form="schwebend"` in `KatalogTabelle.tsx` auf `fluss` →
+ * das Formular steht wieder in der Zelle, der Test wird rot.
+ */
+test.describe('Gate 1 · Bearbeiten ohne Sprung (LLH-1795)', () => {
+  test.describe.configure({ mode: 'parallel' });
+  for (const { breite, hoehe, dichte } of [
+    { breite: 1440, hoehe: 900, dichte: 'kompakt' },
+    { breite: 1024, hoehe: 768, dichte: 'handschuh' },
+  ] as const) {
+    test(`Fahrzeuge ${breite} px, ${dichte}: der Stift der Einheit verschiebt keine Spalte`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page, { startseite: false });
+      const einsatzId = await seedeKraefte(page);
+      await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+      await page.setViewportSize({ width: breite, height: hoehe });
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+      const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT_FAHRZEUG });
+      await expect(zeile).toHaveCount(1);
+      const masse = () =>
+        region.evaluate((el) => {
+          const z = [...el.querySelectorAll<HTMLElement>('.ant-table-tbody tr.ant-table-row')];
+          return {
+            spalten: [...el.querySelectorAll<HTMLElement>('.ant-table-sticky-holder thead th')].map(
+              (th) => Math.round(th.getBoundingClientRect().width * 10) / 10,
+            ),
+            hoehen: z.map((r) => Math.round(r.getBoundingClientRect().height * 10) / 10),
+          };
+        });
+      const vorher = await masse();
+      await zeile.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} eintragen` }).click();
+      const speichern = page.getByRole('button', {
+        name: `Einheit zu ${KRAFT_FAHRZEUG} speichern`,
+      });
+      await expect(speichern).toBeVisible();
+      await expect(speichern, '„Speichern“ steht vollständig im Fenster').toBeInViewport({
+        ratio: 1,
+      });
+      // Die Bearbeitung steht nicht in der Zeile.
+      await expect(zeile.getByRole('button', { name: /speichern$/ })).toHaveCount(0);
+      const nachher = await masse();
+      vorher.spalten.forEach((b, i) =>
+        expect(Math.abs(nachher.spalten[i] - b), `Spalte ${i}`).toBeLessThanOrEqual(1),
+      );
+      vorher.hoehen.forEach((h, i) =>
+        expect(Math.abs(nachher.hoehen[i] - h), `Zeile ${i}`).toBeLessThanOrEqual(1),
+      );
+      // Escape: zuerst die Auswahlliste, dann die Bearbeitung; der Fokus kehrt zur Zelle zurück.
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      await expect(speichern).toHaveCount(0);
+      await expect(
+        zeile.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} eintragen` }),
+      ).toBeFocused();
+    });
+  }
+
+  test('Fahrzeuge 390 px: in der Karte bearbeitet die Einheit im Fluss', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await anmelden(page, { startseite: false });
+    const einsatzId = await seedeKraefte(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+    const karte = page.locator('[data-lfh="datensicht-karte"]').filter({ hasText: KRAFT_FAHRZEUG });
+    await expect(karte).toHaveCount(1);
+    await karte.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} eintragen` }).click();
+    await expect(
+      karte.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} speichern` }),
+    ).toBeVisible();
+  });
+});
+
+/**
+ * Die Hauptaktion einer Zeile liegt ohne Querscrollen im Bild (LLH-1789, Spec
+ * `einsatztauglichkeit-layout`, „Die Hauptaktion einer Tabellenzeile bleibt im Bild“): ab `md` steht
+ * die Aktionsspalte rechts fixiert, unter `md` stehen Primäraktion und ⋮ in der fixierten Kennung.
+ * Gemessen war die Evakuierung bei 1440 px mit „Stand melden“ bei x 1332–1448 hinter dem Rand.
+ *
+ * Mutationsprobe: `amEnde` aus `aktionsSpalte()` entfernen → ab `md` liegt das ⋮ am Ende des
+ * Querscrolls, die Fälle mit überlaufender Tabelle werden rot.
+ */
+test.describe('Gate 1 · Aktion im Bild (LLH-1789)', () => {
+  test.describe.configure({ mode: 'parallel' });
+  // Spec-Szenario „Waagerecht gerollt“: am Anfang und am Ende des Querscrolls steht das ⋮ am
+  // rechten Rand, und die rollenden Spalten behalten ihre Breite.
+  test('Fahrzeuge 1024 px, handschuh: gerollt bleibt das ⋮ am Rand, die Spalten bleiben breit', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await anmelden(page, { startseite: false });
+    const einsatzId = await seedeKraefte(page);
+    await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+    const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+    const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT_FAHRZEUG });
+    const menue = zeile.getByRole('button', { name: /^Weitere Aktionen zu / });
+    await expect(menue).toBeVisible();
+    const koerper = region.locator('.ant-table-body').first();
+    const ueber = await koerper.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(ueber, 'Vorbedingung: die Tabelle läuft waagerecht über').toBeGreaterThan(0);
+    const breiten = () =>
+      region.evaluate((el) =>
+        [...el.querySelectorAll<HTMLElement>('.ant-table-sticky-holder thead th')].map((th) =>
+          Math.round(th.getBoundingClientRect().width),
+        ),
+      );
+    const vorher = await breiten();
+    for (const ziel of [ueber, 0]) {
+      await koerper.evaluate((el, x) => el.scrollTo({ left: x }), ziel);
+      const rahmen = (await koerper.boundingBox())!;
+      const b = (await menue.boundingBox())!;
+      expect(b.x + b.width, `⋮ im Rahmen bei scrollLeft ${ziel}`).toBeLessThanOrEqual(
+        rahmen.x + rahmen.width + 1,
+      );
+      expect(b.x, `⋮ im Rahmen bei scrollLeft ${ziel}`).toBeGreaterThanOrEqual(rahmen.x - 1);
+      expect(await breiten()).toEqual(vorher);
+    }
+  });
+
+  for (const { breite, hoehe, dichte } of [
+    { breite: 1440, hoehe: 900, dichte: 'kompakt' },
+    { breite: 1024, hoehe: 768, dichte: 'handschuh' },
+    { breite: 390, hoehe: 844, dichte: 'komfortabel' },
+  ] as const) {
+    test(`${breite} px, ${dichte}: „Stand melden“, „Belegung melden“ und ⋮ ohne Querscrollen`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page, { startseite: false });
+      const einsatzId = await gate1Saeen(page);
+      await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+      await page.setViewportSize({ width: breite, height: hoehe });
+      for (const [pfad, region, primaer, menue] of [
+        ['evakuierung', 'Evakuierungsbezirke', /^Stand melden für Bezirk /, /^Aktionen zu Bezirk /],
+        ['betreuung', 'Betreuungsstellen', /^Belegung melden für /, /^Aktionen zu Stelle /],
+      ] as const) {
+        await page.goto(`/einsaetze/${einsatzId}/${pfad}`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const flaeche = page.getByRole('region', { name: region, exact: true });
+        const zeile = flaeche.locator('tr.ant-table-row').first();
+        await expect(zeile).toBeVisible();
+        const koerper = flaeche.locator('.ant-table-body, .ant-table-content').first();
+        if (breite === 1440 && pfad === 'evakuierung') {
+          // Spec-Szenario „Evakuierung am Fükw“: mit offenem Modulpanel (ab `xl` Vorgabe) und
+          // einer Tabelle, die breiter ist als ihr Rahmen; sonst hielte der Test auch ohne
+          // Fixierung (Fix-Review LLH-1721).
+          await expect(page.locator('[data-lfh="modul-panel"]')).toBeVisible();
+          const ueber = await koerper.evaluate((el) => el.scrollWidth - el.clientWidth);
+          expect(ueber, 'Vorbedingung: die Bezirkstabelle läuft waagerecht über').toBeGreaterThan(
+            0,
+          );
+        }
+        const rahmen = (await koerper.boundingBox())!;
+        for (const ziel of [
+          zeile.getByRole('button', { name: primaer }),
+          zeile.getByRole('button', { name: menue }),
+        ]) {
+          await expect(ziel).toHaveCount(1);
+          const b = (await ziel.boundingBox())!;
+          expect(b.x, `${pfad}: Aktion links im Rahmen`).toBeGreaterThanOrEqual(rahmen.x - 1);
+          expect(b.x + b.width, `${pfad}: Aktion rechts im Rahmen`).toBeLessThanOrEqual(
+            rahmen.x + rahmen.width + 1,
+          );
+        }
+      }
+    });
+  }
+});
+
 test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
   test.describe.configure({ mode: 'parallel' });
 
@@ -1604,13 +1783,9 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
           region.getByRole('button', { name: / entlassen$|^Zeitachse zu / }),
         ).toHaveCount(0);
 
-        // Was weicht, steht im Zähler des Spaltenschalters: Träger, Ruhe und die Bemerkung
-        // (Voreinstellung), unter `xxl` der Abschnitt (LLH-1096), unter `xl` (1200) die Funktion.
-        await expect(
-          region.getByRole('button', {
-            name: `Spalten · ${breite >= 1200 ? 4 : 5} ausgeblendet`,
-          }),
-        ).toBeVisible();
+        // Was weicht (Träger, Ruhe, Bemerkung als Voreinstellung, unter `xxl` der Abschnitt, unter
+        // `xl` die Funktion), ist Vorgabe: der Schalter heißt „Spalten“ ohne Zähler (LLH-1790).
+        await expect(region.getByRole('button', { name: /^Spalten — / })).toBeVisible();
         const ueber = await tabellenUeberlauf(region);
         expect(ueber, 'Personaltabelle läuft nicht über').toBeLessThanOrEqual(1);
         for (const kopf of ['Einheit', 'Fahrzeug', 'Position', 'Einsatzdauer']) {
@@ -1621,9 +1796,10 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         }
         let offen = ueber;
         if (rolle === 'admin') {
-          // Die offene Einheitsangabe (Auswahl, „Speichern“, „Abbrechen“) passt in die Spalte.
+          // Die offene Einheitsangabe (Auswahl, „Speichern“, „Abbrechen“) schwebt an der Zelle
+          // (LLH-1795, Popover außerhalb der Region) und lässt die Tabelle stehen.
           await einheitAngabe.click();
-          const speichern = region.getByRole('button', {
+          const speichern = page.getByRole('button', {
             name: `Einheit zu ${KRAFT_KURZ} speichern`,
           });
           await expect(speichern).toBeVisible();
@@ -1637,6 +1813,66 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         });
       });
     }
+  }
+
+  /**
+   * Kopf und Körper bündig (LLH-1788): die stehende Kopfzeile ist eine eigene Tabelle. Jeder
+   * Spaltenkopf steht über seiner Spalte, Abweichung je Kante höchstens 1 px, in jeder Stufe.
+   * Gemessen waren in der Personalliste 51 px in `komfortabel` („Position“ über dem Fahrzeug).
+   *
+   * Mutationsprobe: die Regel `table-layout: fixed` an `.ant-table-sticky-holder > table`
+   * (`theme/sprache.css`) entfernen → `komfortabel` und `handschuh` werden rot.
+   */
+  for (const { breite, hoehe, dichte } of [
+    { breite: 1440, hoehe: 900, dichte: 'kompakt' },
+    { breite: 1024, hoehe: 768, dichte: 'komfortabel' },
+    { breite: 1280, hoehe: 800, dichte: 'handschuh' },
+  ] as const) {
+    test(`${breite} px, ${dichte}: Spaltenköpfe von Personal und Fahrzeugen stehen über ihren Spalten`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page, { startseite: false });
+      const einsatzId = await seedeKraefte(page);
+      await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+      await page.setViewportSize({ width: breite, height: hoehe });
+      for (const [pfad, region, anker] of [
+        ['personal', 'Personal im Einsatz', KRAFT],
+        ['fahrzeuge', 'Fahrzeuge im Einsatz', KRAFT_FAHRZEUG],
+      ] as const) {
+        await page.goto(`/einsaetze/${einsatzId}/${pfad}`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const flaeche = page.getByRole('region', { name: region, exact: true });
+        await expect(flaeche.getByText(anker).first()).toBeVisible();
+        const abweichung = await flaeche.evaluate((el) => {
+          const koepfe = [
+            ...el.querySelectorAll<HTMLElement>('.ant-table-sticky-holder thead th'),
+          ].filter((th) => !th.classList.contains('ant-table-cell-scrollbar'));
+          // Die erste Datenzeile; vor ihr steht rc-tables Messzeile.
+          const zeile = el.querySelector<HTMLElement>('.ant-table-tbody tr.ant-table-row');
+          const zellen = zeile ? [...zeile.querySelectorAll<HTMLElement>(':scope > td')] : [];
+          if (koepfe.length === 0 || koepfe.length !== zellen.length) {
+            return { max: Infinity, wo: `${koepfe.length} Köpfe, ${zellen.length} Zellen` };
+          }
+          let max = 0;
+          let wo = '';
+          koepfe.forEach((th, i) => {
+            const a = th.getBoundingClientRect();
+            const b = zellen[i].getBoundingClientRect();
+            const d = Math.max(Math.abs(a.left - b.left), Math.abs(a.right - b.right));
+            if (d > max) {
+              max = d;
+              wo = (th.textContent ?? '').trim();
+            }
+          });
+          return { max, wo };
+        });
+        expect(
+          abweichung.max,
+          `${pfad}: Kopf „${abweichung.wo}“ gegen seine Spalte`,
+        ).toBeLessThanOrEqual(1);
+      }
+    });
   }
 
   for (const rolle of ['admin', 'beobachter'] as const) {
@@ -1716,16 +1952,17 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
   }
 
   /*
-   * EINHEITEN-GLIEDERUNG (LLH-1029): eine Tabelle mit Baum aus dem Kräftebaum-Kern. Am Handy
-   * bleiben Einheit, Ist und Soll als Spalten, der Einzug je Ebene ist schmal, Name, Ist und Soll
-   * stehen ganz im Bild, und weder Tabelle noch Seite laufen quer — angepasst, nicht in Karten
-   * aufgelöst. Ein langes Wort im Namen („Behandlungsgruppe“) wird getrennt, statt die
-   * Einheitenspalte breit zu halten. Am Fükw (1366) läuft die volle Spaltenreihe nicht über.
+   * EINHEITEN-GLIEDERUNG (LLH-1029, LLH-1787): ab `md` eine Tabelle mit Baum aus dem
+   * Kräftebaum-Kern, am Fükw (1366) ohne Überlauf der vollen Spaltenreihe. Am Handy steht der
+   * Baum als Karten (Spec `einsatztauglichkeit-layout`, „Die Einheitenliste steht am Handschirm als
+   * Karten“): vorher setzte die enge Namensspalte Namen Buchstabe für Buchstabe senkrecht. Jede
+   * Karte trägt Name, Ist und Soll, die Untereinheit steht eingerückt und offen, kein Name bricht
+   * innerhalb eines Worts, und die Seite läuft nicht quer.
    * Zwei Ebenen (Zug → Gruppe), damit der Einzug messbar ist; die Gruppe ist gegen ihr Soll aus
    * dem Typ unterbesetzt, damit das Urteil mitgemessen wird.
    */
   for (const rolle of ['admin', 'beobachter'] as const) {
-    test(`mobil (390 px) · ${rolle}: Einheiten-Gliederung als Tabelle ohne Querlauf, schmaler Einzug`, async ({
+    test(`mobil (390 px) · ${rolle}: Einheiten-Gliederung als Karten ohne Querlauf, Gruppe eingerückt`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 1366, height: 768 });
@@ -1768,45 +2005,49 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       const breit = await tabellenUeberlauf(gliederung);
 
       await page.setViewportSize({ width: 390, height: 844 });
-      await expect(gliederung.getByRole('columnheader', { name: 'Abschnitt' })).toHaveCount(0);
-      const zeile = (link: Locator) => gliederung.locator('tbody tr').filter({ has: link });
+      await expect(gliederung.locator('.ant-table')).toHaveCount(0);
+      const karte = (link: Locator) =>
+        gliederung.locator('[data-lfh="datensicht-karte"]').filter({ has: link });
+      await expect(karte(zug)).toHaveCount(1);
+      await expect(karte(gruppe), 'die Gruppe steht offen, ohne Aufklappen').toHaveCount(1);
       const mass = async (link: Locator) => {
-        const r = await zeile(link).evaluate((tr) => {
-          const zellen = Array.from(tr.querySelectorAll('td')).map((td) =>
-            td.getBoundingClientRect(),
-          );
-          return {
-            istRechts: zellen[1]?.right ?? Infinity,
-            sollRechts: zellen[2]?.right ?? Infinity,
-            spalten: zellen.length,
-          };
+        const k = (await karte(link).boundingBox())!;
+        // Zeilen des Namens: ein Wort bricht nie in Buchstaben (höchstens drei Zeilen).
+        const zeilen = await link.evaluate((el) => {
+          const r = document.createRange();
+          r.selectNodeContents(el);
+          return new Set([...r.getClientRects()].map((q) => Math.round(q.top))).size;
         });
-        const box = (await link.boundingBox())!;
-        return { ...r, links: box.x, linkRechts: box.x + box.width };
+        // Eingerückt ist der Inhalt (Polsterung der Karte nach Tiefe), also misst der Name.
+        const l = (await link.boundingBox())!;
+        return { links: l.x, rechts: k.x + k.width, zeilen };
       };
       const [m1, m2] = [await mass(zug), await mass(gruppe)];
-      const schmal = await tabellenUeberlauf(gliederung);
       const seite = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       test.info().annotations.push({
         type: 'messwert',
-        description: `Einzug ${Math.round(m2.links - m1.links)}px · Tabelle 1366 ${breit}px, 390 ${schmal}px · Seite ${seite}px · Spalten ${m1.spalten} · Soll-Kante ${Math.round(Math.max(m1.sollRechts, m2.sollRechts))}px`,
+        description: `Einzug ${Math.round(m2.links - m1.links)}px · Tabelle 1366 ${breit}px · Seite 390 ${seite}px · Namenszeilen ${m1.zeilen}/${m2.zeilen}`,
       });
-      for (const [m, name] of [
-        [m1, 'Zug'],
-        [m2, 'Gruppe'],
+      for (const [m, name, link] of [
+        [m1, 'Zug', zug],
+        [m2, 'Gruppe', gruppe],
       ] as const) {
-        expect(m.spalten, `${name}: Einheit, Ist und Soll`).toBe(3);
-        expect(m.linkRechts, `${name}: der Name steht im Bild`).toBeLessThanOrEqual(390);
-        expect(m.istRechts, `${name}: Ist steht im Bild`).toBeLessThanOrEqual(390);
-        expect(m.sollRechts, `${name}: Soll steht ganz im Bild`).toBeLessThanOrEqual(390);
+        expect(m.rechts, `${name}: die Karte steht im Bild`).toBeLessThanOrEqual(390);
+        expect(
+          m.zeilen,
+          `${name}: der Name bricht nicht Buchstabe für Buchstabe`,
+        ).toBeLessThanOrEqual(3);
+        await expect(
+          karte(link)
+            .getByText(/\d+\/\d+\/\d+\/\/\d+/)
+            .first(),
+        ).toBeVisible();
       }
-      await expect(zeile(gruppe).getByText('unterbesetzt')).toBeInViewport();
-      expect(m2.links - m1.links, 'Einzug der zweiten Ebene').toBeLessThanOrEqual(12);
+      await expect(karte(gruppe).getByText('unterbesetzt')).toBeVisible();
       expect(m2.links - m1.links, 'die Gruppe steht eingerückt').toBeGreaterThan(0);
       expect(seite, 'Seite läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
-      expect(schmal, 'Tabelle läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
       expect(breit, 'Tabelle läuft bei 1366 px nicht quer').toBeLessThanOrEqual(1);
     });
   }
@@ -1948,11 +2189,13 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
       expect(ueber, 'Fahrzeugtabelle läuft nicht über').toBeLessThanOrEqual(1);
       const besatzung = zeile.locator('[data-lfh="besatzung-urteil"]');
       await expect(besatzung, 'Besatzung ohne Querscrollen').toBeInViewport({ ratio: 1 });
-      // Urteil, Ist und Soll in EINER Zeile: die Zeile bleibt so hoch wie in den Kräfte-Listen.
+      // Urteil, Ist und Soll in EINER Zeile. Unter dem Funkrufnamen steht unter `xxl` der Typ
+      // (LLH-1790, Spec `fahrzeug-bearbeitung`, „Typ eines Fahrzeugs in der Liste“): zwei
+      // Textzeilen in der Kennung, gemessen 56 px; mehr hieße, Ist und Soll brächen um.
       expect(
         (await zeile.boundingBox())!.height,
         'Zeilenhöhe mit Ist und Soll',
-      ).toBeLessThanOrEqual(48);
+      ).toBeLessThanOrEqual(60);
       if (rolle === 'admin') {
         await expect(menue, 'Menüauslöser ohne Querscrollen').toBeInViewport({ ratio: 1 });
         // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): Entlassen fragt nicht nach, der
@@ -2080,8 +2323,10 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
     await page.goto('/admin/aufbewahrung');
     const region = page.getByRole('region', { name: 'Aufbewahrung', exact: true });
     await expect(region.getByText(/E2E Sanitätsdienst Stadtlauf/).first()).toBeVisible();
-    // Vorbedingung: unter `xxl` weichen die drei Zustandsdaten in den Spaltenschalter.
-    await expect(region.getByRole('button', { name: 'Spalten · 3 ausgeblendet' })).toBeVisible();
+    // Vorbedingung: unter `xxl` weichen die drei Zustandsdaten in den Spaltenschalter; nach Breite
+    // verborgen ist Vorgabe, der Schalter heißt ohne Zähler „Spalten“ (LLH-1790).
+    await expect(region.getByRole('columnheader')).not.toHaveCount(0);
+    await expect(region.getByRole('button', { name: /^Spalten — / })).toBeVisible();
 
     const ueber = await tabellenUeberlauf(region);
     test.info().annotations.push({

@@ -81,7 +81,10 @@ import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGeda
  *   · `KatalogTabelle` + Bildlauf bleibt für die Stammdaten-VERGLEICHSTABELLEN; keine wird Karte.
  *   · `form: 'tabelle'` für Vergleichsflächen, die auch schmal verglichen werden (Meldebild;
  *     Prüflisten-Kriterium 14 verbietet dort Karten).
- *   · `form: 'auto'` für Einsatzmodule, in denen ein Datensatz eine Einheit ist.
+ *   · `form: 'auto'` für Einsatzmodule, in denen ein Datensatz eine Einheit ist. Dazu die
+ *     Einheiten-Gliederung (LLH-1787): ihr Vergleich über Ist und Soll trägt ab `md`; am Handy
+ *     setzte die schrumpfende Namensspalte Namen Buchstabe für Buchstabe, die Karte trägt Ist
+ *     und Soll je Einheit, der Baum steht eingerückt.
  *   · `form: 'karte'` für Module, die kartenbasiert gelesen werden (Befehle, Lageberichte).
  *
  * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar: eine Spalte ohne Platz im
@@ -137,9 +140,10 @@ import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGeda
 /** Einzug je Baumebene in px: antds Vorgabe (`indentSize`), seit LFH-977 selbst gezeichnet. */
 const BAUM_EINZUG_PX = 15;
 /**
- * Einzug je Baumebene unter md (LLH-1029, vormals die Einheiten-Gliederung, LFH-975): am Handy
- * fräße der volle Einzug auf drei Ebenen ein Viertel der ersten Spalte. Das Aufklappsymbol behält
- * seine Breite, es ist ein Bedienziel.
+ * Einzug je Baumebene unter md im TABELLENZWEIG (LLH-1029, LFH-975): am Handy fräße der volle
+ * Einzug auf drei Ebenen ein Viertel der ersten Spalte. Das Aufklappsymbol behält seine Breite, es
+ * ist ein Bedienziel. Die Einheiten-Gliederung steht dort seit LLH-1787 als Karten (Einzug über
+ * die Polsterung der Karte); Bäume mit `form="tabelle"` (Meldebild, Funkplan) nutzen ihn weiter.
  */
 const BAUM_EINZUG_SCHMAL_PX = 8;
 
@@ -281,6 +285,12 @@ export type DatensichtSpalte<T, K extends string = string> = AntdErbe<T> & {
   mindestBreite?: number;
   /** Nicht abwählbar (Aktionsspalte). Spalte 0 ist es immer, unabhängig vom Flag. */
   immerSichtbar?: boolean;
+  /**
+   * Die Aktionsspalte (LLH-1789, Spec `einsatztauglichkeit-layout`, „Die Hauptaktion einer
+   * Tabellenzeile bleibt im Bild“): ab `md` steht sie rechts fixiert, unter `md` reitet ihr Inhalt
+   * in der fixierten Kennung mit, und die Spalte entfällt. Gebaut über `aktionsSpalte()`.
+   */
+  amEnde?: true;
   /**
    * Zahl, Zeit, Kennung (Funkrufname, Nr., Koordinate): Mono mit `tabular-nums` in BEIDEN Zweigen.
    * Durchgereicht an {@link KatalogSpalte.zahl}.
@@ -972,6 +982,17 @@ export function useSpalteAusgeblendet(key: string): boolean {
   return gezeigt != null && !gezeigt.has(key);
 }
 
+/**
+ * `true`, solange die Tabelle steht und die Spalte `key` darin gezeigt wird (nach Breite UND
+ * Handwahl). Im Kartenzweig, außerhalb einer `Datensicht` und ohne `key` `false`. Für eine Kennung,
+ * die den Wert einer Spalte als zweite Zeile trägt, wenn die Spalte fehlt (`KennungMitZusatz`,
+ * LLH-1790).
+ */
+export function useSpalteGezeigt(key: string | undefined): boolean {
+  const gezeigt = useContext(GezeigteSpaltenKontext);
+  return key != null && gezeigt != null && gezeigt.has(key);
+}
+
 function Platzhalterzeile(props: {
   hoehe: number;
   spalten: number;
@@ -1530,6 +1551,10 @@ export default function Datensicht<T extends object, const K extends string>(
     });
   }, []);
 
+  // Eine offene schwebende Bearbeitung in einer Zelle hält wie ein offenes Menü, auch wenn der
+  // Fokus das Popover verlassen hat (Touch, Klick ins Freie; `components/angabeForm.tsx`).
+  const [isBearbeitungOffen, setBearbeitungOffen] = useState(false);
+
   // Einfrieren, Fokus- und Zeigerbedingung: `useZuflussSchleuse` (Spec `datensicht-zufluss`).
   const zuflussBereich = useZuflussSchleuse(zuflussSteuerung, {
     zeilen,
@@ -1538,7 +1563,7 @@ export default function Datensicht<T extends object, const K extends string>(
     gruppeVon: gruppen?.schluessel,
     mitGerippe: baumKinder != null,
     wurzel,
-    halten: halten || kartenMenueOffen.size > 0 || kontext.offen,
+    halten: halten || kartenMenueOffen.size > 0 || kontext.offen || isBearbeitungOffen,
   });
 
   // ── DEV-Diagnose ──────────────────────────────────────────────────────────────────
@@ -1851,6 +1876,7 @@ export default function Datensicht<T extends object, const K extends string>(
           onAn={setzeSpaltenAn}
           offen={spaltenOffen}
           onOffen={setSpaltenOffen}
+          voreinstellung={spaltenAusVoreinstellung}
         />
       )}
       {/* ZAHL VOR WORT, MIT SICHTBAREM TRENNER (LFH-973): „1 verfügbar · 6 gebunden · 1 nicht
@@ -1930,6 +1956,8 @@ export default function Datensicht<T extends object, const K extends string>(
   );
   const kopfStilGefiltert = useMemo(() => kopfGefiltertStil(rollenwerte(token)), [token]);
 
+  /** Ab `md` steht die Aktionsspalte rechts fixiert, darunter in der Kennung (LLH-1789). */
+  const aktionRechts = abBreite('md');
   const antdSpalten = useMemo<KatalogSpalte<T>[]>(
     () =>
       gezeigteSpalten.map((spalte) => {
@@ -1940,6 +1968,7 @@ export default function Datensicht<T extends object, const K extends string>(
           filter,
           abBreite: _ab,
           immerSichtbar,
+          amEnde,
           ...antd
         } = spalte;
         void etikett;
@@ -1947,6 +1976,8 @@ export default function Datensicht<T extends object, const K extends string>(
         void _ab;
         void immerSichtbar;
         const gebaut: KatalogSpalte<T> = { ...antd };
+        // Ab `md` rechts fixiert (LLH-1789); darunter zieht sie in die Kennung (`tabellenSpalten`).
+        if (amEnde && aktionRechts) gebaut.fixed = 'right';
 
         /**
          * Der Titel-Link steht in BEIDEN Zweigen, als Tastatur- und Berührungsziel der Zeile. Trägt
@@ -2013,6 +2044,7 @@ export default function Datensicht<T extends object, const K extends string>(
       filterWerte,
       filterZaehlung,
       kopfStilGefiltert,
+      aktionRechts,
     ],
   );
 
@@ -2108,7 +2140,7 @@ export default function Datensicht<T extends object, const K extends string>(
       : zelle(ersteSpalte, zeile, index);
   };
   const ausloeserNeben = abBreite('xl');
-  const tabellenSpalten: KatalogSpalte<T>[] =
+  const tabellenSpaltenRoh: KatalogSpalte<T>[] =
     aufklappen && antdSpalten.length > 0 && ersteSpalte
       ? [
           {
@@ -2177,6 +2209,47 @@ export default function Datensicht<T extends object, const K extends string>(
             ...antdSpalten.slice(1),
           ]
         : antdSpalten;
+
+  /**
+   * Unter `md` zieht die Aktionsspalte (`amEnde`) in die fixierte Kennung (LLH-1789, design.md D1):
+   * eine zweite fixierte Spalte fräße am Handy dauerhaft 82–124 px, und am Ende des Querscrolls
+   * läge die Hauptaktion außer Sicht. Primäraktion und ⋮ stehen unter der Kennung.
+   */
+  const aktionsIndex = aktionRechts
+    ? -1
+    : tabellenSpaltenRoh.findIndex(
+        (s, i) => i > 0 && gezeigteSpalten.some((g) => g.amEnde && g.key === s.key),
+      );
+  const tabellenSpalten: KatalogSpalte<T>[] =
+    aktionsIndex > 0 && ersteSpalte
+      ? (() => {
+          const aktion = tabellenSpaltenRoh[aktionsIndex];
+          const ohne = tabellenSpaltenRoh.filter((_, i) => i !== aktionsIndex);
+          const erste = ohne[0];
+          return [
+            {
+              ...erste,
+              render: (wert: unknown, zeile: T, index: number) => (
+                <div
+                  data-lfh="datensicht-kennung-aktion"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: token.marginXS,
+                  }}
+                >
+                  {erste.render
+                    ? (erste.render(wert, zeile, index) as ReactNode)
+                    : zelle(ersteSpalte, zeile, index)}
+                  {aktion.render?.(undefined, zeile, index) as ReactNode}
+                </div>
+              ),
+            },
+            ...ohne.slice(1),
+          ];
+        })()
+      : tabellenSpaltenRoh;
 
   /**
    * Der Zeilenfehler steht in der KENNUNGSZELLE unter ihrem Inhalt: sie ist immer sichtbar (wie
@@ -2358,6 +2431,7 @@ export default function Datensicht<T extends object, const K extends string>(
     <GezeigteSpaltenKontext.Provider value={gezeigteSpaltenSchluessel}>
       <FensterKontext.Provider value={fensterTraeger}>
         <KatalogTabelle<T>
+          onBearbeitungOffen={setBearbeitungOffen}
           columns={gemerkteSpalten}
           dataSource={tabellenZeilen}
           components={virtuell ? FENSTER_KOMPONENTEN : undefined}

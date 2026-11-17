@@ -98,11 +98,12 @@ async function knopffuge(page: Page, bereich: Locator, ziel: number, lauf: strin
   await bereich
     .getByRole('button', { name: `Einheit zu ${KRAFT} bearbeiten`, exact: true })
     .click();
+  // In einer Tabellenzelle schwebt die Bearbeitung außerhalb des Bereichs (LLH-1795).
   const speichern = await kasten(
-    bereich.getByRole('button', { name: `Einheit zu ${KRAFT} speichern`, exact: true }),
+    page.getByRole('button', { name: `Einheit zu ${KRAFT} speichern`, exact: true }),
   );
   const abbrechen = await kasten(
-    bereich.getByRole('button', {
+    page.getByRole('button', {
       name: `Bearbeitung von Einheit zu ${KRAFT} abbrechen`,
       exact: true,
     }),

@@ -377,7 +377,8 @@ describe('Datensicht · Gedächtnis (LLH-1086)', () => {
       spaltenAusVoreinstellung: ['typ'],
     });
     expect(screen.queryByRole('button', { name: /^Typ filtern/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    // Die Voreinstellung ist keine eigene Wahl: der Schalter nennt keinen Zähler (LLH-1790).
+    expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
   });
 
   it('meldet die Spaltenwahl ans Gerät', async () => {

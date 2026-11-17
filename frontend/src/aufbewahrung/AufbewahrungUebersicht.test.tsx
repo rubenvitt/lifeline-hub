@@ -160,7 +160,8 @@ describe('AufbewahrungUebersicht', () => {
       expect(within(t).getAllByRole('columnheader', { name: kopf }).length).toBeGreaterThan(0);
     }
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ }));
+    // Nach Breite verborgen ist Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Vorgemerkt am' }));
     expect(
       within(await tabelle()).getByRole('columnheader', { name: /Vorgemerkt am/ }),

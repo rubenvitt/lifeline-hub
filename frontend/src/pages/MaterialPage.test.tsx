@@ -513,7 +513,8 @@ describe('MaterialPage', () => {
     setzeViewportBreite(1366);
     render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
-    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
+    // Nach Breite verborgen ist Vorgabe: kein Zähler ohne eigene Wahl (LLH-1790).
+    expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^Träger/ })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: /^Kategorie/ })).toBeNull();
     expect(screen.getByRole('columnheader', { name: 'Ort' })).toBeInTheDocument();
@@ -532,7 +533,7 @@ describe('MaterialPage', () => {
     );
 
     // Von Hand zurückgeholt: die Spalte steht, die zweite Zeile weicht.
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Kategorie' }));
     expect(await screen.findByRole('columnheader', { name: /^Kategorie/ })).toBeInTheDocument();
     expect(bezeichnungsZelle()).not.toHaveTextContent('Betreuung');
