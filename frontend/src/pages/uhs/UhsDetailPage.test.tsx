@@ -38,6 +38,11 @@ vi.mock('./Grundriss', async () => {
 vi.mock('./MaterialTab', () => ({ default: () => <div>MATERIAL-TAB</div> }));
 vi.mock('./BewegungenTab', () => ({ default: () => <div>BEWEGUNGEN-TAB</div> }));
 vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
+// Das Paneel „Angaben“ hat eigene Tests (`UhsAngaben.test.tsx`); hier zählt, ob die Seite es mit dem
+// richtigen Recht einsetzt.
+vi.mock('./UhsAngaben', () => ({
+  default: (p: { bearbeitbar: boolean }) => <div>ANGABEN bearbeitbar={String(p.bearbeitbar)}</div>,
+}));
 vi.mock('./UhsAnhaenge', () => ({
   default: (p: { darfSchreiben: boolean; zeigeZugriffe: boolean }) => (
     <div>
@@ -136,7 +141,9 @@ describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
     vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
   };
   const leiste = () =>
-    screen.findByRole('tablist', { name: 'Belegung, Material, Kräfte, Bewegungen und Dateien' });
+    screen.findByRole('tablist', {
+      name: 'Belegung, Material, Kräfte, Bewegungen, Dateien und Angaben',
+    });
 
   it('Vorgabe ist die Belegung: der Grundriss steht im Bereich, die anderen nicht', async () => {
     geladen();
@@ -337,7 +344,7 @@ describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     const leiste = await screen.findByRole('tablist', {
-      name: 'Belegung, Material, Kräfte, Bewegungen und Dateien',
+      name: 'Belegung, Material, Kräfte, Bewegungen, Dateien und Angaben',
     });
     expect(leiste).toBeInTheDocument();
     expect(screen.queryByText(/DATEIEN-TAB/)).not.toBeInTheDocument();
@@ -568,7 +575,7 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     );
   });
 
-  it('kein roter Knopf im Kopf: „Patient aufnehmen“, „Bearbeiten“ und das ⋮ (LLH-1722)', async () => {
+  it('kein roter Knopf im Kopf: „Patient aufnehmen“ und das ⋮ (LLH-1722, LLH-1920)', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
     vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
@@ -579,12 +586,12 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
       within(kopf)
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-label') ?? b.textContent),
-    ).toEqual(['Patient aufnehmen', 'Bearbeiten', 'Weitere Aktionen zu UHS Nord']);
+    ).toEqual(['Patient aufnehmen', 'Weitere Aktionen zu UHS Nord']);
     expect(kopf.querySelector('.ant-btn-dangerous')).toBeNull();
   });
 });
 
-describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
+describe('UhsDetailPage — Stammdaten im Bereich „Angaben“ (LLH-1407, LLH-1920)', () => {
   const uhsBasis = {
     id: 9,
     einsatz_id: 1,
@@ -596,7 +603,13 @@ describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
     plaetze: [],
     belegungen: [],
   };
-  function zeige(status: string, meine_rolle = 'einsatzleitung') {
+  function zeige(
+    status: string,
+    {
+      meine_rolle = 'einsatzleitung',
+      route = '/einsaetze/1/unfallhilfsstellen/9?bereich=angaben',
+    } = {},
+  ) {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1,
       bezeichnung: 'Lage',
@@ -606,27 +619,36 @@ describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
     vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status } as unknown as Awaited<
       ReturnType<typeof ladeUhs>
     >);
-    return renderBei('/einsaetze/1/unfallhilfsstellen/9');
+    return renderBei(route);
   }
 
-  it.each(['geplant', 'aktiv'])('%s: „Bearbeiten“ öffnet die Stammdaten', async (status) => {
-    zeige(status);
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    expect(
-      await screen.findByRole('dialog', { name: 'Unfallhilfsstelle bearbeiten' }),
-    ).toBeInTheDocument();
+  it.each(['geplant', 'aktiv'])(
+    '%s: kein „Bearbeiten“ im Kopf, der Bereich „Angaben“ ist bearbeitbar',
+    async (status) => {
+      zeige(status);
+      expect(await screen.findByText('ANGABEN bearbeitbar=true')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Angaben' })).toHaveAttribute('aria-selected', 'true');
+      const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+      expect(within(kopf).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Unfallhilfsstelle bearbeiten' })).toBeNull();
+    },
+  );
+
+  it('der Reiter „Angaben“ schreibt den Bereich in die Adresse', async () => {
+    zeige('aktiv', { route: '/einsaetze/1/unfallhilfsstellen/9' });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Angaben' }));
+    expect(await screen.findByText('ANGABEN bearbeitbar=true')).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
   });
 
-  it('aufgelöst: kein „Bearbeiten“', async () => {
+  it('aufgelöst: Angaben nur zum Lesen', async () => {
     zeige('aufgeloest');
-    await screen.findByText('GRUNDRISS');
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(await screen.findByText('ANGABEN bearbeitbar=false')).toBeInTheDocument();
   });
 
-  it('ohne Schreibrecht: kein „Bearbeiten“', async () => {
-    zeige('aktiv', 'beobachter');
-    await screen.findByText('GRUNDRISS');
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  it('ohne Schreibrecht: Angaben nur zum Lesen', async () => {
+    zeige('aktiv', { meine_rolle: 'beobachter' });
+    expect(await screen.findByText('ANGABEN bearbeitbar=false')).toBeInTheDocument();
   });
 });
 

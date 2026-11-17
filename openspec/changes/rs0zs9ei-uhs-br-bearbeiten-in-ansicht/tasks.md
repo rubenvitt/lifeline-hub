@@ -25,11 +25,11 @@
 
 ## 5. UHS: Bereich „Angaben“ (D1–D3)
 
-- [ ] 5.1 `routing/deeplinks.ts`: `UhsBereich` um `angaben`; `deeplinks.test.ts` (`parseUhsBereich`, `uhsBereichSuche`) um `angaben` rot→grün
-- [ ] 5.2 `pages/uhs/uhsAngaben.ts`: `uhsAngabenWerte(uhs)` und `uhsPatch(vorher, nachher)` (inkl. Soll-Anzahl und Qualifikationssoll wie `uhsPatchAus`); Tests aus `UhsBearbeitenModal.test.tsx` nach `uhsAngaben.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
-- [ ] 5.3 `pages/uhs/UhsAngaben.tsx`: Paneel „Angaben“ über `BearbeitbaresPaneel` (Felder aus D2, Lesewerte mit „—“ und `qualiSollText`), `onSpeichern` mit `basis_geaendert_at`, Invalidierung (`uhs`, `uhsDetail`, `lagemonitor`) und Erfolgsmeldung wie bisher; Tests in `UhsAngaben.test.tsx` rot→grün: Lesen mit „—“, nur geänderte Soll-Anzahl samt Basis, Notiz leeren → `null`, 409-Rückfrage, ohne Verwaltungsrecht und aufgelöst kein „Bearbeiten“
-- [ ] 5.4 `UhsDetailPage.tsx`: Bereich „Angaben“ in `BEREICH_NAME` und `bereichListe` (nicht am Gerät), Inhalt `UhsAngaben` mit `key={uhs.id}`; „Bearbeiten“ aus dem Kopf und `UhsBearbeitenModal`/`bearbeitenOffen` entfernen; `UhsDetailPage.test.tsx` rot→grün (Kopf ohne „Bearbeiten“ geplant und aktiv, `?bereich=angaben` zeigt das Paneel, Gerät fällt auf Belegung zurück)
-- [ ] 5.5 `UhsBearbeitenModal.tsx` und `UhsBearbeitenModal.test.tsx` löschen; `grep -rn UhsBearbeitenModal` wie 4.4 leer
+- [x] 5.1 `routing/deeplinks.ts`: `UhsBereich` um `angaben`; `deeplinks.test.ts` (`parseUhsBereich`, `uhsBereichSuche`) um `angaben` rot→grün
+- [x] 5.2 `pages/uhs/uhsAngaben.ts`: `uhsAngabenWerte(uhs)` und `uhsPatch(vorher, nachher)` (inkl. Soll-Anzahl und Qualifikationssoll wie `uhsPatchAus`); Tests aus `UhsBearbeitenModal.test.tsx` nach `uhsAngaben.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
+- [x] 5.3 `pages/uhs/UhsAngaben.tsx`: Paneel „Angaben“ über `BearbeitbaresPaneel` (Felder aus D2, Lesewerte mit „—“ und `qualiSollText`), `onSpeichern` mit `basis_geaendert_at`, Invalidierung (`uhs`, `uhsDetail`, `lagemonitor`) und Erfolgsmeldung wie bisher; Tests in `UhsAngaben.test.tsx` rot→grün: Lesen mit „—“, nur geänderte Soll-Anzahl samt Basis, Notiz leeren → `null`, 409-Rückfrage, ohne Verwaltungsrecht und aufgelöst kein „Bearbeiten“
+- [x] 5.4 `UhsDetailPage.tsx`: Bereich „Angaben“ in `BEREICH_NAME` und `bereichListe` (nicht am Gerät), Inhalt `UhsAngaben` mit `key={uhs.id}`; „Bearbeiten“ aus dem Kopf und `UhsBearbeitenModal`/`bearbeitenOffen` entfernen; `UhsDetailPage.test.tsx` rot→grün (Kopf ohne „Bearbeiten“ geplant und aktiv, `?bereich=angaben` zeigt das Paneel, Gerät fällt auf Belegung zurück)
+- [x] 5.5 `UhsBearbeitenModal.tsx` und `UhsBearbeitenModal.test.tsx` löschen; `grep -rn UhsBearbeitenModal` wie 4.4 leer
 - [ ] 5.6 e2e: `uhs-hoehe.spec.ts` und `uhs-grundriss-menue-belegung.spec.ts` (Kopfknöpfe) einzeln grün; weitere Treffer von `grep -rln "Unfallhilfsstelle bearbeiten" frontend/e2e` nachziehen
 
 ## 6. Regeln, Doku, Bilder

@@ -1371,7 +1371,7 @@ describe('deeplinks — Bereiche der UHS-Seite (LLH-1133)', () => {
     expect(uhsBereichSuche('belegung')).toBe('');
   });
 
-  it.each(['material', 'kraefte', 'bewegungen', 'dateien'] as const)(
+  it.each(['material', 'kraefte', 'bewegungen', 'dateien', 'angaben'] as const)(
     '%s steht in der Adresse und übersteht den Round-Trip',
     (bereich) => {
       const pfad = uhsDetailPfad(E, 9, { bereich });
