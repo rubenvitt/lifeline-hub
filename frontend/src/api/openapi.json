@@ -13866,7 +13866,7 @@
       },
       "MaterialEntlassungVorzustand": {
         "type": "object",
-        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an\n`…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
+        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an\n`…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
         "required": [
           "entlassen_at"
         ],

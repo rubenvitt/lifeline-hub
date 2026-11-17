@@ -5534,7 +5534,7 @@ export interface components {
         };
         /**
          * @description Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
-         *     von Material zurücknehmen“; `openspec/changes/nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
+         *     von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
          *     D1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an
          *     `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
          *     höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das

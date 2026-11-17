@@ -26,7 +26,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 4. Verifikation
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
 

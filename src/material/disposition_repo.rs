@@ -1012,7 +1012,7 @@ fn ruecknahme_conflict() -> AppError {
 }
 
 /// Nimmt das Herausnehmen eines Postens zurück
-/// (`openspec/changes/nw7tvxsj-material-herausnahme-zuruecknehmen/design.md` D2), in der
+/// (`openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md` D2), in der
 /// Transaktion des Aufrufers.
 ///
 /// Riegel wie beim Fahrzeug (`fahrzeug::disposition_repo::zuruecknehmen_tx`): nur die Person, die
