@@ -21,8 +21,12 @@ import { textBreite } from './textBreite';
  */
 export const KOPF_TYPO = { stufe: 'fein', gewicht: 600, sperrung: 0.12 } as const;
 
-/** Breite des Sortiersymbols samt Abstand zum Titel (antd: 12 px Symbol, 4 px Abstand). */
-const SORTIER_BREITE = 16;
+/**
+ * Abstand des Sortiersymbols zum Titel (antd). Das Symbol selbst ist so breit wie `fontSizeSM`
+ * und wächst mit der Dichte (12 / 13,8 / 15 px); mit festen 12 px fehlten dem Kopf in
+ * `handschuh` 3 px, und „FUNKRUFNAME“ brach im Wort.
+ */
+const SORTIER_ABSTAND = 4;
 /** Abstand des Filterauslösers zum Titel (antd `margin-inline-start`). */
 const FILTER_ABSTAND = 4;
 
@@ -42,7 +46,7 @@ export function kopfMindestBreite({
   filterbar = false,
 }: {
   titel: string;
-  token: { controlHeightSM: number; padding: number };
+  token: { controlHeightSM: number; padding: number; fontSizeSM: number };
   /** Breite eines Texts in der Kopfschrift, Sperrung eingerechnet ({@link textBreiteKopf}). */
   messen: (text: string) => number;
   sortierbar?: boolean;
@@ -51,7 +55,7 @@ export function kopfMindestBreite({
   const wort = laengstesWort(titel);
   const text = wort ? messen(wort) : 0;
   const knoepfe =
-    (sortierbar ? SORTIER_BREITE : 0) + (filterbar ? token.controlHeightSM + FILTER_ABSTAND : 0);
+    (sortierbar ? token.fontSizeSM + SORTIER_ABSTAND : 0) + (filterbar ? token.controlHeightSM + FILTER_ABSTAND : 0);
   return Math.ceil(2 * token.padding + text + knoepfe);
 }
 

@@ -9,8 +9,8 @@ import {
 
 /** Feste Messung für die Tests: 6 px je Zeichen, Sperrung schon enthalten. */
 const messen = (text: string) => text.length * 6;
-const kompakt = { controlHeightSM: 24, padding: 12 };
-const handschuh = { controlHeightSM: 72, padding: 26 };
+const kompakt = { controlHeightSM: 24, padding: 12, fontSizeSM: 12 };
+const handschuh = { controlHeightSM: 72, padding: 26, fontSizeSM: 15 };
 
 describe('kopfMindestBreite (LLH-1788)', () => {
   it('misst das längste Wort in Versalien, nicht den ganzen Titel: ein Kopf darf umbrechen', () => {
@@ -36,7 +36,8 @@ describe('kopfMindestBreite (LLH-1788)', () => {
       filterbar: true,
     });
     expect(ohne).toBe(2 * 26 + 8 * 6);
-    expect(sortierbar - ohne).toBe(16);
+    // Das Sortiersymbol wächst mit `fontSizeSM` (15 px in `handschuh`), dazu 4 px Abstand.
+    expect(sortierbar - ohne).toBe(15 + 4);
     // Der Filterauslöser trägt den Boden der Stufe (72 px in `handschuh`) plus seinen Abstand.
     expect(mitFilter - sortierbar).toBe(72 + 4);
   });
