@@ -846,6 +846,14 @@ pub struct Entlassen {
     pub ort: Option<MaterialOrt>,
 }
 
+impl Entlassen {
+    /// Der Vorzustand für die Rücknahme (LLH-1923, design.md D1); `entlassen_at` ist der
+    /// Zeitpunkt, den das Herausnehmen geschrieben hat.
+    pub fn vorzustand(&self, entlassen_at: &str) -> crate::material::MaterialEntlassungVorzustand {
+        crate::material::MaterialEntlassungVorzustand::aus_ort(entlassen_at, self.ort)
+    }
+}
+
 /// Nimmt Material aus dem Einsatz (design.md D4, Wortlaut LLH-1093): die Zeile bleibt mit
 /// Zeitpunkt und handelnder Person stehen, der Ort wird gelöst (alle vier Spalten, LLH-1224 D13). Keine Zeitachse (D5).
 /// `NotFound`/`Conflict` wie [`require_aktiv_tx`].
@@ -983,6 +991,125 @@ async fn find_storno_hindernis_tx(
         )));
     }
     Ok(None)
+}
+
+// ── Rücknahme der Herausnahme (LLH-1923, Spec `kraefte-entlassung`) ─────────────────────────
+
+/// Was die Rücknahme zurückgebracht hat (für die Live-Meldung des Orts) und was sie ausgelassen
+/// hat.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Ruecknahme {
+    pub ort: Option<MaterialOrt>,
+    pub ausgelassen: Vec<crate::fahrzeug::RuecknahmeAusgelassen>,
+}
+
+fn ruecknahme_conflict() -> AppError {
+    AppError::Conflict(
+        "Die Herausnahme lässt sich nicht mehr zurücknehmen; das Material lässt sich erneut \
+         disponieren"
+            .into(),
+    )
+}
+
+/// Nimmt das Herausnehmen eines Postens zurück
+/// (`openspec/changes/nw7tvxsj-material-herausnahme-zuruecknehmen/design.md` D2), in der
+/// Transaktion des Aufrufers.
+///
+/// Riegel wie beim Fahrzeug (`fahrzeug::disposition_repo::zuruecknehmen_tx`): nur die Person, die
+/// herausgenommen hat, nur dieses Herausnehmen (`entlassen_at`), nur innerhalb der Frist; sonst
+/// `Conflict`. Ein bestimmtes Stück, das inzwischen in einer anderen Zeile aktiv ist, ebenso
+/// `Conflict` (LLH-1256). Anders als [`reaktivieren_tx`] bleiben Dispositionszeit und Snapshot:
+/// die Zeile kommt zurück, wie sie eben noch aktiv war. Die Storno-Sperre bleibt stehen. Der Ort
+/// geht durch den einen Schreibweg [`ort::set_ort_tx`]; nimmt er den Posten nicht mehr auf, bleibt
+/// der Posten aktiv ohne Ort, und der Ort steht in `ausgelassen`. Keine Zeitachse (D5).
+pub async fn zuruecknehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    vorzustand: &crate::material::MaterialEntlassungVorzustand,
+) -> Result<Ruecknahme, AppError> {
+    let ort_davor = vorzustand.ort()?;
+    let zeile: Option<(Option<String>, Option<i64>, Option<String>, Option<i64>)> = sqlx::query_as(
+        "SELECT beendet_at, beendet_von, beendet_als, material_id FROM einsatz_material \
+             WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (beendet_at, beendet_von, beendet_als, material_id) = zeile.ok_or(AppError::NotFound)?;
+    let im_riegel = beendet_als.as_deref() == Some(BeendetAls::Entlassen.as_str())
+        && beendet_von == Some(benutzer_id)
+        && beendet_at.as_deref() == Some(vorzustand.entlassen_at.as_str())
+        && crate::zeit::plus_minuten(
+            &vorzustand.entlassen_at,
+            crate::fahrzeug::disposition_repo::RUECKNAHME_FRIST_MINUTEN,
+        )
+        .is_some_and(|grenze| jetzt <= grenze.as_str());
+    if !im_riegel {
+        return Err(ruecknahme_conflict());
+    }
+    if let Some(mid) = material_id {
+        if let Some((bezeichnung, nummer)) = stamm_stueck_tx(conn, mid).await? {
+            check_stueck_frei_tx(
+                conn,
+                einsatz_id,
+                mid,
+                Some(em_id),
+                MaterialArt::Geraet,
+                &bezeichnung,
+                Some(&nummer),
+            )
+            .await?;
+        }
+    }
+    let r = sqlx::query(
+        "UPDATE einsatz_material SET beendet_at = NULL, beendet_von = NULL, beendet_als = NULL \
+         WHERE id = ? AND einsatz_id = ? AND beendet_at = ?",
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .bind(&vorzustand.entlassen_at)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(ruecknahme_conflict());
+    }
+
+    let mut ergebnis = Ruecknahme::default();
+    let Some(ziel) = ort_davor else {
+        return Ok(ergebnis);
+    };
+    match ort::set_ort_tx(conn, einsatz_id, em_id, Some(ziel)).await {
+        Ok(_) => ergebnis.ort = Some(ziel),
+        Err(AppError::Conflict(_) | AppError::UnprocessableEntity(_) | AppError::NotFound) => {
+            let (art, grund) = match ziel {
+                MaterialOrt::Einheit(_) => ("Einheit", "inzwischen aufgelöst"),
+                MaterialOrt::Fahrzeug(_) => ("Fahrzeug", "inzwischen entlassen oder storniert"),
+                MaterialOrt::Uhs(_) => ("UHS", "nimmt kein Material mehr auf"),
+                MaterialOrt::Bereitstellungsraum(_) => {
+                    ("Bereitstellungsraum", "nimmt kein Material mehr auf")
+                }
+            };
+            // Spurlos aufgelöst und darum gelöscht: den Namen kennt niemand mehr, die Lücke
+            // steht trotzdem in der Antwort (wie beim Fahrzeug).
+            let bezeichnung = match ort::ort_text_tx(conn, einsatz_id, Some(ziel)).await {
+                Ok(text) => text,
+                Err(AppError::NotFound) => art.to_string(),
+                Err(e) => return Err(e),
+            };
+            ergebnis
+                .ausgelassen
+                .push(crate::fahrzeug::RuecknahmeAusgelassen {
+                    bezeichnung,
+                    grund: grund.into(),
+                });
+        }
+        Err(e) => return Err(e),
+    }
+    Ok(ergebnis)
 }
 
 /// Nimmt Material, das aus dem Einsatz genommen oder storniert war, wieder auf (design.md D7):
@@ -2748,5 +2875,281 @@ mod tests {
                 .unwrap_err(),
             AppError::UnprocessableEntity(_)
         ));
+    }
+
+    // ── Rücknahme der Herausnahme (LLH-1923, Spec `kraefte-entlassung`) ─────────────────────
+
+    const RAUS: &str = "2026-11-17 10:00:00";
+    const KURZ_DANACH: &str = "2026-11-17 10:05:00";
+
+    async fn nimm_heraus_um(
+        pool: &SqlitePool,
+        einsatz: i64,
+        em: i64,
+        benutzer: i64,
+    ) -> crate::material::MaterialEntlassungVorzustand {
+        let mut tx = pool.begin().await.unwrap();
+        let e = entlassen_tx(&mut tx, einsatz, em, benutzer, RAUS)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        e.vorzustand(RAUS)
+    }
+
+    async fn nimm_zurueck(
+        pool: &SqlitePool,
+        einsatz: i64,
+        em: i64,
+        benutzer: i64,
+        jetzt: &str,
+        vorzustand: &crate::material::MaterialEntlassungVorzustand,
+    ) -> Result<Ruecknahme, AppError> {
+        let mut tx = pool.begin().await.unwrap();
+        let r = zuruecknehmen_tx(&mut tx, einsatz, em, benutzer, jetzt, vorzustand).await?;
+        tx.commit().await.unwrap();
+        Ok(r)
+    }
+
+    /// Der erste Benutzer, den `decken_an_der_einheit` über `setup` anlegt.
+    async fn erster_benutzer(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar("SELECT MIN(id) FROM benutzer")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// design.md D1: das Herausnehmen nennt im Vorzustand den Ort davor, in seiner Spalte.
+    #[tokio::test]
+    async fn vorzustand_nennt_den_ort_davor() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, einheit, _, _, em) = decken_an_der_einheit(&pool).await;
+        let benutzer = erster_benutzer(&pool).await;
+        let v = nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+        assert_eq!(
+            v,
+            crate::material::MaterialEntlassungVorzustand {
+                entlassen_at: RAUS.into(),
+                einheit_id: Some(einheit),
+                ..Default::default()
+            }
+        );
+    }
+
+    /// Spec „Herausnahme von Material zurücknehmen“: Ort, Menge, Status und Dispositionszeit
+    /// wie vorher; der Storno bleibt gesperrt.
+    #[tokio::test]
+    async fn rueckgaengig_stellt_ort_und_dispositionszeit_her() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, einheit, _, _, em) = decken_an_der_einheit(&pool).await;
+        let benutzer = erster_benutzer(&pool).await;
+        sqlx::query(
+            "UPDATE einsatz_material SET disponiert_at = datetime('now', '-2 minutes') \
+             WHERE id = ?",
+        )
+        .bind(em)
+        .execute(&pool)
+        .await
+        .unwrap();
+        update(
+            &pool,
+            einsatz,
+            em,
+            MaterialPatch {
+                status: Some(MaterialStatus::Defekt),
+                ..MaterialPatch::default()
+            },
+        )
+        .await
+        .unwrap();
+        let disponiert_at = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, (String, Option<i64>)>(
+                "SELECT disponiert_at, disponiert_von FROM einsatz_material WHERE id = ?",
+            )
+            .bind(em)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = disponiert_at(pool.clone()).await;
+        let v = nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+        let r = nimm_zurueck(&pool, einsatz, em, benutzer, KURZ_DANACH, &v)
+            .await
+            .unwrap();
+        assert_eq!(
+            r,
+            Ruecknahme {
+                ort: Some(MaterialOrt::Einheit(einheit)),
+                ausgelassen: vec![],
+            }
+        );
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(a.beendet_at, None);
+        assert_eq!(a.beendet_als, None);
+        assert_eq!(a.ort(), Some(MaterialOrt::Einheit(einheit)));
+        assert_eq!((a.menge, a.status), (50, MaterialStatus::Defekt));
+        assert_eq!(disponiert_at(pool.clone()).await, vorher);
+        assert!(grund(storniere(&pool, einsatz, em).await.unwrap_err())
+            .starts_with("Das Material war schon einmal aus dem Einsatz genommen"));
+    }
+
+    /// Spec „Rücknahme von Material nur direkt nach dem Herausnehmen“: andere Person, nach der
+    /// Frist, ein zweites Mal und nach dem Reaktivieren je 409, ohne etwas zu ändern.
+    #[tokio::test]
+    async fn ruecknahme_nur_direkt_danach_und_nur_fuer_die_person() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, _, _, _, em) = decken_an_der_einheit(&pool).await;
+        let benutzer = erster_benutzer(&pool).await;
+        let andere: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Andere', 'andere', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let v = nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+        let ist_409 = |r: Result<Ruecknahme, AppError>| matches!(r, Err(AppError::Conflict(_)));
+        assert!(ist_409(
+            nimm_zurueck(&pool, einsatz, em, andere, KURZ_DANACH, &v).await
+        ));
+        assert!(ist_409(
+            nimm_zurueck(&pool, einsatz, em, benutzer, "2026-11-17 10:10:01", &v).await
+        ));
+        let fremder_zeitpunkt = crate::material::MaterialEntlassungVorzustand {
+            entlassen_at: "2026-11-17 09:59:59".into(),
+            ..v.clone()
+        };
+        assert!(ist_409(
+            nimm_zurueck(
+                &pool,
+                einsatz,
+                em,
+                benutzer,
+                KURZ_DANACH,
+                &fremder_zeitpunkt
+            )
+            .await
+        ));
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(
+            a.beendet_at.as_deref(),
+            Some(RAUS),
+            "abgelehnt ändert nichts"
+        );
+        nimm_zurueck(&pool, einsatz, em, benutzer, "2026-11-17 10:10:00", &v)
+            .await
+            .unwrap();
+        assert!(ist_409(
+            nimm_zurueck(&pool, einsatz, em, benutzer, KURZ_DANACH, &v).await
+        ));
+
+        // Erneut herausgenommen und über den Block zurückgeholt: die Rücknahme kommt zu spät.
+        let v = nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+        let mut conn = pool.acquire().await.unwrap();
+        reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
+            .await
+            .unwrap();
+        drop(conn);
+        assert!(ist_409(
+            nimm_zurueck(&pool, einsatz, em, benutzer, KURZ_DANACH, &v).await
+        ));
+    }
+
+    /// Spec „Rücknahme von Material lässt einen veränderten Ort aus“: nimmt der Ort den Posten
+    /// nicht mehr auf, kommt er ohne Ort zurück, und `ausgelassen` nennt den Ort mit Grund.
+    #[tokio::test]
+    async fn ruecknahme_laesst_einen_veraenderten_ort_aus() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, einheit, uhs, fahrzeug, em) = decken_an_der_einheit(&pool).await;
+        let benutzer = erster_benutzer(&pool).await;
+        let fall =
+            |ort: MaterialOrt, sql: &'static str, id: i64, bez: &'static str, gr: &'static str| {
+                (ort, sql, id, bez, gr)
+            };
+        for (ort, sql, id, bezeichnung, grund) in [
+            fall(
+                MaterialOrt::Einheit(einheit),
+                "UPDATE einsatz_einheit SET aufgeloest_at = datetime('now') WHERE id = ?",
+                einheit,
+                "Einheit «Staffel A»",
+                "inzwischen aufgelöst",
+            ),
+            fall(
+                MaterialOrt::Fahrzeug(fahrzeug),
+                "UPDATE einsatz_fahrzeug SET beendet_at = datetime('now'), \
+                 beendet_als = 'entlassen' WHERE id = ?",
+                fahrzeug,
+                "Fahrzeug «Florian 1/83-1»",
+                "inzwischen entlassen oder storniert",
+            ),
+            fall(
+                MaterialOrt::Uhs(uhs),
+                "UPDATE uhs SET status = 'aufgeloest' WHERE id = ?",
+                uhs,
+                "UHS «Turnhalle»",
+                "nimmt kein Material mehr auf",
+            ),
+        ] {
+            let mut conn = pool.acquire().await.unwrap();
+            if load_anzeige_tx(&mut conn, einsatz, em, true)
+                .await
+                .unwrap()
+                .beendet_at
+                .is_some()
+            {
+                reaktivieren_tx(&mut conn, einsatz, 1, em, benutzer)
+                    .await
+                    .unwrap();
+            }
+            ort::set_ort_tx(&mut conn, einsatz, em, Some(ort))
+                .await
+                .unwrap();
+            drop(conn);
+            let v = nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+            sqlx::query(sql).bind(id).execute(&pool).await.unwrap();
+            let r = nimm_zurueck(&pool, einsatz, em, benutzer, KURZ_DANACH, &v)
+                .await
+                .unwrap();
+            assert_eq!(r.ort, None, "{ort:?}");
+            assert_eq!(
+                r.ausgelassen,
+                vec![crate::fahrzeug::RuecknahmeAusgelassen {
+                    bezeichnung: bezeichnung.into(),
+                    grund: grund.into(),
+                }]
+            );
+            let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+            assert_eq!((a.ort(), a.beendet_at), (None, None), "{ort:?}");
+        }
+    }
+
+    /// Spec „Rücknahme von Material nur direkt nach dem Herausnehmen“: ein Gerät mit
+    /// Bestandsnummer, das inzwischen in einer anderen Zeile im Einsatz steht, kommt nicht zurück.
+    #[tokio::test]
+    async fn ruecknahme_lehnt_ab_wenn_das_stueck_neu_disponiert_ist() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(
+            &pool,
+            1,
+            MaterialDaten {
+                bestandsnummer: Some("SE-7"),
+                ..geraet_daten("Stromerzeuger")
+            },
+        )
+        .await
+        .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer)
+            .await
+            .unwrap();
+        let v = nimm_heraus_um(&pool, einsatz, em, benutzer).await;
+        disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer)
+            .await
+            .unwrap();
+        match nimm_zurueck(&pool, einsatz, em, benutzer, KURZ_DANACH, &v).await {
+            Err(AppError::Conflict(g)) => assert!(g.contains("schon disponiert"), "{g}"),
+            r => panic!("409 erwartet, bekam {r:?}"),
+        }
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(a.beendet_at.as_deref(), Some(RAUS));
     }
 }

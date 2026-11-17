@@ -5,13 +5,13 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 1. Backend: Vorzustand und Rücknahme
 
-- [ ] 1.1 `src/material/mod.rs`: `MaterialEntlassungVorzustand` (D1), `MaterialEntlassungAntwort`, `MaterialRuecknahmeAntwort` (mit `fahrzeug::RuecknahmeAusgelassen`), Prüfung „höchstens eine Ortsspalte“ (422) und `etb_text_herausnahme_zurueckgenommen`; Unit-Tests für ETB-Text und Prüfung rot→grün
-- [ ] 1.2 `src/material/disposition_repo.rs`: `Entlassen::vorzustand(entlassen_at)` aus dem gelösten Ort; Repo-Test „Vorzustand nennt den Ort davor“ rot→grün
-- [ ] 1.3 `zuruecknehmen_tx` (D2): Riegel (Art, Person, `entlassen_at`, Frist), Endzustand aufheben mit `disponiert_at`, Menge, Status und Storno-Sperre unverändert, Ort über `ort::set_ort_tx`; Repo-Tests: Rückgängig stellt Ort und Dispositionszeit her; Storno danach gesperrt; 409 nach Reaktivieren, für andere Person, nach Ablauf der Frist, bei zweiter Rücknahme
-- [ ] 1.4 `zuruecknehmen_tx`: ausgelassener Ort je Art (Einheit aufgelöst, Fahrzeug entlassen, UHS/Raum nicht mehr aktiv) → aktiv ohne Ort mit Eintrag in `ausgelassen`; bestimmtes Stück inzwischen in anderer Zeile aktiv → 409 ohne Änderung; Repo-Tests rot→grün
-- [ ] 1.5 Route `POST …/material/{em_id}/entlassen/zuruecknehmen` in `src/routes/einsatz_material.rs` und `src/app.rs` (Gate `EinsatzSchreibzugriff<Material>`, ETB, `sse_material` + `sse_ort`); `…/entlassen` antwortet `{ material, vorzustand }`; Doc-Kommentare beider Routen und von `reaktivieren` berichtigen; `src/api_doc.rs` um Route und Typen
-- [ ] 1.6 Integrationstest in `tests/einsatz_material.rs`: Herausnehmen und Rückgängig vergleicht Ort, Menge, Status, `disponiert_at` und ETB; 409 für andere Person; Fahrzeug inzwischen entlassen → `ausgelassen`, Posten ohne Ort
-- [ ] 1.7 Typ-Codegen (`scripts/check-typ-codegen.sh`), `api/openapi.json` und `api/types.generated.ts` mitcommitten
+- [x] 1.1 `src/material/mod.rs`: `MaterialEntlassungVorzustand` (D1), `MaterialEntlassungAntwort`, `MaterialRuecknahmeAntwort` (mit `fahrzeug::RuecknahmeAusgelassen`), Prüfung „höchstens eine Ortsspalte“ (422) und `etb_text_herausnahme_zurueckgenommen`; Unit-Tests für ETB-Text und Prüfung rot→grün
+- [x] 1.2 `src/material/disposition_repo.rs`: `Entlassen::vorzustand(entlassen_at)` aus dem gelösten Ort; Repo-Test „Vorzustand nennt den Ort davor“ rot→grün
+- [x] 1.3 `zuruecknehmen_tx` (D2): Riegel (Art, Person, `entlassen_at`, Frist), Endzustand aufheben mit `disponiert_at`, Menge, Status und Storno-Sperre unverändert, Ort über `ort::set_ort_tx`; Repo-Tests: Rückgängig stellt Ort und Dispositionszeit her; Storno danach gesperrt; 409 nach Reaktivieren, für andere Person, nach Ablauf der Frist, bei zweiter Rücknahme
+- [x] 1.4 `zuruecknehmen_tx`: ausgelassener Ort je Art (Einheit aufgelöst, Fahrzeug entlassen, UHS/Raum nicht mehr aktiv) → aktiv ohne Ort mit Eintrag in `ausgelassen`; bestimmtes Stück inzwischen in anderer Zeile aktiv → 409 ohne Änderung; Repo-Tests rot→grün
+- [x] 1.5 Route `POST …/material/{em_id}/entlassen/zuruecknehmen` in `src/routes/einsatz_material.rs` und `src/app.rs` (Gate `EinsatzSchreibzugriff<Material>`, ETB, `sse_material` + `sse_ort`); `…/entlassen` antwortet `{ material, vorzustand }`; Doc-Kommentare beider Routen und von `reaktivieren` berichtigen; `src/api_doc.rs` um Route und Typen
+- [x] 1.6 Integrationstest in `tests/einsatz_material.rs`: Herausnehmen und Rückgängig vergleicht Ort, Menge, Status, `disponiert_at` und ETB; 409 für andere Person; Fahrzeug inzwischen entlassen → `ausgelassen`, Posten ohne Ort
+- [x] 1.7 Typ-Codegen (`scripts/check-typ-codegen.sh`), `api/openapi.json` und `api/types.generated.ts` mitcommitten
 
 ## 2. Frontend: Rückgängig nimmt vollständig zurück
 
