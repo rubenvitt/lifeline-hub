@@ -40,6 +40,10 @@ Leitung wegen Stille als abgerissen melden.
 - **WHEN** über mehrere Minuten nur Lebenszeichen und keine Fach-Ereignisse eintreffen
 - **THEN** bleibt der Zustand „live“, und das Frontend baut nichts neu auf
 
+#### Scenario: Weg liefert nie
+- **WHEN** eine Verbindung öffnet, aber bis zum Ablauf der Wache kein einziges Ereignis liefert, und das auch für die sofort neu aufgebaute Verbindung gilt
+- **THEN** wartet das Frontend vor jedem weiteren Neuaufbau gestaffelt länger, bis die Leitung wieder ein Ereignis liefert
+
 #### Scenario: Kaltstart
 - **WHEN** ein Tab die Live-Verbindung öffnet und das erste Öffnen länger als 45 s dauert
 - **THEN** bleibt der Zustand „verbinde“, und das Frontend meldet keinen Abriss wegen Stille

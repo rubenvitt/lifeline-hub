@@ -51,8 +51,12 @@ const statusMerken = (e: Event) =>
   gemeldet.push((e as CustomEvent<{ status: LiveVerbindungsStatus }>).detail.status);
 window.addEventListener('lfh:live-status', statusMerken);
 
+/** Der zuletzt gemeldete Zustand. */
+const zuletzt = () => gemeldet[gemeldet.length - 1];
+
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   FakeEventSource.instanzen = [];
   gemeldet.length = 0;
@@ -125,16 +129,16 @@ describe('Wache gegen eine stumme Leitung (LLH-1935)', () => {
 
     vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS - 1);
     expect(FakeEventSource.instanzen).toHaveLength(1);
-    expect(gemeldet.at(-1)).toBe('open');
+    expect(zuletzt()).toBe('open');
 
     vi.advanceTimersByTime(1);
-    expect(gemeldet.at(-1)).toBe('connecting');
+    expect(zuletzt()).toBe('connecting');
     expect(erste.readyState).toBe(FakeEventSource.CLOSED);
     expect(FakeEventSource.instanzen).toHaveLength(2);
     expect(FakeEventSource.offene()).toHaveLength(1);
 
     FakeEventSource.instanzen[1].oeffne();
-    expect(gemeldet.at(-1)).toBe('open');
+    expect(zuletzt()).toBe('open');
     // Die neue Verbindung hat keine `Last-Event-ID`: Vollabgleich, genau einmal.
     expect(beiWiederaufbau).toHaveBeenCalledTimes(1);
     expect(beimErstenOpen).toHaveBeenCalledTimes(1);
@@ -157,7 +161,7 @@ describe('Wache gegen eine stumme Leitung (LLH-1935)', () => {
     expect(gemeldet).not.toContain('connecting');
 
     vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
-    expect(gemeldet.at(-1)).toBe('connecting');
+    expect(zuletzt()).toBe('connecting');
     schliessen();
   });
 
@@ -186,6 +190,56 @@ describe('Wache gegen eine stumme Leitung (LLH-1935)', () => {
     vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
     expect(FakeEventSource.instanzen).toHaveLength(2);
     schliessen();
+  });
+
+  // design.md D6: ein Weg, der öffnet, aber nie liefert (puffernder Proxy), läuft nicht in eine
+  // Schleife aus Neuaufbau und Vollabgleich alle 45 s.
+  it('staffelt den Neuaufbau, solange neue Leitungen nie ein Ereignis liefern', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { schliessen } = verbinde();
+    const ablaufen = (i: number) => {
+      FakeEventSource.instanzen[i].oeffne();
+      vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
+    };
+
+    ablaufen(0);
+    // Der erste stumme Ablauf baut sofort neu auf.
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+
+    ablaufen(1);
+    expect(zuletzt()).toBe('connecting');
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+    vi.advanceTimersByTime(999);
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(FakeEventSource.instanzen).toHaveLength(3);
+
+    ablaufen(2);
+    vi.advanceTimersByTime(2999);
+    expect(FakeEventSource.instanzen).toHaveLength(3);
+    vi.advanceTimersByTime(1);
+    expect(FakeEventSource.instanzen).toHaveLength(4);
+
+    // Liefert die Leitung wieder, beginnt die Staffel von vorn: der nächste Ablauf baut sofort neu auf.
+    FakeEventSource.instanzen[3].oeffne();
+    FakeEventSource.instanzen[3].sende('heartbeat');
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
+    expect(FakeEventSource.instanzen).toHaveLength(5);
+    schliessen();
+  });
+
+  it('baut nach dem Aufräumen während der gestaffelten Wartezeit nichts mehr auf', () => {
+    vi.useFakeTimers();
+    const { schliessen } = verbinde();
+    FakeEventSource.instanzen[0].oeffne();
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
+    FakeEventSource.instanzen[1].oeffne();
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+    schliessen();
+    vi.advanceTimersByTime(60_000);
+    expect(FakeEventSource.instanzen).toHaveLength(2);
   });
 
   it('feuert nach dem Pausieren und nach dem Aufräumen nicht mehr', () => {

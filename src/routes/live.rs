@@ -24,7 +24,7 @@
 //! Kontroll-Ereignis `heartbeat` ([`strom::mit_heartbeat`]). Daran erkennt das Frontend eine
 //! Leitung, die offen scheint, aber nichts mehr liefert (halboffenes TCP im Funkloch); die
 //! Keep-Alive-Kommentare sieht eine `EventSource` nicht. Sie bleiben trotzdem gesetzt
-//! (`openspec/changes/l39v43md-sse-herzschlag/design.md`, D1).
+//! (`openspec/changes/archive/2026-11-17-l39v43md-sse-herzschlag/design.md`, D1).
 //!
 //! **Zulassung:** beide Ströme stehen außerhalb der routerweiten Zulassung
 //! ([`crate::zulassung::OHNE_ZULASSUNGSGRENZE`]) und belegen stattdessen vor jeder weiteren

@@ -26,7 +26,7 @@ export const WIEDERAUFBAU_SCHONFRIST_MS = 8000;
  * (`HEARTBEAT_INTERVAL` in `src/live/strom.rs`). Trifft nach dem `open` einer Verbindung so lange
  * KEIN Ereignis ein (drei verpasste Schläge), gilt die Leitung als stumm, etwa ein halboffenes
  * TCP im Funkloch, das der Browser nicht bemerkt: `connecting` sofort, Neuaufbau mit Vollabgleich
- * (`openspec/changes/l39v43md-sse-herzschlag/design.md`, D3).
+ * (`openspec/changes/archive/2026-11-17-l39v43md-sse-herzschlag/design.md`, D3).
  */
 export const HEARTBEAT_EVENT = 'heartbeat';
 export const HEARTBEAT_TIMEOUT_MS = 45_000;
@@ -115,6 +115,9 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
   let backoffTimer: ReturnType<typeof setTimeout> | null = null;
   let schonfristTimer: ReturnType<typeof setTimeout> | null = null;
   let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  // Abläufe der Wache in Folge, deren Quelle seit dem `open` kein einziges Ereignis lieferte
+  // (design.md D6): ab dem zweiten wartet der Neuaufbau gestaffelt.
+  let silentStreak = 0;
   let aktuelle: EventSource | null = null;
 
   const schonfristBeenden = () => {
@@ -178,6 +181,7 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     };
     // Die Wache: eine stumme Leitung wird geschlossen und neu aufgebaut. Die neue Quelle hat keine
     // `Last-Event-ID`, ihr `open` gleicht deshalb voll ab (`beiWiederaufbau`).
+    let delivered = false;
     const startWatchdog = () => {
       stopWatchdog();
       watchdogTimer = setTimeout(() => {
@@ -187,13 +191,29 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
         meldeStatus('connecting');
         aktuelle = null;
         trenne(quelle);
-        verbinde();
+        // Ein Weg, der öffnet, aber nie liefert (puffernder Proxy), soll nicht alle 45 s voll
+        // abgleichen: ab dem zweiten stummen Ablauf in Folge gestaffelt warten (design.md D6).
+        silentStreak = delivered ? 0 : silentStreak + 1;
+        if (silentStreak < 2) {
+          verbinde();
+          return;
+        }
+        const basis =
+          RECONNECT_BACKOFF_MS[Math.min(silentStreak - 2, RECONNECT_BACKOFF_MS.length - 1)];
+        backoffTimer = setTimeout(
+          () => {
+            if (!abgebrochen) verbinde();
+          },
+          Math.round(basis * (1 + Math.random() * RECONNECT_STREUUNG)),
+        );
       }, HEARTBEAT_TIMEOUT_MS);
     };
     // Jedes Ereignis zählt als Lebenszeichen, nicht nur `heartbeat`. Eine Wache läuft nur, solange
     // die Quelle offen ist; eine getrennte Quelle meldet nichts mehr, ihre Lauscher bleiben hängen.
     const resetWatchdog = () => {
-      if (watchdogTimer && aktuelle === quelle) startWatchdog();
+      if (aktuelle !== quelle) return;
+      delivered = true;
+      if (watchdogTimer) startWatchdog();
     };
     new Set([
       HEARTBEAT_EVENT,

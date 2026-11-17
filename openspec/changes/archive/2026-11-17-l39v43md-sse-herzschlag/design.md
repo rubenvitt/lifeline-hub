@@ -77,6 +77,25 @@ einmal weniger abzurufen. Abgestimmt mit dem Menschen am 17.11.2026.
 15 s / 45 s, abgestimmt am 17.11.2026. *Verworfen:* 10/30 (mehr Fehlalarme im Mobilfunk) und
 30/90 (totes Lagebild bis 1,5 min als „live“).
 
+### D6 Gestaffelter Neuaufbau, wenn ein Weg nie liefert
+
+Aus dem Review vor dem PR, abgestimmt am 17.11.2026. Liefert ein Weg dauerhaft nichts aus, obwohl
+die Verbindung öffnet (etwa ein Reverse-Proxy, der SSE puffert), bliebe sonst eine Schleife: alle
+45 s Neuaufbau mit Vollabgleich. Die Wache zählt deshalb, wie oft hintereinander eine Quelle
+abläuft, die seit ihrem `open` kein einziges Ereignis geliefert hat. Der erste solche Ablauf baut
+sofort neu auf, jeder weitere wartet vorher gestaffelt nach `RECONNECT_BACKOFF_MS` (1/3/10/30 s,
+mit Streuung). Ein Ereignis setzt die Zählung zurück; ein echtes Funkloch nach gelieferten
+Ereignissen baut weiter sofort neu auf. *Verworfen:* `X-Accel-Buffering: no` setzen (hilft nur
+bei nginx).
+
+### D7 Kontroll-Ereignisse und ADR-0003
+
+ADR-0003 verlangt wörtlich, dass jeder Ereignisname eine Variante von `LiveEvent` oder
+`OrgLiveEvent` ist; schon `position` (LFH-922) ist das nicht. Eine neue ADR mit
+`status: vorgeschlagen` ersetzt ADR-0003 mit denselben Regeln und nimmt die Kontroll-Ereignisse
+ohne Modul (`position`, `heartbeat`) ausdrücklich aus. Annehmen kann sie nur der Mensch
+(`docs/architektur/AGENTS.md`, „Pflege durch Agenten“).
+
 ## Risks / Trade-offs
 
 - [Mobilgerät setzt die Seite aus, die Wache feuert beim Aufwachen vor den gepufferten

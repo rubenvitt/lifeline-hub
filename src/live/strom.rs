@@ -389,7 +389,9 @@ mod tests {
             "das Lebenszeichen trägt keine Position: {d}"
         );
 
-        tx.send(Ok(Event::default().event("etb").data("{}")))
+        tx.send(Ok(Event::default()
+            .event(crate::live::LiveEvent::Etb.as_str())
+            .data("{}")))
             .await
             .unwrap();
         assert!(draht(&strom.next().await.unwrap()).contains("event: etb"));

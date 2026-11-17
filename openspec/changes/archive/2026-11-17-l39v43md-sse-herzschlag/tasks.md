@@ -15,7 +15,13 @@ Jede Aufgabe per TDD: erst der rote Test, dann der Code.
 - [x] 2.2 Tests: `heartbeat`, `position` und Fach-Ereignis setzen die Wache zurück; vor dem ersten `open` keine Meldung wegen Stille; nach `onerror`, Pause und Aufräumen feuert keine Wache mehr
 - [x] 2.3 `liveVerbindung.ts`: `HEARTBEAT_TIMEOUT_MS` und die Wache nach design.md D3; Kopfkommentar von `oeffneLiveVerbindung` ergänzen
 
-## 3. Abschluss
+## 3. Aus dem Review vor dem PR
 
-- [x] 3.1 Doku prüfen: `docs/architektur/` und `docs/anwender/` auf Aussagen zum Verbindungszustand (Mitänderungsregel der jeweiligen `AGENTS.md`)
-- [ ] 3.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 3.1 Test: eine Quelle ohne ein einziges Ereignis seit dem `open` baut beim ersten Ablauf sofort, bei jedem weiteren erst nach gestaffelter Wartezeit neu auf; ein Ereignis setzt die Staffel zurück; Aufräumen während der Wartezeit baut nichts mehr auf
+- [x] 3.2 `liveVerbindung.ts`: Staffel nach design.md D6
+- [x] 3.3 Neue ADR mit `status: vorgeschlagen`, ersetzt ADR-0003, nimmt Kontroll-Ereignisse aus (design.md D7)
+
+## 4. Abschluss
+
+- [x] 4.1 Doku prüfen: `docs/architektur/` und `docs/anwender/` auf Aussagen zum Verbindungszustand (Mitänderungsregel der jeweiligen `AGENTS.md`)
+- [x] 4.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
