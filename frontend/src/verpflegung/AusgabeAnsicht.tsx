@@ -1020,9 +1020,8 @@ export default function AusgabeAnsicht() {
           }}
         >
           {/* Der Grund gesperrter Tasten, sichtbar und als Beschreibung (LFH-966); fester Platz:
-              eine Zeile in der Schrift der Stufe. Seit die Schrift mit der Dichte wächst (LLH-1774),
-              war eine feste Mindesthöhe von 18 px in `handschuh` kleiner als die Zeile, und das
-              Verschwinden des Grunds beim ersten Tipp verschob alle Tasten. */}
+              18 px tragen eine Zeile der festen 12-px-Mono in jeder Dichte, so verschiebt das
+              Verschwinden des Grunds beim ersten Tipp keine Taste. */}
           <div
             id={grundId}
             data-lfh="zaehltasten-grund"

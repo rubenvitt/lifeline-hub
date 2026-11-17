@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { textBreite } from './textBreite';
 import {
   KOPF_TYPO,
   kopfMindestBreite,
@@ -52,7 +53,12 @@ describe('kopfMindestBreite (LLH-1788)', () => {
   });
 
   it('die Kopfschrift misst den Text mit Sperrung (LLH-1954, ohne Wachstum mit der Dichte)', () => {
-    expect(textBreiteKopf('EINSATZFUNKTION', '')).toBeGreaterThan(0);
+    // jsdom ohne Leinwand schätzt: Länge × 0,62 × Größe + Länge × Sperrung × Größe.
+    // EINSATZFUNKTION (15 Zeichen) bei 10 px: 93 + 18; ohne Sperrung wären es nur 93.
+    expect(textBreiteKopf('EINSATZFUNKTION', '')).toBe(
+      textBreite('EINSATZFUNKTION', { schrift: '', groesse: 10, gewicht: 600, sperrung: 0.12 }),
+    );
+    expect(textBreiteKopf('EINSATZFUNKTION', '')).toBeCloseTo(111, 5);
   });
 });
 

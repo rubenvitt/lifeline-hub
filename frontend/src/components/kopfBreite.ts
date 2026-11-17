@@ -22,9 +22,9 @@ import { textBreite } from './textBreite';
 export const KOPF_TYPO = { groesse: 10, gewicht: 600, sperrung: 0.12 } as const;
 
 /**
- * Abstand des Sortiersymbols zum Titel (antd). Das Symbol selbst ist so breit wie `fontSizeSM`
- * und wächst mit der Dichte (12 / 13,8 / 15 px); mit festen 12 px fehlten dem Kopf in
- * `handschuh` 3 px, und „FUNKRUFNAME“ brach im Wort.
+ * Abstand des Sortiersymbols zum Titel (antd). Das Symbol selbst ist so breit wie `fontSizeSM`;
+ * die Rechnung liest den Wert aus dem Token, statt ihn festzuschreiben. Seit der Rücknahme von
+ * LLH-1719 (LLH-1954) leitet antd ihn in jeder Dichte zu 12 px ab.
  */
 const SORTIER_ABSTAND = 4;
 /** Abstand des Filterauslösers zum Titel (antd `margin-inline-start`). */
