@@ -86,7 +86,7 @@ Wege (breitere Fuge, Kacheln):
 Regeln dazu:
 
 - **Kennzahlenband**: „Lage in Zahlen“ hat immer sechs Plätze (vier Kern, zwei Lage); der
-  Führungsstand des Überblicks nur seine Handlungszahlen. Jede Kennzahl hat einen
+  Überblick trägt kein Band, seine Zahlen stehen in den Paneelen. Jede Kennzahl hat einen
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
   per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen); Neuzuschnitt während der Betrachtung als Sammelbanner. Die Fuge
   zeichnet die Zelle, nicht der Rastergrund: Grund `flaeche`, Umriss je Zelle über

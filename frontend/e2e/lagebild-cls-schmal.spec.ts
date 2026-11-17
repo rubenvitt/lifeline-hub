@@ -163,14 +163,19 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite
 }
 
 const inhalt = (page: Page) => page.locator('[data-lfh="seiten-inhalt"]');
-/** Das Band der Seite: im Überblick seit LLH-1743 der „Führungsstand“. */
-const band = (page: Page, seite: Seite) =>
-  page.getByRole('group', { name: seite === 'ueberblick' ? 'Führungsstand' : 'Lage in Zahlen' });
+/**
+ * Was zuletzt steht: im Lagebild die Kennzahlen des Bands als Links, im Überblick (ohne Band seit
+ * LLH-1748) die Zahlen der offenen Vorgänge.
+ */
+const zahlenStehen = (page: Page, seite: Seite) =>
+  seite === 'ueberblick'
+    ? page.locator('[data-lfh="offene-vorgaenge"] [data-lfh="abschnitt-zahl"]').first()
+    : page.getByRole('group', { name: 'Lage in Zahlen' }).locator('a[data-lfh="kennzahl"]').first();
 
-/** Anker des Endzustands: Ortspfad mit Namen, Kennzahlen als Links, kein Ladezeichen mehr. */
+/** Anker des Endzustands: Ortspfad mit Namen, Zahlen stehen, kein Ladezeichen mehr. */
 async function endzustand(page: Page, seite: Seite) {
   await expect(page.locator('[data-lfh="seitenkopf"]')).toContainText(NAME_PRAEFIX);
-  await expect(band(page, seite).locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
+  await expect(zahlenStehen(page, seite)).toBeVisible();
   await expect(inhalt(page).locator('[aria-busy="true"]')).toHaveCount(0);
 }
 

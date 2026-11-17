@@ -248,7 +248,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Evakuiert (LFH-607, `openspec/changes/archive/2026-09-29-lfh-607-kennzahl-evakuiert/`), Pegel auf Platz 1
   (LFH-606), Rückmeldung (LFH-610), ETB-Zählung (LFH-612).
 - **Kennzahlenband** (LFH-640): „Lage in Zahlen“ hat immer sechs Plätze (vier Kern, zwei Lage); der
-  Führungsstand des Überblicks nur seine Handlungszahlen (LLH-1743). Jede Kennzahl hat einen
+  Überblick trägt kein Band, seine Zahlen stehen in den Paneelen (LLH-1748). Jede Kennzahl hat einen
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
   per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen,
   LLH-1371); Neuzuschnitt während der Betrachtung als Sammelbanner
@@ -268,7 +268,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
   `components/instrument/`.
   Kopf: `EinsatzSeite` mit Datenstand und `WarnstufenHinweis` (nur bei Ton achtung/alarm; die
-  Warnstufe ist keine Kennzahl). Darunter, vor jedem Band, auf Überblick, Lagebild und Lagemonitor
+  Warnstufe ist keine Kennzahl). Darunter, vor Band und Paneelen, auf Überblick, Lagebild und Lagemonitor
   die **Alarmzeile „Was brennt“** (`AlarmZeile`, LLH-1743, Spec `lage-alarmzeile`): Einträge,
   Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
   am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
@@ -276,12 +276,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Seite baut eine zweite Sammlung. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**
   (LLH-1815, Spec `ueberblick-startliste`): eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
   Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
-  ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über dem
-  Band steht, warten sie, Band und Paneelreihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
+  ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über den
+  Paneelreihen steht, warten sie und die Reihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
   Alarmzeile nicht. Später hängt eine erstmals ladende Quelle nichts aus, und ein gescheiterter
   Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
-  Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds, der
-  Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
+  Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds). Der
+  Überblick hat keins (LLH-1748, Change `wf7l9axn-ueberblick-ohne-band`): seine erste
+  Paneelreihe trägt „Nächste Marken“ und „Offene Vorgänge“, die zweite „Einsatzabschnitte“ und
+  die Entscheidungen, damit Fristen über der Falz und am Handy zuerst stehen.
   Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
   `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
   (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
@@ -300,10 +302,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   ergänzen die Zahl, nie ersetzen sie; Farben kommen aufgelöst vom Aufrufer, der Baustein trägt
   keine Statuskarte. Ein neuer Paneeltyp kommt als Baustein hierher, nicht lokal in eine Seite.
 - **Rollen der Übersichten** (LLH-1743, Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt
-  die Lage“): der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, Aufträge,
-  Meldungen, Abschnitte, offene Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los
-  ist (Betroffene, Kräfte, Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine
-  Kennzahl steht auf genau einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Die
+  die Lage“): der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, nächste
+  Marken, offene Vorgänge samt Aufträgen und Meldungen, Abschnitte, Entscheidungen; ohne
+  Kennzahlenband, LLH-1748), das Lagebild, was los ist (Betroffene, Kräfte, Vermisste, Gefahren,
+  Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Zahl steht auf genau einer der beiden Seiten;
+  nur die Alarmzeile steht auf beiden. Die
   Startliste zeigt Haken, keine Zahl (LLH-1815). Beide verweisen im Seitenkopf aufeinander.
   Herleitung: `openspec/changes/archive/2026-11-16-t9jjrajy-alarmzeile-was-brennt/design.md` (D8).
 - **Eine Heimat je Zahl** (LFH-550,

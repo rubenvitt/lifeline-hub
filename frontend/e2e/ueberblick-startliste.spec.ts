@@ -11,13 +11,13 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * je Punkt, Sichtbarkeit, Sperre und Ausblenden pinnen `startliste.test.ts` und
  * `UeberblickPage.test.tsx`.
  *
- * KEIN LAYOUTSPRUNG: die Reihe steht zwischen Alarmzeile und Führungsstand. Die Abfrage der
- * jüngsten Lagefeststellung wird gehalten, bis die Seite ruht; dann steht nur die Alarmzeile, Band
- * und Paneelreihen warten mit der Startliste. Nach dem Loslassen erscheinen sie gemeinsam, und bis
+ * KEIN LAYOUTSPRUNG: die Reihe steht zwischen Alarmzeile und Paneelreihen (ein Band gibt es seit
+ * LLH-1748 nicht mehr). Die Abfrage der jüngsten Lagefeststellung wird gehalten, bis die Seite
+ * ruht; dann steht nur die Alarmzeile, die Paneelreihen warten mit der Startliste. Nach dem Loslassen erscheinen sie gemeinsam, und bis
  * „Offene Vorgänge“ fertig ist, verschiebt sich keine Reihe.
  *
  * Mutationsprobe (17.11.2026): in `UeberblickPage.tsx` die Schranke `startlisteLaedt ? null` durch
- * `false ? null` ersetzt → rot an der Vorbedingung (das Band steht vor der Startliste).
+ * `false ? null` ersetzt → rot an der Vorbedingung (die Reihen stehen vor der Startliste).
  */
 
 /** Dieselbe Hausgrenze wie `ueberblick-vorgaenge-cls.spec.ts` — eine Setzung, keine Toleranz. */
@@ -46,7 +46,7 @@ async function oben(page: Page, selektor: string): Promise<number> {
 }
 
 for (const [ansicht, groesse] of Object.entries(ANSICHTEN)) {
-  test(`leerer Einsatz ${ansicht}: Startliste erscheint mit Band und Paneelreihen, nichts verrutscht (${groesse.width} px)`, async ({
+  test(`leerer Einsatz ${ansicht}: Startliste erscheint mit den Paneelreihen, nichts verrutscht (${groesse.width} px)`, async ({
     page,
   }) => {
     await anmeldenAlsAdmin(page);
@@ -71,7 +71,6 @@ for (const [ansicht, groesse] of Object.entries(ANSICHTEN)) {
     await expect(page.getByRole('status', { name: 'Was brennt' })).toBeVisible();
     await expect.poll(() => gehalten).toBeGreaterThan(0);
     await expect(startliste(page)).toHaveCount(0);
-    await expect(page.getByRole('group', { name: 'Führungsstand' })).toHaveCount(0);
     await expect(page.locator('[data-lfh="ueberblick-paneele"]')).toHaveCount(0);
     await ruheShifts(page);
 
@@ -81,16 +80,16 @@ for (const [ansicht, groesse] of Object.entries(ANSICHTEN)) {
       5,
     );
     const vorher = {
-      band: await oben(page, '[data-lfh="kennzahlenband"]'),
       reihe: await oben(page, '[data-lfh="ueberblick-paneele"]'),
+      zweiteReihe: await oben(page, '[data-lfh="ueberblick-paneele-gliederung"]'),
     };
 
     // Endzustand: alle Abschnitte der „Offenen Vorgänge“ geladen, kein Ladezeichen im Inhalt.
     await expect(page.locator('[data-lfh="seiten-inhalt"] [aria-busy="true"]')).toHaveCount(0);
     const m = await ruheShifts(page);
     expect({
-      band: await oben(page, '[data-lfh="kennzahlenband"]'),
       reihe: await oben(page, '[data-lfh="ueberblick-paneele"]'),
+      zweiteReihe: await oben(page, '[data-lfh="ueberblick-paneele-gliederung"]'),
     }).toEqual(vorher);
     // Die Punkte brechen um, statt die Seite waagerecht laufen zu lassen.
     expect(
@@ -168,5 +167,5 @@ test('letzter Punkt von einem anderen Schirm: das Paneel verschwindet über den 
 
   await expect(startliste(page)).toHaveCount(0);
   await expect(page.locator('[data-lfh="ueberblick-startliste"]')).toHaveCount(0);
-  await expect(page.getByRole('group', { name: 'Führungsstand' })).toBeVisible();
+  await expect(page.locator('[data-lfh="ueberblick-paneele"]')).toBeVisible();
 });

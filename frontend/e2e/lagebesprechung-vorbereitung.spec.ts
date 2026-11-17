@@ -61,10 +61,12 @@ async function dashboardWerte(page: Page, einsatzId: string) {
       .filter({ hasText: titel })
       .first()
       .locator('[data-lfh="kennzahl-wert"]');
-  // Aufträge stehen seit LLH-1743 im Überblick (Seitenrollen), Betroffene und Kräfte im Lagebild.
+  // Aufträge stehen seit LLH-1743 im Überblick (Seitenrollen), seit LLH-1748 im Abschnitt
+  // „Aufträge“ der offenen Vorgänge; Betroffene und Kräfte im Lagebild.
   await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
-  await expect(wert('Offene Aufträge')).toHaveText('2');
-  const auftraege = (await wert('Offene Aufträge').textContent())!.trim();
+  const auftragsZahl = page.locator('[data-lfh="vorgaenge-auftraege"] [data-lfh="abschnitt-zahl"]');
+  await expect(auftragsZahl).toHaveText('2');
+  const auftraege = (await auftragsZahl.textContent())!.trim();
   await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
   // Jede Kachel hat ihre eigene Quelle: erst lesen, wenn beide eine Zahl zeigen.
   for (const titel of ['Betroffene', 'Kräfte']) await expect(wert(titel)).toHaveText(/^\d+$/);

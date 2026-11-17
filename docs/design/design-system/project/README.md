@@ -285,10 +285,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Keine erfundenen Daten:** was ohne Datenquelle ist, wird weggelassen,
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
   Evakuiert, Pegel auf Platz 1, Rückmeldung, ETB-Zählung.
-- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, Aufträge,
-  Meldungen, Abschnitte, offene Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los
-  ist (Betroffene, Kräfte, Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine
-  Kennzahl steht auf genau einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Die
+- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, nächste
+  Marken, offene Vorgänge samt Aufträgen und Meldungen, Abschnitte, Entscheidungen; ohne
+  Kennzahlenband), das Lagebild, was los ist (Betroffene, Kräfte, Vermisste, Gefahren,
+  Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Zahl steht auf genau einer der beiden Seiten;
+  nur die Alarmzeile steht auf beiden. Die
   Startliste zeigt Haken, keine Zahl. Beide verweisen im Seitenkopf aufeinander..
 
 ## Farbachsen

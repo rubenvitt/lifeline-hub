@@ -47,10 +47,10 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * prüft der Test vor der Zahl.
  *
  * STARTLISTE (LLH-1815): der gesäte Einsatz hat weder Einsatzort noch Einsatzleiter, als Admin
- * (Einsatzleitung) steht deshalb die Startliste „Einsatz starten“ über dem Führungsstand. Sie hängt
- * an Abschnitten, Einheiten und Personal; damit sie das Band nicht nachträglich verschiebt, warten
- * Band und Paneelreihen mit ihr. In der Folge `Gliederung zuletzt` steht als Admin deshalb nur die
- * Alarmzeile, als Beobachter (keine Startliste) wie bisher das Band.
+ * (Einsatzleitung) steht deshalb die Startliste „Einsatz starten“ über den Paneelreihen. Sie hängt
+ * an Abschnitten, Einheiten und Personal; damit sie die Reihen nicht nachträglich verschiebt,
+ * warten die Reihen mit ihr. Ein Band trägt der Überblick seit LLH-1748 nicht mehr: in der Folge
+ * `Gliederung zuletzt` steht in beiden Rollen nur die Alarmzeile.
  */
 
 /** Dieselbe Hausgrenze wie `lagebild-cls-schmal.spec.ts` — eine Setzung, keine Toleranz. */
@@ -217,15 +217,10 @@ async function messe(
     await ruheShifts(page);
     abfragen.freigeben();
   } else if (folge === 'Gliederung zuletzt') {
-    // Vorbedingung: die Quellen der Gliederung fehlen noch. Als Beobachter steht das Band schon,
-    // als Admin wartet es mit der Startliste (Dateikopf), dann steht nur die Alarmzeile.
-    const band = page.getByRole('group', { name: 'Führungsstand' });
-    if (rolle === 'beobachter') {
-      await expect(band.locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
-    } else {
-      await expect(page.getByRole('status', { name: 'Was brennt' })).toBeVisible();
-      await expect(band).toHaveCount(0);
-    }
+    // Vorbedingung: die Quellen der Gliederung fehlen noch, es steht nur die Alarmzeile (kein
+    // Band seit LLH-1748; als Admin wartet auch die Startliste, Dateikopf).
+    await expect(page.getByRole('status', { name: 'Was brennt' })).toBeVisible();
+    await expect(page.locator('[data-lfh="ueberblick-paneele"]')).toHaveCount(0);
     await expect(page.locator('[data-lfh="ueberblick-abschnitt"]')).toHaveCount(0);
     await ruheShifts(page);
     abfragen.freigeben();
