@@ -41,13 +41,13 @@ Gliederung nach Unteraufgabe: `r9up3kp5` = LLH-1831 (Konfliktprüfung), `mdopfgq
 
 - [x] 7.1 API-Funktionen `patcheEinsatz`, `patcheEinheit`, `patcheFuehrungsstelle` nehmen optionales `erwartet`; verifiziert: Vitest der API-Schicht (Body enthält `erwartet` nur, wenn übergeben)
 - [x] 7.2 `EinsatzdatenPage` (Kopfzeilen, Paneel Einsatzort mit Paar und Adresse+Treffer) und `EinsatzleiterAngabe` senden `erwartet` und nutzen `useFeldKonflikt`; Vermerk an der Zeile, jüngster im Paneelkopf (`meta`); verifiziert: Vitest für „Leitstellen-Nr. mit veraltetem Stand“ (Dialog), Paneelkopf „Zuletzt geändert von B, 14:05“, ohne Vermerk kein Kopftext
-- [ ] 7.3 `EinheitKopf` und `EinheitFunk` (inkl. Bemerkung, Verbindungen, Führer, Soll-Trio, Qualifikationssoll) ebenso; verifiziert: Vitest für Bemerkung-Konflikt und Vermerk an der Zeile
-- [ ] 7.4 e2e mit zwei Browserkontexten: A und B öffnen Einheit › Bemerkung bzw. Einsatzdaten › Leitstellen-Nr.; B sieht den Hinweis im offenen Feld, dann den Dialog; nichts still überschrieben; verifiziert: neue Spec unter `frontend/e2e/` grün
+- [x] 7.3 `EinheitKopf` und `EinheitFunk` (inkl. Bemerkung, Verbindungen, Führer, Soll-Trio, Qualifikationssoll) ebenso; verifiziert: Vitest für Bemerkung-Konflikt und Vermerk an der Zeile
+- [x] 7.4 e2e mit zwei Browserkontexten: A und B öffnen Einheit › Bemerkung bzw. Einsatzdaten › Leitstellen-Nr.; B sieht den Hinweis im offenen Feld, dann den Dialog; nichts still überschrieben; verifiziert: neue Spec unter `frontend/e2e/` grün
 
 ## 8. Regeln und Doku (r9up3kp5, mdopfgqk)
 
-- [ ] 8.1 `frontend/AGENTS.md` („Bearbeiten in der Ansicht“): auch eine Einzelangabe trägt den Feldvergleich über `useFeldKonflikt`; `src/AGENTS.md`: neue 409-Quelle Feld-CAS an Einheit/Kopf/Führungsstelle und die Vermerk-Tabelle; verifiziert: Prettier über `frontend/`, Verweise per `grep` stimmig
-- [ ] 8.2 Anwenderdoku (`docs/anwender/kapitel/` zu Einsatzdaten und Einheit, Konfliktdialog der Personendaten) nach `docs/anwender/AGENTS.md` (Mitänderungsregel, Bilder); verifiziert: Doku-Wächter aus `check-all.sh` grün
+- [x] 8.1 `frontend/AGENTS.md` („Bearbeiten in der Ansicht“): auch eine Einzelangabe trägt den Feldvergleich über `useFeldKonflikt`; `src/AGENTS.md`: neue 409-Quelle Feld-CAS an Einheit/Kopf/Führungsstelle und die Vermerk-Tabelle; verifiziert: Prettier über `frontend/`, Verweise per `grep` stimmig
+- [x] 8.2 Anwenderdoku (`docs/anwender/kapitel/` zu Einsatzdaten und Einheit, Konfliktdialog der Personendaten) nach `docs/anwender/AGENTS.md` (Mitänderungsregel, Bilder); verifiziert: Doku-Wächter aus `check-all.sh` grün
 
 ## 9. Integration
 

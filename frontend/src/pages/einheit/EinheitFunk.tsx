@@ -1,3 +1,4 @@
+import { PaneelVermerk } from '../../components/FeldVermerkAnzeige';
 import type { Einheit } from '../../api/types';
 import { Datenfeld, Datenraster, Paneel } from '../../components/instrument';
 import SprechgruppenAngabe, {
@@ -45,13 +46,21 @@ export default function EinheitFunk({
           </Datenfeld>
         </Datenraster>
       </Paneel>
-      <Paneel titel="Telefon und weitere Verbindungen" koerperPolster>
+      <Paneel
+        titel="Telefon und weitere Verbindungen"
+        meta={<PaneelVermerk vermerk={e.vermerke?.verbindungen} />}
+        koerperPolster
+      >
         <VerbindungenAngabe
           etikett="Telefon und weitere Verbindungen"
           verbindungen={e.verbindungen}
           darfSchreiben={canEdit}
-          onSpeichern={(liste) =>
-            onPatch('Telefon und weitere Verbindungen', { verbindungen: liste })
+          onSpeichern={(liste, alt) =>
+            onPatch(
+              'Telefon und weitere Verbindungen',
+              { verbindungen: liste },
+              { verbindungen: alt },
+            )
           }
         />
       </Paneel>

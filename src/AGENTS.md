@@ -19,15 +19,23 @@ Handler (`JsonBody`, LFH-1074).
   Reine 400er-Referenz: `tests/freies_zeichen.rs` (`ohne_zeichenform_ist_400`,
   `leere_zeichenform_ist_400`, `altes_format_ist_400`; seit LLH-1160 gibt es dort keinen 422 mehr).
 - **409 hat zwei Quellen:** CAS (Zeilen-CAS `basis_geaendert_at` in `schaden/repo.rs`,
-  `tier/repo.rs`, `verpflegung/repo.rs` für Zeitfenster; Feld-CAS `erwartet` in
-  `person/repo.rs`; Rückfrage „Zwischenzeitlich geändert“ mit Überschreiben) und Lebenszyklus
-  (kein Dialog). Das Frontend trennt nur
+  `tier/repo.rs`, `verpflegung/repo.rs` für Zeitfenster; Feld-CAS `erwartet` über den Baustein
+  `src/feld_cas.rs` in `person/repo.rs`, am Einsatzkopf, an der Einheit und an der eigenen
+  Führungsstelle (LLH-1831); Rückfrage „Zwischenzeitlich geändert“ mit „Meine Änderung
+  übernehmen“) und Lebenszyklus (kein Dialog). Das Frontend trennt nur
   heuristisch (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
   `SchaedenDetailPage.tsx`/`TiereDetailPage.tsx`) — ein neuer 409 in einer
   CAS-Route zieht den Zweig mit.
 - **CAS-Baseline beim Öffnen einfrieren**: das Sammelbearbeiten von Tier und Schaden über
   `components/useEditSitzung.ts` (gebrandete `CasBasis`; `starte` nimmt den Datensatz); Test
   braucht ein gemountetes `<Form form={form}>`.
+- **Feld-CAS an Kopf, Einheit und Führungsstelle** (LLH-1831, design.md D1/D2 der Change
+  `nvhnqynd-konflikt-und-aenderungsvermerk`): dieselbe Form wie die Personendaten, alle Altwerte
+  einer Anfrage und das Schreiben in EINER Transaktion; Listen (Verbindungen) als Ganzes, die
+  Soll-Stärke und das Qualifikationssoll der Einheit gegen den wirksamen Wert (eigener, sonst des
+  Typs). Jeder dieser Schreibwege setzt den **Änderungsvermerk** je geänderter Angabe in
+  `einsatz_feld_vermerk` (LLH-1834, `einsatz::feld_vermerk`), auch ohne `erwartet`; kein
+  ETB-Eintrag daraus. Eine neue Angabe an diesen Wegen kommt in die feste Feldliste des Vermerks.
 - **Personendaten nutzen Feld-CAS** (LLH-1103, design.md D1 der Change
   `f8218h1i-personendaten-feldweise`): der PATCH `…/personen/{pid}` trägt in `erwartet` je
   geändertem Feld den Wert beim Öffnen (`null` = leer, Koordinate nur als Paar), und

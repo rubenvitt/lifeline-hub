@@ -682,6 +682,17 @@ pub struct EinheitErwartet {
     pub verbindungen: Option<Vec<VerbindungBody>>,
 }
 
+/// Wirksame Werte für den Feld-CAS (LLH-1831): die eigene Spalte, sonst die des Typs. Feste
+/// Ausdrücke aus dem Code, nie aus der Anfrage; das UPDATE liest sie am Stand vor dem Schreiben.
+const WIRKSAM_SOLL_FUEHRER: &str = "COALESCE(soll_fuehrer, \
+     (SELECT t.soll_fuehrer FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
+const WIRKSAM_SOLL_UNTERFUEHRER: &str = "COALESCE(soll_unterfuehrer, \
+     (SELECT t.soll_unterfuehrer FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
+const WIRKSAM_SOLL_MANNSCHAFT: &str = "COALESCE(soll_mannschaft, \
+     (SELECT t.soll_mannschaft FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
+const WIRKSAM_QUALI_SOLL: &str = "COALESCE(quali_soll, \
+     (SELECT t.quali_soll FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
+
 /// PATCH /api/einsaetze/{id}/einheiten/{eid} — echter Teil-Patch (LFH-306) inkl.
 /// authoritativem `fuehrer_id`. Führer-Wechsel und Abschnitts-Zuordnungs-Änderung
 /// schreiben je einen ETB-Eintrag.
@@ -803,11 +814,20 @@ pub async fn update(
         w.push("ueber_einheit_id", erwartet.ueber_einheit_id.map(Integer));
         w.push("typ_id", erwartet.typ_id.map(Integer));
         w.push("fuehrer_id", erwartet.fuehrer_id.map(Integer));
-        w.push("soll_fuehrer", erwartet.soll_fuehrer.map(Integer));
-        w.push("soll_unterfuehrer", erwartet.soll_unterfuehrer.map(Integer));
-        w.push("soll_mannschaft", erwartet.soll_mannschaft.map(Integer));
+        // Soll-Stärke und Qualifikationssoll zeigt die Ansicht wirksam (eigener Wert, sonst der des
+        // Typs); verglichen wird deshalb der wirksame Wert, sonst wäre ein geerbter stets ein
+        // Konflikt (design.md D2).
+        w.push(WIRKSAM_SOLL_FUEHRER, erwartet.soll_fuehrer.map(Integer));
         w.push(
-            "quali_soll",
+            WIRKSAM_SOLL_UNTERFUEHRER,
+            erwartet.soll_unterfuehrer.map(Integer),
+        );
+        w.push(
+            WIRKSAM_SOLL_MANNSCHAFT,
+            erwartet.soll_mannschaft.map(Integer),
+        );
+        w.push(
+            WIRKSAM_QUALI_SOLL,
             erwartet_quali.as_ref().map(|v| Text(v.as_deref())),
         );
         w.push(

@@ -183,7 +183,7 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await user.clear(feld);
     await user.type(feld, '  2. Zug {Enter}');
     await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(1));
-    expect(onPatch).toHaveBeenCalledWith('Name', { name: '2. Zug' });
+    expect(onPatch).toHaveBeenCalledWith('Name', { name: '2. Zug' }, expect.anything());
   });
 
   it('Name ist Pflicht: leer gespeichert heißt keine Anfrage und ein Hinweis an der Zeile', async () => {
@@ -217,7 +217,9 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await user.click(screen.getByRole('combobox', { name: 'Typ' }));
     await waehleOption(user, 'Gruppe');
     await user.click(screen.getByRole('button', { name: 'Typ speichern' }));
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Typ', { typ_id: 2 }));
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith('Typ', { typ_id: 2 }, expect.anything()),
+    );
     expect(onPatch).toHaveBeenCalledTimes(1);
   });
 
@@ -227,7 +229,9 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await user.click(screen.getByRole('button', { name: 'Funkrufname bearbeiten' }));
     await user.clear(screen.getByRole('textbox', { name: 'Funkrufname' }));
     await user.click(screen.getByRole('button', { name: 'Funkrufname speichern' }));
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Funkrufname', { funkrufname: null }));
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith('Funkrufname', { funkrufname: null }, expect.anything()),
+    );
   });
 
   it('Abschnitt: genau `abschnitt_id`', async () => {
@@ -237,7 +241,9 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await user.click(screen.getByRole('combobox', { name: 'Abschnitt' }));
     await waehleOption(user, 'EA Süd');
     await user.click(screen.getByRole('button', { name: 'Abschnitt speichern' }));
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Abschnitt', { abschnitt_id: 4 }));
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith('Abschnitt', { abschnitt_id: 4 }, expect.anything()),
+    );
   });
 
   it('Abschnitt geleert: `abschnitt_id: null`', async () => {
@@ -247,7 +253,9 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     const feld = screen.getByRole('combobox', { name: 'Abschnitt' }).closest('.ant-select')!;
     await user.click(feld.querySelector('.ant-select-clear')!);
     await user.click(screen.getByRole('button', { name: 'Abschnitt speichern' }));
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Abschnitt', { abschnitt_id: null }));
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith('Abschnitt', { abschnitt_id: null }, expect.anything()),
+    );
   });
 
   it('Über-Einheit: weder sie selbst noch ein Nachfahre steht zur Wahl, genau `ueber_einheit_id`', async () => {
@@ -266,7 +274,11 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await waehleOption(user, 'Nachbar');
     await user.click(screen.getByRole('button', { name: 'Über-Einheit speichern' }));
     await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Über-Einheit', { ueber_einheit_id: 12 }),
+      expect(onPatch).toHaveBeenCalledWith(
+        'Über-Einheit',
+        { ueber_einheit_id: 12 },
+        expect.anything(),
+      ),
     );
   });
 
@@ -278,7 +290,9 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await waitFor(() => expect(offeneOptionen()).toEqual(['Max Mustermann', 'Uwe Unter']));
     await waehleOption(user, 'Uwe Unter');
     await user.click(screen.getByRole('button', { name: 'Einheitsführer speichern' }));
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Einheitsführer', { fuehrer_id: 2 }));
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith('Einheitsführer', { fuehrer_id: 2 }, expect.anything()),
+    );
   });
 
   it('Soll-Stärke: genau die drei Felder in einer Anfrage', async () => {
@@ -292,11 +306,15 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await user.type(mannschaft, '12');
     await user.click(screen.getByRole('button', { name: 'Soll-Stärke speichern' }));
     await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(1));
-    expect(onPatch).toHaveBeenCalledWith('Soll-Stärke', {
-      soll_fuehrer: 1,
-      soll_unterfuehrer: 3,
-      soll_mannschaft: 12,
-    });
+    expect(onPatch).toHaveBeenCalledWith(
+      'Soll-Stärke',
+      {
+        soll_fuehrer: 1,
+        soll_unterfuehrer: 3,
+        soll_mannschaft: 12,
+      },
+      expect.anything(),
+    );
   });
 
   it('Qualifikationssoll: das des Typs als Vorgabe, Ergänzen schickt die ganze Liste (LLH-1553)', async () => {
@@ -321,12 +339,16 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await waehle('Qualifikation 2', 'Sanitäter');
     await user.click(screen.getByRole('button', { name: 'Qualifikationssoll speichern' }));
     await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(1));
-    expect(onPatch).toHaveBeenCalledWith('Qualifikationssoll', {
-      quali_soll: [
-        { qualifikation_id: 2, anzahl: 1 },
-        { qualifikation_id: 1, anzahl: 1 },
-      ],
-    });
+    expect(onPatch).toHaveBeenCalledWith(
+      'Qualifikationssoll',
+      {
+        quali_soll: [
+          { qualifikation_id: 2, anzahl: 1 },
+          { qualifikation_id: 1, anzahl: 1 },
+        ],
+      },
+      expect.anything(),
+    );
   });
 
   it('Bemerkung: mehrzeilig, genau `bemerkung`', async () => {
@@ -338,7 +360,11 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     expect(onPatch).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Bemerkung speichern' }));
     await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Bemerkung', { bemerkung: 'Zufahrt\nNord' }),
+      expect(onPatch).toHaveBeenCalledWith(
+        'Bemerkung',
+        { bemerkung: 'Zufahrt\nNord' },
+        expect.anything(),
+      ),
     );
   });
 

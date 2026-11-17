@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/fernmeldewesen/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/einsatz/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/feld_cas.rs, src/einsatz/feld_vermerk.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/fernmeldewesen/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/einsatz/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
 ---
 
 ## Überblick
@@ -29,6 +29,10 @@ der Einsatz gehört. Wer in den Einsatz darf, regelt die Einsatzleitung in den E
 3. Den neuen Wert eingeben.
 4. Mit Enter oder „Speichern“ übernehmen. Escape oder „Abbrechen“ verwirft die Eingabe. Die App
    meldet „… gespeichert“.
+5. Hat jemand anderes dieselbe Angabe inzwischen geändert, steht im offenen Feld „Inzwischen
+   geändert von …“ mit dem neuen Wert; die eigene Eingabe bleibt. Beim Speichern fragt die App
+   „Zwischenzeitlich geändert“: „Meine Änderung übernehmen“ speichert die eigene Eingabe,
+   „Verwerfen und neu laden“ übernimmt den neuen Stand.
 
 So lassen sich Bezeichnung, Einsatzstichwort, Alarmzeit, Einsatzart, Leitstellen-Nr., Meldende
 Stelle, Sachverhalt / Meldebild und Anzahl Betroffene (initial) ändern. Den Termin der nächsten
@@ -145,6 +149,13 @@ Für die Einsatzleitung:
 - Jede Zeile speichert nur ihren eigenen Wert, die Koordinate als Paar aus Breite und Länge. So
   überschreibt niemand die Angabe, die eine andere Person gerade in einer anderen Zeile
   gespeichert hat. Wer eine Zeile verlässt, ohne zu speichern, behält den alten Wert.
+- Hat eine andere Person **dieselbe** Angabe seit dem Öffnen geändert, speichert die App nicht
+  still darüber, sondern fragt nach (Ablauf „Eine Angabe ändern“). Das gilt für die Kopfdaten,
+  den Einsatzort und die eigene Führungsstelle, auch für den Einsatzleiter: zwei gleichzeitige
+  Übergaben ergeben nur einen Eintrag im Einsatztagebuch.
+- Unter jeder geänderten Angabe steht leise, wer sie zuletzt geändert hat und wann („Geändert von
+  …“), im Kopf jedes Paneels die jüngste Änderung („Zuletzt geändert von …“). Eine Angabe, die seit
+  dem Anlegen niemand geändert hat, trägt keinen Vermerk.
 - „Bezeichnung“ und „Alarmzeit“ sind Pflicht: leer gespeichert bleibt der bisherige Wert stehen,
   und die Zeile sagt, dass die Angabe Pflicht ist.
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie

@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/einsatz/feld_vermerk.rs, frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx]
 ---
 
 ## Überblick
@@ -325,6 +325,16 @@ Jede Angabe wird für sich gespeichert. Was ein anderer Arbeitsplatz oder die Fe
 inzwischen an einer anderen Angabe derselben Einheit geändert hat, bleibt erhalten; nur die
 geänderte Angabe wird überschrieben. Ein abgelehnter Wert bleibt in der offenen Zeile stehen,
 der Grund steht darunter.
+
+Hat ein anderer Arbeitsplatz **dieselbe** Angabe seit dem Öffnen geändert, steht das im offenen
+Feld („Inzwischen geändert von …“), und „Speichern“ fragt „Zwischenzeitlich geändert“: „Meine
+Änderung übernehmen“ speichert die eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen
+Stand. Soll-Stärke und Qualifikationssoll gelten dabei mit dem Wert, den die Zeile zeigt, auch
+wenn er vom Typ kommt. Das taktische Zeichen und die Sprechgruppen fragen nicht nach.
+
+Unter jeder geänderten Angabe steht leise, wer sie zuletzt geändert hat und wann, im Kopf der
+Paneele „Kopfdaten“ und „Telefon und weitere Verbindungen“ die jüngste Änderung. Diese Vermerke
+schreiben nichts ins Einsatztagebuch.
 
 ### Unangemeldete Einheiten
 

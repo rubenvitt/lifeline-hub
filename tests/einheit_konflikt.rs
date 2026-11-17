@@ -261,3 +261,40 @@ async fn vermerk_an_der_einheit_ohne_etb() {
         "die Soll-Stärke ist eine Angabe: {v:?}"
     );
 }
+
+#[tokio::test]
+async fn geerbte_soll_staerke_als_altwert_ist_kein_konflikt() {
+    let (app, admin, einsatz, eid) = start().await;
+    // Einen Typ mit Soll-Stärke anlegen und zuweisen; die Einheit erbt sie.
+    let (s, typ) = anfrage_json(
+        &app,
+        "POST",
+        "/api/einheit-typen",
+        &admin,
+        Some(&json!({"label": "Prüftrupp LLH-1831", "soll_fuehrer": 1, "soll_unterfuehrer": 1, "soll_mannschaft": 4})),
+    )
+    .await;
+    assert!(s.is_success(), "{s} {typ:?}");
+    let typ_id = typ["id"].as_i64().unwrap();
+    patchen(&app, &admin, einsatz, eid, json!({"typ_id": typ_id})).await;
+    let e = einheit(&app, &admin, einsatz, eid).await;
+    assert_eq!(e["soll"]["mannschaft"], 4, "{e:?}");
+
+    // Die Ansicht schickt den wirksamen (geerbten) Wert als Altwert.
+    let (s, j) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        eid,
+        json!({
+            "soll_fuehrer": 1, "soll_unterfuehrer": 1, "soll_mannschaft": 6,
+            "erwartet": {"soll_fuehrer": 1, "soll_unterfuehrer": 1, "soll_mannschaft": 4}
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(
+        einheit(&app, &admin, einsatz, eid).await["soll"]["mannschaft"],
+        6
+    );
+}

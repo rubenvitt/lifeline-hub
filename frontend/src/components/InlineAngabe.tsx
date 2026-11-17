@@ -82,8 +82,10 @@ import { vermerkKurz } from './feldVermerk';
  * Change `nvhnqynd-konflikt-und-aenderungsvermerk`, design.md D5, Spec `formularseiten`.
  * - Beim Öffnen friert die Angabe den Serverstand ein und reicht ihn als zweites Argument
  *   `{ beimOeffnen }` an `onSpeichern`: der Aufrufer schickt ihn als `erwartet` (Feld-CAS).
- * - „Unverändert“ heißt unverändert gegenüber dem Öffnen: trifft inzwischen ein fremder Wert ein
- *   und der Entwurf blieb, wird nichts gesendet (sonst schriebe er den alten Wert zurück).
+ * - Eine unberührte Eingabe sendet nichts: trifft inzwischen ein fremder Wert ein und die Person
+ *   hat nichts eingegeben, schließt „Speichern“ ohne Anfrage (sonst schriebe es den alten Wert
+ *   zurück). Hat sie eingegeben, gilt wie immer der Vergleich mit dem aktuellen Wert; so sendet
+ *   etwa die Sprechgruppen-Angabe nach einer Teilablehnung, was gegenüber dem Gespeicherten fehlt.
  * - Weicht der Live-`wert` vom eingefrorenen ab, steht im offenen Feld „Inzwischen geändert[ von
  *   X, Zeit]: <Anzeige>“ (`role="status"`); `vermerk` liefert Wer und Wann. Der Entwurf bleibt.
  *
@@ -267,6 +269,13 @@ export function InlineAngabe<T>({
   const [bearbeitet, setBearbeitet] = useState(false);
   // Der Serverstand beim Öffnen (LLH-1831): Altwert des Feld-CAS und Maß für „unverändert“.
   const [beimOeffnen, setBeimOeffnenZustand] = useState<T>(wert);
+  // Hat die Person seit dem Öffnen eingegeben? Unberührt sendet „Speichern“ nichts (LLH-1831).
+  const [angefasst, setAngefasstZustand] = useState(false);
+  const angefasstRef = useRef(false);
+  function setAngefasst(neu: boolean) {
+    angefasstRef.current = neu;
+    setAngefasstZustand(neu);
+  }
   const beimOeffnenRef = useRef<T>(wert);
   function setBeimOeffnen(neu: T) {
     beimOeffnenRef.current = neu;
@@ -314,7 +323,7 @@ export function InlineAngabe<T>({
   /** Der Grund steht hier (Text) oder an anderer Stelle (Kennung seines Elements). */
   const sperrText = typeof sperre === 'string' ? sperre : undefined;
   const sperrBeschreibung = typeof sperre === 'object' ? sperre.beschreibungId : sperrId;
-  const geaendert = darfSchreiben && bearbeitet && !gleich(entwurf, beimOeffnen);
+  const geaendert = darfSchreiben && bearbeitet && angefasst && !gleich(entwurf, wert);
   const fremdGeaendert = bearbeitet && !gleich(wert, beimOeffnen);
   const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
 
@@ -390,6 +399,7 @@ export function InlineAngabe<T>({
     popupOffenRef.current = false;
     setEntwurf(wert);
     setBeimOeffnen(wert);
+    setAngefasst(false);
     setFehler(null);
     setPflichtHinweis(false);
     setPruefungAktiv(false);
@@ -411,7 +421,7 @@ export function InlineAngabe<T>({
       schliessen();
       return;
     }
-    if (gleich(entwurf, beimOeffnenRef.current)) {
+    if (!angefasstRef.current || gleich(entwurf, wert)) {
       schliessen();
       return;
     }
@@ -486,7 +496,10 @@ export function InlineAngabe<T>({
             ...(pruefGrund ? { 'aria-invalid': true, 'aria-describedby': pruefId } : {}),
           },
           value: entwurf,
-          onChange: setEntwurf,
+          onChange: (neu) => {
+            setAngefasst(true);
+            setEntwurf(neu);
+          },
           popup: {
             onOpenChange: (offen) => {
               popupOffenRef.current = offen;

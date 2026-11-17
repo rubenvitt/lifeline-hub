@@ -357,8 +357,14 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    EINMAL in der Werkzeugzeile der Liste (`OffeneBearbeitungGrundZeile`), die gesperrten Angaben
    und Bemerkungen verweisen darauf, statt ihn unter jede Zelle jeder Zeile zu schreiben.
 4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
-   Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
-   übernehmen“ / „Verwerfen und neu laden“.
+   Konflikt über `geaendert_at` (Paneel, ganze Ansicht) oder **Feld-CAS an jeder Einzelangabe**
+   (LLH-1831, Change `nvhnqynd-konflikt-und-aenderungsvermerk`): `InlineAngabe` reicht den Wert beim
+   Öffnen als `{ beimOeffnen }` an `onSpeichern`, die Seite schickt ihn als `erwartet` und speichert
+   über `components/useFeldKonflikt`. Ein 409 fragt überall „Zwischenzeitlich geändert“ mit „Meine
+   Änderung übernehmen“ / „Verwerfen und neu laden“ und nennt, wer wann geändert hat. Ein fremder
+   Wert im offenen Feld steht dort als Hinweis, die Eingabe bleibt. Wo der Server einen
+   Änderungsvermerk liefert (`vermerke`), steht er leise an der Zeile (`VermerkZeile`) und der
+   jüngste im Paneelkopf (`PaneelVermerk`). Noch ohne Feld-CAS: die Schreibwege in LLH-1945.
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.

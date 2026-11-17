@@ -42,7 +42,9 @@ impl<'a> ExpectedValues<'a> {
         Self::default()
     }
 
-    /// Nimmt die Spalte auf, wenn ein Altwert genannt ist (`None` = kein Vergleich).
+    /// Nimmt die Spalte auf, wenn ein Altwert genannt ist (`None` = kein Vergleich). Statt einer
+    /// Spalte darf es ein fester SQL-Ausdruck aus dem Code sein (etwa ein wirksamer Wert mit
+    /// `COALESCE`), nie Text aus der Anfrage.
     pub fn push(&mut self, spalte: &'static str, wert: Option<ExpectedValue<'a>>) {
         if let Some(w) = wert {
             self.werte.push((spalte, w));

@@ -146,7 +146,9 @@ function zeichneAuf(
   let aktuell = { ...serverStand };
   let geladen = geladenerStand;
   const handler = http[methode](pfad, async ({ request }) => {
-    const body = (await request.json()) as Record<string, unknown>;
+    // Die Tests vergleichen die Änderung; den Altwert (`erwartet`, LLH-1831) prüfen eigene Tests.
+    const { erwartet: _erwartet, ...body } = (await request.json()) as Record<string, unknown>;
+    void _erwartet;
     bodies.push(body);
     aktuell = { ...aktuell, ...body };
     geladen = aktuell;
@@ -1431,3 +1433,70 @@ function BoardMitKarte() {
   const karte = params.get('nachforderung');
   return <div>Board, Karte {karte}</div>;
 }
+
+/**
+ * Feld-CAS und Änderungsvermerk an der Einheit (LLH-1831/LLH-1834, Change
+ * `nvhnqynd-konflikt-und-aenderungsvermerk`).
+ */
+describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () => {
+  function casServer(geladen: Record<string, unknown>) {
+    const anfragen: Record<string, unknown>[] = [];
+    let stand = { ...geladen };
+    const handler = http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
+      const body = (await request.json()) as Record<string, unknown>;
+      anfragen.push(body);
+      const erwartet = (body.erwartet ?? {}) as Record<string, unknown>;
+      if (Object.entries(erwartet).some(([k, v]) => (stand[k] ?? null) !== v)) {
+        return HttpResponse.json({ error: 'zwischenzeitlich geändert' }, { status: 409 });
+      }
+      const { erwartet: _e, ...rest } = body;
+      void _e;
+      stand = { ...stand, ...rest };
+      return HttpResponse.json(stand);
+    });
+    const liste = http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([stand]));
+    return {
+      anfragen,
+      handler,
+      liste,
+      fremdAendern: (teil: Record<string, unknown>) => {
+        stand = { ...stand, ...teil };
+      },
+    };
+  }
+
+  it('Bemerkung: Altwert geht mit; veraltet fragt die Seite mit Wert und Wer', async () => {
+    const cas = casServer({ ...einheiten[0], bemerkung: 'Tor 3' });
+    zeige(cas.liste, cas.handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bemerkung bearbeiten' }));
+    cas.fremdAendern({
+      bemerkung: 'Tor 5',
+      vermerke: { bemerkung: { at: '2020-01-01 13:05:00', von: 'Anna' } },
+    });
+    const feld = screen.getByRole('textbox', { name: 'Bemerkung' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Halle 2');
+    await userEvent.click(screen.getByRole('button', { name: 'Bemerkung speichern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/Bemerkung inzwischen: „Tor 5“ \(Anna, /);
+    expect(cas.anfragen[0]).toEqual({ bemerkung: 'Halle 2', erwartet: { bemerkung: 'Tor 3' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await waitFor(() => expect(cas.anfragen).toHaveLength(2));
+    expect(cas.anfragen[1]).toEqual({ bemerkung: 'Halle 2' });
+  });
+
+  it('Vermerk an der Zeile und der jüngste im Paneelkopf', async () => {
+    const cas = casServer({
+      ...einheiten[0],
+      bemerkung: 'Tor 3',
+      vermerke: {
+        bemerkung: { at: '2020-01-01 13:05:00', von: 'Anna' },
+        name: { at: '2020-01-01 09:00:00', von: 'Bert' },
+      },
+    });
+    zeige(cas.liste, cas.handler);
+    const kopf = within(await screen.findByRole('region', { name: 'Kopfdaten' }));
+    expect(await kopf.findByText(/^Zuletzt geändert von Anna, /)).toBeInTheDocument();
+    expect(kopf.getByText(/^Geändert von Bert, /)).toBeInTheDocument();
+  });
+});
