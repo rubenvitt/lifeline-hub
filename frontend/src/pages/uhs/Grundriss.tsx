@@ -20,7 +20,6 @@ import {
   InputNumber,
   Radio,
   Space,
-  Tabs,
   Tooltip,
   Typography,
   theme,
@@ -76,6 +75,7 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import {
   Augenbraue,
   Paneel,
+  Segmentleiste,
   StatusChip,
   useRollen,
   schriftGroesse,
@@ -1310,6 +1310,15 @@ function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
   );
 }
 
+type GrundrissReiter = 'flaeche' | 'warte' | 'transport';
+
+/** Die Reiter des schmalen Grundrisses; die Fläche ist der Vorgabe-Reiter (siehe unten). */
+const GRUNDRISS_REITER: readonly { wert: GrundrissReiter; label: string }[] = [
+  { wert: 'flaeche', label: 'Fläche' },
+  { wert: 'warte', label: 'Wartebereich' },
+  { wert: 'transport', label: 'Unterwegs' },
+];
+
 export default function Grundriss({
   einsatzId,
   uhs,
@@ -1473,7 +1482,8 @@ export default function Grundriss({
   const [formImZug, setFormImZug] = useState<boolean | null>(null);
   const breit = formImZug ?? dreiSpaltenPassen(rahmenBreite, flaecheBreite);
   // Der gewählte Reiter überdauert einen Formwechsel hin und zurück.
-  const [reiter, setReiter] = useState('flaeche');
+  const [reiter, setReiter] = useState<GrundrissReiter>('flaeche');
+  const reiterflaecheId = useId();
 
   function invalidate() {
     // Promise zurückgeben: React Query hält die Mutation so bis zum Ende aller Refetches `pending`,
@@ -1932,7 +1942,7 @@ export default function Grundriss({
     </div>
   );
 
-  // Eigener Scroll-Container wie `wartebereich`: im Tabs-Zweig steht der Knoten nackt im
+  // Eigener Scroll-Container wie `wartebereich`: im Reiter-Zweig steht der Knoten nackt im
   // Reiterinhalt, eine lange Liste liefe sonst über den Reiter hinaus.
   const transport = (
     <div style={{ height: '100%', minHeight: 0, overflow: 'auto' }}>
@@ -1989,9 +1999,8 @@ export default function Grundriss({
            * Bildlauf (LFH-970). Bei der Mindestfläche von 700 px sind das 1206 px Rahmen, also
            * neben Rail und Modulpanel erst rund 1500 px Fenster.
            *
-           * Genau ein Zweig im Baum — ein verborgener zweiter trüge `drop-inbox` doppelt. Getragen
-           * wird das von `destroyOnHidden`, nicht vom fehlenden `forceRender`: ohne die Prop bleibt
-           * eine einmal besuchte Pane montiert (`removeOnLeave: false`, nur `display: none`).
+           * Genau ein Zweig im Baum — ein verborgener zweiter trüge `drop-inbox` doppelt. Die
+           * Reiterfläche rendert deshalb nur den gewählten Zweig.
            *
            * Folge: der Drag von der Warteliste auf einen Platz ist hier unmöglich (verschiedene
            * Reiter). Der Weg ist der Klickweg „Patient zuweisen", der Rückweg „Zurück in den
@@ -2007,20 +2016,32 @@ export default function Grundriss({
               minHeight: 0,
             }}
           >
-            <Tabs
-              activeKey={reiter}
-              onChange={setReiter}
-              destroyOnHidden
-              style={{ height: '100%' }}
-              // Body und Pane reichen die Resthöhe weiter, sonst wächst die Fläche über den
-              // begrenzten Grundriss hinaus.
-              styles={{ body: { height: '100%' }, content: { height: '100%' } }}
-              items={[
-                { key: 'flaeche', label: 'Fläche', children: flaeche },
-                { key: 'warte', label: 'Wartebereich', children: wartebereich },
-                { key: 'transport', label: 'Unterwegs', children: transport },
-              ]}
+            {/* Fläche umschalten: Segmentleiste als Reiter (Spec `bedien-umschalten`). Nur die
+                aktive Fläche steht im Baum (siehe oben); die Reiterfläche trägt die Resthöhe
+                weiter, sonst wächst die Fläche über den begrenzten Grundriss hinaus. */}
+            <Segmentleiste<GrundrissReiter>
+              rolle="tablist"
+              beschriftung="Bereiche der Unfallhilfsstelle"
+              // Im Spaltenstapel nicht auf volle Breite strecken: die Leiste ist so breit wie ihre
+              // Segmente, wie an jeder anderen Stelle.
+              style={{ alignSelf: 'flex-start' }}
+              wert={reiter}
+              onWechsel={setReiter}
+              optionen={GRUNDRISS_REITER.map((r) => ({
+                wert: r.wert,
+                label: r.label,
+                steuert: reiterflaecheId,
+              }))}
             />
+            <div
+              role="tabpanel"
+              id={reiterflaecheId}
+              aria-label={GRUNDRISS_REITER.find((r) => r.wert === reiter)?.label}
+              data-lfh="grundriss-reiterflaeche"
+              style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+            >
+              {reiter === 'warte' ? wartebereich : reiter === 'transport' ? transport : flaeche}
+            </div>
           </div>
         )}
       </div>

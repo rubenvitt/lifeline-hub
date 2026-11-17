@@ -6,7 +6,7 @@ der Wurzel-`AGENTS.md`.
 
 ## Frontend — Gestaltungssprache Neuentwurf „Instrumententafel“ (22.09.2026)
 
-Fortschreibung von LFH-352 (dunkel, Radius 0, Archivo/JetBrains Mono, Bedienfarbe blau).
+Fortschreibung des ersten Entwurfs (LFH-352: dunkel, Radius 0, Archivo/JetBrains Mono, Bedienfarbe blau).
 **Maßgeblich:** `docs/design/2026-09-21-neuentwurf/umsetzung.md` (Entscheidungen, Palette);
 Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgeblich;
 `_ds/…/tokens/*.css` ist alt). Bei Konflikten gewinnt das Design — **außer bei der Sichtung**
@@ -77,12 +77,21 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `html, body` und `font: inherit` an `button, input, textarea, select`; kein lokales
   `font: 'inherit'` mehr nötig. Wächter `theme/schriftReset.guard.test.ts`, Beleg
   `e2e/schrift-familie.spec.ts`.
+- **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven
+  Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
+  Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
+  handschuh 4·8·16·24·44·64. In TSX nimmst du das antd-Token (`paddingXXS…XL`, `marginXXS…XL`;
+  MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. Ein festes Kompakt-Raster gibt es nicht.
+  Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
+  `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
+  `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
+  (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter.
 - **Bausteine** in `components/instrument/` (Import über `index.ts`, Dateikopf nennt die Regel):
   `Augenbraue` (`als="h2…h6"`, nur Köpfe) · `Feldetikett` · `Schrift` · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
   Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`StatusChip` (`wort` Pflicht, Übersetzung
-  nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; `SegmentUmschalter` als ein
-  Umschaltknopf daneben, LLH-1065; Wortlaut einzeilig; ein `\n` im `label` bricht ihn in zwei
+  nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; wann welche Form: Bausteinwahl, „Umschalten“;
+  `SegmentFeld` als Formularfeld; `SegmentUmschalter` als ein Umschaltknopf daneben, LLH-1065; Wortlaut einzeilig; ein `\n` im `label` bricht ihn in zwei
   Zeilen, nur wo die Höhe sie trägt und einzeilig kein Platz bliebe: „Ohne\nSchicht“ der
   Ablösung im Handschuh-Betrieb auf dem Handschirm, LLH-1128) · `Sammelbanner` ·
   `Filterhinweis` (Band über einer gefilterten Liste, Achtungsrolle, Zahlen nur aus Serverzählungen, LLH-1071) ·
@@ -115,7 +124,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
   `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion
-  ihren Wortlaut mit den Daten (früher „Auflösen (noch 2 Personen)“, seit LLH-1722 im ⋮), hält
+  ihren Wortlaut mit den Daten (früher „Auflösen (noch 2 Personen)“, jetzt im ⋮; LLH-1722), hält
   `components/BreiteHalten.tsx` die Breite der breitesten Form (LLH-1627). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
   `flaeche.seiteBreit` fällt beim Umbau.
 - **Orientierung** (LFH-954, Spec `seiten-orientierung`): den Tab-Titel setzen nur die Rahmen über
@@ -312,6 +321,72 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau, Funkplan und Fernmeldeskizze
   (`baueFuehrungsorganisation(…, { detachAbgestellte: false })`) behalten den Verband.
 
+## Frontend — Bausteinwahl (wann nehme ich was)
+
+Die erste Frage beim Bauen und beim Entwerfen: Welcher Baustein trägt den Bedarf? Eine Zeile je
+Bedarf. Die Regel dahinter steht am genannten Ort und wird hier nicht wiederholt; die Orte sind
+Abschnitte dieser Datei im Repo, die README des Design Systems trägt nur einen Teil davon. Die Karte ist der
+Ordner im Design System (`docs/design/design-system/project/components/<Karte>/`). Die README des
+Design Systems beginnt mit dieser Tabelle, und `designSystem.test.ts` hält die Spalte „Karte“ und
+die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
+
+| Bedarf                                                                                          | Baustein                                                                                                                                         | Karte                              |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| **Rahmen**                                                                                      |                                                                                                                                                  |                                    |
+| Seite mit Titel, Meta und Kopfaktionen                                                          | `EinsatzSeite` (Verwaltung: `AdminPage`), Kopf nach „Seitenkopf“                                                                                 | `Seitenkopf`                       |
+| Zusammengehöriges in einer Fläche                                                               | `Paneel`/`PaneelZeile`                                                                                                                           | `Paneel`                           |
+| Lagebild aus Zahlen, Verteilung und Listen                                                      | Dashboard-Baukasten                                                                                                                              | `Dashboard`, `DashboardListen`     |
+| Kopfaktion mit wechselndem Wortlaut                                                             | `BreiteHalten`                                                                                                                                   | `BreiteHalten`                     |
+| Übung kennzeichnen                                                                              | `UebungsBand`/`UebungsMarke` (Rahmen, „Übung“)                                                                                                   | `Uebung`                           |
+| **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
+| Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
+| Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
+| „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
+| Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
+| Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
+| Text in einer Rolle der Schriftskala                                                            | `Schrift`, `schriftStil`/`zahlStil` („Schrift: sechs Stufen, Rollen darüber“)                                                                    | `Schrift`                          |
+| Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts` („Zeitdarstellung“)                                                                                                 | `Zeitdarstellung`                  |
+| Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
+| Taktisches Zeichen                                                                              | `EinsatzZeichen`                                                                                                                                 | `TaktischeZeichen`                 |
+| Verletzungen am Körper                                                                          | `Koerperschema`                                                                                                                                  | `Koerperschema`                    |
+| Großbild (Lagemonitor)                                                                          | `GrossKennzahl`, `GrossZeile`                                                                                                                    | `GrossKennzahl`, `GrossZeile`      |
+| **Rückmeldung**                                                                                 |                                                                                                                                                  |                                    |
+| Laden, leer oder Fehler einer Seite oder eines Paneels                                          | `SeitenSkeleton`/`SeitenLeer`/`SeitenFehler`, `PaneelZustand`                                                                                    | `Zustaende`                        |
+| Hinweis zu Rechten, Warnstufe oder Lage der Fläche                                              | `RechteHinweis`, `WarnstufenHinweis`, `Alert` auf der Statusfläche                                                                               | `Hinweis`                          |
+| Mehrere gleichartige Meldungen gebündelt                                                        | `Sammelbanner`                                                                                                                                   | `Sammelbanner`                     |
+| Was gerade brennt, unter dem Seitenkopf von Überblick und Lagebild                              | `AlarmZeile` („Dashboard-Baukasten“)                                                                                                             | `AlarmZeile`                       |
+| Alarm, der eine Handlung verlangt                                                               | `AlarmZone`                                                                                                                                      | `Alarmzone`                        |
+| Eingang (Einwurf, Nachricht)                                                                    | `EingaengeKnopf`, `Eingangsband`                                                                                                                 | `Eingaenge`                        |
+| **Eingabe**                                                                                     |                                                                                                                                                  |                                    |
+| Eine Handlung auslösen                                                                          | antd `Button`, Farben aus `antdKnopf` („Farbe und Zeichen“, „Rot bedient nichts“)                                                                | `Knopf`                            |
+| Frei oder gesperrt mit Grund                                                                    | Sperrzeichen aus `index.css` („Gesperrt trägt die Sperre ohne Farbe“)                                                                            | `Gesperrt`                         |
+| Ein Feld mit Beschriftung und Fehlerzeile                                                       | antd `Input`/`Select` in `Form.Item`, ohne `Form.Item` `FeldFehler`                                                                              | `Eingabefeld`                      |
+| Zeitpunkt eingeben                                                                              | `ZeitpunktEingabe`                                                                                                                               | `Zeiteingabe`                      |
+| Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
+| Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
+| Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
+| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` („Formularseiten“)                                                                          | `Formularlayout`, `Speicherleiste` |
+| Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
+| **Umschalten** (Spec `bedien-umschalten`, LLH-1808)                                             |                                                                                                                                                  |                                    |
+| Fläche oder Bereich darunter umschalten                                                         | `Segmentleiste rolle="tablist"` mit Reiterfläche (`role="tabpanel"`, `steuert`); führt ein Reiter auf eine andere Seite, `aktivierung="manuell"` | `Segmentleiste`                    |
+| Dokumentreiter mit Anlegen und Schließen                                                        | antd `Tabs` `editable-card` (nur ETB-Entwürfe)                                                                                                   | —                                  |
+| Sicht oder Status derselben Liste, bis etwa 5 Werte                                             | `Segmentleiste`, höchstens eine je Ebene                                                                                                         | `Segmentleiste`                    |
+| Weitere Einschränkung derselben Liste                                                           | `Select` oder Suche in derselben Werkzeugzeile                                                                                                   | `Eingabefeld`                      |
+| Kurze Wahl im Formular                                                                          | `SegmentFeld` in `Form.Item`, nie `Radio.Group optionType="button"`                                                                              | `Segmentleiste`                    |
+| Wahl mit erklärenden Optionen                                                                   | senkrechte `Radio.Group`                                                                                                                         | —                                  |
+| Viele Werte oder Wahl aus Stammdaten                                                            | `Select` bzw. `StammdatenFeld`                                                                                                                   | `Eingabefeld`, `StammdatenFeld`    |
+| Zweizustand neben einer Leiste                                                                  | `SegmentUmschalter`                                                                                                                              | `Segmentleiste`                    |
+| antds `Segmented`                                                                               | nie                                                                                                                                              | —                                  |
+| **Bearbeiten** (Regeln: „UI-Form-Leitlinie“, „Bearbeiten in der Ansicht“, „Ort von Bearbeiten“) |                                                                                                                                                  |                                    |
+| Einzelwert am Ort ändern                                                                        | `InlineAngabe`, `BemerkungZelle`                                                                                                                 | `InlineAngabe`                     |
+| Zusammengehörige Werte eines Datensatzes                                                        | `BearbeitbaresPaneel` Modus `paneel`                                                                                                             | `BearbeitbaresPaneel`              |
+| Ganze Ansicht, Felder zusammen geprüft                                                          | `BearbeitbaresPaneel` Modus `ansicht`                                                                                                            | `BearbeitbaresPaneel`              |
+| Anlegen                                                                                         | `ErfassungsModal` („Erfassungs-Norm“); eigene Seite erst ab Ablauf oder > ~5 Pflichtfeldern                                                      | `Dialog`                           |
+| Serienerfassung neben einer Liste                                                               | `Schnellerfassungszeile`                                                                                                                         | —                                  |
+| Kurze blockierende Aktion, Datensatz ohne eigene Ansicht                                        | Modal (Punkt 1 von „Bearbeiten in der Ansicht“)                                                                                                  | `Dialog`                           |
+| Unumkehrbares                                                                                   | rote `Popconfirm`, aus einem Zeilenmenü ein Modal („Aktionen“)                                                                                   | `Knopf`                            |
+| Nur ansehen                                                                                     | Drawer; nie zum Anlegen oder Bearbeiten                                                                                                          | —                                  |
+
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
 **Form nach Umfang** (LFH-19, `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`)
@@ -338,7 +413,9 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
 
 1. **Ein bestehender Datensatz wird in seiner Ansicht bearbeitet**, nie in einem Formular, das die
    Ansicht ersetzt oder verdeckt. Modal und Drawer bleiben fürs **Anlegen** (Erfassungs-Norm,
-   Feldbudget) und für kurze blockierende Aktionen.
+   Feldbudget) und für kurze blockierende Aktionen. Ausnahme: ein Datensatz ohne eigene Ansicht
+   (eine Chat-Nachricht, die Metadaten eines Dokuments) darf in einem kurzen Modal mit höchstens
+   etwa drei Feldern bearbeitet werden (LLH-1808).
 2. **Drei Stufen nach Umfang:** **Einzelwert** (Status, Lagezustand, Führer, Frist) über
    `InlineAngabe`/`BemerkungZelle` am Wert, speichert sofort genau dieses Feld · **Paneel**
    (zusammengehörige Werte, „Funk“, „Personendaten“) über `components/instrument/BearbeitbaresPaneel`
@@ -458,7 +535,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 - **Gefahrenmatrix** (LLH-1090, Spec `gefahrenmatrix`): eine Zelle ohne Bewertung zeigt die
   Vorgabe „keine“ („–“), kein Zähler unbewerteter Felder; „nicht beurteilt“ steht am Gebiet
   (`beurteilt_at/von`, Knopf „Beurteilung bestätigen“ nur mit Schreibrecht, System-ETB) und
-  fortgeschrieben die Entscheidung LFH-969, dass Offenes nicht wie Entwarnung aussieht. Ein
+  fortgeschrieben die Entscheidung (LFH-969), dass Offenes nicht wie Entwarnung aussieht. Ein
   ungültiges Paar ist schraffiert (`schraffurStil`, `steuerRahmen`, ≥ 3 : 1), ohne Text.
   Verdichtet (LLH-1102): die ganze Zelle ist das Ziel (Polsterung 0, Knopf 100 %, Zeile =
   `controlHeight`, Ring nach innen). Wer Gefahrentypen listet, ordnet sie über
@@ -614,8 +691,8 @@ anwendbar), „nicht geprüft" ist keins.
   fehlt, zeigt der Leerzustand mit Knopf (`SeitenLeer` mit `aktion`); warum etwas gesperrt ist,
   steht in wenigen Wörtern sichtbar am Element, nie nur im Tooltip (Touch).
 - Kein Satz nennt Dateiformate, Server, Phasen oder Datenflüsse. Neue Seiten tragen keinen
-  Zweck-Absatz unter dem Titel; bestehende `beschreibung="…"` baut LFH-1078 schrittweise ab
-  (der Wächter erfasst sie nicht).
+  Zweck-Absatz unter dem Titel; bestehende `beschreibung="…"` werden schrittweise abgebaut
+  (LFH-1078; der Wächter erfasst sie nicht).
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
   Modulbeschreibungen aus wenigen Fachwörtern.
@@ -624,7 +701,7 @@ anwendbar), „nicht geprüft" ist keins.
   es dort ins Kapitel. Regeln: `docs/anwender/AGENTS.md`.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
-  `OFFEN` ist seit LFH-1078 P7 leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+  `OFFEN` ist leer (seit LFH-1078 P7); neue Einträge gibt es nicht, ein Treffer wird umgebaut.
 
 **Tabelle und Dichte**
 
@@ -657,7 +734,7 @@ anwendbar), „nicht geprüft" ist keins.
   Sicht). Ein Filter mit `ohneKartenfeld` hat im Kartenzweig kein Auswahlfeld (Betroffene, Status
   der Tiere: die Seite führt die Achse schon, die erste Karte bleibt im ersten Bild), wirkt aber
   und steht als Chip da. Vorbild Schäden, dazu Fahrzeuge, Personal, Material, Sprechgruppen,
-  Betroffene, Tiere, Evakuierung; Rollout LLH-1096. Gerätestartseiten bleiben ohne Kopffilter
+  Betroffene, Tiere, Evakuierung (Rollout LLH-1096). Gerätestartseiten bleiben ohne Kopffilter
   (Kommentar an der Seite).
   In einer `KatalogTabelle` (Unfallhilfsstellen, Bereitstellungsräume) trägt jede Spalte `key` und
   `sorter`, eine Werteliste `filters`/`onFilter`; das Gedächtnis prüft gegen ein Register auf
@@ -986,7 +1063,7 @@ anwendbar), „nicht geprüft" ist keins.
   sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
   `.format('…')` und kein `formatiere(…, '…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/`
   (Maschinenformate ab `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`,
-  Schuldmenge `OFFEN` seit LLH-1061 leer. Titelvorschlag und Startinhalt eines Lagevortrags werden
+  Schuldmenge `OFFEN` leer (seit LLH-1061). Titelvorschlag und Startinhalt eines Lagevortrags werden
   gespeichert und nehmen `konventionenOhneGeraet` (Einsatz vor Organisation, ohne Gerätewahl, wie
   Druck und Servertexte; LLH-1437); ein Eingabefeld zeigt seinen Wert taktisch. Nebenformen im Kern:
   `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26` bzw. `10.10.26`), `uhrzeitOhneDatum`
@@ -1060,11 +1137,11 @@ anwendbar), „nicht geprüft" ist keins.
   `theme/rahmenKontrast.test.ts` und wird dort gerechnet (der Test sieht keine Verwendung, nur
   die Liste). Gilt für jede weitere dauerdunkle Fläche.
 - **Ein `<Space>` in `aktionen` nennt seinen Abstand** (LLH-1273): ohne `size` stehen die Knöpfe
-  3 / 5 / 7 px auseinander, auch im Seitenkopf, dessen Hülle selbst `marginSM` hält. Vorgabe
-  `size={token.marginSM}` (7 / 11 / 16); Wächter `components/aktionenSpace.guard.test.ts`.
+  4 / 4 / 8 px auseinander, auch im Seitenkopf, dessen Hülle selbst `marginSM` hält. Vorgabe
+  `size={token.marginSM}` (8 / 12 / 16); Wächter `components/aktionenSpace.guard.test.ts`.
 - **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
   `size="middle"` (`aktionsabstand.guard.test.ts`). Dialogfüße halten dieselbe Stufe (LFH-653,
-  11/18/26 px, Leitlinie ≥ 8 / ≥ 16): der Fuß der Erfassungs-Hülle über `size="middle"`, antds
+  12/20/24 px, Leitlinie ≥ 8 / ≥ 16): der Fuß der Erfassungs-Hülle über `size="middle"`, antds
   eigene Füße (Modal, `modal.confirm`, `Popconfirm`) über eine Regel in `index.css` mit
   `var(--ant-padding)`. **Kein Komponenten-Token `marginXS`:** jeder antd-Knopf setzt die Variable
   mit seiner `css-var-…`-Klasse zurück, die Überschreibung kommt am Knopf nie an (gemessen 7 px).

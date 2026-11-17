@@ -39,6 +39,7 @@ import Druckkopf from '../../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../../components/druck/useDruckNebenwege';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import './gefahrenPrint.css';
+import { flaeche } from '../../theme/tokens';
 
 /**
  * Trefflächenboden der Gebietszeile. Sie ist ein handgebautes Bedienziel (`ListenEintrag` legt
@@ -163,7 +164,7 @@ export default function GefahrenPage() {
 
   if (einsatzQuery.isLoading)
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );
@@ -197,7 +198,7 @@ export default function GefahrenPage() {
 
   if (gebieteQuery.isLoading)
     return seite(
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>,
     );
@@ -326,7 +327,7 @@ export default function GefahrenPage() {
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
-                // `marginSM` (7/11/16): zwei Bedienziele halten den Zielabstand der Stufe.
+                // `marginSM` (8/12/16): zwei Bedienziele halten den Zielabstand der Stufe.
                 gap: token.marginSM,
               }}
             >

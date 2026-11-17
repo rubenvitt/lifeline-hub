@@ -76,6 +76,7 @@ import { useUploadFortschritt } from '../components/useUploadFortschritt';
 import { anzahl } from '../anzeige/anzahl';
 import { modulName } from '../einsatz/modulRegistry';
 import { parseRouteId } from '../routing/deeplinks';
+import { flaeche } from '../theme/tokens';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -417,7 +418,7 @@ export default function ChatPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

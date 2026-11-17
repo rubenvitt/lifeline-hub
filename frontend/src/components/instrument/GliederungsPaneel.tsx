@@ -87,7 +87,12 @@ export default function GliederungsPaneel({
               />
               <span
                 className={GLIEDERUNG_KLASSE.kopf}
-                style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
+                style={{
+                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: token.marginXS,
+                }}
               >
                 {z.kopf}
               </span>
@@ -97,7 +102,7 @@ export default function GliederungsPaneel({
                   minWidth: 0,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 7,
+                  gap: token.marginSM,
                   fontSize: schriftGroesse('klein'),
                   lineHeight: 1.45,
                   color: rollen.gedaempft,
