@@ -570,7 +570,7 @@ describe('Gerätehülle — Kopfzeile', () => {
     const kopf = screen.getByRole('banner');
     await waitFor(() =>
       expect(kopf.querySelector('[data-lfh="kopf-datenstand"]')?.textContent).toBe(
-        `Stand ${formatiereDatenstand(JETZT)}`,
+        `Stand ${formatiereDatenstand(JETZT)} · offline`,
       ),
     );
     expect(kopf.querySelector('[data-lfh="kopf-sync"]')?.getAttribute('data-zustand')).toBe(
