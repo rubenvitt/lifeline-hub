@@ -28,7 +28,7 @@ Jede Aufgabe per `superpowers:test-driven-development`: erst den roten Test, dan
 
 ## 5. Gesamtprüfung
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün; das Ergebnis kommt in den PR unter „Geprüft“.
+- [x] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün; das Ergebnis kommt in den PR unter „Geprüft“. (Gelaufen 17.11. in Portionen wegen des Plattenkontingents der Cloud-Sitzung: Schnellprüfungen, Frontend-Suite, Rust-Bibliothek, alle Integrationstests, übrige Mitglieder und Dev-Seed grün; die Desktop-Hülle baut im Container nicht, es fehlt GTK (`gdk-sys`), sie ist vom Diff unberührt.)
 
 ## Workflow follow-up
 

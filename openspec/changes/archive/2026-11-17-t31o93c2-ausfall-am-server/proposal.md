@@ -36,8 +36,8 @@ Keine.
 
 - `lagemonitor`: Die Anforderung „Alarmzeile ohne Personenbezug“ schließt die Art „Ausfall“ nicht
   mehr aus. Der Monitor nennt dieselben Einheiten wie Überblick und Lagebild.
-- `lage-alarmzeile`: Die Anforderung „Quellen in der Alarmrolle“ legt fest, in welcher Folge die
-  Einheiten mit Ausfall genannt werden.
+- `lage-alarmzeile`: Eine neue Anforderung legt fest, in welcher Folge die Einheiten mit Ausfall
+  genannt werden (Folge der Einheitenliste).
 - `lage-verdichtung`: Die Anforderung „Gemeinsames Fixture für Regeln beider Sprachen“ deckt
   zusätzlich den Ausfall je Einheit ab.
 
