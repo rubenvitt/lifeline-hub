@@ -21,17 +21,25 @@ import { KENNZAHL_PLAETZE, warnstufeTon, type Quellzustand } from './lagebild';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { VERLAUF_STUNDEN, type Verlauf } from './verlauf';
 
-/** So viele Gefahrentypen passen bei 1920 × 1080 unter das Band; der Rest steht als „+ n weitere“. */
-export const GEFAHREN_HOECHSTENS = 5;
 /**
- * So viele Stunden des Verlaufs, jüngste zuerst. Fünf Zeilen samt „Spitze …“ ragten bei 16:9 um
- * rund 16 px über die untere Reihe (Review vor dem PR).
+ * So viele Gefahrentypen passen bei 1920 × 1080 unter Alarmzeile und Band, samt „+ n weitere“ und
+ * zwei Zeilen Hinweis; der Rest steht als „+ n weitere“. Fünf schnitten seit der Alarmzeile den
+ * Hinweis unten ab (LLH-1931, design.md D3 der Change `t14j0wpt-alarmzeile-grossbild`).
  */
-const VERLAUF_ZEILEN = 4;
+export const GEFAHREN_HOECHSTENS = 4;
+/**
+ * So viele Stunden des Verlaufs, jüngste zuerst. Vier Zeilen samt „Spitze …“ ragen seit der
+ * Alarmzeile bei 16:9 um rund 30 px über die untere Reihe (LLH-1931, D3).
+ */
+export const VERLAUF_ZEILEN = 3;
 /** Zeilen eines Hinweissatzes; Gebietsnamen dürfen 200 Zeichen lang sein. */
 const SATZ_HOECHSTENS_ZEILEN = 2;
-/** Ab so vielen Sichtungszeilen zwei Spaltenpaare, damit nichts unten abreißt. */
-const SICHTUNG_EINSPALTIG_HOECHSTENS = 5;
+/**
+ * Ab mehr Sichtungszeilen zwei Spaltenpaare, damit nichts unten abreißt. Seit der Alarmzeile
+ * passen fünf (SK I–IV und „ohne Sichtung“) nicht mehr untereinander (LLH-1931, D3, mit Ruben am
+ * 17.11.2026).
+ */
+const SICHTUNG_EINSPALTIG_HOECHSTENS = 4;
 /** Längere Werte (Stärke „0/12/58//70“) stehen in der kleinen Zahl, sonst sprengen sie die Spalte. */
 const LANG_AB_ZEICHEN = 7;
 

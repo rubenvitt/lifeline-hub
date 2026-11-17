@@ -84,6 +84,15 @@ Blöcke passen, zeigt `findOverflow` im e2e bei beiden Fenstern. Reicht der Plat
 zuerst `VERLAUF_ZEILEN` und `GEFAHREN_HOECHSTENS` um eins, weil „+ n weitere“ den Rest schon ehrlich
 nennt. Die Schrift wird nicht kleiner. Weicht das vom abgestimmten Weg ab, lege ich es vorher vor.
 
+**Gemessen beim Bauen (17.11.2026):** Gefahren zeigen jetzt 4 statt 5 Typen, denn mit sieben
+Typen und einem langen, unbeurteilten Gebiet schnitt der Hinweis unten ab. Der Verlauf zeigt 3
+statt 4 Stunden; gerechnet aus der Zeilenhöhe der Sichtung waren es rund 30 px zu viel. Dazu
+schnitt die Sichtung bei den üblichen fünf Zeilen (SK I–IV, „ohne Sichtung“) unten ab, 486 > 414 px
+bei 1080. Ruben hat am 17.11.2026 entschieden, dass sie schon ab fünf Zeilen in zwei Spaltenpaaren
+steht (`SICHTUNG_EINSPALTIG_HOECHSTENS` 4 statt 5). Verworfen ist die Alarmzeile im Kopf der
+Fläche: Sie kostet keine Höhe, aber bei 720p passen dort nur etwa zwei Einträge, und die Hülle
+bräuchte einen neuen Platz dafür.
+
 ### D4 Keine Alarmzeile im Großbild der Lagebesprechung
 
 Das Großbild zeigt, was seine Seite zeigt („Dieselben Zahlen wie die Seite“), und die Seite

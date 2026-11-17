@@ -163,7 +163,6 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
       'Dhoch',
       'Cmittel',
       'Aniedrig',
-      'Eniedrig',
     ]);
     expect(block).toHaveTextContent(`+ ${viele.length - GEFAHREN_HOECHSTENS} weitere`);
     expect(block).toHaveTextContent('3 Gebiete unbestätigt');
@@ -182,6 +181,17 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
       .getAllByRole('listitem')
       .map((z) => z.textContent);
     expect(zeilen).toEqual(['SK I4', 'SK II11', 'SK III63', 'SK IV0', 'ohne Sichtung2']);
+  });
+
+  it('stellt die üblichen fünf Sichtungszeilen in zwei Spaltenpaare, vier in eins (LLH-1931, D3)', () => {
+    const liste = () => screen.getByRole('list', { name: 'Sichtung je Kategorie' });
+    const { unmount } = renderGrossbild();
+    expect(liste().style.gridTemplateColumns).toMatch(/^repeat\(2,/);
+    unmount();
+    renderGrossbild({
+      sichtung: { zustand: 'daten', zeilen: SICHTUNG, erfasst: 78, ohneSichtung: 0 },
+    });
+    expect(liste().style.gridTemplateColumns).toMatch(/^repeat\(1,/);
   });
 
   it('zeigt in der Reihe „Sanitätsdienst“ den Verlauf statt der Gefahren', () => {
@@ -209,8 +219,9 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
       within(block)
         .getAllByRole('listitem')
         .map((z) => z.textContent),
-      // Vier Stunden, jüngste zuerst: fünf ragten samt „Spitze“ über die Höhe (Review vor dem PR).
-    ).toEqual(['14 Uhr · laufend2', '13 Uhr3', '12 Uhr1', '11 Uhr4']);
+      // Drei Stunden, jüngste zuerst: seit der Alarmzeile ragten vier samt „Spitze“ über die Höhe
+      // (LLH-1931, design.md D3).
+    ).toEqual(['14 Uhr · laufend2', '13 Uhr3', '12 Uhr1']);
     expect(block).toHaveTextContent('Spitze 13 Uhr · 3');
   });
 

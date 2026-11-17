@@ -26,7 +26,7 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 
 ## 3. Ende zu Ende
 
-- [ ] 3.1 `e2e/grossbild.spec.ts` (Lagebild, beide Fenster): Die Alarmzeile des Großbilds zeigt
+- [x] 3.1 `e2e/grossbild.spec.ts` (Lagebild, beide Fenster): Die Alarmzeile des Großbilds zeigt
   „1 vermisst“ und „1 Auftrag überfällig“ in Alarmrolle, die kleinste Schrift bleibt bei mindestens
   28 px · Anteil, und `findOverflow` ist leer. Lagebesprechung: Das Großbild enthält keine
   `[data-lfh="alarm-zeile"]`. Den Kopfkommentar der Spec nachziehen. Läuft der Platz nicht aus,
