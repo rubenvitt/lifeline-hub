@@ -27,8 +27,10 @@ Einsatzliste (`/einsaetze`) ändern.
 ### D1 — Modul-Hinweis über die Index-Route
 
 `routing/deeplinks.ts` bekommt `einsatzPfad(id, { modul?: ModulKey })` →
-`/einsaetze/<id>?modul=<key>` und `parseModulHinweis(search)` (nur bekannte Schlüssel, sonst
-`undefined`). Der Wechsler bestimmt das aktuelle Modul mit `modulAusPfad(pathname)` und hängt es
+`/einsaetze/<id>?modul=<key>` und `parseModulHinweis(search)` (nur die Form eines Schlüssels,
+sonst `undefined`; ob er in der Registry steht, prüft `DefaultModulRedirect`, weil
+`deeplinks.ts` die Registry samt Icon-CSS nicht laden darf: die e2e-Specs importieren die
+Pfad-Builder in Playwright). Der Wechsler bestimmt das aktuelle Modul mit `modulAusPfad(pathname)` und hängt es
 an; die Palette ebenso aus ihrem Kontextpfad, auch für Strg+↵.
 
 `DefaultModulRedirect` liest den Hinweis. Mit Hinweis wartet die Weiche zusätzlich auf
