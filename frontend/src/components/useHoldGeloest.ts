@@ -32,7 +32,7 @@ const NO_GELOEST: ReadonlyMap<number, never> = new Map<number, never>();
 
 /**
  * Die gelöste Zeile hält ihre Stelle (LLH-1254, Spec `material-am-ort`, „Gelöste Zeile hält ihre Stelle“;
- * geteilt seit LLH-1722, Spec `bedien-muster`, „Eine gelöste Zeile hält ihre Stelle“):
+ * geteilt seit LLH-1722, Spec `bedien-muster`, „Gelöste Zeile hält ihre Stelle“):
  * sonst rückt der Lösen-Auslöser der nächsten Zeile unter Finger oder Zeiger, und ein schneller zweiter
  * Tipp löst den falschen Datensatz. Alle Platzhalter fallen ZUSAMMEN, sobald kein Maus- oder
  * Stiftzeiger über dem Baustein steht, kein Fokus darin liegt und {@link HOLD_MS} seit dem letzten

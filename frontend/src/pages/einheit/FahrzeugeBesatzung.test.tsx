@@ -555,7 +555,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
 
 /**
  * Rückweg und gehaltene Zeile (LLH-1722, Spec `einheit-ansicht`, „Lösen in der Einheit
- * zurücknehmen“; `bedien-muster`, „Eine gelöste Zeile hält ihre Stelle“): die Zeile des gelösten
+ * zurücknehmen“; `bedien-muster`, „Gelöste Zeile hält ihre Stelle“): die Zeile des gelösten
  * Fahrzeugs bleibt als „Gelöst · Rückgängig“ stehen, die Besatzung gedämpft darunter; der
  * nächste Tipp an derselben Stelle trifft die träge Marke, nicht das nächste Fahrzeug.
  */

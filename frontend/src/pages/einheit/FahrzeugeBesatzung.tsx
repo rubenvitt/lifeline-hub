@@ -392,7 +392,7 @@ export default function FahrzeugeBesatzung({
   });
 
   // Die Fahrzeuge der Einheit, wie die Quelle sie zeigt; die gelösten hält `useHoldGeloest` an
-  // ihrer Stelle (LLH-1722, Spec `bedien-muster`, „Eine gelöste Zeile hält ihre Stelle“).
+  // ihrer Stelle (LLH-1722, Spec `bedien-muster`, „Gelöste Zeile hält ihre Stelle“).
   const fahrzeugEintraege: FahrzeugEintrag[] = mittel
     ? mittel.fahrzeuge.map((f) => ({
         id: f.fahrzeug.id,

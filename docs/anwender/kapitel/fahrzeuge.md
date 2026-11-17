@@ -139,7 +139,11 @@ Für Einsatzleitung und Führungspersonal:
    ![Aufgeklappte Besatzung des RTW 83-1 mit „Soll erfüllt“, drei Personen, davon eine mit der Marke „andere Einheit“, und dem Auswahlfeld „Kraft zur Besatzung …“](../bilder/fahrzeuge/besatzung.png)
 
 3. Je Person stehen Position und Funktion. Mit „Vom Fahrzeug lösen“ eine Person wieder von der
-   Besatzung lösen; eine Rückfrage gibt es nicht, sie bleibt als Personal im Einsatz.
+   Besatzung lösen; eine Rückfrage gibt es nicht, sie bleibt als Personal im Einsatz. Ihre Zeile
+   bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Block verlassen haben, damit kein
+   anderer Knopf unter den Finger rückt. „Rückgängig“ an der Stelle ihrer Funktion oder im Hinweis
+   oben setzt sie zurück auf das Fahrzeug. Sitzt sie inzwischen auf einem anderen, bleibt sie dort,
+   und der Grund steht an der Zeile.
 
 ### Personal der Einheit als Besatzung übernehmen
 
@@ -177,9 +181,11 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    das Ergebnis, etwa „Danach hier 20, Staffel A 30“.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
-4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen. Er bleibt ohne Ort im Einsatz. Die Zeile
+4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen; bei einem Verbrauchsgut mit Rest steht es
+   neben „Ausgeben“ im Menü „⋮“ der Zeile. Er bleibt ohne Ort im Einsatz. Die Zeile
    bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein
-   anderer Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den Posten zurück.
+   anderer Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den
+   Posten zurück, außer er liegt inzwischen an einem anderen Ort.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
 

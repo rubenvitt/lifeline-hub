@@ -799,14 +799,21 @@ anwendbar), „nicht geprüft" ist keins.
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
   Rückweg. Die übrigen Teile der Zeile bleiben unsichtbar an ihrem Platz, damit eine umgebrochene
   Zeile ihre Höhe hält. Eine Person, die im Einheit-Detail über ihr ⋮ aus der Einheit gelöst wird,
-  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). **Bekannte Lücke:** Personal-Entlassen und Material „Aus dem Einsatz nehmen“ machen beim
+  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Hat eine Zeile keinen
+  Regler (UHS-Kräfte, Besatzungsblock der Fahrzeugliste), steht „Rückgängig“ an der Stelle ihrer
+  Funktion bzw. Angabe (LLH-1924,
+  `openspec/changes/bq8dvx19-loesen-nachziehen/design.md` D4).
+
+  Jedes Rückgängig einer gelösten Zuordnung schickt `?nur_wenn_frei=1` (Einheit, Material am Ort,
+  Besatzung, UHS-Kraft): steht der Datensatz inzwischen woanders, lehnt der Server mit 409 ab und
+  nennt den Ort, statt ihn dort still wegzunehmen; das bewusste Zuordnen schickt den Schalter
+  nicht (D1). „Austragen“ am Bereitstellungsraum und an der UHS (auch „zurückweisen“ im
+  Grundriss) nimmt der Rückweg über `…/{belegung_id}/zuruecknehmen` zurück: ein Eintritt mit
+  `ruecknahme_von`, den „seit“, längste Wartezeit und „wartet seit“ übergehen; nur solange der
+  Austritt der jüngste Schritt ist und höchstens zehn Minuten zurückliegt, nie nach dem Ausrücken
+  (D2/D3). **Bekannte Lücke:** Personal-Entlassen und Material „Aus dem Einsatz nehmen“ machen beim
   Rückgängig nur die Kraft wieder aktiv, ohne ihre Bindungen; bis zu ihren Folgeaufgaben (LLH-1922, LLH-1923) bleibt das
   so, ohne Rückfrage. Das Fahrzeug nimmt vollständig zurück (`…/entlassen/zuruecknehmen`).
-  Ebenso noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
-  Person; und das Rückgängig von Material am Ort, Besatzung und UHS-Kraft prüft noch nicht, ob der
-  Datensatz inzwischen anders gebunden ist. „Abziehen“ an der UHS und „Vom Fahrzeug lösen“ in
-  der Fahrzeugliste halten die gelöste Zeile noch nicht, und Material am Ort zeigt „Lösen“ noch
-  als Knopf neben „Ausgeben“ (alles LLH-1924).
 
 - **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
   `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,

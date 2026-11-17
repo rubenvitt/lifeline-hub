@@ -103,7 +103,9 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
 
 1. „Raum“ öffnen.
 2. Bei einer Kraft, die ohne Abruf geht oder irrtümlich gebucht ist, das Aktionsmenü öffnen und
-   „Austragen“ wählen. Sie steht danach wieder unter „Kräfte ohne BR“.
+   „Austragen“ wählen. Sie steht danach wieder unter „Kräfte ohne BR“. „Rückgängig“ im Hinweis
+   holt sie mit ihrer bisherigen Wartezeit zurück, solange sie nicht weiter gebucht ist und
+   höchstens zehn Minuten vergangen sind.
 
 ### Verlauf lesen
 
