@@ -1021,20 +1021,30 @@ export default function KatalogTabelle<T extends object>({
             ('filterDropdown' in gebaut && gebaut.filterDropdown != null),
         });
         const withMinWidth = mitKopfMindestBreite(gebaut, mindest) as KatalogSpalte<T>;
-        if (withMinWidth.width != null || withMinWidth.mindestBreite != null) return withMinWidth;
-        // Ohne Breite trägt der Körper seine `max-content`-Breite; die Mindestbreite des Kopfs
-        // steht dann als `min-width` an Kopf- und Körperzelle, sonst würde der feste Kopf gekürzt.
+        if (withMinWidth.width != null) return withMinWidth;
+        // Ohne Zahlbreite trägt der Körper seine `max-content`-Breite, eine Fließspalte den Rest
+        // der Tabellenbreite (`fliessBreite`). Beides kann unter die Mindestbreite fallen: im
+        // Auto-Layout nimmt eine Nachbarspalte, deren Inhalt in `komfortabel`/`handschuh` breiter
+        // ist als ihre Zahl, den Platz der Fließspalte (gemessen 156 statt 180 px am Funkrufnamen,
+        // der Kopf brach im Wort). Die Mindestbreite steht deshalb als `min-width` an Kopf- und
+        // Körperzelle; ein größeres eigenes `minWidth` des Aufrufers bleibt.
+        const minWidth = withMinWidth.mindestBreite ?? mindest;
+        const withMin = (style: CSSProperties | undefined): CSSProperties => ({
+          ...style,
+          minWidth:
+            typeof style?.minWidth === 'number' ? Math.max(style.minWidth, minWidth) : minWidth,
+        });
         const callerOnCell = withMinWidth.onCell;
         const callerOnHeaderCell = withMinWidth.onHeaderCell;
         return {
           ...withMinWidth,
           onCell: (zeile: T, i?: number) => {
             const base = callerOnCell?.(zeile, i) ?? {};
-            return { ...base, style: { ...base.style, minWidth: mindest } };
+            return { ...base, style: withMin(base.style) };
           },
           onHeaderCell: (spalte: Parameters<NonNullable<typeof callerOnHeaderCell>>[0]) => {
             const base = callerOnHeaderCell?.(spalte) ?? {};
-            return { ...base, style: { ...base.style, minWidth: mindest } };
+            return { ...base, style: withMin(base.style) };
           },
         } as KatalogSpalte<T>;
       }

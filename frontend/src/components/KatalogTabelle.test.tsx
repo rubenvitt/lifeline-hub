@@ -170,6 +170,30 @@ describe('KatalogTabelle', () => {
     expect(parseFloat(zelle.style.minWidth)).toBeGreaterThan(60);
   });
 
+  it('eine Fließspalte hält ihr Mindestmaß an Kopf- und Körperzelle, auch wenn Nachbarn wachsen (LLH-1788)', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          {
+            title: 'Funkrufname',
+            dataIndex: 'funkrufname',
+            key: 'funkrufname',
+            mindestBreite: 180,
+            onCell: () => ({ style: { minWidth: 40 } }),
+          },
+          { title: 'Typ', dataIndex: 'typ', key: 'typ', width: 100 },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
+    );
+    const zelle = container.querySelector<HTMLElement>('.ant-table-tbody tr.ant-table-row td')!;
+    expect(zelle.style.minWidth).toBe('180px');
+    const kopf = container.querySelector<HTMLElement>('thead th')!;
+    expect(kopf.style.minWidth).toBe('180px');
+  });
+
   /**
    * Druck (LFH-71): mit `sticky` legt rc-table den Kopf in eine EIGENE Tabelle, der Körper hat
    * dann kein `thead`, und die Kopfwiederholung greift nicht. Bei `beforeprint` rendert das
