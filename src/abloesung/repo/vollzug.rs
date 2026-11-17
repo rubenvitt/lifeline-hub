@@ -460,6 +460,7 @@ async fn abloeser_ausruecken_tx(
                     client_id: None,
                     zeitpunkt_at: None,
                     von_br_id: None,
+                    ruecknahme_von: None,
                 },
                 benutzer_id,
             )
@@ -578,6 +579,7 @@ async fn verbleib_eintritt_tx(
             client_id: None,
             zeitpunkt_at: None,
             von_br_id: None,
+            ruecknahme_von: None,
         },
         benutzer_id,
     )

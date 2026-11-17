@@ -668,14 +668,32 @@ describe('MaterialPage', () => {
 
   /**
    * Aus dem Einsatz nehmen ist umkehrbar (LLH-1079 Teil II, Wortlaut LLH-1093): ein Klick ohne
-   * Rückfrage, danach ein Rückgängig-Toast, der dieselbe Position erneut disponiert.
+   * Rückfrage, danach ein Rückgängig-Toast. Seit LLH-1923 nimmt Rückgängig die Herausnahme mit
+   * dem Vorzustand aus der Antwort zurück (`…/entlassen/zuruecknehmen`), samt Ort, statt neu zu
+   * disponieren.
    */
-  it('Aus dem Einsatz nehmen fragt nicht nach und bietet Rückgängig an', async () => {
+  const VORZUSTAND = {
+    entlassen_at: '2026-11-17 10:00:00',
+    einheit_id: 3,
+    einsatz_fahrzeug_id: null,
+    uhs_id: null,
+    br_id: null,
+  };
+  const herausnehmenAntwort = () =>
+    HttpResponse.json({ material: { ...em, beendet_als: 'entlassen' }, vorzustand: VORZUSTAND });
+
+  it('Aus dem Einsatz nehmen fragt nicht nach, Rückgängig nimmt mit dem Vorzustand zurück (LLH-1923)', async () => {
     const aufrufe: string[] = [];
+    let body: unknown = null;
     server.use(
       http.post('/api/einsaetze/1/material/10/entlassen', () => {
         aufrufe.push('entlassen');
-        return HttpResponse.json({ ...em, beendet_als: 'entlassen' });
+        return herausnehmenAntwort();
+      }),
+      http.post('/api/einsaetze/1/material/10/entlassen/zuruecknehmen', async ({ request }) => {
+        aufrufe.push('zuruecknehmen');
+        body = await request.json();
+        return HttpResponse.json({ material: em, ausgelassen: [] });
       }),
       http.post('/api/einsaetze/1/material/10/reaktivieren', () => {
         aufrufe.push('reaktivieren');
@@ -690,17 +708,18 @@ describe('MaterialPage', () => {
     expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
     expect(await screen.findByText('Wolldecke aus dem Einsatz genommen')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'reaktivieren']));
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'zuruecknehmen']));
+    expect(body).toEqual(VORZUSTAND);
   });
 
-  /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
-  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
+  it('nennt im Seitenhinweis den Ort, den die Rücknahme ausgelassen hat (LLH-1923)', async () => {
     server.use(
-      http.post('/api/einsaetze/1/material/10/entlassen', () =>
-        HttpResponse.json({ ...em, beendet_als: 'entlassen' }),
-      ),
-      http.post('/api/einsaetze/1/material/10/reaktivieren', () =>
-        HttpResponse.json({ error: 'Material ist außer Dienst' }, { status: 422 }),
+      http.post('/api/einsaetze/1/material/10/entlassen', () => herausnehmenAntwort()),
+      http.post('/api/einsaetze/1/material/10/entlassen/zuruecknehmen', () =>
+        HttpResponse.json({
+          material: em,
+          ausgelassen: [{ bezeichnung: 'Einheit «Staffel A»', grund: 'inzwischen aufgelöst' }],
+        }),
       ),
     );
     const { container } = render(einsatzAktiv, [em]);
@@ -708,9 +727,32 @@ describe('MaterialPage', () => {
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     await nimmHeraus(zeile, 'Wolldecke');
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    const hinweis = await screen.findByText('Material ist außer Dienst');
+    const hinweis = await screen.findByText(
+      'Wolldecke zurück, ohne: Einheit «Staffel A» (inzwischen aufgelöst)',
+    );
+    expect(hinweis.closest('.ant-alert')).not.toBeNull();
+  });
+
+  /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
+  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/material/10/entlassen', () => herausnehmenAntwort()),
+      http.post('/api/einsaetze/1/material/10/entlassen/zuruecknehmen', () =>
+        HttpResponse.json(
+          { error: 'Die Herausnahme lässt sich nicht mehr zurücknehmen' },
+          { status: 409 },
+        ),
+      ),
+    );
+    const { container } = render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    await nimmHeraus(zeile, 'Wolldecke');
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    const hinweis = await screen.findByText('Die Herausnahme lässt sich nicht mehr zurücknehmen');
     expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
     expect(hinweis.closest('.ant-alert')).not.toBeNull();
+    expect(screen.getByText('Nicht zurückgenommen')).toBeInTheDocument();
   });
 
   /** Stornieren: Zeilenmenü, `<Modal>` mit einem Satz zur Folge; die Ablehnung an der Zeile. */
@@ -1828,7 +1870,10 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
             ),
           ),
         );
-        return HttpResponse.json({ ...doppel[1], beendet_als: 'entlassen' });
+        return HttpResponse.json({
+          material: { ...doppel[1], beendet_als: 'entlassen' },
+          vorzustand: { entlassen_at: '2026-11-17 10:00:00' },
+        });
       }),
     );
     const { container } = render(einsatzAktiv, [...doppel, decke] as never);

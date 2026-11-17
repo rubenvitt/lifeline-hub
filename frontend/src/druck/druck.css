@@ -79,8 +79,11 @@
 
   /* Vorfahren der Wurzel: Flex-Layout, `min-height: 100vh`, Polsterung und Bildlaufcontainer
      fallen weg, sonst begänne der Druck nicht oben und `overflow: hidden` schnitte ihn ab.
-     Papier ist hell, auch im Nachtbetrieb. */
+     Papier ist hell, auch im Nachtbetrieb: das helle Farbschema am Dokument, sonst malt Chromium
+     mit „Hintergrundgrafiken“ den Seitenrand in der dunklen Canvas-Farbe (LLH-1840). `!important`,
+     weil `index.html` und ThemeModeProvider `color-scheme` inline an `<html>` setzen. */
   :has([data-lfh='druckwurzel']) {
+    color-scheme: light !important;
     position: static !important;
     display: block !important;
     margin: 0 !important;

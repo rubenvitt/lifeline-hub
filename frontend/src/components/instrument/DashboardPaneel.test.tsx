@@ -73,6 +73,45 @@ describe('DashboardPaneel', () => {
   });
 });
 
+describe('DashboardPaneel · Kopf-Aktion (LLH-1815)', () => {
+  function mitKopfAktion(zustand: DashboardZustand, sprung = true) {
+    const onAktion = vi.fn();
+    renderMitProviders(
+      <DashboardPaneel
+        titel="Einsatz starten"
+        zustand={zustand}
+        sprung={sprung ? { label: 'Einsatzdaten', onKlick: vi.fn() } : undefined}
+        kopfAktion={{ label: 'Ausblenden', onKlick: onAktion }}
+        leerText="leer"
+        gesperrtText="gesperrt"
+        onNeuladen={vi.fn()}
+      >
+        <p>Inhalt</p>
+      </DashboardPaneel>,
+    );
+    return onAktion;
+  }
+
+  it('steht als Knopf ohne „↗“ im Kopf, hinter dem Sprung, und handelt', async () => {
+    const onAktion = mitKopfAktion('daten');
+    const kopf = screen.getByRole('region', { name: 'Einsatz starten' });
+    const aktion = screen.getByRole('button', { name: 'Ausblenden' });
+    expect(aktion).toHaveTextContent(/^Ausblenden$/);
+    expect(aktion.closest('[data-lfh="paneel-kopf-rechts"]')).not.toBeNull();
+    const sprung = screen.getByRole('button', { name: 'Einsatzdaten' });
+    expect(sprung.compareDocumentPosition(aktion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(kopf).toContainElement(aktion);
+    await userEvent.click(aktion);
+    expect(onAktion).toHaveBeenCalledOnce();
+  });
+
+  it('bleibt in jedem Zustand stehen, auch ohne Sprung und gesperrt', () => {
+    mitKopfAktion('gesperrt', false);
+    expect(screen.getByRole('button', { name: 'Ausblenden' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Einsatzdaten' })).toBeNull();
+  });
+});
+
 describe('PaneelReihe', () => {
   it('teilt bis zu drei Paneele 1fr 1fr 1.1fr, darunter gestapelt', () => {
     expect(paneelReiheSpalten(true, 3)).toBe('minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr)');

@@ -42,7 +42,8 @@ describe('StatusBadge', () => {
   it('hebt das unbearbeitete Etikett strukturell ab, nicht nur im Wortlaut', () => {
     const { rerender } = render(<StatusBadge phase="offen" label="Neu" unbearbeitet />);
     const neu = chip('Neu') as HTMLElement;
-    expect(neu).toHaveAttribute('data-ton', 'achtung');
+    // Neutral seit eon26eat D4 (Spec `statusrollen`): ein Eingang ist Normalbetrieb.
+    expect(neu).toHaveAttribute('data-ton', 'neutral');
     // Zweiter Kanal neben der Farbe (WCAG 1.4.1): Gewicht UND Wortlaut.
     expect(neu.style.fontWeight).toBe('600');
 

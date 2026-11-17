@@ -191,6 +191,35 @@ pub async fn ersetzen_tx(
     Ok(())
 }
 
+/// Die gespeicherte Liste des Bezugs in ihrer Reihenfolge, auf der offenen Transaktion: Vorher-
+/// Stand und Altwert-Vergleich des Feld-CAS (LLH-1831, Change
+/// `nvhnqynd-konflikt-und-aenderungsvermerk`, design.md D2). Die Reihenfolge ist Teil des Werts.
+pub async fn liste_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    bezug: Bezug,
+) -> Result<Vec<Verbindung>, AppError> {
+    let zeilen: Vec<(String, String, Option<String>)> = sqlx::query_as(
+        "SELECT mittel, wert, hinweis FROM einsatz_verbindung \
+         WHERE einsatz_id = ? AND bezug = ? AND abschnitt_id IS ? AND einheit_id IS ? \
+         ORDER BY sortier, id",
+    )
+    .bind(einsatz_id)
+    .bind(bezug.art())
+    .bind(bezug.abschnitt_id())
+    .bind(bezug.einheit_id())
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .map(|(mittel, wert, hinweis)| Verbindung {
+            mittel: Verbindungsmittel::parse(&mittel).unwrap_or(Verbindungsmittel::Sonstiges),
+            wert,
+            hinweis,
+        })
+        .collect())
+}
+
 /// [`ersetzen_tx`] in eigener Schreibtransaktion.
 pub async fn ersetzen(
     pool: &SqlitePool,

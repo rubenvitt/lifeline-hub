@@ -205,21 +205,30 @@ async fn abschluss_mit_dauer_politik_meldet_den_frist_eintrag_im_etb() {
     let mut rx = live.abonniere(einsatz);
     abschliessen(&app, &admin, einsatz).await;
 
+    // „Einsatz abgeschlossen“ (LLH-1814) und der Frist-Eintrag, in Schreibreihenfolge.
     let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
-    assert_eq!(eintraege.len(), 1, "Vorbedingung: ein Frist-Eintrag");
+    assert_eq!(
+        eintraege.len(),
+        2,
+        "Vorbedingung: Abschluss- und Frist-Eintrag"
+    );
     let alle = eingegangen(&mut rx);
     assert_eq!(
         etb_nutzlasten(&alle),
-        [etb_nutzlast(einsatz, eintraege[0])],
-        "genau ein `etb`-Ereignis mit der Kennung des Frist-Eintrags: {alle:?}"
+        [
+            etb_nutzlast(einsatz, eintraege[0]),
+            etb_nutzlast(einsatz, eintraege[1])
+        ],
+        "je ein `etb`-Ereignis mit der Kennung des Abschluss- und des Frist-Eintrags: {alle:?}"
     );
 }
 
 #[tokio::test]
-async fn abschluss_ohne_dauer_politik_meldet_kein_etb() {
-    let (app, _pool, live) = setup_mit_pool_und_live().await;
+async fn abschluss_ohne_dauer_politik_meldet_nur_den_abschluss_eintrag() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
+    let vorher = system_eintraege(&pool, einsatz).await;
 
     let mut rx = live.abonniere(einsatz);
     abschliessen(&app, &admin, einsatz).await;
@@ -229,9 +238,13 @@ async fn abschluss_ohne_dauer_politik_meldet_kein_etb() {
         1,
         "Vorbedingung: {alle:?}"
     );
-    assert!(
-        etb_nutzlasten(&alle).is_empty(),
-        "kein Eintrag, kein Ereignis: {alle:?}"
+    // Ohne Frist nur „Einsatz abgeschlossen“ (LLH-1814).
+    let eintraege = neu(&vorher, &system_eintraege(&pool, einsatz).await);
+    assert_eq!(eintraege.len(), 1, "{eintraege:?}");
+    assert_eq!(
+        etb_nutzlasten(&alle),
+        [etb_nutzlast(einsatz, eintraege[0])],
+        "nur das Ereignis des Abschluss-Eintrags: {alle:?}"
     );
 }
 

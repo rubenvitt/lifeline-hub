@@ -154,6 +154,26 @@ struct MerkmalGruppe {
     aeltester_alarm: Option<String>,
 }
 
+/// Die ersten `limit` offenen Meldungen (Kennung, laufende Nummer, Inhalt) für die Prüfung vor
+/// dem Abschluss (LLH-1814, design.md D1), mit demselben Prädikat `ist_offen_sql!` wie Liste und
+/// Modulzähler.
+pub async fn offene_kurzliste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    limit: i64,
+) -> Result<Vec<(i64, Option<i64>, String)>, AppError> {
+    const SQL: &str = concat!(
+        "SELECT m.id, m.lfd_nr, m.inhalt FROM meldung m WHERE m.einsatz_id = ? AND ",
+        ist_offen_sql!(),
+        " ORDER BY m.lfd_nr, m.id LIMIT ?"
+    );
+    Ok(sqlx::query_as(SQL)
+        .bind(einsatz_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?)
+}
+
 /// Modulzähler der Meldungen (LFH-935): EINE Abfrage, gruppiert nach den Merkmalen, die die
 /// Zählregel braucht ([`crate::einsatz::zaehler::zaehle_meldungen_gewichtet`]). Die Prädikate
 /// sind dieselben Fragmente wie in [`ANZEIGE_SELECT`]; ohne `inhalt`, ohne Benutzer-Joins,

@@ -1,9 +1,11 @@
 pub mod abraeumen;
+pub mod abschluss;
 pub mod archiv;
 pub mod aufbewahrung_kategorie;
 pub mod berechtigung;
 pub mod effektiv;
 pub mod einstellungen;
+pub mod feld_vermerk;
 pub mod fuehrungsstelle;
 pub mod funktion;
 pub mod kontext;
@@ -127,6 +129,9 @@ pub struct Einsatz {
     pub naechste_lagebesprechung_at: Option<String>,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
+    /// Read-only Join (LLH-1814): Anzeigename der Person, die abgeschlossen hat.
+    #[sqlx(default)]
+    pub abgeschlossen_von_name: Option<String>,
     #[sqlx(try_from = "String")]
     pub einsatzart: Einsatzart,
     pub einsatznummer_intern: Option<String>,
@@ -215,6 +220,7 @@ impl Einsatz {
             naechste_lagebesprechung_at: self.naechste_lagebesprechung_at.clone(),
             abgeschlossen_at: self.abgeschlossen_at.clone(),
             abgeschlossen_von: self.abgeschlossen_von,
+            abgeschlossen_von_name: self.abgeschlossen_von_name.clone(),
             einsatzart: self.einsatzart.clone(),
             einsatznummer_intern: self.einsatznummer_intern.clone(),
             angelegt_at: self.angelegt_at.clone(),
@@ -249,6 +255,7 @@ impl Einsatz {
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
             fuehrung: self.fuehrung.anzeige(),
             spiegel: self.spiegel.anzeige(),
+            vermerke: Default::default(),
         }
     }
 }
@@ -279,6 +286,10 @@ pub struct EinsatzAnzeige {
     pub naechste_lagebesprechung_at: Option<String>,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
+    /// Anzeigename der Person, die abgeschlossen hat (LLH-1814, Paneel „Einsatzabschluss“);
+    /// fehlt am aktiven Einsatz, ohne Konto und bei einer Gerätesitzung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abgeschlossen_von_name: Option<String>,
     pub einsatzart: Einsatzart,
     pub einsatznummer_intern: Option<String>,
     pub angelegt_at: String,
@@ -359,6 +370,12 @@ pub struct EinsatzAnzeige {
     /// nur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spiegel: Option<crate::instanz::spiegel::EinsatzSpiegelAnzeige>,
+    /// Wer welche Kopfangabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
+    /// `aenderungsvermerk`). Nur das Detail und die Antwort des Kopf-PATCH füllen es; es fehlt
+    /// in der Liste, an Gerätesitzungen und ohne Änderung seit dem Anlegen.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[schema(required = false, value_type = HashMap<String, crate::einsatz::feld_vermerk::FeldVermerk>)]
+    pub vermerke: feld_vermerk::Vermerke,
 }
 
 /// Die benutzerbezogenen Felder des Kopfs aus der eigenen Mitgliedschaft (i6k6mzed,
@@ -500,6 +517,7 @@ mod tests {
             naechste_lagebesprechung_at: None,
             abgeschlossen_at: None,
             abgeschlossen_von: None,
+            abgeschlossen_von_name: None,
             einsatzart: Einsatzart::Realeinsatz,
             einsatznummer_intern: None,
             angelegt_at: "2026-05-23".into(),

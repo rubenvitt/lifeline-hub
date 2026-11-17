@@ -10,11 +10,14 @@ describe('kartenKante — der linke Rand trägt EINE Farbe, Gefahr gewinnt', () 
     });
   });
 
-  it('der Eingangszustand ist gelb, wenn kein Alarm besteht', () => {
+  it('der Eingangszustand trägt eine leise neutrale Kante, nicht Gelb (Spec `statusrollen`)', () => {
+    // eon26eat D4: ein Eingang ist Normalbetrieb. Die Kante bleibt, damit er in der Liste
+    // auffindbar ist, aber in `linieStark` statt `achtung`; sie unterscheidet sich von `linie`.
     expect(kartenKante(farbenDunkel, { alarm: false, unbearbeitet: true })).toEqual({
       zustand: 'unbearbeitet',
-      farbe: farbenDunkel.achtung,
+      farbe: farbenDunkel.linieStark,
     });
+    expect(farbenDunkel.linieStark).not.toBe(farbenDunkel.linie);
   });
 
   it('ohne beides steht die Rahmenlinie', () => {
@@ -68,8 +71,9 @@ describe('phaseTon / prioTon', () => {
     expect(phaseTon('ausnahme')).toBe('alarm');
   });
 
-  it('der Eingangszustand schlägt die Phase', () => {
-    expect(phaseTon('offen', true)).toBe('achtung');
+  it('der Eingangszustand ist neutral, auch in Arbeit (Spec `statusrollen`, eon26eat D4)', () => {
+    expect(phaseTon('offen', true)).toBe('neutral');
+    expect(phaseTon('in_arbeit', true)).toBe('neutral');
   });
 
   it('bildet die Prioritäten ab', () => {

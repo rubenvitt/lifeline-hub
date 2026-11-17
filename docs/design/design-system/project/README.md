@@ -82,7 +82,7 @@ die Karten deckungsgleich.
 
 - **Paneel** (`components/Paneel/`, Gruppe Flächen)
 - **Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)** (`components/Seitenkopf/`, Gruppe Rahmen)
-- **Dashboard-Baukasten (Verteilung und Matrix)** (`components/Dashboard/`, Gruppe Flächen)
+- **Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)** (`components/Dashboard/`, Gruppe Flächen)
 - **Schrift: Rollen der Skala und Feldetikett** (`components/Schrift/`, Gruppe Daten)
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
@@ -142,6 +142,13 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
   Nachtpalette abgeleitet.
+- **Vier Flächenstufen**:
+  `grund`, `paneel`, `kopf`, `flaeche`, `flaeche2`, `flaeche3` belegen je Modus höchstens vier
+  Werte, je Schritt ≥ 1,10 : 1, zusammengelegt entlang der Helligkeitsfolge des Modus (nachts
+  `grund` = `paneel`, `kopf` = `flaeche`; am Tag `paneel` = `flaeche2`, `grund` = `kopf`). Ein
+  fünfter Wert ist eine Entscheidung, kein Nachtrag. Der dauerdunkle Rahmen (`rahmenFarben`) ist
+  keine Inhaltsfläche und hält seine Werte selbst. Das gewählte Segment der `Segmentleiste`
+  trägt zusätzlich eine 2-px-Bedienkante unten (eine Typkante ersetzt sie).
 - **Rollen** in `theme/tokens.ts` + `theme/rollen.css` (Gate 5), u. a. `kopf`, `paneel`,
   `flaeche3`, `text2`, `steuerRahmen` (= antds `colorBorder`), `bedienText`, Statusflächen,
   `bannerGrund`/`bannerLinie`, Zeilentönungen. `rahmenFarben` ist modusunabhängig und keine
@@ -289,23 +296,27 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
     neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
     Nachweis `e2e/fehlergrenze.spec.ts`.
+  - **Ortsmarke in der Bedienfarbe**: die aktive
+    Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
+    aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
+    Modulpanel, nie in `marke`; `marke` bleibt der Bildmarke.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Keine erfundenen Daten:** was ohne Datenquelle ist, wird weggelassen,
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
   Evakuiert, Pegel auf Platz 1, Rückmeldung, ETB-Zählung.
-- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Aufträge, Meldungen, Abschnitte, offene
-  Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los ist (Betroffene, Kräfte,
-  Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Kennzahl steht auf genau
-  einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Beide verweisen im Seitenkopf
-  aufeinander..
+- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, Aufträge,
+  Meldungen, Abschnitte, offene Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los
+  ist (Betroffene, Kräfte, Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine
+  Kennzahl steht auf genau einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Die
+  Startliste zeigt Haken, keine Zahl. Beide verweisen im Seitenkopf aufeinander..
 
 ## Farbachsen
 
 (Vertrag `theme/statusFarben.ts`)
 
 - **Betroffene** (`StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
-  „offen" `achtung`, „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
+  „offen" neutral (Eingang), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (`abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
   kritisch `alarm`; nicht beurteilt = leeres Feld. Nur der Wechsel schreibt System-ETB. Im
@@ -332,9 +343,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   SK I rot, II gelb, III grün, IV blau, Tote schwarz, „unverletzt" ohne Farbe. **Angezeigt** wird
   als umrandetes Farbfeld (`SichtungsTag`/`sichtungsfarben`); die Umrandung macht Gelb auf hellem
   und Schwarz auf dunklem Grund sichtbar. **Gewählt** wird als Vollfläche über
-  `personen/SichtungsWahl.tsx` aus der Flächenpalette `sichtungsflaechen` (bis zum Textboden
-  abgedunkelt, in beiden Modi gleich) mit Kante in `text` (`sichtungsKante`), gewählt mit ✓ und
-  3-px-Rahmen, die übrigen in Randform; 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein `color` an antds `Tag`** außer `"default"`: kein Preset hält
+  `personen/SichtungsWahl.tsx` aus `sichtungsPalette` (`flaeche`, bis zum Textboden abgedunkelt,
+  in beiden Modi gleich; `punkt` ist die Anzeigefarbe, eine Palette je Kategorie) mit Kante in
+  `text` (`sichtungsKante`), gewählt mit ✓ und 3-px-Rahmen. Nach einer Wahl behalten die übrigen
+  ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
+  jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
+  nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein `color` an antds `Tag`** außer `"default"`: kein Preset hält
   den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
   Demo-Marke, Blau bedient.
@@ -411,6 +425,15 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 
 - **Rot bedient nichts:** `bedien` und Fokusring blau, Rot ist Gefahr. Jede Statusfarbe braucht
   einen **zweiten Kanal** (WCAG 1.4.1). Farbwerte nur aus `theme/tokens.ts`/`theme/rollen.css`.
+- **Statusrollen haben eine Bedeutung**: Gelb (`achtung`) heißt
+  „jemand muss bald handeln“, Rot (`alarm`) „überfällig, Ausfall, Gefahr“. Ein Zustand des
+  Normalbetriebs (unterwegs, eingesetzt, eingegangen, läuft planmäßig) trägt nie Gelb: „gebunden“
+  ist überall `neutral` und kommt immer aus `statusKategorie`, nie fest in einer Seite; der
+  Eingang „Neu“/„Offen“ ist neutral mit leiser Kante (`linieStark`), Dringliches zeigt die
+  Priorität. Die ZAHL der noch nicht gesichteten Meldungen (Kennzahl „Unbearbeitet“) bleibt
+  dagegen gelb: gezählt ist sie Handlungsbedarf (Entscheidung 16.11.2026). Einzige Ausnahme an der Kategorie vorbei: der Sprechwunsch (FMS 5 und 0) ist gelb;
+  wer den Status EINES Fahrzeugs oder einer Einheit färbt, geht über `fahrzeugStatusRolle` bzw.
+  `kategorieDarstellung` (`theme/statusFarben.ts`). (D1–D4).
 - **Der Fokusring ist `bedien`**: antds Umriss liest `colorPrimaryBorder`, und
   `antdToken` setzt ihn auf `bedien` (≥ 3 : 1 auf jeder deckenden Fläche), wie die eigenen Klassen in
   `sprache.css`. Er ist zugleich die Ruhefarbe des `Slider`; dessen Zeiger nimmt `bedienHover`.
@@ -452,7 +475,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Ähnliches (Wächter `components/menueFarbe.guard.test.ts`). In der Zeile trennt der rote Knopf,
   im Menü der Trenner.
   **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**: der Einsatzabschluss steht als letzter Abschnitt auf den
-  Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.
+  Einsatzdaten, am aktiven Einsatz nur für die Einsatzleitung. Er ist die Ausnahme von
+  „Unumkehrbares → `Popconfirm`“: ein Dialog
+  (`pages/einsatzdaten/EinsatzAbschlussDialog.tsx`) nennt die offenen Punkte, sperrt aber nicht,
+  und sein roter Knopf „Einsatz abschließen“ wird erst aktiv, wenn Einsatznummer oder Bezeichnung
+  eingetippt sind (geprüft nur im Client). Binnen 24 Stunden öffnen Einsatzleitung und System-Admin
+  der Einsatz-Org ihn mit Pflicht-Grund wieder (`darfEinsatzWiedereroeffnen`).
 - **Ein Iconsatz**: Icons8
   „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IconPaar`, heute Rail und Stern).
   Import nur über `icons/index.ts`; Register, SVG-Quellen und Stempel in `scripts/icons/`

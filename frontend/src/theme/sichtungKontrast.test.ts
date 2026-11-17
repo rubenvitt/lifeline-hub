@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { kontrast } from '../test/farbmass';
-import { farbenDunkel, farbenHell, sichtungsKante, sichtungsflaechen } from './tokens';
+import {
+  farbenDunkel,
+  farbenHell,
+  mischeFarbe,
+  SICHTUNG_SCHRAFFUR_DECKKRAFT,
+  sichtungsKante,
+  sichtungsPalette,
+  sichtungsToenung,
+  sichtungsflaechen,
+  type SichtungsFarbe,
+} from './tokens';
 
 /**
  * Die Flächen der Sichtungswahl, GERECHNET statt behauptet (WCAG-Formel).
@@ -38,4 +48,41 @@ describe.each([
     );
     expect(ohneKante).toBe(true);
   });
+});
+
+/**
+ * Getönte Kacheln und Schraffur (Change `eon26eat-farbe-entlasten`, D8; Spec `farbrollen-kontrast`,
+ * „Sichtungsfläche hält den Textboden“, Szenario „Getönte Kachel nach einer Wahl“): eine nicht
+ * gewählte Kachel steht nach einer Wahl getönt, ihr Text in der Textfarbe des Modus; „tot“ trägt
+ * in jedem Zustand eine Schraffur. Gerechnet gegen den HELLSTEN bzw. dunkelsten Strich.
+ */
+const TEXTBODEN = { Tag: 7, Nacht: 5 } as const;
+const FARBEN = Object.keys(sichtungsPalette) as SichtungsFarbe[];
+
+describe.each([
+  ['Tag', farbenHell],
+  ['Nacht', farbenDunkel],
+] as const)('Sichtungswahl getönt und schraffiert im %s (eon26eat D8)', (modus, farben) => {
+  it.each(FARBEN)('%s: Text auf der getönten Kachel hält den Textboden', (farbe) => {
+    const toenung = sichtungsToenung(farbe, farben.flaeche);
+    expect(kontrast(farben.text, toenung)).toBeGreaterThanOrEqual(TEXTBODEN[modus]);
+  });
+
+  it('tot getönt: Text auf dem Strich der Schraffur hält den Textboden', () => {
+    const toenung = sichtungsToenung('schwarz', farben.flaeche);
+    const strich = mischeFarbe(farben.text, toenung, SICHTUNG_SCHRAFFUR_DECKKRAFT);
+    expect(kontrast(farben.text, strich)).toBeGreaterThanOrEqual(TEXTBODEN[modus]);
+  });
+
+  it('die Tönung unterscheidet sich vom Grund der Maske, damit die Kategorie erkennbar bleibt', () => {
+    for (const farbe of FARBEN.filter((f) => f !== 'schwarz')) {
+      expect(sichtungsToenung(farbe, farben.flaeche)).not.toBe(farben.flaeche);
+    }
+  });
+});
+
+it('tot gefüllt: Schrift auf dem Strich der Schraffur hält den Tagboden (eon26eat D8)', () => {
+  const { flaeche, schrift } = sichtungsPalette.schwarz;
+  const strich = mischeFarbe(schrift, flaeche, SICHTUNG_SCHRAFFUR_DECKKRAFT);
+  expect(kontrast(schrift, strich)).toBeGreaterThanOrEqual(TEXTBODEN.Tag);
 });

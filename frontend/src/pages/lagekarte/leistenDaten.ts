@@ -6,6 +6,7 @@ import type {
   Einheit,
   Einsatzabschnitt,
   EinsatzFahrzeug,
+  FahrzeugStatus,
   FuehrungskraftKarte,
   Rueckmeldungen,
   SchadenMarker,
@@ -18,13 +19,13 @@ import {
   auslastung,
   betreuungsstelleStatus,
   brStatus,
+  fahrzeugStatusRolle,
   raeumungszustand,
   schadenAusmass,
   schadenStatus,
-  statusKategorie,
+  type Statusrolle,
   uhsStatus,
   uhsTyp,
-  type Statusrolle,
 } from '../../theme/statusFarben';
 import { MELDEWEG_WORT, rueckmeldungJeEinheit } from '../../meldungen/rueckmeldung';
 import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
@@ -436,6 +437,11 @@ export interface AuswahlRoh {
    * gemeldet".
    */
   rueckmeldungen?: Rueckmeldungen;
+  /**
+   * Fahrzeugstatus-Katalog, für den FMS-Anker eines Fahrzeugs: ein Sprechwunsch (S5, S0) ist gelb
+   * (Spec `statusrollen`). Fehlt er, nimmt der Status die Rolle seiner Kategorie.
+   */
+  fahrzeugStati?: readonly FahrzeugStatus[];
 }
 
 export const LEERE_ROHDATEN: AuswahlRoh = {
@@ -554,7 +560,9 @@ export function auswahlRaster(
         {
           label: 'Status',
           wert: st.verteilung ? `${statusText} (${st.verteilung})` : statusText,
-          rolle: e.status.kategorie ? statusKategorie[e.status.kategorie]?.rolle : undefined,
+          rolle: e.status.kategorie
+            ? fahrzeugStatusRolle(e.status.kategorie, e.status.status?.fms_anker)
+            : undefined,
           mono: false,
         },
         { label: 'Seit', wert: e.status.seit ? zeit(e.status.seit) : '—' },
@@ -571,7 +579,12 @@ export function auswahlRaster(
         {
           label: 'Status',
           wert: text(f.status_label),
-          rolle: f.status_kategorie ? statusKategorie[f.status_kategorie]?.rolle : undefined,
+          rolle: f.status_kategorie
+            ? fahrzeugStatusRolle(
+                f.status_kategorie,
+                roh.fahrzeugStati?.find((s) => s.id === f.status_id)?.fms_anker,
+              )
+            : undefined,
           mono: false,
         },
         { label: 'Seit', wert: f.status_seit ? zeit(f.status_seit) : '—' },

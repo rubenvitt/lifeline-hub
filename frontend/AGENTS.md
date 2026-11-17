@@ -40,6 +40,13 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
   Nachtpalette abgeleitet.
+- **Vier Flächenstufen** (LLH-1783, Spec `farbrollen-kontrast`, Wächter in `theme/tokens.test.ts`):
+  `grund`, `paneel`, `kopf`, `flaeche`, `flaeche2`, `flaeche3` belegen je Modus höchstens vier
+  Werte, je Schritt ≥ 1,10 : 1, zusammengelegt entlang der Helligkeitsfolge des Modus (nachts
+  `grund` = `paneel`, `kopf` = `flaeche`; am Tag `paneel` = `flaeche2`, `grund` = `kopf`). Ein
+  fünfter Wert ist eine Entscheidung, kein Nachtrag. Der dauerdunkle Rahmen (`rahmenFarben`) ist
+  keine Inhaltsfläche und hält seine Werte selbst. Das gewählte Segment der `Segmentleiste`
+  trägt zusätzlich eine 2-px-Bedienkante unten (eine Typkante ersetzt sie).
 - **Rollen** in `theme/tokens.ts` + `theme/rollen.css` (Gate 5), u. a. `kopf`, `paneel`,
   `flaeche3`, `text2`, `steuerRahmen` (= antds `colorBorder`), `bedienText`, Statusflächen,
   `bannerGrund`/`bannerLinie`, Zeilentönungen. `rahmenFarben` ist modusunabhängig und keine
@@ -239,6 +246,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
     neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
     Nachweis `e2e/fehlergrenze.spec.ts`.
+  - **Ortsmarke in der Bedienfarbe** (LLH-1784, Spec `farbrollen-kontrast`): die aktive
+    Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
+    aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
+    Modulpanel, nie in `marke`; `marke` bleibt der Bildmarke.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
@@ -284,15 +295,23 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
   am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
   Quellen, Sprungziele aus `lage/alarmZiel.ts`. Sie zeigt Zustände, die Alarmzone Ereignisse; keine
-  Seite baut eine zweite Sammlung. Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band
-  „Lage in Zahlen“ des Lagebilds, der Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
+  Seite baut eine zweite Sammlung. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**
+  (LLH-1815, Spec `ueberblick-startliste`): eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
+  Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
+  ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über dem
+  Band steht, warten sie, Band und Paneelreihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
+  Alarmzeile nicht. Später hängt eine erstmals ladende Quelle nichts aus, und ein gescheiterter
+  Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
+  Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds, der
+  Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
   Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
   `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
   (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
   Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband
   „Stand“ des Lagebilds (Lagebericht, UHS aktiv) als `Kennzahlenband` mit `groesse="klein"`. Jedes Paneel geht durch
-  `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, `PaneelZustand`; `gesperrt` nennt
-  den Grund, ohne Sprung und Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
+  `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, Kopf-Aktion ohne „↗“ für eine
+  Handlung am Paneel selbst, `PaneelZustand`; `gesperrt` nennt den Grund, ohne Sprung und
+  Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
   Anteilsbalken je Kategorie: Sichtung, FMS-Status), `MatrixPaneel` (Stufenmatrix: Gefahren),
   `StromPaneel` (Zeitachseneinträge mit Sammelbanner), `ListenPaneel` (kurze Liste mit
   „n weitere ↗“) oder `GliederungsPaneel` (Teile mit Lagekante, Kopf, Zahlspalte). Mehrere kurze
@@ -303,11 +322,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   ergänzen die Zahl, nie ersetzen sie; Farben kommen aufgelöst vom Aufrufer, der Baustein trägt
   keine Statuskarte. Ein neuer Paneeltyp kommt als Baustein hierher, nicht lokal in eine Seite.
 - **Rollen der Übersichten** (LLH-1743, Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt
-  die Lage“): der Überblick sagt, was zu tun ist (Aufträge, Meldungen, Abschnitte, offene
-  Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los ist (Betroffene, Kräfte,
-  Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Kennzahl steht auf genau
-  einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Beide verweisen im Seitenkopf
-  aufeinander. Herleitung: `openspec/changes/archive/2026-11-16-t9jjrajy-alarmzeile-was-brennt/design.md` (D8).
+  die Lage“): der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, Aufträge,
+  Meldungen, Abschnitte, offene Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los
+  ist (Betroffene, Kräfte, Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine
+  Kennzahl steht auf genau einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Die
+  Startliste zeigt Haken, keine Zahl (LLH-1815). Beide verweisen im Seitenkopf aufeinander.
+  Herleitung: `openspec/changes/archive/2026-11-16-t9jjrajy-alarmzeile-was-brennt/design.md` (D8).
 - **Eine Heimat je Zahl** (LFH-550,
   `openspec/changes/archive/2026-09-30-lfh-550-lagebesprechung-eine-verdichtung/design.md`):
   Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig,
@@ -457,10 +477,18 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    EINMAL in der Werkzeugzeile der Liste (`OffeneBearbeitungGrundZeile`), die gesperrten Angaben
    und Bemerkungen verweisen darauf, statt ihn unter jede Zelle jeder Zeile zu schreiben.
 4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
-   Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
-   übernehmen“ / „Verwerfen und neu laden“. Zeichnet die Route den Sperrkonflikt aus
-   (`grund: "veraltet"`, `isVeraltet`, `src/AGENTS.md`, Statuscode-Konvention), fragt nur er;
-   ein anderer 409 steht als Grund am Paneel (`isSperrkonflikt`, LLH-1920).
+   Konflikt über `geaendert_at` (Paneel, ganze Ansicht) oder **Feld-CAS an jeder Einzelangabe**
+   (LLH-1831, Change `nvhnqynd-konflikt-und-aenderungsvermerk`): `InlineAngabe` reicht den Wert beim
+   Öffnen als `{ beimOeffnen }` an `onSpeichern`, die Seite schickt ihn als `erwartet` und speichert
+   über `components/useFeldKonflikt`. Ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine
+   Änderung übernehmen“ / „Verwerfen und neu laden“. Zeichnet die Route den Sperrkonflikt aus
+   (`grund: "veraltet"`, `isVeraltet`, `src/AGENTS.md`, Statuscode-Konvention), fragt am Paneel
+   nur er; ein anderer 409 steht als Grund am Paneel (`isSperrkonflikt`, LLH-1920). An einer
+   Einzelangabe nennt die Rückfrage dazu den aktuellen Wert lesbar und, wer ihn wann gesetzt hat;
+   `useFeldKonflikt` lädt beim 409 neu und fragt nur, wenn die Angabe sich wirklich geändert hat.
+   Ein fremder Wert im offenen Feld steht dort als Hinweis, die Eingabe bleibt. Wo der Server einen
+   Änderungsvermerk liefert (`vermerke`), steht er leise an der Zeile (`VermerkZeile`) und der
+   jüngste im Paneelkopf (`PaneelVermerk`). Noch ohne Feld-CAS: die Schreibwege in LLH-1945.
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
@@ -550,7 +578,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 **Farbachsen** (Vertrag `theme/statusFarben.ts`)
 
 - **Betroffene** (LFH-455, `StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
-  „offen" `achtung`, „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
+  „offen" neutral (Eingang, Spec `statusrollen`), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (LFH-608, `abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
   kritisch `alarm`; nicht beurteilt = leeres Feld. Nur der Wechsel schreibt System-ETB. Im
@@ -577,10 +605,13 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   SK I rot, II gelb, III grün, IV blau, Tote schwarz, „unverletzt" ohne Farbe. **Angezeigt** wird
   als umrandetes Farbfeld (`SichtungsTag`/`sichtungsfarben`); die Umrandung macht Gelb auf hellem
   und Schwarz auf dunklem Grund sichtbar. **Gewählt** wird als Vollfläche über
-  `personen/SichtungsWahl.tsx` aus der Flächenpalette `sichtungsflaechen` (bis zum Textboden
-  abgedunkelt, in beiden Modi gleich) mit Kante in `text` (`sichtungsKante`), gewählt mit ✓ und
-  3-px-Rahmen, die übrigen in Randform; 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung
-  (LLH-1083, Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
+  `personen/SichtungsWahl.tsx` aus `sichtungsPalette` (`flaeche`, bis zum Textboden abgedunkelt,
+  in beiden Modi gleich; `punkt` ist die Anzeigefarbe, eine Palette je Kategorie) mit Kante in
+  `text` (`sichtungsKante`), gewählt mit ✓ und 3-px-Rahmen. Nach einer Wahl behalten die übrigen
+  ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
+  jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
+  nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung (LLH-1083, LLH-1785,
+  Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
   Spec `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): kein Preset hält
   den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
@@ -923,16 +954,22 @@ anwendbar), „nicht geprüft" ist keins.
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
   Rückweg. Die übrigen Teile der Zeile bleiben unsichtbar an ihrem Platz, damit eine umgebrochene
   Zeile ihre Höhe hält. Eine Person, die im Einheit-Detail über ihr ⋮ aus der Einheit gelöst wird,
-  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Fahrzeug und Person nehmen
-  das Entlassen vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort
-  des Entlassens; die Person ohne neue Periode, LLH-1922). **Bekannte Lücke:** Material „Aus dem
-  Einsatz nehmen“ macht beim Rückgängig nur den Posten wieder aktiv, ohne seinen Ort; bis zu seiner
-  Folgeaufgabe (LLH-1923) bleibt das so, ohne Rückfrage.
-  Ebenso noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
-  Person; und das Rückgängig von Material am Ort, Besatzung und UHS-Kraft prüft noch nicht, ob der
-  Datensatz inzwischen anders gebunden ist. „Abziehen“ an der UHS und „Vom Fahrzeug lösen“ in
-  der Fahrzeugliste halten die gelöste Zeile noch nicht, und Material am Ort zeigt „Lösen“ noch
-  als Knopf neben „Ausgeben“ (alles LLH-1924).
+  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Hat eine Zeile keinen
+  Regler (UHS-Kräfte, Besatzungsblock der Fahrzeugliste), steht „Rückgängig“ an der Stelle ihrer
+  Funktion bzw. Angabe (LLH-1924,
+  `openspec/changes/archive/2026-11-17-bq8dvx19-loesen-nachziehen/design.md` D4).
+
+  Jedes Rückgängig einer gelösten Zuordnung schickt `?nur_wenn_frei=1` (Einheit, Material am Ort,
+  Besatzung, UHS-Kraft): steht der Datensatz inzwischen woanders, lehnt der Server mit 409 ab und
+  nennt den Ort, statt ihn dort still wegzunehmen; das bewusste Zuordnen schickt den Schalter
+  nicht (D1). „Austragen“ am Bereitstellungsraum und an der UHS (auch „zurückweisen“ im
+  Grundriss) nimmt der Rückweg über `…/{belegung_id}/zuruecknehmen` zurück: ein Eintritt mit
+  `ruecknahme_von`, den „seit“, längste Wartezeit und „wartet seit“ übergehen; nur solange der
+  Austritt der jüngste Schritt ist und höchstens zehn Minuten zurückliegt, nie nach dem Ausrücken
+  und nie für einen Austritt mit Anlass (D2/D3). Fahrzeug, Person und Material nehmen das Entlassen
+  vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort des
+  Entlassens; die Person ohne neue Periode, LLH-1922; das Material samt Ort, LLH-1923); den Satz
+  zu Ausgelassenem bildet `kraefte/ruecknahmeSatz.ts`.
 
 - **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
   `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,
@@ -1174,6 +1211,16 @@ anwendbar), „nicht geprüft" ist keins.
 
 - **Rot bedient nichts:** `bedien` und Fokusring blau, Rot ist Gefahr. Jede Statusfarbe braucht
   einen **zweiten Kanal** (WCAG 1.4.1). Farbwerte nur aus `theme/tokens.ts`/`theme/rollen.css`.
+- **Statusrollen haben eine Bedeutung** (LLH-1778, Spec `statusrollen`): Gelb (`achtung`) heißt
+  „jemand muss bald handeln“, Rot (`alarm`) „überfällig, Ausfall, Gefahr“. Ein Zustand des
+  Normalbetriebs (unterwegs, eingesetzt, eingegangen, läuft planmäßig) trägt nie Gelb: „gebunden“
+  ist überall `neutral` und kommt immer aus `statusKategorie`, nie fest in einer Seite; der
+  Eingang „Neu“/„Offen“ ist neutral mit leiser Kante (`linieStark`), Dringliches zeigt die
+  Priorität. Die ZAHL der noch nicht gesichteten Meldungen (Kennzahl „Unbearbeitet“) bleibt
+  dagegen gelb: gezählt ist sie Handlungsbedarf (Entscheidung 16.11.2026). Einzige Ausnahme an der Kategorie vorbei: der Sprechwunsch (FMS 5 und 0) ist gelb;
+  wer den Status EINES Fahrzeugs oder einer Einheit färbt, geht über `fahrzeugStatusRolle` bzw.
+  `kategorieDarstellung` (`theme/statusFarben.ts`). Herleitung:
+  `openspec/changes/archive/2026-11-16-eon26eat-farbe-entlasten/design.md` (D1–D4).
 - **Der Fokusring ist `bedien`** (LFH-737): antds Umriss liest `colorPrimaryBorder`, und
   `antdToken` setzt ihn auf `bedien` (≥ 3 : 1 auf jeder deckenden Fläche,
   `theme/bedienKontrast.test.ts`, `e2e/fokusring-kontrast.spec.ts`), wie die eigenen Klassen in
@@ -1221,7 +1268,12 @@ anwendbar), „nicht geprüft" ist keins.
   im Menü der Trenner.
   **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**
   (LFH-960, Spec `bedien-wortlaut`): der Einsatzabschluss steht als letzter Abschnitt auf den
-  Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.
+  Einsatzdaten, am aktiven Einsatz nur für die Einsatzleitung. Er ist die Ausnahme von
+  „Unumkehrbares → `Popconfirm`“ (LLH-1814, Spec `einsatz-abschluss`): ein Dialog
+  (`pages/einsatzdaten/EinsatzAbschlussDialog.tsx`) nennt die offenen Punkte, sperrt aber nicht,
+  und sein roter Knopf „Einsatz abschließen“ wird erst aktiv, wenn Einsatznummer oder Bezeichnung
+  eingetippt sind (geprüft nur im Client). Binnen 24 Stunden öffnen Einsatzleitung und System-Admin
+  der Einsatz-Org ihn mit Pflicht-Grund wieder (`darfEinsatzWiedereroeffnen`).
 - **Ein Iconsatz** (LFH-595, Spec `iconsatz`,
   `openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/design.md`): Icons8
   „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IconPaar`, heute Rail und Stern).
@@ -1252,8 +1304,9 @@ und `pages/personen/`.
   nur „wieder aktiv“; was inzwischen anders gebunden ist, lässt es aus und nennt es im
   `SeitenHinweis`, statt es still zu überschreiben (Vorbedingung `nur_wenn_frei` beim Zuordnen,
   LLH-1722). Lücken stehen bei „Beenden: Verb, Ort und Sicherung je Art“.
-- **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`colorError` vor `colorWarning`; prüfbar
-  über `data-alarm`/`data-unbearbeitet`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
+- **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`alarm` vor dem Eingang in `linieStark`,
+  sonst `linie`; prüfbar über `data-alarm`/`data-unbearbeitet`; der Eingang ist neutral, Spec
+  `statusrollen`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
   fünfte `KommPhase`.
 - **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
   steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`

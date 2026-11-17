@@ -73,6 +73,11 @@ pub struct FuehrungsstelleAnzeige {
     /// Personals.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatzleiter: Option<EinsatzleiterAnzeige>,
+    /// Wer welche Angabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
+    /// `aenderungsvermerk`). Nur Lesen und PATCH-Antwort füllen es, nicht an Gerätesitzungen.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[schema(required = false, value_type = HashMap<String, super::feld_vermerk::FeldVermerk>)]
+    pub vermerke: super::feld_vermerk::Vermerke,
 }
 
 wire_enum! {
@@ -246,6 +251,67 @@ pub struct FuehrungsstellePatch<'a> {
     /// Setzt (`Some(Some)`) oder leert (`Some(None)`) den Einsatzleiter; schreibt bei einem
     /// fachlichen Wechsel den Übergabe-Eintrag ins ETB (D3).
     pub einsatzleiter: Option<Option<EinsatzleiterEingabe<'a>>>,
+    /// Feld-CAS (LLH-1831, Spec `einsatz-fuehrungsstelle`, „Angabe der Führungsstelle mit
+    /// Altwert speichern“): die Werte beim Öffnen; leer = kein Vergleich.
+    pub erwartung: FuehrungsstelleErwartung<'a>,
+}
+
+/// Altwerte der Führungsstelle, bereits wie der Patch aufbereitet (getrimmt, geprüft). `None` =
+/// kein Vergleich, `Some(None)` = leer erwartet. Die Koordinate nur als Paar, Listen als Ganzes
+/// (Fahrzeuge als Menge), den Einsatzleiter ohne „seit“ (design.md D2).
+#[derive(Debug, Default)]
+pub struct FuehrungsstelleErwartung<'a> {
+    pub art: Option<FuehrungsstellenArt>,
+    pub bezeichnung: Option<Option<&'a str>>,
+    pub standort_adresse: Option<Option<&'a str>>,
+    pub standort: Option<(Option<f64>, Option<f64>)>,
+    pub rufname: Option<Option<&'a str>>,
+    pub verbindungen: Option<&'a [super::verbindungen::Verbindung]>,
+    pub fahrzeug_ids: Option<&'a [i64]>,
+    pub einsatzleiter: Option<Option<EinsatzleiterKern<'a>>>,
+}
+
+/// Wer Einsatzleiter ist, ohne „seit“: der Vergleichswert des Feld-CAS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EinsatzleiterKern<'a> {
+    /// Ohne Kennung, wenn die Person inzwischen entlassen ist (`ON DELETE SET NULL`).
+    Personal(Option<i64>),
+    Extern(&'a str),
+}
+
+impl FuehrungsstelleErwartung<'_> {
+    /// `true`, wenn jeder genannte Altwert dem gespeicherten Stand entspricht.
+    fn stimmt(
+        &self,
+        vorher: &FuehrungsstelleAnzeige,
+        verbindungen: &[super::verbindungen::Verbindung],
+    ) -> bool {
+        let leiter = vorher.einsatzleiter.as_ref().map(|e| match e.art {
+            EinsatzleiterArt::Personal => EinsatzleiterKern::Personal(e.personal_id),
+            EinsatzleiterArt::Extern => EinsatzleiterKern::Extern(e.name.as_deref().unwrap_or("")),
+        });
+        let mut fahrzeuge = vorher.fahrzeug_ids.clone();
+        fahrzeuge.sort_unstable();
+        self.art.is_none_or(|a| a == vorher.art)
+            && self
+                .bezeichnung
+                .is_none_or(|b| b == vorher.bezeichnung.as_deref())
+            && self
+                .standort_adresse
+                .is_none_or(|a| a == vorher.standort_adresse.as_deref())
+            && self
+                .standort
+                .is_none_or(|p| p == (vorher.standort_lat, vorher.standort_lon))
+            && self.rufname.is_none_or(|r| r == vorher.rufname.as_deref())
+            && self.verbindungen.is_none_or(|v| v == verbindungen)
+            && self.fahrzeug_ids.is_none_or(|ids| {
+                let mut ids = ids.to_vec();
+                ids.sort_unstable();
+                ids.dedup();
+                ids == fahrzeuge
+            })
+            && self.einsatzleiter.is_none_or(|e| e == leiter)
+    }
 }
 
 /// Ein neuer Einsatzleiter; Name getrimmt und geprüft, `seit` normalisiert (Route).
@@ -366,6 +432,7 @@ async fn load_tx(
             verbindungen,
             fahrzeug_ids,
             einsatzleiter: None,
+            vermerke: Default::default(),
         });
     };
     let fs_art = FuehrungsstellenArt::parse(&z.art).ok_or_else(|| {
@@ -382,6 +449,7 @@ async fn load_tx(
         verbindungen,
         fahrzeug_ids,
         einsatzleiter: z.einsatzleiter.anzeige(),
+        vermerke: Default::default(),
     })
 }
 
@@ -550,6 +618,14 @@ pub async fn patch_tx(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
+    // Feld-CAS (LLH-1831, design.md D2): Vorher-Stand in derselben Schreibtransaktion lesen und
+    // gegen die Altwerte prüfen; weicht einer ab, schreibt nichts, auch kein Übergabe-Eintrag.
+    let bezug = super::verbindungen::Bezug::Fuehrungsstelle;
+    let vorher = load_tx(conn, einsatz_id).await?;
+    let verbindungen_vorher = super::verbindungen::liste_tx(conn, einsatz_id, bezug).await?;
+    if !patch.erwartung.stimmt(&vorher, &verbindungen_vorher) {
+        return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+    }
     // Je Feld ein UPDATE: feste Statements statt eines zusammengesetzten SQL-Texts.
     if let Some(art) = patch.art {
         sqlx::query("UPDATE einsatz_fuehrungsstelle SET art = ? WHERE einsatz_id = ?")
@@ -628,5 +704,39 @@ pub async fn patch_tx(
         Some(eingabe) => save_einsatzleiter_tx(conn, einsatz_id, schreiber, eingabe).await?,
         None => None,
     };
-    Ok((load_tx(conn, einsatz_id).await?, etb_id))
+    let nachher = load_tx(conn, einsatz_id).await?;
+    // Änderungsvermerk je Angabe (LLH-1834, design.md D3); Sprechgruppen gehen eigene Wege.
+    let verbindungen_nachher = super::verbindungen::liste_tx(conn, einsatz_id, bezug).await?;
+    let mut felder = Vec::new();
+    let mut wenn = |anders: bool, feld: &'static str| {
+        if anders {
+            felder.push(feld);
+        }
+    };
+    wenn(vorher.art != nachher.art, "art");
+    wenn(vorher.bezeichnung != nachher.bezeichnung, "bezeichnung");
+    wenn(
+        vorher.standort_adresse != nachher.standort_adresse,
+        "standort_adresse",
+    );
+    wenn(
+        (vorher.standort_lat, vorher.standort_lon) != (nachher.standort_lat, nachher.standort_lon),
+        "standort_koordinate",
+    );
+    wenn(vorher.rufname != nachher.rufname, "rufname");
+    wenn(verbindungen_vorher != verbindungen_nachher, "verbindungen");
+    wenn(vorher.fahrzeug_ids != nachher.fahrzeug_ids, "fahrzeug_ids");
+    wenn(
+        vorher.einsatzleiter != nachher.einsatzleiter,
+        "einsatzleiter",
+    );
+    super::feld_vermerk::setze_tx(
+        conn,
+        einsatz_id,
+        super::feld_vermerk::Objekt::Fuehrungsstelle,
+        &felder,
+        schreiber.benutzer_id,
+    )
+    .await?;
+    Ok((nachher, etb_id))
 }

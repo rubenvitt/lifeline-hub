@@ -278,6 +278,8 @@ pub async fn erzeuge(
             einsatzleiter: None,
             // Die Führung je Einsatz ist ein Zustand der Kopplung, kein Teil des Lagebilds.
             fuehrung: None,
+            // Den Namen der abschließenden Person friert der Stand ebenso wenig ein (LLH-1814).
+            abgeschlossen_von_name: None,
             ..einsatz.anzeige(None, None, &crate::fuehrung::Labelkarte::standard())
         },
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
@@ -298,6 +300,8 @@ pub async fn erzeuge(
             .into_iter()
             .map(|e| crate::einheit::EinheitAnzeige {
                 verbindungen: Vec::new(),
+                // Wer wann geändert hat, gehört nicht ins eingefrorene Lagebild (LLH-1834).
+                vermerke: Default::default(),
                 ..e
             })
             .collect(),

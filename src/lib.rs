@@ -34,6 +34,7 @@ pub mod etb_baustein;
 pub mod externe_stelle;
 pub mod extract;
 pub mod fahrzeug;
+pub mod feld_cas;
 pub mod fernmeldewesen;
 pub mod freies_zeichen;
 pub mod fuehrung;

@@ -23,7 +23,9 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
      III gelb, IV grau) werden NICHT übernommen.
    - Übernommen werden dagegen: **Status als getönte Fläche mit getöntem Text**
      („Ampel als Fläche, Zahl bleibt lesbar“), **roter 2-px-Marker an der aktiven
-     Rail-Kategorie** (Rot = Marke), **ETB-Typfarben** Meldung blau, Anordnung orange,
+     Rail-Kategorie** (Rot = Marke; *Nachtrag 16.11.2026: seit der Change
+     `eon26eat-farbe-entlasten`, D7, in der Bedienfarbe wie die Modulmarke — Rot bedient
+     nichts und hielt nur 2,28 : 1*), **ETB-Typfarben** Meldung blau, Anordnung orange,
      Entscheidung violett, Lage cyan, Berichtigung rot, System neutral — als **farbige
      Kante + Typwort**, nicht als Etikett, **Glyphen ⧖ (nachgetragen) und ↗
      (Deeplink)** als Textzeichen. Betroffene Regeln, Guards und Tests werden
@@ -54,6 +56,15 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
 
 ## Palette Nachtbetrieb (aus den Inline-Styles)
 
+> **Nachtrag 16.11.2026 (Change `eon26eat-farbe-entlasten`, LLH-1720):** Die Flächen unten sind
+> der Stand des Entwurfs. Seither gelten **vier Flächenstufen** je Modus mit mindestens
+> 1,10 : 1 je Schritt (D5): nachts `grund` = `paneel` `#08090b`, `kopf` = `flaeche` `#151719`,
+> `flaeche2` `#1f2123`, `flaeche3` `#27292b`; der dauerdunkle Rahmen (Kopfzeile, Rail) behält
+> `#0c0e11`/`#16191d`/`#14171b`. Die Textstufen, der Steuerrahmen und die Berichtigungskante
+> (`#d41b25`) sind dazu nachgezogen. „gebunden“ (auch „Anfahrt“, „Einsatzort“) ist neutral
+> (Spec `statusrollen`). Maßgeblich für die Werte sind `frontend/src/theme/tokens.ts` und
+> `rollen.css`, nicht diese Tabelle.
+
 | Rolle | Wert | Verwendung im Entwurf |
 |---|---|---|
 | grund | `#08090b` | Seitengrund, Inhaltsfläche |
@@ -69,11 +80,11 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
 | gedaempft | `#9aa2ab` | Sekundärtext, Mono-Meta |
 | schwach | `#5f676f` | Augenbrauen, Tertiärtext |
 | bedien | `#4d94d6` (Hover `#7db3e8`) | Primärknopf, Fokus, aktive Modulmarke, Links |
-| marke | `#a8071a` | Quadrat der Bildmarke, aktive Rail-Marke, SK-I-Balken, akut |
+| marke | `#a8071a` | Quadrat der Bildmarke, SK-I-Balken, akut (aktive Rail-Marke seit `eon26eat-farbe-entlasten` D7 in bedien) |
 | alarm (Text) | `#ff6b6b` | überfällig, Ausfall |
-| achtung (Text) | `#e8cc3a` | Warnstufe hoch, Anfahrt |
+| achtung (Text) | `#e8cc3a` | Warnstufe hoch (Anfahrt seit `eon26eat-farbe-entlasten` neutral) |
 | normal | `#52c41a` / Text `#7ddc4a` | einsatzbereit, SYNC |
-| bedien-Text auf Fläche | `#8ec2f0` | gebunden/Einsatzort |
+| bedien-Text auf Fläche | `#8ec2f0` | (Nachtrag 16.11.2026: „gebunden/Einsatzort“ ist seit `eon26eat-farbe-entlasten` D1 neutral, Spec `statusrollen`) |
 | Statusflächen | normal `#0d1a0a` · achtung `#1c1705` · alarm `#1c0a0d` · bedien `#0d1620` | Statuszelle/Status-Chip |
 | Banner bedien | Grund `#0d1520`, Linie `#1d3a5c` | Sammelbanner |
 | ETB-Typ | Meldung `#1677ff` · Anordnung `#d46b08` · Entscheidung `#722ed1` · Lage `#13c2c2` · Berichtigung `#cf1322` (Zeile `#160d0f`) | Typkante 2 px + Typwort |
@@ -117,7 +128,7 @@ Icons des Entwurfs (Tabler) gelten nur noch als Bildidee, nicht als Quelle.
   Suchfeld (max 520, „Modul, Einheit, Meldung, Koordinate …“, ⌘K) · SYNC-Anzeige ·
   Uhr Mono 14 · Initialen + Funktion.
 - Rail 60 px: Icon 20 + Etikett 9 px Versalien darunter, Zeile 62 px; aktiv: Fläche
-  `#16191d`, Text hell, 2-px-Marke links in **marke**. Einstellungen unten abgesetzt.
+  `#16191d`, Text hell, 2-px-Marke links in **marke** (seit `eon26eat-farbe-entlasten` D7 in **bedien**). Einstellungen unten abgesetzt.
 - Modulpanel 208 px `#0a0c0e`: Kopf 42 px Augenbraue; Zeilen 34 px (Dichte-Boden
   beachten), 2×16-px-Marke in bedien bei aktiv, Zähler Mono rechts; Fuß „Einsatzdauer“
   Mono 18.

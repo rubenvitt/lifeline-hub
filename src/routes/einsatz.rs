@@ -7,6 +7,7 @@ use crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige;
 use crate::einsatz::berechtigung::ist_fristverkuerzung;
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLeitungszugriff, EinsatzLesezugriff, EinsatzVerwaltungszugriff,
+    EinsatzWiedereroeffnungszugriff,
 };
 use crate::einsatz::{
     einstellungen, modul, modul_override, repo, EinsatzAnzeige, EinsatzRolle, Einsatzart,
@@ -231,6 +232,17 @@ pub async fn detail(
     // Führungsstelle, und die liest kein Gerät.
     if ctx.geraet.is_some() {
         anzeige.einsatzleiter = None;
+        // Wie die übrigen Personenfelder des Kopfs (LLH-1814): kein Name an ein Gerät.
+        anzeige.abgeschlossen_von_name = None;
+    } else {
+        // Wer welche Angabe zuletzt geändert hat (LLH-1834): nur für Personensitzungen, die die
+        // Kopfdaten bearbeiten; ein Gerät bekommt keine Benutzernamen.
+        anzeige.vermerke = crate::einsatz::feld_vermerk::load(
+            &state.pool,
+            id,
+            crate::einsatz::feld_vermerk::Objekt::Einsatz,
+        )
+        .await?;
     }
     Ok(Json(anzeige))
 }
@@ -251,6 +263,80 @@ pub async fn abschliessen(
     }
     kopf_geaendert(&state, id).await;
     etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    Ok(Json(ergebnis.einsatz.anzeige(
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
+    )))
+}
+
+/// GET /api/einsaetze/{id}/abschluss/pruefung — offene Punkte vor dem Abschluss (LLH-1814, Spec
+/// `einsatz-abschluss`, „Offene Punkte vor dem Abschluss“). Nur Einsatzleitung eines aktiven
+/// Einsatzes; gezählt wird über den ganzen Einsatz, ohne Filter nach Modulfreigabe. Texte und
+/// Bezeichnungen nur aus Modulen, die die Person lesen darf (design.md D1).
+pub async fn abschluss_pruefung(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+) -> Result<Json<crate::einsatz::abschluss::AbschlussPruefung>, AppError> {
+    let lesbar = crate::einsatz::berechtigung::erlaubte_module(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+        &ctx.benutzer,
+        ctx.modul_rolle(),
+    )
+    .await?;
+    Ok(Json(
+        crate::einsatz::abschluss::load_pruefung(
+            &state.pool,
+            ctx.einsatz.id,
+            &crate::zeit::jetzt(),
+            &lesbar,
+        )
+        .await?,
+    ))
+}
+
+/// Body von `POST …/wiedereroeffnen`: der Grund ist Pflicht.
+#[derive(Debug, Deserialize)]
+pub struct Wiedereroeffnen {
+    #[serde(default)]
+    pub grund: Option<String>,
+}
+
+/// POST /api/einsaetze/{id}/wiedereroeffnen — einen abgeschlossenen Einsatz binnen
+/// `NACHLAUF_STUNDEN` wieder öffnen (LLH-1814, Spec `einsatz-abschluss`, design.md D4). Gate
+/// `EinsatzWiedereroeffnungszugriff` (Einsatzleitung oder Admin der Einsatz-Org, kein Gerät).
+/// Grund fehlt, leer oder über `etb::INHALT_MAX` → 400; Zustand, Frist, Aufbewahrung → 422;
+/// Spiegel und CAS → 409. Er geht unverändert ins ETB und trägt darum dessen Grenze.
+pub async fn wiedereroeffnen(
+    State(state): State<AppState>,
+    ctx: EinsatzWiedereroeffnungszugriff,
+    JsonBody(req): JsonBody<Wiedereroeffnen>,
+) -> Result<Json<EinsatzAnzeige>, AppError> {
+    let id = ctx.einsatz.id;
+    let grund = support::pflicht_max(
+        req.grund.as_deref().unwrap_or_default(),
+        "Grund",
+        crate::etb::INHALT_MAX,
+    )?;
+    // Ein fremd geführter Einsatz ist hier ein Spiegel (wie `fordere_aktiv` am Spiegel, 409).
+    if ctx.einsatz.fuehrung.fuehrung_fremd || ctx.einsatz.spiegel.spiegel_ist {
+        return Err(AppError::Conflict(
+            "Dieser Einsatz ist ein Spiegel; wieder öffnen kann nur die führende Instanz.".into(),
+        ));
+    }
+    let ergebnis =
+        repo::wiedereroeffnen(&state.pool, id, ctx.benutzer.id, &grund, chrono::Utc::now()).await?;
+    kopf_geaendert(&state, id).await;
+    etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    // Wie jeder andere Widerruf einer Kopplung an einer Verpflegungsstelle (LLH-1316,
+    // `routes::geraet`): die Stellenliste zieht `geraet_gekoppelt` live nach.
+    if ergebnis.verpflegung_geaendert {
+        state
+            .live
+            .publiziere_einsatz(id, crate::live::LiveEvent::Verpflegung);
+    }
     Ok(Json(ergebnis.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
@@ -1170,6 +1256,33 @@ pub struct KopfdatenPatch {
     /// Schreib-Warteschlange (LFH-705) hielte den Termin für gesetzt.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub naechste_lagebesprechung_at: Option<Option<String>>,
+    /// Feld-CAS (LLH-1831, Spec `einsatzdaten-bearbeitung`, „Zeile der Kopfdaten mit Altwert
+    /// speichern“): je Feld der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<KopfErwartet>,
+}
+
+/// Altwerte der Kopfdaten, dreiwertig wie [`KopfdatenPatch`]; die Koordinate nur als Paar.
+#[derive(Debug, Default, Deserialize)]
+pub struct KopfErwartet {
+    pub bezeichnung: Option<String>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub stichwort: Option<Option<String>>,
+    pub einsatzart: Option<String>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub leitstellen_nr: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub meldende_stelle: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub sachverhalt: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub anzahl_betroffene_initial: Option<Option<i64>>,
+    pub begonnen_at: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id} — Kopf-/Stammdaten als echter Teil-Patch (LFH-306).
@@ -1238,6 +1351,123 @@ pub async fn aktualisieren(
     // Nach allen Feldprüfungen: ein halbes Paar ist 422 (Zusammenhang), ein Feld für sich 400.
     pruefe_koordinate(req.einsatzort_lat, req.einsatzort_lon)?;
 
+    // Feld-CAS (LLH-1831, design.md D1): Altwert nur mit Änderung desselben Felds, die
+    // Koordinate nur als Paar; beides 422. Die Zeit wird wie der Patch normalisiert.
+    let erwartet = req.erwartet.unwrap_or_default();
+    // Lage je Feld vor den Einzelprüfungen festhalten; die Kombination (422) prüft erst danach,
+    // damit ein 400 je Feld vorgeht (`src/AGENTS.md`, Statuscode-Konvention).
+    let erwartet_lage: &[crate::feld_cas::FeldLage] = &[
+        (
+            "bezeichnung",
+            erwartet.bezeichnung.is_some(),
+            bezeichnung.is_some(),
+        ),
+        (
+            "stichwort",
+            erwartet.stichwort.is_some(),
+            stichwort.is_some(),
+        ),
+        (
+            "einsatzart",
+            erwartet.einsatzart.is_some(),
+            req.einsatzart.is_some(),
+        ),
+        (
+            "leitstellen_nr",
+            erwartet.leitstellen_nr.is_some(),
+            leitstellen_nr.is_some(),
+        ),
+        (
+            "einsatzort",
+            erwartet.einsatzort.is_some(),
+            einsatzort.is_some(),
+        ),
+        (
+            "einsatzort_lat",
+            erwartet.einsatzort_lat.is_some(),
+            req.einsatzort_lat.is_some(),
+        ),
+        (
+            "einsatzort_lon",
+            erwartet.einsatzort_lon.is_some(),
+            req.einsatzort_lon.is_some(),
+        ),
+        (
+            "meldende_stelle",
+            erwartet.meldende_stelle.is_some(),
+            meldende_stelle.is_some(),
+        ),
+        (
+            "sachverhalt",
+            erwartet.sachverhalt.is_some(),
+            sachverhalt.is_some(),
+        ),
+        (
+            "anzahl_betroffene_initial",
+            erwartet.anzahl_betroffene_initial.is_some(),
+            req.anzahl_betroffene_initial.is_some(),
+        ),
+        (
+            "begonnen_at",
+            erwartet.begonnen_at.is_some(),
+            begonnen_at.is_some(),
+        ),
+    ];
+    let erwartet_begonnen = match &erwartet.begonnen_at {
+        Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
+        None => None,
+    };
+    let erwartet_texte = [
+        support::trimme_tri(erwartet.stichwort),
+        support::trimme_tri(erwartet.leitstellen_nr),
+        support::trimme_tri(erwartet.einsatzort),
+        support::trimme_tri(erwartet.meldende_stelle),
+        support::trimme_tri(erwartet.sachverhalt),
+    ];
+    crate::feld_cas::pruefe_felder(
+        erwartet_lage,
+        &[(
+            "einsatzort_lat",
+            "einsatzort_lon",
+            "erwartet trägt die Koordinate nur als Paar (einsatzort_lat und einsatzort_lon)",
+        )],
+    )?;
+    let altwerte = {
+        use crate::feld_cas::ExpectedValue::{Integer, Real, Text};
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        fn text(v: &Option<Option<String>>) -> Option<crate::feld_cas::ExpectedValue<'_>> {
+            v.as_ref()
+                .map(|v| crate::feld_cas::ExpectedValue::Text(v.as_deref()))
+        }
+        w.push(
+            "bezeichnung",
+            erwartet
+                .bezeichnung
+                .as_deref()
+                .map(|b| Text(Some(b.trim()))),
+        );
+        w.push("stichwort", text(&erwartet_texte[0]));
+        w.push(
+            "einsatzart",
+            erwartet.einsatzart.as_deref().map(|a| Text(Some(a))),
+        );
+        w.push("leitstellen_nr", text(&erwartet_texte[1]));
+        w.push("einsatzort", text(&erwartet_texte[2]));
+        w.push("einsatzort_lat", erwartet.einsatzort_lat.map(Real));
+        w.push("einsatzort_lon", erwartet.einsatzort_lon.map(Real));
+        w.push("meldende_stelle", text(&erwartet_texte[3]));
+        w.push("sachverhalt", text(&erwartet_texte[4]));
+        w.push(
+            "anzahl_betroffene_initial",
+            erwartet.anzahl_betroffene_initial.map(Integer),
+        );
+        w.push(
+            "begonnen_at",
+            erwartet_begonnen.as_deref().map(|z| Text(Some(z))),
+        );
+        w
+    };
+
     let aktualisiert = repo::patche_kopf(
         &state.pool,
         id,
@@ -1254,13 +1484,22 @@ pub async fn aktualisieren(
             anzahl_betroffene_initial: req.anzahl_betroffene_initial,
             begonnen_at: begonnen_at.as_deref(),
         },
+        &altwerte,
+        Some(ctx.benutzer.id),
     )
     .await?;
     kopf_geaendert(&state, id).await;
 
-    Ok(Json(aktualisiert.anzeige(
+    let mut anzeige = aktualisiert.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
         &repo::labelkarte(&state.pool, id).await?,
-    )))
+    );
+    anzeige.vermerke = crate::einsatz::feld_vermerk::load(
+        &state.pool,
+        id,
+        crate::einsatz::feld_vermerk::Objekt::Einsatz,
+    )
+    .await?;
+    Ok(Json(anzeige))
 }

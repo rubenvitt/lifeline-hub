@@ -36,6 +36,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
     g("einsatz_fuehrungsstelle", K::Fuehrung),
     g("einsatz_fuehrungsstelle_sprechgruppe", K::Fuehrung),
     g("einsatz_fuehrungsstelle_fahrzeug", K::Fuehrung),
+    g("einsatz_feld_vermerk", K::Fuehrung),
     g("einsatz_lagebesprechung", K::Fuehrung),
     g("einsatz_lagekennzahl_wahl", K::Fuehrung),
     g("einsatzabschnitt", K::Fuehrung),

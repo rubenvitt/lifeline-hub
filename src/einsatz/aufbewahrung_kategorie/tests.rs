@@ -147,7 +147,7 @@ async fn abschluss_legt_kategorie_frist_mit_etb_an() {
     assert!(eintrag.contains("§ 46 Abs. 5 BHKG NRW"));
     assert!(etb.iter().any(|t| t.contains("„Anhänge“")));
 
-    // Beide Einträge kommen als Kennung zurück, damit die Route sie live meldet (LFH-858).
+    // Die Einträge kommen als Kennung zurück, damit die Route sie live meldet (LFH-858).
     let mut gemeldet: Vec<String> = Vec::new();
     for id in &e.etb_eintrag_ids {
         gemeldet.push(
@@ -159,7 +159,9 @@ async fn abschluss_legt_kategorie_frist_mit_etb_an() {
                 .unwrap(),
         );
     }
-    assert_eq!(gemeldet.len(), 2, "{gemeldet:?}");
+    // Dazu „Einsatz abgeschlossen“ als erster Eintrag des Abschlusses (LLH-1814).
+    assert_eq!(gemeldet.len(), 3, "{gemeldet:?}");
+    assert_eq!(gemeldet[0], crate::einsatz::repo::ABSCHLUSS_ETB);
     assert!(gemeldet.iter().any(|t| t.contains("„Personenauskunft“")));
     assert!(gemeldet.iter().any(|t| t.contains("„Anhänge“")));
 }

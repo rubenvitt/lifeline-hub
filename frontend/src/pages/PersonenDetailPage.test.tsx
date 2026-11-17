@@ -1383,6 +1383,66 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
     await waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
   });
 
+  it('„Rückgängig“ nach dem Austragen nimmt diesen Austritt zurück; Ablehnung im Kopf (LLH-1924)', async () => {
+    const zurueck: string[] = [];
+    render(einsatzAktiv, belegt, [
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => belegungsAntwort('austritt', 5)),
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung/:bid/zuruecknehmen', ({ params }) => {
+        zurueck.push(String(params.bid));
+        return HttpResponse.json(
+          { error: 'Die Person ist inzwischen weiter gebucht' },
+          { status: 409 },
+        );
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
+    const hinweis = (await screen.findByText('R-001 aus BHP 50 ausgetragen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(zurueck).toEqual(['1']));
+    expect(
+      await within(kopf()).findByText('Die Person ist inzwischen weiter gebucht'),
+    ).toBeInTheDocument();
+    expect(within(kopf()).getByText('Nicht zurückgenommen')).toBeInTheDocument();
+  });
+
+  it('kehrt die Person nur in den Wartebereich zurück, sagt der Hinweis das (LLH-1924)', async () => {
+    render(einsatzAktiv, belegt, [
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => belegungsAntwort('austritt', 5)),
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung/:bid/zuruecknehmen', () =>
+        HttpResponse.json(
+          {
+            ereignis: {
+              id: 2,
+              einsatz_id: 1,
+              person_id: 10,
+              uhs_id: 5,
+              platz_id: null,
+              art: 'eintritt',
+              notiz: null,
+              zeitpunkt_at: '2026-05-27 10:01:00',
+              erfasst_von: 1,
+              ruecknahme_von: 1,
+            },
+            ohne_platz: true,
+          },
+          { status: 201 },
+        ),
+      ),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
+    const hinweis = (await screen.findByText('R-001 aus BHP 50 ausgetragen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    expect(
+      await screen.findByText('R-001 wieder in BHP 50, im Wartebereich: der Platz ist nicht frei'),
+    ).toBeInTheDocument();
+  });
+
   it('bietet bei gesetztem Verbleib kein Aufnehmen an (Grundriss-Konsistenz)', async () => {
     const transportiert = { ...detail, aktueller_verbleib: 'transport' } as PersonDetail;
     render(einsatzAktiv, transportiert, [
@@ -1857,7 +1917,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     expect(koerper[0]).toEqual({ name: 'Lokal', erwartet: { name: 'Mustermann' } });
   });
 
-  it('409: Rückfrage mit dem aktuellen Wert; „Überschreiben“ sendet ohne Altwert', async () => {
+  it('409: Rückfrage mit dem aktuellen Wert; „Meine Änderung übernehmen“ sendet ohne Altwert', async () => {
     const koerper: Array<Record<string, unknown>> = [];
     let stand: PersonDetail = detail;
     render(einsatzAktiv, detail, [
@@ -1884,7 +1944,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
     expect(dialog).toHaveTextContent('„Meier“');
-    await user.click(within(dialog).getByRole('button', { name: 'Überschreiben' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Meine Änderung übernehmen' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
     expect(koerper[0]).toEqual({ name: 'Müller', erwartet: { name: 'Mustermann' } });
     expect(koerper[1]).toEqual({ name: 'Müller' });
@@ -1953,10 +2013,10 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
   /**
    * D2 mit Verschiebung: der 409 lädt den neuen Stand, in dem „Name“ nicht mehr leer ist. Während
    * der Rückfrage bleibt das Feld eingehängt (und die übrigen gesperrt); scheitert
-   * „Überschreiben“, steht der Grund am Feld. Mutationsprobe: Einordnung nach dem neuen Stand —
+   * „Meine Änderung übernehmen“, steht der Grund am Feld. Mutationsprobe: Einordnung nach dem neuen Stand —
    * das Feld hängt beim Neuladen aus, der zweite Fehler steht nirgends, rot.
    */
-  it('409 mit Verschiebung: das Feld bleibt während der Rückfrage, ein gescheitertes Überschreiben steht am Feld', async () => {
+  it('409 mit Verschiebung: das Feld bleibt während der Rückfrage, ein gescheitertes „Meine Änderung übernehmen“ steht am Feld', async () => {
     const ohneName = { ...detail, name: null } as PersonDetail;
     const koerper: Array<Record<string, unknown>> = [];
     let stand: PersonDetail = ohneName;
@@ -1988,7 +2048,7 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     expect(within(ohneAngabe()).getByRole('textbox', { name: 'Name' })).toHaveValue('Müller');
     expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Überschreiben' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Meine Änderung übernehmen' }));
     expect(
       await within(ohneAngabe()).findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
     ).toBeInTheDocument();
@@ -2052,6 +2112,8 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull());
     expect(koerper).toHaveLength(1);
     expect(within(stammdatenRaster()).getByText('Meier')).toBeInTheDocument();
+    // Nichts gesendet, also keine Meldung „gespeichert“ (Review LLH-1831).
+    expect(screen.queryByText('Name gespeichert')).toBeNull();
   });
 
   it('ein 409 ohne Feldänderung (Einsatz abgeschlossen) steht am Feld, ohne Rückfrage', async () => {

@@ -554,3 +554,64 @@ describe('Zeichenplatte (LFH-836)', () => {
     expect(kontrast(farbenDunkel.zeichenPlatte, farbenDunkel.flaeche3)).toBeGreaterThanOrEqual(3);
   });
 });
+
+/**
+ * Vier Flächenstufen (Change `eon26eat-farbe-entlasten`, D5; Spec `farbrollen-kontrast`, „Vier
+ * Flächenstufen mit Mindestabstand“): die sechs Flächenrollen belegen je Modus höchstens vier
+ * Werte, und zwei benachbarte Werte liegen mindestens 1,10 : 1 auseinander. Vorher lagen nachts
+ * sechs Werte zwischen 1,01 und 1,05 : 1 auseinander, gewählt und ruhend waren kaum zu trennen.
+ */
+const FLAECHENROLLEN = ['grund', 'paneel', 'kopf', 'flaeche', 'flaeche2', 'flaeche3'] as const;
+const FLAECHENSTUFEN_HOECHSTENS = 4;
+const FLAECHENSCHRITT_MINDESTENS = 1.1;
+
+/** Verschiedene Flächenwerte eines Modus, nach Helligkeit sortiert, mit den Rollen je Wert. */
+function flaechenstufen(farben: Record<(typeof FLAECHENROLLEN)[number], string>) {
+  const jeWert = new Map<string, string[]>();
+  for (const rolle of FLAECHENROLLEN) {
+    const wert = farben[rolle].toLowerCase();
+    jeWert.set(wert, [...(jeWert.get(wert) ?? []), rolle]);
+  }
+  return [...jeWert.entries()]
+    .map(([wert, rollen]) => ({ wert, rollen }))
+    .sort((a, b) => kontrast(a.wert, '#000000') - kontrast(b.wert, '#000000'));
+}
+
+describe('Vier Flächenstufen mit Mindestabstand (eon26eat D5)', () => {
+  for (const [modus, farben] of [
+    ['Nacht', farbenDunkel],
+    ['Tag', farbenHell],
+  ] as const) {
+    it(`${modus}: höchstens ${FLAECHENSTUFEN_HOECHSTENS} Flächenwerte`, () => {
+      const stufen = flaechenstufen(farben);
+      expect(
+        stufen.length,
+        `Flächenwerte: ${stufen.map((s) => `${s.wert} (${s.rollen.join(', ')})`).join(' · ')}`,
+      ).toBeLessThanOrEqual(FLAECHENSTUFEN_HOECHSTENS);
+    });
+
+    it(`${modus}: benachbarte Stufen liegen mindestens 1,10 : 1 auseinander`, () => {
+      const stufen = flaechenstufen(farben);
+      for (let i = 1; i < stufen.length; i++) {
+        const k = kontrast(stufen[i - 1].wert, stufen[i].wert);
+        expect(
+          k,
+          `${stufen[i - 1].rollen.join('=')} → ${stufen[i].rollen.join('=')}: ${k.toFixed(3)}`,
+        ).toBeGreaterThanOrEqual(FLAECHENSCHRITT_MINDESTENS);
+      }
+    });
+  }
+
+  it('Gegenprobe: ein fünfter Wert und ein zu kleiner Schritt fallen auf', () => {
+    const fuenf = {
+      grund: '#08090b',
+      paneel: '#0a0c0e',
+      kopf: '#151719',
+      flaeche: '#151719',
+      flaeche2: '#1f2123',
+      flaeche3: '#27292b',
+    };
+    expect(flaechenstufen(fuenf).length).toBe(5);
+    expect(kontrast('#08090b', '#0a0c0e')).toBeLessThan(FLAECHENSCHRITT_MINDESTENS);
+  });
+});

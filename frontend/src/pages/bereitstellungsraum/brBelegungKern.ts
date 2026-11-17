@@ -75,6 +75,8 @@ export function verlaufText(
     }
     case 'abruf_aufgehoben':
       return 'Abruf zurückgenommen';
+    case 'austritt_zurueckgenommen':
+      return 'Austragen zurückgenommen';
     case 'wechsel_herein':
       return e.herkunft ? `Wechsel von ${e.herkunft}` : 'Wechsel herein';
     case 'wechsel_hinaus':

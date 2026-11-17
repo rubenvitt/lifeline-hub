@@ -59,15 +59,15 @@ pub fn is_in_storno_frist(disponiert_at: &str, jetzt: &str) -> bool {
 }
 
 /// Wie lange nach dem Entlassen die Rücknahme gelingt (LLH-1722 D5, LLH-1922): deckt den Hinweis
-/// (6 s), Latenz und den Seitenhinweis; danach bleibt „Erneut disponieren“. Gilt für Fahrzeug und
-/// Person.
+/// (6 s), Latenz und den Seitenhinweis; danach bleibt „Erneut disponieren“. Gilt für Fahrzeug,
+/// Person und Material (LLH-1923).
 pub const RUECKNAHME_FRIST_MINUTEN: i64 = 10;
 
 /// Streichgrund der Entlassung, die die Rücknahme einer Person streicht (LLH-1922, design.md D3).
 pub const GRUND_RUECKNAHME: &str = "Entlassung zurückgenommen";
 
 /// Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten
-/// (LLH-1722 für das Fahrzeug, LLH-1922 für die Person).
+/// (LLH-1722 für das Fahrzeug, LLH-1922 für die Person, LLH-1923 für den Ort eines Postens).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 pub struct RuecknahmeAusgelassen {
     /// Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“).

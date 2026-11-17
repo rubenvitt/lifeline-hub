@@ -2,6 +2,23 @@
 
 use super::*;
 
+/// Der Kopf-Patch ohne Altwerte und ohne Vermerk, wie ihn die Tests dieser Datei vor LLH-1831
+/// riefen (Feld-CAS und Vermerk prüfen `tests/einsatz_kopf_konflikt.rs` über die Route).
+async fn patche_kopf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    patch: KopfPatch<'_>,
+) -> Result<Einsatz, AppError> {
+    super::patche_kopf(
+        pool,
+        einsatz_id,
+        patch,
+        &crate::feld_cas::ExpectedValues::new(),
+        None,
+    )
+    .await
+}
+
 /// Kurzform für die Testfälle dieser Datei: legt einen Einsatz mit den beiden
 /// Pflichtangaben an. Einsatzart und Alarmzeit spielen hier nirgends eine Rolle —
 /// die deckt `tests/einsatz.rs` über die Route ab, wo sie auch validiert werden.
@@ -220,7 +237,8 @@ async fn schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis() {
     let inhalt = "Dokument abgelegt: Foto Familie Müller (Foto)";
     let etb_id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
-             VALUES (?, 1, 'system', ?, ?, datetime('now')) RETURNING id",
+             VALUES (?1, (SELECT COALESCE(MAX(lfd_nr), 0) + 1 FROM etb_eintrag WHERE einsatz_id = ?1), \
+                     'system', ?2, ?3, datetime('now')) RETURNING id",
     )
     .bind(einsatz.id)
     .bind(inhalt)

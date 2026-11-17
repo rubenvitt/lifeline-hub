@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { MessageInstance } from 'antd/es/message/interface';
-import { zeigeRueckgaengig } from './rueckgaengig';
+import { schliesseRueckgaengig, zeigeRueckgaengig } from './rueckgaengig';
 
 /** Nimmt die Toast-Anfrage entgegen, ohne antds Portal zu montieren. */
 function messageAttrappe() {
@@ -53,5 +53,14 @@ describe('zeigeRueckgaengig (LFH-343 · C8)', () => {
     // sichtbare Rückwege sagten nicht, welcher zu welchem Datensatz gehört.
     const [ersteArgs, zweiteArgs] = open.mock.calls.map((c) => c[0]);
     expect(ersteArgs.key).toBe(zweiteArgs.key);
+  });
+});
+
+describe('schliesseRueckgaengig (LLH-1924)', () => {
+  it('schließt genau den stehenden Rückgängig-Hinweis', () => {
+    const { api, open, destroy } = messageAttrappe();
+    zeigeRueckgaengig(api, 'Anna vom Fahrzeug gelöst', vi.fn());
+    schliesseRueckgaengig(api);
+    expect(destroy).toHaveBeenCalledWith(open.mock.calls[0][0].key);
   });
 });

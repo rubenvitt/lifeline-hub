@@ -29,12 +29,14 @@ Augenbraue und Notiz.
 KONTRAST DER ZAHL (WCAG, gegen `flaeche` als Grund von `.lfh-kennzahl`; Boden Tag ≥ 7 : 1,
 Nacht ≥ 5 : 1):
 
-| Ton     | Rolle der Zahl | Tag (auf #ffffff) | Nacht (auf #0f1215) |
+| Ton     | Rolle der Zahl | Tag (auf #ffffff) | Nacht (auf #151719) |
 |---------|----------------|-------------------|---------------------|
-| normal  | normalText     | 9,18              | 10,92               |
-| bedien  | bedienText     | 9,51              |  9,95               |
-| achtung | achtungText    | 9,22              | 11,75               |
-| alarm   | alarmText      | 8,96              |  6,77               |
+| normal  | normalText     | 9,18              | 10,45               |
+| bedien  | bedienText     | 9,81              |  9,52               |
+| achtung | achtungText    | 9,22              | 11,24               |
+| alarm   | alarmText      | 9,76              |  6,48               |
+
+(Nachtfläche seit den vier Flächenstufen, Change `eon26eat-farbe-entlasten` D5.)
 
 `neutral` steht in `text` (Tag 18,47). Die Füllfarben selbst tragen den Tagesboden als Text
 nicht, deshalb die `…Text`-Rollen.

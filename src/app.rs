@@ -327,6 +327,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/abschliessen",
             post(routes::einsatz::abschliessen),
         )
+        // LLH-1814: binnen 24 Stunden wieder öffnen (Einsatzleitung oder Admin der Einsatz-Org).
+        .route(
+            "/api/einsaetze/{id}/wiedereroeffnen",
+            post(routes::einsatz::wiedereroeffnen),
+        )
+        // LLH-1814: offene Punkte vor dem Abschluss (nur Einsatzleitung, aktiv).
+        .route(
+            "/api/einsaetze/{id}/abschluss/pruefung",
+            get(routes::einsatz::abschluss_pruefung),
+        )
         .route(
             "/api/einsaetze/{id}/fuehrungsstelle",
             get(routes::einsatz_fuehrungsstelle::lesen)
@@ -1169,6 +1179,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/material/{em_id}/entlassen",
             post(routes::einsatz_material::entlassen),
         )
+        // LLH-1923: „Rückgängig“ nach dem Herausnehmen, mit dem Vorzustand aus der Antwort.
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/entlassen/zuruecknehmen",
+            post(routes::einsatz_material::zuruecknehmen),
+        )
         .route(
             "/api/einsaetze/{id}/material/{em_id}/stornieren",
             post(routes::einsatz_material::stornieren),
@@ -1628,6 +1643,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_uhs::belegung),
         )
         .route(
+            "/api/einsaetze/{id}/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen",
+            post(routes::einsatz_uhs::belegung_zuruecknehmen),
+        )
+        .route(
             "/api/einsaetze/{id}/bereitstellungsraeume",
             get(routes::einsatz_bereitstellungsraum::list),
         )
@@ -1666,6 +1685,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
             post(routes::einsatz_bereitstellungsraum::belegung),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung/{belegung_id}/zuruecknehmen",
+            post(routes::einsatz_bereitstellungsraum::belegung_zuruecknehmen),
         )
         .route(
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",

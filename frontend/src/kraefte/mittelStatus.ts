@@ -1,5 +1,9 @@
 import type { EinsatzFahrzeug, EinsatzPersonal } from '../api/types';
-import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
+import {
+  kategorieDarstellung,
+  statusKategorie,
+  type StatusDarstellung,
+} from '../theme/statusFarben';
 import { fmsEtikett } from './meldebildRaster';
 
 /**
@@ -31,7 +35,10 @@ export function fahrzeugStatusDarstellung(
   if (!ef.status_label || !ef.status_kategorie) return { rolle: 'neutral', label: 'kein Status' };
   // Mit Katalog-Anker im einen FMS-Format „S4 · Am Einsatzort“ (LFH-973); die Anzeige trägt
   // keinen Anker, der Aufrufer reicht ihn aus dem Katalog herein.
-  return { ...statusKategorie[ef.status_kategorie], label: fmsEtikett(ef.status_label, fmsAnker) };
+  return {
+    ...kategorieDarstellung(ef.status_kategorie, fmsAnker),
+    label: fmsEtikett(ef.status_label, fmsAnker),
+  };
 }
 
 /**

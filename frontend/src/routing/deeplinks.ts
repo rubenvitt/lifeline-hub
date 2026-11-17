@@ -68,9 +68,29 @@ export function parsePlanungReiter(params: URLSearchParams): PlanungReiter {
   return r === 'posten' || r === 'helfer' || r === 'ablauf' ? r : 'plan';
 }
 
-/** Zentrale Route zum Einsatz-Workspace. */
-export function einsatzPfad(einsatzId: number): string {
-  return `/einsaetze/${einsatzId}`;
+/**
+ * Zentrale Route zum Einsatz-Workspace. Die Index-Route leitet weiter (`DefaultModulRedirect`);
+ * `modul` ist ein Hinweis an diese Weiche (LLH-1821, Change `frgky8qr-einsatzwechsel-modul`, D1):
+ * der Einsatzwechsel bleibt im Modul, wenn es im Ziel frei ist, sonst gilt das Standardmodul.
+ */
+export function einsatzPfad(einsatzId: number, opts: { modul?: string | null } = {}): string {
+  return mitQuery(`/einsaetze/${einsatzId}`, { modul: opts.modul ?? undefined });
+}
+
+/** Form eines Modulschlüssels der Registry (`fahrzeuge`, `einsatz-einstellungen`). */
+const MODUL_SCHLUESSEL = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * Umkehr des Modul-Hinweises aus {@link einsatzPfad}: ein Wert in der Form eines Modulschlüssels,
+ * sonst `undefined` (leer oder manipuliert). Ob der Schlüssel in der Registry steht und das Modul
+ * im Ziel frei ist, entscheidet die Weiche (`einsatz/DefaultModulRedirect.tsx`). Diese Datei
+ * importiert die Registry bewusst nicht: sie zöge Komponenten und Icon-CSS nach, und die e2e-Specs,
+ * die die Pfad-Builder importieren, liefen in Playwright nicht mehr (Wächter in
+ * `deeplinks.test.ts`).
+ */
+export function parseModulHinweis(params: URLSearchParams): string | undefined {
+  const modul = params.get('modul');
+  return modul && MODUL_SCHLUESSEL.test(modul) ? modul : undefined;
 }
 
 /** Basis-Pfad eines Einsatz-Moduls: `/einsaetze/<einsatzId>/<modulRoute>`. */
@@ -238,10 +258,20 @@ export function tierePfad(einsatzId: number, opts: { neu?: boolean } = {}): stri
 }
 
 /**
- * Seite Einsatzdaten. `?paneel=fuehrung` ist ein AUFTRAG (apply-then-clean): die Seite rollt zum
- * Paneel „Führung“, sobald es geladen ist (LLH-1850, Hinweisband „Führung zurückholen“).
+ * Sprungaufträge der Einsatzdaten: `fuehrung` aus dem Hinweisband „Führung zurückholen“ (LLH-1850),
+ * `einsatzort` und `fuehrungsstelle` aus der Startliste im Überblick (LLH-1815).
  */
-export function einsatzdatenPfad(einsatzId: number, opts: { paneel?: 'fuehrung' } = {}): string {
+export type EinsatzdatenPaneel = 'fuehrung' | 'einsatzort' | 'fuehrungsstelle';
+
+/**
+ * Seite Einsatzdaten. `?paneel=` ist ein AUFTRAG (apply-then-clean): die Seite rollt zum genannten
+ * Paneel, sobald es steht, und nimmt den Parameter aus der Adresse („Führung“, LLH-1850;
+ * „Einsatzort“ und „Eigene Führungsstelle“, LLH-1815).
+ */
+export function einsatzdatenPfad(
+  einsatzId: number,
+  opts: { paneel?: EinsatzdatenPaneel } = {},
+): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'einsatzdaten'), { paneel: opts.paneel });
 }
 

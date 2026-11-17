@@ -1048,8 +1048,14 @@ pub async fn bilde_tx(
                     let ep_id = lage
                         .ep_id
                         .ok_or_else(|| AppError::Internal("Person im Einsatz ohne Zeile".into()))?;
-                    let z =
-                        mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+                    let z = mitglied_repo::zuordnen_personal_tx(
+                        conn,
+                        einsatz_id,
+                        eid,
+                        ep_id,
+                        Some(kontext.benutzer_id),
+                    )
+                    .await?;
                     let name = z.name;
                     // Führte die Person ihre bisherige Einheit, endet die Führung (LLH-1461): die
                     // Einheit wird gemeldet, und das ETB nennt es.

@@ -285,7 +285,7 @@ async fn im_einsatz_person(
     .await
     .unwrap();
     if let Some(e) = e {
-        mitglied_repo::zuordnen_personal_tx(&mut conn, k.einsatz_id, e, d.id)
+        mitglied_repo::zuordnen_personal_tx(&mut conn, k.einsatz_id, e, d.id, None)
             .await
             .unwrap();
     }

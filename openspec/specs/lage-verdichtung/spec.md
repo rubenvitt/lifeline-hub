@@ -177,10 +177,12 @@ stehen bleiben; das Etikett steht daneben.
 - **THEN** zeigt die Abschnittskarte kein Rückmeldungs-Etikett, statt jede Einheit als schweigend zu melden
 
 ### Requirement: Überblick führt, Lagebild zeigt die Lage
-Der Überblick SHALL zeigen, was zu tun ist: Aufträge, Meldungen, Abschnitte, offene Vorgänge,
-nächste Marken und Entscheidungen. Das Lagebild SHALL zeigen, was los ist: Betroffene, Kräfte,
-Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht und Unfallhilfsstellen. Eine Kennzahl MUST
-auf genau einer der beiden Seiten stehen; ausgenommen ist die Alarmzeile, die auf beiden steht.
+Der Überblick SHALL zeigen, was zu tun ist: die Startliste eines neuen Einsatzes (Capability
+`ueberblick-startliste`), Aufträge, Meldungen, Abschnitte, offene Vorgänge, nächste Marken und
+Entscheidungen. Das Lagebild SHALL zeigen, was los ist: Betroffene, Kräfte, Vermisste, Gefahren,
+Sichtung, Einsatzdauer, Lagebericht und Unfallhilfsstellen. Eine Kennzahl MUST auf genau einer der
+beiden Seiten stehen; ausgenommen ist die Alarmzeile, die auf beiden steht. Die Startliste zeigt
+Haken, keine Kennzahl.
 
 #### Scenario: Betroffene nur im Lagebild
 - **WHEN** jemand den Überblick öffnet
@@ -189,6 +191,10 @@ auf genau einer der beiden Seiten stehen; ausgenommen ist die Alarmzeile, die au
 #### Scenario: Aufträge nur im Überblick
 - **WHEN** jemand das Lagebild öffnet
 - **THEN** zeigt es keine Kennzahl „Aufträge offen“ und keine Kennzahl „Meldungen offen“
+
+#### Scenario: Startliste ohne Zahl
+- **WHEN** die Einsatzleitung den Überblick eines Einsatzes mit zwei Einheiten und offenem Einsatzort öffnet
+- **THEN** zeigt die Startliste beim Punkt Kräfte einen Haken und keine Zahl der Einheiten oder Kräfte
 
 ### Requirement: Die Übersichten verweisen aufeinander
 Der Überblick SHALL im Seitenkopf einen Sprung zum Lagebild tragen und das Lagebild einen Sprung

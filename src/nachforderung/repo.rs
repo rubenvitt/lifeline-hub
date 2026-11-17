@@ -416,6 +416,36 @@ macro_rules! ist_ueberfaellig_sql {
     };
 }
 
+/// Die ersten `limit` offenen Nachforderungen (Kennung, Bezeichnung, sonst Art) für die Prüfung
+/// vor dem Abschluss (LLH-1814, design.md D1). „Offen“ ist [`super::NachforderungStatus::ist_offen`]
+/// wie im Modulzähler, die offenen Werte als JSON-Liste gebunden.
+pub async fn offene_kurzliste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    limit: i64,
+) -> Result<Vec<(i64, Option<i64>, String)>, AppError> {
+    let offen: Vec<&str> = super::NachforderungStatus::ALLE
+        .iter()
+        .filter(|s| s.ist_offen())
+        .map(|s| s.as_str())
+        .collect();
+    let offen = serde_json::to_string(&offen).map_err(|e| AppError::Internal(e.to_string()))?;
+    let zeilen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT n.id, COALESCE(NULLIF(TRIM(n.bezeichnung), ''), n.art) FROM nachforderung n \
+         WHERE n.einsatz_id = ? AND n.status IN (SELECT value FROM json_each(?)) \
+         ORDER BY n.id LIMIT ?",
+    )
+    .bind(einsatz_id)
+    .bind(offen)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(zeilen
+        .into_iter()
+        .map(|(id, bezeichnung)| (id, None, bezeichnung))
+        .collect())
+}
+
 /// Zählt die Nachforderungen eines Einsatzes je Status und „überfällig“ (LLH-1078, LLH-1145,
 /// Modulzähler): EINE Abfrage ohne Listenspalten (LFH-935), gezählt wird darüber mit
 /// [`crate::einsatz::zaehler::zaehle_nachforderungen_gewichtet`]. Bind-Reihenfolge: `jetzt`

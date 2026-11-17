@@ -206,6 +206,15 @@ describe('druck.css — Mechanik (D1)', () => {
     }
   });
 
+  it('erzwingt das helle Farbschema am Dokument, auch aus dem Nachtbetrieb (LLH-1840)', () => {
+    // Der Seitenrand außerhalb der Wurzel malt Chromium mit „Hintergrundgrafiken“ in der
+    // Canvas-Farbe des Farbschemas (#121212 bei `dark`). `index.html` und ThemeModeProvider setzen
+    // `color-scheme` inline an `<html>`, deshalb `!important`.
+    const r = regelFuer(`:has(${WURZEL})`);
+    expect(r, 'kein Vorfahren-Neutralisierer').toBeDefined();
+    expect(r!.koerper).toMatch(/color-scheme:\s*light\s*!important/);
+  });
+
   it('stellt die Wurzel in den normalen Fluss', () => {
     const r = regelFuer(WURZEL);
     expect(r, 'keine Regel an der Wurzel').toBeDefined();

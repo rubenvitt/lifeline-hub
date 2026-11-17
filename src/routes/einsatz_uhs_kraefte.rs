@@ -18,13 +18,13 @@ use crate::geraet::stelle;
 use crate::live::LiveEvent;
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::{etb_bezeichnung, ADHOC_TEXT_MAX};
-use crate::routes::support::{optional_max, parse_enum, pflicht_max};
+use crate::routes::support::{optional_max, parse_enum, parse_flag, pflicht_max};
 use crate::staerke::StaerkePosition;
 use crate::uhs::kraefte::{self, UhsKraft};
 use crate::uhs::repo as uhs_repo;
 use crate::uhs::{UhsAnzeige, UhsStatus};
 use crate::zeitachse::repo as zeitachse_repo;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -65,15 +65,25 @@ pub async fn verfuegbar(
     ))
 }
 
+/// Abfrage des Rückgängig nach „Abziehen“ (LLH-1924): `nur_wenn_frei=1` lehnt mit 409 ab, wenn
+/// die Kraft inzwischen an einer anderen UHS steht.
+#[derive(Debug, Default, Deserialize)]
+pub struct ZuruecknahmeParams {
+    nur_wenn_frei: Option<String>,
+}
+
 /// PUT /api/einsaetze/{id}/uhs/{uid}/kraefte/{epid} — eine Einsatzkraft der UHS zuordnen.
 /// Steht sie an einer anderen UHS, wechselt sie für die Leitung; ein Gerät holt sie nicht zu
-/// sich (403). Schon an dieser UHS: unverändert, ohne ETB.
+/// sich (403), das Rückgängig nach „Abziehen“ (`nur_wenn_frei=1`) auch nicht (409 mit der UHS,
+/// LLH-1924). Schon an dieser UHS: unverändert, ohne ETB.
 pub async fn zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
     PfadParam((_eid, uhs_id, ep_id)): PfadParam<(i64, i64, i64)>,
+    Query(params): Query<ZuruecknahmeParams>,
 ) -> Result<Json<UhsKraft>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let nur_wenn_frei = parse_flag(params.nur_wenn_frei.as_deref(), "nur_wenn_frei")?;
     stelle::fordere_uhs(ctx.geraet.as_ref(), uhs_id)?;
     let uhs = offene_uhs(&state, einsatz_id, uhs_id).await?;
     let geraet = stelle::stelle(ctx.geraet.as_ref()).is_some();
@@ -82,6 +92,10 @@ pub async fn zuordnen(
         let alt = kraefte::uhs_der_kraft_tx(conn, einsatz_id, ep_id).await?;
         if alt == Some(uhs_id) {
             return Ok(None);
+        }
+        // Das Rückgängig nennt die andere UHS, auch am Gerät (Review LLH-1924).
+        if let (Some(andere), true) = (alt, nur_wenn_frei) {
+            return Err(kraefte::steht_anderswo_tx(conn, einsatz_id, ep_id, andere).await?);
         }
         if alt.is_some() && geraet {
             return Err(AppError::Forbidden);

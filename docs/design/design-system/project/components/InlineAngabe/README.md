@@ -53,6 +53,18 @@ optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
 - Erfüllt `onSpeichern` mit `OFFEN_LASSEN`, bleibt die Eingabe mit dem Entwurf offen, ohne
   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
 
+── WERT BEIM ÖFFNEN UND FREMDE ÄNDERUNG (LLH-1831) ────────────────────────────────────
+
+Change `nvhnqynd-konflikt-und-aenderungsvermerk`, design.md D5, Spec `formularseiten`.
+- Beim Öffnen friert die Angabe den Serverstand ein und reicht ihn als zweites Argument
+  `{ beimOeffnen }` an `onSpeichern`: der Aufrufer schickt ihn als `erwartet` (Feld-CAS).
+- Eine unberührte Eingabe sendet nichts: trifft inzwischen ein fremder Wert ein und die Person
+  hat nichts eingegeben, schließt „Speichern“ ohne Anfrage (sonst schriebe es den alten Wert
+  zurück). Hat sie eingegeben, gilt wie immer der Vergleich mit dem aktuellen Wert; so sendet
+  etwa die Sprechgruppen-Angabe nach einer Teilablehnung, was gegenüber dem Gespeicherten fehlt.
+- Weicht der Live-`wert` vom eingefrorenen ab, steht im offenen Feld „Inzwischen geändert[ von
+  X, Zeit]: <Anzeige>“ (`role="status"`); `vermerk` liefert Wer und Wann. Der Entwurf bleibt.
+
 ── ANZEIGE MIT EIGENEN BEDIENZIELEN ───────────────────────────────────────
 
 Der Wertknopf umschließt die Anzeige. Trägt sie selbst Ziele (`tel:`/`mailto:` der

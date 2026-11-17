@@ -615,6 +615,8 @@ describe('KraefteuebersichtPage — Raster', () => {
     });
     expect(within(gruppe).getByTitle('bereit')).toHaveTextContent('0');
     expect(within(gruppe).getByTitle('gebunden')).toHaveTextContent('1');
+    // „gebunden“ ist Normalbetrieb: auch mit Zahl neutral, nicht gelb (Spec `statusrollen`).
+    expect(within(gruppe).getByTitle('gebunden')).toHaveAttribute('data-ton', 'neutral');
     expect(within(gruppe).getByTitle('Ausfall')).toHaveTextContent('0');
     // Eine 0 bekommt keinen Ton.
     expect(within(gruppe).getByTitle('Ausfall')).toHaveAttribute('data-ton', 'neutral');

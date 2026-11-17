@@ -22,6 +22,15 @@ const DAUER_S = 6;
  */
 const SCHLUESSEL = 'lfh-rueckgaengig';
 
+/**
+ * Schließt den stehenden Rückgängig-Hinweis, wenn derselbe Rückweg an anderer Stelle gewählt
+ * wurde (etwa „Rückgängig“ in der gehaltenen Zeile, LLH-1924): sonst schriebe sein Knopf die
+ * Rücknahme ein zweites Mal.
+ */
+export function schliesseRueckgaengig(api: MessageInstance) {
+  api.destroy(SCHLUESSEL);
+}
+
 export function zeigeRueckgaengig(api: MessageInstance, text: string, aufRueckgaengig: () => void) {
   // Lokal statt State: der Toast lebt außerhalb des React-Baums des Auslösers.
   let verbraucht = false;

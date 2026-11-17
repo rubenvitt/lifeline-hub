@@ -1,4 +1,5 @@
 import type {
+  AbschlussPruefung,
   Fuehrungsfunktion,
   Einsatzart,
   EinsatzAnzeige,
@@ -49,6 +50,18 @@ export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {
 
 export function schliesseEinsatzAb(id: number): Promise<EinsatzAnzeige> {
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/abschliessen`, 'POST');
+}
+
+/** Offene Punkte vor dem Abschluss (LLH-1814, Spec `einsatz-abschluss`): je Gruppe Anzahl und
+ *  Kurzliste, unabhängig von den Modulfreigaben. Nur die Einsatzleitung eines aktiven Einsatzes. */
+export function loadAbschlussPruefung(id: number): Promise<AbschlussPruefung> {
+  return apiGet<AbschlussPruefung>(`/api/einsaetze/${id}/abschluss/pruefung`);
+}
+
+/** Einen abgeschlossenen Einsatz binnen 24 Stunden wieder öffnen (LLH-1814); der Grund ist
+ *  Pflicht und steht danach im ETB. */
+export function oeffneEinsatzWieder(id: number, grund: string): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/wiedereroeffnen`, 'POST', { grund });
 }
 
 export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
@@ -117,8 +130,21 @@ export type KopfdatenPatch = Partial<Kopfdaten>;
  * mitgeschicktes fremdes Feld aus einem älteren Seitenstand überschriebe die gleichzeitige
  * Änderung einer anderen Person.
  */
-export function patcheEinsatz(id: number, patch: KopfdatenPatch): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', patch);
+/**
+ * Teil-Patch der Kopfdaten. `erwartet` = Werte beim Öffnen (Feld-CAS, LLH-1831, Spec
+ * `einsatzdaten-bearbeitung`): weicht einer ab, antwortet der Server 409. Ohne `erwartet` schreibt
+ * er ohne Vergleich („Meine Änderung übernehmen“ nach der Rückfrage).
+ */
+export function patcheEinsatz(
+  id: number,
+  patch: KopfdatenPatch,
+  erwartet?: Partial<KopfdatenPatch>,
+): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>(
+    `/api/einsaetze/${id}`,
+    'PATCH',
+    erwartet ? { ...patch, erwartet } : patch,
+  );
 }
 
 /** Eigene Führungsstelle (LFH-849); ohne erfasste Angaben nur `sprechgruppen: []`. */
@@ -126,12 +152,21 @@ export function ladeFuehrungsstelle(id: number): Promise<Fuehrungsstelle> {
   return apiGet<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`);
 }
 
-/** Teiländerung der Führungsstelle: nur die übergebenen Schlüssel gehen hinaus (wie die Zeile). */
+/**
+ * Teiländerung der Führungsstelle: nur die übergebenen Schlüssel gehen hinaus (wie die Zeile).
+ * `erwartet` = Werte beim Öffnen (Feld-CAS, LLH-1831, Spec `einsatz-fuehrungsstelle`).
+ */
 export function patcheFuehrungsstelle(
   id: number,
   patch: FuehrungsstellePatch,
+  /** Altwerte; der Einsatzleiter ohne „seit“ (`EinsatzleiterAltwert`). */
+  erwartet?: Record<string, unknown>,
 ): Promise<Fuehrungsstelle> {
-  return apiSend<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`, 'PATCH', patch);
+  return apiSend<Fuehrungsstelle>(
+    `/api/einsaetze/${id}/fuehrungsstelle`,
+    'PATCH',
+    erwartet ? { ...patch, erwartet } : patch,
+  );
 }
 
 /**
