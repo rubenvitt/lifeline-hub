@@ -128,7 +128,8 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   „Unterwegs / offen / abgeschlossen“: unterwegs im Eigentransport, ohne Verbleib, abgeschlossen
   (übergeben, entlassen, Notunterkunft, Verbleib des Leichnams). Abgeschlossene zählen in keiner
   Sichtungskategorie; die Kennzahl „Betroffene“ nennt sie hinter den Patienten („3 Patienten · 2
-  abgeschlossen“), „Verbleib offen“ nennt, wie viele unterwegs sind.
+  abgeschlossen“), „Verbleib offen“ zählt die Angetroffenen, bei denen noch nicht erfasst ist, wohin sie gegangen
+  sind („wohin nicht erfasst“), und nennt, wie viele unterwegs sind.
 - **Jüngste ETB-Einträge:** die jüngsten Einträge des Einsatztagebuchs aller Typen, nicht nur
   Meldungen. Rechts im Kopf steht der Zustand der Leitung: „live“, „Verbindung wird aufgebaut“
   oder „Verbindung unterbrochen“, ohne Netz oder Server „offline“. Ein berichtigter Eintrag trägt wie im Einsatztagebuch die Marke

@@ -531,6 +531,7 @@ export default function LageDashboardPage() {
                       wert={a.wert}
                       einheit={a.einheit}
                       notiz={a.notiz}
+                      notizBeschreibung={a.notizBeschreibung}
                       ton={a.ton}
                       zustand={a.zustand}
                       ziel={a.ziel}

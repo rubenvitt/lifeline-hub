@@ -24,7 +24,8 @@ setzen Status, tragen nach und streichen.
 ### Die Kräfteübersicht lesen
 
 1. Unter „Kräfte & Mittel“ die „Kräfteübersicht“ öffnen. Der Kopf nennt die Zahl der Einheiten und die
-   Stärke (Führer/Unterführer/Mannschaft//Gesamt).
+   Stärke; die Spalte heißt „Stärke F/UF/M//Σ“ (Führer/Unterführer/Mannschaft//Summe, Kapitel
+   [Zeiten und Kürzel](zeiten-und-kuerzel.md)).
 2. Im Statusband unter „Einheiten nach FMS-Status“ je Status Code, Wort und Zahl lesen, etwa
    „S3 Anfahrt 2“; der Balken darunter zeigt den Anteil, die Summe steht oben rechts. Daneben
    gliedert „Personal nach Status“ das Personal nach Kategorie. „Rückmeldung“ mit dem Wort „keine

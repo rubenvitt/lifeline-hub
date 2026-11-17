@@ -1,3 +1,4 @@
+import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
 import { App, Breadcrumb, Button, Modal, Space, Tag, Tree, type TreeDataNode } from 'antd';
 import {
   DndContext,
@@ -732,7 +733,12 @@ export default function EinsatzabschnittePage() {
             >
               <Paneel
                 titel="Gliederung"
-                meta={abschnitteQuery.isSuccess ? String(abschnitte.length) : undefined}
+                // Die Schreibweise der Stärke steht einmal sichtbar (LLH-1750).
+                meta={
+                  abschnitteQuery.isSuccess
+                    ? `${abschnitte.length} · Stärke ${STAERKE_SCHREIBWEISE}`
+                    : undefined
+                }
                 koerperPolster
               >
                 {/* Drei Zustände in dieser Reihenfolge: eine Weiche auf die Länge der Liste wäre

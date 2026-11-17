@@ -245,6 +245,11 @@ interface KennzahlProps {
   ziel?: string;
   /** Zugänglicher Name des Links; Vorgabe ist sein Textinhalt. */
   zielBeschriftung?: string;
+  /**
+   * Erklärt ein Kürzel der Notiz, etwa die Schreibweise der Stärke (LLH-1750): zugängliche
+   * Beschreibung und Tooltip als Zusatz, nie die einzige Erklärung (Spec `bedien-wortlaut`).
+   */
+  notizBeschreibung?: string;
   style?: CSSProperties;
 }
 
@@ -260,6 +265,7 @@ export function Kennzahl({
   aufgliederung,
   ziel,
   zielBeschriftung,
+  notizBeschreibung,
   style,
 }: KennzahlProps) {
   const { token, rollen } = useRollen();
@@ -332,7 +338,11 @@ export function Kennzahl({
       {notizText != null && (
         <span
           data-lfh="kennzahl-notiz"
-          title={notizTitel}
+          title={
+            notizBeschreibung && zustand === 'daten'
+              ? [notizTitel, notizBeschreibung].filter(Boolean).join(' – ')
+              : notizTitel
+          }
           style={{
             fontSize: schriftGroesse('fein'),
             lineHeight: 1.4,

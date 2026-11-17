@@ -57,12 +57,14 @@ zusammen mit der eingeführten Form. Das wird am Freigabe-Checkpoint als Grenzfa
 **D3 Kapitel `kapitel/zeiten-und-kuerzel.md`**, Gruppe `alle`, Reihenfolge im Block der
 allgemeinen Kapitel. Die Abschnitte:
 - Überblick
-- Abläufe: „Zeitdarstellung am Gerät wählen“, nachgeklickt mit Bild
+- Abläufe: „Eine Stärke lesen“ (mit Bild) und „Den Datenstand lesen“
 - Hintergrund: Zeitpunkt, Uhrzeit, Dauer, Datenstand, Stärke, eine Tabelle der eingeführten Kürzel
 - Grundlagen: FwDV/DV 810, schon in Spec `zeitdarstellung` zitiert
 
-Die Kürzelliste der Spec `bedien-wortlaut` und die Tabelle des Kapitels müssen übereinstimmen, ein
-Vitest hält sie gleich.
+Die Kürzelliste der Spec `bedien-wortlaut` steht im Code als `anzeige/kuerzel.ts`
+(`EINGEFUEHRTE_KUERZEL`); ein Vitest hält die Tabelle des Kapitels mit ihr gleich. Der Ablauf zur
+Zeitdarstellung am Gerät steht schon in `profil-sicherheit.md`; das Kapitel verweist darauf und
+führt stattdessen die Abläufe „Eine Stärke lesen“ und „Den Datenstand lesen“.
 
 **D4 Kleiner Wächter für die Stärke.** Er sucht außerhalb von `anzeige/staerke.ts` nach `//Ges`,
 `//GES`, `F/UF/M//Gesamt` und nach `${…}/${…}/${…}` ohne folgendes `//`. Damit fällt eine neue

@@ -1,11 +1,18 @@
 import type { Staerke } from '../api/types';
-import { staerkeText } from './staerke';
+import { STAERKE_AUSGESCHRIEBEN, staerkeText } from './staerke';
 
 /**
- * Reine Darstellung einer taktischen Stärke als `F/UF/M//Σ` (BOS-Schreibweise), "—" bei `null`.
- * Rendert bewusst ein Fragment, damit zusammengesetzte Textzeilen (z. B. „kumuliert …") nicht
- * in mehrere Textknoten zerfallen.
+ * Darstellung einer taktischen Stärke als `F/UF/M//Σ` (BOS-Schreibweise), „—“ bei `null`. Der Wert
+ * trägt die ausgeschriebene Form als `title`: zugängliche Beschreibung für Vorlesehilfen und
+ * Tooltip als Zusatz (LLH-1750, Spec `lage-verdichtung`, „Die Stärke nennt ihre Schreibweise“;
+ * die sichtbare Schreibweise nennt die Fläche selbst, `STAERKE_SCHREIBWEISE`). Ein schlichtes
+ * `span` ohne Abstand und ohne Stil, damit zusammengesetzte Zeilen („kumuliert …“) wie Text fließen.
  */
 export default function StaerkeAnzeige({ wert }: { wert: Staerke | null }) {
-  return <>{staerkeText(wert)}</>;
+  if (!wert) return <>{staerkeText(wert)}</>;
+  return (
+    <span data-lfh="staerke" title={STAERKE_AUSGESCHRIEBEN}>
+      {staerkeText(wert)}
+    </span>
+  );
 }

@@ -1,3 +1,4 @@
+import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { EinsatzFahrzeug } from '../api/types';
@@ -55,7 +56,7 @@ export default function FahrzeugVorschau({ einsatzId, id }: { einsatzId: number;
             <Datenfeld label="Trägerorganisation">{f.traegerorganisation}</Datenfeld>
           )}
           {f.soll_besatzung && (
-            <Datenfeld label="Soll-Besatzung (F/UF/M//Σ)" mono>
+            <Datenfeld label={`Soll-Besatzung (${STAERKE_SCHREIBWEISE})`} mono>
               <StaerkeAnzeige wert={f.soll_besatzung} />
             </Datenfeld>
           )}

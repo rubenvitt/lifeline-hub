@@ -50,7 +50,7 @@ import {
   type LaufendeDauer,
 } from '../kraefte/zeitachse';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
-import { staerkeText } from '../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
 import {
   baueKraeftebild,
   filtereKraefte,
@@ -198,7 +198,7 @@ export function aktiveFilterChips(
 }
 
 /**
- * Der Seitenkopf-Meta — Einheitenzahl und Stärke in BOS-Schreibweise (`F/UF/M//Ges`).
+ * Der Seitenkopf-Meta — Einheitenzahl und Stärke in BOS-Schreibweise (`F/UF/M//Σ`).
  *
  * Bei gesetztem Filter nennt die Zeile den Ausschnitt und den Bezugswert („3 von 7 Einheiten ·
  * Stärke 1/0/5//6 von 2/3/10//15"); sonst verschwände die Gesamtstärke genau dann, wenn jemand
@@ -337,7 +337,8 @@ function rasterSpalten(
       ),
     },
     {
-      title: 'Stärke',
+      // Die Schreibweise steht im Spaltenkopf (LLH-1750, Spec `lage-verdichtung`).
+      title: `Stärke ${STAERKE_SCHREIBWEISE}`,
       key: 'staerke',
       width: 100,
       // Einheit: kumulierte Stärke (D2). Fahrzeug: die Besatzung Ist/Soll statt einer Stärke
@@ -348,7 +349,9 @@ function rasterSpalten(
             <span style={zahlStil('klein')}>—</span>
           ) : null
         ) : z.staerke ? (
-          <span style={zahlStil('klein')}>{staerkeText(z.staerke)}</span>
+          <span style={zahlStil('klein')} title={STAERKE_AUSGESCHRIEBEN}>
+            {staerkeText(z.staerke)}
+          </span>
         ) : z.besatzung ? (
           <StaerkeBesatzung zeilen={besatzungZeilen(z.besatzung)} />
         ) : null,

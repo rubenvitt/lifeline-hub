@@ -47,7 +47,7 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    „gesamt“. Ist am Einsatz die Reihe „Sanitätsdienst“ gewählt (Kapitel [Lagebild](lagebild.md)),
    steht dort „Hilfeleistungen“: Kontakte, letzte Stunde und vermisst, darunter in Versorgung,
    Transporte und SK I.
-3. „Kräfte“ zählt Personal, Einheiten und die Stärke F/UF/M; oben rechts steht, wie viele Kräfte an
+3. „Kräfte“ zählt Personal, Einheiten und die Stärke F/UF/M//Σ; oben rechts steht, wie viele Kräfte an
    aktiven Unfallhilfsstellen arbeiten, gezählt wie im Lagebild.
 4. „Belegung der Unfallhilfsstellen“ nennt je UHS Belegte und Plätze, etwa „8/5“, bis zu sechs;
    der Rest steht als „+… weitere“. Überbelegte UHS (mehr Belegte als Plätze) stehen zuerst, rot

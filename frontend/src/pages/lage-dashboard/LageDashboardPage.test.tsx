@@ -383,7 +383,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     // Der eine Angetroffene hat keinen Verbleib: offene Arbeit, Achtung.
     const verbleib = kennzahl('Verbleib offen');
     expect(verbleib.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('1');
-    expect(verbleib).toHaveTextContent('0 unterwegs');
+    expect(verbleib).toHaveTextContent('wohin nicht erfasst');
     expect(verbleib.getAttribute('data-ton')).toBe('achtung');
     expect(verbleib).toHaveAttribute('href', '/einsaetze/1/personen');
   });
@@ -512,7 +512,11 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     mockEndpunkte({});
     render();
     await kennzahlGeladen('Kräfte');
-    expect(kennzahl('Kräfte')).toHaveTextContent('0 Einheiten · 0/0/0//0');
+    expect(kennzahl('Kräfte')).toHaveTextContent('0 Einheiten · Stärke 0/0/0//0');
+    // Die Schreibweise ausgeschrieben, als zugängliche Beschreibung der Notiz (LLH-1750).
+    expect(
+      kennzahl('Kräfte').querySelector('[data-lfh="kennzahl-notiz"]')!.getAttribute('title'),
+    ).toContain('Führer / Unterführer / Mannschaft // Summe');
   });
 
   it('gesperrtes Meldebild: „Kräfte" zeigt die Stärke ohne Link (LFH-888)', async () => {

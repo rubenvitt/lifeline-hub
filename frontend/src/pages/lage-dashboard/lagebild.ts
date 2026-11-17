@@ -25,7 +25,7 @@ import type {
 } from '../../api/types';
 import { dauer, minutenZwischen } from '../../anzeige/dauer';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../../anzeige/format';
-import { staerkeText } from '../../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
 import { baueKraeftebild } from '../../kraefte/kraeftebild';
 import { LAGEBERICHT_STATUS } from '../../kommunikation/phase';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
@@ -190,6 +190,8 @@ interface Kennzahl {
   wert: string;
   einheit?: string;
   notiz: string;
+  /** Erklärt ein Kürzel der Notiz, etwa die Schreibweise der Stärke (LLH-1750). */
+  notizBeschreibung?: string;
   ton: KennzahlTon;
   /** Modul-Route für `einsatzModulPfad` (die Seite baut den Pfad über `routing/deeplinks`). */
   route: string;
@@ -526,10 +528,14 @@ export function baueLagebild(
     },
     'Verbleib offen': {
       // Angetroffene ohne Verbleib — dieselbe Zählung wie „Unterwegs / offen / abgeschlossen“ im
-      // Sichtungspaneel (LLH-1332).
+      // Sichtungspaneel (LLH-1332). Die Notiz sagt, was offen ist (LLH-1750, Spec
+      // `betroffene-lagedaten`).
       etikett: 'Verbleib offen',
       wert: String(versorgung.offen),
-      notiz: `${versorgung.unterwegs} unterwegs`,
+      notiz:
+        versorgung.unterwegs > 0
+          ? `wohin nicht erfasst · ${versorgung.unterwegs} unterwegs`
+          : 'wohin nicht erfasst',
       ton: versorgung.offen > 0 ? 'achtung' : 'neutral',
       route: 'personen',
     },
@@ -547,10 +553,11 @@ export function baueLagebild(
     },
     Kräfte: {
       // Die Gesamtstärke führt; F/UF/M//Σ steht in der Notiz, damit die BOS-Schreibweise erhalten
-      // bleibt.
+      // bleibt, mit dem Wort „Stärke“ und ausgeschrieben als Beschreibung (LLH-1750).
       etikett: 'Kräfte',
       wert: String(kraefte.staerke.gesamt),
-      notiz: `${r.einheiten.length} Einheiten · ${staerkeText(kraefte.staerke)}`,
+      notiz: `${r.einheiten.length} Einheiten · Stärke ${staerkeText(kraefte.staerke)}`,
+      notizBeschreibung: `Stärke ${STAERKE_SCHREIBWEISE}: ${STAERKE_AUSGESCHRIEBEN}`,
       ton: 'neutral',
       route: 'kraefteuebersicht',
     },

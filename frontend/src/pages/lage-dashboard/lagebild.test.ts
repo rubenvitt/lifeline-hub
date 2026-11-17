@@ -296,7 +296,7 @@ describe('baueLagebild', () => {
     expect(bild.kennzahlen[0]).toMatchObject({
       etikett: 'Verbleib offen',
       wert: '2',
-      notiz: '1 unterwegs',
+      notiz: 'wohin nicht erfasst · 1 unterwegs',
       ton: 'achtung',
       route: 'personen',
     });

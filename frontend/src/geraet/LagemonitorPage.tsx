@@ -1,3 +1,4 @@
+import { STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
 import { relativ } from '../anzeige/dauer';
 import {
   useCallback,
@@ -400,10 +401,8 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
         <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
           <Zahl wert={k.personal} bezeichnung="Personal" />
           <Zahl wert={k.einheiten} bezeichnung="Einheiten" />
-          <Zahl
-            wert={`${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}`}
-            bezeichnung="Stärke F/UF/M"
-          />
+          {/* Mit Summe aus der einen Formatierung (LLH-1750, Spec `lage-verdichtung`). */}
+          <Zahl wert={staerkeText(s)} bezeichnung={`Stärke ${STAERKE_SCHREIBWEISE}`} />
         </div>
       </Kachel>
       {/* Überbelegung (LLH-1746): das Wort steht in der Titelzeile, die Zahl in der Alarmrolle;

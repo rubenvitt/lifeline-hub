@@ -11,7 +11,7 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { statusKategorie, type Statusrolle } from '../theme/statusFarben';
 import { statusFlaeche, tonVonRolle } from '../components/instrument/statusFlaeche';
 import { useRollen } from '../components/instrument';
-import { staerkeText } from '../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
 import { verdichte } from './kraeftebild';
 
 /**
@@ -117,13 +117,16 @@ export default function Verdichtungszeile({
       data-lfh="verdichtungszeile"
       style={{ marginBlockEnd: token.margin }}
     >
-      <span style={{ color: token.colorTextSecondary }}>Stärke</span>
+      {/* Die Schreibweise steht dabei (LLH-1750, Spec `lage-verdichtung`). */}
+      <span style={{ color: token.colorTextSecondary }}>Stärke {STAERKE_SCHREIBWEISE}</span>
       {/* Ohne Personal ist die Stärke unbekannt: „—“, nie „0/0/0//0“ (keine erfundenen Daten). */}
-      <strong>{personalFrei === false ? '—' : staerkeText(v.staerke)}</strong>
+      <strong title={personalFrei === false ? undefined : STAERKE_AUSGESCHRIEBEN}>
+        {personalFrei === false ? '—' : staerkeText(v.staerke)}
+      </strong>
       {fahrzeugeFrei !== false && (
         <>
           <span aria-hidden>·</span>
-          <span style={{ color: token.colorTextSecondary }}>Fzg {v.anzahlFahrzeuge}</span>
+          <span style={{ color: token.colorTextSecondary }}>Fahrzeuge {v.anzahlFahrzeuge}</span>
           {/* Zahl vor Wort, dieselben Wörter wie der Zählerstreifen der Tabelle darunter
               (LFH-973, `statusKategorie`): „verfügbar“ statt „frei“, „nicht verfügbar“
               ausgeschrieben. */}

@@ -181,7 +181,7 @@ describe('Lagemonitor — Großbild', () => {
     expect(within(betroffene).getByText('12')).toBeInTheDocument();
     expect(within(betroffene).getByText('vermisst')).toBeInTheDocument();
     const kraefte = screen.getByRole('region', { name: 'Kräfte' });
-    expect(within(kraefte).getByText('2/6/30')).toBeInTheDocument();
+    expect(within(kraefte).getByText('2/6/30//38')).toBeInTheDocument();
     // Kräfte an den UHS nur als Zahl (LFH-1045).
     expect(within(kraefte).getByText('4 an UHS')).toBeInTheDocument();
     const belegung = screen.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' });

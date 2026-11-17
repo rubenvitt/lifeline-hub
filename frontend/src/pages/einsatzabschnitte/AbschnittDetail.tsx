@@ -1,3 +1,4 @@
+import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { useRef, useState } from 'react';
 import { Input } from 'antd';
 import { ApiError } from '../../api/client';
@@ -238,10 +239,10 @@ export default function AbschnittDetail({
         />
       </Datenfeld>
       <Datenfeld label="Bemerkung">{textRow('Bemerkung', 'bemerkung', true)}</Datenfeld>
-      <Datenfeld label="Stärke (F/UF/M//Σ)" mono>
+      <Datenfeld label={`Stärke (${STAERKE_SCHREIBWEISE})`} mono>
         <StaerkeAnzeige wert={staerken.eigene} />
       </Datenfeld>
-      <Datenfeld label="Stärke inkl. Unterabschnitte (F/UF/M//Σ)" mono>
+      <Datenfeld label={`Stärke inkl. Unterabschnitte (${STAERKE_SCHREIBWEISE})`} mono>
         <StaerkeAnzeige wert={staerken.inklUnter} />
       </Datenfeld>
     </Datenraster>

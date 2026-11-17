@@ -157,7 +157,7 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
       'Abschnitt',
       'Über-Einheit',
       'Einheitsführer',
-      'Soll-Stärke (F/UF/M)',
+      'Soll-Stärke (F/UF/M//Σ)',
       'Qualifikationssoll',
       'Ist (F/UF/M//Σ)',
       'Status',

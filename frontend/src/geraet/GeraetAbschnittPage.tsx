@@ -1,3 +1,4 @@
+import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
 import { Alert, Flex, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -143,7 +144,7 @@ export default function GeraetAbschnittPage() {
               spalten={1}
             />
           </Paneel>
-          <Paneel titel="Einheiten" koerperPolster>
+          <Paneel titel="Einheiten" meta={`Stärke ${STAERKE_SCHREIBWEISE}`} koerperPolster>
             {einheitenQuery.isError ? (
               <Alert type="error" showIcon title="Einheiten konnten nicht geladen werden" />
             ) : einheitenQuery.isLoading ? (
