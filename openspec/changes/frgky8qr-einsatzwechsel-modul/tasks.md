@@ -8,7 +8,7 @@ per TDD.
 - [x] 1.1 `routing/deeplinks.ts`: `einsatzPfad(id, {modul})` und `parseModulHinweis`; Deeplink-Test (bekannter Schlüssel, unbekannter verworfen, ohne Hinweis unverändert)
 - [x] 1.2 `DefaultModulRedirect.tsx`: mit Hinweis auf Freigaben warten, freies Modul → dessen Startseite, gesperrt/ausgeblendet/nicht fertig/unbekannt → bisheriges Ziel; `DefaultModulRedirect.test.tsx` für jeden Fall und gegen Doppel-Navigation
 - [x] 1.3 `EinsatzSwitcher.tsx` hängt das aktuelle Modul an; Test: Wechsel aus `/einsaetze/7/fahrzeuge?fahrzeug=3` führt auf `/einsaetze/8?modul=fahrzeuge` und weiter auf `/einsaetze/8/fahrzeuge`
-- [ ] 1.4 `command-palette/befehle.ts`: Einsatzwechsel mit Modul-Hinweis, auch für Strg+↵; `befehle.test.ts`
+- [x] 1.4 `command-palette/befehle.ts`: Einsatzwechsel mit Modul-Hinweis, auch für Strg+↵; `befehle.test.ts`
 - [ ] 1.5 „Zuletzt besucht“: Test, dass die Ankunft im selben Modul nicht aufzeichnet; Tabelle der Ankünfte in `zuletztModule.ts` nachziehen
 
 ## 2. Nebenzeile (D2)

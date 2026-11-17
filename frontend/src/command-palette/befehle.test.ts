@@ -483,6 +483,22 @@ describe('baueBefehle — Einsatz-Wechsel', () => {
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/7');
   });
 
+  it('bleibt im Modul der Seite, auf der die Palette offen ist, auch für Strg+↵ (LLH-1821)', () => {
+    const k = kontext({ einsaetze: [aktiverEinsatz], aktuellerModulKey: 'fahrzeuge' });
+    const zeile = baueBefehle(k).find((x) => x.id === 'einsatz:7')!;
+    // Die Marke trägt den Hinweis: ↵, Strg+↵ und Strg+Klick nehmen dasselbe Ziel.
+    expect(zeile.ziel).toBe('/einsaetze/7?modul=fahrzeuge');
+    zeile.ausfuehren();
+    expect(k.navigate).toHaveBeenLastCalledWith('/einsaetze/7?modul=fahrzeuge');
+    zeile.ausfuehren('neuerTab');
+    expect(k.navigate).toHaveBeenLastCalledWith('/einsaetze/7?modul=fahrzeuge', 'neuerTab');
+  });
+
+  it('springt außerhalb eines Moduls ohne Hinweis', () => {
+    const k = kontext({ einsatzId: null, einsaetze: [aktiverEinsatz], aktuellerModulKey: null });
+    expect(baueBefehle(k).find((x) => x.id === 'einsatz:7')!.ziel).toBe('/einsaetze/7');
+  });
+
   it('kennzeichnet eine Übung und findet sie über „Übung“ (LLH-1725)', () => {
     const uebung: EinsatzAnzeige = { ...aktiverEinsatz, id: 9, einsatzart: 'uebung' };
     const b = baueBefehle(kontext({ einsaetze: [aktiverEinsatz, uebung] }));

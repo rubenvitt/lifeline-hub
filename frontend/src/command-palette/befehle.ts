@@ -567,7 +567,9 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     }
   }
 
-  // 5. Einsatz-Wechsel — aktive Einsätze (global)
+  // 5. Einsatz-Wechsel — aktive Einsätze (global). Das Modul der Seite, auf der die Palette offen
+  //    ist, reist als Hinweis mit (LLH-1821, Change `frgky8qr-einsatzwechsel-modul`, D1); ob es im
+  //    Ziel frei ist, entscheidet dessen Index-Route. Im Ziel steht es, damit Strg+↵ es mitnimmt.
   for (const e of k.einsaetze) {
     if (e.status !== 'aktiv') continue;
     befehle.push({
@@ -578,7 +580,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       // Eine Übung trägt die Marke und ist über „Übung“ zu finden (LLH-1725).
       ...(isUebung(e) ? { uebung: true as const } : {}),
       schlagworte: [...(e.stichwort ? [e.stichwort] : []), ...(isUebung(e) ? ['Übung'] : [])],
-      ...sprungZu(einsatzPfad(e.id), k.navigate),
+      ...sprungZu(einsatzPfad(e.id, { modul: k.aktuellerModulKey }), k.navigate),
     });
   }
 
