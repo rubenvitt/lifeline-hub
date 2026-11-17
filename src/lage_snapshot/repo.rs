@@ -300,6 +300,8 @@ pub async fn erzeuge(
             .into_iter()
             .map(|e| crate::einheit::EinheitAnzeige {
                 verbindungen: Vec::new(),
+                // Wer wann geändert hat, gehört nicht ins eingefrorene Lagebild (LLH-1834).
+                vermerke: Default::default(),
                 ..e
             })
             .collect(),

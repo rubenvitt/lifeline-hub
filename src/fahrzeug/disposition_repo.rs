@@ -783,6 +783,17 @@ pub async fn entlassen_tx(
             .execute(&mut *conn)
             .await?;
     }
+    // Die Führungsstelle verliert ein Fahrzeug: Änderungsvermerk an ihren Fahrzeugen (LLH-1834).
+    if trug_fuehrungsstelle {
+        crate::einsatz::feld_vermerk::setze_tx(
+            conn,
+            einsatz_id,
+            crate::einsatz::feld_vermerk::Objekt::Fuehrungsstelle,
+            &["fahrzeug_ids"],
+            benutzer_id,
+        )
+        .await?;
+    }
     set_beendet_tx(
         conn,
         einsatz_id,

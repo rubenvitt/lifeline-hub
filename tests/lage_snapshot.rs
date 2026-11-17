@@ -154,12 +154,11 @@ async fn snapshot_friert_fachdaten_ein_umbenennen_aendert_stand_nicht() {
         .unwrap();
 
     // Einheit nach dem Snapshot umbenennen.
-    einheit_repo::patche(
-        &pool,
+    einheit_repo::patche_tx(
+        &mut *pool.acquire().await.unwrap(),
         einsatz_id,
-        org_id,
         einheit_id,
-        EinheitPatch {
+        &EinheitPatch {
             name: Some("THW Zug 2"),
             abschnitt_id: None,
             ueber_einheit_id: None,
@@ -171,7 +170,9 @@ async fn snapshot_friert_fachdaten_ein_umbenennen_aendert_stand_nicht() {
             funkrufname: None,
             sortier: None,
             quali_soll: None,
+            fuehrer_id: None,
         },
+        &lifeline_hub::feld_cas::ExpectedValues::new(),
     )
     .await
     .unwrap();

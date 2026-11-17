@@ -5931,6 +5931,16 @@
               "$ref": "#/components/schemas/KommunikationsVerbindung"
             },
             "description": "Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.\nPersonenbezogen: geschwärzt, nie im Lagebericht."
+          },
+          "vermerke": {
+            "type": "object",
+            "description": "Wer welche Angabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec\n`aenderungsvermerk`); fehlt, solange seit dem Anlegen keine Angabe geändert wurde.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeldVermerk"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           }
         }
       },
@@ -6731,6 +6741,16 @@
             ],
             "format": "int64",
             "description": "Schwärzungsstand (LFH-996): vollzogene Personen-Anträge plus geschwärzte\nDatenkategorien dieses Einsatzes. Wächst nur; fehlt bei 0. Ein Gerät, das einen höheren\nStand sieht, verwirft jeden älteren Stand des Einsatzes (`frontend/src/offline/AGENTS.md`).\nNennt bewusst weder Person noch Zeitpunkt noch Modul."
+          },
+          "vermerke": {
+            "type": "object",
+            "description": "Wer welche Kopfangabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec\n`aenderungsvermerk`). Nur das Detail und die Antwort des Kopf-PATCH füllen es; es fehlt\nin der Liste, an Gerätesitzungen und ohne Änderung seit dem Anlegen.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeldVermerk"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "verwahrung": {
             "oneOf": [
@@ -9521,6 +9541,24 @@
           }
         }
       },
+      "FeldVermerk": {
+        "type": "object",
+        "description": "Der Vermerk einer Angabe: Zeitpunkt (SQLite-Format, UTC) und Anzeigename des Benutzers\n(`None`, wenn der Benutzer fehlt).",
+        "required": [
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "von": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "Fernmeldeskizze": {
         "type": "object",
         "description": "Alles, was die Skizze selbst speichert. Zuordnungen von Abschnitt, Einheit, Führungsstelle und\nexternen Stellen liest der Client aus ihren Datensätzen.",
@@ -10219,6 +10257,16 @@
               "$ref": "#/components/schemas/KommunikationsVerbindung"
             },
             "description": "Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.\nPersonenbezogen: wird geschwärzt und steht nie im Lagebericht."
+          },
+          "vermerke": {
+            "type": "object",
+            "description": "Wer welche Angabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec\n`aenderungsvermerk`). Nur Lesen und PATCH-Antwort füllen es, nicht an Gerätesitzungen.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeldVermerk"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           }
         }
       },

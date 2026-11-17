@@ -178,12 +178,12 @@ export default function SchaedenDetailPage() {
     onError: (e, v) => {
       // Nur der erste 409 (Save mit Baseline) ist der Sperrkonflikt. Die Schaden-Route kennt einen
       // zweiten 409, den Storno-Guard vor der CAS, den `overwrite` nicht umgeht. Ein 409 auf den
-      // Overwrite zeigt deshalb die Servermeldung, sonst wäre „Überschreiben" ein toter Knopf.
+      // Overwrite zeigt deshalb die Servermeldung, sonst wäre „Meine Änderung übernehmen" ein toter Knopf.
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
           content: 'Seit dem Öffnen von jemand anderem gespeichert.',
-          okText: 'Überschreiben',
+          okText: 'Meine Änderung übernehmen',
           okButtonProps: { danger: true },
           cancelText: 'Verwerfen und neu laden',
           onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),

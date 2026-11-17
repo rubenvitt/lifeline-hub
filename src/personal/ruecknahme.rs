@@ -139,7 +139,16 @@ pub async fn zuruecknehmen_tx(
         .filter(|id| Some(*id) == vorzustand.einheit_id)
         .collect();
     if !fuehrung.is_empty() {
-        bind_fuehrung_tx(conn, einsatz_id, ep_id, &fuehrung, rechte, &mut ergebnis).await?;
+        bind_fuehrung_tx(
+            conn,
+            einsatz_id,
+            ep_id,
+            benutzer_id,
+            &fuehrung,
+            rechte,
+            &mut ergebnis,
+        )
+        .await?;
     }
     if let Some(ef_id) = vorzustand.fahrzeug_id {
         bind_fahrzeug_tx(conn, einsatz_id, ep_id, ef_id, rechte, &mut ergebnis).await?;
@@ -160,7 +169,8 @@ pub async fn zuruecknehmen_tx(
     }
     if let Some(name) = &vorzustand.einsatzleiter_name {
         if rechte.einsatzdaten {
-            bind_einsatzleitung_tx(conn, einsatz_id, ep_id, name, &mut ergebnis).await?;
+            bind_einsatzleitung_tx(conn, einsatz_id, ep_id, benutzer_id, name, &mut ergebnis)
+                .await?;
         } else {
             ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
                 "Einsatzleitung",
@@ -287,6 +297,7 @@ async fn bind_fuehrung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
+    benutzer_id: i64,
     einheiten: &[i64],
     rechte: RuecknahmeRechte,
     ergebnis: &mut Ruecknahme,
@@ -306,6 +317,15 @@ async fn bind_fuehrung_tx(
         .fetch_all(&mut *conn)
         .await?;
         for id in gebunden {
+            // Änderungsvermerk am Führer (Spec `aenderungsvermerk`, „bei jedem Schreiben“).
+            crate::einsatz::feld_vermerk::setze_tx(
+                conn,
+                einsatz_id,
+                crate::einsatz::feld_vermerk::Objekt::Einheit(id),
+                &["fuehrer_id"],
+                benutzer_id,
+            )
+            .await?;
             merke_einheit(ergebnis, id);
         }
     }
@@ -541,6 +561,7 @@ async fn bind_einsatzleitung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
+    benutzer_id: i64,
     einsatzleiter_name: &str,
     ergebnis: &mut Ruecknahme,
 ) -> Result<(), AppError> {
@@ -555,6 +576,14 @@ async fn bind_einsatzleitung_tx(
     .execute(&mut *conn)
     .await?;
     if r.rows_affected() == 1 {
+        crate::einsatz::feld_vermerk::setze_tx(
+            conn,
+            einsatz_id,
+            crate::einsatz::feld_vermerk::Objekt::Fuehrungsstelle,
+            &["einsatzleiter"],
+            benutzer_id,
+        )
+        .await?;
         ergebnis.einsatzleiter = true;
         return Ok(());
     }

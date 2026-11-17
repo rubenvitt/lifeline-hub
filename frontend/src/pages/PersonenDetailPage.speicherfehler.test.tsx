@@ -640,7 +640,9 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
     await kopfueberschrift();
     await aendereName();
 
-    expect(await screen.findByRole('button', { name: 'Überschreiben' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }),
+    ).toBeInTheDocument();
     expect(document.querySelector('form [role="alert"]')).toBeNull();
   });
 

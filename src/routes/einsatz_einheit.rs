@@ -85,6 +85,13 @@ pub async fn liste(
     if let Some(b) = crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
         liste.retain(|e| b.einheiten.contains(&e.id));
     }
+    // Wer welche Angabe zuletzt geändert hat (LLH-1834): nicht an Gerätesitzungen, wie Kopf und
+    // Führungsstelle — ein Gerät bekommt keine Benutzernamen.
+    if ctx.geraet.is_some() {
+        for e in &mut liste {
+            e.vermerke.clear();
+        }
+    }
     Ok(Json(liste))
 }
 
@@ -649,7 +656,49 @@ pub struct EinheitPatchBody {
     pub erreichbarkeit: Option<Option<IgnoredAny>>,
     pub sortier: Option<i64>,
     pub sprechgruppe_ids: Option<Vec<i64>>,
+    /// Feld-CAS (LLH-1831, Spec `einheit-ansicht`, „Angabe der Einheit mit Altwert speichern“): je
+    /// Feld der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<EinheitErwartet>,
 }
+
+/// Altwerte der Einheit, dreiwertig wie [`EinheitPatchBody`]; die Soll-Stärke nur als Trio, die
+/// Verbindungen als ganze Liste.
+#[derive(Debug, Default, Deserialize)]
+pub struct EinheitErwartet {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub abschnitt_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ueber_einheit_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub typ_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub fuehrer_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub soll_fuehrer: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub soll_unterfuehrer: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub soll_mannschaft: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub quali_soll: Option<Option<Vec<QualiSollEingabe>>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub funkrufname: Option<Option<String>>,
+    pub verbindungen: Option<Vec<VerbindungBody>>,
+}
+
+/// Wirksame Werte für den Feld-CAS (LLH-1831): die eigene Spalte, sonst die des Typs. Feste
+/// Ausdrücke aus dem Code, nie aus der Anfrage; das UPDATE liest sie am Stand vor dem Schreiben.
+const WIRKSAM_SOLL_FUEHRER: &str = "COALESCE(soll_fuehrer, \
+     (SELECT t.soll_fuehrer FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
+const WIRKSAM_SOLL_UNTERFUEHRER: &str = "COALESCE(soll_unterfuehrer, \
+     (SELECT t.soll_unterfuehrer FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
+const WIRKSAM_SOLL_MANNSCHAFT: &str = "COALESCE(soll_mannschaft, \
+     (SELECT t.soll_mannschaft FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
+const WIRKSAM_QUALI_SOLL: &str = "COALESCE(quali_soll, \
+     (SELECT t.quali_soll FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
 
 /// PATCH /api/einsaetze/{id}/einheiten/{eid} — echter Teil-Patch (LFH-306) inkl.
 /// authoritativem `fuehrer_id`. Führer-Wechsel und Abschnitts-Zuordnungs-Änderung
@@ -683,6 +732,124 @@ pub async fn update(
         .verbindungen
         .map(verbindungen::pruefe_liste)
         .transpose()?;
+
+    // Feld-CAS (LLH-1831, design.md D1/D2): Altwert nur mit Änderung desselben Felds, das
+    // Soll-Trio ganz oder gar nicht (422); Formen wie der Patch (getrimmt, gespeicherte Form).
+    let erwartet = body.erwartet.unwrap_or_default();
+    // Lage je Feld vor den Einzelprüfungen festhalten; die Kombination (422) prüft erst danach,
+    // damit ein 400 je Feld vorgeht (`src/AGENTS.md`, Statuscode-Konvention).
+    let erwartet_lage: &[crate::feld_cas::FeldLage] = &[
+        ("name", erwartet.name.is_some(), name.is_some()),
+        (
+            "abschnitt_id",
+            erwartet.abschnitt_id.is_some(),
+            body.abschnitt_id.is_some(),
+        ),
+        (
+            "ueber_einheit_id",
+            erwartet.ueber_einheit_id.is_some(),
+            body.ueber_einheit_id.is_some(),
+        ),
+        ("typ_id", erwartet.typ_id.is_some(), body.typ_id.is_some()),
+        (
+            "fuehrer_id",
+            erwartet.fuehrer_id.is_some(),
+            body.fuehrer_id.is_some(),
+        ),
+        (
+            "soll_fuehrer",
+            erwartet.soll_fuehrer.is_some(),
+            body.soll_fuehrer.is_some(),
+        ),
+        (
+            "soll_unterfuehrer",
+            erwartet.soll_unterfuehrer.is_some(),
+            body.soll_unterfuehrer.is_some(),
+        ),
+        (
+            "soll_mannschaft",
+            erwartet.soll_mannschaft.is_some(),
+            body.soll_mannschaft.is_some(),
+        ),
+        (
+            "quali_soll",
+            erwartet.quali_soll.is_some(),
+            quali_soll.is_some(),
+        ),
+        (
+            "bemerkung",
+            erwartet.bemerkung.is_some(),
+            bemerkung.is_some(),
+        ),
+        (
+            "funkrufname",
+            erwartet.funkrufname.is_some(),
+            funkrufname.is_some(),
+        ),
+        (
+            "verbindungen",
+            erwartet.verbindungen.is_some(),
+            neue_verbindungen.is_some(),
+        ),
+    ];
+    let erwartet_name = erwartet.name.as_deref().map(str::trim);
+    let erwartet_quali = quali_soll::form_tri(erwartet.quali_soll)?;
+    let erwartet_bemerkung = optional_max_tri(erwartet.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
+    let erwartet_funkrufname =
+        optional_max_tri(erwartet.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
+    let erwartet_verbindungen = erwartet
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
+    crate::feld_cas::pruefe_felder(
+        erwartet_lage,
+        &[
+            (
+                "soll_fuehrer",
+                "soll_unterfuehrer",
+                "erwartet trägt die Soll-Stärke nur als Trio",
+            ),
+            (
+                "soll_unterfuehrer",
+                "soll_mannschaft",
+                "erwartet trägt die Soll-Stärke nur als Trio",
+            ),
+        ],
+    )?;
+    let altwerte = {
+        use crate::feld_cas::ExpectedValue::{Integer, Text};
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        w.push("name", erwartet_name.map(|n| Text(Some(n))));
+        w.push("abschnitt_id", erwartet.abschnitt_id.map(Integer));
+        w.push("ueber_einheit_id", erwartet.ueber_einheit_id.map(Integer));
+        w.push("typ_id", erwartet.typ_id.map(Integer));
+        w.push("fuehrer_id", erwartet.fuehrer_id.map(Integer));
+        // Soll-Stärke und Qualifikationssoll zeigt die Ansicht wirksam (eigener Wert, sonst der des
+        // Typs); verglichen wird deshalb der wirksame Wert, sonst wäre ein geerbter stets ein
+        // Konflikt (design.md D2).
+        w.push(WIRKSAM_SOLL_FUEHRER, erwartet.soll_fuehrer.map(Integer));
+        w.push(
+            WIRKSAM_SOLL_UNTERFUEHRER,
+            erwartet.soll_unterfuehrer.map(Integer),
+        );
+        w.push(
+            WIRKSAM_SOLL_MANNSCHAFT,
+            erwartet.soll_mannschaft.map(Integer),
+        );
+        w.push(
+            WIRKSAM_QUALI_SOLL,
+            erwartet_quali.as_ref().map(|v| Text(v.as_deref())),
+        );
+        w.push(
+            "bemerkung",
+            erwartet_bemerkung.as_ref().map(|v| Text(v.as_deref())),
+        );
+        w.push(
+            "funkrufname",
+            erwartet_funkrufname.as_ref().map(|v| Text(v.as_deref())),
+        );
+        w
+    };
 
     require_aktiv(&state, einsatz_id, eid).await?;
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
@@ -730,42 +897,66 @@ pub async fn update(
         )
         .await?;
     }
-    let nachher = einheit_repo::patche(
-        &state.pool,
-        einsatz_id,
-        ctx.einsatz.org_id,
-        eid,
-        EinheitPatch {
-            name: name.as_deref(),
-            abschnitt_id: body.abschnitt_id,
-            ueber_einheit_id: body.ueber_einheit_id,
-            typ_id: body.typ_id,
-            soll_fuehrer: body.soll_fuehrer,
-            soll_unterfuehrer: body.soll_unterfuehrer,
-            soll_mannschaft: body.soll_mannschaft,
-            quali_soll: quali_soll.as_ref().map(|v| v.as_deref()),
-            bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
-            funkrufname: funkrufname.as_ref().map(|v| v.as_deref()),
-            sortier: body.sortier,
-        },
-    )
-    .await?;
+    let patch = EinheitPatch {
+        name: name.as_deref(),
+        fuehrer_id: if fuehrer_wechsel { fuehrer_neu } else { None },
+        abschnitt_id: body.abschnitt_id,
+        ueber_einheit_id: body.ueber_einheit_id,
+        typ_id: body.typ_id,
+        soll_fuehrer: body.soll_fuehrer,
+        soll_unterfuehrer: body.soll_unterfuehrer,
+        soll_mannschaft: body.soll_mannschaft,
+        quali_soll: quali_soll.as_ref().map(|v| v.as_deref()),
+        bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
+        funkrufname: funkrufname.as_ref().map(|v| v.as_deref()),
+        sortier: body.sortier,
+    };
+    einheit_repo::pruefe_patch(&state.pool, einsatz_id, ctx.einsatz.org_id, eid, &patch).await?;
+    // Spaltenfelder samt Führer, Verbindungen und Vermerk in EINER Schreibtransaktion
+    // (LLH-1831/LLH-1834, design.md D2/D3): ein veralteter Altwert schreibt nichts, auch keinen
+    // ETB-Eintrag (der entsteht erst nach dem Commit).
+    let von = ctx.benutzer.id;
+    let bezug = verbindungen::Bezug::Einheit(eid);
+    crate::write_retry!(&state.pool, |conn| {
+        let werte_vorher = einheit_repo::werte_tx(conn, einsatz_id, eid).await?;
+        let verbindungen_vorher = verbindungen::liste_tx(conn, einsatz_id, bezug).await?;
+        if erwartet_verbindungen
+            .as_ref()
+            .is_some_and(|alt| *alt != verbindungen_vorher)
+        {
+            return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+        }
+        einheit_repo::patche_tx(conn, einsatz_id, eid, &patch, &altwerte).await?;
+        let mut felder = Vec::new();
+        if let Some(liste) = &neue_verbindungen {
+            verbindungen::ersetzen_tx(conn, einsatz_id, bezug, liste).await?;
+            if *liste != verbindungen_vorher {
+                felder.push("verbindungen");
+            }
+        }
+        let werte_nachher = einheit_repo::werte_tx(conn, einsatz_id, eid).await?;
+        felder.extend(werte_vorher.geaenderte_felder(&werte_nachher));
+        crate::einsatz::feld_vermerk::setze_tx(
+            conn,
+            einsatz_id,
+            crate::einsatz::feld_vermerk::Objekt::Einheit(eid),
+            &felder,
+            von,
+        )
+        .await?;
+        Ok(())
+    })?;
+    let nachher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
     // Die Personenzeile trägt Name und Abschnitt der versorgenden Einheit (LLH-1682). Gleich
-    // nach `patche` melden, was gespeichert ist.
+    // nach dem Schreiben melden, was gespeichert ist.
     if vorher.name != nachher.name || vorher.abschnitt_id != nachher.abschnitt_id {
         super::einsatz_person::sse_versorgte_personen(&state, einsatz_id, &[eid]).await;
     }
 
-    // Die übrigen Schritte schreiben je für sich. Scheitert einer doch noch (ein Rennen mit der
-    // Prüfung oben, etwa eine gleichzeitig angelegte gleichnamige Einsatz-Sprechgruppe, oder 503),
-    // ist `patche` schon gespeichert: ETB und Live-Ereignis laufen trotzdem, der Fehler geht
-    // danach an den Client (LLH-1692).
+    // Die Sprechgruppen schreiben danach für sich (idempotente Einzelwege, LLH-1692). Scheitert
+    // das doch noch (ein Rennen mit der Prüfung oben oder 503), sind die übrigen Angaben schon
+    // gespeichert: ETB und Live-Ereignis laufen trotzdem, der Fehler geht danach an den Client.
     let rest: Result<(), AppError> = async {
-        // Führer authoritativ setzen (Mitgliedschaft bereits geprüft) + ETB bei Änderung.
-        if fuehrer_wechsel {
-            einheit_repo::setze_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten())
-                .await?;
-        }
         if let Some(ids) = &sprechgruppe_ids {
             crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
                 &state.pool,
@@ -773,15 +964,6 @@ pub async fn update(
                 einsatz_id,
                 eid,
                 ids,
-            )
-            .await?;
-        }
-        if let Some(liste) = &neue_verbindungen {
-            verbindungen::ersetzen(
-                &state.pool,
-                einsatz_id,
-                verbindungen::Bezug::Einheit(eid),
-                liste,
             )
             .await?;
         }
@@ -1150,9 +1332,26 @@ pub async fn personal_zuordnen(
         if nur_wenn_frei {
             mitglied_repo::require_personal_frei_tx(conn, einsatz_id, eid, ep_id).await?;
         }
-        let z = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+        let z = mitglied_repo::zuordnen_personal_tx(
+            conn,
+            einsatz_id,
+            eid,
+            ep_id,
+            Some(ctx.benutzer.id),
+        )
+        .await?;
         let fuehrer_gesetzt = als_fuehrer
             && mitglied_repo::set_fuehrer_wenn_frei_tx(conn, einsatz_id, eid, ep_id).await?;
+        if fuehrer_gesetzt {
+            crate::einsatz::feld_vermerk::setze_tx(
+                conn,
+                einsatz_id,
+                crate::einsatz::feld_vermerk::Objekt::Einheit(eid),
+                &["fuehrer_id"],
+                ctx.benutzer.id,
+            )
+            .await?;
+        }
         if z.is_changed {
             let fuehrung: Vec<&str> = z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
             let text = crate::einheit::etb_text_personal_eingeteilt(
@@ -1202,7 +1401,14 @@ pub async fn personal_freigeben(
     // F06/LFH-244 Tier-A: Freigabe (inkl. Führer-Leerung) + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        let person = mitglied_repo::freigeben_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+        let person = mitglied_repo::freigeben_personal_tx(
+            conn,
+            einsatz_id,
+            eid,
+            ep_id,
+            Some(ctx.benutzer.id),
+        )
+        .await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,

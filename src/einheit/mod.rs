@@ -255,6 +255,11 @@ pub struct EinheitAnzeige {
     /// System die Besetzung festhielt. Stärke und Mitgliederlisten zählen es nie mit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub letzte_besetzung: Option<LetzteBesetzung>,
+    /// Wer welche Angabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
+    /// `aenderungsvermerk`); fehlt, solange seit dem Anlegen keine Angabe geändert wurde.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[schema(required = false, value_type = HashMap<String, crate::einsatz::feld_vermerk::FeldVermerk>)]
+    pub vermerke: crate::einsatz::feld_vermerk::Vermerke,
 }
 
 /// Die beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266, design.md D1/D2). Namen

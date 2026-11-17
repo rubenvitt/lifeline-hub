@@ -154,8 +154,14 @@ export function patcheEinheit(
   einsatzId: number,
   eid: number,
   patch: EinheitPatch,
+  /** Werte beim Öffnen (Feld-CAS, LLH-1831, Spec `einheit-ansicht`); ohne kein Vergleich. */
+  erwartet?: Partial<EinheitPatch>,
 ): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, 'PATCH', patch);
+  return apiSend<Einheit>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}`,
+    'PATCH',
+    erwartet ? { ...patch, erwartet } : patch,
+  );
 }
 
 /**

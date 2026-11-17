@@ -461,6 +461,8 @@ export interface SprechgruppeEingabe {
 export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
 export type AbschnittLagezustand = S['AbschnittLagezustand'];
 export type Einheit = S['EinheitAnzeige'];
+/** Wer eine Angabe zuletzt geändert hat und wann (LLH-1834, Spec `aenderungsvermerk`). */
+export type FeldVermerk = S['FeldVermerk'];
 /** Beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266), nur an aufgelösten. */
 export type LetzteBesetzung = S['LetzteBesetzung'];
 export type LetztePerson = S['LetztePerson'];

@@ -32,7 +32,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `personen/Personendaten.tsx`): jede Angabe ist eine `InlineAngabe` in der Ansicht, ein PATCH
   je Feld über `savePersonFeld` mit Feld-CAS (`erwartet` = Serverstand beim Öffnen, festgehalten
   in `onOeffnen`), Toast „{Feld} gespeichert“. Ein 409 lädt das Detail neu: hat sich genau dieses
-  Feld geändert, fragt „Zwischenzeitlich geändert“ mit dem aktuellen Wert („Überschreiben“ ohne
+  Feld geändert, fragt „Zwischenzeitlich geändert“ mit dem aktuellen Wert („Meine Änderung übernehmen“ ohne
   Altwert, „Verwerfen und neu laden“), sonst steht der Grund am Feld; Escape oder Schließen der
   Rückfrage entscheidet nichts, das Feld bleibt mit dem Entwurf offen (`OFFEN_LASSEN`). Kein
   Sammelformular, keine Kopfaktion „Bearbeiten“, auch nicht am Gerät; „Zustand / Verdacht“,

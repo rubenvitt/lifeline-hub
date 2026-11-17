@@ -4,7 +4,6 @@ import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { istKonflikt } from '../api/client';
 import {
   ladePerson,
   savePersonFeld,
@@ -18,6 +17,7 @@ import {
   PERSON_UNVERTRAEGLICHKEITEN_MAX,
 } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
+import { useFeldKonflikt, VERWORFEN } from '../components/useFeldKonflikt';
 import type { Person, PersonDetail, PersonKostform } from '../api/types';
 import { Link } from 'react-router';
 import {
@@ -65,8 +65,9 @@ dayjs.extend(utc);
  *   Feld (`savePersonFeld`), der Toast nennt es („Name gespeichert“), eine Ablehnung steht am Feld.
  * - **Feld-CAS (D1, D2):** beim Öffnen (`onOeffnen`) wird der Serverstand des Felds festgehalten
  *   und als `erwartet` mitgeschickt. Ein 409 lädt das Detail neu; hat sich genau dieses Feld
- *   geändert, fragt „Zwischenzeitlich geändert“ mit dem aktuellen Wert nach („Überschreiben“
- *   sendet ohne Altwert, „Verwerfen und neu laden“ schließt das Feld). Steht der Wert noch wie
+ *   geändert, fragt „Zwischenzeitlich geändert“ mit dem aktuellen Wert nach („Meine Änderung
+ *   übernehmen“ sendet ohne Altwert, „Verwerfen und neu laden“ schließt das Feld; gemeinsamer
+ *   Ablauf `components/useFeldKonflikt`, LLH-1831). Steht der Wert noch wie
  *   beim Öffnen, war es kein Feldkonflikt (etwa ein abgeschlossener Einsatz), und der Grund steht
  *   am Feld.
  * - **Leere Angaben (D5):** mit Schreibrecht als Knöpfe „+ Etikett“ in der Zeile „Ohne Angabe“
@@ -260,7 +261,8 @@ function PersonendatenInhalt({
   onGeschrieben,
 }: PersonendatenProps) {
   const { token, rollen } = useRollen();
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
+  const konflikt = useFeldKonflikt();
   const qc = useQueryClient();
   const pfade = useEinsatzPfade();
   const { zone } = useZeitEingabe();
@@ -298,51 +300,25 @@ function PersonendatenInhalt({
   }
 
   const speichere: Schreiben['speichere'] = async (feld, etikett, wert, erwartet, text) => {
-    try {
-      uebernehme(await savePersonFeld(einsatzId, person.id, feld, wert, erwartet));
-    } catch (e) {
-      if (!istKonflikt(e)) throw e;
-      const frisch = await qc.fetchQuery({
-        queryKey: detailKey,
-        queryFn: () => ladePerson(einsatzId, person.id),
-        staleTime: 0,
-      });
-      const aktuell = feldWertAus(frisch, feld);
-      // Steht das Feld noch wie beim Öffnen, war es kein Feldkonflikt (etwa ein abgeschlossener
-      // Einsatz): der Grund des Servers gehört ans Feld.
-      if (isGleicherWireWert(aktuell, erwartet)) throw e;
-      const entscheidung = await new Promise<'ueberschreiben' | 'verwerfen' | 'offen'>((fertig) => {
-        const rueckfrage = modal.confirm({
-          title: 'Zwischenzeitlich geändert',
-          content: `${etikett} inzwischen: ${aktuell == null ? 'ohne Angabe' : `„${text(aktuell)}“`}`,
-          okText: 'Überschreiben',
-          okButtonProps: { danger: true },
-          onOk: () => fertig('ueberschreiben'),
-          // Escape und Schließen entscheiden nichts: weder überschreiben noch verwerfen, das
-          // Feld bleibt mit dem Entwurf offen. Darum ist „Verwerfen“ ein eigener Knopf statt
-          // antds Abbrechen (das auch Escape auslöst).
-          onCancel: () => fertig('offen'),
-          footer: (_, { OkBtn }) => (
-            <>
-              <Button
-                onClick={() => {
-                  fertig('verwerfen');
-                  rueckfrage.destroy();
-                }}
-              >
-                Verwerfen und neu laden
-              </Button>
-              <OkBtn />
-            </>
-          ),
-        });
-      });
-      if (entscheidung === 'offen') return OFFEN_LASSEN;
-      if (entscheidung === 'verwerfen') return;
-      // Ohne Altwert: bewusst über den neuen Stand. Ein zweiter 409 (Einsatz abgeschlossen)
-      // steht am Feld.
-      uebernehme(await savePersonFeld(einsatzId, person.id, feld, wert, undefined));
-    }
+    // Der gemeinsame Ablauf „Zwischenzeitlich geändert“ (LLH-1831, `components/useFeldKonflikt`).
+    const ergebnis = await konflikt({
+      etikett,
+      erwartet,
+      speichern: async (alt) =>
+        uebernehme(await savePersonFeld(einsatzId, person.id, feld, wert, alt)),
+      ladeFrisch: () =>
+        qc.fetchQuery({
+          queryKey: detailKey,
+          queryFn: () => ladePerson(einsatzId, person.id),
+          staleTime: 0,
+        }),
+      aktuell: (frisch) => ({ wert: feldWertAus(frisch, feld) }),
+      text: (w) => text(w as never),
+      gleich: isGleicherWireWert,
+    });
+    if (ergebnis === OFFEN_LASSEN) return OFFEN_LASSEN;
+    // Verworfen: nichts gesendet, also keine Meldung „gespeichert“.
+    if (ergebnis === VERWORFEN) return;
     message.success(`${etikett} gespeichert`);
     setFokusNach({ etikett, vorher: person });
   };
