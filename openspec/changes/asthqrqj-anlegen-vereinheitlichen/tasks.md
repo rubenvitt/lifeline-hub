@@ -24,8 +24,8 @@
 
 ## 5. Anwenderdoku und Bilder
 
-- [ ] 5.1 Kapitel `unfallhilfsstellen.md`, `bereitstellungsraeume.md`, `lagemeldungen.md`: „Seitenleiste“/„Paneel“ beim Anlegen → Dialog, UHS-Notiz unter „Weitere Angaben“, Sprung in die neue UHS; `quellen:` auf die neuen Dateinamen; Wächter `src/hilfe/anwenderdoku.guard.test.ts` grün
-- [ ] 5.2 Bilder-Specs `e2e/doku-bilder/{unfallhilfsstellen,bereitstellungsraeume,lagemeldungen}.bilder.ts` auf den Dialog und die neuen Dateinamen umstellen; nach `cargo build` die drei Kapitel mit `pnpm doku:bilder e2e/doku-bilder/<kapitel>.bilder.ts` neu erzeugen und die Bilder (hell und dunkel, ≤ 300 KB) committen
+- [x] 5.1 Kapitel `unfallhilfsstellen.md`, `bereitstellungsraeume.md`, `lagemeldungen.md`: „Seitenleiste“/„Paneel“ beim Anlegen → Dialog, UHS-Notiz unter „Weitere Angaben“, Sprung in die neue UHS; `quellen:` auf die neuen Dateinamen; Wächter `src/hilfe/anwenderdoku.guard.test.ts` grün
+- [x] 5.2 Bilder-Specs `e2e/doku-bilder/{unfallhilfsstellen,bereitstellungsraeume,lagemeldungen}.bilder.ts` auf den Dialog und die neuen Dateinamen umstellen; nach `cargo build` die drei Kapitel mit `pnpm doku:bilder e2e/doku-bilder/<kapitel>.bilder.ts` neu erzeugen und die Bilder (hell und dunkel, ≤ 300 KB) committen
 
 ## 6. Integration
 

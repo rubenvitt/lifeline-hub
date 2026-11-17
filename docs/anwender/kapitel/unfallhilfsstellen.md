@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/UhsBearbeitenModal.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/UhsBearbeitenModal.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenModal.tsx, frontend/src/components/AnlegenModal.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
 ---
 
 ## Überblick
@@ -21,14 +21,15 @@ Die Patienten selbst sind Betroffene; ihre Sichtung und ihren Verbleib führt da
 ### Eine Unfallhilfsstelle anlegen und in Betrieb nehmen
 
 1. In der Liste der Unfallhilfsstellen „Neu“ wählen, oder im Titel einer Unfallhilfsstelle den
-   Namen öffnen und „+ Neue UHS“ wählen.
-2. „Bezeichnung“ und „Typ“ angeben, bei Bedarf „Standort (optional)“ und „Notiz (optional)“. Den
-   Standort mit Enter oder „Ort suchen“ suchen und einen Treffer wählen, dann ist die Stelle gleich
-   verortet; ohne Treffer bleibt er freier Text.
+   Namen öffnen und „+ Neue UHS“ wählen. Der Dialog „Unfallhilfsstelle anlegen“ öffnet sich.
+2. „Bezeichnung“ und „Typ“ angeben, bei Bedarf „Standort (optional)“. Den Standort mit Enter oder
+   „Ort suchen“ suchen und einen Treffer wählen, dann ist die Stelle gleich verortet; ohne Treffer
+   bleibt er freier Text. Eine Notiz steht unter „Weitere Angaben“; ist eine eingetragen, zeigt der
+   Kopf „Weitere Angaben · Notiz“.
 
-   ![Seitenleiste „Unfallhilfsstelle anlegen“ mit Bezeichnung, Typ Patientenablage und Standort](../bilder/unfallhilfsstellen/anlegen.png)
+   ![Dialog „Unfallhilfsstelle anlegen“ mit Bezeichnung, Typ Patientenablage, Standort und eingeklappten „Weitere Angaben“](../bilder/unfallhilfsstellen/anlegen.png)
 
-3. „Anlegen“ wählen. Die neue Stelle steht auf „geplant“.
+3. „Anlegen“ wählen. Die App öffnet die neue Stelle; sie steht auf „geplant“.
 4. Die Stelle öffnen und „Plätze anlegen“ wählen: den Platz-Typ (etwa „Behandlungsplatz“,
    „Trage“, „Bett“) und die „Menge“ angeben, dann „Anlegen“. Die Plätze werden durchnummeriert.
 5. „In Betrieb nehmen“ wählen. Die Stelle steht auf „aktiv“ und nimmt Patienten auf.
