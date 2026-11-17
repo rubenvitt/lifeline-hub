@@ -823,7 +823,8 @@ export default function UeberblickPage() {
                       darfSchreiben
                         ? {
                             label: 'Abschnitt anlegen',
-                            onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
+                            // Öffnet die Erfassung direkt (LLH-1815), nicht nur die Seite.
+                            onKlick: () => waehle(einsatzabschnittePfad(einsatzId, { neu: true })),
                           }
                         : undefined
                     }

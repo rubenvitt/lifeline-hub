@@ -1447,11 +1447,13 @@ describe('UeberblickPage', () => {
     etb: [],
   } as unknown as Daten;
 
-  it('mit Schreibrecht: Leer-Aktion „Abschnitt anlegen", kein Rechtehinweis', async () => {
+  it('mit Schreibrecht: Leer-Aktion „Abschnitt anlegen" öffnet die Erfassung (LLH-1815)', async () => {
     stelleBereit(leereDaten);
     rendern();
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
-    expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/einsatzabschnitte');
+    expect(screen.getByTestId('ort')).toHaveTextContent(
+      /^\/einsaetze\/1\/einsatzabschnitte\?neu=1$/,
+    );
   });
 
   it('mit Schreibrecht: „Eintrag" bedienbar, kein Rechtehinweis', async () => {

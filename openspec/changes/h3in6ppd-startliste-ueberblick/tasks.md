@@ -12,7 +12,7 @@ per TDD.
 
 - [x] 2.1 `routing/deeplinks.ts`: `einsatzdatenPfad` um `paneel: 'einsatzort' | 'fuehrungsstelle'`; Deeplink-Test grün
 - [x] 2.2 `EinsatzdatenPage.tsx`: Auftrag `?paneel=einsatzort|fuehrungsstelle` rollt zum Paneel und räumt den Parameter (Muster LLH-1850); `EinsatzdatenPage.test.tsx` mit beiden Aufträgen
-- [ ] 2.3 Leeraktion „Abschnitt anlegen“ im Überblick mit `neu: true`; Test in `UeberblickPage.test.tsx`
+- [x] 2.3 Leeraktion „Abschnitt anlegen“ im Überblick mit `neu: true`; Test in `UeberblickPage.test.tsx`
 
 ## 3. Paneel im Überblick (D2, D3, D4)
 
