@@ -6,6 +6,8 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { leereUhrzeit, zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
 import { schriftGroesse } from './instrument/rollenwerte';
+import { minutenZwischen, relativ } from '../anzeige/dauer';
+import { useMinutenTakt } from './useMinutenTakt';
 
 interface DatenstandProps {
   /** TanStack-Query-Zeitstempel (`query.dataUpdatedAt`) in Millisekunden. */
@@ -31,6 +33,12 @@ interface DatenstandProps {
    * Die Prop übersteuert nur.
    */
   offline?: boolean;
+  /**
+   * Das Alter dazu, ab einer Minute („Stand 1731 · vor 2 min“, LLH-1750, Spec `zeitdarstellung`,
+   * „Eine Form für den Datenstand“): nur auf Lagebild, Großbild und Lagemonitor, wo man auf die
+   * Frische achtet. Tickt im Minutentakt; ohne `alter` tickt nichts.
+   */
+  alter?: boolean;
 }
 
 /**
@@ -48,6 +56,32 @@ export function formatiereDatenstand(
 /** Die Konventionen mit der Browserzone: Darstellung folgt der Wahl, die Zone dem Gerät. */
 function geraetezeit(konv: AnzeigeKonventionen): AnzeigeKonventionen {
   return { ...konv, zeitzone: null };
+}
+
+/**
+ * Der Datenstand als Text, eine Form für alle Stellen (LLH-1750, Spec `zeitdarstellung`, „Eine
+ * Form für den Datenstand“): „Stand 1731“, mit `alter` ab einer Minute „Stand 1731 · vor 2 min“,
+ * ohne Netz „… · offline“ am Ende. Kein „vor 0 s“ und nie ein Stand nur als Alter. `0` oder
+ * ungültig heißt „noch nichts abgerufen“. Rein; für Stellen, die einen Text brauchen (Großbild,
+ * Lagemonitor), sonst der Baustein {@link Datenstand}.
+ */
+export function datenstandText(
+  dataUpdatedAt: number,
+  jetzt: number,
+  opts: { alter?: boolean; offline?: boolean; konv?: AnzeigeKonventionen } = {},
+): string {
+  if (!Number.isFinite(dataUpdatedAt) || dataUpdatedAt <= 0) return 'Stand wird abgerufen';
+  const teile = [`Stand ${formatiereDatenstand(dataUpdatedAt, opts.konv)}`];
+  const alter = opts.alter ? alterText(dataUpdatedAt, jetzt) : null;
+  if (alter) teile.push(alter);
+  if (opts.offline) teile.push('offline');
+  return teile.join(' · ');
+}
+
+/** „vor 2 min“ ab einer Minute Alter, darunter nichts. */
+function alterText(dataUpdatedAt: number, jetzt: number): string | null {
+  const minuten = minutenZwischen(dataUpdatedAt, jetzt);
+  return minuten >= 1 ? relativ(minuten, 'vor') : null;
 }
 
 /**
@@ -77,6 +111,7 @@ export default function Datenstand({
   dataUpdatedAt,
   platzHalten = false,
   offline: offlineVorgabe,
+  alter = false,
 }: DatenstandProps) {
   const ohneVerbindung = useOhneVerbindung();
   const { konventionen } = useAnzeigeKonventionen();
@@ -95,17 +130,47 @@ export default function Datenstand({
       </Typography.Text>
     );
   }
+  return alter ? (
+    <StandMitAlter dataUpdatedAt={dataUpdatedAt} offline={offline} konventionen={konventionen} />
+  ) : (
+    <StandText dataUpdatedAt={dataUpdatedAt} offline={offline} konventionen={konventionen} />
+  );
+}
+
+/** Eigener Baustein, damit nur ein Stand mit Alter im Minutentakt rendert. */
+function StandMitAlter(props: {
+  dataUpdatedAt: number;
+  offline: boolean;
+  konventionen: AnzeigeKonventionen;
+}) {
+  const jetzt = useMinutenTakt();
+  return <StandText {...props} alter={alterText(props.dataUpdatedAt, jetzt)} />;
+}
+
+function StandText({
+  dataUpdatedAt,
+  offline,
+  konventionen,
+  alter = null,
+}: {
+  dataUpdatedAt: number;
+  offline: boolean;
+  konventionen: AnzeigeKonventionen;
+  alter?: string | null;
+}) {
   const uhrzeit = formatiereDatenstand(dataUpdatedAt, konventionen);
+  const name = [`Datenstand ${uhrzeit}`, alter, offline ? 'offline' : null].filter(Boolean);
+  const text = [`Stand ${uhrzeit}`, alter, offline ? 'offline' : null].filter(Boolean);
   return (
     <Typography.Text
       type="secondary"
       title={`Letzte Aktualisierung: ${zeitpunkt(dayjs(dataUpdatedAt), geraetezeit(konventionen))}`}
       // Millisekundengenauer Anker für e2e: der Titel trägt seit LLH-1061 nur noch Minuten.
       data-stand={dataUpdatedAt}
-      aria-label={offline ? `Datenstand ${uhrzeit}, offline` : `Datenstand ${uhrzeit}`}
+      aria-label={name.join(', ')}
       style={STIL}
     >
-      {offline ? `Stand ${uhrzeit} · offline` : `Stand ${uhrzeit}`}
+      {text.join(' · ')}
     </Typography.Text>
   );
 }

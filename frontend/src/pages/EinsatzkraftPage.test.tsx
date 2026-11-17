@@ -184,7 +184,7 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
     // der innersten Hülle, die sie trägt.
     const huellen = await screen.findAllByText(
       (_, el) =>
-        el?.tagName === 'SPAN' && el.textContent === 'Sprechfunker · DRK · im Einsatz 4 h 47',
+        el?.tagName === 'SPAN' && el.textContent === 'Sprechfunker · DRK · im Einsatz 4 h 47 min',
     );
     expect(huellen[huellen.length - 1]).toBeVisible();
   });
@@ -198,7 +198,7 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
         },
       ],
     });
-    expect(await screen.findByText(/Ruhe 1 h 10/)).toBeVisible();
+    expect(await screen.findByText(/Ruhe 1 h 10 min/)).toBeVisible();
   });
 
   it('trägt die Marken „ad-hoc“ und „Demo“ im Kopf', async () => {

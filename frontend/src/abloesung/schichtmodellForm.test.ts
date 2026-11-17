@@ -12,7 +12,7 @@ const hochwasser = {
 };
 
 describe('Schichtmodell-Formular (LLH-1122)', () => {
-  it('belegt Dauern als „h:mm“-Text vor und Wechselzeiten taktisch', () => {
+  it('belegt Dauern in der Dauerform vor und Wechselzeiten taktisch', () => {
     expect(toFormWerte(hochwasser)).toEqual({
       bezeichnung: '12-h-Schicht Hochwasser',
       typ: 'wechselzeiten',
@@ -31,7 +31,7 @@ describe('Schichtmodell-Formular (LLH-1122)', () => {
         vorwarnung_minuten: 30,
         planungsvorlauf_minuten: 120,
       }),
-    ).toMatchObject({ typ: 'rhythmus', rhythmus: '7:30 h', vorwarnung: undefined });
+    ).toMatchObject({ typ: 'rhythmus', rhythmus: '7 h 30 min', vorwarnung: undefined });
     expect(toFormWerte(null)).toEqual({ typ: 'rhythmus' });
   });
 
@@ -80,7 +80,7 @@ describe('Schichtmodell-Formular (LLH-1122)', () => {
   it('der Kopf des Klappteils nennt die wirksamen Werte samt Vorgabe', () => {
     expect(vorlaufKopf({})).toBe('Vorwarnung 30 min (Vorgabe) · Planungsvorlauf 2 h (Vorgabe)');
     expect(vorlaufKopf({ vorwarnung: '45 min', planungsvorlauf: '1:30' })).toBe(
-      'Vorwarnung 45 min · Planungsvorlauf 1:30 h',
+      'Vorwarnung 45 min · Planungsvorlauf 1 h 30 min',
     );
   });
 
@@ -92,7 +92,9 @@ describe('Schichtmodell-Formular (LLH-1122)', () => {
     );
     expect(formatRegel({ typ: 'rhythmus', rhythmus_minuten: 720 }, taktisch)).toBe('Rhythmus 12 h');
     expect(formatRegelKurz(hochwasser, taktisch)).toBe('Wechsel 0600/1800');
-    expect(formatRegelKurz({ typ: 'rhythmus', rhythmus_minuten: 450 }, taktisch)).toBe('7:30 h');
+    expect(formatRegelKurz({ typ: 'rhythmus', rhythmus_minuten: 450 }, taktisch)).toBe(
+      '7 h 30 min',
+    );
   });
 
   it('nennt die Wechselzeiten bei „Datum und Uhrzeit“ mit Doppelpunkt (LLH-1437)', () => {

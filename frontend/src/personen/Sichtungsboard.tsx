@@ -3,7 +3,7 @@ import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
-import { formatVor } from '../anzeige/abstand';
+import { vorText } from '../anzeige/dauer';
 import { useRollen, zahlStil } from '../components/instrument';
 import StatusTag from '../components/StatusTag';
 import { useMinutenTakt } from '../components/useMinutenTakt';
@@ -244,8 +244,8 @@ function BoardKarte({
     !p.storniert_at &&
     p.status !== 'vermisst';
   const zeit = p.aktuelle_sichtung_at
-    ? `gesichtet ${formatVor(p.aktuelle_sichtung_at, jetzt)}`
-    : `erfasst ${formatVor(p.erfasst_at, jetzt)}`;
+    ? `gesichtet ${vorText(p.aktuelle_sichtung_at, jetzt)}`
+    : `erfasst ${vorText(p.erfasst_at, jetzt)}`;
   return (
     <article
       data-testid="board-karte"

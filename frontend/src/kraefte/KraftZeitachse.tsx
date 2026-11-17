@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Button, Form, Input, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useId, useRef, useState, type FocusEvent } from 'react';
@@ -40,7 +41,6 @@ import {
   abschliessendeEntlassungId,
   NACHTRAG_ARTEN,
   ankerText,
-  dauerText,
   kraftDauern,
 } from './zeitachse';
 import { serverJetzt } from '../offline/serveruhr';
@@ -632,11 +632,11 @@ function DauerZeile({
   const { rollen } = useRollen();
   const teile: string[] = [];
   if (dauern.laufend) {
-    teile.push(`Im Einsatz ${dauerText(dauern.laufend.minuten)}`);
+    teile.push(`Im Einsatz ${dauer(dauern.laufend.minuten)}`);
     teile.push(ankerText(dauern.laufend.anker, zeit(dauern.laufend.beginnAt)));
   }
-  if (dauern.ruheMinuten != null) teile.push(`Ruhe ${dauerText(dauern.ruheMinuten)}`);
-  if (dauern.gesamtMinuten != null) teile.push(`gesamt ${dauerText(dauern.gesamtMinuten)}`);
+  if (dauern.ruheMinuten != null) teile.push(`Ruhe ${dauer(dauern.ruheMinuten)}`);
+  if (dauern.gesamtMinuten != null) teile.push(`gesamt ${dauer(dauern.gesamtMinuten)}`);
   if (teile.length === 0) return <span />;
   return (
     <span data-lfh="kraft-dauer" style={{ ...schriftStil('meta'), color: rollen.text2 }}>

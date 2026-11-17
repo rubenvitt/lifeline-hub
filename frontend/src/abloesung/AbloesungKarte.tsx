@@ -1,3 +1,4 @@
+import { dauer, relativ } from '../anzeige/dauer';
 import { Button, Flex, Space, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import type { Abloesung, BeendetGrund, RhythmusQuelle } from '../api/types';
@@ -9,7 +10,6 @@ import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
 import { useRollen, schriftGroesse, schriftStil, zahlStil } from '../components/instrument';
-import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -18,7 +18,7 @@ import { besatzungPlanText, besatzungText, nachBesatzungswechselText } from './b
 import { verbleibText } from './verbleib';
 import { beginnWort } from './beginnText';
 import { abloeserStandText, type AbloeserStand } from './abloeserStand';
-import { formatDauer } from './dauer';
+
 import { abloesungZeit, einstufungOf } from './einstufung';
 import { planungEntfallenText, planungWarnungText } from './planungWarnung';
 import { lautPlanText } from './lautPlan';
@@ -60,9 +60,7 @@ function abstandText(faelligAt: string, jetzt: Dayjs): string {
   const f = abloesungZeit(faelligAt);
   if (!f) return '';
   const minuten = Math.floor((f.valueOf() - jetzt.valueOf()) / 60_000);
-  if (minuten < 0) return `seit ${dauerText(-minuten)}`;
-  if (minuten === 0) return 'in < 1 min';
-  return `in ${dauerText(minuten)}`;
+  return minuten < 0 ? relativ(-minuten, 'seit') : relativ(minuten, 'in');
 }
 
 /** Herkunft des Rhythmus in der Karte (LLH-1122: Rangfolge eigen → Abschnitt → Einsatz). */
@@ -158,7 +156,7 @@ export default function AbloesungKarte({
 
   // Laut Plan (LLH-1555) gibt der Block die Fälligkeit, kein Rhythmus: geändert wird der Block.
   const planZeile = lautPlanText(s, konventionen, jetzt);
-  const rhythmusZeile = `Rhythmus ${formatDauer(s.rhythmus_minuten)} (${QUELLE_WORT[s.rhythmus_quelle]})`;
+  const rhythmusZeile = `Rhythmus ${dauer(s.rhythmus_minuten)} (${QUELLE_WORT[s.rhythmus_quelle]})`;
 
   const menue: MenueEintrag<'abloeser' | 'rhythmus'>[] = [
     ...(onAbloeserPlanen ? [{ key: 'abloeser' as const, label: 'Ablösung planen' }] : []),
@@ -276,10 +274,10 @@ export default function AbloesungKarte({
           {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
               Zeile darf sie berühren; sie bleibt deshalb immer einzeilig (LFH-708). Den Abschnitt
               nennt die Zeile darüber, seine Vorgabe heißt nur „Vorgabe“. „Vorgabe Einsatz“
-              (LLH-1122) passt auf 390 px in `komfortabel` für jeden Wert (167:59 h: 252 von
-              256 px); nur im Handschuh-Betrieb auf 390 px kürzt die Zeile bei Werten mit Minuten
-              oder ab 100 h das Quellenwort mit „…“, nie den Wert, und der ganze Text steht im
-              `title` (gemessen in `e2e/abloesung-zufluss.spec.ts`). */}
+              (LLH-1122) passt auf 390 px für die meisten Werte; beim längsten („167 h 59 min“,
+              LLH-1750) und im Handschuh-Betrieb kürzt die Zeile das Quellenwort mit „…“, nie den
+              Wert, und der ganze Text steht im `title` (gemessen in
+              `e2e/abloesung-zufluss.spec.ts`). */}
           <Text
             type="secondary"
             data-lfh="abloesung-rhythmus"
@@ -297,9 +295,7 @@ export default function AbloesungKarte({
               <span data-lfh="abloesung-laut-plan">{planZeile}</span>
             ) : (
               <>
-                <span data-lfh="abloesung-rhythmus-wert">
-                  Rhythmus {formatDauer(s.rhythmus_minuten)}
-                </span>{' '}
+                <span data-lfh="abloesung-rhythmus-wert">Rhythmus {dauer(s.rhythmus_minuten)}</span>{' '}
                 ({QUELLE_WORT[s.rhythmus_quelle]})
               </>
             )}

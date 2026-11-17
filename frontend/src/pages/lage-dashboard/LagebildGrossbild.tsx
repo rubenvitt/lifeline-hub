@@ -1,3 +1,4 @@
+import { dauer } from '../../anzeige/dauer';
 import type { ReactNode } from 'react';
 import type { EinsatzAnzeige } from '../../api/types';
 import {
@@ -331,7 +332,7 @@ function VerlaufBlock({ zustand, verlauf }: LagebildGrossbildProps['verlauf']) {
   const satz = zustandsSatz(leer, `Keine Kontakte in den letzten ${VERLAUF_STUNDEN} Stunden.`);
   const juengste = [...verlauf.stunden].reverse().slice(0, VERLAUF_ZEILEN);
   return (
-    <Block titel="Verlauf" zusatz={zustand === 'daten' ? `${VERLAUF_STUNDEN} h` : undefined}>
+    <Block titel="Verlauf" zusatz={zustand === 'daten' ? dauer(VERLAUF_STUNDEN * 60) : undefined}>
       {satz != null ? (
         <Satz>{satz}</Satz>
       ) : (

@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Alert, App, Breadcrumb, Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { Fragment, useId, useState, type ReactNode } from 'react';
@@ -61,7 +62,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
-import { dauerText, kraftDauern } from '../kraefte/zeitachse';
+import { kraftDauern } from '../kraefte/zeitachse';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import {
@@ -355,9 +356,9 @@ export default function EinsatzkraftPage() {
   );
   const dauerMeta =
     dauern.laufend != null
-      ? `im Einsatz ${dauerText(dauern.laufend.minuten)}`
+      ? `im Einsatz ${dauer(dauern.laufend.minuten)}`
       : dauern.ruheMinuten != null
-        ? `Ruhe ${dauerText(dauern.ruheMinuten)}`
+        ? `Ruhe ${dauer(dauern.ruheMinuten)}`
         : null;
   const funktion = funktionText(ep);
   const metaTeile = [funktion, ep.traegerorganisation, dauerMeta].filter((t): t is string =>

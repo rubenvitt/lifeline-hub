@@ -26,11 +26,11 @@ import type {
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import { evakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
-import { einsatzDauer } from '../../einsatz/einsatzDauer';
+import { dauer, dauerZwischen } from '../../anzeige/dauer';
 import { EINSATZART_LABELS } from '../../einsatz/einsatzart';
 import { typBilanz } from '../../etb/zeitachseModell';
 import { fuehrungsfunktionZeilen } from '../../fuehrung/besetzungAusMitgliedern';
-import { dauerText, kraftDauern } from '../../kraefte/zeitachse';
+import { kraftDauern } from '../../kraefte/zeitachse';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { kettenKoepfe } from '../../lageberichte/ketten';
 import { vorlage } from '../../lageberichte/vorlagen';
@@ -189,7 +189,7 @@ function stammdaten(e: EinsatzAnzeige): Abschnitt[] {
 function zeiten(e: EinsatzAnzeige, standMs: number, konv: AnzeigeKonventionen): Abschnitt[] {
   const laeuft = e.status === 'aktiv';
   const ende = laeuft ? null : (e.abgeschlossen_at ?? null);
-  const dauer = einsatzDauer(e.begonnen_at, ende, standMs);
+  const einsatzDauer = dauerZwischen(e.begonnen_at, ende, standMs);
   return [
     {
       inhalt: [
@@ -198,7 +198,8 @@ function zeiten(e: EinsatzAnzeige, standMs: number, konv: AnzeigeKonventionen): 
           { etikett: 'Ende', wert: laeuft ? 'läuft' : zeit(ende, konv) },
           {
             etikett: 'Dauer',
-            wert: dauer == null ? LEER : laeuft ? `${dauer} (bis Stand)` : dauer,
+            wert:
+              einsatzDauer == null ? LEER : laeuft ? `${einsatzDauer} (bis Stand)` : einsatzDauer,
           },
         ]),
       ],
@@ -318,7 +319,7 @@ function kraefte(
           ? NICHT_GENUTZT
           : personenMit.length === 0
             ? KEINE_ZEITACHSE
-            : dauerText(minuten),
+            : dauer(minuten),
     },
   ];
   const insgesamtInhalt: Inhalt[] = [zeilen(insgesamt)];
@@ -772,7 +773,7 @@ function zeitenDerKraft(
     : abgeschlossen
       ? 'nicht erfasst'
       : 'läuft';
-  return [zeit(perioden[0].beginn_at, konv), ende, dauerText(dauern.gesamtMinuten)];
+  return [zeit(perioden[0].beginn_at, konv), ende, dauer(dauern.gesamtMinuten)];
 }
 
 /** Anzeigename einer Einheit: Name, der Funkrufname in Klammern, wenn er etwas hinzufügt. */
@@ -877,7 +878,7 @@ function personalJeKopf(
             wert:
               mitZeitachse.length === 0
                 ? KEINE_ZEITACHSE
-                : dauerText(helferMinuten(mitZeitachse, bisMs)),
+                : dauer(helferMinuten(mitZeitachse, bisMs)),
           },
         ]),
       ],
@@ -941,7 +942,7 @@ export function verdichteEinsatzbericht(
   if (!einsatz) throw new Error('Einsatzbericht: Einsatz fehlt');
   const standMs = Date.parse(roh.geladenAt);
   // Helferstunden zählen höchstens bis zum Abschluss (design.md D6). Wirestrings ohne Zone sind
-  // UTC und werden ausdrücklich so gelesen (wie `einsatz/einsatzDauer.ts`).
+  // UTC und werden ausdrücklich so gelesen (wie `anzeige/dauer.ts:dauerZwischen`).
   const abschluss = einsatz.abgeschlossen_at ? dayjs.utc(einsatz.abgeschlossen_at) : null;
   const bisMs = abschluss?.isValid() ? Math.min(standMs, abschluss.valueOf()) : standMs;
   const abgeschlossen = einsatz.status !== 'aktiv';

@@ -539,8 +539,10 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     render();
     await kennzahlGeladen('Einsatzdauer');
     const dauer = kennzahl('Einsatzdauer');
-    expect(dauer.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toMatch(/^\d+:\d{2}$/);
-    expect(dauer).toHaveTextContent('h');
+    expect(dauer.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toMatch(
+      /^(\d+ min|\d+ h( \d{2} min)?|\d+ d( \d{2} h)?)$/,
+    );
+    expect(dauer).not.toHaveTextContent(/\d:\d/);
     expect(dauer).toHaveTextContent(/seit /);
   });
 
@@ -1014,18 +1016,16 @@ describe('LageDashboardPage — Kennzahlenband', () => {
 });
 
 describe('LageDashboardPage — Seitenkopf', () => {
-  it('trägt den Menünamen als Titel, die Uhrzeit daneben und den Datenstand als Meta (LFH-965)', async () => {
+  it('trägt den Menünamen als Titel und daneben den Datenstand, keine Uhr (LFH-965, LLH-1750)', async () => {
     mockEndpunkte({});
     render();
     await kennzahlGeladen('Betroffene');
     expect(screen.getByRole('heading', { level: 1, name: 'Lagebild' })).toBeInTheDocument();
-    // „jetzt“ in der Rolle „kurz“ (LLH-1061): heute nur die Uhrzeit, `1422`.
-    expect(document.querySelector('.lfh-seitenkopf__meta')?.textContent).toMatch(
-      /(^|\D)\d{4}(\D|$)/,
-    );
+    // Der Stand in der Rolle „kurz“ (heute nur die Uhrzeit), ohne Alter, solange er jünger als
+    // eine Minute ist; daneben keine zweite Uhr (Spec `zeitdarstellung`, `modul-benennung`).
     await waitFor(() =>
-      expect(document.querySelector('[data-lfh="datenstand"]')?.textContent).toMatch(
-        /^Stand vor \d+ s$/,
+      expect(document.querySelector('.lfh-seitenkopf__meta')?.textContent).toMatch(
+        /^Stand \d{4}( · offline)?$/,
       ),
     );
   });

@@ -41,6 +41,7 @@ Keine.
 - `einsatzbericht`: Die Anlage Einheiten nennt die Einsatzzeit als „6 h 32 min“.
 - `modul-benennung`: Neben dem Titel des Lagebilds steht der Datenstand, keine Uhrzeit.
 - `grossbild-ansicht`: Das Großbild des Lagebilds zeigt die Uhr in der Form der Kopfuhr.
+- `lage-wetter-pegel`: Die Marke für angekündigtes Unwetter nennt „in 2 h“ statt „in 2 h 00 min“.
 
 ## Impact
 

@@ -49,13 +49,15 @@ den Lagemonitor (beides).
 **D1 Kern `anzeige/dauer.ts` mit drei Funktionen.**
 - `dauer(minuten, { tage?: boolean })` liefert „45 min“, „8 h“, „5 h 01 min“, mit `tage` ab 24 h
   „2 d 14 h“. Die Funktion rechnet mit ganzen Minuten, abgerundet wie bisher.
-- `abstand(vonMs, bisMs, vorwort)` liefert „vor …“ / „seit …“ / „in …“ / „noch …“. Unter einer Minute
-  steht „gerade eben“ bzw. „in < 1 min“. Tage zeigt es immer ab 24 h.
+- `relativ(minuten, vorwort)` liefert „vor …“ / „seit …“ / „in …“ / „noch …“. Unter einer Minute
+  steht „gerade eben“ bzw. „in < 1 min“. Tage zeigt es immer ab 24 h. `vorText(zeit, jetzt)`
+  liest dazu einen Wire-Zeitpunkt oder eine Epoche, `dauerAusgeschrieben` liefert den zugänglichen
+  Namen („5 Stunden 12 Minuten“).
 - `dauerZwischen(beginn, ende, jetztMs)` ersetzt `einsatzDauer` (Wire-Strings als UTC lesen) und
   zeigt die Tage.
 
 Die alten Helfer verschwinden und werden nicht als dünne Hüllen behalten. `formatVor` zieht als
-`abstand` in den Kern um. `parseDauer` bleibt in `abloesung/dauer.ts`, weil es eine Eingabe ist,
+`vorText` in den Kern um. `parseDauer` bleibt in `abloesung/dauer.ts`, weil es eine Eingabe ist,
 lernt aber die Form „7 h 30 min“ bzw. „7 h 30“.
 *Alternative:* die sieben Helfer behalten und nur ihren Rumpf auf den Kern umlenken. Verworfen,
 denn dann bleiben sieben Namen für eine Sache, und der Wächter muss sie alle kennen.
@@ -81,7 +83,7 @@ fällt weg.
 
 **D5 Datenstand: ein Baustein mit Option `alter`.**
 `components/Datenstand.tsx` bekommt `alter?: boolean`. Damit erscheint ab 1 min „· vor 2 min“ über
-`abstand`, getaktet mit `useMinutenTakt`; das reicht für Minuten. Das Lagebild, beide Großbilder
+`relativ`, getaktet mit `useMinutenTakt`; das reicht für Minuten. Das Lagebild, beide Großbilder
 und der Lagemonitor nehmen den Baustein. `standText` entfällt. Damit bekommt das Lagebild die
 Offline-Marke, die `Datenstand` schon führt. Der Lagemonitor behält seine Marke „Veraltet“ ab 2 min
 (Spec `lagemonitor`) und setzt sie vor den Baustein. Die Reihenfolge lautet
@@ -97,7 +99,10 @@ Eine Liste `AUSNAHMEN` nennt Konstanten und Einstellungen samt Begründung. Die 
 startet mit dem Bestand und ist am Ende der Change leer. Was der Wächter nicht sieht (Text ohne
 Interpolation, Rust), steht im Kopf der Datei.
 
-**D7 Server: `dauer_text` in `src/zeitdarstellung.rs`.**
+**D7 Server: `dauer_text` in `src/zeitdarstellung.rs`.** Die Restzeit einer Gerätekopplung
+bleibt in ganzen Stunden abgerundet („noch 5 h“, Spec `feldgeraet-bedienung`, LLH-1734); das ist
+eine gültige Form der Dauer, gebildet über `relativ`.
+
 Eine Funktion `dauer_text(minuten)` mit derselben Form wie der Kern im Frontend (ohne Tage, weil
 nur Längen). `plan.rs` und `abloesung::rhythmus_text` rufen sie auf. Ein gemeinsamer Satz
 Testfälle (Rust-Test plus Vitest mit denselben Paaren) hält beide Seiten gleich. `rhythmus_text`

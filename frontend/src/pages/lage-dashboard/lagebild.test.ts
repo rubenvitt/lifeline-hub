@@ -16,8 +16,6 @@ import {
   kontakteLetzteStunde,
   kontakteNotiz,
   reihenWechsel,
-  lagebildZeit,
-  standText,
   warnstufeTon,
   wireAlsEpoche,
   type Rohdaten,
@@ -59,8 +57,8 @@ const T = '\u202f';
 describe('einsatzdauerKennzahl (Lagebild und Überblick, LLH-1140)', () => {
   it('läuft bis jetzt und nennt den Beginn', () => {
     const k = einsatzdauerKennzahl({ begonnen_at: '2026-06-11 05:19:00' }, JETZT);
-    expect(k.wert).toBe('6:41');
-    expect(k.einheit).toBe('h');
+    expect(k.wert).toBe('6 h 41 min');
+    expect(k).not.toHaveProperty('einheit');
     expect(k.notiz).toMatch(/^seit /);
   });
 
@@ -69,51 +67,31 @@ describe('einsatzdauerKennzahl (Lagebild und Überblick, LLH-1140)', () => {
       { begonnen_at: '2026-06-11 05:00:00', abgeschlossen_at: '2026-06-11 07:30:00' },
       JETZT,
     );
-    expect(k.wert).toBe('2:30');
+    expect(k.wert).toBe('2 h 30 min');
     expect(k.notiz).toMatch(/^beendet /);
   });
 });
 
 describe('einsatzdauer', () => {
   it('rechnet Stunden und Minuten seit Beginn', () => {
-    expect(einsatzdauer('2026-06-11 05:19:00', JETZT)).toBe('6:41');
+    expect(einsatzdauer('2026-06-11 05:19:00', JETZT)).toBe('6 h 41 min');
   });
 
-  it('läuft über 24 Stunden hinaus weiter, statt auf null zu springen', () => {
-    expect(einsatzdauer('2026-06-10 09:55:00', JETZT)).toBe('26:05');
+  it('zeigt ab 24 Stunden Tage, statt auf null zu springen', () => {
+    expect(einsatzdauer('2026-06-10 09:55:00', JETZT)).toBe('1 d 02 h');
   });
 
   it('endet am Abschluss, nicht an der Uhr', () => {
-    expect(einsatzdauer('2026-06-11 05:00:00', JETZT, '2026-06-11 07:30:00')).toBe('2:30');
+    expect(einsatzdauer('2026-06-11 05:00:00', JETZT, '2026-06-11 07:30:00')).toBe('2 h 30 min');
   });
 
   it('liefert für einen Beginn in der Zukunft oder Unlesbares keine negative Dauer', () => {
-    expect(einsatzdauer('2026-06-11 13:00:00', JETZT)).toBe('—:——');
-    expect(einsatzdauer('kaputt', JETZT)).toBe('—:——');
+    expect(einsatzdauer('2026-06-11 13:00:00', JETZT)).toBe('—');
+    expect(einsatzdauer('kaputt', JETZT)).toBe('—');
   });
 
   it('liest den Wirestring als UTC', () => {
     expect(wireAlsEpoche('2026-06-11 12:00:00')).toBe(JETZT);
-  });
-});
-
-describe('standText', () => {
-  it('nennt Sekunden, dann Minuten, dann die Uhrzeit in der Anzeigezone', () => {
-    expect(standText(JETZT - 40_000, JETZT)).toBe('Stand vor 40 s');
-    expect(standText(JETZT - 5 * 60_000, JETZT)).toBe('Stand vor 5 min');
-    // 10:00 UTC → 12:00 Sommerzeit in Berlin.
-    expect(standText(JETZT - 2 * 3_600_000, JETZT, BERLIN)).toBe('Stand 1200');
-  });
-
-  it('ohne Abruf behauptet sie keinen Stand', () => {
-    expect(standText(0, JETZT)).toBe('Stand wird abgerufen');
-  });
-});
-
-describe('lagebildZeit', () => {
-  it('nennt „jetzt“ in der Rolle „kurz“ in der Anzeigezone (LLH-1061)', () => {
-    expect(lagebildZeit(JETZT, BERLIN)).toBe('1400');
-    expect(lagebildZeit(JETZT, { ...BERLIN, zeitdarstellung: 'datum_uhrzeit' })).toBe('14:00');
   });
 });
 
@@ -326,11 +304,11 @@ describe('baueLagebild', () => {
     expect(leer).toMatchObject({ wert: '0', ton: 'neutral' });
   });
 
-  it('Einsatzdauer: Wert, Einheit und Beginn in der Anzeigezone', () => {
+  it('Einsatzdauer: Wert in der Form der Dauer und Beginn in der Anzeigezone', () => {
     const dauer = baueLagebild(roh(), JETZT, BERLIN).kennzahlen[5];
     expect(dauer.etikett).toBe('Einsatzdauer');
-    expect(dauer.wert).toBe('6:41');
-    expect(dauer.einheit).toBe('h');
+    expect(dauer.wert).toBe('6 h 41 min');
+    expect(dauer.einheit).toBeUndefined();
     // 05:19 UTC → 07:19 Berlin; derselbe Tag wie „jetzt" braucht keinen Tag.
     expect(dauer.notiz).toMatch(/^seit (\d{2})?0719$/);
   });

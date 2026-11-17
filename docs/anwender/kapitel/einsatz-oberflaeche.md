@@ -558,8 +558,9 @@ Organisation, nie der Wahl am Gerät; die Zeitspalte des gedruckten Einsatztageb
 Datum-Zeit-Gruppe. Die Platzhalter „{uhrzeit}“ und „{datum}“ in Textbausteinen setzen „1430“ und
 „10okt26“ bzw. „14:30“ und „10.10.26“ ein.
 
-Die Uhr in der Kopfzeile bleibt eine Wanduhr in der Zeit des Geräts („14:30“); auch der
-Datenstand („Stand 1430“) zählt in der Zeit des Geräts. Texte, die der Server selbst schreibt (etwa
+Die Uhr in der Kopfzeile zeigt die Zeit des Geräts in derselben Darstellung wie alle Zeiten („1430“
+bzw. „14:30“); auch der Datenstand („Stand 1430“) zählt in der Zeit des Geräts. Dauern stehen in
+jeder Darstellung gleich: „45 min“, „8 h“, „5 h 01 min“, die Einsatzdauer ab einem Tag „2 d 14 h“. Texte, die der Server selbst schreibt (etwa
 automatische Einträge im Einsatztagebuch beim Eintreffen einer Einheit oder zu einer
 Verpflegung), nennen Zeiten noch als „30.09. 06:40“.
 

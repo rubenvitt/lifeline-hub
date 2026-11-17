@@ -9,6 +9,7 @@
  * `VerteilungsPaneel`, `StromPaneel`. Hier steht nur, was das Lagebild hineinlegt — Wortlaut,
  * Farben aus dem Vertrag, Fuß und Meta.
  */
+import { dauer } from '../../anzeige/dauer';
 import type { EtbEintragAnzeige } from '../../api/types';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import { Tooltip } from 'antd';
@@ -382,7 +383,7 @@ export function VerlaufPaneel({
     <DashboardPaneel
       titel="Verlauf"
       zustand={leer}
-      meta={zustand === 'daten' ? `${VERLAUF_STUNDEN} h` : undefined}
+      meta={zustand === 'daten' ? dauer(VERLAUF_STUNDEN * 60) : undefined}
       sprung={{ label: modulName('personen'), onKlick: onPersonen }}
       fuss={
         leer === 'daten' && verlauf.spitze ? (

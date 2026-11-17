@@ -18,8 +18,8 @@ Modul, in dem sie erfasst wird.
 
 ### Das Lagebild lesen
 
-1. Im Bereich „Lage“ „Lagebild“ öffnen. Im Seitenkopf stehen Datum und Uhrzeit, rechts das Alter
-   des Datenstands („Stand vor … s“), sobald eine erhöhte Warnstufe gilt, der Hinweis
+1. Im Bereich „Lage“ „Lagebild“ öffnen. Neben dem Titel steht der Datenstand („Stand 1430“, ab
+   einer Minute mit Alter „Stand 1430 · vor 2 min“); rechts steht, sobald eine erhöhte Warnstufe gilt, der Hinweis
    „Warnstufe …“ und, sobald für den Einsatzort eine Wetterwarnung gilt oder angekündigt ist, ihre
    Marke, etwa „Markantes Wetter Dauerregen bis 21:00 ↗“. Die Marke öffnet „Wetter & Pegel“.
 2. Die Zeile „Was brennt“ lesen: dieselbe wie im Überblick, mit offenen Sofortmeldungen ab
@@ -67,7 +67,7 @@ selben Verhältnis mit, ohne Bildlauf. Die jüngsten ETB-Einträge und die Zeile
 nicht im Großbild. Gehen
 Alarme oder Hinweise ein, nennt das Großbild nur ihre Zahl („1 Alarm offen“), ohne Titel;
 bearbeitet werden sie nach dem Verlassen in der Alarmzone. Ist das Netz weg oder die Live-Verbindung
-getrennt, steht das oben („Ohne Netz“, „Verbindung getrennt“), und die Uhrzeit mit dem Alter des Stands zeigt, wie alt die Zahlen sind.
+getrennt, steht das oben („Ohne Netz“, „Verbindung getrennt“), und Uhr und Stand mit Alter zeigen, wie alt die Zahlen sind.
 Tastenkürzel der App, etwa die Suche, wirken im Großbild nicht. Bei einer Übung trägt es die
 Übungsmarke. Nach einem Neuladen steht die normale Seite da, das Großbild wird nicht gemerkt.
 

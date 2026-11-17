@@ -245,9 +245,11 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
       const kopf = page.locator('[data-lfh="seitenkopf"]').first();
       if (route.inhalt) await expect(page.getByText(route.inhalt).first()).toBeVisible();
       else await expect(kopf).toContainText('1 verortet');
-      const anzeige = page.getByText(/^Stand \d{4} · offline$/).first();
+      // Auf dem Lagebild steht ab einer Minute das Alter dazwischen (LLH-1750, „Eine Form für den
+      // Datenstand“): „Stand 1731 · vor 2 min · offline“.
+      const anzeige = page.getByText(/^Stand \d{4}( · vor [^·]+)? · offline$/).first();
       await expect(anzeige).toBeVisible();
-      const uhrzeit = (await anzeige.textContent())!.slice('Stand '.length, 'Stand '.length + 5);
+      const uhrzeit = /^Stand (\d{4})/.exec((await anzeige.textContent())!)![1];
       const online = standOnline.get(route.name)!.slice('Stand '.length);
       expect(uhrzeit >= online && uhrzeit <= offlineAb, `${route.name}: ${uhrzeit}`).toBe(true);
     }

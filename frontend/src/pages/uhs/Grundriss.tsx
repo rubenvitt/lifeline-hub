@@ -1,3 +1,4 @@
+import { dauer } from '../../anzeige/dauer';
 import { WORTUMBRUCH_STIL } from '../../anzeige/wortumbruch';
 import {
   IconAbmelden,
@@ -100,13 +101,7 @@ import {
   markenZielStil,
   seitlicherUeberlauf,
 } from './grundrissLayout';
-import {
-  gehalteneFolge,
-  nachDringlichkeit,
-  wartetSeit,
-  wartezeitMinuten,
-  wartezeitText,
-} from './dringlichkeit';
+import { gehalteneFolge, nachDringlichkeit, wartetSeit, wartezeitMinuten } from './dringlichkeit';
 import {
   ausgetretenSeit,
   personenInUhs as personenInUhsVon,
@@ -444,7 +439,7 @@ function Wartezeit({ seit, vorwort }: { seit: string; vorwort?: string }) {
       style={{ flex: 'none', fontSize: token.fontSizeSM, color: rollen.text2 }}
     >
       {vorwort && `${vorwort} `}
-      <span style={zahlStil('klein')}>{wartezeitText(minuten)}</span>
+      <span style={zahlStil('klein')}>{dauer(minuten)}</span>
     </span>
   );
 }

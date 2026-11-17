@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import type {
   AblehnungGrund,
   AnbindungAblehnung,
@@ -129,7 +130,7 @@ export function ablehnungText(a: Pick<AnbindungAblehnung, 'grund' | 'abweichung_
     const s = a.abweichung_s;
     if (Math.abs(s) <= UHR_TOLERANZ_S) return 'Token lebt länger als 60 s';
     const minuten = Math.round(Math.abs(s) / 60);
-    return `Uhr geht ${minuten} min ${s < 0 ? 'nach' : 'vor'}`;
+    return `Uhr geht ${dauer(minuten)} ${s < 0 ? 'nach' : 'vor'}`;
   }
   return GRUND_TEXT[a.grund] ?? a.grund;
 }

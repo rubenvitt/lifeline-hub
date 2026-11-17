@@ -127,7 +127,7 @@ Für Einsatzleitung und Führungspersonal:
    „Ruhe …“. Auf die Paneele „Einteilung“, „Person“ und „Zeitachse“ folgt zuletzt „Aus dem
    Einsatz“.
 
-   ![Ansicht von Anna Probe: in der Brotkrume „Personal“, im Kopf die Marke „Demo“, „Sprechfunker“ und „im Einsatz 4 h 47“; darunter die Paneele „Einteilung“ (Status, Einsatzfunktion, Einheit, Fahrzeug, Unfallhilfsstelle, Position, Bemerkung), „Person“ mit „aus dem Stamm“ und „Zeitachse“](../bilder/personal/ansicht.png)
+   ![Ansicht von Anna Probe: in der Brotkrume „Personal“, im Kopf die Marke „Demo“, „Sprechfunker“ und „im Einsatz 4 h 47 min“; darunter die Paneele „Einteilung“ (Status, Einsatzfunktion, Einheit, Fahrzeug, Unfallhilfsstelle, Position, Bemerkung), „Person“ mit „aus dem Stamm“ und „Zeitachse“](../bilder/personal/ansicht.png)
 
 3. Unter „Einteilung“ stehen alle Angaben des Einsatzes, dazu die Unfallhilfsstelle; ändern wie in
    der Liste. Führt die Person ihre Einheit, steht neben der Einheit die Marke „Einheitsführer“.
@@ -153,7 +153,7 @@ Verwaltung im Personalstamm („im Stamm ändern“).
    Kräfte-Zeitachse](meldebild.md)).
 2. Für die Einzelheiten die Ansicht der Person öffnen und zum Paneel „Zeitachse“ gehen.
 
-   ![Paneel „Zeitachse“ von Lena Beispiel mit „Ruhe 40 min · gesamt 4 h 00“, Eintreffen und Entlassung](../bilder/personal/zeitachse-person.png)
+   ![Paneel „Zeitachse“ von Lena Beispiel mit „Ruhe 40 min · gesamt 4 h“, Eintreffen und Entlassung](../bilder/personal/zeitachse-person.png)
 
 3. Fehlt ein Ereignis, mit „Nachtragen“ ergänzen (Kapitel [Kräfteübersicht und
    Kräfte-Zeitachse](meldebild.md)).

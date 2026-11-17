@@ -78,9 +78,14 @@ import { wetterAbfrage } from '../../api/wetter';
 import { kopfWarnung } from '../../wetter/kopfWarnung';
 import WetterKopfMarke from '../../wetter/WetterKopfMarke';
 import { listeEtb } from '../../api/etb';
-import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import {
+  useAnzeigeKonventionen,
+  useUhrDarstellung,
+} from '../../anzeige/AnzeigeKonventionenContext';
+import { formatiereUhr } from '../../anzeige/zeitDarstellung';
+import { useOhneVerbindung } from '../../offline/verbindung';
 import EinsatzSeite from '../../components/EinsatzSeite';
-import { gemeinsamerDatenstand } from '../../components/Datenstand';
+import { datenstandText, gemeinsamerDatenstand } from '../../components/Datenstand';
 import { useViewport } from '../../components/useViewport';
 import {
   DashboardFlaeche,
@@ -102,9 +107,7 @@ import {
   evakuierungStand,
   istSanitaetsdienstReihe,
   kennzahlReihe,
-  lagebildZeit,
   reihenWechsel,
-  standText,
   warnstufeTon,
   type Datenzustand,
   type EvakuierungStand,
@@ -161,6 +164,8 @@ export default function LageDashboardPage() {
   const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const { konventionen: konv } = useAnzeigeKonventionen();
+  const uhrArt = useUhrDarstellung();
+  const ohneNetz = useOhneVerbindung();
   const jetzt = useJetzt(TAKT_MS);
   // Alarmzeile „Was brennt“ (LLH-1743): derselbe Hook wie im Überblick, gegen die Uhr der Seite.
   const wasBrenntDaten = useWasBrennt(einsatzId, dayjs(jetzt));
@@ -416,9 +421,11 @@ export default function LageDashboardPage() {
     <div style={{ display: 'contents' }} {...linkFaenger}>
       <EinsatzSeite
         titel={modulName('lage-dashboard')}
-        // Die Uhrzeit des Lagebilds steht neben dem Titel, nicht in ihm (LFH-965): das h1 ist der
-        // Menüname.
-        meta={lagebildZeit(jetzt, konv)}
+        // Neben dem Titel steht der Datenstand mit Alter, keine Uhr (LLH-1750, Spec
+        // `zeitdarstellung`): die Uhr steht im Kopf, und eine zweite Uhr las sich als Stand und lief
+        // ohne Netz weiter. Das h1 ist der Menüname (LFH-965).
+        dataUpdatedAt={datenstand}
+        datenstandAlter
         breadcrumb={
           <Breadcrumb
             items={[
@@ -445,7 +452,6 @@ export default function LageDashboardPage() {
                 color: rollen.schwach,
               }}
             >
-              <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
               {warnTon !== 'neutral' && lagebild && (
                 <WarnstufenHinweis ton={warnTon === 'alarm' ? 'alarm' : 'achtung'}>
                   Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
@@ -604,7 +610,7 @@ export default function LageDashboardPage() {
       {isGrossbild && (
         <LagebildGrossbild
           einsatz={einsatz}
-          meta={`${lagebildZeit(jetzt, konv)} · ${standText(datenstand, jetzt, konv)}`}
+          meta={`${formatiereUhr(jetzt, uhrArt)} · ${datenstandText(datenstand, jetzt, { alter: true, offline: ohneNetz, konv })}`}
           kennzahlen={
             lagebild?.kennzahlen.map((k) => bandKennzahl(k, kennzahlZustand[k.etikett])) ?? null
           }

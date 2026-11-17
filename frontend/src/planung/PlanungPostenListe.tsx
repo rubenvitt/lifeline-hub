@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Button, Modal, Space } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -9,7 +10,7 @@ import {
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung, PlanungPosten } from '../api/types';
-import { formatDauer } from '../abloesung/dauer';
+
 import { StatusChip, useRollen, zahlStil } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { MenueAusloeser } from '../components/MenueAusloeser';
@@ -127,7 +128,7 @@ export default function PlanungPostenListe({
       key: 'schichtlaenge',
       render: (_, p) => (
         <span style={zahlStil('klein')}>
-          {p.schichtlaenge_minuten != null ? formatDauer(p.schichtlaenge_minuten) : '—'}
+          {p.schichtlaenge_minuten != null ? dauer(p.schichtlaenge_minuten) : '—'}
         </span>
       ),
     },

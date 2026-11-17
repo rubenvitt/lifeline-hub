@@ -1,6 +1,7 @@
+import { dauer } from '../anzeige/dauer';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { formatDauer } from '../abloesung/dauer';
+
 import type {
   Einsatzperiode,
   SchichtplanGrenzwerte,
@@ -21,7 +22,7 @@ dayjs.extend(utc);
  * **Keine erfundenen Daten:** ohne Ereignis gibt es keine Dauer (`null`), nie `0`.
  *
  * Zeitpunkte sind UTC-Wirestrings ohne Zonenkennung und werden ausdrücklich als UTC gelesen
- * (`dayjs(s)` läse Ortszeit, vgl. `einsatz/einsatzDauer.ts`).
+ * (`dayjs(s)` läse Ortszeit, vgl. `anzeige/dauer.ts:dauerZwischen`).
  */
 
 /** Die laufende Periode: Dauer ab dem Anker (Alarmierung, sonst Eintreffen). */
@@ -100,17 +101,6 @@ export function abschliessendeEntlassungId(
 }
 
 /**
- * Dauer als Text: unter einer Stunde „40 min", sonst „7 h 40" (Minuten zweistellig). Keine
- * Tage: im Lagevortrag zählen Stunden („31 h 05"), und die Zahl springt nie zurück.
- */
-export function dauerText(minuten: number): string {
-  if (minuten < 60) return `${minuten} min`;
-  const h = Math.floor(minuten / 60);
-  const m = String(minuten % 60).padStart(2, '0');
-  return `${h} h ${m}`;
-}
-
-/**
  * Einstufung der laufenden Periode gegen die wirksamen Grenzwerte des Einsatzes (LLH-730, Spec
  * `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des Einsatzes“). Dieselben Werte und
  * dieselbe Trennregel wie der Plan-Befund `dienst` (`src/abloesung/schichtplan/pruefung.rs`,
@@ -183,13 +173,13 @@ export function einstufungText(
   grenzwerte: SchichtplanGrenzwerte,
   zeit: (utc: string) => string,
 ): string {
-  const dienst = `Im Dienst seit ${zeit(e.streckeBeginnAt)}: ${dauerText(e.streckeMinuten)}, Höchstwert ${formatDauer(grenzwerte.max_dienst_minuten)}`;
+  const dienst = `Im Dienst seit ${zeit(e.streckeBeginnAt)}: ${dauer(e.streckeMinuten)}, Höchstwert ${dauer(grenzwerte.max_dienst_minuten)}`;
   // Eine Lücke von 0 ist durchgehender Dienst, keine Ruhe: dann kein Ruhe-Teil.
   const kurz =
     e.ruheMinuten != null &&
     (e.wort === 'ruhe_zu_kurz' ||
       (e.ruheMinuten > 0 && e.ruheMinuten < grenzwerte.min_ruhe_minuten))
-      ? `Ruhe davor ${dauerText(e.ruheMinuten)}, Mindestruhe ${formatDauer(grenzwerte.min_ruhe_minuten)}`
+      ? `Ruhe davor ${dauer(e.ruheMinuten)}, Mindestruhe ${dauer(grenzwerte.min_ruhe_minuten)}`
       : null;
   const teile = e.wort === 'ruhe_zu_kurz' ? [kurz, dienst] : [dienst, kurz];
   return teile.filter((t): t is string => t != null).join(' · ');

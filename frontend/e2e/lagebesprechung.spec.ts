@@ -117,7 +117,7 @@ test.describe('LLH-1111: Modul Lagebesprechung', () => {
     antwort = terminAntwort(page, id);
     await paneel(page, 'Termin').getByRole('button', { name: '+1 h', exact: true }).click();
     expect((await antwort).ok()).toBeTruthy();
-    await expect(kennzahl(page, 'Nächste Lagebesprechung')).toContainText(/in (59 min|1 h 00 min)/);
+    await expect(kennzahl(page, 'Nächste Lagebesprechung')).toContainText(/in (59 min|1 h)\b/);
     await expect(kennzahl(page, 'Abgeschlossen')).toContainText('noch keine');
 
     // ── Vorbereitung: der Termin steht dort ebenso, die letzte Besprechung fehlt noch.

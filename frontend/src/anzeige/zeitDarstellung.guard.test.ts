@@ -57,10 +57,7 @@ const ZEIT_TOKEN = /HH|mm|DD|YYYY/;
 const MASCHINENFORMAT = /^YYYY-MM-DD/;
 
 /** Begründete Ausnahmen, Pfad relativ zu `frontend/src/` → Grund. */
-const AUSNAHMEN: Record<string, string> = {
-  'components/Kopfleiste.tsx':
-    'Uhr im Kopf: Gerätezeit, bewusst `HH:mm` wie eine Wanduhr (Entscheidung E2, LLH-1045).',
-};
+const AUSNAHMEN: Record<string, string> = {};
 
 /**
  * Schuldmenge: Datei → Anzahl der Stellen. Der Bestand vom 22.10.2026 ist mit LLH-1061 abgebaut;
@@ -132,7 +129,7 @@ describe('Zeit für Menschen nur über den Kern in anzeige/ (LLH-1053)', () => {
       [],
     );
     expect(zeitFormate("formatiere(p.lat, p.lon, 'mgrs')")).toEqual([]);
-    expect(zeitFormate("formatiereUhr(ms); formatiereDatenstand(x, 'HH:mm')")).toEqual([]);
+    expect(zeitFormate("formatiereUhr(ms, art); formatiereDatenstand(x, 'HH:mm')")).toEqual([]);
     // Ein neues `formatiere(x, 'HHmm')` außerhalb von anzeige/ macht den ersten Fall rot.
     const mitNeuem = funde([
       ...produktiv,

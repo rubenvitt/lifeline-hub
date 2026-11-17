@@ -1197,7 +1197,7 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');
     await zeigeRuhe();
-    await waitFor(() => expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('2 h 05'));
+    await waitFor(() => expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('2 h 05 min'));
     expect(zelleDerSpalte('Ruhe')).toHaveTextContent('—');
     // Unter den Grenzwerten keine Einstufung (LLH-730).
     expect(
@@ -1208,7 +1208,7 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
   // Spec `kraefte-zeitachse`, „Einstufung gegen die Grenzwerte des Einsatzes“ (LLH-730).
   // Zeitpunkte VOR `render()` rechnen, nie im Handler: Die Uhr der Seite (`useUhr`) liest die Zeit
   // beim Einhängen. Käme `vor(60)` erst mit der Anfrage, läge es unter Last mehr als eine Sekunde
-  // hinter der Uhr, und aus „1 h 00“ würden „59 min“ (LLH-1643).
+  // hinter der Uhr, und aus „1 h“ würden „59 min“ (LLH-1643).
   const vor = (minuten: number) =>
     new Date(Date.now() - minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
 
@@ -1232,10 +1232,10 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
     await screen.findByText('Thomas Müller');
     await zeigeRuhe();
     await waitFor(() =>
-      expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('1 h 00 Ruhe zu kurz'),
+      expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('1 h Ruhe zu kurz'),
     );
     expect(zelleDerSpalte('Einsatzdauer').querySelector('[title]')?.getAttribute('title')).toMatch(
-      /^Ruhe davor 2 h 00, Mindestruhe 8 h · Im Dienst seit /,
+      /^Ruhe davor 2 h, Mindestruhe 8 h · Im Dienst seit /,
     );
     // „Ruhe“ bleibt neutral: ohne Wort.
     expect(zelleDerSpalte('Ruhe').querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
@@ -1259,7 +1259,7 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');
     await zeigeRuhe();
-    await waitFor(() => expect(zelleDerSpalte('Ruhe')).toHaveTextContent('1 h 00'));
+    await waitFor(() => expect(zelleDerSpalte('Ruhe')).toHaveTextContent('1 h'));
     expect(zelleDerSpalte('Einsatzdauer')).toHaveTextContent('—');
     expect(document.querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
   });

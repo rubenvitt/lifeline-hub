@@ -11,7 +11,6 @@ import {
   type DringlichkeitsMerkmale,
   wartetSeit,
   wartezeitMinuten,
-  wartezeitText,
 } from './dringlichkeit';
 
 function belegung(over: Partial<UhsBelegung>): UhsBelegung {
@@ -251,13 +250,6 @@ describe('Wartezeit aus der Belegungsreihe (LLH-1135)', () => {
     expect(wartezeitMinuten('2026-10-18 08:00:00', jetzt)).toBe(12);
     expect(wartezeitMinuten('2026-10-18 08:30:00', jetzt)).toBe(0);
     expect(wartezeitMinuten('kaputt', jetzt)).toBeNull();
-  });
-
-  it('schreibt Minuten, ab einer Stunde Stunden und Minuten', () => {
-    expect(wartezeitText(0)).toBe('0 min');
-    expect(wartezeitText(12)).toBe('12 min');
-    expect(wartezeitText(60)).toBe('1 h 00 min');
-    expect(wartezeitText(135)).toBe('2 h 15 min');
   });
 });
 

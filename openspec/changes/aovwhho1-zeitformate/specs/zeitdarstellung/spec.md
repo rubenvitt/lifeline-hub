@@ -63,9 +63,9 @@ Eine relative Zeitangabe SHALL die Form der Dauer mit einem Vorwort tragen: „v
 - **WHEN** eine Sichtung 20 Sekunden zurückliegt
 - **THEN** steht „gesichtet gerade eben“
 
-#### Scenario: Verbleibende Kopplung
-- **WHEN** die Kopplung eines Geräts noch 5 Stunden und 12 Minuten gilt
-- **THEN** zeigt der Gerätekopf „Kopplung noch 5 h 12 min“
+#### Scenario: Kommender Termin
+- **WHEN** die nächste Lagebesprechung in 2 Stunden und 5 Minuten beginnt
+- **THEN** zeigt ihr Zustand „in 2 h 05 min“
 
 ### Requirement: Uhr im Kopf in der Darstellung
 Die Uhr im Kopf SHALL die Gerätezeit in der Rolle „Uhrzeit“ der wirksamen Darstellung zeigen:

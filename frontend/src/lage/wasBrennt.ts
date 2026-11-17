@@ -8,6 +8,7 @@
  * (`lage/ausfallJeEinheit.ts`). Am Lagemonitor kommen dieselben Eingaben vom Server
  * (`lage/alarmAusMonitor.ts`); Folge und Wortlaut sind deshalb überall gleich.
  */
+import { dauer } from '../anzeige/dauer';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -146,7 +147,7 @@ export function wasBrennt(q: WasBrenntQuellen, jetzt: Dayjs): WasBrennt {
     if (m.sofort_offen > 0) {
       const seit = minutenSeit(m.sofort_aelteste_at, jetzt);
       const zahl = mehrzahl(m.sofort_offen, 'Sofortmeldung', 'Sofortmeldungen');
-      setze('sofort', seit != null ? `${zahl} · älteste ${seit} min` : zahl);
+      setze('sofort', seit != null ? `${zahl} · älteste ${dauer(seit, { tage: true })}` : zahl);
     }
     if (m.bestaetigung_ueberfaellig > 0) {
       setze(
@@ -173,7 +174,7 @@ export function wasBrennt(q: WasBrenntQuellen, jetzt: Dayjs): WasBrennt {
       (a, b) => b.seitMin - a.seitMin || a.name.localeCompare(b.name, 'de'),
     );
     const namen = folge.map((e) => e.name);
-    const laengste = ` · längste ${folge[0].seitMin} min`;
+    const laengste = ` · längste ${dauer(folge[0].seitMin, { tage: true })}`;
     setze(
       'rueckmeldung',
       `Rückmeldung überfällig: ${namenKurz(namen)}${laengste}`,

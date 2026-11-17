@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import dayjs from 'dayjs';
 import { erinnerungZustand } from '../../erinnerung/erinnerungZustand';
 import type { Abloesung, Auftrag, Erinnerung, Meldung, Nachforderung } from '../../api/types';
-import { formatVor } from '../../anzeige/abstand';
+import { vorText } from '../../anzeige/dauer';
 import { leereUhrzeit, zeitKurz } from '../../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { einstufungOf } from '../../abloesung/einstufung';
@@ -438,7 +438,7 @@ export default function OffeneVorgaengePaneel({
                 data-lfh="vorgang-nachforderung"
                 style={zeile}
               >
-                {zeit(formatVor(n.angefordert_at, jetzt), 'abstand')}
+                {zeit(vorText(n.angefordert_at, jetzt), 'abstand')}
                 {text(
                   nachforderungName(n),
                   [`an ${adressatText(n)}`, n.benoetigt_bis ? `bis ${kurz(n.benoetigt_bis)}` : null]

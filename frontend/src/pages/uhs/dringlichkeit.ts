@@ -156,9 +156,3 @@ export function wartezeitMinuten(seit: string, jetztMs: number): number | null {
   if (beginn == null) return null;
   return Math.max(0, Math.floor((jetztMs - beginn) / 60_000));
 }
-
-/** „12 min“, ab einer Stunde „1 h 05 min“. */
-export function wartezeitText(minuten: number): string {
-  if (minuten < 60) return `${minuten} min`;
-  return `${Math.floor(minuten / 60)} h ${String(minuten % 60).padStart(2, '0')} min`;
-}

@@ -337,7 +337,7 @@ describe('Lagemonitor — Aktualität und Gerätemenü', () => {
     expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 min/);
   });
 
-  it('nennt einen Stand über einer Stunde in Stunden und Minuten (anzeige/abstand.ts)', async () => {
+  it('nennt einen Stand über einer Stunde in Stunden und Minuten (anzeige/dauer.ts)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
     bereit();
     renderApp('/geraet/7/monitor');
@@ -349,7 +349,7 @@ describe('Lagemonitor — Aktualität und Gerätemenü', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
-    expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 h 4 min$/);
+    expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 h 04 min$/);
   });
 
   it('kurzes Tippen öffnet kein Menü, 3 s Drücken schon, nach 30 s ohne Eingabe zu', async () => {
@@ -663,7 +663,7 @@ describe('Lagemonitor — Ablauf der Veranstaltung (LLH-1570)', () => {
       // Uhrzeit in der Anzeigezone (Europe/Berlin), dann Bezeichnung und Abstand.
       expect.stringMatching(/^12:?20Beginnin 20 min$/),
       expect.stringMatching(/Feuerwerkin 1 h 05 min$/),
-      expect.stringMatching(/Endein 2 h 00 min$/),
+      expect.stringMatching(/Endein 2 h$/),
     ]);
     expect(within(ablauf).queryByText(/überfällig/)).toBeNull();
     // Meldungen teilen sich die Zeile mit dem Ablauf.
