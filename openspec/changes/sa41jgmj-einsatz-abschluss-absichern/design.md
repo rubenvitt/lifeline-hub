@@ -147,9 +147,10 @@ vorhandene Schonfrist, in der ohnehin alle Mitglieder lesen.
 | `retention_bis` von Hand gesetzt | bleibt |
 | Kategorie-Zeilen mit `frist_gesetzt_at = abgeschlossen_at` (samt `vorgemerkt_at`) | gelöscht, ein ETB-Eintrag je Kategorie |
 | Kategorie-Zeilen von Hand gesetzt | bleiben |
-| `nachbereitung_bis` | auf `NULL`, ETB, wenn gesetzt (eine von Hand geänderte Nachbereitung geht mit; der erneute Abschluss setzt sie aus der Org-Vorgabe neu) |
+| `nachbereitung_bis` | auf `NULL`, ETB, wenn gesetzt (eine von Hand geänderte Nachbereitung geht mit; der erneute Abschluss setzt sie aus der Org-Vorgabe neu). „Von Hand gesetzt“ ist hier nicht erkennbar: es gibt keine Spalte und keinen Zeitstempel dafür, nur den ETB-Text; ein Vergleich mit Abschluss plus Org-Vorgabe bräche, sobald die Vorgabe sich binnen 24 h ändert (Review vor dem PR, 17.11.2026; Spec nachgezogen) |
 | Freigabe der öffentlichen API | bleibt gelöscht |
-| Gerätekopplungen | bleiben beendet: der Abschluss macht sie nur über den Status ungültig, deshalb widerruft `wiedereroeffnen` jede noch offene Kopplung in seiner Transaktion (`geraet::repo::widerrufen`, Umsetzung 17.11.2026) |
+| Gerätekopplungen | bleiben beendet: der Abschluss macht sie nur über den Status ungültig, deshalb widerruft `wiedereroeffnen` jede noch offene Kopplung in seiner Transaktion (`geraet::repo::widerrufen`, Umsetzung 17.11.2026); hing eine an einer Verpflegungsstelle, meldet der Handler `verpflegung` |
+| Kopplungen und Freigaben am Spiegel | beide Tabellen werden nicht gespiegelt; die Übernahme des Kopfs (`instanz::spiegel::uebernehmen`) widerruft Kopplungen und löscht Freigaben, wenn der Abschluss ankommt, und noch einmal beim Rückweg nach `aktiv` (Review vor dem PR, 17.11.2026). Sonst lebte, was eine Führungsübergabe am abgebenden Ende stehen ließ, mit dem Wiederöffnen beim Führer wieder auf |
 
 Der Vergleich „automatisch“ hängt an der Gleichheit der Zeitstempel, die der Abschluss in
 derselben Transaktion schreibt (`retention_gesetzt_at = abgeschlossen_at`,

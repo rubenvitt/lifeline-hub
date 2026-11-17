@@ -202,8 +202,12 @@ leerer Grund MUST 400 ergeben.
 Das Wiederöffnen SHALL im selben atomaren Vorgang zurücknehmen, was der Abschluss automatisch
 gesetzt hat: die Aufbewahrungsfrist des Einsatzes, sofern sie beim Abschluss entstand, die beim
 Abschluss entstandenen Kategorie-Fristen samt ihrer Vormerkung und die Nachbereitungsfrist. Eine
-von Hand gesetzte Frist MUST bleiben. Beendete Gerätekopplungen und eine beendete Freigabe für
-Maschinenzugänge MUST beendet bleiben. Ein erneuter Abschluss MUST die Fristen neu setzen.
+von Hand gesetzte Aufbewahrungsfrist oder Kategorie-Frist MUST bleiben. Die Nachbereitungsfrist
+MUST in jedem Fall zurückgenommen werden, auch wenn sie nach dem Abschluss von Hand geändert
+wurde: wer sie gesetzt hat, ist nicht gespeichert, und der erneute Abschluss setzt sie aus der
+Vorgabe der Organisation neu. Beendete Gerätekopplungen und eine beendete Freigabe für
+Maschinenzugänge MUST beendet bleiben, auch an einer Instanz, die den Einsatz spiegelt. Ein
+erneuter Abschluss MUST die Fristen neu setzen.
 
 #### Scenario: Automatische Frist zurückgenommen
 
@@ -213,9 +217,15 @@ Maschinenzugänge MUST beendet bleiben. Ein erneuter Abschluss MUST die Fristen 
 
 #### Scenario: Manuelle Frist bleibt
 
-- **WHEN** die Einsatzleitung nach dem Abschluss eine Frist von Hand setzt und den Einsatz dann
-  wieder öffnet
+- **WHEN** die Einsatzleitung nach dem Abschluss die Aufbewahrungsfrist oder die Frist einer
+  Datenkategorie von Hand setzt und den Einsatz dann wieder öffnet
 - **THEN** bleibt die von Hand gesetzte Frist
+
+#### Scenario: Von Hand geänderte Nachbereitung geht mit
+
+- **WHEN** die Einsatzleitung nach dem Abschluss die Nachbereitung von Hand auf 30 Tage setzt und
+  den Einsatz dann wieder öffnet
+- **THEN** hat er keine Nachbereitungsfrist mehr, und das ETB nennt die Rücknahme
 
 #### Scenario: Erneuter Abschluss
 
@@ -227,6 +237,14 @@ Maschinenzugänge MUST beendet bleiben. Ein erneuter Abschluss MUST die Fristen 
 
 - **WHEN** ein Einsatz mit gekoppeltem Gerät abgeschlossen und wieder geöffnet wird
 - **THEN** ist die Kopplung beendet, und das Gerät muss neu gekoppelt werden
+
+#### Scenario: Kopplung bleibt beendet am Spiegel
+
+- **WHEN** an einer Instanz, die den Einsatz spiegelt, noch eine Gerätekopplung und eine Freigabe
+  für einen Maschinenzugang stehen (etwa nach einer Führungsübergabe) und die führende Instanz
+  den Einsatz abschließt und binnen 24 Stunden wieder öffnet
+- **THEN** sind Kopplung und Freigabe am Spiegel nach dem Abgleich beendet und leben mit dem
+  Rückweg nach `aktiv` nicht wieder auf
 
 ### Requirement: Kein Wiederöffnen, wenn die Aufbewahrung schon greift
 

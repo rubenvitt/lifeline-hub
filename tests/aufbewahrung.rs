@@ -1442,6 +1442,19 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
+    // Spec „Von Hand geänderte Nachbereitung geht mit“: wer sie gesetzt hat, ist nicht
+    // gespeichert, das Wiederöffnen nimmt sie in jedem Fall zurück.
+    let nachbereitung = in_tagen(30);
+    let (s, v) = common::anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{id}/nachbereitung"),
+        &admin,
+        Some(&serde_json::json!({ "nachbereitung_bis": nachbereitung })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(fristen(&pool, id).await.2, Some(nachbereitung));
 
     wieder_oeffnen(&app, &admin, id).await;
     let (bis, _, nb) = fristen(&pool, id).await;
@@ -1450,7 +1463,7 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
         Some(frist.as_str()),
         "manuelle Frist bleibt"
     );
-    assert_eq!(nb, None, "die Nachbereitung geht mit");
+    assert_eq!(nb, None, "die von Hand geänderte Nachbereitung geht mit");
     let zeilen = kategorie_zeilen(&pool, id).await;
     assert_eq!(
         zeilen.len(),
