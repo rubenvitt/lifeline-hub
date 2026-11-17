@@ -1,5 +1,6 @@
 use super::PersonAnzeige;
 use crate::error::AppError;
+use crate::feld_cas::{ExpectedValue, ExpectedValues};
 use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
@@ -107,49 +108,35 @@ pub struct PatchDaten<'a> {
     pub unvertraeglichkeiten: Option<Option<&'a str>>,
 }
 
-/// Ein erwarteter Spaltenwert des Feld-CAS, getypt für den Bind (`None` = leer erwartet).
-#[derive(Debug, Clone, Copy)]
-enum ExpectedValue<'a> {
-    Text(Option<&'a str>),
-    Integer(Option<i64>),
-    Real(Option<f64>),
-    Bool(Option<bool>),
-}
-
-impl<'a> ExpectedValue<'a> {
-    /// Die genannten Altwerte in fester Spaltenfolge, je mit ihrem Spaltennamen.
-    fn aus(erwartet: &PatchDaten<'a>) -> Vec<(&'static str, ExpectedValue<'a>)> {
-        use ExpectedValue::{Bool, Integer, Real, Text};
-        [
-            ("name", erwartet.name.map(Text)),
-            ("vorname", erwartet.vorname.map(Text)),
-            ("geschlecht", erwartet.geschlecht.map(Text)),
-            ("geburtsdatum", erwartet.geburtsdatum.map(Text)),
-            ("alter_geschaetzt", erwartet.alter_geschaetzt.map(Integer)),
-            ("herkunft_adresse", erwartet.herkunft_adresse.map(Text)),
-            ("antreff_ort", erwartet.antreff_ort.map(Text)),
-            ("melder_kontakt", erwartet.melder_kontakt.map(Text)),
-            ("notiz", erwartet.notiz.map(Text)),
-            ("zustand", erwartet.zustand.map(Text)),
-            ("antreff_lat", erwartet.antreff_lat.map(Real)),
-            ("antreff_lon", erwartet.antreff_lon.map(Real)),
-            ("vermisst_seit", erwartet.vermisst_seit.map(Text)),
-            ("pat_nummer", erwartet.pat_nummer.map(Text)),
-            ("kontamination", erwartet.kontamination.map(Bool)),
-            (
-                "versorgende_einheit_id",
-                erwartet.versorgende_einheit_id.map(Integer),
-            ),
-            ("kostform", erwartet.kostform.map(Text)),
-            (
-                "unvertraeglichkeiten",
-                erwartet.unvertraeglichkeiten.map(Text),
-            ),
-        ]
-        .into_iter()
-        .filter_map(|(spalte, wert)| wert.map(|w| (spalte, w)))
-        .collect()
-    }
+/// Die genannten Altwerte des Feld-CAS in fester Spaltenfolge (Baustein [`crate::feld_cas`]).
+fn altwerte<'a>(erwartet: &PatchDaten<'a>) -> ExpectedValues<'a> {
+    use ExpectedValue::{Bool, Integer, Real, Text};
+    let mut w = ExpectedValues::new();
+    w.push("name", erwartet.name.map(Text));
+    w.push("vorname", erwartet.vorname.map(Text));
+    w.push("geschlecht", erwartet.geschlecht.map(Text));
+    w.push("geburtsdatum", erwartet.geburtsdatum.map(Text));
+    w.push("alter_geschaetzt", erwartet.alter_geschaetzt.map(Integer));
+    w.push("herkunft_adresse", erwartet.herkunft_adresse.map(Text));
+    w.push("antreff_ort", erwartet.antreff_ort.map(Text));
+    w.push("melder_kontakt", erwartet.melder_kontakt.map(Text));
+    w.push("notiz", erwartet.notiz.map(Text));
+    w.push("zustand", erwartet.zustand.map(Text));
+    w.push("antreff_lat", erwartet.antreff_lat.map(Real));
+    w.push("antreff_lon", erwartet.antreff_lon.map(Real));
+    w.push("vermisst_seit", erwartet.vermisst_seit.map(Text));
+    w.push("pat_nummer", erwartet.pat_nummer.map(Text));
+    w.push("kontamination", erwartet.kontamination.map(Bool));
+    w.push(
+        "versorgende_einheit_id",
+        erwartet.versorgende_einheit_id.map(Integer),
+    );
+    w.push("kostform", erwartet.kostform.map(Text));
+    w.push(
+        "unvertraeglichkeiten",
+        erwartet.unvertraeglichkeiten.map(Text),
+    );
+    w
 }
 
 /// Personen eines Einsatzes (ohne stornierte), optional nach Status gefiltert.
@@ -567,23 +554,9 @@ pub async fn aktualisiere(
         sql.push_str(" AND geaendert_at = ?40");
         nummer += 1;
     }
-    // Spaltennamen nur aus der festen Liste in `ExpectedValue::aus`, nie aus der Anfrage: das
-    // Suffix bleibt SQL-sicher, nur seine Länge ist dynamisch.
-    let altwerte = ExpectedValue::aus(erwartet);
-    for (spalte, wert) in &altwerte {
-        // Ein leerer Text-Altwert trifft auch eine gespeicherte leere oder nur aus Leerraum
-        // bestehende Zeichenkette (design.md D1): die Oberfläche zeigt beides als „ohne Angabe“
-        // und schickt `null`; sonst bliebe ein solcher Bestand dauerhaft im 409.
-        if matches!(wert, ExpectedValue::Text(_)) {
-            sql.push_str(&format!(
-                " AND ({spalte} IS ?{nummer} OR (?{nummer} IS NULL AND \
-                 TRIM({spalte}, ' ' || char(9) || char(10) || char(13)) = ''))"
-            ));
-        } else {
-            sql.push_str(&format!(" AND {spalte} IS ?{nummer}"));
-        }
-        nummer += 1;
-    }
+    // Spaltennamen nur aus der festen Liste in `altwerte`, nie aus der Anfrage (`feld_cas`).
+    let altwerte = altwerte(erwartet);
+    sql.push_str(&altwerte.sql_suffix(nummer));
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.name.map(|_| 1_i64))
         .bind(daten.name.and_then(|v| v))
@@ -627,14 +600,7 @@ pub async fn aktualisiere(
     if let Some(stand) = erwartet_geaendert_at {
         q = q.bind(stand);
     }
-    for (_, wert) in altwerte.iter().copied() {
-        q = match wert {
-            ExpectedValue::Text(v) => q.bind(v),
-            ExpectedValue::Integer(v) => q.bind(v),
-            ExpectedValue::Real(v) => q.bind(v),
-            ExpectedValue::Bool(v) => q.bind(v),
-        };
-    }
+    q = altwerte.bind_all(q);
     let betroffen = q.execute(pool).await?.rows_affected();
     if betroffen == 0 {
         // Mit Guard: existiert die Zeile → veralteter Stand (409), sonst fehlt sie (404).
@@ -649,7 +615,7 @@ pub async fn aktualisiere(
                 let meldung = if erwartet_geaendert_at.is_some() {
                     "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden."
                 } else {
-                    "Das Feld wurde zwischenzeitlich geändert. Bitte neu laden."
+                    crate::feld_cas::KONFLIKT_MELDUNG
                 };
                 return Err(AppError::Conflict(meldung.into()));
             }
