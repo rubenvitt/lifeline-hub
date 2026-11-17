@@ -12,7 +12,7 @@ import {
 } from '../../components/grossbild';
 import { AlarmZeile, useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
-import type { WasBrennt } from '../../lage/wasBrennt';
+import type { AlarmZeilenDaten } from '../../lage/useWasBrennt';
 import { sichtung, warnstufeBalkenFarbe } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
 import { NICHT_FREIGEGEBEN } from './fuehrungsZahlen';
@@ -68,7 +68,7 @@ interface LagebildGrossbildProps {
    * Die Alarmzeile der Seite, wie `useWasBrennt` sie dort liefert (LLH-1931, ADR-0057, design.md D1
    * der Change `t14j0wpt-alarmzeile-grossbild`): kein zweiter Abruf, keine zweite Uhr.
    */
-  alarm: Pick<WasBrennt, 'eintraege' | 'stand' | 'fehlend'>;
+  alarm: Pick<AlarmZeilenDaten, 'eintraege' | 'stand' | 'fehlend'>;
   onVerlassen: () => void;
 }
 

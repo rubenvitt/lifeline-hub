@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { grossMass } from '../../components/grossbild';
 import LagebildGrossbild, { GEFAHREN_HOECHSTENS } from './LagebildGrossbild';
-import type { AlarmEintrag } from '../../lage/wasBrennt';
+import type { AlarmZeilenDaten } from '../../lage/useWasBrennt';
 import type { KennzahlAnzeige } from './kennzahlAnzeige';
 import type { GefahrenZeile, SichtungsZeile } from './lageVerdichtung';
 import type { Verlauf } from './verlauf';
@@ -40,6 +40,8 @@ const SICHTUNG: SichtungsZeile[] = [
 ];
 
 const LEERER_VERLAUF: Verlauf = { stunden: [], imFenster: 0, spitze: null };
+
+type AlarmEintrag = AlarmZeilenDaten['eintraege'][number];
 
 const brennt = (art: AlarmEintrag['art'], text: string): AlarmEintrag => ({
   art,
