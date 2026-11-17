@@ -166,8 +166,11 @@ Abschluss sie neu.
   die Einsatzleitung den Knopf „Einsatz abschließen…“, der den Dialog
   `pages/einsatzdaten/EinsatzAbschlussDialog.tsx` öffnet.
 - Dialog: Kopf mit Bezeichnung und Nummer ohne Kürzung; Abschnitt „Noch offen“ aus D1 (Lade-,
-  Fehler- und Leerzustand nach `SeitenZustand`/`PaneelZustand`; „Nichts offen“); fester Satz zu
-  den Kräften, sobald `kraefte.anzahl > 0`; Satz zu Kopplungen und Maschinenzugängen; Feld
+  Fehler- und Leerzustand nach `SeitenZustand`/`PaneelZustand`; „Nichts offen“; ohne Netz und
+  ohne Antwort „Ohne Netz nicht geladen“ mit „Erneut abrufen“, weil die Prüfung nicht auf der
+  Platte liegt); fester Satz zu den Kräften, **immer**, auch ohne Antwort der Prüfung (Review vor
+  dem PR, 17.11.2026: ursprünglich nur bei `kraefte.anzahl > 0`, dann entfiel er beim Laden und
+  im Fehler, obwohl der Knopf bedienbar war); Satz zu Kopplungen und Maschinenzugängen; Feld
   „Zur Bestätigung Einsatznummer oder Bezeichnung eintippen“; Fuß „Abbrechen“ und rot
   „Einsatz abschließen“ (disabled bis D2 passt). Fehler bleiben im Dialog stehen (`SpeicherFehler`,
   kein Toast).
@@ -184,6 +187,14 @@ Abschluss sie neu.
   nicht).
 - Beide Mutationen invalidieren `einsatzKeys.einsatz(id)` und `globalKeys.einsaetze()`; das
   Wiederöffnen zusätzlich den ETB.
+- Ohne Netz sind beide gesperrt, nie vorgemerkt (`frontend/src/offline/AGENTS.md`, „Schreiben
+  ohne Netz“, Muster `instanz/FuehrungPaneel.tsx`): der Knopf im Dialog fragt
+  `useOhneVerbindung` und nennt `OHNE_VERBINDUNG_NICHT_AENDERBAR`, die Mutationen laufen mit
+  `networkMode: 'always'`. TanStacks Vorgabe hielte sie an, der Dialog ließe sich nicht
+  schließen, und der Abschluss ginge bei der Rückkehr des Netzes unbemerkt hinaus.
+- Ein offener Dialog folgt dem Einsatz, den der Live-Kanal nachzieht: passt er nicht mehr
+  (anderswo abgeschlossen oder wieder geöffnet, Frist abgelaufen), schließt das Paneel ihn und
+  öffnet ihn auch nicht wieder, wenn der Zustand zurückkehrt.
 
 ## Risks / Trade-offs
 

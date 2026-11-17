@@ -5,12 +5,16 @@ import { ETB_INHALT_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { schriftStil, useRollen } from '../../components/instrument';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
+import { SOFORT_ODER_NIE } from './EinsatzAbschlussDialog';
 
 /**
  * Dialog „Einsatz wieder öffnen“ (LLH-1814, Spec `einsatz-abschluss`, design.md D6): Pflichtfeld
  * „Grund“, das unverändert ins ETB geht (Grenze wie ein ETB-Inhalt), und der Satz, dass Kopplungen
  * und Maschinenzugänge beendet bleiben (D5). Der Knopf ist nicht rot: das Wiederöffnen beendet
  * nichts. Ablehnungen (422 Frist oder Aufbewahrung, 409 Spiegel) stehen im Dialog, kein Toast.
+ * Ohne Netz gesperrt und nie angehalten, wie der Abschluss (`SOFORT_ODER_NIE`): ein angehaltener
+ * Grund ginge sonst bei der Rückkehr des Netzes unbemerkt ins ETB.
  */
 
 /** Fester Satz zu dem, was das Wiederöffnen nicht zurückholt (D5). */
@@ -32,8 +36,10 @@ export default function EinsatzWiedereroeffnenDialog({
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<WiedereroeffnenWerte>();
+  const ohneNetz = useOhneVerbindung();
 
   const mutation = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: (grund: string) => oeffneEinsatzWieder(einsatzId, grund),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
@@ -51,6 +57,8 @@ export default function EinsatzWiedereroeffnenDialog({
       form={form}
       initialValues={{ grund: '' }}
       erfassenText="Einsatz wieder öffnen"
+      gesperrt={ohneNetz}
+      zusammenfassung={ohneNetz ? OHNE_VERBINDUNG_NICHT_AENDERBAR : undefined}
       laeuft={mutation.isPending}
       speicherung={mutation}
       speicherFehlerTitel="Nicht wieder geöffnet"

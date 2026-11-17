@@ -2,7 +2,7 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussPaneel.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussDialog.tsx, frontend/src/pages/einsatzdaten/EinsatzWiedereroeffnenDialog.tsx, src/einsatz/abschluss.rs, src/einsatz/kontext.rs, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs, src/einsatz/nachbereitung.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussPaneel.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussDialog.tsx, frontend/src/pages/einsatzdaten/EinsatzWiedereroeffnenDialog.tsx, src/einsatz/abschluss.rs, src/einsatz/kontext.rs, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs, src/einsatz/nachbereitung.rs, src/instanz/spiegel/uebernehmen.rs]
 ---
 
 ## Überblick
@@ -55,13 +55,15 @@ Für die Einsatzleitung:
    offene Aufträge und Meldungen, laufende Nachforderungen sowie vermisste Betroffene und solche,
    deren Verbleib offen oder unterwegs ist. Je Gruppe stehen die Zahl und bis zu drei Einträge;
    „alle ↗“ springt in das Modul, der Einsatz bleibt dabei aktiv. Steht „Nichts offen“, ist
-   alles erledigt.
+   alles erledigt. Steht „Ohne Netz nicht geladen“, fehlt die Verbindung; „Erneut abrufen“ holt
+   die Liste, sobald sie wieder da ist.
 4. In „Zur Bestätigung Einsatznummer oder Bezeichnung eintippen“ die interne Einsatznummer oder
    die Bezeichnung eintippen. Groß- und Kleinschreibung spielen keine Rolle.
 
    ![Dialog „Einsatz abschließen“ mit offenen Kräften, Aufträgen, Meldungen und Betroffenen unter „Noch offen“ und der eingetippten Bezeichnung](../bilder/einsatzabschluss/abschluss-dialog.png)
 
-5. „Einsatz abschließen“ wählen. Der Knopf ist erst aktiv, wenn die Eingabe passt.
+5. „Einsatz abschließen“ wählen. Der Knopf ist erst aktiv, wenn die Eingabe passt, und nur mit
+   Verbindung zum Server; ohne steht dort „Ohne Verbindung nicht änderbar“.
 
 Die App meldet „Einsatz abgeschlossen“. Am besten den Einsatzbericht vor dem Abschluss einmal
 durchsehen.
@@ -78,7 +80,8 @@ dem Abschluss:
 
    ![Dialog „Einsatz wieder öffnen“ mit eingetragenem Grund](../bilder/einsatzabschluss/wieder-oeffnen.png)
 
-4. „Einsatz wieder öffnen“ wählen.
+4. „Einsatz wieder öffnen“ wählen. Ohne Verbindung zum Server ist der Knopf gesperrt („Ohne
+   Verbindung nicht änderbar“).
 
 Die App meldet „Einsatz wieder geöffnet“. Der Einsatz ist wieder aktiv und beschreibbar.
 
@@ -91,11 +94,17 @@ Die App meldet „Einsatz wieder geöffnet“. Der Einsatz ist wieder aktiv und 
 - Das Einsatztagebuch erhält den Systemeintrag „Einsatz abgeschlossen“ mit der Person, die
   abgeschlossen hat.
 - Offene Punkte warnen nur; der Abschluss geht auch mit offenen Aufträgen oder Betroffenen. Die
-  Zahlen im Dialog zählen den ganzen Einsatz, auch Module, die für die eigene Person gesperrt sind;
-  „alle ↗“ steht nur bei Modulen, die sie öffnen darf.
+  Zahlen im Dialog zählen den ganzen Einsatz, auch Module, die für die eigene Person gesperrt sind.
+  Bei einem gesperrten Modul steht nur die Zahl mit „nicht freigegeben“, ohne Einträge; „alle ↗“
+  steht nur bei Modulen, die sie öffnen darf.
+- Abschließen und wieder öffnen gehen nur mit Verbindung zum Server. Ohne Netz wird nichts
+  vorgemerkt: der Schritt geht sofort hinaus oder gar nicht.
+- Hat jemand anderes den Einsatz inzwischen abgeschlossen oder wieder geöffnet, oder ist die
+  Frist abgelaufen, schließt ein offener Dialog von selbst; das Paneel zeigt den neuen Stand.
 - Nicht entlassene Fahrzeuge, Einheiten und Einsatzkräfte bleiben mit ihrem letzten Status in
   diesem Einsatz stehen; der Abschluss entlässt sie nicht. Für andere Einsätze sind sie frei und
-  lassen sich dort disponieren.
+  lassen sich dort disponieren. Der Dialog sagt das immer, auch wenn die offenen Punkte noch
+  laden.
 - Alle gekoppelten Geräte verlieren ihre Kopplung, und die Freigabe für Maschinenzugänge
   ([Anbindungen](anbindungen.md)) endet.
 - Hat der Einsatz oder die Organisation eine Aufbewahrungs-Dauer und noch keine
@@ -122,7 +131,8 @@ Nur Aufbewahrungsfrist und Nachbereitung lassen sich danach noch ändern; das Ka
   bleibt; eine von Hand geänderte Nachbereitung geht mit. Ein erneuter Abschluss setzt die
   Fristen ab dem neuen Zeitpunkt.
 - Gekoppelte Geräte und Maschinenzugänge bleiben getrennt: Geräte werden neu gekoppelt, die
-  Freigabe einer Anbindung neu erteilt.
+  Freigabe einer Anbindung neu erteilt. Das gilt auch für Kopplungen an einer Installation, die
+  den Einsatz nur spiegelt.
 
 ### Wann sich ein Einsatz nicht wieder öffnen lässt
 

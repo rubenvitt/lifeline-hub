@@ -85,14 +85,42 @@ MUST Bezeichnung und Nummer in voller Länge zeigen.
 
 Der Abschluss MUST Fahrzeuge und Einsatzkräfte im Einsatz unverändert lassen: sie behalten ihren
 letzten Status und werden nicht entlassen. Für andere Einsätze MUST eine solche Bindung nicht
-mehr gelten. Der Abschlussdialog SHALL das in einem festen Satz sagen, sobald Kräfte oder
-Fahrzeuge nicht entlassen sind.
+mehr gelten. Der Abschlussdialog SHALL das in einem festen Satz sagen. Der Satz MUST immer
+stehen, auch solange die offenen Punkte noch laden, ohne Netz nicht geladen sind oder ihre
+Abfrage gescheitert ist: er ist ein Pflichtsatz, kein Ergebnis der Prüfung.
+
+#### Scenario: Satz ohne Antwort der Prüfung
+
+- **WHEN** die Abfrage der offenen Punkte scheitert und die Einsatzleitung den Abschlussdialog
+  offen hat
+- **THEN** steht der Satz zu nicht entlassenen Kräften trotzdem im Dialog
 
 #### Scenario: Fahrzeug nach dem Abschluss
 
 - **WHEN** ein Einsatz mit einem nicht entlassenen Fahrzeug abgeschlossen wird
 - **THEN** steht das Fahrzeug im abgeschlossenen Einsatz weiter mit seinem letzten Status
 - **AND** kann es in einem anderen aktiven Einsatz disponiert werden
+
+### Requirement: Abschluss und Wiederöffnen nur mit Verbindung
+
+Abschluss und Wiederöffnen MUST ohne Verbindung zum Server gesperrt sein und dürfen nicht
+vorgemerkt oder angehalten werden: ein Klick geht sofort hinaus oder scheitert sofort. Der
+Dialog SHALL den Grund nennen. Sind die offenen Punkte ohne Netz nicht geladen, SHALL der Dialog
+das sagen und ein erneutes Abrufen anbieten, statt einen Ladezustand zu zeigen. Ein offener
+Dialog MUST schließen, sobald der Einsatz nicht mehr zu ihm passt (anderswo abgeschlossen oder
+wieder geöffnet, Frist abgelaufen).
+
+#### Scenario: Netz fällt bei offenem Dialog weg
+
+- **WHEN** die Einsatzleitung die Nummer eingetippt hat und dann die Verbindung verliert
+- **THEN** ist der rote Knopf gesperrt mit dem Grund „Ohne Verbindung nicht änderbar“, und auch
+  nach der Rückkehr des Netzes geht kein Abschluss hinaus
+
+#### Scenario: Anderswo abgeschlossen
+
+- **WHEN** die Einsatzleitung den Abschlussdialog offen hat und ein anderes Mitglied der
+  Einsatzleitung den Einsatz abschließt
+- **THEN** schließt der Dialog, und das Paneel zeigt den Abschluss
 
 ### Requirement: Abschluss im Einsatztagebuch
 

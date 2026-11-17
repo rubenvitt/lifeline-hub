@@ -1,12 +1,16 @@
 import { http, HttpResponse } from 'msw';
+import { onlineManager } from '@tanstack/react-query';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { freigabenFixture } from '../../test/fixtures';
 import type { AbschlussPruefung } from '../../api/types';
-import EinsatzAbschlussDialog, { matchesEinsatzkennung } from './EinsatzAbschlussDialog';
+import EinsatzAbschlussDialog, {
+  KRAEFTE_SATZ,
+  matchesEinsatzkennung,
+} from './EinsatzAbschlussDialog';
 
 /**
  * Abschlussdialog (LLH-1814, Spec `einsatz-abschluss`, design.md D2/D6): offene Punkte warnen nur,
@@ -192,11 +196,37 @@ describe('EinsatzAbschlussDialog (LLH-1814)', () => {
     expect(within(betroffene).queryByRole('link')).toBeNull();
   });
 
-  it('sagt „Nichts offen“ ohne offene Punkte und schweigt dann zu den Kräften', async () => {
+  it('sagt „Nichts offen“ ohne offene Punkte', async () => {
     setup({ pruefung: nichtsOffen });
     const d = await screen.findByRole('dialog');
     expect(await within(d).findByText('Nichts offen')).toBeInTheDocument();
-    expect(within(d).queryByText(/Nicht entlassene Kräfte/)).toBeNull();
+  });
+
+  // Der Satz zu den Kräften ist ein fester Pflichtsatz, kein Ergebnis der Prüfung: ohne Antwort
+  // darf er nicht entfallen (Spec `einsatz-abschluss`, „Folgen des Abschlusses für gebundene
+  // Kräfte“).
+  it.each([
+    ['ohne offene Punkte', nichtsOffen],
+    ['solange die Prüfung lädt', 'haengt'],
+    ['wenn die Prüfung scheitert', 'fehler'],
+  ] as const)('nennt die Folge für Kräfte immer, auch %s', async (_fall, pruefung) => {
+    setup({ pruefung });
+    const d = await screen.findByRole('dialog');
+    expect(within(d).getByText(KRAEFTE_SATZ)).toBeInTheDocument();
+  });
+
+  it('nennt bei einem gesperrten Modul nur die Zahl, ohne Einträge und ohne Sprung', async () => {
+    setup({
+      pruefung: { ...nichtsOffen, meldungen: { anzahl: 2, eintraege: [] } },
+      freigaben: freigabenFixture({ meldungen: { zugriff: false } }),
+    });
+    const d = await screen.findByRole('dialog');
+    const meldungen = await within(d).findByRole('region', { name: 'Meldungen' });
+    expect(within(meldungen).getByText('2')).toBeInTheDocument();
+    expect(within(meldungen).getByText('nicht freigegeben')).toBeInTheDocument();
+    expect(within(meldungen).queryByText('keine')).toBeNull();
+    expect(within(meldungen).queryByRole('link')).toBeNull();
+    expect(within(meldungen).queryByRole('listitem')).toBeNull();
   });
 
   it('nennt, dass Kopplungen und Maschinenzugänge beendet werden und beendet bleiben', async () => {
@@ -217,6 +247,58 @@ describe('EinsatzAbschlussDialog (LLH-1814)', () => {
     );
     await user.type(feld(), 'HW-2026-001');
     expect(knopf()).toBeEnabled();
+  });
+
+  it('sagt ohne Netz, dass die Prüfung nicht geladen ist, statt endlos zu laden', async () => {
+    setzeOnline(false);
+    setup();
+    const d = await screen.findByRole('dialog');
+    const offen = within(d).getByRole('region', { name: 'Noch offen' });
+    expect(await within(offen).findByText('Ohne Netz nicht geladen')).toBeInTheDocument();
+    expect(within(offen).getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(within(offen).queryByLabelText('Noch offen wird geladen')).toBeNull();
+    // Mit dem Netz kommt die Prüfung von selbst.
+    setzeOnline(true);
+    expect(await within(d).findByRole('region', { name: 'Aufträge' })).toBeInTheDocument();
+  });
+
+  it('sperrt den Abschluss ohne Netz mit Grund, und nichts geht danach hinaus', async () => {
+    let aufrufe = 0;
+    setup({ pruefung: nichtsOffen });
+    server.use(
+      http.post('/api/einsaetze/7/abschliessen', () => {
+        aufrufe += 1;
+        return HttpResponse.json({ id: 7, status: 'abgeschlossen' });
+      }),
+    );
+    const user = userEvent.setup();
+    await within(await screen.findByRole('dialog')).findByText('Nichts offen');
+    await user.type(feld(), 'HW-2026-001');
+    setzeOnline(false);
+    await waitFor(() => expect(knopf()).toBeDisabled());
+    expect(within(dialog()).getByText('Ohne Verbindung nicht änderbar')).toBeInTheDocument();
+    await user.click(knopf());
+    setzeOnline(true);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(aufrufe).toBe(0);
+  });
+
+  it('hält den Abschluss nie an: er geht sofort hinaus oder scheitert sofort', async () => {
+    let aufrufe = 0;
+    setup({ pruefung: nichtsOffen });
+    server.use(
+      http.post('/api/einsaetze/7/abschliessen', () => {
+        aufrufe += 1;
+        return HttpResponse.json({ id: 7, status: 'abgeschlossen' });
+      }),
+    );
+    const user = userEvent.setup();
+    await within(await screen.findByRole('dialog')).findByText('Nichts offen');
+    await user.type(feld(), 'HW-2026-001');
+    // Nur TanStack hält sich für offline; die App selbst sieht Netz (`useOhneVerbindung`).
+    onlineManager.setOnline(false);
+    await user.click(knopf());
+    await waitFor(() => expect(aufrufe).toBe(1));
   });
 
   it('zeigt den Fehlerzustand mit „Erneut abrufen“, ohne „Nichts offen“', async () => {

@@ -1,4 +1,4 @@
-import { App, Form, Input } from 'antd';
+import { App, Button, Form, Input } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, type ReactNode } from 'react';
 import { loadAbschlussPruefung, schliesseEinsatzAb } from '../../api/einsaetze';
@@ -13,6 +13,7 @@ import type {
 } from '../../api/types';
 import { registrierNummer } from '../../anzeige/registrierNummer';
 import { ErfassungsModal } from '../../components/Erfassung';
+import { PANEEL_NEULADEN } from '../../components/instrument/PaneelZustand';
 import {
   Augenbraue,
   Datenfeld,
@@ -28,6 +29,8 @@ import {
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { WIEDEREROEFFNEN_STUNDEN } from '../../einsatz/schreibrecht';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
+import { NICHT_FREIGEGEBEN } from '../lage-dashboard/fuehrungsZahlen';
 import {
   auftraegePfad,
   kraefteuebersichtPfad,
@@ -45,13 +48,21 @@ import {
  *   kürzt nie): im Kopf der Seite ist der Name oft abgeschnitten (LLH-1726).
  * - **Noch offen:** je Gruppe mit offenen Punkten Zahl, Kurzliste und „alle ↗“ ins Modul, der
  *   Sprung nur, wenn das Modul für die Person freigegeben ist (`istKeyFreigegeben`: unbekannt gibt
- *   nichts frei); die Zahl zählt der Server unabhängig von den Freigaben. Laden, Fehler und
- *   „Nichts offen“ über `PaneelZustand`. Offene Punkte warnen nur, sie sperren nichts.
- * - **Zwei feste Sätze:** zu nicht entlassenen Kräften (nur wenn welche da sind; der Abschluss
- *   lässt sie unverändert, Entscheidung 17.11.2026) und zu Kopplungen und Maschinenzugängen.
+ *   nichts frei); die Zahl zählt der Server unabhängig von den Freigaben. Einträge eines
+ *   gesperrten Moduls liefert er nicht: dann steht nur die Zahl mit „nicht freigegeben“ (D1).
+ *   Laden, Fehler und „Nichts offen“ über `PaneelZustand`; ohne Netz und ohne Antwort sagt der
+ *   Abschnitt das, statt „wird abgerufen“ zu behaupten (die Prüfung liegt nicht auf der Platte).
+ *   Offene Punkte warnen nur, sie sperren nichts.
+ * - **Zwei feste Sätze:** zu nicht entlassenen Kräften und zu Kopplungen und Maschinenzugängen.
+ *   Beide stehen immer, auch solange die Prüfung lädt oder gescheitert ist: sie sind Pflichtsätze,
+ *   kein Ergebnis der Prüfung (der Abschluss lässt Kräfte unverändert, Entscheidung 17.11.2026).
  * - **Bestätigung:** der rote Knopf ist gesperrt, bis Nummer oder Bezeichnung eingetippt sind
  *   ({@link matchesEinsatzkennung}). Geprüft wird nur hier; `POST …/abschliessen` bleibt ohne
  *   Bestätigung im Body (D2), ein Fehlgriff lässt sich binnen 24 Stunden zurücknehmen.
+ * - **Ohne Netz gesperrt, nie vorgemerkt:** der Knopf fragt `useOhneVerbindung`, die Mutation
+ *   läuft mit `networkMode: 'always'` ({@link SOFORT_ODER_NIE}). Sonst hielte TanStack sie an,
+ *   der Dialog ließe sich nicht schließen, und der Abschluss ginge bei der Rückkehr des Netzes
+ *   unbemerkt hinaus (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
  * - **Fehler** stehen im Dialog (`speicherung` der Hülle), kein Toast (LFH-1077).
  */
 
@@ -74,7 +85,10 @@ export function matchesEinsatzkennung(
   );
 }
 
-/** Fester Satz, sobald Kräfte nicht entlassen sind (Spec `einsatz-abschluss`). */
+/**
+ * Fester Satz zu nicht entlassenen Kräften (Spec `einsatz-abschluss`). Er steht immer, auch ohne
+ * Antwort der Prüfung: eine Warnung, die von der Antwort abhinge, entfiele sonst ohne sie.
+ */
 export const KRAEFTE_SATZ =
   'Nicht entlassene Kräfte bleiben mit ihrem letzten Status in diesem Einsatz stehen und sind für andere Einsätze frei.';
 
@@ -87,6 +101,15 @@ export const KOPPLUNG_SATZ = `Gekoppelte Geräte und Maschinenzugänge werden ge
  * Zahl zählt alle, „alle ↗“ führt zum Rest.
  */
 const EINTRAEGE_JE_GRUPPE = 3;
+
+/**
+ * Abschluss und Wiederöffnen gehen sofort hinaus oder scheitern sofort, nie angehalten
+ * (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“; Muster `instanz/FuehrungPaneel.tsx`).
+ */
+export const SOFORT_ODER_NIE = { networkMode: 'always' } as const;
+
+/** Satz des Abschnitts „Noch offen“, wenn die Prüfung ohne Netz nicht geladen ist. */
+export const PRUEFUNG_OHNE_NETZ = 'Ohne Netz nicht geladen';
 
 /** Breiter als antds Vorgabe (520 px): die Zeilen der Kurzliste tragen Nummer, Text und Status. */
 const DIALOG_BREITE = 640;
@@ -129,6 +152,7 @@ export default function EinsatzAbschlussDialog({
   const bestaetigung = Form.useWatch('bestaetigung', form);
   const freigaben = useModulFreigaben(einsatz.id);
   const hatNummer = normalisiere(einsatz.einsatznummer_intern) !== '';
+  const ohneNetz = useOhneVerbindung();
 
   const pruefung = useQuery({
     queryKey: einsatzKeys.abschlussPruefung(einsatz.id),
@@ -139,6 +163,7 @@ export default function EinsatzAbschlussDialog({
   });
 
   const mutation = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: () => schliesseEinsatzAb(einsatz.id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatz.id) });
@@ -156,6 +181,11 @@ export default function EinsatzAbschlussDialog({
     : pruefung.isError
       ? 'fehler'
       : 'laden';
+  // Ohne Netz und ohne Antwort bleibt die Abfrage angehalten (sie liegt bewusst nicht auf der
+  // Platte): dann sagt der Abschnitt das, statt „wird abgerufen“ zu behaupten (wie
+  // `betreuung/registrierung/RegistrierungPaneel.tsx`). Mit dem Netz lädt TanStack von selbst.
+  const ohneNetzUngeladen =
+    daten == null && pruefung.isPending && pruefung.fetchStatus === 'paused';
 
   const absatz = { ...schriftStil('text'), color: rollen.text, margin: 0 } as const;
 
@@ -168,7 +198,8 @@ export default function EinsatzAbschlussDialog({
       initialValues={{ bestaetigung: '' }}
       erfassenText="Einsatz abschließen"
       unumkehrbar
-      gesperrt={!matchesEinsatzkennung(bestaetigung, einsatz)}
+      gesperrt={ohneNetz || !matchesEinsatzkennung(bestaetigung, einsatz)}
+      zusammenfassung={ohneNetz ? OHNE_VERBINDUNG_NICHT_AENDERBAR : undefined}
       laeuft={mutation.isPending}
       speicherung={mutation}
       speicherFehlerTitel="Nicht abgeschlossen"
@@ -196,26 +227,40 @@ export default function EinsatzAbschlussDialog({
           <Augenbraue als="h3" id={offenId}>
             Noch offen
           </Augenbraue>
-          <PaneelZustand
-            zustand={zustand}
-            titel="Noch offen"
-            leerText="Nichts offen"
-            onNeuladen={() => void pruefung.refetch()}
-          >
-            {daten && (
-              <OffenePunkte einsatzId={einsatz.id} pruefung={daten} freigaben={freigaben} />
-            )}
-          </PaneelZustand>
+          {ohneNetzUngeladen ? (
+            <div
+              data-lfh="abschluss-offen-offline"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: token.marginSM,
+                padding: token.padding,
+              }}
+            >
+              <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+                {PRUEFUNG_OHNE_NETZ}
+              </span>
+              <Button onClick={() => void pruefung.refetch()}>{PANEEL_NEULADEN}</Button>
+            </div>
+          ) : (
+            <PaneelZustand
+              zustand={zustand}
+              titel="Noch offen"
+              leerText="Nichts offen"
+              onNeuladen={() => void pruefung.refetch()}
+            >
+              {daten && (
+                <OffenePunkte einsatzId={einsatz.id} pruefung={daten} freigaben={freigaben} />
+              )}
+            </PaneelZustand>
+          )}
         </section>
 
         {/* Beide Sätze in einem Absatz: der Dialog bleibt mit allen Gruppen in der Höhe eines
             Führungsplatzes (1440 × 900). */}
         <p style={absatz}>
-          {daten && daten.kraefte.anzahl > 0 && (
-            <>
-              <span data-lfh="abschluss-kraefte-satz">{KRAEFTE_SATZ}</span>{' '}
-            </>
-          )}
+          <span data-lfh="abschluss-kraefte-satz">{KRAEFTE_SATZ}</span>{' '}
           <span data-lfh="abschluss-kopplung-satz">{KOPPLUNG_SATZ}</span>
         </p>
 
@@ -281,12 +326,17 @@ function OffenePunkte({
         schluessel={(e) => e.id}
         zeile={eintragZeile(p.nummer)}
         sprung={p.sprung}
+        // Zahl über null und keine Einträge: der Server nennt sie nur aus Modulen, die die Person
+        // lesen darf (D1). Dann steht die Zahl mit dem Grund, nicht „keine“.
+        leerText={NICHT_FREIGEGEBEN}
         gesperrtText=""
         onNeuladen={() => {}}
       />
     );
 
   const { kraefte } = pruefung;
+  // Einheiten oder Fahrzeuge sind offen, aber nicht genannt: ihre Module sind gesperrt (D1).
+  const einheitenVerdeckt = kraefte.eintraege.length === 0 && kraefte.anzahl > kraefte.personal;
   return (
     <div data-lfh="abschluss-gruppen">
       {kraefte.anzahl > 0 && (
@@ -296,7 +346,7 @@ function OffenePunkte({
           ueberschrift="h4"
           zahl={kraefte.anzahl}
           notiz={
-            kraefte.personal > 0 && kraefte.eintraege.length > 0
+            kraefte.personal > 0 && (kraefte.eintraege.length > 0 || einheitenVerdeckt)
               ? `davon ${kraefte.personal} Einsatzkräfte`
               : undefined
           }
@@ -313,7 +363,7 @@ function OffenePunkte({
             </div>
           )}
           sprung={sprung('kraefteuebersicht', kraefteuebersichtPfad(einsatzId), 'Kräfte')}
-          leerText={`${kraefte.personal} Einsatzkräfte`}
+          leerText={einheitenVerdeckt ? NICHT_FREIGEGEBEN : `${kraefte.personal} Einsatzkräfte`}
           gesperrtText=""
           onNeuladen={() => {}}
         />

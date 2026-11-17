@@ -26,7 +26,9 @@ import EinsatzWiedereroeffnenDialog from './EinsatzWiedereroeffnenDialog';
  *   „Einsatz wieder öffnen…“ mit dem Ende der Frist. Am Fristende verschwindet der Knopf von selbst.
  *
  * Die Dialoge hängen nur, solange sie offen sind; der Aufrufer setzt `key` auf den Einsatz, damit
- * ein Einsatzwechsel offene Dialoge und ihre Gründe räumt.
+ * ein Einsatzwechsel offene Dialoge und ihre Gründe räumt. Ein offener Dialog folgt dem Zustand
+ * des Einsatzes, den der Live-Kanal nachzieht: schließt jemand anderes ab, öffnet wieder oder
+ * läuft die Frist ab, schließt er, statt eine Aktion anzubieten, die nicht mehr passt.
  */
 export default function EinsatzAbschlussPaneel({
   einsatz,
@@ -41,9 +43,18 @@ export default function EinsatzAbschlussPaneel({
   const jetzt = useJetztBisFristende(bis);
   const abgeschlossen = einsatz.status === 'abgeschlossen';
 
-  if (!abgeschlossen && !darfEinsatzLeiten(einsatz)) return null;
-
   const darfWiedereroeffnen = darfEinsatzWiedereroeffnen(einsatz, benutzer, jetzt);
+  const darfAbschliessen = !abgeschlossen && darfEinsatzLeiten(einsatz);
+  const passt =
+    (dialog === 'abschliessen' && darfAbschliessen) ||
+    (dialog === 'wiedereroeffnen' && darfWiedereroeffnen);
+  // Passt der offene Dialog nicht mehr, ist er zu, und zwar endgültig: kehrt der Zustand später
+  // zurück, öffnet er nicht von selbst wieder. Im selben Render schon nicht mehr gezeigt.
+  useEffect(() => {
+    if (dialog != null && !passt) setDialog(null);
+  }, [dialog, passt]);
+
+  if (!abgeschlossen && !darfEinsatzLeiten(einsatz)) return null;
   const text = { ...schriftStil('text'), color: rollen.text, margin: 0 } as const;
 
   return (
@@ -79,10 +90,10 @@ export default function EinsatzAbschlussPaneel({
           Einsatz abschließen…
         </Button>
       )}
-      {dialog === 'abschliessen' && (
+      {passt && dialog === 'abschliessen' && (
         <EinsatzAbschlussDialog einsatz={einsatz} onSchliessen={() => setDialog(null)} />
       )}
-      {dialog === 'wiedereroeffnen' && (
+      {passt && dialog === 'wiedereroeffnen' && (
         <EinsatzWiedereroeffnenDialog einsatzId={einsatz.id} onSchliessen={() => setDialog(null)} />
       )}
     </Paneel>
