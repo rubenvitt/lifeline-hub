@@ -1174,3 +1174,92 @@ async fn abschnitt_eines_fremden_einsatzes_ist_404() {
     let (_, v) = anfrage_json(&app, "GET", &format!("{pfad}/{uhs}"), &cookie, None).await;
     assert_eq!(v["abschnitt_id"], eigener, "Abschnitt unverändert: {v}");
 }
+
+/// LLH-1924 (Spec `personen-detail`, „Austritt aus der UHS zurücknehmen“): die Rücknahme bringt
+/// die Person auf ihren Platz zurück, der Platz verlässt die Aufbereitung, `seit` bleibt, das ETB
+/// nennt nur das Pseudonym. Steht sie inzwischen in einer anderen UHS, 409.
+#[tokio::test]
+async fn austragen_zuruecknehmen() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
+    let zelt = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "Zelt Nord").await;
+    let platz = platz_anlegen(&app, &cookie, einsatz, uhs, "Bett 3").await;
+    let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
+    let belegung = format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung");
+    let (s, ein) = anfrage_json(
+        &app,
+        "POST",
+        &belegung,
+        &cookie,
+        Some(&json!({"art": "eintritt", "uhs_id": uhs, "platz_id": platz})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{ein}");
+    sqlx::query("UPDATE person_uhs_belegung SET zeitpunkt_at = '2026-05-28 13:10:00' WHERE id = ?")
+        .bind(ein["id"].as_i64().unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let austragen = || async {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &belegung,
+            &cookie,
+            Some(&json!({"art": "austritt"})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        v
+    };
+    let aus = austragen().await;
+    let pfad = |id: &serde_json::Value| format!("{belegung}/{id}/zuruecknehmen");
+
+    let (s, v) = anfrage_json(&app, "POST", &pfad(&aus["id"]), &cookie, None).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["ohne_platz"], false);
+    assert_eq!(v["ereignis"]["platz_id"], platz);
+    assert_eq!(v["ereignis"]["ruecknahme_von"], aus["id"]);
+    let (_, p) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(p["aufenthalt"]["platz_id"], platz, "{p}");
+    assert_eq!(p["aufenthalt"]["seit"], "2026-05-28 13:10:00", "{p}");
+    let inhalte = etb_inhalte(&app, &cookie, einsatz).await;
+    assert!(
+        inhalte
+            .iter()
+            .any(|s| s == "Person R-001: wieder in BHP 50 (Bett 3), Austragen zurückgenommen"),
+        "{inhalte:?}"
+    );
+
+    // Ausgetragen, inzwischen im Zelt Nord: 409, sie bleibt dort.
+    let aus = austragen().await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &belegung,
+        &cookie,
+        Some(&json!({"art": "eintritt", "uhs_id": zelt})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, v) = anfrage_json(&app, "POST", &pfad(&aus["id"]), &cookie, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let (_, p) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(p["aufenthalt"]["uhs_id"], zelt, "{p}");
+}

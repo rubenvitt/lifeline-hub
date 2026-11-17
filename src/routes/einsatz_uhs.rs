@@ -20,8 +20,8 @@ use crate::uhs::belegung_repo;
 use crate::uhs::platz_repo::{self, NeuerPlatz, PatchPlatz};
 use crate::uhs::repo::{self as uhs_repo, NeueDaten, PatchDaten};
 use crate::uhs::{
-    darf_uebergehen, BelegungAnzeige, BelegungsArt, PlatzAnzeige, PlatzTyp, UhsAnzeige, UhsStatus,
-    UhsTyp, Verfuegbarkeit,
+    darf_uebergehen, BelegungAnzeige, BelegungRuecknahme, BelegungsArt, PlatzAnzeige, PlatzTyp,
+    UhsAnzeige, UhsStatus, UhsTyp, Verfuegbarkeit,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -689,6 +689,57 @@ pub async fn belegung(
     sse_uhs(&state, einsatz_id, event.uhs_id);
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(event)))
+}
+
+/// POST /api/einsaetze/{id}/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen — den
+/// Austritt einer Person aus einer UHS zurücknehmen (LLH-1924, Spec `personen-detail`, „Austritt
+/// aus der UHS zurücknehmen“, design.md D3). Rechte und Stellenbindung wie der Austritt: ein
+/// UHS-Gerät nur für die eigene UHS. Pseudonymer ETB-Eintrag, Live für UHS und Person.
+pub async fn belegung_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, person_id, belegung_id)): PfadParam<(i64, i64, i64)>,
+) -> Result<(StatusCode, Json<BelegungRuecknahme>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    let austritt = belegung_repo::laden(&state.pool, einsatz_id, belegung_id).await?;
+    if austritt.person_id != person_id {
+        return Err(AppError::NotFound);
+    }
+    stelle::fordere_ziel_uhs(ctx.geraet.as_ref(), Some(austritt.uhs_id))?;
+    let person = person_repo::laden(&state.pool, einsatz_id, person_id).await?;
+    let r = belegung_repo::nimm_austritt_zurueck(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        belegung_id,
+        ctx.benutzer.id,
+    )
+    .await?;
+    let uhs = uhs_repo::laden(&state.pool, einsatz_id, r.ereignis.uhs_id).await?;
+    let ort = match r.ereignis.platz_id {
+        Some(pid) => {
+            platz_repo::laden(&state.pool, r.ereignis.uhs_id, pid)
+                .await?
+                .bezeichnung
+        }
+        None => "Inbox".into(),
+    };
+    let text = format!(
+        "Person {}: wieder in {} ({ort}), Austragen zurückgenommen",
+        registrier_anzeige(person.registrier_nr),
+        uhs.bezeichnung
+    );
+    super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &text).await;
+    sse_uhs(&state, einsatz_id, r.ereignis.uhs_id);
+    sse_person(&state, einsatz_id, person_id);
+    Ok((
+        StatusCode::CREATED,
+        Json(BelegungRuecknahme {
+            ereignis: r.ereignis,
+            ohne_platz: r.ohne_platz,
+        }),
+    ))
 }
 
 /// Baut den pseudonymen ETB-Text gemäß Spec-Tabelle. Eigene Funktion, damit der

@@ -288,7 +288,9 @@ export default function FahrzeugeBesatzung({
     onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
   });
   const besatzungZurueck = useMutation({
-    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
+    // Nimmt sie keinem anderen Fahrzeug weg (LLH-1924).
+    mutationFn: (v: { efId: number; epId: number }) =>
+      ordneBesatzungZu(einsatzId, v.efId, v.epId, { nurWennFrei: true }),
     onMutate: (v) => trackPerson(v.epId).start(),
     onSuccess: invalidate,
     onError: (e, v) => personErrors.melde(v.epId, e, 'Nicht zurückgenommen'),
@@ -390,7 +392,7 @@ export default function FahrzeugeBesatzung({
   });
 
   // Die Fahrzeuge der Einheit, wie die Quelle sie zeigt; die gelösten hält `useHoldGeloest` an
-  // ihrer Stelle (LLH-1722, Spec `bedien-muster`, „Eine gelöste Zeile hält ihre Stelle“).
+  // ihrer Stelle (LLH-1722, Spec `bedien-muster`, „Gelöste Zeile hält ihre Stelle“).
   const fahrzeugEintraege: FahrzeugEintrag[] = mittel
     ? mittel.fahrzeuge.map((f) => ({
         id: f.fahrzeug.id,

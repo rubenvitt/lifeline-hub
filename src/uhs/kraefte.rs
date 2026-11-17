@@ -105,6 +105,29 @@ pub async fn uhs_der_kraft_tx(
     zeile.ok_or(AppError::NotFound)
 }
 
+/// Die Ablehnung des Rückgängig nach „Abziehen“ (LLH-1924, Spec `bedien-muster`, „Rückgängig
+/// nimmt nichts woanders weg“): die Kraft steht inzwischen an der UHS `andere`.
+pub async fn steht_anderswo_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    andere: i64,
+) -> Result<AppError, AppError> {
+    let (name, uhs): (String, String) = sqlx::query_as(
+        "SELECT ep.snap_name, u.bezeichnung FROM einsatz_personal ep \
+         JOIN uhs u ON u.id = ? AND u.einsatz_id = ep.einsatz_id \
+         WHERE ep.id = ? AND ep.einsatz_id = ?",
+    )
+    .bind(andere)
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(AppError::Conflict(format!(
+        "{name} steht inzwischen an UHS «{uhs}»"
+    )))
+}
+
 /// Setzt oder löscht die UHS einer Kraft; `NotFound`, falls die Kraft nicht zum Einsatz gehört.
 pub async fn setze_uhs_tx(
     conn: &mut SqliteConnection,

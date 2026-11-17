@@ -457,3 +457,75 @@ async fn ganze_einheit_zuordnen_nimmt_nur_kraefte_ohne_uhs() {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+/// LLH-1924 (Spec `bedien-muster`, „Rückgängig nimmt nichts woanders weg“): das Rückgängig nach
+/// „Abziehen“ schickt `?nur_wenn_frei=1`. Steht die Kraft inzwischen an einer anderen UHS,
+/// antwortet der Server 409 und nennt sie; ohne den Parameter wechselt sie für die Leitung wie
+/// bisher.
+#[tokio::test]
+async fn abziehen_zuruecknehmen_nur_wenn_frei() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let turnhalle = uhs_anlegen(&app, &admin, einsatz, "Turnhalle").await;
+    let zelt = uhs_anlegen(&app, &admin, einsatz, "Zelt Nord").await;
+    let ep = kraft(&app, &admin, einsatz, "Ben", "mannschaft").await;
+    let pfad = |uhs: i64, q: &str| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte/{ep}{q}");
+
+    // Frei: das Rückgängig gelingt, an derselben UHS noch einmal auch.
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &pfad(turnhalle, "?nur_wenn_frei=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &pfad(turnhalle, "?nur_wenn_frei=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+
+    // Abgezogen, inzwischen im Zelt Nord: das Rückgängig scheitert und nennt die UHS.
+    let (s, _) = anfrage(&app, "DELETE", &pfad(turnhalle, ""), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(
+        zuordnen(&app, &admin, einsatz, zelt, ep).await,
+        StatusCode::OK
+    );
+    let etb_vorher = system_etb_inhalte(&app, &admin, einsatz).await.len();
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &pfad(turnhalle, "?nur_wenn_frei=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(j["error"], "Ben steht inzwischen an UHS «Zelt Nord»");
+    assert_eq!(
+        personal(&app, &admin, einsatz, ep).await["uhs_id"],
+        json!(zelt)
+    );
+    assert_eq!(
+        system_etb_inhalte(&app, &admin, einsatz).await.len(),
+        etb_vorher
+    );
+
+    // Ohne den Parameter: Wechsel wie bisher.
+    assert_eq!(
+        zuordnen(&app, &admin, einsatz, turnhalle, ep).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        personal(&app, &admin, einsatz, ep).await["uhs_id"],
+        json!(turnhalle)
+    );
+}

@@ -1175,6 +1175,7 @@ pub async fn zuruecknehmen_tx(
                     client_id: None,
                     zeitpunkt_at: None,
                     von_br_id: None,
+                    ruecknahme_von: None,
                 };
                 match belegung_repo::belege_tx(
                     conn,
