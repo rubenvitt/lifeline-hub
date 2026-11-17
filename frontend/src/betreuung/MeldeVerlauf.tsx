@@ -14,7 +14,7 @@ import {
   PANEEL_FEHLER_TEXT,
   PANEEL_NEULADEN,
 } from '../components/instrument/PaneelZustand';
-import { useRollen, schriftGroesse } from '../components/instrument/rollenwerte';
+import { useRollen } from '../components/instrument/rollenwerte';
 import {
   aktuellWort,
   belegungZeile,
@@ -133,10 +133,8 @@ export default function MeldeVerlauf({
         data-lfh="verlauf-fehler"
         style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        <b style={{ color: rollen.alarmText, fontSize: schriftGroesse('text') }}>
-          {PANEEL_FEHLER_TITEL}
-        </b>
-        <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>
+        <b style={{ color: rollen.alarmText, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
+        <span style={{ color: rollen.gedaempft, fontSize: 12 }}>
           Verlauf konnte nicht geladen werden. {PANEEL_FEHLER_TEXT}
         </span>
         <span>

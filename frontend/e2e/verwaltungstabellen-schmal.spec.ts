@@ -393,7 +393,9 @@ test.describe('Seitenleiste der Verwaltung', () => {
       // Die Seitenhöhe folgt dem Inhalt, nicht dem Menü: der Inhalt der Demo-Daten-Seite ist
       // kürzer als der Schirm, also scrollt die Seite nicht.
       const inhaltUnten = await page
-        .locator('.ant-layout-content')
+        // Der Inhalt neben dem Menü: seit nufmon70 D3 ein `div` (kein zweites `<main>`), das
+        // Sprungziel der Verwaltung.
+        .locator('[data-lfh="sprungziel-inhalt"]')
         .last()
         .evaluate((el) => {
           const kinder = [...el.children].map((k) => k.getBoundingClientRect().bottom);

@@ -3,11 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
+import { MarkenRahmen } from '../test/nichtGefunden';
 import { renderMitProviders } from '../test/utils';
 import {
+  istNichtGefunden,
   nichtGefundenInhalt,
   SeitenFehler,
   SeitenLeer,
+  SeitenNichtGefunden,
   SeitenSackgasse,
   SeitenSkeleton,
   SeitenStandVeraltet,
@@ -246,6 +249,75 @@ describe('SeitenSackgasse', () => {
     );
 
     expect(screen.getByText('Kein Zugriff auf diesen Einsatz')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Ein Objekt, das es nicht (mehr) gibt (LLH-1827, Change `a12ms7g9-seitenzustaende`, D4; Spec
+ * `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“).
+ */
+describe('SeitenNichtGefunden', () => {
+  const rueckweg = { label: 'Zu den Betroffenen', pfad: '/einsaetze/7/personen' };
+
+  it('nennt die Sache und bietet genau einen Knopf, der zur Liste führt, ohne „Erneut abrufen“', async () => {
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <SeitenNichtGefunden titel="Diese Person gibt es nicht (mehr)" rueckweg={rueckweg} />
+          }
+        />
+        <Route path="/einsaetze/7/personen" element={<p>Betroffenenliste</p>} />
+      </Routes>,
+    );
+
+    expect(screen.getByText('Diese Person gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    // Neutral, kein Fehler der Anwendung: kein Alarmbanner.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zu den Betroffenen' }));
+    expect(screen.getByText('Betroffenenliste')).toBeInTheDocument();
+  });
+
+  it('setzt die Marke „nicht als letzten Ort merken“, solange der Baustein steht', () => {
+    const marke = { current: false };
+    const revoked: string[] = [];
+    function Rahmen({ zeigen }: { zeigen: boolean }) {
+      return (
+        <MarkenRahmen marke={marke} revoked={revoked}>
+          {zeigen && (
+            <SeitenNichtGefunden titel="Dieses Tier gibt es nicht (mehr)" rueckweg={rueckweg} />
+          )}
+        </MarkenRahmen>
+      );
+    }
+    const { rerender } = renderMitProviders(<Rahmen zeigen />, { route: '/einsaetze/7/tiere/9' });
+    expect(marke.current).toBe(true);
+    // Kam die Meldung erst nach dem Laden, nimmt der Rahmen das Merken dieser Adresse zurück.
+    expect(revoked).toEqual(['/einsaetze/7/tiere/9']);
+
+    rerender(<Rahmen zeigen={false} />);
+    expect(marke.current).toBe(false);
+  });
+});
+
+describe('istNichtGefunden', () => {
+  it('ist nur bei einer `ApiError` mit Status 404 wahr', () => {
+    expect(istNichtGefunden(new ApiError(404, 'Nicht gefunden'))).toBe(true);
+  });
+
+  it('ist bei jedem anderen Fehler falsch', () => {
+    // 403 bleibt ein Abruffehler mit „Erneut abrufen“ (design.md, Risiken); ein Netzfehler ebenso.
+    expect(istNichtGefunden(new ApiError(403, 'Kein Zugriff'))).toBe(false);
+    expect(istNichtGefunden(new ApiError(500, 'kaputt'))).toBe(false);
+    expect(istNichtGefunden(new ApiError(410, 'weg'))).toBe(false);
+    expect(istNichtGefunden(new Error('Failed to fetch'))).toBe(false);
+    expect(istNichtGefunden({ status: 404 })).toBe(false);
+    expect(istNichtGefunden(null)).toBe(false);
+    expect(istNichtGefunden(undefined)).toBe(false);
   });
 });
 

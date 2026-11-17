@@ -17,6 +17,7 @@ import {
 import { ApiError } from '../api/client';
 import type { Erinnerung } from '../api/types';
 import { erinnerungenPfad } from '../routing/deeplinks';
+import { einsatzKeys } from '../api/queryKeys';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
@@ -629,7 +630,31 @@ describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
     );
   });
 
-  it('?erinnerung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt (LLH-1429)', async () => {
+  // Review a12ms7g9 (F5): ein alter Stand der offenen im Cache kennt eine eben angelegte
+  // Erinnerung nicht. Der erste Schritt wartet auf die frische Antwort, statt in die abgeschlossenen
+  // zu suchen und „gibt es nicht“ zu melden.
+  it('?erinnerung= mit altem Stand im Cache: kein Hinweis, die Karte der frischen Antwort ist hervorgehoben', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(einsatzKeys.erinnerungenPhase(1, 'offen'), [], { updatedAt: 0 });
+    // Der Einsatz frisch im Cache: sonst wartete der Sprung schon auf ihn.
+    qc.setQueryData(einsatzKeys.einsatz(1), {
+      id: 1,
+      bezeichnung: 'Hochwasser',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    });
+    renderPage(qc, erinnerungenPfad(1, { erinnerung: 7 }));
+    const karte = await karteVon(7);
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/erinnerungen$/),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+    expect(listeAbgeschlosseneErinnerungen).not.toHaveBeenCalled();
+  });
+
+  it('?erinnerung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt, der Hinweis steht (LLH-1429, LLH-1827)', async () => {
     renderPage(undefined, erinnerungenPfad(1, { erinnerung: 99 }));
     await screen.findByText('Lagemeldung');
     await waitFor(() =>
@@ -640,5 +665,6 @@ describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
     expect(screen.getByText('Lagemeldung')).toBeInTheDocument();
     expect(screen.queryByText('Zur Kenntnis')).not.toBeInTheDocument();
     expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+    expect(screen.getByText('Erinnerung #99 gibt es nicht (mehr)')).toBeInTheDocument();
   });
 });

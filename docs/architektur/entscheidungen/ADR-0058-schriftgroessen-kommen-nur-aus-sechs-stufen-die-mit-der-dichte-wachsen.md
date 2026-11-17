@@ -1,7 +1,7 @@
 ---
 id: ADR-0058
 titel: Schriftgrößen kommen nur aus sechs Stufen, die mit der Dichte wachsen
-status: akzeptiert
+status: verworfen
 datum: 2026-11-15
 gilt_fuer:
   - frontend/src/theme/tokens.ts

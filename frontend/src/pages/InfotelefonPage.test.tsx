@@ -214,6 +214,14 @@ describe('InfotelefonPage (LFH-554)', () => {
     expect(zeilen[0]).toBe(ziel);
   });
 
+  // Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827).
+  it('?anruf= auf einen Anruf, den es nicht gibt (404 des Einzelabrufs), zeigt den Hinweis', async () => {
+    vi.mocked(loadAnruf).mockRejectedValue(new ApiError(404, 'Nicht gefunden'));
+    setup('/einsaetze/1/infotelefon?anruf=99999');
+    expect(await screen.findByText('Anruf #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(document.querySelector('.zeile-hervorgehoben')).toBeNull();
+  });
+
   it('hebt den per ?anruf= angesprungenen Anruf mit Fläche hervor, nicht nur mit der Klasse (LFH-698)', async () => {
     // `Zeitachseneintrag` setzt seinen Grund inline; die Klassenregel in `index.css` liefert nur
     // die Linie. Ohne eigenen Inline-Grund bliebe der Anruf ohne `bedienFlaeche` (Spec

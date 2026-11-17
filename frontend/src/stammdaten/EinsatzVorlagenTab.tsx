@@ -7,6 +7,7 @@ import { globalKeys } from '../api/queryKeys';
 import { fetchSchichtmodelle } from '../api/schichtmodelle';
 import type { EinsatzVorlage } from '../api/types';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -22,7 +23,6 @@ import type { Einsatzart } from '../api/types';
 import EinsatzVorlageFormModal from './EinsatzVorlageFormModal';
 import { moduleText, sichtbarAnzahl } from './einsatzVorlageModule';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import { schriftStil } from '../components/instrument/rollenwerte';
 
 /**
  * Sektion „Einsatz-Vorlagen“ (LLH-1375, Spec `einsatz-vorlagen`, design.md D3a): Modulsätze der
@@ -107,8 +107,8 @@ export default function EinsatzVorlagenTab() {
       title: 'Module',
       key: 'module',
       sorter: (a, b) => sichtbarAnzahl(a.ausgeblendet) - sichtbarAnzahl(b.ausgeblendet),
-      // „8 von 12 Modulen“ trägt Wörter: Textschrift mit gleich breiten Ziffern (LLH-1777).
-      render: (_, v) => <span style={schriftStil('meta')}>{moduleText(v.ausgeblendet)}</span>,
+      // Zahlen in Mono, die Spalte wird zeilenweise verglichen.
+      render: (_, v) => <span style={monoStil(12)}>{moduleText(v.ausgeblendet)}</span>,
     },
     ...(istAdmin
       ? ([

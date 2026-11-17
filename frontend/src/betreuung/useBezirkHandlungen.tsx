@@ -95,11 +95,18 @@ export function useBezirkHandlungen({
   einsatzId,
   bezirke,
   darfSchreiben,
+  nachStorno,
 }: {
   einsatzId: number;
   /** Aktueller Stand der Bezirke: ein Live-Refetch kommt bei offenem Dialog an. */
   bezirke: readonly Evakuierungsbezirk[];
   darfSchreiben: boolean;
+  /**
+   * Wohin es nach dem eigenen Stornieren geht: von der Detailseite auf die Übersicht, wie bei der
+   * Betreuungsstelle. Dort stünde sonst „Diesen Evakuierungsbezirk gibt es nicht (mehr)“ (LLH-1827),
+   * denn die Übersicht führt den stornierten Bezirk nicht mehr. Ohne Angabe bleibt die Seite.
+   */
+  nachStorno?: string;
 }): BezirkHandlungen {
   const navigate = useNavigate();
   const { benutzer } = useAuth();
@@ -178,6 +185,7 @@ export function useBezirkHandlungen({
       invalidiereMitKennzahl();
       setDialog(null);
       message.success(`Bezirk ${b.bezeichnung} storniert`);
+      if (nachStorno != null) navigate(nachStorno);
     },
   });
   const zurueckMut = useMutation({

@@ -1,6 +1,6 @@
 import { Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
 import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -15,6 +15,7 @@ import DokumentEntwurf from '../entwurf/DokumentEntwurf';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import { useDokumentFreigabe } from '../entwurf/useDokumentFreigabe';
 import FormularEingehaengt from '../components/FormularEingehaengt';
+import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
@@ -40,9 +41,8 @@ import {
   verteilerNamesFromForm,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
-import { Paneel, schriftStil } from '../components/instrument';
+import { Paneel, monoStil } from '../components/instrument';
 import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
-
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
 import { flaeche } from '../theme/tokens';
@@ -209,10 +209,19 @@ function BefehlDetail() {
       fehlerBlock.current?.scrollIntoView?.({ block: 'nearest' });
   }, [fortschreibenMutation.error]);
 
-  // Ungültige Befehl-ID → zurück auf den Reiter Befehle, nicht auf die Vorgabe „Aufträge" (LFH-972).
-  if (!idGueltig) {
-    return <Navigate to={auftraegePfad(einsatzId, { reiter: 'befehle' })} replace />;
-  }
+  // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`), ohne stille Weiterleitung. Der Rückweg führt auf den Reiter Befehle,
+  // nicht auf die Vorgabe „Aufträge" (LFH-972).
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diesen Befehl gibt es nicht (mehr)"
+      rueckweg={{
+        label: 'Zur Befehlsliste',
+        pfad: auftraegePfad(einsatzId, { reiter: 'befehle' }),
+      }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || befehlQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
@@ -220,12 +229,23 @@ function BefehlDetail() {
       </div>
     );
   }
-  if (befehlQuery.isError || !befehlQuery.data || !einsatzQuery.data) {
+  if (istNichtGefunden(befehlQuery.error)) return nichtGefunden;
+  // Ein anderer Abruffehler, auch des Einsatzes (den fängt meist schon der Rahmen), bietet den
+  // neuen Versuch an.
+  if (!befehlQuery.data || !einsatzQuery.data) {
     return (
-      <Typography.Paragraph>
-        <Typography.Text type="danger">Befehl nicht gefunden.</Typography.Text>{' '}
-        <Link to={auftraegePfad(einsatzId, { reiter: 'befehle' })}>Zu den Befehlen</Link>
-      </Typography.Paragraph>
+      <SeitenFehler
+        text={
+          einsatzQuery.isError
+            ? 'Einsatz nicht gefunden oder kein Zugriff'
+            : 'Befehl konnte nicht geladen werden'
+        }
+        ursache={einsatzQuery.isError ? einsatzQuery.error : befehlQuery.error}
+        onWiederholen={() => {
+          if (einsatzQuery.isError) void einsatzQuery.refetch();
+          void befehlQuery.refetch();
+        }}
+      />
     );
   }
   const einsatz = einsatzQuery.data;
@@ -419,7 +439,7 @@ function BefehlDetail() {
 
         {/* Taktische DTG in der Anzeigezone: `zeitstand` ist ein UTC-Wirestring ohne
             Zonenkennung. */}
-        <Typography.Paragraph type="secondary" style={schriftStil('meta')}>
+        <Typography.Paragraph type="secondary" style={monoStil(12)}>
           Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
         </Typography.Paragraph>
 

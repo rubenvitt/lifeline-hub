@@ -3,7 +3,7 @@ import { Alert, Button, Form, Input, Modal, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import { IconPlus } from '../../icons';
-import { Formularpaneel, useRollen, zahlStil } from '../../components/instrument';
+import { Formularpaneel, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import { Select } from '../../components/Select';
 import KopierbarerText from '../../components/KopierbarerText';
@@ -282,8 +282,7 @@ export default function EinsatzLagebildExtern({
             <KopierbarerText text={link} bezeichnung="Link">
               <Typography.Text
                 data-lfh="lagebild-link-text"
-                data-schrift="kennung"
-                style={{ ...zahlStil('text', 400), overflowWrap: 'anywhere' }}
+                style={{ ...monoStil(13, 400), overflowWrap: 'anywhere' }}
               >
                 {link}
               </Typography.Text>

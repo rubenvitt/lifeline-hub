@@ -4,7 +4,7 @@ import { EINTRAEGE } from 'virtual:neuigkeiten';
 import type { ChangelogEintrag, Kanal } from '../../scripts/changelog-zerlegen.mjs';
 import AdminPage from '../components/AdminPage';
 import Markdown from '../components/Markdown';
-import { Paneel, Segmentleiste, schriftGroesse, zahlStil } from '../components/instrument';
+import { Paneel, Segmentleiste } from '../components/instrument';
 import { useVersionsstand, useMarkiereGelesen } from './useVersionsstand';
 import {
   kenntVersion,
@@ -117,8 +117,8 @@ function EintragAnzeige({ eintrag }: { eintrag: ChangelogEintrag }) {
   return (
     <article data-lfh="neuigkeit" data-version={eintrag.version}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' }}>
-        <Typography.Title level={2} style={{ margin: 0, fontSize: schriftGroesse('titel') }}>
-          <span style={zahlStil('titel')}>{eintrag.version}</span>
+        <Typography.Title level={2} style={{ margin: 0, fontSize: 18 }}>
+          <span style={{ fontFamily: 'monospace' }}>{eintrag.version}</span>
         </Typography.Title>
         <Tag>{KANAL_TITEL[eintrag.kanal]}</Tag>
         {eintrag.datum && (

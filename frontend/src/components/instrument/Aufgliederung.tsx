@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useRollen, zahlStil, schriftStil } from './rollenwerte';
+import { monoStil, useRollen } from './rollenwerte';
 
 /**
  * Aufgliederung und Balken — die zwei Mengenbilder des Neuentwurfs.
@@ -97,7 +97,7 @@ export function Aufgliederung({ segmente, titel, hoehe = 5, legende, style }: Au
         <div
           aria-hidden="true"
           data-lfh="aufgliederung-legende"
-          style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
+          style={{ ...monoStil(11), color: rollen.gedaempft }}
         >
           {legendenInhalt}
         </div>
@@ -149,7 +149,7 @@ export function Balken({
         <span style={{ width: breite, background: farbe }} />
       </div>
       {label != null && (
-        <span aria-hidden="true" style={{ ...zahlStil('fein'), color: rollen.schwach }}>
+        <span aria-hidden="true" style={{ ...monoStil(11), color: rollen.schwach }}>
           {label}
         </span>
       )}

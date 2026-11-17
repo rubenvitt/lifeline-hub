@@ -1,7 +1,8 @@
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { useRollen, schriftGroesse, zahlStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
+import { schriftskala } from '../../theme/tokens';
 import { fachebeneAlter } from './fachebenen';
 
 interface FachebeneStandProps {
@@ -41,7 +42,7 @@ export default function FachebeneStand({
       data-lfh="fachebene-stand"
       data-veraltet={alter.veraltet || undefined}
       style={{
-        fontSize: schriftGroesse('klein'),
+        fontSize: schriftskala.meta.groesse,
         color: alter.veraltet ? rollen.achtungText : rollen.text2,
         whiteSpace: 'nowrap',
       }}
@@ -51,7 +52,7 @@ export default function FachebeneStand({
           <span aria-hidden="true">⧖ </span>veraltet ·{' '}
         </>
       )}
-      {praefix} <span style={zahlStil('klein')}>{zeit}</span>
+      {praefix} <span style={monoStil(schriftskala.meta.groesse)}>{zeit}</span>
     </span>
   );
 }

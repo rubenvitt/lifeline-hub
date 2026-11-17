@@ -46,9 +46,8 @@
 }
 
 .markdown code {
-  font-family: var(--lfh-schrift-zahl);
-  /* Die Größe der Umgebung (Absatz, Überschrift): Code in einer h1 stünde sonst klein daneben. */
-  font-size: inherit;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  font-size: 0.875em;
   background: var(--md-flaeche);
   padding: 0.1em 0.35em;
   border-radius: 4px;
@@ -118,19 +117,20 @@
   margin: 1.4em 0 0.5em;
 }
 /* Größe an der QUELLstufe (`md-h<n>`), nicht am Tag: `Markdown.tsx` rückt die Tags um drei
-   Ebenen nach unten (unter Seitentitel, Paneel und Abschnitt), die Optik bleibt. Die Größen sind
-   Stufen der Skala (LLH-1775): h1 `wert`, h2 und h3 `titel`, darunter die Lauftextgröße. */
+   Ebenen nach unten (unter Seitentitel, Paneel und Abschnitt), die Optik bleibt. */
 .markdown--dokument .md-h1 {
-  font-size: var(--lfh-groesse-wert);
+  font-size: 1.5em;
 }
-.markdown--dokument .md-h2,
+.markdown--dokument .md-h2 {
+  font-size: 1.3em;
+}
 .markdown--dokument .md-h3 {
-  font-size: var(--lfh-groesse-titel);
+  font-size: 1.15em;
 }
 .markdown--dokument .md-h4,
 .markdown--dokument .md-h5,
 .markdown--dokument .md-h6 {
-  font-size: inherit;
+  font-size: 1em;
 }
 .markdown--dokument p {
   margin: 0.6em 0;
@@ -159,7 +159,7 @@
   margin: 0.25em 0;
 }
 .markdown--kompakt :is(.md-h1, .md-h2, .md-h3, .md-h4, .md-h5, .md-h6) {
-  font-size: inherit;
+  font-size: 1em;
   font-weight: 600;
   line-height: 1.35;
   margin: 0.35em 0 0.15em;
