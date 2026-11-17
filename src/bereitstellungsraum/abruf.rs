@@ -177,12 +177,28 @@ pub async fn abruf_tx(
     // Unterstellung nur an der Wurzel: die Stärke zählt über die oberste Einheit (Spec
     // `lage-verdichtung`, D10).
     if let Some((abschnitt_id, _)) = daten.abschnitt {
-        sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = ? WHERE id = ? AND einsatz_id = ?")
-            .bind(abschnitt_id)
-            .bind(id)
-            .bind(einsatz_id)
-            .execute(&mut *conn)
+        let geaendert = sqlx::query(
+            "UPDATE einsatz_einheit SET abschnitt_id = ? \
+             WHERE id = ? AND einsatz_id = ? AND abschnitt_id IS NOT ?",
+        )
+        .bind(abschnitt_id)
+        .bind(id)
+        .bind(einsatz_id)
+        .bind(abschnitt_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+        // Änderungsvermerk am Abschnitt (LLH-1834): wer abgerufen hat.
+        if geaendert > 0 {
+            crate::einsatz::feld_vermerk::setze_tx(
+                conn,
+                einsatz_id,
+                crate::einsatz::feld_vermerk::Objekt::Einheit(id),
+                &["abschnitt_id"],
+                benutzer_id,
+            )
             .await?;
+        }
     }
     if daten.ausgerueckt {
         let objekte = std::iter::once((typ, id))

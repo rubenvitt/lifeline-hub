@@ -23,8 +23,8 @@ import { OFFEN_LASSEN } from './InlineAngabe';
 export interface FeldKonfliktAuftrag<W, D> {
   /** Name der Angabe, wie die Zeile ihn zeigt. */
   etikett: string;
-  /** Der Wert beim Öffnen (Wire-Form), Altwert des Feld-CAS. */
-  erwartet: W;
+  /** Der Wert beim Öffnen (Wire-Form), Altwert des Feld-CAS; `undefined` speichert ohne Vergleich. */
+  erwartet: W | undefined;
   /** Schickt die Änderung; mit `undefined` ohne Altwert. Lehnt bei Fehlern ab. */
   speichern: (erwartet: W | undefined) => Promise<void>;
   /** Lädt den Datensatz frisch (am Cache vorbei) und legt ihn dort ab. */

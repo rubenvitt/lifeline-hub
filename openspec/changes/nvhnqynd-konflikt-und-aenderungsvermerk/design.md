@@ -150,6 +150,13 @@ Symbol, das nach Warnung aussieht.
 Schreib-Warteschlange LFH-705, öffentliche API, Spiegel-Anträge). Der Vermerk entsteht auf jedem
 Weg, der den Wert ändert (auch ohne `erwartet`), mit dem ausführenden Benutzer.
 
+Dazu zählen die Wege, die eine Angabe nebenbei ändern (Review-Entscheidung 17.11.2026): das
+Entlassen einer Person (Führer, Einsatzleiter) oder eines Fahrzeugs der Führungsstelle, das
+Auflösen einer Einheit (Über-Einheit ihrer Kinder), der Abruf aus dem Bereitstellungsraum mit
+Ziel-Abschnitt (nur bei Wechsel) und das Zuordnen oder Freigeben einer Person mit endender oder
+zurückgesetzter Führung. Sie setzen den Vermerk in ihrer Schreibtransaktion. Ohne Benutzer (Tests,
+Pool-Wrapper) bleibt er aus.
+
 ## Risks / Trade-offs
 
 - [Einheit-Handler wird transaktional, Sprechgruppen bleiben außerhalb] → Sprechgruppen haben

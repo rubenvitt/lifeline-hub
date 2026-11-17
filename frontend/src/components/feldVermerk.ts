@@ -38,7 +38,7 @@ export function ausschnitt<P extends object>(quelle: object, patch: P): Partial<
 }
 
 /** Lesbarer Text eines Ausschnitts für die Rückfrage: die Werte, mit Komma getrennt. */
-export function ausschnittText(wert: object): string {
+export function ausschnittText<T extends object>(wert: T): string {
   return Object.values(wert)
     .filter((v) => v != null && v !== '')
     .map((v) =>
@@ -52,7 +52,7 @@ export function ausschnittText(wert: object): string {
 }
 
 /** Ein Ausschnitt ist leer, wenn jeder Wert leer ist. */
-export function ausschnittLeer(wert: object): boolean {
+export function ausschnittLeer<T extends object>(wert: T): boolean {
   return Object.values(wert).every(
     (v) => v == null || v === '' || (Array.isArray(v) && v.length === 0),
   );

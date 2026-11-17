@@ -1332,9 +1332,26 @@ pub async fn personal_zuordnen(
         if nur_wenn_frei {
             mitglied_repo::require_personal_frei_tx(conn, einsatz_id, eid, ep_id).await?;
         }
-        let z = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+        let z = mitglied_repo::zuordnen_personal_tx(
+            conn,
+            einsatz_id,
+            eid,
+            ep_id,
+            Some(ctx.benutzer.id),
+        )
+        .await?;
         let fuehrer_gesetzt = als_fuehrer
             && mitglied_repo::set_fuehrer_wenn_frei_tx(conn, einsatz_id, eid, ep_id).await?;
+        if fuehrer_gesetzt {
+            crate::einsatz::feld_vermerk::setze_tx(
+                conn,
+                einsatz_id,
+                crate::einsatz::feld_vermerk::Objekt::Einheit(eid),
+                &["fuehrer_id"],
+                ctx.benutzer.id,
+            )
+            .await?;
+        }
         if z.is_changed {
             let fuehrung: Vec<&str> = z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
             let text = crate::einheit::etb_text_personal_eingeteilt(
@@ -1384,7 +1401,14 @@ pub async fn personal_freigeben(
     // F06/LFH-244 Tier-A: Freigabe (inkl. Führer-Leerung) + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        let person = mitglied_repo::freigeben_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+        let person = mitglied_repo::freigeben_personal_tx(
+            conn,
+            einsatz_id,
+            eid,
+            ep_id,
+            Some(ctx.benutzer.id),
+        )
+        .await?;
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,

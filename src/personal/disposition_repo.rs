@@ -602,7 +602,7 @@ pub async fn entlassen_tx(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    release_bindungen_tx(conn, einsatz_id, ep_id).await?;
+    release_bindungen_tx(conn, einsatz_id, ep_id, benutzer_id).await?;
     let (ergebnis, _) = crate::zeitachse::repo::schreibe_tx(
         conn,
         einsatz_id,
@@ -640,12 +640,49 @@ async fn release_bindungen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
+    von: i64,
 ) -> Result<(), AppError> {
-    for sql in [
-        "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
-        "UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ? AND einsatz_id = ?",
+    // Endet eine Führung oder der Einsatzleiter-Bezug, hält der Änderungsvermerk fest, wer das
+    // ausgelöst hat (LLH-1834, Review-Entscheidung 17.11.2026).
+    let ohne_fuehrer: Vec<i64> = sqlx::query_scalar(
+        "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ? \
+         RETURNING id",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for eid in ohne_fuehrer {
+        crate::einsatz::feld_vermerk::setze_tx(
+            conn,
+            einsatz_id,
+            crate::einsatz::feld_vermerk::Objekt::Einheit(eid),
+            &["fuehrer_id"],
+            von,
+        )
+        .await?;
+    }
+    let leiter = sqlx::query(
         "UPDATE einsatz_fuehrungsstelle SET einsatzleiter_personal_id = NULL \
          WHERE einsatzleiter_personal_id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if leiter > 0 {
+        crate::einsatz::feld_vermerk::setze_tx(
+            conn,
+            einsatz_id,
+            crate::einsatz::feld_vermerk::Objekt::Fuehrungsstelle,
+            &["einsatzleiter"],
+            von,
+        )
+        .await?;
+    }
+    for sql in [
+        "UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ? AND einsatz_id = ?",
         "UPDATE einsatz_personal SET einheit_id = NULL, fahrzeug_id = NULL, uhs_id = NULL \
          WHERE id = ? AND einsatz_id = ?",
     ] {

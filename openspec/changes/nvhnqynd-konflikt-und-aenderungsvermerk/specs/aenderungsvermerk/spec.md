@@ -23,6 +23,10 @@ Schreiben MUST keinen Vermerk setzen.
 - **WHEN** ein Aufruf die Bemerkung einer Einheit mit ihrem schon gespeicherten Text sendet
 - **THEN** bleibt der Vermerk der Bemerkung unverändert
 
+#### Scenario: Führer entlassen
+- **WHEN** B eine Person entlässt, die eine Einheit führt
+- **THEN** trägt die Angabe Führer dieser Einheit den Vermerk mit B
+
 #### Scenario: Konflikt setzt keinen Vermerk
 - **WHEN** ein Speichern mit veraltetem Altwert mit 409 abgelehnt wird
 - **THEN** trägt die Angabe weiter den Vermerk der Änderung, die den Konflikt ausgelöst hat

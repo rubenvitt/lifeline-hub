@@ -1712,6 +1712,17 @@ pub async fn aufloesen_tx(
     .fetch_all(&mut *conn)
     .await?;
     ergebnis.kinder.sort_unstable();
+    // Die Kinder hängen um: ihr Vermerk an der Über-Einheit nennt, wer aufgelöst hat (LLH-1834).
+    for kind in &ergebnis.kinder {
+        crate::einsatz::feld_vermerk::setze_tx(
+            conn,
+            einsatz_id,
+            crate::einsatz::feld_vermerk::Objekt::Einheit(*kind),
+            &["ueber_einheit_id"],
+            benutzer_id,
+        )
+        .await?;
+    }
     // Polymorphe Bezüge der Fernmeldeskizze haben keinen FK (LFH-893, design.md D3).
     crate::fernmeldewesen::fernmeldeskizze::vergiss(
         conn,

@@ -49,6 +49,8 @@ Gliederung nach Unteraufgabe: `r9up3kp5` = LLH-1831 (Konfliktprüfung), `mdopfgq
 - [x] 8.1 `frontend/AGENTS.md` („Bearbeiten in der Ansicht“): auch eine Einzelangabe trägt den Feldvergleich über `useFeldKonflikt`; `src/AGENTS.md`: neue 409-Quelle Feld-CAS an Einheit/Kopf/Führungsstelle und die Vermerk-Tabelle; verifiziert: Prettier über `frontend/`, Verweise per `grep` stimmig
 - [x] 8.2 Anwenderdoku (`docs/anwender/kapitel/` zu Einsatzdaten und Einheit, Konfliktdialog der Personendaten) nach `docs/anwender/AGENTS.md` (Mitänderungsregel, Bilder); verifiziert: Doku-Wächter aus `check-all.sh` grün
 
+- [x] 8.3 Vermerk auf den Nebenwegen (Review-Entscheidung, design.md D8): Entlassen von Person und Fahrzeug, Auflösen, BR-Abruf mit Abschnitt, Zuordnen/Freigeben/Rückgängig als Führer; verifiziert: `tests/aenderungsvermerk_wege.rs` grün (je Weg ein Test)
+
 ## 9. Integration
 
 - [ ] 9.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die e2e aus 7.4 lokal einzeln grün
