@@ -5,13 +5,12 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
+  Augenbraue,
   Paneel,
   kennzahlenbandStil,
+  monoStil,
   paneelZeileStil,
   useRollen,
-  schriftGroesse,
-  zahlStil,
-  Feldetikett,
 } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
@@ -182,7 +181,7 @@ function TextAngabe({
       vermerk={vermerk}
       etikett={etikett}
       wert={text}
-      anzeige={mono ? <span style={zahlStil('text')}>{text}</span> : text}
+      anzeige={mono ? <span style={monoStil(13)}>{text}</span> : text}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -356,7 +355,7 @@ const KOPF_MIN_BREITE = 220;
  * Nichts hier ist bedienbar, die Zwei-Angaben-Regel für handgebaute Bedienziele gilt nicht.
  */
 /**
- * Eine Angabe als Zelle im Fugenraster (Feldetikett über dem Wert). Kein `Kennzahl`-Baustein: die
+ * Eine Angabe als Zelle im Fugenraster (Augenbraue über dem Wert). Kein `Kennzahl`-Baustein: die
  * Werte sind Wörter — ein Stichwort in Datenwert-Mono läse sich wie ein Messwert.
  */
 function KopfAngabe({
@@ -383,12 +382,10 @@ function KopfAngabe({
         minWidth: 0,
       }}
     >
-      <Feldetikett style={{ display: 'block', marginBottom: token.marginXXS }}>
-        {etikett}
-      </Feldetikett>
+      <Augenbraue style={{ display: 'block', marginBottom: token.marginXXS }}>{etikett}</Augenbraue>
       <div
         style={{
-          ...(mono ? zahlStil('text', 500) : { fontSize: schriftGroesse('text'), fontWeight: 500 }),
+          ...(mono ? monoStil(15, 500) : { fontSize: 15, fontWeight: 500 }),
           color: rollen.text,
           overflowWrap: 'anywhere',
         }}
@@ -427,7 +424,7 @@ function Angaben({
             alignItems: 'baseline',
           }}
         >
-          <Feldetikett als="dt">{etikett}</Feldetikett>
+          <Augenbraue als="dt">{etikett}</Augenbraue>
           <dd style={{ margin: 0, color: rollen.text2, overflowWrap: 'anywhere' }}>
             {wert}
             <VermerkZeile vermerk={vermerk} />
@@ -1241,11 +1238,7 @@ function RufnameAngabe({
       vermerk={vermerk}
       etikett="Rufname"
       wert={rufname ?? ''}
-      anzeige={
-        <span data-schrift="kennung" style={zahlStil('text')}>
-          {rufname}
-        </span>
-      }
+      anzeige={<span style={monoStil(13)}>{rufname}</span>}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -1682,7 +1675,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Einsatznummer',
-                wert: <span style={zahlStil('text')}>{einsatz.einsatznummer_intern ?? '—'}</span>,
+                wert: <span style={monoStil(13)}>{einsatz.einsatznummer_intern ?? '—'}</span>,
               },
               {
                 etikett: 'Leitstellen-Nr.',
@@ -1702,7 +1695,7 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Angelegt',
                 wert: (
-                  <span style={zahlStil('text')}>
+                  <span style={monoStil(13)}>
                     <ZeitAnzeige wert={einsatz.angelegt_at} rolle="zeitpunkt" />
                   </span>
                 ),
@@ -1794,9 +1787,7 @@ export default function EinsatzdatenPage() {
                     etikett="Anzahl Betroffene (initial)"
                     vermerk={einsatz.vermerke?.anzahl_betroffene_initial}
                     wert={einsatz.anzahl_betroffene_initial ?? null}
-                    anzeige={
-                      <span style={zahlStil('text')}>{einsatz.anzahl_betroffene_initial}</span>
-                    }
+                    anzeige={<span style={monoStil(13)}>{einsatz.anzahl_betroffene_initial}</span>}
                     leer={(n) => n === null}
                     darfSchreiben={darfBearbeiten}
                     onSpeichern={(n, { beimOeffnen }) =>

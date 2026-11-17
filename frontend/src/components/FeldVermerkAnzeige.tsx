@@ -1,6 +1,6 @@
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { FeldVermerk } from '../api/types';
-import Schrift from './instrument/Schrift';
+import { schriftStil, useRollen } from './instrument/rollenwerte';
 
 /**
  * Der Änderungsvermerk in der Ansicht (LLH-1834, Change `nvhnqynd-konflikt-und-aenderungsvermerk`,
@@ -16,21 +16,23 @@ function useVermerkSatz() {
 /** Unter dem Wert einer Zeile: „Geändert von Anna, 14:05“. */
 export function VermerkZeile({ vermerk }: { vermerk?: FeldVermerk }) {
   const satz = useVermerkSatz();
+  const { rollen } = useRollen();
   if (!vermerk) return null;
   return (
-    <Schrift rolle="meta" ton="gedaempft" als="div">
+    <div style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
       <span data-lfh="feld-vermerk">{satz('Geändert', vermerk)}</span>
-    </Schrift>
+    </div>
   );
 }
 
 /** Im Kopf eines Paneels, die jüngste Änderung: „Zuletzt geändert von Anna, 14:05“. */
 export function PaneelVermerk({ vermerk }: { vermerk?: FeldVermerk }) {
   const satz = useVermerkSatz();
+  const { rollen } = useRollen();
   if (!vermerk) return null;
   return (
-    <Schrift rolle="meta" ton="gedaempft">
+    <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
       <span data-lfh="paneel-vermerk">{satz('Zuletzt geändert', vermerk)}</span>
-    </Schrift>
+    </span>
   );
 }

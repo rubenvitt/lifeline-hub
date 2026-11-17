@@ -6,7 +6,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Person, Sichtungskategorie } from '../api/types';
 import SichtungsTag from '../components/SichtungsTag';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { useRollen, schriftGroesse } from '../components/instrument';
+import { useRollen } from '../components/instrument';
 import { SK_META } from './personMeta';
 import { useSaveSichtung } from './SichtungDialog';
 import SichtungsWahl, { SICHTUNGSFLAECHE_BREITE, sichtungsLuecke } from './SichtungsWahl';
@@ -167,10 +167,7 @@ export default function ZeilenSichtung({
         </Button>
       </Popover>
       {vorgemerkt && (
-        <div
-          data-lfh="zeile-vorgemerkt"
-          style={{ fontSize: schriftGroesse('klein'), color: rollen.text2 }}
-        >
+        <div data-lfh="zeile-vorgemerkt" style={{ fontSize: 12, color: rollen.text2 }}>
           Offline vorgemerkt
         </div>
       )}

@@ -77,16 +77,15 @@ describe('EinsatzSeite', () => {
     const leiste = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
     expect(leiste).toContainElement(heading);
     expect(leiste).toContainElement(screen.getByRole('button', { name: 'Anlegen' }));
-    // 16/600 (Stufe `titel`, LLH-1773: größer als der Lauftext), die Ebene bleibt h1.
-    expect(heading.style.fontSize).toBe('var(--lfh-groesse-titel)');
-    expect(heading).toHaveStyle({ fontWeight: '600' });
+    // 14/600 — der Satz des Entwurfs, die Ebene bleibt h1.
+    expect(heading).toHaveStyle({ fontSize: '14px', fontWeight: '600' });
     // Ein Haken für den Druck (LFH-893): eine Druckwurzel kann die Bildschirmhilfe ausblenden.
     expect(container.querySelector('[data-lfh="seiten-beschreibung"]')).toHaveTextContent(
       'Betreute und vermisste Personen',
     );
   });
 
-  it('zeigt ein optionales Meta neben dem Titel, in der Textschrift (LLH-1777)', () => {
+  it('zeigt ein optionales Mono-Meta neben dem Titel', () => {
     const { container } = renderMitProviders(
       <EinsatzSeite titel="Lagebericht" meta="Nr. 12">
         <div>x</div>
@@ -95,8 +94,7 @@ describe('EinsatzSeite', () => {
     const leiste = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
     const meta = screen.getByText('Nr. 12');
     expect(leiste).toContainElement(meta);
-    expect(meta.style.fontFamily).toContain('LFH Archivo');
-    expect(meta.style.fontVariantNumeric).toBe('tabular-nums');
+    expect(meta.style.fontFamily).toContain('Mono');
   });
 
   it('zieht die Kopfleiste über die Seitenrinne, die Lesebreite gilt dem Inhalt', () => {

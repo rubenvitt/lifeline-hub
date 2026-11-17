@@ -41,7 +41,7 @@ import {
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
-import { Datenfeld, Datenraster, Paneel, useRollen, schriftStil } from '../components/instrument';
+import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
@@ -72,7 +72,6 @@ import {
 } from '../routing/deeplinks';
 import { personalDetailPfad } from '../stammdaten/stammdatenDetail';
 import { statusKategorie } from '../theme/statusFarben';
-
 import './EinsatzkraftPage.css';
 
 dayjs.extend(utc);
@@ -456,7 +455,7 @@ export default function EinsatzkraftPage() {
       // Nur die Dauer bleibt immer beisammen.
       meta={
         metaTeile.length > 0 ? (
-          <span className="lfh-personenkopf-meta" style={schriftStil('meta')}>
+          <span className="lfh-personenkopf-meta" style={monoStil(12)}>
             {metaTeile.map((teil, i) => (
               <Fragment key={i}>
                 {i > 0 && ' · '}
@@ -705,10 +704,7 @@ export default function EinsatzkraftPage() {
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
-                  entlassen{' '}
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {zeitKurz(ep.beendet_at)}
-                  </span>
+                  entlassen <span style={monoStil(13)}>{zeitKurz(ep.beendet_at)}</span>
                 </span>
                 {imEinsatzSchreiben && (
                   <Button

@@ -41,9 +41,8 @@ import {
   verteilerNamesFromForm,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
-import { Paneel, schriftStil } from '../components/instrument';
+import { Paneel, monoStil } from '../components/instrument';
 import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
-
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
 import { flaeche } from '../theme/tokens';
@@ -440,7 +439,7 @@ function BefehlDetail() {
 
         {/* Taktische DTG in der Anzeigezone: `zeitstand` ist ein UTC-Wirestring ohne
             Zonenkennung. */}
-        <Typography.Paragraph type="secondary" style={schriftStil('meta')}>
+        <Typography.Paragraph type="secondary" style={monoStil(12)}>
           Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
         </Typography.Paragraph>
 

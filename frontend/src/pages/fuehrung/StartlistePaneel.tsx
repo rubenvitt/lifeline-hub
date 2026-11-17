@@ -5,7 +5,6 @@ import {
   ListenPaneel,
   NUR_VORLESER,
   listenZeileStil,
-  schriftGroesse,
   schriftStil,
   useRollen,
 } from '../../components/instrument';
@@ -134,7 +133,7 @@ export default function StartlistePaneel({
           alignItems: 'baseline',
           columnGap: token.paddingSM,
           rowGap: 2,
-          fontSize: schriftGroesse('klein'),
+          fontSize: 12,
         }}
       >
         <span style={{ fontWeight: 500 }}>{p.titel}</span>

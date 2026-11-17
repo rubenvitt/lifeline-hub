@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
 import { formatVor } from '../anzeige/abstand';
-import { useRollen, zahlStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import StatusTag from '../components/StatusTag';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import {
@@ -213,7 +213,7 @@ function SpaltenKopf({
   return (
     <h2 style={stil}>
       <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{wort(k)}</span>
-      <span data-testid="board-zahl" style={zahlStil('text', 500)}>
+      <span data-testid="board-zahl" style={monoStil(14, 500)}>
         {zahl}
       </span>
     </h2>
@@ -284,9 +284,11 @@ function BoardKarte({
           }}
         >
           <span style={{ display: 'flex', gap: token.marginXS, flexWrap: 'wrap' }}>
-            <span style={zahlStil('text', 500)}>{kennung}</span>
+            <span style={monoStil(token.fontSize, 500)}>{kennung}</span>
             {p.pat_nummer && (
-              <span style={{ ...zahlStil('klein'), color: rollen.text2 }}>PAT {p.pat_nummer}</span>
+              <span style={{ ...monoStil(token.fontSizeSM), color: rollen.text2 }}>
+                PAT {p.pat_nummer}
+              </span>
             )}
           </span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

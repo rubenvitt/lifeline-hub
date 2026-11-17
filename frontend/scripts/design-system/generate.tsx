@@ -40,7 +40,6 @@ import {
   warnstufeFarbenHell,
   type Dichte,
   type Farbrollen,
-  schriftPx,
 } from '../../src/theme/tokens';
 import { sichtung } from '../../src/theme/statusFarben';
 import { statusFlaeche, type StatusTon } from '../../src/components/instrument/statusFlaeche';
@@ -368,7 +367,7 @@ function buildType(files: DesignSystemFiles) {
       .filter(([, s]) => s.familie === familie)
       .map(([name, s]) => ({
         name: kebab(name),
-        fontSize: `${schriftPx(s.stufe)}px`,
+        fontSize: `${s.groesse}px`,
         lineHeight,
         fontWeight: s.gewicht,
       }));

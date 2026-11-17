@@ -15,14 +15,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
-import {
-  Datenfeld,
-  Datenraster,
-  Paneel,
-  schriftStil,
-  useRollen,
-  zahlStil,
-} from '../components/instrument';
+import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import KopierbarerText from '../components/KopierbarerText';
@@ -388,10 +381,7 @@ export default function InstanzkopplungSeite() {
                           >
                             {kopplungZustandZeile(k, zeit)}
                           </div>
-                          <div
-                            data-schrift="kennung"
-                            style={{ ...zahlStil('klein'), color: rollen.gedaempft }}
-                          >
+                          <div style={{ ...monoStil(12), color: rollen.gedaempft }}>
                             {k.gegenueber_fingerabdruck}
                             {k.gegenueber_adresse ? ` · ${k.gegenueber_adresse}` : ''}
                           </div>
@@ -531,7 +521,7 @@ export default function InstanzkopplungSeite() {
                       description={
                         <div>
                           <div style={{ color: rollen.gedaempft }}>{schluesselZeile(s, zeit)}</div>
-                          <div style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+                          <div style={{ ...monoStil(12), color: rollen.gedaempft }}>
                             {s.fingerabdruck}
                           </div>
                         </div>
@@ -589,7 +579,7 @@ export default function InstanzkopplungSeite() {
           name="code"
           rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
         >
-          <Input placeholder="ABCD-EFGH-JKMN-PQRS" style={zahlStil('text')} autoComplete="off" />
+          <Input placeholder="ABCD-EFGH-JKMN-PQRS" style={monoStil(14)} autoComplete="off" />
         </Form.Item>
         <SpeicherFehler fehler={einloesen.error} titel="Nicht gekoppelt" />
       </ErfassungsModal>
@@ -655,7 +645,7 @@ export default function InstanzkopplungSeite() {
               ]}
               normalize={(w: string) => w.toUpperCase()}
             >
-              <Input maxLength={4} style={zahlStil('text')} autoComplete="off" />
+              <Input maxLength={4} style={monoStil(14)} autoComplete="off" />
             </Form.Item>
           </>
         )}
@@ -737,7 +727,7 @@ export default function InstanzkopplungSeite() {
             </p>
             <div style={{ marginBlockEnd: token.marginSM }}>
               <KopierbarerText text={neuerCode.code} bezeichnung="Code">
-                <span style={{ ...zahlStil('titel', 500) }} data-lfh="instanz-code-text">
+                <span style={{ ...monoStil(20, 500) }} data-lfh="instanz-code-text">
                   {neuerCode.code}
                 </span>
               </KopierbarerText>
@@ -750,7 +740,7 @@ export default function InstanzkopplungSeite() {
             <p style={{ marginBlockStart: token.marginSM }}>
               Nach dem Koppeln zeigt die andere Instanz diesen Fingerabdruck. Er muss gleich sein:
             </p>
-            <span style={zahlStil('text')}>{neuerCode.fingerabdruck}</span>
+            <span style={monoStil(13)}>{neuerCode.fingerabdruck}</span>
             {neuerCode.art === 'vor_ort' && (
               <Alert
                 type="info"
@@ -955,8 +945,7 @@ function ImNetzGefunden({
                 <ListenEintragMeta
                   title={<span data-lfh="instanz-im-netz-name">{g.name || g.kennung}</span>}
                   description={
-                    // „· Protokoll 2 · schon gekoppelt“: Wörter, also Textschrift (LLH-1777).
-                    <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+                    <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
                       {gefundenZeile(g)}
                     </span>
                   }

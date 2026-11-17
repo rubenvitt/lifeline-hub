@@ -71,5 +71,5 @@
   gap: var(--lfh-luft-1);
   padding: var(--lfh-luft-2) var(--lfh-luft-3);
   color: var(--lfh-gedaempft);
-  font-size: var(--lfh-groesse-klein);
+  font-size: 12px;
 }

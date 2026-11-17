@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { textBreite } from './textBreite';
 import {
   KOPF_TYPO,
   kopfMindestBreite,
@@ -47,14 +48,17 @@ describe('kopfMindestBreite (LLH-1788)', () => {
     expect(kopfMindestBreite({ titel: '', token: kompakt, messen })).toBe(24);
   });
 
-  it('die Kopfschrift ist die des Tabellenkopfs: Stufe fein, 600, Sperrung .12em', () => {
-    expect(KOPF_TYPO).toEqual({ stufe: 'fein', gewicht: 600, sperrung: 0.12 });
+  it('die Kopfschrift ist die des Tabellenkopfs: 10 px, 600, Sperrung .12em', () => {
+    expect(KOPF_TYPO).toEqual({ groesse: 10, gewicht: 600, sperrung: 0.12 });
   });
 
-  it('die Kopfschrift wächst mit der Dichte (LLH-1774)', () => {
-    const kompakt = textBreiteKopf('EINSATZFUNKTION', '', 'kompakt');
-    const handschuh = textBreiteKopf('EINSATZFUNKTION', '', 'handschuh');
-    expect(handschuh).toBeGreaterThan(kompakt * 1.2);
+  it('die Kopfschrift misst den Text mit Sperrung (LLH-1954, ohne Wachstum mit der Dichte)', () => {
+    // jsdom ohne Leinwand schätzt: Länge × 0,62 × Größe + Länge × Sperrung × Größe.
+    // EINSATZFUNKTION (15 Zeichen) bei 10 px: 93 + 18; ohne Sperrung wären es nur 93.
+    expect(textBreiteKopf('EINSATZFUNKTION', '')).toBe(
+      textBreite('EINSATZFUNKTION', { schrift: '', groesse: 10, gewicht: 600, sperrung: 0.12 }),
+    );
+    expect(textBreiteKopf('EINSATZFUNKTION', '')).toBeCloseTo(111, 5);
   });
 });
 
