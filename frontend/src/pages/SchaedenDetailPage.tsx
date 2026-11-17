@@ -10,9 +10,9 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { StatusChip, monoStil } from '../components/instrument';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
-import { SeitenFehler } from '../components/SeitenZustand';
+import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -239,10 +239,15 @@ export default function SchaedenDetailPage() {
     setStornoFuer(null);
   }, [schadenId, editReset, stornoReset, beendeSitzung]);
 
-  // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
-  if (!idGueltig) {
-    return <Navigate to={schaedenPfad(einsatzId)} replace />;
-  }
+  // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks (Rules-of-Hooks).
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diesen Schaden gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zu den Schäden', pfad: schaedenPfad(einsatzId) }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
@@ -256,7 +261,10 @@ export default function SchaedenDetailPage() {
   const einsatz = einsatzQuery.data;
   const zurueck = schaedenPfad(einsatzId);
 
-  if (detailQuery.isError) {
+  if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
+  // Ein anderer Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den
+  // neuen Versuch an.
+  if (detailQuery.isError || !detailQuery.data) {
     return (
       <SeitenFehler
         text="Schaden konnte nicht geladen werden"
@@ -264,9 +272,6 @@ export default function SchaedenDetailPage() {
         onWiederholen={() => void detailQuery.refetch()}
       />
     );
-  }
-  if (!detailQuery.data) {
-    return <Alert type="error" title="Schaden nicht gefunden" showIcon />;
   }
   const s = detailQuery.data;
   const orgId = einsatz.org_id ?? 0;

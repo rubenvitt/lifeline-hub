@@ -99,6 +99,12 @@ export interface ListeDetailProps<T> {
   fuss?: ReactNode;
   /** Ab {@link LISTE_DETAIL_SCHWELLE} Einträgen nur den Sichtbereich rendern (nur ohne `gruppen`). */
   fenster?: boolean;
+  /**
+   * Ab `lg` ohne Wahl das erste Objekt wählen (Vorgabe). `false`, solange ein Deeplink auf ein
+   * Objekt zeigt, das es nicht gibt (LLH-1827, `components/DeeplinkHinweis.tsx`): dann ist kein
+   * Objekt gewählt, und die Vorauswahl schlösse über `onWahl` den Hinweis gleich wieder.
+   */
+  vorauswahl?: boolean;
 }
 
 /**
@@ -198,6 +204,7 @@ export default function ListeDetail<T>({
   fehler = null,
   leer,
   fuss,
+  vorauswahl = true,
   fenster = false,
 }: ListeDetailProps<T>) {
   const { token } = useRollen();
@@ -265,10 +272,10 @@ export default function ListeDetail<T>({
   /** Vorauswahl ab `lg`: das erste Objekt der gezeigten Folge, ohne den Fokus zu bewegen. */
   const erster = sichtbar.length > 0 ? schluessel(sichtbar[0]) : null;
   useEffect(() => {
-    if (breit && gewaehlt == null && erster != null) onWahl(erster);
+    if (vorauswahl && breit && gewaehlt == null && erster != null) onWahl(erster);
     // `onWahl` ist meist eine Inline-Closure; getaktet wird über Breite, Wahl und Folge.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breit, gewaehlt, erster]);
+  }, [vorauswahl, breit, gewaehlt, erster]);
 
   // Stabile Wahl für die gemerkten Auswahlziele: der Ref trägt die jüngsten Werte.
   const wahlStand = useRef({ breit, gewaehlt, onWahl });

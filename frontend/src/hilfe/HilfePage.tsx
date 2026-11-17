@@ -8,6 +8,7 @@ import Markdown from '../components/Markdown';
 import { Select } from '../components/Select';
 import { SeitenLeer } from '../components/SeitenZustand';
 import DruckKnopf from '../components/druck/DruckKnopf';
+import SprungZumInhalt, { sprungzielInhalt } from '../components/SprungZumInhalt';
 import { useViewport } from '../components/useViewport';
 import { Bildmarke } from '../marke/Bildmarke';
 import { warGeraet } from '../geraet/geraetMarke';
@@ -308,6 +309,9 @@ export default function HilfePage() {
 
   return (
     <div className="hilfe-seite">
+      {/* Die Hilfe liegt außerhalb von `BetriebsLayout` und bindet den Sprunglink selbst ein
+          (nufmon70 D1); Ziel ist ihr `main`, hinter Kopf und Kapitelliste. */}
+      <SprungZumInhalt />
       <header className="hilfe-kopf">
         <div className="hilfe-kopf__marke">
           <Bildmarke hoehe={18} linienFarbe="var(--lfh-text)" quadratFarbe="var(--lfh-marke)" />
@@ -364,7 +368,7 @@ export default function HilfePage() {
           )}
         </nav>
 
-        <main className="hilfe-inhalt" onClick={linkImText}>
+        <main {...sprungzielInhalt} className="hilfe-inhalt" onClick={linkImText}>
           {slug === undefined && liste.length > 0 && (
             <section className="hilfe-uebersicht" aria-label="Kapitel nach Bereichen">
               {bereiche.map((b) => (

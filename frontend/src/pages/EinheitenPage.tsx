@@ -29,6 +29,8 @@ import {
   kraefteuebersichtPfad,
   parseRouteId,
 } from '../routing/deeplinks';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { loadEinheitVorlagen } from '../api/einheitVorlagen';
 import { orderAsTree, vorlagePfad } from '../stammdaten/einheitVorlagenBaum';
 import { demoGroupedOptions, SUCHTEXT_SUCHE } from '../stammdaten/demoAuswahl';
@@ -227,10 +229,14 @@ export default function EinheitenPage() {
    * Bestands-Deeplink `?einheit=<id>` leitet auf die Item-Route weiter: andere Module verlinken
    * weiterhin mit `?einheit=`.
    *
-   * Bewusst nicht über `useQueryParamSelektion`: der Hook ist apply-then-clean und räumt den Param
-   * danach mit einem eigenen `setSearchParams(..., { replace: true })`. Diese zweite Navigation
-   * überschriebe die Weiterleitung sofort; der Hook ist für eine Selektion auf derselben Seite
-   * gebaut.
+   * Die Weiterleitung läuft bewusst nicht über `useQueryParamSelektion`: der Hook ist
+   * apply-then-clean und räumt den Param danach mit einem eigenen `setSearchParams(..., { replace:
+   * true })`. Diese zweite Navigation überschriebe die Weiterleitung sofort. Der Hook übernimmt nur
+   * den anderen Fall: gibt es die Einheit nicht (mehr), räumt er den Param, und über der
+   * Gliederung steht die Hinweisleiste (LLH-1827). Bereit ist er erst, wenn beide Listen
+   * abgerufen sind (`deeplinkStand`) und die Einheit unter den aktiven fehlt: ein alter Cache, in dem eine eben gebildete
+   * Einheit noch fehlt, räumte sonst den Param vor der Weiterleitung. Eine aufgelöste Einheit gibt
+   * es noch; sie bleibt ohne Hinweis.
    *
    * `<Navigate replace>` passiert beim Rendern, und der Zurück-Knopf bleibt nicht in der
    * Weiterleitung hängen. Die ID wird gegen die geladene Liste geprüft — eine erfundene Kennung
@@ -238,6 +244,14 @@ export default function EinheitenPage() {
    */
   const [searchParams] = useSearchParams();
   const deeplinkZiel = parseRouteId(searchParams.get('einheit') ?? undefined);
+  const zielAktiv = deeplinkZiel != null && einheiten.some((e) => e.id === deeplinkZiel);
+  // Scheitert die Liste der aufgelösten, ist „gibt es nicht“ kein sicherer Befund: still.
+  const stand = deeplinkStand([einheitenQuery], [aufgeloesteQuery]);
+  const deeplinkHinweis = useQueryParamSelektion(
+    'einheit',
+    { bereit: stand.bereit && !zielAktiv, sicher: stand.sicher },
+    (eid) => ((aufgeloesteQuery.data ?? []).some((e) => e.id === eid) ? undefined : false),
+  );
 
   /**
    * „Einheit bilden" fragt zuerst: ein sofort geschriebener Platzhalter stünde nach einem Fehlklick
@@ -316,6 +330,7 @@ export default function EinheitenPage() {
       }
     >
       <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
+      <DeeplinkHinweis lage={deeplinkHinweis} sache="Einheit" />
 
       {/* Drei Zustände, nicht zwei: `einheiten.length === 0` ist auch während des Ladens und im
           Fehlerfall wahr. Gefragt wird deshalb die Query; die Länge entscheidet erst, wenn sie

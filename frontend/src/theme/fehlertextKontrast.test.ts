@@ -5,7 +5,7 @@ import { antdAlgorithmus, antdToken, farbenDunkel, farbenHell, type Farbrollen }
 /**
  * Roter Fehlertext außerhalb von Formularen, GERECHNET statt behauptet (WCAG-Formel).
  *
- * LFH-874, Spec `textkontrast-rollen`: `Typography` `danger` („nicht gefunden“, „Überfällig“,
+ * LFH-874, Spec `textkontrast-rollen`: `Typography` `danger` („konnte nicht geladen werden“, „Überfällig“,
  * Ablehnungsgrund) und die übrigen Schriftleser von antds `colorErrorText` halten den Textboden
  * aus Kriterium 5, Tag ≥ 7 : 1, Nacht ≥ 5 : 1, auf jeder deckenden Fläche, in Ruhe, unter dem
  * Zeiger und gedrückt. Die Werte kommen aus dem AUFGELÖSTEN antd-Token (Override plus Algorithmus),

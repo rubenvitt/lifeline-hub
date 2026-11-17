@@ -25,6 +25,7 @@ import { useDokumentTitel } from './useDokumentTitel';
 import { ebene1Seite } from './ebene1Seite';
 import { planungenPfad } from '../routing/deeplinks';
 import { Ebene1OrtProvider, type Ebene1OrtWert } from './Ebene1OrtKontext';
+import { sprungzielInhalt } from './SprungZumInhalt';
 
 const { Header, Content } = Layout;
 
@@ -265,7 +266,8 @@ export default function AppLayout() {
       {/* Alarmzone (LLH-1735): Org-Hinweise direkt unter dem Kopf, in jeder Breite; der Org-Rahmen
          hat keine Leiste am Handschirm (design.md D5). */}
       <AlarmZone />
-      <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
+      {/* Ziel des Sprunglinks zum Inhalt (nufmon70 D2); die Verwaltung schachtelt ihres hinein. */}
+      <Content {...sprungzielInhalt} style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
         <Ebene1OrtProvider value={ebene1Ort}>
           <Outlet />
         </Ebene1OrtProvider>

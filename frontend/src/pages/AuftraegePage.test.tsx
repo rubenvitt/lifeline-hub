@@ -894,6 +894,21 @@ describe('AuftraegePage', () => {
     expect(within(detail()).getByText('Ziel-Auftrag')).toBeInTheDocument();
   });
 
+  /** Spec `liste-detail`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827). */
+  it('?auftrag=<id> ohne Auftrag (404 des Einzelabrufs) zeigt den Hinweis, wählt nichts und räumt die Adresse', async () => {
+    listeAuftraege.mockResolvedValue([auftrag({ id: 1, auftrag_text: 'Anderer Auftrag' })]);
+    renderPage('/einsaetze/1/auftraege?auftrag=99999');
+    expect(await screen.findByText('Auftrag #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+    expect(karte(1)).not.toHaveAttribute('data-gewaehlt');
+    expect(karte(1)).not.toHaveAttribute('data-hervorgehoben');
+    expect(document.querySelector('[data-lfh="liste-detail-detail"]')).toBeNull();
+
+    // Eine Wahl schließt den Hinweis.
+    await waehle('Anderer Auftrag');
+    expect(screen.queryByText('Auftrag #99999 gibt es nicht (mehr)')).not.toBeInTheDocument();
+  });
+
   it('?auftrag=<id> eines abgeschlossenen Auftrags schaltet auf die Abgeschlossen-Ansicht (LFH-153)', async () => {
     listeAuftraege.mockResolvedValue([
       auftrag({ id: 1, auftrag_text: 'Offener Auftrag', bearbeitungsstatus: 'offen' }),

@@ -248,6 +248,26 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     an Form und Wort (schraffiertes Band, gefüllter Chip, immer „ÜBUNG“), nicht am Farbton: violett
     sind auch die ETB-Entscheidung, die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
     Quellen der Kopfhöhe, über einem klebenden Seitenkopf (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
+  - **Sprunglink zum Inhalt** (WCAG 2.4.1): einmal in `BetriebsLayout` (`App.tsx`), vor der Betriebszeile
+    (`components/SprungZumInhalt.tsx`); die Hilfe liegt außerhalb und bindet ihn selbst ein. Jeder
+    Rahmen markiert sein Ziel mit `sprungzielInhalt` (`data-lfh="sprungziel-inhalt"`,
+    `tabIndex -1`), der Link nimmt das letzte in DOM-Reihenfolge: das `main` von Einsatz, Ebene 1
+    und Hilfe, in der Verwaltung den Inhalt neben dem Menü (ein `div`, kein zweites `<main>`). Ein
+    neuer Rahmen markiert sein Ziel mit (Wächter `components/SprungZumInhalt.rahmen.test.tsx`). Ohne
+    Fokus aus dem Bild, mit Fokus `fixed` oben links über `RAHMEN_EBENE` (`.lfh-sprung-inhalt`, von
+    den Fokusabständen in `index.css` ausgenommen). Die Gerätehülle hat keinen. Nachweis
+    `e2e/sprung-zum-inhalt.spec.ts`.
+  - **Jede Rahmenebene hat eine Fehlergrenze** („Fehlergrenze je Rahmen“ und „Letztes Netz an der Wurzel“, Change `a12ms7g9-seitenzustaende`
+    D1/D2): unter `EinsatzLayout`, `AppLayout`, `AdminLayout`, `GeraeteLayout` und
+    `GeraetEinsatzRahmen` genau eine pfadlose Kindroute mit
+    `errorElement={<Fehlergrenze rahmen="…" />}` (`components/Fehlergrenze.tsx`), die alle Seiten
+    des Rahmens umschließt; nie ein `errorElement` am Layout selbst, es ersetzte den Rahmen. Die
+    oberste Route trägt das letzte Netz (`rahmen="wurzel"`, ganze Seite ohne `AuthProvider`). Die
+    Grenze zeigt nie Meldung oder Stack, nur „Neu laden“ und den sicheren Ort des Rahmens („Zum
+    Überblick“ über `einsatz/useUeberblickRueckweg.ts`, „Zur Einsatzliste“, „Zur Startseite“), und
+    meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
+    neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
+    Nachweis `e2e/fehlergrenze.spec.ts`.
   - **Ortsmarke in der Bedienfarbe**: die aktive
     Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
     aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
@@ -316,10 +336,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Füllfarbe; Standardknopf unter dem Zeiger in `bedienText`. Alles in `tokens.ts:antdToken`/
   `antdKomponenten`, nicht je Stelle.
 - **Roter Fehlertext außerhalb von Formularen**:
-  `Typography` `danger` („nicht gefunden“, „Überfällig“, Ablehnungsgrund) liest `alarmText`, ein
-  Link `danger` unter dem Zeiger `alarmHover`, über das GLOBALE `colorErrorText*` in `antdToken`
-  (antd liest es nur als Schrift); das globale `colorError` bleibt Füllfarbe für Knopf, Rand und
-  Kartenkante. Gemessen in `e2e/fehlertext-kontrast.spec.ts`.
+  `Typography` `danger` („konnte nicht geladen werden“, „Überfällig“, Ablehnungsgrund) liest
+  `alarmText`, ein Link `danger` unter dem Zeiger `alarmHover`, über das GLOBALE `colorErrorText*`
+  in `antdToken` (antd liest es nur als Schrift); das globale `colorError` bleibt Füllfarbe für
+  Knopf, Rand und Kartenkante. Gemessen in `e2e/fehlertext-kontrast.spec.ts`.
 - Kontrast: `e2e/betroffene-kontrast.spec.ts` (Tag ≥ 7:1, Nacht ≥ 5:1, Alpha mitgerechnet).
 - **Kein eigener Knopfboden**: die Beschriftung des
   Primärknopfs hält den Textboden in Ruhe, unter dem Zeiger und gedrückt; Werte und Messung am

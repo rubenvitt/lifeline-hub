@@ -40,6 +40,16 @@ export function routenMuster(routen: RouteObject[], pfad: string): string {
   return `/${teile.filter(Boolean).join('/')}`.replace(/\/{2,}/g, '/');
 }
 
+/**
+ * Routenmuster zum Pfad über die beim Start gemerkten Routen; `''` ohne gemerkte Routen oder
+ * ohne Treffer. Für den Absturzbericht (`api/clientFehler.ts`), der `App.tsx` aus demselben
+ * Grund nicht importiert. Suche und Anker fallen weg, sie tragen Kennungen.
+ */
+export function gemerktesRoutenMuster(pfad: string): string {
+  if (!gemerkteRouten) return '';
+  return routenMuster(gemerkteRouten, pfad.split(/[?#]/)[0]);
+}
+
 export function rueckmeldungsAdresse({
   version,
   pfad,

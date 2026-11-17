@@ -9,7 +9,8 @@ import { darfImEinsatzSchreiben, darfVerwaltung, isEinsatzGesperrt } from '../ei
 import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
 import {
@@ -564,12 +565,20 @@ function FahrzeugeInhalt() {
 
   // Cross-Modul-Deeplink ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort). Im Tableau gibt
   // es keine Zeile, `scrolleZurZeile` liefe still ins Leere; der Deeplink schaltet deshalb auf die
-  // Liste.
-  useQueryParamSelektion('fahrzeug', efQuery.isSuccess, (fid) => {
-    if (!(efQuery.data ?? []).some((f) => f.id === fid)) return;
-    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
-    setHighlightId(fid);
-  });
+  // Liste. Ein Fahrzeug, das nicht im Einsatz steht, meldet die Hinweisleiste (LLH-1827); geprüft
+  // gegen den frischen Stand, nicht gegen einen alten Cache. Ein entlassenes steht im Block
+  // „Entlassen“ derselben Seite und bekommt keinen Hinweis.
+  const deeplinkHinweis = useQueryParamSelektion(
+    'fahrzeug',
+    deeplinkStand([efQuery], [entlasseneQuery]),
+    (fid) => {
+      if (!(efQuery.data ?? []).some((f) => f.id === fid)) {
+        return (entlasseneQuery.data ?? []).some((f) => f.id === fid) ? undefined : false;
+      }
+      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
+      setHighlightId(fid);
+    },
+  );
   useEffect(() => {
     if (highlightId == null) return;
     scrolleZurZeile(highlightId);
@@ -1289,6 +1298,7 @@ function FahrzeugeInhalt() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
+          <DeeplinkHinweis lage={deeplinkHinweis} sache="Fahrzeug" />
           <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {ansicht === 'tableau' ? (
             <FmsTableau

@@ -110,6 +110,11 @@ const SCHICHTPLAN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
 /// Feldmeldung) die wirksame Grenze.
 const GEOMETRIE_BODY_MAX: usize = 256 * 1024 + 64 * 1024;
 
+/// Absturzbericht des Clients (LLH-1822, `routes::client_fehler`): Routenmuster, Version, Meldung
+/// bis 500 und Stack bis 2000 Zeichen passen auch mit Umlauten und Escapes hinein. Enger als
+/// `JSON_BODY_MAX`, weil jede Sitzung den Bericht je Anfrage schicken kann.
+pub const CLIENT_FEHLER_BODY_MAX: usize = 8 * 1024;
+
 /// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
 pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     // Grenzen der großen Transfers (LFH-938, `src/transfer.rs`): EINE Upload-Grenze für alle
@@ -134,6 +139,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/system/datentraeger",
             get(routes::system::datentraeger),
+        )
+        .route(
+            "/api/client-fehler",
+            post(routes::client_fehler::melde).layer(DefaultBodyLimit::max(CLIENT_FEHLER_BODY_MAX)),
         )
         .route(
             "/api/auth/login",

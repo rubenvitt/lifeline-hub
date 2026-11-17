@@ -1,6 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
@@ -40,6 +40,11 @@ import KraefteOhneBrSidebar, {
 } from './KraefteOhneBrSidebar';
 import BeendenAbschnitt from '../../components/BeendenAbschnitt';
 import EinsatzSeite from '../../components/EinsatzSeite';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+} from '../../components/SeitenZustand';
 import SektionHeader from '../../components/SektionHeader';
 import {
   Kennzahl,
@@ -440,10 +445,15 @@ export default function BrDetailPage() {
     setVerlegenZiel(null);
   }, [brId, statusReset, leereZeilen]);
 
-  // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
-  if (!idGueltig) {
-    return <Navigate to={listenPfad} replace />;
-  }
+  // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diesen Bereitstellungsraum gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zu den Bereitstellungsräumen', pfad: listenPfad }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: flaechenMass.zustandOben }}>
@@ -454,8 +464,15 @@ export default function BrDetailPage() {
   if (einsatzQuery.error || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
+  if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
   if (detailQuery.error || !detailQuery.data) {
-    return <Alert type="error" title="Bereitstellungsraum konnte nicht geladen werden" showIcon />;
+    return (
+      <SeitenFehler
+        text="Bereitstellungsraum konnte nicht geladen werden"
+        ursache={detailQuery.error}
+        onWiederholen={() => void detailQuery.refetch()}
+      />
+    );
   }
 
   const einsatz = einsatzQuery.data;

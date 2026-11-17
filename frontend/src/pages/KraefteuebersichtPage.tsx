@@ -21,6 +21,7 @@ import {
   nachforderungenPfad,
 } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -1148,10 +1149,12 @@ export default function KraefteuebersichtPage() {
         [fahrzeugeQuery, frei.fahrzeuge],
       ] as const
     ).every(([q, f]) => f === false || (f === true && !q.isPending && !q.isFetching));
-  useQueryParamSelektion('einheit', listenFrisch, (eid) => {
+  // Gibt es die Einheit im Einsatz nicht, meldet das die Hinweisleiste (LLH-1827); blendet nur ein
+  // Filter sie aus, bleibt es still bei der Vorgabe.
+  const deeplinkHinweis = useQueryParamSelektion('einheit', listenFrisch, (eid) => {
     const ziel = `eh-${eid}`;
     const sprung = schluesselZumSprung(raster, ziel);
-    if (!sprung) return;
+    if (!sprung) return (einheitenQuery.data ?? []).some((e) => e.id === eid) ? undefined : false;
     setExpandedKeys([...new Set([...offeneSchluessel.map(String), ...sprung])]);
     setSprungZeile(ziel);
   });
@@ -1406,6 +1409,10 @@ export default function KraefteuebersichtPage() {
               if (frei.einheiten === true) void einheitenQuery.refetch();
             }}
           />
+        </div>
+
+        <div className="kraefte-no-print">
+          <DeeplinkHinweis lage={deeplinkHinweis} sache="Einheit" />
         </div>
 
         {/* ── Werkzeugzeile, außerhalb des Primitivs ── Die Auswahlzeile sagt immer, wie viel

@@ -13,7 +13,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsModal } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
 import { MenueAusloeser } from '../components/MenueAusloeser';
-import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
+import { SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { SprungKnopf } from '../components/Sprung';
 import StatusTag from '../components/StatusTag';
@@ -413,9 +413,9 @@ export default function AusgabeAnsicht() {
         ) : verpflegungQuery.isPending ? (
           <Spin />
         ) : (
-          <SeitenLeer
+          <SeitenNichtGefunden
             titel="Dieses Zeitfenster gibt es nicht (mehr)"
-            aktion={{ label: 'Zur Verpflegung', pfad: verpflegungPfad }}
+            rueckweg={{ label: 'Zur Verpflegung', pfad: verpflegungPfad }}
           />
         )}
       </EinsatzSeite>

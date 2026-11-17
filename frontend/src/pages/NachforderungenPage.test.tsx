@@ -1438,7 +1438,7 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     );
   });
 
-  it('?nachforderung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt', async () => {
+  it('?nachforderung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt, der Hinweis steht', async () => {
     listeNachforderungen.mockResolvedValue([nf(), sandsaecke()]);
     materialServer(() => []);
     renderPage(nachforderungenPfad(1, { nachforderung: 99 }));
@@ -1448,6 +1448,8 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     );
     expect(spalte('abgelehnt')!.querySelector('[aria-expanded="false"]')).not.toBeNull();
     expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+    // Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827).
+    expect(screen.getByText('Nachforderung #99 gibt es nicht (mehr)')).toBeInTheDocument();
   });
 
   it('?nachforderung= beim Kaltstart: antwortet die Liste vor dem Einsatz, rollt die Karte trotzdem sofort ins Bild', async () => {

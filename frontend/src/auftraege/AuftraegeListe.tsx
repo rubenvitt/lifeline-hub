@@ -47,7 +47,8 @@ import Bereichskopf from '../kommunikation/Bereichskopf';
 import { Segmentleiste, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import ListeDetail, { type ListeDetailGruppen } from '../components/ListeDetail';
-import { SeitenLeer } from '../components/SeitenZustand';
+import { SeitenLeer, istNichtGefunden } from '../components/SeitenZustand';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { SERVER_SUCHE_ENTPRELLUNG_MS } from '../components/Datensicht';
 import ZumKopfKnopf from '../components/ZumKopfKnopf';
 import {
@@ -170,13 +171,15 @@ export default function AuftraegeListe({
    * zurückgesetzt, damit das Ziel sichtbar ist. Liegt er nicht in den offenen, holt das Board ihn
    * einzeln (D4) und zeigt ihn über der abgeschlossenen Liste, bis er in einer geladenen Seite
    * auftaucht. Jeder Deeplink zählt für sich, auch ein zweiter auf denselben Auftrag (`nr`).
+   * Antwortet der Einzelabruf mit 404, gibt es den Auftrag nicht (mehr): dann steht über der Liste
+   * der Hinweis (`DeeplinkHinweis`, LLH-1827), und nichts ist gewählt; eine Wahl schließt ihn.
    */
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [sprung, setSprung] = useState<{ id: number; nr: number } | null>(null);
   const [verlinkteId, setVerlinkteId] = useState<number | null>(null);
   // Zählt jeden Deeplink, unabhängig vom Sprung: eine Wahl von Hand räumt den Sprung, nicht die Zahl.
   const [deeplinkNr, setDeeplinkNr] = useState(0);
-  useQueryParamSelektion('auftrag', offeneQuery.isSuccess, (aid) => {
+  const deeplinkHinweis = useQueryParamSelektion('auftrag', offeneQuery.isSuccess, (aid) => {
     setRichtungFilter(undefined);
     setEmpfFilter(undefined);
     setSuchEingabe('');
@@ -193,10 +196,15 @@ export default function AuftraegeListe({
     }
     setVerlinkteId(aid);
   });
-  const select = useCallback((id: number | null) => {
-    setGewaehlt(id);
-    setSprung(null);
-  }, []);
+  const { melde: meldeUnbekannt, schliesse: schliesseHinweis } = deeplinkHinweis;
+  const select = useCallback(
+    (id: number | null) => {
+      setGewaehlt(id);
+      setSprung(null);
+      schliesseHinweis();
+    },
+    [schliesseHinweis],
+  );
   // Ein Wechsel der Ansicht löst die Wahl (Spec `liste-detail`, „Gewähltes Objekt entfällt“).
   const changeAnsicht = (neu: 'offen' | 'abgeschlossen') => {
     setAnsicht(neu);
@@ -211,6 +219,14 @@ export default function AuftraegeListe({
     verlinkteId != null && verlinkteQuery.data?.id === verlinkteId
       ? verlinkteQuery.data
       : undefined;
+  const verlinkterFehlt = verlinkteQuery.isError && istNichtGefunden(verlinkteQuery.error);
+  useEffect(() => {
+    if (verlinkteId == null || !verlinkterFehlt) return;
+    meldeUnbekannt(verlinkteId);
+    setVerlinkteId(null);
+    setGewaehlt((g) => (g === verlinkteId ? null : g));
+    setSprung((s) => (s?.id === verlinkteId ? null : s));
+  }, [verlinkteId, verlinkterFehlt, meldeUnbekannt]);
   // Die Ansicht folgt dem verlinkten Auftrag einmal je Deeplink, nicht jedem späteren Abgleich.
   const [angewandtNr, setAngewandtNr] = useState(0);
   useEffect(() => {
@@ -615,6 +631,7 @@ export default function AuftraegeListe({
         />
       </div>
 
+      <DeeplinkHinweis lage={deeplinkHinweis} sache="Auftrag" />
       {!imOffenen && kopfVerlassen(abgeschlosseneQuery.data) && (
         <ZumKopfKnopf
           schluessel={abgeschlossenSchluessel}
@@ -631,6 +648,8 @@ export default function AuftraegeListe({
         resolve={resolve}
         gruppen={imOffenen ? offeneGruppen : verlinktGruppen}
         fenster={!imOffenen}
+        // Zeigt der Deeplink ins Leere, ist nichts gewählt (Spec `liste-detail`).
+        vorauswahl={deeplinkHinweis.unbekannt == null}
         ladend={listenQuery.isPending}
         fehler={
           listenQuery.isError
