@@ -765,6 +765,33 @@ describe('MeldungFormular als Dialog (LLH-1921)', () => {
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
   });
 
+  // Die Rasterstufen richten sich nach dem Fenster, nicht nach dem 520-px-Dialog (Review
+  // LLH-1921): im Dialog stehen Absender, Empfängerfunktion und Empfänger untereinander.
+  it('setzt Absender, Empfängerfunktion und Empfänger im Dialog einspaltig', () => {
+    render(
+      <AntApp>
+        <MeldungFormular
+          senden={false}
+          onAnlegen={anlegenMock()}
+          artVorgabe="lagemeldung"
+          serie={false}
+          funktionsVorschlaege={TEST_VORSCHLAEGE}
+          dialog={{ offen: true, titel: 'Lagemeldung erfassen', onAbbrechen: () => {} }}
+        />
+      </AntApp>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Lagemeldung erfassen' });
+    for (const name of ['Absender', 'Empfängerfunktion', 'Empfänger / Adressat']) {
+      // Die Spalte der Formularzeile, nicht die innere von `Form.Item`.
+      const spalte = within(dialog)
+        .getByLabelText(name)
+        .closest('.ant-form-item')
+        ?.closest('.ant-col');
+      expect(spalte, name).toHaveClass('ant-col-24');
+      expect(spalte?.className, name).not.toMatch(/ant-col-(sm|lg)-/);
+    }
+  });
+
   it('leert die Eingabe über das Schließkreuz', async () => {
     render(<DialogHarness onAnlegen={anlegenMock()} />);
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Verworfen');

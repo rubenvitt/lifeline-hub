@@ -65,8 +65,10 @@ sobald etwas drinsteht – eingeklappt bleibt nichts verborgen (Vorbild
 kann keine Ablehnung auslösen, der Server begrenzt sie nicht (`src/routes/einsatz_uhs.rs`, nur
 `trimme`). Der Bereitstellungsraum bleibt bei drei sichtbaren Feldern.
 
-Verworfen: alle vier sichtbar (Budget gerissen, der Standort trägt schon eine Karte) und Notiz
-weglassen (Wissen beim Anlegen ginge verloren).
+Verworfen: alle vier sichtbar (der Standort trägt schon eine Karte, die Notiz ist anders als die
+Empfängerfunktion der Lagemeldung, D4, für niemanden wirksam) und Notiz weglassen (Wissen beim
+Anlegen ginge verloren). Der Dialog bleibt bei Liste und Switcher eingehängt; „Weitere Angaben“
+klappt beim Schließen zu.
 
 ### D3 UHS-Liste springt in die neue UHS
 
@@ -82,6 +84,18 @@ eine Quelle. `LagemeldungenPage` behält `formOffen` (Kopf-Knopf, Leerzustand, `
 der Vorschlags-Abfragen), rendert statt des Paneels den Dialog „Lagemeldung erfassen“; der
 Kopf-Knopf heißt immer „Lagemeldung erfassen“ und wechselt nicht mehr zu „Formular schließen“.
 `onFertig` schließt wie bisher.
+
+**Nach dem Review (17.11.2026, mit dem Menschen abgestimmt):** Im Dialog stehen Absender,
+Empfängerfunktion und Empfänger untereinander; die Rasterstufen von antd richten sich nach dem
+Fenster, ab `lg` stünden im 520-px-Dialog drei Spalten zu je ~150 px. Mit Funktionskatalog zeigt der
+Dialog vier Felder (Wortlaut, Absender, Empfängerfunktion, Empfänger). Das ist eine begründete
+Ausnahme vom Budget ~3: die Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt, und bleibt
+sichtbar; dieselben vier Felder stehen im Paneel der Meldungen (LFH-974), und Material-, Personal-
+und Fahrzeugdialog zeigen ebenfalls vier. Verworfen: Dialog breiter (dreispaltig wie im Paneel)
+und Empfänger unter „Weitere Angaben“ (verbirgt, wer benachrichtigt wird). Ein Klick auf die Maske
+verwirft die Eingabe wie in jedem Erfassungsdialog (Erfassungs-Norm); eine Rückfrage nur hier wäre
+ein Sonderweg. Das Formular bleibt bei geschlossenem Dialog eingehängt: „Weitere Angaben“ klappt
+beim Schließen zu, und der Dialog gilt nur für den Einsatz, in dem er geöffnet wurde.
 
 Verworfen: ein antd-`Modal` um `MeldungFormular card={false}` (handgebaute Hülle; Kreuz, Maske und
 Escape liefen am Zurücksetzen vorbei, `components/Erfassung.tsx`, Kommentar zu `ErfassungsModal`)

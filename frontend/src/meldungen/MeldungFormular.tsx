@@ -136,6 +136,12 @@ export function vonZuBezug(
   return m[1] === 'einheit' ? { einheit_id: id } : { abschnitt_id: id };
 }
 
+/**
+ * Im Dialog untereinander (Review LLH-1921): die Rasterstufen von antd richten sich nach dem
+ * Fenster, nicht nach dem 520-px-Dialog; ab `lg` stünden sonst drei Spalten zu je ~150 px.
+ */
+const EINSPALTIG = { span: 24 } as const;
+
 export default function MeldungFormular({
   senden,
   onAnlegen,
@@ -380,7 +386,9 @@ export default function MeldungFormular({
         />
       </Form.Item>
       <Row gutter={16}>
-        <Col xs={24} sm={12} lg={funktionsOptionen.length > 0 ? 8 : 12}>
+        <Col
+          {...(dialog ? EINSPALTIG : { xs: 24, sm: 12, lg: funktionsOptionen.length > 0 ? 8 : 12 })}
+        >
           <Form.Item
             name="absender"
             label="Absender (Funkrufname/Stelle)"
@@ -395,7 +403,7 @@ export default function MeldungFormular({
           </Form.Item>
         </Col>
         {funktionsOptionen.length > 0 && (
-          <Col xs={24} sm={12} lg={8}>
+          <Col {...(dialog ? EINSPALTIG : { xs: 24, sm: 12, lg: 8 })}>
             <Form.Item name="empfaenger_funktion" label="Empfängerfunktion">
               <Select<Fuehrungsfunktion>
                 aria-label="Empfängerfunktion"
@@ -407,7 +415,9 @@ export default function MeldungFormular({
             </Form.Item>
           </Col>
         )}
-        <Col xs={24} sm={12} lg={funktionsOptionen.length > 0 ? 8 : 12}>
+        <Col
+          {...(dialog ? EINSPALTIG : { xs: 24, sm: 12, lg: funktionsOptionen.length > 0 ? 8 : 12 })}
+        >
           <Form.Item name="empfaenger" label="Empfänger / Adressat">
             <StammdatenFeld
               nurText
