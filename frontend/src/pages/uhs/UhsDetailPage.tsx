@@ -44,7 +44,12 @@ import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { MenueAusloeser } from '../../components/MenueAusloeser';
-import UhsBearbeitenModal from './UhsBearbeitenModal';
+import UhsAngaben from './UhsAngaben';
+import { handleLinkKlick } from '../../routing/linkModifier';
+import {
+  OffeneBearbeitungProvider,
+  useWechselNachRueckfrage,
+} from '../../components/offeneBearbeitung';
 import { flaeche } from '../../theme/tokens';
 
 /**
@@ -58,6 +63,7 @@ const BEREICH_NAME: Record<UhsBereich, string> = {
   kraefte: 'Kräfte',
   bewegungen: 'Bewegungen',
   dateien: 'Dateien',
+  angaben: 'Angaben',
 };
 
 /** „Belegung, Material und Bewegungen“: der Name der Bereichsleiste nennt, was sie führt. */
@@ -67,7 +73,21 @@ function aufzaehlung(namen: string[]): string {
     : `${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]}`;
 }
 
+/**
+ * Merker der Seite (LLH-1920, `components/offeneBearbeitung.tsx`): er umfasst die Bereichsleiste,
+ * damit ein Bereichswechsel eine geänderte Bearbeitung der „Angaben“ erst nach Rückfrage aushängt.
+ * Ein Wechsel der Stelle ändert den Pfad und fragt über den Router.
+ */
 export default function UhsDetailPage() {
+  const { uhsId } = useParams();
+  return (
+    <OffeneBearbeitungProvider schluessel={uhsId}>
+      <UhsDetailInhalt />
+    </OffeneBearbeitungProvider>
+  );
+}
+
+function UhsDetailInhalt() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   // Aufnahme führt ins Modul Personen (LFH-888, design.md D4): gesperrt mit Grund statt ins 403.
@@ -93,6 +113,8 @@ export default function UhsDetailPage() {
         'bewegungen',
         // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
         ...(darf('uhs-anhaenge') ? (['dateien'] as const) : []),
+        // LLH-1920: Stammdaten, in der Ansicht bearbeitet (nicht am Gerät: es verwaltet nicht).
+        'angaben',
       ];
   // Der Bereich steht in der Adresse (`?bereich=`); einer, den diese Sicht nicht führt (Gerät),
   // fällt wie ein unbekannter auf die Belegung zurück. Nur der gewählte Bereich ist gebaut.
@@ -101,15 +123,19 @@ export default function UhsDetailPage() {
   const bereich: UhsBereich = bereichListe.includes(gewuenscht) ? gewuenscht : 'belegung';
   // Ersetzen statt Anhängen: das Zurück des Browsers verlässt die Seite, statt durch die Bereiche
   // zu blättern. Andere Parameter bleiben stehen.
+  // Ein Wechsel hängt den Bereich samt offener Bearbeitung aus: mit Änderung erst die Rückfrage.
+  const nachRueckfrage = useWechselNachRueckfrage();
   const waehleBereich = (neu: UhsBereich) =>
-    setSearchParams(
-      (alt) => {
-        const naechste = new URLSearchParams(alt);
-        naechste.delete('bereich');
-        for (const [k, v] of new URLSearchParams(uhsBereichSuche(neu))) naechste.set(k, v);
-        return naechste;
-      },
-      { replace: true },
+    nachRueckfrage(() =>
+      setSearchParams(
+        (alt) => {
+          const naechste = new URLSearchParams(alt);
+          naechste.delete('bereich');
+          for (const [k, v] of new URLSearchParams(uhsBereichSuche(neu))) naechste.set(k, v);
+          return naechste;
+        },
+        { replace: true },
+      ),
     );
   const bereichFeld = useId();
   // Die Materialzahl im Kopf nur mit Freigabe Material (LLH-1133 D2). Anders als bei einem Sprung
@@ -186,7 +212,6 @@ export default function UhsDetailPage() {
     raeume(statusMut);
     stornoMut.mutate();
   };
-  const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
   // Die Rückfrage vor dem Auflösen oder Stornieren: aus dem Menü heraus ein `<Modal>`, keine
   // `Popconfirm` (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“).
   const [frage, setFrage] = useState<'aufloesen' | 'stornieren' | null>(null);
@@ -198,7 +223,6 @@ export default function UhsDetailPage() {
   useEffect(() => {
     statusReset();
     stornoReset();
-    setBearbeitenOffen(false);
     setFrage(null);
   }, [uhsId, statusReset, stornoReset]);
 
@@ -225,11 +249,8 @@ export default function UhsDetailPage() {
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz);
   const verwalten = !schreibgeschuetzt && darf('uhs-verwalten');
   // Stammdaten ändern (LLH-1407): geplant und aktiv, nicht mehr nach dem Auflösen (Muster BR). Der
-  // Server lehnt nur eine stornierte UHS ab (409).
+  // Server lehnt nur eine stornierte UHS ab (409). Bearbeitet wird im Bereich „Angaben“ (LLH-1920).
   const bearbeitbar = verwalten && uhs.status !== 'aufgeloest' && !uhs.storniert_at;
-  const bearbeitenKnopf = bearbeitbar && (
-    <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>
-  );
 
   // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
   // nur seine Beschriftung aus `uhsTyp`. Die Notiz ist Freitext und bleibt Beschreibungszeile.
@@ -252,7 +273,13 @@ export default function UhsDetailPage() {
       <span style={{ whiteSpace: 'nowrap' }}>{metaText} ·</span>{' '}
       {/* Ersetzen wie die Bereichsleiste: „Zurück“ verlässt die Seite, statt den Bereich
           zurückzunehmen. */}
-      <KennungsLink to={{ search: uhsBereichSuche('material') }} replace>
+      <KennungsLink
+        to={{ search: uhsBereichSuche('material') }}
+        replace
+        // Wie die Bereichsleiste über den Merker: ein Wechsel nur des Suchteils fragt der Router
+        // nicht nach. Die Adresse bleibt für „In neuem Tab öffnen“.
+        onClick={(e) => handleLinkKlick(e, () => waehleBereich('material'))}
+      >
         {materialKopfzahl(uhs.material)}
       </KennungsLink>
     </span>
@@ -334,19 +361,14 @@ export default function UhsDetailPage() {
             </Button>
           )}
           {verwalten && uhs.status === 'geplant' && (
-            <>
-              <Button
-                type="primary"
-                onClick={() => setzeStatus('aktiv')}
-                loading={statusMut.isPending}
-              >
-                In Betrieb nehmen
-              </Button>
-              {bearbeitenKnopf}
-            </>
+            <Button
+              type="primary"
+              onClick={() => setzeStatus('aktiv')}
+              loading={statusMut.isPending}
+            >
+              In Betrieb nehmen
+            </Button>
           )}
-          {/* Aktiv zählt „Patient aufnehmen“ als Sprung nicht mit (LFH-616): zwei Handlungen. */}
-          {uhs.status === 'aktiv' && bearbeitenKnopf}
           {/* Endgültiges steht gebündelt rot im ⋮ des Kopfs (LLH-1722, `frontend/AGENTS.md`, „Beenden:
               Verb, Ort und Sicherung je Art“): die UHS ist eine Fensterseite, unter der Arbeitsfläche
               hängt kein letzter Abschnitt. Aktiv „Auflösen“, gesperrt mit dem Grund im Eintrag,
@@ -449,6 +471,14 @@ export default function UhsDetailPage() {
               />
             ) : bereich === 'bewegungen' ? (
               <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />
+            ) : bereich === 'angaben' ? (
+              <UhsAngaben
+                key={uhs.id}
+                einsatzId={einsatzId}
+                uhs={uhs}
+                bearbeitbar={bearbeitbar}
+                onNeuLaden={() => void detailQuery.refetch()}
+              />
             ) : (
               <UhsAnhaenge
                 einsatzId={einsatzId}
@@ -487,14 +517,6 @@ export default function UhsDetailPage() {
             >
               Die Stelle nimmt niemanden mehr auf und bleibt im Nachweis.
             </Modal>
-            {verwalten && (
-              <UhsBearbeitenModal
-                einsatzId={einsatzId}
-                uhs={uhs}
-                offen={bearbeitenOffen}
-                onClose={() => setBearbeitenOffen(false)}
-              />
-            )}
           </div>
         ),
       }}
