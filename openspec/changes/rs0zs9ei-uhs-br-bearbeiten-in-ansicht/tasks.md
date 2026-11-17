@@ -10,7 +10,7 @@
 
 - [x] 2.1 Test in `components/instrument/BearbeitbaresPaneel.test.tsx` rot: `zusatz` steht im Lesezustand vor „Bearbeiten“, fehlt im Bearbeiten-Zustand und erscheint nach „Abbrechen“ wieder; ohne `zusatz` unverändert
 - [x] 2.2 `zusatz?: ReactNode` in `BearbeitbaresPaneel` umsetzen, Dateikopf ergänzen; Test 2.1 grün
-- [ ] 2.3 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), Erzeugtes mitcommitten; `designSystem.guard.test.ts` grün
+- [x] 2.3 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), Erzeugtes mitcommitten; `designSystem.guard.test.ts` grün
 
 ## 3. Client-API: Basisstand senden (D4)
 

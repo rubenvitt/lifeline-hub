@@ -26,6 +26,9 @@ für paneel- und ansichtsweises Speichern; Fach-Seiten bauen keinen eigenen.
   Öffnen ins erste Feld, beim Schließen zurück auf „Bearbeiten“ bzw. `ausloeserRef`.
 - **Fehler am Ort**: Prüffehler unter der Zelle, eine Ablehnung als `SpeicherFehler`
   am Paneel, der 409 als Rückfrage „Zwischenzeitlich geändert“. Kein Toast.
+- **Zusatzhandlungen** (`zusatz`): weitere Handlungen am Datensatz im Paneelkopf vor
+  „Bearbeiten“, etwa „Auf Karte verorten“ an den Raumdaten. Nur im Lesezustand: neben einer
+  offenen Bearbeitung steht keine zweite Handlung.
 
 Quelle: `frontend/src/components/instrument/BearbeitbaresPaneel.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
