@@ -153,6 +153,9 @@ export default function LagemeldungenPage() {
   // Wechsel des Einsatzes rendert sonst einmal mit offenem Dialog, bevor ein Effekt ihn schließt.
   const [formOffenFuer, setFormOffenFuer] = useState<number | null>(null);
   const formOffen = formOffenFuer === einsatzId;
+  // Schließt nur den Dialog dieses Einsatzes: eine spät ankommende Antwort aus dem vorigen
+  // Einsatz (ausgehängtes Formular) schließt den Dialog des neuen nicht am Abbruch vorbei.
+  const schliesseDialog = () => setFormOffenFuer((f) => (f === einsatzId ? null : f));
   // Die Zeile, deren Lage-Angaben gerade bearbeitet werden (Kennung der Meldung).
   const [bearbeitetId, setBearbeitetId] = useState<number | null>(null);
   const { benutzer } = useAuth();
@@ -263,8 +266,9 @@ export default function LagemeldungenPage() {
   useEffect(() => {
     leere();
     alleGesehenReset();
-    // Zurück im vorigen Einsatz steht der Dialog nicht wieder offen.
-    setFormOffenFuer(null);
+    // Zurück im vorigen Einsatz steht der Dialog nicht wieder offen. Einen eben über `?neu=1`
+    // geöffneten Dialog DIESES Einsatzes lässt der Reset beim Einhängen stehen.
+    setFormOffenFuer((f) => (f === einsatzId ? f : null));
     setBearbeitetId(null);
   }, [einsatzId, leere, alleGesehenReset]);
 
@@ -521,11 +525,11 @@ export default function LagemeldungenPage() {
           dialog={{
             offen: formOffen,
             titel: 'Lagemeldung erfassen',
-            onAbbrechen: () => setFormOffenFuer(null),
+            onAbbrechen: schliesseDialog,
           }}
           artVorgabe="lagemeldung"
           serie={false}
-          onFertig={() => setFormOffenFuer(null)}
+          onFertig={schliesseDialog}
           einsatzId={einsatzId}
           senden={erfassenSpeicherung.isPending}
           // mutateAsync: die Erfassungshülle leert nur, wenn die Meldung angekommen ist.
