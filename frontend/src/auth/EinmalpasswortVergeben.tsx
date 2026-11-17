@@ -4,7 +4,7 @@ import { useId } from 'react';
 import type { BenutzerAnzeige, Einmalpasswort } from '../api/types';
 import KopierbarerText from '../components/KopierbarerText';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { useRollen, zahlStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import { EIGENES_PASSWORT, SSO_KONTO } from '../stammdaten/rechteText';
 
 /**
@@ -49,7 +49,7 @@ export default function EinmalpasswortVergeben({
         description={
           <Flex vertical gap={token.marginXXS}>
             <KopierbarerText text={vergeben.data.einmalpasswort} bezeichnung="Einmalpasswort">
-              <span style={zahlStil('titel', 500)}>{vergeben.data.einmalpasswort}</span>
+              <span style={monoStil(token.fontSizeLG, 500)}>{vergeben.data.einmalpasswort}</span>
             </KopierbarerText>
             <span>Wird nur jetzt angezeigt.</span>
           </Flex>

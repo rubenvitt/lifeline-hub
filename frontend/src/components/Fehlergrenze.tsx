@@ -12,7 +12,7 @@ import {
 } from '../routing/deeplinks';
 import { flaeche } from '../theme/tokens';
 import Paneel from './instrument/Paneel';
-import { schriftGroesse, schriftStil, useRollen } from './instrument/rollenwerte';
+import { schriftStil, useRollen } from './instrument/rollenwerte';
 
 /**
  * Fehlergrenze je Rahmen (LLH-1822, Change `a12ms7g9-seitenzustaende`, D1/D2; Spec
@@ -84,7 +84,7 @@ function FehlerPaneel({ satz, ausweg }: { satz: string; ausweg: ReactNode }) {
         <p
           style={{
             margin: 0,
-            fontSize: schriftGroesse('text'),
+            fontSize: 14,
             lineHeight: 1.5,
             color: rollen.text2,
           }}

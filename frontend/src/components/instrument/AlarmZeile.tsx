@@ -1,9 +1,9 @@
 import { Popover } from 'antd';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
-import { fernsicht, schrift } from '../../theme/tokens';
+import { schrift } from '../../theme/tokens';
 import type { AlarmEintrag, WasBrennt } from '../../lage/wasBrennt';
-import { schriftGroesse, useRollen } from './rollenwerte';
+import { useRollen } from './rollenwerte';
 import { statusFlaeche } from './statusFlaeche';
 
 /**
@@ -22,14 +22,8 @@ import { statusFlaeche } from './statusFlaeche';
  * - **`gross`** für den Lagemonitor: 28 px, ohne Bedienung und ohne Links.
  */
 
-/**
- * Schriftgröße der Zeile: Stufe `titel`, also mindestens 16 px (Spec) und mit der Dichte wachsend
- * (LLH-1774); am Monitor die Fernsicht-Skala, 28 px.
- */
-export const ALARMZEILE_SCHRIFT = {
-  normal: schriftGroesse('titel'),
-  gross: `${fernsicht.text}px`,
-} as const;
+/** Schriftgröße der Zeile: mindestens 16 px (Spec), am Monitor die Großbild-Stufe 28 px. */
+export const ALARMZEILE_SCHRIFT = { normal: 16, gross: 28 } as const;
 /**
  * Höhe eines Eintrags: am Monitor fest, sonst die Steuerhöhe der Dichtestufe (30 / 48 / 72 px,
  * Spec `einsatztauglichkeit-layout`, „Trefffläche folgt der Dichtestufe“), nie unter 28 px. Die

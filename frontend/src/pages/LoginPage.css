@@ -66,7 +66,7 @@
 .login-marke__name {
   margin: 0;
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-titel);
+  font-size: 16px;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--lfh-text);
@@ -125,7 +125,7 @@
   text-indent: 0.5em;
   font-family: var(--lfh-schrift-zahl);
   font-variant-numeric: tabular-nums;
-  font-size: var(--lfh-groesse-titel);
+  font-size: 20px;
 }
 
 /* Eingangsanimation für die Formularzeilen — ENTSTAFFELT (LFH-345 · C10, Befund M18).

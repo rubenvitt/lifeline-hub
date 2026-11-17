@@ -882,7 +882,8 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
         for (const { name, fokus } of zuordnungTargetsGesperrt(page, namen, rolle).ziele) {
           ziele.push({ name, fokus });
         }
-        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 20);
+        // Material: „Ausgeben“ und ⋮ statt „Lösen“ (LLH-1924), daher 21.
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 21);
         for (const { name, fokus } of ziele) {
           await expect(fokus, name).toHaveCount(1);
           await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);

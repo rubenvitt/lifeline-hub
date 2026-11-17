@@ -7,8 +7,8 @@ import {
   Paneel,
   SegmentFeld,
   StatusChip,
+  monoStil,
   useRollen,
-  zahlStil,
 } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -377,7 +377,7 @@ export default function FuehrungPaneel({
         />
       </Datenfeld>
       <Datenfeld label="Epoche">
-        <span style={zahlStil('text')}>{fuehrung.epoche}</span>
+        <span style={monoStil(13)}>{fuehrung.epoche}</span>
       </Datenfeld>
       <Datenfeld label="Zuletzt">{FUEHRUNG_ART_TEXT[fuehrung.art]}</Datenfeld>
       <Datenfeld label="Bruchstelle">{fuehrung.bruch_at ? zeit(fuehrung.bruch_at) : '—'}</Datenfeld>
@@ -630,8 +630,7 @@ export default function FuehrungPaneel({
             <ListenEintragMeta
               title={
                 <span>
-                  <span style={zahlStil('klein')}>{v.epoche_zaehler}</span>{' '}
-                  {FUEHRUNG_ART_TEXT[v.art]}
+                  <span style={monoStil(12)}>{v.epoche_zaehler}</span> {FUEHRUNG_ART_TEXT[v.art]}
                   {' · '}
                   {v.von_name ? `${v.von_name} → ${v.nach_name}` : v.nach_name}
                 </span>
@@ -696,7 +695,7 @@ export default function FuehrungPaneel({
                   autoComplete="off"
                   maxLength={19}
                   placeholder="ABCD-EFGH-JKMN-PQRS"
-                  style={zahlStil('text')}
+                  style={monoStil(14)}
                 />
               </Form.Item>
             )}
@@ -747,7 +746,7 @@ export default function FuehrungPaneel({
           <div data-lfh="fuehrung-code-anzeige">
             <p>Nur jetzt sichtbar. Per Funk oder Telefon durchgeben:</p>
             <KopierbarerText text={neuerCode.code} bezeichnung="Code">
-              <span style={zahlStil('titel', 500)}>{neuerCode.code}</span>
+              <span style={monoStil(20, 500)}>{neuerCode.code}</span>
             </KopierbarerText>
           </div>
         )}

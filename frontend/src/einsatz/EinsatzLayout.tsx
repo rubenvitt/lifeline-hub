@@ -20,7 +20,7 @@ import {
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
-import { StatusChip, UebungsBand, UebungsMarke, schriftGroesse } from '../components/instrument';
+import { StatusChip, UebungsBand, UebungsMarke } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
 import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
@@ -210,7 +210,7 @@ const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
 
 const EINSATZNUMMER_STIL = {
   fontFamily: schrift.zahl,
-  fontSize: schriftGroesse('klein'),
+  fontSize: 12,
   color: rahmenFarben.text,
   whiteSpace: 'nowrap',
   flexShrink: 0,

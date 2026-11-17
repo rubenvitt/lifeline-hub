@@ -111,23 +111,19 @@ describe('Kopfleiste · Stile', () => {
     expect(kopfZelleStil({ padding: 11 }, 'keiner').borderInlineEnd).toBeUndefined();
   });
 
-  it('die Rail-Spalte wächst mit der Schrift der Stufe (LLH-1773/LLH-1774)', () => {
-    // Literale, nicht aus `dichten` zurückgelesen: 64 × Schriftfaktor 1 / 1,15 / 1,25, damit das
-    // Rail-Etikett in 11 px Versalien („FÜHRUNG“ misst 58,5 px in `kompakt`) in die Spalte passt.
-    const t = (s: keyof typeof dichten) => ({
-      controlHeight: dichten[s].zeilenhoehe,
-      fontSize: dichten[s].schriftgroesse,
-    });
-    expect(railBreite(t('kompakt'))).toBe(64);
-    expect(railBreite(t('komfortabel'))).toBe(74);
-    expect(railBreite(t('handschuh'))).toBe(80);
+  it('die Rail-Spalte wächst in `handschuh` mit, sonst hält sie die Entwurfsbreite (LFH-384)', () => {
+    // Literale, nicht aus `dichten` zurückgelesen. 73 = 72 px Ziel plus die 1-px-Haarlinie,
+    // die in der `border-box`-Spalte von der Zielbreite abgeht.
+    const t = (s: keyof typeof dichten) => ({ controlHeight: dichten[s].zeilenhoehe });
+    expect(railBreite(t('kompakt'))).toBe(60);
+    expect(railBreite(t('komfortabel'))).toBe(60);
+    expect(railBreite(t('handschuh'))).toBe(73);
   });
 
   it('das Ziel in der Rail-Spalte hält auf jeder Stufe die Steuerhöhe in der Breite', () => {
     for (const s of Object.keys(dichten) as (keyof typeof dichten)[]) {
       const controlHeight = dichten[s].zeilenhoehe;
-      const fontSize = dichten[s].schriftgroesse;
-      expect(railBreite({ controlHeight, fontSize }) - 1).toBeGreaterThanOrEqual(controlHeight);
+      expect(railBreite({ controlHeight }) - 1).toBeGreaterThanOrEqual(controlHeight);
     }
   });
 

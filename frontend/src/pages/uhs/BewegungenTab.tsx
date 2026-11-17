@@ -7,10 +7,10 @@ import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import type { Person, UhsBelegung, UhsDetail, BelegungsArt } from '../../api/types';
 import Datensicht, { spaltenFuer } from '../../components/Datensicht';
 import StatusTag from '../../components/StatusTag';
+import { monoStil } from '../../components/instrument';
 import { belegungsArt, belegungsDarstellung } from '../../theme/statusFarben';
 import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
 import { KennungsLink } from '../../components/kennungsLink';
-import { zahlStil } from '../../components/instrument/rollenwerte';
 
 interface Props {
   uhs: UhsDetail;
@@ -72,7 +72,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           sortWert: (b) => b.zeitpunkt_at,
           // Mono an der Aufrufstelle: `ZeitAnzeige` rendert ein Fragment.
           render: (v: string) => (
-            <span style={zahlStil('klein')}>
+            <span style={monoStil(12)}>
               <ZeitAnzeige wert={v} rolle="zeitpunkt" />
             </span>
           ),

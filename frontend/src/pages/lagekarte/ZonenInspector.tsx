@@ -17,7 +17,7 @@ import { gefahrengebietName } from '../../api/gefahren';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import StatusTag from '../../components/StatusTag';
 import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
-import { Augenbraue, Datenfeld, Datenraster, zahlStil } from '../../components/instrument';
+import { Augenbraue, Datenfeld, Datenraster, monoStil } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
 import { formatRadius, kreisAusZone, parseGeometry, geoKennzahlen, radiusGueltig } from './geo';
 import { KREIS_RADIUS_M_MAX, ZONE_LABEL_MAX, ZONE_NOTIZ_MAX } from '../../api/eingabegrenzen';
@@ -385,7 +385,7 @@ export default function ZonenInspector({
             suffix="m"
             inputMode="numeric"
             disabled={gesperrt}
-            style={{ width: '100%', ...zahlStil('text') }}
+            style={{ width: '100%', ...monoStil(token.fontSize) }}
             onChange={(v) => setRadiusEntwurf(typeof v === 'number' ? v : null)}
             onBlur={radiusSpeichern}
             onPressEnter={radiusSpeichern}

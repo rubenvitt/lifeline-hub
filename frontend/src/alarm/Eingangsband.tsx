@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import { useBandAbstand } from '../components/untereLeiste';
 import { useViewport } from '../components/useViewport';
 import { IconKreuz } from '../icons';
-import { schriftGroesse, schriftStil } from '../components/instrument/rollenwerte';
 
 /**
  * Eingangsband (LLH-1143, design.md D7): der eine Platz für Eingänge, **unten** — mittig über die
@@ -64,15 +63,12 @@ export default function Eingangsband({
         borderRadius: token.borderRadiusLG,
         boxShadow: token.boxShadowSecondary,
         padding: `${token.paddingSM}px ${token.padding}px`,
-        // Ein Portal an `document.body`: die Lauftextgröße der Stufe selbst setzen (LLH-1774).
-        fontSize: schriftGroesse('text'),
         lineHeight: token.lineHeight,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: token.paddingXS }}>
         {/* Nur der Titel wird angesagt, nicht die Bedienelemente des Bands. */}
-        {/* Der Titel ist der Alarmhinweis: Rolle `warnung` (14/600, Spec `schriftskala`). */}
-        <div role="status" style={{ flex: 1, minWidth: 0, ...schriftStil('warnung') }}>
+        <div role="status" style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>
           {titel}
         </div>
         <Button

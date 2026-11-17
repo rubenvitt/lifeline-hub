@@ -1,6 +1,7 @@
 import { Form, Input, InputNumber, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import { useQuery } from '@tanstack/react-query';
+import { monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import {
   aktualisiereQualifikation,
@@ -12,7 +13,6 @@ import type { Qualifikation } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { einschlussKandidaten, einschluesseAus } from '../kraefte/qualiDeckung';
-import { zahlStil } from '../components/instrument/rollenwerte';
 
 interface FormWerte {
   label: string;
@@ -38,7 +38,7 @@ const spaltenMit = (katalog: readonly Qualifikation[]): TableColumnsType<Qualifi
     dataIndex: 'sortier',
     key: 'sortier',
     sorter: nachZahl((q: Qualifikation) => q.sortier),
-    render: (n: number) => <span style={zahlStil('klein')}>{n}</span>,
+    render: (n: number) => <span style={monoStil(12)}>{n}</span>,
   },
   {
     title: 'Schließt ein',

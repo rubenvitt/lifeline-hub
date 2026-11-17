@@ -6,8 +6,7 @@ import { useMarkNichtGefunden } from '../einsatz/nichtGefundenContext';
 import { flaeche } from '../theme/tokens';
 import type { PlatzhalterRueckweg } from './Platzhalter';
 import Paneel from './instrument/Paneel';
-import { schriftStil, useRollen, schriftGroesse } from './instrument/rollenwerte';
-
+import { schriftStil, useRollen } from './instrument/rollenwerte';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache (`.lfh-skelett`). Der Import gehört
 // HIERHER: Konsumenten in `AdminPage` montieren kein `EinsatzSeite`, ihre Balken wären sonst
 // 0 px hoch — und jsdom könnte das nicht zeigen.
@@ -268,14 +267,7 @@ export function SeitenSackgasse({
       <div style={{ display: 'flex', flexDirection: 'column', gap: t.marginSM }}>
         <div style={{ ...schriftStil('seitentitel'), color: rollen.text }}>{titel}</div>
         {untertitel != null && (
-          <p
-            style={{
-              margin: 0,
-              fontSize: schriftGroesse('text'),
-              lineHeight: 1.5,
-              color: rollen.text2,
-            }}
-          >
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
             {untertitel}
           </p>
         )}

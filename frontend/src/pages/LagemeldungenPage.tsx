@@ -26,12 +26,12 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
+  monoStil,
   Segmentleiste,
   StatusChip,
   useRollen,
   Zeitachseneintrag,
   type SegmentOption,
-  zahlStil,
 } from '../components/instrument';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useModulFreigabenStand, useSprungSperre } from '../einsatz/useSprungSperre';
@@ -612,9 +612,9 @@ export default function LagemeldungenPage() {
             marginBlockEnd: token.margin,
           }}
         >
-          +<span style={zahlStil('klein')}>{nachtraege.length}</span>{' '}
+          +<span style={monoStil(12)}>{nachtraege.length}</span>{' '}
           {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
-          <span style={zahlStil('klein')}>
+          <span style={monoStil(12)}>
             {taktisch(letzteLb, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
           </span>{' '}
           übernommen ·{' '}

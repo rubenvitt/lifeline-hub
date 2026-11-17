@@ -39,7 +39,7 @@
 
 .hilfe-kopf__name {
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-text);
+  font-size: 15px;
   font-weight: 500;
   letter-spacing: 0.02em;
 }
@@ -48,7 +48,7 @@
   margin: 0 0 0 6px;
   padding-left: 12px;
   border-left: 1px solid var(--lfh-linie);
-  font-size: var(--lfh-groesse-titel);
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -156,7 +156,7 @@
 .hilfe-navi__ort {
   margin-left: auto;
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-fein);
+  font-size: 11px;
   font-weight: 400;
   color: var(--lfh-text-2);
 }
@@ -195,7 +195,7 @@
   gap: 8px;
   min-height: 40px;
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-fein);
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--lfh-text-2);
@@ -286,14 +286,14 @@
   align-items: baseline;
   gap: 12px;
   margin: 0 0 14px;
-  font-size: var(--lfh-groesse-titel);
+  font-size: 20px;
   font-weight: 600;
 }
 
 .hilfe-bereich__nummer,
 .hilfe-mappe__zahl {
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-klein);
+  font-size: 12px;
   font-weight: 500;
   color: var(--lfh-bedien-text);
 }
@@ -316,7 +316,7 @@
 }
 
 .hilfe-rueckmeldung__frage {
-  font-size: var(--lfh-groesse-text);
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -331,7 +331,7 @@
   align-items: center;
   gap: 4px 16px;
   color: var(--lfh-schwach);
-  font-size: var(--lfh-groesse-klein);
+  font-size: 12px;
 }
 
 .hilfe-rueckmeldung__fuss span {
@@ -400,7 +400,7 @@
 }
 
 .hilfe-karte__titel {
-  font-size: var(--lfh-groesse-text);
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -408,7 +408,7 @@
 .hilfe-karte__kurz {
   display: -webkit-box;
   overflow: hidden;
-  font-size: var(--lfh-groesse-text);
+  font-size: 13px;
   line-height: 1.5;
   color: var(--lfh-text-2);
   -webkit-line-clamp: 3;
@@ -438,7 +438,7 @@
   align-items: center;
   padding: 0 14px;
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-fein);
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--lfh-text-2);
@@ -476,7 +476,7 @@
 .hilfe-rand__titel {
   margin: 0;
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-fein);
+  font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--lfh-text-2);
@@ -497,7 +497,7 @@
   background: none;
   color: var(--lfh-text-2);
   font: inherit;
-  font-size: var(--lfh-groesse-text);
+  font-size: 13px;
   line-height: 1.35;
   text-align: left;
   cursor: pointer;
@@ -543,7 +543,7 @@
 .hilfe-kapitel__bereich {
   margin: 0 0 8px;
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-fein);
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--lfh-text-2);
@@ -551,14 +551,14 @@
 
 .hilfe-kapitel__titel {
   margin: 0 0 20px;
-  font-size: var(--lfh-groesse-gross);
+  font-size: 30px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
 }
 
 .hilfe-kapitel .markdown {
-  font-size: var(--lfh-groesse-text);
+  font-size: 15px;
   line-height: 1.7;
   counter-reset: abschnitt;
 }
@@ -572,7 +572,7 @@
   margin: 40px 0 14px;
   padding-top: 20px;
   border-top: 1px solid var(--lfh-linie);
-  font-size: var(--lfh-groesse-wert);
+  font-size: 21px;
   font-weight: 600;
   scroll-margin-top: 72px;
 }
@@ -580,14 +580,14 @@
 .hilfe-kapitel .markdown .md-h2::before {
   content: counter(abschnitt, decimal-leading-zero);
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-klein);
+  font-size: 12px;
   font-weight: 500;
   color: var(--lfh-bedien-text);
 }
 
 .hilfe-kapitel .markdown .md-h3 {
   margin: 28px 0 10px;
-  font-size: var(--lfh-groesse-titel);
+  font-size: 17px;
   font-weight: 600;
   scroll-margin-top: 72px;
 }
@@ -623,7 +623,7 @@
   border: 1px solid var(--lfh-steuer-rahmen);
   background: var(--lfh-grund);
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-text);
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -635,6 +635,11 @@
   left: 14px;
   width: 1px;
   background: var(--lfh-linie);
+}
+
+.hilfe-druckkopf {
+  margin-bottom: 12px;
+  font-size: 9pt;
 }
 
 /* Bildschirmfotos der Kapitel (LFH-1128): Breite aus `.markdown img` (nie breiter als die
@@ -698,7 +703,7 @@
 
 .hilfe-blaettern__richtung {
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-fein);
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -706,12 +711,6 @@
 }
 
 @media print {
-  /* Der Druckkopf steht nur auf Papier (`druckkopf--nur-druck`), seine Größe in pt. */
-  .hilfe-druckkopf {
-    margin-bottom: 12px;
-    font-size: 9pt;
-  }
-
   .hilfe-kapitel + .hilfe-kapitel {
     margin-top: 0;
     padding-top: 0;
