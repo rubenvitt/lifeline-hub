@@ -53,7 +53,7 @@ Gliederung nach Unteraufgabe: `r9up3kp5` = LLH-1831 (Konfliktprüfung), `mdopfgq
 
 ## 9. Integration
 
-- [ ] 9.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die e2e aus 7.4 lokal einzeln grün
+- [x] 9.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die e2e aus 7.4 lokal einzeln grün
 
 ## Workflow follow-up
 
