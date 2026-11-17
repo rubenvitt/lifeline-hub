@@ -192,6 +192,7 @@ pub struct Ruecknahme {
 ///
 /// # Regeln (in Reihenfolge, jede Ablehnung schreibt nichts)
 /// 1. Das Ereignis ist ein Austritt dieser Person in diesem Einsatz → sonst `NotFound`
+/// 1a. Er trägt keinen Anlass (Notiz eines automatischen Austritts) → `Conflict`
 /// 2. Er ist noch nicht zurückgenommen → `Conflict`
 /// 3. Er ist das jüngste Ereignis der Person → `Conflict`
 /// 4. Er ist höchstens [`RUECKNAHME_FENSTER_MIN`] Minuten alt → `Conflict`
@@ -219,8 +220,9 @@ async fn nimm_austritt_zurueck_tx(
     austritt_id: i64,
     erfasst_von: i64,
 ) -> Result<(i64, bool), AppError> {
-    let zeile: Option<(i64, bool)> = sqlx::query_as(
-        "SELECT uhs_id, zeitpunkt_at >= strftime('%Y-%m-%d %H:%M:%S', 'now', ?) AS frisch \
+    let zeile: Option<(i64, bool, bool)> = sqlx::query_as(
+        "SELECT uhs_id, zeitpunkt_at >= strftime('%Y-%m-%d %H:%M:%S', 'now', ?) AS frisch, \
+                notiz IS NOT NULL AS mit_anlass \
          FROM person_uhs_belegung \
          WHERE id = ? AND einsatz_id = ? AND person_id = ? AND art = 'austritt'",
     )
@@ -230,7 +232,14 @@ async fn nimm_austritt_zurueck_tx(
     .bind(person_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let (uhs_id, frisch) = zeile.ok_or(AppError::NotFound)?;
+    let (uhs_id, frisch, mit_anlass) = zeile.ok_or(AppError::NotFound)?;
+    // Ein automatischer Austritt (Verbleib, Status, Storno) trägt seinen Anlass; zurückgenommen
+    // wird nur das Austragen von Hand (Review LLH-1924).
+    if mit_anlass {
+        return Err(AppError::Conflict(
+            "Dieser Austritt hat einen eigenen Anlass und lässt sich nicht zurücknehmen".into(),
+        ));
+    }
     let schon: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM person_uhs_belegung WHERE ruecknahme_von = ?)",
     )
@@ -340,7 +349,7 @@ pub async fn austritt_intern(
 /// Ob die Person nach `zeitpunkt_at` in eine UHS eingetreten oder gewechselt ist (LLH-1138,
 /// Spec `personen-verlauf`): ein nachgereichter Verbleib, der älter ist als dieser Zugang, nimmt
 /// sie nicht mehr aus der UHS. Gleicher Zeitpunkt zählt nicht als später (der Verbleib ist
-/// später gespeichert und gewinnt).
+/// später gespeichert und gewinnt). Die Rücknahme eines Austritts ist kein Zugang (LLH-1924).
 pub async fn has_zugang_nach_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -350,6 +359,7 @@ pub async fn has_zugang_nach_tx(
     Ok(sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM person_uhs_belegung \
                        WHERE einsatz_id = ? AND person_id = ? AND art IN ('eintritt','wechsel') \
+                         AND ruecknahme_von IS NULL \
                          AND datetime(zeitpunkt_at) > datetime(?))",
     )
     .bind(einsatz_id)
@@ -1055,6 +1065,38 @@ mod tests {
         // Kein Austritt: 404.
         let r = nimm_austritt_zurueck(&pool, e, p, aus.id - 1, b).await;
         assert!(matches!(r, Err(AppError::NotFound)), "{r:?}");
+    }
+
+    /// Review LLH-1924: ein automatischer Austritt (mit Anlass) wird nicht zurückgenommen.
+    #[tokio::test]
+    async fn ruecknahme_nicht_fuer_austritt_mit_anlass() {
+        let pool = test_pool().await;
+        let (b, e, u, _, _, _, p) = setup(&pool).await;
+        eintritt(&pool, e, p, u, None, None, b).await.unwrap();
+        let aus = austritt(&pool, e, p, Some("durch Verbleib"), b)
+            .await
+            .unwrap();
+        let r = nimm_austritt_zurueck(&pool, e, p, aus.id, b).await;
+        assert!(
+            matches!(&r, Err(AppError::Conflict(m)) if m.contains("Anlass")),
+            "{r:?}"
+        );
+    }
+
+    /// LLH-1924 (Review): eine Rücknahme ist kein neuer Zugang; ein nachgereichter Verbleib vor
+    /// dem Austritt holt die Person weiter aus der UHS.
+    #[tokio::test]
+    async fn ruecknahme_zaehlt_nicht_als_zugang_nach() {
+        let pool = test_pool().await;
+        let (b, e, u, _, _, _, p) = setup(&pool).await;
+        let ein = eintritt(&pool, e, p, u, None, None, b).await.unwrap();
+        alt_machen(&pool, ein.id, "2026-05-28 13:00:00").await;
+        let aus = austritt(&pool, e, p, None, b).await.unwrap();
+        nimm_austritt_zurueck(&pool, e, p, aus.id, b).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(!has_zugang_nach_tx(&mut conn, e, p, "2026-05-28 13:20:00")
+            .await
+            .unwrap());
     }
 
     #[tokio::test]

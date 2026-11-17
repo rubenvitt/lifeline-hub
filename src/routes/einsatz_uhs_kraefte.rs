@@ -93,11 +93,12 @@ pub async fn zuordnen(
         if alt == Some(uhs_id) {
             return Ok(None);
         }
-        if alt.is_some() && geraet {
-            return Err(AppError::Forbidden);
-        }
+        // Das Rückgängig nennt die andere UHS, auch am Gerät (Review LLH-1924).
         if let (Some(andere), true) = (alt, nur_wenn_frei) {
             return Err(kraefte::steht_anderswo_tx(conn, einsatz_id, ep_id, andere).await?);
+        }
+        if alt.is_some() && geraet {
+            return Err(AppError::Forbidden);
         }
         kraefte::setze_uhs_tx(conn, einsatz_id, ep_id, Some(uhs_id)).await?;
         let kraft = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;

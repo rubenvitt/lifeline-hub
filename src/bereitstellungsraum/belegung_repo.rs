@@ -156,6 +156,7 @@ pub async fn nimm_austritt_zurueck(
 ///
 /// # Regeln (in Reihenfolge, jede Ablehnung schreibt nichts)
 /// 1. Das Ereignis ist ein Austritt in diesem Raum und Einsatz → sonst `NotFound`
+/// 1a. Er trägt keinen Anlass (Notiz eines Systemwegs) → `Conflict`
 /// 2. Er ist noch nicht zurückgenommen → `Conflict`
 /// 3. Er war kein Ausrücken (das Ereignis davor ist kein Abruf) → `Conflict`
 /// 4. Er ist das jüngste Ereignis der Kraft → `Conflict`
@@ -168,9 +169,10 @@ pub async fn nimm_austritt_zurueck_tx(
     austritt_id: i64,
     benutzer_id: i64,
 ) -> Result<i64, AppError> {
-    let zeile: Option<(String, i64, bool)> = sqlx::query_as(
+    let zeile: Option<(String, i64, bool, bool)> = sqlx::query_as(
         "SELECT objekt_typ, objekt_id, \
-                zeitpunkt_at >= strftime('%Y-%m-%d %H:%M:%S', 'now', ?) AS frisch \
+                zeitpunkt_at >= strftime('%Y-%m-%d %H:%M:%S', 'now', ?) AS frisch, \
+                notiz IS NOT NULL AS mit_anlass \
          FROM br_belegung WHERE id = ? AND einsatz_id = ? AND br_id = ? AND art = 'austritt'",
     )
     .bind(format!("-{RUECKNAHME_FENSTER_MIN} minutes"))
@@ -179,8 +181,15 @@ pub async fn nimm_austritt_zurueck_tx(
     .bind(br_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let (typ, objekt_id, frisch) = zeile.ok_or(AppError::NotFound)?;
+    let (typ, objekt_id, frisch, mit_anlass) = zeile.ok_or(AppError::NotFound)?;
     let typ = ObjektTyp::try_from(typ).map_err(AppError::Internal)?;
+    // Systemwege (Storno einer Übernahme, Rückweg einer Ablösung, Auflösen) buchen ihren Austritt
+    // mit Anlass; zurückgenommen wird nur das Austragen über die Belegungsroute (Review LLH-1924).
+    if mit_anlass {
+        return Err(AppError::Conflict(
+            "Dieser Austritt hat einen eigenen Anlass und lässt sich nicht zurücknehmen".into(),
+        ));
+    }
     let schon: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM br_belegung WHERE ruecknahme_von = ?)")
             .bind(austritt_id)
@@ -2509,6 +2518,61 @@ mod tests {
         );
         assert_eq!(cache_einheit(&pool, hlf).await, None);
         assert!(ereignisse(&pool).await > n);
+    }
+
+    /// Review LLH-1924: zehn Minuten sind die Grenze; ein Austritt mit Anlass (Systemweg) wird
+    /// nicht zurückgenommen.
+    #[tokio::test]
+    async fn ruecknahme_grenze_und_anlass() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "Sportplatz").await;
+        let hlf = einheit_namens(&pool, e, "HLF 20").await;
+        let vor = |min: i64| format!("-{min} minutes");
+        for (minuten, gelingt) in [(9, true), (11, false)] {
+            belege(&pool, e, br, "einheit", hlf, "eintritt", None, b)
+                .await
+                .unwrap();
+            let aus = belege(&pool, e, br, "einheit", hlf, "austritt", None, b)
+                .await
+                .unwrap();
+            sqlx::query(
+                "UPDATE br_belegung SET zeitpunkt_at = strftime('%Y-%m-%d %H:%M:%S','now', ?) \
+                 WHERE id = ?",
+            )
+            .bind(vor(minuten))
+            .bind(aus.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+            let r = zuruecknehmen(&pool, (b, e, br), aus.id).await;
+            assert_eq!(r.is_ok(), gelingt, "{minuten} min: {r:?}");
+            if gelingt {
+                belege(&pool, e, br, "einheit", hlf, "austritt", None, b)
+                    .await
+                    .unwrap();
+            }
+        }
+        belege(&pool, e, br, "einheit", hlf, "eintritt", None, b)
+            .await
+            .unwrap();
+        let aus = belege(
+            &pool,
+            e,
+            br,
+            "einheit",
+            hlf,
+            "austritt",
+            Some("Übernahme storniert"),
+            b,
+        )
+        .await
+        .unwrap();
+        let r = zuruecknehmen(&pool, (b, e, br), aus.id).await;
+        assert!(
+            matches!(&r, Err(AppError::Conflict(m)) if m.contains("Anlass")),
+            "{r:?}"
+        );
     }
 
     /// Eintritt 13:42, Abruf 14:30 mit Ziel und Auftrag: „seit“ bleibt 13:42, der Abruf trägt

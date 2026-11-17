@@ -48,13 +48,14 @@ pub async fn require_besatzung_frei_tx(
     ef_id: i64,
     ep_id: i64,
 ) -> Result<(), AppError> {
-    let anderswo: Option<(String, String)> = sqlx::query_as(
-        "SELECT ep.snap_name, COALESCE(f.funkrufname, ef.snap_funkrufname) \
-         FROM einsatz_personal ep \
+    // Der Funkrufname wie in der Fahrzeugliste (LLH-1290).
+    let anderswo: Option<(String, String)> = sqlx::query_as(concat!(
+        "SELECT ep.snap_name, ",
+        crate::fahrzeug::funkrufname_anzeige_sql!("ef"),
+        " FROM einsatz_personal ep \
          JOIN einsatz_fahrzeug ef ON ef.id = ep.fahrzeug_id \
-         LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
          WHERE ep.id = ? AND ep.einsatz_id = ? AND ep.fahrzeug_id <> ?",
-    )
+    ))
     .bind(ep_id)
     .bind(einsatz_id)
     .bind(ef_id)

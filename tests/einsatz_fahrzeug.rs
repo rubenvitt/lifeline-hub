@@ -2026,11 +2026,14 @@ async fn besatzung_zuruecknehmen_nur_wenn_frei() {
             .clone()
     };
 
-    // Frei: das Rückgängig gelingt, auf demselben Fahrzeug noch einmal auch.
+    // Frei: das Rückgängig gelingt, auf demselben Fahrzeug noch einmal auch, dann ohne zweiten
+    // ETB-Eintrag (Review LLH-1924).
     let (s, j) = anfrage(&app, "PUT", &pfad(a, "?nur_wenn_frei=1"), &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{j}");
+    let etb_einmal = system_etb_anzahl(&app, &admin, einsatz).await;
     let (s, j) = anfrage(&app, "PUT", &pfad(a, "?nur_wenn_frei=1"), &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{j}");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_einmal);
 
     // Gelöst, inzwischen auf 83-2: das Rückgängig scheitert und nennt das Fahrzeug.
     assert_eq!(
