@@ -17,6 +17,7 @@ import {
   setzeBrStatus,
   storniereBr,
   belegeBr,
+  nimmBrAustrittZurueck,
   hebtBrAbrufAuf,
   listeBr,
 } from '../../api/einsatzBereitstellungsraum';
@@ -65,6 +66,7 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import { useUhr } from '../../abloesung/useUhr';
 import { dauerText } from '../../kraefte/zeitachse';
 import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
+import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { listEinsatzMaterial } from '../../api/einsatzMaterial';
@@ -357,8 +359,17 @@ export default function BrDetailPage() {
     },
     // Fester Schlüssel: ein serieller Lauf ersetzt den stehenden Toast statt ihn zu stapeln (wie
     // `kommunikation/rueckgaengig.tsx`).
-    onSuccess: (_antwort, belegung) => {
-      message.success({ content: belegungsQuittung(belegung), key: 'br-belegung' });
+    onSuccess: (antwort, belegung) => {
+      // Austragen ist eine Fehlbuchung, umkehrbar: der Hinweis bietet „Rückgängig“ (LLH-1924, Spec
+      // `bereitstellungsraum-belegung`, „Austragen rückgängig in der Oberfläche“). Das Ausrücken
+      // nimmt seinen Verband mit und hat keinen Rückweg.
+      if (belegung.daten.art === 'austritt' && !belegung.ausruecken) {
+        zeigeRueckgaengig(message, belegungsQuittung(belegung), () =>
+          austrittZurueckMut.mutate({ belegung, austrittId: antwort.id }),
+        );
+      } else {
+        message.success({ content: belegungsQuittung(belegung), key: 'br-belegung' });
+      }
       // Die eigene Anmeldung steht sofort, auch wenn die Schleuse hält — VOR der Invalidierung.
       const { objekt_typ, objekt_id, art } = belegung.daten;
       if (art === 'eintritt') {
@@ -367,6 +378,28 @@ export default function BrDetailPage() {
       invalidate();
     },
     onError: (e, belegung) => zeilen.melde(schluesselVon(belegung), e, belegungsFallback(belegung)),
+  });
+
+  // „Rückgängig“ nach dem Austragen (LLH-1924): die Kraft steht mit ihrer Wartezeit wieder im
+  // Raum. Ihre Zeile ist weg, also steht eine Ablehnung im Seitenhinweis.
+  const [austrittZurueckFehler, setAustrittZurueckFehler] = useState<{
+    fehler: unknown;
+    titel: string;
+  } | null>(null);
+  const austrittZurueckMut = useMutation({
+    mutationFn: (v: { belegung: BelegungMitName; austrittId: number }) =>
+      nimmBrAustrittZurueck(einsatzId, brId, v.austrittId),
+    onMutate: () => setAustrittZurueckFehler(null),
+    onSuccess: (_antwort, { belegung }) => {
+      const { objekt_typ, objekt_id } = belegung.daten;
+      (objekt_typ === 'einheit' ? einheitenZufluss : fahrzeugeZufluss).merkeEigene(objekt_id);
+      invalidate();
+    },
+    onError: (fehler, { belegung }) =>
+      setAustrittZurueckFehler({
+        fehler,
+        titel: `${belegungsObjekt(belegung)} nicht zurückgenommen`,
+      }),
   });
 
   // Abruf zurücknehmen (LLH-1085): die Kraft ist danach wieder bereitgestellt. Unterstellung und
@@ -699,13 +732,20 @@ export default function BrDetailPage() {
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (kopfFehler != null || ohneZeile.length > 0) && (
+        (kopfFehler != null || ohneZeile.length > 0 || austrittZurueckFehler != null) && (
           <Flex vertical gap={token.marginSM}>
             <SeitenHinweise
               fehler={kopfFehler}
               fehlerTitel="Status nicht geändert"
               fehlerFallback="Statuswechsel fehlgeschlagen"
             />
+            {austrittZurueckFehler && (
+              <SpeicherFehler
+                fehler={austrittZurueckFehler.fehler}
+                titel={austrittZurueckFehler.titel}
+                fallback="Rückgängig fehlgeschlagen"
+              />
+            )}
             {ohneZeile.map((k) => {
               const g = zeilen.grund(k);
               const b = belegungen.get(k);

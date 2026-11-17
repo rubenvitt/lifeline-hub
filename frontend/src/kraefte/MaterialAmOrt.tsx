@@ -5,13 +5,16 @@ import { setzeMaterialStatus, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { schriftStil, useRollen, zahlStil } from '../components/instrument';
+import type { WeitereAktionen } from '../components/Datensicht';
 import { KennungsLink } from '../components/kennungsLink';
 import { MODUL_MATERIAL_GESPERRT } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { sprungGesperrtText } from '../components/Sprung';
 import StatusWahl from '../components/StatusWahl';
+import { useZeilenMenueKontext } from '../components/useDatensatzKontextMenue';
 import { useHoldGeloest } from '../components/useHoldGeloest';
+import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -274,6 +277,27 @@ export default function MaterialAmOrt({
     },
   });
 
+  /** Bietet die Zeile neben dem Lösen „Ausgeben“? Dann steht das Lösen im ⋮ (LLH-1924). */
+  const isAusgebbar = (p: MaterialAmOrtPosten) =>
+    isBedienbar && !sperrgrund && p.art === 'verbrauchsgut' && p.ausgegeben < p.menge;
+  const gehalten = new Set(halten.rows.filter((r) => r.isGeloest).map((r) => r.p.id));
+  /**
+   * Das Lösen einer Zeile, EINE Quelle für ⋮ und Kontextmenü (LLH-1924, `frontend/AGENTS.md`,
+   * „Kontextmenü nur über den Baustein“). Gelöst bietet sie nichts mehr.
+   */
+  const zeilenMenue: WeitereAktionen<MaterialAmOrtPosten> = {
+    eintraege: (p) => (gehalten.has(p.id) ? [] : [{ key: 'loesen', label: loesenText }]),
+    zugaenglicherName: (p) => `Aktionen zu ${p.bezeichnung}`,
+    laeuft: (p) => loesend.has(p.id),
+    onWahl: (key, p) => {
+      if (key === 'loesen' && !gehalten.has(p.id) && !loesend.has(p.id)) loesen.mutate(p);
+    },
+  };
+  const kontext = useZeilenMenueKontext(isBedienbar ? zeilenMenue : undefined, {
+    finde: (id) => posten.find((p) => p.id === id),
+    schluessel: (p) => p.id,
+  });
+
   const zuordnenGrund = zuordnenFehler.grund('zuordnen');
   // Ohne Zeile sagt der Leertext alles; „0 Posten“ daneben wäre derselbe Leerzustand zweimal
   // (LLH-1255). Ein Platzhalter „Gelöst“ ist eine Zeile: dort bleibt die Kopfzahl, sonst rückte
@@ -294,6 +318,7 @@ export default function MaterialAmOrt({
 
   return (
     <div data-lfh="material-am-ort" {...halten.rootProps}>
+      {kontext.menue}
       {(titel || showKopfzahl) && (
         <Space size={token.marginXS} style={{ marginBottom: token.marginXS }}>
           {titel && <Typography.Text type="secondary">{titel}</Typography.Text>}
@@ -326,8 +351,7 @@ export default function MaterialAmOrt({
         // Bis der Abgleich steht, zeigt die Zeile den gewählten Status.
         const isStatusPending = statusWechsel.isPending && statusWechsel.variables?.p.id === p.id;
         const statusStand = isStatusPending ? { ...p, status: statusWechsel.variables.status } : p;
-        const isAusgebbar =
-          isBedienbar && !sperrgrund && p.art === 'verbrauchsgut' && p.ausgegeben < p.menge;
+        const ausgebbar = isAusgebbar(p);
         // Am Platzhalter stehen Status und „Ausgeben“ unsichtbar und träge weiter: fielen sie weg,
         // passte eine umgebrochene Zeile wieder in eine, und alles darunter rückte hoch.
         const nurPlatz = isGeloest ? ({ visibility: 'hidden' } as const) : undefined;
@@ -362,7 +386,8 @@ export default function MaterialAmOrt({
                 gap: token.marginXS,
               }}
             >
-              <span>{p.bezeichnung}</span>
+              {/* Die Zeile hat einen Regler: das Kontextmenü nur am Namen (LLH-1599). */}
+              <span {...(isGeloest ? {} : kontext.ausloeser(p))}>{p.bezeichnung}</span>
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
               {/* Eine Zahl bricht nicht um. Die reine Menge in Mono, „30 von 50 übrig“ trägt Wörter
                   und steht in der Textschrift (LLH-1777). */}
@@ -412,7 +437,7 @@ export default function MaterialAmOrt({
             </span>
             {isBedienbar && (
               <Space size="middle" wrap>
-                {isAusgebbar && (
+                {ausgebbar && (
                   <Button
                     aria-label={`${p.bezeichnung} ausgeben`}
                     style={nurPlatz}
@@ -425,35 +450,57 @@ export default function MaterialAmOrt({
                     Ausgeben
                   </Button>
                 )}
-                {/* Gelöst bleibt es DERSELBE Knopf, träge (`aria-disabled`, nicht `disabled`): der Fokus
+                {/* Neben „Ausgeben“ steht das Lösen im ⋮, als einzige Handlung als Knopf (LLH-1924,
+                    Spec `material-am-ort`, „Material am Ort lösen“). Gelöst steht „Gelöst“ träge
+                    an der Stelle des ⋮; ein zweiter Tipp trifft nichts. */}
+                {ausgebbar ? (
+                  <span style={{ display: 'inline-grid', justifyItems: 'end' }}>
+                    <span style={{ gridArea: '1 / 1', ...nurPlatz }}>
+                      <ZeilenMenueAusloeser menue={zeilenMenue} zeile={p} gesperrt={isGeloest} />
+                    </span>
+                    {isGeloest && (
+                      <span style={{ gridArea: '1 / 1' }}>
+                        <Button
+                          aria-label={`${p.bezeichnung} gelöst`}
+                          aria-disabled
+                          style={geloestStyle(rollen.gedaempft)}
+                        >
+                          Gelöst
+                        </Button>
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  /* Gelöst bleibt es DERSELBE Knopf, träge (`aria-disabled`, nicht `disabled`): der Fokus
                     bleibt, und ein zweiter Tipp trifft nichts. Kein Wechsel von `type`: antd hängt den
                     Knopf dann neu ein, und der Fokus fiele auf `body`. Beide Wörter liegen im selben
-                    Gitterfeld, so ist die Marke nie schmaler als der Knopf (design.md D2). */}
-                <Button
-                  danger={!isGeloest}
-                  aria-label={
-                    isGeloest ? `${p.bezeichnung} gelöst` : loesenName(p.bezeichnung, loesenText)
-                  }
-                  aria-disabled={isGeloest || undefined}
-                  loading={!isGeloest && loesend.has(p.id)}
-                  style={isGeloest ? geloestStyle(rollen.gedaempft) : undefined}
-                  onClick={() => {
-                    if (!isGeloest) loesen.mutate(p);
-                  }}
-                >
-                  <span style={{ display: 'inline-grid' }}>
-                    <span
-                      style={{ gridArea: '1 / 1', visibility: isGeloest ? 'hidden' : undefined }}
-                    >
-                      {loesenText}
+                    Gitterfeld, so ist die Marke nie schmaler als der Knopf (design.md D2). */
+                  <Button
+                    danger={!isGeloest}
+                    aria-label={
+                      isGeloest ? `${p.bezeichnung} gelöst` : loesenName(p.bezeichnung, loesenText)
+                    }
+                    aria-disabled={isGeloest || undefined}
+                    loading={!isGeloest && loesend.has(p.id)}
+                    style={isGeloest ? geloestStyle(rollen.gedaempft) : undefined}
+                    onClick={() => {
+                      if (!isGeloest) loesen.mutate(p);
+                    }}
+                  >
+                    <span style={{ display: 'inline-grid' }}>
+                      <span
+                        style={{ gridArea: '1 / 1', visibility: isGeloest ? 'hidden' : undefined }}
+                      >
+                        {loesenText}
+                      </span>
+                      <span
+                        style={{ gridArea: '1 / 1', visibility: isGeloest ? undefined : 'hidden' }}
+                      >
+                        Gelöst
+                      </span>
                     </span>
-                    <span
-                      style={{ gridArea: '1 / 1', visibility: isGeloest ? undefined : 'hidden' }}
-                    >
-                      Gelöst
-                    </span>
-                  </span>
-                </Button>
+                  </Button>
+                )}
               </Space>
             )}
             {grund && (

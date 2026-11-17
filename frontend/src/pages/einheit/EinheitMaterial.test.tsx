@@ -166,8 +166,9 @@ describe('EinheitMaterial (LLH-1036 D11, LLH-1225 D10)', () => {
         within(zeile('Schlauch B')).getByRole('button', { name: /aus Einheit lösen$/ }),
       ).toHaveClass('ant-btn-loading'),
     );
+    // Die Wolldecke bietet „Ausgeben“: ihr Lösen steht im ⋮ (LLH-1924), es lädt nicht mit.
     expect(
-      within(zeile('Wolldecke')).getByRole('button', { name: 'Wolldecke aus Einheit lösen' }),
+      within(zeile('Wolldecke')).getByRole('button', { name: 'Aktionen zu Wolldecke' }),
     ).not.toHaveClass('ant-btn-loading');
   });
 

@@ -560,6 +560,8 @@ export type BelegungsArt = S['BelegungsArt'];
 export type Uhs = S['UhsAnzeige'];
 export type UhsPlatz = S['PlatzAnzeige'];
 export type UhsBelegung = S['BelegungAnzeige'];
+/** Rücknahme eines UHS-Austritts (LLH-1924): das neue Ereignis, `ohne_platz` = im Wartebereich. */
+export type UhsBelegungRuecknahme = S['BelegungRuecknahme'];
 export type UhsDetail = S['UhsDetail'];
 /** Kraft an einer UHS (LFH-1045): Name, Funktion, Position, Einheit. */
 export type UhsKraft = S['UhsKraft'];

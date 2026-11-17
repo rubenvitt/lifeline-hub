@@ -45,9 +45,11 @@ import {
   aenderePersonBelegung,
   aktualisierePlatz,
   legePlaetzeAn,
+  nimmUhsAustrittZurueck,
   setzePlatzVerfuegbarkeit,
   stornierePlatz,
 } from '../../api/einsatzUhs';
+import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import VerbleibErfassung from '../../personen/VerbleibErfassung';
 import { UebergabeDialog } from '../../personen/UebergabeQuittieren';
@@ -1628,11 +1630,32 @@ export default function Grundriss({
     onSettled: invalidate,
   });
   const belegungLaeuft = belegMut.isPending || zuweisenMut.isPending;
+  // „zurückweisen“ bleibt Gefahrknopf, ist aber umkehrbar (LLH-1924, Spec `uhs-grundriss`,
+  // „Zurückweisen rückgängig“): der Hinweis nimmt genau diesen Austritt zurück, mit Platz und
+  // Wartezeit. Eine Ablehnung steht über der Fläche am Platz.
+  type Zurueckweisung = { personId: number; platzId: number; kennung: string };
+  const austrittZurueckMut = useMutation({
+    mutationFn: (v: Zurueckweisung & { austrittId: number }) =>
+      nimmUhsAustrittZurueck(einsatzId, v.personId, v.austrittId),
+    onMutate: ({ platzId }) => platzFehler.beginne(platzId),
+    onSuccess: (antwort, v) => {
+      if (antwort.ohne_platz) {
+        void message.info(`${v.kennung} wieder im Wartebereich: der Platz ist vergeben`);
+      }
+      invalidate();
+    },
+    onError: (e, { platzId }) => platzFehler.melde(platzId, e, 'Nicht zurückgenommen'),
+  });
   const austrittMut = useMutation({
-    mutationFn: ({ personId }: { personId: number; platzId: number }) =>
+    mutationFn: ({ personId }: Zurueckweisung) =>
       aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
     onMutate: ({ platzId }) => platzFehler.beginne(platzId),
-    onSuccess: () => invalidate(),
+    onSuccess: (antwort, v) => {
+      invalidate();
+      zeigeRueckgaengig(message, `${v.kennung} zurückgewiesen`, () =>
+        austrittZurueckMut.mutate({ ...v, austrittId: antwort.id }),
+      );
+    },
     onError: (e, { platzId }) => platzFehler.melde(platzId, e, 'Zurückweisen fehlgeschlagen'),
   });
   // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben) über DIESELBE Maske wie die
@@ -1884,7 +1907,13 @@ export default function Grundriss({
                   onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                   onAustritt={() => {
                     const b = belegtAn(p.id);
-                    if (b) austrittMut.mutate({ personId: b.id, platzId: p.id });
+                    if (b) {
+                      austrittMut.mutate({
+                        personId: b.id,
+                        platzId: p.id,
+                        kennung: registrierAnzeige(b.registrier_nr),
+                      });
+                    }
                   }}
                   onTransport={() => {
                     const b = belegtAn(p.id);

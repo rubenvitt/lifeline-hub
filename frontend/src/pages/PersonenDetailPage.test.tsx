@@ -1353,6 +1353,66 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
     await waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
   });
 
+  it('„Rückgängig“ nach dem Austragen nimmt diesen Austritt zurück; Ablehnung im Kopf (LLH-1924)', async () => {
+    const zurueck: string[] = [];
+    render(einsatzAktiv, belegt, [
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => belegungsAntwort('austritt', 5)),
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung/:bid/zuruecknehmen', ({ params }) => {
+        zurueck.push(String(params.bid));
+        return HttpResponse.json(
+          { error: 'Die Person ist inzwischen weiter gebucht' },
+          { status: 409 },
+        );
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
+    const hinweis = (await screen.findByText('R-001 aus BHP 50 ausgetragen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(zurueck).toEqual(['1']));
+    expect(
+      await within(kopf()).findByText('Die Person ist inzwischen weiter gebucht'),
+    ).toBeInTheDocument();
+    expect(within(kopf()).getByText('Nicht zurückgenommen')).toBeInTheDocument();
+  });
+
+  it('kehrt die Person nur in den Wartebereich zurück, sagt der Hinweis das (LLH-1924)', async () => {
+    render(einsatzAktiv, belegt, [
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => belegungsAntwort('austritt', 5)),
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung/:bid/zuruecknehmen', () =>
+        HttpResponse.json(
+          {
+            ereignis: {
+              id: 2,
+              einsatz_id: 1,
+              person_id: 10,
+              uhs_id: 5,
+              platz_id: null,
+              art: 'eintritt',
+              notiz: null,
+              zeitpunkt_at: '2026-05-27 10:01:00',
+              erfasst_von: 1,
+              ruecknahme_von: 1,
+            },
+            ohne_platz: true,
+          },
+          { status: 201 },
+        ),
+      ),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
+    const hinweis = (await screen.findByText('R-001 aus BHP 50 ausgetragen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    expect(
+      await screen.findByText('R-001 wieder in BHP 50, im Wartebereich: der Platz ist vergeben'),
+    ).toBeInTheDocument();
+  });
+
   it('bietet bei gesetztem Verbleib kein Aufnehmen an (Grundriss-Konsistenz)', async () => {
     const transportiert = { ...detail, aktueller_verbleib: 'transport' } as PersonDetail;
     render(einsatzAktiv, transportiert, [

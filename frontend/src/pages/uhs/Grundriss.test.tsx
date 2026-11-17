@@ -272,6 +272,44 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
     expect(body!.art).toBe('austritt');
   });
 
+  it('„Rückgängig“ nach „zurückweisen“ nimmt diesen Austritt zurück; Ablehnung über der Fläche (LLH-1924)', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    const zurueck: string[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+        HttpResponse.json({
+          id: 41,
+          einsatz_id: 1,
+          person_id: 7,
+          uhs_id: 1,
+          platz_id: null,
+          art: 'austritt',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
+        }),
+      ),
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung/:bid/zuruecknehmen', ({ params }) => {
+        zurueck.push(String(params.bid));
+        return HttpResponse.json(
+          { error: 'Das Austragen liegt mehr als 10 Minuten zurück' },
+          { status: 409 },
+        );
+      }),
+    );
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(await screen.findByRole('button', { name: 'zurückweisen' }));
+    const hinweis = (await screen.findByText('R-007 zurückgewiesen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(zurueck).toEqual(['41']));
+    expect(
+      await screen.findByText(/Das Austragen liegt mehr als 10 Minuten zurück/),
+    ).toBeInTheDocument();
+  });
+
   it('zeigt keine Patientenaktionen für unbelegte Plätze', async () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, []);

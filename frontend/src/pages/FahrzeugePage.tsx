@@ -287,7 +287,6 @@ function BesatzungsBlock({
                     {geloest && darfSchreiben && (
                       <span style={{ gridArea: '1 / 1' }}>
                         <Button
-                          size="small"
                           aria-label={`Rückgängig: ${m.name} zurück auf das Fahrzeug`}
                           loading={laeuft(m.id)}
                           onClick={() => {

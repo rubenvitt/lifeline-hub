@@ -213,7 +213,6 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           </>,
           bedienbar && (
             <Button
-              size="small"
               aria-label={`Rückgängig: ${k.name} zurück an die UHS`}
               loading={laufend.has(k.id)}
               onClick={() => {

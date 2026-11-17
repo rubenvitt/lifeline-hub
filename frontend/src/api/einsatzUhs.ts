@@ -11,6 +11,7 @@ import type {
   UhsAnhang,
   AnhangZugriff,
   UhsKraft,
+  UhsBelegungRuecknahme,
   StaerkePosition,
   QualiSollEingabe,
 } from './types';
@@ -213,6 +214,22 @@ export function aenderePersonBelegung(
     `/api/einsaetze/${einsatzId}/personen/${personId}/uhs-belegung`,
     'POST',
     daten,
+  );
+}
+
+/**
+ * Nimmt den Austritt einer Person aus einer UHS zurück (LLH-1924, Spec `personen-detail`,
+ * „Austritt aus der UHS zurücknehmen“): zurück auf ihren Platz, wenn er frei ist, sonst in den
+ * Wartebereich (`ohne_platz`); die Wartezeit läuft weiter.
+ */
+export function nimmUhsAustrittZurueck(
+  einsatzId: number,
+  personId: number,
+  belegungId: number,
+): Promise<UhsBelegungRuecknahme> {
+  return apiSend<UhsBelegungRuecknahme>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/uhs-belegung/${belegungId}/zuruecknehmen`,
+    'POST',
   );
 }
 

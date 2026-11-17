@@ -32,16 +32,16 @@ Jede Aufgabe entsteht per TDD: erst der Test, der ohne die Änderung rot ist.
 
 ## 5. Frontend: Material am Ort
 
-- [ ] 5.1 `MaterialAmOrt`: bei `isAusgebbar` „Lösen“ ins ⋮ (`WeitereAktionen`, `ZeilenMenueAusloeser`, `useZeilenMenueKontext` am Namensteil), „Ausgeben“ bleibt Knopf, sonst Knopf „Lösen“; gehalten ⋮ unsichtbar und „Gelöst“ träge. Nachweis: `MaterialAmOrt.test.tsx` (Menü, Kontextmenü, gehaltene Zeile), Guards `menueFarbe`, `kontextMenue` grün
+- [x] 5.1 `MaterialAmOrt`: bei `isAusgebbar` „Lösen“ ins ⋮ (`WeitereAktionen`, `ZeilenMenueAusloeser`, `useZeilenMenueKontext` am Namensteil), „Ausgeben“ bleibt Knopf, sonst Knopf „Lösen“; gehalten ⋮ unsichtbar und „Gelöst“ träge. Nachweis: `MaterialAmOrt.test.tsx` (Menü, Kontextmenü, gehaltene Zeile), Guards `menueFarbe`, `kontextMenue` grün
 - [ ] 5.2 Abhängige Tests nachziehen (`EinheitMaterial`, `MaterialTab`, `materialSchreibweg`, `BrDetailPage`) und e2e `material-am-ort.spec.ts`, `trefflaeche-pruefflaechen.spec.ts` (C15). Nachweis: Vitest grün, e2e-Specs lokal grün
 
 ## 6. Frontend: Austragen rückgängig
 
-- [ ] 6.1 API `nimmBrAustrittZurueck`, `nimmUhsAustrittZurueck`; Typ `ruecknahme_von` in den Belegungsschritten. Nachweis: Typprüfung (`tsc`) grün
-- [ ] 6.2 `BrDetailPage`: nach „Austragen“ `zeigeRueckgaengig` mit Rücknahme; nicht bei „Abrufen und austragen“ und „Ausrücken“; Ablehnung im Seitenhinweis. Nachweis: `BrDetailPage.test.tsx`
-- [ ] 6.3 `PersonenDetailPage`: Hinweis mit Rückgängig nach „Austragen“, Hinweis bei `ohne_platz`, Ablehnung unter den Handlungen. Nachweis: `PersonenDetailPage.test.tsx`
-- [ ] 6.4 `Grundriss`: Hinweis mit Rückgängig nach „zurückweisen“, Ablehnung im Seitenhinweis. Nachweis: Grundriss-Test
-- [ ] 6.5 `wartetSeit` übergeht das Paar aus Austritt und Rücknahme. Nachweis: `dringlichkeit.test.ts`
+- [x] 6.1 API `nimmBrAustrittZurueck`, `nimmUhsAustrittZurueck`; Typ `ruecknahme_von` in den Belegungsschritten. Nachweis: Typprüfung (`tsc`) grün
+- [x] 6.2 `BrDetailPage`: nach „Austragen“ `zeigeRueckgaengig` mit Rücknahme; nicht bei „Abrufen und austragen“ und „Ausrücken“; Ablehnung im Seitenhinweis. Nachweis: `BrDetailPage.test.tsx`
+- [x] 6.3 `PersonenDetailPage`: Hinweis mit Rückgängig nach „Austragen“, Hinweis bei `ohne_platz`, Ablehnung unter den Handlungen. Nachweis: `PersonenDetailPage.test.tsx`
+- [x] 6.4 `Grundriss`: Hinweis mit Rückgängig nach „zurückweisen“, Ablehnung im Seitenhinweis. Nachweis: Grundriss-Test
+- [x] 6.5 `wartetSeit` übergeht das Paar aus Austritt und Rücknahme. Nachweis: `dringlichkeit.test.ts`
 
 ## 7. Regeln, Doku, Abschluss
 

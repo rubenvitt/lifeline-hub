@@ -1334,16 +1334,18 @@ function materialAmOrtFlaechen(
   ids: { einheitId: number; uhsId: number; brId: number },
 ): Flaeche[] {
   const R = `/einsaetze/${einsatzId}`;
+  // Das Gerät trägt Lösen als Knopf, das Verbrauchsgut neben „Ausgeben“ im ⋮ (LLH-1924).
   const ziele = (ort: string, loesen: RegExp): Ziel[] => [
     { sorte: `${ort}: Material zuordnen`, ziele: materialAuswahl, mindestens: 1 },
-    { sorte: `${ort}: Material lösen`, ziele: knopf(loesen), mindestens: 2 },
+    { sorte: `${ort}: Material lösen`, ziele: knopf(loesen), mindestens: 1 },
     { sorte: `${ort}: Material ausgeben`, ziele: knopf(/^Decken .+ ausgeben$/), mindestens: 1 },
+    { sorte: `${ort}: Zeilenmenü`, ziele: knopf(/^Aktionen zu Decken /), mindestens: 1 },
   ];
   return [
     {
       pfad: `${R}/einheiten/${ids.einheitId}`,
       anker: knopf('Decken Einheit ausgeben'),
-      ziele: ziele('Einheit', /^(Decken|Trage) Einheit aus Einheit lösen$/),
+      ziele: ziele('Einheit', /^Trage Einheit aus Einheit lösen$/),
     },
     {
       pfad: `${R}/fahrzeuge`,
@@ -1352,17 +1354,17 @@ function materialAmOrtFlaechen(
         await knopf('Details zu Florian 15')(page).click();
         await expect(knopf('Decken Fahrzeug ausgeben')(page)).toBeVisible();
       },
-      ziele: ziele('Fahrzeug', /^(Decken|Trage) Fahrzeug vom Fahrzeug lösen$/),
+      ziele: ziele('Fahrzeug', /^Trage Fahrzeug vom Fahrzeug lösen$/),
     },
     {
       pfad: `${R}/unfallhilfsstellen/${ids.uhsId}?bereich=material`,
       anker: knopf('Decken UHS ausgeben'),
-      ziele: ziele('UHS', /^(Decken|Trage) UHS lösen$/),
+      ziele: ziele('UHS', /^Trage UHS lösen$/),
     },
     {
       pfad: `${R}/bereitstellungsraeume/${ids.brId}`,
       anker: knopf('Decken BR ausgeben'),
-      ziele: ziele('BR', /^(Decken|Trage) BR lösen$/),
+      ziele: ziele('BR', /^Trage BR lösen$/),
     },
   ];
 }

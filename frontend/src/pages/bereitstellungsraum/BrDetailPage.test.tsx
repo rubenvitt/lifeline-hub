@@ -296,6 +296,53 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
     ).toBeInTheDocument();
     expect(capturedBody).not.toHaveProperty('bezeichnung');
   });
+
+  it('„Rückgängig“ nach dem Austragen nimmt genau diesen Austritt zurück (LLH-1924)', async () => {
+    const br = brDetail({ einheiten: [{ id: 10, name: 'Einheit Alpha' }] });
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', () =>
+        HttpResponse.json({
+          id: 77,
+          einsatz_id: 1,
+          br_id: 1,
+          objekt_typ: 'einheit',
+          objekt_id: 10,
+          art: 'austritt',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
+        }),
+      ),
+    );
+    const zurueck: string[] = [];
+    server.use(
+      http.post(
+        '/api/einsaetze/1/bereitstellungsraeume/1/belegung/:bid/zuruecknehmen',
+        ({ params }) => {
+          zurueck.push(String(params.bid));
+          return HttpResponse.json(
+            { error: 'Die Kraft ist inzwischen weiter gebucht' },
+            { status: 409 },
+          );
+        },
+      ),
+    );
+    renderBrDetail();
+    expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
+    await austragen('Einheit Alpha');
+    const hinweis = (
+      await screen.findByText('Einheit „Einheit Alpha“ aus dem BR ausgetragen')
+    ).closest('.ant-message-notice') as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(zurueck).toEqual(['77']));
+    // Die Ablehnung steht im Seitenhinweis, nicht als Fehler-Toast.
+    expect(await screen.findByText('Die Kraft ist inzwischen weiter gebucht')).toBeInTheDocument();
+    expect(screen.getByText('Einheit „Einheit Alpha“ nicht zurückgenommen')).toBeInTheDocument();
+  });
 });
 
 describe('BrDetailPage – Sidebar zuweisen (LFH-14)', () => {

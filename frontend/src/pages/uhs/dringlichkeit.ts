@@ -109,13 +109,18 @@ export function gehalteneFolge<T, K>(
 }
 
 /** Die Felder einer Belegung, aus denen sich der Beginn ergibt. */
-type Belegungsschritt = Pick<UhsBelegung, 'id' | 'person_id' | 'art' | 'platz_id' | 'zeitpunkt_at'>;
+type Belegungsschritt = Pick<
+  UhsBelegung,
+  'id' | 'person_id' | 'art' | 'platz_id' | 'zeitpunkt_at'
+> &
+  Partial<Pick<UhsBelegung, 'ruecknahme_von'>>;
 
 /**
  * Seit wann eine Person in der UHS wartet, aus der Belegungsreihe (`uhs.belegungen`): ab dem
  * jüngsten Eintritt; kam sie danach von einem Platz in den Wartebereich zurück (`wechsel` ohne
  * Platz), ab der letzten solchen Rückkehr. Wer aus einer anderen UHS herüberwechselt, hat hier
- * keinen Eintritt: sein erster Wechsel ist die Ankunft. Nach einem Austritt oder ohne Belegung
+ * keinen Eintritt: sein erster Wechsel ist die Ankunft. Ein zurückgenommener Austritt (LLH-1924) setzt
+ * nichts zurück: die Rücknahme stellt den Beginn davor wieder her. Nach einem Austritt oder ohne Belegung
  * `null`.
  * Gleiche Zeitpunkte ordnet die Kennung (der Server liefert neueste zuerst).
  */
@@ -129,9 +134,16 @@ export function wartetSeit(
       a.zeitpunkt_at === b.zeitpunkt_at ? a.id - b.id : a.zeitpunkt_at < b.zeitpunkt_at ? -1 : 1,
     );
   let beginn: string | null = null;
+  // Der Beginn vor jedem Austritt, für dessen Rücknahme.
+  const vorAustritt = new Map<number, string | null>();
   for (const schritt of reihe) {
-    if (schritt.art === 'eintritt') beginn = schritt.zeitpunkt_at;
-    else if (schritt.art === 'austritt') beginn = null;
+    if (schritt.art === 'eintritt' && schritt.ruecknahme_von != null) {
+      beginn = vorAustritt.get(schritt.ruecknahme_von) ?? schritt.zeitpunkt_at;
+    } else if (schritt.art === 'eintritt') beginn = schritt.zeitpunkt_at;
+    else if (schritt.art === 'austritt') {
+      vorAustritt.set(schritt.id, beginn);
+      beginn = null;
+    }
     // Ein Wechsel ohne Aufenthalt davor kommt aus einer anderen UHS: er ist die Ankunft.
     else if (beginn == null || schritt.platz_id == null) beginn = schritt.zeitpunkt_at;
   }

@@ -152,6 +152,22 @@ export function belegeBr(
 }
 
 /**
+ * Nimmt einen Austritt zurück (LLH-1924, Spec `bereitstellungsraum-belegung`, „Austritt
+ * zurücknehmen“): die Kraft steht wieder im Raum, ihre Wartezeit läuft weiter. 409 mit Grund,
+ * wenn sie inzwischen weiter gebucht ist oder das Austragen zu lange zurückliegt.
+ */
+export function nimmBrAustrittZurueck(
+  einsatzId: number,
+  brId: number,
+  belegungId: number,
+): Promise<BrBelegung> {
+  return apiSend<BrBelegung>(
+    `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/belegung/${belegungId}/zuruecknehmen`,
+    'POST',
+  );
+}
+
+/**
  * Eintreffen buchen (LLH-1075, design.md D1): eine bekannte Kraft (`kraft`) oder eine
  * unangemeldete (`unangemeldet`), genau eines von beiden. Eintritt, Zeitachse, ETB und bei einer
  * unangemeldeten Kraft die Meldung an die Einsatzleitung entstehen beim Server in einem Schritt.
