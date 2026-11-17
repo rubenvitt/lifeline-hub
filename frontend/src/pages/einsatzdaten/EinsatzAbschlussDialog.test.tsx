@@ -162,6 +162,21 @@ describe('EinsatzAbschlussDialog (LLH-1814)', () => {
     ).toBeInTheDocument();
   });
 
+  it('nennt je Gruppe höchstens drei Einträge, die Zahl zählt alle', async () => {
+    const fuenf = [1, 2, 3, 4, 5].map((n) => ({
+      id: 100 + n,
+      nummer: n,
+      bezeichnung: `Meldung ${n}`,
+    }));
+    setup({ pruefung: { ...nichtsOffen, meldungen: { anzahl: 8, eintraege: fuenf } } });
+    const d = await screen.findByRole('dialog');
+    const meldungen = await within(d).findByRole('region', { name: 'Meldungen' });
+    expect(within(meldungen).getByText('8')).toBeInTheDocument();
+    expect(within(meldungen).getAllByRole('listitem')).toHaveLength(3);
+    // Eine lange Bezeichnung steht einzeilig; ganz steht sie im Titel.
+    expect(within(meldungen).getByText('Meldung 1')).toHaveAttribute('title', 'Meldung 1');
+  });
+
   it('springt je Gruppe ins Modul, nur wenn es für die Person freigegeben ist', async () => {
     setup({ freigaben: freigabenFixture({ personen: { zugriff: false } }) });
     const d = await screen.findByRole('dialog');

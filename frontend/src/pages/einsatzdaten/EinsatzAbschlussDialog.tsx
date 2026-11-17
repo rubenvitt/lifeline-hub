@@ -81,8 +81,24 @@ export const KRAEFTE_SATZ =
 /** Fester Satz zu Kopplungen und Maschinenzugängen (D5: sie bleiben nach dem Wiederöffnen beendet). */
 export const KOPPLUNG_SATZ = `Gekoppelte Geräte und Maschinenzugänge werden getrennt und bleiben es, auch wenn der Einsatz binnen ${WIEDEREROEFFNEN_STUNDEN} Stunden wieder geöffnet wird.`;
 
-/** Länge der Kurzliste je Gruppe, wie der Server sie liefert (`KURZLISTE_MAX`). */
-const KURZLISTE_MAX = 5;
+/**
+ * Einträge je Gruppe im Dialog. Der Server liefert bis zu fünf; drei halten den Dialog mit allen
+ * Gruppen in der Höhe eines Führungsplatzes (1440 × 900), wie „Offene Vorgänge“ im Überblick. Die
+ * Zahl zählt alle, „alle ↗“ führt zum Rest.
+ */
+const EINTRAEGE_JE_GRUPPE = 3;
+
+/** Breiter als antds Vorgabe (520 px): die Zeilen der Kurzliste tragen Nummer, Text und Status. */
+const DIALOG_BREITE = 640;
+
+/** Eine Zeile, einzeilig gekürzt; ganz steht der Text im Titel (Hover) und im Modul. */
+const EINZEILIG = {
+  flex: '1 1 auto',
+  minWidth: 0,
+  overflow: 'hidden',
+  whiteSpace: 'nowrap',
+  textOverflow: 'ellipsis',
+} as const;
 
 interface AbschlussWerte {
   bestaetigung?: string;
@@ -147,6 +163,7 @@ export default function EinsatzAbschlussDialog({
     <ErfassungsModal<AbschlussWerte>
       offen
       titel="Einsatz abschließen"
+      breite={DIALOG_BREITE}
       form={form}
       initialValues={{ bestaetigung: '' }}
       erfassenText="Einsatz abschließen"
@@ -164,7 +181,7 @@ export default function EinsatzAbschlussDialog({
     >
       <div
         data-lfh="abschluss-dialog"
-        style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}
+        style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
       >
         <Datenraster spalten={2} beschriftung="Einsatz">
           <Datenfeld label="Bezeichnung">{einsatz.bezeichnung}</Datenfeld>
@@ -191,13 +208,15 @@ export default function EinsatzAbschlussDialog({
           </PaneelZustand>
         </section>
 
-        {daten && daten.kraefte.anzahl > 0 && (
-          <p data-lfh="abschluss-kraefte-satz" style={absatz}>
-            {KRAEFTE_SATZ}
-          </p>
-        )}
-        <p data-lfh="abschluss-kopplung-satz" style={absatz}>
-          {KOPPLUNG_SATZ}
+        {/* Beide Sätze in einem Absatz: der Dialog bleibt mit allen Gruppen in der Höhe eines
+            Führungsplatzes (1440 × 900). */}
+        <p style={absatz}>
+          {daten && daten.kraefte.anzahl > 0 && (
+            <>
+              <span data-lfh="abschluss-kraefte-satz">{KRAEFTE_SATZ}</span>{' '}
+            </>
+          )}
+          <span data-lfh="abschluss-kopplung-satz">{KOPPLUNG_SATZ}</span>
         </p>
 
         <Form.Item
@@ -236,7 +255,7 @@ function OffenePunkte({
   const eintragZeile = (kennung: (nr: number) => string) => (e: AbschlussEintrag) => (
     <div style={zeilenStil}>
       {e.nummer != null && <span style={nummerStil}>{kennung(e.nummer)}</span>}
-      <span style={{ flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere' }}>
+      <span style={EINZEILIG} title={e.bezeichnung}>
         {e.bezeichnung}
       </span>
     </div>
@@ -258,7 +277,7 @@ function OffenePunkte({
         zahl={p.gruppe.anzahl}
         zustand="daten"
         eintraege={p.gruppe.eintraege}
-        max={KURZLISTE_MAX}
+        max={EINTRAEGE_JE_GRUPPE}
         schluessel={(e) => e.id}
         zeile={eintragZeile(p.nummer)}
         sprung={p.sprung}
@@ -283,11 +302,11 @@ function OffenePunkte({
           }
           zustand="daten"
           eintraege={kraefte.eintraege}
-          max={KURZLISTE_MAX}
+          max={EINTRAEGE_JE_GRUPPE}
           schluessel={(k) => `${k.art}-${k.id}`}
           zeile={(k) => (
             <div style={zeilenStil}>
-              <span style={{ flex: '1 1 auto', minWidth: 0, overflowWrap: 'anywhere' }}>
+              <span style={EINZEILIG} title={k.bezeichnung}>
                 {k.bezeichnung}
               </span>
               {k.status && <span style={{ ...meta, flex: '0 1 auto' }}>{k.status}</span>}
