@@ -3261,6 +3261,14 @@
             ],
             "format": "int64"
           },
+          "ruecknahme_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie\nzurücknimmt. Wartezeit und Aufenthalt übergehen das Paar."
+          },
           "uhs_id": {
             "type": "integer",
             "format": "int64"
@@ -3341,6 +3349,22 @@
           "meldung",
           "registrierung"
         ]
+      },
+      "BelegungRuecknahme": {
+        "type": "object",
+        "description": "Antwort auf die Rücknahme eines Austritts (LLH-1924, design.md D3): das neue Ereignis und ob\ndie Person ihren Platz davor nicht zurückbekam und im Wartebereich steht.",
+        "required": [
+          "ereignis",
+          "ohne_platz"
+        ],
+        "properties": {
+          "ereignis": {
+            "$ref": "#/components/schemas/BelegungAnzeige"
+          },
+          "ohne_platz": {
+            "type": "boolean"
+          }
+        }
       },
       "BelegungVerlaufEintrag": {
         "type": "object",
@@ -4302,6 +4326,14 @@
           "objekt_typ": {
             "$ref": "#/components/schemas/ObjektTyp"
           },
+          "ruecknahme_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie\nzurücknimmt."
+          },
           "zeitpunkt_at": {
             "type": "string"
           },
@@ -4578,7 +4610,8 @@
           "wechsel_hinaus",
           "austritt",
           "abruf",
-          "abruf_aufgehoben"
+          "abruf_aufgehoben",
+          "austritt_zurueckgenommen"
         ]
       },
       "BrVerlaufEintrag": {

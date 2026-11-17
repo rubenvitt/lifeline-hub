@@ -277,6 +277,11 @@ const UHS_TABLET: &[(&str, &str)] = &[
         "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
     ),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
+    // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
+    (
+        "POST",
+        "/api/einsaetze/{id}/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen",
+    ),
     ("GET", "/api/einsaetze/{id}/personen"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
     ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
@@ -337,6 +342,11 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("PUT", "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}"),
     ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
+    // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
+    (
+        "POST",
+        "/api/einsaetze/{id}/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen",
+    ),
     ("GET", "/api/einsaetze/{id}/personen"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
     ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
@@ -435,6 +445,11 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     (
         "POST",
         "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
+    ),
+    // Rücknahme eines Austritts, wie das Austragen selbst (LLH-1924, design.md D3).
+    (
+        "POST",
+        "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung/{belegung_id}/zuruecknehmen",
     ),
     (
         "POST",
@@ -894,6 +909,11 @@ mod tests {
             "POST",
             "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung"
         ));
+        assert!(darf_route(
+            Funktionsansicht::Bereitstellungsraum,
+            "POST",
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung/{belegung_id}/zuruecknehmen"
+        ));
     }
 
     #[test]
@@ -1106,6 +1126,11 @@ mod tests {
             ),
             ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
             ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
+            // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
+            (
+                "POST",
+                "/api/einsaetze/{id}/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen",
+            ),
             ("GET", "/api/einsaetze/{id}/uhs"),
             ("GET", "/api/einsaetze/{id}/personen/export"),
             ("GET", "/api/einsaetze/{id}/etb"),

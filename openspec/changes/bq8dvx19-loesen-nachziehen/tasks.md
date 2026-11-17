@@ -4,20 +4,20 @@ Jede Aufgabe entsteht per TDD: erst der Test, der ohne die Änderung rot ist.
 
 ## 1. Rückgängig nur, wenn frei (Backend)
 
-- [ ] 1.1 Material-PATCH nimmt `?nur_wenn_frei=1`; liegt der Posten an einem anderen Ort, 409 mit `ort_text_tx`, nichts geschrieben; am Zielort selbst 2xx. Nachweis: Integrationstest nach dem Muster `fahrzeug_zuruecknehmen_nur_wenn_frei` (frei, woanders → 409 mit Text, Zustand unverändert, ohne Schalter verschiebt)
-- [ ] 1.2 `besatzung_repo::require_besatzung_frei_tx` und Schalter an `besatzung_zuordnen`; 409 „<Name> sitzt inzwischen auf «<Fzg>»“. Nachweis: Repo-Unittest und Integrationstest wie 1.1
-- [ ] 1.3 Schalter an `einsatz_uhs_kraefte::zuordnen`, Prüfung an `alt` nach der Geräte-Regel; 409 nennt die UHS. Nachweis: Integrationstest wie 1.1, Geräte-403 bleibt (bestehender Test grün)
+- [x] 1.1 Material-PATCH nimmt `?nur_wenn_frei=1`; liegt der Posten an einem anderen Ort, 409 mit `ort_text_tx`, nichts geschrieben; am Zielort selbst 2xx. Nachweis: Integrationstest nach dem Muster `fahrzeug_zuruecknehmen_nur_wenn_frei` (frei, woanders → 409 mit Text, Zustand unverändert, ohne Schalter verschiebt)
+- [x] 1.2 `besatzung_repo::require_besatzung_frei_tx` und Schalter an `besatzung_zuordnen`; 409 „<Name> sitzt inzwischen auf «<Fzg>»“. Nachweis: Repo-Unittest und Integrationstest wie 1.1
+- [x] 1.3 Schalter an `einsatz_uhs_kraefte::zuordnen`, Prüfung an `alt` nach der Geräte-Regel; 409 nennt die UHS. Nachweis: Integrationstest wie 1.1, Geräte-403 bleibt (bestehender Test grün)
 
 ## 2. Rücknahme eines Austritts (Backend)
 
-- [ ] 2.1 Migration `ruecknahme_von` an `br_belegung` und `person_uhs_belegung` (Nummer > jede auf `origin/alpha`, `scripts/check-migrationen.sh`). Nachweis: `db::tests`, Spiegel-Wächter `schema::tests::jeder_fremdschluessel_ist_eingeordnet` grün
-- [ ] 2.2 BR: `belegung_repo` Rücknahme in einer Transaktion mit Riegel (Austritt dieser Kraft, kein Ausrücken, jüngstes Ereignis, nicht zurückgenommen, ≤ 10 min, Eintritt-Vorbedingungen). Nachweis: Repo-Tests je Ablehnung (nichts geschrieben) und Erfolg (Cache `aktueller_br_id` wieder gesetzt)
-- [ ] 2.3 BR: „seit“ und Kennzahlen übergehen das Paar (`letztes_je_objekt`, Kennzahl-Abfrage). Nachweis: Repo-Test Eintritt 13:42 → Austritt → Rücknahme, `seit_at` und `laengste_seit_at` 13:42
-- [ ] 2.4 BR: Route `POST …/belegung/{belegung_id}/zuruecknehmen`, Rechte wie der Austritt, Eintrag in den Routen der Geräte, ETB „Austragen … zurückgenommen“, Verlauf zeigt die Rücknahme. Nachweis: Integrationstests in `tests/einsatz_bereitstellungsraum.rs` (Erfolg mit ETB, 409 je Riegel, Gerät des Raums darf, fremdes Gerät nicht)
-- [ ] 2.5 UHS: `belegung_repo` Rücknahme mit Riegel und Platzlogik (Platz frei oder in Aufbereitung ohne fremdes Ereignis → zurück auf den Platz; sonst Wartebereich, `ohne_platz`). Nachweis: Repo-Tests für Platz zurück, Platz vergeben, Person in anderer UHS, zu spät, schon zurückgenommen
-- [ ] 2.6 UHS: `aufenthalt.seit` übergeht das Paar. Nachweis: Repo-Test seit 13:10 → Austritt → Rücknahme, `seit` 13:10
-- [ ] 2.7 UHS: Route `POST …/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen`, Rechte wie der Austritt, Geräte-Listen, ETB pseudonym. Nachweis: Integrationstests in `tests/einsatz_uhs.rs`
-- [ ] 2.8 Antwort-DTOs mit `ruecknahme_von` (und Hülle mit `ohne_platz`), `scripts/check-typ-codegen.sh`, beide generierten Dateien mit. Nachweis: Skript grün
+- [x] 2.1 Migration `ruecknahme_von` an `br_belegung` und `person_uhs_belegung` (Nummer > jede auf `origin/alpha`, `scripts/check-migrationen.sh`). Nachweis: `db::tests`, Spiegel-Wächter `schema::tests::jeder_fremdschluessel_ist_eingeordnet` grün
+- [x] 2.2 BR: `belegung_repo` Rücknahme in einer Transaktion mit Riegel (Austritt dieser Kraft, kein Ausrücken, jüngstes Ereignis, nicht zurückgenommen, ≤ 10 min, Eintritt-Vorbedingungen). Nachweis: Repo-Tests je Ablehnung (nichts geschrieben) und Erfolg (Cache `aktueller_br_id` wieder gesetzt)
+- [x] 2.3 BR: „seit“ und Kennzahlen übergehen das Paar (`letztes_je_objekt`, Kennzahl-Abfrage). Nachweis: Repo-Test Eintritt 13:42 → Austritt → Rücknahme, `seit_at` und `laengste_seit_at` 13:42
+- [x] 2.4 BR: Route `POST …/belegung/{belegung_id}/zuruecknehmen`, Rechte wie der Austritt, Eintrag in den Routen der Geräte, ETB „Austragen … zurückgenommen“, Verlauf zeigt die Rücknahme. Nachweis: Integrationstests in `tests/einsatz_bereitstellungsraum.rs` (Erfolg mit ETB, 409 je Riegel, Gerät des Raums darf, fremdes Gerät nicht)
+- [x] 2.5 UHS: `belegung_repo` Rücknahme mit Riegel und Platzlogik (Platz frei oder in Aufbereitung ohne fremdes Ereignis → zurück auf den Platz; sonst Wartebereich, `ohne_platz`). Nachweis: Repo-Tests für Platz zurück, Platz vergeben, Person in anderer UHS, zu spät, schon zurückgenommen
+- [x] 2.6 UHS: `aufenthalt.seit` übergeht das Paar. Nachweis: Repo-Test seit 13:10 → Austritt → Rücknahme, `seit` 13:10
+- [x] 2.7 UHS: Route `POST …/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen`, Rechte wie der Austritt, Geräte-Listen, ETB pseudonym. Nachweis: Integrationstests in `tests/einsatz_uhs.rs`
+- [x] 2.8 Antwort-DTOs mit `ruecknahme_von` (und Hülle mit `ohne_platz`), `scripts/check-typ-codegen.sh`, beide generierten Dateien mit. Nachweis: Skript grün
 
 ## 3. Frontend: Rückwege mit Schalter
 

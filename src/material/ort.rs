@@ -214,6 +214,31 @@ pub async fn set_ort_tx(
     Ok(wechsel)
 }
 
+/// Vorbedingung des Rückgängig nach dem Lösen (LLH-1924, Spec `material-am-ort`, „Lösen
+/// rückgängig machen“): liegt der Posten inzwischen an einem anderen Ort als `ziel`, 409 mit dem
+/// Ort im ETB-Wortlaut, statt ihn dort still wegzunehmen. Ohne Ort oder schon am Ziel ist er frei.
+pub async fn require_ort_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    ziel: Option<MaterialOrt>,
+) -> Result<(), AppError> {
+    let aktuell = load_ort_tx(conn, einsatz_id, em_id).await?;
+    let Some(ort) = aktuell else {
+        return Ok(());
+    };
+    if Some(ort) == ziel {
+        return Ok(());
+    }
+    let bezeichnung = super::disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true)
+        .await?
+        .bezeichnung;
+    let ort_text = ort_text_tx(conn, einsatz_id, Some(ort)).await?;
+    Err(AppError::Conflict(format!(
+        "«{bezeichnung}» liegt inzwischen bei {ort_text}"
+    )))
+}
+
 /// Wie viele Posten des Einsatzes liegen noch an diesem Ort? Gezählt wird nur Material im Einsatz
 /// (`beendet_at IS NULL`). Storno von UHS und Bereitstellungsraum lehnt ab, solange es welche gibt
 /// (LLH-1249), sonst zeigte ein Posten auf einen stornierten Ort.

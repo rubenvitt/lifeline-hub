@@ -679,14 +679,24 @@ pub async fn reaktivieren(
     Ok(Json(anzeige))
 }
 
+/// Abfrage des Rückgängig nach „Vom Fahrzeug lösen“ (LLH-1924): `nur_wenn_frei=1` lehnt mit 409
+/// ab, wenn die Person inzwischen auf einem anderen Fahrzeug sitzt.
+#[derive(Debug, Default, Deserialize)]
+pub struct BesatzungZuruecknahmeParams {
+    nur_wenn_frei: Option<String>,
+}
+
 /// PUT /api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id} — Kraft als Besatzung
-/// zuordnen (LFH-9, exklusiv: Wechsel überschreibt). Append-only System-ETB + SSE.
+/// zuordnen (LFH-9, exklusiv: Wechsel überschreibt; mit `nur_wenn_frei=1` nicht, LLH-1924).
+/// Append-only System-ETB + SSE.
 pub async fn besatzung_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     PfadParam((_eid, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
+    Query(params): Query<BesatzungZuruecknahmeParams>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let nur_wenn_frei = parse_flag(params.nur_wenn_frei.as_deref(), "nur_wenn_frei")?;
     // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
     // Besatzungs-Zuordnung stabil). F06/LFH-244 Tier-A: Zuordnung + System-ETB atomar in EINER Tx.
     let fahrzeug =
@@ -694,6 +704,9 @@ pub async fn besatzung_zuordnen(
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
+        if nur_wenn_frei {
+            besatzung_repo::require_besatzung_frei_tx(conn, einsatz_id, ef_id, ep_id).await?;
+        }
         let person = besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, ef_id, ep_id).await?;
         crate::etb::system_audit_tx(
             conn,

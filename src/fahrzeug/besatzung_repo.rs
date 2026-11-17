@@ -38,6 +38,36 @@ pub async fn ordne_besatzung_zu_tx(
     Ok(name)
 }
 
+/// Vorbedingung des Rückgängig nach „Vom Fahrzeug lösen“ (LLH-1924, Spec `bedien-muster`,
+/// „Rückgängig nimmt nichts woanders weg“): sitzt die Person inzwischen auf einem anderen
+/// Fahrzeug, `Conflict` mit dessen Funkrufnamen, statt sie dort still abzuziehen. Ohne Fahrzeug
+/// oder schon auf diesem ist sie frei. Eine unbekannte Person meldet [`ordne_besatzung_zu_tx`].
+pub async fn require_besatzung_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
+    let anderswo: Option<(String, String)> = sqlx::query_as(
+        "SELECT ep.snap_name, COALESCE(f.funkrufname, ef.snap_funkrufname) \
+         FROM einsatz_personal ep \
+         JOIN einsatz_fahrzeug ef ON ef.id = ep.fahrzeug_id \
+         LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE ep.id = ? AND ep.einsatz_id = ? AND ep.fahrzeug_id <> ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .bind(ef_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match anderswo {
+        Some((name, fahrzeug)) => Err(AppError::Conflict(format!(
+            "{name} sitzt inzwischen auf «{fahrzeug}»"
+        ))),
+        None => Ok(()),
+    }
+}
+
 /// Gibt eine Personal-Dispozeile aus ihrem Fahrzeug frei (`fahrzeug_id = NULL`), auf einer
 /// offenen Connection/Transaktion (F06/LFH-244 Tier-A). `NotFound`, falls die Kraft nicht
 /// gerade diesem Fahrzeug zugeordnet ist (die WHERE-Klausel verifiziert die Ist-Zuordnung).
@@ -243,6 +273,30 @@ mod tests {
             "Anna"
         );
         assert_eq!(fahrzeug_von(&pool, ep).await, None);
+    }
+
+    #[tokio::test]
+    async fn frei_nur_ohne_anderes_fahrzeug() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, a, b) = setup(&pool).await;
+        let ep = person(&pool, einsatz, "Anna").await;
+        let mut conn = pool.acquire().await.unwrap();
+        // Ohne Fahrzeug frei.
+        require_besatzung_frei_tx(&mut conn, einsatz, a, ep)
+            .await
+            .unwrap();
+        ordne_besatzung_zu_tx(&mut conn, einsatz, a, ep)
+            .await
+            .unwrap();
+        // Auf demselben Fahrzeug frei.
+        require_besatzung_frei_tx(&mut conn, einsatz, a, ep)
+            .await
+            .unwrap();
+        // Auf A, Rückgängig an B: belegt.
+        match require_besatzung_frei_tx(&mut conn, einsatz, b, ep).await {
+            Err(AppError::Conflict(m)) => assert_eq!(m, "Anna sitzt inzwischen auf «Florian 1»"),
+            other => panic!("Conflict erwartet, war {other:?}"),
+        }
     }
 
     #[tokio::test]

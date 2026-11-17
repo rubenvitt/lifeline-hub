@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, erfasst_von, \
-           ziel_abschnitt_id, ziel_anzeige, auftrag_id, mit_abruf_id \
+           ziel_abschnitt_id, ziel_anzeige, auftrag_id, mit_abruf_id, ruecknahme_von \
     FROM br_belegung";
 
 /// Eine Belegungsbuchung ohne Objekt und Raum: Art, Notiz und – für das Eintreffen (LLH-1075,
@@ -24,6 +24,9 @@ pub struct Buchung<'a> {
     /// inzwischen woanders, lehnt [`belege_tx`] ab (`Conflict`), statt still aus dem neuen Raum
     /// zu wechseln. `None` prüft nicht (Gerät, Ablösung).
     pub von_br_id: Option<i64>,
+    /// Nur beim Eintritt einer Rücknahme (LLH-1924, design.md D2): der Austritt, den er
+    /// zurücknimmt. Gesetzt nur von [`nimm_austritt_zurueck_tx`].
+    pub ruecknahme_von: Option<i64>,
 }
 
 /// Bucht ein Objekt (Einheit oder Fahrzeug) in einen Bereitstellungsraum ein,
@@ -107,6 +110,7 @@ pub async fn belege_mit_folgen(
         client_id: None,
         zeitpunkt_at: None,
         von_br_id,
+        ruecknahme_von: None,
     };
     // read-then-write-Atomizität in einer Transaktion (F09: BEGIN IMMEDIATE + Retry)
     let ergebnis = crate::write_retry!(pool, |conn| {
@@ -126,6 +130,113 @@ pub async fn belege_mit_folgen(
         vorher_abruf: ergebnis.vorher_abruf,
         mitgenommen: ergebnis.mitgenommen,
     })
+}
+
+/// Wie lange ein Austritt zurückgenommen werden kann (LLH-1924, design.md D3), wie die Rücknahme
+/// der Entlassung (LLH-1722 D5).
+pub const RUECKNAHME_FENSTER_MIN: i64 = 10;
+
+/// Pool-Hülle um [`nimm_austritt_zurueck_tx`] in EINER Transaktion; liefert das neue Ereignis.
+pub async fn nimm_austritt_zurueck(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    br_id: i64,
+    austritt_id: i64,
+    benutzer_id: i64,
+) -> Result<BrBelegungAnzeige, AppError> {
+    let id = crate::write_retry!(pool, |conn| {
+        nimm_austritt_zurueck_tx(&mut *conn, einsatz_id, br_id, austritt_id, benutzer_id).await
+    })?;
+    laden(pool, einsatz_id, id).await
+}
+
+/// Nimmt einen Austritt zurück (LLH-1924, Spec `bereitstellungsraum-belegung`, „Austritt
+/// zurücknehmen“, design.md D2/D3): ein Eintritt in denselben Raum mit `ruecknahme_von`, den die
+/// Lesestellen für „seit“ samt Austritt übergehen. Liefert die id des neuen Ereignisses.
+///
+/// # Regeln (in Reihenfolge, jede Ablehnung schreibt nichts)
+/// 1. Das Ereignis ist ein Austritt in diesem Raum und Einsatz → sonst `NotFound`
+/// 2. Er ist noch nicht zurückgenommen → `Conflict`
+/// 3. Er war kein Ausrücken (das Ereignis davor ist kein Abruf) → `Conflict`
+/// 4. Er ist das jüngste Ereignis der Kraft → `Conflict`
+/// 5. Er ist höchstens [`RUECKNAHME_FENSTER_MIN`] Minuten alt → `Conflict`
+/// 6. ab hier [`belege_tx`] mit einem Eintritt (Raum aktiv, Kraft aktiv, Fahrzeug ohne Einheit)
+pub async fn nimm_austritt_zurueck_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    br_id: i64,
+    austritt_id: i64,
+    benutzer_id: i64,
+) -> Result<i64, AppError> {
+    let zeile: Option<(String, i64, bool)> = sqlx::query_as(
+        "SELECT objekt_typ, objekt_id, \
+                zeitpunkt_at >= strftime('%Y-%m-%d %H:%M:%S', 'now', ?) AS frisch \
+         FROM br_belegung WHERE id = ? AND einsatz_id = ? AND br_id = ? AND art = 'austritt'",
+    )
+    .bind(format!("-{RUECKNAHME_FENSTER_MIN} minutes"))
+    .bind(austritt_id)
+    .bind(einsatz_id)
+    .bind(br_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (typ, objekt_id, frisch) = zeile.ok_or(AppError::NotFound)?;
+    let typ = ObjektTyp::try_from(typ).map_err(AppError::Internal)?;
+    let schon: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM br_belegung WHERE ruecknahme_von = ?)")
+            .bind(austritt_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if schon {
+        return Err(AppError::Conflict(
+            "Das Austragen ist schon zurückgenommen".into(),
+        ));
+    }
+    let (davor, juengste): (Option<String>, i64) = sqlx::query_as(
+        "SELECT (SELECT art FROM br_belegung WHERE objekt_typ = ?1 AND objekt_id = ?2 \
+                   AND einsatz_id = ?3 AND id < ?4 ORDER BY id DESC LIMIT 1), \
+                (SELECT MAX(id) FROM br_belegung WHERE objekt_typ = ?1 AND objekt_id = ?2 \
+                   AND einsatz_id = ?3)",
+    )
+    .bind(typ.as_str())
+    .bind(objekt_id)
+    .bind(einsatz_id)
+    .bind(austritt_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if davor.as_deref() == Some(BrBelegungsArt::Abruf.as_str()) {
+        return Err(AppError::Conflict(
+            "Ausrücken lässt sich nicht zurücknehmen".into(),
+        ));
+    }
+    if juengste != austritt_id {
+        return Err(AppError::Conflict(
+            "Die Kraft ist inzwischen weiter gebucht".into(),
+        ));
+    }
+    if !frisch {
+        return Err(AppError::Conflict(format!(
+            "Das Austragen liegt mehr als {RUECKNAHME_FENSTER_MIN} Minuten zurück"
+        )));
+    }
+    let buchung = Buchung {
+        art: BrBelegungsArt::Eintritt,
+        notiz: None,
+        client_id: None,
+        zeitpunkt_at: None,
+        von_br_id: None,
+        ruecknahme_von: Some(austritt_id),
+    };
+    Ok(belege_tx(
+        conn,
+        einsatz_id,
+        br_id,
+        typ,
+        objekt_id,
+        &buchung,
+        benutzer_id,
+    )
+    .await?
+    .ereignis)
 }
 
 /// `abruf` und `abruf_aufgehoben` schreibt nur [`super::abruf`] (LLH-1085, design.md D2).
@@ -684,7 +795,9 @@ pub async fn letztes_je_objekt(
              SELECT MAX(x.id) FROM br_belegung x \
              WHERE x.objekt_typ = 'einheit' AND x.objekt_id = e.id \
                AND x.einsatz_id = e.einsatz_id \
-               AND x.art IN ('eintritt', 'wechsel', 'austritt')) \
+               AND x.art IN ('eintritt', 'wechsel', 'austritt') \
+               AND x.ruecknahme_von IS NULL \
+               AND NOT EXISTS (SELECT 1 FROM br_belegung r WHERE r.ruecknahme_von = x.id)) \
          WHERE e.einsatz_id = ?1 AND e.aktueller_br_id IS NOT NULL \
            AND e.aufgeloest_at IS NULL AND (?2 IS NULL OR e.aktueller_br_id = ?2) \
          UNION ALL \
@@ -694,7 +807,9 @@ pub async fn letztes_je_objekt(
              SELECT MAX(x.id) FROM br_belegung x \
              WHERE x.objekt_typ = 'fahrzeug' AND x.objekt_id = f.id \
                AND x.einsatz_id = f.einsatz_id \
-               AND x.art IN ('eintritt', 'wechsel', 'austritt')) \
+               AND x.art IN ('eintritt', 'wechsel', 'austritt') \
+               AND x.ruecknahme_von IS NULL \
+               AND NOT EXISTS (SELECT 1 FROM br_belegung r WHERE r.ruecknahme_von = x.id)) \
          WHERE f.einsatz_id = ?1 AND f.aktueller_br_id IS NOT NULL \
            AND f.beendet_at IS NULL AND (?2 IS NULL OR f.aktueller_br_id = ?2)",
     )
@@ -872,6 +987,7 @@ struct VerlaufZeile {
     abruf_ziel: Option<String>,
     auftrag_nr: Option<i64>,
     mit_einheit: Option<String>,
+    ruecknahme_von: Option<i64>,
 }
 
 /// Verlauf eines Raums (LLH-1095, design.md D5, Spec `bereitstellungsraum-belegung`, „Verlauf
@@ -892,7 +1008,7 @@ pub async fn verlauf(
              WHERE br_id = ?2 AND einsatz_id = ?1), \
          reihe AS ( \
              SELECT b.id, b.br_id, b.objekt_typ, b.objekt_id, b.art, b.notiz, b.zeitpunkt_at, \
-                    b.auftrag_id, v.objekt_id AS mit_objekt_id, \
+                    b.auftrag_id, v.objekt_id AS mit_objekt_id, b.ruecknahme_von, \
                     COALESCE(b.ziel_anzeige, v.ziel_anzeige) AS abruf_ziel, \
                     LAG(b.br_id) OVER fenster AS vorher_br_id, \
                     LAG(b.art) OVER fenster AS vorher_art, \
@@ -912,7 +1028,7 @@ pub async fn verlauf(
                 CASE r.art WHEN 'abruf' THEN r.abruf_ziel \
                            WHEN 'austritt' THEN CASE WHEN r.vorher_art = 'abruf' \
                                                      THEN r.vorher_ziel END END AS abruf_ziel, \
-                a.lfd_nr AS auftrag_nr, me.name AS mit_einheit \
+                a.lfd_nr AS auftrag_nr, me.name AS mit_einheit, r.ruecknahme_von \
          FROM reihe r \
          LEFT JOIN einsatz_einheit e ON r.objekt_typ = 'einheit' AND e.id = r.objekt_id \
          LEFT JOIN einsatz_fahrzeug f ON r.objekt_typ = 'fahrzeug' AND f.id = r.objekt_id \
@@ -932,6 +1048,10 @@ pub async fn verlauf(
         .into_iter()
         .map(|z| {
             let (art, herkunft, ziel) = match z.art.as_str() {
+                // Rücknahme eines Austritts (LLH-1924): kein neuer Eintritt.
+                "eintritt" if z.ruecknahme_von.is_some() => {
+                    (BrVerlaufArt::AustrittZurueckgenommen, None, None)
+                }
                 "eintritt" => (BrVerlaufArt::Eintritt, None, None),
                 "austritt" => (BrVerlaufArt::Austritt, None, z.abruf_ziel),
                 "abruf" => (BrVerlaufArt::Abruf, None, z.abruf_ziel),
@@ -1067,9 +1187,9 @@ async fn insert_buchung(
     Ok(sqlx::query_scalar::<_, i64>(
         "INSERT INTO br_belegung \
             (einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, erfasst_von, client_id, \
-             zeitpunkt_at) \
+             zeitpunkt_at, ruecknahme_von) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, \
-                 COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now'))) RETURNING id",
+                 COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now')), ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(br_id)
@@ -1080,6 +1200,7 @@ async fn insert_buchung(
     .bind(erfasst_von)
     .bind(buchung.client_id)
     .bind(buchung.zeitpunkt_at)
+    .bind(buchung.ruecknahme_von)
     .fetch_one(&mut *conn)
     .await?)
 }
@@ -2006,6 +2127,7 @@ mod tests {
             client_id: None,
             zeitpunkt_at: None,
             von_br_id: None,
+            ruecknahme_von: None,
         }
     }
 
@@ -2016,6 +2138,7 @@ mod tests {
         let wechsel = |von| Buchung {
             art: BrBelegungsArt::Wechsel,
             von_br_id: von,
+            ruecknahme_von: None,
             ..eintritt()
         };
         assert!(check_quellraum(&wechsel(Some(1)), Some(1)).is_ok());
@@ -2049,6 +2172,7 @@ mod tests {
         let buchung = Buchung {
             art: BrBelegungsArt::Wechsel,
             von_br_id: Some(fremd),
+            ruecknahme_von: None,
             ..eintritt()
         };
         let mut tx = pool.begin().await.unwrap();
@@ -2279,6 +2403,112 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap()
+    }
+
+    async fn ereignisse(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM br_belegung")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn zuruecknehmen(
+        pool: &SqlitePool,
+        (b, e, br): (i64, i64, i64),
+        austritt: i64,
+    ) -> Result<BrBelegungAnzeige, AppError> {
+        nimm_austritt_zurueck(pool, e, br, austritt, b).await
+    }
+
+    /// LLH-1924: Eintritt 13:42, Austritt, Rücknahme: die Kraft steht wieder im Raum, „seit“
+    /// und die längste Wartezeit bleiben 13:42; die Rücknahme nennt den Austritt.
+    #[tokio::test]
+    async fn ruecknahme_des_austritts_haelt_seit() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "Sportplatz").await;
+        let hlf = einheit_namens(&pool, e, "HLF 20").await;
+        let ein = belege(&pool, e, br, "einheit", hlf, "eintritt", None, b)
+            .await
+            .unwrap();
+        zeitpunkt(&pool, ein.id, "2026-10-16 13:42:00").await;
+        let aus = belege(&pool, e, br, "einheit", hlf, "austritt", None, b)
+            .await
+            .unwrap();
+
+        let r = zuruecknehmen(&pool, (b, e, br), aus.id).await.unwrap();
+        assert_eq!(r.art, BrBelegungsArt::Eintritt);
+        assert_eq!(r.ruecknahme_von, Some(aus.id));
+        assert_eq!(cache_einheit(&pool, hlf).await, Some(br));
+        let seit_hlf = Some("2026-10-16 13:42:00".to_string());
+        assert_eq!(seit(&pool, e, ObjektTyp::Einheit, hlf).await, seit_hlf);
+        assert_eq!(kennzahlen(&pool, e, br).await.laengste_seit_at, seit_hlf);
+
+        // Ein zweites Mal: schon zurückgenommen, nichts geschrieben.
+        let n = ereignisse(&pool).await;
+        let r = zuruecknehmen(&pool, (b, e, br), aus.id).await;
+        assert!(matches!(r, Err(AppError::Conflict(_))), "{r:?}");
+        assert_eq!(ereignisse(&pool).await, n);
+    }
+
+    /// LLH-1924: Rücknahme scheitert ohne zu schreiben, wenn die Kraft weiter gebucht ist, das
+    /// Austragen zu alt ist oder es ein Ausrücken war; ein Eintritt ist kein Austritt (404).
+    #[tokio::test]
+    async fn ruecknahme_des_austritts_lehnt_ab() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "Sportplatz").await;
+        let schule = aktiven_br(&pool, e, b, "Schule").await;
+        let hlf = einheit_namens(&pool, e, "HLF 20").await;
+        let ein = belege(&pool, e, br, "einheit", hlf, "eintritt", None, b)
+            .await
+            .unwrap();
+        assert!(matches!(
+            zuruecknehmen(&pool, (b, e, br), ein.id).await,
+            Err(AppError::NotFound)
+        ));
+
+        // Weiter gebucht: Eintritt in die Schule nach dem Austritt.
+        let aus = belege(&pool, e, br, "einheit", hlf, "austritt", None, b)
+            .await
+            .unwrap();
+        belege(&pool, e, schule, "einheit", hlf, "eintritt", None, b)
+            .await
+            .unwrap();
+        let n = ereignisse(&pool).await;
+        let r = zuruecknehmen(&pool, (b, e, br), aus.id).await;
+        assert!(
+            matches!(&r, Err(AppError::Conflict(m)) if m.contains("weiter gebucht")),
+            "{r:?}"
+        );
+        assert_eq!(cache_einheit(&pool, hlf).await, Some(schule));
+
+        // Zu alt.
+        let aus = belege(&pool, e, schule, "einheit", hlf, "austritt", None, b)
+            .await
+            .unwrap();
+        zeitpunkt(&pool, aus.id, "2026-01-01 08:00:00").await;
+        let r = zuruecknehmen(&pool, (b, e, schule), aus.id).await;
+        assert!(
+            matches!(&r, Err(AppError::Conflict(m)) if m.contains("Minuten")),
+            "{r:?}"
+        );
+
+        // Ausrücken nach einem Abruf.
+        belege(&pool, e, br, "einheit", hlf, "eintritt", None, b)
+            .await
+            .unwrap();
+        rufe_ab(&pool, (b, e, br), abruf_von(ObjektTyp::Einheit, hlf)).await;
+        let aus = belege(&pool, e, br, "einheit", hlf, "austritt", None, b)
+            .await
+            .unwrap();
+        let r = zuruecknehmen(&pool, (b, e, br), aus.id).await;
+        assert!(
+            matches!(&r, Err(AppError::Conflict(m)) if m.contains("Ausrücken")),
+            "{r:?}"
+        );
+        assert_eq!(cache_einheit(&pool, hlf).await, None);
+        assert!(ereignisse(&pool).await > n);
     }
 
     /// Eintritt 13:42, Abruf 14:30 mit Ziel und Auftrag: „seit“ bleibt 13:42, der Abruf trägt

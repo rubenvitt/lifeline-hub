@@ -3,7 +3,8 @@ use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
-    SELECT id, einsatz_id, person_id, uhs_id, platz_id, art, notiz, zeitpunkt_at, erfasst_von \
+    SELECT id, einsatz_id, person_id, uhs_id, platz_id, art, notiz, zeitpunkt_at, erfasst_von, \
+           ruecknahme_von \
     FROM person_uhs_belegung";
 
 /// Was beim Auto-Austritt passiert ist (für ETB-Text und SSE im Wrapper).
@@ -172,6 +173,152 @@ pub async fn austritt(
     laden(pool, einsatz_id, id).await
 }
 
+/// Wie lange ein Austritt zurückgenommen werden kann (LLH-1924, design.md D3), wie am
+/// Bereitstellungsraum.
+pub const RUECKNAHME_FENSTER_MIN: i64 = 10;
+
+/// Ergebnis einer Rücknahme: das neue Ereignis und ob die Person ihren Platz davor nicht
+/// zurückbekam und im Wartebereich steht.
+#[derive(Debug, Clone)]
+pub struct Ruecknahme {
+    pub ereignis: BelegungAnzeige,
+    pub ohne_platz: bool,
+}
+
+/// Nimmt den Austritt einer Person aus einer UHS zurück (LLH-1924, Spec `personen-detail`,
+/// „Austritt aus der UHS zurücknehmen“, design.md D2/D3): ein Eintritt in dieselbe UHS mit
+/// `ruecknahme_von`. Den Platz davor bekommt sie zurück, wenn er frei ist oder in Aufbereitung
+/// steht und seither niemand auf ihm lag; sonst kommt sie in den Wartebereich.
+///
+/// # Regeln (in Reihenfolge, jede Ablehnung schreibt nichts)
+/// 1. Das Ereignis ist ein Austritt dieser Person in diesem Einsatz → sonst `NotFound`
+/// 2. Er ist noch nicht zurückgenommen → `Conflict`
+/// 3. Er ist das jüngste Ereignis der Person → `Conflict`
+/// 4. Er ist höchstens [`RUECKNAHME_FENSTER_MIN`] Minuten alt → `Conflict`
+/// 5. UHS aktiv (`UnprocessableEntity`), Person nicht belegt und nicht storniert (`Conflict`)
+pub async fn nimm_austritt_zurueck(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+    austritt_id: i64,
+    erfasst_von: i64,
+) -> Result<Ruecknahme, AppError> {
+    let (id, ohne_platz) = crate::write_retry!(pool, |conn| {
+        nimm_austritt_zurueck_tx(conn, einsatz_id, person_id, austritt_id, erfasst_von).await
+    })?;
+    Ok(Ruecknahme {
+        ereignis: laden(pool, einsatz_id, id).await?,
+        ohne_platz,
+    })
+}
+
+async fn nimm_austritt_zurueck_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    austritt_id: i64,
+    erfasst_von: i64,
+) -> Result<(i64, bool), AppError> {
+    let zeile: Option<(i64, bool)> = sqlx::query_as(
+        "SELECT uhs_id, zeitpunkt_at >= strftime('%Y-%m-%d %H:%M:%S', 'now', ?) AS frisch \
+         FROM person_uhs_belegung \
+         WHERE id = ? AND einsatz_id = ? AND person_id = ? AND art = 'austritt'",
+    )
+    .bind(format!("-{RUECKNAHME_FENSTER_MIN} minutes"))
+    .bind(austritt_id)
+    .bind(einsatz_id)
+    .bind(person_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (uhs_id, frisch) = zeile.ok_or(AppError::NotFound)?;
+    let schon: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM person_uhs_belegung WHERE ruecknahme_von = ?)",
+    )
+    .bind(austritt_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if schon {
+        return Err(AppError::Conflict(
+            "Das Austragen ist schon zurückgenommen".into(),
+        ));
+    }
+    let (juengste, platz_davor): (i64, Option<i64>) = sqlx::query_as(
+        "SELECT (SELECT MAX(id) FROM person_uhs_belegung WHERE person_id = ?1 AND einsatz_id = ?2), \
+                (SELECT platz_id FROM person_uhs_belegung \
+                  WHERE person_id = ?1 AND einsatz_id = ?2 AND id < ?3 AND uhs_id = ?4 \
+                  ORDER BY id DESC LIMIT 1)",
+    )
+    .bind(person_id)
+    .bind(einsatz_id)
+    .bind(austritt_id)
+    .bind(uhs_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if juengste != austritt_id {
+        return Err(AppError::Conflict(
+            "Die Person ist inzwischen weiter gebucht".into(),
+        ));
+    }
+    if !frisch {
+        return Err(AppError::Conflict(format!(
+            "Das Austragen liegt mehr als {RUECKNAHME_FENSTER_MIN} Minuten zurück"
+        )));
+    }
+    pruefe_uhs_aktiv(&mut *conn, einsatz_id, uhs_id).await?;
+    pruefe_person_nicht_belegt(&mut *conn, einsatz_id, person_id).await?;
+    let platz = match platz_davor {
+        Some(pid) => platz_wieder_frei_tx(&mut *conn, uhs_id, pid, austritt_id).await?,
+        None => None,
+    };
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO person_uhs_belegung \
+            (einsatz_id, person_id, uhs_id, platz_id, art, erfasst_von, ruecknahme_von) \
+         VALUES (?, ?, ?, ?, 'eintritt', ?, ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .bind(uhs_id)
+    .bind(platz)
+    .bind(erfasst_von)
+    .bind(austritt_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    update_cache(&mut *conn, einsatz_id, person_id, Some(uhs_id), platz).await?;
+    Ok((id, platz_davor.is_some() && platz.is_none()))
+}
+
+/// Der Platz davor, wenn die Rücknahme ihn wieder nehmen darf (design.md D3): nicht storniert,
+/// frei oder in Aufbereitung, niemand liegt darauf und seit dem Austritt hat kein Ereignis ihn
+/// genannt. Eine Aufbereitung geht dabei zurück auf frei, wie vor dem Austritt.
+async fn platz_wieder_frei_tx(
+    conn: &mut SqliteConnection,
+    uhs_id: i64,
+    platz_id: i64,
+    austritt_id: i64,
+) -> Result<Option<i64>, AppError> {
+    let frei: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM uhs_platz p \
+           WHERE p.id = ?1 AND p.uhs_id = ?2 AND p.storniert_at IS NULL \
+             AND p.verfuegbarkeit IN ('frei', 'aufbereitung') \
+             AND NOT EXISTS (SELECT 1 FROM einsatz_person ep WHERE ep.aktueller_platz_id = p.id) \
+             AND NOT EXISTS (SELECT 1 FROM person_uhs_belegung b \
+                              WHERE b.platz_id = p.id AND b.id > ?3))",
+    )
+    .bind(platz_id)
+    .bind(uhs_id)
+    .bind(austritt_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if !frei {
+        return Ok(None);
+    }
+    sqlx::query("UPDATE uhs_platz SET verfuegbarkeit = 'frei' WHERE id = ? AND verfuegbarkeit = 'aufbereitung'")
+        .bind(platz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(Some(platz_id))
+}
+
 /// Auto-Austritt für Cross-Modul-Hooks (Personenstatus, Verbleib, Storno), in EINER
 /// Transaktion: (a) ist die Person belegt → Austritt-Event, Cache-Cleanup, Auto-Aufbereitung;
 /// (b) IMMER → Reservierungen mit `reserviert_fuer_person_id = person_id` auflösen.
@@ -319,7 +466,7 @@ pub async fn aufenthalt(
                 pl.id AS platz_id, pl.bezeichnung AS platz_bezeichnung, \
                 (SELECT b.zeitpunkt_at FROM person_uhs_belegung b \
                   WHERE b.person_id = ep.id AND b.uhs_id = ep.aktuelle_uhs_id \
-                    AND b.art <> 'austritt' \
+                    AND b.art <> 'austritt' AND b.ruecknahme_von IS NULL \
                   ORDER BY b.zeitpunkt_at DESC, b.id DESC LIMIT 1) AS seit \
          FROM einsatz_person ep \
          JOIN uhs u ON u.id = ep.aktuelle_uhs_id \
@@ -821,6 +968,93 @@ mod tests {
         austritt(&pool, e, p, None, b).await.unwrap();
         assert_eq!(cache(&pool, p).await, (None, None));
         assert_eq!(verfuegbarkeit(&pool, pa).await, "aufbereitung");
+    }
+
+    async fn alt_machen(pool: &SqlitePool, ereignis: i64, at: &str) {
+        sqlx::query("UPDATE person_uhs_belegung SET zeitpunkt_at = ? WHERE id = ?")
+            .bind(at)
+            .bind(ereignis)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    /// LLH-1924: Rücknahme bringt die Person auf ihren Platz zurück, der Platz verlässt die
+    /// Aufbereitung, `seit` bleibt der Eintritt davor.
+    #[tokio::test]
+    async fn ruecknahme_bringt_auf_den_platz_zurueck() {
+        let pool = test_pool().await;
+        let (b, e, u, _, pa, _, p) = setup(&pool).await;
+        let ein = eintritt(&pool, e, p, u, Some(pa), None, b).await.unwrap();
+        alt_machen(&pool, ein.id, "2026-05-28 13:10:00").await;
+        let aus = austritt(&pool, e, p, None, b).await.unwrap();
+        assert_eq!(verfuegbarkeit(&pool, pa).await, "aufbereitung");
+
+        let r = nimm_austritt_zurueck(&pool, e, p, aus.id, b).await.unwrap();
+        assert!(!r.ohne_platz);
+        assert_eq!(r.ereignis.ruecknahme_von, Some(aus.id));
+        assert_eq!(cache(&pool, p).await, (Some(u), Some(pa)));
+        assert_eq!(verfuegbarkeit(&pool, pa).await, "frei");
+        let a = aufenthalt(&pool, e, p).await.unwrap().unwrap();
+        assert_eq!(a.seit.as_deref(), Some("2026-05-28 13:10:00"));
+
+        // Zweites Mal: schon zurückgenommen.
+        let r = nimm_austritt_zurueck(&pool, e, p, aus.id, b).await;
+        assert!(matches!(r, Err(AppError::Conflict(_))), "{r:?}");
+    }
+
+    /// LLH-1924: liegt inzwischen jemand anderes auf dem Platz, kommt die Person in den
+    /// Wartebereich; ist sie weiter gebucht oder das Austragen zu alt, 409 ohne Änderung.
+    #[tokio::test]
+    async fn ruecknahme_ohne_platz_und_ablehnungen() {
+        let pool = test_pool().await;
+        let (b, e, u, _, pa, _, p) = setup(&pool).await;
+        let andere: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
+             VALUES (?, 2, 'betroffen', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        eintritt(&pool, e, p, u, Some(pa), None, b).await.unwrap();
+        let aus = austritt(&pool, e, p, None, b).await.unwrap();
+        sqlx::query("UPDATE uhs_platz SET verfuegbarkeit = 'frei' WHERE id = ?")
+            .bind(pa)
+            .execute(&pool)
+            .await
+            .unwrap();
+        eintritt(&pool, e, andere, u, Some(pa), None, b)
+            .await
+            .unwrap();
+        let r = nimm_austritt_zurueck(&pool, e, p, aus.id, b).await.unwrap();
+        assert!(r.ohne_platz);
+        assert_eq!(cache(&pool, p).await, (Some(u), None));
+
+        // Weiter gebucht: nach erneutem Austritt eine neue Aufnahme.
+        let aus = austritt(&pool, e, p, None, b).await.unwrap();
+        eintritt(&pool, e, p, u, None, None, b).await.unwrap();
+        let r = nimm_austritt_zurueck(&pool, e, p, aus.id, b).await;
+        assert!(
+            matches!(&r, Err(AppError::Conflict(m)) if m.contains("weiter gebucht")),
+            "{r:?}"
+        );
+
+        // Zu alt.
+        let aus = austritt(&pool, e, p, None, b).await.unwrap();
+        alt_machen(&pool, aus.id, "2026-01-01 08:00:00").await;
+        let r = nimm_austritt_zurueck(&pool, e, p, aus.id, b).await;
+        assert!(
+            matches!(&r, Err(AppError::Conflict(m)) if m.contains("Minuten")),
+            "{r:?}"
+        );
+        assert_eq!(cache(&pool, p).await, (None, None));
+
+        // Kein Austritt: 404.
+        let r = nimm_austritt_zurueck(&pool, e, p, aus.id - 1, b).await;
+        assert!(matches!(r, Err(AppError::NotFound)), "{r:?}");
     }
 
     #[tokio::test]

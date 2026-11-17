@@ -568,6 +568,42 @@ pub async fn belegung(
     Ok((StatusCode::CREATED, Json(event)))
 }
 
+/// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung/{belegung_id}/zuruecknehmen —
+/// einen Austritt zurücknehmen (LLH-1924, Spec `bereitstellungsraum-belegung`, „Austritt
+/// zurücknehmen“, design.md D3). Rechte wie das Austragen, auch am Gerät des Raums. ETB und Live
+/// wie eine Belegung.
+pub async fn belegung_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Bereitstellungsraeume>,
+    PfadParam((_eid, br_id, belegung_id)): PfadParam<(i64, i64, i64)>,
+) -> Result<(StatusCode, Json<BrBelegungAnzeige>), AppError> {
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Bereitstellungsraum, br_id)?;
+    let einsatz_id = ctx.einsatz.id;
+    let event = belegung_repo::nimm_austritt_zurueck(
+        &state.pool,
+        einsatz_id,
+        br_id,
+        belegung_id,
+        ctx.benutzer.id,
+    )
+    .await?;
+    let br = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
+    if let Some(etb_text) =
+        belegungs_etb_text(&state.pool, einsatz_id, &br.bezeichnung, &event, None).await?
+    {
+        super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &etb_text).await;
+    }
+    sse_br(&state, einsatz_id, br_id);
+    let objekt_event = match event.objekt_typ.as_str() {
+        "einheit" => LiveEvent::Einheit,
+        _ => LiveEvent::Fahrzeug,
+    };
+    let data =
+        serde_json::json!({ "einsatz_id": einsatz_id, "objekt_id": event.objekt_id }).to_string();
+    state.live.publiziere_event(einsatz_id, objekt_event, data);
+    Ok((StatusCode::CREATED, Json(event)))
+}
+
 /// POST /api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf — eine Kraft aus dem Raum abrufen,
 /// optional mit Ziel-Abschnitt (Unterstellung) und Auftrag, auf Wunsch gleich ausgerückt (LLH-1085,
 /// design.md D2, D6–D11, D15). Belegung, Unterstellung, Auftrag samt Anordnung und genau ein
@@ -1026,6 +1062,11 @@ async fn belegungs_etb_text(
     };
 
     let text = match event.art.as_str() {
+        // Rücknahme eines Austritts (LLH-1924): kein neues Eintreffen.
+        "eintritt" if event.ruecknahme_von.is_some() => format!(
+            "{} wieder im Bereitstellungsraum {}: Austragen zurückgenommen",
+            obj_name, br_bezeichnung
+        ),
         "eintritt" => crate::bereitstellungsraum::etb_text_eintritt(&obj_name, br_bezeichnung),
         "wechsel" => format!(
             "{} wechselt zu Bereitstellungsraum {}",

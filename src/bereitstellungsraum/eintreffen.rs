@@ -491,6 +491,7 @@ fn buchung<'a>(r: &Rahmen<'a>) -> Buchung<'a> {
         client_id: r.client_id,
         zeitpunkt_at: Some(r.zeitpunkt_at),
         von_br_id: None,
+        ruecknahme_von: None,
     }
 }
 
