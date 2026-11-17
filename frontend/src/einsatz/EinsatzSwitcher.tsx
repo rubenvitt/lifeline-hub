@@ -6,18 +6,11 @@ import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
 import { einsatzPfad } from '../routing/deeplinks';
 import { farbenDunkel } from '../theme/tokens';
-import type { EinsatzAnzeige } from '../api/types';
-import { einsatzKennung } from './einsatzKennung';
+import { einsatzNebenzeile } from './einsatzNebenzeile';
 import { isUebung } from './einsatzart';
 import { modulAusPfad } from './modulRegistry';
 import { UebungsMarke, schriftGroesse } from '../components/instrument';
 import { useModusFarben } from '../components/rahmenStil';
-
-/** Nebenzeile eines Eintrags: Einsatznummer und Ort, soweit vorhanden (LFH-954). */
-function nebenzeile(e: EinsatzAnzeige): string | null {
-  const teile = [einsatzKennung(e), e.einsatzort?.trim()].filter((t): t is string => !!t);
-  return teile.length > 0 ? teile.join(' · ') : null;
-}
 
 /**
  * Switcher im Einsatz-Header: aktive Einsätze und der Weg zur Einsatzliste.
@@ -64,7 +57,8 @@ export default function EinsatzSwitcher({
   const eigenerKey = `einsatz-${aktuellId}`;
   const items: MenuProps['items'] = [
     ...aktive.map((e) => {
-      const neben = nebenzeile(e);
+      // Nebenzeile „Einsatzart · Nummer · Ort“ (LFH-954, LLH-1821 D2).
+      const neben = einsatzNebenzeile(e);
       // Eine Übung trägt die Übungsmarke vor dem Namen (LLH-1725, Spec `uebungsmarke`).
       const name = isUebung(e) ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

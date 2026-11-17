@@ -202,6 +202,34 @@ describe('EinsatzSwitcher', () => {
     );
   });
 
+  it('nennt die Einsatzart vor Nummer und Ort, bei einer Übung nicht (LLH-1821)', async () => {
+    server.use(
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json([
+          einsatz({ id: 7, bezeichnung: 'Hochwasser' }),
+          einsatz({
+            id: 8,
+            bezeichnung: 'Stadtfest',
+            einsatzart: 'sanitaetsdienst',
+            einsatznummer_intern: 'E-2026-0431',
+            einsatzort: 'Markt',
+          }),
+          einsatz({ id: 9, bezeichnung: 'Stadtfest Probe', einsatzart: 'uebung', einsatzort: 'Markt' }),
+        ]),
+      ),
+    );
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: /Hochwasser/ }));
+    const menue = await screen.findByRole('menu');
+    const neben = (name: RegExp) =>
+      within(menue)
+        .getByRole('menuitem', { name })
+        .querySelector('[data-lfh="wechsler-nebenzeile"]')?.textContent;
+    expect(neben(/E-2026-0431/)).toBe('Sanitätsdienst · E-2026-0431 · Markt');
+    // Die Übung trägt schon die Marke „ÜBUNG“: keine zweite Nennung der Art.
+    expect(neben(/Stadtfest Probe/)).toBe('Markt');
+  });
+
   it('nennt je Einsatz Nummer und Ort in einer Nebenzeile, soweit vorhanden', async () => {
     server.use(
       http.get('/api/einsaetze', () =>
