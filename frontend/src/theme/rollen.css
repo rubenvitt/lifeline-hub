@@ -332,6 +332,15 @@
   --lfh-schrift-faktor: 1.25;
 }
 
+/* Am Handy wächst die Schrift nicht mit der Dichte (LLH-1954, alpha rot nach LLH-1719): unter
+   768 px fehlt der Platz, Kopf, Chips, Leisten und Menüs liefen sonst über oder brächen um. Die
+   Trefferflächen wachsen weiter mit der Dichte. */
+@media (max-width: 767.98px) {
+  :root[data-dichte] {
+    --lfh-schrift-faktor: 1;
+  }
+}
+
 /* ── Helligkeit · die Deckschicht (LFH-397) ───────────────────────────────
    Der Helligkeitsregler dimmt über EINE schwarze Schicht über der ganzen Seite,
    nicht über die Paletten: `farbenDunkel`/`farbenHell` und jedes Kontrast-Gate
