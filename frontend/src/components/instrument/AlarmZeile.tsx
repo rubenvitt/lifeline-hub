@@ -203,7 +203,13 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
           content={
             <ul
               data-lfh="alarm-liste"
-              style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}
+              style={{
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'grid',
+                gap: token.marginXS,
+              }}
             >
               {eintraege.map((e) => (
                 <li key={e.art}>{eintrag({ ...e, text: e.voll }, true)}</li>

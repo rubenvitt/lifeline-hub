@@ -5,9 +5,9 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Kräfte entlassen statt löschen (LLH-1079), Durchstich im Browser: „Entlassen“ in der
  * Personenansicht (seit LLH-1060 nur dort) schreibt die Entlassung in die Zeitachse der Person;
  * die Ansicht bleibt lesbar mit der Marke „entlassen“, die Liste legt die Person in den Block
- * „Entlassen“, dessen Name zurück in die Ansicht führt. Der Rückgängig-Hinweis disponiert sie
- * wieder, ihre Zeitachse bleibt mit der Entlassung stehen. Gewartet wird auf Inhaltsanker, nie
- * auf `networkidle` (LFH-385).
+ * „Entlassen“, dessen Name zurück in die Ansicht führt. Der Rückgängig-Hinweis nimmt das
+ * Entlassen zurück (LLH-1922): die Entlassung steht gestrichen in der Zeitachse, eine neue Periode
+ * entsteht nicht. Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
 const NAME = 'Entlassen, Erika';
@@ -32,7 +32,7 @@ async function seedePerson(page: Page): Promise<string> {
   return einsatzId;
 }
 
-test('Entlassen aus der Ansicht legt die Kraft in den Block „Entlassen“, Rückgängig holt sie mit Zeitachse zurück', async ({
+test('Entlassen aus der Ansicht legt die Kraft in den Block „Entlassen“, Rückgängig nimmt das Entlassen zurück', async ({
   page,
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
@@ -63,8 +63,11 @@ test('Entlassen aus der Ansicht legt die Kraft in den Block „Entlassen“, Rü
   await hinweis.getByRole('button', { name: 'Rückgängig' }).click();
   await expect(main.getByRole('button', { name: `${NAME} entlassen` })).toBeVisible();
   await expect(titel).not.toContainText('entlassen');
-  // Die Zeitachse bleibt mit der Entlassung stehen.
-  await expect(ereignisse.filter({ hasText: 'Entlassung' })).toHaveCount(1);
+  // Die Entlassung steht gestrichen da, mit dem Grund der Rücknahme; die Periode davor läuft weiter.
+  const entlassung = ereignisse.filter({ hasText: 'Entlassung' });
+  await expect(entlassung).toHaveCount(1);
+  await expect(entlassung).toHaveAttribute('data-gestrichen', 'true');
+  await expect(entlassung).toContainText('Entlassung zurückgenommen');
 
   // Erneut entlassen, dann über die Brotkrume zur Liste: dort steht der Block „Entlassen“.
   await main.getByRole('button', { name: `${NAME} entlassen` }).click();

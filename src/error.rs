@@ -64,11 +64,20 @@ pub enum AppError {
     /// Umschlag wie [`AppError::Zeilen`], damit der Client sie vom 404 einer unbekannten Route
     /// unterscheidet (etwa nach einem Server-Rollback) und nur dann die Zeile herausnimmt.
     NichtInListe,
+    /// Sperrkonflikt (409, LLH-1920): der Datensatz hat sich seit dem Basisstand
+    /// (`basis_geaendert_at`) geändert. `{error, grund: "veraltet"}`, damit der Client ihn vom
+    /// übrigen 409 (Lebenszyklus, doppelte Bezeichnung) trennt und nur hier „Zwischenzeitlich
+    /// geändert“ fragt (`src/AGENTS.md`, Statuscode-Konvention).
+    Veraltet,
 }
 
 /// Wert von `grund` im Umschlag von [`AppError::NichtInListe`]; der Client vergleicht ihn
 /// (`frontend/src/api/client.ts`, `GRUND_NICHT_IN_LISTE`).
 pub const GRUND_NICHT_IN_LISTE: &str = "nicht_in_liste";
+
+/// Wert von `grund` im Umschlag von [`AppError::Veraltet`]; der Client vergleicht ihn
+/// (`frontend/src/api/client.ts`, `GRUND_VERALTET`).
+pub const GRUND_VERALTET: &str = "veraltet";
 
 crate::wire_enum::wire_enum! {
     /// Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können
@@ -124,6 +133,10 @@ impl std::fmt::Display for AppError {
             AppError::NotFound | AppError::NichtInListe => write!(f, "Nicht gefunden"),
             AppError::Validation(m) => write!(f, "{m}"),
             AppError::Conflict(m) => write!(f, "{m}"),
+            AppError::Veraltet => write!(
+                f,
+                "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden."
+            ),
             AppError::UnprocessableEntity(m) => write!(f, "{m}"),
             AppError::Database(e) => write!(f, "Datenbankfehler: {e}"),
             AppError::Internal(m) => write!(f, "{m}"),
@@ -156,7 +169,7 @@ impl AppError {
             AppError::Forbidden | AppError::ForbiddenMit(_) => StatusCode::FORBIDDEN,
             AppError::NotFound | AppError::NichtInListe => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
-            AppError::Conflict(_) => StatusCode::CONFLICT,
+            AppError::Conflict(_) | AppError::Veraltet => StatusCode::CONFLICT,
             AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
             // Sicherheitsnetz: nicht vorab abgefangene Constraint-Verletzungen bekommen einen
             // fachlichen
@@ -307,6 +320,14 @@ impl IntoResponse for AppError {
             )
                 .into_response();
         }
+        if let AppError::Veraltet = self {
+            let message = self.public_message();
+            return (
+                status,
+                Json(json!({ "error": message, "grund": GRUND_VERALTET })),
+            )
+                .into_response();
+        }
         if let AppError::NichtInListe = self {
             let message = self.public_message();
             return (
@@ -333,6 +354,21 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json["error"], "Nicht gefunden");
         assert_eq!(json["grund"], GRUND_NICHT_IN_LISTE);
+    }
+
+    /// LLH-1920: der Sperrkonflikt (CAS) trägt `grund: "veraltet"`, damit der Client ihn vom
+    /// übrigen 409 (Lebenszyklus, doppelte Bezeichnung) unterscheidet.
+    #[tokio::test]
+    async fn veraltet_ist_409_mit_grund() {
+        let resp = AppError::Veraltet.into_response();
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            json["error"],
+            "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden."
+        );
+        assert_eq!(json["grund"], GRUND_VERALTET);
     }
 
     #[tokio::test]

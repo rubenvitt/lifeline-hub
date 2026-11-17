@@ -110,6 +110,11 @@ export interface UhsPatch {
   soll_anzahl?: number | null;
   /** LLH-1553: Qualifikationssoll, `[]` oder `null` = keins. */
   quali_soll?: QualiSollEingabe[] | null;
+  /**
+   * Optimistisches Lock (LLH-1920): `geaendert_at` beim Öffnen; ein anderer Stand gibt 409. Fehlt
+   * er, schreibt der Server ohne Prüfung.
+   */
+  basis_geaendert_at?: string;
 }
 
 export function aktualisiereUhs(einsatzId: number, uhsId: number, daten: UhsPatch): Promise<Uhs> {

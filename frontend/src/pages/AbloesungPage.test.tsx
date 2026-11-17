@@ -509,9 +509,7 @@ describe('AbloesungPage (LFH-635)', () => {
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
-    );
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }));
     expect(
       await within(dialog).findByText('Bisherige Besatzung: Anna Alt', { exact: false }),
     ).toBeInTheDocument();
@@ -597,8 +595,13 @@ describe('AbloesungPage (LFH-635)', () => {
     await userEvent.click(knoepfe[0]);
     const dialog = await screen.findByRole('dialog');
     const wechsel = within(dialog).getByRole('radio', { name: 'Besatzungswechsel' });
-    await waitFor(() => expect(wechsel).toBeDisabled());
-    expect(within(dialog).getByText('Modul Personal gesperrt')).toBeInTheDocument();
+    // Die Segmentleiste sperrt über `aria-disabled`, damit der Grund am Segment erreichbar bleibt.
+    await waitFor(() => expect(wechsel).toHaveAttribute('aria-disabled', 'true'));
+    expect(
+      within(dialog)
+        .getAllByText('Modul Personal gesperrt')
+        .filter((el) => el.closest('[hidden]') == null),
+    ).toHaveLength(1);
     expect(listeEinsatzPersonal).not.toHaveBeenCalled();
   });
 
@@ -737,7 +740,12 @@ describe('AbloesungPage (LFH-635)', () => {
       within(dialog).getByRole('combobox', { name: 'Ablösende Einheiten' }),
     ).toHaveAccessibleDescription('Modul Einheiten gesperrt');
     // Der Besatzungswechsel ist aus demselben Grund gesperrt; der Grund steht einmal.
-    expect(within(dialog).getAllByText('Modul Einheiten gesperrt')).toHaveLength(1);
+    // Sichtbar steht er einmal; das Segment trägt ihn zusätzlich als verborgene Beschreibung.
+    expect(
+      within(dialog)
+        .getAllByText('Modul Einheiten gesperrt')
+        .filter((el) => el.closest('[hidden]') == null),
+    ).toHaveLength(1);
     expect(await gewaehlteOptionen('Ablösende Einheiten')).toEqual(['Florian 2']);
     expect(listeEinheiten).not.toHaveBeenCalled();
   });

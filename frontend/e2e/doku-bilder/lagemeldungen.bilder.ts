@@ -8,7 +8,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * (`pnpm doku:bilder --grep lagemeldungen`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   in-die-lage-uebernehmen.png  frontend/src/meldungen/LagerelevantModal.tsx
  *   lagemeldungen.png            frontend/src/pages/LagemeldungenPage.tsx
- *   lagemeldung-erfassen.png     frontend/src/pages/LagemeldungenPage.tsx (Paneel „Lagemeldung
+ *   lagemeldung-erfassen.png     frontend/src/pages/LagemeldungenPage.tsx (Dialog „Lagemeldung
  *                                erfassen“, frontend/src/meldungen/MeldungFormular.tsx)
  *
  * Die Demo enthält zwei Meldungen der Art Lagemeldung; sie stehen ab der Anlage in der Lage. Der
@@ -129,16 +129,16 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/lagemeldungen`);
     await page.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
-    const paneel = page.getByRole('region', { name: 'Lagemeldung erfassen' });
-    await paneel
+    const dialog = page.getByRole('dialog', { name: 'Lagemeldung erfassen' });
+    await dialog
       .getByRole('textbox', { name: 'Inhalt / Wortlaut' })
       .fill('Pegel Mühlbach 2,40 m, steigt weiter. Deich an der Unterstadt hält.');
-    await paneel.getByRole('combobox', { name: 'Absender' }).fill('EA Unterstadt');
-    await paneel.getByRole('combobox', { name: 'Absender' }).blur();
-    await fotografiere(paneel, KAPITEL, 'lagemeldung-erfassen');
+    await dialog.getByRole('combobox', { name: 'Absender' }).fill('EA Unterstadt');
+    await dialog.getByRole('combobox', { name: 'Absender' }).blur();
+    await fotografiere(dialog, KAPITEL, 'lagemeldung-erfassen');
     // Ablauf weiter: erfassen; die neue steht in der Zeitachse.
-    await paneel.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
-    await expect(paneel).toBeHidden();
+    await dialog.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
+    await expect(dialog).toBeHidden();
     await expect(
       page
         .getByRole('region', { name: 'Lagemeldungen' })

@@ -302,18 +302,18 @@ describe('EinsatzSeite', () => {
   /**
    * LLH-1278: der Titelblock hängt oben und hat die Höhe einer Zeile der Stufe. Eine höhere
    * Aktion (Segmentleiste) lässt die Leiste nach unten wachsen, ohne den Titel zu verschieben.
-   * Böden als Literale: kompakt der 44-px-Boden ohne Polster und Haarlinie (44 − 2 · 3 − 1), sonst
+   * Böden als Literale: kompakt der 44-px-Boden ohne Polster und Haarlinie (44 − 2 · 4 − 1), sonst
    * die Treffhöhe; mit 38 wüchse der Kopf in `kompakt` auf 45 px (`e2e/gate3-trefflaeche.spec.ts`).
    * Ob der Titel im Layout stehen bleibt, misst `e2e/kraefte-seitenkopf.spec.ts`.
    */
-  it('hängt den Titelblock oben ein, eine Zeile der Stufe hoch (37 / 48 / 72 px)', () => {
+  it('hängt den Titelblock oben ein, eine Zeile der Stufe hoch (35 / 48 / 72 px)', () => {
     const tokenFuer = (s: keyof typeof dichten) => ({
       controlHeight: dichten[s].zeilenhoehe,
       paddingXS: dichten[s].abstand.xs,
       marginXS: dichten[s].abstand.xs,
     });
     for (const [stufe, boden] of [
-      ['kompakt', 37],
+      ['kompakt', 35],
       ['komfortabel', 48],
       ['handschuh', 72],
     ] as const) {

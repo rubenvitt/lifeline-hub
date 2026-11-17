@@ -20,7 +20,7 @@ import {
  *                        frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/EinheitAngabe.tsx,
  *                        frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx,
  *                        frontend/src/kraefte/einteilungKern.ts (Gruppen nach Einheit)
- *   einteilen.png        frontend/src/pages/PersonalPage.tsx (Zeile), frontend/src/kraefte/EinheitAngabe.tsx,
+ *   einteilen.png        frontend/src/pages/PersonalPage.tsx (Tabelle), frontend/src/kraefte/EinheitAngabe.tsx,
  *                        frontend/src/components/InlineAngabe.tsx
  *   personal-disponieren.png frontend/src/kraefte/PersonalDisponierenModal.tsx,
  *                        frontend/src/kraefte/SammelGruende.tsx
@@ -152,16 +152,18 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/personal`);
     const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
     await region.getByRole('button', { name: `Einheit zu ${OHNE_EINHEIT} eintragen` }).click();
-    await region.getByRole('combobox', { name: `Einheit zu ${OHNE_EINHEIT}` }).click();
+    // Die Bearbeitung schwebt an der Zelle (LLH-1795), im Popover außerhalb der Region.
+    await page.getByRole('combobox', { name: `Einheit zu ${OHNE_EINHEIT}` }).click();
     // Die Auswahl zeigt den Pfad der Einheit (`kraefte/EinheitAngabe.tsx`).
     await waehleStehend(page, 'Sanitätszug Musterstadt › Rettungsstaffel');
     await expect(offeneAuswahl(page)).toHaveCount(0);
-    const zeile = region.locator('tr.ant-table-row').filter({ hasText: OHNE_EINHEIT });
     await expect(
-      zeile.getByRole('button', { name: `Einheit zu ${OHNE_EINHEIT} speichern` }),
+      page.getByRole('button', { name: `Einheit zu ${OHNE_EINHEIT} speichern` }),
     ).toBeVisible();
     await page.mouse.move(0, 0);
-    await fotografiere(zeile, KAPITEL, 'einteilen');
+    // Die Tabelle statt der Zeile: die Zeile allein schnitte die schwebende Bearbeitung ab. Ein
+    // Element-Bild schneidet den Bildschirm aus, das Popover darüber steht also mit darin.
+    await fotografiere(region, KAPITEL, 'einteilen');
   });
 
   test('Dialog „Personal disponieren“', async ({ page }) => {

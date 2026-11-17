@@ -4,7 +4,7 @@ import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import Direkteinstieg from '../../components/Direkteinstieg';
-import BrAnlegenDrawer from './BrAnlegenDrawer';
+import BrAnlegenModal from './BrAnlegenModal';
 import { liesLetztenBr, waehleDefaultBr } from './brAuswahl';
 
 /** Index-Route /einsaetze/:id/bereitstellungsraeume — BR-Belegung von `Direkteinstieg`. */
@@ -23,7 +23,7 @@ export default function BereitstellungsraeumeDefault() {
       fehlerText="Bereitstellungsräume konnten nicht geladen werden"
       leerTitel="Noch keine Bereitstellungsräume erfasst"
       leerAktionLabel="Ersten BR anlegen"
-      anlegen={(slot) => <BrAnlegenDrawer einsatzId={einsatzId} {...slot} />}
+      anlegen={(slot) => <BrAnlegenModal einsatzId={einsatzId} {...slot} />}
     />
   );
 }

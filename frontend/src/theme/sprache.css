@@ -155,8 +155,12 @@
 /* Ein Titel aus einem langen Wort trennt in der Zelle, statt über ihren Rand zu laufen: mit drei
    Spalten auf 390 px lief „EINSATZABSCHNITTE“ im Überblick 15 px über (Gate 1, LLH-1748).
    `hyphens` trennt, wo der Browser ein deutsches Wörterbuch hat, sonst bricht `anywhere` am
-   Spaltenrand. Ein Wort, das passt, bleibt unberührt. */
-.lfh-kennzahl__titel {
+   Spaltenrand. Nur in Bändern mit `notizZeilenSchmal`: Sie halten Platz für umbrochenen Text
+   (in `handschuh` zwei Titelzeilen, unten). Ein anderes Band muss einzeilig bleiben: In der
+   Ausgabeansicht der Verpflegung (LLH-1294) ragt „AUSGEGEBEN“ mit dem Laufweiten-Nachlauf 2 px
+   über seine 83-px-Spalte. Getrennt würde er zweizeilig, und die Ansicht rollte am Gerät bei
+   390 × 700 um 9 px. */
+.lfh-kennzahlenband--notizzeilen .lfh-kennzahl__titel {
   hyphens: auto;
   overflow-wrap: anywhere;
 }
@@ -394,12 +398,21 @@
   text-transform: uppercase;
   border-bottom-color: var(--lfh-linie);
 }
+/* Stehende Kopfzeile (LLH-1788): rc-table legt den Kopf in eine EIGENE Tabelle, deren colgroup
+   die im Körper gemessenen Breiten trägt, setzt aber inline `table-layout: auto`. Dort gälten die
+   Breiten nur als Mindestwert, ein Kopf mit Sortier- und Filterknopf (48 / 72 px) wüchse über
+   seine Körperspalte hinaus und schöbe alle Spalten daneben (51 px in der Personalliste). Fest
+   übernimmt der Kopf die Breiten des Körpers genau; dass er dabei nie gekürzt wird, sichert die
+   Mindestbreite je Spalte (`components/kopfBreite.ts`). `!important` gegen den Inline-Stil. */
+.ant-table-wrapper.lfh-katalog .ant-table-sticky-holder > table {
+  table-layout: fixed !important;
+}
 /* Spaltenfilter-Auslöser im Kopf (LLH-1227, Kriterium 2). antd zeichnet ihn in Schriftgröße
    (20 × 23 px in jeder Stufe); der Boden kommt als aufgelöster `controlHeightSM` über
    `--lfh-filter-ziel` (`filterKopfStil` in `KatalogTabelle.tsx`), 24 / 48 / 72 px. Er ragt um
    die Kopfzellen-Polsterung (`--lfh-filter-einzug`) nach oben und unten, so wächst der Kopf nur
    auf die Steuerhöhe. Rechts kein negativer Rand wie bei antd: die volle Zellpolsterung
-   (11 / 18 / 26 px) trennt ihn von der nächsten, oft sortierbaren Kopfzelle. Den Fokusring
+   (12 / 20 / 24 px) trennt ihn von der nächsten, oft sortierbaren Kopfzelle. Den Fokusring
    nach innen versetzt, wie `.lfh-segment`. */
 .ant-table-wrapper.lfh-katalog .ant-table-thead .ant-table-filter-trigger {
   box-sizing: border-box;
@@ -416,7 +429,7 @@
 /* Sortierbare Kopfzelle (LLH-1273, Kriterium 2). antd hängt den Klick an die ganze Zelle samt
    Polsterung, zwei sortierbare Köpfe stießen deshalb ohne Lücke aneinander. Ziel ist hier nur ihr
    Inhalt (`.ant-table-column-sorters`, mit Filter auch der Auslöser); einen Klick in die Polsterung
-   (11 / 18 / 26 px je Seite) hält `polsterKlickRiegel` in `KatalogTabelle.tsx` an, der Zeiger zeigt
+   (12 / 20 / 24 px je Seite) hält `polsterKlickRiegel` in `KatalogTabelle.tsx` an, der Zeiger zeigt
    dort keine Hand. `position` fängt antds Klickfläche `::after` (`inset: 0`) im Inhalt statt in
    der Zelle. Senkrecht reicht der Inhalt bis an den Zellrand, mindestens auf die Steuerhöhe
    (`--lfh-sortier-ziel`, 30 / 48 / 72 px, `sortierKopfStyle`), wie der Filter-Auslöser um den
@@ -466,6 +479,8 @@
 .ant-table-wrapper.lfh-katalog .ant-table-body,
 .ant-table-wrapper.lfh-katalog .ant-table-content {
   scroll-padding-inline-start: var(--lfh-tabellen-kennung-breite, 0px);
+  /* Gegenstück für die rechts fixierte Aktionsspalte (LLH-1789, `AKTION_FREIRAUM`). */
+  scroll-padding-inline-end: var(--lfh-tabellen-aktion-breite, 0px);
 }
 /* Abschneide-Indikator (LFH-980, Bedien-Leitlinie „Wenn Tabelle, dann vollständig“ Nr. 4):
    kann die Tabelle waagerecht weiterlaufen, zeigt der Rand, auf dessen Seite Inhalt verborgen

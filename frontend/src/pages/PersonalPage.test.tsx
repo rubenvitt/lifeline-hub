@@ -724,7 +724,7 @@ describe('PersonalPage', () => {
 
   /** Blendet eine voreingestellt verborgene Spalte über den Spaltenschalter ein. */
   async function blendeEin(spalte: string) {
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: spalte }));
   }
 
@@ -759,11 +759,14 @@ describe('PersonalPage', () => {
     setzeViewportBreite(1440);
     render(einsatz());
     await bereit();
-    // Abschnitt weicht unter `xxl` wie auf der Fahrzeugseite (LLH-1096).
-    expect(screen.getByRole('button', { name: /Spalten · 4 ausgeblendet/ })).toBeInTheDocument();
+    // Abschnitt weicht unter `xxl` wie auf der Fahrzeugseite (LLH-1096). Ohne eigene Wahl steht
+    // kein Zähler im Namen (LLH-1790); nach einer Wahl zählt er alle verborgenen Spalten.
+    expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
     for (const kopf of ['Träger', 'Ruhe', 'Bemerkung', 'Abschnitt']) {
       expect(screen.queryByRole('columnheader', { name: kopf })).toBeNull();
     }
+    await blendeEin('Ruhe');
+    expect(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ })).toBeInTheDocument();
   });
 
   it.each([
@@ -777,9 +780,9 @@ describe('PersonalPage', () => {
       setzeViewportBreite(breite);
       render(einsatz());
       await bereit();
-      expect(
-        screen.getByRole('button', { name: new RegExp(`Spalten · ${anzahl} ausgeblendet`) }),
-      ).toBeInTheDocument();
+      // Ohne eigene Wahl kein Zähler im Namen (LLH-1790); verborgen sind trotzdem `anzahl`.
+      expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
+      void anzahl;
       for (const kopf of ['Einheit', 'Fahrzeug', 'Position', 'Status', 'Einsatzdauer']) {
         // Am Anfang: der Kopf „Status“ trägt dahinter den Filterauslöser (LLH-1086).
         expect(
@@ -1185,7 +1188,7 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
   };
   /** „Ruhe“ steht seit LLH-1060 im Spaltenschalter (D7). */
   async function zeigeRuhe() {
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · \d+ ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Ruhe' }));
   }
 

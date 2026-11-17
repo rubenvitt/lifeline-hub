@@ -97,7 +97,7 @@ export function StatusChip({ ton, wort, code, trenner, title, style }: StatusChi
         alignItems: 'center',
         gap: token.marginXS,
         height: 22,
-        paddingInline: 8,
+        paddingInline: token.paddingSM,
         background: f.grund,
         color: f.text,
         whiteSpace: 'nowrap',

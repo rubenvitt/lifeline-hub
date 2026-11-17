@@ -24,7 +24,11 @@ Handler (`JsonBody`, LFH-1074).
   (kein Dialog). Das Frontend trennt nur
   heuristisch (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
   `SchaedenDetailPage.tsx`/`TiereDetailPage.tsx`) — ein neuer 409 in einer
-  CAS-Route zieht den Zweig mit.
+  CAS-Route zieht den Zweig mit. Ausgezeichnet ist der Sperrkonflikt bei UHS und
+  Bereitstellungsraum (LLH-1920): `AppError::Veraltet` antwortet 409 mit `grund: "veraltet"`, das
+  `BearbeitbaresPaneel` fragt dort nur bei ihm (`isVeraltet`); ein anderer 409 derselben Route
+  (storniert, doppelte Bezeichnung) steht als Grund am Paneel. Eine neue CAS-Route nimmt
+  `Veraltet`.
 - **CAS-Baseline beim Öffnen einfrieren**: das Sammelbearbeiten von Tier und Schaden über
   `components/useEditSitzung.ts` (gebrandete `CasBasis`; `starte` nimmt den Datensatz); Test
   braucht ein gemountetes `<Form form={form}>`.

@@ -56,6 +56,7 @@ import { registrierNummer } from '../anzeige/registrierNummer';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
+import { flaeche } from '../theme/tokens';
 
 /**
  * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
@@ -304,7 +305,7 @@ export default function TiereDetailPage() {
   if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

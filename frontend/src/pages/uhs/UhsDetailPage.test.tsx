@@ -1,7 +1,15 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  RouterProvider,
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+} from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import UhsDetailPage from './UhsDetailPage';
@@ -13,6 +21,8 @@ import { listePersonen } from '../../api/einsatzPerson';
 import type { Person } from '../../api/types';
 import { ApiError } from '../../api/client';
 import { erwarteNichtGefunden } from '../../test/nichtGefunden';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../test/server';
 
 // Auto-Mocks: bei ungültiger ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
 vi.mock('../../api/einsaetze');
@@ -39,6 +49,25 @@ vi.mock('./Grundriss', async () => {
 vi.mock('./MaterialTab', () => ({ default: () => <div>MATERIAL-TAB</div> }));
 vi.mock('./BewegungenTab', () => ({ default: () => <div>BEWEGUNGEN-TAB</div> }));
 vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
+// Das Paneel „Angaben“ hat eigene Tests (`UhsAngaben.test.tsx`); hier zählt, ob die Seite es mit dem
+// richtigen Recht einsetzt und ob ihr Merker den Bereichswechsel anhält: „ÄNDERN“ meldet eine
+// geänderte Bearbeitung wie das echte Paneel.
+vi.mock('./UhsAngaben', async () => {
+  const { useOffeneBearbeitungBelegung } = await import('../../components/offeneBearbeitung');
+  return {
+    default: function AngabenAttrappe(p: { bearbeitbar: boolean }) {
+      const { melde } = useOffeneBearbeitungBelegung('Angaben');
+      return (
+        <div>
+          ANGABEN bearbeitbar={String(p.bearbeitbar)}
+          <button type="button" onClick={() => melde('geaendert')}>
+            ÄNDERN
+          </button>
+        </div>
+      );
+    },
+  };
+});
 vi.mock('./UhsAnhaenge', () => ({
   default: (p: { darfSchreiben: boolean; zeigeZugriffe: boolean }) => (
     <div>
@@ -91,20 +120,29 @@ async function aufloesenWaehlen(bezeichnung = 'UHS Nord') {
 
 function renderBei(route: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Data Router: der Merker der Seite hält Wechsel mit offener Änderung an (`useBlocker`).
+  const router = createMemoryRouter(
+    [
+      { path: '/einsaetze/:id/unfallhilfsstellen/liste', element: <div>UHS-LISTE</div> },
+      // Ziele außerhalb der Seite (Aufnahme): nur die Adresse zählt.
+      { path: '*', element: <LocationProbe /> },
+      {
+        path: '/einsaetze/:id/unfallhilfsstellen/:uhsId',
+        element: (
+          <>
+            <LocationProbe />
+            <UhsDetailPage />
+          </>
+        ),
+      },
+    ],
+    { initialEntries: [route] },
+  );
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
-          <MemoryRouter initialEntries={[route]}>
-            <LocationProbe />
-            <Routes>
-              <Route
-                path="/einsaetze/:id/unfallhilfsstellen/liste"
-                element={<div>UHS-LISTE</div>}
-              />
-              <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-            </Routes>
-          </MemoryRouter>
+          <RouterProvider router={router} />
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
@@ -163,7 +201,9 @@ describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
     vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
   };
   const leiste = () =>
-    screen.findByRole('tablist', { name: 'Belegung, Material, Kräfte, Bewegungen und Dateien' });
+    screen.findByRole('tablist', {
+      name: 'Belegung, Material, Kräfte, Bewegungen, Dateien und Angaben',
+    });
 
   it('Vorgabe ist die Belegung: der Grundriss steht im Bereich, die anderen nicht', async () => {
     geladen();
@@ -201,7 +241,7 @@ describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
       zahlen.compareDocumentPosition(within(feld).getByText('GRUNDRISS')) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    for (const titel of ['In der Stelle', 'Plätze frei', 'Wartend', 'Unterwegs']) {
+    for (const titel of ['In der Stelle', /^von \d+ Plätzen? frei$/, 'Wartend', 'Unterwegs']) {
       expect(within(zahlen).getByText(titel)).toBeInTheDocument();
     }
     // Über dem Grundriss ist eine Zahl kein Sprung: die Fläche darunter zeigt dasselbe.
@@ -364,7 +404,7 @@ describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     const leiste = await screen.findByRole('tablist', {
-      name: 'Belegung, Material, Kräfte, Bewegungen und Dateien',
+      name: 'Belegung, Material, Kräfte, Bewegungen, Dateien und Angaben',
     });
     expect(leiste).toBeInTheDocument();
     expect(screen.queryByText(/DATEIEN-TAB/)).not.toBeInTheDocument();
@@ -595,7 +635,7 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     );
   });
 
-  it('kein roter Knopf im Kopf: „Patient aufnehmen“, „Bearbeiten“ und das ⋮ (LLH-1722)', async () => {
+  it('kein roter Knopf im Kopf: „Patient aufnehmen“ und das ⋮ (LLH-1722, LLH-1920)', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
     vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
@@ -606,12 +646,12 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
       within(kopf)
         .getAllByRole('button')
         .map((b) => b.getAttribute('aria-label') ?? b.textContent),
-    ).toEqual(['Patient aufnehmen', 'Bearbeiten', 'Weitere Aktionen zu UHS Nord']);
+    ).toEqual(['Patient aufnehmen', 'Weitere Aktionen zu UHS Nord']);
     expect(kopf.querySelector('.ant-btn-dangerous')).toBeNull();
   });
 });
 
-describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
+describe('UhsDetailPage — Stammdaten im Bereich „Angaben“ (LLH-1407, LLH-1920)', () => {
   const uhsBasis = {
     id: 9,
     einsatz_id: 1,
@@ -623,7 +663,13 @@ describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
     plaetze: [],
     belegungen: [],
   };
-  function zeige(status: string, meine_rolle = 'einsatzleitung') {
+  function zeige(
+    status: string,
+    {
+      meine_rolle = 'einsatzleitung',
+      route = '/einsaetze/1/unfallhilfsstellen/9?bereich=angaben',
+    } = {},
+  ) {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1,
       bezeichnung: 'Lage',
@@ -633,27 +679,121 @@ describe('UhsDetailPage — „Bearbeiten“ im Kopf (LLH-1407)', () => {
     vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status } as unknown as Awaited<
       ReturnType<typeof ladeUhs>
     >);
-    return renderBei('/einsaetze/1/unfallhilfsstellen/9');
+    return renderBei(route);
   }
 
-  it.each(['geplant', 'aktiv'])('%s: „Bearbeiten“ öffnet die Stammdaten', async (status) => {
-    zeige(status);
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    expect(
-      await screen.findByRole('dialog', { name: 'Unfallhilfsstelle bearbeiten' }),
-    ).toBeInTheDocument();
+  it.each(['geplant', 'aktiv'])(
+    '%s: kein „Bearbeiten“ im Kopf, der Bereich „Angaben“ ist bearbeitbar',
+    async (status) => {
+      zeige(status);
+      expect(await screen.findByText('ANGABEN bearbeitbar=true')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Angaben' })).toHaveAttribute('aria-selected', 'true');
+      const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+      expect(within(kopf).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Unfallhilfsstelle bearbeiten' })).toBeNull();
+    },
+  );
+
+  it('der Reiter „Angaben“ schreibt den Bereich in die Adresse', async () => {
+    zeige('aktiv', { route: '/einsaetze/1/unfallhilfsstellen/9' });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Angaben' }));
+    expect(await screen.findByText('ANGABEN bearbeitbar=true')).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
   });
 
-  it('aufgelöst: kein „Bearbeiten“', async () => {
+  it('aufgelöst: Angaben nur zum Lesen', async () => {
     zeige('aufgeloest');
-    await screen.findByText('GRUNDRISS');
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(await screen.findByText('ANGABEN bearbeitbar=false')).toBeInTheDocument();
   });
 
-  it('ohne Schreibrecht: kein „Bearbeiten“', async () => {
-    zeige('aktiv', 'beobachter');
-    await screen.findByText('GRUNDRISS');
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  it('geänderte Angaben: ein Bereichswechsel fragt erst nach, „Bleiben“ behält die Bearbeitung', async () => {
+    zeige('aktiv');
+    await userEvent.click(await screen.findByRole('button', { name: 'ÄNDERN' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Material' }));
+    const frage = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
+    await userEvent.click(within(frage).getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByText('ANGABEN bearbeitbar=true')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Angaben' })).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Material' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' })).getByRole(
+        'button',
+        { name: 'Verwerfen' },
+      ),
+    );
+    expect(await screen.findByText('MATERIAL-TAB')).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=material');
+  });
+
+  it('geänderte Angaben: auch die Kopfzahl des Materials fragt erst nach', async () => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockResolvedValue({
+      ...uhsBasis,
+      status: 'aktiv',
+      material: [
+        {
+          id: 1,
+          bezeichnung: 'Posten 1',
+          art: 'geraet',
+          menge: 1,
+          ausgegeben: 0,
+          status: 'defekt',
+          uhs_id: 9,
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
+    await userEvent.click(await screen.findByRole('button', { name: 'ÄNDERN' }));
+    await userEvent.click(await screen.findByRole('link', { name: '1 Posten · 1 Ausfall' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }),
+    ).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
+    vi.mocked(ladeModulFreigaben).mockReset();
+  });
+
+  it('am gekoppelten UHS-Gerät: kein Bereich „Angaben“, `?bereich=angaben` zeigt die Belegung', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({
+          id: 9,
+          anzeigename: 'UHS Nord · Laptop',
+          benutzername: 'geraet-3',
+          system_rolle: 'keiner',
+          org_rolle: 'keine',
+          aktiv: true,
+          erstellt_at: '2026-10-04',
+          totp_aktiviert: false,
+          passwort_gesetzt: false,
+          geraet: {
+            kopplung_id: 3,
+            einsatz_id: 1,
+            ansicht: 'uhs-laptop',
+            uhs_id: 9,
+            stelle: 'UHS Nord',
+            bezeichnung: 'Laptop',
+            laeuft_ab_at: '2026-10-05 12:00:00',
+          },
+        }),
+      ),
+    );
+    zeige('aktiv');
+    expect(await screen.findByText('GRUNDRISS')).toBeInTheDocument();
+    expect(screen.queryByText(/ANGABEN/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Angaben' })).not.toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht: Angaben nur zum Lesen', async () => {
+    zeige('aktiv', { meine_rolle: 'beobachter' });
+    expect(await screen.findByText('ANGABEN bearbeitbar=false')).toBeInTheDocument();
   });
 });
 

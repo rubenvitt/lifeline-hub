@@ -29,7 +29,7 @@ describe('speicherLeisteStil', () => {
 
   /**
    * Gemessen an der tatsächlichen Leiste unter dem Theme jeder Stufe, nicht an der Tokentabelle:
-   * Mutationsprobe: `gap: token.paddingSM` (7/11/16 px) im Stil — rot; ebenso, wenn der Hook die
+   * Mutationsprobe: `gap: token.paddingSM` (8/12/16 px) im Stil — rot; ebenso, wenn der Hook die
    * Option nicht an den Stil weiterreicht.
    */
   it('der Abstand hält die Leitlinie ≥ 8 px (Maus) bzw. ≥ 16 px (Touch) in jeder Stufe', () => {

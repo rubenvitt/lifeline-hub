@@ -72,6 +72,7 @@ function GlobalLink({
   /** Die Person steht in diesem Bereich (LFH-954): `aria-current` und Unterkante, nicht nur Farbe. */
   aktiv?: boolean;
 }) {
+  const { token } = theme.useToken();
   if (gesperrt) {
     return (
       <Typography.Text
@@ -84,7 +85,7 @@ function GlobalLink({
           cursor: 'not-allowed',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 8,
+          gap: token.marginSM,
           flexShrink: 0,
         }}
       >

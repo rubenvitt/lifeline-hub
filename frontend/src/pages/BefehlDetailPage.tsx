@@ -46,6 +46,7 @@ import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusab
 
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
+import { flaeche } from '../theme/tokens';
 
 /**
  * Formularwerte des Entwurfs: Titel und Abschnitte als Text, daneben der Verteiler (LLH-1172).
@@ -224,7 +225,7 @@ function BefehlDetail() {
   if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || befehlQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );
@@ -290,7 +291,7 @@ function BefehlDetail() {
       ref={verankert ? leisteRef : undefined}
       style={aktionsleisteStil(verankert, token)}
     >
-      {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 7 / 11 / 16 px, antds
+      {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 8 / 12 / 16 px, antds
           Vorgabe `paddingXS` ließ 3 / 5 / 7 px. */}
       <Space wrap size={token.marginSM}>
         {!istEntwurf && (

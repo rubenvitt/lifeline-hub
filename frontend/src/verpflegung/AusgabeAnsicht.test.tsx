@@ -189,6 +189,24 @@ describe('AusgabeAnsicht — Kopf (LLH-1032, design.md D3)', () => {
     expect(erfasseAusgabe).not.toHaveBeenCalled();
   });
 
+  it('Sammlung und „Buchen“ stehen in der klebenden Tastenleiste neben „+1“, nicht im Kopf (LLH-1794)', async () => {
+    zeige();
+    await geladen();
+    const leiste = document.querySelector<HTMLElement>('[data-lfh="zaehltasten"]')!;
+    const sammelzeile = document.querySelector<HTMLElement>('[data-lfh="ausgabe-sammlung"]')!;
+    // Die Sammelzeile gehört zur Leiste: gerollt bleibt der Zählerstand im Bild.
+    expect(leiste).toContainElement(sammelzeile);
+    expect(leiste).toContainElement(taste('Buchen'));
+    // „Buchen“, Sammlung und „+1“ teilen sich eine Reihe (kein eigener Streifen über „+1“).
+    const plus1 = document.querySelector<HTMLElement>('[data-lfh="zaehltaste-plus1"]')!;
+    const reihe = document.querySelector<HTMLElement>('[data-lfh="zaehltasten-buchreihe"]')!;
+    expect(reihe).toContainElement(plus1);
+    expect(reihe).toContainElement(taste('Buchen'));
+    expect(reihe).toContainElement(sammelzeile);
+    // Genau ein „Buchen“ auf der Seite.
+    expect(screen.getAllByRole('button', { name: 'Buchen' })).toHaveLength(1);
+  });
+
   it('Zahlen in Monospace mit tabellarischen Ziffern', async () => {
     zeige();
     await geladen();

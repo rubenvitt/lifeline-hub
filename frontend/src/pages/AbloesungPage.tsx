@@ -103,6 +103,7 @@ import {
 } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
+import { flaeche } from '../theme/tokens';
 
 const { Text } = Typography;
 
@@ -743,7 +744,7 @@ export default function AbloesungPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

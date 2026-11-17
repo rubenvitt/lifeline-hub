@@ -46,8 +46,6 @@ import {
 } from '../../components/SeitenZustand';
 import SektionHeader from '../../components/SektionHeader';
 import {
-  Datenfeld,
-  Datenraster,
   Kennzahl,
   Kennzahlenband,
   Sammelbanner,
@@ -59,10 +57,8 @@ import {
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brAbgerufen, brStatus } from '../../theme/statusFarben';
-import { abstand } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
-import BrBearbeitenModal from './BrBearbeitenModal';
-import AufKarteVerorten from './AufKarteVerorten';
+import BrRaumdaten from './BrRaumdaten';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { staerkeDerEinheitImRaum, staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
@@ -103,6 +99,7 @@ import EintreffenDialog from './EintreffenDialog';
 import NichtUebernommenMarke, { UnangemeldetMarke } from '../../kraefte/NichtUebernommenMarke';
 import { useVorgemerkteEintreffen } from '../../offline/useVorgemerkteSchreibaktionen';
 import dayjs from 'dayjs';
+import { flaeche as flaechenMass } from '../../theme/tokens';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
@@ -335,7 +332,6 @@ export default function BrDetailPage() {
     invalidate();
   };
 
-  const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
   // „Eintreffen buchen“ (LLH-1075, design.md D14): am Gerät nur mit `br-eintreffen`.
   const [eintreffenOffen, setEintreffenOffen] = useState(false);
   // Die Kraft, die der Abruf-Dialog gerade abruft (LLH-1085); `null` = zu.
@@ -407,7 +403,6 @@ export default function BrDetailPage() {
   useEffect(() => {
     statusReset();
     leereZeilen();
-    setBearbeitenOffen(false);
     setEintreffenOffen(false);
     setAbrufZiel(null);
     setVerlegenZiel(null);
@@ -424,7 +419,7 @@ export default function BrDetailPage() {
   if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaechenMass.zustandOben }}>
         <Spin size="large" />
       </div>
     );
@@ -786,24 +781,20 @@ export default function BrDetailPage() {
         </Space>
       }
     >
-      {/* „Bearbeiten“ an den Raumdaten, nicht im Kopf: dort stünden im Zustand „geplant“ drei
-          Datensatz-Aktionen, und ab drei bündelt der Kopf (`frontend/AGENTS.md`, „Aktionen“). */}
-      <SektionHeader
-        titel="Raumdaten"
-        extra={
-          bearbeitbar && (
-            <Space wrap>
-              {/* Verorten auf der Lagekarte (LLH-1107), Muster Betreuungsstelle (LFH-673). */}
-              <AufKarteVerorten einsatzId={einsatzId} br={br} />
-              <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>
-            </Space>
-          )
-        }
-      />
-      <Datenraster spalten={2} beschriftung="Raumdaten" style={{ marginBottom: abstand.lg }}>
-        <Datenfeld label="Standort">{br.standort ?? '—'}</Datenfeld>
-        <Datenfeld label="Notiz">{br.notiz ?? '—'}</Datenfeld>
-      </Datenraster>
+      {/* „Bearbeiten“ im Paneelkopf der Raumdaten, nicht im Seitenkopf: dort stünden im Zustand
+          „geplant“ drei Datensatz-Aktionen, und ab drei bündelt der Kopf (`frontend/AGENTS.md`,
+          „Aktionen“). Bearbeitet wird in der Ansicht (LLH-1920). `key` am Raum: der Umschalter
+          behält die Seite; liegt der nächste Raum schon im Cache, lädt sie nicht neu, und eine
+          offene Bearbeitung gehörte sonst an den nächsten Raum. */}
+      <div style={{ marginBottom: token.marginLG }}>
+        <BrRaumdaten
+          key={br.id}
+          einsatzId={einsatzId}
+          br={br}
+          bearbeitbar={bearbeitbar}
+          onNeuLaden={() => void detailQuery.refetch()}
+        />
+      </div>
 
       {/* Unter `md` stapeln statt 240-px-Sidebar daneben; sonst quetschte der Flex-Container die
           100%-Karte weiter in eine Spalte. */}
@@ -812,7 +803,7 @@ export default function BrDetailPage() {
         style={{
           display: 'flex',
           flexDirection: breit ? 'row' : 'column',
-          gap: abstand.lg,
+          gap: token.marginLG,
           alignItems: breit ? 'flex-start' : 'stretch',
         }}
       >
@@ -822,7 +813,7 @@ export default function BrDetailPage() {
               Belegung: das Band hält ihre Höhe fest, sonst schöbe ein Ein- oder Austritt die
               Belegung unter dem Zeiger (`frontend/AGENTS.md`, „Kennzahlenband“). Ton neutral,
               kein Grenzwert für lange Wartezeit. */}
-          <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
+          <div data-testid="br-summe" style={{ marginBottom: token.margin }}>
             <Kennzahlenband
               beschriftung="Bereitgestellte Kräfte"
               notizZeilen={2}
@@ -883,7 +874,7 @@ export default function BrDetailPage() {
                   }
                 >
                   <Liste
-                    style={{ marginBottom: abstand.lg }}
+                    style={{ marginBottom: token.marginLG }}
                     dataSource={abgerufenZufluss.sichtbar}
                     emptyText="Keine Kraft abgerufen"
                     renderItem={(z) => (
@@ -915,7 +906,7 @@ export default function BrDetailPage() {
               extra={bannerPlatz(einheitenZufluss, ['neue Einheit', 'neue Einheiten'])}
             />
             <Liste
-              style={{ marginBottom: abstand.lg }}
+              style={{ marginBottom: token.marginLG }}
               dataSource={einheitenZufluss.sichtbar}
               emptyText="Keine Einheiten bereitgestellt"
               renderItem={(e) => (
@@ -950,7 +941,7 @@ export default function BrDetailPage() {
                 Gehen keine Zeile darüber verschiebt; nicht in den Kennzahlen, die bleiben die des
                 Servers. Beim Nachsenden lädt der Abgleich erst den Raum, dann geht die Zeile. */}
             {vorgemerktHier.length > 0 && (
-              <div data-testid="br-vorgemerkt" style={{ marginTop: abstand.lg }}>
+              <div data-testid="br-vorgemerkt" style={{ marginTop: token.marginLG }}>
                 {/* Anträge am Spiegel (LLH-1492) stehen hier wie Vorgemerktes. */}
                 <SektionHeader
                   titel={vorgemerktHier.every((v) => v.antrag) ? 'Beantragt' : 'Vorgemerkt'}
@@ -980,7 +971,7 @@ export default function BrDetailPage() {
           {/* Unter der Halte-Fläche: eingeschobenes Material verschiebt keine Belegungszeile unter
               dem Zeiger (D13). Bedienbar auch im Zustand „geplant“, anders als das Belegen. */}
           {materialFrei && (
-            <div data-testid="br-material" style={{ marginTop: abstand.lg }}>
+            <div data-testid="br-material" style={{ marginTop: token.marginLG }}>
               {/* Leer sagt der Baustein „Kein Material“; „0 Posten“ daneben wäre doppelt (LLH-1255). */}
               <SektionHeader
                 titel="Material"
@@ -1119,14 +1110,6 @@ export default function BrDetailPage() {
             }
           />
         )}
-      {verwalten && (
-        <BrBearbeitenModal
-          einsatzId={einsatzId}
-          br={br}
-          offen={bearbeitenOffen}
-          onClose={() => setBearbeitenOffen(false)}
-        />
-      )}
     </EinsatzSeite>
   );
 }

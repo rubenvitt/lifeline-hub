@@ -410,7 +410,8 @@ test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet d
   // „Träger" weicht seit LFH-975 unterhalb von `xxl` und stünde hier schon im Zähler.
   const ZIELSPALTE = 'Funktion';
 
-  // Der Zähler steht als Text im Namen des Knopfes und zählt Handauswahl und `abBreite`.
+  // Der Zähler steht als Text im Namen des Knopfes und zählt Handauswahl und `abBreite`; ohne
+  // eigene Wahl steht er nicht da (LLH-1790), dann liest der Test 0.
   const zaehler = async () => {
     const text = (await schalter.textContent()) ?? '';
     return Number(text.match(/·\s*(\d+)\s*ausgeblendet/)?.[1] ?? 0);
@@ -469,9 +470,12 @@ test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet d
   expect(await spaltenKoepfe(), 'die Spalte steht vor dem Umschalten').toContain(geschaltet);
 
   await page.keyboard.press('Enter');
+  // Vorher galt die Vorgabe (kein Zähler); jetzt ist es eine eigene Wahl, der Zähler nennt alle
+  // verborgenen Spalten, also mindestens die eben ausgeblendete.
+  expect(vorher, 'ohne eigene Wahl kein Zähler im Namen').toBe(0);
   await expect
     .poll(zaehler, { message: 'die Eingabetaste muss eine Spalte ausblenden' })
-    .toBe(vorher + 1);
+    .toBeGreaterThan(vorher);
   // Der Zähler allein genügt nicht: er könnte mitzählen, ohne dass die Spalte verschwindet.
   expect(await spaltenKoepfe(), 'die Spalte ist aus der Tabelle verschwunden').not.toContain(
     geschaltet,
@@ -480,6 +484,7 @@ test('Spaltenschalter ist mit der Tastatur bedienbar — Eingabetaste schaltet d
   // Gegenrichtung: derselbe Weg holt dieselbe Spalte zurück.
   await oeffneUndHebeHervor();
   await page.keyboard.press('Enter');
+  // Zurück auf der Vorgabe: der Zähler verschwindet wieder (LLH-1790).
   await expect.poll(zaehler, { message: 'derselbe Weg muss zurückschalten' }).toBe(vorher);
   expect(await spaltenKoepfe(), 'die Spalte steht wieder in der Tabelle').toContain(geschaltet);
 });

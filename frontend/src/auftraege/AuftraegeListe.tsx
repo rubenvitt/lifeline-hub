@@ -38,6 +38,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { ersetzeAuftraege, findeAuftrag } from './auftragCache';
 import AuftragErteilenDialog from './AuftragErteilenDialog';
 import EmpfaengerFilter, { parseEmpfaengerFilter } from './EmpfaengerFilter';
+import { Select } from '../components/Select';
 import AuftragListenKarte from './AuftragListenKarte';
 import AuftragDetail from './AuftragDetail';
 import VollzugMeldenModal from './VollzugMeldenModal';
@@ -609,14 +610,17 @@ export default function AuftraegeListe({
           value={suchEingabe}
           onChange={(e) => setSuchEingabe(e.target.value)}
         />
-        <Segmentleiste
-          beschriftung="Richtung"
-          wert={richtungFilter ?? 'alle'}
-          onWechsel={(v) => setRichtungFilter(v === 'alle' ? undefined : v)}
-          optionen={[
-            { wert: 'alle', label: 'Alle Richtungen' },
-            { wert: 'intern', label: 'Intern' },
-            { wert: 'extern', label: 'Extern' },
+        {/* Eine Umschaltleiste je Ebene (Spec `bedien-umschalten`): „Ansicht“ schaltet die Liste,
+            „Richtung“ und „Empfänger“ schränken sie ein und stehen als Filter nebeneinander. */}
+        <Select
+          aria-label="Richtung"
+          style={{ minWidth: 160 }}
+          value={richtungFilter ?? 'alle'}
+          onChange={(v: string) => setRichtungFilter(v === 'alle' ? undefined : v)}
+          options={[
+            { value: 'alle', label: 'Alle Richtungen' },
+            { value: 'intern', label: 'Intern' },
+            { value: 'extern', label: 'Extern' },
           ]}
         />
         <EmpfaengerFilter

@@ -1,6 +1,6 @@
 # Übungsmarke: Band und Marke
 
-Übungsmarke (LLH-1725, Spec `uebungsmarke`; `frontend/AGENTS.md`, Rahmen, „Übung“): der EINE
+Übungsmarke (`frontend/AGENTS.md`, Rahmen, „Übung“): der EINE
 Baustein, an dem man eine Übung erkennt, ohne den Namen zu lesen. Zwei Formen:
 
 - `UebungsMarke`: kompakter Chip vor einem Einsatznamen (Kopf, Liste, Wechsler,

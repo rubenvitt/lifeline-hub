@@ -1,6 +1,6 @@
 # Großbild: Zeilen
 
-Zeilen im Großbild (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entfernung“: „Ein Wert
+Zeilen im Großbild („Lesbar aus der Entfernung“: „Ein Wert
 MUST direkt neben oder unter seiner Bezeichnung stehen“; design.md D4).
 
 `GrossZeilen` ist ein Raster aus zwei Spalten: die erste so breit wie die längste

@@ -98,6 +98,7 @@ import {
 } from '../routing/deeplinks';
 import { Filterhinweis, Paneel, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
+import { flaeche } from '../theme/tokens';
 
 /** Stabile Leerlisten für den Dialog (`memo`, Muster der Karten). */
 const KEINE_EINHEITEN: never[] = [];
@@ -873,7 +874,7 @@ export default function NachforderungenPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

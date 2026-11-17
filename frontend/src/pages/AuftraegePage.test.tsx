@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { waehle as waehleAuswahl } from '../test/auswahlListe';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -337,7 +338,7 @@ describe('AuftraegePage', () => {
   it('filtert Aufträge nach Richtung extern (LFH-87)', async () => {
     renderPage();
     await geladen();
-    await userEvent.click(screen.getByRole('radio', { name: 'Extern' }));
+    await waehleAuswahl('Richtung', 'Extern');
     await waitFor(() =>
       expect(listeAuftraege).toHaveBeenCalledWith(
         1,
@@ -859,7 +860,7 @@ describe('AuftraegePage', () => {
     ]);
     renderPage();
     await geladen('Ziel-Auftrag');
-    await userEvent.click(screen.getByRole('radio', { name: 'Extern' }));
+    await waehleAuswahl('Richtung', 'Extern');
     await userEvent.type(screen.getByRole('textbox', { name: 'Aufträge durchsuchen' }), 'Pegel');
     await waitFor(() =>
       expect(listeAuftraege).toHaveBeenCalledWith(1, {
@@ -878,10 +879,9 @@ describe('AuftraegePage', () => {
     await waitFor(() => expect(karte(7)).toHaveAttribute('data-hervorgehoben', 'true'));
     expect(karte(7)).toHaveAttribute('data-gewaehlt', 'true');
     expect(screen.getByRole('textbox', { name: 'Aufträge durchsuchen' })).toHaveValue('');
-    expect(screen.getByRole('radio', { name: 'Alle Richtungen' })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
+    expect(
+      screen.getByRole('combobox', { name: 'Richtung' }).closest('.ant-select'),
+    ).toHaveTextContent('Alle Richtungen');
     await waitFor(() =>
       expect(listeAuftraege).toHaveBeenLastCalledWith(1, {
         richtung: undefined,
@@ -1041,6 +1041,38 @@ describe('AuftraegePage', () => {
       expect(within(dialog).getByText(/^Ausführung:/)).toBeInTheDocument();
       expect(reiter.textContent).not.toMatch(/Befehl(?!sschema)/);
       expect(dialog.textContent).not.toMatch(/Befehl(?!sschema)/);
+    });
+
+    // Spec `bedien-umschalten`, „Fläche umschalten über die Segmentleiste als Reiter“.
+    it('schaltet die Fläche über die Segmentleiste als Reiter, auch mit der Pfeiltaste', async () => {
+      renderPage();
+      await geladen();
+      const liste = screen.getByRole('tablist', { name: 'Aufträge und Befehle' });
+      expect(liste).toHaveAttribute('data-lfh', 'segmentleiste');
+      const auftraege = within(liste).getByRole('tab', { name: 'Einzelaufträge' });
+      const flaeche = screen.getByRole('tabpanel');
+      expect(auftraege).toHaveAttribute('aria-controls', flaeche.id);
+      expect(flaeche).toHaveAccessibleName('Einzelaufträge');
+      auftraege.focus();
+      await userEvent.keyboard('{ArrowRight}');
+      expect(within(liste).getByRole('tab', { name: 'Einsatzbefehle' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Einsatzbefehle');
+    });
+
+    // Review vor dem PR (LLH-1808): wie vorher bei antds Tabs bleibt eine besuchte Fläche montiert.
+    it('behält Filter und Ansicht der Einzelaufträge über einen Reiterwechsel', async () => {
+      renderPage();
+      await geladen();
+      await waehleAuswahl('Richtung', 'Extern');
+      await userEvent.click(screen.getByRole('tab', { name: 'Einsatzbefehle' }));
+      expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Einsatzbefehle');
+      await userEvent.click(screen.getByRole('tab', { name: 'Einzelaufträge' }));
+      expect(
+        screen.getByRole('combobox', { name: 'Richtung' }).closest('.ant-select'),
+      ).toHaveTextContent('Extern');
     });
 
     it('die Reiternamen grenzen ab, ohne Erklärsatz darunter (LFH-1078)', async () => {

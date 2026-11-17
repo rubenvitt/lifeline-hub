@@ -273,7 +273,7 @@ describe('Anmeldeverfahren · Dichte', () => {
 
   it('traegt die ZWEITE Angabe daneben', () => {
     // Polsterung allein trägt den Boden nicht, minHeight allein klebt den Text an die Kante.
-    expect(zeilenzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
-    expect(zeilenzielStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+    expect(zeilenzielStil(tokenFuer('kompakt')).padding).toBe('8px 12px');
+    expect(zeilenzielStil(tokenFuer('handschuh')).padding).toBe('16px 24px');
   });
 });

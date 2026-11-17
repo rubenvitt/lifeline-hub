@@ -104,16 +104,27 @@ pub async fn set_termin(
     termin: Option<&str>,
 ) -> Result<bool, AppError> {
     write_retry!(pool, |conn| {
-        crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
-        let geaendert = sqlx::query(SQL_TERMIN_SETZEN)
-            .bind(termin)
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?
-            .rows_affected()
-            == 1;
-        Ok(geaendert)
+        set_termin_tx(conn, einsatz_id, termin).await
     })
+}
+
+/// [`set_termin`] in einer offenen Transaktion, für den Demo-Import (`src/AGENTS.md`, Demo-Daten:
+/// Import nur über `…_tx`). Derselbe Schreibweg: Aktiv-Riegel und [`SQL_TERMIN_SETZEN`] samt
+/// Leeren der Ankündigungsmerker.
+pub async fn set_termin_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    termin: Option<&str>,
+) -> Result<bool, AppError> {
+    crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await?;
+    let geaendert = sqlx::query(SQL_TERMIN_SETZEN)
+        .bind(termin)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected()
+        == 1;
+    Ok(geaendert)
 }
 
 /// Validierte Eingabe für den Abschluss einer Lagebesprechung.

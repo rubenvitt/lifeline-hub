@@ -39,6 +39,7 @@ import { buildEinheitenGliederung, type GliederungZeile } from '../kraefte/einhe
 import { schluesselBisStufe } from '../kraefte/kraeftebaumKern';
 import { einheitStaerkeUrteil } from '../theme/statusFarben';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { WORTUMBRUCH_STIL } from '../anzeige/wortumbruch';
 import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
@@ -50,8 +51,11 @@ import { zahlStil } from '../components/instrument/rollenwerte';
  * Gliederung der Einheiten eines Einsatzes (LLH-1029): eine Tabelle mit Baum, Zeilen aus dem
  * EINEN Kräftebaum-Kern (`kraefte/einheitenGliederung.ts` über `einheitenBaum`) — dieselben
  * Einheit-Knoten in derselben Folge wie das Meldebild, nur ohne Mittel. Die Frage ist „welche
- * Einheit?“, also Tabelle (`frontend/AGENTS.md`, „Die Liste ist die zweite Frage“), auch am Handy
- * angepasst statt in Karten aufgelöst. Die Detailansicht liegt auf eigener Route
+ * Einheit?“, also Tabelle (`frontend/AGENTS.md`, „Die Liste ist die zweite Frage“) ab `md`. Unter
+ * `md` steht der Baum als Karten (LLH-1787, Change `lsug0joq-tabellen-touch` D5): in der Tabelle
+ * schrumpfte die Namensspalte neben Ist und Soll, und die Namen standen Buchstabe für Buchstabe
+ * senkrecht. Die Karte trägt Name mit Zeichen, Ist (mit Urteil), Soll und Einheitsführer; die
+ * Untereinheiten stehen eingerückt und offen. Die Detailansicht liegt auf eigener Route
  * (`EinheitDetailPage.tsx`, `/einsaetze/:id/einheiten/:einheitId`).
  */
 
@@ -71,11 +75,10 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       key: 'einheit',
       immerSichtbar: true,
       mindestBreite: 140,
-      // Ein langes Wort im Namen („Behandlungsgruppe“) darf die Spalte nicht so breit halten,
-      // dass Soll am Handy aus dem Bild läuft: es wird getrennt (`lang="de"`), und wo der Browser
-      // kein Trennwörterbuch hat, bricht es notfalls im Wort. Beides erbt die Zelle.
+      // Ein Name bricht an Wort- und Silbengrenzen, nie Buchstabe für Buchstabe (LLH-1787,
+      // `anzeige/wortumbruch.ts`): mit `anywhere` war seine Mindestbreite ein Zeichen.
       render: (_t, z) => (
-        <div style={{ hyphens: 'auto', overflowWrap: 'anywhere' }}>
+        <div style={WORTUMBRUCH_STIL}>
           <KraeftebaumZelle zeile={z} einsatzId={einsatzId} gesperrt={sprungGesperrt} />
         </div>
       ),
@@ -367,7 +370,7 @@ export default function EinheitenPage() {
               Banner, solange Fokus oder Zeiger in der Tabelle liegen. */}
           <Datensicht
             bezeichnung="Gliederung"
-            form="tabelle"
+            form="auto"
             spalten={spalten}
             daten={zeilen}
             zeilenSchluessel="key"
@@ -376,7 +379,12 @@ export default function EinheitenPage() {
               aufgeklappt: offen ?? vorgabeOffen,
               onAufgeklappt: setOffen,
             }}
-            karte={{ art: 'plan', titel: { spalte: 'einheit' }, sekundaer: ['ist', 'soll'] }}
+            // Am Handy (LLH-1787): Ist trägt das Urteil „unterbesetzt“ schon in seiner Zelle.
+            karte={{
+              art: 'plan',
+              titel: { spalte: 'einheit' },
+              sekundaer: ['ist', 'soll', 'fuehrer'],
+            }}
           />
         </>
       )}
