@@ -1,8 +1,7 @@
 import { Tooltip } from 'antd';
 import { useId, useRef, type CSSProperties, type KeyboardEvent } from 'react';
-import { useRollen, zahlStil } from './rollenwerte';
+import { monoStil, useRollen } from './rollenwerte';
 import { zielEinzug } from './zielEinzug';
-
 import '../../theme/sprache.css';
 
 /**
@@ -274,7 +273,7 @@ export default function Segmentleiste<W extends string | number>({
             )}
             {o.label}
             {mitZahl && (
-              <span data-lfh="segment-zahl" style={zahlStil('klein')}>
+              <span data-lfh="segment-zahl" style={monoStil(12)}>
                 {o.zahl}
               </span>
             )}
@@ -449,7 +448,7 @@ export function SegmentUmschalter({
             />
           )}
           {label}
-          {zahl != null && <span style={zahlStil('fein')}>{zahl}</span>}
+          {zahl != null && <span style={monoStil(11)}>{zahl}</span>}
         </button>
       </span>
     </div>

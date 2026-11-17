@@ -7,13 +7,7 @@ import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import { Zeichenzaehler } from '../components/zeichenGrenze';
 import SichtungsTag from '../components/SichtungsTag';
 import { useViewport } from '../components/useViewport';
-import {
-  Schnellerfassungszeile,
-  useRollen,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
-} from '../components/instrument';
+import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
 import { formatKoordinate } from './koordinate';
 import {
   ANLASS_KUERZEL,
@@ -82,7 +76,7 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
     case 'name':
       // Zähler je Teil ab 80 % der Grenze (LLH-1329); darüber nennt die Zeile den Grund beim Senden.
       return (
-        <span style={{ fontSize: schriftGroesse('text'), color: rollen.text }}>
+        <span style={{ fontSize: 13, color: rollen.text }}>
           {teil.name == null && teil.vorname == null ? 'unbekannt' : teil.text}
           {teil.name != null && <Zeichenzaehler wert={teil.name} max={PERSON_NAME_MAX} />}
           {teil.vorname != null && <Zeichenzaehler wert={teil.vorname} max={PERSON_NAME_MAX} />}
@@ -90,53 +84,47 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       );
     case 'geschlecht':
     case 'alter':
-      return <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>{teil.text}</span>;
+      return <span style={{ ...monoStil(12), color: rollen.gedaempft }}>{teil.text}</span>;
     case 'sichtung':
       return <SichtungsTag kategorie={teil.wert} style={{ marginInlineEnd: 0 }} />;
     case 'anlass':
       return (
-        <span style={{ fontSize: schriftGroesse('text'), color: rollen.text }} title="Anlass">
+        <span style={{ fontSize: 13, color: rollen.text }} title="Anlass">
           {ANLASS_WORT[teil.wert]}
         </span>
       );
     case 'massnahme':
       return (
-        <span style={{ fontSize: schriftGroesse('text'), color: rollen.text }} title="Maßnahme">
+        <span style={{ fontSize: 13, color: rollen.text }} title="Maßnahme">
           + {MASSNAHME_WORT[teil.wert]}
         </span>
       );
     case 'entlassen':
       return (
-        <span style={{ ...schriftStil('meta'), color: rollen.bedien }} title="Verbleib">
+        <span style={{ ...monoStil(12), color: rollen.bedien }} title="Verbleib">
           → entlassen
         </span>
       );
     case 'uhs': {
       const a = loeseUhsAuf(teil.suche, uhsListe);
       return 'uhs' in a ? (
-        <span style={{ ...schriftStil('meta'), color: rollen.bedien }}>
-          → UHS {a.uhs.bezeichnung}
-        </span>
+        <span style={{ ...monoStil(12), color: rollen.bedien }}>→ UHS {a.uhs.bezeichnung}</span>
       ) : (
-        <span style={{ ...schriftStil('meta'), color: rollen.alarmText }} title={a.problem}>
+        <span style={{ ...monoStil(12), color: rollen.alarmText }} title={a.problem}>
           {teil.text} ?
         </span>
       );
     }
     case 'koordinate':
       return (
-        <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }} title="Fundort-Koordinate">
+        <span style={{ ...monoStil(12), color: rollen.gedaempft }} title="Fundort-Koordinate">
           #{formatKoordinate(teil.lat, teil.lon)}
         </span>
       );
     case 'unerkannt':
       return (
         <span
-          style={{
-            ...schriftStil('meta'),
-            color: rollen.alarmText,
-            textDecoration: 'line-through',
-          }}
+          style={{ ...monoStil(12), color: rollen.alarmText, textDecoration: 'line-through' }}
           title={teil.grund}
         >
           {teil.text}

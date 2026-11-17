@@ -30,9 +30,9 @@ import {
   Sammelbanner,
   Segmentleiste,
   Zeitachseneintrag,
+  monoStil,
   useRollen,
   type KennzahlZustand,
-  zahlStil,
 } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -380,7 +380,7 @@ export default function InfotelefonPage() {
               }}
             >
               <span>{ANLIEGEN_LABEL[x.anliegen]}</span>
-              <span style={zahlStil('text')}>{x.anzahl}</span>
+              <span style={monoStil(14)}>{x.anzahl}</span>
             </PaneelZeile>
           </li>
         ))}

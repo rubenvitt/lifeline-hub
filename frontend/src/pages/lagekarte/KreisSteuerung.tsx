@@ -1,13 +1,12 @@
 import { Button, Card, Space, Switch, Typography } from 'antd';
 import { Select } from '../../components/Select';
-import { useRollen, zahlStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import RadiusEingabe from '../../components/RadiusEingabe';
 import type { ZoneTyp } from '../../api/types';
 import EscKappe from './EscKappe';
 import { bandStil } from './KartenFuss';
 import { radiusGueltig, type GeoPunkt } from './geo';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel } from './zonenStil';
-
 import './lagekarte.css';
 
 /** Die Zonenarten, die ein Kreis sein können — jede mit Fläche (nicht die Absperrgrenze). */
@@ -114,7 +113,7 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
         </div>
         <div style={zeile} data-lfh="kreis-mitte">
           <Typography.Text type="secondary">Mitte</Typography.Text>
-          <Typography.Text style={{ ...zahlStil('text'), color: rollen.text }}>
+          <Typography.Text style={{ ...monoStil(token.fontSize), color: rollen.text }}>
             {props.mitte && props.mitteText ? props.mitteText : '—'}
           </Typography.Text>
           {props.einsatzort && (

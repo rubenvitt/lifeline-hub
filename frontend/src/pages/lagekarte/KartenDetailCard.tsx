@@ -1,7 +1,7 @@
 import { IconKreuz } from '../../icons';
 import { Button } from 'antd';
 import type { ReactNode } from 'react';
-import { useRollen, schriftGroesse, schriftStil, zahlStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 
 interface KartenDetailCardProps {
   /** Name des gewählten Objekts (bricht bei Bedarf um statt abzuschneiden). */
@@ -67,7 +67,7 @@ export default function KartenDetailCard({
             borderColor: akzentFarbe,
             color: akzentFarbe,
             overflow: 'hidden',
-            ...zahlStil('fein'),
+            ...monoStil(9),
           }}
         >
           {kachel ?? 'TZ'}
@@ -84,7 +84,7 @@ export default function KartenDetailCard({
           <h3
             style={{
               margin: 0,
-              fontSize: schriftGroesse('text'),
+              fontSize: 14,
               fontWeight: 500,
               lineHeight: 1.3,
               color: rollen.text,
@@ -94,14 +94,7 @@ export default function KartenDetailCard({
             {titel}
           </h3>
           {unterzeile != null && (
-            <div
-              style={{
-                ...schriftStil('meta'),
-                fontSize: schriftGroesse('fein'),
-                color: rollen.gedaempft,
-                overflowWrap: 'anywhere',
-              }}
-            >
+            <div style={{ ...monoStil(11), color: rollen.gedaempft, overflowWrap: 'anywhere' }}>
               {unterzeile}
             </div>
           )}

@@ -3,11 +3,10 @@ import { Link } from 'react-router';
 import type { Farbrollen, Schriftstufenname } from '../../theme/tokens';
 import Augenbraue from './Augenbraue';
 import { Aufgliederung, type Segment } from './Aufgliederung';
-import { schriftStil, useRollen, schriftGroesse } from './rollenwerte';
+import { monoStil, schriftStil, useRollen } from './rollenwerte';
 import { statusFlaeche, type StatusTon } from './statusFlaeche';
 import { zielEinzug } from './zielEinzug';
 import { fugenrasterGrund } from './fugenraster';
-
 // Grund und Hover/Fokus der Zelle stehen als Klasse `.lfh-kennzahl` in der Gestaltungssprache:
 // ein Inline-Grund schlüge jede `:hover`-Regel.
 import '../../theme/sprache.css';
@@ -315,9 +314,7 @@ export function Kennzahl({
         {/* `lineHeight: 1` wie die Zahl: mit der normalen Zeilenhöhe ragte die Einheit an der
             Grundlinie über die Zahl hinaus, und die Zeile wuchs mit den Daten um 1 px (LFH-883). */}
         {einheit != null && zustand === 'daten' && (
-          <span style={{ ...schriftStil('meta'), lineHeight: 1, color: rollen.schwach }}>
-            {einheit}
-          </span>
+          <span style={{ ...monoStil(12), lineHeight: 1, color: rollen.schwach }}>{einheit}</span>
         )}
       </span>
       {aufgliederung != null && zustand === 'daten' && (
@@ -332,7 +329,7 @@ export function Kennzahl({
           data-lfh="kennzahl-notiz"
           title={notizTitel}
           style={{
-            fontSize: schriftGroesse('fein'),
+            fontSize: 11,
             lineHeight: 1.4,
             color: rollen.gedaempft,
             overflowWrap: 'anywhere',

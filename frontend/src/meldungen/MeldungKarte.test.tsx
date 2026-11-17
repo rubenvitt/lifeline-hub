@@ -450,16 +450,10 @@ describe('MeldungKarte · Eingangszustand', () => {
     );
     const inhalt = screen.getByText('Wasser im Keller');
     const absender = screen.getByText('Florian 1');
-    // Der Wortlaut ist der größte Text der Karte, nicht der Absender: Stufe `text` gegen `klein`
-    // (Stufen statt Pixel, LLH-1775; die Reihenfolge der Stufen ist fein < klein < text …).
-    const rang = (s: string) =>
-      ['fein', 'klein', 'text', 'titel', 'wert', 'gross'].indexOf(
-        /--lfh-groesse-(\w+)/.exec(s)?.[1] ?? '',
-      );
-    expect(inhalt.style.fontSize).toBe('var(--lfh-groesse-text)');
+    // Der Wortlaut ist der größte Text der Karte, nicht der Absender.
+    expect(parseFloat(inhalt.style.fontSize)).toBeGreaterThanOrEqual(15);
     expect(inhalt.style.lineHeight).toBe('1.5');
-    expect(rang(absender.style.fontSize)).toBeGreaterThanOrEqual(0);
-    expect(rang(absender.style.fontSize)).toBeLessThan(rang(inhalt.style.fontSize));
+    expect(parseFloat(absender.style.fontSize)).toBeLessThan(parseFloat(inhalt.style.fontSize));
   });
 });
 

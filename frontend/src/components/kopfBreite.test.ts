@@ -47,14 +47,12 @@ describe('kopfMindestBreite (LLH-1788)', () => {
     expect(kopfMindestBreite({ titel: '', token: kompakt, messen })).toBe(24);
   });
 
-  it('die Kopfschrift ist die des Tabellenkopfs: Stufe fein, 600, Sperrung .12em', () => {
-    expect(KOPF_TYPO).toEqual({ stufe: 'fein', gewicht: 600, sperrung: 0.12 });
+  it('die Kopfschrift ist die des Tabellenkopfs: 10 px, 600, Sperrung .12em', () => {
+    expect(KOPF_TYPO).toEqual({ groesse: 10, gewicht: 600, sperrung: 0.12 });
   });
 
-  it('die Kopfschrift wächst mit der Dichte (LLH-1774)', () => {
-    const kompakt = textBreiteKopf('EINSATZFUNKTION', '', 'kompakt');
-    const handschuh = textBreiteKopf('EINSATZFUNKTION', '', 'handschuh');
-    expect(handschuh).toBeGreaterThan(kompakt * 1.2);
+  it('die Kopfschrift misst den Text mit Sperrung (LLH-1954, ohne Wachstum mit der Dichte)', () => {
+    expect(textBreiteKopf('EINSATZFUNKTION', '')).toBeGreaterThan(0);
   });
 });
 

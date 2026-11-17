@@ -18,7 +18,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { EINSATZLEITER_NAME_MAX } from '../api/eingabegrenzen';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { istZuLang, Zeichenzaehler } from '../components/zeichenGrenze';
-import { useRollen, schriftStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../einsatz/einsatzleiter';
@@ -150,7 +150,7 @@ export default function EinsatzleiterAngabe({
           <>
             {einsatzleiterKurz(d)}
             {' · '}
-            <span style={schriftStil('text')}>{`seit ${zeitKurz(d.seit, konventionen)}`}</span>
+            <span style={monoStil(13)}>{`seit ${zeitKurz(d.seit, konventionen)}`}</span>
           </>
         ) : null
       }

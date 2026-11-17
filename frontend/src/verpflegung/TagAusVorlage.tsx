@@ -18,7 +18,7 @@ import { listVerpflegungVorlagen } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { Paneel, useRollen, zahlStil } from '../components/instrument';
+import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
@@ -387,7 +387,7 @@ function FensterPaneel({
       {/* Der Zeitraum im Körper, nicht im Meta des Kopfs: dort kürzte er bei 390 px neben der
           Wahl mit Auslassung, und er ist die Angabe, um die es geht. */}
       <div style={{ marginBottom: anlegbar ? token.marginSM : 0 }}>
-        <span style={zahlStil('text')}>{zeitraum}</span>
+        <span style={monoStil(13)}>{zeitraum}</span>
         {art && <Typography.Text type="secondary"> · {art}</Typography.Text>}
       </div>
       {anlegbar && (

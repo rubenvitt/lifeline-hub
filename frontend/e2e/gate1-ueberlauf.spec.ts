@@ -1431,9 +1431,8 @@ test.describe('Gate 1', () => {
         expect(mass.knopfRechts, 'Knopf rechts im Fenster').toBeLessThanOrEqual(390);
         expect(mass.dokument, 'kein waagerechter Überlauf').toBeLessThanOrEqual(390);
         if (modul === 'verpflegung') {
-          // In `handschuh` zweizeilig wie „Ohne Schicht“ (LLH-1774, Schrift wächst mit).
           expect(mass.segmente, 'Segmente der Ansichtsleiste').toEqual([
-            dichte === 'handschuh' ? 'aktuell\n(13)' : 'aktuell (13)',
+            'aktuell (13)',
             'vergangen',
             'Stellen',
           ]);

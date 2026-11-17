@@ -6,7 +6,6 @@ import { readKopfOben, useKopfOben } from '../components/rahmenOben';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
 import { handleLinkKlick } from '../routing/linkModifier';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 interface Props {
   kategorien: Kategorie[];
@@ -77,8 +76,7 @@ export function railZielStil(
 }
 
 /**
- * Das Etikett unter dem Icon (Stufe `fein`, Versalien, Sperrung .04em — `schriftskala.railEtikett`;
- * die Rail wächst mit, `railBreite`).
+ * Das 9-px-Etikett unter dem Icon (Versalien, Sperrung .06em — `schriftskala.railEtikett`).
  *
  * `maxWidth: '100%'` hält das Etikett in der Zielbreite: ein zu langes Kurzetikett zeigt sich dann
  * als `scrollWidth > clientWidth` (gemessen in `e2e/rail-etikett.spec.ts`, LFH-644) statt still
@@ -86,7 +84,7 @@ export function railZielStil(
  */
 const ETIKETT_STIL: CSSProperties = {
   fontFamily: schrift[schriftskala.railEtikett.familie],
-  fontSize: schriftGroesse('fein'),
+  fontSize: schriftskala.railEtikett.groesse,
   fontWeight: schriftskala.railEtikett.gewicht,
   letterSpacing: schriftskala.railEtikett.sperrung,
   textTransform: 'uppercase',
@@ -136,7 +134,7 @@ function useVorlauf(): [(el: HTMLElement | null) => void, number] {
 }
 
 /**
- * Schmale vertikale Kategorie-Rail, 64 / 74 / 80 px (`railBreite`).
+ * Schmale vertikale Kategorie-Rail, 60 px.
  *
  * Das Etikett steht SICHTBAR, nicht im Tooltip: auf dem Führungs-Tablet gibt es kein Hover. Es
  * ist das Kurzetikett (`Kategorie.kurz`); der volle Name bleibt `aria-label` und `title`.

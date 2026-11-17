@@ -20,12 +20,10 @@ import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, StaerkePosition } from 
 import { kraefteText } from '../../anzeige/staerke';
 import {
   Augenbraue,
+  monoStil,
   Paneel,
   PaneelZustand,
   useRollen,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
 import type { WeitereAktionen } from '../../components/Datensicht';
@@ -453,9 +451,7 @@ export default function FahrzeugeBesatzung({
   } as const;
   const secondaryText = (parts: readonly (string | null | undefined)[]) => {
     const text = parts.filter(Boolean).join(' · ');
-    return text ? (
-      <span style={{ fontSize: schriftGroesse('klein'), color: rollen.gedaempft }}>{text}</span>
-    ) : null;
+    return text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
   };
 
   /** `gedaempft`: unter einer gehaltenen Fahrzeugzeile, ohne Bedienung (LLH-1722). */
@@ -490,7 +486,7 @@ export default function FahrzeugeBesatzung({
 
   /** Name eines Fahrzeugs, als Sprung in die Fahrzeugzeile, wenn das Modul offen ist. */
   const renderFunkrufname = (efId: number, name: string) => (
-    <span data-schrift="kennung" style={zahlStil('text')}>
+    <span style={monoStil(13)}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: efId })}>{name}</KennungsLink>
       ) : (
@@ -630,9 +626,7 @@ export default function FahrzeugeBesatzung({
   /** Name eines Fahrzeugs: gelöst ohne Link und ohne Kontextmenü, in derselben Breite. */
   const renderFahrzeugName = (eintrag: FahrzeugEintrag, geloest: boolean) =>
     geloest ? (
-      <span data-schrift="kennung" style={zahlStil('text')}>
-        {eintrag.funkrufname}
-      </span>
+      <span style={monoStil(13)}>{eintrag.funkrufname}</span>
     ) : (
       // Eine Zeile mit Reglern trägt das Kontextmenü nur an ihrer Bezeichnung (Spec
       // `datensatz-aktionsmenue`).
@@ -683,8 +677,7 @@ export default function FahrzeugeBesatzung({
           {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
             <StatusTag darstellung={besatzungsUrteil[f.urteil]} />
           )}
-          {/* „Ist 1/0/3//4 · Soll …“ trägt Wörter: Textschrift (LLH-1777). */}
-          <span style={schriftStil('meta')}>{besatzungText(f)}</span>
+          <span style={monoStil(12)}>{besatzungText(f)}</span>
           {secondaryText([fremdText(f)])}
         </span>
         {renderFahrzeugActions(eintrag, { wahl: ef }, renderUebernehmen(ef), geloest)}
@@ -735,14 +728,8 @@ export default function FahrzeugeBesatzung({
         {needsOhneFahrzeugKnoten(mittel) ? (
           <div role="group" aria-label="Ohne Fahrzeug">
             <div style={rowStyle}>
-              <Augenbraue style={{ fontSize: schriftGroesse('fein') }}>Ohne Fahrzeug</Augenbraue>
-              <span
-                style={{
-                  ...schriftStil('meta'),
-                  fontSize: schriftGroesse('fein'),
-                  color: rollen.gedaempft,
-                }}
-              >
+              <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
+              <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
                 · {kraefteText(ohne.length)}
               </span>
             </div>
