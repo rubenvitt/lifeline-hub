@@ -1,7 +1,9 @@
 use crate::app::AppState;
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Einheiten, Fahrzeuge, Lagekarte, Personal};
+use crate::einsatz::modul::{
+    Einheiten, Einsatzabschnitte, Fahrzeuge, Lagekarte, Personal, Unfallhilfsstellen,
+};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -9,7 +11,10 @@ use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::personal::disposition_repo::{self, AdhocDaten, DispositionPatch};
 use crate::personal::status_repo;
-use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
+use crate::personal::{
+    EinsatzPersonalAnzeige, FuehrungskraftKarte, PersonalEntlassungAntwort,
+    PersonalEntlassungRuecknahmeAntwort, PersonalEntlassungVorzustand,
+};
 use crate::personal::{ADHOC_TEXT_MAX, BEMERKUNG_MAX, EINSATZFUNKTION_MAX};
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_enum, parse_flag,
@@ -435,20 +440,22 @@ pub async fn update(
 
 /// POST /api/einsaetze/{id}/personal/{ep_id}/entlassen — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Bindungen gehen, Historie bleibt, die
-/// Zeitachse bekommt die Entlassung. Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.
-/// Schreibt ETB-Eintrag; eine beendete Kraft → 409. Liefert die entlassene Kraft.
+/// Zeitachse bekommt die Entlassung. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
+/// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1922), der Block „Entlassen“
+/// nimmt `…/reaktivieren`. Schreibt ETB-Eintrag; eine beendete Kraft → 409. Liefert die
+/// entlassene Kraft und ihren Vorzustand.
 pub async fn entlassen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Personal>,
     PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
-) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
+) -> Result<Json<PersonalEntlassungAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
     // F06/LFH-244 Tier-A: Bindungen lösen, Endzustand, Zeitachse und System-ETB atomar in EINER
     // Tx. Was die Person außerhalb des Personalmoduls trug, fragt die Tx vor dem Lösen; SSE erst
     // nach dem Commit.
-    let (betroffen, anzeige) = crate::write_retry!(&state.pool, |conn| {
+    let (betroffen, anzeige, vorzustand) = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, ep_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         let betroffen =
@@ -469,11 +476,108 @@ pub async fn entlassen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
-        Ok((betroffen, anzeige))
+        Ok((betroffen, anzeige, ergebnis.vorzustand(&jetzt)))
     })?;
     sse_personal(&state, einsatz_id, ep_id);
     betroffen.melden(&state, einsatz_id).await;
-    Ok(Json(anzeige))
+    Ok(Json(PersonalEntlassungAntwort {
+        personal: anzeige,
+        vorzustand,
+    }))
+}
+
+/// POST /api/einsaetze/{id}/personal/{ep_id}/entlassen/zuruecknehmen — „Rückgängig“ nach dem
+/// Entlassen (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer Person zurücknehmen“): Body ist
+/// der Vorzustand aus der Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses
+/// Entlassen, höchstens [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, und nur, solange
+/// die Zeitachse seitdem unberichtigt ist; sonst 409. Was inzwischen anders gebunden ist oder
+/// wofür das Modulrecht fehlt, bleibt aus und steht in `ausgelassen`. Ein ETB-Eintrag,
+/// Live-Meldungen wie beim Entlassen, keine Benachrichtigung.
+pub async fn zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
+    JsonBody(mut vorzustand): JsonBody<PersonalEntlassungVorzustand>,
+) -> Result<Json<PersonalEntlassungRuecknahmeAntwort>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    // Listen von außen: gedeckelt vor dem Entdoppeln, dann entdoppelt (`src/AGENTS.md`,
+    // „Eingabegrenzen“).
+    for (feld, liste) in [
+        ("Geführte Einheiten", &mut vorzustand.gefuehrte_einheiten),
+        ("Geleitete Abschnitte", &mut vorzustand.geleitete_abschnitte),
+    ] {
+        if liste.len() > crate::personal::RUECKNAHME_LISTE_MAX {
+            return Err(AppError::Validation(format!(
+                "{feld} darf höchstens {} Einträge haben",
+                crate::personal::RUECKNAHME_LISTE_MAX
+            )));
+        }
+        liste.sort_unstable();
+        liste.dedup();
+    }
+    if let Some(name) = &vorzustand.einsatzleiter_name {
+        crate::routes::support::hoechstens(
+            name,
+            "Name des Einsatzleiters",
+            crate::personal::RUECKNAHME_NAME_MAX,
+        )?;
+    }
+    let rechte = crate::personal::ruecknahme::RuecknahmeRechte {
+        // Wie das Gate der Führungsstelle (`EinsatzVerwaltungszugriff`), design.md D5.
+        einsatzdaten: ctx.fordere_schreibrecht_oder_admin().is_ok(),
+        einheiten: ctx.darf_zielmodul::<Einheiten>(&state.pool).await?,
+        fahrzeuge: ctx.darf_zielmodul::<Fahrzeuge>(&state.pool).await?,
+        unfallhilfsstellen: ctx
+            .darf_zielmodul::<Unfallhilfsstellen>(&state.pool)
+            .await?,
+        einsatzabschnitte: ctx.darf_zielmodul::<Einsatzabschnitte>(&state.pool).await?,
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis = crate::personal::ruecknahme::zuruecknehmen_tx(
+            conn,
+            einsatz_id,
+            ep_id,
+            ctx.benutzer.id,
+            &jetzt,
+            &vorzustand,
+            rechte,
+        )
+        .await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        let etb_id = crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::personal::etb_text_entlassung_zurueckgenommen(
+                &anzeige.name,
+                anzeige.funktion_text(),
+                &ergebnis.ausgelassen,
+            ),
+        )
+        .await?;
+        Ok((ergebnis, anzeige, etb_id))
+    })?;
+    // Live wie beim Entlassen: dieselben Leser, nur für das, was zurückkam. Das Ereignis
+    // `personal` frischt das Einsatztagebuch nicht auf, der Eintrag geht eigens hinaus.
+    state.live.publiziere(einsatz_id, etb_id);
+    sse_personal(&state, einsatz_id, ep_id);
+    Betroffen {
+        einsatzleiter: ergebnis.einsatzleiter,
+        einheiten: ergebnis.einheiten,
+        abschnitte: ergebnis.abschnitte,
+        uhs: ergebnis.uhs_id,
+        fahrzeug: ergebnis.fahrzeug_id,
+        schaeden: Vec::new(),
+    }
+    .melden(&state, einsatz_id)
+    .await;
+    Ok(Json(PersonalEntlassungRuecknahmeAntwort {
+        personal: anzeige,
+        ausgelassen: ergebnis.ausgelassen,
+    }))
 }
 
 /// POST /api/einsaetze/{id}/personal/{ep_id}/stornieren — Fehldisposition stornieren (LLH-1079,

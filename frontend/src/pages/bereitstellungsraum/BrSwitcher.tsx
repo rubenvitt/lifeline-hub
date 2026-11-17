@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
-import BrAnlegenDrawer from './BrAnlegenDrawer';
+import BrAnlegenModal from './BrAnlegenModal';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 import { brStatus } from '../../theme/statusFarben';
 import EinstiegSwitcher from '../../components/EinstiegSwitcher';
@@ -41,7 +41,7 @@ export default function BrSwitcher({
         neuLabel="+ Neuer BR"
         onNeu={() => setAnlegen(true)}
       />
-      <BrAnlegenDrawer
+      <BrAnlegenModal
         einsatzId={einsatzId}
         open={anlegen}
         onClose={() => setAnlegen(false)}

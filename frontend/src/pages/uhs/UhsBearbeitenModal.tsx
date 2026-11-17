@@ -53,7 +53,7 @@ export function uhsPatchAus(basis: Uhs, werte: FormWerte): UhsPatch {
 /**
  * Stammdaten einer Unfallhilfsstelle ändern: Bezeichnung, Standort, Notiz (LLH-1407). Drei
  * Felder, also Modal (`frontend/AGENTS.md`, „UI-Form-Leitlinie“), dieselben Felder wie
- * `UhsAnlegenDrawer` ohne den Typ. Der Abschnitt bleibt außen vor: auch das Anlegen bietet ihn
+ * `UhsAnlegenModal` ohne den Typ. Der Abschnitt bleibt außen vor: auch das Anlegen bietet ihn
  * nicht an.
  */
 export default function UhsBearbeitenModal({

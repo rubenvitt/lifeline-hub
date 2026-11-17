@@ -405,8 +405,8 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 - **Vollseite/eigene Route** (`/einsaetze/:einsatzId/<modul>/:id`): Sektionen/Tabs, > ~5 Felder,
   Workflow, deeplink-würdig (Muster `BefehlDetailPage`, `PersonenDetailPage`). **Modal**: kurze
   blockierende Aktion, ≤ ~3 Felder. **Inline/Expander**: Zusatz ohne Seitenwechsel.
-  **Drawer**: nur Quick-View (read-only) oder Schnellerfassung ≤ ~4 Felder (`PersonDetailDrawer`);
-  Tabs, großer Edit-Modus oder > ~480 px → eigene Route.
+  **Drawer**: nur Quick-View (read-only, `PersonDetailDrawer`), nie zum Anlegen (LLH-1921); Tabs,
+  großer Edit-Modus oder > ~480 px → eigene Route.
 - **Einzige Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
   `einsatz/ModulAkkordeon.tsx`): Navigation, keine Entität, schließt beim Modulklick, Inhalt erst
   beim Öffnen (kein `forceRender`). Ein zweiter braucht eine eigene Entscheidung.
@@ -423,10 +423,10 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 Ansicht“; schreibt LFH-19 und LFH-979 fort)
 
 1. **Ein bestehender Datensatz wird in seiner Ansicht bearbeitet**, nie in einem Formular, das die
-   Ansicht ersetzt oder verdeckt. Modal und Drawer bleiben fürs **Anlegen** (Erfassungs-Norm,
-   Feldbudget) und für kurze blockierende Aktionen. Ausnahme: ein Datensatz ohne eigene Ansicht
-   (eine Chat-Nachricht, die Metadaten eines Dokuments) darf in einem kurzen Modal mit höchstens
-   etwa drei Feldern bearbeitet werden (LLH-1808).
+   Ansicht ersetzt oder verdeckt. Der Erfassungsdialog bleibt fürs **Anlegen** (Erfassungs-Norm,
+   Feldbudget, Form unten) und für kurze blockierende Aktionen. Ausnahme: ein Datensatz ohne eigene
+   Ansicht (eine Chat-Nachricht, die Metadaten eines Dokuments) darf in einem kurzen Modal mit
+   höchstens etwa drei Feldern bearbeitet werden (LLH-1808).
 2. **Drei Stufen nach Umfang:** **Einzelwert** (Status, Lagezustand, Führer, Frist) über
    `InlineAngabe`/`BemerkungZelle` am Wert, speichert sofort genau dieses Feld · **Paneel**
    (zusammengehörige Werte, „Funk“, „Personendaten“) über `components/instrument/BearbeitbaresPaneel`
@@ -462,10 +462,12 @@ Bereitstellungsraum, Betreuung).
 im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
 Kopfs). Anlegen geht über das `ErfassungsModal`; eine eigene Seite nur bei einem Ablauf oder mehr
 als ~5 Pflichtfeldern (Patient, Einheit aus Vorlage); ein eingeklapptes Formular nur bei
-Serienerfassung neben einer Liste; **kein Drawer zum Anlegen**. Altstellen mit Folgeaufgabe (LLH-1920, LLH-1921): UHS
-und Bereitstellungsraum bearbeiten im Modal und legen im Drawer an (`UhsBearbeitenModal`,
-`BrBearbeitenModal`, `UhsAnlegenDrawer`, `BrAnlegenDrawer`); die eingeklappten Formulare von
-Nachforderung, Meldungen, Lagemeldungen und Erinnerungen sind auf Serienerfassung zu prüfen.
+Serienerfassung neben einer Liste; **kein Drawer zum Anlegen** (Spec `bedien-muster`, „Einen
+Datensatz anlegen“). Einsatzgebundene Datensätze legen über `components/AnlegenModal.tsx` an
+(UHS, Bereitstellungsraum), jeder Einstieg öffnet denselben Dialog. Eingeklappt über der Liste
+bleiben, weil dort in Serie erfasst wird: Nachforderung, Meldungen, Erinnerungen (geprüft
+LLH-1921); die Lagemeldung erfasst im Dialog. Altstelle mit Folgeaufgabe (LLH-1920): UHS und
+Bereitstellungsraum bearbeiten im Modal (`UhsBearbeitenModal`, `BrBearbeitenModal`).
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
@@ -911,9 +913,11 @@ anwendbar), „nicht geprüft" ist keins.
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
   Rückweg. Die übrigen Teile der Zeile bleiben unsichtbar an ihrem Platz, damit eine umgebrochene
   Zeile ihre Höhe hält. Eine Person, die im Einheit-Detail über ihr ⋮ aus der Einheit gelöst wird,
-  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). **Bekannte Lücke:** Personal-Entlassen und Material „Aus dem Einsatz nehmen“ machen beim
-  Rückgängig nur die Kraft wieder aktiv, ohne ihre Bindungen; bis zu ihren Folgeaufgaben (LLH-1922, LLH-1923) bleibt das
-  so, ohne Rückfrage. Das Fahrzeug nimmt vollständig zurück (`…/entlassen/zuruecknehmen`).
+  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Fahrzeug und Person nehmen
+  das Entlassen vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort
+  des Entlassens; die Person ohne neue Periode, LLH-1922). **Bekannte Lücke:** Material „Aus dem
+  Einsatz nehmen“ macht beim Rückgängig nur den Posten wieder aktiv, ohne seinen Ort; bis zu seiner
+  Folgeaufgabe (LLH-1923) bleibt das so, ohne Rückfrage.
   Ebenso noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
   Person; und das Rückgängig von Material am Ort, Besatzung und UHS-Kraft prüft noch nicht, ob der
   Datensatz inzwischen anders gebunden ist. „Abziehen“ an der UHS und „Vom Fahrzeug lösen“ in
@@ -1467,7 +1471,10 @@ Spec `bedien-arbeitsplatz`).
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
   „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026): fünf Felder, das fünfte ist der
   optionale Einsatzort; ein sechstes gehört in die Kopfdaten. Die Einsatz-Vorlage steht als
-  gedämpfte Zeile unter den Feldern, kein Feld (LLH-1375): das Stichwort stellt sie ein.
+  gedämpfte Zeile unter den Feldern, kein Feld (LLH-1375): das Stichwort stellt sie ein. Ausnahme
+  „Lagemeldung erfassen“ (LLH-1921, Entscheidung 17.11.2026, Change
+  `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
+  Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.
 - **Ein Pflichtfeld gehört nie hinter den Collapse**; Felder, die eine Ablehnung auslösen können,
   bleiben sichtbar (Auftrag: Empfänger als `Select mode="tags"`, Präfix `abschnitt:<id>`/
   `einheit:<id>`). Einzige Ausnahme: ein Klappteil, der bei einem Prüffehler darin selbst aufgeht

@@ -1,5 +1,5 @@
 import { Breadcrumb, Button } from 'antd';
-import { Link, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { einsaetzePfad, einsatzPfad, uhsDetailPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
@@ -8,7 +8,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
-import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
+import UhsAnlegenModal from './uhs/UhsAnlegenModal';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import StatusTag from '../components/StatusTag';
@@ -63,12 +63,13 @@ export default function UnfallhilfsstellenPage() {
   });
 
   const [anlegen, setAnlegen] = useState(false);
+  const navigate = useNavigate();
 
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data);
 
   const [searchParams] = useSearchParams();
   const neuAuftrag = useLinkAuftrag();
-  // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen. Einmal je
+  // Schnellaktion: ?neu=1 öffnet den Anlegen-Dialog, sobald die Rechte feststehen. Einmal je
   // Verlaufseintrag (`useLinkAuftrag`, LLH-1558), geräumt aus einer Kopie statt der Instanz, die
   // Render und andere Effekte lesen.
   useEffect(() => {
@@ -209,7 +210,13 @@ export default function UnfallhilfsstellenPage() {
         </>
       )}
 
-      <UhsAnlegenDrawer einsatzId={einsatzId} open={anlegen} onClose={() => setAnlegen(false)} />
+      {/* Nach dem Anlegen in die neue UHS (LLH-1921), wie Bereitstellungsraum und Switcher. */}
+      <UhsAnlegenModal
+        einsatzId={einsatzId}
+        open={anlegen}
+        onClose={() => setAnlegen(false)}
+        onAngelegt={(uhs) => navigate(uhsDetailPfad(einsatzId, uhs.id))}
+      />
     </EinsatzSeite>
   );
 }

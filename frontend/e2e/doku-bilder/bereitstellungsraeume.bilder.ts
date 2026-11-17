@@ -18,8 +18,8 @@ import {
  * `docs/anwender/AGENTS.md`):
  *   liste.png      frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx,
  *                  frontend/src/bereitstellungsraum/brZahlen.ts
- *   anlegen.png    frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx,
- *                  frontend/src/components/AnlegenDrawer.tsx
+ *   anlegen.png    frontend/src/pages/bereitstellungsraum/BrAnlegenModal.tsx,
+ *                  frontend/src/components/AnlegenModal.tsx
  *   raum.png       frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx,
  *                  frontend/src/pages/bereitstellungsraum/brBelegungKern.ts,
  *                  frontend/src/pages/bereitstellungsraum/abrufKern.ts,
@@ -152,19 +152,19 @@ test.describe(KAPITEL, () => {
     await fotografiere(page.locator('.ant-table-wrapper').first(), KAPITEL, 'liste');
   });
 
-  test('Drawer „Bereitstellungsraum anlegen“', async ({ page }) => {
+  test('Dialog „Bereitstellungsraum anlegen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/bereitstellungsraeume/liste`);
     await page.getByRole('button', { name: 'Neu', exact: true }).click();
-    const drawer = page.getByRole('dialog', { name: 'Bereitstellungsraum anlegen' });
-    await drawer.getByLabel('Bezeichnung').fill('BR Süd');
-    await drawer.getByLabel('Standort (optional)').fill('Festplatz, Einfahrt Mühlenweg');
-    await drawer.getByLabel('Notiz (optional)').fill('Platz für 10 Fahrzeuge');
-    await drawer.getByLabel('Notiz (optional)').blur();
+    const dialog = page.getByRole('dialog', { name: 'Bereitstellungsraum anlegen' });
+    await dialog.getByLabel('Bezeichnung').fill('BR Süd');
+    await dialog.getByLabel('Standort (optional)').fill('Festplatz, Einfahrt Mühlenweg');
+    await dialog.getByLabel('Notiz (optional)').fill('Platz für 10 Fahrzeuge');
+    await dialog.getByLabel('Notiz (optional)').blur();
     await page.mouse.move(0, 0);
-    await fotografiere(drawer, KAPITEL, 'anlegen');
+    await fotografiere(dialog, KAPITEL, 'anlegen');
   });
 
   test('Bereitstellungsraum mit Kräften', async ({ page }) => {

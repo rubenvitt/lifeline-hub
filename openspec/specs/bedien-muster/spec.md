@@ -2,8 +2,10 @@
 
 ## Purpose
 Legt fest, wie Handlungen, die einen Datensatz beenden, lösen oder zurücknehmen, über alle Module
-heißen, wo sie stehen und wie sie gesichert sind, und wie viele Handlungen der Kopf einer
-Detailseite sichtbar trägt. Herleitung: `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md`.
+heißen, wo sie stehen und wie sie gesichert sind, wie viele Handlungen der Kopf einer
+Detailseite sichtbar trägt und in welcher Form ein Datensatz angelegt wird. Herleitung:
+`openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` und
+`openspec/changes/archive/2026-11-17-asthqrqj-anlegen-vereinheitlichen/design.md`.
 
 ## Requirements
 
@@ -66,9 +68,13 @@ davor herstellt, sonst MUST es eine Rückfrage zeigen.
 - **WHEN** die Fahrzeugliste am Handy als Karten erscheint
 - **THEN** trägt keine Karte einen Knopf „Entlassen“, und „Entlassen“ steht in ihrem ⋮
 
+#### Scenario: Person entlassen und Rückgängig
+- **WHEN** jemand auf der Detailseite einer Person „Entlassen“ wählt und im Hinweis „Rückgängig“
+- **THEN** wirkt das Entlassen ohne Rückfrage, und die Person steht wieder mit ihren Bindungen da; was nicht zurückkam, nennt der Seitenhinweis in Worten
+
 #### Scenario: Bekannte Lücke bei Personal und Material
-- **WHEN** eine Person entlassen oder ein Posten aus dem Einsatz genommen wird
-- **THEN** wirkt es bis zur Nachrüstung ihres Rückwegs ohne Rückfrage, und „Rückgängig“ macht die Kraft wieder aktiv, ohne ihre Bindungen herzustellen
+- **WHEN** ein Posten aus dem Einsatz genommen wird
+- **THEN** wirkt es bis zur Nachrüstung seines Rückwegs ohne Rückfrage, und „Rückgängig“ macht den Posten wieder aktiv, ohne seinen Ort herzustellen; bei der Person ist die Lücke geschlossen (Szenario „Person entlassen und Rückgängig“)
 
 ### Requirement: Ein Gebilde auflösen oder schließen
 
@@ -126,3 +132,42 @@ eine zweite, ein Statusschritt vor „Bearbeiten“. Alles Weitere MUST im ⋮ d
 #### Scenario: UHS am Tablet
 - **WHEN** jemand mit Schreibrecht eine UHS bei 1180 px öffnet
 - **THEN** stehen „Patient aufnehmen“ und „Bearbeiten“ als Knöpfe in der Zeile des Titels
+
+### Requirement: Einen Datensatz anlegen
+
+Ein neuer Datensatz MUST in einem Erfassungsdialog angelegt werden. Eine eigene Seite MUST es nur
+für einen Ablauf oder mehr als etwa fünf Pflichtfelder geben, ein eingeklapptes Formular über der
+Liste nur, wo dort in Serie erfasst wird („Speichern und nächste“). Eine Seitenleiste (Drawer)
+MUST NOT zum Anlegen dienen. Die Erfassungsleiste des ETB und die Schnellanlage in
+Ein- und Zweifeld-Katalogen sind eigene, bestehende Formen und bleiben.
+
+#### Scenario: Unfallhilfsstelle anlegen
+- **WHEN** jemand mit Schreibrecht in der Liste der Unfallhilfsstellen „Neu“ wählt
+- **THEN** öffnet sich der Dialog „Unfallhilfsstelle anlegen“ mit Bezeichnung, Typ und Standort, die Notiz unter „Weitere Angaben“, und keine Seitenleiste
+
+#### Scenario: Nach dem Anlegen in der neuen Ansicht
+- **WHEN** jemand im Dialog „Unfallhilfsstelle anlegen“ eine Bezeichnung einträgt und „Anlegen“ wählt
+- **THEN** schließt der Dialog, und die Seite zeigt die neue Unfallhilfsstelle
+
+#### Scenario: Lagemeldung erfassen
+- **WHEN** jemand mit Schreibrecht auf der Seite Lagemeldungen „Lagemeldung erfassen“ wählt
+- **THEN** öffnet sich ein Dialog mit dem Meldungsformular, die Art „Lagemeldung“ vorbelegt, und nach dem Erfassen schließt er, die neue Lagemeldung steht oben in der Zeitachse
+
+#### Scenario: Meldungen in Serie
+- **WHEN** jemand mit Schreibrecht auf der Seite Meldungen „Meldung erfassen“ wählt
+- **THEN** klappt das Formular über der Liste auf, und „Speichern und nächste“ hält es nach dem Erfassen offen
+
+### Requirement: Die Einstiege eines Moduls legen in derselben Form an
+
+Führt ein Modul mehrere Einstiege in dasselbe Anlegen (Liste, Leerzustand, Switcher,
+Sprungpalette), MUST jeder davon dieselbe Form öffnen. Ein anderes Modul, das einen Datensatz aus
+seinem eigenen Zusammenhang anlegt (etwa eine Erinnerung als Wiedervorlage aus dem ETB), darf eine
+eigene Form haben.
+
+#### Scenario: Bereitstellungsraum aus der Sprungpalette
+- **WHEN** jemand mit Schreibrecht in der Sprungpalette „Bereitstellungsraum anlegen“ wählt
+- **THEN** öffnet sich der Dialog „Bereitstellungsraum anlegen“, derselbe wie über „Neu“ in der Liste und „+ Neuer BR“ im Switcher
+
+#### Scenario: Lagemeldung aus dem Leerzustand
+- **WHEN** jemand mit Schreibrecht auf der leeren Seite Lagemeldungen „Lagemeldung erfassen“ wählt
+- **THEN** öffnet sich derselbe Dialog „Lagemeldung erfassen“ wie über den Knopf im Seitenkopf
