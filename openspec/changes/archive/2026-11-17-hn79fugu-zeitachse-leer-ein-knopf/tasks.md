@@ -22,7 +22,7 @@
 
 - [x] 4.1 `frontend/src/pages/lagekarte/AGENTS.md`, Regel „Das Zeitachsen-Band hat höchstens zwei Reihen“: Satz zum Leerzustand und zum Wort, Verweis auf diese Change; Prettier grün
 - [x] 4.2 Doku-Bilder: prüfen, ob `lagekarte.png` u. a. die leere Zeitachse zeigen; wenn ja `pnpm doku:bilder --grep lagekarte` und Bilder committen (Mitänderungsregel `docs/anwender/AGENTS.md`)
-- [ ] 4.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 4.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
 

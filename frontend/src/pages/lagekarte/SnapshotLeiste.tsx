@@ -318,8 +318,9 @@ export function SnapshotLeiste({
   );
 
   // Ohne Stand gibt es nichts abzuspielen, zu wählen oder zu verbergen (LLH-1936, D1 in
-  // `openspec/changes/hn79fugu-zeitachse-leer-ein-knopf/design.md`): nur der Knopf mit Wort, an der
-  // Stelle des eingeklappten Knopfs. Die gemerkte Klappwahl gilt erst ab dem ersten Stand.
+  // `openspec/changes/archive/2026-11-17-hn79fugu-zeitachse-leer-ein-knopf/design.md`): nur der
+  // Knopf mit Wort, an der Stelle des eingeklappten Knopfs. Die gemerkte Klappwahl gilt erst ab
+  // dem ersten Stand.
   if (snapshots.length === 0) {
     return (
       <>
