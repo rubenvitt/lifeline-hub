@@ -2593,6 +2593,11 @@ export interface components {
             abgeschlossen_at?: string | null;
             /** Format: int64 */
             abgeschlossen_von?: number | null;
+            /**
+             * @description Anzeigename der Person, die abgeschlossen hat (LLH-1814, Paneel „Einsatzabschluss“);
+             *     fehlt am aktiven Einsatz, ohne Konto und bei einer Gerätesitzung.
+             */
+            abgeschlossen_von_name?: string | null;
             angelegt_at: string;
             /** Format: int64 */
             anzahl_betroffene_initial?: number | null;

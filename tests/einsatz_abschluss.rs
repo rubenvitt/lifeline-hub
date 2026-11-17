@@ -290,3 +290,416 @@ async fn pruefung_am_leeren_einsatz_ist_ueberall_null() {
         assert_eq!(p[gruppe]["eintraege"], json!([]), "{gruppe}: {p}");
     }
 }
+
+// ── 3. Wiederöffnen (D4, D5) ─────────────────────────────────────────────────────────────────
+
+async fn wiedereroeffnen(
+    app: &axum::Router,
+    cookie: &str,
+    id: i64,
+    body: Option<Value>,
+) -> (StatusCode, Value) {
+    anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{id}/wiedereroeffnen"),
+        cookie,
+        body.as_ref(),
+    )
+    .await
+}
+
+fn grund(text: &str) -> Option<Value> {
+    Some(json!({ "grund": text }))
+}
+
+async fn status_von(pool: &SqlitePool, id: i64) -> String {
+    sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Verlegt den Abschluss um `stunden` in die Vergangenheit, samt der Zeitstempel, an denen das
+/// Wiederöffnen eine automatisch gesetzte Frist erkennt (gleich `abgeschlossen_at`).
+pub async fn zurueckdatieren(pool: &SqlitePool, id: i64, stunden: i64) {
+    let versatz = format!("-{stunden} hours");
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET frist_gesetzt_at = datetime(frist_gesetzt_at, ?1) \
+         WHERE einsatz_id = ?2 \
+           AND frist_gesetzt_at = (SELECT abgeschlossen_at FROM einsatz WHERE id = ?2)",
+    )
+    .bind(&versatz)
+    .bind(id)
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE einsatz SET \
+            retention_gesetzt_at = CASE WHEN retention_gesetzt_at = abgeschlossen_at \
+                THEN datetime(retention_gesetzt_at, ?1) ELSE retention_gesetzt_at END, \
+            abgeschlossen_at = datetime(abgeschlossen_at, ?1) \
+         WHERE id = ?2",
+    )
+    .bind(&versatz)
+    .bind(id)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn abgeschlossen(app: &axum::Router, cookie: &str, id: i64) {
+    let (s, v) = abschliessen(app, cookie, id).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Spec „Einsatzleitung öffnet nach zwei Stunden“, „Eintrag mit Grund“.
+#[tokio::test]
+async fn einsatzleitung_oeffnet_nach_zwei_stunden_wieder_mit_eintrag_und_etb_ist_wieder_offen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fk_id = common::benutzer_anlegen(&app, &admin, "erika", "fuehrungskraft").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let e = einsatz_anlegen(&app, &erika).await;
+    abgeschlossen(&app, &erika, e).await;
+    zurueckdatieren(&pool, e, 2).await;
+    let abgeschlossen_at: String =
+        sqlx::query_scalar("SELECT abgeschlossen_at FROM einsatz WHERE id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    let (s, v) = wiedereroeffnen(&app, &erika, e, grund("  Falscher Einsatz abgeschlossen ")).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["status"], "aktiv");
+    assert_eq!(v["abgeschlossen_at"], Value::Null);
+    assert_eq!(status_von(&pool, e).await, "aktiv");
+
+    let eintraege = system_eintraege(&pool, e).await;
+    let (_, inhalt, erfasser) = eintraege.last().unwrap();
+    assert_eq!(*erfasser, fk_id, "Erfasser ist die wieder öffnende Person");
+    assert!(inhalt.starts_with("Einsatz wieder geöffnet"), "{inhalt}");
+    assert!(
+        inhalt.ends_with(": Falscher Einsatz abgeschlossen"),
+        "{inhalt}"
+    );
+    assert!(
+        inhalt.contains("von erika"),
+        "abschließende Person: {inhalt}"
+    );
+    // Abschlusszeitpunkt in Zone und Darstellung des Einsatzes.
+    let stil = lifeline_hub::zeitdarstellung::zeitstil_laden(&pool, e)
+        .await
+        .unwrap();
+    let zeitpunkt = stil.zeitpunkt_text(&abgeschlossen_at);
+    assert!(
+        inhalt.contains(&format!("abgeschlossen am {zeitpunkt} von erika")),
+        "{inhalt} / {zeitpunkt}"
+    );
+
+    // Der Einsatz ist wieder beschreibbar.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/etb"),
+        &erika,
+        Some(&json!({ "typ": "meldung", "inhalt": "Weiter geht's", "von": "A", "an": "B" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}
+
+/// Spec „Frist abgelaufen“ und aktiver Einsatz: 422, nichts geschrieben.
+#[tokio::test]
+async fn nach_25_stunden_und_am_aktiven_einsatz_ist_wiederoeffnen_422() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = wiedereroeffnen(&app, &admin, e, grund("Versehen")).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "aktiv: {v}");
+
+    abgeschlossen(&app, &admin, e).await;
+    zurueckdatieren(&pool, e, 25).await;
+    let vorher = system_eintraege(&pool, e).await;
+    let (s, v) = wiedereroeffnen(&app, &admin, e, grund("Versehen")).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(status_von(&pool, e).await, "abgeschlossen");
+    assert_eq!(system_eintraege(&pool, e).await, vorher);
+}
+
+/// Spec „Admin der Einsatz-Organisation ohne Mitgliedschaft“, „Wer nicht wieder öffnen darf“.
+#[tokio::test]
+async fn admin_der_org_darf_ohne_rolle_andere_bekommen_403() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    common::benutzer_anlegen(&app, &admin, "erika", "fuehrungskraft").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let e = einsatz_anlegen(&app, &erika).await;
+    for (name, rolle) in [("fritz", "fuehrungspersonal"), ("beate", "beobachter")] {
+        let id = common::benutzer_anlegen(&app, &admin, name, "keine").await;
+        common::rolle_setzen(&app, &erika, e, id, rolle).await;
+    }
+    // Org-weite Führungskraft ohne Einsatzrolle.
+    common::benutzer_anlegen(&app, &admin, "karlo", "fuehrungskraft").await;
+    abgeschlossen(&app, &erika, e).await;
+
+    // Admin einer fremden Organisation.
+    let org: i64 = sqlx::query_scalar(
+        "INSERT INTO organisation (name, tz_organisation) \
+         VALUES ('Fremd', 'hilfsorganisation') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let hash = lifeline_hub::auth::password::hash("fremdpw12").unwrap();
+    sqlx::query(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
+         VALUES (?, 'Fremd-Admin', 'fremdadmin', ?, 'admin')",
+    )
+    .bind(org)
+    .bind(&hash)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let fremd = login_cookie(&app, "fremdadmin", "fremdpw12").await;
+
+    for (name, pw) in [
+        ("fritz", "fritzpw1"),
+        ("beate", "beatepw1"),
+        ("karlo", "karlopw1"),
+        ("fremdadmin", "fremdpw12"),
+    ] {
+        let cookie = if name == "fremdadmin" {
+            fremd.clone()
+        } else {
+            login_cookie(&app, name, pw).await
+        };
+        let (s, v) = wiedereroeffnen(&app, &cookie, e, grund("Versehen")).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{name}: {v}");
+    }
+    assert_eq!(status_von(&pool, e).await, "abgeschlossen");
+
+    // Der Admin der Einsatz-Org ist kein Mitglied und darf.
+    let (s, v) = wiedereroeffnen(&app, &admin, e, grund("Versehen")).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(status_von(&pool, e).await, "aktiv");
+}
+
+/// Spec „Ohne Grund“: fehlt, leer oder nur Leerzeichen → 400; zu lang → 400.
+#[tokio::test]
+async fn ohne_grund_ist_400_und_der_einsatz_bleibt_abgeschlossen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    abgeschlossen(&app, &admin, e).await;
+    let zu_lang = "x".repeat(lifeline_hub::etb::INHALT_MAX + 1);
+    for body in [
+        Some(json!({})),
+        grund(""),
+        grund("   "),
+        grund(&zu_lang),
+        Some(json!({ "grund": null })),
+    ] {
+        let (s, v) = wiedereroeffnen(&app, &admin, e, body.clone()).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body:?}: {v}");
+    }
+    assert_eq!(status_von(&pool, e).await, "abgeschlossen");
+}
+
+/// Ein gekoppeltes Gerät öffnet nicht wieder: 403 vor jeder Prüfung des Zustands.
+#[tokio::test]
+async fn ein_geraet_bekommt_403() {
+    use axum::body::{to_bytes, Body};
+    use axum::http::{header, Request};
+    use tower::ServiceExt;
+
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/geraete"),
+        &admin,
+        Some(&json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().unwrap().to_string();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/geraete/koppeln")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json!({ "code": code }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let geraet = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let _ = to_bytes(resp.into_body(), usize::MAX).await;
+    let (s, v) = wiedereroeffnen(&app, &geraet, e, grund("Versehen")).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+}
+
+/// Spec „Geschwärzte Kategorie“ und die übrigen Sperren der Aufbewahrung: je 422, nichts
+/// geschrieben. Ein zur Löschung vorgemerkter Einsatz scheitert schon an der Lese-Policy des
+/// Gates (Totalsperre, design.md D4): 403, ebenso ohne Schreibvorgang.
+#[tokio::test]
+async fn greift_die_aufbewahrung_schon_ist_wiederoeffnen_422() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let admin_id = benutzer_id(&pool, "admin").await;
+    let sperren: [(&str, String); 7] = [
+        (
+            "vorgemerkt",
+            "UPDATE einsatz SET geloescht_at = datetime('now') WHERE id = {e}".into(),
+        ),
+        (
+            "geschwärzt",
+            "UPDATE einsatz SET geschwaerzt_at = datetime('now') WHERE id = {e}".into(),
+        ),
+        (
+            "Kategorie geschwärzt",
+            "INSERT INTO einsatz_aufbewahrung_kategorie \
+             (einsatz_id, kategorie, frist_bis, rechtsgrundlage, frist_gesetzt_at, geschwaerzt_at) \
+             VALUES ({e}, 'personenauskunft', datetime('now'), 'x', datetime('now', '-1 day'), \
+                     datetime('now'))"
+                .into(),
+        ),
+        (
+            "offener Schwärzungsantrag",
+            format!(
+                "INSERT INTO schwaerzung_antrag (einsatz_id, ziel_art, ziel_id, aktenzeichen, \
+                 beantragt_von, beantragt_at, faellig_at) \
+                 VALUES ({{e}}, 'einsatz', NULL, 'AZ 1', {admin_id}, datetime('now'), \
+                         datetime('now', '+1 day'))"
+            ),
+        ),
+        (
+            "archiviert",
+            "INSERT INTO einsatz_archiv (einsatz_id, block, empfaenger_fingerabdruecke, groesse, \
+             sha256, inhalt) VALUES ({e}, 1, '[]', 1, 'x', x'00')"
+                .into(),
+        ),
+        (
+            "zur Verwahrung übergeben",
+            "INSERT INTO einsatz_verwahrung (einsatz_id, gegenstelle, quittiert_at) \
+             VALUES ({e}, 'Hub', datetime('now'))"
+                .into(),
+        ),
+        (
+            "Abräumen vorgemerkt",
+            "INSERT INTO einsatz_abraeumen (einsatz_id, art, gegenstelle) \
+             VALUES ({e}, 'verwahrt', 'Hub')"
+                .into(),
+        ),
+    ];
+    for (name, sql) in sperren {
+        let e = einsatz_anlegen(&app, &admin).await;
+        abgeschlossen(&app, &admin, e).await;
+        sqlx::query(sqlx::AssertSqlSafe(sql.replace("{e}", &e.to_string())))
+            .execute(&pool)
+            .await
+            .unwrap_or_else(|err| panic!("{name}: {err}"));
+        let vorher = system_eintraege(&pool, e).await;
+        let (s, v) = wiedereroeffnen(&app, &admin, e, grund("Versehen")).await;
+        let erwartet = if name == "vorgemerkt" {
+            StatusCode::FORBIDDEN
+        } else {
+            StatusCode::UNPROCESSABLE_ENTITY
+        };
+        assert_eq!(s, erwartet, "{name}: {v}");
+        // Der Repo-Vorgang selbst lehnt jede Sperre mit 422 ab, auch hinter dem Gate.
+        let fehler = lifeline_hub::einsatz::repo::wiedereroeffnen(
+            &pool,
+            e,
+            admin_id,
+            "Versehen",
+            chrono::Utc::now(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            fehler.status(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{name}: {fehler:?}"
+        );
+        assert_eq!(status_von(&pool, e).await, "abgeschlossen", "{name}");
+        assert_eq!(system_eintraege(&pool, e).await, vorher, "{name}");
+    }
+}
+
+/// Spec „Wiederöffnen am Spiegel“: 409, nichts geschrieben.
+#[tokio::test]
+async fn am_spiegel_ist_wiederoeffnen_409() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    abgeschlossen(&app, &admin, e).await;
+    let mut tx = pool.begin().await.unwrap();
+    for sql in [
+        "INSERT INTO spiegel_uebernahme (id) VALUES (1)".to_string(),
+        format!("INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES ({e}, 'x/{e}')"),
+        "DELETE FROM spiegel_uebernahme".to_string(),
+    ] {
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
+    let (s, v) = wiedereroeffnen(&app, &admin, e, grund("Versehen")).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(status_von(&pool, e).await, "abgeschlossen");
+}
+
+// ── 3.7 Abschließende Person im Kopf ─────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn der_kopf_nennt_die_abschliessende_person_mit_namen() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    common::benutzer_anlegen(&app, &admin, "erika", "fuehrungskraft").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let e = einsatz_anlegen(&app, &erika).await;
+
+    let (s, kopf) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}"), &erika, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(kopf["abgeschlossen_von_name"], Value::Null, "aktiv: {kopf}");
+
+    abgeschlossen(&app, &erika, e).await;
+    let (s, kopf) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}"), &erika, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(kopf["abgeschlossen_von_name"], "erika", "{kopf}");
+    let (s, liste) = anfrage(&app, "GET", "/api/einsaetze", &erika, None).await;
+    assert_eq!(s, StatusCode::OK);
+    let eintrag = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == e)
+        .unwrap();
+    assert_eq!(
+        eintrag["abgeschlossen_von_name"], "erika",
+        "Liste wie Detail"
+    );
+
+    let (s, kopf) = wiedereroeffnen(&app, &erika, e, grund("Versehen")).await;
+    assert_eq!(s, StatusCode::OK, "{kopf}");
+    assert_eq!(kopf["abgeschlossen_von_name"], Value::Null, "{kopf}");
+}

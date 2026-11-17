@@ -6489,6 +6489,13 @@
             ],
             "format": "int64"
           },
+          "abgeschlossen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der Person, die abgeschlossen hat (LLH-1814, Paneel „Einsatzabschluss“);\nfehlt am aktiven Einsatz, ohne Konto und bei einer Gerätesitzung."
+          },
           "angelegt_at": {
             "type": "string"
           },

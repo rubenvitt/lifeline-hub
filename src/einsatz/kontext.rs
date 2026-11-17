@@ -337,3 +337,33 @@ impl Deref for EinsatzFuehrungszugriff {
         &self.0
     }
 }
+
+/// Gate des Wiederöffnens (LLH-1814, Spec `einsatz-abschluss`, design.md D4): Org-Floor → kein
+/// Gerät (403) → Einsatzleitung oder System-Admin der Einsatz-Org (sonst 403) → Lese-Policy. Bewusst
+/// **ohne** `fordere_aktiv`: es wirkt gerade am abgeschlossenen Einsatz. Frist, Zustand und
+/// Spiegel prüft der Repo-Vorgang `repo::wiedereroeffnen` in seiner Transaktion.
+pub struct EinsatzWiedereroeffnungszugriff(pub EinsatzKontext);
+
+impl FromRequestParts<AppState> for EinsatzWiedereroeffnungszugriff {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        if ctx.geraet.is_some() {
+            return Err(AppError::Forbidden);
+        }
+        let admin = ctx.benutzer.ist_admin() && ctx.benutzer.org_id == ctx.einsatz.org_id;
+        if !admin {
+            ctx.fordere_einsatzleitung()?;
+        }
+        ctx.fordere_lesezugriff()?;
+        Ok(Self(ctx))
+    }
+}
+
+impl Deref for EinsatzWiedereroeffnungszugriff {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}

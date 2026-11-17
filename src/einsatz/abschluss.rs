@@ -247,9 +247,109 @@ pub async fn load_pruefung(
     })
 }
 
+// ---------- Wiederöffnen: Sperren der Aufbewahrung (design.md D4, 3.) ----------
+
+/// Was an einem abgeschlossenen Einsatz schon von der Aufbewahrung erfasst ist. Jede gesetzte
+/// Angabe sperrt das Wiederöffnen (Spec `einsatz-abschluss`, „Kein Wiederöffnen, wenn die
+/// Aufbewahrung schon greift“).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, sqlx::FromRow)]
+pub struct AufbewahrungStand {
+    /// Zur Löschung vorgemerkt (`einsatz.geloescht_at`).
+    pub vorgemerkt: bool,
+    /// Ganz geschwärzt (`einsatz.geschwaerzt_at`).
+    pub geschwaerzt: bool,
+    /// Eine Datenkategorie ist geschwärzt (`einsatz_aufbewahrung_kategorie.geschwaerzt_at`).
+    pub kategorie_geschwaerzt: bool,
+    /// Ein Schwärzungsantrag, der nicht zurückgenommen ist (offen oder vollzogen,
+    /// `schwaerzung_antrag`).
+    pub schwaerzungsantrag: bool,
+    /// Im Archiv am Hub (`einsatz_archiv`).
+    pub archiviert: bool,
+    /// Zur Verwahrung an die Gegenstelle übergeben (`einsatz_verwahrung`).
+    pub verwahrung: bool,
+    /// Abräumen vorgemerkt (`einsatz_abraeumen`).
+    pub abraeumen: bool,
+}
+
+impl AufbewahrungStand {
+    /// 422 mit dem Grund der ersten greifenden Sperre, sonst `Ok`.
+    pub fn check(&self) -> Result<(), AppError> {
+        let grund = if self.vorgemerkt {
+            "Der Einsatz ist zur Löschung vorgemerkt"
+        } else if self.geschwaerzt {
+            "Der Einsatz ist geschwärzt"
+        } else if self.kategorie_geschwaerzt {
+            "Eine Datenkategorie des Einsatzes ist geschwärzt"
+        } else if self.schwaerzungsantrag {
+            "Für den Einsatz liegt ein Schwärzungsantrag vor"
+        } else if self.archiviert {
+            "Der Einsatz ist archiviert"
+        } else if self.verwahrung {
+            "Der Einsatz ist zur Verwahrung übergeben"
+        } else if self.abraeumen {
+            "Der Einsatz wird hier abgeräumt"
+        } else {
+            return Ok(());
+        };
+        Err(AppError::UnprocessableEntity(format!(
+            "{grund} — Wiederöffnen nicht möglich"
+        )))
+    }
+}
+
+/// Liest den [`AufbewahrungStand`] auf der Verbindung der schreibenden Transaktion.
+pub(crate) async fn load_aufbewahrung_stand(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<AufbewahrungStand, AppError> {
+    sqlx::query_as::<_, AufbewahrungStand>(
+        "SELECT e.geloescht_at IS NOT NULL AS vorgemerkt, \
+                e.geschwaerzt_at IS NOT NULL AS geschwaerzt, \
+                EXISTS (SELECT 1 FROM einsatz_aufbewahrung_kategorie k \
+                        WHERE k.einsatz_id = e.id AND k.geschwaerzt_at IS NOT NULL) \
+                    AS kategorie_geschwaerzt, \
+                EXISTS (SELECT 1 FROM schwaerzung_antrag a \
+                        WHERE a.einsatz_id = e.id AND a.zurueckgenommen_at IS NULL) \
+                    AS schwaerzungsantrag, \
+                EXISTS (SELECT 1 FROM einsatz_archiv x WHERE x.einsatz_id = e.id) AS archiviert, \
+                EXISTS (SELECT 1 FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
+                    AS verwahrung, \
+                EXISTS (SELECT 1 FROM einsatz_abraeumen r WHERE r.einsatz_id = e.id) AS abraeumen \
+         FROM einsatz e WHERE e.id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn jede_sperre_der_aufbewahrung_ist_422_ohne_sperre_ok() {
+        assert!(AufbewahrungStand::default().check().is_ok());
+        let sperren: [fn(&mut AufbewahrungStand); 7] = [
+            |s| s.vorgemerkt = true,
+            |s| s.geschwaerzt = true,
+            |s| s.kategorie_geschwaerzt = true,
+            |s| s.schwaerzungsantrag = true,
+            |s| s.archiviert = true,
+            |s| s.verwahrung = true,
+            |s| s.abraeumen = true,
+        ];
+        for setze in sperren {
+            let mut stand = AufbewahrungStand::default();
+            setze(&mut stand);
+            let fehler = stand.check().unwrap_err();
+            assert_eq!(
+                fehler.status(),
+                axum::http::StatusCode::UNPROCESSABLE_ENTITY,
+                "{stand:?}"
+            );
+        }
+    }
 
     #[test]
     fn kurzliste_nennt_hoechstens_fuenf_und_zaehlt_alle() {

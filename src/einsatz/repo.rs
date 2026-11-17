@@ -359,6 +359,15 @@ macro_rules! spiegel_spalten {
     };
 }
 
+/// Anzeigename der abschließenden Person (LLH-1814), wortgleich in `laden` und `liste_fuer`.
+/// Korreliert statt Join, damit keine der beiden Abfragen einen weiteren Alias braucht.
+macro_rules! abgeschlossen_von_name_spalte {
+    () => {
+        "(SELECT bav.anzeigename FROM benutzer bav WHERE bav.id = e.abgeschlossen_von) \
+             AS abgeschlossen_von_name"
+    };
+}
+
 macro_rules! spiegel_joins {
     () => {
         " LEFT JOIN einsatz_spiegel sp ON sp.einsatz_id = e.id \
@@ -378,7 +387,9 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
-                o.name AS org_name, \
+                o.name AS org_name, ",
+        abgeschlossen_von_name_spalte!(),
+        ", \
                 (SELECT v.gegenstelle FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
                     AS verwahrung_gegenstelle, \
                 (SELECT v.grund FROM einsatz_verwahrung v WHERE v.einsatz_id = e.id) \
@@ -495,6 +506,7 @@ pub async fn liste_fuer(
         naechste_lagebesprechung_at: Option<String>,
         abgeschlossen_at: Option<String>,
         abgeschlossen_von: Option<i64>,
+        abgeschlossen_von_name: Option<String>,
         #[sqlx(try_from = "String")]
         einsatzart: Einsatzart,
         einsatznummer_intern: Option<String>,
@@ -544,7 +556,9 @@ pub async fn liste_fuer(
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
+                e.retention_bis, e.nachbereitung_bis, e.geloescht_at, e.naechste_lagebesprechung_at, ",
+        abgeschlossen_von_name_spalte!(),
+        ", \
                 m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle, \
                 m.fuehrungsfunktion AS meine_fuehrungsfunktion, \
                 EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
@@ -646,6 +660,7 @@ pub async fn liste_fuer(
                 naechste_lagebesprechung_at: r.naechste_lagebesprechung_at,
                 abgeschlossen_at: r.abgeschlossen_at,
                 abgeschlossen_von: r.abgeschlossen_von,
+                abgeschlossen_von_name: r.abgeschlossen_von_name,
                 einsatzart: r.einsatzart,
                 einsatznummer_intern: r.einsatznummer_intern,
                 angelegt_at: r.angelegt_at,
@@ -851,6 +866,244 @@ pub async fn abschliessen(
         }
     }
     tx.commit().await?;
+    Ok(MitEtbEintraegen {
+        einsatz: laden(pool, einsatz_id).await?,
+        etb_eintrag_ids,
+    })
+}
+
+/// Ein System-Eintrag im ETB auf der Verbindung einer schreibenden Transaktion.
+async fn system_eintrag_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    etb_startwert: i64,
+    inhalt: &str,
+) -> Result<i64, AppError> {
+    crate::etb::repo::anlegen_tx(
+        conn,
+        einsatz_id,
+        erfasser_id,
+        etb_startwert,
+        crate::etb::repo::EintragDaten {
+            typ: crate::etb::TYP_SYSTEM,
+            inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await
+}
+
+/// Status, abgeschlossen am, Anzeigename der abschließenden Person, Spiegel, Aufbewahrungsfrist
+/// samt Setzzeitpunkt, Nachbereitung.
+type WiedereroeffnenKopf = (
+    String,
+    Option<String>,
+    Option<String>,
+    bool,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
+
+/// Öffnet einen abgeschlossenen Einsatz wieder (LLH-1814, Spec `einsatz-abschluss`, design.md
+/// D4/D5). `grund` ist geprüft und getrimmt; die Rechte prüft das Gate
+/// `EinsatzWiedereroeffnungszugriff`. Prüft und schreibt in EINER Transaktion:
+///
+/// 1. Spiegel → 409; 2. nicht abgeschlossen oder älter als `NACHLAUF_STUNDEN` → 422;
+/// 3. Aufbewahrung greift schon ([`super::abschluss::AufbewahrungStand`]) → 422;
+/// 4. `UPDATE` zurück nach `aktiv` mit CAS auf den gelesenen Abschlusszeitpunkt (0 Zeilen → 409);
+/// 5. Rücknahme der beim Abschluss automatisch gesetzten Fristen (D5) — erkannt an der Gleichheit
+///    mit dem vor dem `UPDATE` gelesenen `abgeschlossen_at` — je mit ETB-Eintrag, zuletzt der
+///    Eintrag „Einsatz wieder geöffnet“ mit Grund, Abschlusszeitpunkt und abschließender Person.
+///
+/// Freigabe der öffentlichen API und Gerätekopplungen bleiben beendet.
+pub async fn wiedereroeffnen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    von_benutzer_id: i64,
+    grund: &str,
+    jetzt: chrono::DateTime<Utc>,
+) -> Result<MitEtbEintraegen, AppError> {
+    let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
+    let etb_eintrag_ids = crate::write_retry!(pool, |conn| {
+        let kopf: Option<WiedereroeffnenKopf> = sqlx::query_as(concat!(
+            "SELECT e.status, e.abgeschlossen_at, ",
+            abgeschlossen_von_name_spalte!(),
+            ", EXISTS (SELECT 1 FROM einsatz_spiegel s WHERE s.einsatz_id = e.id), \
+               e.retention_bis, e.retention_gesetzt_at, e.nachbereitung_bis \
+             FROM einsatz e WHERE e.id = ?"
+        ))
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some((
+            status,
+            abgeschlossen_at,
+            von_name,
+            spiegel,
+            retention_bis,
+            retention_gesetzt_at,
+            nachbereitung_bis,
+        )) = kopf
+        else {
+            return Err(AppError::NotFound);
+        };
+        if spiegel {
+            return Err(AppError::Conflict(
+                "Dieser Einsatz ist ein Spiegel; wieder öffnen kann nur die führende Instanz."
+                    .into(),
+            ));
+        }
+        let Some(abgeschlossen_at) =
+            abgeschlossen_at.filter(|_| status == super::STATUS_ABGESCHLOSSEN)
+        else {
+            return Err(AppError::UnprocessableEntity(
+                "Der Einsatz ist nicht abgeschlossen".into(),
+            ));
+        };
+        if !super::berechtigung::ist_in_nachlauffrist(Some(&abgeschlossen_at), jetzt) {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Ein Einsatz lässt sich nur binnen {} Stunden nach dem Abschluss wieder öffnen",
+                super::berechtigung::NACHLAUF_STUNDEN
+            )));
+        }
+        super::abschluss::load_aufbewahrung_stand(&mut *conn, einsatz_id)
+            .await?
+            .check()?;
+
+        // D5: was der Abschluss automatisch gesetzt hat, vor dem UPDATE bestimmt.
+        let frist_automatisch = retention_bis.is_some()
+            && retention_gesetzt_at.as_deref() == Some(abgeschlossen_at.as_str());
+        let kategorien: Vec<String> = sqlx::query_scalar(
+            "SELECT kategorie FROM einsatz_aufbewahrung_kategorie \
+             WHERE einsatz_id = ? AND frist_gesetzt_at = ? ORDER BY kategorie",
+        )
+        .bind(einsatz_id)
+        .bind(&abgeschlossen_at)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        let res = sqlx::query(
+            "UPDATE einsatz SET status = 'aktiv', abgeschlossen_at = NULL, abgeschlossen_von = NULL \
+             WHERE id = ? AND status = 'abgeschlossen' AND abgeschlossen_at = ?",
+        )
+        .bind(einsatz_id)
+        .bind(&abgeschlossen_at)
+        .execute(&mut *conn)
+        .await?;
+        if res.rows_affected() == 0 {
+            return Err(AppError::Conflict(
+                "Der Einsatz wurde zwischenzeitlich geändert".into(),
+            ));
+        }
+
+        // Der Abschluss beendet Kopplungen nur über den Status (`geraet::repo`,
+        // `kontext_wenn_gueltig` verlangt einen aktiven Einsatz). Damit sie mit dem Rückweg nach
+        // `aktiv` nicht wieder aufleben, widerruft das Wiederöffnen jede noch offene: das Gerät
+        // muss neu gekoppelt werden (Spec `einsatz-abschluss`, „Kopplung bleibt beendet“).
+        let kopplungen: Vec<i64> = sqlx::query_scalar(
+            "SELECT id FROM geraet_kopplung WHERE einsatz_id = ? AND widerrufen_at IS NULL",
+        )
+        .bind(einsatz_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        for kopplung_id in kopplungen {
+            crate::geraet::repo::widerrufen(&mut *conn, kopplung_id, von_benutzer_id).await?;
+        }
+
+        let mut ids = Vec::new();
+        if frist_automatisch {
+            sqlx::query(
+                "UPDATE einsatz SET retention_bis = NULL, retention_gesetzt_at = NULL WHERE id = ?",
+            )
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+            let inhalt = format!(
+                "Aufbewahrungsfrist zurückgenommen (beim Abschluss automatisch gesetzt auf {})",
+                stil.zeitpunkt_text(retention_bis.as_deref().unwrap_or_default())
+            );
+            ids.push(
+                system_eintrag_tx(
+                    &mut *conn,
+                    einsatz_id,
+                    von_benutzer_id,
+                    etb_startwert,
+                    &inhalt,
+                )
+                .await?,
+            );
+        }
+        for kategorie in &kategorien {
+            sqlx::query(
+                "DELETE FROM einsatz_aufbewahrung_kategorie WHERE einsatz_id = ? AND kategorie = ?",
+            )
+            .bind(einsatz_id)
+            .bind(kategorie)
+            .execute(&mut *conn)
+            .await?;
+            let name = super::retention::Datenkategorie::parse(kategorie)
+                .map_or(kategorie.as_str(), |k| k.bezeichnung());
+            let inhalt = format!(
+                "Aufbewahrungsfrist der Datenkategorie „{name}“ zurückgenommen \
+                 (beim Abschluss automatisch gesetzt)"
+            );
+            ids.push(
+                system_eintrag_tx(
+                    &mut *conn,
+                    einsatz_id,
+                    von_benutzer_id,
+                    etb_startwert,
+                    &inhalt,
+                )
+                .await?,
+            );
+        }
+        if let Some(bis) = &nachbereitung_bis {
+            sqlx::query("UPDATE einsatz SET nachbereitung_bis = NULL WHERE id = ?")
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?;
+            let inhalt = format!(
+                "Nachbereitungsfrist zurückgenommen (war {})",
+                stil.zeitpunkt_text(bis)
+            );
+            ids.push(
+                system_eintrag_tx(
+                    &mut *conn,
+                    einsatz_id,
+                    von_benutzer_id,
+                    etb_startwert,
+                    &inhalt,
+                )
+                .await?,
+            );
+        }
+        let inhalt = format!(
+            "Einsatz wieder geöffnet (abgeschlossen am {} von {}): {grund}",
+            stil.zeitpunkt_text(&abgeschlossen_at),
+            von_name.as_deref().unwrap_or("unbekannt")
+        );
+        ids.push(
+            system_eintrag_tx(
+                &mut *conn,
+                einsatz_id,
+                von_benutzer_id,
+                etb_startwert,
+                &inhalt,
+            )
+            .await?,
+        );
+        Ok(ids)
+    })?;
     Ok(MitEtbEintraegen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,

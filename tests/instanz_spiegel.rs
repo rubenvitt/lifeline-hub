@@ -1862,3 +1862,76 @@ async fn neue_zuordnung_an_dieselbe_org_gleicht_den_spiegel_wieder_ab() {
     .await;
     assert_eq!(st, StatusCode::OK);
 }
+
+// ── Wiederöffnen beim Führer (LLH-1814, Spec `einsatz-abschluss`) ───────────────────────────
+
+/// „Führende Instanz öffnet wieder“: der Rückweg nach `aktiv` läuft über den Spiegel-Log der
+/// Tabelle `einsatz`; der Spiegel beim Gegenüber ist nach dem nächsten Abgleich wieder aktiv.
+#[tokio::test]
+async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_aktiv() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen_mit(&hub.app, &hub.admin, "Alarm Hub").await;
+    etb_eintrag(&hub, e, "Alarm eingegangen").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&elw).await;
+    let status = |i: &Instanz, id: i64| {
+        let pool = i.pool.clone();
+        async move {
+            eine::<String>(
+                &pool,
+                &format!("SELECT status FROM einsatz WHERE id = {id}"),
+            )
+            .await
+        }
+    };
+    assert_eq!(status(&elw, s).await, "aktiv");
+
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{v}");
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    assert_eq!(status(&elw, s).await, "abgeschlossen", "Abschluss kommt an");
+
+    // Am Spiegel öffnet niemand wieder.
+    let (st, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/wiedereroeffnen"),
+        &elw.admin,
+        Some(&json!({ "grund": "Versehen" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT, "{v}");
+
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/wiedereroeffnen"),
+        &hub.admin,
+        Some(&json!({ "grund": "Versehen" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    assert_eq!(status(&elw, s).await, "aktiv", "Rückweg kommt an");
+    let am_spiegel: Option<String> = eine(
+        &elw.pool,
+        &format!("SELECT abgeschlossen_at FROM einsatz WHERE id = {s}"),
+    )
+    .await;
+    assert_eq!(am_spiegel, None);
+    assert!(etb_inhalte(&elw, s)
+        .await
+        .iter()
+        .any(|t| t.starts_with("Einsatz wieder geöffnet")));
+}

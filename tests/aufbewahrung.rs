@@ -1251,3 +1251,305 @@ async fn nach_endgueltiger_loeschung_akte_404_und_protokollzeile_in_der_uebersic
     assert!(zeile.get("bezeichnung").is_none(), "{zeile}");
     assert!(zeile["endgueltig_geloescht_at"].is_string(), "{zeile}");
 }
+
+// ---------- Wiederöffnen nimmt die Abschluss-Fristen zurück (LLH-1814, design.md D5) ----------
+
+/// Verlegt den Abschluss um `stunden` zurück, samt der Zeitstempel, an denen das Wiederöffnen
+/// eine automatisch gesetzte Frist erkennt (gleich `abgeschlossen_at`).
+async fn abschluss_zurueckdatieren(pool: &SqlitePool, id: i64, stunden: i64) {
+    let versatz = format!("-{stunden} hours");
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET frist_gesetzt_at = datetime(frist_gesetzt_at, ?1) \
+         WHERE einsatz_id = ?2 \
+           AND frist_gesetzt_at = (SELECT abgeschlossen_at FROM einsatz WHERE id = ?2)",
+    )
+    .bind(&versatz)
+    .bind(id)
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE einsatz SET \
+            retention_gesetzt_at = CASE WHEN retention_gesetzt_at = abgeschlossen_at \
+                THEN datetime(retention_gesetzt_at, ?1) ELSE retention_gesetzt_at END, \
+            abgeschlossen_at = datetime(abgeschlossen_at, ?1) \
+         WHERE id = ?2",
+    )
+    .bind(&versatz)
+    .bind(id)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn wieder_oeffnen(app: &axum::Router, cookie: &str, id: i64) -> Value {
+    let (s, v) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{id}/wiedereroeffnen"),
+        cookie,
+        Some(r#"{"grund":"Falscher Einsatz abgeschlossen"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "wiedereroeffnen: {v}");
+    v
+}
+
+async fn abschluss_post(app: &axum::Router, cookie: &str, id: i64) -> Value {
+    let (s, v) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{id}/abschliessen"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "abschliessen: {v}");
+    v
+}
+
+/// (retention_bis, retention_gesetzt_at, nachbereitung_bis)
+async fn fristen(pool: &SqlitePool, id: i64) -> (Option<String>, Option<String>, Option<String>) {
+    sqlx::query_as(
+        "SELECT retention_bis, retention_gesetzt_at, nachbereitung_bis FROM einsatz WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// (kategorie, frist_bis, vorgemerkt_at)
+async fn kategorie_zeilen(pool: &SqlitePool, id: i64) -> Vec<(String, String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT kategorie, frist_bis, vorgemerkt_at FROM einsatz_aufbewahrung_kategorie \
+         WHERE einsatz_id = ? ORDER BY kategorie",
+    )
+    .bind(id)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+fn plus_tage(zeitpunkt: &str, tage: i64) -> String {
+    (chrono::NaiveDateTime::parse_from_str(zeitpunkt, FMT).unwrap() + Duration::days(tage))
+        .format(FMT)
+        .to_string()
+}
+
+async fn org_vorgaben(app: &axum::Router, admin: &str) {
+    let (s, v) = common::anfrage_json(
+        app,
+        "PUT",
+        "/api/org-einstellungen",
+        admin,
+        Some(&serde_json::json!({
+            "retention_dauer_tage": 30,
+            "nachbereitung_tage": 7,
+            "aufbewahrung_kategorien": [
+                { "kategorie": "personenauskunft", "dauer_tage": 30,
+                  "rechtsgrundlage": "§ 46 Abs. 5 BHKG NRW" },
+                { "kategorie": "anhaenge", "dauer_tage": 0, "rechtsgrundlage": "Vorgabe" }
+            ],
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Spec `einsatz-abschluss`, „Automatische Frist zurückgenommen“, „Erneuter Abschluss“; Spec
+/// `aufbewahrung`, „Wiederöffnen nimmt die Abschluss-Fristen zurück“, „Rücknahme beim
+/// Wiederöffnen“. Die Kategorie mit 0 Tagen ist schon vorgemerkt und geht samt Vormerkung.
+#[tokio::test]
+async fn wiederoeffnen_nimmt_automatische_fristen_zurueck_und_erneuter_abschluss_setzt_sie_neu() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    org_vorgaben(&app, &admin).await;
+    let id = einsatz_anlegen(&app, &admin).await;
+    abschluss_post(&app, &admin, id).await;
+    abschluss_zurueckdatieren(&pool, id, 2).await;
+    sqlx::query(
+        "UPDATE einsatz_aufbewahrung_kategorie SET vorgemerkt_at = datetime('now') \
+         WHERE einsatz_id = ? AND kategorie = 'anhaenge'",
+    )
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (bis, _, nb) = fristen(&pool, id).await;
+    assert!(bis.is_some() && nb.is_some());
+    assert_eq!(kategorie_zeilen(&pool, id).await.len(), 2);
+
+    let kopf = wieder_oeffnen(&app, &admin, id).await;
+    assert_eq!(kopf["retention_bis"], Value::Null, "{kopf}");
+    assert_eq!(fristen(&pool, id).await, (None, None, None));
+    assert!(kategorie_zeilen(&pool, id).await.is_empty());
+    let texte = common::system_etb_inhalte(&app, &admin, id).await;
+    for baustein in [
+        "Aufbewahrungsfrist zurückgenommen",
+        "Aufbewahrungsfrist der Datenkategorie „Personenauskunft“ zurückgenommen",
+        "Aufbewahrungsfrist der Datenkategorie „Anhänge“ zurückgenommen",
+        "Nachbereitungsfrist zurückgenommen",
+        "Einsatz wieder geöffnet",
+    ] {
+        assert!(
+            texte.iter().any(|t| t.starts_with(baustein)),
+            "„{baustein}“ fehlt: {texte:?}"
+        );
+    }
+
+    // Erneuter Abschluss: alle Fristen ab dem neuen Zeitpunkt.
+    let kopf = abschluss_post(&app, &admin, id).await;
+    let neu = kopf["abgeschlossen_at"].as_str().unwrap().to_string();
+    let (bis, gesetzt, nb) = fristen(&pool, id).await;
+    assert_eq!(bis.as_deref(), Some(plus_tage(&neu, 30).as_str()));
+    assert_eq!(gesetzt.as_deref(), Some(neu.as_str()));
+    assert_eq!(nb.as_deref(), Some(plus_tage(&neu, 7).as_str()));
+    let zeilen = kategorie_zeilen(&pool, id).await;
+    assert_eq!(zeilen.len(), 2, "{zeilen:?}");
+    let personen = zeilen.iter().find(|z| z.0 == "personenauskunft").unwrap();
+    assert_eq!(personen.1, plus_tage(&neu, 30));
+    assert!(zeilen.iter().all(|z| z.2.is_none()), "ohne Vormerkung");
+}
+
+/// Spec „Manuelle Frist bleibt“: von Hand gesetzte Einsatz- und Kategorie-Fristen bleiben.
+#[tokio::test]
+async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    org_vorgaben(&app, &admin).await;
+    let id = einsatz_anlegen(&app, &admin).await;
+    abschluss_post(&app, &admin, id).await;
+    abschluss_zurueckdatieren(&pool, id, 2).await;
+
+    let frist = in_tagen(400);
+    let (s, v) = common::anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{id}/aufbewahrungsfrist"),
+        &admin,
+        Some(&serde_json::json!({ "retention_bis": frist })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let kategorie_frist = in_tagen(300);
+    let (s, v) = common::anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{id}/aufbewahrungsfrist/personenauskunft"),
+        &admin,
+        Some(&serde_json::json!({ "retention_bis": kategorie_frist })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    wieder_oeffnen(&app, &admin, id).await;
+    let (bis, _, nb) = fristen(&pool, id).await;
+    assert_eq!(
+        bis.as_deref(),
+        Some(frist.as_str()),
+        "manuelle Frist bleibt"
+    );
+    assert_eq!(nb, None, "die Nachbereitung geht mit");
+    let zeilen = kategorie_zeilen(&pool, id).await;
+    assert_eq!(
+        zeilen.len(),
+        1,
+        "nur die von Hand geänderte Kategorie bleibt: {zeilen:?}"
+    );
+    assert_eq!(zeilen[0].0, "personenauskunft");
+    assert_eq!(zeilen[0].1, kategorie_frist);
+}
+
+/// Spec „Kopplung bleibt beendet“; die Freigabe der öffentlichen API bleibt gelöscht.
+#[tokio::test]
+async fn wiederoeffnen_laesst_kopplung_und_api_freigabe_beendet() {
+    use axum::body::Body;
+    use axum::http::{header, Request};
+    use tower::ServiceExt;
+
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let admin_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE id = ?")
+        .bind(admin_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let id = einsatz_anlegen(&app, &admin).await;
+
+    let zugang = {
+        let mut conn = pool.acquire().await.unwrap();
+        let z = lifeline_hub::public_api::zugang::anlegen(
+            &mut conn,
+            org,
+            "Leitstelle",
+            &[lifeline_hub::public_api::scope::Scope::EinsaetzeRead],
+            None,
+            None,
+            &lifeline_hub::zeit::jetzt(),
+        )
+        .await
+        .unwrap();
+        lifeline_hub::public_api::freigabe::freigeben_tx(&mut conn, &z, id, admin_id)
+            .await
+            .unwrap();
+        z
+    };
+    let (s, v) = common::anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{id}/geraete"),
+        &admin,
+        Some(&serde_json::json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().unwrap().to_string();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/geraete/koppeln")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::json!({ "code": code }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let geraet = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let (s, _) = anfrage(&app, "GET", "/api/auth/me", &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "Gerät gekoppelt");
+
+    abschluss_post(&app, &admin, id).await;
+    wieder_oeffnen(&app, &admin, id).await;
+
+    let (s, _) = anfrage(&app, "GET", "/api/auth/me", &geraet, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED, "die Kopplung bleibt beendet");
+    let freigaben: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM maschinenzugang_freigabe WHERE zugang_id = ? AND einsatz_id = ?",
+    )
+    .bind(&zugang)
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        freigaben, 0,
+        "die Freigabe der öffentlichen API bleibt gelöscht"
+    );
+}

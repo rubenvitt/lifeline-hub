@@ -7,6 +7,7 @@ use crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige;
 use crate::einsatz::berechtigung::ist_fristverkuerzung;
 use crate::einsatz::kontext::{
     EinsatzKontext, EinsatzLeitungszugriff, EinsatzLesezugriff, EinsatzVerwaltungszugriff,
+    EinsatzWiedereroeffnungszugriff,
 };
 use crate::einsatz::{
     einstellungen, modul, modul_override, repo, EinsatzAnzeige, EinsatzRolle, Einsatzart,
@@ -231,6 +232,8 @@ pub async fn detail(
     // Führungsstelle, und die liest kein Gerät.
     if ctx.geraet.is_some() {
         anzeige.einsatzleiter = None;
+        // Wie die übrigen Personenfelder des Kopfs (LLH-1814): kein Name an ein Gerät.
+        anzeige.abgeschlossen_von_name = None;
     }
     Ok(Json(anzeige))
 }
@@ -273,6 +276,46 @@ pub async fn abschluss_pruefung(
         )
         .await?,
     ))
+}
+
+/// Body von `POST …/wiedereroeffnen`: der Grund ist Pflicht.
+#[derive(Debug, Deserialize)]
+pub struct Wiedereroeffnen {
+    #[serde(default)]
+    pub grund: Option<String>,
+}
+
+/// POST /api/einsaetze/{id}/wiedereroeffnen — einen abgeschlossenen Einsatz binnen
+/// `NACHLAUF_STUNDEN` wieder öffnen (LLH-1814, Spec `einsatz-abschluss`, design.md D4). Gate
+/// `EinsatzWiedereroeffnungszugriff` (Einsatzleitung oder Admin der Einsatz-Org, kein Gerät).
+/// Grund fehlt, leer oder über `etb::INHALT_MAX` → 400; Zustand, Frist, Aufbewahrung → 422;
+/// Spiegel und CAS → 409. Er geht unverändert ins ETB und trägt darum dessen Grenze.
+pub async fn wiedereroeffnen(
+    State(state): State<AppState>,
+    ctx: EinsatzWiedereroeffnungszugriff,
+    JsonBody(req): JsonBody<Wiedereroeffnen>,
+) -> Result<Json<EinsatzAnzeige>, AppError> {
+    let id = ctx.einsatz.id;
+    let grund = support::pflicht_max(
+        req.grund.as_deref().unwrap_or_default(),
+        "Grund",
+        crate::etb::INHALT_MAX,
+    )?;
+    // Ein fremd geführter Einsatz ist hier ein Spiegel (wie `fordere_aktiv` am Spiegel, 409).
+    if ctx.einsatz.fuehrung.fuehrung_fremd || ctx.einsatz.spiegel.spiegel_ist {
+        return Err(AppError::Conflict(
+            "Dieser Einsatz ist ein Spiegel; wieder öffnen kann nur die führende Instanz.".into(),
+        ));
+    }
+    let ergebnis =
+        repo::wiedereroeffnen(&state.pool, id, ctx.benutzer.id, &grund, chrono::Utc::now()).await?;
+    kopf_geaendert(&state, id).await;
+    etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    Ok(Json(ergebnis.einsatz.anzeige(
+        ctx.rolle.map(|r| r.as_str().to_string()),
+        repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,
+        &repo::labelkarte(&state.pool, id).await?,
+    )))
 }
 
 #[derive(Debug, Deserialize)]
