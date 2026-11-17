@@ -1534,6 +1534,14 @@ impl Ablauf<'_> {
                 self.erinnerungen.insert(v.schluessel, erinnerung.id);
                 Ok(())
             }
+            Vorgang::LagebesprechungTermin { termin_vor_min } => {
+                // Derselbe Schreibweg wie die Seite (`frontend/src/lagebesprechung/AGENTS.md`,
+                // „Ein Termin, ein Schreibweg“).
+                let termin = schrittzeit(self.jetzt, termin_vor_min);
+                crate::lagebesprechung::repo::set_termin_tx(conn, self.einsatz_id, Some(&termin))
+                    .await?;
+                Ok(())
+            }
             Vorgang::ErinnerungErledigt { erinnerung } => {
                 // Wie `routes/erinnerung.rs::erledigen`: Status und Vollzug-Achse, kein ETB.
                 let erinnerung_id = frueher(&self.erinnerungen, "Erinnerung", erinnerung)?;

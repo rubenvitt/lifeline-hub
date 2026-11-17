@@ -19,7 +19,7 @@ import {
 
 afterEach(() => localStorage.clear());
 
-const OHNE_MODUS = { modusAktiv: false, imModus: null } as const;
+const OHNE_MODUS = { modusAktiv: false, imModus: null, istBeruehrung: false } as const;
 
 describe('leisteSichtbar (LFH-715)', () => {
   it('ohne Wahl gilt die Vorgabe: ab lg offen, auf dem Tablet offen, auf dem Handschirm zu', () => {
@@ -104,6 +104,39 @@ describe('leisteSichtbar (LFH-715)', () => {
   });
 });
 
+// LLH-1751: Bei grobem Zeiger (Touch, Handschuh) startet die Leiste auf jeder Breite zu.
+describe('leisteSichtbar bei grobem Zeiger (LLH-1751)', () => {
+  const touch = { ...OHNE_MODUS, istBeruehrung: true, erzwungen: false } as const;
+
+  it('ohne Wahl ist die Leiste zu, ab lg wie darunter', () => {
+    expect(leisteSichtbar({ ...touch, gemerkt: null, breit: true, istSchmal: false })).toBe(false);
+    expect(leisteSichtbar({ ...touch, gemerkt: null, breit: false, istSchmal: false })).toBe(false);
+    expect(leisteSichtbar({ ...touch, gemerkt: null, breit: false, istSchmal: true })).toBe(false);
+  });
+
+  it('die gemerkte Wahl gewinnt', () => {
+    expect(leisteSichtbar({ ...touch, gemerkt: true, breit: true, istSchmal: false })).toBe(true);
+  });
+
+  it('eine Auswahl öffnet die Leiste', () => {
+    expect(
+      leisteSichtbar({ ...touch, gemerkt: null, breit: true, istSchmal: false, erzwungen: true }),
+    ).toBe(true);
+  });
+
+  it('feiner Zeiger: ab lg weiter offen', () => {
+    expect(
+      leisteSichtbar({
+        ...touch,
+        istBeruehrung: false,
+        gemerkt: null,
+        breit: true,
+        istSchmal: false,
+      }),
+    ).toBe(true);
+  });
+});
+
 // LFH-765: Unter `lg` gibt jeder Kartenmodus die Karte frei; danach gilt wieder, was vorher galt.
 describe('leisteSichtbar im Kartenmodus (LFH-765)', () => {
   const basis = {
@@ -113,6 +146,7 @@ describe('leisteSichtbar im Kartenmodus (LFH-765)', () => {
     erzwungen: false,
     modusAktiv: true,
     imModus: null,
+    istBeruehrung: false,
   } as const;
 
   it('unter lg schließt ein laufender Modus die Leiste gegen die gemerkte Wahl', () => {
