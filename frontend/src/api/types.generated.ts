@@ -5612,6 +5612,39 @@ export interface components {
          * @enum {string}
          */
         MaterialArt: "geraet" | "verbrauchsgut";
+        /** @description Antwort von `POST …/material/{em_id}/entlassen` (LLH-1923). */
+        MaterialEntlassungAntwort: {
+            material: components["schemas"]["EinsatzMaterialAnzeige"];
+            vorzustand: components["schemas"]["MaterialEntlassungVorzustand"];
+        };
+        /**
+         * @description Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
+         *     von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
+         *     D1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an
+         *     `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
+         *     höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das
+         *     Herausnehmen lässt sie an der Zeile stehen.
+         */
+        MaterialEntlassungVorzustand: {
+            /** Format: int64 */
+            br_id?: number | null;
+            /** Format: int64 */
+            einheit_id?: number | null;
+            /** Format: int64 */
+            einsatz_fahrzeug_id?: number | null;
+            /** @description Zeitpunkt dieses Herausnehmens; Kennung, an der die Rücknahme es wiedererkennt. */
+            entlassen_at: string;
+            /** Format: int64 */
+            uhs_id?: number | null;
+        };
+        /**
+         * @description Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht
+         *     zurückkam, steht in `ausgelassen`.
+         */
+        MaterialRuecknahmeAntwort: {
+            ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
+            material: components["schemas"]["EinsatzMaterialAnzeige"];
+        };
         /**
          * @description Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).
          *     Als TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).
@@ -7437,7 +7470,7 @@ export interface components {
         };
         /**
          * @description Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten
-         *     (LLH-1722 für das Fahrzeug, LLH-1922 für die Person).
+         *     (LLH-1722 für das Fahrzeug, LLH-1922 für die Person, LLH-1923 für den Ort eines Postens).
          */
         RuecknahmeAusgelassen: {
             /** @description Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“). */

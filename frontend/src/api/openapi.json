@@ -14026,6 +14026,82 @@
           "verbrauchsgut"
         ]
       },
+      "MaterialEntlassungAntwort": {
+        "type": "object",
+        "description": "Antwort von `POST …/material/{em_id}/entlassen` (LLH-1923).",
+        "required": [
+          "material",
+          "vorzustand"
+        ],
+        "properties": {
+          "material": {
+            "$ref": "#/components/schemas/EinsatzMaterialAnzeige"
+          },
+          "vorzustand": {
+            "$ref": "#/components/schemas/MaterialEntlassungVorzustand"
+          }
+        }
+      },
+      "MaterialEntlassungVorzustand": {
+        "type": "object",
+        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an\n`…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
+        "required": [
+          "entlassen_at"
+        ],
+        "properties": {
+          "br_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einsatz_fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "entlassen_at": {
+            "type": "string",
+            "description": "Zeitpunkt dieses Herausnehmens; Kennung, an der die Rücknahme es wiedererkennt."
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "MaterialRuecknahmeAntwort": {
+        "type": "object",
+        "description": "Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht\nzurückkam, steht in `ausgelassen`.",
+        "required": [
+          "material",
+          "ausgelassen"
+        ],
+        "properties": {
+          "ausgelassen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuecknahmeAusgelassen"
+            }
+          },
+          "material": {
+            "$ref": "#/components/schemas/EinsatzMaterialAnzeige"
+          }
+        }
+      },
       "MaterialStatus": {
         "type": "string",
         "description": "Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).\nAls TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).",
@@ -18485,7 +18561,7 @@
       },
       "RuecknahmeAusgelassen": {
         "type": "object",
-        "description": "Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten\n(LLH-1722 für das Fahrzeug, LLH-1922 für die Person).",
+        "description": "Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten\n(LLH-1722 für das Fahrzeug, LLH-1922 für die Person, LLH-1923 für den Ort eines Postens).",
         "required": [
           "bezeichnung",
           "grund"

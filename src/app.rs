@@ -1170,6 +1170,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/material/{em_id}/entlassen",
             post(routes::einsatz_material::entlassen),
         )
+        // LLH-1923: „Rückgängig“ nach dem Herausnehmen, mit dem Vorzustand aus der Antwort.
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}/entlassen/zuruecknehmen",
+            post(routes::einsatz_material::zuruecknehmen),
+        )
         .route(
             "/api/einsaetze/{id}/material/{em_id}/stornieren",
             post(routes::einsatz_material::stornieren),

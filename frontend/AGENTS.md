@@ -936,11 +936,10 @@ anwendbar), „nicht geprüft" ist keins.
   Grundriss) nimmt der Rückweg über `…/{belegung_id}/zuruecknehmen` zurück: ein Eintritt mit
   `ruecknahme_von`, den „seit“, längste Wartezeit und „wartet seit“ übergehen; nur solange der
   Austritt der jüngste Schritt ist und höchstens zehn Minuten zurückliegt, nie nach dem Ausrücken
-  und nie für einen Austritt mit Anlass (D2/D3). Fahrzeug und Person nehmen das Entlassen
+  und nie für einen Austritt mit Anlass (D2/D3). Fahrzeug, Person und Material nehmen das Entlassen
   vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort des
-  Entlassens; die Person ohne neue Periode, LLH-1922). **Bekannte Lücke:** Material „Aus dem
-  Einsatz nehmen“ macht beim Rückgängig nur den Posten wieder aktiv, ohne seinen Ort; bis zu seiner
-  Folgeaufgabe (LLH-1923) bleibt das so, ohne Rückfrage.
+  Entlassens; die Person ohne neue Periode, LLH-1922; das Material samt Ort, LLH-1923); den Satz
+  zu Ausgelassenem bildet `kraefte/ruecknahmeSatz.ts`.
 
 - **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
   `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,

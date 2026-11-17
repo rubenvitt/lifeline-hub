@@ -11,7 +11,8 @@ use crate::live::LiveEvent;
 use crate::material::disposition_repo::{self, AdhocDaten, MaterialPatch};
 use crate::material::ort::{self, MaterialOrt, OrtPatch};
 use crate::material::{
-    EinsatzMaterialAnzeige, MaterialArt, MaterialStatus, ADHOC_TEXT_MAX, BEMERKUNG_MAX,
+    EinsatzMaterialAnzeige, MaterialArt, MaterialEntlassungAntwort, MaterialEntlassungVorzustand,
+    MaterialRuecknahmeAntwort, MaterialStatus, ADHOC_TEXT_MAX, BEMERKUNG_MAX,
 };
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
@@ -704,13 +705,15 @@ pub async fn loesen(
 
 /// POST /api/einsaetze/{id}/material/{em_id}/entlassen — aus dem Einsatz nehmen (LLH-1079, Spec
 /// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
-/// Zeile bleibt, der Ort geht (LLH-1224 D13). Ohne Rückfrage, der Rückweg ist `…/reaktivieren`.
-/// Schreibt ETB-Eintrag; beendetes Material → 409. Liefert das herausgenommene Material.
+/// Zeile bleibt, der Ort geht (LLH-1224 D13). Ohne Rückfrage; der Rückweg „Rückgängig“ ist
+/// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1923), der Block „Aus dem
+/// Einsatz genommen“ nimmt `…/reaktivieren`. Schreibt ETB-Eintrag; beendetes Material → 409.
+/// Liefert das herausgenommene Material und seinen Vorzustand.
 pub async fn entlassen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
     PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
-) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
+) -> Result<Json<MaterialEntlassungAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
@@ -736,13 +739,76 @@ pub async fn entlassen(
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         Ok((ergebnis, anzeige))
     })?;
+    let vorzustand = ergebnis.vorzustand(&jetzt);
     sse_material(&state, einsatz_id, em_id);
     // Der Ort zeigt das Material; `material` erreicht seine Leser ohne Materialrecht nicht
     // (LLH-1182).
     if let Some(o) = ergebnis.ort {
         sse_ort(&state, einsatz_id, o);
     }
-    Ok(Json(anzeige))
+    Ok(Json(MaterialEntlassungAntwort {
+        material: anzeige,
+        vorzustand,
+    }))
+}
+
+/// POST /api/einsaetze/{id}/material/{em_id}/entlassen/zuruecknehmen — „Rückgängig“ nach dem
+/// Herausnehmen (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme von Material zurücknehmen“):
+/// Body ist der Vorzustand aus der Antwort von `…/entlassen`. Nur die herausnehmende Person, nur
+/// dieses Herausnehmen, höchstens zehn Minuten danach, sonst 409; ebenso 409, wenn dasselbe Gerät
+/// inzwischen in einer anderen Zeile im Einsatz steht. Mehr als ein Ort im Body → 422. Nimmt der
+/// Ort den Posten nicht mehr auf, kommt er ohne Ort zurück, und der Ort steht in `ausgelassen`.
+/// Nur das Recht auf Material, wie jeder Ortswechsel (Spec `material-liste`). Ein ETB-Eintrag,
+/// Live-Meldungen wie beim Herausnehmen, keine Benachrichtigung.
+pub async fn zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Material>,
+    PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+    JsonBody(vorzustand): JsonBody<MaterialEntlassungVorzustand>,
+) -> Result<Json<MaterialRuecknahmeAntwort>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    vorzustand.ort()?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis = disposition_repo::zuruecknehmen_tx(
+            conn,
+            einsatz_id,
+            em_id,
+            ctx.benutzer.id,
+            &jetzt,
+            &vorzustand,
+        )
+        .await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        let ort = match ergebnis.ort {
+            Some(o) => Some(ort::ort_text_tx(conn, einsatz_id, Some(o)).await?),
+            None => None,
+        };
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::material::etb_text_herausnahme_zurueckgenommen(
+                &anzeige.bezeichnung,
+                anzeige.menge,
+                ort.as_deref(),
+                &ergebnis.ausgelassen,
+            ),
+        )
+        .await?;
+        Ok((ergebnis, anzeige))
+    })?;
+    // Live wie beim Herausnehmen: dieselben Leser, nur in der Gegenrichtung.
+    sse_material(&state, einsatz_id, em_id);
+    if let Some(o) = ergebnis.ort {
+        sse_ort(&state, einsatz_id, o);
+    }
+    Ok(Json(MaterialRuecknahmeAntwort {
+        material: anzeige,
+        ausgelassen: ergebnis.ausgelassen,
+    }))
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/stornieren — Fehldisposition stornieren (LLH-1079,
@@ -777,11 +843,11 @@ pub async fn stornieren(
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/reaktivieren — herausgenommenes oder storniertes
-/// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“ und
-/// Rückgängig nach dem Herausnehmen. Aktiv → 409. ETB-Eintrag. Ein stornierter Posten aus einer
-/// Nachforderung zählt danach wieder als Übernahme und verlangt wie diese eine eingetroffene
-/// Nachforderung (422, LLH-1226); ein schon vorhandener Posten sperrt nicht, das Reaktivieren ist
-/// bewusstes Rückgängigmachen des Stornos.
+/// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“; das
+/// Rückgängig nach dem Herausnehmen nimmt `…/entlassen/zuruecknehmen` (LLH-1923). Aktiv → 409.
+/// ETB-Eintrag. Ein stornierter Posten aus einer Nachforderung zählt danach wieder als Übernahme
+/// und verlangt wie diese eine eingetroffene Nachforderung (422, LLH-1226); ein schon vorhandener
+/// Posten sperrt nicht, das Reaktivieren ist bewusstes Rückgängigmachen des Stornos.
 pub async fn reaktivieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
