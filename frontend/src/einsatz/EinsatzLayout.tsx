@@ -31,10 +31,11 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import {
-  leseLetztenOrt,
   merkeLetztenOrt,
-  stelleLetztenOrtWieder,
+  restoreLetztenOrt,
+  snapshotLetztenOrt,
   type LetzterOrt,
+  type LetzterOrtSnapshot,
 } from './letzterOrt';
 import { loadKategorieModul, rueckkehrModul, saveKategorieModul } from './kategorieModul';
 import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from './EinsatzRahmenKontext';
@@ -367,18 +368,22 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // „gibt es nicht“. Meldet sie sich erst nach dem Laden, stellt `widerrufe` den Ort davor wieder
   // her (`nichtGefundenContext.ts`); dafür hält `gemerkt` fest, was vor der Adresse gemerkt war.
   const nichtGefunden = useRef(false);
-  const gemerkt = useRef<{ benutzerId: number; pfad: string; vorher: LetzterOrt | null } | null>(
-    null,
-  );
+  const gemerkt = useRef<{
+    benutzerId: number;
+    ort: LetzterOrt;
+    vorher: LetzterOrtSnapshot;
+  } | null>(null);
   useEffect(() => {
     if (merkbar && benutzerId != null && !nichtGefunden.current) {
-      // Merkt der Rahmen dieselbe Adresse noch einmal, bleibt der Ort davor der von vorher.
+      // Merkt der Rahmen dieselbe Adresse noch einmal, bleibt der Stand davor der von vorher. Roh
+      // festgehalten, samt Zeitpunkt: das Zurücknehmen verlängert die Frist nicht.
+      const ort = { einsatzId, pfad: pathname };
       const vorher =
-        gemerkt.current?.pfad === pathname && gemerkt.current.benutzerId === benutzerId
+        gemerkt.current?.ort.pfad === pathname && gemerkt.current.benutzerId === benutzerId
           ? gemerkt.current.vorher
-          : leseLetztenOrt(benutzerId);
-      merkeLetztenOrt(benutzerId, { einsatzId, pfad: pathname });
-      gemerkt.current = { benutzerId, pfad: pathname, vorher };
+          : snapshotLetztenOrt(benutzerId);
+      merkeLetztenOrt(benutzerId, ort);
+      gemerkt.current = { benutzerId, ort, vorher };
     }
   }, [merkbar, benutzerId, einsatzId, pathname]);
   const nichtGefundenMarke = useMemo<NichtGefundenMarke>(
@@ -386,9 +391,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       marke: nichtGefunden,
       widerrufe: (pfad) => {
         const zuletzt = gemerkt.current;
-        if (zuletzt == null || zuletzt.pfad !== pfad) return;
+        if (zuletzt == null || zuletzt.ort.pfad !== pfad) return;
         gemerkt.current = null;
-        stelleLetztenOrtWieder(zuletzt.benutzerId, zuletzt.vorher);
+        restoreLetztenOrt(zuletzt.benutzerId, zuletzt.ort, zuletzt.vorher);
       },
     }),
     [],
@@ -417,15 +422,19 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
    * und stellte sonst eine zweite Fehlermeldung daneben. Hinter einem kaputten Einsatz führt die
    * ganze Navigation ins Leere, deshalb die Großform statt eines Banners.
    * Nur an `isError`, NICHT an „keine Daten": während des Abrufs ist `einsatz` regulär leer.
+   * Auch die Sackgasse ist das Ziel des Sprunglinks (`SprungZumInhalt.tsx`): ohne Rahmen gäbe es
+   * sonst keins, und „Zum Inhalt springen“ täte nichts.
    */
   if (einsatzQuery.isError) {
     return (
-      <SeitenSackgasse
-        titel="Einsatz konnte nicht geladen werden"
-        ursache={einsatzQuery.error}
-        onWiederholen={() => void einsatzQuery.refetch()}
-        rueckweg={{ pfad: einsaetzePfad(), label: 'Zur Einsatzliste' }}
-      />
+      <Content {...sprungzielInhalt} style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
+        <SeitenSackgasse
+          titel="Einsatz konnte nicht geladen werden"
+          ursache={einsatzQuery.error}
+          onWiederholen={() => void einsatzQuery.refetch()}
+          rueckweg={{ pfad: einsaetzePfad(), label: 'Zur Einsatzliste' }}
+        />
+      </Content>
     );
   }
 

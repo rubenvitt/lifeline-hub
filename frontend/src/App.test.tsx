@@ -426,6 +426,29 @@ describe('App-Routing', () => {
       await userEvent.click(zurueck);
       await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
     });
+
+    it('stellt den Ort davor unverändert wieder her, ohne seine Frist zu verlängern', async () => {
+      server.use(
+        meHandler(admin),
+        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+        http.get('/api/einsaetze/7/personen/999999', () =>
+          HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
+        ),
+      );
+      // Ein Ort aus einer früheren Sitzung, fast eine Schicht alt.
+      const vorher = JSON.stringify({
+        einsatzId: 7,
+        pfad: '/einsaetze/7/etb',
+        at: Date.now() - 11.5 * 60 * 60 * 1000,
+      });
+      localStorage.setItem(`lfh:nav:letzter-ort:${admin.id}`, vorher);
+      renderApp('/einsaetze/7/personen/999999');
+      expect(await screen.findByText('Diese Person gibt es nicht (mehr)')).toBeInTheDocument();
+      await waitFor(() =>
+        expect(localStorage.getItem(`lfh:nav:letzter-ort:${admin.id}`)).toBe(vorher),
+      );
+    });
   });
 
   /**

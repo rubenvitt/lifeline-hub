@@ -157,6 +157,34 @@ describe('Sprunglink zum Inhalt in den Rahmen', () => {
     ).toBeTruthy();
   });
 
+  it('Einsatz, der nicht geladen werden kann: auch die Sackgasse ist das Ziel', async () => {
+    // Statt des Rahmens steht dann nur die Sackgasse; ohne Ziel täte der Link nichts.
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ error: 'Serverfehler' }, { status: 500 }),
+      ),
+    );
+    const router = createMemoryRouter(appRouten, { initialEntries: ['/einsaetze/7/ueberblick'] });
+    render(
+      <QueryClientProvider client={neuerQueryClient()}>
+        <ConfigProvider>
+          <AntApp>
+            <RouterProvider router={router} />
+          </AntApp>
+        </ConfigProvider>
+      </QueryClientProvider>,
+    );
+    const titel = await screen.findByText('Einsatz konnte nicht geladen werden');
+    expect(ziele().length, 'kein Sprungziel').toBeGreaterThan(0);
+    await userEvent.tab();
+    expect(document.activeElement).toBe(sprungLink());
+    await userEvent.keyboard('{Enter}');
+    expect(document.activeElement).toBe(letztesZiel());
+    expect(letztesZiel()).toContainElement(titel);
+  });
+
   it('Hilfe: das Ziel ist ihr <main>', async () => {
     renderApp('/hilfe/anmelden-abmelden');
     await screen.findByRole('heading', { level: 1, name: 'Hilfe' });
