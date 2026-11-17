@@ -4033,6 +4033,13 @@ export interface components {
              *     Personenbezogen: wird geschwärzt und steht nie im Lagebericht.
              */
             verbindungen: components["schemas"]["KommunikationsVerbindung"][];
+            /**
+             * @description Wer welche Angabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
+             *     `aenderungsvermerk`). Nur Lesen und PATCH-Antwort füllen es, nicht an Gerätesitzungen.
+             */
+            vermerke?: {
+                [key: string]: components["schemas"]["FeldVermerk"];
+            };
         };
         /**
          * @description Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`

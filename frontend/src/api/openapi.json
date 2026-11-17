@@ -10079,6 +10079,16 @@
               "$ref": "#/components/schemas/KommunikationsVerbindung"
             },
             "description": "Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.\nPersonenbezogen: wird geschwärzt und steht nie im Lagebericht."
+          },
+          "vermerke": {
+            "type": "object",
+            "description": "Wer welche Angabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec\n`aenderungsvermerk`). Nur Lesen und PATCH-Antwort füllen es, nicht an Gerätesitzungen.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeldVermerk"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           }
         }
       },

@@ -13,7 +13,7 @@ Gliederung nach Unteraufgabe: `r9up3kp5` = LLH-1831 (Konfliktprüfung), `mdopfgq
 - [x] 2.1 Migration `einsatz_feld_vermerk` (Nummer > höchste auf `origin/alpha`) samt Spiegel-Triggern aus `spiegel::art::trigger_sql`; verifiziert: `scripts/check-migrationen.sh`, `db::tests::migrationsnummern_sind_eindeutig`
 - [x] 2.2 Einordnung: `schwaerzung_registry::TABELLEN`, `instanz::spiegel::art` (`GESPIEGELT`, Kategorie `Fuehrung`), Archiv-Klassifikation; verifiziert: `art::tests::jede_einsatztabelle_ist_eingeordnet`, `trigger_passen_zur_beschreibung`, `jede_gespiegelte_tabelle_hat_einen_primaerschluessel`, `schema::tests::*`, `jede_archivspalte_ist_retain` grün
 - [x] 2.3 Repo `einsatz::feld_vermerk`: Upsert auf einer Transaktion (feste Feldliste je Objektart), Laden je Objekt und je Einsatz/Objektart (eine Abfrage, Anzeigename per Join); verifiziert: Unit-Tests für Upsert, kein Upsert ohne Wertänderung, Laden mit fehlendem Benutzer (`von: null`), CASCADE beim Löschen des Einsatzes
-- [ ] 2.4 `vermerke` in `EinsatzAnzeige`, `EinheitAnzeige` (Liste ohne N+1) und `FuehrungsstelleAnzeige`; `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten; verifiziert: Integrationstest „frisch angelegte Einheit liefert keine Vermerke“
+- [x] 2.4 `vermerke` in `EinsatzAnzeige`, `EinheitAnzeige` (Liste ohne N+1) und `FuehrungsstelleAnzeige`; `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten; verifiziert: Integrationstest „frisch angelegte Einheit liefert keine Vermerke“
 
 ## 3. Kopfdaten (r9up3kp5, mdopfgqk)
 
@@ -28,8 +28,8 @@ Gliederung nach Unteraufgabe: `r9up3kp5` = LLH-1831 (Konfliktprüfung), `mdopfgq
 
 ## 5. Führungsstelle (r9up3kp5, mdopfgqk)
 
-- [ ] 5.1 `FuehrungsstellePatchBody.erwartet` (Art, Bezeichnung, Standort samt Paar, Rufname, Verbindungen, Fahrzeuge als Menge, Einsatzleiter) + Prüfung in `patch_tx` vor jedem Schreiben; Vermerk-Upsert; verifiziert: Tests in `tests/einsatz_fuehrungsstelle.rs` für „Rufname mit veraltetem Stand“, „Einsatzleiter gleichzeitig übergeben“ (nur ein Übergabe-Eintrag), „Ohne Altwert wie bisher“
-- [ ] 5.2 Demo-Import (`demo/import.rs`) ruft `patch_tx` ohne `erwartet` weiter; verifiziert: Demo-Test grün
+- [x] 5.1 `FuehrungsstellePatchBody.erwartet` (Art, Bezeichnung, Standort samt Paar, Rufname, Verbindungen, Fahrzeuge als Menge, Einsatzleiter) + Prüfung in `patch_tx` vor jedem Schreiben; Vermerk-Upsert; verifiziert: Tests in `tests/einsatz_fuehrungsstelle.rs` für „Rufname mit veraltetem Stand“, „Einsatzleiter gleichzeitig übergeben“ (nur ein Übergabe-Eintrag), „Ohne Altwert wie bisher“
+- [x] 5.2 Demo-Import (`demo/import.rs`) ruft `patch_tx` ohne `erwartet` weiter; verifiziert: Demo-Test grün
 
 ## 6. Frontend-Baustein (r9up3kp5)
 

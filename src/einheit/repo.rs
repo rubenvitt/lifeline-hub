@@ -1795,6 +1795,24 @@ pub async fn aufloesen(
 mod tests {
     use super::*;
 
+    /// Der Teil-Patch ohne Altwerte in eigener Schreibtransaktion, wie ihn die Tests dieser Datei
+    /// vor LLH-1831 riefen (Feld-CAS und Vermerk prüfen `tests/einheit_konflikt.rs` über die
+    /// Route).
+    async fn patche(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        org_id: i64,
+        id: i64,
+        patch: EinheitPatch<'_>,
+    ) -> Result<EinheitAnzeige, AppError> {
+        pruefe_patch(pool, einsatz_id, org_id, id, &patch).await?;
+        let ohne = crate::feld_cas::ExpectedValues::new();
+        crate::write_retry!(pool, |conn| {
+            patche_tx(conn, einsatz_id, id, &patch, &ohne).await
+        })?;
+        laden(pool, einsatz_id, id).await
+    }
+
     /// Die ausgeschriebenen Kennzeichen in `SELECT_AUFGELOEST` gleichen den Makros, die auch
     /// die Belegung des Bereitstellungsraums nutzt.
     #[test]
@@ -2539,6 +2557,7 @@ mod tests {
                 funkrufname: Some(Some("F")),
                 quali_soll: Some(Some(&quali)),
                 sortier: Some(7),
+                fuehrer_id: None,
             },
         )
         .await
