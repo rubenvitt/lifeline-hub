@@ -1,8 +1,8 @@
-# Prüfliste für den Review vor dem PR
+# Prüfliste für einen Review
 
-Gegen diese Liste prüft der Review, den der Agent vor jedem PR selbst startet
-(`dev-zunder-ausfuehren`, Abschnitt „Review vor dem PR“). Sie ist die einzige Stelle, an der die
-Fehlerarten stehen; `dev-zunder-orchestrieren` verweist hierher.
+Gegen diese Liste prüft ein Review, wenn der Mensch einen verlangt (`dev-zunder-ausfuehren`,
+Abschnitt „Review auf Wunsch“). Einen Pflicht-Review vor dem PR gibt es seit 17.11.2026 nicht
+mehr; die Liste bleibt im Stand dieses Tages und wird nicht mehr bei jedem Fehler erweitert.
 
 **Herkunft:** Vom 08. bis 12.11.2026 lief CodeRabbit in der Testphase auf jedem PR. Die Klassen
 sind die Arten von Fehlern, die es dort gefunden hat und der eigene Review nicht
