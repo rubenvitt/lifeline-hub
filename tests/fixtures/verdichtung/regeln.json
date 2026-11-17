@@ -121,5 +121,48 @@
       { "name": "zurückgezogen", "status": "zurueckgezogen", "offen": false, "stufe": "zurueckgezogen", "ist_ueberfaellig": false }
     ],
     "erwartet": { "offen": 6, "angefordert": 2, "zugesagt": 1, "unterwegs": 3, "ueberfaellig": 2 }
+  },
+  "ausfall": {
+    "_regel": "LLH-1929: Ausfall je Einheit wie die Tönung des Meldebilds (toenungsGruende über frontend/src/lage/ausfallJeEinheit.ts; Server: einsatz::ausfall). Jede aktive Einheit zählt nur ihre EIGENEN Mittel: aktives Personal und aktive Fahrzeuge mit ihrer einheit_id in der Statuskategorie nicht_verfuegbar (entfällt, wenn der Status der Einheit selbst nicht_verfuegbar ist), dazu Material mit Ort an der Einheit oder als Beladung eines eigenen aktiven Fahrzeugs im Status defekt, verbraucht oder desinfektion_noetig oder aufgebraucht (Verbrauchsgut, ausgegeben >= menge). Mittel einer unbekannten oder aufgelösten Einheit und Material ohne Ort zählen unter „Ohne Einheit“; Material an UHS oder Bereitstellungsraum, Beladung eines beendeten Fahrzeugs und herausgenommenes Material zählen nicht. Folge: sortier, dann id, „Ohne Einheit“ zuletzt.",
+    "einheiten": [
+      { "id": 1, "name": "Sanitätszug", "sortier": 2, "aufgeloest": false, "status_kategorie": null },
+      { "id": 2, "name": "Logistiktrupp", "sortier": 1, "aufgeloest": false, "status_kategorie": "verfuegbar" },
+      { "id": 3, "name": "Betreuungsgruppe", "sortier": 1, "aufgeloest": false, "status_kategorie": "nicht_verfuegbar" },
+      { "id": 4, "name": "Technikgruppe", "sortier": 3, "aufgeloest": false, "status_kategorie": "nicht_verfuegbar" },
+      { "id": 5, "name": "Aufgelöste Gruppe", "sortier": 0, "aufgeloest": true, "status_kategorie": null },
+      { "id": 6, "name": "Führungstrupp", "sortier": 0, "aufgeloest": false, "status_kategorie": "gebunden" },
+      { "id": 7, "name": "Wassertrupp", "sortier": 4, "aufgeloest": false, "status_kategorie": null },
+      { "id": 8, "name": "Fernmeldetrupp", "sortier": 5, "aufgeloest": false, "status_kategorie": "verfuegbar" },
+      { "id": 9, "name": "Verpflegungstrupp", "sortier": 1, "aufgeloest": false, "status_kategorie": null }
+    ],
+    "personal": [
+      { "name": "Sanitätszug, nicht verfügbar", "einheit_id": 1, "status_kategorie": "nicht_verfuegbar", "beendet": false },
+      { "name": "Sanitätszug, verfügbar", "einheit_id": 1, "status_kategorie": "verfuegbar", "beendet": false },
+      { "name": "Betreuungsgruppe, nicht verfügbar (die Einheit meldet es selbst)", "einheit_id": 3, "status_kategorie": "nicht_verfuegbar", "beendet": false },
+      { "name": "aufgelöste Einheit, nicht verfügbar", "einheit_id": 5, "status_kategorie": "nicht_verfuegbar", "beendet": false },
+      { "name": "Führungstrupp, nicht verfügbar, entlassen", "einheit_id": 6, "status_kategorie": "nicht_verfuegbar", "beendet": true },
+      { "name": "Führungstrupp, ohne Status", "einheit_id": 6, "status_kategorie": null, "beendet": false },
+      { "name": "Verpflegungstrupp, nicht verfügbar", "einheit_id": 9, "status_kategorie": "nicht_verfuegbar", "beendet": false }
+    ],
+    "fahrzeuge": [
+      { "id": 10, "einheit_id": 2, "status_kategorie": "verfuegbar", "beendet": false },
+      { "id": 11, "einheit_id": 6, "status_kategorie": "nicht_verfuegbar", "beendet": true },
+      { "id": 12, "einheit_id": 8, "status_kategorie": "nicht_verfuegbar", "beendet": false },
+      { "id": 13, "einheit_id": 6, "status_kategorie": "gebunden", "beendet": false }
+    ],
+    "material": [
+      { "name": "Beladung Logistiktrupp, defekt", "einheit_id": null, "einsatz_fahrzeug_id": 10, "uhs_id": null, "br_id": null, "status": "defekt", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false },
+      { "name": "Beladung eines beendeten Fahrzeugs, defekt", "einheit_id": null, "einsatz_fahrzeug_id": 11, "uhs_id": null, "br_id": null, "status": "defekt", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false },
+      { "name": "Technikgruppe, Desinfektion nötig", "einheit_id": 4, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": null, "status": "desinfektion_noetig", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false },
+      { "name": "Wassertrupp, aufgebraucht", "einheit_id": 7, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": null, "status": "einsatzbereit", "art": "verbrauchsgut", "menge": 5, "ausgegeben": 5, "beendet": false },
+      { "name": "Wassertrupp, im Einsatz", "einheit_id": 7, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": null, "status": "im_einsatz", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false },
+      { "name": "Führungstrupp, teilweise ausgegeben", "einheit_id": 6, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": null, "status": "einsatzbereit", "art": "verbrauchsgut", "menge": 5, "ausgegeben": 3, "beendet": false },
+      { "name": "Führungstrupp, defekt, herausgenommen", "einheit_id": 6, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": null, "status": "defekt", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": true },
+      { "name": "Beladung Führungstrupp, einsatzbereit", "einheit_id": null, "einsatz_fahrzeug_id": 13, "uhs_id": null, "br_id": null, "status": "einsatzbereit", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false },
+      { "name": "an einer UHS, verbraucht", "einheit_id": null, "einsatz_fahrzeug_id": null, "uhs_id": 1, "br_id": null, "status": "verbraucht", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false },
+      { "name": "im Bereitstellungsraum, defekt", "einheit_id": null, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": 1, "status": "defekt", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false },
+      { "name": "Fernmeldetrupp, verbraucht", "einheit_id": 8, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": null, "status": "verbraucht", "art": "geraet", "menge": 1, "ausgegeben": 0, "beendet": false }
+    ],
+    "erwartet": ["Logistiktrupp", "Verpflegungstrupp", "Sanitätszug", "Technikgruppe", "Wassertrupp", "Fernmeldetrupp", "Ohne Einheit"]
   }
 }

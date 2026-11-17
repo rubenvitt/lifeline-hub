@@ -4,9 +4,9 @@ Jede Aufgabe per `superpowers:test-driven-development`: erst den roten Test, dan
 
 ## 1. Fixture und Browser-Regel
 
-- [ ] 1.1 Abschnitt `ausfall` in `tests/fixtures/verdichtung/regeln.json` anlegen, mit den Fällen aus design.md D3 und der erwarteten Namensliste in Folge. Prüfen: Die Datei ist gültiges JSON (`python3 -m json.tool`).
-- [ ] 1.2 In `frontend/src/lage/ausfallJeEinheit.ts` `einheitenMitAusfall(rohdaten)` ergänzen: Einheiten mit Mittel- oder Material-Ausfall nach `sortier`, `id`, „Ohne Einheit“ zuletzt, als `{ id, name }`. Den Fall im Fixture-Test `lage/verdichtungFixture.test.ts` ergänzen. Prüfen: Vitest ist erst rot (Funktion fehlt), dann grün.
-- [ ] 1.3 `useWasBrennt` liest die Liste aus `einheitenMitAusfall` statt der eigenen Abbildung. Prüfen: `useWasBrennt.test.tsx` mit einem Fall, in dem `sortier` von der Baumfolge abweicht, ist grün.
+- [x] 1.1 Abschnitt `ausfall` in `tests/fixtures/verdichtung/regeln.json` anlegen, mit den Fällen aus design.md D3 und der erwarteten Namensliste in Folge. Prüfen: Die Datei ist gültiges JSON (`python3 -m json.tool`).
+- [x] 1.2 In `frontend/src/lage/ausfallJeEinheit.ts` `einheitenMitAusfall(rohdaten)` ergänzen: Einheiten mit Mittel- oder Material-Ausfall nach `sortier`, `id`, „Ohne Einheit“ zuletzt, als `{ id, name }`. Den Fall im Fixture-Test `lage/verdichtungFixture.test.ts` ergänzen. Prüfen: Vitest ist erst rot (Funktion fehlt), dann grün.
+- [x] 1.3 `useWasBrennt` liest die Liste aus `einheitenMitAusfall` statt der eigenen Abbildung. Prüfen: `useWasBrennt.test.tsx` mit einem Fall, in dem `sortier` von der Baumfolge abweicht, ist grün.
 
 ## 2. Server-Regel
 

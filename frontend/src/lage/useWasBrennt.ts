@@ -35,7 +35,7 @@ import {
   nachforderungsStand,
   type Zaehlstand,
 } from '../pages/lage-dashboard/fuehrungsZahlen';
-import { ausfallJeEinheit, OHNE_EINHEIT } from './ausfallJeEinheit';
+import { einheitenMitAusfall } from './ausfallJeEinheit';
 import { wasBrennt, type QuellStand, type WasBrennt, type WasBrenntQuellen } from './wasBrennt';
 
 function ausZaehler<T, W>(s: Zaehlstand<T>, wert: (t: T) => W): QuellStand<W> {
@@ -148,13 +148,8 @@ export function useWasBrennt(einsatzId: number, jetzt: Dayjs): AlarmZeilenDaten 
     const fahrzeuge = leerWennGesperrt(fahrzeugeZ, fahrzeugeQ.data);
     const material = leerWennGesperrt(materialZ, materialQ.data);
     if (!einheiten || !abschnitte || !personal || !fahrzeuge || !material) return null;
-    const je = ausfallJeEinheit({ abschnitte, einheiten, personal, fahrzeuge, material });
-    return [...je.entries()]
-      .filter(([, a]) => a.mittel + a.material > 0)
-      .map(([schluessel, a]) => ({
-        id: schluessel === OHNE_EINHEIT ? null : schluessel,
-        name: a.bezeichnung,
-      }));
+    // Folge der Einheitenliste wie der Server für den Lagemonitor (LLH-1929).
+    return einheitenMitAusfall({ abschnitte, einheiten, personal, fahrzeuge, material });
   }, [
     ausfallZ,
     abschnitteZ,
