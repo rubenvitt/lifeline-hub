@@ -501,6 +501,27 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+.lfh-sprung-inhalt:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.lfh-sprung-inhalt:focus {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: var(--lfh-paneel);
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+[data-lfh='sprungziel-inhalt']:focus {
+  outline: none;
+}
 .lfh-anhang-vorschau:focus-visible {
   outline: 2px solid var(--lfh-bedien);
   outline-offset: -2px;
@@ -799,7 +820,8 @@ main:has([data-lfh='zaehltasten']) {
 :root:has(
   [data-lfh='rahmen-kopf'] :focus,
   [data-lfh='betriebszeile'] :focus,
-  [data-lfh='alarmzone'] :focus
+  [data-lfh='alarmzone'] :focus,
+  .lfh-sprung-inhalt:focus
 ) {
   scroll-padding-block-start: 0px;
 }
