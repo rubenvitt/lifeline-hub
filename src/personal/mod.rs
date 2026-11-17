@@ -266,6 +266,11 @@ pub struct PersonalEntlassungVorzustand {
 /// viele Einheiten führt oder Abschnitte leitet keine Person.
 pub const RUECKNAHME_LISTE_MAX: usize = 200;
 
+/// Höchstlänge des eingefrorenen Einsatzleiter-Namens im Vorzustand (`src/AGENTS.md`,
+/// „Eingabegrenzen“). Großzügig: der Name einer Stamm-Person hat keine eigene Grenze, und ein
+/// echter Vorzustand darf nie abgelehnt werden.
+pub const RUECKNAHME_NAME_MAX: usize = 2_000;
+
 /// Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalEntlassungAntwort {

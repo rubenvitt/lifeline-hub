@@ -1125,6 +1125,16 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+
+    let (s, json) = zuruecknehmen(
+        serde_json::json!({
+            "entlassen_at": "2026-11-17 10:00:00",
+            "einsatzleiter_name": "x".repeat(2_001),
+        })
+        .to_string(),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
 }
 
 /// Spec `kraefte-entlassung`: die entlassene Person bleibt mit Zeitpunkt und entlassender Person,

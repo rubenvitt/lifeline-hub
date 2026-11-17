@@ -67,8 +67,9 @@ interface Aufbau {
   perioden?: unknown[];
   /** Der Statuskatalog scheitert (500); `abgerufen` hält fest, dass er gefragt wurde. */
   statusFehler?: { abgerufen: boolean };
-  /** Ein Link zu dieser Adresse neben der Seite: Wechsel der Detail-Route ohne Remount. */
-  sprung?: string;
+  /** Links zu diesen Adressen neben der Seite (Text = Adresse): Wechsel der Detail-Route ohne
+   * Remount. */
+  sprung?: string[];
 }
 
 let requests: string[];
@@ -144,7 +145,11 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
         <Route path="/einsaetze/:id/personal/:epId" element={<EinsatzkraftPage />} />
         <Route path="/einsaetze/:id/personal" element={<Ort />} />
       </Routes>
-      {a.sprung && <Link to={a.sprung}>Sprung</Link>}
+      {a.sprung?.map((ziel) => (
+        <Link key={ziel} to={ziel}>
+          {ziel}
+        </Link>
+      ))}
     </>,
     { route },
   );
@@ -477,7 +482,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     const zweite = kraft({ id: 11, name: 'Ben Zweit' });
     renderAnsicht('/einsaetze/7/personal/10', {
       aktiv: [kraft(), zweite],
-      sprung: '/einsaetze/7/personal/11',
+      sprung: ['/einsaetze/7/personal/11'],
     });
     const entlassen = kraft({ beendet_at: minutesAgo(0), einheit_id: null, fahrzeug_id: null });
     server.use(
@@ -495,7 +500,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
     const rueckgaengig = await screen.findByRole('button', { name: 'Rückgängig' });
-    await userEvent.click(screen.getByRole('link', { name: 'Sprung' }));
+    await userEvent.click(screen.getByRole('link', { name: '/einsaetze/7/personal/11' }));
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Ben Zweit');
     await userEvent.click(rueckgaengig);
     await waitFor(() =>
@@ -503,6 +508,32 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     );
     // Die Ablehnung gehört zu Lena Beispiel und steht nicht über Ben Zweit.
     await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('Nicht zurückgenommen')).toBeNull();
+  });
+
+  it('räumt den Hinweis der gescheiterten Rücknahme beim Wechsel zu einer anderen Person', async () => {
+    const zweite = kraft({ id: 11, name: 'Ben Zweit' });
+    renderAnsicht('/einsaetze/7/personal/10', {
+      aktiv: [kraft(), zweite],
+      sprung: ['/einsaetze/7/personal/11', '/einsaetze/7/personal/10'],
+    });
+    const entlassen = kraft({ beendet_at: minutesAgo(0), einheit_id: null, fahrzeug_id: null });
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen', () => {
+        serverState = { aktiv: [zweite], entlassene: [entlassen] };
+        return HttpResponse.json({ personal: entlassen, vorzustand: VORZUSTAND });
+      }),
+      http.post('/api/einsaetze/7/personal/10/entlassen/zuruecknehmen', () =>
+        HttpResponse.json({ error: 'Zeitachse berichtigt' }, { status: 409 }),
+      ),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    expect(await screen.findByText('Nicht zurückgenommen')).toBeVisible();
+    await userEvent.click(screen.getByRole('link', { name: '/einsaetze/7/personal/11' }));
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Ben Zweit');
+    await userEvent.click(screen.getByRole('link', { name: '/einsaetze/7/personal/10' }));
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Lena Beispiel');
     expect(screen.queryByText('Nicht zurückgenommen')).toBeNull();
   });
 

@@ -193,66 +193,79 @@ export default function EinsatzkraftPage() {
   });
 
   /** Nach Entlassen und erneutem Disponieren wechselt die Zeile die Liste ohne Lücke dazwischen. */
-  const moveZeile = (neu: EinsatzPersonal, nach: 'aktiv' | 'entlassen') => {
+  const moveZeile = (neu: EinsatzPersonal, nach: 'aktiv' | 'entlassen', eid = einsatzId) => {
     const raus = nach === 'aktiv' ? einsatzKeys.personalEntlassene : einsatzKeys.personal;
     const rein = nach === 'aktiv' ? einsatzKeys.personal : einsatzKeys.personalEntlassene;
-    qc.setQueryData<EinsatzPersonal[]>(raus(einsatzId), (l) => l?.filter((x) => x.id !== neu.id));
-    qc.setQueryData<EinsatzPersonal[]>(rein(einsatzId), (l) =>
+    qc.setQueryData<EinsatzPersonal[]>(raus(eid), (l) => l?.filter((x) => x.id !== neu.id));
+    qc.setQueryData<EinsatzPersonal[]>(rein(eid), (l) =>
       l ? [...l.filter((x) => x.id !== neu.id), neu] : l,
     );
-    void qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
-    void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    void qc.invalidateQueries({ queryKey: einsatzKeys.personal(eid) });
+    void qc.invalidateQueries({ queryKey: einsatzKeys.etb(eid) });
   };
 
-  // Hinweise der Rücknahme gehören zu der Person, an der sie entstanden (LLH-1922): ein Wechsel der
-  // Detail-Route zeigt sie nicht bei der nächsten (`frontend/AGENTS.md`, „Speicherfehler an die
-  // Seite“). Was ausgelassen wurde, ist ein Teilerfolg, den niemand im Toast überliest.
+  // Hinweise der Rücknahme gehören zu der Person, an der sie entstanden (LLH-1922): ein Wechsel von
+  // Einsatz oder Detail-Route räumt sie, und eine Antwort, die danach ankommt, meldet nicht am
+  // neuen Ort (`frontend/AGENTS.md`, „Speicherfehler an die Seite“). Was ausgelassen wurde, ist ein
+  // Teilerfolg, den niemand im Toast überliest.
   const [rueckgaengig, setRueckgaengig] = useState<{
+    einsatzId: number;
     epId: number;
     fehler?: unknown;
     ausgelassen?: string;
   } | null>(null);
-  const hinweis = rueckgaengig?.epId === epId ? rueckgaengig : null;
+  const [ort, setOrt] = useState({ einsatzId, epId });
+  if (ort.einsatzId !== einsatzId || ort.epId !== epId) {
+    setOrt({ einsatzId, epId });
+    setRueckgaengig(null);
+  }
+  const hinweis =
+    rueckgaengig?.einsatzId === einsatzId && rueckgaengig.epId === epId ? rueckgaengig : null;
   const rueckgaengigFehler = hinweis?.fehler ?? null;
   const ausgelassenText = hinweis?.ausgelassen ?? null;
   // Rückgängig nimmt mit dem Vorzustand aus der Antwort des Entlassens alles zurück: Bindungen,
   // Status, Zeitachse ohne neue Periode (Spec `kraefte-entlassung`, „Entlassung einer Person
-  // zurücknehmen“). Die Person kommt in den `variables` mit: der Toast überlebt einen Wechsel der
-  // Route, die Rücknahme gilt trotzdem der Person, die entlassen wurde.
+  // zurücknehmen“). Einsatz und Person kommen in den `variables` mit: der Toast überlebt einen
+  // Wechsel der Route, die Rücknahme gilt trotzdem der Person, die entlassen wurde.
   const rueckgaengigMutation = useMutation({
-    mutationFn: (v: { epId: number; vorzustand: PersonalEntlassungVorzustand }) =>
-      nimmEntlassungZurueck(einsatzId, v.epId, v.vorzustand),
+    mutationFn: (v: {
+      einsatzId: number;
+      epId: number;
+      vorzustand: PersonalEntlassungVorzustand;
+    }) => nimmEntlassungZurueck(v.einsatzId, v.epId, v.vorzustand),
     onMutate: () => setRueckgaengig(null),
     onSuccess: (antwort, v) => {
-      moveZeile(antwort.personal, 'aktiv');
-      void qc.invalidateQueries({ queryKey: einsatzKeys.kraefteZeitachse(einsatzId) });
+      moveZeile(antwort.personal, 'aktiv', v.einsatzId);
+      void qc.invalidateQueries({ queryKey: einsatzKeys.kraefteZeitachse(v.einsatzId) });
       for (const key of [
-        einsatzKeys.einheiten(einsatzId),
-        einsatzKeys.abschnitte(einsatzId),
-        einsatzKeys.fahrzeuge(einsatzId),
-        einsatzKeys.uhs(einsatzId),
+        einsatzKeys.einheiten(v.einsatzId),
+        einsatzKeys.abschnitte(v.einsatzId),
+        einsatzKeys.fahrzeuge(v.einsatzId),
+        einsatzKeys.uhs(v.einsatzId),
       ]) {
         void qc.invalidateQueries({ queryKey: key });
       }
       if (antwort.ausgelassen.length > 0) {
         setRueckgaengig({
+          einsatzId: v.einsatzId,
           epId: v.epId,
           ausgelassen: ausgelassenSatz(antwort.personal.name, antwort),
         });
       }
     },
-    onError: (e, v) => setRueckgaengig({ epId: v.epId, fehler: e }),
+    onError: (e, v) => setRueckgaengig({ einsatzId: v.einsatzId, epId: v.epId, fehler: e }),
   });
   const entlassenMutation = useMutation({
-    mutationFn: (v: { epId: number }) => entlasseDisposition(einsatzId, v.epId),
+    mutationFn: (v: { einsatzId: number; epId: number }) =>
+      entlasseDisposition(v.einsatzId, v.epId),
     onMutate: () => {
       orte.beginne('aus');
       setRueckgaengig(null);
     },
     onSuccess: ({ personal: neu, vorzustand }, v) => {
-      moveZeile(neu, 'entlassen');
+      moveZeile(neu, 'entlassen', v.einsatzId);
       zeigeRueckgaengig(message, `${neu.name} entlassen`, () =>
-        rueckgaengigMutation.mutate({ epId: v.epId, vorzustand }),
+        rueckgaengigMutation.mutate({ ...v, vorzustand }),
       );
     },
     onError: (e) => orte.melde('aus', e, 'Nicht entlassen'),
@@ -700,7 +713,7 @@ export default function EinsatzkraftPage() {
                   loading={entlassenMutation.isPending}
                   disabled={ausLaeuft}
                   aria-label={`${ep.name} entlassen`}
-                  onClick={() => entlassenMutation.mutate({ epId })}
+                  onClick={() => entlassenMutation.mutate({ einsatzId, epId })}
                 >
                   Entlassen
                 </Button>

@@ -515,6 +515,13 @@ pub async fn zuruecknehmen(
         liste.sort_unstable();
         liste.dedup();
     }
+    if let Some(name) = &vorzustand.einsatzleiter_name {
+        crate::routes::support::hoechstens(
+            name,
+            "Name des Einsatzleiters",
+            crate::personal::RUECKNAHME_NAME_MAX,
+        )?;
+    }
     let rechte = crate::personal::ruecknahme::RuecknahmeRechte {
         // Wie das Gate der Führungsstelle (`EinsatzVerwaltungszugriff`), design.md D5.
         einsatzdaten: ctx.fordere_schreibrecht_oder_admin().is_ok(),

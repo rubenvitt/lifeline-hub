@@ -23,8 +23,8 @@ bleiben bei 409; der Client sperrt das Streichen der abschließenden Entlassung
 `…/personal/{ep}/entlassen/zuruecknehmen`, `src/personal/ruecknahme.rs`) streicht genau die
 Entlassung dieses Entlassens (Quelle `disposition`, Grund „Entlassung zurückgenommen“), nachdem
 die Person wieder aktiv ist: die Periode davor ist wieder offen, eine neue entsteht nicht. Ist
-diese Entlassung seither gestrichen oder steht ein Ereignis nach ihr, ist es 409, und nichts kommt
-zurück. „Zeit berichtigen“ (LLH-1455, `zeitachse::repo::berichtige_tx`,
+die Zeitachse der Person seit dem Entlassen berichtigt (ein Ereignis seitdem gestrichen oder
+erfasst, auch vor der Entlassung), ist es 409, und nichts kommt zurück. „Zeit berichtigen“ (LLH-1455, `zeitachse::repo::berichtige_tx`,
 Routen `…/zeitachse/{zid}/berichtigen`) streicht ein Ereignis und schreibt es mit gleicher Art,
 Quelle `nachtrag` und der alten Notiz zum neuen Zeitpunkt neu, in einer Transaktion; die
 Perioden-Regeln gelten nur am Ergebnis (`perioden::ersetze`). Die Kopien folgen den bisherigen

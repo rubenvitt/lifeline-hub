@@ -67,7 +67,7 @@ const OHNE_RECHT_EINHEITEN: &str = "kein Schreibrecht im Modul Einheiten";
 ///
 /// Riegel: nur die entlassende Person, nur dieses Entlassen (`entlassen_at`), nur innerhalb von
 /// [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`]; sonst `Conflict`. Ist die Zeitachse seit dem
-/// Entlassen berichtigt (die Entlassung gestrichen oder nicht mehr das letzte Ereignis), ebenfalls
+/// Entlassen berichtigt (ein Ereignis der Person seitdem gestrichen oder erfasst), ebenfalls
 /// `Conflict`, bevor etwas geschrieben ist. Der Endzustand fällt; Status, Dispositionszeit,
 /// Stärke-Position und Storno-Sperre bleiben. Die Entlassung dieses Entlassens wird mit
 /// [`crate::entlassung::GRUND_RUECKNAHME`] gestrichen, so ist die Periode davor wieder offen.
@@ -129,16 +129,17 @@ pub async fn zuruecknehmen_tx(
     if let Some(einheit_id) = vorzustand.einheit_id {
         bind_einheit_tx(conn, einsatz_id, ep_id, einheit_id, rechte, &mut ergebnis).await?;
     }
-    if !vorzustand.gefuehrte_einheiten.is_empty() {
-        bind_fuehrung_tx(
-            conn,
-            einsatz_id,
-            ep_id,
-            &vorzustand.gefuehrte_einheiten,
-            rechte,
-            &mut ergebnis,
-        )
-        .await?;
+    // Der Führer ist Mitglied seiner Einheit (`einheit::repo::check_fuehrer`): ein echter
+    // Vorzustand nennt höchstens die eigene Einheit. Alles andere bleibt still aus, sonst stünden
+    // Namen fremder Einheiten im Einsatztagebuch (Review vor dem PR).
+    let fuehrung: Vec<i64> = vorzustand
+        .gefuehrte_einheiten
+        .iter()
+        .copied()
+        .filter(|id| Some(*id) == vorzustand.einheit_id)
+        .collect();
+    if !fuehrung.is_empty() {
+        bind_fuehrung_tx(conn, einsatz_id, ep_id, &fuehrung, rechte, &mut ergebnis).await?;
     }
     if let Some(ef_id) = vorzustand.fahrzeug_id {
         bind_fahrzeug_tx(conn, einsatz_id, ep_id, ef_id, rechte, &mut ergebnis).await?;
@@ -197,7 +198,7 @@ async fn find_entlassung_tx(
     let berichtigt: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse \
                        WHERE personal_id = ?1 \
-                         AND (gestrichen_at >= ?2 \
+                         AND (gestrichen_at > ?2 \
                               OR (?3 IS NOT NULL AND id > ?3) \
                               OR (?3 IS NULL AND erfasst_at > ?2)))",
     )
@@ -279,9 +280,8 @@ async fn bind_einheit_tx(
 }
 
 /// Die Führung kommt nur in der Einheit zurück, der die Person jetzt (wieder) angehört: der Führer
-/// ist Mitglied (`einheit::repo::check_fuehrer`). Kennungen, die keine Einheit dieses Einsatzes
-/// nennen, bleiben still aus (wie beim Fahrzeug): ohne gespeicherten Vorzustand stünde sonst
-/// Erfundenes im Einsatztagebuch. Zwei Anweisungen, gleich wie lang die Liste ist (`src/AGENTS.md`,
+/// ist Mitglied (`einheit::repo::check_fuehrer`). Eine Einheit, die es nicht mehr gibt, nennt eine
+/// Zeile ohne Namen. Zwei Anweisungen, gleich wie lang die Liste ist (`src/AGENTS.md`,
 /// „Eingabegrenzen“).
 async fn bind_fuehrung_tx(
     conn: &mut SqliteConnection,
@@ -327,6 +327,20 @@ async fn bind_fuehrung_tx(
             ));
         }
         return Ok(());
+    }
+    let vorhanden: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_einheit \
+         WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2))",
+    )
+    .bind(einsatz_id)
+    .bind(&ids)
+    .fetch_one(&mut *conn)
+    .await?;
+    if (vorhanden as usize) < einheiten.len() {
+        ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
+            "Führung einer Einheit",
+            "inzwischen aufgelöst",
+        ));
     }
     for (name, aufgeloest_at, fuehrer) in fehlen {
         let grund = if aufgeloest_at.is_some() {
@@ -445,7 +459,10 @@ async fn bind_uhs_tx(
     Ok(())
 }
 
-/// Wie [`bind_fuehrung_tx`]: zwei Anweisungen für die ganze Liste, unbekannte Kennungen still aus.
+/// Wie [`bind_fuehrung_tx`]: eine feste Zahl von Anweisungen für die ganze Liste. Abschnitte, die
+/// es nicht mehr gibt (ein Abschnitt wird beim Auflösen gelöscht), nennt eine Zeile mit ihrer
+/// Zahl, ohne Namen: ohne gespeicherten Vorzustand ließen sie sich nicht von erfundenen Kennungen
+/// unterscheiden.
 async fn bind_abschnitte_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -491,6 +508,26 @@ async fn bind_abschnitte_tx(
         ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
             format!("Leitung von «{name}»"),
             "inzwischen anders besetzt",
+        ));
+    }
+    let vorhanden: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatzabschnitt \
+         WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2))",
+    )
+    .bind(einsatz_id)
+    .bind(&ids)
+    .fetch_one(&mut *conn)
+    .await?;
+    let fort = abschnitte.len().saturating_sub(vorhanden as usize);
+    if fort > 0 {
+        let bezeichnung = if fort == 1 {
+            "Leitung eines Abschnitts".to_string()
+        } else {
+            format!("Leitung von {fort} Abschnitten")
+        };
+        ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
+            bezeichnung,
+            "nicht mehr vorhanden",
         ));
     }
     Ok(())

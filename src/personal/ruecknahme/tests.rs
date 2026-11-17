@@ -536,8 +536,7 @@ async fn veraendertes_bleibt_aus_und_wird_genannt() {
     );
 }
 
-/// Einheit aufgelöst, Einsatzleiter ausgetragen; ein gelöschter Abschnitt bleibt still aus (sein
-/// Name ist fort, und eine erfundene Kennung sähe genauso aus).
+/// Einheit aufgelöst, Abschnitt gelöscht (ohne Namen genannt), Einsatzleiter ausgetragen.
 #[tokio::test]
 async fn aufgeloestes_und_ausgetragenes_bleibt_aus() {
     let s = szene().await;
@@ -556,6 +555,10 @@ async fn aufgeloestes_und_ausgetragenes_bleibt_aus() {
         vec![
             ("Einheit «Zug 1»".into(), "inzwischen aufgelöst".into()),
             ("Führung von «Zug 1»".into(), "inzwischen aufgelöst".into()),
+            (
+                "Leitung eines Abschnitts".into(),
+                "nicht mehr vorhanden".into()
+            ),
             ("Einsatzleitung".into(), "inzwischen ausgetragen".into()),
         ]
     );
@@ -652,19 +655,25 @@ async fn storno_bleibt_nach_der_ruecknahme_gesperrt() {
     );
 }
 
-/// Review vor dem PR: Kennungen, die nichts dieses Einsatzes nennen, bleiben still aus und kommen
-/// nicht als „inzwischen aufgelöst“ ins Einsatztagebuch.
+/// Review vor dem PR: eine Führung fremder Einheiten nennt ein echter Vorzustand nie, sie bleibt
+/// still aus; Abschnitte, die es nicht gibt, nennt eine Zeile mit ihrer Zahl, ohne Namen.
 #[tokio::test]
-async fn unbekannte_kennungen_bleiben_still_aus() {
+async fn fremde_und_unbekannte_kennungen_stehen_ohne_namen_da() {
     let s = szene().await;
     let v = s.entlasse().await;
     let erfunden = PersonalEntlassungVorzustand {
         gefuehrte_einheiten: vec![s.zug, 9_001, 9_002],
-        geleitete_abschnitte: vec![s.abschnitt, 9_003],
+        geleitete_abschnitte: vec![s.abschnitt, 9_003, 9_004],
         ..v
     };
     let r = s.nimm_zurueck(&erfunden).await;
-    assert_eq!(bezeichnungen(&r), Vec::<(String, String)>::new());
+    assert_eq!(
+        bezeichnungen(&r),
+        vec![(
+            "Leitung von 2 Abschnitten".into(),
+            "nicht mehr vorhanden".into()
+        )]
+    );
     assert_eq!(r.einheiten, vec![s.zug]);
     assert_eq!(r.abschnitte, vec![s.abschnitt]);
 }
@@ -681,13 +690,7 @@ async fn fuehrung_nur_mit_mitgliedschaft() {
     };
     let r = s.nimm_zurueck(&ohne_einheit).await;
     assert!(r.einheiten.is_empty());
-    assert_eq!(
-        bezeichnungen(&r),
-        vec![(
-            "Führung von «Zug 1»".into(),
-            "nicht mehr Mitglied der Einheit".into()
-        )]
-    );
+    assert_eq!(bezeichnungen(&r), Vec::<(String, String)>::new());
     assert_eq!(s.zustand().await.fuehrer, None);
 }
 
@@ -739,4 +742,46 @@ async fn einsatzleitung_kommt_nach_namensberichtigung_zurueck() {
     let r = s.nimm_zurueck(&v).await;
     assert!(r.einsatzleiter);
     assert_eq!(s.zustand().await.einsatzleiter.unwrap().1, Some(s.ep));
+}
+
+/// Nach-Review: auch ohne Entlassung in der Zeitachse sperrt ein Nachtrag nach dem Entlassen; was
+/// davor erfasst wurde, nicht.
+#[tokio::test]
+async fn ohne_entlassung_sperrt_nur_ein_spaeterer_nachtrag() {
+    let s = szene().await;
+    s.sql("DELETE FROM einsatz_kraft_zeitachse").await;
+    let v = s.entlasse().await;
+    s.sql(
+        "INSERT INTO einsatz_kraft_zeitachse \
+           (einsatz_id, personal_id, art, zeitpunkt_at, quelle, erfasst_von, erfasst_at) \
+         SELECT einsatz_id, id, 'eintreffen', '2026-11-17 09:30:00', 'nachtrag', 1, \
+                '2026-11-17 11:05:00' FROM einsatz_personal",
+    )
+    .await;
+    let e = s
+        .nimm_zurueck_als(s.benutzer, KURZ_DANACH, &v, RuecknahmeRechte::ALLE)
+        .await
+        .unwrap_err();
+    assert!(matches!(e, AppError::Conflict(_)), "{e:?}");
+
+    s.sql("UPDATE einsatz_kraft_zeitachse SET erfasst_at = '2026-11-17 10:30:00'")
+        .await;
+    s.nimm_zurueck(&v).await;
+    assert!(!s.ist_entlassen().await);
+}
+
+/// Nach-Review: eine Streichung in derselben Sekunde wie das Entlassen (etwa die Rücknahme eines
+/// vorigen Entlassens) zählt nicht als Berichtigung.
+#[tokio::test]
+async fn streichung_in_der_sekunde_des_entlassens_sperrt_nicht() {
+    let s = szene().await;
+    let v = s.entlasse().await;
+    s.sql(
+        "UPDATE einsatz_kraft_zeitachse SET gestrichen_at = '2026-11-17 11:00:00', \
+             gestrichen_von = 1, streichgrund = 'Entlassung zurückgenommen' \
+         WHERE art = 'alarmierung'",
+    )
+    .await;
+    s.nimm_zurueck(&v).await;
+    assert!(!s.ist_entlassen().await);
 }
