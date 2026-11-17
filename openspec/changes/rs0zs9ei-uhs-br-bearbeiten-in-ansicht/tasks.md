@@ -14,14 +14,14 @@
 
 ## 3. Client-API: Basisstand senden (D4)
 
-- [ ] 3.1 `basis_geaendert_at?: string` in `UhsPatch` (`api/einsatzUhs.ts`) und `BrPatch` (`api/einsatzBereitstellungsraum.ts`); `tsc` grün
+- [x] 3.1 `basis_geaendert_at?: string` in `UhsPatch` (`api/einsatzUhs.ts`) und `BrPatch` (`api/einsatzBereitstellungsraum.ts`); `tsc` grün
 
 ## 4. Bereitstellungsraum: Paneel „Raumdaten“ (D3, D7)
 
-- [ ] 4.1 `pages/bereitstellungsraum/brRaumdaten.ts`: `brRaumdatenWerte(br)` und `brPatch(vorher, nachher)` (Werte gegen Werte, leer = `null`, Koordinate als Paar); Tests aus `BrBearbeitenModal.test.ts` nach `brRaumdaten.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
-- [ ] 4.2 `BrDetailPage.tsx`: `SektionHeader` + `Datenraster` „Raumdaten“ durch `BearbeitbaresPaneel` (Bezeichnung, Standort, Notiz; Regeln aus dem Modal) ersetzen, `zusatz` = `AufKarteVerorten` nur bei `bearbeitbar`, `onSpeichern` mit `basis_geaendert_at`, `onNeuLaden` = Refetch, Invalidierung und Erfolgsmeldung wie bisher; `BrBearbeitenModal` und `bearbeitenOffen` entfernen
-- [ ] 4.3 `BrDetailPage.test.tsx` rot→grün: „Bearbeiten“ im Paneel „Raumdaten“ öffnet Eingaben an Ort und Stelle (kein Dialog), Speichern sendet nur die Notiz samt `basis_geaendert_at`, 409 → „Zwischenzeitlich geändert“, aufgelöster Raum ohne „Bearbeiten“, „Auf Karte verorten“ nur im Lesezustand
-- [ ] 4.4 `BrBearbeitenModal.tsx` und `BrBearbeitenModal.test.ts` löschen; `grep -rn BrBearbeitenModal` außerhalb von `openspec/changes/archive` und `docs/superpowers` leer (bis auf die Altstellenliste, Aufgabe 6.1)
+- [x] 4.1 `pages/bereitstellungsraum/brRaumdaten.ts`: `brRaumdatenWerte(br)` und `brPatch(vorher, nachher)` (Werte gegen Werte, leer = `null`, Koordinate als Paar); Tests aus `BrBearbeitenModal.test.ts` nach `brRaumdaten.test.ts` umziehen und auf die neue Signatur bringen, rot→grün
+- [x] 4.2 `BrDetailPage.tsx`: `SektionHeader` + `Datenraster` „Raumdaten“ durch `BearbeitbaresPaneel` (Bezeichnung, Standort, Notiz; Regeln aus dem Modal) ersetzen, `zusatz` = `AufKarteVerorten` nur bei `bearbeitbar`, `onSpeichern` mit `basis_geaendert_at`, `onNeuLaden` = Refetch, Invalidierung und Erfolgsmeldung wie bisher; `BrBearbeitenModal` und `bearbeitenOffen` entfernen
+- [x] 4.3 `BrDetailPage.test.tsx` rot→grün: „Bearbeiten“ im Paneel „Raumdaten“ öffnet Eingaben an Ort und Stelle (kein Dialog), Speichern sendet nur die Notiz samt `basis_geaendert_at`, 409 → „Zwischenzeitlich geändert“, aufgelöster Raum ohne „Bearbeiten“, „Auf Karte verorten“ nur im Lesezustand
+- [x] 4.4 `BrBearbeitenModal.tsx` und `BrBearbeitenModal.test.ts` löschen; `grep -rn BrBearbeitenModal` außerhalb von `openspec/changes/archive` und `docs/superpowers` leer (bis auf die Altstellenliste, Aufgabe 6.1)
 
 ## 5. UHS: Bereich „Angaben“ (D1–D3)
 

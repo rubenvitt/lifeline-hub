@@ -41,8 +41,6 @@ import BeendenAbschnitt from '../../components/BeendenAbschnitt';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import SektionHeader from '../../components/SektionHeader';
 import {
-  Datenfeld,
-  Datenraster,
   Kennzahl,
   Kennzahlenband,
   Sammelbanner,
@@ -55,8 +53,7 @@ import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brAbgerufen, brStatus } from '../../theme/statusFarben';
 import BrSwitcher from './BrSwitcher';
-import BrBearbeitenModal from './BrBearbeitenModal';
-import AufKarteVerorten from './AufKarteVerorten';
+import BrRaumdaten from './BrRaumdaten';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { staerkeDerEinheitImRaum, staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
@@ -330,7 +327,6 @@ export default function BrDetailPage() {
     invalidate();
   };
 
-  const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
   // „Eintreffen buchen“ (LLH-1075, design.md D14): am Gerät nur mit `br-eintreffen`.
   const [eintreffenOffen, setEintreffenOffen] = useState(false);
   // Die Kraft, die der Abruf-Dialog gerade abruft (LLH-1085); `null` = zu.
@@ -402,7 +398,6 @@ export default function BrDetailPage() {
   useEffect(() => {
     statusReset();
     leereZeilen();
-    setBearbeitenOffen(false);
     setEintreffenOffen(false);
     setAbrufZiel(null);
     setVerlegenZiel(null);
@@ -769,24 +764,20 @@ export default function BrDetailPage() {
         </Space>
       }
     >
-      {/* „Bearbeiten“ an den Raumdaten, nicht im Kopf: dort stünden im Zustand „geplant“ drei
-          Datensatz-Aktionen, und ab drei bündelt der Kopf (`frontend/AGENTS.md`, „Aktionen“). */}
-      <SektionHeader
-        titel="Raumdaten"
-        extra={
-          bearbeitbar && (
-            <Space wrap>
-              {/* Verorten auf der Lagekarte (LLH-1107), Muster Betreuungsstelle (LFH-673). */}
-              <AufKarteVerorten einsatzId={einsatzId} br={br} />
-              <Button onClick={() => setBearbeitenOffen(true)}>Bearbeiten</Button>
-            </Space>
-          )
-        }
-      />
-      <Datenraster spalten={2} beschriftung="Raumdaten" style={{ marginBottom: token.marginLG }}>
-        <Datenfeld label="Standort">{br.standort ?? '—'}</Datenfeld>
-        <Datenfeld label="Notiz">{br.notiz ?? '—'}</Datenfeld>
-      </Datenraster>
+      {/* „Bearbeiten“ im Paneelkopf der Raumdaten, nicht im Seitenkopf: dort stünden im Zustand
+          „geplant“ drei Datensatz-Aktionen, und ab drei bündelt der Kopf (`frontend/AGENTS.md`,
+          „Aktionen“). Bearbeitet wird in der Ansicht (LLH-1920). `key` am Raum: der Umschalter
+          behält die Seite; liegt der nächste Raum schon im Cache, lädt sie nicht neu, und eine
+          offene Bearbeitung gehörte sonst an den nächsten Raum. */}
+      <div style={{ marginBottom: token.marginLG }}>
+        <BrRaumdaten
+          key={br.id}
+          einsatzId={einsatzId}
+          br={br}
+          bearbeitbar={bearbeitbar}
+          onNeuLaden={() => void detailQuery.refetch()}
+        />
+      </div>
 
       {/* Unter `md` stapeln statt 240-px-Sidebar daneben; sonst quetschte der Flex-Container die
           100%-Karte weiter in eine Spalte. */}
@@ -1102,14 +1093,6 @@ export default function BrDetailPage() {
             }
           />
         )}
-      {verwalten && (
-        <BrBearbeitenModal
-          einsatzId={einsatzId}
-          br={br}
-          offen={bearbeitenOffen}
-          onClose={() => setBearbeitenOffen(false)}
-        />
-      )}
     </EinsatzSeite>
   );
 }
