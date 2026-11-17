@@ -349,6 +349,17 @@ impl FromRequestParts<AppState> for EinsatzWiedereroeffnungszugriff {
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
         let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        Self::check(&ctx)?;
+        Ok(Self(ctx))
+    }
+}
+
+impl EinsatzWiedereroeffnungszugriff {
+    /// Die Entscheidung des Gates auf einem schon extrahierten Kontext. Eigene Funktion, damit ein
+    /// Test sie mit einem Gerät prüfen kann, das sonst durchkäme: Über HTTP hält schon die
+    /// Routenschranke der Gerätesitzung jedes Gerät auf (`tests/einsatz_abschluss.rs`,
+    /// `ein_geraet_bekommt_403`).
+    pub fn check(ctx: &EinsatzKontext) -> Result<(), AppError> {
         if ctx.geraet.is_some() {
             return Err(AppError::Forbidden);
         }
@@ -356,8 +367,7 @@ impl FromRequestParts<AppState> for EinsatzWiedereroeffnungszugriff {
         if !admin {
             ctx.fordere_einsatzleitung()?;
         }
-        ctx.fordere_lesezugriff()?;
-        Ok(Self(ctx))
+        ctx.fordere_lesezugriff()
     }
 }
 

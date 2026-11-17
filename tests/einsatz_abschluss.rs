@@ -509,13 +509,24 @@ async fn ohne_grund_ist_400_und_der_einsatz_bleibt_abgeschlossen() {
 }
 
 /// Ein gekoppeltes Gerät öffnet nicht wieder: 403 vor jeder Prüfung des Zustands.
+///
+/// Über HTTP hält schon die Routenschranke der Gerätesitzung (`auth::session`,
+/// `fordere_geraeteroute`) das Gerät auf, und keine Ansicht ist Einsatzleitung. Damit der Test
+/// die Geräteprüfung des Gates selbst belegt, prüft er dessen Entscheidung zusätzlich an einem
+/// Kontext, der ohne sie durchkäme: ein Gerät mit Einsatzleitung und dem System-Admin der
+/// Einsatz-Org als Konto, am abgeschlossenen Einsatz innerhalb der Frist.
 #[tokio::test]
 async fn ein_geraet_bekommt_403() {
     use axum::body::{to_bytes, Body};
     use axum::http::{header, Request};
+    use lifeline_hub::auth::Benutzer;
+    use lifeline_hub::einsatz::kontext::{EinsatzKontext, EinsatzWiedereroeffnungszugriff};
+    use lifeline_hub::einsatz::EinsatzRolle;
+    use lifeline_hub::error::AppError;
+    use lifeline_hub::geraet::{Funktionsansicht, GeraetKontext};
     use tower::ServiceExt;
 
-    let (app, _pool) = setup_mit_pool().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let (s, v) = anfrage_json(
@@ -554,6 +565,45 @@ async fn ein_geraet_bekommt_403() {
     let _ = to_bytes(resp.into_body(), usize::MAX).await;
     let (s, v) = wiedereroeffnen(&app, &geraet, e, grund("Versehen")).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+
+    // Die Entscheidung des Gates: dieselbe Person ohne Gerät darf, mit Gerät nicht.
+    abgeschlossen(&app, &admin, e).await;
+    let benutzer: Benutzer = sqlx::query_as(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+                aktiv, erstellt_at FROM benutzer WHERE benutzername = 'admin'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let kontext = |geraet: Option<GeraetKontext>| {
+        let pool = pool.clone();
+        let benutzer = benutzer.clone();
+        async move {
+            EinsatzKontext {
+                einsatz: lifeline_hub::einsatz::repo::laden(&pool, e).await.unwrap(),
+                rolle: Some(EinsatzRolle::Einsatzleitung),
+                benutzer,
+                geraet,
+            }
+        }
+    };
+    let person = kontext(None).await;
+    assert_eq!(person.einsatz.org_id, person.benutzer.org_id);
+    assert!(person.benutzer.ist_admin());
+    EinsatzWiedereroeffnungszugriff::check(&person).expect("ohne Gerät darf sie");
+    let mit_geraet = kontext(Some(GeraetKontext {
+        kopplung_id: 1,
+        einsatz_id: e,
+        ansicht: Funktionsansicht::Lagemonitor,
+        stelle: None,
+        bezeichnung: "Monitor".into(),
+        laeuft_ab_at: "2099-01-01 00:00:00".into(),
+    }))
+    .await;
+    assert!(matches!(
+        EinsatzWiedereroeffnungszugriff::check(&mit_geraet),
+        Err(AppError::Forbidden)
+    ));
 }
 
 /// Spec „Geschwärzte Kategorie“ und die übrigen Sperren der Aufbewahrung: je 422, nichts
