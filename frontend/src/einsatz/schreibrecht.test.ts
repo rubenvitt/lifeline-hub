@@ -1,6 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  WIEDEREROEFFNEN_STUNDEN,
   darfBeantragen,
+  darfEinsatzWiedereroeffnen,
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
   darfEinsatzVerwalten,
@@ -15,6 +20,7 @@ import {
   fuehrtHier,
   istSpiegel,
   isEinsatzGesperrt,
+  wiedereroeffnenBis,
 } from './schreibrecht';
 
 // Wahrheitstabelle für die zentrale Schreibrecht-Regel (LFH-234). Pinnt die beiden bewussten
@@ -370,5 +376,123 @@ describe('Spiegel (LLH-1492, D13)', () => {
         expect(darfBeantragen(e)).toBe(darfImEinsatzSchreiben(e));
       }
     }
+  });
+});
+
+describe('darfEinsatzWiedereroeffnen (LLH-1814)', () => {
+  // Abgeschlossen um 10:00 UTC; die Frist endet 24 Stunden später.
+  const abgeschlossen = {
+    status: 'abgeschlossen' as const,
+    abgeschlossen_at: '2026-11-16 10:00:00',
+    org_id: 1,
+  };
+  const zweiStundenDanach = Date.parse('2026-11-16T12:00:00Z');
+  const adminDerOrg = { system_rolle: 'admin' as const, org_id: 1 };
+  const adminFremd = { system_rolle: 'admin' as const, org_id: 2 };
+  const ohneSystemrolle = { system_rolle: 'keiner' as const, org_id: 1 };
+
+  it('erlaubt der Einsatzleitung binnen der Frist', () => {
+    expect(
+      darfEinsatzWiedereroeffnen(
+        { ...abgeschlossen, meine_rolle: 'einsatzleitung' },
+        ohneSystemrolle,
+        zweiStundenDanach,
+      ),
+    ).toBe(true);
+  });
+
+  it('erlaubt dem System-Admin der Einsatz-Org auch ohne Einsatzrolle', () => {
+    expect(
+      darfEinsatzWiedereroeffnen(
+        { ...abgeschlossen, meine_rolle: null },
+        adminDerOrg,
+        zweiStundenDanach,
+      ),
+    ).toBe(true);
+  });
+
+  it('verweigert dem System-Admin einer fremden Org', () => {
+    expect(
+      darfEinsatzWiedereroeffnen(
+        { ...abgeschlossen, meine_rolle: null },
+        adminFremd,
+        zweiStundenDanach,
+      ),
+    ).toBe(false);
+  });
+
+  it.each(['fuehrungspersonal', 'beobachter', null] as const)('verweigert %s', (meine_rolle) => {
+    expect(
+      darfEinsatzWiedereroeffnen(
+        { ...abgeschlossen, meine_rolle },
+        ohneSystemrolle,
+        zweiStundenDanach,
+      ),
+    ).toBe(false);
+  });
+
+  it('verweigert am Spiegel, auch der Einsatzleitung', () => {
+    expect(
+      darfEinsatzWiedereroeffnen(
+        {
+          ...abgeschlossen,
+          meine_rolle: 'einsatzleitung',
+          spiegel: {
+            gegenstelle: 'Hub Nord',
+            beendet: false,
+            antraege_ausstehend: 0,
+            antraege_abgelehnt: 0,
+            bruchstelle: 0,
+          },
+        },
+        adminDerOrg,
+        zweiStundenDanach,
+      ),
+    ).toBe(false);
+  });
+
+  it('verweigert an einem aktiven Einsatz', () => {
+    expect(
+      darfEinsatzWiedereroeffnen(
+        { status: 'aktiv', abgeschlossen_at: null, org_id: 1, meine_rolle: 'einsatzleitung' },
+        adminDerOrg,
+        zweiStundenDanach,
+      ),
+    ).toBe(false);
+  });
+
+  it('endet an der Fristgrenze: eine Sekunde davor ja, auf der Grenze nein', () => {
+    const el = { ...abgeschlossen, meine_rolle: 'einsatzleitung' as const };
+    expect(darfEinsatzWiedereroeffnen(el, null, Date.parse('2026-11-17T09:59:59Z'))).toBe(true);
+    expect(darfEinsatzWiedereroeffnen(el, null, Date.parse('2026-11-17T10:00:00Z'))).toBe(false);
+    expect(darfEinsatzWiedereroeffnen(el, null, Date.parse('2026-11-17T11:00:00Z'))).toBe(false);
+  });
+
+  it('verweigert ohne lesbaren Abschlusszeitpunkt (fail-closed)', () => {
+    const el = { ...abgeschlossen, meine_rolle: 'einsatzleitung' as const };
+    expect(
+      darfEinsatzWiedereroeffnen({ ...el, abgeschlossen_at: null }, null, zweiStundenDanach),
+    ).toBe(false);
+    expect(
+      darfEinsatzWiedereroeffnen({ ...el, abgeschlossen_at: 'kaputt' }, null, zweiStundenDanach),
+    ).toBe(false);
+    expect(darfEinsatzWiedereroeffnen(undefined, adminDerOrg, zweiStundenDanach)).toBe(false);
+  });
+
+  it('nennt das Ende der Frist als Wire-Zeit (UTC)', () => {
+    expect(wiedereroeffnenBis(abgeschlossen)).toBe('2026-11-17 10:00:00');
+    expect(wiedereroeffnenBis({ abgeschlossen_at: null })).toBeNull();
+  });
+
+  it('hält die Frist gleich der Schonfrist des Servers (NACHLAUF_STUNDEN)', () => {
+    // Gelesen wird die Quelle, damit eine dort geänderte Zahl hier rot wird statt still
+    // auseinanderzulaufen; der Server bleibt die Wahrheit.
+    const quelle = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../../src/einsatz/berechtigung.rs'),
+      'utf8',
+    );
+    const treffer = /pub const NACHLAUF_STUNDEN: i64 = (\d+);/.exec(quelle);
+    expect(treffer).not.toBeNull();
+    expect(WIEDEREROEFFNEN_STUNDEN).toBe(Number(treffer![1]));
   });
 });

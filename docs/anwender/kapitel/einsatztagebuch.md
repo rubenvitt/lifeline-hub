@@ -367,8 +367,9 @@ gespiegelten Instanz noch nicht da, meldet das Herunterladen „wird geholt“.
 
 ### Abgeschlossener Einsatz
 
-Nach dem Abschluss des Einsatzes ist das ETB nur noch lesbar. Abgeschlossen wird in den
-Einsatzdaten ([Einsatz abschließen und Einsatzbericht](einsatzabschluss.md)). Drucken lässt sich das ETB
+Nach dem Abschluss des Einsatzes ist das ETB nur noch lesbar. Abgeschlossen und binnen 24 Stunden
+wieder geöffnet wird in den Einsatzdaten ([Einsatz abschließen und
+Einsatzbericht](einsatzabschluss.md)); danach ist das ETB wieder beschreibbar. Drucken lässt sich das ETB
 jederzeit, siehe [Drucken und Export](drucken-export.md).
 
 ## Grundlagen und Quellen

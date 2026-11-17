@@ -1,4 +1,5 @@
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 
 /**
  * Zentrale Quelle für die Einsatz-Schreibrecht-Regel „darf der aktuelle Benutzer in diesem
@@ -122,6 +123,50 @@ export function darfModuleVerwalten(
   if (einsatz?.status !== 'aktiv' || istSpiegel(einsatz)) return false;
   if (istEinsatzLeitung(einsatz)) return true;
   return istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id;
+}
+
+/**
+ * Frist zum Wiederöffnen in Stunden (LLH-1814, Spec `einsatz-abschluss`): gleich der Schonfrist
+ * des Servers (`NACHLAUF_STUNDEN` in `src/einsatz/berechtigung.rs`, gepinnt in
+ * `schreibrecht.test.ts`). Der Server bleibt die Wahrheit; die Zahl lässt nur den Knopf rechtzeitig
+ * verschwinden.
+ */
+export const WIEDEREROEFFNEN_STUNDEN = 24;
+
+/** Was {@link darfEinsatzWiedereroeffnen} vom Einsatz braucht. */
+export type EinsatzWiedereroeffnenKontext =
+  | (Pick<EinsatzAnzeige, 'status' | 'meine_rolle' | 'org_id' | 'abgeschlossen_at'> &
+      Partial<Pick<EinsatzAnzeige, 'fuehrung' | 'spiegel'>>)
+  | null
+  | undefined;
+
+/** Ende der Frist zum Wiederöffnen als Wire-Zeit (UTC), `null` ohne lesbaren Abschluss. */
+export function wiedereroeffnenBis(
+  einsatz: Pick<EinsatzAnzeige, 'abgeschlossen_at'> | null | undefined,
+): string | null {
+  const abgeschlossen = alsZeitpunkt(einsatz?.abgeschlossen_at);
+  return abgeschlossen ? alsBackendZeit(abgeschlossen.add(WIEDEREROEFFNEN_STUNDEN, 'hour')) : null;
+}
+
+/**
+ * Einen abgeschlossenen Einsatz wieder öffnen (LLH-1814, Spec `einsatz-abschluss`): abgeschlossen,
+ * kein Spiegel, Einsatzleitung ODER System-Admin der Einsatz-Org, und `jetzt` vor dem Ende der Frist
+ * ({@link WIEDEREROEFFNEN_STUNDEN}) — wie der Server (`EinsatzWiedereroeffnungszugriff`). Ohne
+ * lesbaren Abschlusszeitpunkt nie. Sperren der Aufbewahrung (Schwärzung, Archiv, Vormerkung) kennt
+ * nur der Server; er lehnt dann ab, und der Dialog nennt den Grund.
+ */
+export function darfEinsatzWiedereroeffnen(
+  einsatz: EinsatzWiedereroeffnenKontext,
+  benutzer: BenutzerOrgKontext,
+  jetzt: number,
+): boolean {
+  if (einsatz?.status !== 'abgeschlossen' || istSpiegel(einsatz)) return false;
+  const istBerechtigt =
+    istEinsatzLeitung(einsatz) || (istAdmin(benutzer) && benutzer?.org_id === einsatz.org_id);
+  if (!istBerechtigt) return false;
+  const abgeschlossen = alsZeitpunkt(einsatz.abgeschlossen_at);
+  if (!abgeschlossen) return false;
+  return jetzt < abgeschlossen.add(WIEDEREROEFFNEN_STUNDEN, 'hour').valueOf();
 }
 
 /** Verwaltungsangaben des Einsatzes ändern (LFH-1066): Kopfdaten, Einstellungen und

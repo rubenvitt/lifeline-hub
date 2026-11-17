@@ -1862,3 +1862,224 @@ async fn neue_zuordnung_an_dieselbe_org_gleicht_den_spiegel_wieder_ab() {
     .await;
     assert_eq!(st, StatusCode::OK);
 }
+
+// ── Wiederöffnen beim Führer (LLH-1814, Spec `einsatz-abschluss`) ───────────────────────────
+
+/// „Führende Instanz öffnet wieder“: der Rückweg nach `aktiv` läuft über den Spiegel-Log der
+/// Tabelle `einsatz`; der Spiegel beim Gegenüber ist nach dem nächsten Abgleich wieder aktiv.
+#[tokio::test]
+async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_aktiv() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen_mit(&hub.app, &hub.admin, "Alarm Hub").await;
+    etb_eintrag(&hub, e, "Alarm eingegangen").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&elw).await;
+    let status = |i: &Instanz, id: i64| {
+        let pool = i.pool.clone();
+        async move {
+            eine::<String>(
+                &pool,
+                &format!("SELECT status FROM einsatz WHERE id = {id}"),
+            )
+            .await
+        }
+    };
+    assert_eq!(status(&elw, s).await, "aktiv");
+
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{v}");
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    assert_eq!(status(&elw, s).await, "abgeschlossen", "Abschluss kommt an");
+
+    // Am Spiegel öffnet niemand wieder.
+    let (st, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/wiedereroeffnen"),
+        &elw.admin,
+        Some(&json!({ "grund": "Versehen" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CONFLICT, "{v}");
+
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/wiedereroeffnen"),
+        &hub.admin,
+        Some(&json!({ "grund": "Versehen" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    assert_eq!(status(&elw, s).await, "aktiv", "Rückweg kommt an");
+    let am_spiegel: Option<String> = eine(
+        &elw.pool,
+        &format!("SELECT abgeschlossen_at FROM einsatz WHERE id = {s}"),
+    )
+    .await;
+    assert_eq!(am_spiegel, None);
+    assert!(etb_inhalte(&elw, s)
+        .await
+        .iter()
+        .any(|t| t.starts_with("Einsatz wieder geöffnet")));
+}
+
+/// Legt am Spiegel eine Gerätekopplung und eine Freigabe für einen Maschinenzugang an, wie sie
+/// eine Führungsübergabe am abgebenden Ende stehen lässt (beide Tabellen werden nicht gespiegelt).
+/// Liefert die Kennung der Kopplung.
+async fn kopplung_und_freigabe_am_spiegel(i: &Instanz, einsatz: i64, nr: i64) -> i64 {
+    let org: i64 = eine(
+        &i.pool,
+        &format!("SELECT org_id FROM einsatz WHERE id = {einsatz}"),
+    )
+    .await;
+    let admin: i64 = eine(
+        &i.pool,
+        "SELECT id FROM benutzer WHERE benutzername = 'admin'",
+    )
+    .await;
+    let konto: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+         org_rolle) VALUES (?, 'Monitor', ?, 'x', 'keiner', 'keine') RETURNING id",
+    )
+    .bind(org)
+    .bind(format!("geraet-test-{nr}"))
+    .fetch_one(&i.pool)
+    .await
+    .unwrap();
+    let kopplung: i64 = sqlx::query_scalar(
+        "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, bezeichnung, erstellt_von, \
+         laeuft_ab_at) VALUES (?, ?, 'lagemonitor', 'Monitor', ?, '2099-01-01 00:00:00') \
+         RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(konto)
+    .bind(admin)
+    .fetch_one(&i.pool)
+    .await
+    .unwrap();
+    let zugang = format!("zugang-{nr}");
+    sqlx::query(
+        "INSERT INTO maschinenzugang (id, org_id, name, scopes, zustand) \
+         VALUES (?, ?, 'Leitstelle', '[]', 'aktiv')",
+    )
+    .bind(&zugang)
+    .bind(org)
+    .execute(&i.pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO maschinenzugang_freigabe (zugang_id, einsatz_id) VALUES (?, ?)")
+        .bind(&zugang)
+        .bind(einsatz)
+        .execute(&i.pool)
+        .await
+        .unwrap();
+    kopplung
+}
+
+/// Spec `einsatz-abschluss`, „Kopplung bleibt beendet am Spiegel“: Kopplungen und Freigaben, die
+/// am Spiegel stehen (etwa nach einer Führungsübergabe), enden, sobald der Abschluss über die
+/// Übernahme ankommt, und leben nicht wieder auf, wenn der Führer binnen 24 Stunden wieder
+/// öffnet. Auch eine, die den Abschluss am Spiegel überstanden hat (älterer Stand), endet mit
+/// dem Rückweg nach `aktiv`.
+#[tokio::test]
+async fn am_spiegel_bleiben_kopplung_und_freigabe_nach_dem_wiederoeffnen_beendet() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let e = common::einsatz_anlegen_mit(&hub.app, &hub.admin, "Alarm Hub").await;
+    etb_eintrag(&hub, e, "Alarm eingegangen").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&elw).await;
+    let erste = kopplung_und_freigabe_am_spiegel(&elw, s, 1).await;
+    let gilt = |kopplung: i64| {
+        let pool = elw.pool.clone();
+        async move {
+            lifeline_hub::geraet::repo::kontext_wenn_gueltig(&pool, kopplung)
+                .await
+                .unwrap()
+                .is_some()
+        }
+    };
+    let freigaben = || {
+        let pool = elw.pool.clone();
+        async move {
+            eine::<i64>(
+                &pool,
+                &format!("SELECT COUNT(*) FROM maschinenzugang_freigabe WHERE einsatz_id = {s}"),
+            )
+            .await
+        }
+    };
+    let widerrufen = |kopplung: i64| {
+        let pool = elw.pool.clone();
+        async move {
+            eine::<Option<String>>(
+                &pool,
+                &format!("SELECT widerrufen_at FROM geraet_kopplung WHERE id = {kopplung}"),
+            )
+            .await
+            .is_some()
+        }
+    };
+    assert!(gilt(erste).await, "vor dem Abschluss gilt die Kopplung");
+    assert_eq!(freigaben().await, 1);
+
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{v}");
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    assert!(
+        widerrufen(erste).await,
+        "der Abschluss beendet die Kopplung am Spiegel"
+    );
+    assert_eq!(
+        freigaben().await,
+        0,
+        "der Abschluss beendet die Freigabe am Spiegel"
+    );
+
+    // Ein Rest aus einem älteren Stand: am abgeschlossenen Spiegel noch offen.
+    let zweite = kopplung_und_freigabe_am_spiegel(&elw, s, 2).await;
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/wiedereroeffnen"),
+        &hub.admin,
+        Some(&json!({ "grund": "Versehen" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    for _ in 0..2 {
+        abgleichen(&elw).await;
+    }
+    let status: String = eine(
+        &elw.pool,
+        &format!("SELECT status FROM einsatz WHERE id = {s}"),
+    )
+    .await;
+    assert_eq!(status, "aktiv", "Rückweg kommt an");
+    for k in [erste, zweite] {
+        assert!(!gilt(k).await, "Kopplung {k} lebt nicht wieder auf");
+        assert!(widerrufen(k).await, "Kopplung {k} ist widerrufen");
+    }
+    assert_eq!(freigaben().await, 0, "keine Freigabe lebt wieder auf");
+}

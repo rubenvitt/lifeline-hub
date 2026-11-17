@@ -1,4 +1,4 @@
-# Dashboard-Baukasten (Verteilung und Matrix)
+# Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)
 
 **Dashboard-Baukasten** (Vorbild Lagebild): jede Fläche, die eine Lage in Zahlen
 zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
@@ -9,15 +9,22 @@ die **Alarmzeile „Was brennt“** (`AlarmZeile`): Einträge,
 Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
 am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
 Quellen, Sprungziele aus `lage/alarmZiel.ts`. Sie zeigt Zustände, die Alarmzone Ereignisse; keine
-Seite baut eine zweite Sammlung. Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band
-„Lage in Zahlen“ des Lagebilds, der Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
+Seite baut eine zweite Sammlung. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**: eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
+Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
+ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über dem
+Band steht, warten sie, Band und Paneelreihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
+Alarmzeile nicht. Später hängt eine erstmals ladende Quelle nichts aus, und ein gescheiterter
+Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
+Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds, der
+Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
 Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
 `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
 (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
 Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband
 „Stand“ des Lagebilds (Lagebericht, UHS aktiv) als `Kennzahlenband` mit `groesse="klein"`. Jedes Paneel geht durch
-`DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, `PaneelZustand`; `gesperrt` nennt
-den Grund, ohne Sprung und Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
+`DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, Kopf-Aktion ohne „↗“ für eine
+Handlung am Paneel selbst, `PaneelZustand`; `gesperrt` nennt den Grund, ohne Sprung und
+Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
 Anteilsbalken je Kategorie: Sichtung, FMS-Status), `MatrixPaneel` (Stufenmatrix: Gefahren),
 `StromPaneel` (Zeitachseneinträge mit Sammelbanner), `ListenPaneel` (kurze Liste mit
 „n weitere ↗“) oder `GliederungsPaneel` (Teile mit Lagekante, Kopf, Zahlspalte). Mehrere kurze

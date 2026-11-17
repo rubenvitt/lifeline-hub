@@ -17,6 +17,7 @@ import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import { GLIEDERUNG_KLASSE } from '../../components/instrument';
 import UeberblickPage from './UeberblickPage';
 import { einsatzKeys } from '../../api/queryKeys';
+import { saveStartlisteAusgeblendet } from './startlisteSpeicher';
 
 dayjs.extend(utc);
 
@@ -265,6 +266,8 @@ type Daten = Omit<typeof volleDaten, 'zaehler' | 'nachforderungen'> & {
   nachforderungen?: object[];
   /** Offene Meldungen (`?phase=offen`) für „Offene Vorgänge“ (LLH-1145). */
   meldungen?: object[];
+  /** ETB-Einträge vom Typ „Lage“ für die Startliste (LLH-1815); ohne Angabe keine. */
+  lage?: object[];
 };
 const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
 
@@ -324,10 +327,14 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/einheiten/zeitachse', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
-      // Die Seite fragt NUR Entscheidungen ab — ein Abruf ohne Filter wäre ein Fehler.
-      return url.searchParams.get('typ') === 'entscheidung'
-        ? HttpResponse.json(d.etb)
-        : HttpResponse.json({ error: 'ohne Typfilter' }, { status: 400 });
+      // Die Seite fragt NUR Entscheidungen und (Startliste, LLH-1815) die jüngste Lage ab — ein
+      // Abruf ohne Filter wäre ein Fehler.
+      const typ = url.searchParams.get('typ');
+      if (typ === 'entscheidung') return HttpResponse.json(d.etb);
+      if (typ === 'lage' && url.searchParams.get('limit') === '1') {
+        return HttpResponse.json(d.lage ?? []);
+      }
+      return HttpResponse.json({ error: 'ohne Typfilter' }, { status: 400 });
     }),
   );
 }
@@ -1471,11 +1478,13 @@ describe('UeberblickPage', () => {
     etb: [],
   } as unknown as Daten;
 
-  it('mit Schreibrecht: Leer-Aktion „Abschnitt anlegen", kein Rechtehinweis', async () => {
+  it('mit Schreibrecht: Leer-Aktion „Abschnitt anlegen" öffnet die Erfassung (LLH-1815)', async () => {
     stelleBereit(leereDaten);
     rendern();
     await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
-    expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/einsatzabschnitte');
+    expect(screen.getByTestId('ort')).toHaveTextContent(
+      /^\/einsaetze\/1\/einsatzabschnitte\?neu=1$/,
+    );
   });
 
   it('mit Schreibrecht: „Eintrag" bedienbar, kein Rechtehinweis', async () => {
@@ -1626,6 +1635,16 @@ describe('UeberblickPage', () => {
    * nichts auf. Die Seiten-CLS misst `e2e/ueberblick-vorgaenge-cls.spec.ts`.
    */
   describe('Paneelreihen warten auf die Quellen der Gliederung (LLH-1481)', () => {
+    // Ohne Startliste (LLH-1815): steht sie über dem Band, wartet der ganze Körper auf Abschnitte,
+    // Einheiten und Personal (Fall „langsame Lage-Abfrage“ unten). Hier geht es nur um die Reihen.
+    beforeEach(() => {
+      localStorage.clear();
+      saveStartlisteAusgeblendet(1);
+      // Angemeldet, sonst räumt der Start nach der 401 den Gerätespeicher samt Ausblenden (LFH-767).
+      server.use(meHandler(benutzerFixture({ id: 9 })));
+    });
+    afterEach(() => localStorage.clear());
+
     for (const quelle of ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material']) {
       it(`${quelle} lädt: Band steht, keine Paneelreihe; mit der Antwort die Zeilen`, async () => {
         let loslassen!: () => void;
@@ -2298,5 +2317,408 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
     await waitFor(() =>
       expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/lagebesprechung'),
     );
+  });
+});
+
+/**
+ * Startliste „Einsatz starten“ (LLH-1815, Spec `ueberblick-startliste`): fünf Punkte unter der
+ * Alarmzeile, nur mit Schreibrecht am aktiven Einsatz, weg, sobald nichts mehr offen ist, und je
+ * Browser ausblendbar.
+ */
+describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
+  const leer = {
+    personen: [],
+    personal: [],
+    fahrzeuge: [],
+    material: [],
+    einheiten: [],
+    abschnitte: [],
+    gefahren: [],
+    auftraege: [],
+    erinnerungen: [],
+    etb: [],
+  } as unknown as Daten;
+
+  /** Ein Einsatz, an dem alle fünf Punkte erledigt sind (volle Daten tragen Abschnitt und Kräfte). */
+  const fertigerKopf = {
+    ...einsatz,
+    einsatzort: 'Deich West',
+    einsatzort_lat: 52.1,
+    einsatzort_lon: 9.3,
+    einsatzleiter: {
+      art: 'personal',
+      name: 'Anna Schulz',
+      personal_id: 3,
+      personal_noch_disponiert: true,
+      seit: vor(60),
+    },
+  };
+  const eineLage = [{ id: 77, typ: 'lage' }];
+
+  /** Zählt die Abrufe der jüngsten Lagefeststellung mit, ohne die Antwort zu ändern. */
+  function lageAbrufe() {
+    const zaehler = { n: 0 };
+    server.use(
+      http.get('/api/einsaetze/1/etb', ({ request }) => {
+        if (new URL(request.url).searchParams.get('typ') === 'lage') zaehler.n += 1;
+      }),
+    );
+    return zaehler;
+  }
+
+  const startliste = () => screen.queryByRole('region', { name: 'Einsatz starten' });
+  const punkt = (schluessel: string) =>
+    document.querySelector<HTMLElement>(
+      `[data-lfh="startliste-punkt"][data-schluessel="${schluessel}"]`,
+    )!;
+
+  beforeEach(() => {
+    localStorage.clear();
+    // Angemeldet: ohne Person räumt der Start nach der 401 den Gerätespeicher (LFH-767), samt dem
+    // Ausblenden der Startliste, mitten im Test.
+    server.use(meHandler(benutzerFixture({ id: 9 })));
+  });
+
+  it('leerer Einsatz: fünf offene Punkte unter der Alarmzeile, vor dem Führungsstand, ohne Zahl', async () => {
+    stelleBereit(leer);
+    rendern();
+    const p = await screen.findByRole('region', { name: 'Einsatz starten' });
+    const punkte = [...p.querySelectorAll<HTMLElement>('[data-lfh="startliste-punkt"]')];
+    expect(punkte.map((x) => [x.dataset.schluessel, x.dataset.zustand])).toEqual([
+      ['einsatzort', 'offen'],
+      ['einsatzleiter', 'offen'],
+      ['einsatzabschnitte', 'offen'],
+      ['kraefte', 'offen'],
+      ['lage', 'offen'],
+    ]);
+    // Reihenfolge: Alarmzeile → Startliste → Führungsstand → Paneelreihen.
+    const alarm = screen.getByRole('status', { name: 'Was brennt' });
+    const folgt = (a: Node, b: Node) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(folgt(alarm, p)).toBe(true);
+    expect(folgt(p, band())).toBe(true);
+    expect(p.closest('[data-lfh="ueberblick-startliste"]')).not.toBeNull();
+    // Haken statt Kennzahl (Spec `lage-verdichtung`).
+    expect(p.textContent).not.toMatch(/\d/);
+  });
+
+  it('jeder offene Punkt springt in seine Erfassung', async () => {
+    stelleBereit(leer);
+    rendern();
+    const p = await screen.findByRole('region', { name: 'Einsatz starten' });
+    const ziele = within(p)
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href'));
+    expect(ziele).toEqual([
+      '/einsaetze/1/einsatzdaten?paneel=einsatzort',
+      '/einsaetze/1/einsatzdaten?paneel=fuehrungsstelle',
+      '/einsaetze/1/einsatzabschnitte?neu=1',
+      '/einsaetze/1/einheiten',
+      '/einsaetze/1/etb?neu=1',
+    ]);
+    await userEvent.click(within(p).getByRole('link', { name: /Einsatzleiter/ }));
+    expect(screen.getByTestId('ort')).toHaveTextContent(
+      '/einsaetze/1/einsatzdaten?paneel=fuehrungsstelle',
+    );
+  });
+
+  it('erledigte Punkte tragen Haken und Wert, ohne Sprung; der Ort ohne Koordinate „nicht verortet“', async () => {
+    stelleBereit({ ...volleDaten }, [
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...fertigerKopf, einsatzort_lat: null, einsatzort_lon: null }),
+      ),
+    ]);
+    rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(punkt('einsatzort')).toHaveAttribute('data-zustand', 'erledigt');
+    expect(punkt('einsatzort')).toHaveTextContent('Deich West');
+    expect(punkt('einsatzort')).toHaveTextContent('nicht verortet');
+    expect(punkt('einsatzleiter')).toHaveTextContent('Anna Schulz');
+    expect(punkt('kraefte')).toHaveAttribute('data-zustand', 'erledigt');
+    for (const s of ['einsatzort', 'einsatzleiter', 'einsatzabschnitte', 'kraefte']) {
+      expect(within(punkt(s)).queryByRole('link'), s).toBeNull();
+      expect(punkt(s).tagName).not.toBe('A');
+    }
+    // Nur die Lage fehlt noch.
+    expect(punkt('lage')).toHaveAttribute('data-zustand', 'offen');
+    expect(punkt('lage').closest('a')).toHaveAttribute('href', '/einsaetze/1/etb?neu=1');
+  });
+
+  it('Startliste ohne Zahl: zwei Einheiten, offener Einsatzort → Kräfte mit Haken, keine Zahl', async () => {
+    stelleBereit({
+      ...leer,
+      einheiten: [volleDaten.einheiten[0], { ...volleDaten.einheiten[0], id: 11, name: 'Zug 2' }],
+    } as unknown as Daten);
+    rendern();
+    const p = await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(punkt('kraefte')).toHaveAttribute('data-zustand', 'erledigt');
+    expect(punkt('einsatzort')).toHaveAttribute('data-zustand', 'offen');
+    expect(p.textContent).not.toMatch(/\d/);
+  });
+
+  it('alles erledigt: kein Paneel und keine Reihe', async () => {
+    stelleBereit({ ...volleDaten, lage: eineLage }, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+    ]);
+    rendern();
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(startliste()).toBeNull();
+    expect(document.querySelector('[data-lfh="ueberblick-startliste"]')).toBeNull();
+  });
+
+  it('Übung: dieselben fünf Punkte', async () => {
+    stelleBereit(leer, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+    ]);
+    rendern();
+    const p = await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(p.querySelectorAll('[data-lfh="startliste-punkt"]')).toHaveLength(5);
+  });
+
+  for (const [fall, kopf] of [
+    ['Beobachter', { ...einsatz, meine_rolle: 'beobachter' }],
+    ['abgeschlossener Einsatz', { ...einsatz, status: 'abgeschlossen' }],
+    [
+      'Spiegel',
+      {
+        ...einsatz,
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      },
+    ],
+  ] as const) {
+    it(`${fall}: kein Paneel und keine Abfrage der Lagefeststellung`, async () => {
+      stelleBereit(leer, [http.get('/api/einsaetze/1', () => HttpResponse.json(kopf))]);
+      const abrufe = lageAbrufe();
+      rendern();
+      await waitFor(() => paneel('Einsatzabschnitte'));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
+      expect(startliste()).toBeNull();
+      expect(abrufe.n).toBe(0);
+    });
+  }
+
+  it('ETB gesperrt: der Punkt steht „—“ mit Grund, ohne Sprung und ohne Abfrage', async () => {
+    stelleBereit(leer, [
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
+      ),
+    ]);
+    const abrufe = lageAbrufe();
+    rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(punkt('lage')).toHaveAttribute('data-zustand', 'gesperrt');
+    expect(punkt('lage')).toHaveTextContent('—');
+    expect(punkt('lage')).toHaveTextContent('nicht freigegeben');
+    expect(punkt('lage').closest('a')).toBeNull();
+    expect(abrufe.n).toBe(0);
+  });
+
+  it('ETB gesperrt, alles andere erledigt: kein Paneel', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
+      ),
+    ]);
+    rendern();
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(startliste()).toBeNull();
+  });
+
+  it('Quelle ausgefallen: Einsatzabschnitte „nicht geladen“, das Paneel bleibt', async () => {
+    stelleBereit({ ...volleDaten, lage: eineLage }, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/einsaetze/1/abschnitte', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(punkt('einsatzabschnitte')).toHaveAttribute('data-zustand', 'unbekannt');
+    expect(punkt('einsatzabschnitte')).toHaveTextContent('nicht geladen');
+    expect(punkt('einsatzabschnitte').closest('a')).toBeNull();
+  });
+
+  /*
+   * Review LLH-1815 (Befunde 6, 10): ein gescheiterter Neuabruf behält in TanStack v5 seine Daten.
+   * Die zuletzt geladenen gelten weiter; „unbekannt“ heißt nur: nie geladen. Sonst holte ein 502
+   * die schon verschwundene Reihe zurück, und Band und Paneelreihen rutschten nach unten.
+   */
+  it('alles erledigt, dann scheitert ein Neuabruf: die Startliste bleibt weg', async () => {
+    // Kräfte nur über eine Einheit: fällt die Einheitenliste aus, trägt das Personal nichts.
+    stelleBereit({ ...volleDaten, personal: [], lage: eineLage }, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+    ]);
+    const { client } = rendern();
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(startliste()).toBeNull();
+    const kaputt = () => HttpResponse.json({ error: 'kaputt' }, { status: 502 });
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', kaputt),
+      http.get('/api/einsaetze/1/einheiten', kaputt),
+      http.get('/api/einsaetze/1/etb', ({ request }) =>
+        new URL(request.url).searchParams.get('typ') === 'lage' ? kaputt() : undefined,
+      ),
+    );
+    await act(() => client.refetchQueries());
+    expect(client.getQueryState(einsatzKeys.etbListe(1, { typ: 'lage', limit: 1 }))?.status).toBe(
+      'error',
+    );
+    expect(client.getQueryState(einsatzKeys.einheiten(1))?.status).toBe('error');
+    expect(startliste()).toBeNull();
+    expect(document.querySelector('[data-lfh="ueberblick-startliste"]')).toBeNull();
+  });
+
+  // Review LLH-1815 (Befund 7): ein Punkt „nicht geladen“ hat einen sichtbaren Weg zum Neuladen.
+  it('Quelle ausgefallen: „Erneut abrufen“ am Punkt lädt die Quelle neu', async () => {
+    stelleBereit({ ...volleDaten, lage: eineLage }, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/einsaetze/1/abschnitte', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    const knopf = within(punkt('einsatzabschnitte')).getByRole('button', {
+      name: 'Erneut abrufen: Einsatzabschnitte',
+    });
+    for (const s of ['einsatzort', 'einsatzleiter', 'kraefte', 'lage']) {
+      expect(within(punkt(s)).queryByRole('button'), s).toBeNull();
+    }
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(volleDaten.abschnitte)),
+    );
+    await userEvent.click(knopf);
+    // Der letzte unbekannte Punkt ist erledigt: die Reihe fällt nach der Handlung weg.
+    await waitFor(() => expect(startliste()).toBeNull());
+  });
+
+  /*
+   * Review LLH-1815 (Befund 8): die gemeinsame Ladeschranke gilt nur beim ersten Aufbau. Bekommt
+   * eine lesende Person live Schreibrecht, lädt die Lagefeststellung zum ersten Mal; Band und
+   * Paneelreihen bleiben dabei eingehängt, und die Startliste erscheint erst mit ihren Quellen.
+   */
+  it('Schreibrecht kommt live dazu: Band und Paneelreihen bleiben stehen, solange die Lage lädt', async () => {
+    let loslassen!: () => void;
+    const tor = new Promise<void>((f) => (loslassen = f));
+    const lage = { n: 0 };
+    stelleBereit(leer, [
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    const { client } = rendern();
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    const bandVorher = band();
+    const reihenVorher = document.querySelector('[data-lfh="ueberblick-paneele"]')!;
+    expect(reihenVorher).not.toBeNull();
+    expect(startliste()).toBeNull();
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/etb', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('typ') !== 'lage') return;
+        lage.n += 1;
+        await tor;
+        return HttpResponse.json([]);
+      }),
+    );
+    await act(() => client.refetchQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(lage.n).toBe(1));
+    expect(bandVorher.isConnected).toBe(true);
+    expect(reihenVorher.isConnected).toBe(true);
+    // Kein „nicht geladen“ dazwischen: die Liste steht erst mit ihren Quellen.
+    expect(startliste()).toBeNull();
+
+    loslassen();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(bandVorher.isConnected).toBe(true);
+    expect(reihenVorher.isConnected).toBe(true);
+  });
+
+  it('fragt die jüngste Lagefeststellung genau einmal ab: Typ „Lage“, ein Eintrag', async () => {
+    const urls: string[] = [];
+    stelleBereit(leer);
+    server.use(
+      http.get('/api/einsaetze/1/etb', ({ request }) => {
+        urls.push(new URL(request.url).search);
+      }),
+    );
+    rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(urls.filter((u) => u.includes('typ=lage'))).toEqual(['?typ=lage&limit=1']);
+  });
+
+  /*
+   * Ladeschranke (Spec „Kein Layoutsprung durch die Startliste“): die Reihe steht über dem
+   * Führungsstand, also warten Band, Startliste und Paneelreihen gemeinsam auf ihre Quellen. Die
+   * Alarmzeile darüber hat eine feste Höhe und steht sofort.
+   */
+  it('langsame Lage-Abfrage: Startliste und Paneelreihen erscheinen zusammen', async () => {
+    let loslassen!: () => void;
+    const tor = new Promise<void>((f) => (loslassen = f));
+    stelleBereit(leer, [
+      http.get('/api/einsaetze/1/etb', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('typ') !== 'lage') return;
+        await tor;
+        return HttpResponse.json([]);
+      }),
+    ]);
+    rendern();
+    await screen.findByText('Hochwasser Weserlauf');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getByRole('status', { name: 'Was brennt' })).toBeInTheDocument();
+    expect(startliste()).toBeNull();
+    expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Führungsstand' })).toBeNull();
+    loslassen();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).not.toBeNull();
+    expect(band()).toBeInTheDocument();
+  });
+
+  it('ausgeblendet ist die Liste weg und bleibt es nach dem Neuladen; die Lage wird nicht mehr gefragt', async () => {
+    stelleBereit(leer);
+    const erste = rendern();
+    const p = await screen.findByRole('region', { name: 'Einsatz starten' });
+    await userEvent.click(within(p).getByRole('button', { name: 'Ausblenden' }));
+    expect(startliste()).toBeNull();
+    expect(document.querySelector('[data-lfh="ueberblick-startliste"]')).toBeNull();
+    expect(localStorage.getItem('startliste-ausgeblendet:1')).toBe('1');
+    erste.unmount();
+
+    const abrufe = lageAbrufe();
+    rendern();
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(startliste()).toBeNull();
+    expect(abrufe.n).toBe(0);
+  });
+
+  it('Speicher wirft: ausgeblendet bis zum Neuladen, danach steht die Liste wieder', async () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('voll', 'QuotaExceededError');
+    });
+    try {
+      stelleBereit(leer);
+      const erste = rendern();
+      const p = await screen.findByRole('region', { name: 'Einsatz starten' });
+      await userEvent.click(within(p).getByRole('button', { name: 'Ausblenden' }));
+      expect(startliste()).toBeNull();
+      erste.unmount();
+      rendern();
+      expect(await screen.findByRole('region', { name: 'Einsatz starten' })).toBeInTheDocument();
+    } finally {
+      setItem.mockRestore();
+    }
   });
 });

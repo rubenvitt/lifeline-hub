@@ -318,6 +318,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/abschliessen",
             post(routes::einsatz::abschliessen),
         )
+        // LLH-1814: binnen 24 Stunden wieder öffnen (Einsatzleitung oder Admin der Einsatz-Org).
+        .route(
+            "/api/einsaetze/{id}/wiedereroeffnen",
+            post(routes::einsatz::wiedereroeffnen),
+        )
+        // LLH-1814: offene Punkte vor dem Abschluss (nur Einsatzleitung, aktiv).
+        .route(
+            "/api/einsaetze/{id}/abschluss/pruefung",
+            get(routes::einsatz::abschluss_pruefung),
+        )
         .route(
             "/api/einsaetze/{id}/fuehrungsstelle",
             get(routes::einsatz_fuehrungsstelle::lesen)

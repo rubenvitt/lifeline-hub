@@ -1,22 +1,30 @@
 import { expect, test, type Page } from '@playwright/test';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 import { anmelden, einsatzAnlegen } from './fuehrungsorganisation-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 /**
- * Einsatzabschluss auf den Einsatzdaten (LFH-960): Unumkehrbares für den ganzen Einsatz steht nicht
- * im Kopf einer Arbeitsseite. Hier steht, was jsdom nicht belegt: auf Handy, Tablet hoch und quer
- * und Desktop trägt das Einsatztagebuch weder im Kopf noch im Menü „Weitere“ einen Abschluss, und
- * auf den Einsatzdaten steht „Einsatz abschließen“ als bedienbarer Knopf außerhalb des Seitenkopfs,
- * ohne waagerechten Überhang. Am Ende einmal der echte Abschluss über die benannte Rückfrage.
+ * Einsatzabschluss auf den Einsatzdaten (LFH-960, LLH-1814): Unumkehrbares für den ganzen Einsatz
+ * steht nicht im Kopf einer Arbeitsseite. Hier steht, was jsdom nicht belegt: auf Handy, Tablet
+ * hoch und quer und Desktop trägt das Einsatztagebuch weder im Kopf noch im Menü „Weitere“ einen
+ * Abschluss, auf den Einsatzdaten steht „Einsatz abschließen…“ als bedienbarer Knopf außerhalb des
+ * Seitenkopfs, und der Dialog passt mit seinem roten Knopf ohne waagerechten Überhang in jede
+ * Breite. Am Ende einmal der ganze Ablauf über Seiten (Spec `einsatz-abschluss`): Dialog mit einem
+ * offenen Auftrag, Eintippen, Abschluss, Wiederöffnen mit Grund, und das ETB zeigt beide Einträge.
+ * Die Logik des Dialogs (Vergleich, Gruppen, Fehler) prüft Vitest
+ * (`pages/einsatzdaten/EinsatzAbschlussDialog.test.tsx`).
  *
  * Gemessen als Admin UND als Führungspersonal (`frontend/e2e/AGENTS.md`, Layout-Gate
  * nicht-privilegiert): Führungspersonal schreibt im Einsatz, leitet ihn aber nicht.
  *
- * Mutationsproben (beide gefahren):
- *   • in `pages/EinsatzdatenPage.tsx` `darfAbschliessen` auf `darfImEinsatzSchreiben` → nur der
- *     Führungspersonal-Test wird rot (Abschnitt ohne Leitungsrecht);
+ * Mutationsproben (die erste und die dritte für LLH-1814 gefahren, die zweite seit LFH-960):
+ *   • in `pages/einsatzdaten/EinsatzAbschlussPaneel.tsx` `darfEinsatzLeiten` auf
+ *     `darfImEinsatzSchreiben` → nur der Führungspersonal-Test wird rot (Abschnitt ohne
+ *     Leitungsrecht);
  *   • in `pages/EtbPage.tsx` den Menüeintrag „Einsatz abschließen“ zurück in „Weitere“ → beide
- *     Tests werden bei 390 px rot (Menü „Weitere“).
+ *     Tests werden bei 390 px rot (Menü „Weitere“);
+ *   • in `pages/einsatzdaten/EinsatzAbschlussDialog.tsx` `gesperrt` auf `false` → der Admin-Test
+ *     wird rot (roter Knopf vor dem Eintippen aktiv).
  */
 
 const BREITEN = [
@@ -58,12 +66,21 @@ async function etbOhneAbschluss(page: Page, einsatzId: string, breite: number, w
   }
 }
 
-test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs (Admin)', async ({
+test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs, Dialog, Wiederöffnen (Admin)', async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Einsatzabschluss ${Date.now()}`);
+  const name = `E2E Einsatzabschluss ${Date.now()}`;
+  const einsatzId = await einsatzAnlegen(page, name);
+  // Ein offener Punkt: ein Auftrag ohne Bearbeitung.
+  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+    data: {
+      auftrag_text: 'Sandsäcke zum Deich bringen',
+      empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Logistiktrupp' }],
+    },
+  });
+  expect(auftrag.ok(), `POST …/auftraege: ${auftrag.status()}`).toBe(true);
 
   for (const breite of BREITEN) {
     await page.setViewportSize(breite);
@@ -73,9 +90,8 @@ test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs 
     await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
     const main = page.locator('main');
     await expect(main.getByRole('heading', { name: 'Einsatzabschluss' }), wo).toBeVisible();
-    const knopf = main.getByRole('button', { name: 'Einsatz abschließen', exact: true });
+    const knopf = main.getByRole('button', { name: 'Einsatz abschließen…', exact: true });
     await expect(knopf, `${wo}: als Wort`).toBeVisible();
-    await knopf.click({ trial: true, timeout: 5_000 });
     await expect(
       main.locator('[data-lfh="seitenkopf-aktionen"]').getByText('Einsatz abschließen'),
       `${wo}: nicht im Seitenkopf`,
@@ -85,17 +101,66 @@ test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs 
     expect(k!.x, `${wo}: links im Bild`).toBeGreaterThanOrEqual(0);
     expect(k!.x + k!.width, `${wo}: rechts im Bild`).toBeLessThanOrEqual(breite.width + 1);
     expect(await ueberhang(page), `${wo}: ohne Überhang`).toBeLessThanOrEqual(1);
+
+    // Der Dialog passt in die Breite; sein roter Knopf ist vor dem Eintippen gesperrt.
+    await knopf.click();
+    const dialog = page.getByRole('dialog', { name: 'Einsatz abschließen' });
+    await expect(dialog.getByRole('region', { name: 'Aufträge' }), wo).toBeVisible();
+    const ok = dialog.getByRole('button', { name: 'Einsatz abschließen', exact: true });
+    await expect(ok, `${wo}: gesperrt vor dem Eintippen`).toBeDisabled();
+    const o = await ok.boundingBox();
+    expect(o, `${wo}: roter Knopf messbar`).not.toBeNull();
+    expect(o!.x, `${wo}: roter Knopf links im Bild`).toBeGreaterThanOrEqual(0);
+    expect(o!.x + o!.width, `${wo}: roter Knopf rechts im Bild`).toBeLessThanOrEqual(
+      breite.width + 1,
+    );
+    expect(await ueberhang(page), `${wo}: Dialog ohne Überhang`).toBeLessThanOrEqual(1);
+    await dialog.getByRole('button', { name: 'Abbrechen' }).click();
+    await expect(dialog).toHaveCount(0);
   }
 
-  // Der Abschluss selbst: erst die benannte Rückfrage schließt ab.
+  // Der Abschluss selbst: Dialog mit dem offenen Auftrag, erst nach dem Eintippen aktiv.
   const main = page.locator('main');
-  await main.getByRole('button', { name: 'Einsatz abschließen', exact: true }).click();
-  const ok = page.getByRole('button', { name: 'Einsatz endgültig abschließen', exact: true });
-  await expect(ok).toBeVisible();
+  await main.getByRole('button', { name: 'Einsatz abschließen…', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Einsatz abschließen' });
+  const auftraege = dialog.getByRole('region', { name: 'Aufträge' });
+  await expect(auftraege.getByText('Sandsäcke zum Deich bringen')).toBeVisible();
+  const ok = dialog.getByRole('button', { name: 'Einsatz abschließen', exact: true });
+  const bestaetigung = dialog.getByRole('textbox', { name: /Zur Bestätigung/ });
+  await bestaetigung.fill('Hochwasser woanders');
+  await expect(ok).toBeDisabled();
+  // Ohne interne Nummer die Bezeichnung, in Kleinbuchstaben und mit Leerraum am Rand.
+  await bestaetigung.fill(`  ${name.toLowerCase()} `);
+  await expect(ok).toBeEnabled();
   await ok.click();
-  await expect(main.getByRole('heading', { name: 'Einsatzabschluss' })).toHaveCount(0);
-  const einsatz = await page.request.get(`/api/einsaetze/${einsatzId}`);
+  await expect(dialog).toHaveCount(0);
+  const paneel = main.getByRole('region', { name: 'Einsatzabschluss' });
+  await expect(paneel.getByText(/^Abgeschlossen am /)).toBeVisible();
+  let einsatz = await page.request.get(`/api/einsaetze/${einsatzId}`);
   expect(((await einsatz.json()) as { status: string }).status).toBe('abgeschlossen');
+
+  // Wiederöffnen binnen 24 Stunden, mit Grund.
+  await paneel.getByRole('button', { name: 'Einsatz wieder öffnen…' }).click();
+  const wieder = page.getByRole('dialog', { name: 'Einsatz wieder öffnen' });
+  await wieder.getByRole('textbox', { name: 'Grund' }).fill('Falscher Einsatz abgeschlossen');
+  await wieder.getByRole('button', { name: 'Einsatz wieder öffnen', exact: true }).click();
+  await expect(wieder).toHaveCount(0);
+  await expect(
+    main.getByRole('button', { name: 'Einsatz abschließen…', exact: true }),
+  ).toBeVisible();
+  einsatz = await page.request.get(`/api/einsaetze/${einsatzId}`);
+  expect(((await einsatz.json()) as { status: string }).status).toBe('aktiv');
+
+  // Beide Schritte stehen im ETB.
+  await page.goto(etbMitSystem(einsatzId));
+  await systemBuendelAufklappen(page);
+  const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+  await expect(zeitachse.getByText('Einsatz abgeschlossen', { exact: true })).toBeVisible();
+  await expect(
+    zeitachse.getByText(
+      /^Einsatz wieder geöffnet \(abgeschlossen am .+\): Falscher Einsatz abgeschlossen$/,
+    ),
+  ).toBeVisible();
 });
 
 test('Einsatzabschluss: fehlt für Führungspersonal auf allen Breiten', async ({ page }) => {

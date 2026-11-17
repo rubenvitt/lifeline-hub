@@ -6215,6 +6215,60 @@ async fn kopplung_an_verpflegungsstelle_meldet_sich_live() {
     assert_eq!(verpflegung_ereignisse(&mut rx, einsatz), 0, "ohne Stelle");
 }
 
+/// LLH-1814: Das Wiederöffnen widerruft jede noch offene Kopplung (Spec `einsatz-abschluss`,
+/// „Kopplung bleibt beendet“). Trug eine davon eine Verpflegungsstelle, meldet es `verpflegung`
+/// wie jeder andere Widerruf (LLH-1316), sonst zeigte die Stellenliste weiter „Gerät gekoppelt“.
+/// Ohne Kopplung an einer Stelle meldet es keins.
+#[tokio::test]
+async fn wiederoeffnen_mit_kopplung_an_verpflegungsstelle_meldet_sich_live() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let wieder_oeffnen = |einsatz: i64| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            for (pfad, body) in [
+                ("abschliessen", None),
+                ("wiedereroeffnen", Some(json!({ "grund": "Versehen" }))),
+            ] {
+                let (s, v) = anfrage_json(
+                    &app,
+                    "POST",
+                    &format!("/api/einsaetze/{einsatz}/{pfad}"),
+                    &admin,
+                    body.as_ref(),
+                )
+                .await;
+                assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
+            }
+        }
+    };
+
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "geplant").await;
+    verpflegungsgeraet_an(&app, &admin, einsatz, kueche).await;
+    let mut rx = live.abonniere(einsatz);
+    wieder_oeffnen(einsatz).await;
+    assert_eq!(
+        verpflegung_ereignisse(&mut rx, einsatz),
+        1,
+        "Stelle gekoppelt"
+    );
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, false);
+
+    let ohne = einsatz_anlegen(&app, &admin).await;
+    kopplung(
+        &app,
+        &admin,
+        ohne,
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"}),
+    )
+    .await;
+    let mut rx = live.abonniere(ohne);
+    wieder_oeffnen(ohne).await;
+    assert_eq!(verpflegung_ereignisse(&mut rx, ohne), 0, "ohne Stelle");
+}
+
 /// LLH-1316: Läuft eine Kopplung an einer Verpflegungsstelle ab, meldet der Takt des Planers
 /// genau einmal `verpflegung` (Fenster `(letzter Takt, jetzt]`), auch wenn ein Takt dazwischen
 /// an der Abfrage scheitert. Abgelaufene Kopplungen ohne Stelle oder schon widerrufene melden

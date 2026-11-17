@@ -114,7 +114,8 @@ entfernt ihn als Mitglied.
   darin aber nichts.
 - Ein **System-Admin** liest jeden Einsatz, auch den einer anderen Organisation. Ändern darf er
   ohne Rolle nur an Einsätzen der eigenen Organisation, und dort nur die Verwaltungsangaben:
-  Kopfdaten, Einstellungen, Führungsstelle, Aufbewahrungsfrist und Module. In den Modulen selbst
+  Kopfdaten, Einstellungen, Führungsstelle, Aufbewahrungsfrist und Module. Einen abgeschlossenen
+  Einsatz der eigenen Organisation öffnet er binnen 24 Stunden auch ohne Rolle wieder. In den Modulen selbst
   (Einsatztagebuch, Kräfte, Lagekarte …) schreibt er erst mit einer Rolle.
 - An einem Einsatz einer anderen Organisation schreibt ein System-Admin nur mit einer Rolle in
   diesem Einsatz.
@@ -124,6 +125,9 @@ Wo ein Recht fehlt, steht die Seite auf „Nur Ansicht“ und nennt, wer schreib
 ### Abgeschlossener Einsatz
 
 Ein abgeschlossener Einsatz ist schreibgeschützt, auch für Einsatzleitung und System-Admin; nur
-die Aufbewahrungsfrist lässt sich noch ändern. Mitglieder lesen ihn noch 24 Stunden nach dem
+Aufbewahrungsfrist und Nachbereitung lassen sich noch ändern. Binnen 24 Stunden nach dem
+Abschluss können die Einsatzleitung und System-Admins der Organisation des Einsatzes ihn mit
+Grund wieder öffnen; danach ist er wieder aktiv und beschreibbar (siehe
+[Einsatz abschließen und Einsatzbericht](einsatzabschluss.md)). Mitglieder lesen ihn noch 24 Stunden nach dem
 Abschluss, danach nur noch die Einsatzleitung, Führungskräfte der Organisation und System-Admins.
 Nach Ablauf der Aufbewahrungsfrist liest ihn niemand mehr.
