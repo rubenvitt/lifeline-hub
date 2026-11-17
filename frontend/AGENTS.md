@@ -876,9 +876,12 @@ anwendbar), „nicht geprüft" ist keins.
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
   Rückweg. Die übrigen Teile der Zeile bleiben unsichtbar an ihrem Platz, damit eine umgebrochene
   Zeile ihre Höhe hält. Eine Person, die im Einheit-Detail über ihr ⋮ aus der Einheit gelöst wird,
-  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). **Bekannte Lücke:** Personal-Entlassen und Material „Aus dem Einsatz nehmen“ machen beim
-  Rückgängig nur die Kraft wieder aktiv, ohne ihre Bindungen; bis zu ihren Folgeaufgaben (LLH-1922, LLH-1923) bleibt das
-  so, ohne Rückfrage. Das Fahrzeug nimmt vollständig zurück (`…/entlassen/zuruecknehmen`).
+  behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Fahrzeug und Material
+  nehmen vollständig zurück (`…/entlassen/zuruecknehmen` mit dem Vorzustand aus der Antwort des
+  Entlassens; Material samt Ort, LLH-1923); den Satz zu Ausgelassenem bildet
+  `kraefte/ruecknahme.ts`. **Bekannte Lücke:** Personal-Entlassen macht beim Rückgängig nur die
+  Kraft wieder aktiv, ohne ihre Bindungen; bis zur Folgeaufgabe LLH-1922 bleibt das so, ohne
+  Rückfrage.
   Ebenso noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
   Person; und das Rückgängig von Material am Ort, Besatzung und UHS-Kraft prüft noch nicht, ob der
   Datensatz inzwischen anders gebunden ist. „Abziehen“ an der UHS und „Vom Fahrzeug lösen“ in

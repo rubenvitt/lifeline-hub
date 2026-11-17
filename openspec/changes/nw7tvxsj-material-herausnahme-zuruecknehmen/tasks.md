@@ -21,8 +21,8 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 3. Regel und Doku
 
-- [ ] 3.1 `frontend/AGENTS.md`, „Beenden: Verb, Ort und Sicherung je Art“: Material aus der bekannten Lücke streichen (Personal, LLH-1922, bleibt), Material neben dem Fahrzeug als vollständig zurücknehmend nennen; Prettier grün
-- [ ] 3.2 `docs/anwender/kapitel/material.md`, „Material aus dem Einsatz nehmen“: Rückgängig bringt den Posten an seinen Ort zurück, ein nicht mehr bestehender Ort wird genannt; Mitänderungsregel aus `docs/anwender/AGENTS.md` prüfen (kein Bild ändert sich)
+- [x] 3.1 `frontend/AGENTS.md`, „Beenden: Verb, Ort und Sicherung je Art“: Material aus der bekannten Lücke streichen (Personal, LLH-1922, bleibt), Material neben dem Fahrzeug als vollständig zurücknehmend nennen; Prettier grün
+- [x] 3.2 `docs/anwender/kapitel/material.md`, „Material aus dem Einsatz nehmen“: Rückgängig bringt den Posten an seinen Ort zurück, ein nicht mehr bestehender Ort wird genannt; Mitänderungsregel aus `docs/anwender/AGENTS.md` prüfen (kein Bild ändert sich)
 
 ## 4. Verifikation
 
