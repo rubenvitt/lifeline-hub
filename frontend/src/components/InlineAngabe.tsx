@@ -188,6 +188,11 @@ export interface InlineAngabeProps<T> {
   /** Wer den gespeicherten Wert zuletzt gesetzt hat (LLH-1834), für den Hinweis im offenen Feld. */
   vermerk?: FeldVermerk;
   /**
+   * Kein Hinweis „Inzwischen geändert“: für Angaben, die ihren Vergleichsstand selbst fortschreiben
+   * und den Live-Wert schon mit eigenen Teilschritten ändern (Sprechgruppen-Einzelwege).
+   */
+  ohneFremdHinweis?: boolean;
+  /**
    * Die Anzeige trägt eigene Bedienziele, etwa `tel:`-Links (LLH-1426): sie steht als Inhalt, nicht
    * im Wertknopf, und daneben ein eigener Knopf „Bearbeiten“ (Dateikopf, „Anzeige mit eigenen
    * Bedienzielen“).
@@ -264,6 +269,7 @@ export function InlineAngabe<T>({
   onOeffnen,
   onSchliessen,
   vermerk,
+  ohneFremdHinweis = false,
   bearbeitenDaneben = false,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
@@ -324,7 +330,7 @@ export function InlineAngabe<T>({
   const sperrText = typeof sperre === 'string' ? sperre : undefined;
   const sperrBeschreibung = typeof sperre === 'object' ? sperre.beschreibungId : sperrId;
   const geaendert = darfSchreiben && bearbeitet && angefasst && !gleich(entwurf, wert);
-  const fremdGeaendert = bearbeitet && !gleich(wert, beimOeffnen);
+  const fremdGeaendert = !ohneFremdHinweis && bearbeitet && !gleich(wert, beimOeffnen);
   const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
 
   // Die Sperre schließt eine offene Bearbeitung ohne Änderung (Zustand beim Rendern angepasst,

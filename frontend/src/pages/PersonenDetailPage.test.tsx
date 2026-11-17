@@ -2022,6 +2022,8 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull());
     expect(koerper).toHaveLength(1);
     expect(within(stammdatenRaster()).getByText('Meier')).toBeInTheDocument();
+    // Nichts gesendet, also keine Meldung „gespeichert“ (Review LLH-1831).
+    expect(screen.queryByText('Name gespeichert')).toBeNull();
   });
 
   it('ein 409 ohne Feldänderung (Einsatz abgeschlossen) steht am Feld, ohne Rückfrage', async () => {

@@ -1,3 +1,4 @@
+import type { FeldVermerk } from '../api/types';
 import { Button, Flex, Input } from 'antd';
 import { VERBINDUNGEN_MAX, VERBINDUNG_TEXT_MAX } from '../api/eingabegrenzen';
 import type { KommunikationsVerbindung, NeueVerbindung, Verbindungsmittel } from '../api/types';
@@ -163,7 +164,10 @@ export function VerbindungenAngabe({
   darfSchreiben,
   onSpeichern,
   gesperrt,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   etikett: string;
   verbindungen: readonly KommunikationsVerbindung[] | null | undefined;
   darfSchreiben: boolean;
@@ -175,6 +179,7 @@ export function VerbindungenAngabe({
   return (
     <InlineAngabe<NeueVerbindung[]>
       etikett={etikett}
+      vermerk={vermerk}
       wert={wert}
       anzeige={<VerbindungenListe verbindungen={wert} />}
       leer={(l) => l.length === 0}

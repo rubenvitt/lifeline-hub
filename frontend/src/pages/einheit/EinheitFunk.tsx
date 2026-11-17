@@ -53,6 +53,7 @@ export default function EinheitFunk({
       >
         <VerbindungenAngabe
           etikett="Telefon und weitere Verbindungen"
+          vermerk={e.vermerke?.verbindungen}
           verbindungen={e.verbindungen}
           darfSchreiben={canEdit}
           onSpeichern={(liste, alt) =>

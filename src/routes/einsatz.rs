@@ -1277,70 +1277,65 @@ pub async fn aktualisieren(
     // Feld-CAS (LLH-1831, design.md D1): Altwert nur mit Änderung desselben Felds, die
     // Koordinate nur als Paar; beides 422. Die Zeit wird wie der Patch normalisiert.
     let erwartet = req.erwartet.unwrap_or_default();
-    crate::feld_cas::pruefe_felder(
-        &[
-            (
-                "bezeichnung",
-                erwartet.bezeichnung.is_some(),
-                bezeichnung.is_some(),
-            ),
-            (
-                "stichwort",
-                erwartet.stichwort.is_some(),
-                stichwort.is_some(),
-            ),
-            (
-                "einsatzart",
-                erwartet.einsatzart.is_some(),
-                req.einsatzart.is_some(),
-            ),
-            (
-                "leitstellen_nr",
-                erwartet.leitstellen_nr.is_some(),
-                leitstellen_nr.is_some(),
-            ),
-            (
-                "einsatzort",
-                erwartet.einsatzort.is_some(),
-                einsatzort.is_some(),
-            ),
-            (
-                "einsatzort_lat",
-                erwartet.einsatzort_lat.is_some(),
-                req.einsatzort_lat.is_some(),
-            ),
-            (
-                "einsatzort_lon",
-                erwartet.einsatzort_lon.is_some(),
-                req.einsatzort_lon.is_some(),
-            ),
-            (
-                "meldende_stelle",
-                erwartet.meldende_stelle.is_some(),
-                meldende_stelle.is_some(),
-            ),
-            (
-                "sachverhalt",
-                erwartet.sachverhalt.is_some(),
-                sachverhalt.is_some(),
-            ),
-            (
-                "anzahl_betroffene_initial",
-                erwartet.anzahl_betroffene_initial.is_some(),
-                req.anzahl_betroffene_initial.is_some(),
-            ),
-            (
-                "begonnen_at",
-                erwartet.begonnen_at.is_some(),
-                begonnen_at.is_some(),
-            ),
-        ],
-        &[(
+    // Lage je Feld vor den Einzelprüfungen festhalten; die Kombination (422) prüft erst danach,
+    // damit ein 400 je Feld vorgeht (`src/AGENTS.md`, Statuscode-Konvention).
+    let erwartet_lage: &[crate::feld_cas::FeldLage] = &[
+        (
+            "bezeichnung",
+            erwartet.bezeichnung.is_some(),
+            bezeichnung.is_some(),
+        ),
+        (
+            "stichwort",
+            erwartet.stichwort.is_some(),
+            stichwort.is_some(),
+        ),
+        (
+            "einsatzart",
+            erwartet.einsatzart.is_some(),
+            req.einsatzart.is_some(),
+        ),
+        (
+            "leitstellen_nr",
+            erwartet.leitstellen_nr.is_some(),
+            leitstellen_nr.is_some(),
+        ),
+        (
+            "einsatzort",
+            erwartet.einsatzort.is_some(),
+            einsatzort.is_some(),
+        ),
+        (
             "einsatzort_lat",
+            erwartet.einsatzort_lat.is_some(),
+            req.einsatzort_lat.is_some(),
+        ),
+        (
             "einsatzort_lon",
-            "erwartet trägt die Koordinate nur als Paar (einsatzort_lat und einsatzort_lon)",
-        )],
-    )?;
+            erwartet.einsatzort_lon.is_some(),
+            req.einsatzort_lon.is_some(),
+        ),
+        (
+            "meldende_stelle",
+            erwartet.meldende_stelle.is_some(),
+            meldende_stelle.is_some(),
+        ),
+        (
+            "sachverhalt",
+            erwartet.sachverhalt.is_some(),
+            sachverhalt.is_some(),
+        ),
+        (
+            "anzahl_betroffene_initial",
+            erwartet.anzahl_betroffene_initial.is_some(),
+            req.anzahl_betroffene_initial.is_some(),
+        ),
+        (
+            "begonnen_at",
+            erwartet.begonnen_at.is_some(),
+            begonnen_at.is_some(),
+        ),
+    ];
     let erwartet_begonnen = match &erwartet.begonnen_at {
         Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
         None => None,
@@ -1352,6 +1347,14 @@ pub async fn aktualisieren(
         support::trimme_tri(erwartet.meldende_stelle),
         support::trimme_tri(erwartet.sachverhalt),
     ];
+    crate::feld_cas::pruefe_felder(
+        erwartet_lage,
+        &[(
+            "einsatzort_lat",
+            "einsatzort_lon",
+            "erwartet trägt die Koordinate nur als Paar (einsatzort_lat und einsatzort_lon)",
+        )],
+    )?;
     let altwerte = {
         use crate::feld_cas::ExpectedValue::{Integer, Real, Text};
         let mut w = crate::feld_cas::ExpectedValues::new();

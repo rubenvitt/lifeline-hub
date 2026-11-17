@@ -59,7 +59,8 @@ import {
   alsEingabe as alsVerbindungsEingabe,
   bereinigeVerbindungen,
 } from '../components/verbindungen';
-import { qualiSollEingabe } from '../kraefte/qualiSoll';
+import { qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
+import { staerkeText } from '../anzeige/staerke';
 import { vollstaendig } from '../kraefte/QualiSollFeld';
 import EinheitFunk from './einheit/EinheitFunk';
 import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
@@ -106,6 +107,27 @@ function einheitWire(e: Einheit): Record<string, unknown> {
     funkrufname: e.funkrufname ?? null,
     verbindungen: bereinigeVerbindungen(alsVerbindungsEingabe(e.verbindungen)),
   };
+}
+
+/**
+ * Der aktuelle Wert einer Angabe lesbar für die Rückfrage (Review LLH-1831): Namen statt
+ * Kennungen, Soll-Stärke und Qualifikationssoll als Text; sonst die Wire-Werte.
+ */
+function einheitAnzeige(
+  e: Einheit,
+  patch: EinheitPatch,
+  alle: readonly Einheit[],
+): string | undefined {
+  if ('fuehrer_id' in patch) return e.fuehrer_name ?? undefined;
+  if ('abschnitt_id' in patch) return e.abschnitt_name ?? undefined;
+  if ('typ_id' in patch) return e.typ_label ?? undefined;
+  if ('ueber_einheit_id' in patch) {
+    return alle.find((x) => x.id === e.ueber_einheit_id)?.name ?? undefined;
+  }
+  if ('soll_fuehrer' in patch) return staerkeText(e.soll);
+  if ('quali_soll' in patch) return qualiSollText(e.quali_soll);
+  if ('verbindungen' in patch) return e.verbindungen.map((v) => v.wert).join(', ');
+  return undefined;
 }
 
 export default function EinheitDetailPage() {
@@ -432,12 +454,16 @@ function EinheitAnsicht({
         });
         return liste.find((x) => x.id === einheitId);
       },
-      aktuell: (frisch) => ({
-        wert: frisch ? ausschnitt(einheitWire(frisch), p) : undefined,
-        vermerk: vermerkFuer(frisch?.vermerke, p),
-      }),
-      text: (w) => (w ? ausschnittText(w) : ''),
-      leer: (w) => w === undefined || ausschnittLeer(w),
+      // Eine inzwischen aufgelöste Einheit fehlt in der Liste: dann kein Feldkonflikt, der Grund
+      // des Servers steht an der Angabe (Review LLH-1831).
+      aktuell: (frisch) =>
+        frisch && {
+          wert: ausschnitt(einheitWire(frisch), p),
+          vermerk: vermerkFuer(frisch.vermerke, p),
+          anzeige: einheitAnzeige(frisch, p, einheiten),
+        },
+      text: ausschnittText,
+      leer: ausschnittLeer,
     });
 
   /**

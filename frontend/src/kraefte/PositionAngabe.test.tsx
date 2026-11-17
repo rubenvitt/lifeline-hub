@@ -32,7 +32,9 @@ describe('PositionAngabe (LLH-1060)', () => {
     await waehle('Position zu Anna', 'Führer');
     expect(onSpeichern).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Position zu Anna speichern' }));
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('fuehrer', { beimOeffnen: expect.anything() }));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith('fuehrer', { beimOeffnen: expect.anything() }),
+    );
   });
 
   it('Leeren sendet null', async () => {

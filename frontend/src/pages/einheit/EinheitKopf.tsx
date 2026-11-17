@@ -146,6 +146,7 @@ export default function EinheitKopf({
   ) => (
     <InlineAngabe<string>
       etikett={etikett}
+      vermerk={e.vermerke?.[feld]}
       wert={e[feld] ?? ''}
       anzeige={
         <span
@@ -232,6 +233,7 @@ export default function EinheitKopf({
             <Datenfeld label="Name">
               <InlineAngabe<string>
                 etikett="Name"
+                vermerk={e.vermerke?.name}
                 wert={e.name}
                 anzeige={e.name}
                 leer={isEmptyText}
@@ -255,6 +257,7 @@ export default function EinheitKopf({
             <Datenfeld label="Typ">
               <InlineAngabe<number | null>
                 etikett="Typ"
+                vermerk={e.vermerke?.typ_id}
                 wert={e.typ_id ?? null}
                 anzeige={e.typ_label}
                 leer={(w) => w == null}
@@ -296,6 +299,7 @@ export default function EinheitKopf({
             <Datenfeld label="Abschnitt">
               <InlineAngabe<number | null>
                 etikett="Abschnitt"
+                vermerk={e.vermerke?.abschnitt_id}
                 wert={e.abschnitt_id ?? null}
                 anzeige={e.abschnitt_name}
                 leer={(w) => w == null}
@@ -323,6 +327,7 @@ export default function EinheitKopf({
             <Datenfeld label="Über-Einheit">
               <InlineAngabe<number | null>
                 etikett="Über-Einheit"
+                vermerk={e.vermerke?.ueber_einheit_id}
                 wert={e.ueber_einheit_id ?? null}
                 anzeige={ueberName}
                 leer={(w) => w == null}
@@ -367,6 +372,7 @@ export default function EinheitKopf({
             <Datenfeld label="Einheitsführer">
               <InlineAngabe<number | null>
                 etikett="Einheitsführer"
+                vermerk={e.vermerke?.fuehrer_id}
                 wert={e.fuehrer_id ?? null}
                 anzeige={e.fuehrer_name}
                 leer={(w) => w == null}
@@ -394,6 +400,7 @@ export default function EinheitKopf({
             <Datenfeld label="Soll-Stärke (F/UF/M)">
               <InlineAngabe<Staerke | null>
                 etikett="Soll-Stärke"
+                vermerk={e.vermerke?.soll}
                 wert={e.soll ?? null}
                 anzeige={
                   <span style={zahlStil('text')}>
@@ -432,6 +439,7 @@ export default function EinheitKopf({
             <Datenfeld label="Qualifikationssoll">
               <InlineAngabe<QualiSollZeile[]>
                 etikett="Qualifikationssoll"
+                vermerk={e.vermerke?.quali_soll}
                 wert={qualiSollEingabe(e.quali_soll)}
                 anzeige={
                   e.quali_soll_eigen

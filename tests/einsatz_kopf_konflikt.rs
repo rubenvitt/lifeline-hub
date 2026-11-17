@@ -231,3 +231,93 @@ async fn gleicher_wert_und_konflikt_lassen_den_vermerk_stehen() {
     let v = &lesen(&app, &admin, einsatz).await["vermerke"];
     assert_eq!(v["leitstellen_nr"]["at"], "2026-01-01 00:00:00");
 }
+
+/// Ein gekoppeltes Gerät der Ansicht `body`: das Sitzungscookie des Geräts.
+async fn geraet(app: &axum::Router, admin: &str, einsatz: i64, body: Value) -> String {
+    use axum::body::Body;
+    use axum::http::{header, Request};
+    use tower::ServiceExt;
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/geraete"),
+        admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().unwrap();
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/geraete/koppeln")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json!({ "code": code }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    resp.headers()
+        .get(header::SET_COOKIE)
+        .map(|v| v.to_str().unwrap().split(';').next().unwrap().to_string())
+        .expect("Sitzungscookie")
+}
+
+/// Ein Gerät bekommt keine Benutzernamen (Review LLH-1834): Kopf, Führungsstelle und Einheiten
+/// liefern ihm keine Vermerke, einer Personensitzung schon.
+#[tokio::test]
+async fn geraet_bekommt_keine_vermerke() {
+    let (app, admin, einsatz) = start().await;
+    let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
+    patchen(&app, &admin, einsatz, json!({"leitstellen_nr": "ILS-1"})).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}"),
+        &admin,
+        Some(&json!({"funkrufname": "Florian 1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fuehrungsstelle"),
+        &admin,
+        Some(&json!({"rufname": "Florian 10"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    // Gegenprobe: die Personensitzung sieht die Vermerke.
+    assert!(lesen(&app, &admin, einsatz).await.get("vermerke").is_some());
+
+    let geraete = [
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"}),
+        json!({"ansicht": "einheit", "stelle_id": eid, "bezeichnung": "Tablet Trupp"}),
+    ];
+    let mut gelesen = std::collections::BTreeSet::new();
+    for body in geraete {
+        let cookie = geraet(&app, &admin, einsatz, body).await;
+        for pfad in [
+            format!("/api/einsaetze/{einsatz}"),
+            format!("/api/einsaetze/{einsatz}/fuehrungsstelle"),
+            format!("/api/einsaetze/{einsatz}/einheiten"),
+        ] {
+            let (s, j) = anfrage(&app, "GET", &pfad, &cookie, None).await;
+            if s != StatusCode::OK {
+                continue;
+            }
+            let objekte: Vec<&Value> = match j.as_array() {
+                Some(a) => a.iter().collect(),
+                None => vec![&j],
+            };
+            assert!(!objekte.is_empty(), "{pfad}");
+            for o in objekte {
+                assert!(o.get("vermerke").is_none(), "{pfad}: {o:?}");
+            }
+            gelesen.insert(pfad.rsplit('/').next().unwrap().to_string());
+        }
+    }
+    assert!(
+        gelesen.contains("einheiten"),
+        "ein Gerät liest die Einheiten: {gelesen:?}"
+    );
+}

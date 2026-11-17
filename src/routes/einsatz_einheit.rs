@@ -85,6 +85,13 @@ pub async fn liste(
     if let Some(b) = crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
         liste.retain(|e| b.einheiten.contains(&e.id));
     }
+    // Wer welche Angabe zuletzt geändert hat (LLH-1834): nicht an Gerätesitzungen, wie Kopf und
+    // Führungsstelle — ein Gerät bekommt keine Benutzernamen.
+    if ctx.geraet.is_some() {
+        for e in &mut liste {
+            e.vermerke.clear();
+        }
+    }
     Ok(Json(liste))
 }
 
@@ -729,61 +736,73 @@ pub async fn update(
     // Feld-CAS (LLH-1831, design.md D1/D2): Altwert nur mit Änderung desselben Felds, das
     // Soll-Trio ganz oder gar nicht (422); Formen wie der Patch (getrimmt, gespeicherte Form).
     let erwartet = body.erwartet.unwrap_or_default();
+    // Lage je Feld vor den Einzelprüfungen festhalten; die Kombination (422) prüft erst danach,
+    // damit ein 400 je Feld vorgeht (`src/AGENTS.md`, Statuscode-Konvention).
+    let erwartet_lage: &[crate::feld_cas::FeldLage] = &[
+        ("name", erwartet.name.is_some(), name.is_some()),
+        (
+            "abschnitt_id",
+            erwartet.abschnitt_id.is_some(),
+            body.abschnitt_id.is_some(),
+        ),
+        (
+            "ueber_einheit_id",
+            erwartet.ueber_einheit_id.is_some(),
+            body.ueber_einheit_id.is_some(),
+        ),
+        ("typ_id", erwartet.typ_id.is_some(), body.typ_id.is_some()),
+        (
+            "fuehrer_id",
+            erwartet.fuehrer_id.is_some(),
+            body.fuehrer_id.is_some(),
+        ),
+        (
+            "soll_fuehrer",
+            erwartet.soll_fuehrer.is_some(),
+            body.soll_fuehrer.is_some(),
+        ),
+        (
+            "soll_unterfuehrer",
+            erwartet.soll_unterfuehrer.is_some(),
+            body.soll_unterfuehrer.is_some(),
+        ),
+        (
+            "soll_mannschaft",
+            erwartet.soll_mannschaft.is_some(),
+            body.soll_mannschaft.is_some(),
+        ),
+        (
+            "quali_soll",
+            erwartet.quali_soll.is_some(),
+            quali_soll.is_some(),
+        ),
+        (
+            "bemerkung",
+            erwartet.bemerkung.is_some(),
+            bemerkung.is_some(),
+        ),
+        (
+            "funkrufname",
+            erwartet.funkrufname.is_some(),
+            funkrufname.is_some(),
+        ),
+        (
+            "verbindungen",
+            erwartet.verbindungen.is_some(),
+            neue_verbindungen.is_some(),
+        ),
+    ];
+    let erwartet_name = erwartet.name.as_deref().map(str::trim);
+    let erwartet_quali = quali_soll::form_tri(erwartet.quali_soll)?;
+    let erwartet_bemerkung = optional_max_tri(erwartet.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
+    let erwartet_funkrufname =
+        optional_max_tri(erwartet.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
+    let erwartet_verbindungen = erwartet
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
     crate::feld_cas::pruefe_felder(
-        &[
-            ("name", erwartet.name.is_some(), name.is_some()),
-            (
-                "abschnitt_id",
-                erwartet.abschnitt_id.is_some(),
-                body.abschnitt_id.is_some(),
-            ),
-            (
-                "ueber_einheit_id",
-                erwartet.ueber_einheit_id.is_some(),
-                body.ueber_einheit_id.is_some(),
-            ),
-            ("typ_id", erwartet.typ_id.is_some(), body.typ_id.is_some()),
-            (
-                "fuehrer_id",
-                erwartet.fuehrer_id.is_some(),
-                body.fuehrer_id.is_some(),
-            ),
-            (
-                "soll_fuehrer",
-                erwartet.soll_fuehrer.is_some(),
-                body.soll_fuehrer.is_some(),
-            ),
-            (
-                "soll_unterfuehrer",
-                erwartet.soll_unterfuehrer.is_some(),
-                body.soll_unterfuehrer.is_some(),
-            ),
-            (
-                "soll_mannschaft",
-                erwartet.soll_mannschaft.is_some(),
-                body.soll_mannschaft.is_some(),
-            ),
-            (
-                "quali_soll",
-                erwartet.quali_soll.is_some(),
-                quali_soll.is_some(),
-            ),
-            (
-                "bemerkung",
-                erwartet.bemerkung.is_some(),
-                bemerkung.is_some(),
-            ),
-            (
-                "funkrufname",
-                erwartet.funkrufname.is_some(),
-                funkrufname.is_some(),
-            ),
-            (
-                "verbindungen",
-                erwartet.verbindungen.is_some(),
-                neue_verbindungen.is_some(),
-            ),
-        ],
+        erwartet_lage,
         &[
             (
                 "soll_fuehrer",
@@ -797,15 +816,6 @@ pub async fn update(
             ),
         ],
     )?;
-    let erwartet_name = erwartet.name.as_deref().map(str::trim);
-    let erwartet_quali = quali_soll::form_tri(erwartet.quali_soll)?;
-    let erwartet_bemerkung = optional_max_tri(erwartet.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
-    let erwartet_funkrufname =
-        optional_max_tri(erwartet.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
-    let erwartet_verbindungen = erwartet
-        .verbindungen
-        .map(verbindungen::pruefe_liste)
-        .transpose()?;
     let altwerte = {
         use crate::feld_cas::ExpectedValue::{Integer, Text};
         let mut w = crate::feld_cas::ExpectedValues::new();

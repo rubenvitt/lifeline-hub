@@ -47,8 +47,9 @@ test('Einsatzdaten · Leitstellen-Nr.: B sieht den fremden Wert und wird gefragt
     await expect(page.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' })).toBeVisible();
 
     // B: Hinweis im offenen Feld (Live-Verteilung), die eigene Eingabe bleibt.
+    // Mit Wer und Wann (Spec `formularseiten`, „Wert kommt während der Eingabe“).
     await expect(b.getByRole('status').filter({ hasText: 'Inzwischen geändert' })).toContainText(
-      'ILS-4711',
+      /Inzwischen geändert von \S.*: ILS-4711/,
     );
     await expect(feldB).toHaveValue('ILS-4712');
 
@@ -76,6 +77,41 @@ test('Einsatzdaten · Leitstellen-Nr.: B sieht den fremden Wert und wird gefragt
   }
 });
 
+test('Einsatzort · Adresse: eine reine Textänderung lässt die fremd verschobene Koordinate stehen', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await anmeldenPerApi(page, ADMIN, ADMIN_PW, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Feld-CAS Ort ${Date.now()}`);
+  const kopf = (daten: Record<string, unknown>) =>
+    page.request.patch(`/api/einsaetze/${einsatzId}`, { data: daten });
+  expect(
+    (
+      await kopf({ einsatzort: 'Hinter der Halle', einsatzort_lat: 52.5, einsatzort_lon: 13.4 })
+    ).ok(),
+  ).toBe(true);
+
+  await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
+  const paneel = page.getByRole('region', { name: 'Einsatzort' });
+  await paneel.getByRole('button', { name: 'Adresse bearbeiten' }).click();
+  // Ein anderer Arbeitsplatz verschiebt inzwischen nur die Koordinate.
+  expect((await kopf({ einsatzort_lat: 52.6, einsatzort_lon: 13.5 })).ok()).toBe(true);
+  await expect(paneel.getByRole('status').filter({ hasText: 'Inzwischen geändert' })).toBeVisible();
+
+  const feld = paneel.getByRole('textbox', { name: 'Adresse' });
+  await feld.fill('Vor der Halle');
+  await paneel.getByRole('button', { name: 'Adresse speichern' }).click();
+  await expect(paneel.getByRole('button', { name: 'Adresse bearbeiten' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  const e = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as {
+    einsatzort: string;
+    einsatzort_lat: number;
+  };
+  expect(e.einsatzort).toBe('Vor der Halle');
+  expect(e.einsatzort_lat, 'die fremde Koordinate bleibt').toBe(52.6);
+});
+
 test('Einheit · Bemerkung: B wird gefragt, „Meine Änderung übernehmen“ schreibt bewusst', async ({
   page,
   browser,
@@ -100,7 +136,7 @@ test('Einheit · Bemerkung: B wird gefragt, „Meine Änderung übernehmen“ sc
     });
     expect(a.ok()).toBe(true);
     await expect(b.getByRole('status').filter({ hasText: 'Inzwischen geändert' })).toContainText(
-      'Tor 3',
+      /Inzwischen geändert von \S.*: Tor 3/,
     );
 
     await b.getByRole('button', { name: 'Bemerkung speichern' }).click();

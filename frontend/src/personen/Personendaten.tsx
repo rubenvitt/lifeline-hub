@@ -17,7 +17,7 @@ import {
   PERSON_UNVERTRAEGLICHKEITEN_MAX,
 } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
-import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import { useFeldKonflikt, VERWORFEN } from '../components/useFeldKonflikt';
 import type { Person, PersonDetail, PersonKostform } from '../api/types';
 import { Link } from 'react-router';
 import {
@@ -317,6 +317,8 @@ function PersonendatenInhalt({
       gleich: isGleicherWireWert,
     });
     if (ergebnis === OFFEN_LASSEN) return OFFEN_LASSEN;
+    // Verworfen: nichts gesendet, also keine Meldung „gespeichert“.
+    if (ergebnis === VERWORFEN) return;
     message.success(`${etikett} gespeichert`);
     setFokusNach({ etikett, vorher: person });
   };

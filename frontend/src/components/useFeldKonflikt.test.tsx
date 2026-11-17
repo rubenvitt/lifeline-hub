@@ -7,7 +7,7 @@ import { ApiError } from '../api/client';
 import type { FeldVermerk } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import { OFFEN_LASSEN } from './InlineAngabe';
-import { useFeldKonflikt } from './useFeldKonflikt';
+import { useFeldKonflikt, VERWORFEN } from './useFeldKonflikt';
 
 /**
  * Der gemeinsame Ablauf „Zwischenzeitlich geändert“ (LLH-1831, Change
@@ -21,8 +21,9 @@ interface Stand {
 
 function Probe(p: {
   speichern: (erwartet: string | null | undefined) => Promise<void>;
-  frisch: Stand;
+  frisch: Stand | undefined;
   onErgebnis: (e: unknown) => void;
+  ladeFehler?: Error;
 }) {
   const konflikt = useFeldKonflikt();
   const [lauf, setLauf] = useState(0);
@@ -34,8 +35,10 @@ function Probe(p: {
           etikett: 'Bemerkung',
           erwartet: 'Tor 1' as string | null,
           speichern: p.speichern,
-          ladeFrisch: () => Promise.resolve(p.frisch),
-          aktuell: (s: Stand) => ({ wert: s.bemerkung, vermerk: s.vermerke?.bemerkung }),
+          ladeFrisch: () =>
+            p.ladeFehler ? Promise.reject(p.ladeFehler) : Promise.resolve(p.frisch),
+          aktuell: (s: Stand | undefined) =>
+            s && { wert: s.bemerkung, vermerk: s.vermerke?.bemerkung },
           text: (w) => w ?? '',
         }).then(p.onErgebnis, p.onErgebnis);
       }}
@@ -99,7 +102,8 @@ describe('useFeldKonflikt', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen und neu laden' }));
-    await waitFor(() => expect(onErgebnis).toHaveBeenCalledWith(undefined));
+    // Unterscheidbar vom Erfolg: der Aufrufer meldet nichts als gespeichert.
+    await waitFor(() => expect(onErgebnis).toHaveBeenCalledWith(VERWORFEN));
     expect(speichern).toHaveBeenCalledTimes(1);
   });
 
@@ -128,5 +132,32 @@ describe('useFeldKonflikt', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onErgebnis).toHaveBeenCalledWith(fehler));
     expect(screen.queryByText('Zwischenzeitlich geändert')).not.toBeInTheDocument();
+  });
+
+  it('scheitert das Neuladen, bleibt der 409 der Grund an der Angabe', async () => {
+    const fehler = konflikt409();
+    const speichern = vi.fn().mockRejectedValueOnce(fehler);
+    const onErgebnis = vi.fn();
+    renderMitProviders(
+      <Probe
+        speichern={speichern}
+        frisch={{ bemerkung: 'Tor 3' }}
+        ladeFehler={new Error('Netz weg')}
+        onErgebnis={onErgebnis}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErgebnis).toHaveBeenCalledWith(fehler));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('gibt es den Datensatz nicht mehr, ist es kein Feldkonflikt', async () => {
+    const fehler = konflikt409();
+    const speichern = vi.fn().mockRejectedValueOnce(fehler);
+    const onErgebnis = vi.fn();
+    renderMitProviders(<Probe speichern={speichern} frisch={undefined} onErgebnis={onErgebnis} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErgebnis).toHaveBeenCalledWith(fehler));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

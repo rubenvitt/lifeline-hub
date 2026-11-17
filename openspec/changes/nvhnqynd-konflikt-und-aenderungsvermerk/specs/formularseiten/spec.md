@@ -18,8 +18,7 @@ mitgesendeten Altwert MUST wie bisher ohne Vergleich schreiben.
 - **THEN** wird die Bemerkung von A gespeichert, ohne Rückfrage, und der Funkrufname von B bleibt
 
 ### Requirement: Einheitlicher Dialog „Zwischenzeitlich geändert“
-Wird das Speichern einer Einzelangabe oder eines Paneels mit 409 wegen einer fremden Änderung
-abgelehnt, SHALL die Ansicht „Zwischenzeitlich geändert“ fragen, den aktuellen Wert nennen und,
+Wird das Speichern einer Einzelangabe mit 409 wegen einer fremden Änderung abgelehnt, SHALL die Ansicht „Zwischenzeitlich geändert“ fragen, den aktuellen Wert nennen und,
 soweit bekannt, wer ihn wann gesetzt hat. Sie MUST genau „Meine Änderung übernehmen“ und
 „Verwerfen und neu laden“ anbieten. Schließen oder Escape MUST nichts entscheiden: die Eingabe
 bleibt offen.

@@ -419,12 +419,6 @@ test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', 
 });
 
 /**
- * Die VORGABE der Entwurfsseite: „Bearbeiten“ (`entwurf/DokumentEntwurf`), je Abschnitt ein
- * Textfeld — der Zustand, in dem die `<textarea>` am ehesten mitgedruckt wird. Diskriminierend: die
- * Endmarke des LETZTEN Abschnitts steht als dargestellter Markdown-Absatz jenseits der ersten
- * Seite, und kein Textfeld ist im Druck sichtbar.
- */
-/**
  * LLH-1840: Aus dem Nachtbetrieb malte Chromium mit „Hintergrundgrafiken“ den Seitenrand in der
  * dunklen Canvas-Farbe (#121212), weil `<html>` inline `color-scheme: dark` trägt. Im Druck setzt
  * `druck.css` das helle Schema am Dokument durch. Geprüft am berechneten Wert unter Druckmedium;
@@ -450,6 +444,12 @@ test('Druck aus dem Nachtbetrieb erzwingt das helle Farbschema am Dokument (LLH-
   }
 });
 
+/**
+ * Die VORGABE der Entwurfsseite: „Bearbeiten“ (`entwurf/DokumentEntwurf`), je Abschnitt ein
+ * Textfeld — der Zustand, in dem die `<textarea>` am ehesten mitgedruckt wird. Diskriminierend: die
+ * Endmarke des LETZTEN Abschnitts steht als dargestellter Markdown-Absatz jenseits der ersten
+ * Seite, und kein Textfeld ist im Druck sichtbar.
+ */
 test('Lagebericht (Entwurf, Bearbeiten) druckt jeden Abschnitt vollständig als Markdown', async ({
   page,
 }) => {

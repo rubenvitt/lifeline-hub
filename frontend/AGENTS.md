@@ -361,7 +361,8 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    (LLH-1831, Change `nvhnqynd-konflikt-und-aenderungsvermerk`): `InlineAngabe` reicht den Wert beim
    Öffnen als `{ beimOeffnen }` an `onSpeichern`, die Seite schickt ihn als `erwartet` und speichert
    über `components/useFeldKonflikt`. Ein 409 fragt überall „Zwischenzeitlich geändert“ mit „Meine
-   Änderung übernehmen“ / „Verwerfen und neu laden“ und nennt, wer wann geändert hat. Ein fremder
+   Änderung übernehmen“ / „Verwerfen und neu laden“; an einer Einzelangabe nennt die Rückfrage
+   dazu den aktuellen Wert lesbar und, wer ihn wann gesetzt hat. Ein fremder
    Wert im offenen Feld steht dort als Hinweis, die Eingabe bleibt. Wo der Server einen
    Änderungsvermerk liefert (`vermerke`), steht er leise an der Zeile (`VermerkZeile`) und der
    jüngste im Paneelkopf (`PaneelVermerk`). Noch ohne Feld-CAS: die Schreibwege in LLH-1945.

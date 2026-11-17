@@ -54,6 +54,7 @@ import {
   type KopfdatenPatch,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useFeldKonflikt } from '../components/useFeldKonflikt';
 import {
   ausschnitt,
@@ -166,7 +167,10 @@ function TextAngabe({
   pflicht,
   speichern,
   zuPatch,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   etikett: string;
   wert: string | null | undefined;
   darfSchreiben: boolean;
@@ -180,6 +184,7 @@ function TextAngabe({
   const text = wert ?? '';
   return (
     <InlineAngabe<string>
+      vermerk={vermerk}
       etikett={etikett}
       wert={text}
       anzeige={mono ? <span style={zahlStil('text')}>{text}</span> : text}
@@ -218,7 +223,10 @@ function ZeitpunktAngabe({
   darfSchreiben,
   speichern,
   zuPatch,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   etikett: string;
   wire: string | null | undefined;
   pflicht?: boolean;
@@ -228,6 +236,7 @@ function ZeitpunktAngabe({
 }) {
   return (
     <InlineAngabe<Dayjs | null>
+      vermerk={vermerk}
       etikett={etikett}
       wert={alsZeitpunkt(wire) ?? null}
       anzeige={wire ? <ZeitAnzeige wert={wire} rolle="zeitpunkt" /> : null}
@@ -276,7 +285,10 @@ function KoordinatenAngabe({
   lon,
   darfSchreiben,
   speichern,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   einsatzId: number;
   lat: number | null | undefined;
   lon: number | null | undefined;
@@ -286,6 +298,7 @@ function KoordinatenAngabe({
   const wert: KoordinatenWert = lat != null && lon != null ? { lat, lon } : null;
   return (
     <InlineAngabe<KoordinatenWert>
+      vermerk={vermerk}
       etikett="Koordinate"
       wert={wert}
       anzeige={
@@ -351,7 +364,18 @@ const KOPF_MIN_BREITE = 220;
  * Eine Angabe als Zelle im Fugenraster (Feldetikett über dem Wert). Kein `Kennzahl`-Baustein: die
  * Werte sind Wörter — ein Stichwort in Datenwert-Mono läse sich wie ein Messwert.
  */
-function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode; mono?: boolean }) {
+function KopfAngabe({
+  etikett,
+  wert,
+  mono,
+  vermerk,
+}: {
+  etikett: string;
+  wert: ReactNode;
+  mono?: boolean;
+  /** Wer die Angabe zuletzt geändert hat (LLH-1834), leise unter dem Wert. */
+  vermerk?: FeldVermerk;
+}) {
   const { token, rollen } = useRollen();
   return (
     <div
@@ -376,6 +400,7 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
       >
         {wert}
       </div>
+      <VermerkZeile vermerk={vermerk} />
     </div>
   );
 }
@@ -432,7 +457,8 @@ function fuehrungsstelleWire(fs: Fuehrungsstelle): Record<string, unknown> {
     standort_lon: fs.standort_lon ?? null,
     rufname: fs.rufname ?? null,
     verbindungen: bereinigeVerbindungen(alsVerbindungsEingabe(fs.verbindungen)),
-    fahrzeug_ids: fs.fahrzeug_ids,
+    // Als Menge: der Server vergleicht ohne Reihenfolge, die Zeile sortiert nach Funkrufname.
+    fahrzeug_ids: [...fs.fahrzeug_ids].sort((a, b) => a - b),
     einsatzleiter: !e
       ? null
       : e.art === 'extern'
@@ -441,6 +467,47 @@ function fuehrungsstelleWire(fs: Fuehrungsstelle): Record<string, unknown> {
           ? { art: 'personal', personal_id: e.personal_id }
           : { art: 'personal' },
   };
+}
+
+type Konventionen = ReturnType<typeof useAnzeigeKonventionen>;
+
+/**
+ * Der aktuelle Wert einer Kopfangabe lesbar für die Rückfrage (Review LLH-1831): Zeit in der
+ * Anzeigezone, Einsatzart als Bezeichnung, Ort als Text oder Koordinate; sonst die Wire-Werte.
+ */
+function kopfAnzeige(
+  e: EinsatzAnzeige,
+  patch: KopfdatenPatch,
+  k: Konventionen,
+): string | undefined {
+  if ('begonnen_at' in patch) return e.begonnen_at ? k.zeitpunkt(e.begonnen_at) : undefined;
+  if ('einsatzart' in patch) return EINSATZART_LABELS[e.einsatzart];
+  if ('einsatzort' in patch && e.einsatzort) return e.einsatzort;
+  if ('einsatzort_lat' in patch && e.einsatzort_lat != null && e.einsatzort_lon != null) {
+    return k.formatKoordinate(e.einsatzort_lat, e.einsatzort_lon);
+  }
+  return undefined;
+}
+
+/** Der aktuelle Wert einer Angabe der Führungsstelle lesbar für die Rückfrage (Review LLH-1831). */
+function fuehrungsstelleAnzeige(
+  fs: Fuehrungsstelle,
+  patch: FuehrungsstellePatch,
+  k: Konventionen,
+): string | undefined {
+  if ('einsatzleiter' in patch) {
+    return einsatzleiterKurz(einsatzleiterDarstellung({ zustand: 'daten', daten: fs }));
+  }
+  if ('verbindungen' in patch) return fs.verbindungen.map((v) => v.wert).join(', ');
+  if ('fahrzeug_ids' in patch) {
+    const n = fs.fahrzeug_ids.length;
+    return n === 1 ? '1 Führungsfahrzeug' : `${n} Führungsfahrzeuge`;
+  }
+  if ('standort_adresse' in patch && fs.standort_adresse) return fs.standort_adresse;
+  if ('standort_lat' in patch && fs.standort_lat != null && fs.standort_lon != null) {
+    return k.formatKoordinate(fs.standort_lat, fs.standort_lon);
+  }
+  return undefined;
 }
 
 /** Die Angaben der Führungsstelle mit Vermerk, für den Paneelkopf (LLH-1834). */
@@ -558,6 +625,7 @@ function EinsatzortPaneel({
             vermerk: einsatz.vermerke?.einsatzort,
             wert: (
               <InlineAngabe<OrtsfeldWert>
+                vermerk={einsatz.vermerke?.einsatzort}
                 etikett="Adresse"
                 // Die gespeicherte Koordinate steht mit in der Bearbeitung: die Vorschau zeigt
                 // sie, die Nadel berichtigt sie. Als `karte` gelöst vom Text, damit eine reine
@@ -580,14 +648,18 @@ function EinsatzortPaneel({
                     // reiner Text schickt nur die Adresse (Spec `einsatzdaten-bearbeitung`).
                     // Hat das Feld den gespeicherten Punkt verloren (geleerter Text, LLH-1534),
                     // geht er als `null` mit: sonst bliebe ein Punkt, den die Maske nicht zeigte.
+                    // „Neu“ und „verloren“ gegenüber dem Stand beim Öffnen, nicht dem Live-Punkt:
+                    // sonst schriebe eine reine Textänderung eine inzwischen fremd verschobene
+                    // Koordinate zurück (Review LLH-1831).
                     w.koordinate &&
-                      (w.koordinate.lat !== punkt?.lat || w.koordinate.lon !== punkt?.lon)
+                      (w.koordinate.lat !== beimOeffnen.koordinate?.lat ||
+                        w.koordinate.lon !== beimOeffnen.koordinate?.lon)
                       ? {
                           einsatzort: leerZuNull(w.text),
                           einsatzort_lat: w.koordinate.lat,
                           einsatzort_lon: w.koordinate.lon,
                         }
-                      : !w.koordinate && punkt
+                      : !w.koordinate && beimOeffnen.koordinate
                         ? {
                             einsatzort: leerZuNull(w.text),
                             einsatzort_lat: null,
@@ -627,6 +699,7 @@ function EinsatzortPaneel({
             vermerk: einsatz.vermerke?.einsatzort_koordinate,
             wert: (
               <KoordinatenAngabe
+                vermerk={einsatz.vermerke?.einsatzort_koordinate}
                 einsatzId={einsatzId}
                 lat={einsatz.einsatzort_lat}
                 lon={einsatz.einsatzort_lon}
@@ -731,6 +804,7 @@ function FuehrungsstellePaneel({
   // Feld-CAS mit dem einen Konfliktablauf (LLH-1831): `alt` ist der Wert der Zeile beim Öffnen in
   // Wire-Form; verglichen wird mit der Wire-Form des frisch geladenen Stands.
   const konflikt = useFeldKonflikt();
+  const fsKonv = useAnzeigeKonventionen();
   const speichern = (etikett: string, patch: FuehrungsstellePatch, alt?: Record<string, unknown>) =>
     konflikt({
       etikett,
@@ -747,6 +821,7 @@ function FuehrungsstellePaneel({
       aktuell: (frisch) => ({
         wert: ausschnitt(fuehrungsstelleWire(frisch), patch),
         vermerk: vermerkFuer(frisch.vermerke, patch),
+        anzeige: fuehrungsstelleAnzeige(frisch, patch, fsKonv),
       }),
       text: ausschnittText,
       leer: (w) => w === undefined || ausschnittLeer(w),
@@ -784,6 +859,7 @@ function FuehrungsstellePaneel({
   ) => (
     <InlineAngabe<string>
       etikett={etikett}
+      vermerk={fs?.vermerke?.[schluessel]}
       wert={wert ?? ''}
       anzeige={wert}
       leer={leererText}
@@ -827,6 +903,7 @@ function FuehrungsstellePaneel({
                 vermerk: fs.vermerke?.einsatzleiter,
                 wert: (
                   <EinsatzleiterAngabe
+                    vermerk={fs.vermerke?.einsatzleiter}
                     einsatzId={einsatzId}
                     fs={fs}
                     darfSchreiben={darfSchreiben}
@@ -864,6 +941,10 @@ function FuehrungsstellePaneel({
                 vermerk: juengsterVermerk(fs.vermerke, ['standort_adresse', 'standort_koordinate']),
                 wert: (
                   <StandortAngabe
+                    vermerk={juengsterVermerk(fs.vermerke, [
+                      'standort_adresse',
+                      'standort_koordinate',
+                    ])}
                     fs={fs}
                     einsatz={einsatz}
                     darfSchreiben={darfSchreiben}
@@ -876,6 +957,7 @@ function FuehrungsstellePaneel({
                 vermerk: fs.vermerke?.rufname,
                 wert: (
                   <RufnameAngabe
+                    vermerk={fs.vermerke?.rufname}
                     rufname={fs.rufname}
                     fahrzeugIds={fs.fahrzeug_ids}
                     quelle={fahrzeugQuelle}
@@ -909,6 +991,7 @@ function FuehrungsstellePaneel({
                 vermerk: fs.vermerke?.verbindungen,
                 wert: (
                   <VerbindungenAngabe
+                    vermerk={fs.vermerke?.verbindungen}
                     etikett="Telefon und weitere Verbindungen"
                     verbindungen={fs.verbindungen}
                     darfSchreiben={darfSchreiben}
@@ -927,6 +1010,7 @@ function FuehrungsstellePaneel({
                 vermerk: fs.vermerke?.fahrzeug_ids,
                 wert: (
                   <FuehrungsfahrzeugeZeile
+                    vermerk={fs.vermerke?.fahrzeug_ids}
                     art={fs.art}
                     ids={fs.fahrzeug_ids}
                     quelle={fahrzeugQuelle}
@@ -935,7 +1019,7 @@ function FuehrungsstellePaneel({
                       speichern(
                         'Führungsfahrzeuge',
                         { fahrzeug_ids: ids },
-                        { fahrzeug_ids: beimOeffnen },
+                        { fahrzeug_ids: [...beimOeffnen].sort((a, b) => a - b) },
                       )
                     }
                   />
@@ -1013,7 +1097,10 @@ function StandortAngabe({
   einsatz,
   darfSchreiben,
   onSpeichern,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   fs: Fuehrungsstelle;
   einsatz: EinsatzAnzeige;
   darfSchreiben: boolean;
@@ -1034,6 +1121,7 @@ function StandortAngabe({
   const koordId = useId();
   return (
     <InlineAngabe<StandortEntwurf>
+      vermerk={vermerk}
       etikett="Standort"
       wert={{ adresse: fs.standort_adresse ?? '', koord }}
       anzeige={
@@ -1131,7 +1219,10 @@ function RufnameAngabe({
   quelle,
   darfSchreiben,
   onSpeichern,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   rufname: string | null | undefined;
   fahrzeugIds: readonly number[];
   quelle: ReturnType<typeof useFahrzeugeQuelle>;
@@ -1140,6 +1231,7 @@ function RufnameAngabe({
 }) {
   return (
     <InlineAngabe<string>
+      vermerk={vermerk}
       etikett="Rufname"
       wert={rufname ?? ''}
       anzeige={
@@ -1222,7 +1314,10 @@ function FahrzeugeAngabe({
   quelle,
   darfSchreiben,
   onSpeichern,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   ids: readonly number[];
   quelle: ReturnType<typeof useFahrzeugeQuelle>;
   darfSchreiben: boolean;
@@ -1233,6 +1328,7 @@ function FahrzeugeAngabe({
   const gewaehlt = quelle.fahrzeuge.filter((f) => ids.includes(f.id));
   return (
     <InlineAngabe<number[]>
+      vermerk={vermerk}
       etikett="Führungsfahrzeuge"
       wert={gewaehlt.map((f) => f.id)}
       anzeige={gewaehlt.map(fahrzeugText).join(', ')}
@@ -1321,6 +1417,7 @@ export default function EinsatzdatenPage() {
   // Feld-CAS mit dem einen Konfliktablauf (LLH-1831, `components/useFeldKonflikt`): die Schlüssel
   // des Patches gehen mit ihrem Wert beim Öffnen als `erwartet` mit.
   const konflikt = useFeldKonflikt();
+  const konv = useAnzeigeKonventionen();
   const feldSpeichern: FeldSpeichern = (etikett, patch, alt) =>
     konflikt({
       etikett,
@@ -1337,6 +1434,7 @@ export default function EinsatzdatenPage() {
       aktuell: (frisch) => ({
         wert: ausschnitt(frisch, patch),
         vermerk: vermerkFuer(frisch.vermerke, patch),
+        anzeige: kopfAnzeige(frisch, patch, konv),
       }),
       text: ausschnittText,
       leer: (w) => w === undefined || ausschnittLeer(w),
@@ -1443,9 +1541,11 @@ export default function EinsatzdatenPage() {
       >
         <KopfAngabe
           etikett="Einsatzstichwort"
+          vermerk={einsatz.vermerke?.stichwort}
           wert={
             <InlineAngabe<string>
               etikett="Einsatzstichwort"
+              vermerk={einsatz.vermerke?.stichwort}
               wert={einsatz.stichwort ?? ''}
               anzeige={einsatz.stichwort}
               leer={leererText}
@@ -1474,10 +1574,12 @@ export default function EinsatzdatenPage() {
         />
         <KopfAngabe
           etikett="Alarmzeit"
+          vermerk={einsatz.vermerke?.begonnen_at}
           mono
           wert={
             <ZeitpunktAngabe
               etikett="Alarmzeit"
+              vermerk={einsatz.vermerke?.begonnen_at}
               wire={einsatz.begonnen_at}
               pflicht
               darfSchreiben={darfBearbeiten}
@@ -1534,6 +1636,7 @@ export default function EinsatzdatenPage() {
                 wert: (
                   <TextAngabe
                     etikett="Bezeichnung"
+                    vermerk={einsatz.vermerke?.bezeichnung}
                     wert={einsatz.bezeichnung}
                     pflicht
                     darfSchreiben={darfBearbeiten}
@@ -1549,6 +1652,7 @@ export default function EinsatzdatenPage() {
                 wert: (
                   <InlineAngabe<Einsatzart>
                     etikett="Einsatzart"
+                    vermerk={einsatz.vermerke?.einsatzart}
                     wert={einsatz.einsatzart}
                     anzeige={EINSATZART_LABELS[einsatz.einsatzart]}
                     // Pflicht, aber ein `Select` ohne `allowClear` kann nicht leer werden.
@@ -1579,6 +1683,7 @@ export default function EinsatzdatenPage() {
                 wert: (
                   <TextAngabe
                     etikett="Leitstellen-Nr."
+                    vermerk={einsatz.vermerke?.leitstellen_nr}
                     wert={einsatz.leitstellen_nr}
                     mono
                     darfSchreiben={darfBearbeiten}
@@ -1630,6 +1735,7 @@ export default function EinsatzdatenPage() {
                 wert: (
                   <InlineAngabe<string>
                     etikett="Meldende Stelle"
+                    vermerk={einsatz.vermerke?.meldende_stelle}
                     wert={einsatz.meldende_stelle ?? ''}
                     anzeige={einsatz.meldende_stelle}
                     leer={leererText}
@@ -1664,6 +1770,7 @@ export default function EinsatzdatenPage() {
                 wert: (
                   <TextAngabe
                     etikett="Sachverhalt / Meldebild"
+                    vermerk={einsatz.vermerke?.sachverhalt}
                     wert={einsatz.sachverhalt}
                     mehrzeilig
                     darfSchreiben={darfBearbeiten}
@@ -1678,6 +1785,7 @@ export default function EinsatzdatenPage() {
                 wert: (
                   <InlineAngabe<number | null>
                     etikett="Anzahl Betroffene (initial)"
+                    vermerk={einsatz.vermerke?.anzahl_betroffene_initial}
                     wert={einsatz.anzahl_betroffene_initial ?? null}
                     anzeige={
                       <span style={zahlStil('text')}>{einsatz.anzahl_betroffene_initial}</span>

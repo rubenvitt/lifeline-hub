@@ -1,3 +1,4 @@
+import type { FeldVermerk } from '../api/types';
 import { Button } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -115,7 +116,10 @@ export default function EinsatzleiterAngabe({
   fs,
   darfSchreiben,
   onSpeichern,
+  vermerk,
 }: {
+  /** Wer zuletzt geändert hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   einsatzId: number;
   fs: Fuehrungsstelle;
   darfSchreiben: boolean;
@@ -161,6 +165,7 @@ export default function EinsatzleiterAngabe({
   return (
     <InlineAngabe<Wahl>
       etikett="Einsatzleiter"
+      vermerk={vermerk}
       wert={gespeichert}
       anzeige={
         d.art === 'erfasst' ? (

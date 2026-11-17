@@ -49,8 +49,12 @@ wann zuletzt geändert hat („Geändert von <Name>, <Zeit>“). Der Kopf eines 
 verdecken.
 
 #### Scenario: Paneel Einsatz
-- **WHEN** im Paneel „Einsatz“ der Einsatzdaten zuletzt B das Stichwort um 14:05 geändert hat
-- **THEN** nennt der Paneelkopf „Zuletzt geändert von B, 14:05“, und die Zeile Stichwort trägt denselben Vermerk
+- **WHEN** im Paneel „Einsatz“ der Einsatzdaten zuletzt B die Leitstellen-Nr. um 14:05 geändert hat
+- **THEN** nennt der Paneelkopf „Zuletzt geändert von B, 14:05“, und die Zeile Leitstellen-Nr. trägt denselben Vermerk
+
+#### Scenario: Angabe in der Kopfleiste
+- **WHEN** B das Einsatzstichwort um 14:05 geändert hat
+- **THEN** steht unter dem Stichwort in der Kopfleiste „Geändert von B, 14:05“
 
 #### Scenario: Ohne Vermerk
 - **WHEN** an einem Paneel keine Angabe seit dem Anlegen geändert wurde

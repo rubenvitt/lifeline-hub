@@ -654,7 +654,9 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
-    expect(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }),
+    ).toBeInTheDocument();
     expect(within(formular()).queryByRole('alert')).toBeNull();
     keinToast();
   });

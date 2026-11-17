@@ -265,52 +265,47 @@ pub async fn aendern(
     // Feld-CAS (LLH-1831, design.md D1/D2): Altwert nur mit Änderung desselben Felds, die
     // Koordinate nur als Paar (422); aufbereitet wie der Patch.
     let erwartet = body.erwartet.unwrap_or_default();
-    crate::feld_cas::pruefe_felder(
-        &[
-            ("art", erwartet.art.is_some(), art.is_some()),
-            (
-                "bezeichnung",
-                erwartet.bezeichnung.is_some(),
-                bezeichnung.is_some(),
-            ),
-            (
-                "standort_adresse",
-                erwartet.standort_adresse.is_some(),
-                adresse.is_some(),
-            ),
-            (
-                "standort_lat",
-                erwartet.standort_lat.is_some(),
-                body.standort_lat.is_some(),
-            ),
-            (
-                "standort_lon",
-                erwartet.standort_lon.is_some(),
-                body.standort_lon.is_some(),
-            ),
-            ("rufname", erwartet.rufname.is_some(), rufname.is_some()),
-            (
-                "verbindungen",
-                erwartet.verbindungen.is_some(),
-                neue_verbindungen.is_some(),
-            ),
-            (
-                "fahrzeug_ids",
-                erwartet.fahrzeug_ids.is_some(),
-                fahrzeug_ids.is_some(),
-            ),
-            (
-                "einsatzleiter",
-                erwartet.einsatzleiter.is_some(),
-                einsatzleiter.is_some(),
-            ),
-        ],
-        &[(
+    // Lage je Feld vor den Einzelprüfungen festhalten; die Kombination (422) prüft erst danach,
+    // damit ein 400 je Feld vorgeht (`src/AGENTS.md`, Statuscode-Konvention).
+    let erwartet_lage: &[crate::feld_cas::FeldLage] = &[
+        ("art", erwartet.art.is_some(), art.is_some()),
+        (
+            "bezeichnung",
+            erwartet.bezeichnung.is_some(),
+            bezeichnung.is_some(),
+        ),
+        (
+            "standort_adresse",
+            erwartet.standort_adresse.is_some(),
+            adresse.is_some(),
+        ),
+        (
             "standort_lat",
+            erwartet.standort_lat.is_some(),
+            body.standort_lat.is_some(),
+        ),
+        (
             "standort_lon",
-            "erwartet trägt den Standort nur als Paar (standort_lat und standort_lon)",
-        )],
-    )?;
+            erwartet.standort_lon.is_some(),
+            body.standort_lon.is_some(),
+        ),
+        ("rufname", erwartet.rufname.is_some(), rufname.is_some()),
+        (
+            "verbindungen",
+            erwartet.verbindungen.is_some(),
+            neue_verbindungen.is_some(),
+        ),
+        (
+            "fahrzeug_ids",
+            erwartet.fahrzeug_ids.is_some(),
+            fahrzeug_ids.is_some(),
+        ),
+        (
+            "einsatzleiter",
+            erwartet.einsatzleiter.is_some(),
+            einsatzleiter.is_some(),
+        ),
+    ];
     let erwartet_art = erwartet
         .art
         .map(|a| {
@@ -340,6 +335,14 @@ pub async fn aendern(
             .transpose()
         })
         .transpose()?;
+    crate::feld_cas::pruefe_felder(
+        erwartet_lage,
+        &[(
+            "standort_lat",
+            "standort_lon",
+            "erwartet trägt den Standort nur als Paar (standort_lat und standort_lon)",
+        )],
+    )?;
     // Ein leerer Patch ändert nichts: keine Zeile, kein Ereignis.
     if art.is_none()
         && bezeichnung.is_none()

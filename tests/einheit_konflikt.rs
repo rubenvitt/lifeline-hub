@@ -298,3 +298,23 @@ async fn geerbte_soll_staerke_als_altwert_ist_kein_konflikt() {
         6
     );
 }
+
+/// 400 je Feld vor dem 422 der Kombination (`src/AGENTS.md`, Statuscode-Konvention; Review
+/// LLH-1831): ein zu langer Altwert ist 400, auch wenn `erwartet` zugleich ein Feld ohne Änderung
+/// nennt.
+#[tokio::test]
+async fn zu_langer_altwert_ist_400_vor_dem_422() {
+    let (app, admin, einsatz, eid) = start().await;
+    let (s, j) = patchen(
+        &app,
+        &admin,
+        einsatz,
+        eid,
+        json!({
+            "bemerkung": "x",
+            "erwartet": {"bemerkung": "y".repeat(5000), "name": "Trupp 1"}
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
+}

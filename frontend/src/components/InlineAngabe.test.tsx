@@ -894,6 +894,13 @@ describe('InlineAngabe · Wert beim Öffnen und fremde Änderung', () => {
     expect(screen.queryByText(/Inzwischen geändert/)).not.toBeInTheDocument();
   });
 
+  it('ohneFremdHinweis: kein Hinweis, auch wenn der Live-Wert wechselt (Sprechgruppen)', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" ohneFremdHinweis />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    rerender(<TextAngabe wert="ILS-2" anzeige="ILS-2" ohneFremdHinweis />);
+    expect(screen.queryByText(/Inzwischen geändert/)).not.toBeInTheDocument();
+  });
+
   it('ein fremder leerer Wert heißt „ohne Angabe“', async () => {
     const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
     await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
