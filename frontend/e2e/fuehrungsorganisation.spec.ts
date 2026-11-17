@@ -371,18 +371,6 @@ for (const groesse of [FUEKW, { width: 390, height: 844 }]) {
     const oben = () => ebene1.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
 
     await ziel(page).focus();
-    // Erst messen, wenn die Seite steht: bei 390 px kippt die Werkzeugzeile beim Laden einmal um,
-    // solange die Bildlaufleiste kommt und geht (gemessen 96 → 63 px, seit LLH-1774 die Knöpfe
-    // in 14 px stehen). Das ist Einschwingen beim Laden, nicht der Banner, um den es hier geht.
-    let vorher = Number.NaN;
-    await expect
-      .poll(async () => {
-        const jetzt = await oben();
-        const steht = jetzt === vorher;
-        vorher = jetzt;
-        return steht;
-      })
-      .toBe(true);
     const ruhe = await oben();
     await post(page, einsatzId, 'abschnitte', { name: 'Einsatzabschnitt Neu' });
     await expect(stand(page).getByRole('status')).toContainText('1 neu');

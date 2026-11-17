@@ -20,7 +20,7 @@ import type {
 } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { Paneel, useRollen, zielEinzug, zahlStil } from '../components/instrument';
+import { Paneel, monoStil, useRollen, zielEinzug } from '../components/instrument';
 import type { PaneelUeberschrift } from '../components/instrument/Paneel';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
@@ -430,12 +430,7 @@ function Baum({
             meta={
               <span>
                 {k.typ_label}
-                {k.funkrufname && (
-                  <span data-schrift="kennung" style={zahlStil('klein')}>
-                    {' '}
-                    · {k.funkrufname}
-                  </span>
-                )}
+                {k.funkrufname && <span style={monoStil(12)}> · {k.funkrufname}</span>}
               </span>
             }
             koerperPolster
@@ -457,9 +452,7 @@ function Baum({
                   onWahl={onWahl}
                   beschriftung={
                     <>
-                      <span data-schrift="kennung" style={zahlStil('text')}>
-                        {f.funkrufname}
-                      </span>
+                      <span style={monoStil(14)}>{f.funkrufname}</span>
                       {f.fahrzeugtyp && (
                         <Typography.Text type="secondary"> {f.fahrzeugtyp}</Typography.Text>
                       )}
@@ -630,9 +623,7 @@ function MaterialZeile({
         style={{ flex: '1 1 auto', minWidth: 0 }}
       >
         {position.menge}× {position.bezeichnung}
-        {position.bestandsnummer && (
-          <span style={zahlStil('text')}> {position.bestandsnummer}</span>
-        )}
+        {position.bestandsnummer && <span style={monoStil(13)}> {position.bestandsnummer}</span>}
       </Checkbox>
       <Typography.Text type="secondary" data-lfh="vorlage-zustand" style={{ whiteSpace: 'nowrap' }}>
         {materialZustandWort(position)}

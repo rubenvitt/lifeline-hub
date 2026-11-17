@@ -1,4 +1,5 @@
 import { Collapse, Form, Input, InputNumber, type TableColumnsType } from 'antd';
+import { monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
 import {
@@ -14,7 +15,6 @@ import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
-import { zahlStil } from '../components/instrument/rollenwerte';
 
 interface FormWerte {
   label: string;
@@ -66,7 +66,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     key: 'farbe',
     // Der gepflegte Code als Wert (Mono), keine Farbfläche: `status_farbe` ist ungeprüfter
     // Freitext, sein Kontrast ist nicht zugesichert (siehe `StatusTag`, Mandantenfarbe).
-    render: (f: string | null) => (f ? <span style={zahlStil('klein')}>{f}</span> : '—'),
+    render: (f: string | null) => (f ? <span style={monoStil(12)}>{f}</span> : '—'),
   },
   {
     title: 'FMS-Anker',
@@ -74,7 +74,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     key: 'fms_anker',
     sorter: nachZahl((s: FahrzeugStatus) => s.fms_anker),
     // `== null`, nicht Wahrheitswert: 0 ist ein gültiger Anker.
-    render: (f: number | null) => (f == null ? '—' : <span style={zahlStil('klein')}>{f}</span>),
+    render: (f: number | null) => (f == null ? '—' : <span style={monoStil(12)}>{f}</span>),
   },
   markeSpalte,
   {
@@ -82,7 +82,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     dataIndex: 'sortier',
     key: 'sortier',
     sorter: nachZahl((s: FahrzeugStatus) => s.sortier),
-    render: (n: number) => <span style={zahlStil('klein')}>{n}</span>,
+    render: (n: number) => <span style={monoStil(12)}>{n}</span>,
   },
 ];
 

@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'react-router';
 import type { Dayjs } from 'dayjs';
 import { QRCodeSVG } from 'qrcode.react';
 import { IconKreuz, IconPlus, IconSchluessel, IconUhr } from '../../icons';
-import { Formularpaneel, useRollen, zahlStil } from '../../components/instrument';
+import { Formularpaneel, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -555,7 +555,7 @@ export default function EinsatzGeraete() {
               <KopierbarerText text={anzeigeCode.code.code} bezeichnung="Kopplungscode">
                 <span
                   data-lfh="kopplungscode-text"
-                  style={{ ...zahlStil('wert', 500), letterSpacing: '0.1em' }}
+                  style={{ ...monoStil(24, 500), letterSpacing: '0.1em' }}
                 >
                   {codeGruppiert(anzeigeCode.code.code)}
                 </span>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dichten } from '../theme/tokens';
-import { EINHEITEN_STUFE, einheitenSprungAufbau } from './einheitenSprung';
+import { EINHEITEN_SCHRIFT, einheitenSprungAufbau } from './einheitenSprung';
 
 /**
  * Die Zeile „Als Einheit übernommen: …“ in der schmalen Board-Spalte (LLH-1410). Mit dem
@@ -15,8 +15,8 @@ describe('einheitenSprungAufbau', () => {
     lineHeight: ANTD_ZEILE,
   });
 
-  it('schreibt die Zeile in der Stufe text (14 px in kompakt, LLH-1775)', () => {
-    expect(EINHEITEN_STUFE).toBe('text');
+  it('schreibt die Zeile in 13 px', () => {
+    expect(EINHEITEN_SCHRIFT).toBe(13);
   });
 
   it('kompakt: die Links fließen im Satz und tragen keinen Steuerboden', () => {
@@ -31,8 +31,8 @@ describe('einheitenSprungAufbau', () => {
     const aufbau = einheitenSprungAufbau(tokenFuer('kompakt'));
     if (aufbau.art !== 'fliessend') throw new Error('kompakt fließt');
     const polster = aufbau.link.paddingBlock as number;
-    // 14 × 22/14 = 22 px Zeile (Stufe text in kompakt); 2 × Polster ergänzt auf 24.
-    expect(14 * ANTD_ZEILE + 2 * polster).toBeCloseTo(24, 5);
+    // 13 × 22/14 ≈ 20,43 px Zeile; 2 × Polster ergänzt auf 24.
+    expect(13 * ANTD_ZEILE + 2 * polster).toBeCloseTo(24, 5);
     // Höchstens 2 px je Seite: mehr griffe in die Nachbarzeile.
     expect(polster).toBeLessThanOrEqual(2);
   });

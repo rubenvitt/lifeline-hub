@@ -43,13 +43,7 @@ import { einsatzStatus } from '../theme/statusFarben';
 // Ausfall wäre in keinem Test sichtbar.
 import '../theme/sprache.css';
 import './EinsaetzePage.css';
-import {
-  Sammelbanner,
-  UebungsMarke,
-  schriftStil,
-  useRollen,
-  zahlStil,
-} from '../components/instrument';
+import { monoStil, Sammelbanner, UebungsMarke, useRollen } from '../components/instrument';
 import {
   flachZufluss,
   useZuflussSchleuse,
@@ -500,17 +494,13 @@ function EinsaetzeInhalt() {
           </span>
           <span
             style={{
-              ...schriftStil('meta'),
+              ...monoStil(12),
               display: 'flex',
               flexWrap: 'wrap',
               columnGap: token.marginXS,
             }}
           >
-            {kennung && (
-              <span data-lfh="einsatznummer" style={zahlStil('klein')}>
-                {kennung}
-              </span>
-            )}
+            {kennung && <span data-lfh="einsatznummer">{kennung}</span>}
             <span>seit {zeitKurz(e.begonnen_at)}</span>
             {e.stichwort && <span>{e.stichwort}</span>}
           </span>

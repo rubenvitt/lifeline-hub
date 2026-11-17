@@ -14,10 +14,9 @@ import {
   Paneel,
   PaneelLink,
   PaneelZustand,
+  monoStil,
   useRollen,
   type PaneelDatenzustand,
-  schriftGroesse,
-  zahlStil,
 } from '../components/instrument';
 import { KEIN_PEGEL, VERALTET, pegelZeile, prognoseOffen } from '../pegel/pegelKennzahl';
 import Verlaufslinie from './Verlaufslinie';
@@ -108,10 +107,10 @@ export default function PegelPaneel({
                     {z.gewaesser ? ` · ${z.gewaesser}` : ''}
                   </Augenbraue>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS }}>
-                    <span style={{ ...zahlStil('gross', 500), color: rollen.text }}>{z.wert}</span>
+                    <span style={{ ...monoStil(28, 500), color: rollen.text }}>{z.wert}</span>
                     {z.einheit && <span style={{ color: rollen.gedaempft }}>{z.einheit}</span>}
                   </div>
-                  <div style={{ color: rollen.text2, fontSize: schriftGroesse('klein') }}>
+                  <div style={{ color: rollen.text2, fontSize: 12 }}>
                     {[z.trend, z.stand].filter(Boolean).join(' · ')}
                     {z.veraltet && (
                       <span style={{ color: rollen.achtungText, fontWeight: 600 }}>
@@ -121,20 +120,14 @@ export default function PegelPaneel({
                     )}
                   </div>
                   {z.prognose && (
-                    <div style={{ color: rollen.text2, fontSize: schriftGroesse('klein') }}>
-                      {z.prognose}
-                    </div>
+                    <div style={{ color: rollen.text2, fontSize: 12 }}>{z.prognose}</div>
                   )}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   {z.fall === 'ausfall' ? null : verlauf === null ? (
-                    <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>
-                      {VERLAUF_FEHLT}
-                    </span>
+                    <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{VERLAUF_FEHLT}</span>
                   ) : verlauf === undefined ? null : reihe.length === 0 ? (
-                    <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>
-                      {KEIN_VERLAUF}
-                    </span>
+                    <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{KEIN_VERLAUF}</span>
                   ) : (
                     <Verlaufslinie
                       punkte={reihe}

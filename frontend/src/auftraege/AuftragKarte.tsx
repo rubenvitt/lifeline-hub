@@ -19,7 +19,6 @@ import {
 } from './AuftragTeile';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useKartenKontext } from '../components/useKartenKontext';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 const { Text } = Typography;
 
@@ -107,15 +106,7 @@ function AuftragKarte({
     >
       <AuftragKopf auftrag={a} einsatzId={einsatzId} />
 
-      <Text
-        strong
-        style={{
-          fontSize: schriftGroesse('text'),
-          lineHeight: 1.4,
-          display: 'block',
-          marginBottom: 8,
-        }}
-      >
+      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: 8 }}>
         {a.auftrag_text}
       </Text>
 

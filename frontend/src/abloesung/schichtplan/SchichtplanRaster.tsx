@@ -10,7 +10,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { useRollen, schriftGroesse, schriftStil, zahlStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import { KontextMenue, type KontextMenueOffen } from '../../components/KontextMenue';
 import type { MenueEintrag } from '../../components/MenueAusloeser';
 import { useKontextMenue, type KontextHandler } from '../../components/useKontextMenue';
@@ -432,7 +432,7 @@ export default function SchichtplanRaster({
                           : 'translateX(-50%)',
                     bottom: 2,
                     color: rollen.gedaempft,
-                    ...zahlStil('fein'),
+                    ...monoStil(11),
                     whiteSpace: 'nowrap',
                   }}
                 >
@@ -572,9 +572,7 @@ export default function SchichtplanRaster({
                           background: rollen.auswahlFlaeche,
                           pointerEvents: 'none',
                           zIndex: 3,
-                          // „14:00–18:00 · Kopie“ trägt Wörter: Textschrift (LLH-1777).
-                          ...schriftStil('meta'),
-                          fontSize: schriftGroesse('fein'),
+                          ...monoStil(11),
                           color: rollen.text,
                           paddingInline: 4,
                           whiteSpace: 'nowrap',
@@ -729,14 +727,12 @@ function BlockKachel({
         zIndex: 2,
       }}
     >
-      <span
-        style={{ ...schriftStil('meta'), fontSize: schriftGroesse('fein'), whiteSpace: 'nowrap' }}
-      >
+      <span style={{ ...monoStil(11), whiteSpace: 'nowrap' }}>
         {zeit} · {block.ampelWort}
       </span>
       <span
         style={{
-          fontSize: schriftGroesse('klein'),
+          fontSize: 12,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
