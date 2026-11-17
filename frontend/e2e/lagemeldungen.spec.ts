@@ -41,13 +41,14 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
   await page.goto(`/einsaetze/${id}/lagemeldungen`);
   await expect(page.getByText('1 Lagemeldung', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
-  const paneel = page.getByRole('region', { name: 'Lagemeldung erfassen' });
-  await paneel
+  // Erfassen im Dialog (LLH-1921, Spec `bedien-muster`).
+  const dialog = page.getByRole('dialog', { name: 'Lagemeldung erfassen' });
+  await dialog
     .getByRole('textbox', { name: 'Inhalt / Wortlaut' })
     .fill('Pegel Mühlbach steigt, Deich hält');
-  await paneel.getByRole('combobox', { name: 'Absender' }).fill('EA Unterstadt');
-  await paneel.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
-  await expect(paneel).toBeHidden();
+  await dialog.getByRole('combobox', { name: 'Absender' }).fill('EA Unterstadt');
+  await dialog.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
+  await expect(dialog).toBeHidden();
 
   const sicht = page.getByRole('region', { name: 'Lagemeldungen' });
   const zeilen = sicht.getByRole('listitem');

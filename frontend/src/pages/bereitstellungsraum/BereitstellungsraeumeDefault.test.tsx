@@ -88,7 +88,7 @@ describe('BereitstellungsraeumeDefault', () => {
     expect(await screen.findByText('DETAIL-7')).toBeInTheDocument();
   });
 
-  it('zeigt bei 0 BR einen Leerzustand, dessen CTA den Anlegen-Drawer öffnet', async () => {
+  it('zeigt bei 0 BR einen Leerzustand, dessen CTA den Anlegen-Dialog öffnet', async () => {
     server.use(http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])));
     renderDefault();
     await userEvent.click(await screen.findByRole('button', { name: 'Ersten BR anlegen' }));

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { uhsDetailPfad } from '../../routing/deeplinks';
 import { listeUhs } from '../../api/einsatzUhs';
 import { einsatzKeys } from '../../api/queryKeys';
-import UhsAnlegenDrawer from './UhsAnlegenDrawer';
+import UhsAnlegenModal from './UhsAnlegenModal';
 import type { Uhs, UhsStatus } from '../../api/types';
 import { uhsStatus } from '../../theme/statusFarben';
 import EinstiegSwitcher from '../../components/EinstiegSwitcher';
@@ -40,7 +40,7 @@ export default function UhsSwitcher({
         neuLabel="+ Neue UHS"
         onNeu={() => setAnlegen(true)}
       />
-      <UhsAnlegenDrawer
+      <UhsAnlegenModal
         einsatzId={einsatzId}
         open={anlegen}
         onClose={() => setAnlegen(false)}
