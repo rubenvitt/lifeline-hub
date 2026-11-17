@@ -26,6 +26,10 @@ import { schriftGroesse, useRollen } from './rollenwerte';
  * KOPF-AKTION (LLH-1815): eine Handlung am Paneel selbst, kein Sprung ins Modul („Ausblenden“ der
  * Startliste im Überblick). Sie steht als Knopf ohne „↗“ hinter dem Sprung und in jedem Zustand,
  * auch gesperrt: sie führt in kein Modul.
+ *
+ * KOPF-HINWEIS (LLH-1934): eine Mitteilung im Kopf vor Sprung und Kopf-Aktion, etwa der
+ * Sammelbanner des `StromPaneel`. Abstand wie zwischen Meta und Aktion, damit ein Hinweis an der
+ * Stelle des Metas den Kopf nicht anders umbrechen lässt.
  */
 
 /** Datenzustand eines Dashboard-Paneels: die vier des `PaneelZustand` plus `gesperrt`. */
@@ -50,6 +54,8 @@ export interface DashboardPaneelBasis {
   sprung?: DashboardAktion;
   /** Handlung am Paneel selbst, ohne „↗“, in jedem Zustand (siehe Dateikopf). */
   kopfAktion?: DashboardAktion;
+  /** Mitteilung im Kopf vor Sprung und Kopf-Aktion (siehe Dateikopf). */
+  kopfHinweis?: ReactNode;
   leerText: string;
   /** Grund im Zustand `gesperrt` („Modul Personen nicht freigegeben.“). */
   gesperrtText: string;
@@ -72,6 +78,7 @@ export default function DashboardPaneel({
   meta,
   sprung,
   kopfAktion,
+  kopfHinweis,
   leerText,
   gesperrtText,
   leerAktion,
@@ -98,19 +105,29 @@ export default function DashboardPaneel({
         {kopfAktion.label}
       </Button>
     );
+  const aktion =
+    sprungLink && aktionKnopf ? (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingXS }}>
+        {sprungLink}
+        {aktionKnopf}
+      </span>
+    ) : (
+      (sprungLink ?? aktionKnopf ?? undefined)
+    );
   return (
     <Paneel
       titel={titel}
       ueberschrift={ueberschrift}
       meta={meta}
       aktion={
-        sprungLink && aktionKnopf ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingXS }}>
-            {sprungLink}
-            {aktionKnopf}
-          </span>
+        kopfHinweis == null ? (
+          aktion
         ) : (
-          (sprungLink ?? aktionKnopf ?? undefined)
+          // Abstand wie `paneelKopfRechtsStil` zwischen Meta und Aktion (siehe Dateikopf).
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingSM }}>
+            {kopfHinweis}
+            {aktion}
+          </span>
         )
       }
       fuss={fuss}

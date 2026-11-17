@@ -2,7 +2,28 @@
 titel: Lagebild
 gruppen: [alle, fuehrung]
 reihenfolge: 400
-quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/lage/wasBrennt.ts, frontend/src/lage/useWasBrennt.ts, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/verlauf.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts, frontend/src/pages/lage-dashboard/LagebildGrossbild.tsx, frontend/src/pages/lage-dashboard/kennzahlAnzeige.ts, frontend/src/components/grossbild/]
+quellen:
+  [
+    frontend/src/pages/lage-dashboard/LageDashboardPage.tsx,
+    frontend/src/lage/wasBrennt.ts,
+    frontend/src/lage/useWasBrennt.ts,
+    frontend/src/pages/lage-dashboard/LagePaneele.tsx,
+    frontend/src/pages/lage-dashboard/lagebild.ts,
+    frontend/src/pages/lage-dashboard/verlauf.ts,
+    frontend/src/pages/lage-dashboard/lageVerdichtung.ts,
+    frontend/src/pages/gefahren/erlaeuterungen.ts,
+    frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx,
+    frontend/src/pages/lage-dashboard/meldungsstrom.ts,
+    frontend/src/pages/lage-dashboard/useLagebild.ts,
+    frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts,
+    src/einsatz/lagekennzahl.rs,
+    frontend/src/wetter/kopfWarnung.ts,
+    frontend/src/wetter/WetterKopfMarke.tsx,
+    frontend/src/api/queryKeys.ts,
+    frontend/src/pages/lage-dashboard/LagebildGrossbild.tsx,
+    frontend/src/pages/lage-dashboard/kennzahlAnzeige.ts,
+    frontend/src/components/grossbild/,
+  ]
 ---
 
 ## Überblick
@@ -39,11 +60,13 @@ Modul, in dem sie erfasst wird.
 ### Neue ETB-Einträge im Lagebild anzeigen
 
 1. Im Lagebild bleiben, während neue Einträge eingehen. Das Paneel „Jüngste ETB-Einträge“ schiebt
-   sie nicht zwischen die gelesenen Zeilen, sondern kündigt sie oben an („… neue Einträge“).
+   sie nicht zwischen die gelesenen Zeilen, sondern kündigt sie im Paneelkopf an („2 neu“, an der
+   Stelle von „live“).
 
-   ![Paneel „Jüngste ETB-Einträge“ mit dem Hinweis „2 neue Einträge“ und dem Knopf „anzeigen“](../bilder/lagebild/etb-eintraege-neu.png)
+   ![Paneel „Jüngste ETB-Einträge“ mit dem Knopf „2 neu“ im Kopf neben „ETB“](../bilder/lagebild/etb-eintraege-neu.png)
 
-2. „anzeigen“ wählen: Die neuen Einträge stehen oben im Paneel, der Hinweis verschwindet.
+2. „2 neu“ wählen: Die neuen Einträge stehen oben im Paneel, der Knopf verschwindet, und im Kopf
+   steht wieder „live“.
 
 ### Das Lagebild im Großbild zeigen
 
