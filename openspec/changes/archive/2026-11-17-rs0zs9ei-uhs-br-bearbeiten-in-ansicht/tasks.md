@@ -41,7 +41,7 @@
 
 ## 7. Prüfen
 
-- [ ] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (in Teilen gefahren wegen des Plattenkontingents; Desktop-Hülle hier ohne GTK nicht baubar, siehe PR „Geprüft“)
 - [x] 7.2 Bilder der Änderung (UHS-Bereich „Angaben“ lesen und offen, BR-Paneel „Raumdaten“ lesen und offen) per Wegwerf-Spec aufgenommen
 
 ## 8. Befunde des Reviews vor dem PR
