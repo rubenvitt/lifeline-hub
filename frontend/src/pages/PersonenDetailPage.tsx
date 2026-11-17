@@ -6,6 +6,7 @@ import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import {
   Alert,
+  App,
   Breadcrumb,
   Button,
   Collapse,
@@ -36,7 +37,8 @@ import {
   setzePersonStatus,
   stornierePerson,
 } from '../api/einsatzPerson';
-import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
+import { listeUhs, aenderePersonBelegung, nimmUhsAustrittZurueck } from '../api/einsatzUhs';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzKeys } from '../api/queryKeys';
 import { STATUS_META } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -50,7 +52,7 @@ import PersonBezuege from '../personen/PersonBezuege';
 import Personendaten from '../personen/Personendaten';
 import { UhsZuweisenDialog } from '../personen/ZuweisungsDialoge';
 import KatalogTabelle from '../components/KatalogTabelle';
-import type { Person, PersonDetail, PersonStatus, PersonZugriff } from '../api/types';
+import type { Person, PersonDetail, PersonStatus, PersonZugriff, UhsBelegung } from '../api/types';
 import { lagekartePfad, parseRouteId, personDruckPfad } from '../routing/deeplinks';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -283,9 +285,36 @@ export default function PersonenDetailPage() {
     invalidateDetail();
     qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
   }
-  const austrittMutation = useMutation({
+  // Austragen ist umkehrbar (LLH-1924, Spec `personen-detail`, „Austragen rückgängig im
+  // Patientenkopf“): der Hinweis nimmt genau diesen Austritt zurück, mit Platz und Wartezeit.
+  const { message } = App.useApp();
+  const austrittZurueckMutation = useMutation({
+    // Person und Austritt aus dem Austragen, nicht aus dem Render beim Klick (Review LLH-1924).
+    mutationFn: (v: { austrittId: number; personId: number; kennung: string; uhs: string }) =>
+      nimmUhsAustrittZurueck(einsatzId, v.personId, v.austrittId),
+    onSuccess: (antwort, v) => {
+      if (antwort.ohne_platz) {
+        void message.info(
+          `${v.kennung} wieder in ${v.uhs}, im Wartebereich: der Platz ist nicht frei`,
+        );
+      }
+      invalidateUhs();
+    },
+  });
+  // Kennung und UHS reisen als Variablen nur für den Hinweis mit.
+  const austrittMutation = useMutation<UhsBelegung, Error, { kennung: string; uhs: string }>({
     mutationFn: () => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
-    onSuccess: invalidateUhs,
+    onMutate: () => austrittZurueckMutation.reset(),
+    onSuccess: (antwort, v) => {
+      invalidateUhs();
+      zeigeRueckgaengig(message, `${v.kennung} aus ${v.uhs} ausgetragen`, () =>
+        austrittZurueckMutation.mutate({
+          ...v,
+          austrittId: antwort.id,
+          personId: antwort.person_id,
+        }),
+      );
+    },
   });
 
   const abgleichEntscheidenMutation = useMutation({
@@ -310,6 +339,7 @@ export default function PersonenDetailPage() {
   const { leere: leereAbgleiche } = abgleichFehler;
   const { reset: stornoReset } = stornoMutation;
   const { reset: austrittReset } = austrittMutation;
+  const { reset: austrittZurueckReset } = austrittZurueckMutation;
   const vorigePerson = useRef(personSchluessel);
   useEffect(() => {
     if (vorigePerson.current === personSchluessel) return;
@@ -317,7 +347,8 @@ export default function PersonenDetailPage() {
     leereAbgleiche();
     stornoReset();
     austrittReset();
-  }, [personSchluessel, leereAbgleiche, stornoReset, austrittReset]);
+    austrittZurueckReset();
+  }, [personSchluessel, leereAbgleiche, stornoReset, austrittReset, austrittZurueckReset]);
 
   // Die Bezüge (`personen/PersonBezuege.tsx`) hält der Einsatz-Live-Stream im EinsatzLayout aktuell:
   // `tier`→'einsatz-tiere', `schaden`→'einsatz-schaeden'. Der Prefix-Match deckt die Keys
@@ -688,7 +719,12 @@ export default function PersonenDetailPage() {
           <Button
             danger
             loading={austrittMutation.isPending}
-            onClick={() => austrittMutation.mutate()}
+            onClick={() =>
+              austrittMutation.mutate({
+                kennung: registrierAnzeige(p.registrier_nr),
+                uhs: p.aufenthalt?.uhs_bezeichnung ?? 'der UHS',
+              })
+            }
           >
             Austragen
           </Button>
@@ -703,6 +739,13 @@ export default function PersonenDetailPage() {
           fehler={austrittMutation.error}
           titel="Nicht ausgetragen"
           fallback="Austragen fehlgeschlagen"
+        />
+      )}
+      {austrittZurueckMutation.error != null && (
+        <SpeicherFehler
+          fehler={austrittZurueckMutation.error}
+          titel="Nicht zurückgenommen"
+          fallback="Rückgängig fehlgeschlagen"
         />
       )}
     </>

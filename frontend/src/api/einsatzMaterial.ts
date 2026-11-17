@@ -7,6 +7,7 @@ import type {
   MaterialStatus,
 } from './types';
 import { apiGet, apiSend } from './client';
+import { zuruecknahmeQuery, type ZuruecknahmeFilter } from './einheiten';
 
 export interface MaterialAdhocEingabe {
   bezeichnung: string;
@@ -99,12 +100,21 @@ export interface MaterialPatch extends MaterialOrtPatch {
   traegerorganisation?: string | null;
 }
 
+/**
+ * Ändert einen Posten. Das Rückgängig nach dem Lösen vom Ort schickt `nurWennFrei` (LLH-1924):
+ * liegt der Posten inzwischen an einem anderen Ort, 409 statt Umsetzen.
+ */
 export function updateDisposition(
   einsatzId: number,
   emId: number,
   felder: MaterialPatch,
+  optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
 ): Promise<EinsatzMaterial> {
-  return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material/${emId}`, 'PATCH', felder);
+  return apiSend<EinsatzMaterial>(
+    `/api/einsaetze/${einsatzId}/material/${emId}${zuruecknahmeQuery(optionen)}`,
+    'PATCH',
+    felder,
+  );
 }
 
 /**

@@ -195,6 +195,17 @@ describe('Wartezeit aus der Belegungsreihe (LLH-1135)', () => {
     ).toBe('2026-10-18 08:40:00');
   });
 
+  it('ein zurückgenommenes Austragen setzt die Wartezeit nicht zurück (LLH-1924)', () => {
+    expect(
+      wartetSeit(7, [
+        belegung({ id: 1, zeitpunkt_at: '2026-10-18 08:00:00' }),
+        belegung({ id: 2, art: 'wechsel', platz_id: null, zeitpunkt_at: '2026-10-18 08:20:00' }),
+        belegung({ id: 3, art: 'austritt', zeitpunkt_at: '2026-10-18 08:40:00' }),
+        belegung({ id: 4, ruecknahme_von: 3, zeitpunkt_at: '2026-10-18 08:41:00' }),
+      ]),
+    ).toBe('2026-10-18 08:20:00');
+  });
+
   it('eine Rückkehr vor dem jüngsten Eintritt zählt nicht', () => {
     expect(
       wartetSeit(7, [

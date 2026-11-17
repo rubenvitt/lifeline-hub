@@ -43,6 +43,8 @@ Keine.
 - `kraefte-entlassung`: „Erneut disponieren“ nennt Material nicht mehr als Kraft, die beim
   Rückgängig nur reaktiviert wird; neue Anforderung „Herausnahme von Material zurücknehmen“ mit
   Ort, Auslassung, Riegel und Gerät mit Bestandsnummer.
+- `bedien-muster`: Das Szenario „Bekannte Lücke bei Personal und Material“ entfällt; an seiner
+  Stelle steht „Material aus dem Einsatz nehmen und Rückgängig“ (beim Merge von `alpha` nachgezogen).
 
 ## Impact
 

@@ -175,7 +175,10 @@ Zurück in den Wartebereich führt das Platzmenü („…“) mit „Zurück in 
    wählen.
 
 „zurückweisen“ nimmt einen Patienten aus der Stelle, ohne einen Verbleib zu erfassen; er steht
-dann wieder unter „Noch nicht aufgenommen“.
+dann wieder unter „Noch nicht aufgenommen“. War es ein Fehltipp, legt „Rückgängig“ im Hinweis ihn
+zurück auf seinen Platz, mit seiner bisherigen Wartezeit, solange er nicht weiter gebucht ist und
+höchstens zehn Minuten vergangen sind. Ist der Platz inzwischen vergeben, kommt er in den
+Wartebereich.
 
 Braucht der Patient ein Rettungsmittel, öffnet „Rettungsmittel anfordern“ im Menü des Platzes die
 Nachforderung für ihn ([Nachforderungen](nachforderung.md)). Platz und Wartebereich zeigen dann den

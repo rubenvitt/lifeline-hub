@@ -4,8 +4,9 @@ Segmentleiste — Umschalter im Instrumentenstil (ETB-Filter, Basiskarte, Ansich
 antds `Segmented`, dessen Pillenform, Schatten und Gleitanimation die Formensprache (Radius 0,
 Fugenraster) brechen.
 
-FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche3` + `text`,
-inaktiv `flaeche` + `gedaempft`, optional ein 6-px-Farbpunkt (quadratisch). Farben und
+FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche3` + `text`
++ 2-px-Bedienkante unten (eine Option mit `kante` ersetzt sie), inaktiv `flaeche`
++ `gedaempft`, optional ein 6-px-Farbpunkt (quadratisch). Farben und
 Hover/Fokus liegen als Klassen in `theme/sprache.css` (`.lfh-segmente`, `.lfh-segment`), weil
 `:hover` und `:focus-visible` inline nicht erreichbar sind; die GEOMETRIE steht inline aus den
 Tokens.

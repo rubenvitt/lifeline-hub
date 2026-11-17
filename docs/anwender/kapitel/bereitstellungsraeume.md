@@ -149,7 +149,10 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
    ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit „Auf Karte verorten“ und „Bearbeiten“ im Kopf der Raumdaten: oben unter „Abgerufen“ die Betreuungsgruppe mit „abgerufen … → Betreuung · Auftrag Nr. …“, „Ausrücken buchen“ und „Abruf zurücknehmen“, darunter unter „Bereitgestellte Einheiten“ die Rettungsstaffel mit ihren Fahrzeugen, „seit … · 48 min“ und „Abrufen“; Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und die Seitenleiste „Kräfte ohne BR“ mit aufgeklapptem „Im Einsatz“](../bilder/bereitstellungsraeume/raum.png)
 
 4. Ist eine Kraft irrtümlich gebucht oder ohne Abruf gegangen, bei ihr das Aktionsmenü öffnen und
-   „Austragen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
+   „Austragen“ wählen. Sie steht wieder unter „Kräfte ohne BR“. War es ein Fehltipp, holt
+   „Rückgängig“ im Hinweis sie mit ihrer bisherigen Wartezeit zurück, solange sie nicht weiter
+   gebucht ist und höchstens zehn Minuten vergangen sind. Der Verlauf zeigt dann „Austritt“ und
+   „Austragen zurückgenommen“. Das Ausrücken nach einem Abruf lässt sich nicht zurücknehmen.
 
 ### Eine Kraft abrufen
 
@@ -236,7 +239,8 @@ geplanten Raum:
    etwa „Danach hier 20, Staffel A 30“.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
-4. Mit „Lösen“ einen Posten aus dem Raum lösen. Er bleibt ohne Ort im Einsatz. Die Zeile bleibt als
+4. Mit „Lösen“ einen Posten aus dem Raum lösen; bei einem Verbrauchsgut mit Rest steht es neben
+   „Ausgeben“ im Menü „⋮“ der Zeile. Er bleibt ohne Ort im Einsatz. Die Zeile bleibt als
    „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein anderer
    Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den Posten zurück.
 

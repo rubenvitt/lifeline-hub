@@ -240,8 +240,9 @@ export function storniereEinheit(einsatzId: number, eid: number): Promise<void> 
 }
 
 /**
- * Vorbedingungen des Rückgängig nach „Aus Einheit lösen“ (LLH-1722, Spec `einheit-ansicht`):
- * `nurWennFrei` lehnt mit 409 ab, statt den Datensatz einer anderen Einheit still zu nehmen;
+ * Vorbedingungen des Rückgängig nach „Aus Einheit lösen“ (LLH-1722, Spec `einheit-ansicht`) und
+ * nach jedem anderen Lösen (LLH-1924, Spec `bedien-muster`, „Rückgängig nimmt nichts woanders
+ * weg“): `nurWennFrei` lehnt mit 409 ab, statt den Datensatz einem anderen Ort still zu nehmen;
  * `alsFuehrer` setzt eine Person in derselben Transaktion wieder als Einheitsführer ein.
  */
 export interface ZuruecknahmeFilter {
@@ -249,7 +250,7 @@ export interface ZuruecknahmeFilter {
   alsFuehrer?: boolean;
 }
 
-function zuruecknahmeQuery(o: ZuruecknahmeFilter = {}): string {
+export function zuruecknahmeQuery(o: ZuruecknahmeFilter = {}): string {
   const q = new URLSearchParams();
   if (o.nurWennFrei) q.set('nur_wenn_frei', '1');
   if (o.alsFuehrer) q.set('als_fuehrer', '1');

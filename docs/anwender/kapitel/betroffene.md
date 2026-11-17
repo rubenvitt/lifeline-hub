@@ -276,7 +276,9 @@ nicht, sagt die Seite „Person nicht gefunden“.
 ### Aufenthalt und Bezüge pflegen
 
 1. Steht die Person in keiner Unfallhilfsstelle, im Kopf „In UHS aufnehmen“ wählen und die UHS
-   wählen. Steht sie schon in einer, verlegen „Verlegen“ und „Austragen“ sie.
+   wählen. Steht sie schon in einer, verlegen „Verlegen“ und „Austragen“ sie. Nach „Austragen“
+   holt „Rückgängig“ im Hinweis sie mit Platz und bisheriger Wartezeit zurück, solange sie nicht
+   weiter gebucht ist und höchstens zehn Minuten vergangen sind.
 2. Gehört der Person ein Tier oder ist sie bei einem Schaden geschädigt, „Bezüge“ aufklappen und
    „Bezug hinzufügen“ wählen.
 3. Im Feld „Tier oder Schaden“ nach Kennung, Art, Name oder Ort suchen, den Treffer wählen und
@@ -347,10 +349,13 @@ sichten.
 
 Die Sichtungskategorien und ihre Farben: SK I akut (rot), SK II schwer (gelb), SK III leicht
 (grün), SK IV abwartend (blau), tot (schwarz), unverletzt (ohne Farbe). Bei der Wahl ist jede
-Kategorie eine eigene Farbfläche mit Kürzel und Bedeutungswort. Die gewählte trägt ein Häkchen und
-einen kräftigen Rahmen, die übrigen treten zurück und zeigen ihre Farbe nur noch als Streifen am
-Rand. So ist die Wahl auch ohne Farbe zu erkennen. Jede Fläche ist mindestens 72 px hoch, auch in
-der kompakten Darstellung.
+Kategorie eine eigene Farbfläche mit Kürzel und Bedeutungswort. „tot“ ist zusätzlich schraffiert,
+„unverletzt“ hat keine Fläche, nur einen Rahmen; so sind beide auch nachts ohne Lesen zu
+unterscheiden. Die gewählte Kategorie trägt ein Häkchen und einen kräftigen Rahmen. Die übrigen
+treten zurück, behalten aber ihre Farbe als Rahmen innen und als leichte Tönung: Wer sich vertippt
+hat, findet die richtige Kategorie an der Farbe wieder. Beim Öffnen der Maske liegt der Fokus auf
+der ganzen Reihe, nicht auf „SK I“; mit einer Pfeiltaste geht es in die Reihe. Jede Fläche ist
+mindestens 72 px hoch, auch in der kompakten Darstellung.
 
 Wird eine Person mit SK I erfasst oder auf SK I hochgestuft, auch bei ihrer ersten Sichtung,
 bekommen alle im Einsatz, die das Modul „Betroffene“ lesen, den Hinweis „Sichtung I“ mit der

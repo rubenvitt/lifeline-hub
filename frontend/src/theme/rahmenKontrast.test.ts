@@ -48,7 +48,23 @@ describe('Rahmen — Kontrast bei Tageslicht (LFH-434)', () => {
   it('kennt keine Textrolle unterhalb der Tag-Schwelle außer „gesperrt“', () => {
     // Eine neue schwache Textstufe im Rahmen ist eine Entscheidung gegen LFH-434, kein Nachtrag.
     expect(Object.keys(rahmenFarben).sort()).toEqual(
-      ['aktiv', 'alarm', 'feld', 'gedaempft', 'gesperrt', 'grund', 'linie', 'marke', 'text'].sort(),
+      [
+        'aktiv',
+        'alarm',
+        'bedien',
+        'feld',
+        'gedaempft',
+        'gesperrt',
+        'grund',
+        'linie',
+        'text',
+      ].sort(),
     );
+  });
+
+  it('die Ortsmarke (Bedienrolle) hält ≥ 3 : 1 auf `aktiv` und `grund` (eon26eat D7, WCAG 1.4.11)', () => {
+    // Vorher Markenrot: 2,28 auf `aktiv`, 2,49 auf `grund`.
+    expect(kontrast(rahmenFarben.bedien, rahmenFarben.aktiv)).toBeGreaterThanOrEqual(3);
+    expect(kontrast(rahmenFarben.bedien, rahmenFarben.grund)).toBeGreaterThanOrEqual(3);
   });
 });

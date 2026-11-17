@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import type { ZuruecknahmeFilter } from '../api/einheiten';
 import { teileAuf, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
 import { ortPatch, ortVon, type MaterialOrtRef } from './materialPosten';
@@ -35,12 +36,20 @@ export function useMaterialOrt(einsatzId: number) {
     },
     [einsatzId, qc],
   );
+  /**
+   * `optionen.nurWennFrei` für das Rückgängig nach dem Lösen (LLH-1924): liegt der Posten
+   * inzwischen woanders, lehnt der Server ab, statt ihn dort wegzunehmen.
+   */
   const setOrt = useCallback(
-    async (em: OrtPosten, ziel: MaterialOrtRef | null): Promise<void> => {
+    async (
+      em: OrtPosten,
+      ziel: MaterialOrtRef | null,
+      optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
+    ): Promise<void> => {
       const vorher = ortVon(em);
       const patch = ortPatch(ziel, vorher);
       if (patch == null) return;
-      await updateDisposition(einsatzId, em.id, patch);
+      await updateDisposition(einsatzId, em.id, patch, optionen);
       await syncOrte([vorher, ziel]);
     },
     [einsatzId, syncOrte],

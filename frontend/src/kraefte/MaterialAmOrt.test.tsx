@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
@@ -85,11 +85,28 @@ function zeige(props: Partial<MaterialAmOrtProps> = {}) {
 const zeile = (text: string) =>
   screen.getByText(text).closest('[data-lfh="material-am-ort-zeile"]') as HTMLElement;
 
+/**
+ * Löst einen Posten: über den Knopf, wenn Lösen die einzige Handlung der Zeile ist, sonst über
+ * ihr ⋮ (LLH-1924, Spec `material-am-ort`, „Material am Ort lösen“).
+ */
+async function waehleLoesen(user: ReturnType<typeof userEvent.setup>, bezeichnung: string) {
+  const z = zeile(bezeichnung);
+  const knopf = within(z).queryByRole('button', { name: `${bezeichnung} lösen` });
+  if (knopf) {
+    await user.click(knopf);
+    return;
+  }
+  await user.click(within(z).getByRole('button', { name: `Aktionen zu ${bezeichnung}` }));
+  const liste = await waitFor(() => screen.getByRole('menu'));
+  await user.click(within(liste).getByRole('menuitem', { name: 'Lösen' }));
+}
+
 function patchMitschnitt(antwort?: () => Response) {
   const gesendet: { url: string; body: unknown }[] = [];
   server.use(
     http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
-      gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
+      const url = new URL(request.url);
+      gesendet.push({ url: url.pathname + url.search, body: await request.json() });
       return antwort ? antwort() : HttpResponse.json({});
     }),
   );
@@ -475,9 +492,7 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
   ) {
     const gesendet = patchMitschnitt();
     const r = zeige(props);
-    await user.click(
-      within(zeile(bezeichnung)).getByRole('button', { name: `${bezeichnung} lösen` }),
-    );
+    await waehleLoesen(user, bezeichnung);
     await screen.findByRole('button', { name: `${bezeichnung} gelöst` });
     const neu = (p: Partial<MaterialAmOrtProps>) =>
       r.rerender(
@@ -537,7 +552,7 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
   it('mehrere Platzhalter behalten ihre Plätze, auch in umgekehrter Folge gelöst', async () => {
     const user = userEvent.setup();
     const { neu } = await loeseUndGleicheAb(user, 'Trage', 2);
-    await user.click(within(zeile('Wolldecke')).getByRole('button', { name: 'Wolldecke lösen' }));
+    await waehleLoesen(user, 'Wolldecke');
     await screen.findByRole('button', { name: 'Wolldecke gelöst' });
     neu({ posten: ohne(1, 2) });
     expect(reihenfolge()).toEqual(['Wolldecke', 'Trage', 'Zeltbahn']);
@@ -629,7 +644,8 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     await waitFor(() =>
       expect(gesendet).toEqual([
         { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
-        { url: '/api/einsaetze/1/material/2', body: { uhs_id: 7 } },
+        // Nimmt den Posten keinem anderen Ort weg (LLH-1924).
+        { url: '/api/einsaetze/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
       ]),
     );
     neu({ posten: POSTEN });
@@ -693,7 +709,7 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     await waitFor(() =>
       expect(gesendet).toEqual([
         { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
-        { url: '/api/einsaetze/1/material/2', body: { uhs_id: 7 } },
+        { url: '/api/einsaetze/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
       ]),
     );
     neu({ posten: POSTEN });
@@ -743,5 +759,43 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     expect(within(z).queryByRole('button', { name: 'Wolldecke ausgeben' })).toBeNull();
     expect(z.querySelector('[aria-label="Status von Wolldecke ändern"]')).not.toBeNull();
     expect(within(z).queryByRole('button', { name: /Status von/ })).toBeNull();
+  });
+});
+
+describe('MaterialAmOrt: Lösen bei Verbrauchsgut im ⋮ (LLH-1924)', () => {
+  it('bietet die Zeile „Ausgeben“, steht „Lösen“ im ⋮; sonst bleibt der Knopf', async () => {
+    const user = userEvent.setup();
+    const gesendet = patchMitschnitt();
+    zeige();
+    const decke = zeile('Wolldecke');
+    expect(within(decke).getByRole('button', { name: 'Wolldecke ausgeben' })).toBeInTheDocument();
+    expect(within(decke).queryByRole('button', { name: 'Wolldecke lösen' })).toBeNull();
+    expect(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' })).toBeInTheDocument();
+    // Alles ausgegeben: kein „Ausgeben“, also der Knopf.
+    expect(
+      within(zeile('Zeltbahn')).getByRole('button', { name: 'Zeltbahn lösen' }),
+    ).toBeInTheDocument();
+    await user.click(within(decke).getByRole('button', { name: 'Aktionen zu Wolldecke' }));
+    const liste = await waitFor(() => screen.getByRole('menu'));
+    expect(
+      within(liste)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Lösen']);
+    await user.click(within(liste).getByRole('menuitem', { name: 'Lösen' }));
+    await waitFor(() =>
+      expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/1', body: { uhs_id: null } }]),
+    );
+    // Gehalten: „Gelöst“ steht träge an der Stelle des ⋮.
+    const marke = await within(decke).findByRole('button', { name: 'Wolldecke gelöst' });
+    expect(marke).toHaveAttribute('aria-disabled', 'true');
+    expect(within(decke).queryByRole('button', { name: 'Aktionen zu Wolldecke' })).toBeNull();
+  });
+
+  it('das Kontextmenü am Namen bietet dasselbe „Lösen“', async () => {
+    zeige();
+    fireEvent.contextMenu(screen.getByText('Wolldecke'), { button: 2 });
+    const liste = await waitFor(() => screen.getByRole('menu'));
+    expect(within(liste).getByRole('menuitem', { name: 'Lösen' })).toBeInTheDocument();
   });
 });

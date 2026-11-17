@@ -110,6 +110,10 @@ describe('Art eines Verlaufseintrags als Wort', () => {
       'Austritt nach EA Deich',
     );
     expect(verlaufText(eintrag({ art: 'abruf_aufgehoben' }))).toBe('Abruf zurückgenommen');
+    // LLH-1924: die Rücknahme eines Austritts ist kein neuer Eintritt.
+    expect(verlaufText(eintrag({ art: 'austritt_zurueckgenommen' }))).toBe(
+      'Austragen zurückgenommen',
+    );
   });
 
   it('der Abruf einer mitgenommenen Untereinheit nennt ihre Einheit (Spec „Verlauf“, D10)', () => {

@@ -2,16 +2,16 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/lage/wasBrennt.ts, frontend/src/lage/useWasBrennt.ts, frontend/src/lage/alarmZiel.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/erinnerung/erinnerungZustand.ts, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/lage/wasBrennt.ts, frontend/src/lage/useWasBrennt.ts, frontend/src/lage/alarmZiel.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/pages/fuehrung/startliste.ts, frontend/src/pages/fuehrung/StartlistePaneel.tsx, frontend/src/pages/fuehrung/startlisteSpeicher.ts, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/erinnerung/erinnerungZustand.ts, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
 ---
 
 ## Überblick
 
 Der Überblick ist die Startseite eines Einsatzes im Bereich „Führung“. Er fasst auf einer Seite
-zusammen, was zu tun ist: was gerade brennt, den Führungsstand, den Stand der
-Einsatzabschnitte, die offenen Vorgänge, die Entscheidungen der letzten Stunde und die nächsten
-Fristen. Was los ist (Betroffene, Kräfte, Gefahren, Einsatzdauer), zeigt das
-[Lagebild](lagebild.md). Der Überblick rechnet nur aus Daten, die in den Modulen schon erfasst
+zusammen, was zu tun ist: was gerade brennt, bei einem neuen Einsatz die Startliste „Einsatz
+starten“, den Führungsstand, den Stand der Einsatzabschnitte, die offenen Vorgänge, die
+Entscheidungen der letzten Stunde und die nächsten Fristen. Was los ist (Betroffene, Kräfte,
+Gefahren, Einsatzdauer), zeigt das [Lagebild](lagebild.md). Der Überblick rechnet nur aus Daten, die in den Modulen schon erfasst
 sind; erfasst wird in den Modulen selbst.
 
 ## Abläufe
@@ -45,6 +45,26 @@ sind; erfasst wird in den Modulen selbst.
    „Entscheidungen der letzten Stunde“. Was zuerst fällig ist, steht oben.
 7. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
    Entscheidungen. Jedes Paneel führt so über den Verweis oben rechts in sein Modul.
+
+### Einen neuen Einsatz arbeitsfähig machen
+
+Für die Einsatzleitung und das Führungspersonal:
+
+1. Den Überblick des neuen Einsatzes öffnen: Unter „Was brennt“ steht das Paneel „Einsatz
+   starten“ mit fünf Punkten: „Einsatzort“, „Einsatzleiter“, „Einsatzabschnitte“, „Kräfte“ und
+   „Erste Lagefeststellung“. Ein erledigter Punkt trägt einen Haken, beim Einsatzort und beim
+   Einsatzleiter mit dem erfassten Wert; ein offener einen leeren Kreis.
+
+   ![Paneel „Einsatz starten“ mit erledigtem Einsatzort „Deich West · nicht verortet“, erledigtem Einsatzleiter und drei offenen Punkten](../bilder/ueberblick/startliste.png)
+
+2. Einen offenen Punkt wählen: Er führt dorthin, wo er erfasst wird. „Einsatzort“ und
+   „Einsatzleiter“ öffnen die [Einsatzdaten](einsatzdaten.md) beim Paneel „Einsatzort“ bzw.
+   „Eigene Führungsstelle“, „Einsatzabschnitte“ den Dialog „Abschnitt anlegen“, „Kräfte“ die
+   Einheiten und „Erste Lagefeststellung“ die Erfassung im
+   [Einsatztagebuch](einsatztagebuch.md).
+3. Erfassen und zum Überblick zurückkehren: Der Punkt trägt jetzt einen Haken.
+4. Sind alle Punkte erledigt, fehlt das Paneel. Wer es vorher nicht mehr braucht, wählt im
+   Paneelkopf „Ausblenden“.
 
 ### Nur die eigenen Vorgänge sehen
 
@@ -89,6 +109,30 @@ sind; erfasst wird in den Modulen selbst.
   den Sprung „→ Nr. …“ auf die jüngste Berichtigung.
 - Die Zahlen eines Abschnitts schließen seine Unterabschnitte ein; zusammen ergeben die Zeilen
   die Einsatzstärke. Kräfte ohne Abschnitt stehen in der Zeile „Ohne Abschnitt“ am Ende.
+
+### Startliste „Einsatz starten“
+
+Ein Punkt gilt als erledigt:
+
+- **Einsatzort**, sobald eine Adresse eingetragen ist. Fehlt die Koordinate, steht dahinter
+  „nicht verortet“; der Einsatzort erscheint dann nicht auf der Lagekarte.
+- **Einsatzleiter**, sobald an der eigenen Führungsstelle einer eingetragen ist.
+- **Einsatzabschnitte**, sobald es einen Abschnitt gibt.
+- **Kräfte**, sobald der Einsatz eine Einheit oder eine Einsatzkraft führt.
+- **Erste Lagefeststellung**, sobald das Einsatztagebuch einen Eintrag vom Typ „Lage“ hat. Eine
+  Entscheidung oder Meldung zählt nicht.
+
+Die Liste zeigt Haken, keine Zahlen. Sie steht nur für die Einsatzleitung und das
+Führungspersonal eines laufenden Einsatzes, bei jeder Einsatzart gleich, nicht für Leser und
+nicht an einem Einsatz, den eine andere Instanz führt. Ist ein Modul für die Person nicht
+freigegeben, steht sein Punkt als „—“ mit „nicht freigegeben“ und ohne Sprung; er gilt nicht als
+offen. Kann eine Liste nicht geladen werden, steht der Punkt als „—“ mit „nicht geladen“, und das
+Paneel bleibt stehen. Sind alle Punkte erledigt oder nicht freigegeben, fehlt das Paneel auf
+jedem Bildschirm, auch ohne Neuladen.
+
+„Ausblenden“ wirkt nur in diesem Browser und nur für diesen Einsatz; andere Geräte zeigen die
+Liste weiter. Lässt der Browser nichts speichern, bleibt sie bis zum Neuladen weg. Nach dem
+Abmelden steht sie wieder da, solange Punkte offen sind.
 
 ### Offene Vorgänge
 

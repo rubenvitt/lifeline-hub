@@ -1993,3 +1993,68 @@ async fn beladung_sperrt_den_storno_und_bleibt_beim_entlassen_ohne_ort() {
         );
     }
 }
+
+/// LLH-1924 (Spec `bedien-muster`, „Rückgängig nimmt nichts woanders weg“): das Rückgängig nach
+/// „Vom Fahrzeug lösen“ schickt `?nur_wenn_frei=1`. Sitzt die Person inzwischen auf einem anderen
+/// Fahrzeug, antwortet der Server 409 und nennt es; ohne den Parameter bleibt das bewusste
+/// Umsetzen.
+#[tokio::test]
+async fn besatzung_zuruecknehmen_nur_wenn_frei() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let a = fahrzeug_disponieren(&app, &admin, einsatz, "83-1").await;
+    let b = fahrzeug_disponieren(&app, &admin, einsatz, "83-2").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
+    let pfad =
+        |ef: i64, q: &str| format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}{q}");
+    let fahrzeug_von = || async {
+        let (_, personal) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/personal"),
+            &admin,
+            None,
+        )
+        .await;
+        personal
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == ep)
+            .unwrap()["fahrzeug_id"]
+            .clone()
+    };
+
+    // Frei: das Rückgängig gelingt, auf demselben Fahrzeug noch einmal auch, dann ohne zweiten
+    // ETB-Eintrag (Review LLH-1924).
+    let (s, j) = anfrage(&app, "PUT", &pfad(a, "?nur_wenn_frei=1"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{j}");
+    let etb_einmal = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, j) = anfrage(&app, "PUT", &pfad(a, "?nur_wenn_frei=1"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{j}");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_einmal);
+
+    // Gelöst, inzwischen auf 83-2: das Rückgängig scheitert und nennt das Fahrzeug.
+    assert_eq!(
+        anfrage(&app, "DELETE", &pfad(a, ""), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        anfrage(&app, "PUT", &pfad(b, ""), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, j) = anfrage(&app, "PUT", &pfad(a, "?nur_wenn_frei=1"), &admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(j["error"], "Anna sitzt inzwischen auf «83-2»");
+    assert_eq!(fahrzeug_von().await, b, "bleibt auf 83-2");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+    // Ohne den Parameter: bewusstes Umsetzen wie bisher.
+    assert_eq!(
+        anfrage(&app, "PUT", &pfad(a, ""), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(fahrzeug_von().await, a);
+}

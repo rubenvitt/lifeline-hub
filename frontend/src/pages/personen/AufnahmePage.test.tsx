@@ -191,8 +191,8 @@ describe('AufnahmePage', () => {
     await waitFor(() =>
       expect(within(screen.getByRole('radiogroup')).getAllByRole('radio')[1]).not.toBeChecked(),
     );
-    const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
-    await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
+    // Der Fokus kehrt auf die Gruppe der Sichtung zurück, nicht auf „SK I“ (Spec `sichtungswahl`).
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('radiogroup')));
   });
 
   it('geht nach dem Primär-Knopf zurück in die Liste', async () => {

@@ -79,6 +79,15 @@ describe('fmsStatusOptionen (LFH-642)', () => {
     ]);
     expect(o[0].darstellung?.rolle).toBeDefined();
   });
+
+  it('färbt den Sprechwunsch gelb, den übrigen gebundenen Status neutral (eon26eat D2)', () => {
+    // `status` legt per Vorgabe die Kategorie „gebunden“ an.
+    const o = fmsStatusOptionen([
+      status(5, '5 – Sprechwunsch', 5),
+      status(4, '4 – Am Einsatzort', 4),
+    ]);
+    expect(o.map((x) => x.darstellung?.rolle)).toEqual(['achtung', 'neutral']);
+  });
 });
 
 describe('handStatusOptionen (LFH-609, gehoben für LLH-1036)', () => {

@@ -684,6 +684,24 @@ describe('einsatzKeys.auftragDruck (LLH-1171)', () => {
 });
 
 /**
+ * Offene Punkte vor dem Einsatzabschluss (LLH-1814): ein Abruf beim Öffnen des Dialogs, nicht live
+ * und nicht auf der Platte (ohne Netz schließt niemand ab).
+ */
+describe('einsatzKeys.abschlussPruefung (LLH-1814)', () => {
+  it('baut den Key als [prefix, einsatzId] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.abschlussPruefung(5)).toEqual(['einsatz-abschluss-pruefung', 5]);
+  });
+
+  it('ist nicht live und nicht im Lagebild offline', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-abschluss-pruefung');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-abschluss-pruefung');
+    }
+    expect(istLagebildOfflineKey(einsatzKeys.abschlussPruefung(5))).toBe(false);
+  });
+});
+
+/**
  * Druckansicht einer Person (LLH-1120): ein Schnappschuss mit eigenem Prefix außerhalb von
  * `person`, nicht live und nicht auf der Platte; jeder Abruf schreibt einen `druck`-Eintrag.
  */

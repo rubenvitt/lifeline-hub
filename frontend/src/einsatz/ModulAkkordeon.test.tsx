@@ -130,7 +130,8 @@ describe('ModulAkkordeon · Dichte der Kopfzeile', () => {
     const offen = akkordeonKopfStil(tokenFuer('kompakt'), farbenDunkel, { offen: true });
     const zu = akkordeonKopfStil(tokenFuer('kompakt'), farbenDunkel, { offen: false });
     expect(offen.background).toBe(farbenDunkel.flaeche3);
-    expect(offen.boxShadow).toBe(`inset 2px 0 0 ${farbenDunkel.marke}`);
+    // Ortsmarke in der Bedienfarbe wie in Rail und Modulpanel (eon26eat D7).
+    expect(offen.boxShadow).toBe(`inset 2px 0 0 ${farbenDunkel.bedien}`);
     expect(offen.color).toBe(farbenDunkel.text);
     expect(zu.background).toBe('transparent');
     expect(zu.boxShadow).toBe('none');

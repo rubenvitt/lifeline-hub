@@ -285,6 +285,13 @@ fn notify_nachforderung(state: &AppState, posten: &EinsatzMaterialAnzeige) {
     }
 }
 
+/// Abfrage des Rückgängig nach dem Lösen (LLH-1924, Spec `material-am-ort`): `nur_wenn_frei=1`
+/// lehnt mit 409 ab, wenn der Posten inzwischen an einem anderen Ort liegt.
+#[derive(Debug, Default, Deserialize)]
+pub struct NurWennFreiParams {
+    nur_wenn_frei: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct DispoPatchBody {
     pub menge: Option<i64>,
@@ -329,9 +336,11 @@ pub async fn update(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
     PfadParam((_eid, em_id)): PfadParam<(i64, i64)>,
+    Query(params): Query<NurWennFreiParams>,
     JsonBody(body): JsonBody<DispoPatchBody>,
 ) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let nur_wenn_frei = parse_flag(params.nur_wenn_frei.as_deref(), "nur_wenn_frei")?;
     if let Some(menge) = body.menge {
         if menge < 1 {
             return Err(AppError::Validation("Menge muss mindestens 1 sein".into()));
@@ -404,6 +413,14 @@ pub async fn update(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        if nur_wenn_frei {
+            // Rückgängig nach dem Lösen (LLH-1924): nur wenn der Posten nicht inzwischen woanders
+            // liegt. Ein Patch ohne Ortsziel prüft nichts.
+            let aktuell = ort::load_ort_tx(conn, einsatz_id, em_id).await?;
+            if let Some(ziel) = patch.ort.ziel(aktuell) {
+                ort::require_ort_frei_tx(conn, einsatz_id, em_id, ziel).await?;
+            }
+        }
         disposition_repo::update_tx(conn, einsatz_id, em_id, patch).await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let mut texte = Vec::new();

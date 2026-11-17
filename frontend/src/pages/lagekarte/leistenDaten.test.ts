@@ -5,6 +5,7 @@ import type {
   Einheit,
   Einsatzabschnitt,
   EinsatzFahrzeug,
+  FahrzeugStatus,
   FuehrungskraftKarte,
   Schaden,
   Uhs,
@@ -537,7 +538,8 @@ describe('auswahlRaster', () => {
       ['Abschnitt', 'Nord'],
       ['Führer', 'Meier'],
     ]);
-    expect(raster[1].rolle).toBe('achtung');
+    // S4 ist `gebunden` und damit neutral (Spec `statusrollen`, eon26eat D1).
+    expect(raster[1].rolle).toBe('neutral');
   });
 
   it('Einheit gemischt: kein erfundener Status, Verteilung im Wert, „Seit" bleibt leer', () => {
@@ -578,10 +580,31 @@ describe('auswahlRaster', () => {
   it('Fahrzeug: Status mit Rolle aus der Statuskategorie, Seit, Disponiert-Zeit, Einheit', () => {
     const mitSeit = { ...FAHRZEUG, status_seit: '2026-09-21 10:05:00' } as EinsatzFahrzeug;
     const raster = auswahlRaster(marker('fahrzeug', 7), { ...ROH, fahrzeuge: [mitSeit] }, zeit);
-    expect(raster[0]).toMatchObject({ label: 'Status', wert: 'am Einsatzort', rolle: 'achtung' });
+    // `gebunden` ist neutral (Spec `statusrollen`, eon26eat D1).
+    expect(raster[0]).toMatchObject({ label: 'Status', wert: 'am Einsatzort', rolle: 'neutral' });
     expect(raster[1]).toEqual({ label: 'Seit', wert: 'Z(2026-09-21 10:05:00)' });
     expect(raster[2]).toEqual({ label: 'Disponiert', wert: 'Z(2026-09-21 09:12:00)' });
     expect(raster[3]).toMatchObject({ label: 'Einheit', wert: 'Zug 1' });
+  });
+
+  it('Fahrzeug mit Sprechwunsch: der Katalog-Anker 5 färbt gelb (eon26eat D2)', () => {
+    const sprechwunsch = {
+      ...FAHRZEUG,
+      status_id: 55,
+      status_label: 'Sprechwunsch',
+    } as EinsatzFahrzeug;
+    const stati = [
+      { id: 55, label: '5 – Sprechwunsch', kategorie: 'gebunden', fms_anker: 5, sortier: 50 },
+    ] as FahrzeugStatus[];
+    const mit = auswahlRaster(
+      marker('fahrzeug', 7),
+      { ...ROH, fahrzeuge: [sprechwunsch], fahrzeugStati: stati },
+      zeit,
+    );
+    expect(mit[0]).toMatchObject({ label: 'Status', rolle: 'achtung' });
+    // Ohne Katalog bleibt die Kategorie: neutral.
+    const ohne = auswahlRaster(marker('fahrzeug', 7), { ...ROH, fahrzeuge: [sprechwunsch] }, zeit);
+    expect(ohne[0]).toMatchObject({ label: 'Status', rolle: 'neutral' });
   });
 
   it('Fahrzeug ohne bekannten Wechselzeitpunkt: „Seit" ist „—", nicht die Dispozeit', () => {
@@ -991,7 +1014,8 @@ describe('auswahlRaster — Sammelstelle (LLH-1393)', () => {
       ['Evakuiert', '40 · von 120 geplant'],
       ['Abschnitt', 'EA Süd'],
     ]);
-    expect(raster[0].rolle).toBe('achtung');
+    // „läuft“ ist planmäßig und neutral (eon26eat D3).
+    expect(raster[0].rolle).toBe('neutral');
   });
   it('fehlt der Bezirk, bleibt das Raster leer', () => {
     expect(auswahlRaster(marker('sammelstelle', 9), roh, zeit)).toEqual([]);

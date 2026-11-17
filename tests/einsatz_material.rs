@@ -4058,3 +4058,83 @@ async fn ohne_freigabe_material_setzt_kein_weg_den_ort() {
     assert_eq!(s, StatusCode::NOT_FOUND, "frühere Einheiten-Route");
     assert!(material_zeile(&app, &admin, einsatz, em).await["einheit_id"].is_null());
 }
+
+/// LLH-1924 (Spec `material-am-ort`, „Lösen rückgängig machen“): das Rückgängig nach dem Lösen
+/// schickt `?nur_wenn_frei=1`. Liegt der Posten inzwischen an einem anderen Ort, antwortet der
+/// Server 409 und nennt ihn, statt ihn dort still wegzunehmen; am Zielort selbst und ohne Ort geht
+/// es. Ohne den Parameter bleibt das bewusste Umsetzen.
+#[tokio::test]
+async fn ort_zuruecknehmen_nur_wenn_frei() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let turnhalle = create_uhs(&app, &admin, einsatz, "Turnhalle").await;
+    let zelt = create_uhs(&app, &admin, einsatz, "Zelt Nord").await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    let pfad = |q: &str| format!("/api/einsaetze/{einsatz}/material/{em}{q}");
+    let an = |uhs: i64| format!(r#"{{"uhs_id":{uhs}}}"#);
+
+    // Ohne Ort: das Rückgängig gelingt.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &pfad("?nur_wenn_frei=1"),
+        &admin,
+        Some(&an(turnhalle)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    // Schon am Ziel: idempotent.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &pfad("?nur_wenn_frei=1"),
+        &admin,
+        Some(&an(turnhalle)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+
+    // Gelöst und inzwischen an der UHS Zelt Nord: das Rückgängig scheitert und nennt sie.
+    let (s, j) = material_patch(&app, &admin, einsatz, em, r#"{"uhs_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    let (s, j) = material_patch(&app, &admin, einsatz, em, &an(zelt)).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &pfad("?nur_wenn_frei=1"),
+        &admin,
+        Some(&an(turnhalle)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(j["error"], "«Trage» liegt inzwischen bei UHS «Zelt Nord»");
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, em).await["uhs_id"],
+        zelt,
+        "bleibt im Zelt"
+    );
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb_vorher,
+        "nichts geschrieben"
+    );
+
+    // Ohne den Parameter: bewusstes Umsetzen wie bisher.
+    let (s, j) = anfrage(&app, "PATCH", &pfad(""), &admin, Some(&an(turnhalle))).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["uhs_id"], turnhalle);
+
+    // Ein ungültiger Wert ist 400.
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad("?nur_wenn_frei=vielleicht"),
+        &admin,
+        Some(&an(zelt)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}

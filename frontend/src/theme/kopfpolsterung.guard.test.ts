@@ -76,7 +76,7 @@ describe('Kopf-Polsterung — die Verdrahtung (LFH-329 · B1/M12)', () => {
   it('der Haupt-`:root`-Block wird vom neuen Media-Block nicht beschattet', () => {
     // `rollen.guard.test.ts` nimmt den ERSTEN `:root` am Zeilenanfang; ein zweiter davor ließe
     // dessen Wertvergleiche still gegen die falschen Werte laufen.
-    expect(wurzelblock()['--lfh-grund']).toBe('#e9ebee');
+    expect(wurzelblock()['--lfh-grund']).toBe('#e6e7e9');
     // `[ \t]`, nicht `\s`: das schlösse den Zeilenumbruch ein und träfe jeden Media-Block nach
     // einer Leerzeile.
     expect(css).not.toMatch(/^[ \t]+@media/m);

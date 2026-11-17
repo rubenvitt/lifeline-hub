@@ -65,7 +65,8 @@ const BEZIRKE = [
     stand: { evakuiert: 212, erhebung: 'geschaetzt' },
     raeumung: 'laeuft',
     wort: 'läuft',
-    rolle: 'achtung',
+    // Planmäßiger Ablauf, neutral (Spec `statusrollen`, eon26eat D3).
+    rolle: 'neutral',
   },
   {
     name: 'Mühlenweg 2–18',

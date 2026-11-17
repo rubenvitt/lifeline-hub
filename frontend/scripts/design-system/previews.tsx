@@ -55,6 +55,7 @@ import {
   Kennzahl,
   Kennzahlenband,
   ListenAbschnitt,
+  ListenPaneel,
   listenZeileStil,
   MatrixPaneel,
   Paneel,
@@ -375,6 +376,30 @@ function DashboardBeispiel() {
           stufenwort: stufe,
           ton,
         }))}
+      />
+      {/* Kopf-Aktion (LLH-1815): eine Handlung am Paneel selbst, ohne „↗“ — wie „Ausblenden“ der
+          Startliste im Überblick. */}
+      <ListenPaneel<readonly [string, string]>
+        titel="Einsatz starten"
+        ueberschrift="h3"
+        zustand="daten"
+        kopfAktion={{ label: 'Ausblenden', onKlick: nichts }}
+        leerText=""
+        gesperrtText=""
+        onNeuladen={nichts}
+        eintraege={[
+          ['Einsatzort', 'Deich West · nicht verortet'],
+          ['Einsatzleiter', 'offen'],
+          ['Erste Lagefeststellung', '— nicht freigegeben'],
+        ]}
+        max={3}
+        schluessel={(e) => e[0]}
+        zeile={(e) => (
+          <div style={{ ...listenZeileStil(rollen, token), alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 500 }}>{e[0]}</span>
+            <span style={{ color: rollen.gedaempft }}>{e[1]}</span>
+          </div>
+        )}
       />
     </DashboardFlaeche>
   );
@@ -1393,9 +1418,9 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'Dashboard',
-    title: 'Dashboard-Baukasten (Verteilung und Matrix)',
+    title: 'Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)',
     group: 'Flächen',
-    height: 976,
+    height: 1200,
     source: 'components/instrument/DashboardPaneel.tsx',
     ruleHead: 'Dashboard-Baukasten',
     styles: ['components/instrument/matrixPaneel.css'],
