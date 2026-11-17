@@ -3,7 +3,7 @@ import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { ladeEinsatz } from '../api/einsaetze';
 import { PERSONAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
@@ -194,11 +194,19 @@ export default function PersonalPage() {
 
   // `?personal=<id>` bleibt Zeilenmarke (D2): Lagekarte und Schaden springen hierher, um die Person
   // im Vergleich zu sehen; die Zeile wird hervorgehoben und ins Bild gerollt (best-effort). Steht
-  // die Kraft nicht (mehr) in der Liste, meldet das die Hinweisleiste (LLH-1827).
-  const deeplinkHinweis = useQueryParamSelektion('personal', epQuery.isSuccess, (pid) => {
-    if (!(epQuery.data ?? []).some((p) => p.id === pid)) return false;
-    setHighlightId(pid);
-  });
+  // die Kraft nicht (mehr) in der Liste, meldet das die Hinweisleiste (LLH-1827), geprüft gegen den
+  // frischen Stand. Eine entlassene Kraft steht im Block „Entlassen“ derselben Seite (Brotkrume
+  // ihrer Personenansicht) und bekommt keinen Hinweis.
+  const deeplinkHinweis = useQueryParamSelektion(
+    'personal',
+    deeplinkStand([epQuery], [entlasseneQuery]),
+    (pid) => {
+      if (!(epQuery.data ?? []).some((p) => p.id === pid)) {
+        return (entlasseneQuery.data ?? []).some((p) => p.id === pid) ? undefined : false;
+      }
+      setHighlightId(pid);
+    },
+  );
   useEffect(() => {
     if (highlightId == null) return;
     scrolleZurZeile(highlightId);

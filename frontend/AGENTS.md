@@ -1518,7 +1518,11 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   - **Query-Param-Deeplink** über `useQueryParamSelektion`: `anwenden` liefert `false`, wo die
     Existenzprüfung scheitert; erfährt die Seite es erst später (404 des Einzelabrufs, Suche in
     einer zweiten Liste), ruft sie `melde(id)`, aber nur bei sicherem Befund (keine weitere Seite,
-    kein gescheiterter Abruf). Die Seite zeichnet die Lage als `DeeplinkHinweis` über der Liste
+    kein gescheiterter Abruf). Bereit und sicher ist eine Liste über `deeplinkStand` (am Hook):
+    angewandt wird erst ohne laufenden Abruf (ein alter Cache kennt ein eben angelegtes Objekt
+    nicht), ein `false` zählt nur frisch und ohne Fehler, ohne Netz hebt der Cache still hervor.
+    Was auf derselben Seite steht (Block der Entlassenen), gilt als vorhanden. Die Seite zeichnet
+    die Lage als `DeeplinkHinweis` über der Liste
     („<Sache> #<id> gibt es nicht (mehr)“, `info`, `role="status"`, nie Toast) und ruft
     `schliesse()` in ihrer Wahl; eine `ListeDetail` bekommt solange `vorauswahl={false}`, nichts
     ist gewählt. Wächter `components/DeeplinkHinweis.guard.test.ts`.

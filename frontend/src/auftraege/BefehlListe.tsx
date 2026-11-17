@@ -11,7 +11,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { BefehlKopf } from '../api/types';
 import { NEW_SELECTABLE } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { ErfassungsModal } from '../components/Erfassung';
 import { anzahl, segmentLabel } from '../anzeige/anzahl';
@@ -141,7 +141,7 @@ export default function BefehlListe({
   const [sprung, setSprung] = useState<{ id: number; nr: number } | null>(null);
   const sprungNr = useRef(0);
   // Einen unbekannten Befehl meldet die Hinweisleiste (LLH-1827); nichts ist dann gewählt.
-  const deeplinkHinweis = useQueryParamSelektion('befehl', befehleQuery.isSuccess, (id) => {
+  const deeplinkHinweis = useQueryParamSelektion('befehl', deeplinkStand([befehleQuery]), (id) => {
     const ziel = (befehleQuery.data ?? []).find((b) => b.id === id);
     if (!ziel) {
       // Die Vorauswahl der Liste kam dem Deeplink zuvor; sie gilt nicht.

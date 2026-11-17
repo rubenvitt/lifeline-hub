@@ -101,7 +101,7 @@ import {
   parseAbloesungWechsel,
   type AbloesungAnsicht,
 } from '../routing/deeplinks';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { flaeche } from '../theme/tokens';
 
@@ -510,7 +510,7 @@ export default function AbloesungPage() {
   };
   const deeplinkHinweis = useQueryParamSelektion(
     'schicht',
-    laufendQuery.isSuccess && einsatzQuery.isSuccess,
+    deeplinkStand([laufendQuery, einsatzQuery]),
     (id) => {
       if (laufende.some((x) => x.id === id)) {
         gibFrei();

@@ -480,6 +480,26 @@ describe('GefahrenPage', () => {
     expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
   });
 
+  // Review a12ms7g9 (F5): ein alter Stand im Cache (Lagebild) kennt ein eben angelegtes Gebiet
+  // nicht; gewählt wird gegen die frische Antwort.
+  it('?gefahrengebiet= mit altem Stand im Cache: kein Hinweis, das Gebiet der frischen Antwort ist gewählt', async () => {
+    const sued = { ...gebiet, id: 8, label: 'Süd', zonen_ids: [11] };
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.gefahrengebiete(1), [gebiet], { updatedAt: 0 });
+    server.use(
+      ...handlers([gebiet, sued]),
+      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/gefahren?gefahrengebiet=8', client },
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Süd'));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+  });
+
   it('?gefahrengebiet= mit unbekannter Kennung zeigt den Hinweis, die Wahl eines Gebiets schließt ihn (LLH-1827)', async () => {
     server.use(...handlers());
     renderMitProviders(

@@ -31,7 +31,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import ZumKopfKnopf from '../components/ZumKopfKnopf';
 import {
@@ -118,7 +118,7 @@ export default function ErinnerungenPage() {
   };
   const deeplinkHinweis = useQueryParamSelektion(
     'erinnerung',
-    offeneQuery.isSuccess && einsatzQuery.isSuccess,
+    deeplinkStand([offeneQuery, einsatzQuery]),
     (eid) => {
       if ((offeneQuery.data ?? []).some((e) => e.id === eid)) {
         setSucheErinnerung(null);

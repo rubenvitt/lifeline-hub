@@ -6,7 +6,9 @@ import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, setzeOnline } from '../test/utils';
+import type { QueryClient } from '@tanstack/react-query';
+import { einsatzKeys } from '../api/queryKeys';
 import { erwarteNichtGefunden, MarkenRahmen } from '../test/nichtGefunden';
 import { waehle } from '../test/auswahlListe';
 import { adminFixture, benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
@@ -73,6 +75,8 @@ interface Aufbau {
   /** Links zu diesen Adressen neben der Seite (Text = Adresse): Wechsel der Detail-Route ohne
    * Remount. */
   sprung?: string[];
+  /** Vorbefüllter Cache. */
+  client?: QueryClient;
 }
 
 let requests: string[];
@@ -154,7 +158,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
         </Link>
       ))}
     </MarkenRahmen>,
-    { route },
+    { route, client: a.client },
   );
 }
 
@@ -647,6 +651,49 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Stornieren' }));
     const aus = screen.getByRole('region', { name: 'Aus dem Einsatz' });
     expect(await within(aus).findByText(/schon eingetroffen/)).toBeVisible();
+  });
+});
+
+/**
+ * Review a12ms7g9 (F8): Ob es die Kraft nicht (mehr) gibt, steht erst fest, wenn beide Listen
+ * stehen. Scheitert eine oder wartet sie ohne Netz ohne Stand, ist das ein Abruffehler mit
+ * „Erneut abrufen“, nicht das Muster „gibt es nicht“.
+ */
+describe('EinsatzkraftPage – Abruffehler statt „gibt es nicht“', () => {
+  it('eine gescheiterte Liste der Entlassenen zeigt den Abruffehler, nicht „Nicht (mehr) im Einsatz“', async () => {
+    renderAnsicht('/einsaetze/7/personal/10', { aktiv: [] });
+    server.use(
+      http.get('/api/einsaetze/7/personal', ({ request }) =>
+        new URL(request.url).searchParams.has('entlassene')
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json([]),
+      ),
+    );
+    expect(
+      await screen.findByText('Entlassenes Personal konnte nicht geladen werden'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: /Erneut abrufen/ })).toBeVisible();
+    expect(screen.queryByText('Nicht (mehr) im Einsatz')).toBeNull();
+  });
+
+  it('ohne Netz und ohne Stand der Listen zeigt es den Abruffehler, nicht „Nicht (mehr) im Einsatz“', async () => {
+    const client = neuerQueryClient();
+    client.setQueryDefaults(einsatzKeys.einsatz(7), { staleTime: Infinity });
+    client.setQueryData(
+      einsatzKeys.einsatz(7),
+      einsatzFixture({ id: 7, bezeichnung: 'Hochwasser' }),
+    );
+    setzeOnline(false);
+    try {
+      renderAnsicht('/einsaetze/7/personal/10', { client });
+      expect(
+        await screen.findByText('Disponiertes Personal konnte nicht geladen werden'),
+      ).toBeVisible();
+      expect(screen.getByRole('button', { name: /Erneut abrufen/ })).toBeVisible();
+      expect(screen.queryByText('Nicht (mehr) im Einsatz')).toBeNull();
+    } finally {
+      setzeOnline(true);
+    }
   });
 });
 

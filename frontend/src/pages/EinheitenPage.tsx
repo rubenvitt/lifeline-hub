@@ -28,7 +28,7 @@ import {
   kraefteuebersichtPfad,
   parseRouteId,
 } from '../routing/deeplinks';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { loadEinheitVorlagen } from '../api/einheitVorlagen';
 import { orderAsTree, vorlagePfad } from '../stammdaten/einheitVorlagenBaum';
@@ -233,8 +233,8 @@ export default function EinheitenPage() {
    * apply-then-clean und räumt den Param danach mit einem eigenen `setSearchParams(..., { replace:
    * true })`. Diese zweite Navigation überschriebe die Weiterleitung sofort. Der Hook übernimmt nur
    * den anderen Fall: gibt es die Einheit nicht (mehr), räumt er den Param, und über der
-   * Gliederung steht die Hinweisleiste (LLH-1827). Bereit ist er erst, wenn beide Listen frisch
-   * stehen und die Einheit unter den aktiven fehlt: ein alter Cache, in dem eine eben gebildete
+   * Gliederung steht die Hinweisleiste (LLH-1827). Bereit ist er erst, wenn beide Listen
+   * abgerufen sind (`deeplinkStand`) und die Einheit unter den aktiven fehlt: ein alter Cache, in dem eine eben gebildete
    * Einheit noch fehlt, räumte sonst den Param vor der Weiterleitung. Eine aufgelöste Einheit gibt
    * es noch; sie bleibt ohne Hinweis.
    *
@@ -245,13 +245,11 @@ export default function EinheitenPage() {
   const [searchParams] = useSearchParams();
   const deeplinkZiel = parseRouteId(searchParams.get('einheit') ?? undefined);
   const zielAktiv = deeplinkZiel != null && einheiten.some((e) => e.id === deeplinkZiel);
+  // Scheitert die Liste der aufgelösten, ist „gibt es nicht“ kein sicherer Befund: still.
+  const stand = deeplinkStand([einheitenQuery], [aufgeloesteQuery]);
   const deeplinkHinweis = useQueryParamSelektion(
     'einheit',
-    einheitenQuery.isSuccess &&
-      !einheitenQuery.isFetching &&
-      !aufgeloesteQuery.isPending &&
-      !aufgeloesteQuery.isFetching &&
-      !zielAktiv,
+    { bereit: stand.bereit && !zielAktiv, sicher: stand.sicher },
     (eid) => ((aufgeloesteQuery.data ?? []).some((e) => e.id === eid) ? undefined : false),
   );
 

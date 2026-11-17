@@ -33,7 +33,7 @@ import {
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -214,12 +214,16 @@ export default function EinsatzabschnittePage() {
 
   // Cross-Modul-Deeplink: ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden; sonst steht
   // die Hinweisleiste (LLH-1827), bis ein Abschnitt gewählt wird.
-  const deeplinkHinweis = useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
-    if (!(abschnitteQuery.data ?? []).some((a) => a.id === zid)) return false;
-    setGewaehlt(zid);
-    // Aus dem Organigramm: das Detail steht in der Gliederung (LFH-626, D7).
-    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
-  });
+  const deeplinkHinweis = useQueryParamSelektion(
+    'abschnitt',
+    deeplinkStand([abschnitteQuery]),
+    (zid) => {
+      if (!(abschnitteQuery.data ?? []).some((a) => a.id === zid)) return false;
+      setGewaehlt(zid);
+      // Aus dem Organigramm: das Detail steht in der Gliederung (LFH-626, D7).
+      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
+    },
+  );
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung eines neuen Abschnitts (Sprungpalette, LFH-506) —
   // dieselben Schritte wie `openAnlegen`, hier ausgeschrieben, weil die Funktion je Render neu

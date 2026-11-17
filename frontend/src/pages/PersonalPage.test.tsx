@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders, sortTarget } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
+import type { QueryClient } from '@tanstack/react-query';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import PersonalPage from './PersonalPage';
@@ -72,6 +73,7 @@ function render(
   entlasseneDaten: unknown[] = [],
   einheitenDaten: unknown[] = einheiten,
   route = '/einsaetze/7/personal',
+  client?: QueryClient,
 ) {
   server.use(
     meHandler(admin),
@@ -102,7 +104,7 @@ function render(
         <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
       </Routes>
     </>,
-    { route },
+    { route, client },
   );
 }
 
@@ -401,6 +403,57 @@ describe('PersonalPage', () => {
     );
     expect(await screen.findByText('Einsatzkraft #99999 gibt es nicht (mehr)')).toBeInTheDocument();
     expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+  });
+
+  // Review a12ms7g9 (F5): ein alter Stand im Cache kennt eine eben disponierte Kraft nicht.
+  it('?personal=<id> mit altem Stand im Cache: kein Hinweis, die Zeile der frischen Antwort ist hervorgehoben', async () => {
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.personal(7), [], { updatedAt: 0 });
+    // Die Entlassenen frisch im Cache: sonst wartete der Sprung schon auf sie.
+    client.setQueryDefaults(einsatzKeys.personalEntlassene(7), { staleTime: Infinity });
+    client.setQueryData(einsatzKeys.personalEntlassene(7), []);
+    const { container } = render(
+      einsatz(),
+      disponiert,
+      [],
+      einheiten,
+      '/einsaetze/7/personal?personal=10',
+      client,
+    );
+    await screen.findByText('Thomas Müller');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="10"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+  });
+
+  // Review a12ms7g9 (F6): die Brotkrume „Personal“ der Ansicht einer entlassenen Kraft führt auf
+  // `?personal=<id>`; die Kraft steht im Block „Entlassen“ derselben Seite.
+  it('?personal=<id> einer entlassenen Kraft zeigt keinen Hinweis und räumt den Parameter', async () => {
+    const entlassen = {
+      ...disponiert[0],
+      id: 11,
+      name: 'Erika Entlassen',
+      beendet_at: '2026-05-26 12:00:00',
+    };
+    render(einsatz(), disponiert, [entlassen], einheiten, '/einsaetze/7/personal?personal=11');
+    expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/personal'));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+  });
+
+  it('?personal=<id> bei gescheiterter Liste der Entlassenen bleibt still statt eines Hinweises', async () => {
+    render(einsatz(), disponiert, [], einheiten, '/einsaetze/7/personal?personal=11');
+    server.use(
+      http.get('/api/einsaetze/7/personal', ({ request }) =>
+        new URL(request.url).searchParams.has('entlassene')
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json(disponiert),
+      ),
+    );
+    await screen.findByText('Thomas Müller');
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/personal'));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
   });
 
   it('auch im KARTENZWEIG trägt der Deeplink seine Hervorhebung — und springt zum Ziel', async () => {

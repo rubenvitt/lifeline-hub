@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import type { ReactNode } from 'react';
 import { AdresseSteht } from '../test/adresseSteht';
-import { useQueryParamSelektion } from './useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from './useQueryParamSelektion';
 
 function wrapper(initial: string) {
   return ({ children }: { children: ReactNode }) => (
@@ -210,5 +210,56 @@ describe('useQueryParamSelektion: Hinweislage (LLH-1827)', () => {
       void result.current.navigate('/einsaetze/2/x');
     });
     await waitFor(() => expect(result.current.lage.unbekannt).toBeNull());
+  });
+});
+
+/**
+ * Nur ein sicherer Befund zeigt den Hinweis (Review der Change `a12ms7g9-seitenzustaende`): ein
+ * Stand aus dem Cache, dessen Neuabruf noch läuft, kennt ein eben angelegtes Objekt nicht.
+ */
+describe('deeplinkStand: angewandt gegen einen frischen Stand', () => {
+  const geladen = { isSuccess: true, fetchStatus: 'idle' } as const;
+  const neuAbruf = { isSuccess: true, fetchStatus: 'fetching' } as const;
+  const angehalten = { isSuccess: true, fetchStatus: 'paused' } as const;
+  const gescheitert = { isSuccess: false, fetchStatus: 'idle' } as const;
+
+  it('wartet, solange ein Neuabruf über dem Cache läuft', () => {
+    expect(deeplinkStand([neuAbruf])).toEqual({ bereit: false, sicher: false });
+  });
+
+  it('ist frisch geladen bereit und sicher', () => {
+    expect(deeplinkStand([geladen])).toEqual({ bereit: true, sicher: true });
+  });
+
+  it('wendet ohne Netz den Cache an, meldet aber nichts als unbekannt', () => {
+    expect(deeplinkStand([angehalten])).toEqual({ bereit: true, sicher: false });
+  });
+
+  it('wartet auf eine weitere Liste, die gerade lädt', () => {
+    expect(deeplinkStand([geladen], [neuAbruf])).toEqual({ bereit: false, sicher: false });
+  });
+
+  it('eine gescheiterte weitere Liste hält nicht auf, macht den Befund aber unsicher', () => {
+    expect(deeplinkStand([geladen], [gescheitert])).toEqual({ bereit: true, sicher: false });
+  });
+
+  it('der Hook zeigt bei unsicherem Stand keinen Hinweis und räumt den Parameter', async () => {
+    const { result } = renderHook(
+      () => ({
+        lage: useQueryParamSelektion('einheit', { bereit: true, sicher: false }, () => false),
+        location: useLocation(),
+      }),
+      { wrapper: wrapper('/x?einheit=99') },
+    );
+    await waitFor(() => expect(result.current.location.search).toBe(''));
+    expect(result.current.lage.unbekannt).toBeNull();
+  });
+
+  it('der Hook zeigt bei sicherem Stand den Hinweis', async () => {
+    const { result } = renderHook(
+      () => useQueryParamSelektion('einheit', { bereit: true, sicher: true }, () => false),
+      { wrapper: wrapper('/x?einheit=99') },
+    );
+    await waitFor(() => expect(result.current.unbekannt).toBe(99));
   });
 });

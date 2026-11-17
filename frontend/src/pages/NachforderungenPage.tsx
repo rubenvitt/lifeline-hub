@@ -72,7 +72,7 @@ import {
 } from '../nachforderungen/materialUebernahme';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -791,7 +791,7 @@ export default function NachforderungenPage() {
   // Bildlauf fände keine Karte, bis ein späterer Datenstand den Effekt erneut anstößt (Review).
   const deeplinkHinweis = useQueryParamSelektion(
     'nachforderung',
-    nfQuery.isSuccess && einsatzQuery.isSuccess,
+    deeplinkStand([nfQuery, einsatzQuery]),
     (nfId) => {
       const n = nfQuery.data?.find((x) => x.id === nfId);
       if (!n) return false;

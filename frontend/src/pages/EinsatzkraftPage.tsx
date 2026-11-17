@@ -318,7 +318,9 @@ export default function EinsatzkraftPage() {
   const aktiv = epQuery.data?.find((x) => x.id === epId);
   const entlassen = aktiv ? undefined : entlasseneQuery.data?.find((x) => x.id === epId);
   if (!aktiv && !entlassen) {
-    if (epQuery.isError) {
+    // Ein Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den neuen
+    // Versuch an: ohne beide Listen steht nicht fest, dass es die Kraft nicht (mehr) gibt.
+    if (epQuery.isError || !epQuery.data) {
       return (
         <SeitenFehler
           text="Disponiertes Personal konnte nicht geladen werden"
@@ -328,6 +330,15 @@ export default function EinsatzkraftPage() {
       );
     }
     if (entlasseneQuery.isLoading) return <SeitenSkeleton />;
+    if (entlasseneQuery.isError || !entlasseneQuery.data) {
+      return (
+        <SeitenFehler
+          text="Entlassenes Personal konnte nicht geladen werden"
+          ursache={entlasseneQuery.error}
+          onWiederholen={() => void entlasseneQuery.refetch()}
+        />
+      );
+    }
     // Unbekannt oder storniert: kein Abruf scheiterte, die Person steht in keiner Liste.
     return nichtGefunden;
   }

@@ -17,7 +17,7 @@ import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad } from '../../routing/deeplinks';
-import { useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../../components/DeeplinkHinweis';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
@@ -102,7 +102,7 @@ export default function GefahrenPage() {
   // Ein unbekanntes Gebiet meldet die Hinweisleiste (LLH-1827); die Wahl eines Gebiets schließt sie.
   const deeplinkHinweis = useQueryParamSelektion(
     'gefahrengebiet',
-    gebieteQuery.isSuccess,
+    deeplinkStand([gebieteQuery]),
     (ziel) => {
       if (!gebiete.some((g) => g.id === ziel)) return false;
       setGewaehlt(ziel);
