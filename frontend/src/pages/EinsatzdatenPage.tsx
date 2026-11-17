@@ -1,14 +1,4 @@
-import {
-  App,
-  AutoComplete,
-  Breadcrumb,
-  Button,
-  Collapse,
-  Input,
-  InputNumber,
-  Popconfirm,
-  Space,
-} from 'antd';
+import { App, AutoComplete, Breadcrumb, Button, Collapse, Input, InputNumber, Space } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -50,7 +40,6 @@ import {
   patcheFuehrungsstelle,
   loeseFuehrungsstelleSprechgruppe,
   ordneFuehrungsstelleSprechgruppeZu,
-  schliesseEinsatzAb,
   type KopfdatenPatch,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
@@ -109,6 +98,7 @@ import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import AblaufPaneel from '../programmpunkt/AblaufPaneel';
+import EinsatzAbschlussPaneel from './einsatzdaten/EinsatzAbschlussPaneel';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -1484,9 +1474,12 @@ export default function EinsatzdatenPage() {
       )}
 
       {/* Zuletzt und nicht im Kopf (LFH-960): Unumkehrbares für den ganzen Einsatz steht nicht im
-          Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“). */}
-      {/* `key`: ein Einsatzwechsel räumt den Grund, eine spätere Antwort meldet nicht hier. */}
-      {darfLeiten && <EinsatzAbschluss key={einsatzId} einsatzId={einsatzId} />}
+          Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“).
+          Am aktiven Einsatz nur für die Einsatzleitung, am abgeschlossenen für jeden Leser, mit dem
+          Wiederöffnen binnen 24 Stunden (LLH-1814). */}
+      {/* `key`: ein Einsatzwechsel räumt offene Dialoge und ihre Gründe; eine spätere Antwort meldet
+          nicht hier. */}
+      <EinsatzAbschlussPaneel key={einsatzId} einsatz={einsatz} benutzer={benutzer} />
     </EinsatzSeite>
   );
 }
@@ -1546,52 +1539,5 @@ function FuehrungAbschnitt({
         </Paneel>
       )}
     </div>
-  );
-}
-
-/** Folge des Abschlusses — steht in der Rückfrage, nicht als Satz neben dem Knopf. */
-const ABSCHLIESSEN_FOLGE = 'Danach sind keine neuen Einträge oder Berichtigungen mehr möglich.';
-
-/**
- * Einsatzabschluss (LFH-960, Spec `bedien-wortlaut`): aktiv → abgeschlossen, ohne Rückweg im
- * Frontend. Rückfrage als `Popconfirm`, deren roter Knopf die Handlung nennt. Eine Ablehnung steht
- * am Paneel bis zum nächsten Abschließen, kein Toast (LFH-1077).
- */
-function EinsatzAbschluss({ einsatzId }: { einsatzId: number }) {
-  const { token } = useRollen();
-  const { message } = App.useApp();
-  const qc = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: () => schliesseEinsatzAb(einsatzId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
-      qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
-      message.success('Einsatz abgeschlossen');
-    },
-  });
-  return (
-    <Paneel titel="Einsatzabschluss" koerperPolster style={{ marginTop: token.marginLG }}>
-      <Popconfirm
-        title="Einsatz abschließen?"
-        description={ABSCHLIESSEN_FOLGE}
-        okText="Einsatz endgültig abschließen"
-        cancelText="Abbrechen"
-        okButtonProps={{ danger: true }}
-        onConfirm={() => mutation.mutate()}
-      >
-        <Button danger loading={mutation.isPending}>
-          Einsatz abschließen
-        </Button>
-      </Popconfirm>
-      {mutation.error != null && (
-        <div style={{ marginTop: token.marginSM }}>
-          <SpeicherFehler
-            fehler={mutation.error}
-            titel="Nicht abgeschlossen"
-            fallback="Abschließen fehlgeschlagen"
-          />
-        </div>
-      )}
-    </Paneel>
   );
 }

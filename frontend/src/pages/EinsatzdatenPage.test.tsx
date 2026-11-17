@@ -1797,15 +1797,50 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
 
 /**
  * Der Einsatzabschluss steht auf den Einsatzdaten, nicht im Kopf einer Arbeitsseite (LFH-960,
- * Spec `bedien-wortlaut`): ein eigener letzter Abschnitt, nur für die Einsatzleitung eines aktiven
- * Einsatzes, und die Rückfrage bestätigt mit der Handlung.
+ * Spec `bedien-wortlaut`): ein eigener letzter Abschnitt, am aktiven Einsatz nur für die
+ * Einsatzleitung. Seit LLH-1814 (Spec `einsatz-abschluss`) öffnet der Knopf einen Dialog mit den
+ * offenen Punkten, dessen roter Knopf erst nach dem Eintippen aktiv ist; am abgeschlossenen Einsatz
+ * nennt das Paneel Zeitpunkt und Person und bietet binnen 24 Stunden „Einsatz wieder öffnen…“.
  */
-describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
+describe('EinsatzdatenPage · Einsatzabschluss (LFH-960, LLH-1814)', () => {
   const leitung = { ...admin, system_rolle: 'keiner' as const };
+  const nichtsOffen = {
+    kraefte: { anzahl: 0, eintraege: [], personal: 0 },
+    auftraege: { anzahl: 0, eintraege: [] },
+    meldungen: { anzahl: 0, eintraege: [] },
+    nachforderungen: { anzahl: 0, eintraege: [] },
+    betroffene: { anzahl: 0, eintraege: [] },
+  };
+  /** Wire-Zeit (UTC ohne Zone) vor `stunden` Stunden. */
+  const vor = (stunden: number) =>
+    dayjs.utc().subtract(stunden, 'hour').format('YYYY-MM-DD HH:mm:ss');
+  const abgeschlossenVor = (stunden: number): Partial<EinsatzAnzeige> => ({
+    status: 'abgeschlossen',
+    abgeschlossen_at: vor(stunden),
+    abgeschlossen_von: 1,
+    abgeschlossen_von_name: 'Anna Leitung',
+  });
 
-  it('fragt mit „Einsatz endgültig abschließen“ nach und schließt erst nach Bestätigung ab', async () => {
+  function mitPruefung() {
+    server.use(
+      http.get('/api/einsaetze/7/abschluss/pruefung', () => HttpResponse.json(nichtsOffen)),
+    );
+  }
+
+  const abschlussPaneel = async () =>
+    within(await screen.findByRole('region', { name: 'Einsatzabschluss' }));
+
+  async function oeffneDialog(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(
+      (await abschlussPaneel()).getByRole('button', { name: 'Einsatz abschließen…' }),
+    );
+    return within(await screen.findByRole('dialog'));
+  }
+
+  it('öffnet den Dialog; erst der rote Knopf nach dem Eintippen schließt ab', async () => {
     let abgeschlossen = false;
     setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
+    mitPruefung();
     server.use(
       http.post('/api/einsaetze/7/abschliessen', () => {
         abgeschlossen = true;
@@ -1815,83 +1850,159 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
     const user = userEvent.setup();
 
     expect(await screen.findByRole('heading', { name: 'Einsatzabschluss' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Einsatz abschließen' }));
-    expect(await screen.findByText('Einsatz abschließen?')).toBeInTheDocument();
-    const ok = screen.getByRole('button', { name: 'Einsatz endgültig abschließen' });
+    const dialog = await oeffneDialog(user);
+    expect(await dialog.findByText('Nichts offen')).toBeInTheDocument();
+    const ok = dialog.getByRole('button', { name: 'Einsatz abschließen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
-    expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
-    expect(abgeschlossen).toBe(false);
+    expect(ok).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Einsatz endgültig abschließen' })).toBeNull();
 
+    await user.type(dialog.getByRole('textbox', { name: /Zur Bestätigung/ }), 'Hochwasser Süd');
+    expect(ok).toBeDisabled();
+    expect(abgeschlossen).toBe(false);
+    await user.clear(dialog.getByRole('textbox', { name: /Zur Bestätigung/ }));
+    await user.type(dialog.getByRole('textbox', { name: /Zur Bestätigung/ }), '2026-001');
+    expect(ok).toBeEnabled();
     await user.click(ok);
     await waitFor(() => expect(abgeschlossen).toBe(true));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('steht nicht im Seitenkopf', async () => {
     const { container } = setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
-    await screen.findByRole('button', { name: 'Einsatz abschließen' });
+    await screen.findByRole('button', { name: 'Einsatz abschließen…' });
     const kopf = container.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
     expect(kopf).not.toBeNull();
-    expect(within(kopf).queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
+    expect(within(kopf).queryByRole('button', { name: /Einsatz abschließen/ })).toBeNull();
   });
 
-  it.each(['fuehrungspersonal', 'beobachter'] as const)('fehlt für %s', async (meine_rolle) => {
-    setup({ benutzer: leitung, einsatz: { meine_rolle } });
-    await screen.findByText('Realeinsatz');
-    expect(screen.queryByRole('heading', { name: 'Einsatzabschluss' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
-  });
+  it.each(['fuehrungspersonal', 'beobachter'] as const)(
+    'fehlt am aktiven Einsatz für %s',
+    async (meine_rolle) => {
+      setup({ benutzer: leitung, einsatz: { meine_rolle } });
+      await screen.findByText('Realeinsatz');
+      expect(screen.queryByRole('heading', { name: 'Einsatzabschluss' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /Einsatz abschließen/ })).toBeNull();
+    },
+  );
 
-  it('fehlt bei einem abgeschlossenen Einsatz', async () => {
-    setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
-    await screen.findByText('Realeinsatz');
-    expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
-  });
-
-  const abschlussPaneel = async () =>
-    within(await screen.findByRole('region', { name: 'Einsatzabschluss' }));
-
-  async function schliesseAb(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(
-      (await abschlussPaneel()).getByRole('button', { name: 'Einsatz abschließen' }),
-    );
-    await user.click(await screen.findByRole('button', { name: 'Einsatz endgültig abschließen' }));
-  }
-
-  // LFH-1077: der Grund steht am Paneel, nicht im Toast.
-  it('zeigt eine Ablehnung am Paneel „Einsatzabschluss“, ohne Toast', async () => {
+  it('zeigt eine Ablehnung im Dialog, ohne Toast', async () => {
     setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
+    mitPruefung();
     server.use(
       http.post('/api/einsaetze/7/abschliessen', () =>
-        HttpResponse.json({ error: 'Offene Aufträge vorhanden' }, { status: 409 }),
+        HttpResponse.json({ error: 'Einsatz ist bereits abgeschlossen' }, { status: 409 }),
       ),
     );
     const user = userEvent.setup();
-    await schliesseAb(user);
+    const dialog = await oeffneDialog(user);
+    await user.type(dialog.getByRole('textbox', { name: /Zur Bestätigung/ }), '2026-001');
+    await user.click(dialog.getByRole('button', { name: 'Einsatz abschließen' }));
 
-    const grund = await (await abschlussPaneel()).findByRole('alert');
+    const grund = await dialog.findByRole('alert');
     expect(grund).toHaveTextContent('Nicht abgeschlossen');
-    expect(grund).toHaveTextContent('Offene Aufträge vorhanden');
+    expect(grund).toHaveTextContent('Einsatz ist bereits abgeschlossen');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
-  it('räumt den Grund beim nächsten Abschließen', async () => {
-    let aufrufe = 0;
-    setup({ benutzer: leitung, einsatz: { meine_rolle: 'einsatzleitung' } });
+  it('nennt am abgeschlossenen Einsatz Zeitpunkt und Person, ohne „Einsatz abschließen“', async () => {
+    setup({
+      benutzer: leitung,
+      einsatz: { meine_rolle: 'einsatzleitung', ...abgeschlossenVor(48) },
+    });
+    const paneel = await abschlussPaneel();
+    expect(paneel.getByText(/^Abgeschlossen am .+ von Anna Leitung$/)).toBeInTheDocument();
+    expect(paneel.queryByRole('button', { name: /Einsatz abschließen/ })).toBeNull();
+    // Nach der Frist fehlt der Rückweg.
+    expect(paneel.queryByRole('button', { name: 'Einsatz wieder öffnen…' })).toBeNull();
+  });
+
+  it('bietet der Einsatzleitung binnen der Frist „Einsatz wieder öffnen…“ mit dem Ende der Frist', async () => {
+    setup({
+      benutzer: leitung,
+      einsatz: { meine_rolle: 'einsatzleitung', ...abgeschlossenVor(1) },
+    });
+    const paneel = await abschlussPaneel();
+    expect(paneel.getByRole('button', { name: 'Einsatz wieder öffnen…' })).toBeInTheDocument();
+    expect(paneel.getByText(/^bis .+/)).toBeInTheDocument();
+  });
+
+  it('bietet das Wiederöffnen dem System-Admin der Einsatz-Org ohne Einsatzrolle', async () => {
+    setup({ benutzer: admin, einsatz: { meine_rolle: null, ...abgeschlossenVor(1) } });
+    const paneel = await abschlussPaneel();
+    expect(paneel.getByRole('button', { name: 'Einsatz wieder öffnen…' })).toBeInTheDocument();
+  });
+
+  it.each(['fuehrungspersonal', 'beobachter'] as const)(
+    'bietet %s kein Wiederöffnen, nennt aber den Abschluss',
+    async (meine_rolle) => {
+      setup({ benutzer: leitung, einsatz: { meine_rolle, ...abgeschlossenVor(1) } });
+      const paneel = await abschlussPaneel();
+      expect(paneel.getByText(/^Abgeschlossen am /)).toBeInTheDocument();
+      expect(paneel.queryByRole('button', { name: 'Einsatz wieder öffnen…' })).toBeNull();
+    },
+  );
+
+  it('öffnet mit Pflicht-Grund wieder und nennt, was beendet bleibt', async () => {
+    const bodies: unknown[] = [];
+    setup({
+      benutzer: leitung,
+      einsatz: { meine_rolle: 'einsatzleitung', ...abgeschlossenVor(1) },
+    });
     server.use(
-      http.post('/api/einsaetze/7/abschliessen', async () => {
-        aufrufe += 1;
-        if (aufrufe === 1)
-          return HttpResponse.json({ error: 'Offene Aufträge vorhanden' }, { status: 409 });
-        return new Promise<never>(() => {});
+      http.post('/api/einsaetze/7/wiedereroeffnen', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ ...basisEinsatz, status: 'aktiv' });
       }),
     );
     const user = userEvent.setup();
-    await schliesseAb(user);
-    await (await abschlussPaneel()).findByText('Offene Aufträge vorhanden');
+    await user.click(
+      (await abschlussPaneel()).getByRole('button', { name: 'Einsatz wieder öffnen…' }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(
+      dialog.getByText(/Gekoppelte Geräte und Maschinenzugänge bleiben getrennt/),
+    ).toBeInTheDocument();
+    const ok = dialog.getByRole('button', { name: 'Einsatz wieder öffnen' });
+    expect(ok).not.toHaveClass('ant-btn-dangerous');
+    // Ohne Grund geht nichts hinaus.
+    await user.click(ok);
+    expect(await dialog.findByText('Grund angeben')).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
 
-    await schliesseAb(user);
-    await waitFor(() => expect(aufrufe).toBe(2));
-    expect((await abschlussPaneel()).queryByRole('alert')).toBeNull();
+    await user.type(
+      dialog.getByRole('textbox', { name: 'Grund' }),
+      'Falscher Einsatz abgeschlossen',
+    );
+    await user.click(ok);
+    await waitFor(() => expect(bodies).toEqual([{ grund: 'Falscher Einsatz abgeschlossen' }]));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('zeigt eine Ablehnung des Wiederöffnens im Dialog', async () => {
+    setup({
+      benutzer: leitung,
+      einsatz: { meine_rolle: 'einsatzleitung', ...abgeschlossenVor(1) },
+    });
+    server.use(
+      http.post('/api/einsaetze/7/wiedereroeffnen', () =>
+        HttpResponse.json(
+          { error: 'Eine Datenkategorie dieses Einsatzes ist schon geschwärzt.' },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    await user.click(
+      (await abschlussPaneel()).getByRole('button', { name: 'Einsatz wieder öffnen…' }),
+    );
+    const dialog = within(await screen.findByRole('dialog'));
+    await user.type(dialog.getByRole('textbox', { name: 'Grund' }), 'Versehen');
+    await user.click(dialog.getByRole('button', { name: 'Einsatz wieder öffnen' }));
+    const grund = await dialog.findByRole('alert');
+    expect(grund).toHaveTextContent('Nicht wieder geöffnet');
+    expect(grund).toHaveTextContent('schon geschwärzt');
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
   it('meldet eine Ablehnung aus dem vorigen Einsatz nicht im neuen', async () => {
@@ -1918,6 +2029,7 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
         } satisfies Fuehrungsstelle),
       ),
       http.get('/api/einsaetze/:id/sprechgruppen', () => HttpResponse.json(sprechgruppenListe)),
+      http.get('/api/einsaetze/:id/abschluss/pruefung', () => HttpResponse.json(nichtsOffen)),
       http.post(
         '/api/einsaetze/7/abschliessen',
         () =>
@@ -1949,7 +2061,9 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
       { route: '/einsaetze/7/einsatzdaten', client },
     );
     const user = userEvent.setup();
-    await schliesseAb(user);
+    const dialog = await oeffneDialog(user);
+    await user.type(dialog.getByRole('textbox', { name: /Zur Bestätigung/ }), '2026-001');
+    await user.click(dialog.getByRole('button', { name: 'Einsatz abschließen' }));
     // Erst wechseln, wenn die Anfrage des vorigen Einsatzes beim Server liegt.
     await waitFor(() => expect(lehneAb).not.toBeNull());
     await user.click(screen.getByRole('button', { name: 'Zu Einsatz 8' }));
@@ -1959,7 +2073,8 @@ describe('EinsatzdatenPage · Einsatzabschluss (LFH-960)', () => {
     await waitFor(() => expect(client.getMutationCache().getAll()[0]?.state.status).toBe('error'));
     await act(() => new Promise((r) => setTimeout(r, 20)));
     expect(paneel8.queryByRole('alert')).toBeNull();
-    expect((await abschlussPaneel()).queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('Offene Aufträge vorhanden')).toBeNull();
   });
 });
 

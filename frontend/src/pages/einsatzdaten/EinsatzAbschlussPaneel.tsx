@@ -1,0 +1,109 @@
+import { Button } from 'antd';
+import { useEffect, useState } from 'react';
+import type { EinsatzAnzeige } from '../../api/types';
+import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
+import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
+import { Paneel, schriftStil, useRollen } from '../../components/instrument';
+import {
+  darfEinsatzLeiten,
+  darfEinsatzWiedereroeffnen,
+  wiedereroeffnenBis,
+  type BenutzerOrgKontext,
+} from '../../einsatz/schreibrecht';
+import EinsatzAbschlussDialog from './EinsatzAbschlussDialog';
+import EinsatzWiedereroeffnenDialog from './EinsatzWiedereroeffnenDialog';
+
+/**
+ * Paneel „Einsatzabschluss“, letzter Abschnitt der Einsatzdaten (LFH-960, LLH-1814, Spec
+ * `bedien-wortlaut` und `einsatz-abschluss`, design.md D6). Unumkehrbares für den ganzen Einsatz
+ * steht nicht im Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich
+ * destruktiv“).
+ *
+ * - **Aktiver Einsatz:** nur für die Einsatzleitung (`darfEinsatzLeiten`) „Einsatz abschließen…“,
+ *   das den Dialog mit offenen Punkten und Eintippen öffnet. Für alle anderen fehlt das Paneel.
+ * - **Abgeschlossener Einsatz:** für jeden, der die Seite liest, „Abgeschlossen am … von …“; für
+ *   Einsatzleitung und System-Admin der Einsatz-Org binnen der Frist (`darfEinsatzWiedereroeffnen`)
+ *   „Einsatz wieder öffnen…“ mit dem Ende der Frist. Am Fristende verschwindet der Knopf von selbst.
+ *
+ * Die Dialoge hängen nur, solange sie offen sind; der Aufrufer setzt `key` auf den Einsatz, damit
+ * ein Einsatzwechsel offene Dialoge und ihre Gründe räumt.
+ */
+export default function EinsatzAbschlussPaneel({
+  einsatz,
+  benutzer,
+}: {
+  einsatz: EinsatzAnzeige;
+  benutzer: BenutzerOrgKontext;
+}) {
+  const { token, rollen } = useRollen();
+  const [dialog, setDialog] = useState<'abschliessen' | 'wiedereroeffnen' | null>(null);
+  const bis = wiedereroeffnenBis(einsatz);
+  const jetzt = useJetztBisFristende(bis);
+  const abgeschlossen = einsatz.status === 'abgeschlossen';
+
+  if (!abgeschlossen && !darfEinsatzLeiten(einsatz)) return null;
+
+  const darfWiedereroeffnen = darfEinsatzWiedereroeffnen(einsatz, benutzer, jetzt);
+  const text = { ...schriftStil('text'), color: rollen.text, margin: 0 } as const;
+
+  return (
+    <Paneel titel="Einsatzabschluss" koerperPolster style={{ marginTop: token.marginLG }}>
+      {abgeschlossen ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+          <p data-lfh="abschluss-stand" style={text}>
+            Abgeschlossen am <ZeitAnzeige wert={einsatz.abgeschlossen_at} />
+            {einsatz.abgeschlossen_von_name && <> von {einsatz.abgeschlossen_von_name}</>}
+          </p>
+          {darfWiedereroeffnen && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                columnGap: token.margin,
+                rowGap: token.marginXS,
+              }}
+            >
+              <Button onClick={() => setDialog('wiedereroeffnen')}>Einsatz wieder öffnen…</Button>
+              <span
+                data-lfh="wiedereroeffnen-bis"
+                style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
+              >
+                bis <ZeitAnzeige wert={bis} />
+              </span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <Button danger onClick={() => setDialog('abschliessen')}>
+          Einsatz abschließen…
+        </Button>
+      )}
+      {dialog === 'abschliessen' && (
+        <EinsatzAbschlussDialog einsatz={einsatz} onSchliessen={() => setDialog(null)} />
+      )}
+      {dialog === 'wiedereroeffnen' && (
+        <EinsatzWiedereroeffnenDialog einsatzId={einsatz.id} onSchliessen={() => setDialog(null)} />
+      )}
+    </Paneel>
+  );
+}
+
+/**
+ * Die Uhr des Paneels in ms: gelesen beim Einhängen und einmal am Ende der Frist, damit
+ * „Einsatz wieder öffnen…“ dann ohne neuen Abruf verschwindet. Sonst steht sie: nur dieser eine
+ * Wechsel ändert, was das Paneel zeigt.
+ */
+function useJetztBisFristende(bis: string | null): number {
+  const [jetzt, setJetzt] = useState(() => Date.now());
+  useEffect(() => {
+    const ende = alsZeitpunkt(bis)?.valueOf();
+    if (ende == null) return;
+    const rest = ende - Date.now();
+    if (rest <= 0) return;
+    // +50 ms: sicher HINTER der Grenze lesen; Timer über 2^31 - 1 ms liefen sofort ab.
+    const t = window.setTimeout(() => setJetzt(Date.now()), Math.min(rest + 50, 2_147_483_647));
+    return () => window.clearTimeout(t);
+  }, [bis]);
+  return jetzt;
+}
