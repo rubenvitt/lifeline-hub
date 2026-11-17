@@ -83,7 +83,7 @@ Für Einsatzleitung und Führungspersonal, in der Liste oder in der Ansicht der 
    ohne Abschnitt stehen zuletzt unter „ohne Abschnitt“. Erst „Speichern“ ändert etwas; Escape
    oder „Abbrechen“ verwirft die Wahl.
 
-   ![Zeile einer nicht eingeteilten Person mit offener Einheitsauswahl, gewählt „Rettungsstaffel“, darunter „Speichern“ und „Abbrechen“](../bilder/personal/einteilen.png)
+   ![Personalliste; an der Zeile einer nicht eingeteilten Person schwebt die Einheitsauswahl, gewählt „Rettungsstaffel“, darunter „Speichern“ und „Abbrechen“](../bilder/personal/einteilen.png)
 
 3. Ebenso in der Spalte „Fahrzeug“ das Fahrzeug wählen. Die Fahrzeuge der eigenen Einheit stehen
    oben unter „Einheit «…»“, die übrigen unter „Weitere Fahrzeuge“.
