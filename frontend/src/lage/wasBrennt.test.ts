@@ -81,6 +81,16 @@ describe('wasBrennt (Spec lage-alarmzeile)', () => {
     expect(e.bezug).toEqual([1, 2]);
   });
 
+  it('nennt lange Wartezeiten in Stunden und die erste Minute „< 1 min“ (LLH-1750)', () => {
+    const mit = (seitMin: number): WasBrenntQuellen => ({
+      ...ruhig(),
+      rueckmeldung: { zustand: 'daten', wert: [{ id: 1, name: 'Logistiktrupp', seitMin }] },
+    });
+    expect(wasBrennt(mit(301), JETZT).eintraege[0].text).toMatch(/· längste 5 h 01 min$/);
+    expect(wasBrennt(mit(1565), JETZT).eintraege[0].text).toMatch(/· längste 26 h 05 min$/);
+    expect(wasBrennt(mit(0), JETZT).eintraege[0].text).toMatch(/· längste < 1 min$/);
+  });
+
   it('höchstens zwei Namen, der Rest als „+n“, der volle Wortlaut nennt alle', () => {
     const q: WasBrenntQuellen = {
       ...ruhig(),

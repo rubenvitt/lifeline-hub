@@ -1,3 +1,4 @@
+import { OrgAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { IconSchloss } from '../icons';
 import { Layout, Tag, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
@@ -250,7 +251,10 @@ export default function AppLayout() {
           {/* Außerhalb eines Einsatzes läuft kein Live-Strom — die SYNC-Zelle erscheint hier
               nur bei Netzverlust oder offener Offline-Queue. */}
           <SyncAnzeige liveErwartet={false} kompakt={!mittel} />
-          <Uhr zelle={zellToken} />
+          {/* Gerät vor Organisation vor Vorgabe (LLH-1750): dieselbe Darstellung wie die Einsatzliste. */}
+          <OrgAnzeigeProvider>
+            <Uhr zelle={zellToken} />
+          </OrgAnzeigeProvider>
           {!breit && (
             <div style={kopfZelleStil(zellToken)}>
               <CommandPaletteTrigger />

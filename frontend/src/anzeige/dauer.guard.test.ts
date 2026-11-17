@@ -10,10 +10,12 @@
  *
  * ── Was dieser Wächter sieht ────────────────────────────────────────────────────
  * Außerhalb von `anzeige/` jede Interpolation, auf die direkt eine Einheit folgt (`${n} min`,
- * `${h} h`, `${t} d`), und jede `${h}:${…padStart(2…)}`-Zusammensetzung (Stunden:Minuten).
+ * `${h} h`, `${t} d`), dasselbe als JSX-Text (`{n} min</…>`), und jede
+ * `${h}:${…padStart(2…)}`-Zusammensetzung (Stunden:Minuten).
  *
  * ── Was er NICHT sieht ──────────────────────────────────────────────────────────
- * Text ohne Interpolation („alle 6 h“ als Literal), Einheiten in eigener Spalte, den Server
+ * Text ohne Interpolation („alle 6 h“ als Literal), ausgeschriebene Einheiten in festen Sätzen
+ * („binnen ${N} Stunden“), Verkettung mit `+`, `${h}:${m}` ohne `padStart`, den Server
  * (`src/zeitdarstellung.rs`, gehalten über `dauer.faelle.json`). {@link AUSNAHMEN} nennt jede
  * bewertete Stelle, an der der Treffer keine Dauer für Menschen ist.
  */
@@ -34,6 +36,7 @@ const quellen = Object.entries(dateien).filter(
 
 const EINHEIT_NACH_WERT = /\$\{[^}]+\}\s?(?:min|h|d)\b(?![-\w])/;
 const STUNDEN_DOPPELPUNKT = /\$\{[^}]+\}:\$\{[^}]*padStart\(2/;
+const EINHEIT_IN_JSX = /\{[^{}]+\}\s?(?:min|h)\s*</;
 
 /** Bewertete Treffer, die keine Dauer für Menschen sind: Pfad → Ausschnitt der Zeile. */
 const AUSNAHMEN: Record<string, string[]> = {
@@ -49,7 +52,12 @@ const OFFEN = new Set<string>([]);
 export function dauerTreffer(inhalt: string): string[] {
   return inhalt
     .split('\n')
-    .filter((zeile) => EINHEIT_NACH_WERT.test(zeile) || STUNDEN_DOPPELPUNKT.test(zeile))
+    .filter(
+      (zeile) =>
+        EINHEIT_NACH_WERT.test(zeile) ||
+        STUNDEN_DOPPELPUNKT.test(zeile) ||
+        EINHEIT_IN_JSX.test(zeile),
+    )
     .map((zeile) => zeile.trim());
 }
 
@@ -74,6 +82,7 @@ describe('Eine Formatstelle für Dauern (LLH-1750)', () => {
     expect(dauerTreffer('return `${h} h ${m}`;')).toHaveLength(1);
     expect(dauerTreffer("`${h}:${String(m).padStart(2, '0')}`")).toHaveLength(1);
     expect(dauerTreffer('`${tage} d`')).toHaveLength(1);
+    expect(dauerTreffer('<span>{minuten} min</span>')).toHaveLength(1);
     expect(dauerTreffer('relativ(minuten, "seit")')).toEqual([]);
     expect(dauerTreffer('`${einsatzId}:${maske}`')).toEqual([]);
     expect(dauerTreffer('`${n} Einheiten`')).toEqual([]);

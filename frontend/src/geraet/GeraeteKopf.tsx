@@ -1,4 +1,4 @@
-import { dauerAusgeschrieben, relativ } from '../anzeige/dauer';
+import { dauer, dauerAusgeschrieben, relativ } from '../anzeige/dauer';
 import { useCallback, useSyncExternalStore } from 'react';
 import { theme } from 'antd';
 import dayjs from 'dayjs';
@@ -16,7 +16,7 @@ import {
 } from '../components/Kopfleiste';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useViewport } from '../components/useViewport';
-import { formatiereDatenstand } from '../components/Datenstand';
+import { datenstandText, formatiereDatenstand } from '../components/Datenstand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
@@ -52,8 +52,9 @@ export function kopplungRestText(
   const rest = dayjs.utc(laeuftAbAt).valueOf() - jetzt;
   if (rest <= 0) return { kurz: 'endet', lang: 'endet jetzt' };
   if (rest >= STUNDE_MS) {
+    // Ganze Stunden, auch über einen Tag („noch 71 h“): die Kopplung ist eine Frist in Stunden.
     const minuten = Math.floor(rest / STUNDE_MS) * 60;
-    return { kurz: relativ(minuten, 'noch'), lang: `noch ${dauerAusgeschrieben(minuten)}` };
+    return { kurz: `noch ${dauer(minuten)}`, lang: `noch ${dauerAusgeschrieben(minuten)}` };
   }
   const min = Math.max(1, Math.floor(rest / MINUTE_MS));
   return { kurz: relativ(min, 'noch'), lang: `noch ${dauerAusgeschrieben(min)}` };
@@ -199,7 +200,9 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
               color: farbenDunkel.achtung,
             }}
           >
-            <span aria-hidden="true">Stand {formatiereDatenstand(stand, konventionen)}</span>
+            <span aria-hidden="true">
+              {datenstandText(stand, stand, { offline: true, konv: konventionen })}
+            </span>
           </div>
         )}
         <Uhr zelle={zellToken} />

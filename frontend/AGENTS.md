@@ -1173,9 +1173,10 @@ anwendbar), „nicht geprüft" ist keins.
   `dauerAusgeschrieben` (zugänglicher Name). Kräfte-Dauern und eingestellte Längen laufen in Stunden
   weiter, weil sie neben Stunden-Grenzwerten stehen. Der Server schreibt dieselbe Form
   (`src/zeitdarstellung.rs:dauer_text`), beide lesen `anzeige/dauer.faelle.json`. Wächter
-  `anzeige/dauer.guard.test.ts` (keine `${n} min`/`${h} h`/`${h}:${mm}` außerhalb von `anzeige/`).
+  `anzeige/dauer.guard.test.ts` (keine `${n} min`, `${h} h`, `{n} min</…>` und kein Stunden:Minuten mit `padStart` außerhalb von
+  `anzeige/`; ausgeschriebene Einheiten in festen Sätzen sieht er nicht).
   Der **Datenstand** heißt überall „Stand 1731“, ohne Netz „· offline“ am Ende, in Gerätezeit
-  (`components/Datenstand.tsx`, Text `datenstandText`); mit `alter` (Lagebild, Großbild,
+  (`components/Datenstand.tsx`, Text `datenstandText`; Alter in ganzen Minuten der Uhr); mit `alter` (Lagebild, Großbild,
   Lagemonitor, `EinsatzSeite datenstandAlter`) ab einer Minute „· vor 2 min“. Nie „Stand vor 0 s“.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot

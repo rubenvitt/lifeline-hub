@@ -108,6 +108,14 @@ describe('Eine Form für den Datenstand (LLH-1750, Spec zeitdarstellung)', () =>
     expect(datenstandText(stand, um(17, 40))).toBe('Stand 1731');
   });
 
+  it('zählt das Alter in ganzen Minuten der Uhr, wie die Kopfuhr', () => {
+    // Abruf 17:31:45, die Uhr zeigt 1733: „vor 2 min“, nicht „vor 1 min“.
+    expect(datenstandText(um(17, 31, 45), um(17, 33), { alter: true })).toBe(
+      'Stand 1731 · vor 2 min',
+    );
+    expect(datenstandText(um(17, 31, 45), um(17, 31, 59), { alter: true })).toBe('Stand 1731');
+  });
+
   it('setzt „offline“ ans Ende und kennt kein „vor 0 s“', () => {
     expect(datenstandText(stand, um(17, 40), { alter: true, offline: true })).toBe(
       'Stand 1731 · vor 9 min · offline',

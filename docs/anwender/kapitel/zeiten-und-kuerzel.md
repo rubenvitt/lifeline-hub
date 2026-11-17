@@ -74,6 +74,7 @@ etwa „Unterabschnitte“ statt „UA“.
 | F/UF/M//Σ | Führer / Unterführer / Mannschaft // Summe (Stärke) |
 | FMS, S1–S9 | Funkmeldesystem und seine Status 1 bis 9 |
 | Fzg. | Fahrzeuge |
+| Mtl. | Material |
 | Pers. | Personen |
 | Rückm. | Rückmeldung |
 | SK I–IV | Sichtungskategorie I bis IV |

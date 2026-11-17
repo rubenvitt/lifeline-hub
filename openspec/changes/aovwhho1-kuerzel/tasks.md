@@ -2,7 +2,7 @@
 
 ## 1. Kern der Stärke
 
-- [x] 1.1 `anzeige/staerke.ts`: `STAERKE_SCHREIBWEISE`, `STAERKE_AUSGESCHRIEBEN`, `staerkeBeschreibung(wert)`; `StaerkeAnzeige` mit `aria-label` und `title` (D1) per TDD. Prüfung: `StaerkeAnzeige.test.tsx` findet den Wert per zugänglichem Namen „… Führer / Unterführer / Mannschaft // Summe“.
+- [x] 1.1 `anzeige/staerke.ts`: `STAERKE_SCHREIBWEISE`, `STAERKE_AUSGESCHRIEBEN`; `StaerkeAnzeige` mit `title` als zugänglicher Beschreibung (D1) per TDD. Prüfung: `StaerkeAnzeige.test.tsx` findet den Wert per zugänglichem Namen „… Führer / Unterführer / Mannschaft // Summe“.
 - [x] 1.2 Wächter `anzeige/staerke.guard.test.ts` (D4) mit Schuldmenge aus dem Bestand. Prüfung: grün; die Probe `//Ges` in einer Seite macht ihn rot (Mutationsprobe, zurücknehmen).
 
 ## 2. Flächen

@@ -79,7 +79,10 @@ Die Uhr nimmt die Rolle `uhrzeit` in der wirksamen Darstellung, rechnet aber in 
 `Datenstand` (Zone `null`). Die Kopfleiste liest die Darstellung aus `useAnzeigeKonventionen()`.
 Ohne Einsatz (AppLayout) gilt Gerät vor Organisation vor Vorgabe. Die Ausnahme `formatiereUhr` im
 Wächter entfällt. Lagemonitor und Großbild verwenden denselben `Uhr`-Baustein. `lagebildZeit`
-fällt weg.
+fällt weg. Außerhalb eines Einsatzes legt `AppLayout` den `OrgAnzeigeProvider` um die Uhr
+(Gerät vor Organisation vor Vorgabe, dieselbe Abfrage wie die Einsatzliste). Gekoppelte Geräte
+und der Lagemonitor haben bewusst keinen Einsatz-Provider (`frontend/src/geraet/AGENTS.md`, 403
+auf `/einstellungen`); ihre Uhr folgt der Gerätewahl vor der Vorgabe.
 
 **D5 Datenstand: ein Baustein mit Option `alter`.**
 `components/Datenstand.tsx` bekommt `alter?: boolean`. Damit erscheint ab 1 min „· vor 2 min“ über
@@ -106,7 +109,8 @@ eine gültige Form der Dauer, gebildet über `relativ`.
 Eine Funktion `dauer_text(minuten)` mit derselben Form wie der Kern im Frontend (ohne Tage, weil
 nur Längen). `plan.rs` und `abloesung::rhythmus_text` rufen sie auf. Ein gemeinsamer Satz
 Testfälle (Rust-Test plus Vitest mit denselben Paaren) hält beide Seiten gleich. `rhythmus_text`
-ändert dabei seine Ausgabe nicht.
+schreibt danach Minuten zweistellig („6 h 05 min“ statt „6 h 5 min“); geschriebene ETB-Einträge
+bleiben, wie sie sind.
 
 ## Risks / Trade-offs
 

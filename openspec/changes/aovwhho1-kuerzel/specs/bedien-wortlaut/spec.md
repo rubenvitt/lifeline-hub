@@ -3,7 +3,7 @@
 ### Requirement: Kürzel sind eingeführt oder erklärt
 Die Oberfläche SHALL ein Kürzel nur zeigen, wenn es eingeführt ist oder auf derselben Fläche sichtbar
 erklärt wird. Eingeführt sind die Kürzel, die das Anwenderkapitel „Zeiten und Kürzel“ führt: FMS und
-S1–S9, SK I–IV, ETB, UHS, BR, F/UF/M//Σ, Rückm., Einh., Fzg., Pers. Ein neues Kürzel MUST dort
+S1–S9, SK I–IV, ETB, UHS, BR, F/UF/M//Σ, Rückm., Einh., Fzg., Mtl., Pers. Ein neues Kürzel MUST dort
 nachgetragen werden, sonst wird es ausgeschrieben. Kurzbezeichnungen, die eine Organisation selbst
 vergibt („EA 1.1“), MUST unverändert stehen.
 

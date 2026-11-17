@@ -19,7 +19,7 @@ nicht. LLH-1750, Thema 3 der UI/UX-Analyse vom 12.11.2026, Entscheidungen vom 17
   „Fzg“ in der Verdichtungszeile zu „Fahrzeuge“, „n.v.“ im Kräftebild-Text zu „nicht verfügbar“.
 - **„Verbleib offen“ erklärt sich:** Die Kennzahl trägt die Notiz „wohin nicht erfasst · n unterwegs“.
 - **Regel für Kürzel:** Ein Kürzel steht nur, wenn es eingeführt ist (FMS und S1–S9, SK I–IV, ETB, UHS,
-  BR, F/UF/M//Σ, Rückm., Einh., Fzg., Pers.) oder auf der Fläche sichtbar erklärt wird. Kurzbezeichnungen,
+  BR, F/UF/M//Σ, Rückm., Einh., Fzg., Mtl., Pers.) oder auf der Fläche sichtbar erklärt wird. Kurzbezeichnungen,
   die eine Organisation selbst vergibt („EA 1.1“), sind Daten und bleiben unverändert.
 - **Neues Anwenderkapitel „Zeiten und Kürzel“:** Zeitpunkt, Uhrzeit, Dauer und Datenstand (aus
   `aovwhho1-zeitformate`), die Stärke, die eingeführten Kürzel und als Ablauf das Umstellen der

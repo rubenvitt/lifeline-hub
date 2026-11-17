@@ -110,6 +110,7 @@ export default function LagebildGrossbild({
                 wert={k.wert}
                 einheit={k.einheit}
                 notiz={k.notiz}
+                notizBeschreibung={k.notizBeschreibung}
                 ton={k.ton}
                 zustand={k.zustand}
                 groesse={String(k.wert).length >= LANG_AB_ZEICHEN ? 'zahlKlein' : 'zahl'}
@@ -144,6 +145,7 @@ export default function LagebildGrossbild({
                 titel={k.titel}
                 wert={k.wert}
                 notiz={k.notiz}
+                notizBeschreibung={k.notizBeschreibung}
                 ton={k.ton}
                 zustand={k.zustand}
                 groesse="zahlKlein"

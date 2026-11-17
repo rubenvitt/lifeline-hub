@@ -16,7 +16,7 @@ import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../kraefte/QualiSollFeld';
 import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
-import { staerkeText } from '../anzeige/staerke';
+import { STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
 import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from '../pages/lagekarte/taktischesZeichen';
 import { useAuth } from '../auth/AuthContext';
@@ -491,7 +491,7 @@ function SollField({ typen, vorlage }: { typen: EinheitTyp[]; vorlage: EinheitVo
       {/* EIN `Form.Item` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
           `FahrzeugDetailPage`). */}
       <Form.Item
-        label="Soll-Stärke"
+        label={`Soll-Stärke (${STAERKE_SCHREIBWEISE})`}
         name="soll"
         extra={soll == null && typSoll ? typVorgabe(staerkeText(typSoll)) : undefined}
       >

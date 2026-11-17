@@ -33,7 +33,9 @@ braucht genau die vier Abschnitte aus `docs/anwender/AGENTS.md`.
 - `STAERKE_SCHREIBWEISE` = „F/UF/M//Σ“
 - `STAERKE_AUSGESCHRIEBEN` = „Führer / Unterführer / Mannschaft // Summe“
 
-`StaerkeAnzeige` setzt `aria-label` aus Wert und ausgeschriebener Form und `title` als Zusatz.
+`StaerkeAnzeige` setzt die ausgeschriebene Form als `title`: zugängliche Beschreibung und Tooltip
+zugleich. Wo die Stärke als Text in einer Notiz steht, trägt die Kennzahl sie als
+`notizBeschreibung` (Großbild und Lagemonitor als `aria-description`, dort gibt es keinen Tooltip).
 Etiketten und Spaltenköpfe nehmen die Konstante statt eines eigenen Literals.
 *Alternative:* `<abbr>` um den Wert. Verworfen: `abbr` erklärt eine Abkürzung, der Wert ist aber
 eine Zahlengruppe, und Vorlesehilfen lesen `abbr` uneinheitlich.

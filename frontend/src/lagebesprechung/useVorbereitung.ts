@@ -39,7 +39,7 @@ export interface Vorbereitung {
   zeilen: VorbereitungsZeile[];
   /** Ältester Stand der Quellen als Wire-String, `null` ohne Stand. */
   standWire: string | null;
-  /** Derselbe Stand als Epoche, für „Stand vor n s“; nicht endlich ohne Stand. */
+  /** Derselbe Stand als Epoche, für den Datenstand mit Alter („Stand 1731 · vor 2 min“); nicht endlich ohne Stand. */
   standMs: number;
   /** Eine Quelle lädt noch. */
   laedt: boolean;

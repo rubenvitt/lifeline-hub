@@ -1,3 +1,4 @@
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
 import { Button, Space } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -105,7 +106,7 @@ export default function EinheitVorlagenTab() {
         ),
     },
     {
-      title: 'Soll',
+      title: `Soll (${STAERKE_SCHREIBWEISE})`,
       key: 'soll',
       // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
       render: (_, { vorlage }) => {
@@ -115,6 +116,7 @@ export default function EinheitVorlagenTab() {
             {/* Geerbt trägt das Soll „(Vorgabe)“, ein Wort: dann Textschrift (LLH-1777). */}
             <span
               style={vorlage.soll && !vorlage.soll_eigen ? schriftStil('meta') : zahlStil('klein')}
+              title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}
             >
               {sollText(vorlage)}
             </span>

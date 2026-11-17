@@ -14,8 +14,13 @@ describe('Eine Form für Dauern (LLH-1750, Spec zeitdarstellung)', () => {
     expect(dauer(-3)).toBe('0 min');
   });
 
-  it('trägt nie einen Doppelpunkt', () => {
+  it('trägt nie einen Doppelpunkt, über eine ganze Woche', () => {
     for (const f of faelle.faelle) expect(f.text).not.toContain(':');
+    for (let m = 0; m <= 7 * 24 * 60; m += 7) {
+      expect(dauer(m)).not.toContain(':');
+      expect(dauer(m, { tage: true })).not.toContain(':');
+      expect(dauer(m)).toMatch(/^(\d+ min|\d+ h( \d{2} min)?)$/);
+    }
   });
 });
 

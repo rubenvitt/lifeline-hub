@@ -16,7 +16,7 @@ Jede Aufgabe stellt die Tests ihrer Aufrufer mit um und streicht ihre Dateien au
 - [x] 2.4 `kraefte/zeitachse.ts:dauerText` → `dauer` ohne Tage (Meldebild, Personal, Einheit, BR, Einsatzbericht Helferstunden). Prüfung: `zeitachse.test.ts` und die Seitentests zeigen „7 h 40 min“ und „2 h“.
 - [x] 2.5 `lagebesprechung/lagebesprechungZustand.ts:dauerText` und `pages/uhs/dringlichkeit.ts:wartezeitText` → `dauer`/`relativ`. Prüfung: `lagebesprechungZustand.test.ts`, `dringlichkeit.test.ts`, `ueberblickDaten.test.ts` und `meldebildRaster`-Tests grün mit unveränderten bzw. angepassten Texten.
 - [x] 2.6 `anzeige/abstand.ts:formatVor` → `vorText` im Kern; Aufrufer (Sichtung, Patientenkopf, Nachforderung, Offene Vorgänge, Spiegel, Lagemonitor, `SitzungsListe` mit eigener Schwelle) umstellen und `abstand.ts` entfernen. Prüfung: `Patientenkopf.test.tsx` und die Spiegel-Tests zeigen „vor 3 h 05 min“.
-- [x] 2.7 Inline-Stellen: `lage/wasBrennt.ts` („längste 5 h 01 min“), `geraet/GeraeteKopf.tsx` („noch 5 h 12 min“), `etb/schnellerfassungModell.ts` („Ereignis vor 1 h 05 min“). Prüfung: ihre Tests. Danach ist `OFFEN` im Wächter leer.
+- [x] 2.7 Inline-Stellen: `lage/wasBrennt.ts` („längste 5 h 01 min“), `geraet/GeraeteKopf.tsx` (ganze Stunden „noch 5 h“, auch über einen Tag, D7), `etb/schnellerfassungModell.ts` („Ereignis vor 1 h 05 min“). Prüfung: ihre Tests. Danach ist `OFFEN` im Wächter leer.
 
 ## 3. Server
 

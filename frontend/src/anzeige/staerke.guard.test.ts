@@ -25,7 +25,8 @@ const quellen = Object.entries(dateien).filter(
     pfad !== '/src/anzeige/staerke.ts',
 );
 
-const SUMME_FALSCH = /\/\/\s?(?:Ges|GES|Gesamt)\b/;
+/** Die Summe heißt „Σ“: „M//Ges“, „M//GES“, „M//Gesamt“ sind falsch (nicht jeder Kommentar „// Gesamt“). */
+const SUMME_FALSCH = /M\/\/\s?(?:Ges|GES|Gesamt)\b/;
 /** Drei Interpolationen Führer/Unterführer/Mannschaft ohne folgendes „//“ (keine URL-Pfade). */
 const OHNE_SUMME =
   /\$\{[^}]*(?:fuehrer|\bf\b)[^}]*\}\/\$\{[^}]*\}\/\$\{[^}]*(?:mannschaft|\bm\b)[^}]*\}(?!\/\/)/;
@@ -50,6 +51,7 @@ describe('Eine Schreibweise der Stärke (LLH-1750)', () => {
     expect(staerkeTreffer('`${s.f}/${s.uf}/${s.m}`')).toHaveLength(1);
     expect(staerkeTreffer('`${a}/${b}/${c}//${d}`')).toEqual([]);
     expect(staerkeTreffer('staerkeText(s)')).toEqual([]);
+    expect(staerkeTreffer('// Gesamt der Einheiten')).toEqual([]);
     expect(staerkeTreffer('`/api/einsaetze/${einsatzId}/${modul}/${id}/zeitachse`')).toEqual([]);
   });
 });

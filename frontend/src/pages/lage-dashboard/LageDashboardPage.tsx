@@ -144,7 +144,7 @@ function zustandVon(...queries: UseQueryResult<unknown>[]): Datenzustand {
   return 'daten';
 }
 
-/** Takt der Uhr: „Stand vor n s", die Einsatzdauer und „n seit über 4 h" laufen mit, ohne
+/** Takt der Uhr: das Alter des Datenstands im Großbild, die Einsatzdauer und „n seit über 4 h" laufen mit, ohne
  *  jede Sekunde zu rendern. */
 const TAKT_MS = 5000;
 

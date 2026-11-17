@@ -1,4 +1,5 @@
-import { STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
+import { useOhneVerbindung } from '../offline/verbindung';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
 import { relativ } from '../anzeige/dauer';
 import {
   useCallback,
@@ -221,6 +222,7 @@ function Zahl({
   farbe,
   zeilen = 1,
   hervorgehoben,
+  beschreibung,
 }: {
   wert: number | string;
   bezeichnung: string;
@@ -234,6 +236,8 @@ function Zahl({
    * reicht per `box-shadow` über den Rand, damit nichts verrutscht.
    */
   hervorgehoben?: boolean;
+  /** Zugängliche Beschreibung des Werts, etwa die ausgeschriebene Stärke (LLH-1750). */
+  beschreibung?: string;
 }) {
   const { rollen } = useRollen();
   return (
@@ -252,6 +256,7 @@ function Zahl({
       }}
     >
       <span
+        aria-description={beschreibung}
         style={{
           fontFamily: schrift.zahl,
           fontVariantNumeric: 'tabular-nums',
@@ -402,7 +407,11 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
           <Zahl wert={k.personal} bezeichnung="Personal" />
           <Zahl wert={k.einheiten} bezeichnung="Einheiten" />
           {/* Mit Summe aus der einen Formatierung (LLH-1750, Spec `lage-verdichtung`). */}
-          <Zahl wert={staerkeText(s)} bezeichnung={`Stärke ${STAERKE_SCHREIBWEISE}`} />
+          <Zahl
+            wert={staerkeText(s)}
+            bezeichnung={`Stärke ${STAERKE_SCHREIBWEISE}`}
+            beschreibung={STAERKE_AUSGESCHRIEBEN}
+          />
         </div>
       </Kachel>
       {/* Überbelegung (LLH-1746): das Wort steht in der Titelzeile, die Zahl in der Alarmrolle;
@@ -611,6 +620,7 @@ function Statusleiste({
   const { rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const uhrArt = useUhrDarstellung();
+  const ohneNetz = useOhneVerbindung();
   const verbindung = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus);
   const druck = useRef<number | undefined>(undefined);
   const loslassen = () => window.clearTimeout(druck.current);
@@ -667,7 +677,7 @@ function Statusleiste({
         }}
       >
         {standMs > 0
-          ? `${veraltet ? 'Veraltet · ' : ''}${datenstandText(standMs, jetzt, { alter: true, konv: konventionen })}`
+          ? `${veraltet ? 'Veraltet · ' : ''}${datenstandText(standMs, jetzt, { alter: true, offline: ohneNetz, konv: konventionen })}`
           : 'Kein Stand'}
       </span>
       {/* Dieselbe Uhr wie im Kopf (LLH-1750, E5): Gerätezeit in der Zeitdarstellung. */}

@@ -1303,6 +1303,11 @@ describe('Bausteine', () => {
       kurz: 'noch 5 h',
       lang: 'noch 5 Stunden',
     });
+    // Über einen Tag weiter ganze Stunden (LLH-1750, D7), keine Tage.
+    expect(kopplungRestText('2026-10-07 09:30:00', JETZT)).toEqual({
+      kurz: 'noch 71 h',
+      lang: 'noch 71 Stunden',
+    });
     expect(kopplungRestText('2026-10-04 11:00:00', JETZT)).toEqual({
       kurz: 'noch 1 h',
       lang: 'noch 1 Stunde',

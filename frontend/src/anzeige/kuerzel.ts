@@ -15,6 +15,7 @@ export const EINGEFUEHRTE_KUERZEL: readonly { kuerzel: string; bedeutung: string
   { kuerzel: 'F/UF/M//Σ', bedeutung: 'Führer / Unterführer / Mannschaft // Summe (Stärke)' },
   { kuerzel: 'FMS, S1–S9', bedeutung: 'Funkmeldesystem und seine Status 1 bis 9' },
   { kuerzel: 'Fzg.', bedeutung: 'Fahrzeuge' },
+  { kuerzel: 'Mtl.', bedeutung: 'Material' },
   { kuerzel: 'Pers.', bedeutung: 'Personen' },
   { kuerzel: 'Rückm.', bedeutung: 'Rückmeldung' },
   { kuerzel: 'SK I–IV', bedeutung: 'Sichtungskategorie I bis IV' },

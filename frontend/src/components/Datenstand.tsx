@@ -78,10 +78,17 @@ export function datenstandText(
   return teile.join(' · ');
 }
 
-/** „vor 2 min“ ab einer Minute Alter, darunter nichts. */
+/**
+ * „vor 2 min“ ab einer Minute Alter, darunter nichts. Gezählt in ganzen Minuten der Uhr: „Stand
+ * 1731“ heißt um 1733 „vor 2 min“, auch wenn der Abruf um 17:31:45 kam (Spec `zeitdarstellung`).
+ */
 function alterText(dataUpdatedAt: number, jetzt: number): string | null {
-  const minuten = minutenZwischen(dataUpdatedAt, jetzt);
+  const minuten = minutenZwischen(volleMinute(dataUpdatedAt), volleMinute(jetzt));
   return minuten >= 1 ? relativ(minuten, 'vor') : null;
+}
+
+function volleMinute(ms: number): number {
+  return Math.floor(ms / 60_000) * 60_000;
 }
 
 /**
