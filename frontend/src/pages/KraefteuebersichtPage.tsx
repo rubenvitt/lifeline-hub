@@ -90,7 +90,7 @@ import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import type { SchichtplanGrenzwerte, StatusKategorie } from '../api/types';
 import StatusWahl from '../components/StatusWahl';
-import { statusKategorie } from '../theme/statusFarben';
+import { kategorieDarstellung, statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/SpaltenSchalter';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -113,6 +113,7 @@ import {
   schriftStil,
   zahlStil,
 } from '../components/instrument';
+import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
 import './kraefteuebersichtPrint.css';
@@ -555,7 +556,12 @@ function MittelVerteilungZellen({ zeile: z }: { zeile: RasterZeile }) {
   if (!v) return null;
   const zellen = [
     { wert: v.bereit, wort: 'bereit', ton: 'normal' as const },
-    { wert: v.gebunden, wort: 'gebunden', ton: 'achtung' as const },
+    // Rolle aus der Kategorie, nie fest: „gebunden“ ist überall dieselbe (Spec `statusrollen`).
+    {
+      wert: v.gebunden,
+      wort: 'gebunden',
+      ton: tonVonRolle(statusKategorie.gebunden.rolle) ?? 'neutral',
+    },
     { wert: v.ausfall, wort: 'Ausfall', ton: 'alarm' as const },
   ];
   return (
@@ -1018,7 +1024,10 @@ export default function KraefteuebersichtPage() {
           darstellung={
             s && aktuell != null
               ? {
-                  ...statusKategorie[z.einheitStatus!.status!.kategorie],
+                  ...kategorieDarstellung(
+                    z.einheitStatus!.status!.kategorie,
+                    z.einheitStatus!.status!.fms_anker,
+                  ),
                   label: s.code ? `${s.code} · ${s.wort}` : s.wort,
                 }
               : null
@@ -1330,7 +1339,7 @@ export default function KraefteuebersichtPage() {
         metaPlatzhalter={metaPlatzhalter}
         dataUpdatedAt={datenstand}
         aktionen={
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
           <Space className="kraefte-no-print" wrap size={token.marginSM}>
             {/* Sekundär: der Abschnitt-Filter. Er wirkt wie alle Filter außerhalb des Primitivs

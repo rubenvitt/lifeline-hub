@@ -419,6 +419,8 @@ function basisHandler(
     http.get('/api/einsaetze/1/schaeden/marker', () => HttpResponse.json([SCHADEN_VERORTET])),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    // Fahrzeugstatus-Katalog für den Sprechwunsch im Paneel „Ausgewählt“ (eon26eat D2).
+    http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/freie-zeichen', () => HttpResponse.json([])),
@@ -838,6 +840,53 @@ describe('LagekartePage', () => {
     // Nur das Koordinatenpaar (LFH-1006): jede weitere Kopfzeile aus dem Seitenstand überschriebe
     // die gleichzeitige Änderung einer anderen Person, etwa die Leitstellen-Nr.
     expect(patchBody).toEqual({ einsatzort_lat: 50.1, einsatzort_lon: 8.6 });
+  });
+
+  it('Marker-Tipp wählt aus, ohne die Karte anzufliegen (LLH-1751)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-schaden-9'));
+    await screen.findByRole('link', { name: /Im Fachmodul öffnen/ });
+    expect(screen.getByTestId('flyto')).toHaveTextContent('null');
+  });
+
+  it('ein Treffer der Objektliste wählt aus und fliegt hin (LLH-1751)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    objekteVorn();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'S-003' }));
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":7,"lat":51}');
+  });
+
+  it('ein Ansichtswechsel in der durch eine Auswahl geöffneten Leiste hält sie offen (LLH-1751)', async () => {
+    // Leiste zu (gemerkt, wie bei Touch die Vorgabe): nur die Auswahl öffnet sie.
+    localStorage.setItem('lfh:lagekarte:leiste-offen:ab-lg', '0');
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    const leiste = () => document.getElementById('lagekarte-leiste')!;
+    await user.click(await screen.findByText('marker-schaden-9'));
+    await waitFor(() => expect(leiste()).not.toHaveAttribute('hidden'));
+    await user.click(screen.getByRole('tab', { name: 'Objekte' }));
+    // Die Auswahl endet (Esc schließt sie); die Person arbeitet in „Objekte“ weiter.
+    await user.click(screen.getByRole('tab', { name: 'Auswahl' }));
+    await user.click(screen.getByRole('button', { name: 'Zurück zu Objekte' }));
+    expect(leiste()).not.toHaveAttribute('hidden');
+    expect(screen.getByRole('tab', { name: 'Objekte' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('ohne Ansichtswechsel schließt das Ende der Auswahl die Leiste wieder', async () => {
+    localStorage.setItem('lfh:lagekarte:leiste-offen:ab-lg', '0');
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    const leiste = () => document.getElementById('lagekarte-leiste')!;
+    await user.click(await screen.findByText('marker-schaden-9'));
+    await waitFor(() => expect(leiste()).not.toHaveAttribute('hidden'));
+    await user.click(screen.getByRole('button', { name: /^Zurück zu / }));
+    await waitFor(() => expect(leiste()).toHaveAttribute('hidden'));
   });
 
   it('Marker-Klick öffnet den Inspector mit Modul-Link', async () => {

@@ -120,17 +120,18 @@ describe('ModulAkkordeon · Dichte der Kopfzeile', () => {
   });
 
   it('trägt ZWEI Angaben, nicht eine (LFH-365)', () => {
-    // Konkreter Wert als LITERAL: waagerecht `padding` der Stufe (26 in `handschuh`).
+    // Konkreter Wert als LITERAL: waagerecht `padding` der Stufe (24 in `handschuh`).
     const stil = akkordeonKopfStil(tokenFuer('handschuh'), farbenDunkel, { offen: false });
     expect(stil.minHeight).toBe(72);
-    expect(stil.padding).toBe('0 26px');
+    expect(stil.padding).toBe('0 24px');
   });
 
   it('zeigt die offene Kategorie mit Fläche und Ortsmarke, die geschlossene gedämpft', () => {
     const offen = akkordeonKopfStil(tokenFuer('kompakt'), farbenDunkel, { offen: true });
     const zu = akkordeonKopfStil(tokenFuer('kompakt'), farbenDunkel, { offen: false });
     expect(offen.background).toBe(farbenDunkel.flaeche3);
-    expect(offen.boxShadow).toBe(`inset 2px 0 0 ${farbenDunkel.marke}`);
+    // Ortsmarke in der Bedienfarbe wie in Rail und Modulpanel (eon26eat D7).
+    expect(offen.boxShadow).toBe(`inset 2px 0 0 ${farbenDunkel.bedien}`);
     expect(offen.color).toBe(farbenDunkel.text);
     expect(zu.background).toBe('transparent');
     expect(zu.boxShadow).toBe('none');

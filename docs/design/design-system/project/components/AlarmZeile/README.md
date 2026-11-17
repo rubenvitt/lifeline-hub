@@ -1,6 +1,6 @@
 # AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)
 
-AlarmZeile „Was brennt“ (LLH-1743, Spec `lage-alarmzeile`, design.md D3; Regel
+AlarmZeile „Was brennt“ (design.md D3; Regel
 „Dashboard-Baukasten“, `frontend/AGENTS.md`): das erste Element unter dem Seitenkopf von
 Überblick, Lagebild und Lagemonitor. Der Baustein ordnet nur an; Einträge, Folge und Wortlaut
 kommen aus `lage/wasBrennt.ts`.

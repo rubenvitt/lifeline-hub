@@ -45,9 +45,11 @@ const MARKE_BREITE = 2;
  * `Math.max` und NICHT `??`: die Staffel darf den Boden heben, nie senken. ZWEI Angaben:
  * `minHeight` PLUS Polsterung; aufgelöste Tokens, nie `var(--lfh-*)`.
  *
- * DIE AKTIVE MARKE IST ROT (umsetzung.md, Entscheidung 2): 2 px in `marke` am linken Rand. Sie
- * bedient nichts — die Fläche des aktiven Ziels ist `flaeche3` (neutral). Als `boxShadow`
- * innen, weil ein Rand Icon und Etikett beim Aktivieren verschöbe.
+ * DIE AKTIVE MARKE IST BLAU: 2 px in der Bedienrolle des Rahmens am linken Rand, wie die Marke
+ * des aktiven Moduls im Modulpanel (Change `eon26eat-farbe-entlasten` D7; vorher Markenrot nach
+ * umsetzung.md, Entscheidung 2 — „Rot bedient nichts“, und Rot hielt nur 2,28 : 1). Die Fläche
+ * des aktiven Ziels bleibt `aktiv` (neutral). Als `boxShadow` innen, weil ein Rand Icon und
+ * Etikett beim Aktivieren verschöbe.
  */
 export function railZielStil(
   token: { controlHeight: number; paddingXS: number },
@@ -71,7 +73,7 @@ export function railZielStil(
     // Nachtrollen, nicht Modus-Token: die Rail ist in BEIDEN Modi dunkel. Inaktiv heißt nicht
     // gesperrt: das Etikett ist bedienbarer Text und hält die Tag-Schwelle (LFH-434).
     background: zustand.aktiv ? rahmenFarben.aktiv : 'transparent',
-    boxShadow: zustand.aktiv ? `inset ${MARKE_BREITE}px 0 0 ${rahmenFarben.marke}` : 'none',
+    boxShadow: zustand.aktiv ? `inset ${MARKE_BREITE}px 0 0 ${rahmenFarben.bedien}` : 'none',
     color: zustand.aktiv ? rahmenFarben.text : rahmenFarben.gedaempft,
   };
 }

@@ -65,7 +65,8 @@ const BEZIRKE = [
     stand: { evakuiert: 212, erhebung: 'geschaetzt' },
     raeumung: 'laeuft',
     wort: 'läuft',
-    rolle: 'achtung',
+    // Planmäßiger Ablauf, neutral (Spec `statusrollen`, eon26eat D3).
+    rolle: 'neutral',
   },
   {
     name: 'Mühlenweg 2–18',
@@ -712,9 +713,19 @@ for (const fall of DIALOGE) {
     await expect(dialog.locator('.ant-modal-close[data-e2e-fokus]')).toHaveCount(1);
     await expect(dialog.locator('button.ant-btn-primary[data-e2e-fokus]')).toHaveCount(1);
 
-    // Jede Radiogruppe steht mit genau EINEM Ziel in der Liste — dem gewählten Radio.
+    // Jede Radiogruppe steht mit genau EINEM Ziel in der Liste — dem gewählten Radio. Das gilt
+    // auch für eine Wahl als `SegmentFeld` (Segmentleiste, `role="radiogroup"`, Spec
+    // `bedien-umschalten`): ihr Tabulatorhalt ist genau ein Segment.
     const gruppen = await dialog.locator('.ant-radio-group').count();
     await expect(dialog.locator('input[type="radio"][data-e2e-fokus]')).toHaveCount(gruppen);
+    const segmentGruppen = await dialog
+      .locator('[data-lfh="segmentleiste"][role="radiogroup"]')
+      .count();
+    await expect(
+      dialog.locator(
+        '[data-lfh="segmentleiste"][role="radiogroup"] [role="radio"][data-e2e-fokus]',
+      ),
+    ).toHaveCount(segmentGruppen);
 
     await dialog.locator('[data-e2e-fokus]').first().focus();
     const befund = await pruefeFokusVerdeckung(page, ziele.length * 2 + 4);

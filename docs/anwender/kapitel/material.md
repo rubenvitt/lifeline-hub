@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 240
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/ruecknahmeSatz.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts, frontend/src/components/aktionsSpalte.tsx]
 ---
 
 ## Überblick
@@ -15,7 +15,9 @@ wo der Posten liegt: bei einer Einheit, auf einem Fahrzeug, an einer UHS oder in
 Bereitstellungsraum, immer an höchstens einem Ort.
 
 Die Führung liest hier, was einsatzbereit, im Einsatz oder ausgefallen ist und wo es liegt.
-Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
+Das Menü „Weitere Aktionen“ steht am rechten Rand der Tabelle fest, auch wenn sie quer rollt; den
+Ort wählt die Auswahl an der Zelle, ohne dass die Tabelle springt. Disponieren und ändern dürfen
+Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
@@ -193,7 +195,9 @@ Für Einsatzleitung und Führungspersonal, wenn ein Posten den Einsatz verlässt
 
 1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Aus dem Einsatz nehmen“ wählen, auf
    dem Handy ebenso im Menü der Karte. Eine Rückfrage gibt es nicht.
-2. Der Posten verlässt die Liste. Der Hinweis unten bietet einige Sekunden lang „Rückgängig“.
+2. Der Posten verlässt die Liste. Der Hinweis unten bietet einige Sekunden lang „Rückgängig“: Es
+   holt den Posten mit Menge, Status und Ort zurück. Nimmt der Ort ihn nicht mehr auf, nennt ihn
+   ein Hinweis über der Liste.
 3. Unter der Liste „Aus dem Einsatz genommen“ aufklappen. Dort stehen alle herausgenommenen
    Posten mit Menge und Zeitpunkt.
 
@@ -332,6 +336,15 @@ Lagebericht. Erneut disponiert, steht er wieder in der Liste, mit
 derselben Menge und demselben Status, aber ohne Ort. „Material disponieren“
 legt dagegen immer eine neue Zeile an.
 
+„Rückgängig“ direkt nach dem Herausnehmen holt den Posten zurück, wie er war: dieselbe Menge,
+derselbe Status, derselbe Ort und dieselbe Dispositionszeit. Stornieren lässt er sich danach nicht
+mehr, und das Einsatztagebuch behält das Herausnehmen. Ist die Einheit inzwischen aufgelöst, das
+Fahrzeug entlassen oder die UHS oder der Bereitstellungsraum nicht mehr aktiv, kommt der Posten ohne
+Ort zurück; der Hinweis über der Liste und das Einsatztagebuch nennen den Ort. Das
+gelingt nur der Person, die herausgenommen hat, und nur in den ersten zehn Minuten. Ein Gerät mit
+Bestandsnummer, das inzwischen neu disponiert ist, kommt so nicht zurück; die Meldung nennt den
+Grund. Danach führt nur „Erneut disponieren“ zurück.
+
 Stornieren korrigiert eine Fehldisposition und lässt keine Spur. Es geht nur in den ersten 15
 Minuten nach der Disposition und nur, solange der Posten ohne Ort ist. Wer einmal aus dem Einsatz genommen war, lässt sich auch nach dem erneuten Disponieren nicht
 mehr stornieren. Ein stornierter Posten erscheint in keiner Liste. Eine durch Aufteilen entstandene
@@ -359,6 +372,8 @@ Stornieren stehen im Einsatztagebuch, mit alter und neuer Menge bzw. altem und n
   Tauchpumpen für Keller Hauptstraße»“.
 - Von einer Nachforderung lösen: „Material «Tauchpumpe THW» (×1) von Nachforderung «3 Tauchpumpen
   für Keller Hauptstraße» gelöst“.
+- Rückgängig nach dem Herausnehmen: „Material «Wolldecke» (×20): Herausnahme zurückgenommen, Ort
+  Einheit «Staffel A»“, ohne Ort „…, ohne Einheit «Staffel A» (inzwischen aufgelöst)“.
 
 Eine Bemerkung ändert das Einsatztagebuch nicht.
 

@@ -10,8 +10,9 @@ import '../../theme/sprache.css';
  * antds `Segmented`, dessen Pillenform, Schatten und Gleitanimation die Formensprache (Radius 0,
  * Fugenraster) brechen.
  *
- * FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche3` + `text`,
- * inaktiv `flaeche` + `gedaempft`, optional ein 6-px-Farbpunkt (quadratisch). Farben und
+ * FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche3` + `text`
+ * + 2-px-Bedienkante unten (eon26eat D6; eine Option mit `kante` ersetzt sie), inaktiv `flaeche`
+ * + `gedaempft`, optional ein 6-px-Farbpunkt (quadratisch). Farben und
  * Hover/Fokus liegen als Klassen in `theme/sprache.css` (`.lfh-segmente`, `.lfh-segment`), weil
  * `:hover` und `:focus-visible` inline nicht erreichbar sind; die GEOMETRIE steht inline aus den
  * Tokens.
@@ -19,7 +20,8 @@ import '../../theme/sprache.css';
  * ZUGÄNGLICH als `radiogroup` (Vorgabe, eine Wahl unter mehreren) oder als `tablist` (wenn das
  * Segment eine Fläche darunter umschaltet). Tastatur nach APG: ←/→ (und ↑/↓) wandern und
  * wählen, Pos1/Ende springen; nur das gewählte Segment liegt in der Tab-Reihenfolge (roving
- * tabindex).
+ * tabindex). Mit `aktivierung="manuell"` (Reiter, die die Seite wechseln) wandern die Pfeile nur,
+ * gewählt wird mit Enter oder Leertaste.
  *
  * BEDIENZIEL: jedes Segment ist ein `<button>` ohne antd-Höhe und trägt die ZWEI Angaben aus
  * LFH-365 ({@link segmentStil}). Die Staffel 30 / 48 / 72 gilt, nicht die Entwurfsskizze — als
@@ -168,7 +170,20 @@ interface SegmentleisteProps<W extends string | number> {
   hasFullWidth?: boolean;
   /** Id eines Texts, der die ganze Leiste beschreibt (`aria-describedby`, LLH-1642). */
   beschreibungId?: string;
+  /** Zusätzliche Klasse, etwa um die Leiste aus dem Druck zu nehmen (`funkplan-no-print`). */
+  className?: string;
   style?: CSSProperties;
+  /** Id der Leiste, etwa aus `Form.Item` (Ziel des Etiketts). */
+  id?: string;
+  /** Prüfzustand aus `Form.Item` (`aria-invalid`, `aria-required`) für die ganze Gruppe. */
+  ariaInvalid?: boolean;
+  ariaRequired?: boolean;
+  /**
+   * Wann eine Pfeiltaste umschaltet: `sofort` (Vorgabe) wählt mit dem Fokus; `manuell` bewegt nur
+   * den Fokus, gewählt wird mit Enter oder Leertaste. `manuell` für Reiter, deren Wechsel die
+   * Seite verlässt (Fernmeldewesen): sonst risse jeder Pfeilschritt den Fokus mit der Seite weg.
+   */
+  aktivierung?: 'sofort' | 'manuell';
 }
 
 export default function Segmentleiste<W extends string | number>({
@@ -179,7 +194,12 @@ export default function Segmentleiste<W extends string | number>({
   rolle = 'radiogroup',
   hasFullWidth = false,
   beschreibungId: leistenBeschreibungId,
+  className,
   style,
+  id,
+  ariaInvalid,
+  ariaRequired,
+  aktivierung = 'sofort',
 }: SegmentleisteProps<W>) {
   const { token } = useRollen();
   const grundId = useId();
@@ -194,16 +214,19 @@ export default function Segmentleiste<W extends string | number>({
     const ziel = naechsterIndex(e.key, index, optionen.length, (i) => !!optionen[i].gesperrt);
     if (ziel == null) return;
     e.preventDefault();
-    onWechsel(optionen[ziel].wert);
+    if (aktivierung === 'sofort') onWechsel(optionen[ziel].wert);
     knoepfe.current[ziel]?.focus();
   };
 
   return (
     <div
+      id={id}
       role={rolle}
       aria-label={beschriftung}
       aria-describedby={leistenBeschreibungId}
-      className="lfh-segmente"
+      aria-invalid={ariaInvalid || undefined}
+      aria-required={ariaRequired || undefined}
+      className={className ? `lfh-segmente ${className}` : 'lfh-segmente'}
       data-lfh="segmentleiste"
       style={hasFullWidth ? { display: 'flex', ...style } : style}
     >
@@ -314,6 +337,70 @@ interface SegmentUmschalterProps {
   /** Aufgelöste Farbe des 6-px-Punkts; aus gestrichen (zweites Zeichen, WCAG 1.4.1). */
   punkt?: string;
   style?: CSSProperties;
+}
+
+/**
+ * Die Segmentleiste als Formularfeld (Spec `bedien-umschalten`): eine kurze Wahl aus wenigen Werten
+ * in einem antd-`Form`, statt einer Knopfgruppe aus `Radio.Group optionType="button"`. Nimmt antds
+ * Formularschnittstelle (`value`/`onChange`, gesetzt von `Form.Item`) und gibt sie an
+ * `Segmentleiste` weiter; ohne `value` ist kein Segment gewählt, die Gruppe bleibt erreichbar.
+ * Prüffehler zeigt `Form.Item` darunter wie bei jedem Feld; Id, `aria-invalid`, `aria-required`
+ * und `aria-describedby` aus `Form.Item` trägt die Gruppe. Ein Klick auf das gewählte Segment
+ * meldet nichts.
+ */
+export function SegmentFeld<W extends string | number>({
+  value,
+  onChange,
+  optionen,
+  beschriftung,
+  beschreibungId,
+  onWahl,
+  hasFullWidth,
+  style,
+  id,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
+  'aria-describedby': formBeschreibung,
+}: {
+  value?: W;
+  onChange?: (wert: W) => void;
+  /** Von `Form.Item` gesetzt: Id und Prüfzustand der Gruppe. */
+  id?: string;
+  'aria-invalid'?: boolean | 'true' | 'false';
+  'aria-required'?: boolean | 'true' | 'false';
+  'aria-describedby'?: string;
+  optionen: readonly SegmentOption<W>[];
+  /** Zugänglicher Name der Gruppe, auch neben dem Etikett des `Form.Item`. */
+  beschriftung: string;
+  /** Id eines Texts, der die ganze Wahl beschreibt (etwa den Grund einer Sperre). */
+  beschreibungId?: string;
+  /** Meldet eine Wahl durch die Person, zusätzlich zum Formularwert. */
+  onWahl?: (wert: W) => void;
+  hasFullWidth?: boolean;
+  style?: CSSProperties;
+}) {
+  return (
+    <Segmentleiste<W>
+      optionen={optionen}
+      // Ohne Wert passt keine Option: kein Segment gewählt (siehe `Segmentleiste`).
+      wert={value as W}
+      // Ein Klick auf das schon gewählte Segment ist keine Änderung: wie beim nativen Radio bleibt
+      // das Feld unberührt (`isFieldTouched`), sonst überschriebe ein Speichern einen Live-Stand,
+      // den der Dialog nur ins unberührte Feld übernimmt (RaeumungDialog, LFH-681).
+      onWechsel={(wert) => {
+        if (wert === value) return;
+        onChange?.(wert);
+        onWahl?.(wert);
+      }}
+      beschriftung={beschriftung}
+      beschreibungId={[beschreibungId, formBeschreibung].filter(Boolean).join(' ') || undefined}
+      id={id}
+      ariaInvalid={ariaInvalid === true || ariaInvalid === 'true'}
+      ariaRequired={ariaRequired === true || ariaRequired === 'true'}
+      hasFullWidth={hasFullWidth}
+      style={style}
+    />
+  );
 }
 
 /**

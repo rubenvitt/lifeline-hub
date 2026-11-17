@@ -9,7 +9,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * (`pnpm doku:bilder --grep unfallhilfsstellen`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   grundriss.png         frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx
  *   patient-zuweisen.png  frontend/src/pages/uhs/Grundriss.tsx
- *   anlegen.png           frontend/src/pages/uhs/UhsAnlegenDrawer.tsx
+ *   anlegen.png           frontend/src/pages/uhs/UhsAnlegenModal.tsx,
+ *                         frontend/src/components/AnlegenModal.tsx
  *   liste.png             frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx
  *
  * Daten: die UHS Turnhalle des Demo-Einsatzes. Die Demo-Daten stellen alle Aufgenommenen in den
@@ -114,19 +115,19 @@ test.describe(KAPITEL, () => {
     await fotografiere(dialog, KAPITEL, 'patient-zuweisen');
   });
 
-  test('Drawer „Unfallhilfsstelle anlegen“', async ({ page }) => {
+  test('Dialog „Unfallhilfsstelle anlegen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/unfallhilfsstellen/liste`);
     await expect(page.getByRole('cell', { name: /Turnhalle Musterstadt/ })).toBeVisible();
     await page.getByRole('button', { name: 'Neu', exact: true }).click();
-    const drawer = page.getByRole('dialog', { name: 'Unfallhilfsstelle anlegen' });
-    await drawer.getByLabel('Bezeichnung').fill('Patientenablage Mühlbachweg');
-    await waehleIn(drawer.getByRole('combobox', { name: 'Typ' }), 'Patientenablage');
-    await drawer.getByLabel('Standort (optional)').fill('Wendeplatz Mühlbachweg');
-    await drawer.getByLabel('Standort (optional)').blur();
-    await fotografiere(drawer, KAPITEL, 'anlegen');
+    const dialog = page.getByRole('dialog', { name: 'Unfallhilfsstelle anlegen' });
+    await dialog.getByLabel('Bezeichnung').fill('Patientenablage Mühlbachweg');
+    await waehleIn(dialog.getByRole('combobox', { name: 'Typ' }), 'Patientenablage');
+    await dialog.getByLabel('Standort (optional)').fill('Wendeplatz Mühlbachweg');
+    await dialog.getByLabel('Standort (optional)').blur();
+    await fotografiere(dialog, KAPITEL, 'anlegen');
   });
 
   test('Liste der Unfallhilfsstellen', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
@@ -33,6 +33,7 @@ import {
   listEntlassenesMaterial,
   loeseNachforderung,
   nimmAusDemEinsatz,
+  nimmHerausnahmeZurueck,
   reaktiviereDisposition,
   setzeMaterialStatus,
   storniereDisposition,
@@ -42,7 +43,12 @@ import {
 } from '../api/einsatzMaterial';
 import { MATERIAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { EinsatzMaterial, MaterialArt, MaterialStatus } from '../api/types';
+import type {
+  EinsatzMaterial,
+  MaterialArt,
+  MaterialEntlassungVorzustand,
+  MaterialStatus,
+} from '../api/types';
 import { kraefteuebersichtPfad, nachforderungenPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import MaterialVerdichtung from '../kraefte/MaterialVerdichtung';
@@ -91,6 +97,7 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
+import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { nachforderungName } from '../nachforderungen/nachforderungName';
 
@@ -499,13 +506,32 @@ function MaterialInhalt() {
     fehler: unknown;
     titel: string;
   } | null>(null);
-  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
+  // Der Ort, den die Rücknahme ausgelassen hat (LLH-1923): ein Teilerfolg, den niemand im Toast
+  // überliest.
+  const [ausgelassenText, setAusgelassenText] = useState<string | null>(null);
+  /** Herausnehmen und Rücknahme ändern den Ort; liegt er an einer Einheit, deren Liste mit. */
+  function invalidateMitEinheiten() {
+    invalidate();
+    void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+  }
+  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen. Sie bringt den Posten mit dem
+  // Vorzustand aus der Antwort des Herausnehmens an seinen Ort zurück (Spec `kraefte-entlassung`,
+  // „Herausnahme von Material zurücknehmen“).
   const rueckgaengigMutation = useMutation({
-    mutationFn: (emId: number) => reaktiviereDisposition(einsatzId, emId),
-    onMutate: () => setRueckgaengigFehler(null),
-    onSuccess: invalidate,
+    mutationFn: (v: { emId: number; name: string; vorzustand: MaterialEntlassungVorzustand }) =>
+      nimmHerausnahmeZurueck(einsatzId, v.emId, v.vorzustand),
+    onMutate: () => {
+      setRueckgaengigFehler(null);
+      setAusgelassenText(null);
+    },
+    onSuccess: (antwort, v) => {
+      invalidateMitEinheiten();
+      if (antwort.ausgelassen.length > 0) {
+        setAusgelassenText(ausgelassenSatz(v.name, antwort));
+      }
+    },
     onError: (e) => {
-      setRueckgaengigFehler({ fehler: e, titel: 'Nicht erneut disponiert' });
+      setRueckgaengigFehler({ fehler: e, titel: 'Nicht zurückgenommen' });
       invalidate();
     },
   });
@@ -546,16 +572,15 @@ function MaterialInhalt() {
     onError: (e, v) => zeilen.melde(v.emId, e, 'Nicht gelöst'),
   });
   // Aus dem Einsatz nehmen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast
-  // (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“, design.md D8). Rückgängig
-  // setzt Einheit und UHS nicht wieder. Die Einheit verliert ein Mitglied: ihre Liste mit.
+  // (`frontend/AGENTS.md`, „Beenden: Verb, Ort und Sicherung je Art“). Rückgängig stellt den
+  // Zustand davor her, samt Ort (LLH-1923). Die Einheit verliert ein Mitglied: ihre Liste mit.
   const herausnehmenMutation = useMutation({
     mutationFn: (v: { emId: number; name: string }) => nimmAusDemEinsatz(einsatzId, v.emId),
     onMutate: (v) => zeilen.beginne(v.emId),
-    onSuccess: (_, v) => {
-      invalidate();
-      qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+    onSuccess: (antwort, v) => {
+      invalidateMitEinheiten();
       zeigeRueckgaengig(message, `${v.name} aus dem Einsatz genommen`, () =>
-        rueckgaengigMutation.mutate(v.emId),
+        rueckgaengigMutation.mutate({ ...v, vorzustand: antwort.vorzustand }),
       );
     },
     onError: (e, v) => zeilen.melde(v.emId, e, 'Nicht aus dem Einsatz genommen'),
@@ -970,6 +995,8 @@ function MaterialInhalt() {
             key: 'aktionen' as const,
             width: menueSpaltenBreite(dichte),
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             // Alle Handlungen im Zeilenmenü (LLH-1722), zuerst „Aus dem Einsatz nehmen“; Stornieren
             // fragt nach (LLH-1079 D8, LLH-1093 D11, wie die Fahrzeugseite).
             render: (_: unknown, em: EinsatzMaterial) => (
@@ -1012,14 +1039,25 @@ function MaterialInhalt() {
       metaPlatzhalter="0 Posten"
       dataUpdatedAt={emQuery.dataUpdatedAt}
       hinweis={
-        nurAnsicht || rueckgaengigFehler != null ? (
-          <SeitenHinweise
-            rechteText={einsatzRechteGrund(einsatz)}
-            rechteFehlt={nurAnsicht}
-            fehler={rueckgaengigFehler?.fehler ?? null}
-            fehlerTitel={rueckgaengigFehler?.titel ?? 'Nicht erneut disponiert'}
-            fehlerFallback="Rückgängig fehlgeschlagen"
-          />
+        nurAnsicht || rueckgaengigFehler != null || ausgelassenText != null ? (
+          <>
+            <SeitenHinweise
+              rechteText={einsatzRechteGrund(einsatz)}
+              rechteFehlt={nurAnsicht}
+              fehler={rueckgaengigFehler?.fehler ?? null}
+              fehlerTitel={rueckgaengigFehler?.titel ?? 'Nicht erneut disponiert'}
+              fehlerFallback="Rückgängig fehlgeschlagen"
+            />
+            {ausgelassenText != null && (
+              <Alert
+                type="warning"
+                showIcon
+                closable
+                message={ausgelassenText}
+                onClose={() => setAusgelassenText(null)}
+              />
+            )}
+          </>
         ) : null
       }
       /**
@@ -1027,7 +1065,7 @@ function MaterialInhalt() {
        * Dialog mit Absende-Knopf im `<form>`. Vorher stand hier eine Maske, die direkt absendete.
        */
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
         // `paddingXS` ließ 3 / 5 / 7 px.
         <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
           {/* Gruppierung (LLH-1225 D4): eine Segmentleiste darf im Kopf stehen

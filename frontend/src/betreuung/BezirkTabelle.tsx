@@ -1,4 +1,4 @@
-import { Button, Space, Typography, theme } from 'antd';
+import { Typography, theme } from 'antd';
 import { useMemo } from 'react';
 import type { Evakuierungsbezirk, Raeumungszustand } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -10,10 +10,13 @@ import Datensicht, {
 } from '../components/Datensicht';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KennungsLink } from '../components/kennungsLink';
-import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { Balken, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
+import { aktionsSpalte } from '../components/aktionsSpalte';
+import { leseTextSchrift } from '../components/textBreite';
+import { useDichte } from '../theme/ThemeModeProvider';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { evakuierungsbezirkPfad } from '../routing/deeplinks';
@@ -165,21 +168,15 @@ function bezirkWeitere(
 
 const bezirkSpalten = (
   einsatzId: number,
-  aktion: PrimaerAktion<Evakuierungsbezirk>,
-  weitere: WeitereAktionen<Evakuierungsbezirk>,
-  /** Unter `md`: „Stand melden" reitet in der fixierten Kennung mit. */
-  meldenInKennung: boolean,
+  /** Unter `md`: die Kennung bleibt schmal, Aktionen ziehen in sie (`Datensicht`, LLH-1789). */
+  schmal: boolean,
   kennungAbstand: number,
+  /** Die Aktionsspalte aus `aktionsSpalte()` (LLH-1789). */
+  aktionen: ReturnType<typeof aktionsSpalte<Evakuierungsbezirk>>,
   balkenFarbe: string,
   /** Die Abschnitte der Bezirke, für den Filter; leer heißt kein Filter. */
   abschnittWerte: readonly { text: string; value: string }[],
 ) => {
-  const meldeKnopf = (b: Evakuierungsbezirk) =>
-    (aktion.sichtbar?.(b) ?? true) ? (
-      <Button aria-label={aktion.zugaenglicherName?.(b)} onClick={() => aktion.onKlick(b)}>
-        {aktion.etikett}
-      </Button>
-    ) : null;
   return spaltenFuer<Evakuierungsbezirk>()([
     {
       key: 'bezeichnung',
@@ -187,35 +184,14 @@ const bezirkSpalten = (
       immerSichtbar: true,
       sortWert: (b) => b.bezeichnung,
       suchText: (b) => b.bezeichnung,
-      render: (_, b) => {
-        const name = (
-          <KennungsLink
-            to={evakuierungsbezirkPfad(einsatzId, b.id)}
-            style={{
-              fontWeight: 600,
-              ...(meldenInKennung ? { maxWidth: KENNUNG_MAX_PX } : {}),
-            }}
-          >
-            {b.bezeichnung}
-          </KennungsLink>
-        );
-        const knopf = meldenInKennung ? meldeKnopf(b) : null;
-        return knopf ? (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              gap: kennungAbstand,
-            }}
-          >
-            {name}
-            {knopf}
-          </div>
-        ) : (
-          name
-        );
-      },
+      render: (_, b) => (
+        <KennungsLink
+          to={evakuierungsbezirkPfad(einsatzId, b.id)}
+          style={{ fontWeight: 600, ...(schmal ? { maxWidth: KENNUNG_MAX_PX } : {}) }}
+        >
+          {b.bezeichnung}
+        </KennungsLink>
+      ),
     },
     {
       key: 'raeumung',
@@ -295,27 +271,7 @@ const bezirkSpalten = (
       suchText: (b) => b.abschnitt_name,
       render: (_, b) => b.abschnitt_name ?? leer,
     },
-    {
-      key: 'aktionen' as const,
-      title: 'Aktionen',
-      immerSichtbar: true,
-      render: (_: unknown, b: Evakuierungsbezirk) => {
-        const eintraege = weitere.eintraege(b);
-        return (
-          // `middle`: hält ≥ 16 px zwischen Knopf und Dreipunkt im Handschuh-Betrieb.
-          <Space wrap size="middle">
-            {!meldenInKennung && meldeKnopf(b)}
-            {eintraege.length > 0 && (
-              <MenueAusloeser
-                eintraege={eintraege}
-                zugaenglicherName={weitere.zugaenglicherName(b)}
-                onWahl={(key) => weitere.onWahl(key, b)}
-              />
-            )}
-          </Space>
-        );
-      },
-    },
+    aktionen,
   ]);
 };
 
@@ -342,6 +298,8 @@ export default function BezirkTabelle({
   const { token } = theme.useToken();
   const { rollen } = useRollen();
   const { istSchmal } = useViewport();
+  const { dichte } = useDichte();
+  const schrift = useMemo(leseTextSchrift, []);
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const gedaechtnis = useListenGedaechtnis<GedaechtnisKey>('evakuierung', GEDAECHTNIS_SPALTEN, {
     vorgabe: null,
@@ -383,14 +341,23 @@ export default function BezirkTabelle({
     () =>
       bezirkSpalten(
         einsatzId,
-        aktion,
-        weitere,
         istSchmal,
         token.marginXS,
+        aktionsSpalte<Evakuierungsbezirk>({ aktion, weitere, dichte, schrift }),
         rollen.gedaempft,
         abschnittWerte,
       ),
-    [einsatzId, aktion, weitere, istSchmal, token.marginXS, rollen.gedaempft, abschnittWerte],
+    [
+      einsatzId,
+      aktion,
+      weitere,
+      istSchmal,
+      token.marginXS,
+      dichte,
+      schrift,
+      rollen.gedaempft,
+      abschnittWerte,
+    ],
   );
   const aufklappen = useMemo(
     () => ({

@@ -2,7 +2,12 @@ import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import type { Sichtungskategorie } from '../api/types';
 import { useRollen } from '../components/instrument';
 import { sichtung } from '../theme/statusFarben';
-import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
+import {
+  sichtungsKante,
+  sichtungsPalette,
+  sichtungsSchraffur,
+  sichtungsToenung,
+} from '../theme/tokens';
 import { SK_REIHE, SK_WORT } from './personMeta';
 
 /**
@@ -12,17 +17,27 @@ import { SK_REIHE, SK_WORT } from './personMeta';
  *
  * ── FLÄCHE STATT FARBFELD ──────────────────────────────────────────────────────────────
  *
- * Jede Kategorie ist eine gefüllte Fläche aus `sichtungsflaechen` (abgedunkelt bis zum
- * Textboden), Kürzel groß, Bedeutungswort darunter; „unverletzt“ bleibt ohne Farbe. Jede Fläche
- * trägt eine Kante in der Textfarbe des Modus (`sichtungsKante`): nachts verschwänden sonst Rot,
- * Blau, Grün und Schwarz, am Tag Gelb.
+ * Jede Kategorie ist eine gefüllte Fläche aus `sichtungsPalette` (`flaeche`, abgedunkelt bis zum
+ * Textboden), Kürzel groß, Bedeutungswort darunter. „unverletzt“ hat KEINE Fläche (durchsichtig,
+ * nur die Kante), „tot“ trägt in JEDEM Zustand eine Schraffur: nachts lagen beide sonst bei
+ * 1,12 : 1 (Change `eon26eat-farbe-entlasten`, D8). Jede Fläche trägt eine Kante in der
+ * Textfarbe des Modus (`sichtungsKante`): nachts verschwänden sonst Rot, Blau, Grün und Schwarz,
+ * am Tag Gelb.
  *
- * ── GEWÄHLT OHNE FARBE ERKENNBAR ───────────────────────────────────────────────────────
+ * ── GEWÄHLT OHNE FARBE ERKENNBAR, ÜBRIGE MIT FARBE ─────────────────────────────────────
  *
- * Die gewählte Fläche bleibt gefüllt und trägt ✓ und einen Rahmen von 3 px; die übrigen fallen in
- * die Randform (neutrale Fläche, Farbe nur als Streifen links) und bleiben wählbar. Für
- * Hilfstechnik `radiogroup`/`radio` mit `aria-checked`, Roving-Tabindex, Pfeile wechseln,
- * Leertaste und Enter wählen (ein `type="button"` sendet kein Formular ab).
+ * Die gewählte Fläche bleibt gefüllt und trägt ✓ und einen Rahmen von 3 px. Die übrigen behalten
+ * ihre Farbe abgeschwächt: 4-px-Innenrahmen in der Anzeigefarbe (`punkt`) auf getönter Fläche
+ * (`sichtungsToenung`), Text in der Textfarbe; so findet man eine Fehlwahl an der Farbe wieder
+ * (vorher nur ein 8-px-Streifen). Für Hilfstechnik `radiogroup`/`radio` mit `aria-checked`,
+ * Roving-Tabindex, Pfeile wechseln, Leertaste und Enter wählen (ein `type="button"` sendet kein
+ * Formular ab).
+ *
+ * ── STARTFOKUS AUF DER GRUPPE ──────────────────────────────────────────────────────────
+ *
+ * Das Fokusziel der Erfassung (`data-erfassung-fokus`) ist die Gruppe (`tabIndex -1`), nicht
+ * „SK I“: ein Ring auf SK I las sich wie eine Vorauswahl. Ein Pfeil auf der Gruppe führt zur
+ * gewählten, sonst zur ersten Kachel; Tab führt in die Gruppe auf den Roving-Stopp.
  *
  * ── FORMULARVERTRAG ────────────────────────────────────────────────────────────────────
  *
@@ -88,6 +103,14 @@ export default function SichtungsWahl({
     onChange?.(k);
   }
 
+  // Pfeil auf der GRUPPE (Startfokus): zur gewählten, sonst zur ersten Kachel, ohne zu wählen.
+  function handleGruppenTaste(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.target !== e.currentTarget) return;
+    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    knoepfe.current[fokusIndex]?.focus();
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
     const schritt =
       e.key === 'ArrowRight' || e.key === 'ArrowDown'
@@ -108,6 +131,12 @@ export default function SichtungsWahl({
       aria-label={ariaLabel}
       aria-disabled={disabled || undefined}
       data-lfh="sichtungswahl"
+      // Startfokus der Erfassung liegt auf der Gruppe (`components/Erfassung.tsx`,
+      // `fokussiereErstesFeld`), nicht in der Tab-Folge: Tab führt auf den Roving-Stopp.
+      tabIndex={-1}
+      data-erfassung-fokus=""
+      className="lfh-sichtungswahl"
+      onKeyDown={handleGruppenTaste}
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(auto-fit, minmax(${SICHTUNGSFLAECHE_BREITE}px, 1fr))`,
@@ -117,10 +146,19 @@ export default function SichtungsWahl({
       {SK_REIHE.map((k, index) => {
         const farbe = sichtung[k].farbe;
         const gewaehlt = value === k;
-        // Randform: eine ANDERE Kategorie ist gewählt — die Fläche tritt zurück, bleibt wählbar.
+        // Eine ANDERE Kategorie ist gewählt: die Fläche tritt zurück (getönt, Innenrahmen in der
+        // Anzeigefarbe), bleibt aber an ihrer Farbe erkennbar und wählbar.
         const zurueck = value != null && !gewaehlt;
-        const voll = farbe ? sichtungsflaechen[farbe] : null;
+        const voll = farbe ? sichtungsPalette[farbe] : null;
         const gefuellt = voll != null && !zurueck;
+        const getoent = voll != null && zurueck;
+        // „tot“ trägt in jedem Zustand die Schraffur: gefüllt in der Schrift der Fläche, getönt in
+        // der Textfarbe des Modus.
+        const schraffur =
+          farbe === 'schwarz'
+            ? sichtungsSchraffur(gefuellt ? voll!.schrift : rollen.text)
+            : undefined;
+        const rahmen = `${gewaehlt ? 3 : 1}px ${disabled ? 'dashed' : 'solid'} ${kante}`;
         const stil: CSSProperties = {
           ...masse,
           boxSizing: 'border-box',
@@ -133,15 +171,18 @@ export default function SichtungsWahl({
           borderRadius: 0,
           font: 'inherit',
           cursor: disabled ? 'not-allowed' : 'pointer',
-          background: gefuellt ? voll.flaeche : rollen.flaeche,
+          // „unverletzt“ ohne eigene Fläche: durchsichtig auf dem Grund der Maske.
+          backgroundColor: gefuellt
+            ? voll.flaeche
+            : getoent
+              ? sichtungsToenung(farbe!, rollen.flaeche)
+              : 'transparent',
+          backgroundImage: schraffur,
           color: gefuellt ? voll.schrift : rollen.text,
           // Gesperrt gestrichelt (Zeichen der Sperre ohne Farbe, LLH-1233).
-          border: `${gewaehlt ? 3 : 1}px ${disabled ? 'dashed' : 'solid'} ${kante}`,
-          // Die Randform trägt die Sichtungsfarbe als Streifen; ohne Farbe kein Streifen.
-          borderInlineStart:
-            zurueck && voll
-              ? `8px solid ${voll.flaeche}`
-              : `${gewaehlt ? 3 : 1}px ${disabled ? 'dashed' : 'solid'} ${kante}`,
+          border: rahmen,
+          // Getönt: die Farbe bleibt als 4-px-Innenrahmen (innen, damit nichts springt).
+          boxShadow: getoent ? `inset 0 0 0 4px ${voll.punkt}` : undefined,
         };
         return (
           <button
@@ -159,9 +200,6 @@ export default function SichtungsWahl({
             aria-label={`${sichtung[k].label}, ${SK_WORT[k]}`}
             disabled={disabled}
             tabIndex={index === fokusIndex ? 0 : -1}
-            // In einer Erfassungshülle ist die Wahl das erste Feld; die Hülle greift sonst nur
-            // echte `<input>` (`components/Erfassung.tsx`, `fokussiereErstesFeld`).
-            data-erfassung-fokus={index === fokusIndex ? '' : undefined}
             onClick={() => select(k)}
             onKeyDown={(e) => handleKeyDown(e, index)}
             style={stil}

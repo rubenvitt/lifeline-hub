@@ -389,12 +389,72 @@ export interface components {
             stelle_id: number;
         };
         /**
+         * @description Ein offener Punkt der Kurzliste: Kennung, laufende Nummer des Moduls (Auftrag, Meldung,
+         *     Registriernummer einer Person), Bezeichnung.
+         */
+        AbschlussEintrag: {
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Laufende Nummer im Modul; fehlt, wo das Modul keine kennt.
+             */
+            nummer?: number | null;
+        };
+        /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).
          *     String = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur
          *     ("Tier T-001 (Hund): an Tierarzt übergeben").
          * @enum {string}
          */
         AbschlussGrund: "uebergabe_halter" | "uebergabe_tierarzt" | "uebergabe_tierheim" | "verstorben" | "freilauf" | "sonstiges";
+        /** @description Eine Gruppe offener Punkte: alle gezählt, höchstens [`KURZLISTE_MAX`] genannt. */
+        AbschlussGruppe: {
+            /** Format: int64 */
+            anzahl: number;
+            /** @description Leer, wenn die Person das Modul nicht lesen darf; `anzahl` zählt trotzdem alle. */
+            eintraege: components["schemas"]["AbschlussEintrag"][];
+        };
+        /**
+         * @description Nicht entlassene Kräfte. `anzahl` zählt alle: die Einheiten und Fahrzeuge der Kurzliste
+         *     (ein Fahrzeug in einer aktiven Einheit steht nur über seine Einheit) und die Einsatzkräfte,
+         *     die `personal` noch einmal für sich nennt.
+         */
+        AbschlussKraefte: {
+            /** Format: int64 */
+            anzahl: number;
+            /** @description Einheiten nur mit lesbarem Modul `einheiten`, Fahrzeuge nur mit `fahrzeuge`. */
+            eintraege: components["schemas"]["AbschlussKraft"][];
+            /**
+             * Format: int64
+             * @description Davon nicht entlassene Einsatzkräfte (`einsatz_personal`).
+             */
+            personal: number;
+        };
+        /** @description Eine nicht entlassene Einheit oder ein nicht entlassenes Fahrzeug mit aktuellem Status. */
+        AbschlussKraft: {
+            art: components["schemas"]["AbschlussKraftArt"];
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Statustext („3 – Auf Anfahrt“); fehlt ohne Status. */
+            status?: string | null;
+        };
+        /**
+         * @description Art einer nicht entlassenen Kraft in der Kurzliste der Abschlussprüfung.
+         * @enum {string}
+         */
+        AbschlussKraftArt: "einheit" | "fahrzeug";
+        /** @description Antwort von `GET /api/einsaetze/{id}/abschluss/pruefung`: die offenen Punkte je Gruppe. */
+        AbschlussPruefung: {
+            auftraege: components["schemas"]["AbschlussGruppe"];
+            /** @description Betroffene mit offenem oder unterwegs befindlichem Verbleib, vermisste eingeschlossen. */
+            betroffene: components["schemas"]["AbschlussGruppe"];
+            kraefte: components["schemas"]["AbschlussKraefte"];
+            meldungen: components["schemas"]["AbschlussGruppe"];
+            nachforderungen: components["schemas"]["AbschlussGruppe"];
+        };
         /**
          * @description Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft
          *     die Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt" ist KEIN
@@ -1258,6 +1318,12 @@ export interface components {
             person_id: number;
             /** Format: int64 */
             platz_id?: number | null;
+            /**
+             * Format: int64
+             * @description Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie
+             *     zurücknimmt. Wartezeit und Aufenthalt übergehen das Paar.
+             */
+            ruecknahme_von?: number | null;
             /** Format: int64 */
             uhs_id: number;
             zeitpunkt_at: string;
@@ -1301,6 +1367,14 @@ export interface components {
          * @enum {string}
          */
         BelegungQuelle: "meldung" | "registrierung";
+        /**
+         * @description Antwort auf die Rücknahme eines Austritts (LLH-1924, design.md D3): das neue Ereignis und ob
+         *     die Person ihren Platz davor nicht zurückbekam und im Wartebereich steht.
+         */
+        BelegungRuecknahme: {
+            ereignis: components["schemas"]["BelegungAnzeige"];
+            ohne_platz: boolean;
+        };
         /**
          * @description Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
          *     [`StandVerlaufEintrag`].
@@ -1735,6 +1809,12 @@ export interface components {
             /** Format: int64 */
             objekt_id: number;
             objekt_typ: components["schemas"]["ObjektTyp"];
+            /**
+             * Format: int64
+             * @description Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie
+             *     zurücknimmt.
+             */
+            ruecknahme_von?: number | null;
             zeitpunkt_at: string;
             /**
              * Format: int64
@@ -1858,7 +1938,7 @@ export interface components {
          *     `wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.
          * @enum {string}
          */
-        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt" | "abruf" | "abruf_aufgehoben";
+        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt" | "abruf" | "abruf_aufgehoben" | "austritt_zurueckgenommen";
         /**
          * @description Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
          *     `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
@@ -2542,6 +2622,11 @@ export interface components {
             abgeschlossen_at?: string | null;
             /** Format: int64 */
             abgeschlossen_von?: number | null;
+            /**
+             * @description Anzeigename der Person, die abgeschlossen hat (LLH-1814, Paneel „Einsatzabschluss“);
+             *     fehlt am aktiven Einsatz, ohne Konto und bei einer Gerätesitzung.
+             */
+            abgeschlossen_von_name?: string | null;
             angelegt_at: string;
             /** Format: int64 */
             anzahl_betroffene_initial?: number | null;
@@ -5557,6 +5642,39 @@ export interface components {
          * @enum {string}
          */
         MaterialArt: "geraet" | "verbrauchsgut";
+        /** @description Antwort von `POST …/material/{em_id}/entlassen` (LLH-1923). */
+        MaterialEntlassungAntwort: {
+            material: components["schemas"]["EinsatzMaterialAnzeige"];
+            vorzustand: components["schemas"]["MaterialEntlassungVorzustand"];
+        };
+        /**
+         * @description Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
+         *     von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
+         *     D1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an
+         *     `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
+         *     höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das
+         *     Herausnehmen lässt sie an der Zeile stehen.
+         */
+        MaterialEntlassungVorzustand: {
+            /** Format: int64 */
+            br_id?: number | null;
+            /** Format: int64 */
+            einheit_id?: number | null;
+            /** Format: int64 */
+            einsatz_fahrzeug_id?: number | null;
+            /** @description Zeitpunkt dieses Herausnehmens; Kennung, an der die Rücknahme es wiedererkennt. */
+            entlassen_at: string;
+            /** Format: int64 */
+            uhs_id?: number | null;
+        };
+        /**
+         * @description Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht
+         *     zurückkam, steht in `ausgelassen`.
+         */
+        MaterialRuecknahmeAntwort: {
+            ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
+            material: components["schemas"]["EinsatzMaterialAnzeige"];
+        };
         /**
          * @description Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).
          *     Als TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).
@@ -6725,6 +6843,46 @@ export interface components {
             telefon?: string | null;
             traegerorganisation?: string | null;
         };
+        /** @description Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922). */
+        PersonalEntlassungAntwort: {
+            personal: components["schemas"]["EinsatzPersonalAnzeige"];
+            vorzustand: components["schemas"]["PersonalEntlassungVorzustand"];
+        };
+        /** @description Antwort von `POST …/personal/{ep_id}/entlassen/zuruecknehmen` (LLH-1922). */
+        PersonalEntlassungRuecknahmeAntwort: {
+            ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
+            personal: components["schemas"]["EinsatzPersonalAnzeige"];
+        };
+        /**
+         * @description Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer
+         *     Person zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`
+         *     D1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+         *     zurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das
+         *     Entlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.
+         */
+        PersonalEntlassungVorzustand: {
+            /** Format: int64 */
+            einheit_id?: number | null;
+            /**
+             * @description War die Person Einsatzleiter: der Name, den die Führungsstelle für sie eingefroren hat. Die
+             *     Rücknahme erkennt daran den Vermerk „nicht mehr disponiert“ wieder, auch wenn der Name der
+             *     Person inzwischen berichtigt wurde. `None` = war nicht Einsatzleiter.
+             */
+            einsatzleiter_name?: string | null;
+            /** @description Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt. */
+            entlassen_at: string;
+            /**
+             * Format: int64
+             * @description Fahrzeug, dessen Besatzung die Person war.
+             */
+            fahrzeug_id?: number | null;
+            /** @description Einheiten, die die Person führte. */
+            gefuehrte_einheiten?: number[];
+            /** @description Einsatzabschnitte, die die Person leitete. */
+            geleitete_abschnitte?: number[];
+            /** Format: int64 */
+            uhs_id?: number | null;
+        };
         /** @description Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`. */
         PersonalStatus: {
             farbe?: string | null;
@@ -7340,7 +7498,10 @@ export interface components {
              */
             frist_min: number;
         };
-        /** @description Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten. */
+        /**
+         * @description Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten
+         *     (LLH-1722 für das Fahrzeug, LLH-1922 für die Person, LLH-1923 für den Ort eines Postens).
+         */
         RuecknahmeAusgelassen: {
             /** @description Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“). */
             bezeichnung: string;

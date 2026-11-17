@@ -272,6 +272,44 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
     expect(body!.art).toBe('austritt');
   });
 
+  it('„Rückgängig“ nach „zurückweisen“ nimmt diesen Austritt zurück; Ablehnung über der Fläche (LLH-1924)', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    const zurueck: string[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', () =>
+        HttpResponse.json({
+          id: 41,
+          einsatz_id: 1,
+          person_id: 7,
+          uhs_id: 1,
+          platz_id: null,
+          art: 'austritt',
+          notiz: null,
+          zeitpunkt_at: 'x',
+          erfasst_von: 1,
+        }),
+      ),
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung/:bid/zuruecknehmen', ({ params }) => {
+        zurueck.push(String(params.bid));
+        return HttpResponse.json(
+          { error: 'Das Austragen liegt mehr als 10 Minuten zurück' },
+          { status: 409 },
+        );
+      }),
+    );
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(await screen.findByRole('button', { name: 'zurückweisen' }));
+    const hinweis = (await screen.findByText('R-007 zurückgewiesen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(zurueck).toEqual(['41']));
+    expect(
+      await screen.findByText(/Das Austragen liegt mehr als 10 Minuten zurück/),
+    ).toBeInTheDocument();
+  });
+
   it('zeigt keine Patientenaktionen für unbelegte Plätze', async () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, []);
@@ -896,6 +934,47 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     expect(await screen.findByRole('radiogroup', { name: 'Patient' })).toBeInTheDocument();
   });
 
+  it('Zeilen im Dialog „Patient zuweisen“ brechen um statt über den Rand zu laufen (LLH-1793)', async () => {
+    const p = person({
+      id: 5,
+      registrier_nr: 5,
+      aktuelle_uhs_id: null,
+      name: 'Maximiliane Musterfrau-Langenberg',
+      zustand: 'Schnittwunde am Unterarm, blutet stark',
+    });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    await userEvent.click(within(offenesMenue()).getByText('Patient zuweisen'));
+    const wahl = await screen.findByRole('radiogroup', { name: 'Patient' });
+    // Zeile 1 (Kennung und Name) darf umbrechen, Zeile 2 (Wartezeit, Zustand) kürzt sich; beide
+    // schrumpfen mit der Breite des Dialogs (`minWidth: 0`).
+    const name = within(wahl).getByText(/Maximiliane Musterfrau-Langenberg/);
+    const zeile1 = name.closest<HTMLElement>('[data-lfh="kandidat-zeile1"]')!;
+    const zeile2 = within(wahl)
+      .getByText('Schnittwunde am Unterarm, blutet stark')
+      .closest<HTMLElement>('[data-lfh="kandidat-zeile2"]')!;
+    expect(zeile1.style.whiteSpace).not.toBe('nowrap');
+    expect(zeile1.style.overflowWrap).toBe('break-word');
+    expect(zeile2.style.minWidth).toBe('0px');
+    expect(zeile2.style.whiteSpace).toBe('nowrap');
+    expect(zeile2.style.overflow).toBe('hidden');
+  });
+
+  it('der Platztitel bricht an Silbengrenzen, nicht mitten im Wort ohne Trennstrich (LLH-1793)', async () => {
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Transportbereitstellung' })],
+    });
+    renderGrundriss(uhs, []);
+    const karte = await screen.findByTestId('platz-karte');
+    // `strong` setzt antd in den Titel-Span; der Stil liegt am Span darum.
+    const titel = within(karte).getByText('Transportbereitstellung').parentElement!;
+    // `hyphens` und `word-break` kennt jsdom nicht; beide prüft `anzeige/wortumbruch.test.ts`.
+    expect(titel.style.overflowWrap).toBe('break-word');
+  });
+
   it('löst beim Klick auf einen Menüeintrag NICHT zusätzlich die Platzzuweisung aus', async () => {
     // Das Dropdown rendert im Portal, sein Synthetic Event steigt aber im Komponentenbaum auf und
     // erreicht den Wurzel-onClick der Karte. Mit zuweisbarer Person rendern, sonst zeigte der
@@ -1184,9 +1263,10 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     expect(namen[2]).toContain('Person öffnen');
     expect(namen[3]).toContain('Zurück in den Wartebereich');
     expect(namen[namen.length - 1]).toContain('zurückweisen');
+    // Neutral seit LLH-1924: es hat ein Rückgängig (ADR-0055).
     expect(
       within(offenesMenue()).getByRole('menuitem', { name: /zurückweisen/ }).className,
-    ).toContain('danger');
+    ).not.toContain('danger');
   });
 
   it('zeigt das laufende Rettungsmittel am Platz und bietet keine zweite Anforderung an', async () => {
@@ -1346,7 +1426,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
 
   /**
    * Ein Live-Update, das die Belegung ändert, baut die Einträge um (aus „Patient zuweisen" würde
-   * „Verbleib / Entlassung erfassen", dazu ein `danger` „zurückweisen") — unter dem Finger. Das
+   * „Verbleib / Entlassung erfassen", dazu „zurückweisen") — unter dem Finger. Das
    * offene Menü gehört zu seinem Zustand und schließt, wenn der sich ändert.
    */
   it('schließt ein offenes Menü, wenn sich die Belegung des Platzes live ändert', async () => {
@@ -1441,7 +1521,7 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
 
   it('trägt in kompakt die Knopfzeile mit vollem marginSM, und sie passt in die Karte', () => {
     const form = platzBedienform(tokenFuer('kompakt'));
-    expect(form).toEqual({ form: 'zeile', abstand: 7 });
+    expect(form).toEqual({ form: 'zeile', abstand: 8 });
     // Knopfbreiten + Lücken ≤ Innenbreite. Icon-only-Knöpfe sind `controlHeightSM` breit, der Boden
     // in kompakt ist 24.
     const t = tokenFuer('kompakt');
@@ -1588,7 +1668,8 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
         '—',
         'zurueckweisen',
       ]);
-      expect(gefahr(items)).toEqual(['zurueckweisen']);
+      // Neutral seit LLH-1924: es hat ein Rückgängig (ADR-0055).
+      expect(gefahr(items)).toEqual([]);
     });
 
     it('Bearbeiten-Modus, unbelegt: Verfügbarkeiten und Löschen, kein Zuweisen', () => {
@@ -1605,7 +1686,7 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
         bearbeitbar: true,
       });
       expect(folge(items).slice(-3)).toEqual(['—', 'zurueckweisen', 'storno']);
-      expect(gefahr(items)).toEqual(['zurueckweisen', 'storno']);
+      expect(gefahr(items)).toEqual(['storno']);
     });
 
     /** Sperren statt entfernen: gesperrt ist, was eine zweite Bewegung derselben Person anstößt. */

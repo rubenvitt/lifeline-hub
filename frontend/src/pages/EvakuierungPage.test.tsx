@@ -673,7 +673,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
       within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'geräumt' }).closest('label')!);
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'geräumt' }));
     const neu = await einsatzAbrufeNach(async () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
       await waitFor(() =>
@@ -732,7 +732,7 @@ describe('EvakuierungPage (LLH-1034)', () => {
     await waitFor(() =>
       expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
     );
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'läuft' }).closest('label')!);
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'läuft' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'laeuft' }),
@@ -758,6 +758,29 @@ describe('EvakuierungPage (LLH-1034)', () => {
       z.getAttribute('data-row-key'),
     );
     expect(folge).toEqual(['bezirk-6', 'bezirk-5']);
+  });
+
+  it('Stand melden und ⋮ stehen ab md in der rechts fixierten Spalte, darunter in der Kennung (LLH-1789)', async () => {
+    setzeViewportBreite(1440);
+    const { unmount } = renderPage();
+    await screen.findByText('Hafenviertel');
+    const kopf = screen.getByRole('columnheader', { name: 'Aktionen' });
+    expect(kopf.className).toMatch(/ant-table-cell-fix-(end|right)/);
+    unmount();
+
+    setzeViewportBreite(390);
+    const { container } = renderPage();
+    await screen.findByText('Hafenviertel');
+    expect(screen.queryByRole('columnheader', { name: 'Aktionen' })).toBeNull();
+    const zeile = container.querySelector<HTMLElement>('tr[data-row-key="bezirk-5"]')!;
+    const kennung = zeile.querySelector<HTMLElement>('[data-lfh="datensicht-kennung-aktion"]')!;
+    expect(
+      within(kennung).getByRole('button', { name: /^Stand melden für Bezirk / }),
+    ).toBeInTheDocument();
+    // Neu: auch das ⋮ steht in der Kennung, nicht am Ende des Querscrolls.
+    expect(
+      within(kennung).getByRole('button', { name: /^Aktionen zu Bezirk / }),
+    ).toBeInTheDocument();
   });
 
   it('der Abschnitt filtert mit den Werten der Bezirke, auch aus der Adresse (LLH-1096)', async () => {

@@ -57,6 +57,38 @@ describe('BewegungenTab (LFH-25)', () => {
     expect(zeit.style.fontFamily).toContain('JetBrains Mono');
     expect(zeit.style.fontVariantNumeric).toBe('tabular-nums');
   });
+
+  it('nennt die Rücknahme eines Austritts „Austragen zurückgenommen“ (LLH-1924)', async () => {
+    server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
+    const mitRuecknahme = {
+      ...uhs,
+      belegungen: [
+        ...uhs.belegungen,
+        {
+          id: 2,
+          person_id: 10,
+          art: 'austritt',
+          platz_id: null,
+          notiz: null,
+          zeitpunkt_at: '2026-06-23 10:05:00',
+        },
+        {
+          id: 3,
+          person_id: 10,
+          art: 'eintritt',
+          platz_id: null,
+          notiz: null,
+          zeitpunkt_at: '2026-06-23 10:06:00',
+          ruecknahme_von: 2,
+        },
+      ],
+    } as unknown as UhsDetail;
+    renderMitProviders(<BewegungenTab uhs={mitRuecknahme} />, {
+      route: '/einsaetze/1/unfallhilfsstellen/3',
+    });
+    expect(await screen.findByText('Austragen zurückgenommen')).toBeInTheDocument();
+    expect(screen.getAllByText('Eintritt')).toHaveLength(1);
+  });
 });
 
 /**

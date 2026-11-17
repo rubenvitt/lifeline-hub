@@ -2,17 +2,21 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx]
 ---
 
 ## Überblick
 
 Das Modul **Fahrzeuge** führt alle Fahrzeuge, die im Einsatz disponiert sind, aus dem Fahrzeugstamm
 der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, Einheit, FMS-Status und
-Besatzung. Typ, Abschnitt, „Seit“ (wann der Status gesetzt wurde), Kennzeichen und Träger stehen
-erst ab 1600 px Fensterbreite in der Liste, darunter lassen sie sich wie die Bemerkung unter
-„Spalten“ einblenden. Ist das Modul Einheiten im Einsatz nicht freigegeben, fehlen Einheit und
-Abschnitt.
+Besatzung. Der Typ steht ab 1600 px Fensterbreite in einer eigenen Spalte, darunter unter dem
+Funkrufnamen; wer die Spalte „Typ“ selbst ein- oder ausblendet, findet ihn immer genau an einer
+der beiden Stellen. Abschnitt, „Seit“ (wann der Status gesetzt wurde), Kennzeichen und Träger
+stehen erst ab 1600 px in der Liste, darunter lassen sie sich wie die Bemerkung unter „Spalten“
+einblenden. Der Knopf heißt „Spalten“, solange niemand selbst etwas ein- oder ausgeblendet hat;
+danach nennt er, wie viele Spalten verborgen sind. Am rechten Rand der Tabelle steht das Menü
+„Weitere Aktionen“ fest, auch wenn die Tabelle quer rollt. Ist das Modul Einheiten im Einsatz
+nicht freigegeben, fehlen Einheit und Abschnitt.
 
 Zwei Ansichten zeigen dieselben Fahrzeuge: die **Liste** zum Pflegen und Vergleichen und das
 **FMS-Tableau** als Überblick über die ganze Flotte, in dem sich der Status mit einem Klick oder
@@ -27,7 +31,7 @@ entlassen dürfen Einsatzleitung und Führungspersonal.
 2. Je Fahrzeug „Einheit“, „Status“ und „Besatzung“ lesen. Die Besatzung steht als Urteil, etwa
    „Besatzung nicht erfasst“ oder „Soll erfüllt“, daneben Ist- und Soll-Stärke.
 
-   ![Fahrzeugliste mit Funkrufname, Einheit, FMS-Status, Besatzung und dem Menü „Weitere Aktionen“ je Fahrzeug, darüber „Spalten · 6 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
+   ![Fahrzeugliste mit Funkrufname und Typ darunter, Einheit, FMS-Status, Besatzung und dem Menü „Weitere Aktionen“ je Fahrzeug, darüber der Knopf „Spalten“](../bilder/fahrzeuge/fahrzeuge.png)
 
 3. In „Funkrufname, Typ, Kennzeichen“ suchen, oder im Kopf der Spalten „Typ“, „Einheit“,
    „Abschnitt“, „Status“ und „Träger“ filtern: das Trichterzeichen öffnet die Werte zum Ankreuzen,
@@ -70,7 +74,7 @@ Fahrzeug einer Nachbarwehr:
 Für Einsatzleitung und Führungspersonal, wenn das Modul Einheiten freigegeben ist:
 
 1. In der Zeile des Fahrzeugs unter „Einheit“ „Einheit eintragen“ wählen, oder bei einer schon
-   zugeordneten Einheit ihren Namen.
+   zugeordneten Einheit ihren Namen. Die Auswahl öffnet an der Zelle; die Tabelle bleibt stehen.
 2. Die Einheit wählen. Die Auswahl ist nach Abschnitt gegliedert, unterstellte Einheiten stehen
    mit ihrem Pfad, etwa „Sanitätszug Musterstadt › Rettungsstaffel“. Mit dem Kreuz im Feld wird die
    Einheit geleert.
@@ -139,7 +143,11 @@ Für Einsatzleitung und Führungspersonal:
    ![Aufgeklappte Besatzung des RTW 83-1 mit „Soll erfüllt“, drei Personen, davon eine mit der Marke „andere Einheit“, und dem Auswahlfeld „Kraft zur Besatzung …“](../bilder/fahrzeuge/besatzung.png)
 
 3. Je Person stehen Position und Funktion. Mit „Vom Fahrzeug lösen“ eine Person wieder von der
-   Besatzung lösen; eine Rückfrage gibt es nicht, sie bleibt als Personal im Einsatz.
+   Besatzung lösen; eine Rückfrage gibt es nicht, sie bleibt als Personal im Einsatz. Ihre Zeile
+   bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Block verlassen haben, damit kein
+   anderer Knopf unter den Finger rückt. „Rückgängig“ an der Stelle ihrer Funktion oder im Hinweis
+   oben setzt sie zurück auf das Fahrzeug. Sitzt sie inzwischen auf einem anderen, bleibt sie dort,
+   und der Grund steht an der Zeile.
 
 ### Personal der Einheit als Besatzung übernehmen
 
@@ -167,7 +175,7 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
 1. In der Liste beim Fahrzeug „Details“ aufklappen. Unter der Besatzung steht „Beladung“ mit der
    Zahl der Posten und, falls vorhanden, dem Ausfall, je Posten Menge und Status.
 
-   ![Block „Beladung 2 Posten · 1 Ausfall“ unter der Besatzung: Rettungsdecken mit „6 von 10 übrig“, „Ausgeben“ und „Vom Fahrzeug lösen“, eine defekte Absaugpumpe und die Auswahl „Material zuordnen …“](../bilder/fahrzeuge/beladung.png)
+   ![Block „Beladung 2 Posten · 1 Ausfall“ unter der Besatzung: Rettungsdecken mit „6 von 10 übrig“, „Ausgeben“ und dem Menü „⋮“, eine defekte Absaugpumpe mit „Vom Fahrzeug lösen“ und die Auswahl „Material zuordnen …“](../bilder/fahrzeuge/beladung.png)
 
 2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
    anderem Ort“ Posten, die schon an einem anderen Ort liegen, mit diesem Ort im Eintrag. Der Posten
@@ -177,9 +185,11 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    das Ergebnis, etwa „Danach hier 20, Staffel A 30“.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
-4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen. Er bleibt ohne Ort im Einsatz. Die Zeile
+4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen; bei einem Verbrauchsgut mit Rest steht es
+   neben „Ausgeben“ im Menü „⋮“ der Zeile. Er bleibt ohne Ort im Einsatz. Die Zeile
    bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein
-   anderer Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den Posten zurück.
+   anderer Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den
+   Posten zurück, außer er liegt inzwischen an einem anderen Ort.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
 

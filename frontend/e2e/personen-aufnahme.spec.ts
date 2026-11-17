@@ -79,9 +79,9 @@ test('AK 3: „Speichern und nächste" leert, fokussiert zurück und zählt hoch
   const gewaehlt = sichtung(page).getByRole('radio', { checked: true });
   await expect(gewaehlt, 'die Sichtung wird je Person neu erhoben').toHaveCount(0);
 
-  // Fokus zurück im ersten Feld, der ersten Auswahlfläche der Sichtung.
-  const ersteFlaeche = sichtung(page).getByRole('radio').first();
-  await expect(ersteFlaeche).toBeFocused();
+  // Fokus zurück im ersten Feld, der GRUPPE der Sichtung, nicht auf „SK I“ (eon26eat D8: der
+  // Ring auf SK I las sich wie eine Vorauswahl).
+  await expect(sichtung(page)).toBeFocused();
 
   await skFlaeche(page, 'SK III').click();
   await page.getByRole('button', { name: 'Speichern und nächste' }).click();

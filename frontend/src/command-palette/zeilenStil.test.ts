@@ -26,8 +26,8 @@ describe('palettenZeilenStil', () => {
    * aber mitziehen, sonst klebt der Text an der Kante.
    */
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
-    expect(palettenZeilenStil(tokenFuer('kompakt')).padding).toBe('3px 7px');
-    expect(palettenZeilenStil(tokenFuer('handschuh')).padding).toBe('7px 16px');
+    expect(palettenZeilenStil(tokenFuer('kompakt')).padding).toBe('4px 8px');
+    expect(palettenZeilenStil(tokenFuer('handschuh')).padding).toBe('8px 16px');
   });
 
   /**
@@ -70,8 +70,8 @@ describe('vorschauZielStil', () => {
   });
 
   it('trägt neben dem Boden eine mitziehende Polsterung', () => {
-    expect(vorschauZielStil(tokenFuer('kompakt')).padding).toBe('3px 7px');
-    expect(vorschauZielStil(tokenFuer('handschuh')).padding).toBe('7px 16px');
+    expect(vorschauZielStil(tokenFuer('kompakt')).padding).toBe('4px 8px');
+    expect(vorschauZielStil(tokenFuer('handschuh')).padding).toBe('8px 16px');
   });
 
   it('wächst über die Dichtestufen, statt auf einer Stufe zu kleben', () => {

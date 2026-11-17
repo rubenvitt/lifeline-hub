@@ -1,4 +1,4 @@
-import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
+import { IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -26,7 +26,6 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
-  Paneel,
   Segmentleiste,
   StatusChip,
   useRollen,
@@ -67,6 +66,7 @@ import { useLetzteLagebesprechung } from '../lagebesprechung/useLetzteLagebespre
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
+import { flaeche } from '../theme/tokens';
 
 const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
   { wert: 'alle', label: 'Alle Orte' },
@@ -149,7 +149,13 @@ export default function LagemeldungenPage() {
     setFilter(LEERER_FILTER);
     zeitraumWaehlen({ von: undefined, bis: undefined });
   };
-  const [formOffen, setFormOffen] = useState(false);
+  // Offen ist der Dialog nur für den Einsatz, in dem er geöffnet wurde (Review LLH-1921): ein
+  // Wechsel des Einsatzes rendert sonst einmal mit offenem Dialog, bevor ein Effekt ihn schließt.
+  const [formOffenFuer, setFormOffenFuer] = useState<number | null>(null);
+  const formOffen = formOffenFuer === einsatzId;
+  // Schließt nur den Dialog dieses Einsatzes: eine spät ankommende Antwort aus dem vorigen
+  // Einsatz (ausgehängtes Formular) schließt den Dialog des neuen nicht am Abbruch vorbei.
+  const schliesseDialog = () => setFormOffenFuer((f) => (f === einsatzId ? null : f));
   // Die Zeile, deren Lage-Angaben gerade bearbeitet werden (Kennung der Meldung).
   const [bearbeitetId, setBearbeitetId] = useState<number | null>(null);
   const { benutzer } = useAuth();
@@ -173,9 +179,16 @@ export default function LagemeldungenPage() {
     if (searchParams.get('neu') !== '1') return;
     if (neuAuftrag.verbraucht()) return;
     if (einsatzQuery.isLoading || !freigabenBekannt) return;
-    if (darfErfassenRoh) setFormOffen(true);
+    if (darfErfassenRoh) setFormOffenFuer(einsatzId);
     neuAuftrag.raeume('neu');
-  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, freigabenBekannt, darfErfassenRoh]);
+  }, [
+    searchParams,
+    neuAuftrag,
+    einsatzQuery.isLoading,
+    freigabenBekannt,
+    darfErfassenRoh,
+    einsatzId,
+  ]);
   const lageQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
@@ -240,7 +253,7 @@ export default function LagemeldungenPage() {
       message.success(`Lagemeldung #${ergebnis.daten.lfd_nr} erfasst`);
     },
   });
-  // Nur das Erfassen DIESES Einsatzes gehört ins Paneel.
+  // Nur das Erfassen DIESES Einsatzes gehört in den Dialog.
   const diesesErfassen = erfassenMutation.variables?.einsatzId === einsatzId;
   const erfassenSpeicherung: Speicherung = {
     error: diesesErfassen ? erfassenMutation.error : null,
@@ -253,7 +266,9 @@ export default function LagemeldungenPage() {
   useEffect(() => {
     leere();
     alleGesehenReset();
-    setFormOffen(false);
+    // Zurück im vorigen Einsatz steht der Dialog nicht wieder offen. Einen eben über `?neu=1`
+    // geöffneten Dialog DIESES Einsatzes lässt der Reset beim Einhängen stehen.
+    setFormOffenFuer((f) => (f === einsatzId ? f : null));
     setBearbeitetId(null);
   }, [einsatzId, leere, alleGesehenReset]);
 
@@ -282,7 +297,7 @@ export default function LagemeldungenPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );
@@ -382,7 +397,7 @@ export default function LagemeldungenPage() {
       }
       aktionen={
         (l.is_neu && darfSchreiben) || (darfBearbeiten && bearbeitetId !== l.meldung_id) ? (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
           <Space wrap size={token.marginSM}>
             {l.is_neu && darfSchreiben && (
@@ -433,8 +448,8 @@ export default function LagemeldungenPage() {
       <SeitenLeer
         titel="Noch keine Lagemeldungen"
         aktion={
-          darfErfassen && !formOffen
-            ? { label: 'Lagemeldung erfassen', onClick: () => setFormOffen(true) }
+          darfErfassen
+            ? { label: 'Lagemeldung erfassen', onClick: () => setFormOffenFuer(einsatzId) }
             : undefined
         }
       />
@@ -485,15 +500,8 @@ export default function LagemeldungenPage() {
       }
       aktionen={
         darfErfassen && (
-          // Solange eine Lagemeldung unterwegs ist, bleibt das Paneel offen: die Antwort braucht
-          // ihren Ort.
-          <Button
-            type="primary"
-            icon={formOffen ? <IconChevronHoch /> : <IconPlus />}
-            disabled={formOffen && erfassenSpeicherung.isPending}
-            onClick={() => setFormOffen(!formOffen)}
-          >
-            {formOffen ? 'Formular schließen' : 'Lagemeldung erfassen'}
+          <Button type="primary" icon={<IconPlus />} onClick={() => setFormOffenFuer(einsatzId)}>
+            Lagemeldung erfassen
           </Button>
         )
       }
@@ -507,37 +515,31 @@ export default function LagemeldungenPage() {
         />
       }
     >
-      {darfErfassen && formOffen && (
-        <Paneel
-          titel="Lagemeldung erfassen"
-          koerperPolster
-          style={{ marginBlockEnd: token.margin }}
-          aktion={
-            <Button
-              type="text"
-              icon={<IconKreuz />}
-              disabled={erfassenSpeicherung.isPending}
-              onClick={() => setFormOffen(false)}
-              aria-label="Formular schließen"
-            />
-          }
-        >
-          <MeldungFormular
-            card={false}
-            artVorgabe="lagemeldung"
-            serie={false}
-            onFertig={() => setFormOffen(false)}
-            einsatzId={einsatzId}
-            senden={erfassenSpeicherung.isPending}
-            // mutateAsync: die Erfassungshülle leert nur, wenn die Meldung angekommen ist.
-            onAnlegen={(daten) => erfassenMutation.mutateAsync({ einsatzId, daten })}
-            speicherung={erfassenSpeicherung}
-            einheiten={einheitenQuery.data}
-            abschnitte={abschnitteQuery.data}
-            funktionsVorschlaege={funktionsVorschlaege}
-            vorschlagsquellen={vorschlagsquellen}
-          />
-        </Paneel>
+      {/* Erfassen im Dialog, nicht im Paneel über der Zeitachse (LLH-1921, Spec `bedien-muster`,
+          „Einen Datensatz anlegen“): eine einzelne Meldung, keine Serie neben der Liste. */}
+      {darfErfassen && (
+        <MeldungFormular
+          // Das Formular bleibt bei geschlossenem Dialog eingehängt; ein anderer Einsatz beginnt
+          // mit einem leeren.
+          key={einsatzId}
+          dialog={{
+            offen: formOffen,
+            titel: 'Lagemeldung erfassen',
+            onAbbrechen: schliesseDialog,
+          }}
+          artVorgabe="lagemeldung"
+          serie={false}
+          onFertig={schliesseDialog}
+          einsatzId={einsatzId}
+          senden={erfassenSpeicherung.isPending}
+          // mutateAsync: die Erfassungshülle leert nur, wenn die Meldung angekommen ist.
+          onAnlegen={(daten) => erfassenMutation.mutateAsync({ einsatzId, daten })}
+          speicherung={erfassenSpeicherung}
+          einheiten={einheitenQuery.data}
+          abschnitte={abschnitteQuery.data}
+          funktionsVorschlaege={funktionsVorschlaege}
+          vorschlagsquellen={vorschlagsquellen}
+        />
       )}
       {angezeigteNeue.length > 0 && darfSchreiben && (
         <div

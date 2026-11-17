@@ -191,7 +191,10 @@ Archiv-Schlüssel der Organisation hat:
 1. **Laufender Einsatz:** Eine Frist sperrt nie einen laufenden Einsatz; sie greift erst ab dem
    Abschluss.
 2. **Abschluss:** Ohne gesetzte Frist setzt der Abschluss sie aus der Aufbewahrungs-Dauer des
-   Einsatzes oder der Organisation. Ohne Dauer bleibt der Einsatz ohne Frist.
+   Einsatzes oder der Organisation. Ohne Dauer bleibt der Einsatz ohne Frist. Wird der Einsatz
+   binnen 24 Stunden wieder geöffnet, nimmt das die so gesetzte Frist und die Fristen je
+   Datenkategorie zurück; von Hand gesetzte bleiben (siehe
+   [Einsatz abschließen und Einsatzbericht](einsatzabschluss.md)).
 3. **Frist abgelaufen:** Ab dann ist der Einsatz für alle gesperrt, auch für die Einsatzleitung
    und System-Admins; es bleibt nur die pseudonyme Archivakte. Der Server prüft alle zehn
    Minuten und merkt ihn zur Löschung vor.
@@ -213,7 +216,8 @@ Vormerkung, Schwärzung und jede Änderung einer Frist stehen im Einsatztagebuch
 
 Die Nachbereitung ist die Zeit nach dem Abschluss, in der ein Einsatz an der Installation bleibt,
 an der er läuft. Hat die Organisation eine Nachbereitung in Tagen, setzt der Abschluss ihr Ende
-auf Abschluss plus Dauer; das Einsatztagebuch hält es fest, ebenso jede Änderung.
+auf Abschluss plus Dauer; das Einsatztagebuch hält es fest, ebenso jede Änderung. Das
+Wiederöffnen nimmt das Ende zurück, ein erneuter Abschluss setzt es neu.
 
 Mit dem Ende der Nachbereitung gilt an einem ELW, der mit einem Hub gekoppelt ist:
 

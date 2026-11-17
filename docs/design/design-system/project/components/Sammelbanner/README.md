@@ -13,11 +13,10 @@ je Liste; eine zweite Aktualisierung ändert seinen Text, sie stapelt kein zweit
 
 Die Aktion ist ein antd-`Button type="link"`: er erbt `controlHeight` vom
 `ConfigProvider` und schuldet damit nicht die zwei Angaben eines handgebauten
-Bedienziels (LFH-365). Das Icon steht in einer `aria-hidden`-Hülle — antds Icons
+Bedienziels. Das Icon steht in einer `aria-hidden`-Hülle — antds Icons
 bringen ein eigenes englisches `aria-label` mit.
 
-KURZFORM für den Handschirm (LFH-694,
-`openspec/changes/archive/2026-10-01-lfh-694-sammelbanner-schmal/`): steht das Banner in einer
+KURZFORM für den Handschirm: steht das Banner in einer
 Werkzeugzeile neben einer Segmentleiste, bleibt ihm bei 390 px zu wenig Breite für Satz UND
 Knopf (gemessen: Text 0 px, bis 59 px Überlauf). Mit `kurz` (und einer
 `aktion`) wird das GANZE Banner ein Knopf: Icon plus „1 neu" (`sammelbannerKurz`),

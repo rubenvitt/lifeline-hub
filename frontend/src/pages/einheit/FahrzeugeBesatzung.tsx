@@ -55,7 +55,7 @@ import { fmsEtikett } from '../../kraefte/meldebildRaster';
 import { fahrzeugStatusDarstellung } from '../../kraefte/mittelStatus';
 import { gruendeJeKraft } from '../../kraefte/sammelDisposition';
 import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
-import { besatzungsUrteil, statusKategorie } from '../../theme/statusFarben';
+import { besatzungsUrteil, kategorieDarstellung } from '../../theme/statusFarben';
 import {
   besatzungGrund,
   buildFahrzeugMenuItems,
@@ -288,7 +288,9 @@ export default function FahrzeugeBesatzung({
     onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
   });
   const besatzungZurueck = useMutation({
-    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
+    // Nimmt sie keinem anderen Fahrzeug weg (LLH-1924).
+    mutationFn: (v: { efId: number; epId: number }) =>
+      ordneBesatzungZu(einsatzId, v.efId, v.epId, { nurWennFrei: true }),
     onMutate: (v) => trackPerson(v.epId).start(),
     onSuccess: invalidate,
     onError: (e, v) => personErrors.melde(v.epId, e, 'Nicht zurückgenommen'),
@@ -390,7 +392,7 @@ export default function FahrzeugeBesatzung({
   });
 
   // Die Fahrzeuge der Einheit, wie die Quelle sie zeigt; die gelösten hält `useHoldGeloest` an
-  // ihrer Stelle (LLH-1722, Spec `bedien-muster`, „Eine gelöste Zeile hält ihre Stelle“).
+  // ihrer Stelle (LLH-1722, Spec `bedien-muster`, „Gelöste Zeile hält ihre Stelle“).
   const fahrzeugEintraege: FahrzeugEintrag[] = mittel
     ? mittel.fahrzeuge.map((f) => ({
         id: f.fahrzeug.id,
@@ -439,7 +441,7 @@ export default function FahrzeugeBesatzung({
 
   /**
    * Bedienziel-Boden einer handgebauten Zeile (LFH-365): Steuerhöhe plus Polsterung. Zwei Zeilen
-   * und die Teile einer umbrochenen Zeile stehen `marginSM` auseinander (7/11/16 px), damit Link
+   * und die Teile einer umbrochenen Zeile stehen `marginSM` auseinander (8/12/16 px), damit Link
    * und Aktion untereinander den Aktionsabstand halten (Leitlinie ≥ 8 / ≥ 16).
    */
   const rowStyle = {
@@ -778,7 +780,7 @@ export default function FahrzeugeBesatzung({
                       darstellung={
                         m.status
                           ? {
-                              ...statusKategorie[m.status.kategorie],
+                              ...kategorieDarstellung(m.status.kategorie, m.status.fms_anker),
                               label: fmsEtikett(m.status.label, m.status.fms_anker),
                             }
                           : { rolle: 'neutral', label: 'kein Status' }

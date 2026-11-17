@@ -44,7 +44,7 @@ export function VerbindungenListe({
   const gedaempft = { color: rollen.text2 };
   return (
     // Die Verweise sind Bedienziele: Zeile über Zeile ≥ 8 / ≥ 16 px auseinander (LFH-630,
-    // `paddingSM` 7/11/16), nicht nur der Zeilenabstand des Fließtexts.
+    // `paddingSM` 8/12/16), nicht nur der Zeilenabstand des Fließtexts.
     <Flex vertical gap={token.paddingSM}>
       {verbindungen.map((v, i) => {
         const verweis = verbindungsVerweis(v.mittel, v.wert);

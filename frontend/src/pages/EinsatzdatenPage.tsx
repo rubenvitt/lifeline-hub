@@ -1,14 +1,4 @@
-import {
-  App,
-  AutoComplete,
-  Breadcrumb,
-  Button,
-  Collapse,
-  Input,
-  InputNumber,
-  Popconfirm,
-  Space,
-} from 'antd';
+import { App, AutoComplete, Breadcrumb, Button, Collapse, Input, InputNumber, Space } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -36,7 +26,12 @@ import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
 import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { sucheOrtImEinsatz } from '../api/ortSuche';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { einsatzberichtPfad, einsatzEinstellungenPfad, lagekartePfad } from '../routing/deeplinks';
+import {
+  einsatzberichtPfad,
+  einsatzEinstellungenPfad,
+  lagekartePfad,
+  type EinsatzdatenPaneel,
+} from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SPIEGEL_KOPF_ABRUF_MS } from '../einsatz/spiegel/spiegelText';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -50,7 +45,6 @@ import {
   patcheFuehrungsstelle,
   loeseFuehrungsstelleSprechgruppe,
   ordneFuehrungsstelleSprechgruppeZu,
-  schliesseEinsatzAb,
   type KopfdatenPatch,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
@@ -124,6 +118,7 @@ import { leerZuNull } from '../api/patchTriState';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import AblaufPaneel from '../programmpunkt/AblaufPaneel';
+import EinsatzAbschlussPaneel from './einsatzdaten/EinsatzAbschlussPaneel';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -608,138 +603,142 @@ function EinsatzortPaneel({
       ? { lat: einsatz.einsatzort_lat, lon: einsatz.einsatzort_lon }
       : null;
   const adresse = einsatz.einsatzort ?? '';
+  // `?paneel=einsatzort` aus der Startliste im Überblick (LLH-1815): das Paneel steht mit dem Einsatz.
+  const sprungRef = usePaneelSprung('einsatzort', true);
 
   return (
-    <Paneel
-      titel="Einsatzort"
-      meta={
-        <PaneelVermerk
-          vermerk={juengsterVermerk(einsatz.vermerke, ['einsatzort', 'einsatzort_koordinate'])}
-        />
-      }
-    >
-      <Angaben
-        zeilen={[
-          {
-            etikett: 'Adresse',
-            vermerk: einsatz.vermerke?.einsatzort,
-            wert: (
-              <InlineAngabe<OrtsfeldWert>
-                vermerk={einsatz.vermerke?.einsatzort}
-                etikett="Adresse"
-                // Die gespeicherte Koordinate steht mit in der Bearbeitung: die Vorschau zeigt
-                // sie, die Nadel berichtigt sie. Als `karte` gelöst vom Text, damit eine reine
-                // Textänderung den Punkt nicht leert (LLH-1108).
-                wert={
-                  punkt
-                    ? { text: adresse, koordinate: punkt, quelle: 'karte' }
-                    : { text: adresse, koordinate: null }
-                }
-                anzeige={adresse}
-                leer={(w) => w.text.trim() === ''}
-                // Nach Werten, nicht nach Identität: ein Treffer an anderer Stelle ist eine
-                // Änderung, auch bei gleichem Text.
-                gleich={gleicherOrt}
-                darfSchreiben={darfSchreiben}
-                onSpeichern={(w, { beimOeffnen }) =>
-                  speichern(
-                    'Adresse',
-                    // Die Koordinate geht nur mit, wenn sie neu ist (Treffer, Nadel, getippt);
-                    // reiner Text schickt nur die Adresse (Spec `einsatzdaten-bearbeitung`).
-                    // Hat das Feld den gespeicherten Punkt verloren (geleerter Text, LLH-1534),
-                    // geht er als `null` mit: sonst bliebe ein Punkt, den die Maske nicht zeigte.
-                    // „Neu“ und „verloren“ gegenüber dem Stand beim Öffnen, nicht dem Live-Punkt:
-                    // sonst schriebe eine reine Textänderung eine inzwischen fremd verschobene
-                    // Koordinate zurück (Review LLH-1831).
-                    w.koordinate &&
-                      (w.koordinate.lat !== beimOeffnen.koordinate?.lat ||
-                        w.koordinate.lon !== beimOeffnen.koordinate?.lon)
-                      ? {
-                          einsatzort: leerZuNull(w.text),
-                          einsatzort_lat: w.koordinate.lat,
-                          einsatzort_lon: w.koordinate.lon,
-                        }
-                      : !w.koordinate && beimOeffnen.koordinate
+    <div ref={sprungRef} data-lfh="einsatzort-paneel" style={{ minWidth: 0 }}>
+      <Paneel
+        titel="Einsatzort"
+        meta={
+          <PaneelVermerk
+            vermerk={juengsterVermerk(einsatz.vermerke, ['einsatzort', 'einsatzort_koordinate'])}
+          />
+        }
+      >
+        <Angaben
+          zeilen={[
+            {
+              etikett: 'Adresse',
+              vermerk: einsatz.vermerke?.einsatzort,
+              wert: (
+                <InlineAngabe<OrtsfeldWert>
+                  vermerk={einsatz.vermerke?.einsatzort}
+                  etikett="Adresse"
+                  // Die gespeicherte Koordinate steht mit in der Bearbeitung: die Vorschau zeigt
+                  // sie, die Nadel berichtigt sie. Als `karte` gelöst vom Text, damit eine reine
+                  // Textänderung den Punkt nicht leert (LLH-1108).
+                  wert={
+                    punkt
+                      ? { text: adresse, koordinate: punkt, quelle: 'karte' }
+                      : { text: adresse, koordinate: null }
+                  }
+                  anzeige={adresse}
+                  leer={(w) => w.text.trim() === ''}
+                  // Nach Werten, nicht nach Identität: ein Treffer an anderer Stelle ist eine
+                  // Änderung, auch bei gleichem Text.
+                  gleich={gleicherOrt}
+                  darfSchreiben={darfSchreiben}
+                  onSpeichern={(w, { beimOeffnen }) =>
+                    speichern(
+                      'Adresse',
+                      // Die Koordinate geht nur mit, wenn sie neu ist (Treffer, Nadel, getippt);
+                      // reiner Text schickt nur die Adresse (Spec `einsatzdaten-bearbeitung`).
+                      // Hat das Feld den gespeicherten Punkt verloren (geleerter Text, LLH-1534),
+                      // geht er als `null` mit: sonst bliebe ein Punkt, den die Maske nicht zeigte.
+                      // „Neu“ und „verloren“ gegenüber dem Stand beim Öffnen, nicht dem Live-Punkt:
+                      // sonst schriebe eine reine Textänderung eine inzwischen fremd verschobene
+                      // Koordinate zurück (Review LLH-1831).
+                      w.koordinate &&
+                        (w.koordinate.lat !== beimOeffnen.koordinate?.lat ||
+                          w.koordinate.lon !== beimOeffnen.koordinate?.lon)
                         ? {
                             einsatzort: leerZuNull(w.text),
-                            einsatzort_lat: null,
-                            einsatzort_lon: null,
+                            einsatzort_lat: w.koordinate.lat,
+                            einsatzort_lon: w.koordinate.lon,
                           }
-                        : { einsatzort: leerZuNull(w.text) },
-                    // Der Altwert in voller Form; es gehen nur die Schlüssel des Patches mit.
-                    {
-                      einsatzort: leerZuNull(beimOeffnen.text),
-                      einsatzort_lat: beimOeffnen.koordinate?.lat ?? null,
-                      einsatzort_lon: beimOeffnen.koordinate?.lon ?? null,
-                    },
-                  )
-                }
-                eingabe={({ feld, popup, value, onChange }) => (
-                  <Ortsfeld
-                    {...feld}
-                    {...popup}
-                    value={value}
-                    onChange={onChange}
-                    suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
-                    suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
-                    karte={{
-                      etikett: 'Einsatzort',
-                      einsatzId,
-                      // Die Peilung zeigt nicht auf den Einsatzort selbst.
-                      exclude: `einsatzort:${einsatzId}`,
-                      umgebung: punkt,
-                    }}
-                  />
-                )}
-              />
-            ),
-          },
-          {
-            etikett: 'Koordinate',
-            vermerk: einsatz.vermerke?.einsatzort_koordinate,
-            wert: (
-              <KoordinatenAngabe
-                vermerk={einsatz.vermerke?.einsatzort_koordinate}
-                einsatzId={einsatzId}
-                lat={einsatz.einsatzort_lat}
-                lon={einsatz.einsatzort_lon}
-                darfSchreiben={darfSchreiben}
-                speichern={speichern}
-              />
-            ),
-          },
-        ]}
-      />
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: token.marginXS,
-          paddingBlock: token.paddingSM,
-          paddingInline: token.padding,
-        }}
-      >
-        <Kartenausschnitt punkt={punkt} etikett="Einsatzort" />
-        {punkt && lagekarteFrei && (
-          // Link in Knopfgestalt wie „Einsatzbericht drucken“: ein nacktes `<a>` erbt keine
-          // Steuerhöhe (`frontend/AGENTS.md`, Handgebautes Bedienziel); Strg/⌘+Klick öffnet einen Tab.
-          <div data-lfh="inspector-sprung">
-            <Button
-              type="link"
-              href={lagekartePfad(einsatzId, { zentrum: punkt })}
-              style={{ paddingInline: 0 }}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                e.preventDefault();
-                navigate(lagekartePfad(einsatzId, { zentrum: punkt }));
-              }}
-            >
-              Auf Lagekarte zeigen <span aria-hidden="true">↗</span>
-            </Button>
-          </div>
-        )}
-      </div>
-    </Paneel>
+                        : !w.koordinate && beimOeffnen.koordinate
+                          ? {
+                              einsatzort: leerZuNull(w.text),
+                              einsatzort_lat: null,
+                              einsatzort_lon: null,
+                            }
+                          : { einsatzort: leerZuNull(w.text) },
+                      // Der Altwert in voller Form; es gehen nur die Schlüssel des Patches mit.
+                      {
+                        einsatzort: leerZuNull(beimOeffnen.text),
+                        einsatzort_lat: beimOeffnen.koordinate?.lat ?? null,
+                        einsatzort_lon: beimOeffnen.koordinate?.lon ?? null,
+                      },
+                    )
+                  }
+                  eingabe={({ feld, popup, value, onChange }) => (
+                    <Ortsfeld
+                      {...feld}
+                      {...popup}
+                      value={value}
+                      onChange={onChange}
+                      suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
+                      suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
+                      karte={{
+                        etikett: 'Einsatzort',
+                        einsatzId,
+                        // Die Peilung zeigt nicht auf den Einsatzort selbst.
+                        exclude: `einsatzort:${einsatzId}`,
+                        umgebung: punkt,
+                      }}
+                    />
+                  )}
+                />
+              ),
+            },
+            {
+              etikett: 'Koordinate',
+              vermerk: einsatz.vermerke?.einsatzort_koordinate,
+              wert: (
+                <KoordinatenAngabe
+                  vermerk={einsatz.vermerke?.einsatzort_koordinate}
+                  einsatzId={einsatzId}
+                  lat={einsatz.einsatzort_lat}
+                  lon={einsatz.einsatzort_lon}
+                  darfSchreiben={darfSchreiben}
+                  speichern={speichern}
+                />
+              ),
+            },
+          ]}
+        />
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: token.marginXS,
+            paddingBlock: token.paddingSM,
+            paddingInline: token.padding,
+          }}
+        >
+          <Kartenausschnitt punkt={punkt} etikett="Einsatzort" />
+          {punkt && lagekarteFrei && (
+            // Link in Knopfgestalt wie „Einsatzbericht drucken“: ein nacktes `<a>` erbt keine
+            // Steuerhöhe (`frontend/AGENTS.md`, Handgebautes Bedienziel); Strg/⌘+Klick öffnet einen Tab.
+            <div data-lfh="inspector-sprung">
+              <Button
+                type="link"
+                href={lagekartePfad(einsatzId, { zentrum: punkt })}
+                style={{ paddingInline: 0 }}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                  e.preventDefault();
+                  navigate(lagekartePfad(einsatzId, { zentrum: punkt }));
+                }}
+              >
+                Auf Lagekarte zeigen <span aria-hidden="true">↗</span>
+              </Button>
+            </div>
+          )}
+        </div>
+      </Paneel>
+    </div>
   );
 }
 
@@ -849,6 +848,9 @@ function FuehrungsstellePaneel({
     onSuccess: () => message.success('Sprechgruppen gespeichert'),
   });
   const fahrzeugQuelle = useFahrzeugeQuelle(einsatzId);
+  // `?paneel=fuehrungsstelle` aus der Startliste im Überblick (LLH-1815): erst, wenn die
+  // Führungsstelle steht (auch als Fehler), sonst fehlte die Zeile „Einsatzleiter“ als Fokusziel.
+  const sprungRef = usePaneelSprung('fuehrungsstelle', !query.isPending);
 
   const fs = query.data;
   const text = (
@@ -885,151 +887,156 @@ function FuehrungsstellePaneel({
 
   return (
     // Kein Außenabstand: der Abstand kommt aus dem Paneel-Raster der Seite (LFH-1170).
-    <Paneel
-      titel="Eigene Führungsstelle"
-      meta={<PaneelVermerk vermerk={juengsterVermerk(fs?.vermerke, FUEHRUNGSSTELLE_FELDER)} />}
-    >
-      <PaneelZustand
-        zustand={query.isPending ? 'laden' : query.isError ? 'fehler' : 'daten'}
+    <div ref={sprungRef} data-lfh="fuehrungsstelle-paneel" style={{ minWidth: 0 }}>
+      <Paneel
         titel="Eigene Führungsstelle"
-        leerText=""
-        onNeuladen={() => void query.refetch()}
+        meta={<PaneelVermerk vermerk={juengsterVermerk(fs?.vermerke, FUEHRUNGSSTELLE_FELDER)} />}
       >
-        {fs && (
-          <Angaben
-            zeilen={[
-              {
-                etikett: 'Einsatzleiter',
-                vermerk: fs.vermerke?.einsatzleiter,
-                wert: (
-                  <EinsatzleiterAngabe
-                    vermerk={fs.vermerke?.einsatzleiter}
-                    einsatzId={einsatzId}
-                    fs={fs}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(einsatzleiter, alt) =>
-                      speichern('Einsatzleiter', { einsatzleiter }, { einsatzleiter: alt })
-                    }
-                  />
-                ),
-              },
-              {
-                etikett: 'Art',
-                vermerk: fs.vermerke?.art,
-                wert: (
-                  <ArtAngabe
-                    art={fs.art}
-                    erfasst={fuehrungsstelleErfasst(fs)}
-                    darfSchreiben={darfSchreiben}
-                    // Ohne Öffnen (Umschalter): der Altwert ist die gezeigte Art.
-                    onSpeichern={(art) => speichern('Art', { art }, { art: fs.art })}
-                  />
-                ),
-              },
-              {
-                etikett: 'Bezeichnung',
-                vermerk: fs.vermerke?.bezeichnung,
-                wert: text(
-                  'Bezeichnung',
-                  fs.bezeichnung,
-                  'bezeichnung',
-                  FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
-                ),
-              },
-              {
-                etikett: 'Standort',
-                vermerk: juengsterVermerk(fs.vermerke, ['standort_adresse', 'standort_koordinate']),
-                wert: (
-                  <StandortAngabe
-                    vermerk={juengsterVermerk(fs.vermerke, [
-                      'standort_adresse',
-                      'standort_koordinate',
-                    ])}
-                    fs={fs}
-                    einsatz={einsatz}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(patch, alt) => speichern('Standort', patch, alt)}
-                  />
-                ),
-              },
-              {
-                etikett: 'Rufname',
-                vermerk: fs.vermerke?.rufname,
-                wert: (
-                  <RufnameAngabe
-                    vermerk={fs.vermerke?.rufname}
-                    rufname={fs.rufname}
-                    fahrzeugIds={fs.fahrzeug_ids}
-                    quelle={fahrzeugQuelle}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(w, { beimOeffnen }) =>
-                      speichern(
-                        'Rufname',
-                        { rufname: leerZuNull(w) },
-                        { rufname: leerZuNull(beimOeffnen) },
-                      )
-                    }
-                  />
-                ),
-              },
-              {
-                etikett: 'Sprechgruppen',
-                wert: (
-                  <SprechgruppenAngabe
-                    sprechgruppen={fs.sprechgruppen}
-                    einsatzId={einsatzId}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(aenderung, onSchritt) =>
-                      sprechgruppen.mutateAsync({ aenderung, onSchritt })
-                    }
-                  />
-                ),
-              },
-              {
-                // Funk (Rufname, Sprechgruppen) und Telefon getrennt (LLH-1134).
-                etikett: 'Telefon und weitere Verbindungen',
-                vermerk: fs.vermerke?.verbindungen,
-                wert: (
-                  <VerbindungenAngabe
-                    vermerk={fs.vermerke?.verbindungen}
-                    etikett="Telefon und weitere Verbindungen"
-                    verbindungen={fs.verbindungen}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(liste, alt) =>
-                      speichern(
-                        'Telefon und weitere Verbindungen',
-                        { verbindungen: liste },
-                        { verbindungen: alt },
-                      )
-                    }
-                  />
-                ),
-              },
-              {
-                etikett: 'Führungsfahrzeuge',
-                vermerk: fs.vermerke?.fahrzeug_ids,
-                wert: (
-                  <FuehrungsfahrzeugeZeile
-                    vermerk={fs.vermerke?.fahrzeug_ids}
-                    art={fs.art}
-                    ids={fs.fahrzeug_ids}
-                    quelle={fahrzeugQuelle}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(ids, { beimOeffnen }) =>
-                      speichern(
-                        'Führungsfahrzeuge',
-                        { fahrzeug_ids: ids },
-                        { fahrzeug_ids: [...beimOeffnen].sort((a, b) => a - b) },
-                      )
-                    }
-                  />
-                ),
-              },
-            ]}
-          />
-        )}
-      </PaneelZustand>
-    </Paneel>
+        <PaneelZustand
+          zustand={query.isPending ? 'laden' : query.isError ? 'fehler' : 'daten'}
+          titel="Eigene Führungsstelle"
+          leerText=""
+          onNeuladen={() => void query.refetch()}
+        >
+          {fs && (
+            <Angaben
+              zeilen={[
+                {
+                  etikett: 'Einsatzleiter',
+                  vermerk: fs.vermerke?.einsatzleiter,
+                  wert: (
+                    <EinsatzleiterAngabe
+                      vermerk={fs.vermerke?.einsatzleiter}
+                      einsatzId={einsatzId}
+                      fs={fs}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(einsatzleiter, alt) =>
+                        speichern('Einsatzleiter', { einsatzleiter }, { einsatzleiter: alt })
+                      }
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Art',
+                  vermerk: fs.vermerke?.art,
+                  wert: (
+                    <ArtAngabe
+                      art={fs.art}
+                      erfasst={fuehrungsstelleErfasst(fs)}
+                      darfSchreiben={darfSchreiben}
+                      // Ohne Öffnen (Umschalter): der Altwert ist die gezeigte Art.
+                      onSpeichern={(art) => speichern('Art', { art }, { art: fs.art })}
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Bezeichnung',
+                  vermerk: fs.vermerke?.bezeichnung,
+                  wert: text(
+                    'Bezeichnung',
+                    fs.bezeichnung,
+                    'bezeichnung',
+                    FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+                  ),
+                },
+                {
+                  etikett: 'Standort',
+                  vermerk: juengsterVermerk(fs.vermerke, [
+                    'standort_adresse',
+                    'standort_koordinate',
+                  ]),
+                  wert: (
+                    <StandortAngabe
+                      vermerk={juengsterVermerk(fs.vermerke, [
+                        'standort_adresse',
+                        'standort_koordinate',
+                      ])}
+                      fs={fs}
+                      einsatz={einsatz}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(patch, alt) => speichern('Standort', patch, alt)}
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Rufname',
+                  vermerk: fs.vermerke?.rufname,
+                  wert: (
+                    <RufnameAngabe
+                      vermerk={fs.vermerke?.rufname}
+                      rufname={fs.rufname}
+                      fahrzeugIds={fs.fahrzeug_ids}
+                      quelle={fahrzeugQuelle}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(w, { beimOeffnen }) =>
+                        speichern(
+                          'Rufname',
+                          { rufname: leerZuNull(w) },
+                          { rufname: leerZuNull(beimOeffnen) },
+                        )
+                      }
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Sprechgruppen',
+                  wert: (
+                    <SprechgruppenAngabe
+                      sprechgruppen={fs.sprechgruppen}
+                      einsatzId={einsatzId}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(aenderung, onSchritt) =>
+                        sprechgruppen.mutateAsync({ aenderung, onSchritt })
+                      }
+                    />
+                  ),
+                },
+                {
+                  // Funk (Rufname, Sprechgruppen) und Telefon getrennt (LLH-1134).
+                  etikett: 'Telefon und weitere Verbindungen',
+                  vermerk: fs.vermerke?.verbindungen,
+                  wert: (
+                    <VerbindungenAngabe
+                      vermerk={fs.vermerke?.verbindungen}
+                      etikett="Telefon und weitere Verbindungen"
+                      verbindungen={fs.verbindungen}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(liste, alt) =>
+                        speichern(
+                          'Telefon und weitere Verbindungen',
+                          { verbindungen: liste },
+                          { verbindungen: alt },
+                        )
+                      }
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Führungsfahrzeuge',
+                  vermerk: fs.vermerke?.fahrzeug_ids,
+                  wert: (
+                    <FuehrungsfahrzeugeZeile
+                      vermerk={fs.vermerke?.fahrzeug_ids}
+                      art={fs.art}
+                      ids={fs.fahrzeug_ids}
+                      quelle={fahrzeugQuelle}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(ids, { beimOeffnen }) =>
+                        speichern(
+                          'Führungsfahrzeuge',
+                          { fahrzeug_ids: ids },
+                          { fahrzeug_ids: [...beimOeffnen].sort((a, b) => a - b) },
+                        )
+                      }
+                    />
+                  ),
+                },
+              ]}
+            />
+          )}
+        </PaneelZustand>
+      </Paneel>
+    </div>
   );
 }
 
@@ -1830,11 +1837,41 @@ export default function EinsatzdatenPage() {
       )}
 
       {/* Zuletzt und nicht im Kopf (LFH-960): Unumkehrbares für den ganzen Einsatz steht nicht im
-          Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“). */}
-      {/* `key`: ein Einsatzwechsel räumt den Grund, eine spätere Antwort meldet nicht hier. */}
-      {darfLeiten && <EinsatzAbschluss key={einsatzId} einsatzId={einsatzId} />}
+          Kopf einer Arbeitsseite (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“).
+          Am aktiven Einsatz nur für die Einsatzleitung, am abgeschlossenen für jeden Leser, mit dem
+          Wiederöffnen binnen 24 Stunden (LLH-1814). */}
+      {/* `key`: ein Einsatzwechsel räumt offene Dialoge und ihre Gründe; eine spätere Antwort meldet
+          nicht hier. */}
+      <EinsatzAbschlussPaneel key={einsatzId} einsatz={einsatz} benutzer={benutzer} />
     </EinsatzSeite>
   );
+}
+
+/**
+ * Sprungauftrag `?paneel=<name>` (apply-then-clean, LLH-1850; Startliste LLH-1815, design.md D5):
+ * sobald das Paneel `bereit` ist, einmal zu ihm rollen, den Fokus auf seine erste bedienbare
+ * Erfassung setzen (ohne Schreibrecht ist keine da) und den Auftrag aus der Adresse nehmen. Die
+ * Hülle mit dem Ref ist ein Block mit eigener Box: `display: contents` hätte nichts zum Rollen.
+ */
+function usePaneelSprung(
+  paneel: EinsatzdatenPaneel,
+  bereit: boolean,
+  { fokus = true }: { fokus?: boolean } = {},
+) {
+  const [params, setParams] = useSearchParams();
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!bereit || params.get('paneel') !== paneel) return;
+    const ziel = ref.current;
+    ziel?.scrollIntoView?.({ block: 'start' });
+    if (fokus) {
+      ziel?.querySelector<HTMLElement>('button:not([disabled])')?.focus({ preventScroll: true });
+    }
+    const rest = new URLSearchParams(params);
+    rest.delete('paneel');
+    setParams(rest, { replace: true });
+  }, [bereit, fokus, paneel, params, setParams]);
+  return ref;
 }
 
 /** Paneel „Führung“ mit eigener Abfrage (Akte und Verlauf, live über `einsatz`). */
@@ -1857,18 +1894,8 @@ function FuehrungAbschnitt({
       query.state.data?.fuehrer_beendet_at ? SPIEGEL_KOPF_ABRUF_MS : false,
   });
   // `?paneel=fuehrung` (Hinweisband „Führung zurückholen“, LLH-1850): einmal zum Paneel rollen,
-  // sobald es steht (auch als Fehlerzustand), dann den Auftrag aus der Adresse nehmen
-  // (apply-then-clean).
-  const [params, setParams] = useSearchParams();
-  const targetRef = useRef<HTMLDivElement>(null);
-  const isPending = q.isPending;
-  useEffect(() => {
-    if (isPending || params.get('paneel') !== 'fuehrung') return;
-    targetRef.current?.scrollIntoView?.({ block: 'start' });
-    const rest = new URLSearchParams(params);
-    rest.delete('paneel');
-    setParams(rest, { replace: true });
-  }, [isPending, params, setParams]);
+  // sobald es steht (auch als Fehlerzustand). Kein Fokus: das Band nennt den Knopf selbst.
+  const targetRef = usePaneelSprung('fuehrung', !q.isPending, { fokus: false });
   return (
     <div ref={targetRef} data-lfh="fuehrung-abschnitt">
       {q.data ? (
@@ -1892,52 +1919,5 @@ function FuehrungAbschnitt({
         </Paneel>
       )}
     </div>
-  );
-}
-
-/** Folge des Abschlusses — steht in der Rückfrage, nicht als Satz neben dem Knopf. */
-const ABSCHLIESSEN_FOLGE = 'Danach sind keine neuen Einträge oder Berichtigungen mehr möglich.';
-
-/**
- * Einsatzabschluss (LFH-960, Spec `bedien-wortlaut`): aktiv → abgeschlossen, ohne Rückweg im
- * Frontend. Rückfrage als `Popconfirm`, deren roter Knopf die Handlung nennt. Eine Ablehnung steht
- * am Paneel bis zum nächsten Abschließen, kein Toast (LFH-1077).
- */
-function EinsatzAbschluss({ einsatzId }: { einsatzId: number }) {
-  const { token } = useRollen();
-  const { message } = App.useApp();
-  const qc = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: () => schliesseEinsatzAb(einsatzId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
-      qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
-      message.success('Einsatz abgeschlossen');
-    },
-  });
-  return (
-    <Paneel titel="Einsatzabschluss" koerperPolster style={{ marginTop: token.marginLG }}>
-      <Popconfirm
-        title="Einsatz abschließen?"
-        description={ABSCHLIESSEN_FOLGE}
-        okText="Einsatz endgültig abschließen"
-        cancelText="Abbrechen"
-        okButtonProps={{ danger: true }}
-        onConfirm={() => mutation.mutate()}
-      >
-        <Button danger loading={mutation.isPending}>
-          Einsatz abschließen
-        </Button>
-      </Popconfirm>
-      {mutation.error != null && (
-        <div style={{ marginTop: token.marginSM }}>
-          <SpeicherFehler
-            fehler={mutation.error}
-            titel="Nicht abgeschlossen"
-            fallback="Abschließen fehlgeschlagen"
-          />
-        </div>
-      )}
-    </Paneel>
   );
 }

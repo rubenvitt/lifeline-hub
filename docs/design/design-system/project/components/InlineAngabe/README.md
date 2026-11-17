@@ -1,11 +1,11 @@
 # InlineAngabe (geschlossen, leer, offen)
 
-Inline bearbeitbare Angabe mit BELIEBIGER Eingabe (LFH-472) — Text, Textfeld, Zahl, Auswahl,
+Inline bearbeitbare Angabe mit BELIEBIGER Eingabe — Text, Textfeld, Zahl, Auswahl,
 Datum/Uhrzeit —, optional als Pflichtangabe.
 
 ── ABGRENZUNG ZU `BemerkungZelle` ─────────────────────────────────────────────────────
 
-`BemerkungZelle` (LFH-369) trägt optionale Freitexte in Listen und steht auf antds
+`BemerkungZelle` trägt optionale Freitexte in Listen und steht auf antds
 `Typography.Text editable`, das nur Text kann. Hier braucht es Zeiteingabe, Select und
 InputNumber und eine Pflichtangabe, die leer abgelehnt wird. Gemeinsam sind die Anzeige (Wert
 als Knopf, `wertKnopfStil`, Platzhalter in `bedienText`) und die Fokusrückgabe
@@ -16,8 +16,7 @@ als Knopf, `wertKnopfStil`, Platzhalter in `bedienText`) und die Fokusrückgabe
 - **Der Auslöser nennt die Angabe** („Leitstellen-Nr. bearbeiten"); der Wert ist die
   Beschreibung (`aria-describedby`), kein `aria-label`, das den Inhalt verdeckte.
 - **Ohne Schreibrecht keine Aufforderung**: nur der Wert, leer als „—".
-- **In einer Liste trägt `kennung` die Zeile in jeden Namen** („Funktion zu Anna bearbeiten“,
-  LLH-1067), wie bei `BemerkungZelle`; der sichtbare Text bleibt „Funktion eintragen“.
+- **In einer Liste trägt `kennung` die Zeile in jeden Namen** („Funktion zu Anna bearbeiten“), wie bei `BemerkungZelle`; der sichtbare Text bleibt „Funktion eintragen“.
 - **Fokus fällt nicht auf `<body>`**, auch wenn der neue Wert erst eine Runde später kommt.
 - Die `keyCode`-Falle von antds `Editable` gilt NICHT: hier sendet das native `<form>` (Enter),
   Escape läuft über `key`.
@@ -28,7 +27,7 @@ als Knopf, `wertKnopfStil`, Platzhalter in `bedienText`) und die Fokusrückgabe
 darin verlässt die Eingabe, und ein Blur-Speichern schriebe einen halben Zeitpunkt. Gespeichert
 wird nur ausdrücklich: Enter, Strg/⌘+Enter im Textfeld, oder „Speichern".
 
-── FELDWEISE BEARBEITUNG IN EINER ANSICHT (LLH-1103) ──────────────────────────────────
+── FELDWEISE BEARBEITUNG IN EINER ANSICHT ──────────────────────────────────
 
 Für die Personendaten (Change `f8218h1i-personendaten-feldweise`, design.md D3) kamen vier
 optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
@@ -41,18 +40,16 @@ optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
   nicht, bis die Sperre fällt.
 - `onEntwurf`: meldet nur die Wechsel zwischen „unverändert“ und „geändert“ (auch beim
   Aushängen), für den Merker `components/offeneBearbeitung.tsx`. Ohne `onEntwurf` meldet sich
-  die Angabe selbst beim Merker der Seite an (LLH-1468): unter einem `OffeneBearbeitungProvider`
+  die Angabe selbst beim Merker der Seite an: unter einem `OffeneBearbeitungProvider`
   fragt ein geänderter Entwurf vor dem Verlassen und vor einem Wechsel in der Seite nach, ohne
   Provider bleibt es still. Gesperrt, solange ein anderes Feld einen Entwurf hat, ist sie dabei
-  nur, wenn die Seite den Grund an EINER Stelle zeigt (`OffeneBearbeitungGrundZeile`, LLH-1480,
-  Fahrzeuge und Material); sie verweist dann darauf, statt ihn unter jede Zelle zu schreiben. Ein
+  nur, wenn die Seite den Grund an EINER Stelle zeigt (`OffeneBearbeitungGrundZeile`, Fahrzeuge und Material); sie verweist dann darauf, statt ihn unter jede Zelle zu schreiben. Ein
   eigenes `gesperrt` geht vor. Wer `onEntwurf` reicht, verdrahtet die Sperre selbst
   (`useOffeneBearbeitung`, Vorbild Personendaten).
 - `onOeffnen`: jedes Öffnen; der Aufrufer hält dort den Serverstand für den Feld-CAS fest.
 - `onSchliessen`: jedes Schließen einer offenen Bearbeitung (gespeichert, abgebrochen, von der
   Sperre geschlossen, ausgehängt). Mit `onOeffnen` hält der Aufrufer ein offenes Feld an seinem
-  Ort, auch wenn ein neuer Stand es woanders einordnete (Spec `personendaten-bearbeiten`,
-  „Eine offene Bearbeitung zur Zeit“).
+  Ort, auch wenn ein neuer Stand es woanders einordnete.
 - Erfüllt `onSpeichern` mit `OFFEN_LASSEN`, bleibt die Eingabe mit dem Entwurf offen, ohne
   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
 
@@ -68,7 +65,7 @@ Change `nvhnqynd-konflikt-und-aenderungsvermerk`, design.md D5, Spec `formularse
 - Weicht der Live-`wert` vom eingefrorenen ab, steht im offenen Feld „Inzwischen geändert[ von
   X, Zeit]: <Anzeige>“ (`role="status"`); `vermerk` liefert Wer und Wann. Der Entwurf bleibt.
 
-── ANZEIGE MIT EIGENEN BEDIENZIELEN (LLH-1426) ───────────────────────────────────────
+── ANZEIGE MIT EIGENEN BEDIENZIELEN ───────────────────────────────────────
 
 Der Wertknopf umschließt die Anzeige. Trägt sie selbst Ziele (`tel:`/`mailto:` der
 Verbindungen), stünde ein Link in einem Button: der Klick auf die Nummer öffnete die Bearbeitung

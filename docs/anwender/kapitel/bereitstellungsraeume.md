@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 260
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, src/bereitstellungsraum/stamm_treffer.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, frontend/src/pages/bereitstellungsraum/VerlegenDialog.tsx, frontend/src/pages/bereitstellungsraum/verlegenKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenModal.tsx, frontend/src/components/AnlegenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/repo.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, src/bereitstellungsraum/stamm_treffer.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, frontend/src/pages/bereitstellungsraum/VerlegenDialog.tsx, frontend/src/pages/bereitstellungsraum/verlegenKern.ts, src/bereitstellungsraum/abruf.rs, src/nachforderung/erwartet.rs, frontend/src/pages/bereitstellungsraum/BrRaumdaten.tsx, frontend/src/pages/bereitstellungsraum/brPatch.ts]
 ---
 
 ## Überblick
@@ -45,12 +45,12 @@ Auftrag ab und lösen Räume wieder auf. Die Bedienung am gekoppelten Tablet ein
 Für Einsatzleitung und Führungspersonal:
 
 1. In der Übersicht „Neu“ wählen, oder im Seitenkopf eines Raums den Namen öffnen und „+ Neuer BR“
-   wählen.
+   wählen. Der Dialog „Bereitstellungsraum anlegen“ öffnet sich.
 2. „Bezeichnung“ eingeben, bei Bedarf „Standort (optional)“ und „Notiz (optional)“. Den Standort
    mit Enter oder „Ort suchen“ suchen und einen Treffer wählen, dann ist der Raum gleich verortet;
    ohne Treffer bleibt er freier Text.
 
-   ![Seitenleiste „Bereitstellungsraum anlegen“ mit Bezeichnung „BR Süd“, Standort und Notiz](../bilder/bereitstellungsraeume/anlegen.png)
+   ![Dialog „Bereitstellungsraum anlegen“ mit Bezeichnung „BR Süd“, Standort und Notiz](../bilder/bereitstellungsraeume/anlegen.png)
 
 3. „Anlegen“ wählen. Die App öffnet den neuen Raum; er steht auf „geplant“.
 4. Ist der Raum eingerichtet, „In Betrieb nehmen“ wählen. Er steht dann auf „aktiv“.
@@ -59,21 +59,26 @@ Für Einsatzleitung und Führungspersonal:
 
 Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv ist:
 
-1. Den Raum öffnen und bei „Raumdaten“ „Bearbeiten“ wählen.
-2. Im Dialog „Bereitstellungsraum bearbeiten“ „Bezeichnung“, „Standort (optional)“ oder
-   „Notiz (optional)“ ändern. Ein geleertes Feld löscht die Angabe; die Bezeichnung bleibt Pflicht.
-   Eine Korrektur am Text des Standorts behält den Punkt, ein neuer Treffer versetzt ihn.
+1. Den Raum öffnen und im Kopf der „Raumdaten“ „Bearbeiten“ wählen. Die Raumdaten werden an Ort
+   und Stelle zu Eingabefeldern.
+2. „Bezeichnung“, „Standort“ oder „Notiz“ ändern. Ein geleertes Feld löscht die Angabe; die
+   Bezeichnung bleibt Pflicht. Eine Korrektur am Text des Standorts behält den Punkt, ein neuer
+   Treffer versetzt ihn.
 
-   ![Dialog „Bereitstellungsraum bearbeiten“ mit Bezeichnung „Parkplatz Stadion Nord“, Standort und Notiz](../bilder/bereitstellungsraeume/bearbeiten.png)
+   ![Paneel „Raumdaten“ beim Bearbeiten mit Bezeichnung „Parkplatz Stadion Nord“, Standort, Notiz, „Speichern“ und „Abbrechen“](../bilder/bereitstellungsraeume/bearbeiten.png)
 
-3. „Speichern“ wählen. Die neue Bezeichnung steht im Seitenkopf, im Umschalter und in der
-   Übersicht, Standort und Notiz stehen unter „Raumdaten“; die Übersicht zeigt auch den Standort.
+3. „Speichern“ wählen, oder Enter; Escape oder „Abbrechen“ verwirft die Eingabe. Die neue
+   Bezeichnung steht im Seitenkopf, im Umschalter und in der Übersicht, Standort und Notiz stehen
+   unter „Raumdaten“; die Übersicht zeigt auch den Standort.
+
+Hat jemand anderes den Raum inzwischen geändert, fragt die App „Zwischenzeitlich geändert“:
+„Meine Änderung übernehmen“ speichert trotzdem, „Verwerfen und neu laden“ zeigt den neuen Stand.
 
 ### Einen Bereitstellungsraum auf der Lagekarte verorten
 
 Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv ist:
 
-1. Den Raum öffnen und bei „Raumdaten“ „Auf Karte verorten“ wählen. Steht der Raum schon auf der
+1. Den Raum öffnen und im Kopf der „Raumdaten“ „Auf Karte verorten“ wählen. Steht der Raum schon auf der
    Karte, heißt der Knopf „Auf Karte versetzen“.
 2. Die Lagekarte öffnet sich zum Platzieren dieses Raums. Auf die Stelle der Karte tippen, an der
    der Raum liegt. Die Karte meldet die Bezeichnung mit „verortet“, etwa „Parkplatz Stadion Nord
@@ -141,10 +146,13 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
    Die Stärke an der Zeile einer Einheit nennt die Einheit samt ihren Untereinheiten im selben
    Raum. Anders als „Eintreffen buchen“ trägt „zuweisen“ kein Eintreffen in die Zeitachse ein.
 
-   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit „Auf Karte verorten“ und „Bearbeiten“ an den Raumdaten: oben unter „Abgerufen“ die Betreuungsgruppe mit „abgerufen … → Betreuung · Auftrag Nr. …“, „Ausrücken buchen“ und „Abruf zurücknehmen“, darunter unter „Bereitgestellte Einheiten“ die Rettungsstaffel mit ihren Fahrzeugen, „seit … · 48 min“ und „Abrufen“; Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und die Seitenleiste „Kräfte ohne BR“ mit aufgeklapptem „Im Einsatz“](../bilder/bereitstellungsraeume/raum.png)
+   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit „Auf Karte verorten“ und „Bearbeiten“ im Kopf der Raumdaten: oben unter „Abgerufen“ die Betreuungsgruppe mit „abgerufen … → Betreuung · Auftrag Nr. …“, „Ausrücken buchen“ und „Abruf zurücknehmen“, darunter unter „Bereitgestellte Einheiten“ die Rettungsstaffel mit ihren Fahrzeugen, „seit … · 48 min“ und „Abrufen“; Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und die Seitenleiste „Kräfte ohne BR“ mit aufgeklapptem „Im Einsatz“](../bilder/bereitstellungsraeume/raum.png)
 
 4. Ist eine Kraft irrtümlich gebucht oder ohne Abruf gegangen, bei ihr das Aktionsmenü öffnen und
-   „Austragen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
+   „Austragen“ wählen. Sie steht wieder unter „Kräfte ohne BR“. War es ein Fehltipp, holt
+   „Rückgängig“ im Hinweis sie mit ihrer bisherigen Wartezeit zurück, solange sie nicht weiter
+   gebucht ist und höchstens zehn Minuten vergangen sind. Der Verlauf zeigt dann „Austritt“ und
+   „Austragen zurückgenommen“. Das Ausrücken nach einem Abruf lässt sich nicht zurücknehmen.
 
 ### Eine Kraft abrufen
 
@@ -231,7 +239,8 @@ geplanten Raum:
    etwa „Danach hier 20, Staffel A 30“.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
-4. Mit „Lösen“ einen Posten aus dem Raum lösen. Er bleibt ohne Ort im Einsatz. Die Zeile bleibt als
+4. Mit „Lösen“ einen Posten aus dem Raum lösen; bei einem Verbrauchsgut mit Rest steht es neben
+   „Ausgeben“ im Menü „⋮“ der Zeile. Er bleibt ohne Ort im Einsatz. Die Zeile bleibt als
    „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein anderer
    Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den Posten zurück.
 

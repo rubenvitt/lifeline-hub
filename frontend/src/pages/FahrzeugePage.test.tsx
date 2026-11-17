@@ -1,7 +1,7 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 import { AdresseSteht } from '../test/adresseSteht';
@@ -649,6 +649,122 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('zwei schnelle Tipps auf „Vom Fahrzeug lösen“: ein DELETE, an der Stelle steht „Gelöst“ (LLH-1924)', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', async ({ params }) => {
+        aufrufe.push(`DELETE ${params.epId}`);
+        await delay(20);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+      person({ id: 101, name: 'Ben Crew', fahrzeug_id: 10 }),
+    ]);
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    const knopf = await within(block).findByRole('button', {
+      name: 'Anna Crew vom Fahrzeug lösen',
+    });
+    await userEvent.click(knopf);
+    await userEvent.click(knopf);
+    const marke = await within(block).findByRole('button', { name: 'Anna Crew gelöst' });
+    await userEvent.click(marke);
+    await userEvent.click(knopf);
+    expect(aufrufe).toEqual(['DELETE 100']);
+    expect(marke).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      within(block).getByRole('button', { name: 'Ben Crew vom Fahrzeug lösen' }),
+    ).toBeInTheDocument();
+    // „Rückgängig“ steht in der Zeile, aber nicht an der Stelle des Knopfs.
+    const rueck = within(block).getByRole('button', {
+      name: 'Rückgängig: Anna Crew zurück auf das Fahrzeug',
+    });
+    expect(rueck.parentElement).not.toBe(marke.parentElement);
+  });
+
+  it('„Rückgängig“ in der gehaltenen Besatzungszeile; Ablehnung steht an der Zeile (LLH-1924)', async () => {
+    server.use(
+      http.delete(
+        '/api/einsaetze/7/fahrzeuge/10/besatzung/:epId',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', () =>
+        HttpResponse.json({ error: 'Anna Crew sitzt inzwischen auf «83-2»' }, { status: 409 }),
+      ),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+    ]);
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    await userEvent.click(
+      await within(block).findByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
+    await userEvent.click(
+      await within(block).findByRole('button', {
+        name: 'Rückgängig: Anna Crew zurück auf das Fahrzeug',
+      }),
+    );
+    expect(
+      await within(block).findByText('Anna Crew sitzt inzwischen auf «83-2»'),
+    ).toBeInTheDocument();
+  });
+
+  it('fällt die gehaltene Zeile, steht die Ablehnung ihres Rückgängig oben (Review LLH-1924)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let gesetzt = true;
+    server.use(
+      http.delete('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', () => {
+        gesetzt = false;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', () =>
+        HttpResponse.json({ error: 'Anna Crew sitzt inzwischen auf «83-2»' }, { status: 409 }),
+      ),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+    ]);
+    server.use(
+      http.get('/api/einsaetze/7/personal', () =>
+        HttpResponse.json([
+          person({ id: 100, name: 'Anna Crew', fahrzeug_id: gesetzt ? 10 : null }),
+        ]),
+      ),
+    );
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    await user.click(
+      await within(block).findByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
+    expect(await screen.findByText('Anna Crew vom Fahrzeug gelöst')).toBeInTheDocument();
+    await user.click(
+      await within(block).findByRole('button', {
+        name: 'Rückgängig: Anna Crew zurück auf das Fahrzeug',
+      }),
+    );
+    expect(
+      await within(block).findByText('Anna Crew sitzt inzwischen auf «83-2»'),
+    ).toBeInTheDocument();
+    // Zeiger und Fokus verlassen den Block, die Haltezeit läuft ab: die Zeile fällt, der Grund
+    // steht im Seitenhinweis.
+    await user.pointer({ target: document.body });
+    act(() => (document.activeElement as HTMLElement | null)?.blur());
+    act(() => vi.advanceTimersByTime(10_000));
+    await waitFor(() =>
+      expect(within(block).queryByRole('button', { name: 'Anna Crew gelöst' })).toBeNull(),
+    );
+    expect(screen.getByText('Anna Crew sitzt inzwischen auf «83-2»')).toBeInTheDocument();
+    expect(screen.getByText('Nicht zurückgenommen')).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it('nach „Vom Fahrzeug lösen“ setzt „Rückgängig“ die Person wieder auf das Fahrzeug (LLH-1722)', async () => {
     const aufrufe: string[] = [];
     server.use(
@@ -656,8 +772,8 @@ describe('FahrzeugePage', () => {
         aufrufe.push(`DELETE ${params.epId}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params }) => {
-        aufrufe.push(`PUT ${params.epId}`);
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params, request }) => {
+        aufrufe.push(`PUT ${params.epId}${new URL(request.url).search}`);
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -674,7 +790,8 @@ describe('FahrzeugePage', () => {
       '.ant-message-notice',
     ) as HTMLElement;
     await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(aufrufe).toEqual(['DELETE 100', 'PUT 100']));
+    // Nimmt sie keinem anderen Fahrzeug weg (LLH-1924).
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 100', 'PUT 100?nur_wenn_frei=1']));
   });
 
   it('markiert eine Besatzung aus anderer Einheit als das Fahrzeug', async () => {
@@ -869,7 +986,8 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ }));
+    // Ohne eigene Wahl kein Zähler im Namen (LLH-1790).
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
@@ -889,7 +1007,8 @@ describe('FahrzeugePage', () => {
     setzeViewportBreite(1600);
     const { unmount } = render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    // Voreinstellung (Bemerkung) und Breite sind Vorgabe: kein Zähler ohne eigene Wahl (LLH-1790).
+    expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Kennzeichen' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Typ' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Abschnitt' })).toBeInTheDocument();
@@ -898,12 +1017,105 @@ describe('FahrzeugePage', () => {
     setzeViewportBreite(1024);
     render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Abschnitt' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Seit' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Typ' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Kennzeichen' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Träger' })).toBeNull();
+  });
+
+  it('eine gemerkte Wahl mit der voreingestellten Bemerkung heißt nach dem Neuladen „Spalten“ (LLH-1790)', async () => {
+    // Gemerkt wie nach „Status ab- und wieder anwählen“: nur die Voreinstellung.
+    localStorage.setItem('lfh:spalten:fahrzeuge', JSON.stringify({ aus: ['bemerkung'], an: [] }));
+    try {
+      setzeViewportBreite(1440);
+      render(einsatz());
+      await screen.findByText('Florian 1');
+      expect(screen.queryByRole('columnheader', { name: /^Bemerkung/ })).toBeNull();
+      expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
+    } finally {
+      localStorage.removeItem('lfh:spalten:fahrzeuge');
+    }
+  });
+
+  describe('Typ unter dem Funkrufnamen (LLH-1790, Spec fahrzeug-bearbeitung)', () => {
+    const kennungsZelle = (container: HTMLElement) =>
+      container.querySelector<HTMLElement>('[data-row-key="10"] td')!;
+
+    it('bei 1440 px steht der Typ unter dem Funkrufnamen, die Spalte fehlt', async () => {
+      setzeViewportBreite(1440);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      expect(screen.queryByRole('columnheader', { name: /^Typ/ })).toBeNull();
+      expect(within(kennungsZelle(container)).getByText('LF 20')).toBeInTheDocument();
+    });
+
+    it('ab xxl steht er in der Spalte und nicht doppelt', async () => {
+      setzeViewportBreite(1920);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      expect(screen.getByRole('columnheader', { name: /^Typ/ })).toBeInTheDocument();
+      expect(within(kennungsZelle(container)).queryByText('LF 20')).toBeNull();
+      expect(screen.getAllByText('LF 20')).toHaveLength(1);
+    });
+
+    it('in der Karte am Handy auch mit Freigabe Einheiten', async () => {
+      setzeViewportBreite(390);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      const karte = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]')!;
+      expect(within(karte).getAllByText('LF 20')).toHaveLength(1);
+    });
+
+    it('unter xxl von Hand eingeblendet: der Typ steht in der Spalte und nicht doppelt (LLH-1790)', async () => {
+      setzeViewportBreite(1440);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Typ' }));
+      expect(await screen.findByRole('columnheader', { name: /^Typ/ })).toBeInTheDocument();
+      expect(within(kennungsZelle(container)).queryByText('LF 20')).toBeNull();
+    });
+
+    it('ab xxl von Hand abgewählt: der Typ steht wieder unter dem Funkrufnamen', async () => {
+      setzeViewportBreite(1920);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Typ' }));
+      await waitFor(() => expect(screen.queryByRole('columnheader', { name: /^Typ/ })).toBeNull());
+      expect(within(kennungsZelle(container)).getByText('LF 20')).toBeInTheDocument();
+    });
+
+    it('die Suche trifft den Typ auch, wenn er nur unter dem Funkrufnamen steht', async () => {
+      setzeViewportBreite(1440);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      const suche = screen.getByRole('searchbox');
+      await userEvent.type(suche, 'LF 20');
+      await waitFor(() =>
+        expect(container.querySelectorAll('tr.ant-table-row[data-row-key]')).toHaveLength(1),
+      );
+      await userEvent.clear(suche);
+      await userEvent.type(suche, 'HLF');
+      await waitFor(() =>
+        expect(container.querySelectorAll('tr.ant-table-row[data-row-key]')).toHaveLength(0),
+      );
+    });
+
+    it('ohne Freigabe Einheiten steht der Typ in der Karte einmal, nicht zusätzlich als Feld', async () => {
+      setzeViewportBreite(390);
+      server.use(
+        http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+          HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+        ),
+      );
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      const karte = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]')!;
+      await waitFor(() => expect(within(karte).getAllByText('LF 20')).toHaveLength(1));
+    });
   });
 
   describe('unter md', () => {
@@ -1095,7 +1307,11 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     await userEvent.click(within(zeile).getByRole('button', { name: `${FELD} eintragen` }));
     await waehle(FELD, 'Zug 1');
     await userEvent.click(screen.getByRole('button', { name: `${FELD} speichern` }));
-    expect(await within(zeile).findByText(/Einheit ist aufgelöst/)).toBeInTheDocument();
+    // In der Tabelle schwebt die Bearbeitung an der Zelle (LLH-1795): sie bleibt mit dem Entwurf
+    // offen, und der Grund steht in ihr, nicht im Zellfluss.
+    expect(await screen.findByText(/Einheit ist aufgelöst/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `${FELD} speichern` })).toBeInTheDocument();
+    expect(within(zeile).queryByText(/Einheit ist aufgelöst/)).toBeNull();
   });
 
   it('Beobachter sieht die Einheit als Text', async () => {

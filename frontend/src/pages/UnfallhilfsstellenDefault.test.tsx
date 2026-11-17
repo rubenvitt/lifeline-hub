@@ -92,7 +92,7 @@ describe('UnfallhilfsstellenDefault', () => {
     expect(await screen.findByText('DETAIL-7')).toBeInTheDocument();
   });
 
-  it('zeigt bei 0 UHS einen Leerzustand, dessen CTA den Anlegen-Drawer öffnet', async () => {
+  it('zeigt bei 0 UHS einen Leerzustand, dessen CTA den Anlegen-Dialog öffnet', async () => {
     server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])));
     renderDefault();
     await userEvent.click(await screen.findByRole('button', { name: 'Erste UHS anlegen' }));

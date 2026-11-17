@@ -3,8 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
-import { dichten } from '../../theme/tokens';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dichten, farbenDunkel, farbenHell } from '../../theme/tokens';
+import { kontrast } from '../../test/farbmass';
+import { zielEinzug } from './zielEinzug';
+import { Button, Form, type FormInstance } from 'antd';
 import Segmentleiste, {
+  SegmentFeld,
   SegmentUmschalter,
   naechsterIndex,
   segmentStil,
@@ -31,6 +38,10 @@ function Gesteuert({ rolle }: { rolle?: 'radiogroup' | 'tablist' }) {
   );
 }
 
+const sprache = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../theme/sprache.css'),
+  'utf-8',
+);
 describe('Segmentleiste', () => {
   it('ist eine benannte Radiogruppe mit genau einem gewählten Segment', () => {
     renderMitProviders(<Gesteuert />);
@@ -165,6 +176,19 @@ describe('Segmentleiste', () => {
     expect(screen.getByRole('radio', { name: 'Meldung' }).style.boxShadow).toBe('');
   });
 
+  it('gewählt trägt unten eine 2-px-Bedienkante, die nachts und am Tag ≥ 3 : 1 hält (eon26eat D6)', () => {
+    // Spec `farbrollen-kontrast`, „Das gewählte Segment trägt eine Bedienkante“: nachts hob sich
+    // das gewählte Segment nur mit 1,07 : 1 über die Fläche ab. Die Kante steht in der Klasse,
+    // eine Option mit eigener `kante` (ETB-Typ) überschreibt sie inline (Test oben).
+    const regel = sprache.match(/\.lfh-segment--aktiv\s*\{([^}]*)\}/);
+    expect(regel, 'Regel `.lfh-segment--aktiv` fehlt in sprache.css').not.toBeNull();
+    expect(regel![1]).toMatch(/box-shadow:\s*inset 0 -2px 0 var\(--lfh-bedien\);/);
+    expect(regel![1]).toMatch(/background:\s*var\(--lfh-flaeche-3\);/);
+    for (const farben of [farbenHell, farbenDunkel]) {
+      expect(kontrast(farben.bedien, farben.flaeche3)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('volle Breite (LLH-1642): Leiste als Block, jede Zelle wächst gleich; ohne bleibt sie inline', () => {
     const { rerender } = renderMitProviders(
       <Segmentleiste
@@ -218,6 +242,8 @@ describe('Segmentleiste', () => {
 
   /** Gate 3: ZWEI Angaben an einem handgebauten Bedienziel, Böden als Literale. */
   it('Bedienziel: Boden 30 / 48 / 72 aus controlHeight, plus Polsterung, die mitwächst', () => {
+    // Die Polsterung kommt aus dem Token der Stufe (`paddingSM` abzüglich des Zieleinzugs, im
+    // Raster 8 px in jeder Stufe); was mitwächst, ist der Platz je Segment samt Einzug.
     const t = (s: keyof typeof dichten) => ({
       controlHeight: dichten[s].zeilenhoehe,
       paddingSM: dichten[s].abstand.sm,
@@ -226,9 +252,12 @@ describe('Segmentleiste', () => {
     expect(segmentStil(t('kompakt')).minHeight).toBe(30);
     expect(segmentStil(t('komfortabel')).minHeight).toBe(48);
     expect(segmentStil(t('handschuh')).minHeight).toBe(72);
-    expect(segmentStil(t('kompakt')).paddingInline).not.toBe(
-      segmentStil(t('handschuh')).paddingInline,
-    );
+    for (const s of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      expect(segmentStil(t(s)).paddingInline, s).toBe(t(s).paddingSM - zielEinzug(t(s)));
+    }
+    const platz = (s: keyof typeof dichten) =>
+      Number(segmentStil(t(s)).paddingInline) + zielEinzug(t(s));
+    expect(platz('kompakt')).toBeLessThan(platz('handschuh'));
   });
 
   /**
@@ -376,5 +405,104 @@ describe('SegmentUmschalter (LLH-1065)', () => {
     expect(radios[0]).toHaveAttribute('tabindex', '0');
     expect(radios[1]).toHaveAttribute('tabindex', '-1');
     expect(radios[0]).not.toHaveClass('lfh-segment--aktiv');
+  });
+});
+
+/**
+ * `SegmentFeld` (Spec `bedien-umschalten`, „Kurze Wahl im Formular über die Segmentleiste als
+ * Feld“): die Segmentleiste in antds Formularschnittstelle (`value`/`onChange`), statt einer
+ * Knopfgruppe aus `Radio.Group optionType="button"`.
+ */
+describe('SegmentFeld', () => {
+  const ARTEN: SegmentOption<string>[] = [
+    { wert: 'telefon', label: 'Telefon' },
+    { wert: 'funk', label: 'Funk' },
+  ];
+
+  function Formular({ onFinish }: { onFinish: (werte: { art?: string }) => void }) {
+    return (
+      <Form onFinish={onFinish}>
+        <Form.Item name="art" label="Art" rules={[{ required: true, message: 'Art wählen' }]}>
+          <SegmentFeld optionen={ARTEN} beschriftung="Art" />
+        </Form.Item>
+        <Button htmlType="submit">Speichern</Button>
+      </Form>
+    );
+  }
+
+  it('übermittelt den gewählten Wert mit dem Formular', async () => {
+    const onFinish = vi.fn();
+    renderMitProviders(<Formular onFinish={onFinish} />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Funk' }));
+    expect(screen.getByRole('radio', { name: 'Funk' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(onFinish).toHaveBeenCalledWith({ art: 'funk' }));
+  });
+
+  it('ohne Wert ist nichts gewählt, die Gruppe bleibt erreichbar', () => {
+    renderMitProviders(<Formular onFinish={vi.fn()} />);
+    const knoepfe = screen.getAllByRole('radio');
+    expect(knoepfe.every((k) => k.getAttribute('aria-checked') === 'false')).toBe(true);
+    expect(knoepfe[0]).toHaveAttribute('tabindex', '0');
+  });
+
+  it('ein Klick auf das gewählte Segment meldet keine Änderung, das Feld bleibt unberührt', async () => {
+    const onValuesChange = vi.fn();
+    const formular = { current: null as FormInstance | null };
+    function Mit() {
+      const [form] = Form.useForm();
+      formular.current = form;
+      return (
+        <Form form={form} initialValues={{ art: 'funk' }} onValuesChange={onValuesChange}>
+          <Form.Item name="art" label="Art">
+            <SegmentFeld optionen={ARTEN} beschriftung="Art" />
+          </Form.Item>
+        </Form>
+      );
+    }
+    renderMitProviders(<Mit />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Funk' }));
+    expect(onValuesChange).not.toHaveBeenCalled();
+    expect(formular.current?.isFieldTouched('art')).toBe(false);
+  });
+
+  it('trägt Id und Prüfzustand aus Form.Item an der Gruppe', async () => {
+    renderMitProviders(<Formular onFinish={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Art wählen');
+    const gruppe = screen.getByRole('radiogroup', { name: 'Art' });
+    expect(gruppe).toHaveAttribute('aria-invalid', 'true');
+    expect(gruppe).toHaveAttribute('aria-required', 'true');
+    expect(gruppe.id).not.toBe('');
+  });
+
+  it('zeigt die Fehlerzeile einer Pflichtwahl wie jedes andere Feld', async () => {
+    const onFinish = vi.fn();
+    renderMitProviders(<Formular onFinish={onFinish} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Art wählen')).toBeInTheDocument();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+});
+
+describe('Segmentleiste mit manueller Aktivierung', () => {
+  it('bewegt mit der Pfeiltaste nur den Fokus, gewählt wird mit Enter', async () => {
+    const onWechsel = vi.fn();
+    renderMitProviders(
+      <Segmentleiste
+        rolle="tablist"
+        aktivierung="manuell"
+        optionen={OPTIONEN}
+        wert="alle"
+        onWechsel={onWechsel}
+        beschriftung="Reiter"
+      />,
+    );
+    screen.getByRole('tab', { name: 'Alle' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Meldung' })).toHaveFocus();
+    expect(onWechsel).not.toHaveBeenCalled();
+    await userEvent.keyboard('{Enter}');
+    expect(onWechsel).toHaveBeenCalledWith('meldung');
   });
 });

@@ -444,8 +444,9 @@ describe('BemerkungZelle', () => {
      * der Test die Rolle gegen sich selbst.
      */
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
+    // `#114577` seit eon26eat D5 (auf der dunkleren `flaeche3` des Tags nachgezogen).
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }).style.color).toBe(
-      'rgb(20, 71, 121)',
+      'rgb(17, 69, 119)',
     );
   });
 });
@@ -470,9 +471,9 @@ describe('wertKnopfStil (LFH-650)', () => {
   it('zieht Höhe UND Polsterung über die Stufen mit, statt auf einer zu kleben', () => {
     const k = wertKnopfStil(tokenFuer('kompakt'));
     const h = wertKnopfStil(tokenFuer('handschuh'));
-    expect(k.paddingBlock).toBe(3);
-    expect(h.paddingBlock).toBe(7);
-    expect(k.paddingInline).toBe(7);
+    expect(k.paddingBlock).toBe(4);
+    expect(h.paddingBlock).toBe(8);
+    expect(k.paddingInline).toBe(8);
     expect(h.paddingInline).toBe(16);
     expect(Number(k.minHeight)).toBeLessThan(Number(h.minHeight));
   });

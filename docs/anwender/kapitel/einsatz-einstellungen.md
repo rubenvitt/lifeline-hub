@@ -309,6 +309,7 @@ die Organisation selbst ausblendet, bleibt auch mit Vorlage ausgeblendet.
   abgeschlossenen Einsatz: Die Wahl gilt nur für das eigene Gerät.
 - Alle anderen sehen die Einstellungen als „Nur Ansicht“.
 
-Nach dem Abschluss ist der Einsatz eingefroren; nur die Aufbewahrungsfrist lässt sich noch
-ändern, siehe [Einsatz abschließen und Einsatzbericht](einsatzabschluss.md). Die Rollen im
+Nach dem Abschluss ist der Einsatz eingefroren; nur Aufbewahrungsfrist und Nachbereitung lassen
+sich noch ändern. Binnen 24 Stunden lässt er sich wieder öffnen, siehe
+[Einsatz abschließen und Einsatzbericht](einsatzabschluss.md). Die Rollen im
 Einsatz beschreibt [Rechte im Einsatz](rechte-im-einsatz.md).

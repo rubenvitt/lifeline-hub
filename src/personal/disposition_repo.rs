@@ -504,8 +504,9 @@ pub async fn update(
 
 /// Jeder Schreibweg an einer Kraft fragt zuerst hier (design.md D6): `NotFound`, wenn die Zeile
 /// nicht zum Einsatz gehört, `Conflict` (Lebenszyklus, `src/AGENTS.md`), wenn sie entlassen oder
-/// storniert ist. Nur das erneute Disponieren und die Berichtigung der Zeitachse einer entlassenen
-/// Person ([`lebenszustand_tx`], LLH-1263) schreiben an einer beendeten Kraft.
+/// storniert ist. Nur das erneute Disponieren, die Rücknahme der Entlassung
+/// (`personal::ruecknahme`, LLH-1922) und die Berichtigung der Zeitachse einer entlassenen Person
+/// ([`lebenszustand_tx`], LLH-1263) schreiben an einer beendeten Kraft.
 pub async fn require_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -577,6 +578,31 @@ pub struct Entlassen {
     pub einheit_name: Option<String>,
     /// Ist die Entlassung in die Zeitachse eingegangen? Ohne offene Periode nicht.
     pub zeitachse: bool,
+    /// Bindungen vor dem Lösen, für den Vorzustand der Rücknahme (LLH-1922, design.md D1).
+    pub einheit_id: Option<i64>,
+    pub fahrzeug_id: Option<i64>,
+    pub uhs_id: Option<i64>,
+    /// Aktive Einheiten, die die Person führte.
+    pub gefuehrte_einheiten: Vec<i64>,
+    pub geleitete_abschnitte: Vec<i64>,
+    /// Eingefrorener Name an der Führungsstelle, wenn die Person Einsatzleiter war.
+    pub einsatzleiter_name: Option<String>,
+}
+
+impl Entlassen {
+    /// Der Vorzustand für die Rücknahme (LLH-1922, design.md D1); `entlassen_at` ist der
+    /// Zeitpunkt, den das Entlassen geschrieben hat.
+    pub fn vorzustand(&self, entlassen_at: &str) -> crate::personal::PersonalEntlassungVorzustand {
+        crate::personal::PersonalEntlassungVorzustand {
+            entlassen_at: entlassen_at.to_string(),
+            einheit_id: self.einheit_id,
+            fahrzeug_id: self.fahrzeug_id,
+            uhs_id: self.uhs_id,
+            gefuehrte_einheiten: self.gefuehrte_einheiten.clone(),
+            geleitete_abschnitte: self.geleitete_abschnitte.clone(),
+            einsatzleiter_name: self.einsatzleiter_name.clone(),
+        }
+    }
 }
 
 /// Entlässt eine Person aus dem Einsatz (design.md D4/D5): die Zeile bleibt mit Zeitpunkt und
@@ -602,6 +628,39 @@ pub async fn entlassen_tx(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
+    let (einheit_id, fahrzeug_id, uhs_id): (Option<i64>, Option<i64>, Option<i64>) =
+        sqlx::query_as(
+            "SELECT einheit_id, fahrzeug_id, uhs_id FROM einsatz_personal \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(ep_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    let gefuehrte_einheiten: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_einheit \
+         WHERE fuehrer_id = ? AND einsatz_id = ? AND aufgeloest_at IS NULL ORDER BY id",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let geleitete_abschnitte: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatzabschnitt WHERE leiter_id = ? AND einsatz_id = ? ORDER BY id",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let einsatzleiter_name: Option<String> = sqlx::query_scalar(
+        "SELECT einsatzleiter_name FROM einsatz_fuehrungsstelle \
+         WHERE einsatz_id = ? AND einsatzleiter_personal_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(ep_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .flatten();
     release_bindungen_tx(conn, einsatz_id, ep_id, benutzer_id).await?;
     let (ergebnis, _) = crate::zeitachse::repo::schreibe_tx(
         conn,
@@ -631,6 +690,12 @@ pub async fn entlassen_tx(
             ergebnis,
             crate::zeitachse::repo::Schreibergebnis::Geschrieben(_)
         ),
+        einheit_id,
+        fahrzeug_id,
+        uhs_id,
+        gefuehrte_einheiten,
+        geleitete_abschnitte,
+        einsatzleiter_name,
     })
 }
 
@@ -1846,6 +1911,98 @@ mod tests {
                 AppError::Conflict(_)
             ),
             "Bereits entlassen → 409"
+        );
+    }
+
+    /// LLH-1922, design.md D1: das Entlassen liefert, was die Person vorher trug, auch die Rollen
+    /// außerhalb ihrer Zeile.
+    #[tokio::test]
+    async fn entlassen_liefert_den_vorzustand() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, p1, _p2, p3) = seed_personal_mit_fuehrung(&pool).await;
+        let bn: i64 = sqlx::query_scalar("SELECT id FROM benutzer LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let trupp: i64 = sqlx::query_scalar("SELECT id FROM einsatz_einheit WHERE name = 'Trupp'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let abschnitt: i64 = sqlx::query_scalar("SELECT id FROM einsatzabschnitt LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let ef: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, '83-1') \
+             RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'UHS Nord', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(bn)
+        .bind(bn)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_personal SET einheit_id = ?, fahrzeug_id = ?, uhs_id = ? WHERE id = ?",
+        )
+        .bind(trupp)
+        .bind(ef)
+        .bind(uhs)
+        .bind(p1)
+        .execute(&pool)
+        .await
+        .unwrap();
+        // p1 leitet auch den Abschnitt und ist Einsatzleiter.
+        sqlx::query("UPDATE einsatzabschnitt SET leiter_id = ? WHERE id = ?")
+            .bind(p1)
+            .bind(abschnitt)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrungsstelle (einsatz_id, einsatzleiter_art, \
+                 einsatzleiter_personal_id, einsatzleiter_name, einsatzleiter_seit) \
+             VALUES (?, 'personal', ?, 'Anton Abel', '2026-11-17 09:00:00')",
+        )
+        .bind(einsatz)
+        .bind(p1)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let e = entlasse(&pool, einsatz, p1, bn, "2026-11-17 10:00:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            e.vorzustand("2026-11-17 10:00:00"),
+            crate::personal::PersonalEntlassungVorzustand {
+                entlassen_at: "2026-11-17 10:00:00".into(),
+                einheit_id: Some(trupp),
+                fahrzeug_id: Some(ef),
+                uhs_id: Some(uhs),
+                gefuehrte_einheiten: vec![trupp],
+                geleitete_abschnitte: vec![abschnitt],
+                einsatzleiter_name: Some("Anton Abel".into()),
+            }
+        );
+        // Ohne Bindung: alles leer.
+        let e = entlasse(&pool, einsatz, p3, bn, "2026-11-17 10:00:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            e.vorzustand("2026-11-17 10:00:00"),
+            crate::personal::PersonalEntlassungVorzustand {
+                entlassen_at: "2026-11-17 10:00:00".into(),
+                ..Default::default()
+            }
         );
     }
 

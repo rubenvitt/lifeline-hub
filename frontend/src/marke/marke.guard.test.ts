@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { farbenDunkel } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import {
   LINIE_ECKE,
   LINIE_GEHRUNGSGRENZE,
@@ -36,7 +36,9 @@ const pwaManifest = JSON.parse(readFileSync(join(hier, 'pwaManifest.json'), 'utf
 };
 
 const QUELLEN = ['symbol.svg', 'symbol-maskable.svg', 'symbol-macos.svg'] as const;
-const KOPF_SCHWARZ = farbenDunkel.kopf;
+// Das Kopf-Schwarz ist der Grund des dauerdunklen Rahmens, nicht die Inhaltsrolle `kopf`: seit den
+// vier Flächenstufen (Change `eon26eat-farbe-entlasten`, D5) sind beide verschieden.
+const KOPF_SCHWARZ = rahmenFarben.grund;
 
 /** Breite und Höhe aus dem IHDR-Block einer PNG-Datei. */
 function pngMasse(pfad: string): { breite: number; hoehe: number } {

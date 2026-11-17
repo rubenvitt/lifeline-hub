@@ -508,6 +508,95 @@ pub fn etb_text_aus_einsatz_genommen(
     }
 }
 
+/// System-ETB der Rücknahme einer Herausnahme (LLH-1923, Spec `kraefte-entlassung`): nennt den
+/// Ort, an den der Posten zurückkam (`ort`, im Wortlaut von `ort::ort_text_tx`), und den, der
+/// nicht zurückkam. Der Ort kommt aus dem Vorzustand des Clients; im ETB steht er darum immer,
+/// wie bei jedem Ortswechsel (Spec `material-modell`).
+pub fn etb_text_herausnahme_zurueckgenommen(
+    bezeichnung: &str,
+    menge: i64,
+    ort: Option<&str>,
+    ausgelassen: &[crate::entlassung::RuecknahmeAusgelassen],
+) -> String {
+    let mut text = format!("Material «{bezeichnung}» (×{menge}): Herausnahme zurückgenommen");
+    if let Some(ort) = ort {
+        text.push_str(&format!(", Ort {ort}"));
+    }
+    text.push_str(&crate::entlassung::ohne_text(ausgelassen));
+    text
+}
+
+/// Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
+/// von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
+/// D1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an
+/// `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
+/// höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das
+/// Herausnehmen lässt sie an der Zeile stehen.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
+pub struct MaterialEntlassungVorzustand {
+    /// Zeitpunkt dieses Herausnehmens; Kennung, an der die Rücknahme es wiedererkennt.
+    pub entlassen_at: String,
+    #[serde(default)]
+    pub einheit_id: Option<i64>,
+    #[serde(default)]
+    pub einsatz_fahrzeug_id: Option<i64>,
+    #[serde(default)]
+    pub uhs_id: Option<i64>,
+    #[serde(default)]
+    pub br_id: Option<i64>,
+}
+
+impl MaterialEntlassungVorzustand {
+    /// Der Vorzustand aus dem Ort, den das Herausnehmen gelöst hat.
+    pub fn aus_ort(entlassen_at: &str, ort: Option<ort::MaterialOrt>) -> Self {
+        let [einheit_id, einsatz_fahrzeug_id, uhs_id, br_id] = ort::MaterialOrt::spalten(ort);
+        Self {
+            entlassen_at: entlassen_at.to_string(),
+            einheit_id,
+            einsatz_fahrzeug_id,
+            uhs_id,
+            br_id,
+        }
+    }
+
+    /// Der Ort davor; mehr als eine Spalte mit Wert ist eine Feld-Kombination: 422
+    /// (`src/AGENTS.md`, Statuscode-Konvention), wie `OrtPatch::validate`.
+    pub fn ort(&self) -> Result<Option<ort::MaterialOrt>, crate::error::AppError> {
+        let spalten = [
+            self.einheit_id,
+            self.einsatz_fahrzeug_id,
+            self.uhs_id,
+            self.br_id,
+        ];
+        if spalten.iter().filter(|s| s.is_some()).count() > 1 {
+            return Err(crate::error::AppError::UnprocessableEntity(
+                "Ein Posten hat höchstens einen Ort".into(),
+            ));
+        }
+        Ok(ort::MaterialOrt::aus_spalten(
+            self.einheit_id,
+            self.einsatz_fahrzeug_id,
+            self.uhs_id,
+            self.br_id,
+        ))
+    }
+}
+
+/// Antwort von `POST …/material/{em_id}/entlassen` (LLH-1923).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MaterialEntlassungAntwort {
+    pub material: EinsatzMaterialAnzeige,
+    pub vorzustand: MaterialEntlassungVorzustand,
+}
+
+/// Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht
+/// zurückkam, steht in `ausgelassen`.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MaterialRuecknahmeAntwort {
+    pub material: EinsatzMaterialAnzeige,
+    pub ausgelassen: Vec<crate::entlassung::RuecknahmeAusgelassen>,
+}
+
 /// System-ETB beim Stornieren einer Fehldisposition (LLH-1079, design.md D3).
 pub fn etb_text_storniert(bezeichnung: &str, menge: i64) -> String {
     format!("Material «{bezeichnung}» (×{menge}) storniert (Fehldisposition)")
@@ -595,6 +684,56 @@ pub fn etb_text_angaben(
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
+
+    #[test]
+    fn herausnahme_zurueckgenommen_nennt_den_ausgelassenen_ort() {
+        assert_eq!(
+            etb_text_herausnahme_zurueckgenommen("Wolldecke", 20, None, &[]),
+            "Material «Wolldecke» (×20): Herausnahme zurückgenommen"
+        );
+        assert_eq!(
+            etb_text_herausnahme_zurueckgenommen("Wolldecke", 20, Some("Einheit «Staffel A»"), &[]),
+            "Material «Wolldecke» (×20): Herausnahme zurückgenommen, Ort Einheit «Staffel A»"
+        );
+        assert_eq!(
+            etb_text_herausnahme_zurueckgenommen(
+                "Wolldecke",
+                20,
+                None,
+                &[crate::entlassung::RuecknahmeAusgelassen {
+                    bezeichnung: "Einheit «Staffel A»".into(),
+                    grund: "inzwischen aufgelöst".into(),
+                }]
+            ),
+            "Material «Wolldecke» (×20): Herausnahme zurückgenommen, ohne Einheit «Staffel A» \
+             (inzwischen aufgelöst)"
+        );
+    }
+
+    #[test]
+    fn vorzustand_hat_hoechstens_einen_ort() {
+        let mut v = MaterialEntlassungVorzustand {
+            entlassen_at: "2026-11-17 10:00:00".into(),
+            ..Default::default()
+        };
+        assert_eq!(v.ort().unwrap(), None);
+        v.uhs_id = Some(3);
+        assert_eq!(v.ort().unwrap(), Some(ort::MaterialOrt::Uhs(3)));
+        v.einheit_id = Some(1);
+        assert!(matches!(
+            v.ort(),
+            Err(crate::error::AppError::UnprocessableEntity(_))
+        ));
+        let aus = MaterialEntlassungVorzustand::aus_ort(
+            "2026-11-17 10:00:00",
+            Some(ort::MaterialOrt::Bereitstellungsraum(9)),
+        );
+        assert_eq!(aus.br_id, Some(9));
+        assert_eq!(
+            aus.ort().unwrap(),
+            Some(ort::MaterialOrt::Bereitstellungsraum(9))
+        );
+    }
 
     #[test]
     fn aus_einsatz_genommen_storniert_erneut() {

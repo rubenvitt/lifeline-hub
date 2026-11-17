@@ -1,4 +1,5 @@
 pub mod abraeumen;
+pub mod abschluss;
 pub mod archiv;
 pub mod aufbewahrung_kategorie;
 pub mod berechtigung;
@@ -128,6 +129,9 @@ pub struct Einsatz {
     pub naechste_lagebesprechung_at: Option<String>,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
+    /// Read-only Join (LLH-1814): Anzeigename der Person, die abgeschlossen hat.
+    #[sqlx(default)]
+    pub abgeschlossen_von_name: Option<String>,
     #[sqlx(try_from = "String")]
     pub einsatzart: Einsatzart,
     pub einsatznummer_intern: Option<String>,
@@ -216,6 +220,7 @@ impl Einsatz {
             naechste_lagebesprechung_at: self.naechste_lagebesprechung_at.clone(),
             abgeschlossen_at: self.abgeschlossen_at.clone(),
             abgeschlossen_von: self.abgeschlossen_von,
+            abgeschlossen_von_name: self.abgeschlossen_von_name.clone(),
             einsatzart: self.einsatzart.clone(),
             einsatznummer_intern: self.einsatznummer_intern.clone(),
             angelegt_at: self.angelegt_at.clone(),
@@ -281,6 +286,10 @@ pub struct EinsatzAnzeige {
     pub naechste_lagebesprechung_at: Option<String>,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
+    /// Anzeigename der Person, die abgeschlossen hat (LLH-1814, Paneel „Einsatzabschluss“);
+    /// fehlt am aktiven Einsatz, ohne Konto und bei einer Gerätesitzung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abgeschlossen_von_name: Option<String>,
     pub einsatzart: Einsatzart,
     pub einsatznummer_intern: Option<String>,
     pub angelegt_at: String,
@@ -508,6 +517,7 @@ mod tests {
             naechste_lagebesprechung_at: None,
             abgeschlossen_at: None,
             abgeschlossen_von: None,
+            abgeschlossen_von_name: None,
             einsatzart: Einsatzart::Realeinsatz,
             einsatznummer_intern: None,
             angelegt_at: "2026-05-23".into(),

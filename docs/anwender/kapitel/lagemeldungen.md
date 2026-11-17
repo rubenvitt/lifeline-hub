@@ -22,15 +22,16 @@ Lagekarte.
 Für Einsatzleitung und Führungspersonal:
 
 1. Im Bereich „Lage“ „Lagemeldungen“ öffnen und im Seitenkopf „Lagemeldung erfassen“ wählen.
-   Steht noch keine Lagemeldung da, steht der Knopf auch in der leeren Ansicht.
+   Steht noch keine Lagemeldung da, steht der Knopf auch in der leeren Ansicht. Der Dialog
+   „Lagemeldung erfassen“ öffnet sich.
 2. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ eingeben. Die Meldungsart ist
    „Lagemeldung“.
 
-   ![Paneel „Lagemeldung erfassen“ mit Wortlaut und Absender](../bilder/lagemeldungen/lagemeldung-erfassen.png)
+   ![Dialog „Lagemeldung erfassen“ mit Wortlaut und Absender](../bilder/lagemeldungen/lagemeldung-erfassen.png)
 
 3. Ist der Ort bekannt, unter „Weitere Angaben“ bei „Verortung (optional)“ die Koordinate
    eingeben. Dort stehen auch Richtung, Priorität und Ereigniszeit.
-4. „Lagemeldung erfassen“ wählen. Das Paneel schließt, die neue Lagemeldung steht mit der Marke
+4. „Lagemeldung erfassen“ wählen. Der Dialog schließt, die neue Lagemeldung steht mit der Marke
    „Neu“ oben in der Zeitachse.
 
 Dieselbe Lagemeldung lässt sich auch im Modul „Meldungen“ erfassen, mit der Meldungsart

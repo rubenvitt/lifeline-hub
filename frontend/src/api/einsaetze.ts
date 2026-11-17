@@ -1,4 +1,5 @@
 import type {
+  AbschlussPruefung,
   Fuehrungsfunktion,
   Einsatzart,
   EinsatzAnzeige,
@@ -49,6 +50,18 @@ export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {
 
 export function schliesseEinsatzAb(id: number): Promise<EinsatzAnzeige> {
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/abschliessen`, 'POST');
+}
+
+/** Offene Punkte vor dem Abschluss (LLH-1814, Spec `einsatz-abschluss`): je Gruppe Anzahl und
+ *  Kurzliste, unabhängig von den Modulfreigaben. Nur die Einsatzleitung eines aktiven Einsatzes. */
+export function loadAbschlussPruefung(id: number): Promise<AbschlussPruefung> {
+  return apiGet<AbschlussPruefung>(`/api/einsaetze/${id}/abschluss/pruefung`);
+}
+
+/** Einen abgeschlossenen Einsatz binnen 24 Stunden wieder öffnen (LLH-1814); der Grund ist
+ *  Pflicht und steht danach im ETB. */
+export function oeffneEinsatzWieder(id: number, grund: string): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/wiedereroeffnen`, 'POST', { grund });
 }
 
 export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {

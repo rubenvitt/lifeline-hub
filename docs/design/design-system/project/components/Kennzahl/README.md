@@ -8,7 +8,7 @@ Das Band setzt n Zellen ins FUGENRASTER: `gap: 1px` auf `linie`, jede Zelle auf 
 Die Fuge bleibt in jeder Dichtestufe 1 px; den Abstand klickbarer Zellen hält der Einzug
 (siehe „KLICKBAR“).
 
-── DATENZUSTÄNDE (wie im Lage-Dashboard, LFH-331 · B3) ────────────────────────────
+── DATENZUSTÄNDE (wie im Lage-Dashboard) ────────────────────────────
 
 `laden` → „····" mit `aria-busy`, Notiz „wird abgerufen". `fehler` → „?" mit
 `title="Stand unbekannt"`, Notiz „Stand unbekannt". Die Strings pinnen die Tests von
@@ -29,27 +29,28 @@ Augenbraue und Notiz.
 KONTRAST DER ZAHL (WCAG, gegen `flaeche` als Grund von `.lfh-kennzahl`; Boden Tag ≥ 7 : 1,
 Nacht ≥ 5 : 1):
 
-| Ton     | Rolle der Zahl | Tag (auf #ffffff) | Nacht (auf #0f1215) |
+| Ton     | Rolle der Zahl | Tag (auf #ffffff) | Nacht (auf #151719) |
 |---------|----------------|-------------------|---------------------|
-| normal  | normalText     | 9,18              | 10,92               |
-| bedien  | bedienText     | 9,51              |  9,95               |
-| achtung | achtungText    | 9,22              | 11,75               |
-| alarm   | alarmText      | 8,96              |  6,77               |
+| normal  | normalText     | 9,18              | 10,45               |
+| bedien  | bedienText     | 9,81              |  9,52               |
+| achtung | achtungText    | 9,22              | 11,24               |
+| alarm   | alarmText      | 9,76              |  6,48               |
+
+(Nachtfläche seit den vier Flächenstufen, Change `eon26eat-farbe-entlasten` D5.)
 
 `neutral` steht in `text` (Tag 18,47). Die Füllfarben selbst tragen den Tagesboden als Text
 nicht, deshalb die `…Text`-Rollen.
 
-── NOTIZHÖHE (LFH-629, LFH-691) ──────────────────────────────────────────────────
+── NOTIZHÖHE ──────────────────────────────────────────────────
 
 Eine Notiz, deren Länge sich mit der Lage ändert, ließe das Band wachsen und schrumpfen und
 alles darunter springen (Prüfliste Kriterium 12). Das Band fordert deshalb Platz an, gesetzt in
-`sprache.css` vom ersten Bild an: unter `md` mit `notizZeilenSchmal` einen Boden (LFH-629), ab
-`md` mit `notizZeilen` Boden UND Deckel (LFH-691). Eine längere Notiz endet dort mit „…“; der
+`sprache.css` vom ersten Bild an: unter `md` mit `notizZeilenSchmal` einen Boden, ab
+`md` mit `notizZeilen` Boden UND Deckel. Eine längere Notiz endet dort mit „…“; der
 volle Text bleibt im DOM, also im zugänglichen Namen, und steht im Zustand `daten` im `title`.
-Die tragende Aussage einer Notiz steht deshalb vorn. Herleitung:
-`openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`.
+Die tragende Aussage einer Notiz steht deshalb vorn.
 
-HANDSCHUH UNTER `md` (LFH-883): die Polsterung `paddingLG` (44 px) lässt auf 390 px eine
+HANDSCHUH UNTER `md`: die Polsterung `paddingLG` (44 px) lässt auf 390 px eine
 Textspalte von rund 94 px (kompakt 146, komfortabel 126). Darin bricht eine Augenbraue wie
 „Schäden offen“ zweizeilig um und die Pegel-Notiz dreizeilig, die Platzhalter aber tragen eine
 Zeile Augenbraue und „wird abgerufen“: die Reihen wuchsen mit den Daten um 13 bzw. 16 px. In
@@ -69,7 +70,7 @@ Mit `ziel` trägt die Zelle einen `<Link>` — ein handgebautes Bedienziel mit d
 Angaben aus LFH-365. Auch im Zustand `laden` bleibt sie ein Link: das Ziel existiert ohne
 Zahl.
 
-ABSTAND ZWISCHEN ZIELEN (LFH-630, Bedien-Leitlinie Kriterium 2): im Fugenraster stünden zwei
+ABSTAND ZWISCHEN ZIELEN (Bedien-Leitlinie Kriterium 2): im Fugenraster stünden zwei
 Links nur 1 px auseinander, die Leitlinie verlangt in `komfortabel` ≥ 8 px und in `handschuh`
 ≥ 16 px. Die Fuge bleibt deshalb 1 px, und der Link rückt INNERHALB seiner Rasterzelle um
 `kennzahlZielEinzug` (0 / 4 / 8 px) von jedem Rand ab: zwischen zwei Treffflächen liegen
@@ -81,6 +82,47 @@ nach dem Link die Eskalationskante (`data-lfh="kennzahl-kante"`, siehe
 die Tönung zeigt, wo ein Tippen wirkt, der Rand bleibt still. Herleitung und verworfene
 Wege (breitere Fuge, Kacheln):
 `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`.
+
+Regeln dazu:
+
+- **Kennzahlenband**: „Lage in Zahlen“ hat immer sechs Plätze (vier Kern, zwei Lage); der
+  Führungsstand des Überblicks nur seine Handlungszahlen. Jede Kennzahl hat einen
+  Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
+  per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen); Neuzuschnitt während der Betrachtung als Sammelbanner. Die Fuge
+  zeichnet die Zelle, nicht der Rastergrund: Grund `flaeche`, Umriss je Zelle über
+  `[data-fugenraster]` (`components/instrument/fugenraster.ts`), damit eine leere Restspur keine
+  graue Kachel wird; wer den Grund übernimmt, setzt das Attribut mit. Sie bleibt in
+  jeder Dichte 1 px; eine klickbare Zelle rückt ihren Link um 0 / 4 / 8 px ein
+  (`kennzahlZielEinzug`), damit Ziele ≥ 8 / ≥ 16 px auseinanderstehen.
+  Segmentleiste, Kartengrundlage und Kartenknöpfe teilen den Einzug (`zielEinzug`).
+  Ein Band, über dessen Notizen sich die Lage ändert, hält ihre Höhe fest: unter `md` als Boden
+  (`notizZeilenSchmal`), ab `md` als Boden und Deckel (`notizZeilen`, „Lage in Zahlen“ drei
+  Zeilen; Längeres endet mit „…“ und steht ganz im `title`). Die tragende Aussage einer Notiz
+  steht deshalb vorn.
+
+- **Eine Heimat je Zahl**:
+  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig, Sofort- und dringende Meldungen offen samt Eingang der ältesten),
+  Nachforderungen (offen, je Stufe, überfällig), Erinnerungen (fällig) und Lagemeldungen
+  (neu) nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
+  gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
+  Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
+  Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
+  über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
+  `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
+  Einheiten. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
+  jüngste Meldung allein (`abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
+  (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
+  ihm steht: Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit
+  beim wirksamen Abschnitt), seine Einheiten nur über `einheitenImAbschnitt`, dieselbe Menge. „Kräfte“
+  sind Köpfe, Fahrzeuge zählen eigens; Kräfte an UHS nur an aktiven UHS (`countsKraefteAnUhs`,
+  Lagebild und Lagemonitor). Belegung eines Bereitstellungsraums: Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
+  des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
+  (`bereitstellungsraum/brZahlen.ts`; nur Einheiten im Raum mit ihrer eigenen Stärke); „noch n belegt“ vor dem Auflösen zählt wie
+  `aktive_belegungen_tx` (Einheiten und einheitenlose Fahrzeuge). Lage einer UHS (In der Stelle, Plätze frei, Wartend, Unterwegs) nur über `pages/uhs/uhsLage.ts`, aus denselben
+  Mengen wie der Grundriss. Einheiten ohne Schicht (Seite Ablösung, Sprung im Überblick) nur
+  über `abloesung/ohneSchicht.ts:findOhneSchicht`, aus denselben Fächern. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
+  `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
+  (`tests/verdichtung_fixture.rs`).
 
 Quelle: `frontend/src/components/instrument/Kennzahl.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

@@ -8,7 +8,8 @@ import type { StatusDarstellung } from '../theme/statusFarben';
 /** Zweiter Kanal ist Pflicht — die Darstellungen werden hier von Hand gebaut, damit die
  *  Tests unabhängig von den konkreten Enum-Zuordnungen der drei Module bleiben. */
 const frei: StatusDarstellung = { rolle: 'normal', label: '1 – Frei auf Funk' };
-const gebunden: StatusDarstellung = { rolle: 'achtung', label: '4 – Am Einsatzort' };
+// „Am Einsatzort“ ist `gebunden` und damit neutral (Spec `statusrollen`, eon26eat D1).
+const gebunden: StatusDarstellung = { rolle: 'neutral', label: '4 – Am Einsatzort' };
 
 const OPTIONEN: StatusOption<number>[] = [
   { wert: 1, label: '1 – Frei auf Funk', darstellung: frei },
@@ -120,7 +121,7 @@ describe('StatusWahl', () => {
   it('markiert den aktuellen Wert im Menü — über den WERT, nicht über das Label', async () => {
     // Der Mandant darf sein Katalog-Label frei umbenennen; eine Markierung, die am Text
     // hinge, verlöre sich damit lautlos. Deshalb ein eigenes `aktuell`.
-    aufbauen({ aktuell: 4, darstellung: { rolle: 'achtung', label: 'am Einsatzort (umbenannt)' } });
+    aufbauen({ aktuell: 4, darstellung: { rolle: 'neutral', label: 'am Einsatzort (umbenannt)' } });
     const menue = await oeffneMenue();
     const gewaehlt = within(menue).getByRole('menuitem', { name: /Am Einsatzort/ });
     expect(gewaehlt.className).toMatch(/ant-dropdown-menu-item-selected/);

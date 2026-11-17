@@ -60,9 +60,8 @@ test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einb
     await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
     await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(0);
 
-    const schalter = page.getByRole('button', {
-      name: 'Spalten · 2 ausgeblendet — Online-Quellen',
-    });
+    // Nach Breite verborgen ist Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
+    const schalter = page.getByRole('button', { name: 'Spalten — Online-Quellen' });
     await expect(schalter).toBeVisible();
     await breitenPruefen(page);
 
@@ -88,7 +87,8 @@ test('Offline-Karten bei 390 px: Tabelle mit Schalter, Attribution gezählt', as
   await expect(page.locator('.ant-table-thead th').first()).toBeVisible();
   await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(0);
 
-  const schalter = page.getByRole('button', { name: 'Spalten · 1 ausgeblendet — Offline-Karten' });
+  // Nach Breite verborgen ist Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
+  const schalter = page.getByRole('button', { name: 'Spalten — Offline-Karten' });
   await expect(schalter).toBeVisible();
   await breitenPruefen(page);
 

@@ -33,14 +33,6 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
      Wirkung: ein Satz, warum es kein Bild gibt. Aufnahme und Einbinden:
      `dev-zunder-ausfuehren`, „Bilder der Änderung“. -->
 
-## Review
-
-<!-- Der Review vor dem PR (`dev-zunder-ausfuehren`, „Review vor dem PR“). Lief keiner: der Grund
-     (Route `trivial`). Sonst je Befund eine Zeile:
-     - bestätigt: was, wo, Commit der Behebung (oder Link auf die Folgeaufgabe)
-     - verworfen: was, warum
-     Kein Befund: ein Satz. -->
-
 ## Geprüft
 
 <!-- Im PR prüft die CI nur leicht (Schnellprüfungen, Migrations- und ADR-Nummern); die
@@ -49,6 +41,7 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
      Dichtestufe, welcher Browser? Label `voll` nur nach `scripts/AGENTS.md`, „Wann `voll`“. -->
 
 - [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün
+- [ ] Review: gelaufen (Anlass, Befunde, Verbleib) oder nicht nötig (warum); `dev-zunder-ausfuehren`, „Review nach Ermessen“
 - [ ] Bei UI-Abläufen: die betroffene e2e-Spec lokal grün (Kommando: `scripts/AGENTS.md`, „Wann `voll`“)
 - [ ] Bei Backend-Typänderungen: `openapi.json` + `types.generated.ts` mitcommittet
 - [ ] Bei neuer/umgebauter Seite: Prüfliste Einsatztauglichkeit ausgefüllt (15 Kriterien)

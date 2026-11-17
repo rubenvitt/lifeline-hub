@@ -190,6 +190,18 @@ export function istKonflikt(e: unknown): e is ApiError {
   return e instanceof ApiError && e.status === 409;
 }
 
+/** `grund` des Sperrkonflikts (409, `src/error.rs`, `GRUND_VERALTET`, LLH-1920). */
+export const GRUND_VERALTET = 'veraltet';
+
+/**
+ * Der Sperrkonflikt einer Route, die ihn auszeichnet (409 mit `grund: "veraltet"`, LLH-1920): nur
+ * er fragt „Zwischenzeitlich geändert“. Ein anderer 409 derselben Route (storniert, doppelte
+ * Bezeichnung) ist ein Grund, keine Rückfrage. Routen ohne Auszeichnung trennt nur `istKonflikt`.
+ */
+export function isVeraltet(e: unknown): e is ApiError {
+  return istKonflikt(e) && e.grund === GRUND_VERALTET;
+}
+
 /** Die Sitzungsprüfung selbst: eine 403 darauf stößt keine neue Prüfung an, sonst liefe der
  *  Provider in eine Schleife (`AuthContext`, `pruefe` holt nach jedem Anstoß nach). */
 const ME_PFAD = '/api/auth/me';

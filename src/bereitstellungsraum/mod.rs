@@ -135,6 +135,10 @@ pub struct BrBelegungAnzeige {
     /// Abruf der Einheit, mit der diese Untereinheit abgerufen wurde (Verband, D10).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mit_abruf_id: Option<i64>,
+    /// Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie
+    /// zurücknimmt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ruecknahme_von: Option<i64>,
 }
 
 /// Abruf einer Kraft, die im Raum steht (LLH-1085, design.md D3, Spec
@@ -252,6 +256,7 @@ wire_enum! {
         Austritt => "austritt",
         Abruf => "abruf",
         AbrufAufgehoben => "abruf_aufgehoben",
+        AustrittZurueckgenommen => "austritt_zurueckgenommen",
     }
     try_from = |s| format!("Ungültige BrVerlaufArt: {s}");
 }

@@ -5,7 +5,7 @@ use crate::benachrichtigung::{
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Bereitstellungsraeume, Einheiten, Fahrzeuge, Material, ModulMarker};
+use crate::einsatz::modul::{Bereitstellungsraeume, Einheiten, Fahrzeuge, Material};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -516,23 +516,10 @@ pub async fn entlassen(
     }))
 }
 
-/// Darf die Person in das Modul `Z` schreiben? Für die Rücknahme, die einen Teil ohne Recht
-/// auslässt statt abzulehnen (LLH-1722, design.md D5).
-async fn darf_zielmodul<Z: ModulMarker>(
-    state: &AppState,
-    ctx: &EinsatzSchreibzugriff<Fahrzeuge>,
-) -> Result<bool, AppError> {
-    match ctx.fordere_zielmodul::<Z>(&state.pool).await {
-        Ok(()) => Ok(true),
-        Err(AppError::Forbidden | AppError::ForbiddenMit(_)) => Ok(false),
-        Err(e) => Err(e),
-    }
-}
-
 /// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen/zuruecknehmen — „Rückgängig“ nach dem
 /// Entlassen (LLH-1722, Spec `kraefte-entlassung`, design.md D5): Body ist der Vorzustand aus der
 /// Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses Entlassen, höchstens
-/// [`disposition_repo::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders
+/// [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders
 /// gebunden ist oder wofür das Modulrecht fehlt, bleibt aus und steht in `ausgelassen`. Ein
 /// ETB-Eintrag, Live-Meldungen wie beim Entlassen, keine Benachrichtigung.
 pub async fn zuruecknehmen(
@@ -558,9 +545,11 @@ pub async fn zuruecknehmen(
         liste.dedup();
     }
     let rechte = disposition_repo::RuecknahmeRechte {
-        einheiten: darf_zielmodul::<Einheiten>(&state, &ctx).await?,
-        material: darf_zielmodul::<Material>(&state, &ctx).await?,
-        bereitstellungsraeume: darf_zielmodul::<Bereitstellungsraeume>(&state, &ctx).await?,
+        einheiten: ctx.darf_zielmodul::<Einheiten>(&state.pool).await?,
+        material: ctx.darf_zielmodul::<Material>(&state.pool).await?,
+        bereitstellungsraeume: ctx
+            .darf_zielmodul::<Bereitstellungsraeume>(&state.pool)
+            .await?,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
@@ -679,21 +668,47 @@ pub async fn reaktivieren(
     Ok(Json(anzeige))
 }
 
+/// Abfrage des Rückgängig nach „Vom Fahrzeug lösen“ (LLH-1924): `nur_wenn_frei=1` lehnt mit 409
+/// ab, wenn die Person inzwischen auf einem anderen Fahrzeug sitzt.
+#[derive(Debug, Default, Deserialize)]
+pub struct BesatzungZuruecknahmeParams {
+    nur_wenn_frei: Option<String>,
+}
+
 /// PUT /api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id} — Kraft als Besatzung
-/// zuordnen (LFH-9, exklusiv: Wechsel überschreibt). Append-only System-ETB + SSE.
+/// zuordnen (LFH-9, exklusiv: Wechsel überschreibt; mit `nur_wenn_frei=1` nicht, LLH-1924).
+/// Append-only System-ETB + SSE.
 pub async fn besatzung_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     PfadParam((_eid, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
+    Query(params): Query<BesatzungZuruecknahmeParams>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let nur_wenn_frei = parse_flag(params.nur_wenn_frei.as_deref(), "nur_wenn_frei")?;
     // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
     // Besatzungs-Zuordnung stabil). F06/LFH-244 Tier-A: Zuordnung + System-ETB atomar in EINER Tx.
     let fahrzeug =
         disposition_repo::load_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let geaendert = crate::write_retry!(&state.pool, |conn| {
+        if nur_wenn_frei {
+            besatzung_repo::require_besatzung_frei_tx(conn, einsatz_id, ef_id, ep_id).await?;
+        }
+        // Schon auf diesem Fahrzeug: unverändert, ohne ETB und ohne Meldung, wie das Zuordnen zu
+        // einer Einheit (LLH-1262). Sonst schriebe ein zweites Rückgängig die Zuordnung noch
+        // einmal (Review LLH-1924).
+        let schon: Option<Option<i64>> = sqlx::query_scalar(
+            "SELECT fahrzeug_id FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(ep_id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if schon == Some(Some(ef_id)) {
+            return Ok(false);
+        }
         let person = besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, ef_id, ep_id).await?;
         crate::etb::system_audit_tx(
             conn,
@@ -703,10 +718,12 @@ pub async fn besatzung_zuordnen(
             &crate::fahrzeug::etb_text_besatzung_zugeordnet(&fahrzeug.funkrufname, &[person]),
         )
         .await?;
-        Ok(())
+        Ok(true)
     })?;
-    sse_fahrzeug(&state, einsatz_id, ef_id);
-    sse_personal(&state, einsatz_id, ep_id);
+    if geaendert {
+        sse_fahrzeug(&state, einsatz_id, ef_id);
+        sse_personal(&state, einsatz_id, ep_id);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

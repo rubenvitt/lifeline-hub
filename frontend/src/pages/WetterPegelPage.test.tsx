@@ -429,12 +429,14 @@ describe('WetterPegelPage (LFH-633)', () => {
         (h) => h.getAttribute('data-lfh') === 'wetter-stand-unbekannt',
       );
       expect(unbekannt).toHaveLength(3);
+      // Stand unbekannt ist kein fehlender Einsatzort: kein Seitenhinweis (LLH-1752).
+      expect(document.querySelectorAll('[data-lfh="wetter-kein-ort"]')).toHaveLength(0);
       expect(document.querySelectorAll('[data-lfh="wetter-warnung"]')).toHaveLength(0);
       expect(document.querySelectorAll('[data-lfh="wetter-stunde"]')).toHaveLength(0);
       expect(screen.getByText('6,84')).toBeInTheDocument();
     });
 
-    it('kein Einsatzort: Erklärung und EIN Weg zu den Einsatzdaten', async () => {
+    it('kein Einsatzort: EINE Erklärung auf der Seite, EIN Weg, die Paneele knapp (LLH-1752)', async () => {
       antworten({
         wetter: {
           warnungen: { zustand: 'kein_ort' },
@@ -443,7 +445,12 @@ describe('WetterPegelPage (LFH-633)', () => {
         },
       });
       renderPage();
-      expect(await screen.findAllByText('Einsatzort nicht verortet')).toHaveLength(3);
+      const hinweis = await screen.findByText(
+        'Einsatzort nicht verortet — Warnungen, Vorhersage und aktuelle Bedingungen brauchen eine Koordinate',
+      );
+      expect(hinweis.closest('[data-lfh="wetter-kein-ort"]')).not.toBeNull();
+      expect(document.querySelectorAll('[data-lfh="wetter-kein-ort"]')).toHaveLength(1);
+      expect(screen.getAllByText('ohne Einsatzort')).toHaveLength(3);
       const wege = screen.getAllByRole('button', {
         name: 'Einsatzort in den Einsatzdaten verorten',
       });

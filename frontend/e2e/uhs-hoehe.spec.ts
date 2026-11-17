@@ -282,7 +282,7 @@ for (const [breite, hoehe] of [
     await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
 
     const leiste = page.getByRole('tablist', {
-      name: 'Belegung, Material, Kräfte, Bewegungen und Dateien',
+      name: 'Belegung, Material, Kräfte, Bewegungen, Dateien und Angaben',
     });
     const material = leiste.getByRole('tab', { name: 'Material', exact: true });
     // Ohne Bildlauf: die Seite steht oben, und der Reiter liegt im Fenster über dem Grundriss.
@@ -291,7 +291,8 @@ for (const [breite, hoehe] of [
     // Die Lage der Stelle in Zahlen (LLH-1136) steht ganz im Fenster über der Leiste.
     const zahlen = page.getByRole('group', { name: 'Lage der Stelle' });
     await expect(zahlen).toBeInViewport({ ratio: 1 });
-    for (const titel of ['In der Stelle', 'Plätze frei', 'Wartend', 'Unterwegs']) {
+    // „Plätze“ liest sich „5 von 5 Plätzen frei“ (LLH-1793).
+    for (const titel of ['In der Stelle', /^von \d+ Plätzen? frei$/, 'Wartend', 'Unterwegs']) {
       await expect(zahlen.getByText(titel, { exact: true })).toBeVisible();
     }
     const abstand = await page
@@ -303,7 +304,7 @@ for (const [breite, hoehe] of [
     expect(abstand).toBeGreaterThanOrEqual(0);
 
     const flaechen: Record<string, number> = {};
-    for (const name of ['Belegung', 'Material', 'Kräfte', 'Bewegungen', 'Dateien']) {
+    for (const name of ['Belegung', 'Material', 'Kräfte', 'Bewegungen', 'Dateien', 'Angaben']) {
       await leiste.getByRole('tab', { name, exact: true }).click();
       await expect(leiste.getByRole('tab', { name, exact: true })).toHaveAttribute(
         'aria-selected',

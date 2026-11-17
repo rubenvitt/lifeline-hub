@@ -23,7 +23,7 @@ import { createRoot } from 'react-dom/client';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
 import { QueryClient, QueryClientProvider, type QueryKey } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { Button, ConfigProvider, Form, Input, Segmented } from 'antd';
+import { Alert, Breadcrumb, Button, Col, ConfigProvider, Form, Input, Row, Segmented } from 'antd';
 import deDE from 'antd/locale/de_DE';
 import {
   antdKaestchen,
@@ -50,15 +50,19 @@ import {
   DatenfeldEingabe,
   Datenraster,
   FeldFehler,
+  Formularpaneel,
   GliederungsPaneel,
   Kennzahl,
   Kennzahlenband,
   ListenAbschnitt,
+  ListenPaneel,
   listenZeileStil,
   MatrixPaneel,
   Paneel,
   PaneelZeile,
+  PaneelZustand,
   Sammelbanner,
+  SegmentFeld,
   Segmentleiste,
   StatusChip,
   StatusZelle,
@@ -66,6 +70,7 @@ import {
   UebungsBand,
   UebungsMarke,
   VerteilungsPaneel,
+  WarnstufenHinweis,
   Zeitachseneintrag,
   useRollen,
 } from '../../src/components/instrument';
@@ -83,6 +88,21 @@ import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
 import { VORLAGEN } from '../../src/befehle/vorlagen';
 import StammdatenFeld, { type Vorschlagsquelle } from '../../src/components/StammdatenFeld';
 import KatalogTabelle from '../../src/components/KatalogTabelle';
+import { Select } from '../../src/components/Select';
+import { ZeilenMenueAusloeser } from '../../src/components/ZeilenMenueAusloeser';
+import type { WeitereAktionen } from '../../src/components/Datensicht';
+import { ErfassungsModal } from '../../src/components/Erfassung';
+import {
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../../src/components/SeitenZustand';
+import { RechteHinweis, SpeicherFehler } from '../../src/components/SpeicherHinweis';
+import { EINSATZ_ABGESCHLOSSEN, MODUL_PERSONAL_GESPERRT } from '../../src/components/nurAnsicht';
+import EinsatzSeite from '../../src/components/EinsatzSeite';
+import { ApiError, NetzFehler } from '../../src/api/client';
+import { IconPlus, IconPunkteSenkrecht, IconStift } from '../../src/icons';
 import type { ListenGedaechtnis } from '../../src/components/listenGedaechtnis';
 import { AnzeigeKonventionenProvider } from '../../src/anzeige/AnzeigeKonventionenContext';
 import ZeitAnzeige from '../../src/anzeige/ZeitAnzeige';
@@ -124,6 +144,11 @@ export interface PreviewSpec {
   ruleHead?: string;
   /** Weitere Quelle (relativ zu `frontend/src/`), deren erster JSDoc-Absatz die README ergänzt. */
   moreDoc?: string;
+  /**
+   * Regeln aus `frontend/AGENTS.md` (Spiegelstriche mit diesem fetten Kopf), die nur diese Karte
+   * betreffen: sie stehen in der README der Karte statt in der README des Design Systems.
+   */
+  regeln?: readonly string[];
   /**
    * Stile, die der Baustein selbst importiert (relativ zu `frontend/src/`): der Rahmen trägt sonst
    * nur `theme/rollen.css`, `theme/sprache.css` und `index.css` (`generate.tsx`, `appCss`).
@@ -351,6 +376,30 @@ function DashboardBeispiel() {
           stufenwort: stufe,
           ton,
         }))}
+      />
+      {/* Kopf-Aktion (LLH-1815): eine Handlung am Paneel selbst, ohne „↗“ — wie „Ausblenden“ der
+          Startliste im Überblick. */}
+      <ListenPaneel<readonly [string, string]>
+        titel="Einsatz starten"
+        ueberschrift="h3"
+        zustand="daten"
+        kopfAktion={{ label: 'Ausblenden', onKlick: nichts }}
+        leerText=""
+        gesperrtText=""
+        onNeuladen={nichts}
+        eintraege={[
+          ['Einsatzort', 'Deich West · nicht verortet'],
+          ['Einsatzleiter', 'offen'],
+          ['Erste Lagefeststellung', '— nicht freigegeben'],
+        ]}
+        max={3}
+        schluessel={(e) => e[0]}
+        zeile={(e) => (
+          <div style={{ ...listenZeileStil(rollen, token), alignItems: 'baseline' }}>
+            <span style={{ fontWeight: 500 }}>{e[0]}</span>
+            <span style={{ color: rollen.gedaempft }}>{e[1]}</span>
+          </div>
+        )}
       />
     </DashboardFlaeche>
   );
@@ -709,6 +758,8 @@ function KoerperschemaBeispiel() {
 interface Quelle {
   kennung: string;
   ort: string;
+  abschnitt: string;
+  meldung: string;
   ausmass: 'gross' | 'mittel' | 'klein';
 }
 
@@ -719,28 +770,50 @@ const AUSMASS = [
 ] as const;
 
 const SCHAEDEN: Quelle[] = [
-  { kennung: 'S-01', ort: 'Scheune Hof Meyer', ausmass: 'gross' },
-  { kennung: 'S-02', ort: 'Wohnhaus Nord', ausmass: 'klein' },
-  { kennung: 'S-03', ort: 'Stallung', ausmass: 'mittel' },
-  { kennung: 'S-04', ort: 'Lagerhalle', ausmass: 'gross' },
-  { kennung: 'S-05', ort: 'Garage', ausmass: 'klein' },
+  {
+    kennung: 'S-01',
+    ort: 'Scheune Hof Meyer',
+    abschnitt: 'EA 1',
+    meldung: '1412',
+    ausmass: 'gross',
+  },
+  { kennung: 'S-02', ort: 'Wohnhaus Nord', abschnitt: 'EA 1', meldung: '1418', ausmass: 'klein' },
+  { kennung: 'S-03', ort: 'Stallung', abschnitt: 'EA 1', meldung: '1421', ausmass: 'mittel' },
+  { kennung: 'S-04', ort: 'Lagerhalle', abschnitt: 'EA 2', meldung: '1433', ausmass: 'gross' },
+  { kennung: 'S-05', ort: 'Garage', abschnitt: 'EA 2', meldung: '1440', ausmass: 'klein' },
+  { kennung: 'S-06', ort: 'Trafostation', abschnitt: 'EA 2', meldung: '1446', ausmass: 'mittel' },
+  { kennung: 'S-07', ort: 'Brücke Allerweg', abschnitt: 'EA 3', meldung: '1452', ausmass: 'gross' },
 ];
 
-/** Ein gemerkter Stand: nach Ort sortiert, Ausmaß „Groß“ gefiltert. */
+/**
+ * Ein gemerkter Stand: nach Ort sortiert, Ausmaß „Klein“ ausgefiltert, die Spalte „Gemeldet“ von
+ * Hand ausgeblendet (der Spaltenschalter zählt sie).
+ */
 const SCHAEDEN_GEDAECHTNIS: ListenGedaechtnis = {
   start: {
     sortierung: { spalte: 'ort', richtung: 'auf' },
-    filter: { ausmass: ['gross'] },
+    filter: { ausmass: ['gross', 'mittel'] },
     suche: '',
   },
-  spaltenStart: null,
+  spaltenStart: { aus: ['meldung'], an: [] },
   melde: nichts,
   meldeSpalten: nichts,
 };
 
+/** Eine Quelle für das ⋮ der Aktionsspalte und das Kontextmenü der Zeile. */
+const SCHADEN_MENUE: WeitereAktionen<Quelle> = {
+  eintraege: () => [
+    { key: 'bearbeiten', label: 'Bearbeiten' },
+    { key: 'auftrag', label: 'Auftrag erteilen' },
+    { key: 'stornieren', label: 'Stornieren', gefahr: true },
+  ],
+  zugaenglicherName: (s) => `Aktionen zu Schaden ${s.kennung}`,
+  onWahl: nichts,
+};
+
 /**
- * Eine Vergleichstabelle mit Sortieren und Filtern im Kopf: sortiert nach Ort, gefiltert nach
- * Ausmaß, darüber Chip und Filterhinweis.
+ * Eine Vergleichstabelle mit Suche, Spaltenschalter und ⋮ je Zeile; Sortieren und Filtern im
+ * Kopf: sortiert nach Ort, gefiltert nach Ausmaß, darüber Chips und Filterhinweis.
  */
 function TabelleBeispiel() {
   return (
@@ -750,6 +823,9 @@ function TabelleBeispiel() {
       gedaechtnis={SCHAEDEN_GEDAECHTNIS}
       mehrzahl="Schäden"
       pagination={false}
+      suche={{ platzhalter: 'Kennung, Ort oder Abschnitt' }}
+      spaltenSchalter={{ bezeichnung: 'Schäden' }}
+      zeilenMenue={SCHADEN_MENUE}
       columns={[
         {
           title: 'Kennung',
@@ -764,12 +840,21 @@ function TabelleBeispiel() {
           key: 'ort',
           sorter: (a, b) => a.ort.localeCompare(b.ort),
         },
+        { title: 'Abschnitt', dataIndex: 'abschnitt', key: 'abschnitt' },
+        { title: 'Gemeldet', dataIndex: 'meldung', key: 'meldung', zahl: true },
         {
           title: 'Ausmaß',
           key: 'ausmass',
           render: (_, s) => AUSMASS.find((a) => a.value === s.ausmass)!.text,
           filters: [...AUSMASS],
           onFilter: (wert, s) => s.ausmass === wert,
+        },
+        {
+          title: 'Aktionen',
+          key: 'aktionen',
+          immerSichtbar: true,
+          fixed: 'right',
+          render: (_, s) => <ZeilenMenueAusloeser menue={SCHADEN_MENUE} zeile={s} />,
         },
       ]}
     />
@@ -983,13 +1068,332 @@ function GrossZeilenVorschau() {
   );
 }
 
+/**
+ * Das Ende einer CSS-Bewegung, wie der Browser es meldet. jsdom spielt keine Bewegung ab und
+ * meldet kein Ende; rc-motion hört auf genau einen Namen je Art, je nach Umgebung mit oder ohne
+ * Vorsilbe (jsdom kennt kein `AnimationEvent`, also `webkitAnimationEnd`). Gemeldet werden alle.
+ */
+const BEWEGUNG_ENDE = [
+  'animationend',
+  'webkitAnimationEnd',
+  'transitionend',
+  'webkitTransitionEnd',
+];
+
+/**
+ * Beendet die Einblendung von antd (Dialog, Maske, Fehlerzeile), sonst stünde ihr Anfang (Höhe 0,
+ * unsichtbar) in der Vorschau. Eine Bewegung endet am gemeldeten Ende oder, wo sie eine Frist hat,
+ * an der Frist (`motionDeadline`, 500 ms; die Fehlerzeile wartet auf das Ende der Höhe). In
+ * kleinen Schritten, weil `act` die Updates eines Schritts erst an seinem Ende anwendet und jede
+ * Phase der Bewegung auf der vorigen aufbaut.
+ */
+async function beendeBewegung(container: HTMLElement): Promise<void> {
+  const LAUFEND = '[class*="-appear"], [class*="-enter"]';
+  for (let schritt = 0; schritt < 40; schritt += 1) {
+    await act(async () => {
+      for (const element of container.querySelectorAll(LAUFEND)) {
+        for (const name of BEWEGUNG_ENDE) element.dispatchEvent(new Event(name));
+      }
+      await new Promise((fertig) => setTimeout(fertig, 50));
+    });
+    if (!container.querySelector(LAUFEND)) return;
+  }
+  throw new Error('Design System: die Einblendung von antd endet nicht');
+}
+
+/** Abschnitte eines Einsatzes als Auswahl, für Eingabefeld, Dialog und Formularlayout. */
+const ABSCHNITTE = [
+  { value: 'ea1', label: 'EA 1 Brandbekämpfung' },
+  { value: 'ea2', label: 'EA 2 Wasserversorgung' },
+  { value: 'ea3', label: 'EA 3 Bereitstellung' },
+];
+
+/**
+ * Felder mit Beschriftung darüber: Text, Auswahl und Zeitpunkt (`ZeitpunktEingabe`, die
+ * Datumseingabe der App), ein Pflichtfeld mit sichtbarer Fehlerzeile. Darunter ein Feld ohne
+ * `Form.Item` mit `FeldFehler`. Eigener Formularname je Instanz: die Feld-IDs stehen sonst
+ * doppelt im Dokument.
+ */
+function EingabefeldBeispiel() {
+  const name = useId();
+  const feldId = useId();
+  const fehlerId = useId();
+  return (
+    <AnzeigeKonventionenProvider konventionen={KONVENTIONEN_TAKTISCH}>
+      <Form
+        name={name}
+        layout="vertical"
+        initialValues={{
+          einheit: 'Florian Celle 1-46-1',
+          abschnitt: 'ea2',
+          eingetroffen: dayjs(ZEIT_LAGE),
+        }}
+      >
+        <Form.Item label="Einheit (Funkrufname)" name="einheit">
+          <Input />
+        </Form.Item>
+        <Form.Item label="Einsatzabschnitt" name="abschnitt">
+          <Select options={ABSCHNITTE} />
+        </Form.Item>
+        <Form.Item label="Eingetroffen" name="eingetroffen">
+          <ZeitpunktEingabe art="ereignis" />
+        </Form.Item>
+        <Form.Item
+          label="Auftrag"
+          name="auftrag"
+          required
+          validateStatus="error"
+          help="Auftrag ist Pflicht"
+        >
+          <Input />
+        </Form.Item>
+      </Form>
+      <div className="ds-feld">
+        <label htmlFor={feldId}>Einsatzort</label>
+        <Input id={feldId} aria-invalid aria-describedby={fehlerId} />
+        <FeldFehler id={fehlerId}>Ort ist Pflicht</FeldFehler>
+      </div>
+    </AnzeigeKonventionenProvider>
+  );
+}
+
+interface Lagemeldung {
+  absender: string;
+  abschnitt: string;
+  lage: string;
+}
+
+/**
+ * Die Erfassungshülle als Dialog im Serienmodus. Die Feld-IDs tragen eine eigene Vorsilbe je
+ * Instanz (`ErfassungsFormular` setzt keinen Formularnamen), sonst stünden sie doppelt im Dokument.
+ */
+function ErfassungsBeispiel() {
+  const [form] = Form.useForm<Lagemeldung>();
+  const id = useId();
+  return (
+    <ErfassungsModal<Lagemeldung>
+      offen
+      titel="Lagemeldung erfassen"
+      form={form}
+      onErfassen={async () => undefined}
+      onFertig={nichts}
+      onAbbrechen={nichts}
+      serie
+      uebernahme={['absender', 'abschnitt']}
+      initialValues={{ absender: 'Florian Celle 1-46-1', abschnitt: 'ea1' }}
+    >
+      <Form.Item
+        label="Absender"
+        name="absender"
+        htmlFor={`${id}-absender`}
+        rules={[{ required: true, message: 'Absender ist Pflicht' }]}
+      >
+        <Input id={`${id}-absender`} />
+      </Form.Item>
+      <Form.Item label="Einsatzabschnitt" name="abschnitt" htmlFor={`${id}-abschnitt`}>
+        <Select id={`${id}-abschnitt`} options={ABSCHNITTE} />
+      </Form.Item>
+      <Form.Item label="Lage" name="lage" htmlFor={`${id}-lage`}>
+        <Input.TextArea id={`${id}-lage`} rows={3} />
+      </Form.Item>
+    </ErfassungsModal>
+  );
+}
+
+/**
+ * Der Dialog öffnet als Portal. Hier landet er über `getPopupContainer` in einem Rahmen der Karte;
+ * `transform` macht den Rahmen zum Bezug seiner festen Lage (Maske und Dialog), so steht beides
+ * in der Karte statt über dem Fenster.
+ */
+function DialogBeispiel() {
+  const [rahmen, setRahmen] = useState<HTMLDivElement | null>(null);
+  return (
+    <div
+      ref={setRahmen}
+      style={{ position: 'relative', transform: 'translateZ(0)', height: 520, overflow: 'hidden' }}
+    >
+      {rahmen && (
+        <ConfigProvider getPopupContainer={() => rahmen}>
+          <ErfassungsBeispiel />
+        </ConfigProvider>
+      )}
+    </div>
+  );
+}
+
+/** Die drei Zustände eines Paneels nebeneinander, je in einem Paneel. */
+const PANEEL_ZUSTAENDE = [
+  ['laden', 'Meldungen'],
+  ['leer', 'Aufträge'],
+  ['fehler', 'Nachforderungen'],
+] as const;
+
+/**
+ * Lade-, Leer- und Fehlerzustand einer Seite, darunter dieselben drei eines Paneels. Der
+ * Leerzustand führt mit einer Aktion heraus; der Fehler bietet den erneuten Abruf an.
+ */
+function ZustaendeBeispiel() {
+  return (
+    <MemoryRouter>
+      <div className="ds-stapel">
+        <SeitenSkeleton />
+        <SeitenLeer
+          titel="Noch keine Schäden erfasst"
+          hinweis="Schäden entstehen aus Meldungen oder werden hier angelegt."
+          aktion={{ label: 'Schaden erfassen', onClick: nichts }}
+        />
+        <SeitenFehler
+          text="Schäden konnten nicht abgerufen werden"
+          ursache={new ApiError(503, 'Dienst vorübergehend nicht erreichbar')}
+          onWiederholen={nichts}
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+          {PANEEL_ZUSTAENDE.map(([zustand, titel]) => (
+            <Paneel key={zustand} titel={titel} ueberschrift="h3">
+              <PaneelZustand
+                zustand={zustand}
+                titel={titel}
+                leerText={`Keine ${titel} offen.`}
+                leerAktion="Auftrag erteilen"
+                onLeerAktion={nichts}
+                onNeuladen={nichts}
+              >
+                {null}
+              </PaneelZustand>
+            </Paneel>
+          ))}
+        </div>
+      </div>
+    </MemoryRouter>
+  );
+}
+
+/**
+ * Hinweise einer Fläche: fehlendes Recht als eine Zeile, die Warnstufe im Seitenkopf und `Alert`
+ * auf den Statusflächen (bedien, normal, achtung, alarm). Achtung und Alarm sind die echten
+ * Hinweise der App: veralteter Stand und Speicherfehler ohne Netz.
+ */
+function HinweisBeispiel() {
+  return (
+    <div className="ds-stapel">
+      <RechteHinweis sichtbar text={EINSATZ_ABGESCHLOSSEN} />
+      <RechteHinweis sichtbar marke="Ohne Besatzung" text={MODUL_PERSONAL_GESPERRT} />
+      <div className="ds-reihe">
+        <WarnstufenHinweis ton="achtung">Warnstufe mittel</WarnstufenHinweis>
+        <WarnstufenHinweis ton="alarm">Warnstufe hoch</WarnstufenHinweis>
+      </div>
+      <Alert type="info" showIcon title="Zeitachse: kein Status trägt ein Ereignis" />
+      <Alert type="success" showIcon title="Lagebericht 3 freigegeben" />
+      <SeitenStandVeraltet onWiederholen={nichts} />
+      <SpeicherFehler fehler={new NetzFehler()} />
+    </div>
+  );
+}
+
+/**
+ * Seitenkopf einer Modulseite: Ortspfad, Titel als `h1`, Mono-Meta, eine Primäraktion und ein
+ * Nebenweg; darunter knapp der Inhalt. Der letzte Eintrag des Ortspfads nennt die Seite selbst
+ * und ist ausgeblendet. Ohne Kleben: die Karte hat keinen Rahmen, unter dem er stehen könnte.
+ */
+function SeitenkopfBeispiel() {
+  return (
+    <MemoryRouter>
+      <EinsatzSeite
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: <Link to="/einsaetze/7">Hochwasser Aller</Link> },
+              { title: 'Schäden' },
+            ]}
+          />
+        }
+        titel="Schäden"
+        meta="12 Schäden · 3 offen"
+        aktionen={<Button type="primary">Schaden erfassen</Button>}
+        weitere={{
+          name: 'Weitere Aktionen zu den Schäden',
+          eintraege: [{ key: 'drucken', label: 'Drucken', onWahl: nichts }],
+        }}
+        kopfKlebt={false}
+      >
+        <Paneel titel="Offene Schäden" ueberschrift="h2" meta="3 Schäden">
+          <PaneelZeile>S-01 Scheune Hof Meyer · EA 1</PaneelZeile>
+          <PaneelZeile>S-04 Lagerhalle · EA 2</PaneelZeile>
+          <PaneelZeile>S-07 Brücke Allerweg · EA 3</PaneelZeile>
+        </Paneel>
+      </EinsatzSeite>
+    </MemoryRouter>
+  );
+}
+
+/**
+ * Eine Formularseite: zwei Feldgruppen als `Formularpaneel` im selben `<Form>`, danach die
+ * Speicherleiste mit genau einem Knopf. Eigener Formularname je Instanz.
+ */
+function FormularlayoutBeispiel() {
+  const { token } = useRollen();
+  const leiste = useSpeicherLeiste();
+  const name = useId();
+  return (
+    <Form
+      name={name}
+      layout="vertical"
+      initialValues={{
+        bezeichnung: 'Bereitstellungsraum Nord',
+        abschnitt: 'ea3',
+        rufname: 'Florian Celle 1-46-1',
+        sprechgruppe: '412_F_DRK',
+      }}
+    >
+      <Formularpaneel
+        titel="Bereitstellungsraum"
+        ueberschrift="h3"
+        beschreibung="Gilt für alle Einheiten, die hier eintreffen."
+      >
+        <Row gutter={token.margin}>
+          <Col xs={24} sm={12}>
+            <Form.Item label="Bezeichnung" name="bezeichnung">
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Form.Item label="Einsatzabschnitt" name="abschnitt">
+              <Select options={ABSCHNITTE} />
+            </Form.Item>
+          </Col>
+        </Row>
+      </Formularpaneel>
+      <Formularpaneel titel="Funk" ueberschrift="h3">
+        <Row gutter={token.margin}>
+          <Col xs={24} sm={12}>
+            <Form.Item label="Rufname der Leitung" name="rufname">
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12}>
+            <Form.Item label="Sprechgruppe" name="sprechgruppe">
+              <Input />
+            </Form.Item>
+          </Col>
+        </Row>
+      </Formularpaneel>
+      <div {...leiste}>
+        <Button type="primary" htmlType="submit">
+          Speichern
+        </Button>
+      </div>
+    </Form>
+  );
+}
+
 /** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
 export const PREVIEWS: readonly PreviewSpec[] = [
   {
     name: 'Paneel',
     title: 'Paneel',
     group: 'Flächen',
-    height: 420,
+    height: 423,
     source: 'components/instrument/Paneel.tsx',
     docAnchor: 'export const PANEEL_KOPF_HOEHE',
     content: () => (
@@ -1001,10 +1405,22 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     ),
   },
   {
+    name: 'Seitenkopf',
+    title: 'Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)',
+    group: 'Rahmen',
+    height: 665,
+    source: 'components/EinsatzSeite.tsx',
+    docAnchor: 'export default function EinsatzSeite',
+    regeln: ['Seitenkopf'],
+    styles: ['components/EinsatzSeite.css', 'icons/icons.css'],
+    client: true,
+    content: () => <SeitenkopfBeispiel />,
+  },
+  {
     name: 'Dashboard',
-    title: 'Dashboard-Baukasten (Verteilung und Matrix)',
+    title: 'Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)',
     group: 'Flächen',
-    height: 976,
+    height: 1200,
     source: 'components/instrument/DashboardPaneel.tsx',
     ruleHead: 'Dashboard-Baukasten',
     styles: ['components/instrument/matrixPaneel.css'],
@@ -1039,7 +1455,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Datenraster',
     title: 'Datenraster mit DatenfeldEingabe und FeldFehler',
     group: 'Daten',
-    height: 550,
+    height: 570,
     source: 'components/instrument/Datenraster.tsx',
     content: () => (
       <Form layout="vertical" initialValues={{ funkrufname: 'Florian Celle 1-46-1' }}>
@@ -1095,8 +1511,9 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Kennzahl',
     title: 'Kennzahl und Kennzahlenband',
     group: 'Daten',
-    height: 490,
+    height: 513,
     source: 'components/instrument/Kennzahl.tsx',
+    regeln: ['Kennzahlenband', 'Eine Heimat je Zahl'],
     content: () => (
       <Kennzahlenband spalten={2} beschriftung="Lage in Zahlen">
         <Kennzahl titel="Betroffene" wert={42} notiz="davon 3 SK I" />
@@ -1149,9 +1566,9 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'Segmentleiste',
-    title: 'Segmentleiste',
+    title: 'Segmentleiste (Filter, Umbruch, als Formularfeld)',
     group: 'Bedienung',
-    height: 280,
+    height: 425,
     source: 'components/instrument/Segmentleiste.tsx',
     // Die zweite Leiste zeigt den Zeilenumbruch im Wortlaut (Ablösung im Handschuh-Betrieb).
     // `alignItems` hält beide Leisten so breit wie ihre Segmente, wie in der App.
@@ -1178,6 +1595,19 @@ export const PREVIEWS: readonly PreviewSpec[] = [
             { wert: 'vergangen', label: 'Vergangen' },
           ]}
         />
+        {/* Als Formularfeld (Spec `bedien-umschalten`): kurze Wahl im `Form`, Beschriftung darüber. */}
+        <Form layout="vertical" initialValues={{ raeumung: 'laeuft' }} style={{ width: '100%' }}>
+          <Form.Item name="raeumung" label="Räumungszustand" style={{ marginBottom: 0 }}>
+            <SegmentFeld<string>
+              beschriftung="Räumungszustand"
+              optionen={[
+                { wert: 'angeordnet', label: 'Angeordnet' },
+                { wert: 'laeuft', label: 'Läuft' },
+                { wert: 'geraeumt', label: 'Geräumt' },
+              ]}
+            />
+          </Form.Item>
+        </Form>
       </div>
     ),
   },
@@ -1232,17 +1662,36 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Sammelbanner',
     title: 'Sammelbanner',
     group: 'Rückmeldung',
-    height: 200,
+    height: 213,
     source: 'components/instrument/Sammelbanner.tsx',
     content: () => (
       <Sammelbanner aktion={{ label: 'Anzeigen', onKlick: nichts }}>12 neue Meldungen</Sammelbanner>
     ),
   },
   {
+    name: 'Zustaende',
+    title: 'Zustände: Seite und Paneel (laden, leer, Fehler)',
+    group: 'Rückmeldung',
+    height: 1217,
+    source: 'components/SeitenZustand.tsx',
+    moreDoc: 'components/instrument/PaneelZustand.tsx',
+    content: () => <ZustaendeBeispiel />,
+  },
+  {
+    name: 'Hinweis',
+    title: 'Hinweis: Rechte, Warnstufe und Alert auf der Statusfläche',
+    group: 'Rückmeldung',
+    height: 820,
+    source: 'components/SpeicherHinweis.tsx',
+    moreDoc: 'components/instrument/WarnstufenHinweis.tsx',
+    styles: ['icons/icons.css'],
+    content: () => <HinweisBeispiel />,
+  },
+  {
     name: 'InlineAngabe',
     title: 'InlineAngabe (geschlossen, leer, offen)',
     group: 'Bedienung',
-    height: 570,
+    height: 602,
     source: 'components/InlineAngabe.tsx',
     content: () => (
       <Datenraster spalten={1} beschriftung="Angaben">
@@ -1271,7 +1720,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Verbindungen',
     title: 'Verbindungen (Funk und Telefon getrennt; Liste offen)',
     group: 'Bedienung',
-    height: 895,
+    height: 1025,
     source: 'components/VerbindungenFeld.tsx',
     moreDoc: 'components/FunkUndTelefon.tsx',
     content: () => (
@@ -1356,7 +1805,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'BearbeitbaresPaneel',
     title: 'BearbeitbaresPaneel (offen und gesperrt)',
     group: 'Formular',
-    height: 710,
+    height: 751,
     source: 'components/instrument/BearbeitbaresPaneel.tsx',
     content: () => <BearbeitbaresPaneelBeispiel />,
     interact: async (container) => {
@@ -1373,10 +1822,77 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     },
   },
   {
+    name: 'Knopf',
+    title: 'Knopf (primär, Standard, Text, Gefahr, gesperrt, mit Symbol)',
+    group: 'Eingabe',
+    height: 361,
+    source: 'theme/tokens.ts',
+    docAnchor: 'export function antdKnopf',
+    styles: ['icons/icons.css'],
+    content: () => (
+      <div className="ds-stapel">
+        <div className="ds-reihe">
+          <Button type="primary">Erfassen</Button>
+          <Button>Bearbeiten</Button>
+          <Button type="text">Abbrechen</Button>
+          <Button danger>Stornieren</Button>
+        </div>
+        <div className="ds-reihe">
+          <Button type="primary" disabled>
+            Erfassen
+          </Button>
+          <Button disabled>Bearbeiten</Button>
+          <Button type="text" disabled>
+            Abbrechen
+          </Button>
+          <Button danger disabled>
+            Stornieren
+          </Button>
+        </div>
+        <div className="ds-reihe">
+          <Button type="primary" icon={<IconPlus />}>
+            Meldung erfassen
+          </Button>
+          <Button icon={<IconStift />}>Bearbeiten</Button>
+          <Button aria-label="Weitere Aktionen" icon={<IconPunkteSenkrecht />} />
+        </div>
+      </div>
+    ),
+  },
+  {
+    name: 'Eingabefeld',
+    title: 'Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)',
+    group: 'Eingabe',
+    height: 903,
+    source: 'components/instrument/FeldFehler.tsx',
+    styles: ['anzeige/ZeitpunktEingabe.css'],
+    content: () => <EingabefeldBeispiel />,
+    interact: beendeBewegung,
+  },
+  {
+    name: 'Formularlayout',
+    title: 'Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)',
+    group: 'Eingabe',
+    height: 915,
+    source: 'components/instrument/Formularpaneel.tsx',
+    content: () => <FormularlayoutBeispiel />,
+  },
+  {
+    name: 'Dialog',
+    title: 'Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)',
+    group: 'Eingabe',
+    height: 1173,
+    source: 'components/Erfassung.tsx',
+    docAnchor: 'export function ErfassungsModal',
+    styles: ['components/Erfassung.css'],
+    content: () => <DialogBeispiel />,
+    interact: beendeBewegung,
+  },
+  {
     name: 'Speicherleiste',
     title: 'Speicherleiste',
     group: 'Formular',
-    height: 360,
+    height: 371,
     source: 'components/speicherLeiste.ts',
     docAnchor: 'export function speicherLeisteStil',
     content: () => <SpeicherleisteBeispiel />,
@@ -1394,7 +1910,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'DokumentEntwurf',
     title: 'DokumentEntwurf (Bearbeiten und Lesefassung)',
     group: 'Formular',
-    height: 1610,
+    height: 1687,
     source: 'entwurf/DokumentEntwurf.tsx',
     docAnchor: 'export default function DokumentEntwurf',
     styles: [
@@ -1492,7 +2008,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'DashboardListen',
     title: 'Dashboard-Baukasten (Abschnitte, Gliederung, Strom)',
     group: 'Flächen',
-    height: 1305,
+    height: 1350,
     source: 'components/instrument/ListenPaneel.tsx',
     docAnchor: 'export function ListenAbschnitt',
     moreDoc: 'components/instrument/StromPaneel.tsx',
@@ -1502,11 +2018,12 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'Tabelle',
-    title: 'Tabellenkopf mit Sortieren und Filtern, Filterhinweis',
+    title: 'Tabelle: KatalogTabelle mit Suche, Spalten, Filtern und Zeilenmenü',
     group: 'Daten',
-    height: 515,
-    source: 'components/tabellenFilter.tsx',
-    moreDoc: 'components/instrument/Filterhinweis.tsx',
+    height: 921,
+    source: 'components/KatalogTabelle.tsx',
+    docAnchor: 'export type KatalogSpalte<T>',
+    moreDoc: 'components/tabellenFilter.tsx',
     client: true,
     content: () => <TabelleBeispiel />,
   },
@@ -1533,7 +2050,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Ortsfeld',
     title: 'Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)',
     group: 'Formular',
-    height: 1140,
+    height: 1146,
     source: 'anzeige/Ortsfeld.tsx',
     docAnchor: 'export function Ortsfeld',
     content: () => <OrtsfeldBeispiel />,

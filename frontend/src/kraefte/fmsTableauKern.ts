@@ -1,6 +1,6 @@
 import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
 import type { StatusOption } from '../components/StatusWahl';
-import { statusKategorie } from '../theme/statusFarben';
+import { kategorieDarstellung } from '../theme/statusFarben';
 import { abschnittDerEinheit } from './kraeftebaumKern';
 import { fmsEtikett } from './meldebildRaster';
 
@@ -112,7 +112,7 @@ export function fmsStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOpt
   return katalog.map((s) => ({
     wert: s.id,
     label: fmsEtikett(s.label, s.fms_anker),
-    darstellung: statusKategorie[s.kategorie],
+    darstellung: kategorieDarstellung(s.kategorie, s.fms_anker),
     farbe: s.farbe,
   }));
 }

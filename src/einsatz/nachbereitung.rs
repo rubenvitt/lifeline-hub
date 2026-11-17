@@ -270,7 +270,8 @@ mod tests {
             texte[0].ends_with("(Vorgabe 30 Tage ab Abschluss)"),
             "{texte:?}"
         );
-        assert_eq!(ergebnis.etb_eintrag_ids.len(), 1, "live gemeldet");
+        // „Einsatz abgeschlossen“ (LLH-1814) und die Nachbereitung, beide live gemeldet.
+        assert_eq!(ergebnis.etb_eintrag_ids.len(), 2, "live gemeldet");
     }
 
     #[tokio::test]

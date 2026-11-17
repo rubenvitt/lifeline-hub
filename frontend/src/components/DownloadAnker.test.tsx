@@ -24,8 +24,8 @@ describe('downloadAnkerStil (LFH-21)', () => {
   });
 
   it('trägt ZWEI Angaben: neben dem Boden eine Polsterung, die mitzieht', () => {
-    expect(downloadAnkerStil(tokenFuer('kompakt')).paddingBlock).toBe(3);
-    expect(downloadAnkerStil(tokenFuer('komfortabel')).paddingBlock).toBe(5);
+    expect(downloadAnkerStil(tokenFuer('kompakt')).paddingBlock).toBe(4);
+    expect(downloadAnkerStil(tokenFuer('handschuh')).paddingBlock).toBe(8);
     expect(downloadAnkerStil(tokenFuer('kompakt')).boxSizing).toBe('border-box');
   });
 });

@@ -25,6 +25,7 @@ import { ordneEinheiten } from './GeraetAbschnittPage';
 import { isEigenerEmpfaenger } from './GeraetAuftraegePage';
 import { abschnittsZonen, flaechenRahmen } from './GeraetAbschnittKarte';
 import { navigationZeigt } from './GeraeteLayout';
+import { rahmenFarben } from '../theme/tokens';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
 
@@ -182,7 +183,6 @@ afterEach(() => {
   FakeEventSource.zuruecksetzen();
   localStorage.clear();
 });
-
 describe('Gerätehülle — Übung (LLH-1725, Spec `uebungsmarke`)', () => {
   it('zeigt bei einer Übung das Band direkt unter dem Gerätekopf, ohne zu kleben', async () => {
     stelleBereit();
@@ -270,6 +270,11 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
         .getAllByRole('link')
         .map((l) => l.textContent),
     ).toEqual(['Abschnitt', 'Aufträge', 'Melden', 'Karte']);
+    // Ortsmarke des aktiven Reiters in der Bedienfarbe, nicht rot (Spec `farbrollen-kontrast`,
+    // „Die Ortsmarke im Rahmen trägt die Bedienfarbe“, eon26eat D7); die übrigen ohne Marke.
+    const aktiv = within(nav).getByRole('link', { name: 'Abschnitt' });
+    expect(aktiv.style.boxShadow).toBe(`inset 0 3px 0 ${rahmenFarben.bedien}`);
+    expect(within(nav).getByRole('link', { name: 'Karte' }).style.boxShadow).toBe('none');
   });
 
   it('eine Untereinheit mit geerbtem Abschnitt: Abschnitt, „über …“ und eigene Stärke (LLH-1744)', async () => {
