@@ -61,7 +61,10 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    die Beurteilung bestätigt hat, steht dahinter „unbestätigt“ (Kapitel
    [Gefahren](gefahren.md)). Ist in der Matrix noch keine Gefahr gesetzt, steht dort „keine
    Stufe“, und die Fläche ist vorsichtshalber rot. Ein langer Name bricht in der Beschriftung um.
-   Absperrungen und Sperrgebiete tragen nur ihre Art, etwa „Absperrbereich“.
+   Absperrungen und Sperrgebiete tragen nur ihre Art, etwa „Absperrbereich“. Liegen
+   Beschriftungen eng beieinander, rücken sie auseinander, statt sich zu überdecken: Die
+   Beschriftung einer UHS bleibt an ihrem Ort, die der Flächen weicht aus. Der Punkt des
+   Einsatzorts bleibt immer frei.
 6. „Meldungen“ unter der Karte zählt die „Sofortmeldungen offen“, die noch niemand bestätigt
    hat.
 7. „Ablauf“ neben „Meldungen“ nennt die nächsten drei Programmpunkte aus den

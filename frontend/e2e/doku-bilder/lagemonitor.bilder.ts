@@ -184,6 +184,31 @@ test.describe(KAPITEL, () => {
           }),
         )
         .toBe(true);
+      // LLH-1933: der Einsatzort-Punkt bleibt frei und keine Marke überdeckt eine andere. Die
+      // Marken weichen nach dem Aufbau aus (`idle`), deshalb abwarten statt einmal messen.
+      await expect
+        .poll(() =>
+          geraet.evaluate(() => {
+            const marken = [...document.querySelectorAll<HTMLElement>('.maplibregl-marker')];
+            const name = (m: HTMLElement) =>
+              m.getAttribute('aria-label') ?? m.textContent ?? m.dataset.lfh ?? '?';
+            const boxen = marken.map((m) => ({ name: name(m), r: m.getBoundingClientRect() }));
+            const befunde: string[] = [];
+            for (const [i, a] of boxen.entries()) {
+              for (const b of boxen.slice(i + 1)) {
+                if (
+                  a.r.left < b.r.right &&
+                  b.r.left < a.r.right &&
+                  a.r.top < b.r.bottom &&
+                  b.r.top < a.r.bottom
+                )
+                  befunde.push(`${a.name} ↔ ${b.name}`);
+              }
+            }
+            return befunde;
+          }),
+        )
+        .toEqual([]);
       await geraet.mouse.move(0, 0);
       await expect(geraet.locator('[data-lfh="alarm-zeile"]')).toHaveAttribute(
         'data-stand',

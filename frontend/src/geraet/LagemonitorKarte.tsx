@@ -25,6 +25,7 @@ import {
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
 import { rollenFarbe } from '../theme/statusFarben';
 import { baueMonitorFlaechen, belegungText, istUeberbelegt } from './lagemonitorFlaechen';
+import { placeMarken, type Box, type MarkenEingabe } from './lagemonitorMarken';
 
 /**
  * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`),
@@ -62,6 +63,41 @@ export function monitorAusschnitt(
   if (west === ost && sued === nord)
     return { art: 'punkt', lon: west, lat: sued, zoom: PUNKT_ZOOM };
   return { art: 'rahmen', west, sued, ost, nord };
+}
+
+/** Eine Marke auf der Karte: maplibres Marker, sein Element und sein Ort. */
+interface KartenMarke {
+  marker: maplibregl.Marker;
+  el: HTMLElement;
+  lngLat: [number, number];
+}
+
+/**
+ * Setzt die Marken so, dass keine den Einsatzort und keine eine andere deckt (LLH-1933,
+ * `lagemonitorMarken.ts`): misst die Elemente, rechnet ihre Anker in Pixel der Kachel und gibt jedem
+ * Marker seinen Versatz. `marken` in der Rangfolge UHS, Abschnitte, Zonen. Ohne Fläche (Kachel
+ * verborgen) bleibt alles, wie es ist.
+ */
+function placeOnMap(map: maplibregl.Map, einsatzort: KartenMarke | null, marken: KartenMarke[]) {
+  const kachel = map.getContainer();
+  const area = { width: kachel.clientWidth, height: kachel.clientHeight };
+  if (area.width === 0 || area.height === 0) return;
+  const measure = (m: KartenMarke): MarkenEingabe => {
+    const { x, y } = map.project(m.lngLat);
+    return { anchor: { x, y }, width: m.el.offsetWidth, height: m.el.offsetHeight };
+  };
+  const obstacles: Box[] = [];
+  if (einsatzort) {
+    const p = measure(einsatzort);
+    obstacles.push({
+      left: p.anchor.x - p.width / 2,
+      top: p.anchor.y - p.height / 2,
+      width: p.width,
+      height: p.height,
+    });
+  }
+  const versatz = placeMarken({ area, obstacles, marken: marken.map(measure) });
+  marken.forEach((m, i) => m.marker.setOffset([versatz[i].dx, versatz[i].dy]));
 }
 
 /**
@@ -214,12 +250,22 @@ export default function LagemonitorKarte({
   }, [flaechen, config, dunkel, hatAusschnitt]);
 
   // Marker: Einsatzort, je Abschnittsfläche ihre Bezeichnung, je Gefahrenzone Name und Stufe
-  // (LLH-1746) und je UHS ein Schild mit Belegten und Plätzen, überbelegt in der Alarmrolle.
+  // (LLH-1746) und je UHS ein Schild mit Belegten und Plätzen, überbelegt in der Alarmrolle. Danach
+  // weichen die Marken einander und dem Einsatzort aus (LLH-1933), neu nach jedem Aufbau der Karte.
   useEffect(() => {
     const map = karte.current;
     if (!map) return;
     for (const m of marker.current) m.remove();
     const neu: maplibregl.Marker[] = [];
+    const setze = (el: HTMLElement, lngLat: [number, number]): KartenMarke => {
+      const m = new maplibregl.Marker({ element: el }).setLngLat(lngLat);
+      neu.push(m);
+      return { marker: m, el, lngLat };
+    };
+    let ort: KartenMarke | null = null;
+    const uhsMarken: KartenMarke[] = [];
+    const abschnittMarken: KartenMarke[] = [];
+    const zonenMarken: KartenMarke[] = [];
     if (einsatzort) {
       const el = document.createElement('div');
       el.setAttribute('aria-label', 'Einsatzort');
@@ -229,8 +275,10 @@ export default function LagemonitorKarte({
         borderRadius: '50%',
         background: rollen.marke,
         border: `4px solid ${rollen.grund}`,
+        // Über allen Marken: selbst wenn kein freier Platz bleibt, deckt keine den Punkt zu.
+        zIndex: '1',
       });
-      neu.push(new maplibregl.Marker({ element: el }).setLngLat([einsatzort.lon, einsatzort.lat]));
+      ort = setze(el, [einsatzort.lon, einsatzort.lat]);
     }
     for (const a of flaechen.marken) {
       const el = document.createElement('div');
@@ -246,7 +294,7 @@ export default function LagemonitorKarte({
         color: rollen.text,
         border: `2px solid ${ABSCHNITT_FARBE}`,
       });
-      neu.push(new maplibregl.Marker({ element: el }).setLngLat([a.lon, a.lat]));
+      abschnittMarken.push(setze(el, [a.lon, a.lat]));
     }
     for (const z of zonenBeschriften ? flaechen.zonenMarken : []) {
       const el = document.createElement('div');
@@ -281,7 +329,7 @@ export default function LagemonitorKarte({
         stufe.style.whiteSpace = 'nowrap';
         el.append(stufe);
       }
-      neu.push(new maplibregl.Marker({ element: el }).setLngLat([z.lon, z.lat]));
+      zonenMarken.push(setze(el, [z.lon, z.lat]));
     }
     for (const u of verortet) {
       const ueberbelegt = istUeberbelegt(u);
@@ -299,10 +347,22 @@ export default function LagemonitorKarte({
         color: ueberbelegt ? rollen.alarmText : rollen.text,
         border: `2px solid ${ueberbelegt ? rollen.alarmText : rollen.linieStark}`,
       });
-      neu.push(new maplibregl.Marker({ element: el }).setLngLat([u.lon!, u.lat!]));
+      uhsMarken.push(setze(el, [u.lon!, u.lat!]));
     }
     for (const m of neu) m.addTo(map);
     marker.current = neu;
+    // Rangfolge: die UHS-Marke ist ihr Standort und bleibt, Flächenmarken benennen eine Fläche und
+    // dürfen wandern, Zonen zuletzt. Nach dem Laden von Kacheln und Schrift (`idle`) und bei
+    // geänderter Größe neu, weil sich Pixelorte und Maße dann ändern.
+    const rang = [...uhsMarken, ...abschnittMarken, ...zonenMarken];
+    const place = () => placeOnMap(map, ort, rang);
+    place();
+    map.on('idle', place);
+    map.on('resize', place);
+    return () => {
+      map.off('idle', place);
+      map.off('resize', place);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
   }, [
     verortetSchluessel,
