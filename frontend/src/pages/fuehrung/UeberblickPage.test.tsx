@@ -1,3 +1,6 @@
+import { theme as antdTheme } from 'antd';
+import { rollenFarbe } from '../../theme/statusFarben';
+import { farbenHell } from '../../theme/tokens';
 import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -363,6 +366,11 @@ const abschnitt = (name: string) => within(vorgaenge()).getByRole('region', { na
 const abschnittZahl = (name: string) =>
   abschnitt(name).querySelector('[data-lfh="abschnitt-zahl"]') as HTMLElement;
 
+/** `#rrggbb` → `rgb(r, g, b)`, wie jsdom Inline-Farben zurückgibt. */
+function rgbVon(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((k) => Number.parseInt(hex.slice(k, k + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}
 describe('UeberblickPage', () => {
   it('Seitenkopf: Ortspfad mit Einsatzname, Titel und genau eine Primäraktion', async () => {
     stelleBereit(volleDaten);
@@ -544,6 +552,14 @@ describe('UeberblickPage', () => {
     expect(Array.from(werte).map((z) => z.textContent)).toEqual(['0', '0', '1']);
     const balken = zeile.querySelectorAll<HTMLElement>('[data-lfh="abschnitt-status-anteil"]');
     expect(Array.from(balken).map((z) => z.style.width)).toEqual(['0%', '0%', '100%']);
+    // „gebunden“ trägt die Rolle der Kategorie (neutral), nicht mehr fest Blau und nicht Gelb
+    // (Spec `statusrollen`, eon26eat D1): dieselbe Rolle wie im Meldebild.
+    // Die Test-Provider rendern mit antds Standard-Token; dieselben Token lösen hier die Rolle auf.
+    const standard = antdTheme.getDesignToken();
+    // jsdom schreibt Farben mit Leerzeichen, antds Token ohne.
+    const gebundenFarbe = balken[1].style.background.replace(/ /g, '');
+    expect(gebundenFarbe).toBe(rollenFarbe('neutral', standard).replace(/ /g, ''));
+    expect(gebundenFarbe).not.toBe(rollenFarbe('bedien', standard));
     expect(within(p).queryByText(/Einheiten nach Status:/)).toBeNull();
     expect(within(p).getByText('1 Abschnitt · 1 Einheit')).toBeInTheDocument();
   });
@@ -892,6 +908,14 @@ describe('UeberblickPage', () => {
     ]);
     expect(zeilen[0]).toHaveAttribute('data-alarm', 'true');
     expect(zeilen[0]).toHaveTextContent('Bestätigung überfällig');
+    // Das Statuswort „neu“ ist der Eingang und neutral (`gedaempft`), nicht gelb, wie das Etikett
+    // in der Meldungsliste (Spec `statusrollen`, eon26eat D4). Die Test-Provider rendern hell.
+    const neu = alle
+      .find((l) => l.getAttribute('href') === '/einsaetze/1/meldungen?meldung=54')!
+      .querySelector<HTMLElement>('[data-lfh="vorgang-wort"]')!;
+    expect(neu).toHaveTextContent('neu');
+    expect(neu.style.color).toBe(rgbVon(farbenHell.gedaempft));
+    expect(neu.style.color).not.toBe(rgbVon(farbenHell.achtungText));
   });
 
   it('Offene Vorgänge · Meldungen: eine frische Sofortmeldung steht zuoberst mit „SOFORT“, ohne Alarmkante (LLH-1740)', async () => {

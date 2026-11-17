@@ -125,7 +125,7 @@ describe('AuftragKarte — Eingangszustand', () => {
     );
     expect(screen.getByText('Offen').closest('[data-lfh="status-chip"]')).toHaveAttribute(
       'data-ton',
-      'achtung',
+      'neutral',
     );
   });
 
@@ -153,7 +153,7 @@ describe('AuftragKarte — Eingangszustand', () => {
     expect(karte).not.toHaveAttribute('data-unbearbeitet');
     expect(screen.getByText('Offen').closest('[data-lfh="status-chip"]')).toHaveAttribute(
       'data-ton',
-      'achtung',
+      'neutral',
     );
   });
 });

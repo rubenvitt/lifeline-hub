@@ -49,7 +49,7 @@ interface Props {
 const TREFFLAECHE = 48;
 
 /** Die Farbrollen, die eine Kopfzeile liest — als Ausschnitt, damit der Test sie setzen kann. */
-type KopfFarben = Pick<Farbrollen, 'flaeche3' | 'marke' | 'text' | 'gedaempft'>;
+type KopfFarben = Pick<Farbrollen, 'flaeche3' | 'bedien' | 'text' | 'gedaempft'>;
 
 /**
  * Stil einer Kategorie-Kopfzeile — rein und exportiert, damit die Dichte-Zusicherung ohne
@@ -81,7 +81,8 @@ export function akkordeonKopfStil(
     cursor: 'pointer',
     fontWeight: offen ? 600 : 400,
     background: offen ? farben.flaeche3 : 'transparent',
-    boxShadow: offen ? `inset 2px 0 0 ${farben.marke}` : 'none',
+    // Ortsmarke in der Bedienfarbe wie Rail und Modulpanel (eon26eat D7).
+    boxShadow: offen ? `inset 2px 0 0 ${farben.bedien}` : 'none',
     color: offen ? farben.text : farben.gedaempft,
   };
 }

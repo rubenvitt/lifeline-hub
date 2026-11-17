@@ -149,8 +149,29 @@ describe('Statusfarb-Vertrag', () => {
     expect(sf.dienststatus.ausser_dienst).toEqual({ rolle: 'neutral', label: 'außer Dienst' });
   });
 
-  it('löst die Divergenz `gebunden` (gold vs. orange) zu EINER Rolle auf', () => {
-    expect(sf.statusKategorie.gebunden.rolle).toBe('achtung');
+  it('`gebunden` ist Normalbetrieb und neutral, nicht gelb (Spec `statusrollen`, eon26eat D1)', () => {
+    // Vorher `achtung`: im laufenden Einsatz war die Kräfte-Seite fast ganz gelb, und echter
+    // Handlungsbedarf („unterbesetzt“, „ohne Leiter“) fiel nicht mehr auf.
+    expect(sf.statusKategorie.gebunden.rolle).toBe('neutral');
+    expect(sf.statusKategorie.verfuegbar.rolle).toBe('normal');
+    expect(sf.statusKategorie.nicht_verfuegbar.rolle).toBe('alarm');
+  });
+
+  describe('fahrzeugStatusRolle: Sprechwunsch bleibt gelb (Spec `statusrollen`, eon26eat D2)', () => {
+    it.each([5, 0])('FMS-Anker %i ist `achtung`, gleich welche Kategorie', (anker) => {
+      expect(sf.fahrzeugStatusRolle('gebunden', anker)).toBe('achtung');
+      expect(sf.fahrzeugStatusRolle('verfuegbar', anker)).toBe('achtung');
+    });
+
+    it.each([3, 4, 7])('FMS-Anker %i nimmt die Rolle der Kategorie', (anker) => {
+      expect(sf.fahrzeugStatusRolle('gebunden', anker)).toBe('neutral');
+    });
+
+    it('ohne Anker gilt die Kategorie', () => {
+      expect(sf.fahrzeugStatusRolle('gebunden', null)).toBe('neutral');
+      expect(sf.fahrzeugStatusRolle('gebunden', undefined)).toBe('neutral');
+      expect(sf.fahrzeugStatusRolle('nicht_verfuegbar', null)).toBe('alarm');
+    });
   });
 
   it('trägt selbst keinen Farbwert — Farben stehen nur in tokens.ts/rollen.css', () => {
@@ -398,10 +419,10 @@ describe('verpflegungsstelleStatus (LLH-1040, wie brStatus)', () => {
 describe('Betreuung (LFH-639, design.md D8)', () => {
   // Byte-Pin gegen handgeschriebene Literale. `bedien` kommt nicht vor: die Rolle trägt eine
   // aktive Beziehung (Übergabe, Reservierung, Verortung), keinen Zustand der Entität selbst.
-  it('bildet die vier Räumungszustände ab — „läuft" teilt `achtung` mit „angeordnet"', () => {
+  it('bildet die vier Räumungszustände ab — „läuft" ist planmäßig und neutral (eon26eat D3)', () => {
     expect(sf.raeumungszustand).toEqual({
       angeordnet: { rolle: 'achtung', label: 'angeordnet' },
-      laeuft: { rolle: 'achtung', label: 'läuft' },
+      laeuft: { rolle: 'neutral', label: 'läuft' },
       geraeumt: { rolle: 'normal', label: 'geräumt' },
       aufgehoben: { rolle: 'neutral', label: 'aufgehoben' },
     });
@@ -524,7 +545,7 @@ describe('Betroffenen-Farbachsen (LFH-455)', () => {
   });
   it('ordnet Schadensstatus und Schadensausmaß ihren Rollen zu', () => {
     expect(sf.schadenStatus).toEqual({
-      offen: { label: 'offen', rolle: 'achtung' },
+      offen: { label: 'offen', rolle: 'neutral' },
       uebergeben: { label: 'übergeben', rolle: 'bedien' },
       abgeschlossen: { label: 'abgeschlossen', rolle: 'neutral' },
     });
@@ -690,7 +711,9 @@ describe('ETB-Typfarben als Kante + Typwort (Neuentwurf, 21.09.2026)', () => {
       '#d46b08',
       '#8f4be3',
       '#13c2c2',
-      '#cf1322',
+      // Eine Spur heller als der Entwurf (#cf1322): nachts hält sie auf der helleren `flaeche2`
+      // der vier Flächenstufen sonst keine 3 : 1 (Change `eon26eat-farbe-entlasten`, D5).
+      '#d41b25',
       farbenDunkel.schwach,
     ]);
   });

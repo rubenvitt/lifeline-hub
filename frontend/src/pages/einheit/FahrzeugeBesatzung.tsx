@@ -55,7 +55,7 @@ import { fmsEtikett } from '../../kraefte/meldebildRaster';
 import { fahrzeugStatusDarstellung } from '../../kraefte/mittelStatus';
 import { gruendeJeKraft } from '../../kraefte/sammelDisposition';
 import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
-import { besatzungsUrteil, statusKategorie } from '../../theme/statusFarben';
+import { besatzungsUrteil, kategorieDarstellung } from '../../theme/statusFarben';
 import {
   besatzungGrund,
   buildFahrzeugMenuItems,
@@ -780,7 +780,7 @@ export default function FahrzeugeBesatzung({
                       darstellung={
                         m.status
                           ? {
-                              ...statusKategorie[m.status.kategorie],
+                              ...kategorieDarstellung(m.status.kategorie, m.status.fms_anker),
                               label: fmsEtikett(m.status.label, m.status.fms_anker),
                             }
                           : { rolle: 'neutral', label: 'kein Status' }

@@ -307,11 +307,15 @@ const ZIEL = { light: 7, dark: 5 } as const;
 /** Die drei Statusrollen, wie sie in der Verdichtungszeile ausgeschrieben stehen. */
 const ZEILEN_ZAHLEN = [/^\d+ verfügbar$/, /^\d+ gebunden$/, /^\d+ nicht verfügbar$/];
 
-/** Die drei Kategorien des FMS-Katalogs und der Ton ihres Segments in der Aufgliederung. */
-const BAND_TOENE = [
-  { kategorie: 'verfuegbar', ton: 'normal' },
-  { kategorie: 'gebunden', ton: 'achtung' },
-  { kategorie: 'nicht_verfuegbar', ton: 'alarm' },
+/**
+ * Die drei Kategorien des FMS-Katalogs: je eine Einheit, damit jede Zeile der Verteilung gemessen
+ * wird. Gemessen wird der Textkontrast; die Rolle je Kategorie belegen die Unit-Tests
+ * (`theme/statusFarben.test.ts`, `pages/KraefteuebersichtPage.test.tsx`).
+ */
+const BAND_KATEGORIEN = [
+  { kategorie: 'verfuegbar' },
+  { kategorie: 'gebunden' },
+  { kategorie: 'nicht_verfuegbar' },
 ] as const;
 
 for (const modus of ['light', 'dark'] as const) {
@@ -331,7 +335,7 @@ for (const modus of ['light', 'dark'] as const) {
     const katalogAntwort = await page.request.get('/api/fahrzeug-status');
     expect(katalogAntwort.ok(), await katalogAntwort.text()).toBeTruthy();
     const katalog = (await katalogAntwort.json()) as { id: number; kategorie: string }[];
-    for (const [i, { kategorie }] of BAND_TOENE.entries()) {
+    for (const [i, { kategorie }] of BAND_KATEGORIEN.entries()) {
       const status = katalog.find((k) => k.kategorie === kategorie);
       expect(status, `Katalog ohne Status der Kategorie ${kategorie}`).toBeDefined();
       const id = await post(page, `${basis}/fahrzeuge`, {
@@ -366,9 +370,9 @@ for (const modus of ['light', 'dark'] as const) {
     const einheiten = page.getByRole('region', { name: 'Einheiten nach FMS-Status' });
     // Vorbedingung: alle drei Töne stehen in der Verteilung, sonst misst sie weniger.
     await expect(einheiten.getByRole('listitem'), 'drei Statuszeilen').toHaveCount(
-      BAND_TOENE.length,
+      BAND_KATEGORIEN.length,
     );
-    for (let i = 0; i < BAND_TOENE.length; i += 1) {
+    for (let i = 0; i < BAND_KATEGORIEN.length; i += 1) {
       const zeile = einheiten.getByRole('listitem').nth(i);
       await pruefe(
         zeile.locator('[data-lfh="statusband-einheit-wert"]'),

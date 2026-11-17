@@ -1,11 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   flaeche,
+  flaeche as flaecheVon,
   kontrast,
   pruefe,
   randKontrast,
   svgTextKontrast,
   verhaeltnis,
+  type Farbe,
 } from './kontrast-kern';
 import { kartenpunktAufSeite, messeKante } from './karten-pixel-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
@@ -20,6 +22,35 @@ async function vorbereiten(page: Page, modus: 'light' | 'dark') {
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
   return `/einsaetze/${page.url().match(/\/einsaetze\/(\d+)/)![1]}`;
+}
+
+/**
+ * Text auf der Schraffur von „tot“ (eon26eat D8): `messe` lehnt ein Hintergrundbild ab. Hier wird
+ * der Strich (`rgba` im Verlauf) über die deckende Fläche gelegt und der Text gegen Strich UND
+ * Lücke gemessen; der schwächere Wert zählt. Gerechnet steht dasselbe in
+ * `src/theme/sichtungKontrast.test.ts`.
+ */
+async function pruefeSchraffiert(ziel: Locator, minimum: number, name: string) {
+  const m = await ziel.evaluate((el) => {
+    const s = getComputedStyle(el);
+    const zahlen = (t: string) => t.match(/[\d.]+/g)!.map(Number);
+    const strich = s.backgroundImage.match(/rgba?\([^)]+\)/)![0];
+    return {
+      text: zahlen(s.color),
+      grund: zahlen(s.backgroundColor),
+      strich: zahlen(strich),
+      bild: s.backgroundImage,
+    };
+  });
+  expect(m.bild, `${name}: Schraffur`).toContain('repeating-linear-gradient');
+  const a = m.strich[3] ?? 1;
+  const auf = m.grund.slice(0, 3).map((g, i) => Math.round(m.strich[i] * a + g * (1 - a)));
+  const text = [...m.text.slice(0, 3), 1] as Farbe;
+  const werte = [
+    verhaeltnis(text, [...m.grund.slice(0, 3), 1] as Farbe),
+    verhaeltnis(text, [...auf, 1] as Farbe),
+  ];
+  expect(Math.min(...werte), `${name}: ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(minimum);
 }
 
 async function post(page: Page, pfad: string, data: unknown) {
@@ -37,29 +68,62 @@ for (const modus of ['light', 'dark'] as const) {
       await page.goto(`${basis}/personen${ort === 'route' ? '/aufnahme' : ''}`);
       if (ort === 'modal') await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
       // Die Sichtungswahl (LLH-1083, Spec `farbrollen-kontrast`, „Sichtungsfläche hält den
-      // Textboden“): Text auf jeder Fläche, Kante gegen den Grund ≥ 3 : 1, gefüllt und in der
-      // Randform, in Ruhe und unter dem Zeiger.
+      // Textboden“): Text auf jeder Fläche, Kante gegen den Grund ≥ 3 : 1, gefüllt und getönt
+      // (nicht gewählt nach einer Wahl, eon26eat D8), in Ruhe und unter dem Zeiger.
       const gruppe = page.getByRole('radiogroup', { name: 'Sichtungskategorie' });
       const flaechen = gruppe.getByRole('radio');
       await expect(flaechen).toHaveCount(6);
       for (const label of ['SK I', 'SK II', 'SK III', 'SK IV', 'tot', 'unverletzt']) {
         const flaeche = gruppe.getByRole('radio', { name: new RegExp(`^${label},`) });
+        // „tot“ trägt die Schraffur: eigene Messung (`pruefeSchraffiert`).
+        const pruefeText = label === 'tot' ? pruefeSchraffiert : pruefe;
         await page.mouse.move(0, 0);
-        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/ungewählt`);
-        const kante = await randKontrast(flaeche, 'top');
-        expect(kante.gegenAussen, `${modus}/${ort}/${label}/Kante`).toBeGreaterThanOrEqual(3);
+        await pruefeText(flaeche, minimum, `${modus}/${ort}/${label}/ungewählt`);
+        // Die Kante gegen den Grund der Gruppe; `randKontrast` lehnt das Hintergrundbild der
+        // Schraffur ab, für „tot“ deshalb gerechnet aus Randfarbe und Gruppenfläche.
+        const gegenAussen =
+          label === 'tot'
+            ? verhaeltnis(
+                [
+                  ...(await flaeche.evaluate((el) =>
+                    getComputedStyle(el)
+                      .borderTopColor.match(/[\d.]+/g)!
+                      .slice(0, 3)
+                      .map(Number),
+                  )),
+                  1,
+                ] as Farbe,
+                await flaecheVon(gruppe),
+              )
+            : (await randKontrast(flaeche, 'top')).gegenAussen;
+        expect(gegenAussen, `${modus}/${ort}/${label}/Kante`).toBeGreaterThanOrEqual(3);
         await flaeche.hover();
-        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/hover`);
+        await pruefeText(flaeche, minimum, `${modus}/${ort}/${label}/hover`);
         await flaeche.click();
         await expect(gruppe.getByRole('radio', { checked: true })).toHaveCount(1);
         await expect(flaeche).toBeChecked();
-        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/gewählt+hover`);
+        await pruefeText(flaeche, minimum, `${modus}/${ort}/${label}/gewählt+hover`);
         await page.mouse.move(0, 0);
-        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/gewählt`);
-        // Die übrigen stehen jetzt in der Randform und halten den Boden ebenso.
+        await pruefeText(flaeche, minimum, `${modus}/${ort}/${label}/gewählt`);
+        // Die übrigen stehen jetzt getönt mit Innenrahmen und halten den Boden ebenso.
         for (const andere of await gruppe.getByRole('radio', { checked: false }).all()) {
-          await pruefe(andere, minimum, `${modus}/${ort}/${label}/Randform`);
+          const istTot = (await andere.getAttribute('data-sichtung')) === 'tot';
+          await (istTot ? pruefeSchraffiert : pruefe)(
+            andere,
+            minimum,
+            `${modus}/${ort}/${label}/getönt`,
+          );
         }
+        // „tot“ und „unverletzt“ ohne Lesen unterscheidbar (Spec `sichtungswahl`): „tot“ trägt in
+        // jedem Zustand die Schraffur, „unverletzt“ nie.
+        const bild = (l: string) =>
+          gruppe
+            .getByRole('radio', { name: new RegExp(`^${l},`) })
+            .evaluate((el) => getComputedStyle(el).backgroundImage);
+        expect(await bild('tot'), `${modus}/${ort}/${label}/tot schraffiert`).toContain(
+          'repeating-linear-gradient',
+        );
+        expect(await bild('unverletzt'), `${modus}/${ort}/${label}/unverletzt glatt`).toBe('none');
       }
     }
   });

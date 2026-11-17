@@ -23,6 +23,7 @@ import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { ladeKarteConfig } from '../../api/karte';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
+import { listeFahrzeugStatus } from '../../api/fahrzeugStatus';
 import { listeFuehrungskraefte } from '../../api/einsatzPersonal';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeZonen } from '../../api/lagezonen';
@@ -176,6 +177,12 @@ export function useLagekarteDaten({
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: fahrzeugeFrei,
+  });
+  // Nur für den FMS-Anker im Paneel „Ausgewählt“: ein Sprechwunsch ist gelb (Spec `statusrollen`).
+  const fahrzeugStatiQuery = useQuery({
+    queryKey: globalKeys.fahrzeugStatus(),
+    queryFn: listeFahrzeugStatus,
     enabled: fahrzeugeFrei,
   });
   const abschnitteQuery = useQuery({
@@ -813,6 +820,7 @@ export function useLagekarteDaten({
       tiere: tiereRoh ?? [],
       bezirke: bezirkeRoh ?? [],
       fuehrungsstelle: fuehrungsstelleRoh ?? null,
+      fahrzeugStati: fahrzeugStatiQuery.data,
       // Nur ein erfolgreicher Live-Abruf; nach Fehler bliebe `data` als stiller Altstand stehen.
       rueckmeldungen:
         !rueckmeldungenFrei || rueckmeldungenQuery.isError ? undefined : rueckmeldungenQuery.data,

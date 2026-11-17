@@ -40,6 +40,13 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
   Nachtpalette abgeleitet.
+- **Vier Flächenstufen** (LLH-1783, Spec `farbrollen-kontrast`, Wächter in `theme/tokens.test.ts`):
+  `grund`, `paneel`, `kopf`, `flaeche`, `flaeche2`, `flaeche3` belegen je Modus höchstens vier
+  Werte, je Schritt ≥ 1,10 : 1, zusammengelegt entlang der Helligkeitsfolge des Modus (nachts
+  `grund` = `paneel`, `kopf` = `flaeche`; am Tag `paneel` = `flaeche2`, `grund` = `kopf`). Ein
+  fünfter Wert ist eine Entscheidung, kein Nachtrag. Der dauerdunkle Rahmen (`rahmenFarben`) ist
+  keine Inhaltsfläche und hält seine Werte selbst. Das gewählte Segment der `Segmentleiste`
+  trägt zusätzlich eine 2-px-Bedienkante unten (eine Typkante ersetzt sie).
 - **Rollen** in `theme/tokens.ts` + `theme/rollen.css` (Gate 5), u. a. `kopf`, `paneel`,
   `flaeche3`, `text2`, `steuerRahmen` (= antds `colorBorder`), `bedienText`, Statusflächen,
   `bannerGrund`/`bannerLinie`, Zeilentönungen. `rahmenFarben` ist modusunabhängig und keine
@@ -217,6 +224,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     an Form und Wort (schraffiertes Band, gefüllter Chip, immer „ÜBUNG“), nicht am Farbton: violett
     sind auch die ETB-Entscheidung, die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
     Quellen der Kopfhöhe, über einem klebenden Seitenkopf (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
+  - **Ortsmarke in der Bedienfarbe** (LLH-1784, Spec `farbrollen-kontrast`): die aktive
+    Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
+    aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
+    Modulpanel, nie in `marke`; `marke` bleibt der Bildmarke.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
@@ -537,7 +548,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 **Farbachsen** (Vertrag `theme/statusFarben.ts`)
 
 - **Betroffene** (LFH-455, `StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
-  „offen" `achtung`, „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
+  „offen" neutral (Eingang, Spec `statusrollen`), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (LFH-608, `abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
   kritisch `alarm`; nicht beurteilt = leeres Feld. Nur der Wechsel schreibt System-ETB. Im
@@ -564,10 +575,13 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   SK I rot, II gelb, III grün, IV blau, Tote schwarz, „unverletzt" ohne Farbe. **Angezeigt** wird
   als umrandetes Farbfeld (`SichtungsTag`/`sichtungsfarben`); die Umrandung macht Gelb auf hellem
   und Schwarz auf dunklem Grund sichtbar. **Gewählt** wird als Vollfläche über
-  `personen/SichtungsWahl.tsx` aus der Flächenpalette `sichtungsflaechen` (bis zum Textboden
-  abgedunkelt, in beiden Modi gleich) mit Kante in `text` (`sichtungsKante`), gewählt mit ✓ und
-  3-px-Rahmen, die übrigen in Randform; 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung
-  (LLH-1083, Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
+  `personen/SichtungsWahl.tsx` aus `sichtungsPalette` (`flaeche`, bis zum Textboden abgedunkelt,
+  in beiden Modi gleich; `punkt` ist die Anzeigefarbe, eine Palette je Kategorie) mit Kante in
+  `text` (`sichtungsKante`), gewählt mit ✓ und 3-px-Rahmen. Nach einer Wahl behalten die übrigen
+  ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
+  jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
+  nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung (LLH-1083, LLH-1785,
+  Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
   Spec `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): kein Preset hält
   den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
@@ -1168,6 +1182,16 @@ anwendbar), „nicht geprüft" ist keins.
 
 - **Rot bedient nichts:** `bedien` und Fokusring blau, Rot ist Gefahr. Jede Statusfarbe braucht
   einen **zweiten Kanal** (WCAG 1.4.1). Farbwerte nur aus `theme/tokens.ts`/`theme/rollen.css`.
+- **Statusrollen haben eine Bedeutung** (LLH-1778, Spec `statusrollen`): Gelb (`achtung`) heißt
+  „jemand muss bald handeln“, Rot (`alarm`) „überfällig, Ausfall, Gefahr“. Ein Zustand des
+  Normalbetriebs (unterwegs, eingesetzt, eingegangen, läuft planmäßig) trägt nie Gelb: „gebunden“
+  ist überall `neutral` und kommt immer aus `statusKategorie`, nie fest in einer Seite; der
+  Eingang „Neu“/„Offen“ ist neutral mit leiser Kante (`linieStark`), Dringliches zeigt die
+  Priorität. Die ZAHL der noch nicht gesichteten Meldungen (Kennzahl „Unbearbeitet“) bleibt
+  dagegen gelb: gezählt ist sie Handlungsbedarf (Entscheidung 16.11.2026). Einzige Ausnahme an der Kategorie vorbei: der Sprechwunsch (FMS 5 und 0) ist gelb;
+  wer den Status EINES Fahrzeugs oder einer Einheit färbt, geht über `fahrzeugStatusRolle` bzw.
+  `kategorieDarstellung` (`theme/statusFarben.ts`). Herleitung:
+  `openspec/changes/archive/2026-11-16-eon26eat-farbe-entlasten/design.md` (D1–D4).
 - **Der Fokusring ist `bedien`** (LFH-737): antds Umriss liest `colorPrimaryBorder`, und
   `antdToken` setzt ihn auf `bedien` (≥ 3 : 1 auf jeder deckenden Fläche,
   `theme/bedienKontrast.test.ts`, `e2e/fokusring-kontrast.spec.ts`), wie die eigenen Klassen in
@@ -1251,8 +1275,9 @@ und `pages/personen/`.
   nur „wieder aktiv“; was inzwischen anders gebunden ist, lässt es aus und nennt es im
   `SeitenHinweis`, statt es still zu überschreiben (Vorbedingung `nur_wenn_frei` beim Zuordnen,
   LLH-1722). Lücken stehen bei „Beenden: Verb, Ort und Sicherung je Art“.
-- **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`colorError` vor `colorWarning`; prüfbar
-  über `data-alarm`/`data-unbearbeitet`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
+- **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`alarm` vor dem Eingang in `linieStark`,
+  sonst `linie`; prüfbar über `data-alarm`/`data-unbearbeitet`; der Eingang ist neutral, Spec
+  `statusrollen`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
   fünfte `KommPhase`.
 - **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
   steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`
