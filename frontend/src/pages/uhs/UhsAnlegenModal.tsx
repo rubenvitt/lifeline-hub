@@ -1,4 +1,4 @@
-import { Collapse, Form, Input } from 'antd';
+import { Collapse, Form, Input, theme } from 'antd';
 import { useState } from 'react';
 import { Select } from '../../components/Select';
 import AnlegenModal, { type AnlegenModalSlot } from '../../components/AnlegenModal';
@@ -33,6 +33,7 @@ function uhsEingabe({ standort, ...rest }: UhsFormular): UhsEingabe {
  * auslösen kann; der Kopf nennt sie, sobald etwas drinsteht.
  */
 export default function UhsAnlegenModal(props: AnlegenModalSlot<Uhs>) {
+  const { token } = theme.useToken();
   const [weitereOffen, setWeitereOffen] = useState(false);
   return (
     <AnlegenModal<Uhs, UhsFormular>
@@ -64,7 +65,7 @@ export default function UhsAnlegenModal(props: AnlegenModalSlot<Uhs>) {
       {/* `forceRender`: Prüfung und Zurücksetzen erreichen die Notiz auch zugeklappt. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         activeKey={weitereOffen ? ['weitere'] : []}
         onChange={(k) => setWeitereOffen(k.includes('weitere'))}
         items={[
