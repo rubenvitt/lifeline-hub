@@ -19,8 +19,8 @@
 
 ## 4. Regeln (D5, D6)
 
-- [ ] 4.1 `frontend/AGENTS.md`: „Form nach Umfang“ (Drawer nur Quick-View), „Bearbeiten in der Ansicht“ Punkt 1 und die Altstellenliste unter „Ort von ‚Bearbeiten‘ und Form des Anlegens“ (nur noch LLH-1920; Nachforderung, Meldungen, Erinnerungen als geprüfte Serienerfassung) nachziehen; `grep -rn "UhsAnlegenDrawer\|BrAnlegenDrawer\|AnlegenDrawer" frontend/AGENTS.md frontend/src` leer; Prettier grün
-- [ ] 4.2 Purpose von `openspec/specs/bedien-muster/spec.md` um das Anlegen ergänzen; `mise exec -- openspec validate asthqrqj-anlegen-vereinheitlichen --strict` grün
+- [x] 4.1 `frontend/AGENTS.md`: „Form nach Umfang“ (Drawer nur Quick-View), „Bearbeiten in der Ansicht“ Punkt 1 und die Altstellenliste unter „Ort von ‚Bearbeiten‘ und Form des Anlegens“ (nur noch LLH-1920; Nachforderung, Meldungen, Erinnerungen als geprüfte Serienerfassung) nachziehen; `grep -rn "UhsAnlegenDrawer\|BrAnlegenDrawer\|AnlegenDrawer" frontend/AGENTS.md frontend/src` leer; Prettier grün
+- [x] 4.2 Purpose von `openspec/specs/bedien-muster/spec.md` um das Anlegen ergänzen; `mise exec -- openspec validate asthqrqj-anlegen-vereinheitlichen --strict` grün
 
 ## 5. Anwenderdoku und Bilder
 

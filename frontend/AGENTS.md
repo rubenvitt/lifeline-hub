@@ -319,8 +319,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Vollseite/eigene Route** (`/einsaetze/:einsatzId/<modul>/:id`): Sektionen/Tabs, > ~5 Felder,
   Workflow, deeplink-würdig (Muster `BefehlDetailPage`, `PersonenDetailPage`). **Modal**: kurze
   blockierende Aktion, ≤ ~3 Felder. **Inline/Expander**: Zusatz ohne Seitenwechsel.
-  **Drawer**: nur Quick-View (read-only) oder Schnellerfassung ≤ ~4 Felder (`PersonDetailDrawer`);
-  Tabs, großer Edit-Modus oder > ~480 px → eigene Route.
+  **Drawer**: nur Quick-View (read-only, `PersonDetailDrawer`), nie zum Anlegen (LLH-1921); Tabs,
+  großer Edit-Modus oder > ~480 px → eigene Route.
 - **Einzige Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
   `einsatz/ModulAkkordeon.tsx`): Navigation, keine Entität, schließt beim Modulklick, Inhalt erst
   beim Öffnen (kein `forceRender`). Ein zweiter braucht eine eigene Entscheidung.
@@ -337,8 +337,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 Ansicht“; schreibt LFH-19 und LFH-979 fort)
 
 1. **Ein bestehender Datensatz wird in seiner Ansicht bearbeitet**, nie in einem Formular, das die
-   Ansicht ersetzt oder verdeckt. Modal und Drawer bleiben fürs **Anlegen** (Erfassungs-Norm,
-   Feldbudget) und für kurze blockierende Aktionen.
+   Ansicht ersetzt oder verdeckt. Der Erfassungsdialog bleibt fürs **Anlegen** (Erfassungs-Norm,
+   Feldbudget, Form unten) und für kurze blockierende Aktionen.
 2. **Drei Stufen nach Umfang:** **Einzelwert** (Status, Lagezustand, Führer, Frist) über
    `InlineAngabe`/`BemerkungZelle` am Wert, speichert sofort genau dieses Feld · **Paneel**
    (zusammengehörige Werte, „Funk“, „Personendaten“) über `components/instrument/BearbeitbaresPaneel`
@@ -374,10 +374,12 @@ Bereitstellungsraum, Betreuung).
 im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
 Kopfs). Anlegen geht über das `ErfassungsModal`; eine eigene Seite nur bei einem Ablauf oder mehr
 als ~5 Pflichtfeldern (Patient, Einheit aus Vorlage); ein eingeklapptes Formular nur bei
-Serienerfassung neben einer Liste; **kein Drawer zum Anlegen**. Altstellen mit Folgeaufgabe (LLH-1920, LLH-1921): UHS
-und Bereitstellungsraum bearbeiten im Modal und legen im Drawer an (`UhsBearbeitenModal`,
-`BrBearbeitenModal`, `UhsAnlegenDrawer`, `BrAnlegenDrawer`); die eingeklappten Formulare von
-Nachforderung, Meldungen, Lagemeldungen und Erinnerungen sind auf Serienerfassung zu prüfen.
+Serienerfassung neben einer Liste; **kein Drawer zum Anlegen** (Spec `bedien-muster`, „Einen
+Datensatz anlegen“). Einsatzgebundene Datensätze legen über `components/AnlegenModal.tsx` an
+(UHS, Bereitstellungsraum), jeder Einstieg öffnet denselben Dialog. Eingeklappt über der Liste
+bleiben, weil dort in Serie erfasst wird: Nachforderung, Meldungen, Erinnerungen (geprüft
+LLH-1921); die Lagemeldung erfasst im Dialog. Altstelle mit Folgeaufgabe (LLH-1920): UHS und
+Bereitstellungsraum bearbeiten im Modal (`UhsBearbeitenModal`, `BrBearbeitenModal`).
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →

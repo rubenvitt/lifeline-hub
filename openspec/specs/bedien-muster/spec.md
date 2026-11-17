@@ -2,8 +2,10 @@
 
 ## Purpose
 Legt fest, wie Handlungen, die einen Datensatz beenden, lösen oder zurücknehmen, über alle Module
-heißen, wo sie stehen und wie sie gesichert sind, und wie viele Handlungen der Kopf einer
-Detailseite sichtbar trägt. Herleitung: `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md`.
+heißen, wo sie stehen und wie sie gesichert sind, wie viele Handlungen der Kopf einer
+Detailseite sichtbar trägt und in welcher Form ein Datensatz angelegt wird. Herleitung:
+`openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` und
+`openspec/changes/asthqrqj-anlegen-vereinheitlichen/design.md`.
 
 ## Requirements
 
