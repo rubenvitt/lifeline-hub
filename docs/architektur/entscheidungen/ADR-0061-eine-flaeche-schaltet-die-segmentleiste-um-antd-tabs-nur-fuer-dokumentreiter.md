@@ -1,5 +1,5 @@
 ---
-id: ADR-0060
+id: ADR-0061
 titel: Eine Fläche schaltet die Segmentleiste um, antd-Tabs nur für Dokumentreiter
 status: akzeptiert
 datum: 2026-11-16
@@ -10,7 +10,7 @@ herleitung:
   - Zunder LLH-1808 (Reiterform „nur Segmentleiste“ und Prüfung im Gate abgestimmt mit Ruben am 16.11.2026)
 ---
 
-# ADR-0060: Eine Fläche schaltet die Segmentleiste um, antd-Tabs nur für Dokumentreiter
+# ADR-0061: Eine Fläche schaltet die Segmentleiste um, antd-Tabs nur für Dokumentreiter
 
 ## Regeln
 

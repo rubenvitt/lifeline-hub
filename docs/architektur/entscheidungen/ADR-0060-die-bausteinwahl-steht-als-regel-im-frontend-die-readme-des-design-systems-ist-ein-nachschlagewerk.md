@@ -1,5 +1,5 @@
 ---
-id: ADR-0059
+id: ADR-0060
 titel: Die Bausteinwahl steht als Regel im Frontend, die README des Design Systems ist ein Nachschlagewerk
 status: akzeptiert
 datum: 2026-11-16
@@ -11,7 +11,7 @@ herleitung:
   - Zunder LLH-1807 (Variante V1 abgestimmt mit Ruben am 16.11.2026)
 ---
 
-# ADR-0059: Die Bausteinwahl steht als Regel im Frontend, die README des Design Systems ist ein Nachschlagewerk
+# ADR-0060: Die Bausteinwahl steht als Regel im Frontend, die README des Design Systems ist ein Nachschlagewerk
 
 ## Regeln
 

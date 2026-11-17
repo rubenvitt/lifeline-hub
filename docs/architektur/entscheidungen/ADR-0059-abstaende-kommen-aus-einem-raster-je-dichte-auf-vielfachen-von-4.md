@@ -1,5 +1,5 @@
 ---
-id: ADR-0058
+id: ADR-0059
 titel: Abstände kommen aus einem Raster je Dichte auf Vielfachen von 4
 status: akzeptiert
 datum: 2026-11-16
@@ -13,7 +13,7 @@ herleitung:
   - Zunder LLH-1809 (Variante „auf 4er runden“ und Ratschen-Wächter abgestimmt mit Ruben am 16.11.2026)
 ---
 
-# ADR-0058: Abstände kommen aus einem Raster je Dichte auf Vielfachen von 4
+# ADR-0059: Abstände kommen aus einem Raster je Dichte auf Vielfachen von 4
 
 ## Regeln
 
