@@ -42,7 +42,7 @@ per TDD: erst der rote Test, dann der Code.
 
 ## 6. Verifikation
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (lokaler Lauf vor dem PR; Ergebnis im PR unter „Geprüft“)
+- [x] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (lokaler Lauf vor dem PR; Ergebnis im PR unter „Geprüft“)
 
 ## Workflow follow-up
 

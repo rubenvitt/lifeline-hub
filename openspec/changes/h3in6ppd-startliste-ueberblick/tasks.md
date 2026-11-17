@@ -30,7 +30,7 @@ per TDD.
 
 ## 5. Verifikation
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
 
