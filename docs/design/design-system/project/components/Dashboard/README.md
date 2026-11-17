@@ -18,7 +18,8 @@ Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
 Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds). Der
 Überblick hat keins (Change `wf7l9axn-ueberblick-ohne-band`): seine erste
 Paneelreihe trägt „Nächste Marken“ und „Offene Vorgänge“, die zweite „Einsatzabschnitte“ und
-die Entscheidungen, damit Fristen über der Falz und am Handy zuerst stehen.
+die Entscheidungen, damit Fristen über der Falz und am Handy zuerst stehen. Beim ersten Aufbau
+warten die Reihen auf die Quellen der Gliederung und der Marken, sonst rückt alles darunter.
 Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
 `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
 (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
