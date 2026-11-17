@@ -1,6 +1,6 @@
 import { IconChevronRunter } from '../icons';
 import { Button, Dropdown, theme, type MenuProps } from 'antd';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
@@ -9,6 +9,7 @@ import { farbenDunkel } from '../theme/tokens';
 import type { EinsatzAnzeige } from '../api/types';
 import { einsatzKennung } from './einsatzKennung';
 import { isUebung } from './einsatzart';
+import { modulAusPfad } from './modulRegistry';
 import { UebungsMarke, schriftGroesse } from '../components/instrument';
 import { useModusFarben } from '../components/rahmenStil';
 
@@ -24,6 +25,10 @@ function nebenzeile(e: EinsatzAnzeige): string | null {
  * Der eigene Einsatz ist gewählt markiert; ein Klick darauf schließt nur das Menü, statt aus dem
  * Modul auf die Startseite des Einsatzes zu werfen (LFH-954). Verwaltung steht hier nicht: sie
  * hat ihren Link im Kopf, mit Sperre für wen sie nicht freigegeben ist.
+ *
+ * DER WECHSEL BLEIBT IM MODUL (LLH-1821, Change `frgky8qr-einsatzwechsel-modul`, D1): das Ziel ist
+ * die Index-Route des anderen Einsatzes mit dem aktuellen Modul als Hinweis; ob es dort frei ist,
+ * entscheidet `DefaultModulRedirect`. Detail, Auswahl und Filter bleiben zurück.
  *
  * DER NAME KÜRZT, statt die Kopfzeile zu schieben (LFH-329): ein antd-Knopf kürzt ohne eigenes
  * `overflow` nicht. Der volle Name bleibt am `title` lesbar und bleibt TEXTINHALT — in einem
@@ -43,6 +48,7 @@ export default function EinsatzSwitcher({
   aktuellName: string;
 }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { token } = theme.useToken();
   // Das Menü folgt dem Modus, nicht dem dunklen Kopf: Farben aus den Rollen des Modus.
   const farben = useModusFarben();
@@ -94,7 +100,8 @@ export default function EinsatzSwitcher({
     // Der eigene Einsatz: antd schließt das Menü, die Seite bleibt.
     else if (key === eigenerKey) return;
     else if (key.startsWith('einsatz-')) {
-      navigate(einsatzPfad(Number(key.slice('einsatz-'.length))));
+      const modul = modulAusPfad(pathname)?.key;
+      navigate(einsatzPfad(Number(key.slice('einsatz-'.length)), { modul }));
     }
   };
 

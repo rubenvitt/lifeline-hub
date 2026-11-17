@@ -2,11 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Outlet, Route, Routes, useLocation } from 'react-router';
 import { schriftGroesse } from '../components/instrument';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinsatzSwitcher from './EinsatzSwitcher';
+import DefaultModulRedirect from './DefaultModulRedirect';
 
 function einsatz(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -123,6 +124,78 @@ describe('EinsatzSwitcher', () => {
     await userEvent.click(screen.getByRole('button', { name: /Hochwasser/ }));
     await userEvent.click(await screen.findByRole('menuitem', { name: /MANV B14/ }));
     await waitFor(() => expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/8'));
+  });
+
+  it('bleibt beim Wechsel im Modul und lässt Detail und Auswahl zurück (LLH-1821)', async () => {
+    server.use(
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json([einsatz({ id: 7 }), einsatz({ id: 8, bezeichnung: 'MANV B14' })]),
+      ),
+    );
+    const besucht: string[] = [];
+    function AdressSonde() {
+      const { pathname, search } = useLocation();
+      besucht.push(`${pathname}${search}`);
+      return <span data-testid="adresse">{`${pathname}${search}`}</span>;
+    }
+    // Der Rahmen in klein: Wechsler im Kopf, darunter die Index-Weiche und das Modul.
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route
+            path="/einsaetze/:id"
+            element={
+              <>
+                <EinsatzSwitcher aktuellId={7} aktuellName="Hochwasser" />
+                <Outlet />
+              </>
+            }
+          >
+            <Route index element={<DefaultModulRedirect />} />
+            <Route path="fahrzeuge" element={<div>Fahrzeuge-Inhalt</div>} />
+            <Route path="ueberblick" element={<div>Überblick-Inhalt</div>} />
+          </Route>
+        </Routes>
+        <AdressSonde />
+      </>,
+      { route: '/einsaetze/7/fahrzeuge?fahrzeug=3' },
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Hochwasser/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /MANV B14/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId('adresse')).toHaveTextContent(/^\/einsaetze\/8\/fahrzeuge$/),
+    );
+    expect(besucht).toContain('/einsaetze/8?modul=fahrzeuge');
+    expect(besucht.some((a) => a.includes('/ueberblick'))).toBe(false);
+  });
+
+  it('wechselt außerhalb eines Moduls ohne Hinweis', async () => {
+    server.use(
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json([einsatz({ id: 7 }), einsatz({ id: 8, bezeichnung: 'MANV B14' })]),
+      ),
+    );
+    function SucheSonde() {
+      const { pathname, search } = useLocation();
+      return <span data-testid="adresse">{`${pathname}${search}`}</span>;
+    }
+    renderMitProviders(
+      <>
+        <Routes>
+          <Route
+            path="/einsaetze/:id/*"
+            element={<EinsatzSwitcher aktuellId={7} aktuellName="Hochwasser" />}
+          />
+        </Routes>
+        <SucheSonde />
+      </>,
+      { route: '/einsaetze/7' },
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Hochwasser/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /MANV B14/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId('adresse')).toHaveTextContent(/^\/einsaetze\/8$/),
+    );
   });
 
   it('nennt je Einsatz Nummer und Ort in einer Nebenzeile, soweit vorhanden', async () => {
