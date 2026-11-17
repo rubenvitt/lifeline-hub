@@ -26,8 +26,9 @@ In der Stufe „kompakt“ SHALL die Platzkarte ihre Aktionen als Knopfzeile tra
 enthält „Verbleib / Entlassung erfassen“, „zurückweisen“, „als frei markieren“ und den Auslöser
 des Platzmenüs, jeweils nur, wenn sie anwendbar sind. Jeder Knopf MUST den Trefflächenboden der
 Stufe halten, das sind 24 px in der kurzen Achse. Die Zeile MUST in die Innenbreite der Karte
-passen, Knöpfe und Lücken zusammengerechnet. Neben dem Gefahrknopf „zurückweisen“ MUST ein
-Abstand von mindestens dem kleinen Randabstand der Stufe stehen. Ein Klick auf die freie Fläche
+passen, Knöpfe und Lücken zusammengerechnet. Neben „zurückweisen“ MUST ein
+Abstand von mindestens dem kleinen Randabstand der Stufe stehen; es steht neutral, denn es
+hat ein Rückgängig (LLH-1924). Ein Klick auf die freie Fläche
 eines unbelegten Platzes SHALL wie bisher direkt den Zuweisungsdialog öffnen.
 
 #### Scenario: Belegter Platz in kompakt
@@ -58,7 +59,7 @@ Fenster liegen, auch wenn das Menü dafür die Karte überdeckt oder selbst scro
 
 #### Scenario: Tipp auf belegten Platz
 - **WHEN** in „Handschuh“ auf einen belegten Platz getippt wird
-- **THEN** öffnet sich das Aktionsmenü, sein erster Eintrag ist „Verbleib / Entlassung erfassen“, und es enthält „Person öffnen“, „Zurück in den Wartebereich“, die Verfügbarkeiten sowie hinter einem Trenner „zurückweisen“ als Gefahreintrag
+- **THEN** öffnet sich das Aktionsmenü, sein erster Eintrag ist „Verbleib / Entlassung erfassen“, und es enthält „Person öffnen“, „Zurück in den Wartebereich“, die Verfügbarkeiten sowie hinter einem Trenner „zurückweisen“ als neutralen Eintrag
 
 #### Scenario: Tastatur
 - **WHEN** die Karte in „komfortabel“ fokussiert ist und Enter gedrückt wird
@@ -174,3 +175,18 @@ ohne dass neue Daten eintreffen.
 #### Scenario: Lange unterwegs
 - **WHEN** R-008 seit 65 Minuten unterwegs ist
 - **THEN** trägt seine Zeile die Marke „Übergabe offen“
+
+### Requirement: Zurückweisen rückgängig
+Nach „zurückweisen“ an einem Platz SHALL ein Hinweis „<Kennung> zurückgewiesen“ mit „Rückgängig“
+stehen. „Rückgängig“ MUST den eben gebuchten Austritt zurücknehmen, mit denselben Regeln wie
+beim Austragen im Patientenkopf (Platz, Wartezeit, zehn Minuten). Eine Ablehnung MUST im
+Hinweis der Seite stehen, ohne Fehler-Toast. Weil es umkehrbar ist, steht „zurückweisen“ neutral
+(ADR-0055), hinter dem Trenner zuletzt.
+
+#### Scenario: Zurückweisen rückgängig
+- **WHEN** jemand im Grundriss bei R-009 auf Platz 3 „zurückweisen“ und im Hinweis „Rückgängig“ wählt
+- **THEN** liegt R-009 wieder auf Platz 3, und Platz 3 steht nicht in Aufbereitung
+
+#### Scenario: Am UHS-Laptop
+- **WHEN** am gekoppelten Gerät der UHS „zurückweisen“ und danach „Rückgängig“ gewählt wird
+- **THEN** liegt die Person wieder auf ihrem Platz

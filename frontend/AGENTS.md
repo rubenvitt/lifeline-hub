@@ -802,7 +802,7 @@ anwendbar), „nicht geprüft" ist keins.
   behält keine Zeile: der Hinweis trägt das Rückgängig (design.md D7). Hat eine Zeile keinen
   Regler (UHS-Kräfte, Besatzungsblock der Fahrzeugliste), steht „Rückgängig“ an der Stelle ihrer
   Funktion bzw. Angabe (LLH-1924,
-  `openspec/changes/bq8dvx19-loesen-nachziehen/design.md` D4).
+  `openspec/changes/archive/2026-11-17-bq8dvx19-loesen-nachziehen/design.md` D4).
 
   Jedes Rückgängig einer gelösten Zuordnung schickt `?nur_wenn_frei=1` (Einheit, Material am Ort,
   Besatzung, UHS-Kraft): steht der Datensatz inzwischen woanders, lehnt der Server mit 409 ab und
