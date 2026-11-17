@@ -42,7 +42,7 @@
 ## 7. Prüfen
 
 - [ ] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
-- [ ] 7.2 Bilder der Änderung (UHS-Bereich „Angaben“ lesen und offen, BR-Paneel „Raumdaten“ lesen und offen) per Wegwerf-Spec aufgenommen
+- [x] 7.2 Bilder der Änderung (UHS-Bereich „Angaben“ lesen und offen, BR-Paneel „Raumdaten“ lesen und offen) per Wegwerf-Spec aufgenommen
 
 ## Workflow follow-up
 
