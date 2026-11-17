@@ -155,8 +155,12 @@
 /* Ein Titel aus einem langen Wort trennt in der Zelle, statt über ihren Rand zu laufen: mit drei
    Spalten auf 390 px lief „EINSATZABSCHNITTE“ im Überblick 15 px über (Gate 1, LLH-1748).
    `hyphens` trennt, wo der Browser ein deutsches Wörterbuch hat, sonst bricht `anywhere` am
-   Spaltenrand. Ein Wort, das passt, bleibt unberührt. */
-.lfh-kennzahl__titel {
+   Spaltenrand. Nur in Bändern mit `notizZeilenSchmal`: Sie halten Platz für umbrochenen Text
+   (in `handschuh` zwei Titelzeilen, unten). Ein anderes Band muss einzeilig bleiben: In der
+   Ausgabeansicht der Verpflegung (LLH-1294) ragt „AUSGEGEBEN“ mit dem Laufweiten-Nachlauf 2 px
+   über seine 83-px-Spalte. Getrennt würde er zweizeilig, und die Ansicht rollte am Gerät bei
+   390 × 700 um 9 px. */
+.lfh-kennzahlenband--notizzeilen .lfh-kennzahl__titel {
   hyphens: auto;
   overflow-wrap: anywhere;
 }
