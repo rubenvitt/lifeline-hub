@@ -669,8 +669,9 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
     for (const bleibt of ['Stärke', 'Fahrzeuge', 'Einheiten', 'Längste Wartezeit']) {
       expect(screen.getByRole('columnheader', { name: bleibt })).toBeInTheDocument();
     }
+    // Nach Breite verborgen ist Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
     expect(
-      screen.getByRole('button', { name: /Spalten · 2 ausgeblendet.*Bereitstellungsräume/ }),
+      screen.getByRole('button', { name: /^Spalten — .*Bereitstellungsräume/ }),
     ).toBeInTheDocument();
   });
 

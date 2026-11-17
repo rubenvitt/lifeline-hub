@@ -83,7 +83,7 @@ Für Einsatzleitung und Führungspersonal, in der Liste oder in der Ansicht der 
    ohne Abschnitt stehen zuletzt unter „ohne Abschnitt“. Erst „Speichern“ ändert etwas; Escape
    oder „Abbrechen“ verwirft die Wahl.
 
-   ![Zeile einer nicht eingeteilten Person mit offener Einheitsauswahl, gewählt „Rettungsstaffel“, darunter „Speichern“ und „Abbrechen“](../bilder/personal/einteilen.png)
+   ![Personalliste; an der Zeile einer nicht eingeteilten Person schwebt die Einheitsauswahl, gewählt „Rettungsstaffel“, darunter „Speichern“ und „Abbrechen“](../bilder/personal/einteilen.png)
 
 3. Ebenso in der Spalte „Fahrzeug“ das Fahrzeug wählen. Die Fahrzeuge der eigenen Einheit stehen
    oben unter „Einheit «…»“, die übrigen unter „Weitere Fahrzeuge“.
@@ -103,8 +103,9 @@ stehen und wandert erst in die neue Gruppe, wenn beide die Liste verlassen haben
 
 Für Einsatzleitung und Führungspersonal, wenn eine Person im Einsatz eine Aufgabe übernimmt:
 
-1. In der Spalte „Funktion“ der Person „Funktion eintragen“ wählen, bei einer schon vergebenen
-   Einsatzfunktion auf ihren Text klicken. In der Ansicht der Person steht die Angabe unter
+1. In der Spalte „Funktion“ der Person den Stift neben ihrer Qualifikation wählen (ohne
+   Qualifikation „Funktion eintragen“), bei einer schon vergebenen Einsatzfunktion auf ihren
+   Text klicken. Die Eingabe öffnet an der Zelle. In der Ansicht der Person steht die Angabe unter
    „Einsatzfunktion“.
 2. Eine Funktion aus den Vorschlägen wählen oder einen eigenen Text eingeben, etwa „Sprechfunker“.
 3. „Speichern“ wählen oder Enter drücken. Die Einsatzfunktion steht über der Qualifikation.

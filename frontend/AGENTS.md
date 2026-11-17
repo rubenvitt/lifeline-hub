@@ -720,8 +720,14 @@ anwendbar), „nicht geprüft" ist keins.
 **Tabelle und Dichte**
 
 - **Tabelle nur, wenn verglichen wird**: stehende Kopfzeile, fixierte **menschenlesbare** Kennung
-  (nie DB-`id`), Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Auf schmalem Schirm
-  **angepasst, nicht in Karten aufgelöst**. Träger `KatalogTabelle`/`Datensicht`.
+  (nie DB-`id`), Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Der Zähler steht erst
+  nach eigener Wahl im Namen (LLH-1790, Spec `katalogtabelle-spaltenschalter`): solange die Wahl
+  der Voreinstellung der Seite und der Breite folgt, heißt der Schalter „Spalten“, danach
+  „Spalten · n ausgeblendet“ mit allen verborgenen (`weichtVonVorgabeAb` in
+  `components/SpaltenSchalter.tsx`; die Seite reicht `spaltenAusVoreinstellung` durch). Auf schmalem Schirm
+  **angepasst, nicht in Karten aufgelöst**; ausgenommen sind Flächen mit `form="auto"`, deren
+  Zeile am Handy nicht trägt (Fahrzeuge, Personal, die Einheitenliste mit Baum als Karten,
+  LLH-1787). Träger `KatalogTabelle`/`Datensicht`.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
@@ -757,6 +763,21 @@ anwendbar), „nicht geprüft" ist keins.
   Zeile hält ihre Stelle, LLH-1254).
   Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
   Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
+- **Die Hauptaktion einer Zeile bleibt im Bild** (LLH-1789, Spec `einsatztauglichkeit-layout`,
+  Change `lsug0joq-tabellen-touch` D1): die Aktionsspalte einer `Datensicht` trägt `amEnde` und
+  steht ab `md` rechts fixiert (direkte `KatalogTabelle`-Nutzer setzen `fixed: 'right'` selbst); unter `md` ziehen Primäraktion und ⋮ in die fixierte Kennung (`Datensicht`), eine
+  zweite fixierte Spalte gibt es dort nicht. Spalte mit Primäraktion über
+  `components/aktionsSpalte.tsx` (Breite je Stufe gerechnet, aus `PrimaerAktion`/`WeitereAktionen`
+  wie Karte und Kontextmenü); eine reine ⋮-Spalte (`menueSpaltenBreite`) setzt nur `amEnde`.
+  Nachweis `e2e/gate1-ueberlauf.spec.ts` („Aktion im Bild“), Fokus in
+  `e2e/fokus-verdeckung.spec.ts`.
+- **Kopf und Körper sind gleich breit** (LLH-1788): mit stehender Kopfzeile legt rc-table den
+  Kopf in eine eigene Tabelle; `theme/sprache.css` setzt sie auf `table-layout: fixed`, damit
+  sie die gemessenen Körperbreiten genau übernimmt. Damit der feste Kopf nie gekürzt wird, hebt
+  `KatalogTabelle` jede Zahlbreite und jedes `mindestBreite` auf die Mindestbreite ihres Kopfs
+  (`components/kopfBreite.ts`: längstes Wort des Titels in der Kopfschrift, Sortiersymbol,
+  Filterauslöser der Stufe, Zellpolster). Gerechnet, nicht gemessen, damit nichts springt.
+  Nachweis `e2e/gate1-ueberlauf.spec.ts` („Spaltenköpfe … stehen über ihren Spalten“).
 - **Kopfwerkzeuge der `KatalogTabelle` folgen der Dichte** (LLH-1227): Suche und Spaltenschalter
   stehen `paddingSM` auseinander, antds Spaltenfilter-Auslöser hält `controlHeightSM` und liegt
   in der Tab-Folge (Name „<Spalte> filtern“, Enter/Leertaste öffnen), beides im Primitiv, nie je
@@ -955,7 +976,24 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Inline-Bearbeitung und Status**
 
-- **Ein leeres Feld muss sagen, dass man es schreiben kann:** optionale Inline-Angaben nehmen
+- **In einer Tabellenzelle schwebt die Bearbeitung** (LLH-1795, Spec `einsatztauglichkeit-layout`,
+  Change `lsug0joq-tabellen-touch` D2): `KatalogTabelle` setzt `AngabeFormProvider form="schwebend"`
+  (`components/angabeForm.tsx`) um den Körper, `fluss` um aufgeklappte Zeilen. Eine `InlineAngabe`
+  lässt dort ihre Anzeige stehen und öffnet Eingabe, Fehler und Knöpfe in einem Popover an ihr;
+  die Spalten bleiben stehen. Ein Klick daneben schließt nicht (Escape, „Abbrechen“, Speichern
+  schon), je Tabelle ist höchstens eine offen (eine unveränderte schließt, eine geänderte behält den
+  Fokus), der Fokus kehrt auf die Anzeige zurück. Tab aus dem Popover schließt eine unveränderte
+  Bearbeitung, eine geänderte hält den Fokus (Tab im Kreis, Shift+Tab auf die Anzeige, Enter dort
+  zurück). Eine offene hält die Zeilenfolge der `Datensicht` auch ohne Fokus (`onBearbeitungOffen`
+  in `halten`). Karten und Ansichten bearbeiten im Fluss;
+  `BemerkungZelle` liest den Kontext nicht. Nachweis `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten
+  ohne Sprung“).
+- **Ein leeres Feld muss sagen, dass man es schreiben kann** (Listenform LLH-1791, Spec
+  `personal-einsatzangaben`): steht in einer Listenzelle schon ein anderer Wert (die Qualifikation
+  neben der leeren Einsatzfunktion), sagt ein Stift-Knopf mit zugänglichem Namen (Etikett und
+  Zeilenkennung, „Funktion zu Anna eintragen“) und dem Boden der Stufe das Schreibbare, über
+  `InlineAngabe.ausloeser` (Vorbild `kraefte/EinsatzfunktionZelle.tsx`); ohne solchen Wert bleibt
+  die Aufforderung als Wort. Optionale Inline-Angaben nehmen
   `components/BemerkungZelle.tsx`, nicht `Typography.Text editable` (Platzhalter `Button type="link"`, Zeilenkennung im Namen,
   Lesezweig „—", Fehler an der Zelle per `data-fehler`, Fokusrückgabe und Wertgleichheits-Riegel
   im Primitiv). Falle: antds `Editable` wertet **legacy `keyCode`** aus — Tasten per `fireEvent`

@@ -98,9 +98,10 @@ lassen sich Patienten auch mit der Maus auf einen Platz ziehen.
 
 1. Die Stelle öffnen. Über der Leiste steht die Lage der Stelle in vier Zahlen, ohne Namen.
 2. „In der Stelle“ ablesen: wer in der Stelle steht, auf einem Platz oder im Wartebereich,
-   darunter je Sichtung als Farbbalken und in Worten, etwa „SK I 1 · SK II 3“.
-3. „Plätze frei“ ablesen: freie von allen Plätzen, etwa „2 / 6“, dazu wie viele in Aufbereitung
-   sind.
+   darunter je Sichtung als Farbbalken und in Worten, die Zahl vor der Kategorie, etwa
+   „1 SK I · 3 SK II“.
+3. Die freien Plätze ablesen: freie von allen Plätzen, etwa „2 von 6 Plätzen frei“, dazu wie
+   viele belegt oder in Aufbereitung sind.
 4. „Wartend“ und „Unterwegs“ ablesen: wer im Wartebereich auf einen Platz wartet, mit der
    längsten Wartezeit, und wer die Stelle im Eigentransport verlassen hat und noch nicht
    übergeben ist.

@@ -291,7 +291,8 @@ for (const [breite, hoehe] of [
     // Die Lage der Stelle in Zahlen (LLH-1136) steht ganz im Fenster über der Leiste.
     const zahlen = page.getByRole('group', { name: 'Lage der Stelle' });
     await expect(zahlen).toBeInViewport({ ratio: 1 });
-    for (const titel of ['In der Stelle', 'Plätze frei', 'Wartend', 'Unterwegs']) {
+    // „Plätze“ liest sich „5 von 5 Plätzen frei“ (LLH-1793).
+    for (const titel of ['In der Stelle', /^von \d+ Plätzen? frei$/, 'Wartend', 'Unterwegs']) {
       await expect(zahlen.getByText(titel, { exact: true })).toBeVisible();
     }
     const abstand = await page

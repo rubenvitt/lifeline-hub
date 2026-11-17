@@ -1,4 +1,4 @@
-import { Button, Space, Typography, theme } from 'antd';
+import { Space, Typography, theme } from 'antd';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useMemo, type CSSProperties } from 'react';
@@ -18,9 +18,12 @@ import Datensicht, {
 } from '../components/Datensicht';
 import { KennungsLink } from '../components/kennungsLink';
 import { betreuungsstellePfad } from '../routing/deeplinks';
-import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
+import { aktionsSpalte } from '../components/aktionsSpalte';
+import { leseTextSchrift } from '../components/textBreite';
+import { useDichte } from '../theme/ThemeModeProvider';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
 import {
@@ -161,29 +164,14 @@ function stellenWeitere(
 
 const stellenSpalten = (
   einsatzId: number,
-  darfSchreiben: boolean,
-  /** „Belegung melden“: am Spiegel ein Antrag, auch ohne Schreibrecht (LLH-1492). */
-  darfMelden: boolean,
-  aktion: PrimaerAktion<Betreuungsstelle>,
-  weitere: WeitereAktionen<Betreuungsstelle>,
   namentlich: ReadonlyMap<number, number> | undefined,
   /** Mono-Stil der Zahl in „davon namentlich n". */
   zahlStil: CSSProperties,
-  /** Unter `md`: „Belegung melden" reitet in der fixierten Kennung mit (LFH-967). */
-  meldenInKennung: boolean,
-  /** Abstand zwischen Name und Meldeknopf in der Kennung. */
-  kennungAbstand: number,
+  /** Unter `md` bleibt die Kennung schmal; die Aktionen ziehen in sie (`Datensicht`, LLH-1789). */
+  schmal: boolean,
+  /** Die Aktionsspalte aus `aktionsSpalte()`; `null` ohne Schreib- und Melderecht. */
+  aktionen: ReturnType<typeof aktionsSpalte<Betreuungsstelle>> | null,
 ) => {
-  const meldeKnopf = (s: Betreuungsstelle) =>
-    !darfMelden || s.status === 'geschlossen' ? null : s.belegungsart === 'namentlich' ? (
-      // Der Server meldet die Belegung aus der Registrierung (LLH-1612): der Kurzgrund steht in
-      // der Zeile statt eines Knopfs, der nur 409 brächte.
-      <Typography.Text type="secondary">{BELEGUNGSART_LABEL.namentlich}</Typography.Text>
-    ) : (
-      <Button aria-label={aktion.zugaenglicherName?.(s)} onClick={() => aktion.onKlick(s)}>
-        {aktion.etikett}
-      </Button>
-    );
   return spaltenFuer<Betreuungsstelle>()([
     {
       key: 'bezeichnung',
@@ -197,33 +185,15 @@ const stellenSpalten = (
          * und frei aus dem Bild (die Tabelle ist inhaltsgetrieben breit, `max-content`). Darüber
          * steht er wie bisher einzeilig.
          */
-        const name = (
+        return (
           <KennungsLink
             to={betreuungsstellePfad(einsatzId, s.id)}
-            style={
-              meldenInKennung ? { display: 'inline-flex', maxWidth: KENNUNG_MAX_PX } : undefined
-            }
+            style={schmal ? { display: 'inline-flex', maxWidth: KENNUNG_MAX_PX } : undefined}
           >
             <Typography.Text strong style={{ color: 'inherit' }}>
               {s.bezeichnung}
             </Typography.Text>
           </KennungsLink>
-        );
-        const knopf = meldenInKennung ? meldeKnopf(s) : null;
-        return knopf ? (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              gap: kennungAbstand,
-            }}
-          >
-            {name}
-            {knopf}
-          </div>
-        ) : (
-          name
         );
       },
     },
@@ -316,29 +286,7 @@ const stellenSpalten = (
       suchText: (s) => s.abschnitt_name,
       render: (_, s) => s.abschnitt_name ?? leer,
     },
-    ...(darfSchreiben || darfMelden
-      ? [
-          {
-            key: 'aktionen' as const,
-            title: 'Aktionen',
-            immerSichtbar: true,
-            render: (_: unknown, s: Betreuungsstelle) => (
-              // `middle`: die Vorgabe ergäbe im Handschuh-Betrieb 7 px zwischen „Belegung melden" und dem
-              // Dreipunkt; `middle` hält ≥ 16 px (gemessen in `e2e/gate3-trefflaeche.spec.ts`).
-              <Space wrap size="middle">
-                {!meldenInKennung && meldeKnopf(s)}
-                {darfSchreiben && (
-                  <MenueAusloeser
-                    eintraege={weitere.eintraege(s)}
-                    zugaenglicherName={weitere.zugaenglicherName(s)}
-                    onWahl={(key) => weitere.onWahl(key, s)}
-                  />
-                )}
-              </Space>
-            ),
-          },
-        ]
-      : []),
+    ...(aktionen ? [aktionen] : []),
   ]);
 };
 
@@ -370,6 +318,8 @@ export default function StellenBlock({
   const { token } = theme.useToken();
   const navigate = useNavigate();
   const { istSchmal } = useViewport();
+  const { dichte } = useDichte();
+  const schrift = useMemo(leseTextSchrift, []);
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const namentlichJeStelle = useMemo(
     () => (namentlich ? new Map(namentlich.map((n) => [n.stelle_id, n.anzahl])) : undefined),
@@ -400,14 +350,27 @@ export default function StellenBlock({
     () =>
       stellenSpalten(
         einsatzId,
-        darfSchreiben,
-        darfMelden,
-        aktion,
-        weitere,
         namentlichJeStelle,
         zahlStil('text'),
         istSchmal,
-        token.marginXS,
+        darfSchreiben || darfMelden
+          ? aktionsSpalte<Betreuungsstelle>({
+              aktion: {
+                ...aktion,
+                // Eine namentliche Stelle meldet der Server aus der Registrierung (LLH-1612): der
+                // Kurzgrund steht in der Zeile statt eines Knopfs, der nur 409 brächte.
+                ersatz: (s) =>
+                  darfMelden && s.status !== 'geschlossen' && s.belegungsart === 'namentlich' ? (
+                    <Typography.Text type="secondary">
+                      {BELEGUNGSART_LABEL.namentlich}
+                    </Typography.Text>
+                  ) : null,
+              },
+              weitere: darfSchreiben ? weitere : undefined,
+              dichte,
+              schrift,
+            })
+          : null,
       ),
     [
       einsatzId,
@@ -417,9 +380,11 @@ export default function StellenBlock({
       weitere,
       namentlichJeStelle,
       istSchmal,
-      token.marginXS,
+      dichte,
+      schrift,
     ],
   );
+
   const aufklappen = useMemo(
     () => ({
       etikett: 'Verlauf',
