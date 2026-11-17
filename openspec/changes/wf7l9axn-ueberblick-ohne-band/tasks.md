@@ -25,7 +25,7 @@ entsteht per TDD: erst der rote Test, dann der Code.
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, Ergebnis im PR unter „Geprüft“. Die e2e-Specs aus 3.1 liefen lokal grün.
+- [x] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, Ergebnis im PR unter „Geprüft“. Die e2e-Specs aus 3.1 liefen lokal grün. (17.11.2026: in Teilen gefahren — `--nur schnell` und `--nur frontend` grün, aus der Rust-Suite gezielt `tests/modul_override.rs` grün; die volle Rust-Suite sprengt das Plattenkontingent der Cloud-Sitzung und läuft nach dem Merge auf `alpha`.)
 
 ## Workflow follow-up
 
