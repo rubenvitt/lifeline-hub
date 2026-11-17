@@ -53,6 +53,11 @@ Hinweis.
 - `textkontrast-rollen`: Das Szenario „Nicht gefunden auf dem Seitengrund“ beruht auf dem roten
   Text „Befehl nicht gefunden.“. Diesen Text gibt es nach der Änderung nicht mehr, deshalb belegt
   ein anderer roter Fehlertext außerhalb eines Formulars die Anforderung.
+- `betreuung-evakuierung`: Die Detailseiten von Evakuierungsbezirk und Betreuungsstelle führen
+  bei unbekannter oder stornierter Kennung nicht mehr still auf die Übersicht, sondern zeigen das
+  Muster „gibt es nicht (mehr)“.
+- `personal-ansicht`: Eine ungültige ID führt nicht mehr still zur Personalliste, sondern zeigt
+  dieselbe Meldung wie eine unbekannte Person.
 
 ## Impact
 
