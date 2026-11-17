@@ -32,7 +32,7 @@ describe('PositionAngabe (LLH-1060)', () => {
     await waehle('Position zu Anna', 'Führer');
     expect(onSpeichern).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Position zu Anna speichern' }));
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('fuehrer'));
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('fuehrer', { beimOeffnen: expect.anything() }));
   });
 
   it('Leeren sendet null', async () => {
@@ -41,7 +41,9 @@ describe('PositionAngabe (LLH-1060)', () => {
     const feld = screen.getByRole('combobox', { name: 'Position zu Anna' }).closest('.ant-select')!;
     await userEvent.click(feld.querySelector<HTMLElement>('.ant-select-clear')!);
     await userEvent.click(screen.getByRole('button', { name: 'Position zu Anna speichern' }));
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith(null));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith(null, { beimOeffnen: expect.anything() }),
+    );
   });
 
   it('ohne Schreibrecht: Kürzel als Text', () => {
