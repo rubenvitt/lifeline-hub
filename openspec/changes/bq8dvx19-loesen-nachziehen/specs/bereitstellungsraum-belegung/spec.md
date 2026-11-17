@@ -38,12 +38,11 @@ bestimmen. Zeitpunkte MUST als UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`) üb
 ## ADDED Requirements
 
 ### Requirement: Austritt zurücknehmen
-Das System SHALL einen Austritt zurücknehmen, den die Belegungsroute gebucht hat. Die Rücknahme
-MUST ein neues Ereignis sein, das die Kraft in denselben Raum zurückbringt und den Austritt
-nennt, den es zurücknimmt. Sie MUST abgelehnt werden (409 mit Grund, ohne Ereignis, ETB-Eintrag
-und Änderung), wenn der Austritt nicht das jüngste Belegungsereignis der Kraft ist, älter als
-zehn Minuten ist, schon zurückgenommen ist, ein Ausrücken war oder einen eigenen Anlass trägt
-(Austritt eines Systemwegs wie Storno einer Übernahme oder Rückweg einer Ablösung).
+Das System SHALL einen Austritt zurücknehmen, den die Belegungsroute gebucht hat: als neues
+Ereignis, das die Kraft in denselben Raum zurückbringt und den Austritt nennt. Abgelehnt (409,
+ohne Änderung) MUST sie werden, wenn der Austritt nicht das jüngste Ereignis der Kraft ist, älter
+als zehn Minuten, schon zurückgenommen, ein Ausrücken war oder einen Anlass eines Systemwegs
+trägt.
 
 #### Scenario: Rücknahme gleich nach dem Austragen
 - **WHEN** „HLF 20“ aus dem BR Sportplatz ausgetragen wird und die Rücknahme dieses Austritts eine Minute später eingeht

@@ -1,12 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Austritt aus der UHS zurücknehmen
-Das System SHALL den Austritt einer Person aus einer UHS zurücknehmen. Die Rücknahme MUST ein
-neues Belegungsereignis sein, das den Austritt nennt. Sie bringt die Person in dieselbe UHS, auf
-ihren Platz davor, wenn er frei oder nur durch diesen Austritt in Aufbereitung ist, sonst in den
-Wartebereich. Abgelehnt (409, ohne Änderung) MUST sie werden, wenn der Austritt nicht der jüngste
-Schritt der Person ist, älter als zehn Minuten, schon zurückgenommen ist oder ein automatischer
-Austritt mit Anlass war.
+Das System SHALL den Austritt einer Person aus einer UHS zurücknehmen: als neues Ereignis, das den
+Austritt nennt, in dieselbe UHS, auf den Platz davor, wenn er frei oder nur durch diesen Austritt
+in Aufbereitung ist, sonst in den Wartebereich. Abgelehnt (409, ohne Änderung) MUST sie werden,
+wenn der Austritt nicht der jüngste Schritt ist, älter als zehn Minuten, schon zurückgenommen
+oder ein automatischer mit Anlass war.
 
 #### Scenario: Zurück auf den Platz
 - **WHEN** eine Person auf Platz 3 der UHS Turnhalle ausgetragen wird und Platz 3 dadurch in Aufbereitung geht und die Rücknahme eine Minute später eingeht
