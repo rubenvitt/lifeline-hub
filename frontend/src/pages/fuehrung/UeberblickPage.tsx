@@ -21,8 +21,6 @@ import {
   DashboardFlaeche,
   Feldetikett,
   GliederungsPaneel,
-  Kennzahl,
-  Kennzahlenband,
   ListenPaneel,
   NUR_VORLESER,
   PaneelReihe,
@@ -36,7 +34,6 @@ import {
   useRollen,
   type DashboardZustand,
   type Gliederungszeile,
-  type KennzahlZustand,
   type Verteilungszeile,
   schriftGroesse,
   schriftStil,
@@ -63,12 +60,6 @@ import { listeEtb } from '../../api/etb';
 import { holeRueckmeldungen, listeOffeneMeldungen } from '../../api/meldungen';
 import { useAuth } from '../../auth/AuthContext';
 import { ladeModulZaehler } from '../../api/modulZaehler';
-import {
-  NICHT_FREIGEGEBEN,
-  auftragsStand,
-  meldungenNotiz,
-  meldungsStand,
-} from '../lage-dashboard/fuehrungsZahlen';
 import { UNBESTAETIGT } from '../gefahren/beurteilung';
 import { pegelAbfrage } from '../../api/pegel';
 import { wetterAbfrage } from '../../api/wetter';
@@ -88,7 +79,6 @@ import {
   erinnerungenPfad,
   etbPfad,
   lageberichtePfad,
-  meldungenPfad,
   lagebesprechungPfad,
   abloesungPfad,
   pegelZielPfad,
@@ -105,9 +95,7 @@ import StatusTag from '../../components/StatusTag';
 import { grundWort } from '../../kraefte/meldebildRaster';
 import {
   abschnittGruende,
-  abschnittNamen,
   abschnittZeilen,
-  auftraegeKennzahl,
   entscheidungenAuswahl,
   folgeText,
   naechsteMarken,
@@ -216,11 +204,6 @@ function zustandVon(freigaben: FreigabenStand, ...quellen: Quelle[]): Zustand {
       return 'daten';
     }),
   );
-}
-
-/** Der Zustand, den eine Kennzahl kennt — gesperrt steht als Wert „—" mit Grund da. */
-function kennzahlZustand(z: Zustand): KennzahlZustand {
-  return z === 'gesperrt' ? 'daten' : z;
 }
 
 /** Die Uhr der Seite — tickt alle 30 s, damit „in 60 min" und Fristfarben mitlaufen. */
@@ -361,7 +344,7 @@ export default function UeberblickPage() {
     queryFn: () => listeNachforderungen(einsatzId, {}),
     enabled: nachforderungenFrei,
   });
-  // Die Kennzahl „Offene Aufträge" zählt der Server (LFH-550): derselbe Cache wie das Modulpanel.
+  // Die Zahlen der offenen Vorgänge zählt der Server (LFH-550): derselbe Cache wie das Modulpanel.
   // Die Liste darüber speist nur das Paneel und die Fristen.
   const zaehlerQ = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
@@ -474,9 +457,6 @@ export default function UeberblickPage() {
           : null,
     [pegelQ.isError, pegel, jetzt],
   );
-  const auftragsstand = auftragsStand(zaehlerQ);
-  const auftragszahl =
-    auftragsstand.zustand === 'daten' ? auftraegeKennzahl(auftragsstand.zahl) : null;
   const stelle = useMemo(() => meineStelle(einsatz, benutzer?.id), [einsatz, benutzer?.id]);
   const zeilen = useMemo(
     () =>
@@ -540,7 +520,6 @@ export default function UeberblickPage() {
     quellen.filter((x) => x.frei || freigabenStand !== 'da');
 
   const zWarnstufe = zustandVon(freigabenStand, qGefahren);
-  const zAbschnitteZahl = zustandVon(freigabenStand, qAbschnitte);
   const zAbschnitte = zustandVon(
     freigabenStand,
     qAbschnitte,
@@ -579,16 +558,16 @@ export default function UeberblickPage() {
   // Die Paneelreihen warten auf die Quellen der Gliederung (LLH-1481): wie viele Zeilen das Paneel
   // „Einsatzabschnitte“ bekommt (oberste Abschnitte, „Ohne Abschnitt“ aus Einheiten, Personal,
   // Fahrzeugen und Material) und wie hoch sie werden, sagt keine Zahl vorher. Mit einer Ladezeile
-  // wuchs es um jede Zeile (auf 390 px rund 140 px) und schob alles darunter. Unter dem
-  // Kennzahlenband steht bis dahin nichts; was dort erscheint, verschiebt nichts. Wie beim Körper
+  // wuchs es um jede Zeile (auf 390 px rund 140 px) und schob alles darunter. Unter Alarmzeile und
+  // Startliste steht bis dahin nichts; was dort erscheint, verschiebt nichts. Wie beim Körper
   // zählt nur das erste Laden: Fehler, „ohne Netz“ und gesperrte Module halten nichts auf.
   const gliederungLaedt = [abschnitteQ, einheitenQ, personalQ, fahrzeugeQ, materialQ].some(
     (q) => q.isLoading,
   );
 
-  // Startliste (LLH-1815, design.md D1/D3). Sie steht ÜBER dem Führungsstand: erschiene sie nach
-  // dem Band, schöbe sie Band und Paneelreihen nach unten. Deshalb warten beim ersten Aufbau alle
-  // drei auf ihre Quellen, solange sie erscheinen kann (`startlisteSchranke`); die Alarmzeile
+  // Startliste (LLH-1815, design.md D1/D3). Sie steht ÜBER den Paneelreihen: erschiene sie nach
+  // ihnen, schöbe sie die Reihen nach unten. Deshalb warten beim ersten Aufbau beide auf ihre
+  // Quellen, solange sie erscheinen kann (`startlisteSchranke`); die Alarmzeile
   // darüber hat eine feste Höhe und steht sofort. Die Paneelreihen warten zusätzlich auf die
   // Gliederung. Wie dort zählt nur das erste Laden einer Quelle (`isLoading`). Die Freigaben hält
   // der Rahmen vor dem ersten Bild der Seite bereit (`EinsatzLayout`); fehlen sie doch, steht die
@@ -729,10 +708,6 @@ export default function UeberblickPage() {
       </span>
     ) : undefined;
 
-  const meldungsstand = meldungsStand(zaehlerQ);
-  // Drei Handlungszahlen in einer Reihe, auch am Handy (LLH-1748: das Band nahm dort den ganzen
-  // ersten Schirm).
-  const bandSpalten = 3;
   const lagebildZiel = einsatzModulPfad(einsatzId, 'lage-dashboard');
   const lagebildGesperrt = istSprungGesperrt('lage-dashboard', freigaben);
 
@@ -820,7 +795,7 @@ export default function UeberblickPage() {
             {startlisteSchranke ? null : (
               <>
                 {/* Startliste „Einsatz starten“ (LLH-1815): eine eigene Reihe nur mit diesem Paneel
-              zwischen Alarmzeile und Führungsstand; fehlt sie, fehlt die ganze Reihe. */}
+              zwischen Alarmzeile und Paneelreihen; fehlt sie, fehlt die ganze Reihe. */}
                 {zeigeStartliste && (
                   <PaneelReihe kennung="ueberblick-startliste">
                     <StartlistePaneel
@@ -830,169 +805,12 @@ export default function UeberblickPage() {
                     />
                   </PaneelReihe>
                 )}
-                {/* Führungsstand: nur Handlungszahlen (LLH-1743, Seitenrollen „Führen: was ist zu
-              tun“, `frontend/AGENTS.md`). Betroffene, Kräfte und Einsatzdauer haben ihre Heimat im
-              Lagebild. Notizplatz wie dort: unter `md` Boden (LFH-629), ab `md` drei Zeilen Boden
-              und Deckel (LFH-691). */}
-                <Kennzahlenband
-                  beschriftung="Führungsstand"
-                  spalten={bandSpalten}
-                  notizZeilenSchmal={2}
-                  notizZeilen={3}
-                  style={{ border: 'none' }}
-                >
-                  <Kennzahl
-                    titel="Offene Aufträge"
-                    zustand={
-                      auftragsstand.zustand === 'laden' || auftragsstand.zustand === 'fehler'
-                        ? auftragsstand.zustand
-                        : 'daten'
-                    }
-                    ton={auftragszahl?.ton ?? 'neutral'}
-                    wert={auftragszahl?.offen ?? '—'}
-                    einheit={
-                      auftragszahl && auftragszahl.ueberfaellig > 0
-                        ? `davon ${auftragszahl.ueberfaellig} ü.`
-                        : undefined
-                    }
-                    notiz={
-                      !auftragszahl
-                        ? NICHT_FREIGEGEBEN
-                        : auftragszahl.ueberfaellig > 0
-                          ? `${auftragszahl.inArbeit} in Arbeit`
-                          : `keine über Frist · ${auftragszahl.inArbeit} in Arbeit`
-                    }
-                    ziel={
-                      auftragsstand.zustand === 'gesperrt' ? undefined : auftraegePfad(einsatzId)
-                    }
-                  />
-                  {/* Aus dem Modulzähler wie im Lagebild (LFH-550); die überfällige Bestätigung ist
-                ein Alarmbeitrag. */}
-                  <Kennzahl
-                    titel="Meldungen offen"
-                    zustand={
-                      meldungsstand.zustand === 'laden' || meldungsstand.zustand === 'fehler'
-                        ? meldungsstand.zustand
-                        : 'daten'
-                    }
-                    ton={
-                      meldungsstand.zustand === 'daten' &&
-                      meldungsstand.zahl.bestaetigung_ueberfaellig > 0
-                        ? 'alarm'
-                        : 'neutral'
-                    }
-                    wert={meldungsstand.zustand === 'daten' ? meldungsstand.zahl.offen : '—'}
-                    notiz={
-                      meldungsstand.zustand === 'daten'
-                        ? meldungenNotiz(meldungsstand.zahl)
-                        : NICHT_FREIGEGEBEN
-                    }
-                    ziel={
-                      meldungsstand.zustand === 'gesperrt' ? undefined : meldungenPfad(einsatzId)
-                    }
-                  />
-                  <Kennzahl
-                    titel="Einsatzabschnitte"
-                    zustand={kennzahlZustand(zAbschnitteZahl)}
-                    wert={zAbschnitteZahl === 'gesperrt' ? '—' : (abschnitte?.length ?? 0)}
-                    notiz={
-                      zAbschnitteZahl === 'gesperrt'
-                        ? NICHT_FREIGEGEBEN
-                        : abschnitte && abschnitte.length > 0
-                          ? abschnittNamen(abschnitte)
-                          : 'noch keine angelegt'
-                    }
-                    ziel={
-                      zAbschnitteZahl === 'gesperrt' ? undefined : einsatzabschnittePfad(einsatzId)
-                    }
-                  />
-                </Kennzahlenband>
-
                 {gliederungLaedt ? null : (
                   <>
+                    {/* Kein Band (LLH-1748, Spec `lage-verdichtung`): Reihe 1 trägt die Fristen und die
+                        offenen Vorgänge, Reihe 2 die Gliederung und die Entscheidungen. Gestapelt (unter `lg`)
+                        stehen die Fristen damit direkt unter Alarmzeile und Startliste. */}
                     <PaneelReihe kennung="ueberblick-paneele">
-                      <GliederungsPaneel
-                        titel="Einsatzabschnitte"
-                        kennung="ueberblick-abschnitt"
-                        zustand={mitLeer(zAbschnitte, zeilen.length === 0)}
-                        // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
-                        // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
-                        // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883). Seit LLH-1481
-                        // lädt das Paneel hier nur noch, solange die Freigaben fehlen (`gliederungLaedt`).
-                        meta={
-                          zAbschnitte === 'daten' ? (
-                            // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
-                            `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
-                          ) : zAbschnitte === 'laden' ? (
-                            <span
-                              data-lfh="paneel-meta-platzhalter"
-                              aria-hidden="true"
-                              style={{ visibility: 'hidden' }}
-                            >
-                              0 Abschnitte · 0 Einheiten
-                            </span>
-                          ) : undefined
-                        }
-                        sprung={{
-                          label: modulName('einsatzabschnitte'),
-                          onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
-                        }}
-                        fuss={
-                          zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
-                            <span
-                              style={{
-                                ...schriftStil('meta'),
-                                fontSize: schriftGroesse('fein'),
-                                color: rollen.schwach,
-                              }}
-                            >
-                              Aufträge nicht abrufbar, Auftragstexte fehlen
-                            </span>
-                          ) : undefined
-                        }
-                        leerText={
-                          abschnitteHinweis
-                            ? `Noch keine Abschnitte, Einheiten oder Personal erfasst. ${abschnitteHinweis}`
-                            : 'Noch keine Abschnitte und keine Kräfte erfasst.'
-                        }
-                        gesperrtText={GESPERRT}
-                        leerAktion={
-                          darfSchreiben
-                            ? {
-                                label: 'Abschnitt anlegen',
-                                // Öffnet die Erfassung direkt (LLH-1815), nicht nur die Seite.
-                                onKlick: () =>
-                                  waehle(einsatzabschnittePfad(einsatzId, { neu: true })),
-                              }
-                            : undefined
-                        }
-                        onNeuladen={() =>
-                          nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
-                        }
-                        zeilen={zeilen.map((z) =>
-                          abschnittGliederung(z, einsatzId, kurz, token, rollen, jetzt),
-                        )}
-                      />
-
-                      <OffeneVorgaengePaneel
-                        einsatzId={einsatzId}
-                        jetzt={jetzt.valueOf()}
-                        zustand={zVorgaenge}
-                        zaehler={zaehlerQ}
-                        meldungen={{ q: meldungenOffenQ, frei: rueckmeldungenFrei }}
-                        auftraege={{ q: auftraegeQ, frei: auftraegeFrei }}
-                        nachforderungen={{ q: nachforderungenQ, frei: nachforderungenFrei }}
-                        erinnerungen={{ q: erinnerungenQ, frei: erinnerungenFrei }}
-                        abloesungen={{ q: abloesungenQ, frei: abloesungSichtbar }}
-                        ohneSchicht={ohneSchichtZahl}
-                        stelle={stelle}
-                        sicht={sicht}
-                        onSicht={waehleSicht}
-                        onNeuladen={() => void freigabenQ.refetch()}
-                      />
-                    </PaneelReihe>
-
-                    <PaneelReihe kennung="ueberblick-paneele-fristen">
                       <ListenPaneel
                         titel="Nächste Marken"
                         zustand={zMarken}
@@ -1063,6 +881,88 @@ export default function UeberblickPage() {
                               {m.text}
                             </span>
                           </MarkenZeile>
+                        )}
+                      />
+
+                      <OffeneVorgaengePaneel
+                        einsatzId={einsatzId}
+                        jetzt={jetzt.valueOf()}
+                        zustand={zVorgaenge}
+                        zaehler={zaehlerQ}
+                        meldungen={{ q: meldungenOffenQ, frei: rueckmeldungenFrei }}
+                        auftraege={{ q: auftraegeQ, frei: auftraegeFrei }}
+                        nachforderungen={{ q: nachforderungenQ, frei: nachforderungenFrei }}
+                        erinnerungen={{ q: erinnerungenQ, frei: erinnerungenFrei }}
+                        abloesungen={{ q: abloesungenQ, frei: abloesungSichtbar }}
+                        ohneSchicht={ohneSchichtZahl}
+                        stelle={stelle}
+                        sicht={sicht}
+                        onSicht={waehleSicht}
+                        onNeuladen={() => void freigabenQ.refetch()}
+                      />
+                    </PaneelReihe>
+
+                    <PaneelReihe kennung="ueberblick-paneele-gliederung">
+                      <GliederungsPaneel
+                        titel="Einsatzabschnitte"
+                        kennung="ueberblick-abschnitt"
+                        zustand={mitLeer(zAbschnitte, zeilen.length === 0)}
+                        // Beim Laden hält ein unsichtbares Meta seinen Platz (Muster `Datenstand
+                        // platzHalten`): auf 390 px bricht der Kopf mit dem Meta um (38 → 52 px), und
+                        // das erst mit den Daten zu tun, schöbe alles darunter (LFH-883). Seit LLH-1481
+                        // lädt das Paneel hier nur noch, solange die Freigaben fehlen (`gliederungLaedt`).
+                        meta={
+                          zAbschnitte === 'daten' ? (
+                            // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
+                            `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
+                          ) : zAbschnitte === 'laden' ? (
+                            <span
+                              data-lfh="paneel-meta-platzhalter"
+                              aria-hidden="true"
+                              style={{ visibility: 'hidden' }}
+                            >
+                              0 Abschnitte · 0 Einheiten
+                            </span>
+                          ) : undefined
+                        }
+                        sprung={{
+                          label: modulName('einsatzabschnitte'),
+                          onKlick: () => waehle(einsatzabschnittePfad(einsatzId)),
+                        }}
+                        fuss={
+                          zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
+                            <span
+                              style={{
+                                ...schriftStil('meta'),
+                                fontSize: schriftGroesse('fein'),
+                                color: rollen.schwach,
+                              }}
+                            >
+                              Aufträge nicht abrufbar, Auftragstexte fehlen
+                            </span>
+                          ) : undefined
+                        }
+                        leerText={
+                          abschnitteHinweis
+                            ? `Noch keine Abschnitte, Einheiten oder Personal erfasst. ${abschnitteHinweis}`
+                            : 'Noch keine Abschnitte und keine Kräfte erfasst.'
+                        }
+                        gesperrtText={GESPERRT}
+                        leerAktion={
+                          darfSchreiben
+                            ? {
+                                label: 'Abschnitt anlegen',
+                                // Öffnet die Erfassung direkt (LLH-1815), nicht nur die Seite.
+                                onKlick: () =>
+                                  waehle(einsatzabschnittePfad(einsatzId, { neu: true })),
+                              }
+                            : undefined
+                        }
+                        onNeuladen={() =>
+                          nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
+                        }
+                        zeilen={zeilen.map((z) =>
+                          abschnittGliederung(z, einsatzId, kurz, token, rollen, jetzt),
                         )}
                       />
 

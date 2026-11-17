@@ -145,40 +145,6 @@ export function warnstufeNotiz(
   return [gebiete, offen, pegelNotiz].filter(Boolean).join(' · ');
 }
 
-interface AuftraegeKennzahl {
-  offen: number;
-  /** Davon schon angenommen (`in_arbeit`). */
-  inArbeit: number;
-  ueberfaellig: number;
-  ton: KennzahlTon;
-}
-
-/**
- * Die Kennzahl „Offene Aufträge" aus dem Modulzähler des Servers (LFH-550): dieselbe Zahl wie im
- * Modulpanel und im Führungsstand des Lage-Dashboards. Hier wird nichts gezählt, nur benannt.
- */
-export function auftraegeKennzahl(z: {
-  offen: number;
-  in_arbeit: number;
-  ueberfaellig: number;
-}): AuftraegeKennzahl {
-  return {
-    offen: z.offen,
-    inArbeit: z.in_arbeit,
-    ueberfaellig: z.ueberfaellig,
-    ton: z.ueberfaellig > 0 ? 'alarm' : 'neutral',
-  };
-}
-
-/** Wie viele Abschnittsnamen die Notiz trägt, bevor sie zählt statt aufzählt. */
-const NAMEN_MAX = 4;
-
-export function abschnittNamen(abschnitte: Einsatzabschnitt[]): string {
-  const namen = sortiereAbschnitte(abschnitte).map((a) => a.name);
-  if (namen.length <= NAMEN_MAX) return namen.join(', ');
-  return `${namen.slice(0, NAMEN_MAX).join(', ')} +${namen.length - NAMEN_MAX}`;
-}
-
 function sortiereAbschnitte(abschnitte: Einsatzabschnitt[]): Einsatzabschnitt[] {
   return [...abschnitte].sort((a, b) => a.sortier - b.sortier || a.id - b.id);
 }
