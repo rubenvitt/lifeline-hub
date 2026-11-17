@@ -285,7 +285,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (LLH-1815, Spec `ueberblick-startliste`): eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
   Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
   ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über dem
-  Band steht, warten sie, Band und Paneelreihen gemeinsam auf ihre Quellen; die Alarmzeile nicht.
+  Band steht, warten sie, Band und Paneelreihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
+  Alarmzeile nicht. Später hängt eine erstmals ladende Quelle nichts aus, und ein gescheiterter
+  Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
   Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds, der
   Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
   Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
