@@ -234,7 +234,7 @@ describe('loadPersonDruck', () => {
 
 /**
  * Ein Feld je PATCH mit Feld-CAS (LLH-1103, design.md D1): genau das Feld und sein Wert beim Öffnen
- * unter `erwartet`; die Koordinate als Paar; ohne Altwert (Überschreiben) kein `erwartet`.
+ * unter `erwartet`; die Koordinate als Paar; ohne Altwert (Meine Änderung übernehmen) kein `erwartet`.
  *
  * Mutationsprobe: `erwartet` immer mitsenden — rot in „ohne Altwert“.
  */
@@ -276,7 +276,7 @@ describe('savePersonFeld', () => {
     });
   });
 
-  it('ohne Altwert (Überschreiben) kein `erwartet`', async () => {
+  it('ohne Altwert (Meine Änderung übernehmen) kein `erwartet`', async () => {
     const fetchMock = attrappe();
     await savePersonFeld(7, 3, 'koordinate', null, undefined);
     expect(body(fetchMock).daten).toEqual({ antreff_lat: null, antreff_lon: null });

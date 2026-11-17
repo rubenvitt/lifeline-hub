@@ -216,7 +216,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
-    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
     expect(koerper[0].basis_geaendert_at).toBe('2026-05-29 09:00:00');
     expect(koerper[1].basis_geaendert_at).toBeUndefined();
@@ -237,7 +237,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
     // Die Servermeldung erscheint (am Formular, LFH-1077), nicht erneut der
     // Konfliktdialog.
@@ -654,7 +654,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
-    expect(await screen.findByRole('button', { name: 'Überschreiben' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' })).toBeInTheDocument();
     expect(within(formular()).queryByRole('alert')).toBeNull();
     keinToast();
   });
@@ -668,7 +668,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
 
     expect(await within(formular()).findByRole('alert')).toHaveTextContent(
       'Storniertes Tier kann nicht geändert werden',

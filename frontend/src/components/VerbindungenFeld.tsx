@@ -167,7 +167,8 @@ export function VerbindungenAngabe({
   etikett: string;
   verbindungen: readonly KommunikationsVerbindung[] | null | undefined;
   darfSchreiben: boolean;
-  onSpeichern: (liste: NeueVerbindung[]) => Promise<unknown>;
+  /** `alt`: die Liste beim Öffnen, bereinigt (Feld-CAS, LLH-1831). */
+  onSpeichern: (liste: NeueVerbindung[], alt: NeueVerbindung[]) => Promise<unknown>;
   gesperrt?: string | { beschreibungId: string };
 }) {
   const wert = alsEingabe(verbindungen);
@@ -182,7 +183,9 @@ export function VerbindungenAngabe({
       gesperrt={gesperrt}
       bearbeitenDaneben
       pruefe={pruefeVerbindungen}
-      onSpeichern={(l) => onSpeichern(bereinigeVerbindungen(l))}
+      onSpeichern={(l, { beimOeffnen }) =>
+        onSpeichern(bereinigeVerbindungen(l), bereinigeVerbindungen(beimOeffnen))
+      }
       eingabe={(p) => <VerbindungenEingabe {...p} />}
     />
   );

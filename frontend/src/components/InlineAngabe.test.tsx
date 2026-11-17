@@ -121,7 +121,7 @@ describe('InlineAngabe · Bearbeitung', () => {
     await user.clear(feld);
     await user.type(feld, 'ILS-4711{Enter}');
     expect(onSpeichern).toHaveBeenCalledTimes(1);
-    expect(onSpeichern).toHaveBeenCalledWith('ILS-4711');
+    expect(onSpeichern).toHaveBeenCalledWith('ILS-4711', { beimOeffnen: expect.anything() });
   });
 
   it('der Speichern-Knopf sendet ebenso', async () => {
@@ -131,7 +131,7 @@ describe('InlineAngabe · Bearbeitung', () => {
     await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' }));
     await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), 'X');
     await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' }));
-    expect(onSpeichern).toHaveBeenCalledWith('X');
+    expect(onSpeichern).toHaveBeenCalledWith('X', { beimOeffnen: expect.anything() });
   });
 
   it('Escape und „Abbrechen" verwerfen ohne zu senden', async () => {
@@ -175,7 +175,11 @@ describe('InlineAngabe · Bearbeitung', () => {
     await user.type(feld, 'Zeile 1{Enter}Zeile 2');
     expect(onSpeichern).not.toHaveBeenCalled();
     fireEvent.keyDown(feld, { key: 'Enter', ctrlKey: true });
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('Zeile 1\nZeile 2'));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith('Zeile 1\nZeile 2', {
+        beimOeffnen: expect.anything(),
+      }),
+    );
   });
 });
 
@@ -236,7 +240,9 @@ describe('InlineAngabe · Riegel', () => {
 
     await user.clear(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }));
     await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), 'ILS-2{Enter}');
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('ILS-2'));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith('ILS-2', { beimOeffnen: expect.anything() }),
+    );
   });
 
   it('eine optionale Angabe darf geleert werden', async () => {
@@ -246,7 +252,7 @@ describe('InlineAngabe · Riegel', () => {
     await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
     await user.clear(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }));
     await user.keyboard('{Enter}');
-    expect(onSpeichern).toHaveBeenCalledWith('');
+    expect(onSpeichern).toHaveBeenCalledWith('', { beimOeffnen: expect.anything() });
   });
 });
 
@@ -581,7 +587,9 @@ describe('InlineAngabe · Prüfung am Feld (pruefe)', () => {
     expect(screen.queryByText('höchstens 120')).toBeNull();
     expect(feld).not.toHaveAttribute('aria-invalid');
     await user.keyboard('{Enter}');
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('99'));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith('99', { beimOeffnen: expect.anything() }),
+    );
   });
 
   it('Enter sendet ebenso nicht', async () => {
@@ -831,7 +839,9 @@ describe('InlineAngabe · OFFEN_LASSEN', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
     await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), '2{Enter}');
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('ILS-12'));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith('ILS-12', { beimOeffnen: expect.anything() }),
+    );
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' })).not.toHaveClass(
         'ant-btn-loading',
@@ -839,5 +849,64 @@ describe('InlineAngabe · OFFEN_LASSEN', () => {
     );
     expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('ILS-12');
     expect(document.querySelector('[data-fehler]')).toBeNull();
+  });
+});
+
+// LLH-1831 (Change `nvhnqynd-konflikt-und-aenderungsvermerk`, Spec `formularseiten`, „Fremder
+// Wert im offenen Feld“): der Wert beim Öffnen geht an `onSpeichern`, ein fremder Wert erscheint
+// als Hinweis im offenen Feld, die eigene Eingabe bleibt.
+describe('InlineAngabe · Wert beim Öffnen und fremde Änderung', () => {
+  it('reicht den Wert beim Öffnen an onSpeichern, auch wenn inzwischen ein anderer kam', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'ILS-3');
+    rerender(<TextAngabe wert="ILS-2" onSpeichern={onSpeichern} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' }));
+    expect(onSpeichern).toHaveBeenCalledWith('ILS-3', { beimOeffnen: 'ILS-1' });
+  });
+
+  it('zeigt einen fremden Wert als Hinweis im offenen Feld, mit Wer und Wann', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    await userEvent.type(feld, '7');
+    rerender(
+      <TextAngabe
+        wert="ILS-4711"
+        anzeige="ILS-4711"
+        vermerk={{ at: '2026-11-17 13:05:00', von: 'Anna' }}
+      />,
+    );
+    const hinweis = screen.getByRole('status');
+    expect(hinweis).toHaveTextContent(/Inzwischen geändert von Anna, .*: ILS-4711/);
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('ILS-17');
+  });
+
+  it('der Hinweis verschwindet, wenn der Wert wieder dem beim Öffnen entspricht', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    rerender(<TextAngabe wert="ILS-2" anzeige="ILS-2" />);
+    expect(screen.getByText(/Inzwischen geändert/)).toBeInTheDocument();
+    rerender(<TextAngabe wert="ILS-1" anzeige="ILS-1" />);
+    expect(screen.queryByText(/Inzwischen geändert/)).not.toBeInTheDocument();
+  });
+
+  it('ein fremder leerer Wert heißt „ohne Angabe“', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    rerender(<TextAngabe wert="" anzeige="" />);
+    expect(screen.getByText('Inzwischen geändert: ohne Angabe')).toBeInTheDocument();
+  });
+
+  it('unverändert gegenüber dem Öffnen sendet nichts, auch nach einem fremden Wert', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    rerender(<TextAngabe wert="ILS-2" onSpeichern={onSpeichern} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' }));
+    expect(onSpeichern).not.toHaveBeenCalled();
   });
 });

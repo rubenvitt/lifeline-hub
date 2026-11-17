@@ -28,6 +28,16 @@ import { setzeViewportBreite } from '../test/viewport';
 import { tippeZeit } from '../test/zeitEingabe';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 
+/**
+ * Der PATCH-Körper ohne den Altwert des Feld-CAS (LLH-1831): die Tests dieser Datei vergleichen die
+ * Änderung; `erwartet` prüfen eigene Tests („Feld-CAS“).
+ */
+function ohneErwartet<T extends object>(body: T): T {
+  const rest = { ...body } as Record<string, unknown>;
+  delete rest.erwartet;
+  return rest as T;
+}
+
 dayjs.extend(utc);
 
 const MONATE = ['jan', 'feb', 'mrz', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dez'];
@@ -273,7 +283,7 @@ function serverStand(einsatz: Partial<EinsatzAnzeige> = {}) {
     http.get('/api/einsaetze/7', () => HttpResponse.json(stand)),
     http.patch('/api/einsaetze/7', async ({ request }) => {
       const body = (await request.json()) as Partial<EinsatzAnzeige>;
-      bodies.push(body);
+      bodies.push(ohneErwartet(body));
       stand = { ...stand, ...body };
       return HttpResponse.json(stand);
     }),
@@ -496,7 +506,7 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(stand)),
       http.patch('/api/einsaetze/7', async ({ request }) => {
         const body = (await request.json()) as Partial<EinsatzAnzeige>;
-        bodies.push(body);
+        bodies.push(ohneErwartet(body));
         stand = { ...stand, ...body };
         return HttpResponse.json(stand);
       }),
@@ -945,7 +955,7 @@ describe('EinsatzdatenPage — Alarmzeit in der Anzeigezone (LFH-692)', () => {
     server.use(
       http.patch('/api/einsaetze/7', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
-        bodies.push(body);
+        bodies.push(ohneErwartet(body));
         return HttpResponse.json({ ...basisEinsatz, ...body });
       }),
     );
@@ -1063,7 +1073,7 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
       http.delete('/api/einsaetze/7/fuehrungsstelle/sprechgruppen/:sg', einzelweg),
       http.patch('/api/einsaetze/7/fuehrungsstelle', async ({ request }) => {
         const body = (await request.json()) as FuehrungsstellePatch;
-        bodies.push(body);
+        bodies.push(ohneErwartet(body));
         const { fahrzeug_ids, einsatzleiter, ...felder } = body;
         // Wie der Server: `null` leert, ein Wert ersetzt (die Art ist nie `null`).
         const naechster = { ...stand } as Record<string, unknown>;
@@ -1975,7 +1985,7 @@ describe('EinsatzdatenPage · Paneel Einsatzort (LFH-1175)', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(stand)),
       http.patch('/api/einsaetze/7', async ({ request }) => {
         const body = (await request.json()) as Partial<EinsatzAnzeige>;
-        bodies.push(body);
+        bodies.push(ohneErwartet(body));
         stand = { ...stand, ...body };
         return HttpResponse.json(stand);
       }),
@@ -2256,5 +2266,89 @@ describe('Sprung zum Paneel „Führung“ (LLH-1850)', () => {
     } finally {
       Element.prototype.scrollIntoView = vorher;
     }
+  });
+});
+
+/**
+ * Feld-CAS und Änderungsvermerk (LLH-1831/LLH-1834, Change
+ * `nvhnqynd-konflikt-und-aenderungsvermerk`): die Zeile schickt ihren Wert beim Öffnen als
+ * `erwartet`; der Server antwortet 409, wenn er nicht mehr stimmt, und die Seite fragt nach.
+ */
+describe('EinsatzdatenPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () => {
+  function casServer(einsatz: Partial<EinsatzAnzeige> = {}) {
+    const anfragen: Record<string, unknown>[] = [];
+    let stand: EinsatzAnzeige = { ...basisEinsatz, ...einsatz };
+    server.use(
+      http.get('/api/einsaetze/7', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        anfragen.push(body);
+        const erwartet = (body.erwartet ?? {}) as Record<string, unknown>;
+        const aktuell = stand as unknown as Record<string, unknown>;
+        if (Object.entries(erwartet).some(([k, v]) => (aktuell[k] ?? null) !== v)) {
+          return HttpResponse.json({ error: 'zwischenzeitlich geändert' }, { status: 409 });
+        }
+        stand = { ...stand, ...ohneErwartet(body) };
+        return HttpResponse.json(stand);
+      }),
+    );
+    return {
+      anfragen,
+      stand: () => stand,
+      fremdAendern: (teil: Partial<EinsatzAnzeige>) => {
+        stand = { ...stand, ...teil };
+      },
+    };
+  }
+
+  it('sendet den Wert beim Öffnen als erwartet', async () => {
+    setup({ einsatz: { leitstellen_nr: 'LS-1' } });
+    const { anfragen } = casServer({ leitstellen_nr: 'LS-1' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    await user.clear(feld);
+    await user.type(feld, 'LS-2{Enter}');
+    await waitFor(() =>
+      expect(anfragen).toEqual([{ leitstellen_nr: 'LS-2', erwartet: { leitstellen_nr: 'LS-1' } }]),
+    );
+  });
+
+  it('veralteter Stand: Rückfrage mit Wert und Wer, Verwerfen sendet nichts weiter', async () => {
+    setup({ einsatz: { leitstellen_nr: null } });
+    const { anfragen, stand, fremdAendern } = casServer({ leitstellen_nr: null });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Leitstellen-Nr. eintragen' }));
+    fremdAendern({
+      leitstellen_nr: 'ILS-4711',
+      vermerke: { leitstellen_nr: { at: '2020-01-01 13:05:00', von: 'Anna' } },
+    });
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), 'ILS-4712{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent(/Leitstellen-Nr\. inzwischen: „ILS-4711“ \(Anna, /);
+    await user.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    // Die Zeile schließt mit dem neuen Stand; gesendet wurde nur der abgelehnte Versuch.
+    expect(await screen.findByRole('button', { name: 'Leitstellen-Nr. bearbeiten' })).toBeVisible();
+    expect(anfragen).toHaveLength(1);
+    expect(stand().leitstellen_nr).toBe('ILS-4711');
+  });
+
+  it('Vermerk an der Zeile und der jüngste im Paneelkopf', async () => {
+    setup({
+      einsatz: {
+        leitstellen_nr: 'LS-1',
+        vermerke: {
+          bezeichnung: { at: '2020-01-01 09:00:00', von: 'Anna' },
+          leitstellen_nr: { at: '2020-01-01 13:05:00', von: 'Bert' },
+        },
+      },
+    });
+    const paneel = within(await screen.findByRole('region', { name: 'Einsatz' }));
+    expect(paneel.getByText(/^Zuletzt geändert von Bert, /)).toBeInTheDocument();
+    expect(paneel.getByText(/^Geändert von Anna, /)).toBeInTheDocument();
+    expect(paneel.getByText(/^Geändert von Bert, /)).toBeInTheDocument();
+    const erstmeldung = within(screen.getByRole('region', { name: 'Erstmeldung' }));
+    expect(erstmeldung.queryByText(/geändert/i)).toBeNull();
   });
 });

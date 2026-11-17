@@ -293,8 +293,8 @@ nicht, sagt die Seite „Person nicht gefunden“.
    „Abbrechen“ verwirft die Eingabe. Das Geburtsdatum steht als „TT.MM.JJJJ“, „1.2.1980“ und
    „01.02.80“ gehen ebenso.
 4. Hat jemand anderes dieselbe Angabe seit dem Öffnen geändert, fragt die App
-   „Zwischenzeitlich geändert“ und nennt den neuen Wert. „Überschreiben“ speichert die eigene
-   Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand. Wer die Rückfrage mit Escape
+   „Zwischenzeitlich geändert“ und nennt den neuen Wert. „Meine Änderung übernehmen“ speichert die
+   eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand. Wer die Rückfrage mit Escape
    schließt, entscheidet nichts: die Eingabe bleibt offen.
 
 „Kostform“ und „Unverträglichkeiten“ stehen ebenfalls unter „Personendaten“; an einer

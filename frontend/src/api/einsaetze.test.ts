@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { patcheEinsatz } from './einsaetze';
+import { patcheEinsatz, patcheFuehrungsstelle } from './einsaetze';
 
 /**
  * Der Teil-PATCH der Kopfdaten (LFH-472). Eine Zeile der Einsatzdaten schickt NUR ihr Feld —
@@ -30,5 +30,39 @@ describe('api/einsaetze · patcheEinsatz', () => {
   it('erhält ein explizites null (leeren), statt es wegzulassen', async () => {
     await patcheEinsatz(7, { einsatzort: null });
     expect(JSON.parse(aufruf().init.body as string)).toEqual({ einsatzort: null });
+  });
+});
+
+/**
+ * Feld-CAS an Kopfdaten und Führungsstelle (LLH-1831, Change
+ * `nvhnqynd-konflikt-und-aenderungsvermerk`): `erwartet` geht nur mit, wenn übergeben.
+ */
+describe('patcheEinsatz / patcheFuehrungsstelle mit Altwert', () => {
+  function daten(fetchMock: { mock: { calls: unknown[][] } }) {
+    return JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+  }
+  it('Kopfdaten: mit Altwert unter `erwartet`', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+    await patcheEinsatz(4, { leitstellen_nr: 'ILS-2' }, { leitstellen_nr: null });
+    expect(daten(fetchMock)).toEqual({
+      leitstellen_nr: 'ILS-2',
+      erwartet: { leitstellen_nr: null },
+    });
+  });
+  it('Kopfdaten: ohne Altwert kein `erwartet`', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+    await patcheEinsatz(4, { leitstellen_nr: 'ILS-2' });
+    expect(daten(fetchMock)).toEqual({ leitstellen_nr: 'ILS-2' });
+  });
+  it('Führungsstelle: mit Altwert unter `erwartet`', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 200 }));
+    await patcheFuehrungsstelle(4, { rufname: 'Florian 2' }, { rufname: 'Florian 1' });
+    expect(daten(fetchMock)).toEqual({ rufname: 'Florian 2', erwartet: { rufname: 'Florian 1' } });
   });
 });

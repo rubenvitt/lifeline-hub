@@ -33,14 +33,14 @@ Gliederung nach Unteraufgabe: `r9up3kp5` = LLH-1831 (Konfliktprüfung), `mdopfgq
 
 ## 6. Frontend-Baustein (r9up3kp5)
 
-- [ ] 6.1 `InlineAngabe`: Wert beim Öffnen einfrieren, als `{ beimOeffnen }` an `onSpeichern`; Hinweis „Inzwischen geändert[ von X, HH:MM]: …“ bei abweichendem Live-`wert`, Entwurf bleibt, Hinweis verschwindet bei Rückkehr; Prop `vermerk`; verifiziert: Vitest für alle drei Szenarien aus `formularseiten` „Fremder Wert im offenen Feld“ und unverändertes Verhalten ohne neue Props
-- [ ] 6.2 `useFeldKonflikt` aus `Personendaten.tsx` lösen: Dialog mit „Meine Änderung übernehmen“ / „Verwerfen und neu laden“, Wer/Wann aus dem frischen Vermerk, Escape = `OFFEN_LASSEN`, 409 ohne Feldänderung an die Angabe; verifiziert: Vitest für die Szenarien aus `formularseiten` „Einheitlicher Dialog“ und „409 ohne fremde Änderung“
-- [ ] 6.3 `Personendaten.tsx` auf den Hook umstellen (Wortlaut „Meine Änderung übernehmen“); bestehende Tests und e2e mit „Überschreiben“ anpassen; verifiziert: `grep -rn "Überschreiben" frontend/src frontend/e2e` findet den Personendialog nicht mehr, Personendaten-Tests grün
+- [x] 6.1 `InlineAngabe`: Wert beim Öffnen einfrieren, als `{ beimOeffnen }` an `onSpeichern`; Hinweis „Inzwischen geändert[ von X, HH:MM]: …“ bei abweichendem Live-`wert`, Entwurf bleibt, Hinweis verschwindet bei Rückkehr; Prop `vermerk`; verifiziert: Vitest für alle drei Szenarien aus `formularseiten` „Fremder Wert im offenen Feld“ und unverändertes Verhalten ohne neue Props
+- [x] 6.2 `useFeldKonflikt` aus `Personendaten.tsx` lösen: Dialog mit „Meine Änderung übernehmen“ / „Verwerfen und neu laden“, Wer/Wann aus dem frischen Vermerk, Escape = `OFFEN_LASSEN`, 409 ohne Feldänderung an die Angabe; verifiziert: Vitest für die Szenarien aus `formularseiten` „Einheitlicher Dialog“ und „409 ohne fremde Änderung“
+- [x] 6.3 `Personendaten.tsx` auf den Hook umstellen (Wortlaut „Meine Änderung übernehmen“); bestehende Tests und e2e mit „Überschreiben“ anpassen; verifiziert: `grep -rn "Überschreiben" frontend/src frontend/e2e` findet den Personendialog nicht mehr, Personendaten-Tests grün
 
 ## 7. Frontend-Ansichten (r9up3kp5, mdopfgqk)
 
-- [ ] 7.1 API-Funktionen `patcheEinsatz`, `patcheEinheit`, `patcheFuehrungsstelle` nehmen optionales `erwartet`; verifiziert: Vitest der API-Schicht (Body enthält `erwartet` nur, wenn übergeben)
-- [ ] 7.2 `EinsatzdatenPage` (Kopfzeilen, Paneel Einsatzort mit Paar und Adresse+Treffer) und `EinsatzleiterAngabe` senden `erwartet` und nutzen `useFeldKonflikt`; Vermerk an der Zeile, jüngster im Paneelkopf (`meta`); verifiziert: Vitest für „Leitstellen-Nr. mit veraltetem Stand“ (Dialog), Paneelkopf „Zuletzt geändert von B, 14:05“, ohne Vermerk kein Kopftext
+- [x] 7.1 API-Funktionen `patcheEinsatz`, `patcheEinheit`, `patcheFuehrungsstelle` nehmen optionales `erwartet`; verifiziert: Vitest der API-Schicht (Body enthält `erwartet` nur, wenn übergeben)
+- [x] 7.2 `EinsatzdatenPage` (Kopfzeilen, Paneel Einsatzort mit Paar und Adresse+Treffer) und `EinsatzleiterAngabe` senden `erwartet` und nutzen `useFeldKonflikt`; Vermerk an der Zeile, jüngster im Paneelkopf (`meta`); verifiziert: Vitest für „Leitstellen-Nr. mit veraltetem Stand“ (Dialog), Paneelkopf „Zuletzt geändert von B, 14:05“, ohne Vermerk kein Kopftext
 - [ ] 7.3 `EinheitKopf` und `EinheitFunk` (inkl. Bemerkung, Verbindungen, Führer, Soll-Trio, Qualifikationssoll) ebenso; verifiziert: Vitest für Bemerkung-Konflikt und Vermerk an der Zeile
 - [ ] 7.4 e2e mit zwei Browserkontexten: A und B öffnen Einheit › Bemerkung bzw. Einsatzdaten › Leitstellen-Nr.; B sieht den Hinweis im offenen Feld, dann den Dialog; nichts still überschrieben; verifiziert: neue Spec unter `frontend/e2e/` grün
 

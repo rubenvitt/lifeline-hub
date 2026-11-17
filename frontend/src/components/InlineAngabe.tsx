@@ -16,6 +16,9 @@ import { wertKnopfStil } from './BemerkungZelle';
 import { useSelbstanmeldung } from './offeneBearbeitung';
 import { SpeicherFehler } from './SpeicherHinweis';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import type { FeldVermerk } from '../api/types';
+import { vermerkKurz } from './feldVermerk';
 
 /**
  * Inline bearbeitbare Angabe mit BELIEBIGER Eingabe (LFH-472) — Text, Textfeld, Zahl, Auswahl,
@@ -73,6 +76,16 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *   „Eine offene Bearbeitung zur Zeit“).
  * - Erfüllt `onSpeichern` mit {@link OFFEN_LASSEN}, bleibt die Eingabe mit dem Entwurf offen, ohne
  *   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
+ *
+ * ── WERT BEIM ÖFFNEN UND FREMDE ÄNDERUNG (LLH-1831) ────────────────────────────────────
+ *
+ * Change `nvhnqynd-konflikt-und-aenderungsvermerk`, design.md D5, Spec `formularseiten`.
+ * - Beim Öffnen friert die Angabe den Serverstand ein und reicht ihn als zweites Argument
+ *   `{ beimOeffnen }` an `onSpeichern`: der Aufrufer schickt ihn als `erwartet` (Feld-CAS).
+ * - „Unverändert“ heißt unverändert gegenüber dem Öffnen: trifft inzwischen ein fremder Wert ein
+ *   und der Entwurf blieb, wird nichts gesendet (sonst schriebe er den alten Wert zurück).
+ * - Weicht der Live-`wert` vom eingefrorenen ab, steht im offenen Feld „Inzwischen geändert[ von
+ *   X, Zeit]: <Anzeige>“ (`role="status"`); `vermerk` liefert Wer und Wann. Der Entwurf bleibt.
  *
  * ── ANZEIGE MIT EIGENEN BEDIENZIELEN (LLH-1426) ───────────────────────────────────────
  *
@@ -151,7 +164,7 @@ export interface InlineAngabeProps<T> {
    * Übernahme. Lehnt bei Ablehnung ab (`mutateAsync`) — dann bleibt die Eingabe mit dem Entwurf
    * offen und der Fehler steht an der Zeile. Erfüllt erst, wenn der neue Wert im Cache steht.
    */
-  onSpeichern: (wert: T) => Promise<unknown>;
+  onSpeichern: (wert: T, kontext: { beimOeffnen: T }) => Promise<unknown>;
   /**
    * Prüfung ohne Server (LLH-1103): ein Grund in wenigen Wörtern („höchstens 120“) sperrt das
    * Senden und steht als `FeldFehler` unter der Eingabe; `null` = in Ordnung.
@@ -170,6 +183,8 @@ export interface InlineAngabeProps<T> {
   onEntwurf?: (geaendert: boolean) => void;
   /** Jedes Schließen einer offenen Bearbeitung, auch durch Sperre oder Aushängen. */
   onSchliessen?: () => void;
+  /** Wer den gespeicherten Wert zuletzt gesetzt hat (LLH-1834), für den Hinweis im offenen Feld. */
+  vermerk?: FeldVermerk;
   /**
    * Die Anzeige trägt eigene Bedienziele, etwa `tel:`-Links (LLH-1426): sie steht als Inhalt, nicht
    * im Wertknopf, und daneben ein eigener Knopf „Bearbeiten“ (Dateikopf, „Anzeige mit eigenen
@@ -246,9 +261,17 @@ export function InlineAngabe<T>({
   onEntwurf,
   onOeffnen,
   onSchliessen,
+  vermerk,
   bearbeitenDaneben = false,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
+  // Der Serverstand beim Öffnen (LLH-1831): Altwert des Feld-CAS und Maß für „unverändert“.
+  const [beimOeffnen, setBeimOeffnenZustand] = useState<T>(wert);
+  const beimOeffnenRef = useRef<T>(wert);
+  function setBeimOeffnen(neu: T) {
+    beimOeffnenRef.current = neu;
+    setBeimOeffnenZustand(neu);
+  }
   const [entwurf, setEntwurfZustand] = useState<T>(wert);
   // Der Entwurf auch als Ref: die Zeiteingabe übernimmt beim Enter (`onChange`) und das native
   // Absenden folgt im SELBEN Tastendruck, bevor React neu gerendert hat — `abschicken` läse sonst
@@ -274,6 +297,7 @@ export function InlineAngabe<T>({
   const escSchliesstPopup = useRef(false);
   const knopfRef = useFokusRueckgabe(bearbeitet);
   const { token, rollen } = useRollen();
+  const { zeitKurz } = useAnzeigeKonventionen();
   const wertId = useId();
   const feldId = useId();
   const pruefId = useId();
@@ -290,7 +314,8 @@ export function InlineAngabe<T>({
   /** Der Grund steht hier (Text) oder an anderer Stelle (Kennung seines Elements). */
   const sperrText = typeof sperre === 'string' ? sperre : undefined;
   const sperrBeschreibung = typeof sperre === 'object' ? sperre.beschreibungId : sperrId;
-  const geaendert = darfSchreiben && bearbeitet && !gleich(entwurf, wert);
+  const geaendert = darfSchreiben && bearbeitet && !gleich(entwurf, beimOeffnen);
+  const fremdGeaendert = bearbeitet && !gleich(wert, beimOeffnen);
   const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
 
   // Die Sperre schließt eine offene Bearbeitung ohne Änderung (Zustand beim Rendern angepasst,
@@ -364,6 +389,7 @@ export function InlineAngabe<T>({
     if (isGesperrt) return;
     popupOffenRef.current = false;
     setEntwurf(wert);
+    setBeimOeffnen(wert);
     setFehler(null);
     setPflichtHinweis(false);
     setPruefungAktiv(false);
@@ -385,7 +411,7 @@ export function InlineAngabe<T>({
       schliessen();
       return;
     }
-    if (gleich(entwurf, wert)) {
+    if (gleich(entwurf, beimOeffnenRef.current)) {
       schliessen();
       return;
     }
@@ -405,7 +431,8 @@ export function InlineAngabe<T>({
     setSendet(true);
     setFehler(null);
     try {
-      if ((await onSpeichern(entwurf)) !== OFFEN_LASSEN) schliessen();
+      const kontext = { beimOeffnen: beimOeffnenRef.current };
+      if ((await onSpeichern(entwurf, kontext)) !== OFFEN_LASSEN) schliessen();
     } catch (e) {
       setFehler(e);
     } finally {
@@ -467,6 +494,12 @@ export function InlineAngabe<T>({
           },
         })}
         <FeldFehler id={pruefId}>{pruefGrund}</FeldFehler>
+        {fremdGeaendert ? (
+          <div role="status" style={{ color: rollen.achtungText }}>
+            {`Inzwischen geändert${vermerk ? ` von ${vermerkKurz(vermerk, zeitKurz)}` : ''}: `}
+            {leer(wert) ? 'ohne Angabe' : anzeige}
+          </div>
+        ) : null}
         <SpeicherFehler fehler={fehler} />
         {sperrHinweis}
         {/* Abstand der Dialogfüße (frontend/AGENTS.md, „Rot steht nicht bündig neben Neutralem“). */}

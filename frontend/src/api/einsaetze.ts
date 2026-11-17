@@ -117,8 +117,21 @@ export type KopfdatenPatch = Partial<Kopfdaten>;
  * mitgeschicktes fremdes Feld aus einem älteren Seitenstand überschriebe die gleichzeitige
  * Änderung einer anderen Person.
  */
-export function patcheEinsatz(id: number, patch: KopfdatenPatch): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', patch);
+/**
+ * Teil-Patch der Kopfdaten. `erwartet` = Werte beim Öffnen (Feld-CAS, LLH-1831, Spec
+ * `einsatzdaten-bearbeitung`): weicht einer ab, antwortet der Server 409. Ohne `erwartet` schreibt
+ * er ohne Vergleich („Meine Änderung übernehmen“ nach der Rückfrage).
+ */
+export function patcheEinsatz(
+  id: number,
+  patch: KopfdatenPatch,
+  erwartet?: Partial<KopfdatenPatch>,
+): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>(
+    `/api/einsaetze/${id}`,
+    'PATCH',
+    erwartet ? { ...patch, erwartet } : patch,
+  );
 }
 
 /** Eigene Führungsstelle (LFH-849); ohne erfasste Angaben nur `sprechgruppen: []`. */
@@ -126,12 +139,21 @@ export function ladeFuehrungsstelle(id: number): Promise<Fuehrungsstelle> {
   return apiGet<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`);
 }
 
-/** Teiländerung der Führungsstelle: nur die übergebenen Schlüssel gehen hinaus (wie die Zeile). */
+/**
+ * Teiländerung der Führungsstelle: nur die übergebenen Schlüssel gehen hinaus (wie die Zeile).
+ * `erwartet` = Werte beim Öffnen (Feld-CAS, LLH-1831, Spec `einsatz-fuehrungsstelle`).
+ */
 export function patcheFuehrungsstelle(
   id: number,
   patch: FuehrungsstellePatch,
+  /** Altwerte; der Einsatzleiter ohne „seit“ (`EinsatzleiterAltwert`). */
+  erwartet?: Record<string, unknown>,
 ): Promise<Fuehrungsstelle> {
-  return apiSend<Fuehrungsstelle>(`/api/einsaetze/${id}/fuehrungsstelle`, 'PATCH', patch);
+  return apiSend<Fuehrungsstelle>(
+    `/api/einsaetze/${id}/fuehrungsstelle`,
+    'PATCH',
+    erwartet ? { ...patch, erwartet } : patch,
+  );
 }
 
 /**

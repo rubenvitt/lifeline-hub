@@ -6,7 +6,8 @@
 Das Speichern einer Zeile der Kopfdaten über `PATCH /api/einsaetze/{id}` SHALL neben dem neuen
 Wert den Wert beim Öffnen als `erwartet` senden, mit denselben Feldnamen, die die Zeile schreibt.
 Die Koordinate MUST als Paar (`einsatzort_lat`, `einsatzort_lon`) erwartet werden; sendet die
-Zeile „Adresse“ eine neue Koordinate mit, erwartet sie Adresse und Koordinate.
+Zeile „Adresse“ eine neue Koordinate mit, erwartet sie Adresse und Koordinate. `erwartet` ist
+kein Feld der Angabe: wo eine Anforderung die gesendeten Felder nennt, gilt sie ohne `erwartet`.
 
 #### Scenario: Leitstellen-Nr. mit veraltetem Stand
 - **WHEN** B die Zeile „Leitstellen-Nr.“ leer öffnet, A inzwischen `ILS-4711` speichert und B `ILS-4712` mit `erwartet: { leitstellen_nr: null }` sendet

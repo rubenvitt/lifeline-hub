@@ -51,6 +51,20 @@ function isSameZeit(a: Dayjs | null, b: Dayjs | null): boolean {
   return a === null || b === null ? a === b : a.valueOf() === b.valueOf();
 }
 
+/**
+ * Der Leiter beim Öffnen als Altwert des Feld-CAS (LLH-1831, design.md D2): wer, ohne „seit“. Eine
+ * entlassene Person hat keine Kennung mehr; der Server vergleicht dann nur die Art.
+ */
+export type EinsatzleiterAltwert =
+  { art: 'personal'; personal_id?: number } | { art: 'extern'; name: string } | null;
+
+function toAltwert(w: Wahl): EinsatzleiterAltwert {
+  if (w.wahl === null) return null;
+  if (w.wahl.startsWith('p:')) return { art: 'personal', personal_id: Number(w.wahl.slice(2)) };
+  if (w.wahl.startsWith('x:')) return { art: 'extern', name: w.wahl.slice(2) };
+  return { art: 'personal' };
+}
+
 /** Die Wahl als PATCH-Feld; ohne „seit“ nimmt der Server die Zeit des Speicherns. */
 function toEingabe(w: Wahl): EinsatzleiterEingabe | null {
   if (w.wahl === null) return null;
@@ -105,7 +119,10 @@ export default function EinsatzleiterAngabe({
   einsatzId: number;
   fs: Fuehrungsstelle;
   darfSchreiben: boolean;
-  onSpeichern: (einsatzleiter: EinsatzleiterEingabe | null) => Promise<unknown>;
+  onSpeichern: (
+    einsatzleiter: EinsatzleiterEingabe | null,
+    alt: EinsatzleiterAltwert,
+  ) => Promise<unknown>;
 }) {
   const { konventionen } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
@@ -157,11 +174,11 @@ export default function EinsatzleiterAngabe({
       leer={(w) => w.wahl === null}
       gleich={(a, b) => a.wahl === b.wahl && isSameZeit(a.seit, b.seit)}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(w) => {
+      onSpeichern={(w, { beimOeffnen }) => {
         setSuche('');
         return Promise.resolve()
           .then(() => toEingabe(w))
-          .then(onSpeichern);
+          .then((eingabe) => onSpeichern(eingabe, toAltwert(beimOeffnen)));
       }}
       eingabe={({ feld, popup, value, onChange }) => (
         <>

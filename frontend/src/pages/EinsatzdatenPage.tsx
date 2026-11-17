@@ -54,6 +54,19 @@ import {
   type KopfdatenPatch,
 } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import {
+  ausschnitt,
+  ausschnittLeer,
+  ausschnittText,
+  juengsterVermerk,
+  vermerkFuer,
+} from '../components/feldVermerk';
+import { PaneelVermerk, VermerkZeile } from '../components/FeldVermerkAnzeige';
+import {
+  alsEingabe as alsVerbindungsEingabe,
+  bereinigeVerbindungen,
+} from '../components/verbindungen';
 import { externeStellenOptions, useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { MELDENDE_STELLE_MAX } from '../api/eingabegrenzen';
@@ -75,6 +88,7 @@ import type {
   EinsatzAnzeige,
   Einsatzart,
   EinsatzFahrzeug,
+  FeldVermerk,
   Fuehrungsstelle,
   FuehrungsstellenArt,
   FuehrungsstellePatch,
@@ -131,7 +145,16 @@ function leererText(w: string): boolean {
  * Speichert EIN Feld der Kopfdaten (LFH-472). `etikett` nennt die Angabe in der Erfolgsmeldung;
  * der Patch trägt genau einen Schlüssel.
  */
-type FeldSpeichern = (etikett: string, patch: KopfdatenPatch) => Promise<EinsatzAnzeige>;
+/**
+ * Speichert eine Zeile der Kopfdaten. `alt` = der Wert der Zeile beim Öffnen in Wire-Form; daraus
+ * gehen die Schlüssel des Patches als `erwartet` mit (Feld-CAS, LLH-1831). Erfüllt mit
+ * `OFFEN_LASSEN`, wenn die Rückfrage ohne Entscheidung schloss.
+ */
+type FeldSpeichern = (
+  etikett: string,
+  patch: KopfdatenPatch,
+  alt?: KopfdatenPatch,
+) => Promise<unknown>;
 
 /** Eine freie Textangabe als Zeile (Stichwort und meldende Stelle ausgenommen: sie haben Vorschläge). */
 function TextAngabe({
@@ -165,7 +188,9 @@ function TextAngabe({
       darfSchreiben={darfSchreiben}
       mehrzeilig={mehrzeilig}
       pflicht={pflicht}
-      onSpeichern={(w) => speichern(etikett, zuPatch(leerZuNull(w)))}
+      onSpeichern={(w, { beimOeffnen }) =>
+        speichern(etikett, zuPatch(leerZuNull(w)), zuPatch(leerZuNull(beimOeffnen)))
+      }
       eingabe={({ feld, value, onChange }) =>
         mehrzeilig ? (
           <Input.TextArea
@@ -210,7 +235,13 @@ function ZeitpunktAngabe({
       gleich={gleicherZeitpunkt}
       pflicht={pflicht}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(d) => speichern(etikett, zuPatch(d ? alsBackendZeit(d) : null))}
+      onSpeichern={(d, { beimOeffnen }) =>
+        speichern(
+          etikett,
+          zuPatch(d ? alsBackendZeit(d) : null),
+          zuPatch(beimOeffnen ? alsBackendZeit(beimOeffnen) : null),
+        )
+      }
       eingabe={({ feld, popup, value, onChange }) => (
         <ZeitpunktEingabe
           art="ereignis"
@@ -271,11 +302,18 @@ function KoordinatenAngabe({
       gleich={isSameKoordinate}
       darfSchreiben={darfSchreiben}
       isValid={(w) => w === null || istLatLon(w)}
-      onSpeichern={(w) =>
-        speichern('Koordinate', {
-          einsatzort_lat: istLatLon(w) ? w.lat : null,
-          einsatzort_lon: istLatLon(w) ? w.lon : null,
-        })
+      onSpeichern={(w, { beimOeffnen }) =>
+        speichern(
+          'Koordinate',
+          {
+            einsatzort_lat: istLatLon(w) ? w.lat : null,
+            einsatzort_lon: istLatLon(w) ? w.lon : null,
+          },
+          {
+            einsatzort_lat: istLatLon(beimOeffnen) ? beimOeffnen.lat : null,
+            einsatzort_lon: istLatLon(beimOeffnen) ? beimOeffnen.lon : null,
+          },
+        )
       }
       eingabe={({ feld, value, onChange }) => (
         <KoordinatenEingabe
@@ -348,12 +386,17 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
  * `ModulEinstellungsListe`): die 140 px der Etikettspalte ließen dem Wert am Handy zu wenig, und
  * die Seite lief über (LFH-964).
  */
-function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] }) {
+function Angaben({
+  zeilen,
+}: {
+  /** `vermerk`: wer die Angabe zuletzt geändert hat (LLH-1834), leise unter dem Wert. */
+  zeilen: { etikett: string; wert: ReactNode; vermerk?: FeldVermerk }[];
+}) {
   const { token, rollen } = useRollen();
   const { istSchmal } = useViewport();
   return (
     <dl style={{ margin: 0 }}>
-      {zeilen.map(({ etikett, wert }) => (
+      {zeilen.map(({ etikett, wert, vermerk }) => (
         <div
           key={etikett}
           style={{
@@ -365,12 +408,52 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
           }}
         >
           <Feldetikett als="dt">{etikett}</Feldetikett>
-          <dd style={{ margin: 0, color: rollen.text2, overflowWrap: 'anywhere' }}>{wert}</dd>
+          <dd style={{ margin: 0, color: rollen.text2, overflowWrap: 'anywhere' }}>
+            {wert}
+            <VermerkZeile vermerk={vermerk} />
+          </dd>
         </div>
       ))}
     </dl>
   );
 }
+
+/**
+ * Die Führungsstelle in der Wire-Form des PATCH (LLH-1831): Vergleichswert des Feld-CAS nach einem
+ * 409. Der Einsatzleiter ohne „seit“, die Verbindungen ohne Kennung, wie die Zeilen sie senden.
+ */
+function fuehrungsstelleWire(fs: Fuehrungsstelle): Record<string, unknown> {
+  const e = fs.einsatzleiter;
+  return {
+    art: fs.art,
+    bezeichnung: fs.bezeichnung ?? null,
+    standort_adresse: fs.standort_adresse ?? null,
+    standort_lat: fs.standort_lat ?? null,
+    standort_lon: fs.standort_lon ?? null,
+    rufname: fs.rufname ?? null,
+    verbindungen: bereinigeVerbindungen(alsVerbindungsEingabe(fs.verbindungen)),
+    fahrzeug_ids: fs.fahrzeug_ids,
+    einsatzleiter: !e
+      ? null
+      : e.art === 'extern'
+        ? { art: 'extern', name: e.name ?? '' }
+        : e.personal_id != null
+          ? { art: 'personal', personal_id: e.personal_id }
+          : { art: 'personal' },
+  };
+}
+
+/** Die Angaben der Führungsstelle mit Vermerk, für den Paneelkopf (LLH-1834). */
+const FUEHRUNGSSTELLE_FELDER = [
+  'einsatzleiter',
+  'art',
+  'bezeichnung',
+  'standort_adresse',
+  'standort_koordinate',
+  'rufname',
+  'verbindungen',
+  'fahrzeug_ids',
+] as const;
 
 /** Gleiche Auswahl (Fahrzeuge) unabhängig von der Reihenfolge („unverändert → kein Senden“). */
 function gleicheIds(a: readonly number[], b: readonly number[]): boolean {
@@ -460,11 +543,19 @@ function EinsatzortPaneel({
   const adresse = einsatz.einsatzort ?? '';
 
   return (
-    <Paneel titel="Einsatzort">
+    <Paneel
+      titel="Einsatzort"
+      meta={
+        <PaneelVermerk
+          vermerk={juengsterVermerk(einsatz.vermerke, ['einsatzort', 'einsatzort_koordinate'])}
+        />
+      }
+    >
       <Angaben
         zeilen={[
           {
             etikett: 'Adresse',
+            vermerk: einsatz.vermerke?.einsatzort,
             wert: (
               <InlineAngabe<OrtsfeldWert>
                 etikett="Adresse"
@@ -482,7 +573,7 @@ function EinsatzortPaneel({
                 // Änderung, auch bei gleichem Text.
                 gleich={gleicherOrt}
                 darfSchreiben={darfSchreiben}
-                onSpeichern={(w) =>
+                onSpeichern={(w, { beimOeffnen }) =>
                   speichern(
                     'Adresse',
                     // Die Koordinate geht nur mit, wenn sie neu ist (Treffer, Nadel, getippt);
@@ -503,6 +594,12 @@ function EinsatzortPaneel({
                             einsatzort_lon: null,
                           }
                         : { einsatzort: leerZuNull(w.text) },
+                    // Der Altwert in voller Form; es gehen nur die Schlüssel des Patches mit.
+                    {
+                      einsatzort: leerZuNull(beimOeffnen.text),
+                      einsatzort_lat: beimOeffnen.koordinate?.lat ?? null,
+                      einsatzort_lon: beimOeffnen.koordinate?.lon ?? null,
+                    },
                   )
                 }
                 eingabe={({ feld, popup, value, onChange }) => (
@@ -527,6 +624,7 @@ function EinsatzortPaneel({
           },
           {
             etikett: 'Koordinate',
+            vermerk: einsatz.vermerke?.einsatzort_koordinate,
             wert: (
               <KoordinatenAngabe
                 einsatzId={einsatzId}
@@ -617,15 +715,42 @@ function FuehrungsstellePaneel({
   // Wie `feldMutation`: erst in den Cache, dann erfüllen — die Zeile schließt mit dem neuen Wert,
   // und die Fokusrückgabe trifft den frischen Wertknopf. Der Fehler steht an der Zeile.
   const mutation = useMutation({
-    mutationFn: ({ patch }: { etikett: string; patch: FuehrungsstellePatch }) =>
-      patcheFuehrungsstelle(einsatzId, patch),
+    mutationFn: ({
+      patch,
+      erwartet,
+    }: {
+      etikett: string;
+      patch: FuehrungsstellePatch;
+      erwartet?: Record<string, unknown>;
+    }) => patcheFuehrungsstelle(einsatzId, patch, erwartet),
     onSuccess: (neu, { etikett }) => {
       qc.setQueryData(einsatzKeys.fuehrungsstelle(einsatzId), neu);
       message.success(`${etikett} gespeichert`);
     },
   });
-  const speichern = (etikett: string, patch: FuehrungsstellePatch) =>
-    mutation.mutateAsync({ etikett, patch });
+  // Feld-CAS mit dem einen Konfliktablauf (LLH-1831): `alt` ist der Wert der Zeile beim Öffnen in
+  // Wire-Form; verglichen wird mit der Wire-Form des frisch geladenen Stands.
+  const konflikt = useFeldKonflikt();
+  const speichern = (etikett: string, patch: FuehrungsstellePatch, alt?: Record<string, unknown>) =>
+    konflikt({
+      etikett,
+      erwartet: alt ? ausschnitt(alt, patch) : undefined,
+      speichern: async (erwartet) => {
+        await mutation.mutateAsync({ etikett, patch, erwartet });
+      },
+      ladeFrisch: () =>
+        qc.fetchQuery({
+          queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+          queryFn: () => ladeFuehrungsstelle(einsatzId),
+          staleTime: 0,
+        }),
+      aktuell: (frisch) => ({
+        wert: ausschnitt(fuehrungsstelleWire(frisch), patch),
+        vermerk: vermerkFuer(frisch.vermerke, patch),
+      }),
+      text: ausschnittText,
+      leer: (w) => w === undefined || ausschnittLeer(w),
+    });
   /*
    * Sprechgruppen über die Einzelwege (LLH-1456, D1/D5): erst lösen, dann zuordnen; die erste
    * Ablehnung hält an und steht an der Zeile. Die Wege antworten ohne Körper, deshalb wartet das
@@ -664,7 +789,13 @@ function FuehrungsstellePaneel({
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(w) => speichern(etikett, { [schluessel]: leerZuNull(w) })}
+      onSpeichern={(w, { beimOeffnen }) =>
+        speichern(
+          etikett,
+          { [schluessel]: leerZuNull(w) },
+          { [schluessel]: leerZuNull(beimOeffnen) },
+        )
+      }
       eingabe={({ feld, value, onChange }) => (
         <Input
           {...feld}
@@ -678,7 +809,10 @@ function FuehrungsstellePaneel({
 
   return (
     // Kein Außenabstand: der Abstand kommt aus dem Paneel-Raster der Seite (LFH-1170).
-    <Paneel titel="Eigene Führungsstelle">
+    <Paneel
+      titel="Eigene Führungsstelle"
+      meta={<PaneelVermerk vermerk={juengsterVermerk(fs?.vermerke, FUEHRUNGSSTELLE_FELDER)} />}
+    >
       <PaneelZustand
         zustand={query.isPending ? 'laden' : query.isError ? 'fehler' : 'daten'}
         titel="Eigene Führungsstelle"
@@ -690,28 +824,34 @@ function FuehrungsstellePaneel({
             zeilen={[
               {
                 etikett: 'Einsatzleiter',
+                vermerk: fs.vermerke?.einsatzleiter,
                 wert: (
                   <EinsatzleiterAngabe
                     einsatzId={einsatzId}
                     fs={fs}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(einsatzleiter) => speichern('Einsatzleiter', { einsatzleiter })}
+                    onSpeichern={(einsatzleiter, alt) =>
+                      speichern('Einsatzleiter', { einsatzleiter }, { einsatzleiter: alt })
+                    }
                   />
                 ),
               },
               {
                 etikett: 'Art',
+                vermerk: fs.vermerke?.art,
                 wert: (
                   <ArtAngabe
                     art={fs.art}
                     erfasst={fuehrungsstelleErfasst(fs)}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(art) => speichern('Art', { art })}
+                    // Ohne Öffnen (Umschalter): der Altwert ist die gezeigte Art.
+                    onSpeichern={(art) => speichern('Art', { art }, { art: fs.art })}
                   />
                 ),
               },
               {
                 etikett: 'Bezeichnung',
+                vermerk: fs.vermerke?.bezeichnung,
                 wert: text(
                   'Bezeichnung',
                   fs.bezeichnung,
@@ -721,24 +861,32 @@ function FuehrungsstellePaneel({
               },
               {
                 etikett: 'Standort',
+                vermerk: juengsterVermerk(fs.vermerke, ['standort_adresse', 'standort_koordinate']),
                 wert: (
                   <StandortAngabe
                     fs={fs}
                     einsatz={einsatz}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(patch) => speichern('Standort', patch)}
+                    onSpeichern={(patch, alt) => speichern('Standort', patch, alt)}
                   />
                 ),
               },
               {
                 etikett: 'Rufname',
+                vermerk: fs.vermerke?.rufname,
                 wert: (
                   <RufnameAngabe
                     rufname={fs.rufname}
                     fahrzeugIds={fs.fahrzeug_ids}
                     quelle={fahrzeugQuelle}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(w) => speichern('Rufname', { rufname: leerZuNull(w) })}
+                    onSpeichern={(w, { beimOeffnen }) =>
+                      speichern(
+                        'Rufname',
+                        { rufname: leerZuNull(w) },
+                        { rufname: leerZuNull(beimOeffnen) },
+                      )
+                    }
                   />
                 ),
               },
@@ -758,26 +906,38 @@ function FuehrungsstellePaneel({
               {
                 // Funk (Rufname, Sprechgruppen) und Telefon getrennt (LLH-1134).
                 etikett: 'Telefon und weitere Verbindungen',
+                vermerk: fs.vermerke?.verbindungen,
                 wert: (
                   <VerbindungenAngabe
                     etikett="Telefon und weitere Verbindungen"
                     verbindungen={fs.verbindungen}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(liste) =>
-                      speichern('Telefon und weitere Verbindungen', { verbindungen: liste })
+                    onSpeichern={(liste, alt) =>
+                      speichern(
+                        'Telefon und weitere Verbindungen',
+                        { verbindungen: liste },
+                        { verbindungen: alt },
+                      )
                     }
                   />
                 ),
               },
               {
                 etikett: 'Führungsfahrzeuge',
+                vermerk: fs.vermerke?.fahrzeug_ids,
                 wert: (
                   <FuehrungsfahrzeugeZeile
                     art={fs.art}
                     ids={fs.fahrzeug_ids}
                     quelle={fahrzeugQuelle}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(ids) => speichern('Führungsfahrzeuge', { fahrzeug_ids: ids })}
+                    onSpeichern={(ids, { beimOeffnen }) =>
+                      speichern(
+                        'Führungsfahrzeuge',
+                        { fahrzeug_ids: ids },
+                        { fahrzeug_ids: beimOeffnen },
+                      )
+                    }
                   />
                 ),
               },
@@ -857,7 +1017,8 @@ function StandortAngabe({
   fs: Fuehrungsstelle;
   einsatz: EinsatzAnzeige;
   darfSchreiben: boolean;
-  onSpeichern: (patch: FuehrungsstellePatch) => Promise<unknown>;
+  /** `alt`: Adresse und Koordinate beim Öffnen in Wire-Form (Feld-CAS, LLH-1831). */
+  onSpeichern: (patch: FuehrungsstellePatch, alt: Record<string, unknown>) => Promise<unknown>;
 }) {
   const { token } = useRollen();
   const koord =
@@ -891,16 +1052,24 @@ function StandortAngabe({
       leer={(w) => w.adresse.trim() === '' && w.koord == null}
       gleich={gleicherStandort}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(w) => {
+      onSpeichern={(w, { beimOeffnen }) => {
         if (istUngueltigeKoordinate(w.koord)) {
           return Promise.reject(new Error('Koordinate nicht lesbar'));
         }
         const ll = alsLatLon(w.koord);
-        return onSpeichern({
-          standort_adresse: leerZuNull(w.adresse),
-          standort_lat: ll?.lat ?? null,
-          standort_lon: ll?.lon ?? null,
-        });
+        const alt = alsLatLon(beimOeffnen.koord);
+        return onSpeichern(
+          {
+            standort_adresse: leerZuNull(w.adresse),
+            standort_lat: ll?.lat ?? null,
+            standort_lon: ll?.lon ?? null,
+          },
+          {
+            standort_adresse: leerZuNull(beimOeffnen.adresse),
+            standort_lat: alt?.lat ?? null,
+            standort_lon: alt?.lon ?? null,
+          },
+        );
       }}
       eingabe={({ feld, value, onChange }) => (
         <Space orientation="vertical" style={{ width: '100%' }} size={token.marginXS}>
@@ -967,7 +1136,7 @@ function RufnameAngabe({
   fahrzeugIds: readonly number[];
   quelle: ReturnType<typeof useFahrzeugeQuelle>;
   darfSchreiben: boolean;
-  onSpeichern: (wert: string) => Promise<unknown>;
+  onSpeichern: (wert: string, kontext: { beimOeffnen: string }) => Promise<unknown>;
 }) {
   return (
     <InlineAngabe<string>
@@ -1057,7 +1226,7 @@ function FahrzeugeAngabe({
   ids: readonly number[];
   quelle: ReturnType<typeof useFahrzeugeQuelle>;
   darfSchreiben: boolean;
-  onSpeichern: (ids: number[]) => Promise<unknown>;
+  onSpeichern: (ids: number[], kontext: { beimOeffnen: number[] }) => Promise<unknown>;
 }) {
   if (quelle.zustand !== 'daten') return <>{ZUSTAND_GRUND[quelle.zustand]}</>;
   // Eine ID ohne disponiertes Fahrzeug (inzwischen entlassen) fällt still weg.
@@ -1132,8 +1301,14 @@ export default function EinsatzdatenPage() {
   // Der Fehler geht an die Zeile (`mutateAsync` lehnt ab, `InlineAngabe` zeigt ihn), deshalb kein
   // `onError`-Toast.
   const feldMutation = useMutation({
-    mutationFn: ({ patch }: { etikett: string; patch: KopfdatenPatch }) =>
-      patcheEinsatz(einsatzId, patch),
+    mutationFn: ({
+      patch,
+      erwartet,
+    }: {
+      etikett: string;
+      patch: KopfdatenPatch;
+      erwartet?: Partial<KopfdatenPatch>;
+    }) => patcheEinsatz(einsatzId, patch, erwartet),
     onSuccess: (aktualisiert, { etikett }) => {
       // Erst in den Cache, dann erfüllen: die Zeile zeigt den neuen Wert in derselben Runde, in der
       // sie die Eingabe schließt, und die Fokusrückgabe trifft den frischen Wertknopf.
@@ -1143,8 +1318,29 @@ export default function EinsatzdatenPage() {
       message.success(`${etikett} gespeichert`);
     },
   });
-  const feldSpeichern: FeldSpeichern = (etikett, patch) =>
-    feldMutation.mutateAsync({ etikett, patch });
+  // Feld-CAS mit dem einen Konfliktablauf (LLH-1831, `components/useFeldKonflikt`): die Schlüssel
+  // des Patches gehen mit ihrem Wert beim Öffnen als `erwartet` mit.
+  const konflikt = useFeldKonflikt();
+  const feldSpeichern: FeldSpeichern = (etikett, patch, alt) =>
+    konflikt({
+      etikett,
+      erwartet: alt ? ausschnitt(alt, patch) : undefined,
+      speichern: async (erwartet) => {
+        await feldMutation.mutateAsync({ etikett, patch, erwartet });
+      },
+      ladeFrisch: () =>
+        qc.fetchQuery({
+          queryKey: einsatzKeys.einsatz(einsatzId),
+          queryFn: () => ladeEinsatz(einsatzId),
+          staleTime: 0,
+        }),
+      aktuell: (frisch) => ({
+        wert: ausschnitt(frisch, patch),
+        vermerk: vermerkFuer(frisch.vermerke, patch),
+      }),
+      text: ausschnittText,
+      leer: (w) => w === undefined || ausschnittLeer(w),
+    });
 
   if (einsatzQuery.isLoading) {
     return <SeitenSkeleton />;
@@ -1255,7 +1451,13 @@ export default function EinsatzdatenPage() {
               leer={leererText}
               gleich={(a, b) => a.trim() === b.trim()}
               darfSchreiben={darfBearbeiten}
-              onSpeichern={(w) => feldSpeichern('Einsatzstichwort', { stichwort: leerZuNull(w) })}
+              onSpeichern={(w, { beimOeffnen }) =>
+                feldSpeichern(
+                  'Einsatzstichwort',
+                  { stichwort: leerZuNull(w) },
+                  { stichwort: leerZuNull(beimOeffnen) },
+                )
+              }
               eingabe={({ feld, popup, value, onChange }) => (
                 <AutoComplete
                   {...feld}
@@ -1312,11 +1514,23 @@ export default function EinsatzdatenPage() {
           alignItems: 'start',
         }}
       >
-        <Paneel titel="Einsatz">
+        <Paneel
+          titel="Einsatz"
+          meta={
+            <PaneelVermerk
+              vermerk={juengsterVermerk(einsatz.vermerke, [
+                'bezeichnung',
+                'einsatzart',
+                'leitstellen_nr',
+              ])}
+            />
+          }
+        >
           <Angaben
             zeilen={[
               {
                 etikett: 'Bezeichnung',
+                vermerk: einsatz.vermerke?.bezeichnung,
                 wert: (
                   <TextAngabe
                     etikett="Bezeichnung"
@@ -1331,6 +1545,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Einsatzart',
+                vermerk: einsatz.vermerke?.einsatzart,
                 wert: (
                   <InlineAngabe<Einsatzart>
                     etikett="Einsatzart"
@@ -1339,7 +1554,9 @@ export default function EinsatzdatenPage() {
                     // Pflicht, aber ein `Select` ohne `allowClear` kann nicht leer werden.
                     leer={() => false}
                     darfSchreiben={darfBearbeiten}
-                    onSpeichern={(art) => feldSpeichern('Einsatzart', { einsatzart: art })}
+                    onSpeichern={(art, { beimOeffnen }) =>
+                      feldSpeichern('Einsatzart', { einsatzart: art }, { einsatzart: beimOeffnen })
+                    }
                     eingabe={({ feld, popup, value, onChange }) => (
                       <Select<Einsatzart>
                         {...feld}
@@ -1358,6 +1575,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Leitstellen-Nr.',
+                vermerk: einsatz.vermerke?.leitstellen_nr,
                 wert: (
                   <TextAngabe
                     etikett="Leitstellen-Nr."
@@ -1390,11 +1608,23 @@ export default function EinsatzdatenPage() {
         {/* Programmpunkte der Veranstaltung (LLH-1570): Marken im Überblick und auf dem Monitor. */}
         <AblaufPaneel einsatzId={einsatzId} darfSchreiben={darfBearbeiten} />
 
-        <Paneel titel="Erstmeldung">
+        <Paneel
+          titel="Erstmeldung"
+          meta={
+            <PaneelVermerk
+              vermerk={juengsterVermerk(einsatz.vermerke, [
+                'meldende_stelle',
+                'sachverhalt',
+                'anzahl_betroffene_initial',
+              ])}
+            />
+          }
+        >
           <Angaben
             zeilen={[
               {
                 etikett: 'Meldende Stelle',
+                vermerk: einsatz.vermerke?.meldende_stelle,
                 // Vorschläge aus dem Katalog „Externe Stellen“ (LFH-1194); gespeichert wird nur
                 // der Text (Speicherform A), Freitext bleibt.
                 wert: (
@@ -1405,8 +1635,12 @@ export default function EinsatzdatenPage() {
                     leer={leererText}
                     gleich={(a, b) => a.trim() === b.trim()}
                     darfSchreiben={darfBearbeiten}
-                    onSpeichern={(w) =>
-                      feldSpeichern('Meldende Stelle', { meldende_stelle: leerZuNull(w) })
+                    onSpeichern={(w, { beimOeffnen }) =>
+                      feldSpeichern(
+                        'Meldende Stelle',
+                        { meldende_stelle: leerZuNull(w) },
+                        { meldende_stelle: leerZuNull(beimOeffnen) },
+                      )
                     }
                     eingabe={({ feld, popup, value, onChange }) => (
                       <AutoComplete
@@ -1426,6 +1660,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Sachverhalt / Meldebild',
+                vermerk: einsatz.vermerke?.sachverhalt,
                 wert: (
                   <TextAngabe
                     etikett="Sachverhalt / Meldebild"
@@ -1439,6 +1674,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Anzahl Betroffene (initial)',
+                vermerk: einsatz.vermerke?.anzahl_betroffene_initial,
                 wert: (
                   <InlineAngabe<number | null>
                     etikett="Anzahl Betroffene (initial)"
@@ -1448,10 +1684,12 @@ export default function EinsatzdatenPage() {
                     }
                     leer={(n) => n === null}
                     darfSchreiben={darfBearbeiten}
-                    onSpeichern={(n) =>
-                      feldSpeichern('Anzahl Betroffene (initial)', {
-                        anzahl_betroffene_initial: n,
-                      })
+                    onSpeichern={(n, { beimOeffnen }) =>
+                      feldSpeichern(
+                        'Anzahl Betroffene (initial)',
+                        { anzahl_betroffene_initial: n },
+                        { anzahl_betroffene_initial: beimOeffnen },
+                      )
                     }
                     eingabe={({ feld, value, onChange }) => (
                       <InputNumber<number>
