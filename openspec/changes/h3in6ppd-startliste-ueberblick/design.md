@@ -59,7 +59,9 @@ damit Name und Funktion so heißen wie auf den Einsatzdaten.
 
 Das Paneel ist ein `ListenPaneel` (Titel „Einsatz starten“, `max` 5, kein „weitere“), jede Zeile
 mit `listenZeileStil` als Link bei offenem Punkt, sonst als Text. Zustand je Punkt: Haken
-(erledigt), leerer Kreis (offen), „—“ mit Grund (gesperrt), „—“ mit „nicht geladen“ (unbekannt).
+(erledigt), leerer Kreis (offen), „—“ mit Grund (gesperrt), „—“ mit „nicht geladen“ und dem Knopf
+„Erneut abrufen“ (unbekannt; er lädt nur die Quellen dieses Punkts, wie ein ausgefallener
+`ListenAbschnitt`, weil das Paneel selbst immer `daten` zeigt und sein Fehlerzweig nie greift).
 Ein Knopf „Ausblenden“ steht im Paneelkopf (über die vorhandene Kopf-Aktion von
 `DashboardPaneel`; fehlt sie, kommt sie dort als Erweiterung des Bausteins hinzu, nicht als
 eigener Baustein).
@@ -82,6 +84,16 @@ der Query-Keys, nur wenn das ETB frei ist. Die Seite rechnet `startlisteBereit`,
 der Startliste `daten`, `fehler` oder `gesperrt` ist, und nimmt das in die vorhandene Ladeschranke
 der Paneelreihen (neben `gliederungLaedt`) auf. Live-Ereignisse invalidieren die Quellen wie bisher;
 das Verschwinden ist dann ein Wegfall nach Handlung, kein Sprung beim Laden.
+
+Nachtrag aus dem Review (17.11.2026):
+
+- Die Schranke gilt nur beim ersten Aufbau der Seite je Einsatz. Startet eine Quelle erst mitten in
+  der Sitzung (Schreibrecht kommt live dazu, Wiedereröffnen, neue Modulfreigabe), bleiben Band und
+  Paneelreihen eingehängt; die Startliste hält bis zum Ende dieses Abrufs ihren letzten Stand
+  (fehlte sie, fehlt sie weiter).
+- Ein gescheiterter Neuabruf behält in TanStack v5 seine Daten. Sie gelten weiter
+  (`startQuelle`: Daten vor Fehler, wie die Freigaben der Seite); `fehler`, also „unbekannt“, heißt
+  nur: nie geladen. Sonst holte ein 502 die schon verschwundene Liste über dem Band zurück.
 
 ### D4 — Ausblenden je Browser
 

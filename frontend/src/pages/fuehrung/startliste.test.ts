@@ -4,6 +4,7 @@ import { modulRegistry } from '../../einsatz/modulRegistry';
 import { freigabenFixture } from '../../test/fixtures';
 import {
   STARTLISTE_MODUL,
+  startQuelle,
   startliste,
   startlisteOffen,
   type StartlisteQuellen,
@@ -329,5 +330,55 @@ describe('startliste · Modulsperre (LLH-1815, Aufgabe 1.2)', () => {
       'kraefte',
     );
     expect(p.zustand).toBe('gesperrt');
+  });
+});
+
+/*
+ * Review LLH-1815 (Befunde 6, 10): TanStack v5 behält `data`, wenn ein Neuabruf scheitert. Die
+ * zuletzt geladenen Daten zählen weiter; „fehler“ heißt nur: nie geladen. Sonst würde ein
+ * erledigter Punkt nach einem 502 „unbekannt“ und holte die verschwundene Liste zurück.
+ */
+describe('startQuelle (LLH-1815, Review)', () => {
+  const abfrage = (data: readonly unknown[] | undefined, isError: boolean) => ({ data, isError });
+
+  it('Daten aus einem gelungenen Abruf', () => {
+    expect(startQuelle(abfrage([1], false), true)).toEqual({ zustand: 'daten', daten: [1] });
+  });
+
+  it('gescheiterter Neuabruf mit alten Daten: die zuletzt geladenen gelten', () => {
+    expect(startQuelle(abfrage([1], true), true)).toEqual({ zustand: 'daten', daten: [1] });
+    expect(startQuelle(abfrage([], true), true)).toEqual({ zustand: 'daten', daten: [] });
+  });
+
+  it('nie geladen und gescheitert: Fehler; nie geladen: Laden', () => {
+    expect(startQuelle(abfrage(undefined, true), true)).toEqual({ zustand: 'fehler' });
+    expect(startQuelle(abfrage(undefined, false), true)).toEqual({ zustand: 'laden' });
+  });
+
+  it('gesperrt vor allem anderen: der Cache eines gesperrten Moduls zählt nicht', () => {
+    expect(startQuelle(abfrage([1], false), false)).toEqual({ zustand: 'gesperrt' });
+  });
+
+  it('erledigt bleibt erledigt, wenn der Neuabruf scheitert', () => {
+    const punkte = startliste(
+      quellen({
+        einsatz: {
+          zustand: 'daten',
+          daten: { ...leererKopf, einsatzort: 'Deich', einsatzleiter: anna },
+        },
+        abschnitte: startQuelle(abfrage([1], true), true),
+        einheiten: startQuelle(abfrage([1], true), true),
+        personal: startQuelle(abfrage([], true), true),
+        lage: startQuelle(abfrage([1], true), true),
+      }),
+    );
+    expect(punkte.map((p) => p.zustand)).toEqual([
+      'erledigt',
+      'erledigt',
+      'erledigt',
+      'erledigt',
+      'erledigt',
+    ]);
+    expect(startlisteOffen(punkte)).toBe(false);
   });
 });

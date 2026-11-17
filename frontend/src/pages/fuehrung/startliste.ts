@@ -18,7 +18,8 @@ import {
  * - `offen`: noch nicht erfasst; der Punkt springt in seine Erfassung (`ziel`).
  * - `gesperrt`: das Modul des Punkts ist für die Person nicht frei (gesperrt oder ausgeblendet);
  *   „—“ mit Grund, ohne Sprung, und zählt beim Verschwinden nicht als offen.
- * - `unbekannt`: eine Quelle fehlt (Fehler, lädt); nie offen oder erledigt, die Liste bleibt.
+ * - `unbekannt`: eine Quelle hat noch nie geladen (Fehler, lädt); nie offen oder erledigt, die
+ *   Liste bleibt.
  *
  * Kein Zähler: die Startliste zeigt Haken, keine Kennzahl (Spec `lage-verdichtung`).
  */
@@ -42,9 +43,30 @@ export interface StartPunkt {
   ziel?: string;
 }
 
-/** Eine Quelle, wie die Seite sie reicht: Daten nur aus einem gelungenen Abruf. */
+/**
+ * Eine Quelle, wie die Seite sie reicht: Daten aus dem letzten gelungenen Abruf. `fehler` heißt:
+ * nie geladen (siehe {@link startQuelle}).
+ */
 export type StartQuelle<T> =
   { zustand: 'daten'; daten: T } | { zustand: Exclude<AbrufZustand, 'daten'> };
+
+/**
+ * Eine Quelle der Startliste aus ihrer Abfrage. Die zuletzt geladenen Daten gelten auch nach einem
+ * gescheiterten Neuabruf: TanStack v5 behält `data` und setzt `isError`. Werte die Seite den Fehler
+ * zuerst, würde ein erledigter Punkt nach einem 502 „unbekannt“, und die schon verschwundene Liste
+ * kehrte über dem Band zurück (Review LLH-1815; wie die Freigaben der Seite: „ein gescheiterter
+ * Neuabruf lässt die alten Freigaben gültig“). `fehler` steht also nur, wenn nie Daten da waren.
+ * Ein 403/404 räumt die Daten selbst (`raeumeNachRechteentzug`). Gesperrt geht vor: der Cache
+ * eines gesperrten Moduls kann einen Altstand tragen.
+ */
+export function startQuelle<T>(
+  q: { data: T | undefined; isError: boolean },
+  frei: boolean,
+): StartQuelle<T> {
+  if (!frei) return { zustand: 'gesperrt' };
+  if (q.data !== undefined) return { zustand: 'daten', daten: q.data };
+  return q.isError ? { zustand: 'fehler' } : { zustand: 'laden' };
+}
 
 export type StartEinsatzkopf = Pick<
   EinsatzAnzeige,

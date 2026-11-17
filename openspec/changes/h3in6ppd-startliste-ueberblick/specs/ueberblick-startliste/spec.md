@@ -68,8 +68,10 @@ geöffnete Erfassung des ETB.
 ### Requirement: Gesperrter Punkt gilt nicht als offen
 
 Ist das Modul eines Punkts für die Person gesperrt oder ausgeblendet, MUST der Punkt „—“ mit dem
-Grund zeigen, ohne Sprung, und MUST beim Verschwinden des Paneels nicht als offen zählen. Kann eine
-Quelle nicht geladen werden, MUST der Punkt als unbekannt stehen, nie als offen oder erledigt.
+Grund zeigen, ohne Sprung, und MUST beim Verschwinden des Paneels nicht als offen zählen. Konnte
+eine Quelle noch nie geladen werden, MUST der Punkt als unbekannt stehen, nie als offen oder
+erledigt, und MUST einen Weg „Erneut abrufen“ tragen. Scheitert nur ein Neuabruf, MUST der Punkt
+nach den zuletzt geladenen Daten stehen.
 
 #### Scenario: ETB gesperrt
 
@@ -79,7 +81,14 @@ Quelle nicht geladen werden, MUST der Punkt als unbekannt stehen, nie als offen 
 #### Scenario: Quelle ausgefallen
 
 - **WHEN** die Abschnitte nicht geladen werden können
-- **THEN** steht der Punkt Einsatzabschnitte als unbekannt, und das Paneel bleibt stehen
+- **THEN** steht der Punkt Einsatzabschnitte als unbekannt mit „Erneut abrufen“, und das Paneel
+  bleibt stehen
+
+#### Scenario: Neuabruf scheitert nach „alles erledigt“
+
+- **WHEN** alle Punkte erledigt sind, das Paneel also fehlt, und ein späterer Neuabruf der
+  Einheiten scheitert
+- **THEN** fehlt das Paneel weiter
 
 ### Requirement: Sichtbarkeit der Startliste
 
@@ -124,3 +133,10 @@ Ladephase erscheinen wie die übrigen Paneele des Überblicks, damit nichts nach
 
 - **WHEN** die Abfrage der Lagefeststellungen später antwortet als die übrigen Quellen
 - **THEN** erscheinen Startliste und Paneelreihen zusammen, und keine Reihe verschiebt sich danach
+
+#### Scenario: Quelle startet mitten in der Sitzung
+
+- **WHEN** eine Person auf dem Überblick live Schreibrecht bekommt und die Lagefeststellungen zum
+  ersten Mal geladen werden
+- **THEN** bleiben Führungsstand und Paneelreihen dabei stehen, und die Startliste erscheint erst
+  mit ihren Quellen

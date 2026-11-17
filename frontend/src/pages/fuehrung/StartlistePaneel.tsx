@@ -1,3 +1,4 @@
+import { Button } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router';
 import {
@@ -8,8 +9,9 @@ import {
   schriftStil,
   useRollen,
 } from '../../components/instrument';
+import { PANEEL_NEULADEN } from '../../components/instrument/PaneelZustand';
 import { IconHaken } from '../../icons';
-import type { StartPunkt } from './startliste';
+import type { StartPunkt, StartPunktSchluessel } from './startliste';
 
 /**
  * Paneel „Einsatz starten“ im Überblick (LLH-1815, Spec `ueberblick-startliste`, design.md D2):
@@ -19,6 +21,12 @@ import type { StartPunkt } from './startliste';
  * Je Zustand eine Zeile: Haken mit Wert (erledigt), leerer Kreis als Link in die Erfassung (offen),
  * „—“ mit Grund (gesperrt, unbekannt). Keine Zahl: die Startliste zeigt Haken, keine Kennzahl
  * (Spec `lage-verdichtung`). „Ausblenden“ steht als Kopf-Aktion des `DashboardPaneel`.
+ *
+ * NEULADEN (Review LLH-1815): das Paneel steht immer im Zustand `daten`, der Fehlerzweig des
+ * `PaneelZustand` mit „Erneut abrufen“ greift also nie. Ein Ausfall betrifft hier einen Punkt, nicht
+ * das Paneel; deshalb trägt die Zeile eines unbekannten Punkts den Knopf selbst, wie ein
+ * ausgefallener `ListenAbschnitt` („Erneut abrufen“ neben dem Grund). Sein Name nennt den Punkt,
+ * damit mehrere Knöpfe für Vorlesende unterscheidbar bleiben; er lädt nur die Quellen dieses Punkts.
  */
 export const STARTLISTE_TITEL = 'Einsatz starten';
 
@@ -37,7 +45,8 @@ export default function StartlistePaneel({
 }: {
   punkte: readonly StartPunkt[];
   onAusblenden: () => void;
-  onNeuladen: () => void;
+  /** Lädt die Quellen eines Punkts neu, der nie geladen werden konnte (`unbekannt`). */
+  onNeuladen: (schluessel: StartPunktSchluessel) => void;
 }) {
   const { token, rollen } = useRollen();
   const zeile: CSSProperties = { ...listenZeileStil(rollen, token), alignItems: 'center' };
@@ -101,6 +110,18 @@ export default function StartlistePaneel({
     return null;
   };
 
+  /** „Erneut abrufen“ am unbekannten Punkt (Dateikopf, NEULADEN). */
+  const neuladen = (p: StartPunkt): ReactNode =>
+    p.zustand === 'unbekannt' ? (
+      <Button
+        aria-label={`${PANEEL_NEULADEN}: ${p.titel}`}
+        onClick={() => onNeuladen(p.schluessel)}
+        style={{ flex: '0 0 auto' }}
+      >
+        {PANEEL_NEULADEN}
+      </Button>
+    ) : null;
+
   const inhalt = (p: StartPunkt) => (
     <>
       {zeichen(p)}
@@ -120,6 +141,7 @@ export default function StartlistePaneel({
         <span style={NUR_VORLESER}> {ZUSTAND_WORT[p.zustand]}</span>
         {angabe(p)}
       </span>
+      {neuladen(p)}
     </>
   );
 
@@ -131,7 +153,10 @@ export default function StartlistePaneel({
       // Die Liste hat immer fünf Punkte; leer und gesperrt kommen nicht vor.
       leerText=""
       gesperrtText=""
-      onNeuladen={onNeuladen}
+      // Erreicht nie den Fehlerzweig (Zustand `daten`); die Knöpfe stehen an den Punkten.
+      onNeuladen={() => {
+        for (const p of punkte) if (p.zustand === 'unbekannt') onNeuladen(p.schluessel);
+      }}
       eintraege={punkte}
       max={punkte.length}
       schluessel={(p) => p.schluessel}

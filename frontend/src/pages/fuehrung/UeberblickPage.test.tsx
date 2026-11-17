@@ -2523,6 +2523,103 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     expect(punkt('einsatzabschnitte').closest('a')).toBeNull();
   });
 
+  /*
+   * Review LLH-1815 (Befunde 6, 10): ein gescheiterter Neuabruf behält in TanStack v5 seine Daten.
+   * Die zuletzt geladenen gelten weiter; „unbekannt“ heißt nur: nie geladen. Sonst holte ein 502
+   * die schon verschwundene Reihe zurück, und Band und Paneelreihen rutschten nach unten.
+   */
+  it('alles erledigt, dann scheitert ein Neuabruf: die Startliste bleibt weg', async () => {
+    // Kräfte nur über eine Einheit: fällt die Einheitenliste aus, trägt das Personal nichts.
+    stelleBereit({ ...volleDaten, personal: [], lage: eineLage }, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+    ]);
+    const { client } = rendern();
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    expect(startliste()).toBeNull();
+    const kaputt = () => HttpResponse.json({ error: 'kaputt' }, { status: 502 });
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', kaputt),
+      http.get('/api/einsaetze/1/einheiten', kaputt),
+      http.get('/api/einsaetze/1/etb', ({ request }) =>
+        new URL(request.url).searchParams.get('typ') === 'lage' ? kaputt() : undefined,
+      ),
+    );
+    await act(() => client.refetchQueries());
+    expect(client.getQueryState(einsatzKeys.etbListe(1, { typ: 'lage', limit: 1 }))?.status).toBe(
+      'error',
+    );
+    expect(client.getQueryState(einsatzKeys.einheiten(1))?.status).toBe('error');
+    expect(startliste()).toBeNull();
+    expect(document.querySelector('[data-lfh="ueberblick-startliste"]')).toBeNull();
+  });
+
+  // Review LLH-1815 (Befund 7): ein Punkt „nicht geladen“ hat einen sichtbaren Weg zum Neuladen.
+  it('Quelle ausgefallen: „Erneut abrufen“ am Punkt lädt die Quelle neu', async () => {
+    stelleBereit({ ...volleDaten, lage: eineLage }, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/einsaetze/1/abschnitte', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    const knopf = within(punkt('einsatzabschnitte')).getByRole('button', {
+      name: 'Erneut abrufen: Einsatzabschnitte',
+    });
+    for (const s of ['einsatzort', 'einsatzleiter', 'kraefte', 'lage']) {
+      expect(within(punkt(s)).queryByRole('button'), s).toBeNull();
+    }
+    server.use(
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(volleDaten.abschnitte)),
+    );
+    await userEvent.click(knopf);
+    // Der letzte unbekannte Punkt ist erledigt: die Reihe fällt nach der Handlung weg.
+    await waitFor(() => expect(startliste()).toBeNull());
+  });
+
+  /*
+   * Review LLH-1815 (Befund 8): die gemeinsame Ladeschranke gilt nur beim ersten Aufbau. Bekommt
+   * eine lesende Person live Schreibrecht, lädt die Lagefeststellung zum ersten Mal; Band und
+   * Paneelreihen bleiben dabei eingehängt, und die Startliste erscheint erst mit ihren Quellen.
+   */
+  it('Schreibrecht kommt live dazu: Band und Paneelreihen bleiben stehen, solange die Lage lädt', async () => {
+    let loslassen!: () => void;
+    const tor = new Promise<void>((f) => (loslassen = f));
+    const lage = { n: 0 };
+    stelleBereit(leer, [
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    const { client } = rendern();
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    const bandVorher = band();
+    const reihenVorher = document.querySelector('[data-lfh="ueberblick-paneele"]')!;
+    expect(reihenVorher).not.toBeNull();
+    expect(startliste()).toBeNull();
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/etb', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('typ') !== 'lage') return;
+        lage.n += 1;
+        await tor;
+        return HttpResponse.json([]);
+      }),
+    );
+    await act(() => client.refetchQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await waitFor(() => expect(lage.n).toBe(1));
+    expect(bandVorher.isConnected).toBe(true);
+    expect(reihenVorher.isConnected).toBe(true);
+    // Kein „nicht geladen“ dazwischen: die Liste steht erst mit ihren Quellen.
+    expect(startliste()).toBeNull();
+
+    loslassen();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    expect(bandVorher.isConnected).toBe(true);
+    expect(reihenVorher.isConnected).toBe(true);
+  });
+
   it('fragt die jüngste Lagefeststellung genau einmal ab: Typ „Lage“, ein Eintrag', async () => {
     const urls: string[] = [];
     stelleBereit(leer);

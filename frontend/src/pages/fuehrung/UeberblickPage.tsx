@@ -1,7 +1,7 @@
 import { IconBericht, IconPlus } from '../../icons';
 import { useWasBrennt } from '../../lage/useWasBrennt';
 import { alarmZiel } from '../../lage/alarmZiel';
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Breadcrumb, Button } from 'antd';
@@ -113,7 +113,13 @@ import {
 } from './ueberblickDaten';
 import OffeneVorgaengePaneel from './OffeneVorgaengePaneel';
 import StartlistePaneel from './StartlistePaneel';
-import { startliste, startlisteOffen, type StartQuelle } from './startliste';
+import {
+  startQuelle,
+  startliste,
+  startlisteOffen,
+  type StartPunkt,
+  type StartPunktSchluessel,
+} from './startliste';
 import { isStartlisteAusgeblendet, saveStartlisteAusgeblendet } from './startlisteSpeicher';
 import {
   VORGANGS_SICHT_PARAM,
@@ -163,14 +169,6 @@ const ETB_ENTSCHEIDUNGEN = { typ: 'entscheidung' as const, limit: 50 };
 
 /** Die jüngste Lagefeststellung für die Startliste (LLH-1815, design.md D3): ein Eintrag genügt. */
 const ETB_ERSTE_LAGE = { typ: 'lage' as const, limit: 1 };
-
-/** Eine Quelle der Startliste aus ihrer Abfrage: Daten nur aus einem gelungenen Abruf. */
-function startQuelle<T>(q: UseQueryResult<T>, frei: boolean): StartQuelle<T> {
-  if (!frei) return { zustand: 'gesperrt' };
-  if (q.isError) return { zustand: 'fehler' };
-  if (q.data === undefined) return { zustand: 'laden' };
-  return { zustand: 'daten', daten: q.data };
-}
 
 /** `gesperrt`: das Modul der Quelle ist für die Person nicht freigegeben (LFH-669). */
 type Zustand = AbrufZustand;
@@ -584,13 +582,31 @@ export default function UeberblickPage() {
   );
 
   // Startliste (LLH-1815, design.md D1/D3). Sie steht ÜBER dem Führungsstand: erschiene sie nach
-  // dem Band, schöbe sie Band und Paneelreihen nach unten. Deshalb warten alle drei auf ihre
-  // Quellen, solange sie erscheinen kann (`startlisteLaedt`); die Alarmzeile darüber hat eine feste
-  // Höhe und steht sofort. Die Paneelreihen warten zusätzlich auf die Gliederung. Wie dort zählt nur
-  // das erste Laden. Die Freigaben hält der Rahmen vor dem ersten Bild der Seite bereit
-  // (`EinsatzLayout`); fehlen sie doch, steht die Liste erst mit ihnen (unten).
+  // dem Band, schöbe sie Band und Paneelreihen nach unten. Deshalb warten beim ersten Aufbau alle
+  // drei auf ihre Quellen, solange sie erscheinen kann (`startlisteSchranke`); die Alarmzeile
+  // darüber hat eine feste Höhe und steht sofort. Die Paneelreihen warten zusätzlich auf die
+  // Gliederung. Wie dort zählt nur das erste Laden einer Quelle (`isLoading`). Die Freigaben hält
+  // der Rahmen vor dem ersten Bild der Seite bereit (`EinsatzLayout`); fehlen sie doch, steht die
+  // Liste erst mit ihnen (unten).
   const startlisteLaedt =
     startlisteMoeglich && [abschnitteQ, einheitenQ, personalQ, ersteLageQ].some((q) => q.isLoading);
+  // Die gemeinsame Schranke gilt nur beim ersten Aufbau der Seite je Einsatz (Review LLH-1815,
+  // Befund 8). Startet eine Quelle der Startliste erst mitten in der Sitzung (Schreibrecht kommt
+  // live dazu, der Einsatz wird wiedereröffnet, ein Modul wird freigegeben), hinge die Schranke
+  // sonst Band und alle Paneelreihen für einen Abruf aus, und die Seite spränge in der Höhe.
+  // Danach hält die Startliste stattdessen ihren letzten Stand (`startlisteStand`), bis die Quelle
+  // geladen hat: kein „nicht geladen“, das gleich wieder verschwindet.
+  const aufgebautFuer = useRef<number | null>(null);
+  if (
+    aufgebautFuer.current !== einsatzId &&
+    !einsatzQ.isLoading &&
+    !zaehlerQ.isLoading &&
+    freigabenStand !== 'laden' &&
+    !startlisteLaedt
+  ) {
+    aufgebautFuer.current = einsatzId;
+  }
+  const startlisteSchranke = startlisteLaedt && aufgebautFuer.current !== einsatzId;
   const startPunkte = useMemo(
     () =>
       startliste({
@@ -619,8 +635,30 @@ export default function UeberblickPage() {
   );
   // Ohne bekannte Freigaben (sie laden noch) steht die Liste nicht: ihre gebundenen Quellen fragen
   // dann gar nicht und wären „unbekannt“. Gescheiterte Freigaben zeigen sie mit „nicht geladen“.
-  const zeigeStartliste =
+  const startlisteEntschieden =
     startlisteMoeglich && freigabenStand !== 'laden' && startlisteOffen(startPunkte);
+  // Letzter Stand ohne ladende Quelle; gilt, solange eine Quelle nach dem ersten Aufbau zum ersten
+  // Mal lädt (siehe `startlisteSchranke`).
+  const startlisteStand = useRef<{ punkte: StartPunkt[]; zeigen: boolean } | null>(null);
+  if (!startlisteLaedt)
+    startlisteStand.current = { punkte: startPunkte, zeigen: startlisteEntschieden };
+  const startlisteGehalten = startlisteLaedt ? startlisteStand.current : null;
+  const zeigeStartliste = startlisteGehalten?.zeigen ?? startlisteEntschieden;
+  const startlistePunkte = startlisteGehalten?.punkte ?? startPunkte;
+  /** „Erneut abrufen“ an einem unbekannten Punkt: nur seine Quellen (gescheiterte Freigaben zuerst). */
+  const startlisteNachladen = (schluessel: StartPunktSchluessel) => {
+    switch (schluessel) {
+      case 'einsatzort':
+      case 'einsatzleiter':
+        return nachladen(qEinsatz);
+      case 'einsatzabschnitte':
+        return nachladen(qAbschnitte);
+      case 'kraefte':
+        return nachladen(qEinheiten, qPersonal);
+      case 'lage':
+        return nachladen({ q: ersteLageQ, frei: etbFrei });
+    }
+  };
 
   const zeile = listenZeileStil(rollen, token);
   // Rolle „kurz“ (LLH-1061): die Liste reicht über Mitternacht; eine Lücke hält Ziffernbreite.
@@ -767,28 +805,23 @@ export default function UeberblickPage() {
             von einer Zeile auf ihre Platzhalter, derselbe Sprung wie ohne sie. Der Rahmen ruft ihn
             ohnehin (Rail); ein Fehler oder „ohne Netz“ hält den Körper nicht auf (`isLoading`).
             Die Paneelreihen unter dem Band warten zusätzlich auf die Gliederung (`gliederungLaedt`,
-            LLH-1481), Startliste, Band und Paneelreihen auf die Quellen der Startliste
-            (`startlisteLaedt`, LLH-1815). */}
+            LLH-1481), Startliste, Band und Paneelreihen beim ersten Aufbau auf die Quellen der
+            Startliste (`startlisteSchranke`, LLH-1815). */}
         {einsatzQ.isLoading || zaehlerQ.isLoading ? null : (
           <DashboardFlaeche kennung="ueberblick">
             {/* Die Alarmzeile „Was brennt“ steht als erstes unter dem Seitenkopf, auf Überblick,
               Lagebild und Lagemonitor dieselbe (LLH-1743, Spec `lage-alarmzeile`). */}
             <AlarmZeile daten={wasBrenntDaten} ziel={(e) => alarmZiel(e, einsatzId, freigaben)} />
-            {startlisteLaedt ? null : (
+            {startlisteSchranke ? null : (
               <>
                 {/* Startliste „Einsatz starten“ (LLH-1815): eine eigene Reihe nur mit diesem Paneel
               zwischen Alarmzeile und Führungsstand; fehlt sie, fehlt die ganze Reihe. */}
                 {zeigeStartliste && (
                   <PaneelReihe kennung="ueberblick-startliste">
                     <StartlistePaneel
-                      punkte={startPunkte}
+                      punkte={startlistePunkte}
                       onAusblenden={blendeStartlisteAus}
-                      onNeuladen={() =>
-                        nachladen(qAbschnitte, qEinheiten, qPersonal, {
-                          q: ersteLageQ,
-                          frei: etbFrei,
-                        })
-                      }
+                      onNeuladen={startlisteNachladen}
                     />
                   </PaneelReihe>
                 )}
