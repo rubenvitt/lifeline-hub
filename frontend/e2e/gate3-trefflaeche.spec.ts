@@ -218,9 +218,8 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
 
 // ── Ortspfad im Seitenkopf (LFH-909) ───────────────────────────────────────────────
 //
-// Die Brotkrume hat keine Dichte-Ausnahme: jeder Pfad-Link hält die Staffel, die Schrift steht in
-// der Stufe `klein` und wächst mit der Dichte (LLH-1774). antd setzt den Link auf
-// `height: fontHeight`; den Boden trägt
+// Die Brotkrume hat keine Dichte-Ausnahme: jeder Pfad-Link hält die Staffel, die Schrift bleibt
+// 12 px. antd setzt den Link auf `height: fontHeight` (20 px in jeder Stufe); den Boden trägt
 // `ortspfadStil` in `EinsatzSeite.tsx` mit der Regel in `EinsatzSeite.css`. Gemessen auf der
 // Druckansicht der Personenliste, weil ihr Pfad ZWEI Links trägt („Einsätze“ und „Betroffene“) und
 // nichts außer dem Einsatz gesät werden muss. Fükw und Handschirm: unter `md` steht im Einsatz
@@ -228,19 +227,12 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
 
 /** Pfad-Links der Druckansicht: „Einsätze“ und das Modul; der Einsatzname ist Text. */
 const PFAD_LINKS = 2;
-/**
- * Schriftgröße des Ortspfads (`Ortspfad` in `EinsatzSeite.tsx`) je Stufe, als Literal: die Stufe
- * `klein` mal Dichtefaktor 1 / 1,15 / 1,25 (LLH-1774, Spec `einsatztauglichkeit-layout`).
- */
-const PFAD_SCHRIFT: Record<string, string> = {
-  kompakt: '12px',
-  komfortabel: '13.8px',
-  handschuh: '15px',
-};
+/** Schriftgröße des Ortspfads (`Ortspfad` in `EinsatzSeite.tsx`), als Literal. */
+const PFAD_SCHRIFT = '12px';
 /** Mindesthöhe der Seitenkopfleiste (`SEITENKOPF_HOEHE`), als Literal. */
 const SEITENKOPF = 44;
 
-test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Schrift der Stufe klein', async ({
+test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Schrift bleibt 12 px', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -272,7 +264,7 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
         anzahl,
       );
       for (let i = 0; i < anzahl; i += 1) {
-        await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT[dichte]);
+        await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT);
       }
 
       let kopf = '';
@@ -327,7 +319,7 @@ for (const { liste, api, daten, pfad } of [
     pfad: (id: number) => `/admin/stammdaten/einheiten/${id}`,
   },
 ]) {
-  test(`Ortspfad der ${liste}-Detailseite: „${liste}“ folgt der Dichte-Staffel 30 / 48 / 72 px, die Schrift der Stufe klein`, async ({
+  test(`Ortspfad der ${liste}-Detailseite: „${liste}“ folgt der Dichte-Staffel 30 / 48 / 72 px, die Schrift bleibt 12 px`, async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -363,7 +355,7 @@ for (const { liste, api, daten, pfad } of [
           PFAD_LINKS,
         );
         for (let i = 0; i < PFAD_LINKS; i += 1) {
-          await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT[dichte]);
+          await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT);
         }
 
         je.set(`${dichte} ${schirm}`, kleinstes);
@@ -479,9 +471,9 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
       });
     }
     // 12 Angaben (LLH-1134: „Telefon und weitere Verbindungen“ statt Kommunikationsmittel und
-    // Erreichbarkeit), 7 Zuordnungsziele, „Personal der Einheit übernehmen“, „Einheit auflösen“
-    // und „Einheit stornieren“ (LLH-1881).
-    expect(ziele).toHaveLength(22);
+    // Erreichbarkeit), 8 Zuordnungsziele (Material: „Ausgeben“ und ⋮, LLH-1924), „Personal der
+    // Einheit übernehmen“, „Einheit auflösen“ und „Einheit stornieren“ (LLH-1881).
+    expect(ziele).toHaveLength(23);
     let minimum = Infinity;
     const miss = async (name: string, ziel: Locator) => {
       const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);
@@ -613,9 +605,9 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
         }
         for (const { name, ziel } of gesperrt.ziele) ziele.push({ name, ziel });
         // Beobachter: nur der Funkrufname. Führungspersonal: 12 Angaben, „Einheit auflösen“,
-        // „Einheit stornieren“ (LLH-1881) und sechs Zuordnungsziele; „Person zuordnen …“ zählt
-        // als gesperrtes Ziel extra.
-        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 20);
+        // „Einheit stornieren“ (LLH-1881) und sieben Zuordnungsziele (Material: „Ausgeben“ und ⋮,
+        // LLH-1924); „Person zuordnen …“ zählt als gesperrtes Ziel extra.
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 21);
 
         let kleinsteZeile = Infinity;
         for (const { name, zeile } of gesperrt.zeilen) {
@@ -5712,9 +5704,6 @@ async function measurePersonalKopf(page: Page, dichte: keyof typeof ZIELABSTAND,
   }
   let kleinsteHoehe = Number.POSITIVE_INFINITY;
   for (let i = 0; i < anzahl; i += 1) {
-    // Mit der Schrift der Stufe (LLH-1774) ist die Tabelle in `handschuh` breiter als der Fükw und
-    // rollt seitlich (`scroll.x`); gemessen wird jeder Kopf dort, wo man ihn bedient: im Bild.
-    await sortierbar.nth(i).scrollIntoViewIfNeeded();
     const hoehe = await sortierTrefferHoehe(sortierbar.nth(i));
     expect(
       hoehe,

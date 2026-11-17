@@ -80,13 +80,17 @@ umleiten. Die Seite Betreuung MUST nur Stellen führen, mit der Primäraktion
 
 Die Oberfläche SHALL je nicht storniertem Bezirk eine Detailseite unter
 `/einsaetze/<id>/evakuierung/<bezirk-id>` führen, gegatet wie die Modulseite Evakuierung. Eine
-ungültige, unbekannte, fremde oder stornierte Kennung MUST zur Übersicht zurückführen. Der Kopf
+ungültige, unbekannte, fremde oder stornierte Kennung MUST im Rahmen bleiben und „Diesen
+Evakuierungsbezirk gibt es nicht (mehr)“ mit einem Weg zur Evakuierung zeigen, ohne stille
+Weiterleitung; nach dem eigenen Stornieren MUST die Seite auf die Übersicht führen. Der Kopf
 MUST die Bezeichnung mit dem Räumungszustand als Wort und genau eine Primäraktion „Stand
 melden“ tragen. Die Seite MUST die Kennzahlen Evakuiert, Geplant, Anteil mit Balken und letzte
-Meldung zeigen, geschätzte Werte mit „≈“. 
+Meldung zeigen, geschätzte Werte mit „≈“.
+
 #### Scenario: Unbekannte Kennung
 - **WHEN** jemand `/einsaetze/1/evakuierung/99` öffnet und der Einsatz keinen Bezirk 99 führt
-- **THEN** steht die Übersicht der Evakuierung
+- **THEN** bleibt die Adresse stehen, und die Seite zeigt „Diesen Evakuierungsbezirk gibt es nicht
+  (mehr)“ mit „Zur Evakuierung“
 
 #### Scenario: Beobachter
 - **WHEN** eine Person ohne Schreibrecht die Detailseite öffnet
@@ -456,7 +460,8 @@ Stelle MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre akt
 Die Oberfläche SHALL jede nicht stornierte Betreuungsstelle unter
 `/einsaetze/<id>/betreuung/<stellen-id>` als eigene Seite zeigen. Die Seite MUST ihre Daten aus
 der Betreuungsübersicht lesen. Eine unbekannte, fremde oder stornierte Stelle und eine
-unlesbare Kennung MUST auf die Übersicht führen. Die Adresse `…/betreuung?stelle=<id>` MUST
+unlesbare Kennung MUST im Rahmen bleiben und „Diese Betreuungsstelle gibt es nicht (mehr)“ mit
+einem Weg zur Betreuung zeigen, ohne stille Weiterleitung. Die Adresse `…/betreuung?stelle=<id>` MUST
 auf diese Seite umleiten. Die Bezeichnung einer Stelle in der Übersicht MUST auf ihre Seite
 führen; Sprünge von der Lagekarte und der Rückweg nach dem Verorten MUST dorthin führen. Ein
 Verbleib „Notunterkunft“, der auf eine Stelle zeigt, MUST an der Stabsoberfläche (Patientenkopf
@@ -493,7 +498,8 @@ Kapazität). Mit weniger als zwei Meldungen MUST die Linie fehlen.
 
 #### Scenario: Stornierte Stelle
 - **WHEN** die Detailseite einer stornierten Stelle aufgerufen wird
-- **THEN** zeigt die Oberfläche die Übersicht
+- **THEN** bleibt die Adresse stehen, und die Seite zeigt „Diese Betreuungsstelle gibt es nicht
+  (mehr)“ mit „Zur Betreuung“
 
 #### Scenario: Schließen einer belegten Stelle
 - **WHEN** an einer Stelle mit Belegung 40 „Schließen“ gewählt und die Leermeldung bestätigt wird

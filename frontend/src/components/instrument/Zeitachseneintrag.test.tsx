@@ -71,7 +71,7 @@ describe('Zeitachseneintrag', () => {
       </Zeitachseneintrag>,
     );
     const text = screen.getByText('Person R-012 erfasst');
-    expect(text.style.fontSize).toBe('var(--lfh-groesse-klein)');
+    expect(text.style.fontSize).toBe('12px');
     expect(text.style.color).toBe(hexZuRgb(farbenHell.gedaempft));
     expect(container.querySelector('[data-leise="true"]')).not.toBeNull();
     // Ohne `leise` der Lauftext in text2 und 13 px.
@@ -80,7 +80,7 @@ describe('Zeitachseneintrag', () => {
         Lage ruhig
       </Zeitachseneintrag>,
     );
-    expect(screen.getByText('Lage ruhig').style.fontSize).toBe('var(--lfh-groesse-text)');
+    expect(screen.getByText('Lage ruhig').style.fontSize).toBe('13px');
   });
 
   it('Zeilentönung färbt die ganze Zeile; ohne Tönung transparent', () => {

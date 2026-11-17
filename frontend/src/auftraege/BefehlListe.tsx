@@ -11,11 +11,12 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { BefehlKopf } from '../api/types';
 import { NEW_SELECTABLE } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { ErfassungsModal } from '../components/Erfassung';
 import { anzahl, segmentLabel } from '../anzeige/anzahl';
 import ListeDetail from '../components/ListeDetail';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { Segmentleiste, useRollen } from '../components/instrument';
 import BefehlListenKarte from './BefehlListenKarte';
@@ -139,9 +140,15 @@ export default function BefehlListe({
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [sprung, setSprung] = useState<{ id: number; nr: number } | null>(null);
   const sprungNr = useRef(0);
-  useQueryParamSelektion('befehl', befehleQuery.isSuccess, (id) => {
+  // Einen unbekannten Befehl meldet die Hinweisleiste (LLH-1827); nichts ist dann gewählt.
+  const deeplinkHinweis = useQueryParamSelektion('befehl', deeplinkStand([befehleQuery]), (id) => {
     const ziel = (befehleQuery.data ?? []).find((b) => b.id === id);
-    if (!ziel) return;
+    if (!ziel) {
+      // Die Vorauswahl der Liste kam dem Deeplink zuvor; sie gilt nicht.
+      setGewaehlt(null);
+      setSprung(null);
+      return false;
+    }
     setSuche('');
     setEmpfFilter(undefined);
     setSegment(ziel.status);
@@ -149,10 +156,15 @@ export default function BefehlListe({
     sprungNr.current += 1;
     setSprung({ id, nr: sprungNr.current });
   });
-  const select = useCallback((id: number | null) => {
-    setGewaehlt(id);
-    setSprung(null);
-  }, []);
+  const { schliesse: schliesseHinweis } = deeplinkHinweis;
+  const select = useCallback(
+    (id: number | null) => {
+      setGewaehlt(id);
+      setSprung(null);
+      schliesseHinweis();
+    },
+    [schliesseHinweis],
+  );
   const changeSegment = (neu: BefehlStatus) => {
     setSegment(neu);
     select(null);
@@ -237,6 +249,7 @@ export default function BefehlListe({
         />
       </div>
 
+      <DeeplinkHinweis lage={deeplinkHinweis} sache="Befehl" />
       <ListeDetail<BefehlKopf>
         bezeichnung={aktivesSegment === 'entwurf' ? 'Befehlsentwürfe' : 'Freigegebene Befehle'}
         eintraege={eintraege}
@@ -244,6 +257,7 @@ export default function BefehlListe({
         gewaehlt={gewaehlt}
         onWahl={select}
         sprung={sprung}
+        vorauswahl={deeplinkHinweis.unbekannt == null}
         ladend={befehleQuery.isPending}
         fehler={
           befehleQuery.isError

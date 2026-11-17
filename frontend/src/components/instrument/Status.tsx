@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { useRollen, schriftGroesse, zahlStil } from './rollenwerte';
+import { monoStil, useRollen } from './rollenwerte';
 import { statusFlaeche, type StatusTon } from './statusFlaeche';
 
 /**
@@ -58,7 +58,7 @@ export function StatusZelle({ ton, wert, wort, hoehe = 34, style }: StatusZelleP
         minHeight: hoehe,
         background: f.grund,
         color: f.text,
-        ...zahlStil(hoehe >= 30 ? 'text' : 'klein'),
+        ...monoStil(hoehe >= 30 ? 13 : 12),
         ...style,
       }}
     >
@@ -104,10 +104,10 @@ export function StatusChip({ ton, wort, code, trenner, title, style }: StatusChi
         ...style,
       }}
     >
-      {code != null && <span style={zahlStil('fein', 500)}>{code}</span>}
+      {code != null && <span style={monoStil(11, 500)}>{code}</span>}
       {/* Vorgelesen trennt der Abstand, der Punkt ist Optik. */}
       {code != null && trenner && <span aria-hidden="true">·</span>}
-      <span style={{ fontSize: schriftGroesse('fein') }}>{wort}</span>
+      <span style={{ fontSize: 11 }}>{wort}</span>
     </span>
   );
 }

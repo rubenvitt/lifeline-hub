@@ -1,4 +1,4 @@
-import { useRollen, schriftGroesse, zahlStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import { SK_WORT } from '../../personen/personMeta';
 import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { SICHTUNGSBILD_REIHE, type SichtungsbildSchluessel } from '../../personen/personenBilanz';
@@ -46,12 +46,7 @@ export default function Sichtungslegende() {
       {SICHTUNGSBILD_REIHE.map((k) => (
         <li
           key={k}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: token.marginXS,
-            fontSize: schriftGroesse('fein'),
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: token.marginXS, fontSize: 11 }}
         >
           <span
             aria-hidden="true"
@@ -69,7 +64,7 @@ export default function Sichtungslegende() {
               // Äußere Kante in der Textfarbe des Modus: ohne sie verschwände der weiße Ring — und
               // mit ihm Gelb — auf hellem Grund.
               boxShadow: `0 0 0 1px ${token.colorText}`,
-              ...zahlStil('fein'),
+              ...monoStil(8),
               color: sichtungsfarben.schwarz,
               textShadow: `0 0 2px ${token.colorWhite}`,
             }}

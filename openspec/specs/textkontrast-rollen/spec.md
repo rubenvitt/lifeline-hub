@@ -117,20 +117,22 @@ ein Zwischenwert während des Übergangs den Boden gehalten hätte.
 - **WHEN** eine Textstelle im eingeschwungenen Zustand unter dem Boden ihres Modus liegt
 - **THEN** ist der Nachweis in jedem wiederholten Lauf rot
 
-### Requirement: Fehlertext außerhalb von Formularen in der Textrolle
+### Requirement: Roter Fehlertext außerhalb von Formularen in der Textrolle
 
 Roter Text, mit dem die Anwendung außerhalb eines Formulars einen Fehler oder einen Verzug meldet,
-MUST die Textrolle `alarm` als Text tragen, nicht deren Füllfarbe. Gemeint ist etwa „nicht
-gefunden“, eine ungültige Eingabe, ein Ablehnungsgrund oder „Überfällig“. Er MUST im Tagmodus
-≥ 7 : 1 und im Nachtmodus ≥ 5 : 1 gegen den Grund halten, auf dem er steht. Ist er ein Link, gilt
-das auch unter dem Zeiger und beim Drücken. Die Färbung MUST app-weit aus einer Stelle kommen; keine
-Seite und kein Baustein MUST dafür eine eigene Farbe setzen. Gefahrknöpfe, Fehlerränder von
-Feldern und die Kante einer alarmierten Karte MUST die Füllfarbe behalten.
+MUST die Textrolle `alarm` als Text tragen, nicht deren Füllfarbe. Gemeint ist etwa ein
+gescheiterter Abruf, eine ungültige Eingabe, ein Ablehnungsgrund oder „Überfällig“. Er MUST im
+Tagmodus ≥ 7 : 1 und im Nachtmodus ≥ 5 : 1 gegen den Grund halten, auf dem er steht. Ist er ein
+Link, gilt das auch unter dem Zeiger und beim Drücken. Die Färbung MUST app-weit aus einer Stelle
+kommen; keine Seite und kein Baustein MUST dafür eine eigene Farbe setzen. Gefahrknöpfe,
+Fehlerränder von Feldern und die Kante einer alarmierten Karte MUST die Füllfarbe behalten.
 
-#### Scenario: Nicht gefunden auf dem Seitengrund
-- **WHEN** ein Befehl aufgerufen wird, den es im Einsatz nicht gibt, im Tag- und im Nachtmodus
-- **THEN** erscheint „Befehl nicht gefunden.“
-- **AND** der Text hält gegen den Seitengrund im Tag ≥ 7 : 1 und in der Nacht ≥ 5 : 1
+#### Scenario: Gescheiterter Abruf als roter Text
+- **WHEN** die Seite eines Evakuierungsbezirks geöffnet wird und der Abruf seines Gebiets
+  scheitert, im Tag- und im Nachtmodus
+- **THEN** erscheint „Gebiet konnte nicht geladen werden“
+- **AND** der Text hält gegen den Grund, auf dem er steht, im Tag ≥ 7 : 1 und in der Nacht
+  ≥ 5 : 1
 
 #### Scenario: Überfällig auf der Karte eines überfälligen Auftrags
 - **WHEN** die Auftragsliste eines Einsatzes mit einem offenen Auftrag geöffnet wird, dessen Frist

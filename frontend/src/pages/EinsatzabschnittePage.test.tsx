@@ -424,6 +424,18 @@ describe('EinsatzabschnittePage', () => {
     expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
   });
 
+  // Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827).
+  it('?abschnitt=<id> eines unbekannten Abschnitts zeigt den Hinweis', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einsatzabschnitte?abschnitt=99999' },
+    );
+    expect(await screen.findByText('Abschnitt #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+  });
+
   /**
    * Schnellaktion der Sprungpalette (LFH-506): `?neu=1` öffnet die Erfassung „Abschnitt anlegen“
    * (LFH-1208), wie der Knopf. Als Paar: ohne den Parameter bleibt sie zu.

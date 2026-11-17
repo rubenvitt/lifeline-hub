@@ -5,11 +5,9 @@ import {
   Aufgliederung,
   Paneel,
   PaneelZeile,
+  monoStil,
   useRollen,
   type Segment,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
 } from '../components/instrument';
 import { sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
@@ -125,11 +123,11 @@ export default function BetroffenenSeitenleiste({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: token.marginSM }}>
-            <span data-lfh="summe" style={{ ...zahlStil('gross', 500), lineHeight: 1 }}>
+            <span data-lfh="summe" style={{ ...monoStil(40, 500), lineHeight: 1 }}>
               {bild.gesamt}
             </span>
             {/* „gesamt“, nicht „erfasst“: „erfasst“ ist ein Personenstatus (LFH-963). */}
-            <span style={{ fontSize: schriftGroesse('fein'), color: rollen.schwach }}>gesamt</span>
+            <span style={{ fontSize: 11, color: rollen.schwach }}>gesamt</span>
           </div>
           <Aufgliederung
             segmente={segmente}
@@ -150,14 +148,11 @@ export default function BetroffenenSeitenleiste({
             {SICHTUNGSBILD_REIHE.map((k) => (
               <li key={k} data-sichtung-zeile={k} style={zeile}>
                 <Farbfeld k={k} groesse={8} />
-                {/* Kategorie als Wort („SK I“, „unverletzt“): Textschrift (LLH-1777). */}
-                <span style={{ ...schriftStil('meta'), color: rollen.text2, width: 72 }}>
+                <span style={{ ...monoStil(12), color: rollen.text2, width: 72 }}>
                   {kuerzel(k)}
                 </span>
-                <span style={{ flex: 1, fontSize: schriftGroesse('fein'), color: rollen.schwach }}>
-                  {SK_WORT[k]}
-                </span>
-                <span style={{ ...zahlStil('text'), color: rollen.text }}>{bild.je[k]}</span>
+                <span style={{ flex: 1, fontSize: 11, color: rollen.schwach }}>{SK_WORT[k]}</span>
+                <span style={{ ...monoStil(15), color: rollen.text }}>{bild.je[k]}</span>
               </li>
             ))}
           </ul>
@@ -177,16 +172,13 @@ export default function BetroffenenSeitenleiste({
                 }}
               >
                 <span
-                  style={{
-                    fontSize: schriftGroesse('klein'),
-                    color: v.offen ? rollen.achtungText : rollen.gedaempft,
-                  }}
+                  style={{ fontSize: 12, color: v.offen ? rollen.achtungText : rollen.gedaempft }}
                 >
                   {v.label}
                 </span>
                 <span
                   style={{
-                    ...zahlStil('text'),
+                    ...monoStil(14),
                     color: v.offen && v.wert > 0 ? rollen.achtungText : rollen.text,
                   }}
                 >
@@ -211,10 +203,10 @@ export default function BetroffenenSeitenleiste({
                     gap: token.marginSM,
                   }}
                 >
-                  <span style={{ fontSize: schriftGroesse('klein'), color: rollen.gedaempft }}>
+                  <span style={{ fontSize: 12, color: rollen.gedaempft }}>
                     {einheitText(k.name, k.abschnitt)}
                   </span>
-                  <span style={{ ...zahlStil('text'), color: rollen.text }}>{k.wert}</span>
+                  <span style={{ ...monoStil(14), color: rollen.text }}>{k.wert}</span>
                 </PaneelZeile>
               </li>
             ))}
@@ -233,12 +225,7 @@ export default function BetroffenenSeitenleiste({
         >
           <p
             data-lfh="offene-felder"
-            style={{
-              margin: 0,
-              fontSize: schriftGroesse('klein'),
-              lineHeight: 1.5,
-              color: rollen.gedaempft,
-            }}
+            style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}
           >
             {offeneFelderText(offen)}
           </p>

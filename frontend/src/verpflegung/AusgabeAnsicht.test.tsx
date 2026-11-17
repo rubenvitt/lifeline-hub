@@ -12,6 +12,7 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
+import { MarkenRahmen } from '../test/nichtGefunden';
 import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
 import {
   ABSCHNITT_DEICH,
@@ -492,6 +493,17 @@ describe('AusgabeAnsicht — Zustände (D1, D7)', () => {
       ),
     );
     expect(taste('+1')).toBeDisabled();
+  });
+
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4).
+  it('unbekanntes Zeitfenster setzt die Marke: der Rahmen merkt die Adresse nicht als letzten Ort', async () => {
+    const marke = { current: false };
+    server.use(meHandler(benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Leitung' })));
+    renderMitProviders(<MarkenRahmen marke={marke}>{ansicht}</MarkenRahmen>, {
+      route: '/einsaetze/1/verpflegung/99/ausgabe',
+    });
+    expect(await screen.findByText('Dieses Zeitfenster gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(marke.current).toBe(true);
   });
 
   it('unbekanntes Zeitfenster: „gibt es nicht (mehr)“ mit Weg zur Verpflegung', async () => {

@@ -2,11 +2,11 @@ import { Alert, Button, theme } from 'antd';
 import { useId } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiError } from '../api/client';
+import { useMarkNichtGefunden } from '../einsatz/nichtGefundenContext';
 import { flaeche } from '../theme/tokens';
 import type { PlatzhalterRueckweg } from './Platzhalter';
 import Paneel from './instrument/Paneel';
-import { schriftStil, useRollen, schriftGroesse } from './instrument/rollenwerte';
-
+import { schriftStil, useRollen } from './instrument/rollenwerte';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache (`.lfh-skelett`). Der Import gehört
 // HIERHER: Konsumenten in `AdminPage` montieren kein `EinsatzSeite`, ihre Balken wären sonst
 // 0 px hoch — und jsdom könnte das nicht zeigen.
@@ -143,6 +143,43 @@ export function SeitenLeer({ titel, hinweis, aktion }: SeitenLeerProps) {
   );
 }
 
+interface SeitenNichtGefundenProps {
+  /**
+   * „<Sache> gibt es nicht (mehr)“ in der Grammatik der Sache („Diese Person …“, „Diesen
+   * Befehl …“, „Dieses Tier …“); der Aufrufer setzt ihn.
+   */
+  titel: string;
+  /** Der eine Weg zur Liste des Moduls, Pfad aus `routing/deeplinks.ts` („Zu den Betroffenen“). */
+  rueckweg: PlatzhalterRueckweg;
+}
+
+/**
+ * Das Objekt einer Detailseite gibt es nicht (mehr): 404 vom Server oder eine ungültige Kennung in
+ * der Adresse (LLH-1827, Change `a12ms7g9-seitenzustaende`, D4; Spec `seiten-zustaende`, „Ein
+ * Muster für ein Objekt, das es nicht gibt“).
+ *
+ * Die neutrale Form von `SeitenLeer`, keine Kante in `alarm` und kein `Alert`: gescheitert ist
+ * nichts in der Anwendung. Genau ein Knopf, der Rückweg zur Liste; kein „Erneut abrufen“, denn ein
+ * neuer Versuch ändert nichts, und keine Servermeldung. Die Seite bleibt im Rahmen, die Adresse in
+ * der Leiste (keine stille Weiterleitung). Der Rahmen merkt die Adresse nicht als letzten Ort
+ * (`useMarkNichtGefunden`), sonst führte „Zurück zu …“ aus dem Profil wieder hierher.
+ *
+ * Entschieden wird an der Seite in einer Zeile: {@link istNichtGefunden} → dieser Baustein, ein
+ * anderer Abruffehler → `SeitenFehler` mit „Erneut abrufen“.
+ */
+export function SeitenNichtGefunden({ titel, rueckweg }: SeitenNichtGefundenProps) {
+  useMarkNichtGefunden();
+  return <SeitenLeer titel={titel} aktion={{ label: rueckweg.label, pfad: rueckweg.pfad }} />;
+}
+
+/**
+ * Sagt der Fehler einer Detailabfrage „gibt es nicht“? Nur eine `ApiError` mit Status 404; ein 403,
+ * ein 5xx oder ein Netzfehler bleibt ein Abruffehler, der „Erneut abrufen“ anbietet.
+ */
+export function istNichtGefunden(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404;
+}
+
 /**
  * Die Detailzeile eines Fehlerzustands. Nur eine `ApiError` trägt eine fachlich formulierte
  * Meldung (aus dem `{error}`-Body); jeder andere Fehler ist technisch („Failed to fetch") und
@@ -230,14 +267,7 @@ export function SeitenSackgasse({
       <div style={{ display: 'flex', flexDirection: 'column', gap: t.marginSM }}>
         <div style={{ ...schriftStil('seitentitel'), color: rollen.text }}>{titel}</div>
         {untertitel != null && (
-          <p
-            style={{
-              margin: 0,
-              fontSize: schriftGroesse('text'),
-              lineHeight: 1.5,
-              color: rollen.text2,
-            }}
-          >
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
             {untertitel}
           </p>
         )}

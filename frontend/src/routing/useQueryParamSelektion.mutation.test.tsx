@@ -23,7 +23,7 @@ describe('useQueryParamSelektion – Nicht-Mutation (LFH-156)', () => {
     const angewendet: number[] = [];
     // Der Router liefert nur noch den Verlaufseintrag (`useLinkAuftrag`), die Parameter kommen aus
     // der Attrappe.
-    renderHook(() => useQueryParamSelektion('einheit', true, (id) => angewendet.push(id)), {
+    renderHook(() => useQueryParamSelektion('einheit', true, (id) => void angewendet.push(id)), {
       wrapper: MemoryRouter,
     });
 
@@ -38,5 +38,22 @@ describe('useQueryParamSelektion – Nicht-Mutation (LFH-156)', () => {
     const uebergeben = h.setSearchParams.mock.calls[0][0] as URLSearchParams;
     expect(uebergeben).not.toBe(h.ref.sp); // Klon, nicht dieselbe Referenz
     expect(uebergeben.has('einheit')).toBe(false); // der Klon ist geräumt
+  });
+
+  it('räumt auch bei einer unbekannten Kennung (anwenden liefert false) über einen Klon (LLH-1827)', async () => {
+    h.ref.sp = new URLSearchParams('einheit=99&sicht=alle');
+    h.setSearchParams.mockClear();
+    const { result } = renderHook(() => useQueryParamSelektion('einheit', true, () => false), {
+      wrapper: MemoryRouter,
+    });
+
+    await waitFor(() => expect(result.current.unbekannt).toBe(99));
+    expect(h.ref.sp.has('einheit')).toBe(true);
+    expect(h.setSearchParams).toHaveBeenCalledTimes(1);
+    const uebergeben = h.setSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(uebergeben).not.toBe(h.ref.sp);
+    expect(uebergeben.has('einheit')).toBe(false);
+    // Fremde Parameter bleiben.
+    expect(uebergeben.get('sicht')).toBe('alle');
   });
 });

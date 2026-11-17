@@ -36,7 +36,7 @@
 }
 
 .lfh-zahl--mittel {
-  font-size: var(--lfh-groesse-titel);
+  font-size: 17px;
   font-weight: 500;
 }
 
@@ -189,6 +189,35 @@
   white-space: nowrap;
 }
 
+/* Sprunglink zum Inhalt (nufmon70 D4, `components/SprungZumInhalt.tsx`, WCAG 2.4.1): ohne Fokus
+   wie „Zum Detail“ aus dem Bild genommen, aber erster Tab-Halt. Mit Fokus liegt er fest oben links
+   über Betriebszeile und Kopf; `fixed` nimmt keinen Platz im Fluss, der Rahmen springt nicht. Höhe,
+   Polsterung und die Stapelebene über `RAHMEN_EBENE` setzt der Baustein aus den Tokens. Der Ring
+   liegt innen, weil der Link am Fensterrand steht und ein äußerer dort abgeschnitten wäre. */
+.lfh-sprung-inhalt:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.lfh-sprung-inhalt:focus {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: var(--lfh-paneel);
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+/* Das Ziel des Sprungs ist ein Inhaltsgebiet mit `tabIndex -1`, kein Bedienelement: kein Ring um
+   die ganze Fläche, der nächste Tab-Halt zeigt den Fokus ohnehin (nufmon70, Risiken). */
+[data-lfh='sprungziel-inhalt']:focus {
+  outline: none;
+}
+
 /* Vorschaubild eines Anhangs (LFH-759): handgebautes Bedienziel, Fokusring in `bedien` wie oben. */
 .lfh-anhang-vorschau:focus-visible {
   outline: 2px solid var(--lfh-bedien);
@@ -207,14 +236,12 @@
   /* Handschuh (LFH-883): die Polsterung von 44 px lässt der Zelle eine Textspalte von rund 94 px.
      Darin brach „Schäden offen“ zweizeilig um (+13 px) und die Pegel-Notiz dreizeilig (+16 px),
      beides erst mit den Daten. Der Platz steht deshalb hier vom ersten Bild an: zwei Zeilen
-     Augenbraue (`lineHeight: 1.3`, `augenbraueStil`), zwei Notizzeilen über dem Boden des Bandes
-     (seit LLH-1774 wächst die Schrift mit der Stufe, die Pegel-Notiz bricht eine Zeile öfter um:
-     gemessen +19,25 px = 1,4 × 13,75). */
+     Augenbraue (`lineHeight: 1.3`, `augenbraueStil`), eine Notizzeile über dem Boden des Bandes. */
   [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen .lfh-kennzahl__titel {
     min-height: 2.6em;
   }
   [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen [data-lfh='kennzahl-notiz'] {
-    min-height: calc((var(--lfh-kennzahl-notizzeilen) + 2) * 1.4em);
+    min-height: calc((var(--lfh-kennzahl-notizzeilen) + 1) * 1.4em);
   }
 }
 
@@ -258,7 +285,7 @@
   background: var(--lfh-flaeche);
   color: var(--lfh-gedaempft);
   font-family: var(--lfh-schrift-text);
-  font-size: var(--lfh-groesse-klein);
+  font-size: 12px;
   line-height: 1.2;
   /* Ein Zeilenumbruch im Wortlaut bricht (LLH-1128: „Ohne\nSchicht“ der Ablösung auf 390 px im
      Handschuh-Betrieb, wo das Segment 72 px hoch ist); sonst bleibt jedes Wort einzeilig. */
@@ -338,7 +365,7 @@
   background: transparent;
   box-shadow: none;
   color: var(--lfh-text);
-  font-size: var(--lfh-groesse-text);
+  font-size: 14px;
   /* Die Zeile behält die Zeilenhöhe der Stufe: antd rechnet die Polsterung aus `fontHeight`
      (`controlHeight − fontHeight`), mit der 14-px-Zeile allein fehlten in `handschuh` 2 px am
      Textfeld (70 statt 72, `e2e/trefflaeche-pruefflaechen.spec.ts` C7). */

@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
 import type { EinsatzFahrzeug, Fahrzeug } from '../api/types';
-import { useRollen } from '../components/instrument/index';
+import { monoStil, useRollen } from '../components/instrument/index';
 import { DEMO_GROUP, DemoLabel, splitDemo } from '../stammdaten/demoAuswahl';
 import { isFuehrungsfahrzeug } from './fernmeldeskizze';
-import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Vorschläge für den Rufnamen der eigenen Führungsstelle aus vorhandenen Stammdaten (LFH-1187):
@@ -121,9 +120,7 @@ function VorschlagLabel({ vorschlag }: { vorschlag: RufnameVorschlag }) {
   const { token, rollen } = useRollen();
   return (
     <span style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS, minWidth: 0 }}>
-      <span data-schrift="kennung" style={zahlStil('text')}>
-        {vorschlag.funkrufname}
-      </span>
+      <span style={monoStil(13)}>{vorschlag.funkrufname}</span>
       {vorschlag.typ && <span style={{ color: rollen.text2 }}>{vorschlag.typ}</span>}
     </span>
   );

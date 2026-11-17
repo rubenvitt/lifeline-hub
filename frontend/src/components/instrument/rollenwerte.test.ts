@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { farbenDunkel, farbenHell, schrift } from '../../theme/tokens';
-import { istDunkel, rollenwerte, schriftGroesse, schriftStil, zahlStil } from './rollenwerte';
+import { istDunkel, monoStil, rollenwerte, schriftStil } from './rollenwerte';
 
 describe('rollenwerte', () => {
   it('erkennt den Modus an der Helligkeit der Basisfläche', () => {
@@ -20,43 +20,28 @@ describe('rollenwerte', () => {
     expect(rollenwerte({ colorBgBase: '#fff' })).toBe(farbenHell);
   });
 
-  it('die Augenbraue kommt aus der Schriftskala: Stufe fein, 600, .08em, Versalien', () => {
+  it('die Augenbraue kommt aus der Schriftskala: 10 px, 600, .14em, Versalien', () => {
     expect(schriftStil('augenbraue')).toEqual({
       fontFamily: schrift.text,
-      fontSize: 'var(--lfh-groesse-fein)',
+      fontSize: 10,
       fontWeight: 600,
-      letterSpacing: '0.08em',
+      letterSpacing: '0.14em',
       textTransform: 'uppercase',
-      fontVariantNumeric: 'tabular-nums',
-    });
-  });
-
-  it('die Größe ist die CSS-Variable der Stufe, keine Zahl (wächst mit der Dichte)', () => {
-    expect(schriftGroesse('klein')).toBe('var(--lfh-groesse-klein)');
-    expect(schriftStil('seitentitel').fontSize).toBe('var(--lfh-groesse-titel)');
-  });
-
-  it('meta steht in der Textschrift mit gleich breiten Ziffern (LLH-1777)', () => {
-    expect(schriftStil('meta')).toMatchObject({
-      fontFamily: schrift.text,
-      fontSize: 'var(--lfh-groesse-klein)',
-      fontVariantNumeric: 'tabular-nums',
     });
   });
 
   it('Zahlenstufen laufen in Mono mit tabular-nums', () => {
     expect(schriftStil('datenwert')).toMatchObject({
       fontFamily: schrift.zahl,
-      fontSize: 'var(--lfh-groesse-gross)',
+      fontSize: 32,
       fontWeight: 500,
       fontVariantNumeric: 'tabular-nums',
     });
-    expect(zahlStil('fein')).toEqual({
+    expect(monoStil(11)).toEqual({
       fontFamily: schrift.zahl,
-      fontSize: 'var(--lfh-groesse-fein)',
+      fontSize: 11,
       fontWeight: 400,
       fontVariantNumeric: 'tabular-nums',
     });
-    expect(zahlStil('text', 500).fontWeight).toBe(500);
   });
 });

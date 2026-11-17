@@ -1,6 +1,6 @@
 import { Button, Modal, Space } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, zahlStil } from '../components/instrument';
+import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -136,7 +136,7 @@ export default function ExterneStellenTab() {
       key: 'rufnummer',
       abBreite: 'lg',
       sorter: nachText((s: ExterneStelle) => s.rufnummer),
-      render: (r?: string) => (r ? <span style={zahlStil('klein', 500)}>{r}</span> : '—'),
+      render: (r?: string) => (r ? <span style={monoStil(12, 500)}>{r}</span> : '—'),
     },
     {
       title: 'Funkrufname',
@@ -144,14 +144,7 @@ export default function ExterneStellenTab() {
       key: 'funkrufname',
       abBreite: 'lg',
       sorter: nachText((s: ExterneStelle) => s.funkrufname),
-      render: (f?: string) =>
-        f ? (
-          <span data-schrift="kennung" style={zahlStil('klein', 500)}>
-            {f}
-          </span>
-        ) : (
-          '—'
-        ),
+      render: (f?: string) => (f ? <span style={monoStil(12, 500)}>{f}</span> : '—'),
     },
     {
       title: 'Aktiv',
