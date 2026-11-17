@@ -121,6 +121,12 @@ diese Zusage.
   die nicht in sich umbrechen (Wiedergabe: Ausblenden, Abspielen, Schieber · Stand: Auswahl
   „Stand“, Sichern); Stände nur über die Auswahl, nie als Knopfreihe; die Bezeichnung im Dialog.
   Abstände nur aus `bandStile` (Staffel), Deckel und Zielabstand in `e2e/leisten-flaeche.spec.ts`.
+  **Ohne Stand gibt es kein Band** (LLH-1936, Spec `lagekarte-zeitachse`,
+  `openspec/changes/hn79fugu-zeitachse-leer-ein-knopf/design.md`): mit Schreibrecht steht nur der
+  Knopf „Stand sichern“ mit Wort (`data-lfh="zeitachse-sichern"`) unten links, die gemerkte
+  Klappwahl gilt erst ab dem ersten Stand. „Stand sichern“ trägt auch im Band das Wort;
+  `SICHERN_BASIS` in `bandStile` ist seine gemessene Breite. Ein e2e, der das Band braucht,
+  sichert vorher einen Stand per API.
 - **Jeder Kamera-Aufruf sagt, wer bewegt** (LFH-766, `lagekarte/kamera.ts`, D2 in
   `openspec/changes/archive/2026-10-02-lfh-766-eigenposition-anflug-genauigkeit/design.md`):
   letztes Argument `BEDIENUNG` (Knopf, Tipp, `flyToZiel`) oder `AUTOMATISCH` (Startansicht,

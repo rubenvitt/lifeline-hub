@@ -57,6 +57,13 @@ export type BandToken = Pick<GlobalToken, 'controlHeight' | 'margin' | 'marginSM
 /** Mindestbreite des Schiebers und der Auswahl, bevor ihre Gruppe allein in eine Zeile geht. */
 const SCHIEBER_BASIS = 120;
 const AUSWAHL_BASIS = 160;
+/**
+ * Breite des Knopfs „Stand sichern“ mit Symbol und Wort (LLH-1936): gemessen 136 / 151 / 165 px in
+ * kompakt / komfortabel / handschuh (antd 6, App-Schrift), aufgerundet auf die breiteste Stufe.
+ * Eine Konstante statt einer Rechnung aus der Schrift: die Basis entscheidet nur, wann die
+ * Stand-Gruppe in die zweite Zeile geht, und 30 px Reserve in `kompakt` halten den Fükw einzeilig.
+ */
+const SICHERN_BASIS = 168;
 
 /**
  * Stile des Bands aus der Dichte-Staffel (LFH-899, D3/D4 in
@@ -70,7 +77,7 @@ const AUSWAHL_BASIS = 160;
  */
 export function bandStile(token: BandToken) {
   const wiedergabeBasis = 2 * token.controlHeight + 2 * token.marginSM + SCHIEBER_BASIS;
-  const standBasis = AUSWAHL_BASIS + token.marginSM + token.controlHeight;
+  const standBasis = AUSWAHL_BASIS + token.marginSM + SICHERN_BASIS;
   const gruppe = {
     display: 'flex',
     alignItems: 'center',
@@ -276,21 +283,83 @@ export function SnapshotLeiste({
   // Nichts anzeigen, wenn es weder etwas zu sichern noch etwas zu betrachten gibt.
   if (!darfSichern && snapshots.length === 0) return null;
 
-  if (eingeklappt) {
+  // Hülle `aria-hidden`: das Symbol brächte sonst „camera" in den zugänglichen Namen.
+  const sichernSymbol = (
+    <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+      <IconKamera />
+    </span>
+  );
+
+  // Das Feld steht nicht dauerhaft im Band (LFH-899, D2): es nahm am Handschirm eine eigene Reihe
+  // ein. Kurze blockierende Aktion mit einem Feld → Erfassungs-Dialog. Er steht in jeder Form an
+  // derselben Stelle des Fragments: nach dem ersten Stand wechselt die Form (LLH-1936), und der
+  // Dialog soll dabei nicht neu eingehängt werden, solange er sich schließt.
+  const sichernDialog = (
+    <ErfassungsModal<{ bezeichnung?: string }>
+      offen={sichernOffen}
+      titel="Stand sichern"
+      form={sichernForm}
+      erfassenText="Sichern"
+      laeuft={sichertGerade}
+      speicherung={sichernSpeicherung}
+      speicherFehlerTitel="Stand nicht gesichert"
+      speicherFehlerFallback="Sichern fehlgeschlagen"
+      onErfassen={aufSichern}
+      onErfasst={() => {
+        message.success('Stand gesichert');
+      }}
+      onFertig={() => setSichernOffen(false)}
+      onAbbrechen={() => setSichernOffen(false)}
+    >
+      <Form.Item label="Bezeichnung (optional)" name="bezeichnung">
+        <Input placeholder="z. B. Lage 08:00" aria-label="Snapshot-Bezeichnung" />
+      </Form.Item>
+    </ErfassungsModal>
+  );
+
+  // Ohne Stand gibt es nichts abzuspielen, zu wählen oder zu verbergen (LLH-1936, D1 in
+  // `openspec/changes/hn79fugu-zeitachse-leer-ein-knopf/design.md`): nur der Knopf mit Wort, an der
+  // Stelle des eingeklappten Knopfs. Die gemerkte Klappwahl gilt erst ab dem ersten Stand.
+  if (snapshots.length === 0) {
     return (
-      <Tooltip title="Zeitachse einblenden">
+      <>
         <Button
-          icon={<IconUhrRueckwaerts />}
-          aria-label="Zeitachse einblenden"
-          onClick={() => klappeUm(false)}
+          // Eigener Griff: Messungen über das Band sollen nicht still diesen Knopf messen (D3).
+          data-lfh="zeitachse-sichern"
+          icon={sichernSymbol}
+          loading={sichertGerade}
+          onClick={() => setSichernOffen(true)}
           style={{
-            // Eingeklappt bleibt der Knopf unten links, als linksbündiges Band im `KartenFuss`.
             ...bandStil('links'),
             background: token.colorBgElevated,
             boxShadow: token.boxShadow,
           }}
-        />
-      </Tooltip>
+        >
+          Stand sichern
+        </Button>
+        {sichernDialog}
+      </>
+    );
+  }
+
+  if (eingeklappt) {
+    return (
+      <>
+        <Tooltip title="Zeitachse einblenden">
+          <Button
+            icon={<IconUhrRueckwaerts />}
+            aria-label="Zeitachse einblenden"
+            onClick={() => klappeUm(false)}
+            style={{
+              // Eingeklappt bleibt der Knopf unten links, als linksbündiges Band im `KartenFuss`.
+              ...bandStil('links'),
+              background: token.colorBgElevated,
+              boxShadow: token.boxShadow,
+            }}
+          />
+        </Tooltip>
+        {sichernDialog}
+      </>
     );
   }
 
@@ -314,128 +383,94 @@ export function SnapshotLeiste({
   ];
 
   return (
-    <div
-      // Stabiler Griff für `e2e/lagekarte-smoke.spec.ts` — die Klassen dieser Leiste sind
-      // antd-Interna.
-      data-lfh="zeitachse"
-      style={{
-        // Volle Kartenbreite im Fuß-Rahmen: als Flow-Band stapelt es sich mit der
-        // ZeichnenSteuerung, statt sie zu verdecken. Nachgiebig: passt der Fuß nicht in die Karte,
-        // wird dieses Band niedriger und rollt in sich.
-        ...bandStil('voll', true),
-        ...stile.band,
-        borderRadius: token.borderRadiusLG,
-        background: token.colorBgElevated,
-        boxShadow: token.boxShadow,
-      }}
-    >
-      <div data-lfh="zeitachse-wiedergabe" style={stile.wiedergabe}>
-        {/* Links: eingeklappt steht „Zeitachse einblenden“ ebenfalls unten links. */}
-        <Tooltip title="Zeitachse ausblenden">
-          <Button
-            type="text"
-            icon={<IconChevronRunter />}
-            aria-label="Zeitachse ausblenden"
-            onClick={() => klappeUm(true)}
-            style={stile.knopf}
-          />
-        </Tooltip>
-        {chrono.length > 0 && (
-          <>
-            <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
-              <Button
-                icon={spielt ? <IconPause /> : <IconPlayKreis />}
-                onClick={aufPlayPause}
-                disabled={chrono.length < 2}
-                aria-label={spielt ? 'Pause' : 'Abspielen'}
-                style={stile.knopf}
-              />
-            </Tooltip>
-            <Slider
-              style={stile.schieber}
-              min={0}
-              max={Math.max(0, chrono.length - 1)}
-              value={aktiverIndex >= 0 ? aktiverIndex : 0}
-              marks={marks}
-              tooltip={{
-                formatter: (i) =>
-                  i != null && chrono[i]
-                    ? standBeschriftung(chrono[i].bezeichnung, chrono[i].stand_at, konventionen)
-                        .voll
-                    : '',
-              }}
-              onChange={(i) => {
-                setSpielt(false);
-                onWaehle(chrono[i].id);
-              }}
+    <>
+      <div
+        // Stabiler Griff für `e2e/lagekarte-smoke.spec.ts` — die Klassen dieser Leiste sind
+        // antd-Interna.
+        data-lfh="zeitachse"
+        style={{
+          // Volle Kartenbreite im Fuß-Rahmen: als Flow-Band stapelt es sich mit der
+          // ZeichnenSteuerung, statt sie zu verdecken. Nachgiebig: passt der Fuß nicht in die Karte,
+          // wird dieses Band niedriger und rollt in sich.
+          ...bandStil('voll', true),
+          ...stile.band,
+          borderRadius: token.borderRadiusLG,
+          background: token.colorBgElevated,
+          boxShadow: token.boxShadow,
+        }}
+      >
+        <div data-lfh="zeitachse-wiedergabe" style={stile.wiedergabe}>
+          {/* Links: eingeklappt steht „Zeitachse einblenden“ ebenfalls unten links. */}
+          <Tooltip title="Zeitachse ausblenden">
+            <Button
+              type="text"
+              icon={<IconChevronRunter />}
+              aria-label="Zeitachse ausblenden"
+              onClick={() => klappeUm(true)}
+              style={stile.knopf}
+            />
+          </Tooltip>
+          <Tooltip title={spielt ? 'Pause' : 'Replay abspielen'}>
+            <Button
+              icon={spielt ? <IconPause /> : <IconPlayKreis />}
+              onClick={aufPlayPause}
               disabled={chrono.length < 2}
-              aria-label="Zeitleiste"
+              aria-label={spielt ? 'Pause' : 'Abspielen'}
+              style={stile.knopf}
             />
-          </>
-        )}
-      </div>
+          </Tooltip>
+          <Slider
+            style={stile.schieber}
+            min={0}
+            max={Math.max(0, chrono.length - 1)}
+            value={aktiverIndex >= 0 ? aktiverIndex : 0}
+            marks={marks}
+            tooltip={{
+              formatter: (i) =>
+                i != null && chrono[i]
+                  ? standBeschriftung(chrono[i].bezeichnung, chrono[i].stand_at, konventionen).voll
+                  : '',
+            }}
+            onChange={(i) => {
+              setSpielt(false);
+              onWaehle(chrono[i].id);
+            }}
+            disabled={chrono.length < 2}
+            aria-label="Zeitleiste"
+          />
+        </div>
 
-      {(chrono.length > 0 || darfSichern) && (
         <div data-lfh="zeitachse-stand" style={stile.stand}>
-          {chrono.length > 0 && (
-            <Select<number | typeof LIVE>
-              aria-label="Stand"
-              // Ein Stand außerhalb der Liste (gelöscht, alter Link) zeigte sonst seine nackte Id;
-              // wie die frühere Beschriftung steht dann „Live“.
-              value={aktiverIndex >= 0 ? chrono[aktiverIndex].id : LIVE}
-              options={optionen}
-              optionRender={({ data }) => (
-                <StandOption haupt={String(data.label)} zeit={data.zeit ?? null} token={token} />
-              )}
-              onChange={waehle}
-              // Ohne Suche: am Handschirm öffnete das Tippen sonst die Bildschirmtastatur über der
-              // Karte, und eine Handvoll Stände braucht keinen Filter.
-              showSearch={false}
-              style={stile.auswahl}
-            />
-          )}
+          <Select<number | typeof LIVE>
+            aria-label="Stand"
+            // Ein Stand außerhalb der Liste (gelöscht, alter Link) zeigte sonst seine nackte Id;
+            // wie die frühere Beschriftung steht dann „Live“.
+            value={aktiverIndex >= 0 ? chrono[aktiverIndex].id : LIVE}
+            options={optionen}
+            optionRender={({ data }) => (
+              <StandOption haupt={String(data.label)} zeit={data.zeit ?? null} token={token} />
+            )}
+            onChange={waehle}
+            // Ohne Suche: am Handschirm öffnete das Tippen sonst die Bildschirmtastatur über der
+            // Karte, und eine Handvoll Stände braucht keinen Filter.
+            showSearch={false}
+            style={stile.auswahl}
+          />
           {darfSichern && (
-            <Tooltip title="Stand sichern">
-              <Button
-                type="primary"
-                // Hülle `aria-hidden`: das Symbol brächte sonst „camera" in den zugänglichen Namen.
-                icon={
-                  <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <IconKamera />
-                  </span>
-                }
-                aria-label="Stand sichern"
-                loading={sichertGerade}
-                onClick={() => setSichernOffen(true)}
-                style={stile.knopf}
-              />
-            </Tooltip>
+            // Das Wort ist der Name (LLH-1936): kein `aria-label`, kein Tooltip mit demselben Text.
+            <Button
+              type="primary"
+              icon={sichernSymbol}
+              loading={sichertGerade}
+              onClick={() => setSichernOffen(true)}
+              style={stile.knopf}
+            >
+              Stand sichern
+            </Button>
           )}
         </div>
-      )}
-
-      {/* Das Feld steht nicht dauerhaft im Band (LFH-899, D2): es nahm am Handschirm eine eigene
-          Reihe ein. Kurze blockierende Aktion mit einem Feld → Erfassungs-Dialog. */}
-      <ErfassungsModal<{ bezeichnung?: string }>
-        offen={sichernOffen}
-        titel="Stand sichern"
-        form={sichernForm}
-        erfassenText="Sichern"
-        laeuft={sichertGerade}
-        speicherung={sichernSpeicherung}
-        speicherFehlerTitel="Stand nicht gesichert"
-        speicherFehlerFallback="Sichern fehlgeschlagen"
-        onErfassen={aufSichern}
-        onErfasst={() => {
-          message.success('Stand gesichert');
-        }}
-        onFertig={() => setSichernOffen(false)}
-        onAbbrechen={() => setSichernOffen(false)}
-      >
-        <Form.Item label="Bezeichnung (optional)" name="bezeichnung">
-          <Input placeholder="z. B. Lage 08:00" aria-label="Snapshot-Bezeichnung" />
-        </Form.Item>
-      </ErfassungsModal>
-    </div>
+      </div>
+      {sichernDialog}
+    </>
   );
 }
