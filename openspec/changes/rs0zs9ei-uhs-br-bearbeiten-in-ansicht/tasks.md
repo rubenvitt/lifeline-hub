@@ -30,13 +30,13 @@
 - [x] 5.3 `pages/uhs/UhsAngaben.tsx`: Paneel „Angaben“ über `BearbeitbaresPaneel` (Felder aus D2, Lesewerte mit „—“ und `qualiSollText`), `onSpeichern` mit `basis_geaendert_at`, Invalidierung (`uhs`, `uhsDetail`, `lagemonitor`) und Erfolgsmeldung wie bisher; Tests in `UhsAngaben.test.tsx` rot→grün: Lesen mit „—“, nur geänderte Soll-Anzahl samt Basis, Notiz leeren → `null`, 409-Rückfrage, ohne Verwaltungsrecht und aufgelöst kein „Bearbeiten“
 - [x] 5.4 `UhsDetailPage.tsx`: Bereich „Angaben“ in `BEREICH_NAME` und `bereichListe` (nicht am Gerät), Inhalt `UhsAngaben` mit `key={uhs.id}`; „Bearbeiten“ aus dem Kopf und `UhsBearbeitenModal`/`bearbeitenOffen` entfernen; `UhsDetailPage.test.tsx` rot→grün (Kopf ohne „Bearbeiten“ geplant und aktiv, `?bereich=angaben` zeigt das Paneel, Gerät fällt auf Belegung zurück)
 - [x] 5.5 `UhsBearbeitenModal.tsx` und `UhsBearbeitenModal.test.tsx` löschen; `grep -rn UhsBearbeitenModal` wie 4.4 leer
-- [ ] 5.6 e2e: `uhs-hoehe.spec.ts` und `uhs-grundriss-menue-belegung.spec.ts` (Kopfknöpfe) einzeln grün; weitere Treffer von `grep -rln "Unfallhilfsstelle bearbeiten" frontend/e2e` nachziehen
+- [x] 5.6 e2e: `uhs-hoehe.spec.ts` und `uhs-grundriss-menue-belegung.spec.ts` (Kopfknöpfe) einzeln grün; weitere Treffer von `grep -rln "Unfallhilfsstelle bearbeiten" frontend/e2e` nachziehen
 
 ## 6. Regeln, Doku, Bilder
 
 - [x] 6.1 `frontend/AGENTS.md`: In „Ort von ‚Bearbeiten‘ und Form des Anlegens“ die Altstellen auf die Anlegen-Drawer kürzen (LLH-1921); in „Bearbeiten in der Ansicht“ „Bereitstellungsraum“ aus der Liste der umzustellenden Seiten streichen; `BearbeitbaresPaneel` im Bausteinkatalog um den Zusatzplatz ergänzen; Prettier grün
 - [x] 6.2 `docs/anwender/kapitel/unfallhilfsstellen.md`: Abschnitt zum Bearbeiten auf den Bereich „Angaben“ umschreiben, `quellen` (`UhsBearbeitenModal.tsx` → `UhsAngaben.tsx`, `uhsAngaben.ts`); `docs/anwender/kapitel/bereitstellungsraeume.md`: Schritte auf das Paneel „Raumdaten“, `quellen` nachziehen; Wächter von `docs/anwender/AGENTS.md` grün
-- [ ] 6.3 `e2e/doku-bilder/bereitstellungsraeume.bilder.ts`: „Dialog … bearbeiten“ → offenes Paneel „Raumdaten“; Bild `bereitstellungsraeume/bearbeiten.png` im Bildlauf neu aufnehmen (gebautes Backend); geht das nicht, Text angepasst lassen und Nachzug als Aufgabe anlegen
+- [x] 6.3 `e2e/doku-bilder/bereitstellungsraeume.bilder.ts`: „Dialog … bearbeiten“ → offenes Paneel „Raumdaten“; Bild `bereitstellungsraeume/bearbeiten.png` im Bildlauf neu aufnehmen (gebautes Backend); geht das nicht, Text angepasst lassen und Nachzug als Aufgabe anlegen
 - [x] 6.4 Mitänderungsregel `docs/architektur/AGENTS.md` prüfen (Kapitel zu Bausteinen/Querschnitt); `scripts/adr-fuer.sh` für die geänderten Pfade gelesen und eingehalten
 
 ## 7. Prüfen
