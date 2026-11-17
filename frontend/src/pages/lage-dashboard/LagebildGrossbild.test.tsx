@@ -158,12 +158,7 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
     const block = screen.getByRole('region', { name: 'Gefahren' });
     const zeilen = within(block).getAllByRole('listitem');
     expect(zeilen).toHaveLength(GEFAHREN_HOECHSTENS);
-    expect(zeilen.map((z) => z.textContent)).toEqual([
-      'Bakut',
-      'Dhoch',
-      'Cmittel',
-      'Aniedrig',
-    ]);
+    expect(zeilen.map((z) => z.textContent)).toEqual(['Bakut', 'Dhoch', 'Cmittel', 'Aniedrig']);
     expect(block).toHaveTextContent(`+ ${viele.length - GEFAHREN_HOECHSTENS} weitere`);
     expect(block).toHaveTextContent('3 Gebiete unbestätigt');
     // Ein langer Hinweis endet nach zwei Zeilen mit „…“, der ganze Text bleibt im `title`.
