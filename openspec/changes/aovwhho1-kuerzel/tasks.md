@@ -19,7 +19,7 @@ Jede Aufgabe stellt die Tests der Fläche mit um und streicht sie aus der Schuld
 
 ## 3. Regel und Kapitel
 
-- [ ] 3.1 Anwenderkapitel `docs/anwender/kapitel/zeiten-und-kuerzel.md` (D3) samt Bilder-Spec und Bildern, Ablauf am laufenden System nachgeklickt. Prüfung: Doku-Wächter in `check-all.sh` grün, die Hilfe zeigt das Kapitel.
+- [x] 3.1 Anwenderkapitel `docs/anwender/kapitel/zeiten-und-kuerzel.md` (D3) samt Bilder-Spec und Bildern, Ablauf am laufenden System nachgeklickt. Prüfung: Doku-Wächter in `check-all.sh` grün, die Hilfe zeigt das Kapitel.
 - [x] 3.2 Vitest `anzeige/kuerzel.test.ts`, der die Kürzeltabelle des Kapitels mit der Liste `anzeige/kuerzel.ts` (`EINGEFUEHRTE_KUERZEL`, die Liste der Spec) abgleicht. Prüfung: Eine fehlende Zeile macht ihn rot (Mutationsprobe).
 - [x] 3.3 `frontend/AGENTS.md`: Regel „Kürzel sind eingeführt oder erklärt“ mit Verweis auf das Kapitel und den Stärke-Kern. Anwendertexte `meldebild.md`, `einheiten.md`, `lagemonitor.md`, `ueberblick.md`, `lagebild.md` auf „F/UF/M//Σ“, „Unterabschnitte“ und „wohin nicht erfasst“ ziehen, geänderte Bilder neu aufnehmen. Prüfung: `rg '//Ges|//Gesamt|Stärke F/UF/M[^/]' docs/anwender frontend/src` leer.
 
