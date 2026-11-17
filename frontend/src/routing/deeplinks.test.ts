@@ -126,14 +126,39 @@ describe('deeplinks — Basis', () => {
     expect(einsatzPfad(8, { modul: null })).toBe('/einsaetze/8');
   });
 
-  it('parseModulHinweis nimmt nur bekannte Modulschlüssel', () => {
+  it('parseModulHinweis nimmt nur die Form eines Modulschlüssels', () => {
     expect(parseModulHinweis(new URLSearchParams('modul=fahrzeuge'))).toBe('fahrzeuge');
     expect(parseModulHinweis(new URLSearchParams('modul=etb&x=1'))).toBe('etb');
-    // Unbekannt oder manipuliert: verworfen, die Weiche nimmt das bisherige Ziel.
-    expect(parseModulHinweis(new URLSearchParams('modul=gibtsnicht'))).toBeUndefined();
-    expect(parseModulHinweis(new URLSearchParams('modul=toString'))).toBeUndefined();
+    // Manipuliert oder leer: verworfen. Ob ein Schlüssel bekannt ist, prüft die Weiche.
+    expect(parseModulHinweis(new URLSearchParams('modul=../admin'))).toBeUndefined();
+    expect(parseModulHinweis(new URLSearchParams('modul=Fahrzeuge'))).toBeUndefined();
     expect(parseModulHinweis(new URLSearchParams('modul='))).toBeUndefined();
     expect(parseModulHinweis(new URLSearchParams(''))).toBeUndefined();
+  });
+
+  it('jeder Schlüssel der Modul-Registry hat die Form, die parseModulHinweis annimmt', async () => {
+    const { modulRegistry } = await import('../einsatz/modulRegistry');
+    for (const m of modulRegistry) {
+      expect(parseModulHinweis(new URLSearchParams(`modul=${m.key}`))).toBe(m.key);
+    }
+  });
+
+  /**
+   * Die e2e-Specs importieren die Pfad-Builder in Playwright (Node, ohne Vite). Ein Import, der
+   * Komponenten oder CSS nachzieht (etwa die Modul-Registry mit ihren Icons), ließe sie mit
+   * „SyntaxError … .css“ nicht mehr laden (LLH-1821, Fehler im Branch).
+   */
+  it('deeplinks.ts importiert zur Laufzeit nur reine Module, keine Registry und kein TSX', () => {
+    const quelle = Object.values(
+      import.meta.glob('./deeplinks.ts', { query: '?raw', import: 'default', eager: true }),
+    )[0] as string;
+    const laufzeit = [...quelle.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'([^']+)'/gms)].map(
+      (m) => m[1],
+    );
+    expect(laufzeit.length).toBeGreaterThan(0);
+    for (const pfad of laufzeit) {
+      expect(pfad).not.toMatch(/modulRegistry|\.tsx$|\.css$|\/icons/);
+    }
   });
 
   it('Rundweg: einsatzPfad mit Hinweis ergibt über parseModulHinweis denselben Schlüssel', () => {

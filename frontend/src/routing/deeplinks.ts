@@ -27,7 +27,6 @@ import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter
 import type { TiereSicht } from '../pages/tiere/tierHelfer';
 import type { SchaedenSicht } from '../pages/schaeden/schadenHelfer';
 import { istGruppe, type Gruppe } from '../hilfe/gruppen';
-import { modulRegistry } from '../einsatz/modulRegistry';
 
 /** Zentrale Route zur Einsatzliste. */
 export function einsaetzePfad(): string {
@@ -78,14 +77,20 @@ export function einsatzPfad(einsatzId: number, opts: { modul?: string | null } =
   return mitQuery(`/einsaetze/${einsatzId}`, { modul: opts.modul ?? undefined });
 }
 
+/** Form eines Modulschlüssels der Registry (`fahrzeuge`, `einsatz-einstellungen`). */
+const MODUL_SCHLUESSEL = /^[a-z][a-z0-9-]*$/;
+
 /**
- * Umkehr des Modul-Hinweises aus {@link einsatzPfad}: nur ein Schlüssel der Modul-Registry, sonst
- * `undefined` (unbekannt, leer oder manipuliert). Ob das Modul im Ziel frei ist, entscheidet die
- * Weiche mit den Freigaben, nicht der Parser.
+ * Umkehr des Modul-Hinweises aus {@link einsatzPfad}: ein Wert in der Form eines Modulschlüssels,
+ * sonst `undefined` (leer oder manipuliert). Ob der Schlüssel in der Registry steht und das Modul
+ * im Ziel frei ist, entscheidet die Weiche (`einsatz/DefaultModulRedirect.tsx`). Diese Datei
+ * importiert die Registry bewusst nicht: sie zöge Komponenten und Icon-CSS nach, und die e2e-Specs,
+ * die die Pfad-Builder importieren, liefen in Playwright nicht mehr (Wächter in
+ * `deeplinks.test.ts`).
  */
 export function parseModulHinweis(params: URLSearchParams): string | undefined {
   const modul = params.get('modul');
-  return modul && modulRegistry.some((m) => m.key === modul) ? modul : undefined;
+  return modul && MODUL_SCHLUESSEL.test(modul) ? modul : undefined;
 }
 
 /** Basis-Pfad eines Einsatz-Moduls: `/einsaetze/<einsatzId>/<modulRoute>`. */

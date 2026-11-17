@@ -29,7 +29,10 @@ export default function DefaultModulRedirect() {
   // Ungültige ID → Einsatzliste statt eines Abrufs gegen `NaN` (LFH-438); im App-Baum fängt das
   // schon `EinsatzLayout` ab, hier steht es, weil die Komponente allein trägt.
   if (einsatzId == null) return <Navigate to={einsaetzePfad()} replace />;
-  return <StandardModulWeiche einsatzId={einsatzId} modulHinweis={parseModulHinweis(params)} />;
+  // Nur ein Schlüssel der Registry zählt; ein unbekannter fragt keine Freigaben ab.
+  const hinweis = parseModulHinweis(params);
+  const bekannt = hinweis && modulRegistry.some((m) => m.key === hinweis) ? hinweis : undefined;
+  return <StandardModulWeiche einsatzId={einsatzId} modulHinweis={bekannt} />;
 }
 
 function StandardModulWeiche({
