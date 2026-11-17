@@ -12,14 +12,14 @@ import { useLocation } from 'react-router';
  * Seite erscheint. Die Seite setzt die Marke per `useLayoutEffect`, und alle Layout-Effekte laufen
  * vor den Effekten (`useEffect`) des Rahmens; ein Zustand käme erst einen Commit später an.
  *
- * `widerrufe` deckt den späten Fall: eine Detailseite lädt erst und erfährt dann (404), dass es ihr
+ * `revoke` deckt den späten Fall: eine Detailseite lädt erst und erfährt dann (404), dass es ihr
  * Objekt nicht gibt. Bis dahin hat der Rahmen die Adresse schon gemerkt; er stellt dann den Ort
  * davor wieder her, aber nur, wenn das Gemerkte genau diese Adresse ist.
  */
 export interface NichtGefundenMarke {
   marke: MutableRefObject<boolean>;
   /** Nimmt das Merken von `pfad` (ohne Suche) zurück, falls der Rahmen ihn zuletzt gemerkt hat. */
-  widerrufe: (pfad: string) => void;
+  revoke: (pfad: string) => void;
 }
 
 const NichtGefundenContext = createContext<NichtGefundenMarke | null>(null);
@@ -34,7 +34,7 @@ export function useMarkNichtGefunden(): void {
     if (!kontext) return;
     const flag = kontext.marke;
     flag.current = true;
-    kontext.widerrufe(pathname);
+    kontext.revoke(pathname);
     return () => {
       flag.current = false;
     };

@@ -38,22 +38,22 @@ export const NICHT_GEFUNDEN_BODY = { error: 'Nicht gefunden' } as const;
 /**
  * Der Einsatzrahmen im Kleinen: er hält die Marke „nicht als letzten Ort merken“
  * (`einsatz/nichtGefundenContext.ts`), die `SeitenNichtGefunden` setzt. `marke.current` sagt nach
- * dem Zeichnen, ob der Rahmen die Adresse merken würde; `widerrufe` hält fest, für welche Adressen
+ * dem Zeichnen, ob der Rahmen die Adresse merken würde; `revoke` hält fest, für welche Adressen
  * die Seite ein schon Gemerktes zurücknehmen ließ.
  */
 export function MarkenRahmen({
   marke,
-  widerrufen = [],
+  revoked = [],
   children,
 }: {
   marke: { current: boolean };
-  widerrufen?: string[];
+  revoked?: string[];
   children: ReactNode;
 }) {
   const [wert] = useState(() => ({
     marke,
-    widerrufe: (pfad: string) => {
-      widerrufen.push(pfad);
+    revoke: (pfad: string) => {
+      revoked.push(pfad);
     },
   }));
   return <NichtGefundenProvider value={wert}>{children}</NichtGefundenProvider>;

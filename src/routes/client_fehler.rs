@@ -52,7 +52,7 @@ struct Bericht {
 }
 
 impl Bericht {
-    fn aus(eingang: ClientFehlerBericht) -> Result<Self, AppError> {
+    fn from_body(eingang: ClientFehlerBericht) -> Result<Self, AppError> {
         let feld =
             |wert, name, max| Ok::<_, AppError>(optional_max(wert, name, max)?.unwrap_or_default());
         Ok(Bericht {
@@ -93,7 +93,7 @@ pub async fn melde(
     CurrentUser(_benutzer): CurrentUser,
     JsonBody(eingang): JsonBody<ClientFehlerBericht>,
 ) -> Result<StatusCode, AppError> {
-    let bericht = Bericht::aus(eingang)?;
+    let bericht = Bericht::from_body(eingang)?;
     melden(&BERICHTE, &bericht);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn felder_werden_getrimmt_und_fehlende_bleiben_leer() {
-        let b = Bericht::aus(ClientFehlerBericht {
+        let b = Bericht::from_body(ClientFehlerBericht {
             route: Some("  /einsaetze/:id  ".into()),
             version: None,
             meldung: Some("   ".into()),

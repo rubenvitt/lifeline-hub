@@ -26,14 +26,14 @@ const gemeldet = new WeakSet<object>();
 
 /** Kürzt nach Zeichen (Codepoints), damit kein Ersatzpaar halbiert wird: Ein halbes Paar machte
  *  das JSON für den Server ungültig. */
-function kuerze(text: string, max: number): string {
+function truncate(text: string, max: number): string {
   const zeichen = Array.from(text);
   return zeichen.length > max ? zeichen.slice(0, max).join('') : text;
 }
 
 /** Meldung und Stack des Wurfs. Von einem Wurf ohne Error-Objekt geht nur die Art mit, nie sein
  *  Inhalt: Er kann ein Datensatz sein. */
-function beschreibe(fehler: unknown): { meldung: string; stack: string } {
+function describe(fehler: unknown): { meldung: string; stack: string } {
   if (fehler instanceof Error) return { meldung: fehler.message, stack: fehler.stack ?? '' };
   if (typeof fehler === 'string') return { meldung: fehler, stack: '' };
   const status = (fehler as { status?: unknown } | null)?.status;
@@ -52,12 +52,12 @@ export async function meldeClientFehler(fehler: unknown, pfad: string): Promise<
       if (gemeldet.has(fehler)) return;
       gemeldet.add(fehler);
     }
-    const { meldung, stack } = beschreibe(fehler);
+    const { meldung, stack } = describe(fehler);
     await apiSendKeepalive(CLIENT_FEHLER_PFAD, {
       route: gemerktesRoutenMuster(pfad),
       version: __APP_VERSION__,
-      meldung: kuerze(meldung, CLIENT_FEHLER_MELDUNG_MAX),
-      stack: kuerze(stack, CLIENT_FEHLER_STACK_MAX),
+      meldung: truncate(meldung, CLIENT_FEHLER_MELDUNG_MAX),
+      stack: truncate(stack, CLIENT_FEHLER_STACK_MAX),
     });
   } catch {
     // Ein Bericht, der den Server nicht erreicht, wird still verworfen (Spec, „Ohne Netz“).

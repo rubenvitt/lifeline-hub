@@ -284,10 +284,10 @@ describe('SeitenNichtGefunden', () => {
 
   it('setzt die Marke „nicht als letzten Ort merken“, solange der Baustein steht', () => {
     const marke = { current: false };
-    const widerrufen: string[] = [];
+    const revoked: string[] = [];
     function Rahmen({ zeigen }: { zeigen: boolean }) {
       return (
-        <MarkenRahmen marke={marke} widerrufen={widerrufen}>
+        <MarkenRahmen marke={marke} revoked={revoked}>
           {zeigen && (
             <SeitenNichtGefunden titel="Dieses Tier gibt es nicht (mehr)" rueckweg={rueckweg} />
           )}
@@ -297,7 +297,7 @@ describe('SeitenNichtGefunden', () => {
     const { rerender } = renderMitProviders(<Rahmen zeigen />, { route: '/einsaetze/7/tiere/9' });
     expect(marke.current).toBe(true);
     // Kam die Meldung erst nach dem Laden, nimmt der Rahmen das Merken dieser Adresse zurück.
-    expect(widerrufen).toEqual(['/einsaetze/7/tiere/9']);
+    expect(revoked).toEqual(['/einsaetze/7/tiere/9']);
 
     rerender(<Rahmen zeigen={false} />);
     expect(marke.current).toBe(false);

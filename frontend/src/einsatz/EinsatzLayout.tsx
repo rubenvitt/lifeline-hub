@@ -365,7 +365,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     benutzerId != null && !einsatzQuery.isError && !modulFreigabenQuery.isLoading && !gesperrt;
   // Eine unbekannte Adresse (LLH-1729) und ein Objekt, das es nicht (mehr) gibt (LLH-1827), werden
   // ebenso wenig gemerkt: die Seite meldet sich über diese Marke, sonst führte der Rückweg auf
-  // „gibt es nicht“. Meldet sie sich erst nach dem Laden, stellt `widerrufe` den Ort davor wieder
+  // „gibt es nicht“. Meldet sie sich erst nach dem Laden, stellt `revoke` den Ort davor wieder
   // her (`nichtGefundenContext.ts`); dafür hält `gemerkt` fest, was vor der Adresse gemerkt war.
   const nichtGefunden = useRef(false);
   const gemerkt = useRef<{
@@ -389,7 +389,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const nichtGefundenMarke = useMemo<NichtGefundenMarke>(
     () => ({
       marke: nichtGefunden,
-      widerrufe: (pfad) => {
+      revoke: (pfad) => {
         const zuletzt = gemerkt.current;
         if (zuletzt == null || zuletzt.ort.pfad !== pfad) return;
         gemerkt.current = null;
