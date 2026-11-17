@@ -564,6 +564,14 @@ export default function UeberblickPage() {
   const gliederungLaedt = [abschnitteQ, einheitenQ, personalQ, fahrzeugeQ, materialQ].some(
     (q) => q.isLoading,
   );
+  // Ebenso die Quellen der Marken (LLH-1748, design.md D3): „Nächste Marken“ steht seit dem Wegfall
+  // des Bands zuoberst, am Handy als erstes Paneel. Wie viele Marken kommen, sagt keine Zahl vorher;
+  // aus „wird abgerufen“ wuchs das Paneel und schob „Offene Vorgänge“ und alles darunter (390 px:
+  // CLS 0,12 bis 0,20). Eine abgeschaltete Quelle (gesperrtes Modul) lädt nicht und hält nichts auf.
+  const markenLaedt = [auftraegeQ, erinnerungenQ, abloesungenQ, programmQ, pegelQ, wetterQ].some(
+    (q) => q.isLoading,
+  );
+  const reihenLaden = gliederungLaedt || markenLaedt;
 
   // Startliste (LLH-1815, design.md D1/D3). Sie steht ÜBER den Paneelreihen: erschiene sie nach
   // ihnen, schöbe sie die Reihen nach unten. Deshalb warten beim ersten Aufbau beide auf ihre
@@ -784,9 +792,10 @@ export default function UeberblickPage() {
             Platzhalterzeilen sie beim Laden halten. Kam er nach dem Körper, wuchsen die Abschnitte
             von einer Zeile auf ihre Platzhalter, derselbe Sprung wie ohne sie. Der Rahmen ruft ihn
             ohnehin (Rail); ein Fehler oder „ohne Netz“ hält den Körper nicht auf (`isLoading`).
-            Die Paneelreihen unter dem Band warten zusätzlich auf die Gliederung (`gliederungLaedt`,
-            LLH-1481), Startliste, Band und Paneelreihen beim ersten Aufbau auf die Quellen der
-            Startliste (`startlisteSchranke`, LLH-1815). */}
+            Die Paneelreihen unter der Alarmzeile warten zusätzlich auf die Gliederung
+            (`gliederungLaedt`, LLH-1481) und die Quellen der Marken (`markenLaedt`, LLH-1748),
+            Startliste und Paneelreihen beim ersten Aufbau auf die Quellen der Startliste
+            (`startlisteSchranke`, LLH-1815). */}
         {einsatzQ.isLoading || zaehlerQ.isLoading ? null : (
           <DashboardFlaeche kennung="ueberblick">
             {/* Die Alarmzeile „Was brennt“ steht als erstes unter dem Seitenkopf, auf Überblick,
@@ -805,7 +814,7 @@ export default function UeberblickPage() {
                     />
                   </PaneelReihe>
                 )}
-                {gliederungLaedt ? null : (
+                {reihenLaden ? null : (
                   <>
                     {/* Kein Band (LLH-1748, Spec `lage-verdichtung`): Reihe 1 trägt die Fristen und die
                         offenen Vorgänge, Reihe 2 die Gliederung und die Entscheidungen. Gestapelt (unter `lg`)

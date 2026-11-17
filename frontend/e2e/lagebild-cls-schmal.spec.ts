@@ -167,10 +167,11 @@ const inhalt = (page: Page) => page.locator('[data-lfh="seiten-inhalt"]');
  * Was zuletzt steht: im Lagebild die Kennzahlen des Bands als Links, im Überblick (ohne Band seit
  * LLH-1748) die Zahlen der offenen Vorgänge.
  */
+const lageBand = (page: Page) => page.getByRole('group', { name: 'Lage in Zahlen' });
 const zahlenStehen = (page: Page, seite: Seite) =>
   seite === 'ueberblick'
     ? page.locator('[data-lfh="offene-vorgaenge"] [data-lfh="abschnitt-zahl"]').first()
-    : page.getByRole('group', { name: 'Lage in Zahlen' }).locator('a[data-lfh="kennzahl"]').first();
+    : lageBand(page).locator('a[data-lfh="kennzahl"]').first();
 
 /** Anker des Endzustands: Ortspfad mit Namen, Zahlen stehen, kein Ladezeichen mehr. */
 async function endzustand(page: Page, seite: Seite) {
@@ -300,14 +301,12 @@ for (const dichte of DICHTEN) {
       await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
       await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
       // Vorbedingung: das Band steht im Ladezustand, mit geladener Schrift.
-      await expect(
-        band(page, 'lage-dashboard').locator('[aria-busy="true"]').first(),
-      ).toBeVisible();
+      await expect(lageBand(page).locator('[aria-busy="true"]').first()).toBeVisible();
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
-      const vorher = (await band(page, 'lage-dashboard').boundingBox())?.height ?? Number.NaN;
+      const vorher = (await lageBand(page).boundingBox())?.height ?? Number.NaN;
       abfragen.freigeben();
       await endzustand(page, 'lage-dashboard');
-      const nachher = (await band(page, 'lage-dashboard').boundingBox())?.height ?? Number.NaN;
+      const nachher = (await lageBand(page).boundingBox())?.height ?? Number.NaN;
       const messwert = `${folge}: ${vorher.toFixed(1)} → ${nachher.toFixed(1)}`;
       hoehen.push(messwert);
       expect.soft(Math.abs(nachher - vorher), `${dichte}, ${messwert}`).toBeLessThanOrEqual(1);

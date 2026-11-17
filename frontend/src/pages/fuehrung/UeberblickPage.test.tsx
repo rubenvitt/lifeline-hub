@@ -1588,9 +1588,10 @@ describe('UeberblickPage', () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
+    // Die Meldungsliste hält die Reihen nicht auf (anders als die Quellen der Marken, LLH-1748).
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/personen', haengt),
-      http.get('/api/einsaetze/1/auftraege', haengt),
+      http.get('/api/einsaetze/1/meldungen', haengt),
     ]);
     rendern();
     await koerperDa();
@@ -1599,8 +1600,8 @@ describe('UeberblickPage', () => {
     await waitFor(() => expect(zeile).toHaveTextContent('1 Auftrag überfällig'));
     expect(zeile).toHaveAttribute('data-stand', 'laedt');
     expect(zeile).not.toHaveTextContent('Nichts brennt');
-    // Die Paneelreihen kommen erst mit den Quellen der Gliederung (LLH-1481).
-    const p = await waitFor(() => abschnitt('Aufträge'));
+    // Die Paneelreihen kommen erst mit den Quellen der Gliederung (LLH-1481) und der Marken.
+    const p = await waitFor(() => abschnitt('Meldungen'));
     expect(within(p).getByText('wird abgerufen').closest('[aria-busy="true"]')).not.toBeNull();
     // Eine unabhängige Quelle lädt trotzdem durch.
     expect(
@@ -1620,12 +1621,12 @@ describe('UeberblickPage', () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
-    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/auftraege', haengt)]);
+    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/nachforderungen', haengt)]);
     rendern();
     await koerperDa();
-    // Der Aufträge-Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
-    const auftraege = await waitFor(() => abschnitt('Aufträge'));
-    expect(within(auftraege).getByText('wird abgerufen')).toBeInTheDocument();
+    // Ein Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
+    const nachforderungen = await waitFor(() => abschnitt('Nachforderungen'));
+    expect(within(nachforderungen).getByText('wird abgerufen')).toBeInTheDocument();
     expect(vorgaenge().querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
     // Die Gliederung ist da: leer mit Ausweg, kein Ladezustand.
     expect(
@@ -1650,7 +1651,16 @@ describe('UeberblickPage', () => {
     });
     afterEach(() => localStorage.clear());
 
-    for (const quelle of ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material']) {
+    // Seit LLH-1748 auch die Quellen der Marken: „Nächste Marken“ steht in Reihe 1 zuoberst.
+    for (const quelle of [
+      'abschnitte',
+      'einheiten',
+      'personal',
+      'fahrzeuge',
+      'material',
+      'auftraege',
+      'erinnerungen',
+    ]) {
       it(`${quelle} lädt: Alarmzeile steht, keine Paneelreihe; mit der Antwort die Zeilen`, async () => {
         let loslassen!: () => void;
         const tor = new Promise<void>((f) => (loslassen = f));
@@ -1692,7 +1702,9 @@ describe('UeberblickPage', () => {
    * LLH-1430: laden die Listen der „Offenen Vorgänge“, hält jeder Abschnitt so viele Zeilen, wie
    * der Modulzähler Einträge erwarten lässt (höchstens drei). Erinnerungen kennen nur die fälligen,
    * Ablösungen keinen Serverzähler; „meine Stelle“ zählt der Zähler nicht. Die Seiten-CLS misst
-   * `e2e/ueberblick-vorgaenge-cls.spec.ts`.
+   * `e2e/ueberblick-vorgaenge-cls.spec.ts`. Aufträge, Erinnerungen und Ablösungen speisen seit
+   * LLH-1748 auch die Marken in Reihe 1; ihre Listen halten die Reihen beim ersten Aufbau ganz auf
+   * (`markenLaedt`). Sichtbar laden hier deshalb nur Meldungen und Nachforderungen.
    */
   describe('Offene Vorgänge · Ladezustand hält den Platz der erwarteten Einträge (LLH-1430)', () => {
     const haengt = async () => {
@@ -1725,10 +1737,7 @@ describe('UeberblickPage', () => {
         },
         [
           http.get('/api/einsaetze/1/meldungen', haengt),
-          http.get('/api/einsaetze/1/auftraege', haengt),
           http.get('/api/einsaetze/1/nachforderungen', haengt),
-          http.get('/api/einsaetze/1/erinnerungen', haengt),
-          http.get('/api/einsaetze/1/abloesungen', haengt),
         ],
       );
     const platzhalter = (name: string) =>
@@ -1739,21 +1748,12 @@ describe('UeberblickPage', () => {
       rendern();
       await waitFor(() => vorgaenge());
       // Der Zähler steht, die Listen laden noch.
-      await waitFor(() => expect(abschnittZahl('Aufträge')).toHaveTextContent(/^2$/));
-      for (const name of [
-        'Meldungen',
-        'Aufträge',
-        'Nachforderungen',
-        'Erinnerungen',
-        'Ablösungen',
-      ]) {
+      await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent(/^5$/));
+      for (const name of ['Meldungen', 'Nachforderungen']) {
         expect(abschnitt(name).querySelector('[aria-busy="true"]')).not.toBeNull();
       }
       expect(platzhalter('Meldungen')).toBe(3);
-      expect(platzhalter('Aufträge')).toBe(2);
       expect(platzhalter('Nachforderungen')).toBe(0);
-      expect(platzhalter('Erinnerungen')).toBe(1);
-      expect(platzhalter('Ablösungen')).toBe(0);
       expect(within(abschnitt('Nachforderungen')).getByText('wird abgerufen')).toBeInTheDocument();
     });
 
@@ -1766,10 +1766,9 @@ describe('UeberblickPage', () => {
         { route: '/einsaetze/1/ueberblick?vorgaenge=meine' },
       );
       await waitFor(() => vorgaenge());
-      await waitFor(() => expect(abschnittZahl('Aufträge')).toHaveTextContent(/^2/));
-      for (const name of ['Meldungen', 'Aufträge', 'Erinnerungen']) {
-        expect(platzhalter(name)).toBe(0);
-      }
+      await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent(/^5/));
+      expect(abschnitt('Meldungen').querySelector('[aria-busy="true"]')).not.toBeNull();
+      expect(platzhalter('Meldungen')).toBe(0);
     });
   });
 

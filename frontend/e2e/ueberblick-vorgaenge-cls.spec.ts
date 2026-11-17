@@ -30,11 +30,19 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * zwei Einheiten ohne Abschnitt). Wie viele Zeilen kommen und wie hoch sie werden, sagt keine Zahl
  * des Modulzählers (oberste Abschnitte, „Ohne Abschnitt“ aus vier Listen). Seither erscheinen die
  * Paneelreihen des Überblicks erst mit den Quellen der Gliederung (`UeberblickPage.tsx`); was
- * unter dem Kennzahlenband erscheint, verschiebt nichts.
+ * unter der Alarmzeile erscheint, verschiebt nichts.
  *
- * DREI LADEFOLGEN, Muster `lagebild-cls-schmal.spec.ts`: der Sprung hängt daran, was zuerst kommt.
- *  - `Listen zuletzt`: die fünf Listen warten, bis die Seite im Ladezustand ruht (jeder Abschnitt
- *    zeigt seine Platzhalter). Misst Platzhalter → Einträge.
+ * DER DRITTE SPRUNG (LLH-1748): ohne Band steht „Nächste Marken“ in Reihe 1, auf 390 px als
+ * erstes Paneel. Aus „wird abgerufen“ wuchs es auf seine Marken und schob alles darunter
+ * (Seiten-CLS 0,12–0,20 auf 390 px). Seither warten die Reihen auch auf die Quellen der Marken
+ * (Aufträge, Erinnerungen, Ablösungen, Programm, Pegel, Wetter). Sichtbar laden in „Offene
+ * Vorgänge“ damit nur noch Meldungen und Nachforderungen.
+ *
+ * VIER LADEFOLGEN, Muster `lagebild-cls-schmal.spec.ts`: der Sprung hängt daran, was zuerst kommt.
+ *  - `Listen zuletzt`: die Listen von Meldungen und Nachforderungen warten, bis die Seite im
+ *    Ladezustand ruht (ihre Abschnitte zeigen Platzhalter). Misst Platzhalter → Einträge.
+ *  - `Marken zuletzt`: die Listen, aus denen auch die Marken rechnen (Aufträge, Erinnerungen,
+ *    Ablösungen), warten. Misst, dass die Reihen erst mit ihnen erscheinen (LLH-1748).
  *  - `Gliederung zuletzt`: die fünf Quellen der Gliederung warten (Abschnitte, Einheiten,
  *    Personal, Fahrzeuge, Material), bis die Seite ruht. Misst den Sprung des Paneels
  *    „Einsatzabschnitte“ (LLH-1481).
@@ -136,11 +144,18 @@ async function einsatzMitVorgaengen(page: Page): Promise<string> {
   return einsatzId;
 }
 
-type Folge = 'Listen zuletzt' | 'Gliederung zuletzt' | 'natürlich';
-const FOLGEN: Folge[] = ['Listen zuletzt', 'Gliederung zuletzt', 'natürlich'];
+type Folge = 'Listen zuletzt' | 'Marken zuletzt' | 'Gliederung zuletzt' | 'natürlich';
+const FOLGEN: Folge[] = ['Listen zuletzt', 'Marken zuletzt', 'Gliederung zuletzt', 'natürlich'];
 
-/** Die Listen der fünf Abschnitte, ohne Unterpfade (`/nachforderungen/arten` gehört nicht dazu). */
-const LISTEN = ['meldungen', 'auftraege', 'nachforderungen', 'erinnerungen', 'abloesungen'];
+/**
+ * Die Listen der Abschnitte, die sichtbar laden, ohne Unterpfade (`/nachforderungen/arten` gehört
+ * nicht dazu). Aufträge, Erinnerungen und Ablösungen speisen auch die Marken und halten die Reihen
+ * auf (`MARKEN`).
+ */
+const LISTEN = ['meldungen', 'nachforderungen'];
+
+/** Listen der offenen Vorgänge, aus denen auch „Nächste Marken“ rechnet (LLH-1748). */
+const MARKEN = ['auftraege', 'erinnerungen', 'abloesungen'];
 
 /** Die Quellen des Paneels „Einsatzabschnitte“ (`abschnittZeilen`), ohne Unterpfade. */
 const GLIEDERUNG = ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material'];
@@ -155,7 +170,13 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge) {
   const tor = new Promise<void>((f) => (loslassen = f));
   const kopf = `/api/einsaetze/${einsatzId}`;
   const gehaltenePfade = (
-    folge === 'Listen zuletzt' ? LISTEN : folge === 'Gliederung zuletzt' ? GLIEDERUNG : []
+    folge === 'Listen zuletzt'
+      ? LISTEN
+      : folge === 'Marken zuletzt'
+        ? MARKEN
+        : folge === 'Gliederung zuletzt'
+          ? GLIEDERUNG
+          : []
   ).map((l) => `${kopf}/${l}`);
   let gehalten = 0;
   await page.route(new RegExp(`/api/einsaetze/${einsatzId}/`), async (route) => {
@@ -209,16 +230,16 @@ async function messe(
   const abfragen = await stelleAbfragen(page, einsatzId, folge);
   await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
   if (folge === 'Listen zuletzt') {
-    // Vorbedingung: alle fünf Abschnitte laden, die Zahlen aus dem Modulzähler stehen schon.
+    // Vorbedingung: die gehaltenen Abschnitte laden, die Zahlen aus dem Modulzähler stehen schon.
     await expect(vorgaenge(page).locator('section [aria-busy="true"]')).toHaveCount(LISTEN.length);
     await expect(
       vorgaenge(page).locator('[data-lfh="vorgaenge-meldungen"] [data-lfh="abschnitt-zahl"]'),
     ).toHaveText(String(ERWARTET.meldung));
     await ruheShifts(page);
     abfragen.freigeben();
-  } else if (folge === 'Gliederung zuletzt') {
-    // Vorbedingung: die Quellen der Gliederung fehlen noch, es steht nur die Alarmzeile (kein
-    // Band seit LLH-1748; als Admin wartet auch die Startliste, Dateikopf).
+  } else if (folge === 'Gliederung zuletzt' || folge === 'Marken zuletzt') {
+    // Vorbedingung: Quellen der Gliederung bzw. der Marken fehlen noch, es steht nur die Alarmzeile
+    // (kein Band seit LLH-1748; als Admin wartet auch die Startliste, Dateikopf).
     await expect(page.getByRole('status', { name: 'Was brennt' })).toBeVisible();
     await expect(page.locator('[data-lfh="ueberblick-paneele"]')).toHaveCount(0);
     await expect(page.locator('[data-lfh="ueberblick-abschnitt"]')).toHaveCount(0);

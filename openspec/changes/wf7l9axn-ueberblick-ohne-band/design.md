@@ -24,7 +24,7 @@ eines Abschnitts ist die des Moduls“), der Kopf von „Einsatzabschnitte“ tr
 - Fristen und Überfälliges stehen am Fükw über der Falz und am Handy direkt nach Alarmzeile
   und Startliste.
 - Keine Zahl steht im Überblick zweimal.
-- Kein neuer Layoutsprung beim Laden: die Ladeschranken bleiben, wie sie sind.
+- Kein neuer Layoutsprung beim Laden (D3).
 
 **Non-Goals:**
 
@@ -66,12 +66,26 @@ schmaler, und die Abschnittskarten mit Zahlspalte brechen dann schon am Fükw um
 *Folge:* Die Abschnittskarten rücken am Fükw unter die Falz. Was an ihnen brennt (Rückmeldung
 überfällig, Ausfall, Lagezustand kritisch), nennt die Alarmzeile ganz oben.
 
-### D3 Ladeschranken unverändert
+### D3 Die Reihen warten auch auf die Quellen der Marken
 
-Beide Reihen stehen weiter gemeinsam hinter `gliederungLaedt` und `startlisteSchranke`. „Nächste
-Marken“ hängt nicht an der Gliederung, aber eine Reihe, die vor der anderen erscheint, schöbe beim
-Nachladen alles darunter. Ohne Band fällt nur ein Element weg, das bisher vor den Reihen stand;
-das Muster „ein erscheinender Körper verschiebt nichts“ (LFH-629) bleibt.
+Beide Reihen stehen weiter gemeinsam hinter `gliederungLaedt` und `startlisteSchranke`, dazu seit
+der Umsetzung hinter `markenLaedt`: den Listen, aus denen „Nächste Marken“ rechnet (Aufträge,
+Erinnerungen, Ablösungen, Programm, Pegel, Wetter). Gezählt wird nur das erste Laden (`isLoading`);
+ein gesperrtes Modul fragt nicht an und hält nichts auf.
+
+Ursprünglich sollten die Schranken unverändert bleiben. Der CLS-Test (`ueberblick-vorgaenge-cls`)
+zeigte bei 390 px aber 0,12 bis 0,20 (Grenze 0,03): „Nächste Marken“ steht dort als erstes Paneel
+und wuchs aus „wird abgerufen“ auf seine Marken, alles darunter rückte nach. Wie viele Marken
+kommen, sagt keine Zahl vorher. Entschieden am 17.11.2026 mit dem Menschen.
+
+*Verworfen:* (a) Eine feste Höhe für sechs Marken. Sie ließe am Handy rund 300 px leer, wenn wenig
+ansteht. (b) Am Handy die alte Folge mit den Marken unten. Das widerspräche dem Ziel der Change
+und dem Szenario „Fristen zuerst am Handy“.
+
+*Folge:* Eine langsame Aufträge- oder Erinnerungsliste hält beim ersten Aufbau alles unter
+Alarmzeile und Startliste auf, so wie es die Gliederung seit LLH-1481 schon tut. Die Platzhalter
+der offenen Vorgänge (LLH-1430) greifen beim ersten Aufbau nur noch bei Meldungen und
+Nachforderungen.
 
 ### D4 Beschreibung des Moduls „Überblick“
 
