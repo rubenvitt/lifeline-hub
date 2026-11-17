@@ -1,6 +1,7 @@
 import { theme } from 'antd';
 import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import Markdown from '../components/Markdown';
+import { monoStil } from '../components/instrument';
 import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
 import { uhrzeit, zeitpunkt } from '../anzeige/zeitDarstellung';
 import { formatGroesse } from '../karten/formatGroesse';
@@ -9,8 +10,6 @@ import { istNachgetragen } from './typFarben';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { berichtigungsindex } from './zeitachseModell';
 import { istUeberlang } from './druckUmbruch';
-import { zahlStil } from '../components/instrument/rollenwerte';
-
 import '../druck/druckansichtSchmal.css';
 
 /**
@@ -138,10 +137,12 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
           const durch = index.berichtigtDurch(e);
           return (
             <tr key={e.id} data-lfh={istUeberlang(e.inhalt) ? 'druck-ueberlang' : undefined}>
-              <td style={{ ...zelle, ...zahlStil('text'), whiteSpace: 'nowrap' }}>{e.lfd_nr}</td>
+              <td style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}>
+                {e.lfd_nr}
+              </td>
               <td
                 className="druckansicht-zeit"
-                style={{ ...zelle, ...zahlStil('text'), whiteSpace: 'nowrap' }}
+                style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}
               >
                 <div>{zeitpunkt(e.ereigniszeit, konventionen)}</div>
                 {istNachgetragen(e.ereigniszeit, e.received_at) && (

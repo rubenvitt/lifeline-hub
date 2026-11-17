@@ -5,7 +5,7 @@ import type { Farbrollen } from '../../theme/tokens';
 import Augenbraue from './Augenbraue';
 import DashboardPaneel, { type DashboardPaneelBasis } from './DashboardPaneel';
 import { PANEEL_LADEN_TEXT, PANEEL_NEULADEN } from './PaneelZustand';
-import { useRollen, schriftGroesse, zahlStil, schriftStil } from './rollenwerte';
+import { monoStil, useRollen } from './rollenwerte';
 
 /**
  * ListenPaneel — eine kurze Liste mit „n weitere ↗“ ins Modul (Regel „Dashboard-Baukasten“,
@@ -85,7 +85,7 @@ export default function ListenPaneel<T>({
           aria-label={`${rest} weitere ${weitere.name}`}
           style={{
             ...listenZeileStil(rollen, token),
-            ...schriftStil('meta'),
+            ...monoStil(11),
             color: rollen.bedienText,
             borderBlockEnd: 0,
           }}
@@ -110,12 +110,10 @@ export function LadePlatzhalterZeile({ stil, text }: { stil: CSSProperties; text
       <span
         style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}
       >
-        <span
-          style={{ fontSize: schriftGroesse('klein'), lineHeight: 1.45, color: rollen.gedaempft }}
-        >
+        <span style={{ fontSize: 12, lineHeight: 1.45, color: rollen.gedaempft }}>
           {text ? PANEEL_LADEN_TEXT : '\u00a0'}
         </span>
-        <span aria-hidden="true" style={schriftStil('meta')}>
+        <span aria-hidden="true" style={monoStil(10)}>
           {'\u00a0'}
         </span>
       </span>
@@ -206,7 +204,7 @@ export function ListenAbschnitt<T>({
   const hinweisStil: CSSProperties = {
     ...zeilenStil,
     alignItems: 'center',
-    fontSize: schriftGroesse('klein'),
+    fontSize: 12,
     color: rollen.gedaempft,
   };
 
@@ -277,15 +275,15 @@ export function ListenAbschnitt<T>({
         <Augenbraue als={ueberschrift} id={kopfId}>
           {titel}
         </Augenbraue>
-        <span data-lfh="abschnitt-zahl" style={{ ...zahlStil('text', 500), color: rollen.text }}>
+        <span data-lfh="abschnitt-zahl" style={{ ...monoStil(15, 500), color: rollen.text }}>
           {gesperrt || zahl == null ? '—' : zahl}
           {zahlWort && !gesperrt && zahl != null && (
-            <span style={{ ...schriftStil('meta'), color: rollen.schwach }}> {zahlWort}</span>
+            <span style={{ ...monoStil(10), color: rollen.schwach }}> {zahlWort}</span>
           )}
         </span>
         <span
           data-lfh="abschnitt-notiz"
-          style={{ flex: '1 1 auto', minWidth: 0, ...schriftStil('meta'), color: rollen.gedaempft }}
+          style={{ flex: '1 1 auto', minWidth: 0, ...monoStil(10), color: rollen.gedaempft }}
         >
           {gesperrt ? null : notiz}
         </span>
@@ -300,7 +298,7 @@ export function ListenAbschnitt<T>({
               gap: token.marginXXS,
               minHeight: token.controlHeight,
               paddingInline: token.paddingXS,
-              ...schriftStil('meta'),
+              ...monoStil(11),
               color: rollen.bedienText,
               textDecoration: 'none',
             }}

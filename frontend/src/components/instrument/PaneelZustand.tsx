@@ -1,6 +1,6 @@
 import { Button, Skeleton } from 'antd';
 import type { ReactNode } from 'react';
-import { useRollen, schriftGroesse } from './rollenwerte';
+import { useRollen } from './rollenwerte';
 
 /**
  * Datenzustand eines Paneel-Körpers. Dieselben vier Werte wie `Datenzustand` in
@@ -72,9 +72,7 @@ export default function PaneelZustand({
         aria-label={`${titel} wird geladen`}
         style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>
-          {PANEEL_LADEN_TEXT}
-        </span>
+        <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{PANEEL_LADEN_TEXT}</span>
         {leerAktion != null && onLeerAktion != null && (
           <span>
             <Skeleton.Button active />
@@ -90,12 +88,8 @@ export default function PaneelZustand({
         data-lfh="paneel-fehler"
         style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        <b style={{ color: rollen.alarmText, fontSize: schriftGroesse('text') }}>
-          {PANEEL_FEHLER_TITEL}
-        </b>
-        <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>
-          {PANEEL_FEHLER_TEXT}
-        </span>
+        <b style={{ color: rollen.alarmText, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
+        <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{PANEEL_FEHLER_TEXT}</span>
         <span>
           <Button onClick={onNeuladen}>{PANEEL_NEULADEN}</Button>
         </span>
@@ -108,9 +102,7 @@ export default function PaneelZustand({
         data-lfh="paneel-leer"
         style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>
-          {leerText}
-        </span>
+        <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{leerText}</span>
         {leerAktion != null && onLeerAktion != null && (
           <span>
             <Button onClick={onLeerAktion}>{leerAktion}</Button>
@@ -133,7 +125,7 @@ export function PaneelLink({ label, onKlick }: { label: string; onKlick: () => v
       type="link"
       data-lfh="paneel-link"
       onClick={onKlick}
-      style={{ paddingInline: token.paddingXS, fontSize: schriftGroesse('klein') }}
+      style={{ paddingInline: token.paddingXS, fontSize: 12 }}
     >
       {label}
       <span aria-hidden="true" style={{ marginInlineStart: token.marginXXS }}>

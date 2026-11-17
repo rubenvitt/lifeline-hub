@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react';
 import type { Einsatzart } from '../../api/types';
 import { isUebung } from '../../einsatz/einsatzart';
-import { fernsicht, type Farbrollen } from '../../theme/tokens';
+import type { Farbrollen } from '../../theme/tokens';
 import { grossMass } from '../grossbild/grossMass';
 import { RAHMEN_EBENE, RAHMEN_RANG, useRahmenObenStapel } from '../rahmenOben';
-import { schriftGroesse, schriftStil, useRollen } from './rollenwerte';
+import { schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Übungsmarke (LLH-1725, Spec `uebungsmarke`; `frontend/AGENTS.md`, Rahmen, „Übung“): der EINE
@@ -28,17 +28,17 @@ type MitArt = { einsatzart?: Einsatzart | null } | null | undefined;
 const WORT = 'Übung';
 
 /**
- * Größen der Marke: Kopf, Liste und Wechsler `klein` in der Stufe `fein` (wächst mit der Dichte,
- * LLH-1774); der Lagemonitor liest aus Metern (Fernsicht-Skala). `grossbild` ist die Monitorgröße
- * als mitwachsende Länge (LLH-1747, `components/grossbild/grossMass.ts`).
+ * Größen der Marke: Kopf, Liste und Wechsler `klein`; der Lagemonitor liest aus Metern. `grossbild`
+ * ist die Monitorgröße als mitwachsende Länge (LLH-1747, `components/grossbild/grossMass.ts`).
  */
-const MARKE_SCHRIFT = {
-  klein: schriftGroesse('fein'),
-  monitor: `${fernsicht.text}px`,
-  grossbild: grossMass(fernsicht.text),
-} as const;
+const MARKE_SCHRIFT = { klein: 11, monitor: 28, grossbild: 28 } as const;
 
-function wortStil(rollen: Pick<Farbrollen, 'uebungText'>, groesse: string): CSSProperties {
+/** Länge einer Markengröße: im Großbild mit dem Fenster, sonst feste Pixel. */
+function markenMass(groesse: keyof typeof MARKE_SCHRIFT, px: number): number | string {
+  return groesse === 'grossbild' ? grossMass(px) : px;
+}
+
+function wortStil(rollen: Pick<Farbrollen, 'uebungText'>, groesse: number | string): CSSProperties {
   return {
     ...schriftStil('augenbraue'),
     fontSize: groesse,
@@ -68,17 +68,15 @@ export function UebungsMarke({
         display: 'inline-flex',
         alignItems: 'center',
         flexShrink: 0,
-        // Polster im Verhältnis zur Schrift, die mit der Dichte bzw. dem Fenster wächst (LLH-1774,
-        // LLH-1747).
-        paddingBlock: `calc(${px} * 0.2)`,
-        paddingInline: `calc(${px} * 0.5)`,
+        paddingBlock: markenMass(groesse, Math.round(px * 0.2)),
+        paddingInline: markenMass(groesse, Math.round(px * 0.5)),
         background: rollen.uebungFuellung,
         // Kante gegen dunkle Flächen; gegen helle trägt die Füllung den Umriss (D2).
         boxShadow: `inset 0 0 0 1px ${rollen.uebungKante}`,
         ...style,
       }}
     >
-      <span style={wortStil(rollen, px)}>{WORT}</span>
+      <span style={wortStil(rollen, markenMass(groesse, px))}>{WORT}</span>
     </span>
   );
 }
@@ -89,11 +87,8 @@ export const UNBEKANNT = 'Einsatzart nicht geladen';
 /** Takt, in dem eine Hülle ohne Einsatzkopf ihn erneut lädt (Gerät, Lagemonitor). */
 export const EINSATZKOPF_REFETCH_MS = 30_000;
 
-/**
- * Schriftgröße des Worts im Band: die Stufe `text`, damit es aus dem Augenwinkel trägt (vorher
- * 13 px, keine Stufe der Skala, LLH-1775).
- */
-const BAND_GROESSE = schriftGroesse('text');
+/** Schriftgröße des Worts im Band: eine Stufe über dem Lauftext, damit es aus dem Augenwinkel trägt. */
+const BAND_SCHRIFT = 13;
 
 /**
  * `klebend` (Vorgabe): das Band klebt im Dokument-Scroll unter den übrigen Rahmenquellen und meldet
@@ -133,7 +128,7 @@ export function UebungsBand({
           background: rollen.flaeche3,
           borderBlockEnd: `1px solid ${rollen.linie}`,
           color: rollen.text2,
-          fontSize: BAND_GROESSE,
+          fontSize: BAND_SCHRIFT,
         }}
       >
         {UNBEKANNT}
@@ -159,7 +154,7 @@ export function UebungsBand({
         borderBlock: `1px solid ${rollen.uebungKante}`,
       }}
     >
-      <span style={wortStil(rollen, BAND_GROESSE)}>{WORT}</span>
+      <span style={wortStil(rollen, BAND_SCHRIFT)}>{WORT}</span>
     </div>
   );
 }

@@ -54,36 +54,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `etbTypFarben{Dunkel,Hell}` (`etbTypFarbe()`), `warnstufeFarben{Dunkel,Hell}`
   (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, LFH-593:
   Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
-- **Schrift: sechs Stufen, Rollen darüber** (LLH-1773/LLH-1775, Spec `schriftskala`, Change
-  `i1o47voj-schrift-lesbarkeit`; umgekehrt 15.11.2026 gegenüber dem Neuentwurf): jede Größe am
-  Schirm ist eine der `groessenstufen` in `theme/tokens.ts` (`fein` 11 · `klein` 12 · `text` 14 ·
-  `titel` 16 · `wert` 22 · `gross` 32), nichts unter 11 px. `schriftskala` nennt je Rolle Stufe,
-  Gewicht und Familie (`seitentitel` und `uhr` 16, `warnung` 14/600 für jeden Warnhinweis,
-  `etikett`, `meta` …); CSS `--lfh-groesse-*`/`--lfh-typo-*`, deckungsgleich per
-  `rollen.guard.test.ts`. Die Stufen bis `titel` wachsen mit der Dichte um 1 / 1,15 / 1,25
-  (`--lfh-schrift-faktor`, `dichteFaktor`, LLH-1774), auch antds Schriftgrößen; `wert` und
-  `gross` stehen fest. Gesetzt wird eine Größe nur über `schriftGroesse(stufe)`,
-  `schriftStil(rolle)`, `zahlStil(stufe)` (`components/instrument/rollenwerte.ts`), den Baustein
-  `Schrift`, antds `token.fontSize*` oder `var(--lfh-…)` in CSS; Rechnungen nehmen `schriftPx`.
-  **Kein Größen-Literal** (`fontSize: 12`, `font-size: 12px`, `monoStil`), ohne Schuldmenge:
-  Wächter `theme/schriftLiteral.guard.test.ts`. Ausnahmen nur Druckblätter (pt), die
-  Fernsicht-Skala des Lagemonitors (`fernsicht`), die Großbild-Skala (`grossMass`, LLH-1747) und
-  Zeichnungen mit eigenem Maßstab (Lagekarte, Fernmeldeskizze, taktische Zeichen).
-- **Mono nur für Zahl, Zeit, Kennung und Funkrufname** (LLH-1777, Spec `schriftrollen`;
-  umgekehrt 15.11.2026: der Neuentwurf setzte auch die Meta-Zeilen in Mono): `zahlStil` trägt
-  Mono, Kennungen sind auch das Typwort der Zeitachse, `/typ`, Tastenkürzel, die Wortmarke und
-  FMS-Kürzel. Text mit Wörtern steht in der Textschrift, auch gemischt („Stand 14:32“) und ganz:
-  jede Rolle setzt `tabular-nums`. Funkrufnamen tragen `data-schrift="kennung"` (Messung
-  `e2e/schrift-mono-grenze.spec.ts`).
-- **Versalien nur in Köpfen, Feldetiketten gemischt** (LLH-1776, Spec `schriftrollen`;
-  umgekehrt 15.11.2026): die `Augenbraue` benennt Paneelköpfe, Kennzahlen, Tabellenköpfe und
-  Gruppen, das Rail-Etikett steht ebenso in Versalien. Ein Feld benennt das `Feldetikett`
-  (`components/instrument/Feldetikett.tsx`: Stufe `klein`, `gedaempft`, ohne Sperrung);
-  `Datenfeld`, `DatenfeldEingabe` und `FeldLabel` tragen es, die Augenbraue kennt `als="dt"` nicht.
-- **Body und native Bedienelemente erben die Textschrift** (LLH-1772): `index.css` setzt sie an
-  `html, body` und `font: inherit` an `button, input, textarea, select`; kein lokales
-  `font: 'inherit'` mehr nötig. Wächter `theme/schriftReset.guard.test.ts`, Beleg
-  `e2e/schrift-familie.spec.ts`.
+- **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
+  Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
+  30/48/72 gilt, nicht die Entwurfsskizze.
 - **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
@@ -94,7 +67,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
   (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter.
 - **Bausteine** in `components/instrument/` (Import über `index.ts`, Dateikopf nennt die Regel):
-  `Augenbraue` (`als="h2…h6"`, nur Köpfe) · `Feldetikett` · `Schrift` · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
+  `Augenbraue` (`als="h2…h6"`) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
   Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`StatusChip` (`wort` Pflicht, Übersetzung
   nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; wann welche Form: Bausteinwahl, „Umschalten“;
@@ -128,7 +101,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   mitwachsend über `min(vw, vh)`). Jeder hat eine Karte im Design System, außer der Hülle
   `GrossbildFlaeche` (Portal und Vollbild).
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
-  Staffel): `titel` als `h1` (16/600, Paneele ab `h2`), `meta` in der Textschrift, `aktionen` rechts (Primär blau
+  Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
   `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion
@@ -203,8 +176,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
     Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
-    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (Stufe `titel`, 16 / 18,4 / 20 px)
-    seine Eigenbreite, bevor die
+    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
     Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
     nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht in jeder Breite nur als
     Symbol, eine Störung ab `md` mit Wort (darunter trägt die Betriebszeile die Verbindung, die
@@ -368,7 +340,6 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
 | Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
-| Text in einer Rolle der Schriftskala                                                            | `Schrift`, `schriftStil`/`zahlStil` („Schrift: sechs Stufen, Rollen darüber“)                                                                    | `Schrift`                          |
 | Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts` („Zeitdarstellung“)                                                                                                 | `Zeitdarstellung`                  |
 | Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
 | Taktisches Zeichen                                                                              | `EinsatzZeichen`                                                                                                                                 | `TaktischeZeichen`                 |
@@ -832,23 +803,20 @@ anwendbar), „nicht geprüft" ist keins.
   (Höhe und Breite) und steht am unteren Rand (LLH-1032, `verpflegung/zaehltasteStil.ts`). Das ist
   eine Ausnahme nach oben, keine Stufenwahl: die übrigen Tasten folgen der Staffel. Nachweis
   `e2e/gate3-trefflaeche.spec.ts` („Ausgabeansicht“).
-- **Der Zoom ist frei, der Doppeltipp nicht** (LLH-1774, Spec `schriftskala`; umgekehrt
-  15.11.2026 gegenüber LLH-1328 „Kein Zoom wie in einer App“): der Viewport in `index.html` nennt
-  weder `maximum-scale` noch `user-scalable=no`, `html` in `index.css` sperrt nur den Doppeltipp
-  (`touch-action: manipulation`). iOS zoomt beim Fokus nicht, weil ein Feld in `komfortabel`
-  14 × 1,15 = 16,1 px misst; in `kompakt` auf dem iPhone ist der Fokus-Zoom hingenommen. Wächter
-  `theme/zoomFrei.guard.test.ts`.
+- **Kein Zoom wie in einer App** (LLH-1328): der Viewport in `index.html` sperrt den Zoom
+  (`maximum-scale=1.0, user-scalable=no`), `html` in `index.css` den Doppeltipp
+  (`touch-action: manipulation`). Sonst zoomt iOS beim Fokus in jedes Feld unter 16 px Schrift,
+  und die Stufen liegen darunter. Größe trägt die Dichte, kein Feld wird dafür auf 16 px gehoben.
+  Wächter `theme/keinZoom.guard.test.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
-  `theme/dichte.ts:startDichte`, gespiegelt im Bootstrap-Skript von `index.html` (setzt
-  `data-dichte` vor dem ersten Bild, LLH-1774) — immer beide ändern, `theme/dichte.test.ts` führt
-  das Skript gegen `startDichte` aus; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart,
-  kein Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
+  `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
+  Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
   `e2e/dichte-ableitung.spec.ts`; Flächenmessung der Modul-Prüflisten
   `e2e/trefflaeche-pruefflaechen.spec.ts`, Messhelfer in `e2e/trefflaeche-kern.ts`.
 - **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel
   (`Math.max(48, controlHeight)`, Griffe über `navGriffMass`); die Rail-Spalte wächst mit
-  (`railBreite` in `components/Kopfleiste.tsx`, mit der Schrift: 64 / 74 / 80 px, LLH-1774).
+  (`railBreite` in `components/Kopfleiste.tsx`, 73 px in `handschuh`).
 - Knopfboden `minWidth` = `controlHeightSM` (`antdKnopf()` in `theme/tokens.ts`). `Switch` über
   `switchMasse`/`antdKomponenten(farben, dichte)`; Nachweis am CSS der `css-var-…`-Klasse über
   `innerHTML`, nicht `textContent`. Schalter in fester Breite brechen um, statt zu kürzen

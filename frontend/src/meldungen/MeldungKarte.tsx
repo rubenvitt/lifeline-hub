@@ -17,7 +17,7 @@ import {
 } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { StatusChip, useRollen, schriftGroesse, schriftStil } from '../components/instrument';
+import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -386,22 +386,18 @@ function MeldungKarte({
 
       {/* Absender und Empfänger sind Metadaten, nicht Inhalt — Metazeilen-Größe. */}
       <Space size={6} wrap style={{ marginBottom: 6 }}>
-        <Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
           {m.absender}
         </Text>
         {m.empfaenger && (
-          <Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             → {m.empfaenger}
           </Text>
         )}
         {/* Standort der Meldung (Einheitengerät auf Knopfdruck, LLH-1579 F9); die Führung springt
            damit auf die Karte, ein Gerät sieht ihn nur. */}
         {m.lat != null && m.lon != null && (
-          <Text
-            type="secondary"
-            style={{ fontSize: schriftGroesse('klein') }}
-            data-lfh="meldung-standort"
-          >
+          <Text type="secondary" style={{ fontSize: 12 }} data-lfh="meldung-standort">
             {darf('fremde-module') ? (
               <KennungsLink to={lagekartePfad(einsatzId, { zentrum: { lat: m.lat, lon: m.lon } })}>
                 {formatKoordinate(m.lat, m.lon)}
@@ -416,36 +412,20 @@ function MeldungKarte({
       {/* Der Wortlaut ist der Grund der Karte und trägt den größten Schriftgrad (wie `AuftragKarte`);
          Zeilenhöhe 1.5, weil er regelmäßig mehrzeilig ist. Er folgt direkt auf Absender und
          Empfänger, die Verwaltung steht danach (LFH-974): am Handy liegt er so im ersten Schirm. */}
-      <Text style={{ fontSize: schriftGroesse('text'), lineHeight: 1.5, display: 'block' }}>
-        {m.inhalt}
-      </Text>
+      <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
 
       <Flex align="center" gap={8} wrap style={{ marginTop: 8 }}>
-        <Text
-          type="secondary"
-          style={{
-            ...schriftStil('meta'),
-            fontSize: schriftGroesse('fein'),
-            color: rollen.gedaempft,
-          }}
-        >
+        <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {WEG_LABEL[m.meldeweg]} · {MELDUNGSART_LABEL[m.meldungsart]} · Ereignis:{' '}
           {zeitpunkt(m.ereigniszeit)}
         </Text>
         {ansicht === 'abgeschlossen' && m.erledigt_at && (
-          <Text
-            type="secondary"
-            style={{
-              ...schriftStil('meta'),
-              fontSize: schriftGroesse('fein'),
-              color: rollen.gedaempft,
-            }}
-          >
+          <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
             Erledigt: {zeitpunkt(m.erledigt_at)}
           </Text>
         )}
         {m.bearbeiter_name && (
-          <Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             Bearbeiter: {m.bearbeiter_name}
           </Text>
         )}

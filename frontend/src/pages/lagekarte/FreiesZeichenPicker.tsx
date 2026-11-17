@@ -228,7 +228,7 @@ const Kachel = memo(function Kachel(p: KachelProps) {
     >
       <span aria-hidden style={{ display: 'flex', height: KACHEL_BILD, alignItems: 'center' }}>
         {p.id == null ? (
-          <IconMinus size={KACHEL_BILD / 2} />
+          <IconMinus style={{ fontSize: KACHEL_BILD / 2 }} />
         ) : p.drawing ? (
           <ZeichenAufPlatte drawing={p.drawing} size={KACHEL_BILD} />
         ) : null}

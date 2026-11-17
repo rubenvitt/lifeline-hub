@@ -8,7 +8,7 @@ import { useKartenKontext } from '../components/useKartenKontext';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
-import { useRollen, schriftGroesse, schriftStil, zahlStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
@@ -238,22 +238,14 @@ export default function AbloesungKarte({
           gap: 2,
         }}
       >
-        <span style={{ ...zahlStil('text', 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
+        <span style={{ ...monoStil(13, 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
           <ZeitAnzeige wert={spalte.zeit} rolle="kurz" />
         </span>
-        <span
-          style={{
-            ...schriftStil('meta'),
-            fontSize: schriftGroesse('fein'),
-            color: rollen.schwach,
-          }}
-        >
-          {spalte.wort}
-        </span>
+        <span style={{ ...monoStil(10), color: rollen.schwach }}>{spalte.wort}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: token.paddingSM }}>
         <Flex justify="space-between" align="center" gap={token.marginXS} wrap>
-          <Text strong style={{ fontSize: schriftGroesse('text') }}>
+          <Text strong style={{ fontSize: 15 }}>
             {s.einheit_name}
           </Text>
           {darstellung && <StatusTag darstellung={darstellung} />}

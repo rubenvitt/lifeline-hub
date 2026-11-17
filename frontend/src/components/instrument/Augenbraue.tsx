@@ -3,11 +3,9 @@ import type { Farbrollen } from '../../theme/tokens';
 import { schriftStil, useRollen } from './rollenwerte';
 
 /**
- * Augenbraue — die Kopf-Stimme des Neuentwurfs: Stufe `fein` (11 px), 600, Versalien, Sperrung
- * .08em, Farbe `schwach` (`schriftskala.augenbraue`). Sie benennt NUR Köpfe: Paneele,
- * Kennzahlen, Tabellenspalten, Gruppen (LLH-1776, Spec `schriftrollen`). Ein Feld benennt das
- * `Feldetikett` (gemischt geschrieben, `gedaempft`); deshalb kennt `als` kein `dt` mehr
- * (umgekehrt 15.11.2026 gegenüber dem Neuentwurf, der auch Feldetiketten so setzte).
+ * Augenbraue — die Metadaten-Stimme des Neuentwurfs: 10 px, 600, Versalien, Sperrung
+ * .14em, Farbe `schwach` (`schriftskala.augenbraue`). Sie benennt Paneele, Kennzahlen,
+ * Tabellenspalten und Feldgruppen.
  *
  * Standard ist ein `<span>` (Satz, kein Gliederungspunkt). Wo die Augenbraue eine
  * Sektion BENENNT — Paneelkopf, Kennzahl —, macht `als="h2"` … `"h6"` sie zur Überschrift,
@@ -25,7 +23,7 @@ export function augenbraueStil(rollen: Pick<Farbrollen, 'schwach'>): CSSProperti
   };
 }
 
-export type AugenbraueElement = 'span' | 'div' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+export type AugenbraueElement = 'span' | 'div' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'dt';
 
 interface AugenbraueProps {
   children: ReactNode;

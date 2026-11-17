@@ -17,12 +17,7 @@ import Tastenkuerzel from '../components/Tastenkuerzel';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { weiter } from '../components/useUploadFortschritt';
-import {
-  Schnellerfassungszeile,
-  useRollen,
-  schriftGroesse,
-  zahlStil,
-} from '../components/instrument';
+import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import EtbFeldzeile, { FEHLT, TypKnopf, type ParteiRef } from './EtbFeldzeile';
 import { useFunkrufnamen } from './funkrufnamen';
@@ -266,7 +261,7 @@ export function fusszeileStil(
     columnGap: token.marginSM,
     rowGap: token.marginXS,
     marginTop: token.marginXS,
-    fontSize: schriftGroesse('klein'),
+    fontSize: 12,
     ...(schmal ? { overflowX: 'auto', minWidth: 0 } : {}),
   };
 }
@@ -925,9 +920,7 @@ export default function Schnellerfassung({
     setTyp(t);
   };
   const praefix = berichtigungZu ? (
-    <span style={{ color: typFarbe.wort, fontSize: schriftGroesse('text') }}>
-      {etbTyp.berichtigung.label}
-    </span>
+    <span style={{ color: typFarbe.wort, fontSize: 13 }}>{etbTyp.berichtigung.label}</span>
   ) : istSchmal ? (
     <TypKnopf typ={typ} gesperrt={sendet} onTyp={typWaehlen} />
   ) : undefined;
@@ -976,7 +969,7 @@ export default function Schnellerfassung({
       onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
       style={istSchmal ? { minHeight: 0, flexShrink: 0 } : { flexShrink: 0 }}
     >
-      <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
         Werte behalten
       </Typography.Text>
     </Checkbox>
@@ -997,7 +990,7 @@ export default function Schnellerfassung({
         onChange={(e) => setNurProtokollieren(!e.target.checked)}
         style={istSchmal ? { minHeight: 0 } : undefined}
       >
-        <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           Auch in den Meldungseingang
         </Typography.Text>
       </Checkbox>
@@ -1139,11 +1132,7 @@ export default function Schnellerfassung({
         <span
           id={anhangGrundId}
           data-lfh="etb-anhang-grund"
-          style={{
-            ...(online ? zahlStil('klein') : {}),
-            color: rollen.text2,
-            whiteSpace: 'nowrap',
-          }}
+          style={{ ...(online ? monoStil(12) : {}), color: rollen.text2, whiteSpace: 'nowrap' }}
         >
           {anhangGrund}
         </span>

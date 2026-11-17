@@ -1,13 +1,13 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import type { EtbTyp } from '../api/types';
-import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { useRollen } from '../components/instrument';
+import { monoStil } from '../components/instrument/rollenwerte';
 import { zeilenGrund } from '../components/instrument/Zeitachseneintrag';
 import { etbTypFarbe } from '../theme/statusFarben';
 import { EtbInhalt } from './EtbInhalt';
 import { NUR_VORLESER, VonAnText } from './EtbSpaltenzeile';
 import { ETB_SPALTEN_KANTE } from './etbSpalten';
 import type { VonAnAnzeige } from './etbSpalten';
-
 import './etbSpaltenzeile.css';
 
 /**
@@ -104,24 +104,19 @@ export default function EtbHandschirmzeile({
       >
         <span
           data-lfh="zeitachse-zeit"
-          style={{ ...zahlStil('text', 500), lineHeight: '20px', color: rollen.text, flex: 'none' }}
+          style={{ ...monoStil(15, 500), lineHeight: '20px', color: rollen.text, flex: 'none' }}
         >
           {zeit}
         </span>
         {nr != null && (
-          <span style={{ ...zahlStil('klein'), color: rollen.gedaempft, flex: 'none' }}>
+          <span style={{ ...monoStil(12), color: rollen.gedaempft, flex: 'none' }}>
             <span style={NUR_VORLESER}>Nr. </span>
             {nr}
           </span>
         )}
         <span
           data-lfh="typwort"
-          style={{
-            fontSize: schriftGroesse('klein'),
-            fontWeight: 600,
-            color: farbe.wort,
-            flex: 'none',
-          }}
+          style={{ fontSize: 12, fontWeight: 600, color: farbe.wort, flex: 'none' }}
         >
           {typwort}
         </span>
@@ -136,9 +131,7 @@ export default function EtbHandschirmzeile({
           minWidth: 0,
           overflowWrap: 'anywhere',
           color: leise ? rollen.gedaempft : rollen.text,
-          ...(leise
-            ? ({ '--etb-inhalt-groesse': 'var(--lfh-groesse-klein)' } as CSSProperties)
-            : {}),
+          ...(leise ? ({ '--etb-inhalt-groesse': '12px' } as CSSProperties) : {}),
         }}
       >
         <EtbInhalt offenErzwungen={offenErzwungen} style={{ lineHeight: '20px' }}>

@@ -8,7 +8,7 @@ import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser'
 import { sprungGesperrtText } from '../components/Sprung';
 import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
-import { useRollen, schriftGroesse, schriftStil, zahlStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { aktualisierePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
@@ -117,29 +117,17 @@ function PersonZelle({ p }: { p: Person }) {
   return (
     <div style={{ minWidth: 0 }}>
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: token.marginXS }}>
-        <span
-          style={{
-            fontSize: schriftGroesse('text'),
-            color: nameText(p) ? rollen.text : rollen.gedaempft,
-          }}
-        >
+        <span style={{ fontSize: 13, color: nameText(p) ? rollen.text : rollen.gedaempft }}>
           {nameText(p) ?? 'unbekannt'}
         </span>
-        {ga && <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>{ga}</span>}
+        {ga && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{ga}</span>}
         {/* Kontamination „ja“ als Marke (LLH-1326, design.md D11): Gefahr für die Kräfte, Rolle
             `achtung` mit Wort; „nein“ und „keine Angabe“ tragen keine. Die Personenzelle steht
             in Liste, Karte und Patientenliste am Gerät. */}
         {p.kontamination === true && <StatusTag darstellung={kontamination} />}
       </span>
       {offen && (
-        <div
-          data-lfh="luecke"
-          style={{
-            ...schriftStil('meta'),
-            fontSize: schriftGroesse('fein'),
-            color: rollen.achtungText,
-          }}
-        >
+        <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtungText }}>
           {offen}
         </div>
       )}
@@ -151,10 +139,7 @@ function PersonZelle({ p }: { p: Person }) {
 function NichtGeladenZelle() {
   const { rollen } = useRollen();
   return (
-    <span
-      data-lfh="nicht-geladen"
-      style={{ fontSize: schriftGroesse('klein'), color: rollen.gedaempft }}
-    >
+    <span data-lfh="nicht-geladen" style={{ fontSize: 12, color: rollen.gedaempft }}>
       nicht geladen
     </span>
   );
@@ -173,13 +158,9 @@ function FundortZelle({ p }: { p: Person }) {
   if (!p.antreff_ort && !koordinate) return <Leerzelle offen={lueckenVon(p).fundort} />;
   return (
     <div style={{ minWidth: 0 }}>
-      {p.antreff_ort && (
-        <div style={{ fontSize: schriftGroesse('klein'), color: rollen.text2 }}>
-          {p.antreff_ort}
-        </div>
-      )}
+      {p.antreff_ort && <div style={{ fontSize: 12, color: rollen.text2 }}>{p.antreff_ort}</div>}
       {koordinate && (
-        <div data-lfh="koordinate" style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+        <div data-lfh="koordinate" style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {koordinate}
         </div>
       )}
@@ -204,7 +185,7 @@ function TransportZelle({ p }: { p: Person }) {
     >
       <PrioritaetMarke prioritaet={p.transport_prioritaet} />{' '}
       {p.transport_art && (
-        <span style={{ fontSize: schriftGroesse('klein'), color: rollen.text2 }}>
+        <span style={{ fontSize: 12, color: rollen.text2 }}>
           {TRANSPORT_ART_WORT[p.transport_art]}
         </span>
       )}
@@ -421,7 +402,7 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
         onSpeichern={(wert) => mutation.mutate(wert)}
       />
       {fehler && (
-        <div role="alert" style={{ fontSize: schriftGroesse('klein'), color: rollen.alarmText }}>
+        <div role="alert" style={{ fontSize: 12, color: rollen.alarmText }}>
           Nicht gespeichert: {fehler}
         </div>
       )}
@@ -437,7 +418,7 @@ function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: PersonenBedienu
   // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht angeboten.
   if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {
     return p.zustand ? (
-      <span style={{ fontSize: schriftGroesse('klein'), color: rollen.text2 }}>{p.zustand}</span>
+      <span style={{ fontSize: 12, color: rollen.text2 }}>{p.zustand}</span>
     ) : (
       <span style={{ color: rollen.schwach }}>—</span>
     );
@@ -485,25 +466,19 @@ function VerbleibZelle({
   const text = verbleibText(p, uhsName);
   // Ein vorgemerkter Verbleib (LLH-1138) steht neben dem Serverstand, nicht an seiner Stelle.
   const vorgemerkt = bedienung?.vorgemerkt?.get(p.id)?.has('verbleib') && (
-    <div
-      data-lfh="zeile-vorgemerkt"
-      style={{ fontSize: schriftGroesse('klein'), color: rollen.text2 }}
-    >
+    <div data-lfh="zeile-vorgemerkt" style={{ fontSize: 12, color: rollen.text2 }}>
       Offline vorgemerkt
     </div>
   );
   if (vorgemerkt) {
     return (
       <>
-        {text != null && (
-          <span style={{ fontSize: schriftGroesse('klein'), color: rollen.text2 }}>{text}</span>
-        )}
+        {text != null && <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>}
         {vorgemerkt}
       </>
     );
   }
-  if (text != null)
-    return <span style={{ fontSize: schriftGroesse('klein'), color: rollen.text2 }}>{text}</span>;
+  if (text != null) return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
   const offen = lueckenVon(p).verbleib;
   const onVerbleib = bedienung?.darfSchreiben && !p.storniert_at ? bedienung.onVerbleib : undefined;
   if (!offen || !onVerbleib) return <Leerzelle offen={offen} />;
@@ -666,7 +641,7 @@ export function personenSpalten(
           <Typography.Text
             type="secondary"
             ellipsis={{ tooltip: p.notiz }}
-            style={{ fontSize: schriftGroesse('klein') }}
+            style={{ fontSize: 12 }}
           >
             {p.notiz}
           </Typography.Text>
