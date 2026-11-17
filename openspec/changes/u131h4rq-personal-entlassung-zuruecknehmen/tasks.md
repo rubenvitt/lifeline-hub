@@ -26,8 +26,8 @@ ist, dann der Code.
 
 ## 4. Regeln und Doku
 
-- [ ] 4.1 `frontend/AGENTS.md`, „Beenden: Verb, Ort und Sicherung je Art“: Personal aus der bekannten Lücke streichen, Rücknahme der Person nennen; `frontend/src/kraefte/AGENTS.md`, Kräfte-Zeitachse: Rücknahme streicht die Entlassung dieses Entlassens, bei berichtigter Zeitachse 409; Prettier grün
-- [ ] 4.2 `docs/anwender/kapitel/personal.md`, „Eine Person entlassen oder stornieren“: was „Rückgängig“ zurückholt und was der Hinweis nennt (Vorbild `fahrzeuge.md`); `quellen` prüfen; Wächter von `docs/anwender/AGENTS.md` grün
+- [x] 4.1 `frontend/AGENTS.md`, „Beenden: Verb, Ort und Sicherung je Art“: Personal aus der bekannten Lücke streichen, Rücknahme der Person nennen; `frontend/src/kraefte/AGENTS.md`, Kräfte-Zeitachse: Rücknahme streicht die Entlassung dieses Entlassens, bei berichtigter Zeitachse 409; Prettier grün
+- [x] 4.2 `docs/anwender/kapitel/personal.md`, „Eine Person entlassen oder stornieren“: was „Rückgängig“ zurückholt und was der Hinweis nennt (Vorbild `fahrzeuge.md`); `quellen` prüfen; Wächter von `docs/anwender/AGENTS.md` grün
 
 ## 5. Integration
 

@@ -19,7 +19,12 @@ einer entlassenen Person sind der einzige Schreibweg an einer beendeten Kraft ne
 Disponieren (LLH-1263, `src/routes/zeitachse.rs`): danach ist keine Periode offen (sonst 422),
 das ETB vermerkt „berichtigt nach Entlassung“, die stornierte Person und die aufgelöste Einheit
 bleiben bei 409; der Client sperrt das Streichen der abschließenden Entlassung
-(`abschliessendeEntlassungId`). „Zeit berichtigen“ (LLH-1455, `zeitachse::repo::berichtige_tx`,
+(`abschliessendeEntlassungId`). Die Rücknahme der Entlassung einer Person (LLH-1922,
+`…/personal/{ep}/entlassen/zuruecknehmen`, `src/personal/ruecknahme.rs`) streicht genau die
+Entlassung dieses Entlassens (Quelle `disposition`, Grund „Entlassung zurückgenommen“), nachdem
+die Person wieder aktiv ist: die Periode davor ist wieder offen, eine neue entsteht nicht. Ist
+diese Entlassung seither gestrichen oder steht ein Ereignis nach ihr, ist es 409, und nichts kommt
+zurück. „Zeit berichtigen“ (LLH-1455, `zeitachse::repo::berichtige_tx`,
 Routen `…/zeitachse/{zid}/berichtigen`) streicht ein Ereignis und schreibt es mit gleicher Art,
 Quelle `nachtrag` und der alten Notiz zum neuen Zeitpunkt neu, in einer Transaktion; die
 Perioden-Regeln gelten nur am Ergebnis (`perioden::ersetze`). Die Kopien folgen den bisherigen

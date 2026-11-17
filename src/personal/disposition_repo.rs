@@ -504,8 +504,9 @@ pub async fn update(
 
 /// Jeder Schreibweg an einer Kraft fragt zuerst hier (design.md D6): `NotFound`, wenn die Zeile
 /// nicht zum Einsatz gehört, `Conflict` (Lebenszyklus, `src/AGENTS.md`), wenn sie entlassen oder
-/// storniert ist. Nur das erneute Disponieren und die Berichtigung der Zeitachse einer entlassenen
-/// Person ([`lebenszustand_tx`], LLH-1263) schreiben an einer beendeten Kraft.
+/// storniert ist. Nur das erneute Disponieren, die Rücknahme der Entlassung
+/// (`personal::ruecknahme`, LLH-1922) und die Berichtigung der Zeitachse einer entlassenen Person
+/// ([`lebenszustand_tx`], LLH-1263) schreiben an einer beendeten Kraft.
 pub async fn require_aktiv_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
