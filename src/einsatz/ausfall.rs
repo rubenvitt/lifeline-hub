@@ -255,14 +255,13 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        let e = Some(
-            id(
-                &pool,
-                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'A') RETURNING id",
-                &[],
-            )
-            .await,
-        );
+        let einsatz_id = id(
+            &pool,
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'A') RETURNING id",
+            &[],
+        )
+        .await;
+        let e = Some(einsatz_id);
         let p_aus = Some(id(&pool, "INSERT INTO personal_status (org_id, label, kategorie) VALUES (1, 'krank', 'nicht_verfuegbar') RETURNING id", &[]).await);
         let f_aus = Some(id(&pool, "INSERT INTO fahrzeug_status (org_id, label, kategorie, sortier) VALUES (1, 'außer Dienst', 'nicht_verfuegbar', 90) RETURNING id", &[]).await);
         let einheit = |name: &'static str, sortier: i64| {
@@ -326,7 +325,7 @@ mod tests {
         id(&pool, material, &[e, None, uhs]).await;
 
         assert_eq!(
-            load_einheiten_mit_ausfall(&pool, e.unwrap()).await.unwrap(),
+            load_einheiten_mit_ausfall(&pool, einsatz_id).await.unwrap(),
             ["Logistiktrupp", "Sanitätszug", OHNE_EINHEIT]
         );
     }

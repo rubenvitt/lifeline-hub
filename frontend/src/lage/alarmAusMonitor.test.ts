@@ -10,7 +10,7 @@ dayjs.extend(utc);
 const JETZT = dayjs.utc('2026-11-16 14:10:00');
 
 describe('alarmAusMonitor (LLH-1743, D5)', () => {
-  it('derselbe Fall über Browser-Quellen und Monitor ergibt dieselbe Zeile (ohne Ausfall)', () => {
+  it('derselbe Fall über Browser-Quellen und Monitor ergibt dieselbe Zeile (LLH-1929: mit Ausfall)', () => {
     const browser: WasBrenntQuellen = {
       meldungen: {
         zustand: 'daten',
@@ -33,7 +33,14 @@ describe('alarmAusMonitor (LLH-1743, D5)', () => {
           { id: 11, name: 'Sanitätszug', seitMin: 12 },
         ],
       },
-      ausfall: { zustand: 'daten', wert: [] },
+      ausfall: {
+        zustand: 'daten',
+        wert: [
+          { id: 20, name: 'Sanitätszug' },
+          { id: 10, name: 'Logistiktrupp' },
+          { id: null, name: 'Ohne Einheit' },
+        ],
+      },
     };
     const monitor = {
       betroffene: { vermisst: 1 },
@@ -50,6 +57,7 @@ describe('alarmAusMonitor (LLH-1743, D5)', () => {
           { einheit: 'Sanitätszug', seit_min: 12 },
         ],
         abschnitte_kritisch: ['UHS Turnhalle'],
+        ausfall: ['Sanitätszug', 'Logistiktrupp', 'Ohne Einheit'],
       },
     } as unknown as LagemonitorAnzeige;
     const ohneBezug = (q: WasBrenntQuellen) =>
@@ -61,6 +69,27 @@ describe('alarmAusMonitor (LLH-1743, D5)', () => {
       }));
     expect(ohneBezug(alarmAusMonitor(monitor))).toEqual(ohneBezug(browser));
     expect(wasBrennt(alarmAusMonitor(monitor), JETZT).stand).toBe('vollstaendig');
+    expect(
+      wasBrennt(alarmAusMonitor(monitor), JETZT).eintraege.find((e) => e.art === 'ausfall')?.text,
+    ).toBe('Ausfall: Sanitätszug, Logistiktrupp +1');
+  });
+
+  it('älterer Server ohne Feld `ausfall`: keine Quelle, kein unvollständiger Stand', () => {
+    const lage = {
+      betroffene: { vermisst: 0 },
+      alarm: {
+        sofort_offen: 0,
+        dringend_offen: 0,
+        bestaetigung_ueberfaellig: 0,
+        auftraege_ueberfaellig: 0,
+        erinnerungen_faellig: 0,
+        nachforderungen_ueberfaellig: 0,
+        rueckmeldung_ueberfaellig: [],
+        abschnitte_kritisch: [],
+      },
+    } as unknown as LagemonitorAnzeige;
+    expect(alarmAusMonitor(lage).ausfall).toBeNull();
+    expect(wasBrennt(alarmAusMonitor(lage), JETZT).stand).toBe('vollstaendig');
   });
 
   it('ohne Antwort lädt die Zeile', () => {

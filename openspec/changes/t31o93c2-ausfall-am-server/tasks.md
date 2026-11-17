@@ -16,9 +16,9 @@ Jede Aufgabe per `superpowers:test-driven-development`: erst den roten Test, dan
 
 ## 3. Lagemonitor
 
-- [ ] 3.1 `LagemonitorAlarm` um `ausfall: Vec<String>` erweitern, im Handler `alarm` füllen und die Routen-Tests in `src/routes/lagemonitor.rs` ergänzen: Ausfall mit Einheitsname, und der Name einer Person steht nicht in der Antwort. Prüfen: `cargo test routes::lagemonitor` ist grün.
-- [ ] 3.2 `scripts/check-typ-codegen.sh` laufen lassen und beide generierten Dateien mitcommitten. Prüfen: Das Skript endet mit 0.
-- [ ] 3.3 `alarmAusMonitor` liefert `ausfall` als Quelle (`id: null`); fehlt das Feld, bleibt `null`. Prüfen: `alarmAusMonitor.test.ts` mit dem Fall „Ausfall: Sanitätszug, Logistiktrupp +1“ wie im Browser und einem Fall ohne Feld ist grün.
+- [x] 3.1 `LagemonitorAlarm` um `ausfall: Vec<String>` erweitern, im Handler `alarm` füllen und die Routen-Tests neben dem bestehenden Alarm-Test in `tests/geraet_kopplung.rs` ergänzen: Ausfall mit Einheitsname, und der Name einer Person steht nicht in der Antwort. Prüfen: `cargo test --test geraet_kopplung lagemonitor_alarm` ist grün.
+- [x] 3.2 `scripts/check-typ-codegen.sh` laufen lassen und beide generierten Dateien mitcommitten. Prüfen: Das Skript endet mit 0.
+- [x] 3.3 `alarmAusMonitor` liefert `ausfall` als Quelle (`id: null`); fehlt das Feld, bleibt `null`. Prüfen: `alarmAusMonitor.test.ts` mit dem Fall „Ausfall: Sanitätszug, Logistiktrupp +1“ wie im Browser und einem Fall ohne Feld ist grün.
 
 ## 4. Doku und Regeln
 
