@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { grossMass } from '../../components/grossbild';
 import LagebildGrossbild, { GEFAHREN_HOECHSTENS } from './LagebildGrossbild';
+import type { AlarmEintrag } from '../../lage/wasBrennt';
 import type { KennzahlAnzeige } from './kennzahlAnzeige';
 import type { GefahrenZeile, SichtungsZeile } from './lageVerdichtung';
 import type { Verlauf } from './verlauf';
@@ -40,6 +41,20 @@ const SICHTUNG: SichtungsZeile[] = [
 
 const LEERER_VERLAUF: Verlauf = { stunden: [], imFenster: 0, spitze: null };
 
+const brennt = (art: AlarmEintrag['art'], text: string): AlarmEintrag => ({
+  art,
+  rolle: 'alarm',
+  text,
+  voll: text,
+  bezug: [7],
+});
+
+const ALARM = {
+  stand: 'vollstaendig' as const,
+  fehlend: [],
+  eintraege: [brennt('vermisst', '1 vermisst'), brennt('auftrag', '1 Auftrag überfällig')],
+};
+
 function renderGrossbild(mehr: Partial<Parameters<typeof LagebildGrossbild>[0]> = {}) {
   return render(
     <LagebildGrossbild
@@ -56,6 +71,7 @@ function renderGrossbild(mehr: Partial<Parameters<typeof LagebildGrossbild>[0]> 
       verlauf={{ zustand: 'daten', verlauf: LEERER_VERLAUF }}
       sichtung={{ zustand: 'daten', zeilen: SICHTUNG, erfasst: 248, ohneSichtung: 2 }}
       fuehrung={FUEHRUNG}
+      alarm={ALARM}
       onVerlassen={() => undefined}
       {...mehr}
     />,
@@ -67,6 +83,19 @@ function kennzahl(titel: string): HTMLElement {
 }
 
 describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des Großbilds im Lagebild“)', () => {
+  it('zeigt die Alarmzeile der Seite als erstes Element, vor dem Band und ohne Sprung (LLH-1931)', () => {
+    renderGrossbild();
+    const zeile = screen.getByRole('status', { name: 'Was brennt' });
+    expect(zeile).toHaveAttribute('data-stand', 'vollstaendig');
+    const eintraege = [...zeile.querySelectorAll('[data-lfh="alarm-eintrag"]')];
+    expect(eintraege.map((e) => e.textContent)).toEqual(['1 vermisst', '1 Auftrag überfällig']);
+    expect(eintraege.map((e) => e.getAttribute('data-ton'))).toEqual(['alarm', 'alarm']);
+    expect(zeile.style.fontSize).toBe(grossMass(28));
+    expect(within(zeile).queryByRole('link')).toBeNull();
+    const band = screen.getByRole('group', { name: 'Lage in Zahlen' });
+    expect(zeile.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('zeigt Titel, Uhrzeit und Datenstand', () => {
     renderGrossbild();
     expect(screen.getByRole('dialog', { name: 'Lagebild' })).toBeInTheDocument();

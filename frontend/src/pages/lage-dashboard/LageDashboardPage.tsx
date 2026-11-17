@@ -623,6 +623,7 @@ export default function LageDashboardPage() {
             ohneSichtung: lagebild?.sk.ohne ?? 0,
           }}
           fuehrung={fuehrungsKennzahlen(fuehrungsQuellen)}
+          alarm={wasBrenntDaten}
           onVerlassen={() => setIsGrossbild(false)}
         />
       )}

@@ -2,6 +2,7 @@ import { Popover } from 'antd';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { fernsicht, schrift } from '../../theme/tokens';
+import { GROSS_BEZUG, grossMass } from '../grossbild/grossMass';
 import type { AlarmEintrag, WasBrennt } from '../../lage/wasBrennt';
 import { schriftGroesse, useRollen } from './rollenwerte';
 import { statusFlaeche } from './statusFlaeche';
@@ -20,7 +21,12 @@ import { statusFlaeche } from './statusFlaeche';
  * - **Rolle und Wort:** Alarm- und Achtungsfläche aus {@link statusFlaeche}; das Wort im Eintrag ist
  *   der zweite Kanal zur Farbe. `role="status"` (höflich), denn `alert` gehört der Alarmzone.
  * - **`gross`** für den Lagemonitor: 28 px, ohne Bedienung und ohne Links.
+ * - **`grossbild`** für das Großbild des Lagebilds (LLH-1931, Spec `grossbild-ansicht`, design.md
+ *   D2 der Change `t14j0wpt-alarmzeile-grossbild`): wie `gross`, aber jedes Maß über `grossMass`,
+ *   also 28 px bei 1920 × 1080 und mit dem Fenster wachsend.
  */
+
+export type AlarmGroesse = 'normal' | 'gross' | 'grossbild';
 
 /**
  * Schriftgröße der Zeile: Stufe `titel`, also mindestens 16 px (Spec) und mit der Dichte wachsend
@@ -29,6 +35,7 @@ import { statusFlaeche } from './statusFlaeche';
 export const ALARMZEILE_SCHRIFT = {
   normal: schriftGroesse('titel'),
   gross: `${fernsicht.text}px`,
+  grossbild: grossMass(GROSS_BEZUG.text),
 } as const;
 /**
  * Höhe eines Eintrags: am Monitor fest, sonst die Steuerhöhe der Dichtestufe (30 / 48 / 72 px,
@@ -39,13 +46,53 @@ export function alarmEintragHoehe(groesse: 'normal' | 'gross', steuerHoehe: numb
   return groesse === 'gross' ? 40 : Math.max(28, steuerHoehe);
 }
 
-const ABSTAND = { normal: 6, gross: 6 } as const;
+/** Eine Länge: Zahl in px (React hängt `px` an) oder eine CSS-Länge wie `grossMass(…)`. */
+type Laenge = number | string;
+
+const css = (l: Laenge) => (typeof l === 'number' ? `${l}px` : l);
+
+/**
+ * Maße einer Größe an einer Stelle. Bei `grossbild` sind es Bezugspixel bei 1920 × 1080 über
+ * `grossMass`: Eintrag 56 wie die Knöpfe im Kopf der Fläche, Abstand 8, Zeile 56 + 2 · 8.
+ */
+interface AlarmMass {
+  eintrag: Laenge;
+  abstand: Laenge;
+  hoehe: Laenge;
+  luecke: Laenge;
+  innen: Laenge;
+  kante: Laenge;
+}
+
+function alarmMass(groesse: AlarmGroesse, steuerHoehe: number): AlarmMass {
+  if (groesse === 'grossbild') {
+    return {
+      eintrag: grossMass(56),
+      abstand: grossMass(GROSS_BEZUG.eng),
+      hoehe: grossMass(56 + 2 * GROSS_BEZUG.eng),
+      luecke: grossMass(2 * GROSS_BEZUG.eng),
+      innen: grossMass(16),
+      kante: grossMass(6),
+    };
+  }
+  const eintrag = alarmEintragHoehe(groesse, steuerHoehe);
+  const abstand = 6;
+  const gross = groesse === 'gross';
+  return {
+    eintrag,
+    abstand,
+    hoehe: eintrag + 2 * abstand,
+    luecke: abstand * 2,
+    innen: gross ? 16 : 10,
+    kante: gross ? 6 : 3,
+  };
+}
 
 interface AlarmZeileProps {
   daten: Pick<WasBrennt, 'eintraege' | 'stand' | 'fehlend'>;
   /** Sprungziel je Eintrag; `undefined` = ohne Link. Am Monitor weggelassen. */
   ziel?: (e: AlarmEintrag) => string | undefined;
-  groesse?: 'normal' | 'gross';
+  groesse?: AlarmGroesse;
 }
 
 /**
@@ -74,11 +121,12 @@ export function passend(
 
 export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZeileProps) {
   const { rollen, token } = useRollen();
-  const gross = groesse === 'gross';
+  // Ohne Bedienung: Lagemonitor und Großbild zeigen nur.
+  const gross = groesse !== 'normal';
   const fontSize = ALARMZEILE_SCHRIFT[groesse];
-  const eintragHoehe = alarmEintragHoehe(groesse, token.controlHeight);
-  const abstand = ABSTAND[groesse];
-  const hoehe = eintragHoehe + 2 * abstand;
+  const mass = alarmMass(groesse, token.controlHeight);
+  const eintragHoehe = mass.eintrag;
+  const abstand = mass.abstand;
   const { eintraege, stand, fehlend } = daten;
 
   const reiheRef = useRef<HTMLDivElement>(null);
@@ -97,13 +145,15 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
           (k) => k.offsetWidth,
         );
       const hinweisBreite = breiten('hinweis')[0];
+      // Eine CSS-Länge (Großbild) wird gemessen, nie gerechnet: sie hängt am Fenster.
+      const luft = typeof abstand === 'number' ? abstand : (breiten('abstand')[0] ?? 0);
       setSichtbar(
         passend(
           reihe.clientWidth,
           breiten('eintrag'),
-          (breiten('plus')[0] ?? 0) + abstand,
-          abstand,
-          hinweisBreite != null ? hinweisBreite + abstand : 0,
+          (breiten('plus')[0] ?? 0) + luft,
+          luft,
+          hinweisBreite != null ? hinweisBreite + luft : 0,
         ),
       );
     };
@@ -121,10 +171,10 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
       alignItems: 'center',
       flex: '0 0 auto',
       height: eintragHoehe,
-      padding: `0 ${gross ? 16 : 10}px`,
+      padding: `0 ${css(mass.innen)}`,
       background: f.grund,
       color: f.text,
-      borderLeft: `${gross ? 6 : 3}px solid ${f.kante}`,
+      borderLeft: `${css(mass.kante)} solid ${f.kante}`,
       // Auch in der Liste hinter „+n“ (Portal am body, erbt nichts): mindestens 16 px.
       fontSize,
       fontWeight: 600,
@@ -178,7 +228,7 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
   const plusStil: CSSProperties = {
     flex: '0 0 auto',
     height: eintragHoehe,
-    padding: `0 ${gross ? 16 : 10}px`,
+    padding: `0 ${css(mass.innen)}`,
     border: `1px solid ${rollen.steuerRahmen}`,
     background: 'transparent',
     color: rollen.text,
@@ -243,9 +293,9 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        gap: abstand * 2,
-        height: hoehe,
-        padding: `0 ${abstand}px`,
+        gap: mass.luecke,
+        height: mass.hoehe,
+        padding: `0 ${css(abstand)}`,
         background: rollen.paneel,
         borderBottom: `1px solid ${rollen.linie}`,
         fontFamily: schrift.text,
@@ -297,6 +347,9 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
           <span data-mess="hinweis" style={{ ...hinweisStil, overflow: 'visible' }}>
             {hinweis}
           </span>
+        )}
+        {typeof abstand !== 'number' && (
+          <span data-mess="abstand" style={{ flex: '0 0 auto', width: abstand }} />
         )}
       </div>
     </section>

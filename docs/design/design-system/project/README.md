@@ -90,7 +90,7 @@ die Karten deckungsgleich.
 - **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
 - **Großbild: Zeilen** (`components/GrossZeile/`, Gruppe Großbild)
 - **Segmentleiste (Filter, Umbruch, als Formularfeld)** (`components/Segmentleiste/`, Gruppe Bedienung)
-- **AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)** (`components/AlarmZeile/`, Gruppe Rückmeldung)
+- **AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig, Großbild)** (`components/AlarmZeile/`, Gruppe Rückmeldung)
 - **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
 - **Zustände: Seite und Paneel (laden, leer, Fehler)** (`components/Zustaende/`, Gruppe Rückmeldung)
 - **Hinweis: Rechte, Warnstufe und Alert auf der Statusfläche** (`components/Hinweis/`, Gruppe Rückmeldung)

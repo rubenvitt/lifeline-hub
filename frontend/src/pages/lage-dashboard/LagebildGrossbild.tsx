@@ -10,8 +10,9 @@ import {
   GrossbildFlaeche,
   grossMass,
 } from '../../components/grossbild';
-import { useRollen } from '../../components/instrument';
+import { AlarmZeile, useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
+import type { WasBrennt } from '../../lage/wasBrennt';
 import { sichtung, warnstufeBalkenFarbe } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
 import { NICHT_FREIGEGEBEN } from './fuehrungsZahlen';
@@ -55,6 +56,11 @@ interface LagebildGrossbildProps {
     ohneSichtung: number;
   };
   fuehrung: readonly KennzahlAnzeige[];
+  /**
+   * Die Alarmzeile der Seite, wie `useWasBrennt` sie dort liefert (LLH-1931, ADR-0057, design.md D1
+   * der Change `t14j0wpt-alarmzeile-grossbild`): kein zweiter Abruf, keine zweite Uhr.
+   */
+  alarm: Pick<WasBrennt, 'eintraege' | 'stand' | 'fehlend'>;
   onVerlassen: () => void;
 }
 
@@ -64,7 +70,8 @@ interface LagebildGrossbildProps {
  *
  * Die Seite reicht ihre schon berechneten Werte herein, das Großbild rechnet nichts selbst: das Band
  * und der Stand (Lagebericht, UHS) kommen als {@link KennzahlAnzeige} aus `kennzahlAnzeige.ts`, Gefahren,
- * Sichtung und Verlauf aus denselben Verdichtungen wie die Paneele. Aufteilung bei 16:9: das Band in
+ * Sichtung und Verlauf aus denselben Verdichtungen wie die Paneele. Aufteilung bei 16:9: ganz oben die
+ * Alarmzeile „Was brennt“ der Seite in der Größe `grossbild`, ohne Sprünge (LLH-1931), das Band in
  * drei Spalten und zwei Reihen, darunter Gefahren (oder der Verlauf in der Reihe
  * „Sanitätsdienst“), Sichtung und Stand. Der Meldungsstrom fehlt: ETB-Text ist aus 3 m
  * kein Lagewert.
@@ -78,6 +85,7 @@ export default function LagebildGrossbild({
   verlauf,
   sichtung: sichtungsDaten,
   fuehrung,
+  alarm,
   onVerlassen,
 }: LagebildGrossbildProps) {
   return (
@@ -87,6 +95,9 @@ export default function LagebildGrossbild({
       einsatz={einsatz}
       onVerlassen={onVerlassen}
     >
+      <div style={{ flexShrink: 0 }}>
+        <AlarmZeile daten={alarm} groesse="grossbild" />
+      </div>
       <div
         role="group"
         aria-label="Lage in Zahlen"
@@ -127,7 +138,7 @@ export default function LagebildGrossbild({
         {sanitaetsdienst ? <VerlaufBlock {...verlauf} /> : <GefahrenBlock {...gefahren} />}
         <SichtungsBlock {...sichtungsDaten} />
         {/* Stand: Lagebericht und UHS; Aufträge und Meldungen zeigt nur der Überblick (LLH-1743),
-            ihr Überfällig-Signal kommt mit der Alarmzeile (LLH-1931). */}
+            ihr Überfällig-Signal trägt die Alarmzeile oben (LLH-1931). */}
         <Block titel="Stand">
           <div
             style={{
