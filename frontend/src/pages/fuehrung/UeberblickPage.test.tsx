@@ -1616,6 +1616,8 @@ describe('UeberblickPage', () => {
     beforeEach(() => {
       localStorage.clear();
       saveStartlisteAusgeblendet(1);
+      // Angemeldet, sonst räumt der Start nach der 401 den Gerätespeicher samt Ausblenden (LFH-767).
+      server.use(meHandler(benutzerFixture({ id: 9 })));
     });
     afterEach(() => localStorage.clear());
 
@@ -2346,7 +2348,12 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
       `[data-lfh="startliste-punkt"][data-schluessel="${schluessel}"]`,
     )!;
 
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    // Angemeldet: ohne Person räumt der Start nach der 401 den Gerätespeicher (LFH-767), samt dem
+    // Ausblenden der Startliste, mitten im Test.
+    server.use(meHandler(benutzerFixture({ id: 9 })));
+  });
 
   it('leerer Einsatz: fünf offene Punkte unter der Alarmzeile, vor dem Führungsstand, ohne Zahl', async () => {
     stelleBereit(leer);
@@ -2531,7 +2538,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   /*
    * Ladeschranke (Spec „Kein Layoutsprung durch die Startliste“): die Reihe steht über dem
-   * Führungsstand, also warten Band, Startliste und Paneelreihen gemeinsam auf ihre Quellen.
+   * Führungsstand, also warten Band, Startliste und Paneelreihen gemeinsam auf ihre Quellen. Die
+   * Alarmzeile darüber hat eine feste Höhe und steht sofort.
    */
   it('langsame Lage-Abfrage: Startliste und Paneelreihen erscheinen zusammen', async () => {
     let loslassen!: () => void;
@@ -2548,6 +2556,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
+    expect(screen.getByRole('status', { name: 'Was brennt' })).toBeInTheDocument();
     expect(startliste()).toBeNull();
     expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Führungsstand' })).toBeNull();
