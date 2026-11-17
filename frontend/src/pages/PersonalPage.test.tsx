@@ -382,6 +382,27 @@ describe('PersonalPage', () => {
     );
   });
 
+  // Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827).
+  it('?personal=<id> einer Kraft, die nicht in der Liste steht, zeigt den Hinweis', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(fahrzeuge)),
+      http.get('/api/personal-status', () => HttpResponse.json([])),
+      http.get('/api/personal', () => HttpResponse.json([])),
+    );
+    const { container } = renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+      </Routes>,
+      { route: '/einsaetze/7/personal?personal=99999' },
+    );
+    expect(await screen.findByText('Einsatzkraft #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+  });
+
   it('auch im KARTENZWEIG trägt der Deeplink seine Hervorhebung — und springt zum Ziel', async () => {
     /**
      * Unter `md` rendert `Datensicht` Karten, ohne das `data-row-key` der Tabelle: Hervorhebung und

@@ -34,6 +34,7 @@ import {
 } from '../components/SeitenZustand';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
@@ -211,13 +212,13 @@ export default function EinsatzabschnittePage() {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
-  // Cross-Modul-Deeplink: ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
-  useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
-    if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) {
-      setGewaehlt(zid);
-      // Aus dem Organigramm: das Detail steht in der Gliederung (LFH-626, D7).
-      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
-    }
+  // Cross-Modul-Deeplink: ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden; sonst steht
+  // die Hinweisleiste (LLH-1827), bis ein Abschnitt gewählt wird.
+  const deeplinkHinweis = useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
+    if (!(abschnitteQuery.data ?? []).some((a) => a.id === zid)) return false;
+    setGewaehlt(zid);
+    // Aus dem Organigramm: das Detail steht in der Gliederung (LFH-626, D7).
+    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
   });
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung eines neuen Abschnitts (Sprungpalette, LFH-506) —
@@ -665,6 +666,7 @@ export default function EinsatzabschnittePage() {
         )
       }
     >
+      <DeeplinkHinweis lage={deeplinkHinweis} sache="Abschnitt" />
       {ansicht === 'organigramm' ? (
         abschnitteQuery.isLoading ? (
           <SeitenSkeleton />
@@ -826,7 +828,10 @@ export default function EinsatzabschnittePage() {
                             return neu;
                           });
                         }}
-                        onSelect={(keys) => setGewaehlt(keys.length ? Number(keys[0]) : null)}
+                        onSelect={(keys) => {
+                          setGewaehlt(keys.length ? Number(keys[0]) : null);
+                          deeplinkHinweis.schliesse();
+                        }}
                       />
                       {darfSchreiben && <ObersteEbeneDropZone abschnitte={abschnitte} />}
                     </div>

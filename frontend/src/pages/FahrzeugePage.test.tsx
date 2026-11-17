@@ -291,6 +291,38 @@ describe('FahrzeugePage', () => {
     );
   });
 
+  // Spec `seiten-zustaende`, „Liste ohne Detailpaneel“ (LLH-1827).
+  it('?fahrzeug=<id> eines Fahrzeugs, das nicht im Einsatz steht, zeigt den Hinweis und räumt den Parameter', async () => {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
+      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
+      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+    );
+    function Suche() {
+      return <output data-testid="suche">{useLocation().search}</output>;
+    }
+    const { container } = renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/fahrzeuge"
+          element={
+            <>
+              <Suche />
+              <FahrzeugePage />
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/7/fahrzeuge?fahrzeug=99999', datenRouter: true },
+    );
+    expect(await screen.findByText('Fahrzeug #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(''));
+  });
+
   it('Einsatzleitung im aktiven Einsatz sieht Disponieren-/Entlassen-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Florian 1');

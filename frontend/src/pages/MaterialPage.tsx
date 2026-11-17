@@ -45,6 +45,7 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialArt, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad, nachforderungenPfad } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import MaterialVerdichtung from '../kraefte/MaterialVerdichtung';
 import MaterialOrtAngabe, {
   ortSuchText,
@@ -297,11 +298,12 @@ function MaterialInhalt() {
    * `?material=<id>` ist Zeilenmarke (LLH-1260, Sprung aus der Nachforderung): der Posten wird
    * hervorgehoben und ins Bild gerollt (best-effort). Die Gruppen der Liste klappen nicht zu, die
    * Zeile steht also immer da. Ein herausgenommener Posten steht nicht in der Liste und markiert
-   * nichts.
+   * nichts; dann steht über der Liste die Hinweisleiste (LLH-1827).
    */
   const [highlightId, setHighlightId] = useState<number | null>(null);
-  useQueryParamSelektion('material', emQuery.isSuccess, (mid) => {
-    if ((emQuery.data ?? []).some((m) => m.id === mid)) setHighlightId(mid);
+  const deeplinkHinweis = useQueryParamSelektion('material', emQuery.isSuccess, (mid) => {
+    if (!(emQuery.data ?? []).some((m) => m.id === mid)) return false;
+    setHighlightId(mid);
   });
   useEffect(() => {
     if (highlightId == null) return;
@@ -1070,6 +1072,7 @@ function MaterialInhalt() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void emQuery.refetch()} />}
+          <DeeplinkHinweis lage={deeplinkHinweis} sache="Posten" />
           <MaterialVerdichtung
             einsatzId={einsatzId}
             material={emQuery.data}

@@ -32,6 +32,7 @@ import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import ZumKopfKnopf from '../components/ZumKopfKnopf';
 import {
   LISTEN_MAX_SEITEN,
@@ -101,23 +102,34 @@ export default function ErinnerungenPage() {
    * Sprung `?erinnerung=<id>` (LLH-1429, Spec `deeplink-hervorhebung`, `frontend/AGENTS.md`
    * „Deeplink-Muster“): steht die Erinnerung unter den offenen, zeigt die Seite die Offen-Ansicht,
    * sonst sucht sie in der geladenen Seite der abgeschlossenen. Gefunden, rollt die Karte einmal
-   * ins Bild und bleibt hervorgehoben; eine unbekannte Kennung ändert nichts. Kein Blättern bis
-   * zur Erinnerung. Der Parameter wird geräumt (`useQueryParamSelektion`). Erst wenn auch der
-   * Einsatz da ist: vorher steht statt der Karten der Ladekreis.
+   * ins Bild und bleibt hervorgehoben; eine unbekannte Kennung ändert nichts an der Ansicht. Kein
+   * Blättern bis zur Erinnerung. Der Parameter wird geräumt (`useQueryParamSelektion`). Erst wenn
+   * auch der Einsatz da ist: vorher steht statt der Karten der Ladekreis.
+   *
+   * Fehlt sie unter den offenen und in der vollständig geladenen Liste der abgeschlossenen, gibt es
+   * sie nicht (mehr): dann steht über der Liste die Hinweisleiste (LLH-1827). Hat die Liste weitere
+   * Seiten oder scheitert ihr Abruf, ist das nicht entschieden, und die Suche endet still.
    */
   const springeZu = (eid: number, ziel: 'offen' | 'abgeschlossen') => {
     setAnsicht(ziel);
     setHervorgehobenId(eid);
     setScrollZiel(eid);
   };
-  useQueryParamSelektion('erinnerung', offeneQuery.isSuccess && einsatzQuery.isSuccess, (eid) => {
-    if ((offeneQuery.data ?? []).some((e) => e.id === eid)) {
-      setSucheErinnerung(null);
-      springeZu(eid, 'offen');
-    } else {
-      setSucheErinnerung(eid);
-    }
-  });
+  const deeplinkHinweis = useQueryParamSelektion(
+    'erinnerung',
+    offeneQuery.isSuccess && einsatzQuery.isSuccess,
+    (eid) => {
+      if ((offeneQuery.data ?? []).some((e) => e.id === eid)) {
+        setSucheErinnerung(null);
+        springeZu(eid, 'offen');
+      } else {
+        setSucheErinnerung(eid);
+      }
+    },
+  );
+  const { melde: meldeUnbekannt } = deeplinkHinweis;
+  const abgeschlosseneVollstaendig =
+    abgeschlosseneQuery.isSuccess && !abgeschlosseneQuery.hasNextPage;
   // Erst entscheiden, wenn die abgeschlossenen frisch stehen, sonst entschiede ein alter Stand.
   const abgeschlosseneBereit = abgeschlosseneQuery.isFetched && !abgeschlosseneQuery.isFetching;
   useEffect(() => {
@@ -135,9 +147,20 @@ export default function ErinnerungenPage() {
     }
     if (abgeschlossene.some((e) => e.id === sucheErinnerung)) {
       springeZu(sucheErinnerung, 'abgeschlossen');
+    } else if (abgeschlosseneVollstaendig) {
+      meldeUnbekannt(sucheErinnerung);
     }
     setSucheErinnerung(null);
-  }, [sucheErinnerung, abgeschlosseneBereit, abgeschlossene, ohneKopf, qc, einsatzId]);
+  }, [
+    sucheErinnerung,
+    abgeschlosseneBereit,
+    abgeschlossene,
+    abgeschlosseneVollstaendig,
+    ohneKopf,
+    qc,
+    einsatzId,
+    meldeUnbekannt,
+  ]);
   // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel oder den Daten).
   useEffect(() => {
     if (scrollZiel == null) return;
@@ -355,6 +378,7 @@ export default function ErinnerungenPage() {
         </Paneel>
       )}
 
+      <DeeplinkHinweis lage={deeplinkHinweis} sache="Erinnerung" />
       {(offeneQuery.isError || (ansicht === 'abgeschlossen' && abgeschlosseneQuery.isError)) && (
         <Alert
           type="error"

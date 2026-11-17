@@ -629,7 +629,7 @@ describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
     );
   });
 
-  it('?erinnerung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt (LLH-1429)', async () => {
+  it('?erinnerung= mit unbekannter Kennung: Ansicht und Hervorhebung bleiben, der Parameter wird geräumt, der Hinweis steht (LLH-1429, LLH-1827)', async () => {
     renderPage(undefined, erinnerungenPfad(1, { erinnerung: 99 }));
     await screen.findByText('Lagemeldung');
     await waitFor(() =>
@@ -640,5 +640,6 @@ describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
     expect(screen.getByText('Lagemeldung')).toBeInTheDocument();
     expect(screen.queryByText('Zur Kenntnis')).not.toBeInTheDocument();
     expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+    expect(screen.getByText('Erinnerung #99 gibt es nicht (mehr)')).toBeInTheDocument();
   });
 });

@@ -76,7 +76,7 @@ vi.mock('../api/meldungen', async () => {
     },
     ladeMeldung: async (id: number, mid: number) => {
       const m = (await liste(id)).find((x) => x.id === mid);
-      if (!m) throw new Error('404');
+      if (!m) throw new ApiError(404, 'Nicht gefunden');
       return m;
     },
     legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
@@ -819,6 +819,20 @@ describe('MeldungenPage', () => {
     );
     // apply-then-clean: der Selektions-Param ist aus der URL geräumt.
     await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+  });
+
+  /** Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827). */
+  it('?meldung=<id> ohne Meldung (404 des Einzelabrufs) zeigt den Hinweis, hebt nichts hervor und räumt die Adresse', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ id: 1, inhalt: 'Andere Meldung' })]);
+    const { container } = renderPage('/einsaetze/1/meldungen?meldung=99999');
+    expect(await screen.findByText('Meldung #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+    expect(container.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+    expect(screen.getByText('Andere Meldung')).toBeInTheDocument();
+
+    // Ein Klick auf eine Karte schließt den Hinweis.
+    await userEvent.click(screen.getByText('Andere Meldung'));
+    expect(screen.queryByText('Meldung #99999 gibt es nicht (mehr)')).not.toBeInTheDocument();
   });
 
   it('?meldung=<id> einer erledigten Meldung schaltet auf die Abgeschlossen-Ansicht', async () => {

@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { POSITION_LABELS } from '../api/personal';
 import {
@@ -509,9 +510,9 @@ function FahrzeugeInhalt() {
 
   // Cross-Modul-Deeplink ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort). Im Tableau gibt
   // es keine Zeile, `scrolleZurZeile` liefe still ins Leere; der Deeplink schaltet deshalb auf die
-  // Liste.
-  useQueryParamSelektion('fahrzeug', efQuery.isSuccess, (fid) => {
-    if (!(efQuery.data ?? []).some((f) => f.id === fid)) return;
+  // Liste. Ein Fahrzeug, das nicht im Einsatz steht, meldet die Hinweisleiste (LLH-1827).
+  const deeplinkHinweis = useQueryParamSelektion('fahrzeug', efQuery.isSuccess, (fid) => {
+    if (!(efQuery.data ?? []).some((f) => f.id === fid)) return false;
     setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
     setHighlightId(fid);
   });
@@ -1175,6 +1176,7 @@ function FahrzeugeInhalt() {
       ) : (
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
+          <DeeplinkHinweis lage={deeplinkHinweis} sache="Fahrzeug" />
           <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {ansicht === 'tableau' ? (
             <FmsTableau

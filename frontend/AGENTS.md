@@ -516,10 +516,10 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   Füllfarbe; Standardknopf unter dem Zeiger in `bedienText`. Alles in `tokens.ts:antdToken`/
   `antdKomponenten`, nicht je Stelle.
 - **Roter Fehlertext außerhalb von Formularen** (LFH-874, Spec `textkontrast-rollen`):
-  `Typography` `danger` („nicht gefunden“, „Überfällig“, Ablehnungsgrund) liest `alarmText`, ein
-  Link `danger` unter dem Zeiger `alarmHover`, über das GLOBALE `colorErrorText*` in `antdToken`
-  (antd liest es nur als Schrift); das globale `colorError` bleibt Füllfarbe für Knopf, Rand und
-  Kartenkante. Gemessen in `e2e/fehlertext-kontrast.spec.ts`.
+  `Typography` `danger` („konnte nicht geladen werden“, „Überfällig“, Ablehnungsgrund) liest
+  `alarmText`, ein Link `danger` unter dem Zeiger `alarmHover`, über das GLOBALE `colorErrorText*`
+  in `antdToken` (antd liest es nur als Schrift); das globale `colorError` bleibt Füllfarbe für
+  Knopf, Rand und Kartenkante. Gemessen in `e2e/fehlertext-kontrast.spec.ts`.
 - Kontrast: `e2e/betroffene-kontrast.spec.ts` (Tag ≥ 7:1, Nacht ≥ 5:1, Alpha mitgerechnet).
 - **Kein eigener Knopfboden** (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung des
   Primärknopfs hält den Textboden in Ruhe, unter dem Zeiger und gedrückt; Werte und Messung am
@@ -1383,6 +1383,21 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   (`?fahrzeug=`, `?abschnitt=`, `?meldung=`, `?auftrag=`, `?erinnerung=`, `?gefahrengebiet=`, ETB
   `?eintrag=`);
   `?neu=1` fokussiert die Schnellerfassung. Stabile DB-`id`; `parseRouteId`.
+- **Ein Objekt, das es nicht (mehr) gibt** (LLH-1827, Spec `seiten-zustaende`, Change
+  `a12ms7g9-seitenzustaende` D4/D5), eine Form je Weg:
+  - **Detailseite** im Einsatzrahmen, in einer Zeile entschieden: `istNichtGefunden(error)` (nur
+    `ApiError` 404) oder eine ungültige Kennung (`parseRouteId` → `null`) zeigt
+    `SeitenNichtGefunden` (`components/SeitenZustand.tsx`): „<Sache> gibt es nicht (mehr)“ in der
+    Grammatik der Sache, genau ein Knopf zur Liste aus `routing/deeplinks.ts`, kein „Erneut
+    abrufen“, keine Servermeldung, die Adresse bleibt (kein stilles `Navigate`), der Rahmen merkt
+    sie nicht als letzten Ort. Jeder andere Fehler bleibt `SeitenFehler` mit „Erneut abrufen“.
+  - **Query-Param-Deeplink** über `useQueryParamSelektion`: `anwenden` liefert `false`, wo die
+    Existenzprüfung scheitert; erfährt die Seite es erst später (404 des Einzelabrufs, Suche in
+    einer zweiten Liste), ruft sie `melde(id)`, aber nur bei sicherem Befund (keine weitere Seite,
+    kein gescheiterter Abruf). Die Seite zeichnet die Lage als `DeeplinkHinweis` über der Liste
+    („<Sache> #<id> gibt es nicht (mehr)“, `info`, `role="status"`, nie Toast) und ruft
+    `schliesse()` in ihrer Wahl; eine `ListeDetail` bekommt solange `vorauswahl={false}`, nichts
+    ist gewählt. Wächter `components/DeeplinkHinweis.guard.test.ts`.
 - **Jede Detailansicht, die bearbeitet werden kann, hat eine Item-Route** (LLH-1139, „Bearbeiten
   in der Ansicht“): eine offene Bearbeitung braucht eine Adresse, auf die Verlassen-Schutz,
   Brotkrume und Lesezeichen zeigen. Ein Query-Param bleibt Auswahl oder Zeilenmarke in einer Liste

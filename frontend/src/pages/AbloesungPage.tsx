@@ -102,6 +102,7 @@ import {
   type AbloesungAnsicht,
 } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 
 const { Text } = Typography;
 
@@ -506,18 +507,24 @@ export default function AbloesungPage() {
     setHervorhebung({ id });
     setScrollZiel(id);
   };
-  useQueryParamSelektion('schicht', laufendQuery.isSuccess && einsatzQuery.isSuccess, (id) => {
-    if (laufende.some((x) => x.id === id)) {
-      gibFrei();
-      gibOhneFrei();
-      setSprungAnsicht('laufend');
-      springeZu(id);
-    } else {
-      setSucheSchicht(id);
-    }
-  });
+  const deeplinkHinweis = useQueryParamSelektion(
+    'schicht',
+    laufendQuery.isSuccess && einsatzQuery.isSuccess,
+    (id) => {
+      if (laufende.some((x) => x.id === id)) {
+        gibFrei();
+        gibOhneFrei();
+        setSprungAnsicht('laufend');
+        springeZu(id);
+      } else {
+        setSucheSchicht(id);
+      }
+    },
+  );
+  const { melde: meldeUnbekannt } = deeplinkHinweis;
   // Nicht unter den laufenden: die vergangenen beider Status laden, dann entscheiden. Erst wenn
-  // beide frisch stehen, sonst entschiede ein alter Stand.
+  // beide frisch stehen, sonst entschiede ein alter Stand. Fehlt die Schicht in beiden, gibt es sie
+  // nicht (mehr): dann steht die Hinweisleiste (LLH-1827); scheitert ein Abruf, bleibt es still.
   const vergangenBereit = (q: { isFetched: boolean; isFetching: boolean }) =>
     q.isFetched && !q.isFetching;
   const abgeloestBereit = vergangenBereit(abgeloestQuery);
@@ -534,9 +541,20 @@ export default function AbloesungPage() {
       setVergangen(status);
       setHervorhebung({ id: sucheSchicht });
       setScrollZiel(sucheSchicht);
+    } else if (abgeloestQuery.isSuccess && beendetQuery.isSuccess) {
+      meldeUnbekannt(sucheSchicht);
     }
     setSucheSchicht(null);
-  }, [sucheSchicht, abgeloestBereit, beendetBereit, abgeloestQuery.data, beendetQuery.data]);
+  }, [
+    sucheSchicht,
+    abgeloestBereit,
+    beendetBereit,
+    abgeloestQuery.data,
+    beendetQuery.data,
+    abgeloestQuery.isSuccess,
+    beendetQuery.isSuccess,
+    meldeUnbekannt,
+  ]);
   // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel).
   useEffect(() => {
     if (scrollZiel == null) return;
@@ -836,6 +854,7 @@ export default function AbloesungPage() {
       {/* Auf dem Handschirm trüge die Werkzeugzeile neben vier Segmenten kein Banner mehr (im
           Handschuh-Betrieb füllen vier allein die Zeile, LLH-1554). Dort wählt eine eigene Leiste
           darüber zwischen den Schichten und dem Plan; die Werkzeugzeile bleibt wie bisher. */}
+      <DeeplinkHinweis lage={deeplinkHinweis} sache="Schicht" />
       {istSchmal && (
         <Segmentleiste
           beschriftung="Ansicht"

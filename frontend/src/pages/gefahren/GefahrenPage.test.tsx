@@ -480,6 +480,19 @@ describe('GefahrenPage', () => {
     expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
   });
 
+  it('?gefahrengebiet= mit unbekannter Kennung zeigt den Hinweis, die Wahl eines Gebiets schließt ihn (LLH-1827)', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/gefahren?gefahrengebiet=99' },
+    );
+    expect(await screen.findByText('Gefahrengebiet #99 gibt es nicht (mehr)')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Nord/ }));
+    expect(screen.queryByText('Gefahrengebiet #99 gibt es nicht (mehr)')).not.toBeInTheDocument();
+  });
+
   it('ein Klick bleibt stehen, solange die Adresse ?gefahrengebiet= noch trägt (LFH-1153)', async () => {
     const sued = {
       id: 8,

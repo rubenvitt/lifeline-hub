@@ -223,11 +223,12 @@ describe('MaterialPage', () => {
     await waitFor(() => expect(ort.aktuell).not.toContain('material='));
   });
 
-  it('ein unbekannter Posten in ?material= markiert nichts (LLH-1260)', async () => {
+  it('ein unbekannter Posten in ?material= markiert nichts und zeigt den Hinweis (LLH-1260, LLH-1827)', async () => {
     const { container } = render(einsatzAktiv, [em], [], {}, '/einsaetze/1/material?material=99');
     await screen.findByText('Wolldecke');
     await waitFor(() => expect(ort.aktuell).not.toContain('material='));
     expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+    expect(screen.getByText('Posten #99 gibt es nicht (mehr)')).toBeInTheDocument();
   });
 
   it('auch im Kartenzweig trägt der angesprungene Posten die Markierung (LLH-1260)', async () => {

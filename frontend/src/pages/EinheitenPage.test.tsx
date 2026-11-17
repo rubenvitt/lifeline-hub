@@ -554,7 +554,7 @@ describe('EinheitenPage', () => {
     expect(await screen.findByText('Detail von Einheit')).toBeInTheDocument();
   });
 
-  it('eine unbekannte Kennung in ?einheit= bleibt auf der Gliederung', async () => {
+  it('eine unbekannte Kennung in ?einheit= bleibt auf der Gliederung und zeigt den Hinweis', async () => {
     // Gegenprobe: ohne sie wäre die Weiterleitung auch grün, wenn sie jede Zahl in eine Detailroute
     // übersetzte — die dann einen Leerzustand zeigte.
     server.use(...handlers());
@@ -567,6 +567,8 @@ describe('EinheitenPage', () => {
     );
     expect(await screen.findByRole('link', { name: '1. Zug' })).toBeInTheDocument();
     expect(screen.queryByText('Detail von Einheit')).toBeNull();
+    // Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827).
+    expect(await screen.findByText('Einheit #999 gibt es nicht (mehr)')).toBeInTheDocument();
   });
 
   it('zeigt „Einheit bilden" bei Schreibrecht', async () => {

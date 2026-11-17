@@ -1911,7 +1911,7 @@ describe('KraefteuebersichtPage — Sprung auf eine Einheit (LLH-1049)', () => {
     expect(markiert(zeile(container, 'eh-20'))).toBe(false);
   });
 
-  it('eine unbekannte Einheit lässt die Vorgabestufe ohne Markierung', async () => {
+  it('eine unbekannte Einheit lässt die Vorgabestufe ohne Markierung und zeigt den Hinweis', async () => {
     mitZweitemZug();
     const { container } = setupMitSprung('?einheit=99');
     await waitFor(() =>
@@ -1921,6 +1921,8 @@ describe('KraefteuebersichtPage — Sprung auf eine Einheit (LLH-1049)', () => {
     expect(zeile(container, 'ep-3')).toBeNull();
     expect(container.querySelector(`.${HERVORGEHOBEN}`)).toBeNull();
     expect(screen.getByRole('radio', { name: 'Einheiten' })).toBeChecked();
+    // Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827).
+    expect(screen.getByText('Einheit #99 gibt es nicht (mehr)')).toBeInTheDocument();
   });
 
   it('eine gescheiterte Personalliste hält den Sprung nicht auf', async () => {

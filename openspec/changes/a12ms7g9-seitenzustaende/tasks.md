@@ -67,25 +67,25 @@
 
 ## 4. qick1bpd (LLH-1827): Deeplink auf Unbekanntes
 
-- [ ] 4.1 `routing/useQueryParamSelektion.ts`: `anwenden` darf `false` liefern, der Hook gibt die
+- [x] 4.1 `routing/useQueryParamSelektion.ts`: `anwenden` darf `false` liefern, der Hook gibt die
   `DeeplinkHinweisLage` (`unbekannt`, `melde`, `schliesse`) zurück. Ein neuer Deeplink setzt die
   Lage neu. Die Tests in `useQueryParamSelektion.test.tsx` und `.mutation.test.tsx` werden
   ergänzt: Rückgabe `false` setzt `unbekannt`, der Parameter wird trotzdem geräumt,
   `schliesse` leert die Lage.
-- [ ] 4.2 `components/DeeplinkHinweis.tsx`: schließbarer `Alert` vom Typ `info`, Text
+- [x] 4.2 `components/DeeplinkHinweis.tsx`: schließbarer `Alert` vom Typ `info`, Text
   „<Sache> #<id> gibt es nicht (mehr)“. Ein Vitest prüft Text, Schließen, keinen Toast und keine
   Rolle `alert`.
-- [ ] 4.3 Meldungen und Aufträge (Einzelabruf): Ein 404 des Einzelabrufs ruft `melde(id)` auf,
+- [x] 4.3 Meldungen und Aufträge (Einzelabruf): Ein 404 des Einzelabrufs ruft `melde(id)` auf,
   die Wahl ruft `schliesse()` auf. Vitests: `?meldung=99999` mit 404 zeigt den Hinweis, keine
   Karte ist gewählt, die Adresse ist geräumt; ein Klick auf eine Karte schließt den Hinweis.
-- [ ] 4.4 Die übrigen Aufrufer (Befehle, Kräfteübersicht, Material, Gefahren, Nachforderungen,
+- [x] 4.4 Die übrigen Aufrufer (Befehle, Kräfteübersicht, Material, Gefahren, Nachforderungen,
   Fahrzeuge, Personal, Einsatzabschnitte, Einheiten, Erinnerungen, Ablösung, Informationstelefon)
   geben `false` zurück, wo die Existenzprüfung scheitert, und zeichnen `DeeplinkHinweis` über
   ihrer Liste. Je Seite ein Vitest „unbekannte Kennung zeigt den Hinweis“.
-- [ ] 4.5 e2e `fehlertext-kontrast.spec.ts` auf „Gebiet konnte nicht geladen werden“ umstellen
+- [x] 4.5 e2e `fehlertext-kontrast.spec.ts` auf „Gebiet konnte nicht geladen werden“ umstellen
   (D6, Zonenabruf per `page.route` mit 500). Dazu eine e2e-Probe „`?meldung=99999` zeigt die
   Hinweisleiste“. Lauf beider Specs grün.
-- [ ] 4.6 `frontend/AGENTS.md`: Regel „Ein Objekt, das es nicht (mehr) gibt“
+- [x] 4.6 `frontend/AGENTS.md`: Regel „Ein Objekt, das es nicht (mehr) gibt“
   (`SeitenNichtGefunden`/`istNichtGefunden`, `DeeplinkHinweis`) am Abschnitt der Zustände bzw.
   „Sprungmarken“. Anwenderkapitel nachziehen, wo es das stille Verschwinden eines Links oder
   „Erneut abrufen“ bei fehlenden Objekten beschreibt (grep über `docs/anwender/kapitel/`).
