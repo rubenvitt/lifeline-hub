@@ -30,7 +30,7 @@ import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { useUhr } from '../../abloesung/useUhr';
 import { dauerText } from '../../kraefte/zeitachse';
 import { wartezeitMinuten } from './brBelegungKern';
-import BrAnlegenDrawer from './BrAnlegenDrawer';
+import BrAnlegenModal from './BrAnlegenModal';
 import { KennungsLink } from '../../components/kennungsLink';
 import { useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
@@ -101,7 +101,7 @@ export default function BereitstellungsraeumePage() {
 
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data);
 
-  // Schnellaktion: ?neu=1 öffnet den Anlege-Drawer (Sprungpalette, LFH-506). Gelesen auf der
+  // Schnellaktion: ?neu=1 öffnet den Anlege-Dialog (Sprungpalette, LFH-506). Gelesen auf der
   // LISTEN-Route — `BereitstellungsraeumeDefault` am baren Modulpfad liest den Parameter nicht,
   // deshalb zeigt `bereitstellungsraeumeListePfad` hierher. Warten bis der Einsatz geladen ist;
   // Param immer löschen, Drawer nur bei Schreibrecht. Einmal je Verlaufseintrag
@@ -331,7 +331,7 @@ export default function BereitstellungsraeumePage() {
         </>
       )}
 
-      <BrAnlegenDrawer
+      <BrAnlegenModal
         einsatzId={einsatzId}
         open={anlegen}
         onClose={() => setAnlegen(false)}

@@ -1,6 +1,7 @@
-import { Form, Input } from 'antd';
+import { Collapse, Form, Input } from 'antd';
+import { useState } from 'react';
 import { Select } from '../../components/Select';
-import AnlegenDrawer, { type AnlegenDrawerSlot } from '../../components/AnlegenDrawer';
+import AnlegenModal, { type AnlegenModalSlot } from '../../components/AnlegenModal';
 import { legeUhsAn, type UhsEingabe } from '../../api/einsatzUhs';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Uhs } from '../../api/types';
@@ -23,13 +24,18 @@ function uhsEingabe({ standort, ...rest }: UhsFormular): UhsEingabe {
 }
 
 /**
- * Wiederverwendbarer Drawer zum Anlegen einer UHS (Liste, Leerzustand, Switcher). Der Standort ist
- * ein Ortsfeld (LLH-1114, Spec `ortsfeld`): ein Treffer, eine getippte Koordinate oder ein Punkt auf
- * der Karte verortet die UHS gleich beim Anlegen.
+ * Dialog zum Anlegen einer UHS (Liste, Leerzustand, Switcher). Der Standort ist ein Ortsfeld
+ * (LLH-1114, Spec `ortsfeld`): ein Treffer, eine getippte Koordinate oder ein Punkt auf der Karte
+ * verortet die UHS gleich beim Anlegen.
+ *
+ * Feldbudget des Dialogs (LLH-1921, design.md D2): Bezeichnung, Typ und Standort sichtbar, die
+ * Notiz unter „Weitere Angaben“. Sie darf dorthin, weil sie optional ist und keine Ablehnung
+ * auslösen kann; der Kopf nennt sie, sobald etwas drinsteht.
  */
-export default function UhsAnlegenDrawer(props: AnlegenDrawerSlot<Uhs>) {
+export default function UhsAnlegenModal(props: AnlegenModalSlot<Uhs>) {
+  const [weitereOffen, setWeitereOffen] = useState(false);
   return (
-    <AnlegenDrawer<Uhs, UhsFormular>
+    <AnlegenModal<Uhs, UhsFormular>
       {...props}
       titel="Unfallhilfsstelle anlegen"
       erfolgText="UHS angelegt"
@@ -50,9 +56,31 @@ export default function UhsAnlegenDrawer(props: AnlegenDrawerSlot<Uhs>) {
       <Form.Item label="Standort (optional)" name="standort">
         <EinsatzOrtsfeld einsatzId={props.einsatzId} etikett="Standort" />
       </Form.Item>
-      <Form.Item label="Notiz (optional)" name="notiz">
-        <Input.TextArea rows={3} />
-      </Form.Item>
-    </AnlegenDrawer>
+      {/* `forceRender`: Prüfung und Zurücksetzen erreichen die Notiz auch zugeklappt. */}
+      <Collapse
+        ghost
+        style={{ marginInline: -8 }}
+        activeKey={weitereOffen ? ['weitere'] : []}
+        onChange={(k) => setWeitereOffen(k.includes('weitere'))}
+        items={[
+          {
+            key: 'weitere',
+            forceRender: true,
+            label: (
+              <Form.Item noStyle shouldUpdate={(a, b) => a.notiz !== b.notiz}>
+                {({ getFieldValue }) =>
+                  getFieldValue('notiz')?.trim() ? 'Weitere Angaben · Notiz' : 'Weitere Angaben'
+                }
+              </Form.Item>
+            ),
+            children: (
+              <Form.Item label="Notiz (optional)" name="notiz">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+            ),
+          },
+        ]}
+      />
+    </AnlegenModal>
   );
 }

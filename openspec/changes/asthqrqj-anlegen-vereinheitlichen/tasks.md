@@ -2,14 +2,14 @@
 
 ## 1. Anlegen-Dialog für UHS und Bereitstellungsraum (D1, D2)
 
-- [ ] 1.1 `components/AnlegenModal.tsx` auf `ErfassungsModal` bauen (Props und Einsatzbindung aus `AnlegenDrawer`, Slot-Typ `AnlegenModalSlot`); `AnlegenDrawer.test.tsx` als `AnlegenModal.test.tsx` übernehmen, auf den Dialog umstellen (Ablehnung im Dialog, Einsatzwechsel, Abbruch während des Speicherns, Kreuz/Escape setzen zurück) und grün sehen; `AnlegenDrawer.tsx` und sein Test fallen
-- [ ] 1.2 `BrAnlegenDrawer` → `BrAnlegenModal` auf `AnlegenModal`, Aufrufer `BereitstellungsraeumePage`, `BereitstellungsraeumeDefault`, `BrSwitcher` umstellen; Tests der Aufrufer (`BereitstellungsraeumeDefault.test.tsx`, `BereitstellungsraeumePage.test.tsx`) prüfen den Dialog statt der Seitenleiste und laufen grün
-- [ ] 1.3 `UhsAnlegenDrawer` → `UhsAnlegenModal` auf `AnlegenModal`, Notiz unter „Weitere Angaben“ (`forceRender`, Kopf nennt „Notiz“, wenn gefüllt); Test: drei sichtbare Felder, Aufklappen → vier, gefüllte Notiz steht im Kopf und geht in den POST (Mutationsprobe: Kopfzusatz entfernen → rot); `UhsAnlegenDrawer.test.tsx` (Ortsfeld) als `UhsAnlegenModal.test.tsx` grün
-- [ ] 1.4 Aufrufer `UnfallhilfsstellenPage`, `UnfallhilfsstellenDefault`, `UhsSwitcher` umstellen; `UhsSwitcher.test.tsx`, `UnfallhilfsstellenDefault.test.tsx`, `UnfallhilfsstellenPage.test.tsx` grün; `grep -rn "AnlegenDrawer\|ant-drawer" frontend/src frontend/e2e` trifft nur noch Verweise in Bilder-Specs, die Gruppe 5 nachzieht (`e2e/uhs-hoehe.spec.ts` Escape bei offenem Drawer prüfen und anpassen)
+- [x] 1.1 `components/AnlegenModal.tsx` auf `ErfassungsModal` bauen (Props und Einsatzbindung aus `AnlegenDrawer`, Slot-Typ `AnlegenModalSlot`); `AnlegenDrawer.test.tsx` als `AnlegenModal.test.tsx` übernehmen, auf den Dialog umstellen (Ablehnung im Dialog, Einsatzwechsel, Abbruch während des Speicherns, Kreuz/Escape setzen zurück) und grün sehen; `AnlegenDrawer.tsx` und sein Test fallen
+- [x] 1.2 `BrAnlegenDrawer` → `BrAnlegenModal` auf `AnlegenModal`, Aufrufer `BereitstellungsraeumePage`, `BereitstellungsraeumeDefault`, `BrSwitcher` umstellen; Tests der Aufrufer (`BereitstellungsraeumeDefault.test.tsx`, `BereitstellungsraeumePage.test.tsx`) prüfen den Dialog statt der Seitenleiste und laufen grün
+- [x] 1.3 `UhsAnlegenDrawer` → `UhsAnlegenModal` auf `AnlegenModal`, Notiz unter „Weitere Angaben“ (`forceRender`, Kopf nennt „Notiz“, wenn gefüllt); Test: drei sichtbare Felder, Aufklappen → vier, gefüllte Notiz steht im Kopf und geht in den POST (Mutationsprobe: Kopfzusatz entfernen → rot); `UhsAnlegenDrawer.test.tsx` (Ortsfeld) als `UhsAnlegenModal.test.tsx` grün
+- [x] 1.4 Aufrufer `UnfallhilfsstellenPage`, `UnfallhilfsstellenDefault`, `UhsSwitcher` umstellen; `UhsSwitcher.test.tsx`, `UnfallhilfsstellenDefault.test.tsx`, `UnfallhilfsstellenPage.test.tsx` grün; `grep -rn "AnlegenDrawer\|ant-drawer" frontend/src frontend/e2e` trifft nur noch Verweise in Bilder-Specs, die Gruppe 5 nachzieht (`e2e/uhs-hoehe.spec.ts` Escape bei offenem Drawer prüfen und anpassen)
 
 ## 2. UHS-Liste springt in die neue UHS (D3)
 
-- [ ] 2.1 `UnfallhilfsstellenPage` reicht `onAngelegt` mit Sprung auf `uhsDetailPfad`; Test in `UnfallhilfsstellenPage.test.tsx`: nach „Anlegen“ steht die Adresse der neuen UHS (rot ohne den Sprung)
+- [x] 2.1 `UnfallhilfsstellenPage` reicht `onAngelegt` mit Sprung auf `uhsDetailPfad`; Test in `UnfallhilfsstellenPage.test.tsx`: nach „Anlegen“ steht die Adresse der neuen UHS (rot ohne den Sprung)
 
 ## 3. Lagemeldung im Dialog (D4)
 

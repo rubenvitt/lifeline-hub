@@ -44,7 +44,7 @@ export function brPatchAus(basis: Bereitstellungsraum, werte: FormWerte): BrPatc
 /**
  * Raumdaten eines Bereitstellungsraums ändern: Bezeichnung, Standort, Notiz (LFH-1147). Drei
  * Felder, also Modal (`frontend/AGENTS.md`, „UI-Form-Leitlinie“), dieselben Felder wie
- * `BrAnlegenDrawer`. Der Abschnitt bleibt außen vor: auch das Anlegen bietet ihn nicht an.
+ * `BrAnlegenModal`. Der Abschnitt bleibt außen vor: auch das Anlegen bietet ihn nicht an.
  */
 export default function BrBearbeitenModal({
   einsatzId,

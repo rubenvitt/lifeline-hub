@@ -20,7 +20,7 @@ interface DirekteinstiegProps<T extends { id: number }> {
   fehlerText: string;
   leerTitel: string;
   leerAktionLabel: string;
-  /** Der Anlegen-Drawer des Moduls; er läuft über lokalen Zustand, nicht über eine Route. */
+  /** Der Anlegen-Dialog des Moduls; er läuft über lokalen Zustand, nicht über eine Route. */
   anlegen: (slot: AnlegenSlot) => ReactNode;
 }
 
