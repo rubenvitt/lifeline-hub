@@ -11,7 +11,7 @@ entsteht per TDD: erst der rote Test, dann der Code.
 
 ## 2. Beschreibung des Moduls
 
-- [ ] 2.1 In `einsatz/modulRegistry.ts` die Beschreibung des Überblicks auf „Fristen, Vorgänge, Entscheidungen“ setzen und Tests sowie e2e-Specs, die den alten Wortlaut prüfen, nachziehen (`grep -rn "Kennzahlen, Fristen, Entscheidungen" frontend docs`). Nachweis: Der grep findet nur noch Archiv und eingefrorene Doku, die betroffenen Unit-Tests sind grün.
+- [x] 2.1 In `einsatz/modulRegistry.ts` die Beschreibung des Überblicks auf „Fristen, Vorgänge, Entscheidungen“ setzen und Tests, e2e-Specs und die Kopie der Website (`website/src/daten/module.json`, Wächter `websiteModule.guard.test.ts`), die den alten Wortlaut tragen, nachziehen (`grep -rn "Kennzahlen, Fristen, Entscheidungen" frontend docs`). Nachweis: Der grep findet nur noch Archiv und eingefrorene Doku, die betroffenen Unit-Tests sind grün.
 
 ## 3. e2e-Specs
 
