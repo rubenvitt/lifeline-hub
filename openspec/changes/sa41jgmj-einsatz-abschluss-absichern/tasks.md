@@ -5,8 +5,8 @@ per TDD: erst der rote Test, dann der Code.
 
 ## 1. Abschluss im ETB (D3)
 
-- [ ] 1.1 `tests/einsatz_abschluss.rs`: Abschluss schreibt genau einen System-Eintrag „Einsatz abgeschlossen“ mit der abschließenden Person als Erfasser, ein zweiter Aufruf am abgeschlossenen Einsatz keinen; Test rot, dann grün
-- [ ] 1.2 `repo::abschliessen` schreibt den Eintrag als ersten nach dem `UPDATE` (nur bei `rows_affected == 1`) und gibt die Kennung in `etb_eintrag_ids` mit; bestehende Tests, die ETB-Einträge nach dem Abschluss zählen, nachziehen und `cargo test` für die betroffenen Dateien grün
+- [x] 1.1 `tests/einsatz_abschluss.rs`: Abschluss schreibt genau einen System-Eintrag „Einsatz abgeschlossen“ mit der abschließenden Person als Erfasser, ein zweiter Aufruf am abgeschlossenen Einsatz keinen; Test rot, dann grün
+- [x] 1.2 `repo::abschliessen` schreibt den Eintrag als ersten nach dem `UPDATE` (nur bei `rows_affected == 1`) und gibt die Kennung in `etb_eintrag_ids` mit; bestehende Tests, die ETB-Einträge nach dem Abschluss zählen, nachziehen und `cargo test` für die betroffenen Dateien grün
 
 ## 2. Prüfung offener Punkte (D1)
 

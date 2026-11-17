@@ -690,10 +690,15 @@ pub struct MitEtbEintraegen {
     pub etb_eintrag_ids: Vec<i64>,
 }
 
+/// Wortlaut des System-Eintrags, den der Abschluss schreibt (LLH-1814, Spec `einsatz-abschluss`,
+/// „Abschluss im Einsatztagebuch“).
+pub const ABSCHLUSS_ETB: &str = "Einsatz abgeschlossen";
+
 /// Schließt einen Einsatz ab (nur wenn aktuell `aktiv`) und lädt ihn neu.
 /// Das `status = 'aktiv'`-Prädikat im WHERE schützt gegen Races; die fachliche
-/// 409-Prüfung erfolgt zusätzlich im Handler. Die ETB-Kennungen sind die der automatischen
-/// Frist und der Kategorie-Fristen; ein Re-Close-No-Op liefert keine.
+/// 409-Prüfung erfolgt zusätzlich im Handler. Die ETB-Kennungen sind die des Eintrags
+/// „Einsatz abgeschlossen“ (zuerst), der automatischen Frist, der Nachbereitung und der
+/// Kategorie-Fristen; ein Re-Close-No-Op liefert keine.
 pub async fn abschliessen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -734,6 +739,28 @@ pub async fn abschliessen(
     // Abschluss-tx, NICHT über frist_setzen — der Verkürzungs-Gate (None→Some)
     // würde das sonst als bestätigungspflichtige Verkürzung werten (LFH-135).
     if ergebnis.rows_affected() == 1 {
+        // LLH-1814 (design.md D3): der Abschluss selbst steht als erster System-Eintrag im ETB,
+        // vor den Frist-Einträgen, mit der abschließenden Person als Erfasser.
+        etb_eintrag_ids.push(
+            crate::etb::repo::anlegen_tx(
+                &mut tx,
+                einsatz_id,
+                von_benutzer_id,
+                einstellungen.etb_startwert(),
+                crate::etb::repo::EintragDaten {
+                    typ: crate::etb::TYP_SYSTEM,
+                    inhalt: ABSCHLUSS_ETB,
+                    von: None,
+                    an: None,
+                    meldeweg: None,
+                    veranlassung: None,
+                    ereigniszeit: None,
+                    erfasst_lokal_at: None,
+                    berichtigt_eintrag_id: None,
+                },
+            )
+            .await?,
+        );
         // LLH-1638: Maschinenzugänge lesen nur laufende Einsätze; der Abschluss beendet ihre
         // Freigabe in derselben Transaktion (ADR-0035).
         crate::public_api::freigabe::delete_fuer_einsatz_tx(&mut tx, einsatz_id).await?;
