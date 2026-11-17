@@ -2712,7 +2712,7 @@ describe('Datensicht · Aktionsspalte (LLH-1789, amEnde)', () => {
     expect(within(kennung).getByRole('button', { name: /^Stand melden für / })).toBeInTheDocument();
   });
 
-  it('unter md bemisst die Aktionsreihe die Kennung nicht: sie meldet nur ihre Mindestbreite', () => {
+  it('unter md meldet die Datensicht der Aktionsreihe die Kennung: sie bemisst die Spalte nicht', () => {
     // Nebeneinander setzte die Reihe die Breite der fixierten Kennung (Betreuungsstellen auf
     // 390 px: +31 px, „frei“ aus dem Bild). `min-content` meldet nur das breiteste Teil,
     // `minWidth: 100%` füllt danach die Zelle; ⋮ bricht nur um, wenn der Platz fehlt.
@@ -2721,9 +2721,10 @@ describe('Datensicht · Aktionsspalte (LLH-1789, amEnde)', () => {
     const knopf = container.querySelector<HTMLElement>(
       'tr.ant-table-row [data-lfh="datensicht-kennung-aktion"] button',
     )!;
+    // Die Hülle selbst legt `AktionsInhalt` an, sobald die Datensicht die Kennung meldet
+    // (`KennungAktionKontext`); ihre Form prüft `aktionsSpalte.test.tsx`.
     const huelle = knopf.closest<HTMLElement>('[data-lfh="datensicht-kennung-aktionsreihe"]');
     expect(huelle).not.toBeNull();
     expect(huelle!.style.width).toBe('min-content');
-    expect(huelle!.style.minWidth).toBe('100%');
   });
 });

@@ -29,6 +29,7 @@ import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { zielEinzug } from './instrument/zielEinzug';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
+import { KennungAktionKontext } from './aktionsSpalte';
 import { useDatensatzKontextMenue } from './useDatensatzKontextMenue';
 import {
   fuehreKontextWahlAus,
@@ -2242,16 +2243,11 @@ export default function Datensicht<T extends object, const K extends string>(
                   {erste.render
                     ? (erste.render(wert, zeile, index) as ReactNode)
                     : zelle(ersteSpalte, zeile, index)}
-                  {/* Bemisst die Kennung nicht mit: `min-content` meldet der Tabelle nur das
-                      breiteste Teil der Reihe, `minWidth: 100%` füllt danach die Zelle. So setzt
-                      der Name die Breite, und ⋮ bricht nur um, wenn der Platz fehlt
-                      (Betreuungsstellen auf 390 px, `e2e/betreuung-stellen-schmal.spec.ts`). */}
-                  <div
-                    data-lfh="datensicht-kennung-aktionsreihe"
-                    style={{ width: 'min-content', minWidth: '100%' }}
-                  >
+                  {/* Der Kontext sagt `AktionsInhalt`, dass er hier die Breite der Kennung nicht
+                      mitbestimmen darf (Umbruch, Mindestbreite; `aktionsSpalte.tsx`). */}
+                  <KennungAktionKontext.Provider value={true}>
                     {aktion.render?.(undefined, zeile, index) as ReactNode}
-                  </div>
+                  </KennungAktionKontext.Provider>
                 </div>
               ),
             },
