@@ -204,43 +204,55 @@ export default function EinsatzkraftPage() {
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   };
 
-  const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
-  // Was die Rücknahme ausgelassen hat (LLH-1922): ein Teilerfolg, den niemand im Toast überliest.
-  const [ausgelassenText, setAusgelassenText] = useState<string | null>(null);
+  // Hinweise der Rücknahme gehören zu der Person, an der sie entstanden (LLH-1922): ein Wechsel der
+  // Detail-Route zeigt sie nicht bei der nächsten (`frontend/AGENTS.md`, „Speicherfehler an die
+  // Seite“). Was ausgelassen wurde, ist ein Teilerfolg, den niemand im Toast überliest.
+  const [rueckgaengig, setRueckgaengig] = useState<{
+    epId: number;
+    fehler?: unknown;
+    ausgelassen?: string;
+  } | null>(null);
+  const hinweis = rueckgaengig?.epId === epId ? rueckgaengig : null;
+  const rueckgaengigFehler = hinweis?.fehler ?? null;
+  const ausgelassenText = hinweis?.ausgelassen ?? null;
   // Rückgängig nimmt mit dem Vorzustand aus der Antwort des Entlassens alles zurück: Bindungen,
   // Status, Zeitachse ohne neue Periode (Spec `kraefte-entlassung`, „Entlassung einer Person
-  // zurücknehmen“). Die nächste Rücknahme räumt den Hinweis der vorigen.
+  // zurücknehmen“). Die Person kommt in den `variables` mit: der Toast überlebt einen Wechsel der
+  // Route, die Rücknahme gilt trotzdem der Person, die entlassen wurde.
   const rueckgaengigMutation = useMutation({
-    mutationFn: (vorzustand: PersonalEntlassungVorzustand) =>
-      nimmEntlassungZurueck(einsatzId, epId, vorzustand),
-    onMutate: () => {
-      setRueckgaengigFehler(null);
-      setAusgelassenText(null);
-    },
-    onSuccess: (antwort) => {
+    mutationFn: (v: { epId: number; vorzustand: PersonalEntlassungVorzustand }) =>
+      nimmEntlassungZurueck(einsatzId, v.epId, v.vorzustand),
+    onMutate: () => setRueckgaengig(null),
+    onSuccess: (antwort, v) => {
       moveZeile(antwort.personal, 'aktiv');
+      void qc.invalidateQueries({ queryKey: einsatzKeys.kraefteZeitachse(einsatzId) });
       for (const key of [
         einsatzKeys.einheiten(einsatzId),
         einsatzKeys.abschnitte(einsatzId),
         einsatzKeys.fahrzeuge(einsatzId),
         einsatzKeys.uhs(einsatzId),
-        einsatzKeys.kraefteZeitachsePersonal(einsatzId),
       ]) {
         void qc.invalidateQueries({ queryKey: key });
       }
       if (antwort.ausgelassen.length > 0) {
-        setAusgelassenText(ausgelassenSatz(antwort.personal.name, antwort));
+        setRueckgaengig({
+          epId: v.epId,
+          ausgelassen: ausgelassenSatz(antwort.personal.name, antwort),
+        });
       }
     },
-    onError: (e) => setRueckgaengigFehler(e),
+    onError: (e, v) => setRueckgaengig({ epId: v.epId, fehler: e }),
   });
   const entlassenMutation = useMutation({
-    mutationFn: () => entlasseDisposition(einsatzId, epId),
-    onMutate: () => orte.beginne('aus'),
-    onSuccess: ({ personal: neu, vorzustand }) => {
+    mutationFn: (v: { epId: number }) => entlasseDisposition(einsatzId, v.epId),
+    onMutate: () => {
+      orte.beginne('aus');
+      setRueckgaengig(null);
+    },
+    onSuccess: ({ personal: neu, vorzustand }, v) => {
       moveZeile(neu, 'entlassen');
       zeigeRueckgaengig(message, `${neu.name} entlassen`, () =>
-        rueckgaengigMutation.mutate(vorzustand),
+        rueckgaengigMutation.mutate({ epId: v.epId, vorzustand }),
       );
     },
     onError: (e) => orte.melde('aus', e, 'Nicht entlassen'),
@@ -258,7 +270,10 @@ export default function EinsatzkraftPage() {
   });
   const reaktivierenMutation = useMutation({
     mutationFn: () => reaktiviereDisposition(einsatzId, epId),
-    onMutate: () => orte.beginne('aus'),
+    onMutate: () => {
+      orte.beginne('aus');
+      setRueckgaengig(null);
+    },
     onSuccess: (neu) => moveZeile(neu, 'aktiv'),
     onError: (e) => orte.melde('aus', e, 'Nicht erneut disponiert'),
   });
@@ -462,7 +477,7 @@ export default function EinsatzkraftPage() {
                 showIcon
                 closable
                 message={ausgelassenText}
-                onClose={() => setAusgelassenText(null)}
+                onClose={() => setRueckgaengig(null)}
               />
             )}
           </Space>
@@ -685,7 +700,7 @@ export default function EinsatzkraftPage() {
                   loading={entlassenMutation.isPending}
                   disabled={ausLaeuft}
                   aria-label={`${ep.name} entlassen`}
-                  onClick={() => entlassenMutation.mutate()}
+                  onClick={() => entlassenMutation.mutate({ epId })}
                 >
                   Entlassen
                 </Button>

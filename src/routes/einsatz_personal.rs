@@ -516,6 +516,8 @@ pub async fn zuruecknehmen(
         liste.dedup();
     }
     let rechte = crate::personal::ruecknahme::RuecknahmeRechte {
+        // Wie das Gate der Führungsstelle (`EinsatzVerwaltungszugriff`), design.md D5.
+        einsatzdaten: ctx.fordere_schreibrecht_oder_admin().is_ok(),
         einheiten: ctx.darf_zielmodul::<Einheiten>(&state.pool).await?,
         fahrzeuge: ctx.darf_zielmodul::<Fahrzeuge>(&state.pool).await?,
         unfallhilfsstellen: ctx
@@ -525,7 +527,7 @@ pub async fn zuruecknehmen(
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis = crate::personal::ruecknahme::zuruecknehmen_tx(
             conn,
             einsatz_id,
@@ -537,7 +539,7 @@ pub async fn zuruecknehmen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -549,9 +551,11 @@ pub async fn zuruecknehmen(
             ),
         )
         .await?;
-        Ok((ergebnis, anzeige))
+        Ok((ergebnis, anzeige, etb_id))
     })?;
-    // Live wie beim Entlassen: dieselben Leser, nur für das, was zurückkam.
+    // Live wie beim Entlassen: dieselben Leser, nur für das, was zurückkam. Das Ereignis
+    // `personal` frischt das Einsatztagebuch nicht auf, der Eintrag geht eigens hinaus.
+    state.live.publiziere(einsatz_id, etb_id);
     sse_personal(&state, einsatz_id, ep_id);
     Betroffen {
         einsatzleiter: ergebnis.einsatzleiter,

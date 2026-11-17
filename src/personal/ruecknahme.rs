@@ -9,11 +9,13 @@ use crate::personal::PersonalEntlassungVorzustand;
 use crate::zeitachse::repo::Kraft;
 use sqlx::SqliteConnection;
 
-/// Welche Module die Person beschreiben darf, in die die Rücknahme zurückbindet (design.md D4).
-/// Ein Teil ohne Recht bleibt aus und wird genannt. Die Einsatzleitung braucht nur das
-/// Schreibrecht im Einsatz, das das Gate der Route schon prüft.
+/// Welche Module die Person beschreiben darf, in die die Rücknahme zurückbindet (design.md D4/D5).
+/// Ein Teil ohne Recht bleibt aus und wird genannt, ohne den Namen aus dem fremden Modul.
 #[derive(Debug, Clone, Copy)]
 pub struct RuecknahmeRechte {
+    /// Einsatzdaten: das Recht, den Einsatzleiter zu setzen (Gate der Führungsstelle,
+    /// `EinsatzVerwaltungszugriff`).
+    pub einsatzdaten: bool,
     pub einheiten: bool,
     pub fahrzeuge: bool,
     pub unfallhilfsstellen: bool,
@@ -23,6 +25,7 @@ pub struct RuecknahmeRechte {
 impl RuecknahmeRechte {
     /// Alle Rechte (Tests).
     pub const ALLE: Self = Self {
+        einsatzdaten: true,
         einheiten: true,
         fahrzeuge: true,
         unfallhilfsstellen: true,
@@ -79,15 +82,15 @@ pub async fn zuruecknehmen_tx(
     vorzustand: &PersonalEntlassungVorzustand,
     rechte: RuecknahmeRechte,
 ) -> Result<Ruecknahme, AppError> {
-    let zeile: Option<(String, Option<String>, Option<i64>, Option<String>)> = sqlx::query_as(
-        "SELECT snap_name, beendet_at, beendet_von, beendet_als FROM einsatz_personal \
+    let zeile: Option<(Option<String>, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT beendet_at, beendet_von, beendet_als FROM einsatz_personal \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(ep_id)
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let (snap_name, beendet_at, beendet_von, beendet_als) = zeile.ok_or(AppError::NotFound)?;
+    let (beendet_at, beendet_von, beendet_als) = zeile.ok_or(AppError::NotFound)?;
     let im_riegel = beendet_als.as_deref() == Some(BeendetAls::Entlassen.as_str())
         && beendet_von == Some(benutzer_id)
         && beendet_at.as_deref() == Some(vorzustand.entlassen_at.as_str())
@@ -126,8 +129,16 @@ pub async fn zuruecknehmen_tx(
     if let Some(einheit_id) = vorzustand.einheit_id {
         bind_einheit_tx(conn, einsatz_id, ep_id, einheit_id, rechte, &mut ergebnis).await?;
     }
-    for &einheit_id in &vorzustand.gefuehrte_einheiten {
-        bind_fuehrung_tx(conn, einsatz_id, ep_id, einheit_id, rechte, &mut ergebnis).await?;
+    if !vorzustand.gefuehrte_einheiten.is_empty() {
+        bind_fuehrung_tx(
+            conn,
+            einsatz_id,
+            ep_id,
+            &vorzustand.gefuehrte_einheiten,
+            rechte,
+            &mut ergebnis,
+        )
+        .await?;
     }
     if let Some(ef_id) = vorzustand.fahrzeug_id {
         bind_fahrzeug_tx(conn, einsatz_id, ep_id, ef_id, rechte, &mut ergebnis).await?;
@@ -135,26 +146,43 @@ pub async fn zuruecknehmen_tx(
     if let Some(uhs_id) = vorzustand.uhs_id {
         bind_uhs_tx(conn, einsatz_id, ep_id, uhs_id, rechte, &mut ergebnis).await?;
     }
-    for &abschnitt_id in &vorzustand.geleitete_abschnitte {
-        bind_abschnitt_tx(conn, einsatz_id, ep_id, abschnitt_id, rechte, &mut ergebnis).await?;
+    if !vorzustand.geleitete_abschnitte.is_empty() {
+        bind_abschnitte_tx(
+            conn,
+            einsatz_id,
+            ep_id,
+            &vorzustand.geleitete_abschnitte,
+            rechte,
+            &mut ergebnis,
+        )
+        .await?;
     }
-    if vorzustand.einsatzleiter {
-        bind_einsatzleitung_tx(conn, einsatz_id, ep_id, &snap_name, &mut ergebnis).await?;
+    if let Some(name) = &vorzustand.einsatzleiter_name {
+        if rechte.einsatzdaten {
+            bind_einsatzleitung_tx(conn, einsatz_id, ep_id, name, &mut ergebnis).await?;
+        } else {
+            ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
+                "Einsatzleitung",
+                "kein Schreibrecht für die Einsatzdaten",
+            ));
+        }
     }
     Ok(ergebnis)
 }
 
 /// Die Entlassung dieses Entlassens in der Zeitachse (design.md D3): `None`, wenn das Entlassen
-/// keine geschrieben hat (keine offene Periode). `Conflict`, wenn sie seither gestrichen ist oder
-/// ein ungestrichenes Ereignis der Person nach ihr steht.
+/// keine geschrieben hat (keine offene Periode). `Conflict`, wenn die Zeitachse der Person seit dem
+/// Entlassen berichtigt ist: die Entlassung gestrichen, ein Ereignis danach erfasst (Nachtrag,
+/// „Zeit berichtigen“, „Periode nachtragen“) oder eines gestrichen. Erfasst- und Streichzeit stehen
+/// im selben Format wie `entlassen_at` (`crate::zeit::FORMAT`).
 async fn find_entlassung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
     entlassen_at: &str,
 ) -> Result<Option<i64>, AppError> {
-    let ereignis: Option<(i64, Option<String>)> = sqlx::query_as(
-        "SELECT id, gestrichen_at FROM einsatz_kraft_zeitachse \
+    let ereignis: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_kraft_zeitachse \
          WHERE personal_id = ? AND einsatz_id = ? AND art = 'entlassung' \
            AND quelle = 'disposition' AND zeitpunkt_at = ? AND ursprung_id IS NULL \
          ORDER BY id DESC LIMIT 1",
@@ -164,26 +192,24 @@ async fn find_entlassung_tx(
     .bind(entlassen_at)
     .fetch_optional(&mut *conn)
     .await?;
-    let Some((id, gestrichen_at)) = ereignis else {
-        return Ok(None);
-    };
-    if gestrichen_at.is_some() {
-        return Err(zeitachse_conflict());
-    }
-    let danach: bool = sqlx::query_scalar(
+    // Mit der Entlassung: alles nach ihr erfasste zählt. Ohne sie: was nach dem Entlassen erfasst
+    // ist (in derselben Sekunde stünde auch ein Statuswechsel kurz davor).
+    let berichtigt: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse \
-                       WHERE personal_id = ?1 AND gestrichen_at IS NULL AND id <> ?2 \
-                         AND (zeitpunkt_at > ?3 OR (zeitpunkt_at = ?3 AND id > ?2)))",
+                       WHERE personal_id = ?1 \
+                         AND (gestrichen_at >= ?2 \
+                              OR (?3 IS NOT NULL AND id > ?3) \
+                              OR (?3 IS NULL AND erfasst_at > ?2)))",
     )
     .bind(ep_id)
-    .bind(id)
     .bind(entlassen_at)
+    .bind(ereignis)
     .fetch_one(&mut *conn)
     .await?;
-    if danach {
+    if berichtigt {
         return Err(zeitachse_conflict());
     }
-    Ok(Some(id))
+    Ok(ereignis)
 }
 
 /// Name und Auflösungszeitpunkt einer Einheit des Einsatzes; `None`, wenn sie fehlt (spurlos
@@ -221,9 +247,9 @@ async fn bind_einheit_tx(
         None => ergebnis
             .ausgelassen
             .push(aus("Einheit".into(), "inzwischen aufgelöst")),
-        Some((name, _)) if !rechte.einheiten => ergebnis
+        Some(_) if !rechte.einheiten => ergebnis
             .ausgelassen
-            .push(aus(format!("Einheit «{name}»"), OHNE_RECHT_EINHEITEN)),
+            .push(aus("Einheit".into(), OHNE_RECHT_EINHEITEN)),
         Some((name, Some(_))) => ergebnis
             .ausgelassen
             .push(aus(format!("Einheit «{name}»"), "inzwischen aufgelöst")),
@@ -252,44 +278,68 @@ async fn bind_einheit_tx(
     Ok(())
 }
 
+/// Die Führung kommt nur in der Einheit zurück, der die Person jetzt (wieder) angehört: der Führer
+/// ist Mitglied (`einheit::repo::check_fuehrer`). Kennungen, die keine Einheit dieses Einsatzes
+/// nennen, bleiben still aus (wie beim Fahrzeug): ohne gespeicherten Vorzustand stünde sonst
+/// Erfundenes im Einsatztagebuch. Zwei Anweisungen, gleich wie lang die Liste ist (`src/AGENTS.md`,
+/// „Eingabegrenzen“).
 async fn bind_fuehrung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
-    einheit_id: i64,
+    einheiten: &[i64],
     rechte: RuecknahmeRechte,
     ergebnis: &mut Ruecknahme,
 ) -> Result<(), AppError> {
-    let aus = |b: String, g: &str| RuecknahmeAusgelassen::new(b, g);
-    match load_einheit_tx(conn, einsatz_id, einheit_id).await? {
-        None => ergebnis
-            .ausgelassen
-            .push(aus("Führung einer Einheit".into(), "inzwischen aufgelöst")),
-        Some((name, _)) if !rechte.einheiten => ergebnis
-            .ausgelassen
-            .push(aus(format!("Führung von «{name}»"), OHNE_RECHT_EINHEITEN)),
-        Some((name, Some(_))) => ergebnis
-            .ausgelassen
-            .push(aus(format!("Führung von «{name}»"), "inzwischen aufgelöst")),
-        Some((name, None)) => {
-            let r = sqlx::query(
-                "UPDATE einsatz_einheit SET fuehrer_id = ? \
-                 WHERE id = ? AND einsatz_id = ? AND fuehrer_id IS NULL AND aufgeloest_at IS NULL",
-            )
-            .bind(ep_id)
-            .bind(einheit_id)
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?;
-            if r.rows_affected() == 1 {
-                merke_einheit(ergebnis, einheit_id);
-            } else {
-                ergebnis.ausgelassen.push(aus(
-                    format!("Führung von «{name}»"),
-                    "inzwischen anders besetzt",
-                ));
-            }
+    let ids = crate::kraefte_disposition::ids_json(einheiten);
+    if rechte.einheiten {
+        let gebunden: Vec<i64> = sqlx::query_scalar(
+            "UPDATE einsatz_einheit SET fuehrer_id = ?1 \
+             WHERE einsatz_id = ?2 AND id IN (SELECT value FROM json_each(?3)) \
+               AND fuehrer_id IS NULL AND aufgeloest_at IS NULL \
+               AND id = (SELECT einheit_id FROM einsatz_personal WHERE id = ?1) \
+             RETURNING id",
+        )
+        .bind(ep_id)
+        .bind(einsatz_id)
+        .bind(&ids)
+        .fetch_all(&mut *conn)
+        .await?;
+        for id in gebunden {
+            merke_einheit(ergebnis, id);
         }
+    }
+    let fehlen: Vec<(String, Option<String>, Option<i64>)> = sqlx::query_as(
+        "SELECT name, aufgeloest_at, fuehrer_id FROM einsatz_einheit \
+         WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2)) \
+           AND fuehrer_id IS NOT ?3 ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(&ids)
+    .bind(ep_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    if !rechte.einheiten {
+        if !fehlen.is_empty() {
+            ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
+                "Führung einer Einheit",
+                OHNE_RECHT_EINHEITEN,
+            ));
+        }
+        return Ok(());
+    }
+    for (name, aufgeloest_at, fuehrer) in fehlen {
+        let grund = if aufgeloest_at.is_some() {
+            "inzwischen aufgelöst"
+        } else if fuehrer.is_some() {
+            "inzwischen anders besetzt"
+        } else {
+            "nicht mehr Mitglied der Einheit"
+        };
+        ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
+            format!("Führung von «{name}»"),
+            grund,
+        ));
     }
     Ok(())
 }
@@ -316,8 +366,8 @@ async fn bind_fahrzeug_tx(
         None => ergebnis
             .ausgelassen
             .push(aus("Fahrzeug".into(), "nicht mehr im Einsatz")),
-        Some((name, _)) if !rechte.fahrzeuge => ergebnis.ausgelassen.push(aus(
-            format!("Fahrzeug «{name}»"),
+        Some(_) if !rechte.fahrzeuge => ergebnis.ausgelassen.push(aus(
+            "Fahrzeug".into(),
             "kein Schreibrecht im Modul Fahrzeuge",
         )),
         Some((name, Some(_))) => ergebnis
@@ -365,8 +415,8 @@ async fn bind_uhs_tx(
         None => ergebnis
             .ausgelassen
             .push(aus("UHS".into(), "nicht mehr vorhanden")),
-        Some((name, _)) if !rechte.unfallhilfsstellen => ergebnis.ausgelassen.push(aus(
-            format!("UHS «{name}»"),
+        Some(_) if !rechte.unfallhilfsstellen => ergebnis.ausgelassen.push(aus(
+            "UHS".into(),
             "kein Schreibrecht im Modul Unfallhilfsstellen",
         )),
         Some((name, status)) if status == "aufgeloest" => ergebnis
@@ -395,61 +445,66 @@ async fn bind_uhs_tx(
     Ok(())
 }
 
-async fn bind_abschnitt_tx(
+/// Wie [`bind_fuehrung_tx`]: zwei Anweisungen für die ganze Liste, unbekannte Kennungen still aus.
+async fn bind_abschnitte_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
-    abschnitt_id: i64,
+    abschnitte: &[i64],
     rechte: RuecknahmeRechte,
     ergebnis: &mut Ruecknahme,
 ) -> Result<(), AppError> {
-    let name: Option<String> =
-        sqlx::query_scalar("SELECT name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
-            .bind(abschnitt_id)
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-    let aus = |b: String, g: &str| RuecknahmeAusgelassen::new(b, g);
-    match name {
-        None => ergebnis.ausgelassen.push(aus(
-            "Leitung eines Abschnitts".into(),
-            "Abschnitt nicht mehr vorhanden",
-        )),
-        Some(name) if !rechte.einsatzabschnitte => ergebnis.ausgelassen.push(aus(
-            format!("Leitung von «{name}»"),
-            "kein Schreibrecht im Modul Einsatzabschnitte",
-        )),
-        Some(name) => {
-            let r = sqlx::query(
-                "UPDATE einsatzabschnitt SET leiter_id = ? \
-                 WHERE id = ? AND einsatz_id = ? AND leiter_id IS NULL",
-            )
-            .bind(ep_id)
-            .bind(abschnitt_id)
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?;
-            if r.rows_affected() == 1 {
-                ergebnis.abschnitte.push(abschnitt_id);
-            } else {
-                ergebnis.ausgelassen.push(aus(
-                    format!("Leitung von «{name}»"),
-                    "inzwischen anders besetzt",
-                ));
-            }
+    let ids = crate::kraefte_disposition::ids_json(abschnitte);
+    if rechte.einsatzabschnitte {
+        ergebnis.abschnitte = sqlx::query_scalar(
+            "UPDATE einsatzabschnitt SET leiter_id = ?1 \
+             WHERE einsatz_id = ?2 AND id IN (SELECT value FROM json_each(?3)) \
+               AND leiter_id IS NULL RETURNING id",
+        )
+        .bind(ep_id)
+        .bind(einsatz_id)
+        .bind(&ids)
+        .fetch_all(&mut *conn)
+        .await?;
+        ergebnis.abschnitte.sort_unstable();
+    }
+    let fehlen: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM einsatzabschnitt \
+         WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2)) \
+           AND leiter_id IS NOT ?3 ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(&ids)
+    .bind(ep_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    if !rechte.einsatzabschnitte {
+        if !fehlen.is_empty() {
+            ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
+                "Leitung eines Abschnitts",
+                "kein Schreibrecht im Modul Einsatzabschnitte",
+            ));
         }
+        return Ok(());
+    }
+    for name in fehlen {
+        ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
+            format!("Leitung von «{name}»"),
+            "inzwischen anders besetzt",
+        ));
     }
     Ok(())
 }
 
 /// Die Einsatzleitung kommt nur zurück, wenn kein anderer Einsatzleiter eingetragen ist
 /// (design.md D5): die Zeile trägt noch den Vermerk „nicht mehr disponiert“ dieser Person (Art
-/// `personal`, ohne Verweis, ihr eingefrorener Name). Name und „seit“ bleiben, wie sie waren.
+/// `personal`, ohne Verweis, der eingefrorene Name aus dem Vorzustand). Name und „seit“ bleiben,
+/// wie sie waren.
 async fn bind_einsatzleitung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
-    snap_name: &str,
+    einsatzleiter_name: &str,
     ergebnis: &mut Ruecknahme,
 ) -> Result<(), AppError> {
     let r = sqlx::query(
@@ -459,7 +514,7 @@ async fn bind_einsatzleitung_tx(
     )
     .bind(ep_id)
     .bind(einsatz_id)
-    .bind(snap_name)
+    .bind(einsatzleiter_name)
     .execute(&mut *conn)
     .await?;
     if r.rows_affected() == 1 {

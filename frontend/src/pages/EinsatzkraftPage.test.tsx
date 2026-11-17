@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router';
+import { Link, Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { waehle } from '../test/auswahlListe';
@@ -67,6 +67,8 @@ interface Aufbau {
   perioden?: unknown[];
   /** Der Statuskatalog scheitert (500); `abgerufen` hält fest, dass er gefragt wurde. */
   statusFehler?: { abgerufen: boolean };
+  /** Ein Link zu dieser Adresse neben der Seite: Wechsel der Detail-Route ohne Remount. */
+  sprung?: string;
 }
 
 let requests: string[];
@@ -137,10 +139,13 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
     }),
   );
   return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/personal/:epId" element={<EinsatzkraftPage />} />
-      <Route path="/einsaetze/:id/personal" element={<Ort />} />
-    </Routes>,
+    <>
+      <Routes>
+        <Route path="/einsaetze/:id/personal/:epId" element={<EinsatzkraftPage />} />
+        <Route path="/einsaetze/:id/personal" element={<Ort />} />
+      </Routes>
+      {a.sprung && <Link to={a.sprung}>Sprung</Link>}
+    </>,
     { route },
   );
 }
@@ -396,7 +401,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     uhs_id: null,
     gefuehrte_einheiten: [3],
     geleitete_abschnitte: [],
-    einsatzleiter: false,
+    einsatzleiter_name: null,
   };
   /** Entlassen antwortet mit Person und Vorzustand; die Person wandert in die Entlassenen. */
   function entlassenAntwortet() {
@@ -466,6 +471,58 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
         'Lena Beispiel zurück, ohne: Führung von «Zug 1» (inzwischen anders besetzt)',
       ),
     ).toBeVisible();
+  });
+
+  it('Rückgängig nach einem Wechsel zu einer anderen Person nimmt die entlassene zurück', async () => {
+    const zweite = kraft({ id: 11, name: 'Ben Zweit' });
+    renderAnsicht('/einsaetze/7/personal/10', {
+      aktiv: [kraft(), zweite],
+      sprung: '/einsaetze/7/personal/11',
+    });
+    const entlassen = kraft({ beendet_at: minutesAgo(0), einheit_id: null, fahrzeug_id: null });
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen', () => {
+        serverState = { aktiv: [zweite], entlassene: [entlassen] };
+        return HttpResponse.json({ personal: entlassen, vorzustand: VORZUSTAND });
+      }),
+      http.post('/api/einsaetze/7/personal/:ep/entlassen/zuruecknehmen', ({ request }) => {
+        requests.push(`POST ${new URL(request.url).pathname}`);
+        return HttpResponse.json(
+          { error: 'Die Entlassung lässt sich nicht mehr zurücknehmen' },
+          { status: 409 },
+        );
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
+    const rueckgaengig = await screen.findByRole('button', { name: 'Rückgängig' });
+    await userEvent.click(screen.getByRole('link', { name: 'Sprung' }));
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Ben Zweit');
+    await userEvent.click(rueckgaengig);
+    await waitFor(() =>
+      expect(requests).toContain('POST /api/einsaetze/7/personal/10/entlassen/zuruecknehmen'),
+    );
+    // Die Ablehnung gehört zu Lena Beispiel und steht nicht über Ben Zweit.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('Nicht zurückgenommen')).toBeNull();
+  });
+
+  it('räumt den Hinweis der gescheiterten Rücknahme beim erneuten Disponieren', async () => {
+    renderAnsicht();
+    entlassenAntwortet();
+    server.use(
+      http.post('/api/einsaetze/7/personal/10/entlassen/zuruecknehmen', () =>
+        HttpResponse.json({ error: 'Zeitachse berichtigt' }, { status: 409 }),
+      ),
+      http.post('/api/einsaetze/7/personal/10/reaktivieren', () => {
+        serverState = { aktiv: [kraft()], entlassene: [] };
+        return HttpResponse.json(kraft());
+      }),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Lena Beispiel entlassen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    expect(await screen.findByText('Nicht zurückgenommen')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut disponieren' }));
+    await waitFor(() => expect(screen.queryByText('Nicht zurückgenommen')).toBeNull());
   });
 
   it('zeigt eine Ablehnung der Rücknahme im Seitenhinweis, die Person bleibt entlassen', async () => {

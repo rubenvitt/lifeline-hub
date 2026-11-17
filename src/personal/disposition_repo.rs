@@ -585,7 +585,8 @@ pub struct Entlassen {
     /// Aktive Einheiten, die die Person führte.
     pub gefuehrte_einheiten: Vec<i64>,
     pub geleitete_abschnitte: Vec<i64>,
-    pub einsatzleiter: bool,
+    /// Eingefrorener Name an der Führungsstelle, wenn die Person Einsatzleiter war.
+    pub einsatzleiter_name: Option<String>,
 }
 
 impl Entlassen {
@@ -599,7 +600,7 @@ impl Entlassen {
             uhs_id: self.uhs_id,
             gefuehrte_einheiten: self.gefuehrte_einheiten.clone(),
             geleitete_abschnitte: self.geleitete_abschnitte.clone(),
-            einsatzleiter: self.einsatzleiter,
+            einsatzleiter_name: self.einsatzleiter_name.clone(),
         }
     }
 }
@@ -651,8 +652,15 @@ pub async fn entlassen_tx(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
-    let einsatzleiter =
-        crate::einsatz::fuehrungsstelle::is_einsatzleiter_tx(conn, einsatz_id, ep_id).await?;
+    let einsatzleiter_name: Option<String> = sqlx::query_scalar(
+        "SELECT einsatzleiter_name FROM einsatz_fuehrungsstelle \
+         WHERE einsatz_id = ? AND einsatzleiter_personal_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(ep_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .flatten();
     release_bindungen_tx(conn, einsatz_id, ep_id).await?;
     let (ergebnis, _) = crate::zeitachse::repo::schreibe_tx(
         conn,
@@ -687,7 +695,7 @@ pub async fn entlassen_tx(
         uhs_id,
         gefuehrte_einheiten,
         geleitete_abschnitte,
-        einsatzleiter,
+        einsatzleiter_name,
     })
 }
 
@@ -1945,7 +1953,7 @@ mod tests {
                 uhs_id: Some(uhs),
                 gefuehrte_einheiten: vec![trupp],
                 geleitete_abschnitte: vec![abschnitt],
-                einsatzleiter: true,
+                einsatzleiter_name: Some("Anton Abel".into()),
             }
         );
         // Ohne Bindung: alles leer.

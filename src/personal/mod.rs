@@ -255,9 +255,11 @@ pub struct PersonalEntlassungVorzustand {
     /// Einsatzabschnitte, die die Person leitete.
     #[serde(default)]
     pub geleitete_abschnitte: Vec<i64>,
-    /// War die Person Einsatzleiter?
+    /// War die Person Einsatzleiter: der Name, den die Führungsstelle für sie eingefroren hat. Die
+    /// Rücknahme erkennt daran den Vermerk „nicht mehr disponiert“ wieder, auch wenn der Name der
+    /// Person inzwischen berichtigt wurde. `None` = war nicht Einsatzleiter.
     #[serde(default)]
-    pub einsatzleiter: bool,
+    pub einsatzleiter_name: Option<String>,
 }
 
 /// Höchstzahl je Liste im Vorzustand einer Rücknahme (`src/AGENTS.md`, „Eingabegrenzen“): so

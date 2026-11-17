@@ -16685,9 +16685,12 @@
             ],
             "format": "int64"
           },
-          "einsatzleiter": {
-            "type": "boolean",
-            "description": "War die Person Einsatzleiter?"
+          "einsatzleiter_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "War die Person Einsatzleiter: der Name, den die Führungsstelle für sie eingefroren hat. Die\nRücknahme erkennt daran den Vermerk „nicht mehr disponiert“ wieder, auch wenn der Name der\nPerson inzwischen berichtigt wurde. `None` = war nicht Einsatzleiter."
           },
           "entlassen_at": {
             "type": "string",

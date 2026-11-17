@@ -1071,9 +1071,11 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     assert_eq!(json["ausgelassen"], serde_json::json!([]));
     assert_eq!(stand(&json["personal"]), vorher);
     let (mut einheiten, mut abschnitte, mut uhs_ereignisse) = (Vec::new(), Vec::new(), Vec::new());
+    let mut etb = 0;
     while let Ok(n) = rx.try_recv() {
         let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
         match n.event {
+            lifeline_hub::live::LiveEvent::Etb => etb += 1,
             lifeline_hub::live::LiveEvent::Einheit => einheiten.push(data["einheit_id"].clone()),
             lifeline_hub::live::LiveEvent::Abschnitt => {
                 abschnitte.push(data["abschnitt_id"].clone())
@@ -1085,6 +1087,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     assert_eq!(einheiten, [einheit], "Live an die Einheit");
     assert_eq!(abschnitte, [abschnitt], "Live an den Abschnitt");
     assert_eq!(uhs_ereignisse, [uhs], "Live an die UHS");
+    assert_eq!(etb, 1, "der ETB-Eintrag geht live hinaus");
     let (_, einheiten_json) = anfrage(
         &app,
         "GET",

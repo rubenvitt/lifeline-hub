@@ -536,7 +536,8 @@ async fn veraendertes_bleibt_aus_und_wird_genannt() {
     );
 }
 
-/// Einheit aufgelöst bzw. gelöscht, Abschnitt gelöscht, Einsatzleiter ausgetragen.
+/// Einheit aufgelöst, Einsatzleiter ausgetragen; ein gelöschter Abschnitt bleibt still aus (sein
+/// Name ist fort, und eine erfundene Kennung sähe genauso aus).
 #[tokio::test]
 async fn aufgeloestes_und_ausgetragenes_bleibt_aus() {
     let s = szene().await;
@@ -555,10 +556,6 @@ async fn aufgeloestes_und_ausgetragenes_bleibt_aus() {
         vec![
             ("Einheit «Zug 1»".into(), "inzwischen aufgelöst".into()),
             ("Führung von «Zug 1»".into(), "inzwischen aufgelöst".into()),
-            (
-                "Leitung eines Abschnitts".into(),
-                "Abschnitt nicht mehr vorhanden".into()
-            ),
             ("Einsatzleitung".into(), "inzwischen ausgetragen".into()),
         ]
     );
@@ -582,6 +579,8 @@ async fn vermerk_einer_anderen_person_bleibt() {
 }
 
 /// Spec „Ohne Recht im Modul Einheiten“ und die übrigen Modulrechte.
+/// Spec „Ohne Recht im Modul Einheiten“ und die übrigen Modulrechte: der Teil bleibt aus, ohne den
+/// Namen aus einem Modul zu nennen, das die Person nicht beschreiben darf.
 #[tokio::test]
 async fn ohne_modulrecht_bleibt_der_teil_aus() {
     let s = szene().await;
@@ -592,6 +591,7 @@ async fn ohne_modulrecht_bleibt_der_teil_aus() {
             KURZ_DANACH,
             &v,
             RuecknahmeRechte {
+                einsatzdaten: false,
                 einheiten: false,
                 fahrzeuge: false,
                 unfallhilfsstellen: false,
@@ -604,28 +604,32 @@ async fn ohne_modulrecht_bleibt_der_teil_aus() {
         bezeichnungen(&r),
         vec![
             (
-                "Einheit «Zug 1»".into(),
+                "Einheit".into(),
                 "kein Schreibrecht im Modul Einheiten".into()
             ),
             (
-                "Führung von «Zug 1»".into(),
+                "Führung einer Einheit".into(),
                 "kein Schreibrecht im Modul Einheiten".into()
             ),
             (
-                "Fahrzeug «83-1»".into(),
+                "Fahrzeug".into(),
                 "kein Schreibrecht im Modul Fahrzeuge".into()
             ),
             (
-                "UHS «UHS Nord»".into(),
+                "UHS".into(),
                 "kein Schreibrecht im Modul Unfallhilfsstellen".into()
             ),
             (
-                "Leitung von «Süd»".into(),
+                "Leitung eines Abschnitts".into(),
                 "kein Schreibrecht im Modul Einsatzabschnitte".into()
+            ),
+            (
+                "Einsatzleitung".into(),
+                "kein Schreibrecht für die Einsatzdaten".into()
             ),
         ]
     );
-    assert!(r.einsatzleiter, "die Einsatzleitung braucht nur das Gate");
+    assert!(!r.einsatzleiter);
     assert!(!s.ist_entlassen().await);
 }
 
@@ -646,4 +650,93 @@ async fn storno_bleibt_nach_der_ruecknahme_gesperrt() {
         matches!(&e, AppError::UnprocessableEntity(m) if m.contains("schon einmal aus dem Einsatz entlassen")),
         "{e:?}"
     );
+}
+
+/// Review vor dem PR: Kennungen, die nichts dieses Einsatzes nennen, bleiben still aus und kommen
+/// nicht als „inzwischen aufgelöst“ ins Einsatztagebuch.
+#[tokio::test]
+async fn unbekannte_kennungen_bleiben_still_aus() {
+    let s = szene().await;
+    let v = s.entlasse().await;
+    let erfunden = PersonalEntlassungVorzustand {
+        gefuehrte_einheiten: vec![s.zug, 9_001, 9_002],
+        geleitete_abschnitte: vec![s.abschnitt, 9_003],
+        ..v
+    };
+    let r = s.nimm_zurueck(&erfunden).await;
+    assert_eq!(bezeichnungen(&r), Vec::<(String, String)>::new());
+    assert_eq!(r.einheiten, vec![s.zug]);
+    assert_eq!(r.abschnitte, vec![s.abschnitt]);
+}
+
+/// Review vor dem PR: der Führer ist Mitglied (`einheit::repo::check_fuehrer`); ohne Mitgliedschaft
+/// kommt die Führung nicht zurück.
+#[tokio::test]
+async fn fuehrung_nur_mit_mitgliedschaft() {
+    let s = szene().await;
+    let v = s.entlasse().await;
+    let ohne_einheit = PersonalEntlassungVorzustand {
+        einheit_id: None,
+        ..v
+    };
+    let r = s.nimm_zurueck(&ohne_einheit).await;
+    assert!(r.einheiten.is_empty());
+    assert_eq!(
+        bezeichnungen(&r),
+        vec![(
+            "Führung von «Zug 1»".into(),
+            "nicht mehr Mitglied der Einheit".into()
+        )]
+    );
+    assert_eq!(s.zustand().await.fuehrer, None);
+}
+
+/// Review vor dem PR: jede Berichtigung nach dem Entlassen sperrt die Rücknahme, auch eine an einem
+/// früheren Ereignis (Streichen oder Nachtrag vor der Entlassung).
+#[tokio::test]
+async fn berichtigung_vor_der_entlassung_ist_409() {
+    // Die Alarmierung wird nach dem Entlassen gestrichen.
+    let s = szene().await;
+    let v = s.entlasse().await;
+    s.sql(
+        "UPDATE einsatz_kraft_zeitachse SET gestrichen_at = '2026-11-17 11:01:00', \
+             gestrichen_von = 1, streichgrund = 'falsch' WHERE art = 'alarmierung'",
+    )
+    .await;
+    let e = s
+        .nimm_zurueck_als(s.benutzer, KURZ_DANACH, &v, RuecknahmeRechte::ALLE)
+        .await
+        .unwrap_err();
+    assert!(matches!(e, AppError::Conflict(_)), "{e:?}");
+
+    // Ein Eintreffen vor der Entlassung wird nachgetragen.
+    let s = szene().await;
+    let v = s.entlasse().await;
+    s.sql(
+        "INSERT INTO einsatz_kraft_zeitachse \
+           (einsatz_id, personal_id, art, zeitpunkt_at, quelle, erfasst_von) \
+         SELECT einsatz_id, personal_id, 'eintreffen', '2026-11-17 09:30:00', 'nachtrag', 1 \
+         FROM einsatz_kraft_zeitachse WHERE art = 'entlassung'",
+    )
+    .await;
+    let e = s
+        .nimm_zurueck_als(s.benutzer, KURZ_DANACH, &v, RuecknahmeRechte::ALLE)
+        .await
+        .unwrap_err();
+    assert!(matches!(e, AppError::Conflict(_)), "{e:?}");
+    assert!(s.ist_entlassen().await);
+}
+
+/// Review vor dem PR: der Name einer Ad-hoc-Person wurde berichtigt, während sie Einsatzleiterin
+/// war; die Führungsstelle hat den alten eingefroren. Die Rücknahme erkennt den Vermerk trotzdem.
+#[tokio::test]
+async fn einsatzleitung_kommt_nach_namensberichtigung_zurueck() {
+    let s = szene().await;
+    s.sql("UPDATE einsatz_personal SET snap_name = 'Anna Muster-Berg'")
+        .await;
+    let v = s.entlasse().await;
+    assert_eq!(v.einsatzleiter_name.as_deref(), Some("Anna Muster"));
+    let r = s.nimm_zurueck(&v).await;
+    assert!(r.einsatzleiter);
+    assert_eq!(s.zustand().await.einsatzleiter.unwrap().1, Some(s.ep));
 }

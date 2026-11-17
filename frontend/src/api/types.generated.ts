@@ -6715,8 +6715,12 @@ export interface components {
         PersonalEntlassungVorzustand: {
             /** Format: int64 */
             einheit_id?: number | null;
-            /** @description War die Person Einsatzleiter? */
-            einsatzleiter?: boolean;
+            /**
+             * @description War die Person Einsatzleiter: der Name, den die Führungsstelle für sie eingefroren hat. Die
+             *     Rücknahme erkennt daran den Vermerk „nicht mehr disponiert“ wieder, auch wenn der Name der
+             *     Person inzwischen berichtigt wurde. `None` = war nicht Einsatzleiter.
+             */
+            einsatzleiter_name?: string | null;
             /** @description Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt. */
             entlassen_at: string;
             /**

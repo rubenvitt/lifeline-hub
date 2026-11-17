@@ -50,12 +50,15 @@ Storno-Sperre.
 - `entlassen_at`: Kennung dieses Entlassens (= `beendet_at`);
 - `einheit_id`, `fahrzeug_id`, `uhs_id`;
 - `gefuehrte_einheiten: [einheit_id]`, `geleitete_abschnitte: [abschnitt_id]`;
-- `einsatzleiter: bool`.
+- `einsatzleiter_name`: der Name, den die Führungsstelle für die Person eingefroren hat, wenn sie
+  Einsatzleiter war (D5; Review vor dem PR, anfangs ein `bool`).
 
 Status, Dispositionszeit, Stärke-Position und Storno-Sperre stehen nicht darin: das Entlassen
 lässt sie stehen, die Rücknahme fasst sie nicht an. Das Zeitachsen-Ereignis steht ebenfalls nicht
 darin: der Server findet es selbst (D3), damit der Client nichts Fremdes streichen lassen kann.
-`entlassen_tx` liest die Rollen vor dem Lösen, so wie es heute den Einheitsnamen liest.
+`entlassen_tx` liest die Rollen vor dem Lösen, so wie es heute den Einheitsnamen liest. Der Code
+der Rücknahme liegt in `src/personal/ruecknahme.rs` (die Datei `disposition_repo.rs` ist schon über
+2400 Zeilen lang).
 
 Neu `POST …/personal/{ep}/entlassen/zuruecknehmen` mit dem Vorzustand als Body, Gate
 `EinsatzSchreibzugriff<Personal>` (ADR-0005). Die Listen werden wie beim Fahrzeug gedeckelt
@@ -84,9 +87,12 @@ Der Server sucht das Ereignis E: `personal_id` = Person, `art = 'entlassung'`,
 
 - **E fehlt:** Das Entlassen hat keine Zeitachse geschrieben (keine offene Periode). Nichts zu
   streichen.
-- **E ist gestrichen, oder nach E steht ein ungestrichenes Ereignis der Person** (nach
-  `zeitpunkt_at`, dann `id`): Die Zeitachse ist seit dem Entlassen berichtigt (Streichen,
-  „Zeit berichtigen“, Nachtrag). Dann 409 „Die Zeitachse der Person ist seit dem Entlassen
+- **Die Zeitachse ist seit dem Entlassen berichtigt** (Streichen, „Zeit berichtigen“, Nachtrag,
+  „Periode nachtragen“, auch an einem Ereignis vor E): ein Ereignis der Person ist seit
+  `entlassen_at` gestrichen, oder eines ist nach E erfasst (`id > E`; ohne E: `erfasst_at` nach
+  `entlassen_at`). Erfasst- und Streichzeit stehen im Format von `crate::zeit::FORMAT`. Anfangs
+  zählte nur ein Ereignis nach E nach `zeitpunkt_at`; der Review vor dem PR fand, dass eine
+  Berichtigung davor so durchrutschte. Dann 409 „Die Zeitachse der Person ist seit dem Entlassen
   berichtigt; die Person lässt sich erneut disponieren“, und die ganze Transaktion fällt: nichts
   kommt zurück (mit dem Menschen abgestimmt, 16.11.2026).
 - **Sonst:** `zeitachse::repo::streiche_tx` mit Grund `GRUND_RUECKNAHME` = „Entlassung
@@ -114,21 +120,28 @@ Worten:
 | Teil | Frei, wenn | Recht |
 | --- | --- | --- |
 | Einheit (`einheit_id`) | Einheit besteht und ist nicht aufgelöst | Modul Einheiten |
-| Führung (`gefuehrte_einheiten`) | Einheit besteht, nicht aufgelöst, `fuehrer_id` leer | Modul Einheiten |
+| Führung (`gefuehrte_einheiten`) | Einheit besteht, nicht aufgelöst, `fuehrer_id` leer, die Person ist (wieder) ihr Mitglied | Modul Einheiten |
 | Fahrzeug (`fahrzeug_id`) | Fahrzeug besteht und ist nicht beendet | Modul Fahrzeuge |
 | UHS (`uhs_id`) | UHS besteht und ist nicht `aufgeloest` | Modul Unfallhilfsstellen |
 | Abschnittsleitung (`geleitete_abschnitte`) | Abschnitt besteht, `leiter_id` leer | Modul Einsatzabschnitte |
-| Einsatzleitung (`einsatzleiter`) | der Vermerk dieser Person steht unverändert (D5) | Schreibrecht im Einsatz (das Gate) |
+| Einsatzleitung (`einsatzleiter_name`) | der Vermerk dieser Person steht unverändert (D5) | Einsatzdaten (wie das Gate der Führungsstelle) |
 
-Das Recht fragt die Route vor der Transaktion je Modul über `fordere_zielmodul` ab (wie
-`darf_zielmodul` beim Fahrzeug; die Hilfsfunktion wird dafür generisch über den Marker des
-Gates). Die Bindung schreibt jeweils ein bedingtes UPDATE (`… AND fuehrer_id IS NULL` usw.), das
-dann auch gegen einen gleichzeitigen Schreiber hält.
+Das Recht fragt die Route vor der Transaktion je Modul ab (`EinsatzKontext::darf_zielmodul`, aus
+der Fahrzeug-Route dorthin gehoben). Die Bindung schreibt jeweils ein bedingtes UPDATE
+(`… AND fuehrer_id IS NULL` usw.), das dann auch gegen einen gleichzeitigen Schreiber hält.
 
-Führung ohne Mitgliedschaft ist erlaubt, wie heute: das Schema verlangt nicht, dass der Führer
-Mitglied ist. Fällt die Einheit aus, fällt ihre Führung mit demselben Grund aus.
+Nach dem Review vor dem PR:
 
-Ein Abschnitt wird beim Auflösen gelöscht; fehlt er, lautet der Grund „nicht mehr vorhanden“.
+- **Listen über `json_each`:** Führung und Abschnittsleitung binden je Liste mit einem UPDATE samt
+  `RETURNING` und lesen das Ausgelassene mit einer Abfrage (`src/AGENTS.md`, „Eingabegrenzen“).
+- **Unbekannte Kennungen still aus:** Nennt eine Kennung der Listen nichts dieses Einsatzes, bleibt
+  sie ohne Wort aus, wie beim Fahrzeug. Ohne gespeicherten Vorzustand ließe sich ein gelöschter
+  Abschnitt nicht von einer erfundenen Kennung unterscheiden, und das Einsatztagebuch nennte
+  Erfundenes.
+- **Führung nur mit Mitgliedschaft:** Der Führer ist Mitglied (`einheit::repo::check_fuehrer`);
+  ohne Mitgliedschaft lautet der Grund „nicht mehr Mitglied der Einheit“.
+- **Ohne Recht ohne Namen:** Fehlt das Recht eines Moduls, nennt der Hinweis den Teil allgemein
+  („Einheit“, „Leitung eines Abschnitts“), nicht den Namen aus dem Modul.
 
 **Verworfen:** Personalrecht genügt (umginge die Modulrechte; Abstimmung).
 
@@ -138,8 +151,18 @@ Das Entlassen leert nur `einsatzleiter_personal_id`; `art = 'personal'`, Name un
 als Vermerk „nicht mehr disponiert“. Mit dem Menschen abgestimmt: zurück nur, wenn keine andere
 Person und kein Freitext-Einsatzleiter eingetragen ist. Umgesetzt als: die Zeile trägt noch genau
 diesen Vermerk (`einsatzleiter_art = 'personal'`, `einsatzleiter_personal_id IS NULL`,
-`einsatzleiter_name` = eingefrorener Name der Person). Dann setzt die Rücknahme
+`einsatzleiter_name` = der eingefrorene Name aus dem Vorzustand). Dann setzt die Rücknahme
 `einsatzleiter_personal_id` zurück; Name und „seit“ bleiben, wie sie waren.
+
+Nach dem Review vor dem PR, mit dem Menschen abgestimmt (17.11.2026): die Einsatzleitung kommt nur
+mit dem Recht zurück, das auch der Weg über die Führungsstelle verlangt (`EinsatzVerwaltungszugriff`,
+`fordere_schreibrecht_oder_admin`); ohne es bleibt sie aus. Das Gate der Rücknahme verlangt schon
+das Schreibrecht im Einsatz, das diese Prüfung erfüllt; sie steht trotzdem ausdrücklich da, damit
+sie nicht still auseinanderläuft. Der Vorzustand trägt den eingefrorenen Namen statt eines
+`bool`: der Name einer Ad-hoc-Person kann sich ändern, während sie Einsatzleiter ist, und der
+Abgleich mit ihrem heutigen Namen träfe den Vermerk dann nicht. Ein gefälschter Name bindet
+höchstens einen Vermerk ohne Verweis an die Person, und das darf, wer dieses Recht hat, ohnehin
+über die Führungsstelle.
 
 Hat jemand den Einsatzleiter inzwischen ganz ausgetragen (alle Felder leer), kommt er nicht
 zurück („inzwischen ausgetragen“): das war eine bewusste Handlung in den zehn Minuten, und ein
@@ -147,7 +170,9 @@ leeres „seit“ ließe sich nur erfinden.
 
 ### D6 ETB, Live, Antwort
 
-- ETB `etb_text_entlassung_zurueckgenommen(name, funktion, ausgelassen)` in `personal`:
+- ETB `etb_text_entlassung_zurueckgenommen(name, funktion, ausgelassen)` in `personal`; der
+  Eintrag geht eigens live hinaus (`live.publiziere`), das Ereignis `personal` frischt das
+  Einsatztagebuch nicht auf (Review vor dem PR):
   „Person «X»: Entlassung zurückgenommen“, bei Auslassungen „, ohne A (Grund), B (Grund)“.
 - Live nach dem Commit: `sse_personal` und ein `Betroffen` aus dem, was die Rücknahme
   tatsächlich zurückgebunden hat (Einheiten aus Mitgliedschaft und Führung, Abschnitte, UHS,
@@ -159,7 +184,8 @@ leeres „seit“ ließe sich nur erfinden.
 - `api/einsatzPersonal.ts`: `entlasseDisposition` liefert `PersonalEntlassungAntwort`, neu
   `nimmEntlassungZurueck(einsatzId, epId, vorzustand)`.
 - `EinsatzkraftPage`: Das Rückgängig im Toast ruft die Rücknahme mit dem Vorzustand aus der
-  Antwort. Erfolg: Zeile zurück nach „aktiv“ (`moveZeile`), ein Ausgelassen-Satz im Seitenhinweis
+  Antwort. Die Kennung der Person steht in den `variables` der Mutation, die Hinweise tragen sie
+  mit und erscheinen nur bei ihr; Erneut disponieren und Entlassen räumen sie (Review vor dem PR). Erfolg: Zeile zurück nach „aktiv“ (`moveZeile`), ein Ausgelassen-Satz im Seitenhinweis
   wie `ausgelassenSatz` der Fahrzeugliste (die Funktion wandert dafür in ein gemeinsames Modul,
   weil zwei Seiten sie brauchen). Ablehnung (409/422): Grund im Seitenhinweis („Rückgängig
   fehlgeschlagen“), wie heute. „Erneut disponieren“ bleibt `reaktivieren`.
