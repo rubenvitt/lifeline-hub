@@ -1877,7 +1877,7 @@ pub async fn patche_kopf(
         if getroffen == 0 {
             // Die Zeile gibt es (Vorher-Stand gelesen): mit Altwerten ist das ein Feldkonflikt.
             if !erwartet.is_empty() {
-                return Err(AppError::Conflict(crate::feld_cas::KONFLIKT_MELDUNG.into()));
+                return Err(AppError::Veraltet);
             }
             return Err(AppError::NotFound);
         }
