@@ -63,7 +63,13 @@ import {
 } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
-import { istNichtGefunden } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+  istNichtGefunden,
+} from '../components/SeitenZustand';
+import { segmentLabel } from '../anzeige/anzahl';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -751,9 +757,48 @@ export default function MeldungenPage() {
     einheiten: (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name })),
   };
 
+  /*
+   * Zahlen nur aus einem echten Stand (LLH-1823): vor der ersten Lieferung und nach einem
+   * gescheiterten Abruf ist die Menge unbekannt (`null`), nicht leer. „0 offen“ oder „Offen (0)“
+   * wäre dann eine falsche Aussage über die Lage. Ohne Kennzahlen zählt die geladene Liste, die
+   * abgeschlossene nur, wenn sie vollständig im Client liegt.
+   */
   const kennzahlen = kennzahlenQuery.data;
-  const offenZahl = kennzahlen ? kennzahlen.unbearbeitet + kennzahlen.in_arbeit : offene.length;
-  const abgeschlossenZahl = kennzahlen?.erledigt ?? abgeschlossene.length;
+  const offenZahl: number | null = kennzahlen
+    ? kennzahlen.unbearbeitet + kennzahlen.in_arbeit
+    : offeneQuery.data
+      ? offene.length
+      : null;
+  const abgeschlossenZahl: number | null =
+    kennzahlen?.erledigt ??
+    (abgeschlosseneQuery.data && !abgeschlosseneQuery.hasNextPage && !ohneKopf
+      ? abgeschlossene.length
+      : null);
+  // Solange noch geladen wird, hält der Platzhalter die Breite der Meta; danach steht „—“ für eine
+  // Zahl, die es nicht gibt.
+  const metaLaedt =
+    offenZahl == null &&
+    abgeschlossenZahl == null &&
+    (offeneQuery.isPending || kennzahlenQuery.isPending);
+  const meta = metaLaedt
+    ? undefined
+    : `${offenZahl ?? '—'} offen · ${abgeschlossenZahl ?? '—'} abgeschlossen`;
+  /*
+   * Zustand der gezeigten Liste, Muster `ListeDetail`: die erste Lieferung läuft → Skelett; ein
+   * Fehler ohne Bestand tritt an die Stelle der Liste („Erneut abrufen“); mit Bestand bleiben die
+   * Zeilen stehen, darüber der Hinweis auf den alten Stand. `placeholderData` schützt nur den
+   * Filterwechsel, nicht den ersten Abruf (LLH-1823).
+   */
+  const listenQuery = ansicht === 'offen' ? offeneQuery : abgeschlosseneQuery;
+  const listenBestand = ansicht === 'offen' ? offene.length : abgeschlossene.length;
+  const listenZustand: 'laden' | 'fehler' | 'veraltet' | 'daten' = listenQuery.isPending
+    ? 'laden'
+    : listenQuery.isError
+      ? listenBestand > 0
+        ? 'veraltet'
+        : 'fehler'
+      : 'daten';
+  const erneutAbrufen = () => void listenQuery.refetch();
   /*
    * Steht die Karte eines Grundes in der gezeigten Ansicht nicht (Ansicht gewechselt, Karte
    * gewandert), hätte er keinen Ort mehr: dann steht er im Seitenhinweis, schließbar. Solange die
@@ -787,7 +832,8 @@ export default function MeldungenPage() {
     <EinsatzSeite
       titel={modulName('meldungen')}
 
-      meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
+      meta={meta}
+      metaPlatzhalter="0 offen · 0 abgeschlossen"
       dataUpdatedAt={offeneQuery.dataUpdatedAt}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
@@ -909,14 +955,6 @@ export default function MeldungenPage() {
       )}
 
       <DeeplinkHinweis lage={deeplinkHinweis} sache="Meldung" />
-      {(offeneQuery.isError || (ansicht === 'abgeschlossen' && abgeschlosseneQuery.isError)) && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: token.marginSM }}
-          title="Meldungen konnten nicht geladen werden"
-        />
-      )}
       <div
         style={{
           display: 'flex',
@@ -931,8 +969,8 @@ export default function MeldungenPage() {
           wert={ansicht}
           onWechsel={setAnsicht}
           optionen={[
-            { wert: 'offen', label: `Offen (${offenZahl})` },
-            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossenZahl})` },
+            { wert: 'offen', label: segmentLabel('Offen', offenZahl) },
+            { wert: 'abgeschlossen', label: segmentLabel('Abgeschlossen', abgeschlossenZahl) },
           ]}
         />
         {istSchmal ? (
@@ -953,7 +991,21 @@ export default function MeldungenPage() {
       {/* Meldungen kennen keine Wahl: ein Klick in eine Karte zählt als solche und schließt den
           Deeplink-Hinweis (LLH-1827). */}
       <div onClickCapture={schliesseHinweis}>
-        {ansicht === 'offen' ? (
+        {listenZustand === 'veraltet' && (
+          <div style={{ marginBottom: token.marginSM }}>
+            <SeitenStandVeraltet onWiederholen={erneutAbrufen} />
+          </div>
+        )}
+        {listenZustand === 'laden' ? (
+          <SeitenSkeleton />
+        ) : listenZustand === 'fehler' ? (
+          <SeitenFehler
+            text="Meldungen konnten nicht geladen werden"
+            ursache={listenQuery.error}
+            laedt={listenQuery.isFetching}
+            onWiederholen={erneutAbrufen}
+          />
+        ) : ansicht === 'offen' ? (
           offeneGruppen.length === 0 ? (
             <MeldungListe meldungen={[]} ansicht="offen" {...listenProps} />
           ) : (
@@ -986,13 +1038,7 @@ export default function MeldungenPage() {
                 ladeKopf={() => listeAbgeschlosseneMeldungen(einsatzId, richtungFilter)}
               />
             )}
-            {abgeschlosseneQuery.isPending ? (
-              <div style={{ textAlign: 'center', padding: token.paddingLG }}>
-                <Spin />
-              </div>
-            ) : (
-              <MeldungListe meldungen={abgeschlossene} ansicht="abgeschlossen" {...listenProps} />
-            )}
+            <MeldungListe meldungen={abgeschlossene} ansicht="abgeschlossen" {...listenProps} />
             {/* Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
               sagt, dass es keine gibt. */}
             {abgeschlosseneQuery.hasNextPage &&
@@ -1006,7 +1052,7 @@ export default function MeldungenPage() {
                   </Button>
                   <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
                     {abgeschlossene.length}
-                    {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
+                    {!ohneKopf && abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`} geladen
                   </div>
                 </div>
               )}

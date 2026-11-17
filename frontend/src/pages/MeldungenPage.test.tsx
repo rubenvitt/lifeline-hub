@@ -344,6 +344,63 @@ describe('MeldungenPage', () => {
   });
 
   /**
+   * LLH-1823: Beim ersten Laden und bei einem gescheiterten Abruf ist die Lage unbekannt, nicht
+   * leer. „0 offen“, „Offen (0)“ und „Keine Meldungen“ wären eine falsche Aussage.
+   */
+  describe('Laden und Fehler ohne Bestand (LLH-1823)', () => {
+    const OHNE_PLATZHALTER = 'script, style, [data-lfh="meta-platzhalter"]';
+
+    it('zeigt beim ersten Laden das Skelett, keine Null und keinen Leerzustand', async () => {
+      listeMeldungen.mockImplementation(() => new Promise<Meldung[]>(() => {}));
+      renderPage();
+      expect(await screen.findByLabelText('Inhalt wird geladen')).toBeInTheDocument();
+      expect(screen.queryByText('Keine Meldungen')).not.toBeInTheDocument();
+      expect(screen.queryByText(/0 offen/, { ignore: OHNE_PLATZHALTER })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Offen' })).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /Offen \(0\)/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Abgeschlossen' })).toBeInTheDocument();
+    });
+
+    it('zeigt bei 500 den Abruffehler mit „Erneut abrufen“ und keine Null', async () => {
+      listeMeldungen.mockRejectedValue(new ApiError(500, 'Interner Fehler'));
+      renderPage();
+      expect(await screen.findByText('Meldungen konnten nicht geladen werden')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+      expect(screen.queryByText('Keine Meldungen')).not.toBeInTheDocument();
+      expect(screen.queryByText(/\b0 offen/, { ignore: OHNE_PLATZHALTER })).not.toBeInTheDocument();
+      expect(screen.getByText('— offen · — abgeschlossen')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Offen' })).toBeInTheDocument();
+
+      // Erneut abrufen holt die Liste; danach steht sie normal da.
+      listeMeldungen.mockResolvedValue([meldung()]);
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+      expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    });
+
+    it('zeigt bei einem Fehler mit Bestand die Zeilen und den veralteten Stand', async () => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      renderPage(undefined, client);
+      await screen.findByText('Florian Nord 1');
+      listeMeldungen.mockRejectedValue(new ApiError(500, 'Interner Fehler'));
+      await act(() =>
+        client.refetchQueries({ queryKey: einsatzKeys.meldungenPhase(1, 'offen', 'alle') }),
+      );
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
+    });
+
+    it('zeigt im Normalfall Zahlen in Kopf und Segmenten wie bisher', async () => {
+      renderPage();
+      await screen.findByText('Florian Nord 1');
+      expect(screen.getByText('1 offen · 0 abgeschlossen')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Offen (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Abgeschlossen (0)' })).toBeInTheDocument();
+    });
+  });
+
+  /**
    * Schnellaktion „Meldung erfassen“ der Sprungpalette (Spec `meldungseingang`, „Das
    * Meldungsformular öffnet sich über die Adresse“). Als Paar mit der Gegenaussage unten.
    */
