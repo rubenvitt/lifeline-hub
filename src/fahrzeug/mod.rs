@@ -257,14 +257,7 @@ pub struct EntlassungAntwort {
     pub vorzustand: EntlassungVorzustand,
 }
 
-/// Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct RuecknahmeAusgelassen {
-    /// Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“).
-    pub bezeichnung: String,
-    /// Warum („inzwischen aufgelöst“, „sitzt inzwischen auf einem anderen Fahrzeug“).
-    pub grund: String,
-}
+pub use crate::entlassung::RuecknahmeAusgelassen;
 
 /// Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722).
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -278,15 +271,10 @@ pub fn etb_text_entlassung_zurueckgenommen(
     funkrufname: &str,
     ausgelassen: &[RuecknahmeAusgelassen],
 ) -> String {
-    let text = format!("Fahrzeug «{funkrufname}»: Entlassung zurückgenommen");
-    if ausgelassen.is_empty() {
-        return text;
-    }
-    let ohne: Vec<String> = ausgelassen
-        .iter()
-        .map(|a| format!("{} ({})", a.bezeichnung, a.grund))
-        .collect();
-    format!("{text}, ohne {}", ohne.join(", "))
+    format!(
+        "Fahrzeug «{funkrufname}»: Entlassung zurückgenommen{}",
+        crate::entlassung::ohne_text(ausgelassen)
+    )
 }
 
 #[cfg(test)]

@@ -154,6 +154,19 @@ impl EinsatzKontext {
         let key = Z::KEY.expect("Zielmodul ist an ein Modul gebunden");
         self.fordere_modul_zugriff(pool, key).await
     }
+
+    /// Wie [`Self::fordere_zielmodul`], als Antwort statt Fehler: für die Rücknahme eines
+    /// Entlassens, die einen Teil ohne Recht auslässt statt abzulehnen (LLH-1722, LLH-1922).
+    pub async fn darf_zielmodul<Z: ModulMarker>(
+        &self,
+        pool: &SqlitePool,
+    ) -> Result<bool, AppError> {
+        match self.fordere_zielmodul::<Z>(pool).await {
+            Ok(()) => Ok(true),
+            Err(AppError::Forbidden | AppError::ForbiddenMit(_)) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 /// Lese-Gate-Extractor (LFH-230): Org-Floor (via [`EinsatzKontext`]) + `fordere_lesezugriff`

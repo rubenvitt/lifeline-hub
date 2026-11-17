@@ -977,6 +977,153 @@ async fn aktion(
     .await
 }
 
+/// LLH-1922 (Spec `kraefte-entlassung`, „Entlassung einer Person zurücknehmen“): Nach „Entlassen“
+/// und „Rückgängig“ steht die Person wie vorher da — Status, Einheit samt Führung, UHS,
+/// Abschnittsleitung; ETB und Live wie beim Entlassen. Ein zweites Rücknehmen ist 409, eine zu
+/// lange Liste 400.
+#[tokio::test]
+async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let einheit = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let anna = stammpersonal_disponieren(&app, &admin, einsatz, "Anna Müller").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/personal/{anna}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "zuordnen");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}"),
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{anna}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Führer setzen");
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(&format!(r#"{{"name":"Süd","leiter_id":{anna}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let abschnitt = json["id"].as_i64().unwrap();
+    let uhs = uhs_mit_kraft(&app, &admin, einsatz, anna).await;
+    let stand = |p: &serde_json::Value| {
+        (
+            p["status_id"].clone(),
+            p["disponiert_at"].clone(),
+            p["einheit_id"].clone(),
+            p["uhs_id"].clone(),
+        )
+    };
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    let vorher = stand(
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == anna)
+            .unwrap(),
+    );
+
+    let (s, entlassen) = aktion(&app, &admin, einsatz, anna, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{entlassen}");
+    let v = &entlassen["vorzustand"];
+    assert_eq!(v["einheit_id"], einheit);
+    assert_eq!(v["uhs_id"], uhs);
+    assert_eq!(v["gefuehrte_einheiten"], serde_json::json!([einheit]));
+    assert_eq!(v["geleitete_abschnitte"], serde_json::json!([abschnitt]));
+    let vorzustand = v.to_string();
+
+    let zuruecknehmen = |body: String| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            anfrage(
+                &app,
+                "POST",
+                &format!("/api/einsaetze/{einsatz}/personal/{anna}/entlassen/zuruecknehmen"),
+                &admin,
+                Some(&body),
+            )
+            .await
+        }
+    };
+    let mut rx = live.abonniere(einsatz);
+    let (s, json) = zuruecknehmen(vorzustand.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["ausgelassen"], serde_json::json!([]));
+    assert_eq!(stand(&json["personal"]), vorher);
+    let (mut einheiten, mut abschnitte, mut uhs_ereignisse) = (Vec::new(), Vec::new(), Vec::new());
+    while let Ok(n) = rx.try_recv() {
+        let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+        match n.event {
+            lifeline_hub::live::LiveEvent::Einheit => einheiten.push(data["einheit_id"].clone()),
+            lifeline_hub::live::LiveEvent::Abschnitt => {
+                abschnitte.push(data["abschnitt_id"].clone())
+            }
+            lifeline_hub::live::LiveEvent::Uhs => uhs_ereignisse.push(data["uhs_id"].clone()),
+            _ => {}
+        }
+    }
+    assert_eq!(einheiten, [einheit], "Live an die Einheit");
+    assert_eq!(abschnitte, [abschnitt], "Live an den Abschnitt");
+    assert_eq!(uhs_ereignisse, [uhs], "Live an die UHS");
+    let (_, einheiten_json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let zug = einheiten_json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == einheit)
+        .unwrap();
+    assert_eq!(zug["fuehrer_id"], anna, "{zug}");
+    assert!(
+        system_etb_inhalte(&app, &admin, einsatz)
+            .await
+            .iter()
+            .any(|t| t.starts_with("Person «Anna Müller")
+                && t.ends_with(": Entlassung zurückgenommen")),
+        "ETB"
+    );
+
+    let (s, _) = zuruecknehmen(vorzustand.clone()).await;
+    assert_eq!(s, StatusCode::CONFLICT, "schon zurückgenommen");
+
+    let zu_viele: Vec<i64> = (1..=201).collect();
+    let (s, json) = zuruecknehmen(
+        serde_json::json!({
+            "entlassen_at": "2026-11-17 10:00:00",
+            "gefuehrte_einheiten": zu_viele,
+        })
+        .to_string(),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+}
+
 /// Spec `kraefte-entlassung`: die entlassene Person bleibt mit Zeitpunkt und entlassender Person,
 /// fehlt in der Liste und steht unter `?entlassene=1`; jeder Schreibweg an ihr ist 409, das
 /// erneute Disponieren holt sie zurück.
@@ -990,11 +1137,13 @@ async fn entlassen_und_erneut_disponieren() {
 
     let (s, json) = aktion(&app, &admin, einsatz, anna, "entlassen").await;
     assert_eq!(s, StatusCode::OK, "{json}");
-    assert_eq!(json["beendet_als"], "entlassen");
+    let person = &json["personal"];
+    assert_eq!(person["beendet_als"], "entlassen");
     assert!(
-        json["beendet_at"].is_string() && json["beendet_von"].is_i64(),
+        person["beendet_at"].is_string() && person["beendet_von"].is_i64(),
         "{json}"
     );
+    assert_eq!(json["vorzustand"]["entlassen_at"], person["beendet_at"]);
     assert_eq!(namen(&app, &admin, einsatz, "").await, ["Bert"]);
     assert_eq!(
         namen(&app, &admin, einsatz, "?entlassene=1").await,
