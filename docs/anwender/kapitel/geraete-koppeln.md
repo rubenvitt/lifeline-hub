@@ -157,7 +157,8 @@ Ein Gerät zählt dabei weder als Führungskraft der Organisation noch als Führ
 
 - mit dem Widerruf durch die Einsatzleitung,
 - mit ihrem Ablauf,
-- mit dem Abschluss des Einsatzes: alle Geräte verlieren den Zugriff,
+- mit dem Abschluss des Einsatzes: alle Geräte verlieren den Zugriff, auch wenn der Einsatz
+  danach wieder geöffnet wird,
 - wenn der Einsatzabschnitt aufgelöst wird, an den sie gebunden ist.
 
 Am Gerät steht dann „Kopplung beendet“; zurück kommt es nur über eine neue Kopplung.

@@ -45,6 +45,12 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * Gemessen wird breit und auf dem Handschirm, als Admin und als Beobachter (LFH-435,
  * `e2e/AGENTS.md`): der Beobachter sieht über dem Inhalt einen Rechtehinweis, die Vorbedingung
  * prüft der Test vor der Zahl.
+ *
+ * STARTLISTE (LLH-1815): der gesäte Einsatz hat weder Einsatzort noch Einsatzleiter, als Admin
+ * (Einsatzleitung) steht deshalb die Startliste „Einsatz starten“ über dem Führungsstand. Sie hängt
+ * an Abschnitten, Einheiten und Personal; damit sie das Band nicht nachträglich verschiebt, warten
+ * Band und Paneelreihen mit ihr. In der Folge `Gliederung zuletzt` steht als Admin deshalb nur die
+ * Alarmzeile, als Beobachter (keine Startliste) wie bisher das Band.
  */
 
 /** Dieselbe Hausgrenze wie `lagebild-cls-schmal.spec.ts` — eine Setzung, keine Toleranz. */
@@ -183,15 +189,23 @@ async function zeilenStehen(page: Page) {
 }
 
 /** Anker des Endzustands: Ortspfad mit Namen, alle Zeilen, Zahlen, kein Ladezeichen im Inhalt. */
-async function endzustand(page: Page) {
+async function endzustand(page: Page, rolle: 'admin' | 'beobachter') {
   await expect(page.locator('[data-lfh="seitenkopf"]')).toContainText(NAME_PRAEFIX);
   await zeilenStehen(page);
   await expect(page.locator('[data-lfh="ueberblick-abschnitt"]')).toHaveCount(GLIEDERUNG_ZEILEN);
   await expect(vorgaenge(page).locator('[data-lfh="abschnitt-zahl"]').first()).not.toHaveText('—');
+  await expect(page.locator('[data-lfh="ueberblick-startliste"]')).toHaveCount(
+    rolle === 'admin' ? 1 : 0,
+  );
   await expect(page.locator('[data-lfh="seiten-inhalt"] [aria-busy="true"]')).toHaveCount(0);
 }
 
-async function messe(page: Page, einsatzId: string, folge: Folge): Promise<Messung> {
+async function messe(
+  page: Page,
+  einsatzId: string,
+  folge: Folge,
+  rolle: 'admin' | 'beobachter',
+): Promise<Messung> {
   const abfragen = await stelleAbfragen(page, einsatzId, folge);
   await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
   if (folge === 'Listen zuletzt') {
@@ -203,15 +217,20 @@ async function messe(page: Page, einsatzId: string, folge: Folge): Promise<Messu
     await ruheShifts(page);
     abfragen.freigeben();
   } else if (folge === 'Gliederung zuletzt') {
-    // Vorbedingung: das Kennzahlenband steht, die Quellen der Gliederung fehlen noch.
-    await expect(
-      page.getByRole('group', { name: 'Führungsstand' }).locator('a[data-lfh="kennzahl"]').first(),
-    ).toBeVisible();
+    // Vorbedingung: die Quellen der Gliederung fehlen noch. Als Beobachter steht das Band schon,
+    // als Admin wartet es mit der Startliste (Dateikopf), dann steht nur die Alarmzeile.
+    const band = page.getByRole('group', { name: 'Führungsstand' });
+    if (rolle === 'beobachter') {
+      await expect(band.locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
+    } else {
+      await expect(page.getByRole('status', { name: 'Was brennt' })).toBeVisible();
+      await expect(band).toHaveCount(0);
+    }
     await expect(page.locator('[data-lfh="ueberblick-abschnitt"]')).toHaveCount(0);
     await ruheShifts(page);
     abfragen.freigeben();
   }
-  await endzustand(page);
+  await endzustand(page, rolle);
   return ruheShifts(page);
 }
 
@@ -231,7 +250,7 @@ for (const [ansicht, groesse] of Object.entries(ANSICHTEN)) {
 
       const werte: string[] = [];
       for (const folge of FOLGEN) {
-        const m = await messe(page, einsatzId, folge);
+        const m = await messe(page, einsatzId, folge, rolle);
         // Der Rollenzweig ist Vorbedingung der Zahl (LFH-435).
         await expect(
           page.getByText('nur Einsatzleitung und Führungspersonal', { exact: true }),

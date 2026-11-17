@@ -1,4 +1,4 @@
-import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from './kern';
+import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
  * Bilder des Kapitels „Einsatz abschließen und Einsatzbericht“
@@ -6,11 +6,14 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep einsatzabschluss`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   bericht-bloecke.png       frontend/src/druck/einsatzbericht/Auswahlleiste.tsx
- *   abschluss-rueckfrage.png  frontend/src/pages/EinsatzdatenPage.tsx (EinsatzAbschluss)
+ *   bericht-bloecke.png   frontend/src/druck/einsatzbericht/Auswahlleiste.tsx
+ *   abschluss-dialog.png  frontend/src/pages/einsatzdaten/EinsatzAbschlussDialog.tsx
+ *                         (ListenAbschnitt aus components/instrument/ListenPaneel.tsx)
+ *   wieder-oeffnen.png    frontend/src/pages/einsatzdaten/EinsatzWiedereroeffnenDialog.tsx
  *
- * Der Demo-Einsatz wird nie abgeschlossen: die Rückfrage bleibt offen, andere Kapitel brauchen
- * ihn laufend.
+ * Der Demo-Einsatz wird nie abgeschlossen: der Abschlussdialog bleibt offen, andere Kapitel
+ * brauchen ihn laufend. Das Wiederöffnen zeigt ein eigener, über die API angelegter und
+ * abgeschlossener Einsatz.
  */
 
 const KAPITEL = 'einsatzabschluss';
@@ -33,19 +36,40 @@ test.describe(KAPITEL, () => {
     await fotografiere(bloecke, KAPITEL, 'bericht-bloecke');
   });
 
-  test('Rückfrage „Einsatz abschließen?“', async ({ page }) => {
+  test('Dialog „Einsatz abschließen“ mit den offenen Punkten', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/einsatzdaten`);
     const abschluss = page.getByRole('region', { name: 'Einsatzabschluss' });
-    await abschluss.getByRole('button', { name: 'Einsatz abschließen' }).click();
-    const rueckfrage = page.locator('.ant-popover').filter({ hasText: 'Einsatz abschließen?' });
+    await abschluss.getByRole('button', { name: 'Einsatz abschließen…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Einsatz abschließen' });
+    await expect(dialog.getByRole('region', { name: 'Kräfte' })).toBeVisible();
+    await dialog.getByRole('textbox', { name: /Zur Bestätigung/ }).fill(demo.bezeichnung);
     await expect(
-      rueckfrage.getByRole('button', { name: 'Einsatz endgültig abschließen' }),
-    ).toBeVisible();
+      dialog.getByRole('button', { name: 'Einsatz abschließen', exact: true }),
+    ).toBeEnabled();
     await page.mouse.move(0, 0);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await fotografiere(rueckfrage, KAPITEL, 'abschluss-rueckfrage');
+    await fotografiere(dialog, KAPITEL, 'abschluss-dialog');
+  });
+
+  test('Dialog „Einsatz wieder öffnen“', async ({ page }) => {
+    await anmelden(page);
+    const einsatz = await fuelle<{ id: number }>(page, 'post', '/api/einsaetze', {
+      bezeichnung: 'Ölspur B 27',
+    });
+    await fuelle(page, 'post', `/api/einsaetze/${einsatz.id}/abschliessen`);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${einsatz.id}/einsatzdaten`);
+    const abschluss = page.getByRole('region', { name: 'Einsatzabschluss' });
+    await abschluss.getByRole('button', { name: 'Einsatz wieder öffnen…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Einsatz wieder öffnen' });
+    await dialog
+      .getByRole('textbox', { name: 'Grund' })
+      .fill('Versehentlich abgeschlossen, Nachalarmierung läuft noch');
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await fotografiere(dialog, KAPITEL, 'wieder-oeffnen');
   });
 });

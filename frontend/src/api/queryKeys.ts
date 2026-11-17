@@ -137,6 +137,9 @@ export const EINSATZ_KEYS = {
   modulOverrides: 'einsatz-modul-overrides',
   // Modul-Vorgaben der Einsatz-Org (LLH-1183), für den Editor „Module“.
   modulVorgaben: 'einsatz-modul-vorgaben',
+  // Offene Punkte vor dem Einsatzabschluss (LLH-1814): ein Abruf beim Öffnen des Dialogs. Nicht
+  // im Lagebild offline: ohne Netz schließt niemand ab.
+  abschlussPruefung: 'einsatz-abschluss-pruefung',
   // Gerätekopplungen der Einsatzleitung (LFH-892).
   geraete: 'einsatz-geraete',
   // Freigaben für Anbindungen (Maschinenzugänge) an diesem Einsatz (LLH-1638), Seite der Geräte.
@@ -591,6 +594,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.modulOverrides,
   EINSATZ_KEYS.modulVorgaben,
+  EINSATZ_KEYS.abschlussPruefung,
   EINSATZ_KEYS.geraete,
   EINSATZ_KEYS.anbindungen,
   EINSATZ_KEYS.lagebildFreigaben,
@@ -690,6 +694,8 @@ export const einsatzKeys = {
   modulVorgaben: (einsatzId: number) => [EINSATZ_KEYS.modulVorgaben, einsatzId] as const,
   // Invalidierungs-Prefix über ALLE Einsätze: eine Org-Vorgabe gilt für jeden Einsatz der Org.
   modulVorgabenAlle: () => [EINSATZ_KEYS.modulVorgaben] as const,
+  /** Offene Punkte vor dem Einsatzabschluss (LLH-1814), nur die Einsatzleitung, nicht live. */
+  abschlussPruefung: (einsatzId: number) => [EINSATZ_KEYS.abschlussPruefung, einsatzId] as const,
   /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
   geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
   /** Anbindungen der Org aus Sicht dieses Einsatzes (LLH-1638), nicht live. */
@@ -1501,7 +1507,8 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * Kartenebene „Tiere" (LLH-1123: sie trägt Halterkontakt und Kennzeichnung; ohne Netz zeigt die
  * Karte keine Tiere), von den Bereitstellungsräumen alles außer der Liste (LLH-1318: Detail,
  * Verlauf, Dialogdaten) und die Vorgabe je Funktion (LLH-1421: nur
- * die Einstellungsseite liest sie, geschrieben wird mit Netz).
+ * die Einstellungsseite liest sie, geschrieben wird mit Netz) und die offenen Punkte vor dem
+ * Abschluss (LLH-1814: ohne Netz schließt niemand ab).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {

@@ -14,6 +14,7 @@ import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
 import { listenGedaechtnisRaeumen } from '../components/listenGedaechtnis';
 import { entwuerfeAufraeumen, entwuerfeRaeumen } from '../etb/entwuerfe/entwurfStore';
+import { clearStartlisteAusgeblendet } from '../pages/fuehrung/startlisteSpeicher';
 import { zuletztRaeumen } from '../stammdaten/zuletztVerwendet';
 import { gemerkteStellenRaeumen } from '../verpflegung/stellenGedaechtnis';
 import { personErfassungsQuittungenAufraeumen, personErfassungsQuittungenRaeumen } from './queue';
@@ -115,6 +116,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'bleibt',
     grund:
       'Gewählte Spalten einer Liste je Seite (LLH-1086): Geräte-Einstellung aus Spaltenschlüsseln, ohne Personenbezug und ohne Einsatzinhalt.',
+  },
+  {
+    ort: 'localStorage startliste-ausgeblendet:<einsatz>',
+    datei: 'pages/fuehrung/startlisteSpeicher.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Ob die Startliste „Einsatz starten“ des Überblicks in diesem Browser ausgeblendet ist, je Einsatz (LLH-1815); kein Personenbezug, aber Einsatzkennungen. Die nächste Person sieht die Liste wieder, solange Punkte offen sind.',
   },
   {
     ort: 'localStorage lfh:verpflegung:stelle:<einsatz>',
@@ -293,6 +301,7 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     verlaufInhalt: () => verlaufInhalt.clear(),
     listenGedaechtnis: listenGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
+    startlisteAusgeblendet: clearStartlisteAusgeblendet,
     stammdatenfeldZuletzt: zuletztRaeumen,
     queueZaehlerMerker: queueZaehlerMerkerRaeumen,
     ...(anlass === 'abmelden' ? { etbEntwuerfe: entwuerfeRaeumen } : {}),

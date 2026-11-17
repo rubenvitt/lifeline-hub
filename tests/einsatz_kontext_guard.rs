@@ -40,6 +40,8 @@ const SANKTIONIERTE_GATES: &[&str] = &[
     "EinsatzVerwaltungszugriff",
     // LLH-1491: Führung je Einsatz, Einsatzleitung oder Admin ohne `fordere_aktiv`.
     "EinsatzFuehrungszugriff",
+    // LLH-1814: Wiederöffnen, Einsatzleitung oder Admin der Einsatz-Org ohne `fordere_aktiv`.
+    "EinsatzWiedereroeffnungszugriff",
 ];
 
 /// Handler, die BEWUSST nur den Org-Floor (`EinsatzKontext`) ziehen, ohne Read-/Write-

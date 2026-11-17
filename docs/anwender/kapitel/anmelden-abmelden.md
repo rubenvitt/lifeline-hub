@@ -2,7 +2,7 @@
 titel: Anmelden und Abmelden
 gruppen: [alle, geraete]
 reihenfolge: 10
-quellen: [frontend/src/pages/LoginPage.tsx, src/auth/passwort_wechsel.rs, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/auth/AbmeldenRueckfrage.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/offline/queueZaehlerMerker.ts, frontend/src/stammdaten/zuletztVerwendet.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/pages/LoginPage.tsx, src/auth/passwort_wechsel.rs, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/auth/AbmeldenRueckfrage.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/offline/queueZaehlerMerker.ts, frontend/src/stammdaten/zuletztVerwendet.ts, frontend/src/pages/fuehrung/startlisteSpeicher.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -136,6 +136,7 @@ gehört:
 - das vorgehaltene Lagebild für die Arbeit ohne Netz,
 - zwischengespeicherte Orte und Erfassungshilfen,
 - die beim Zählen der Ausgabe zuletzt gewählte Verpflegungsstelle je Einsatz,
+- welche Startlisten „Einsatz starten“ im Überblick ausgeblendet sind,
 - die zuletzt verwendeten Absender und Empfänger aus Einsatztagebuch und Meldungen,
 - die zuletzt gezählte Zahl vorgemerkter und abgelehnter Einträge, mit der die Kopfleiste
   „WARTET“ und „PRÜFEN“ schon beim Laden zeigt,

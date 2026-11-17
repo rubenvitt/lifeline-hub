@@ -182,6 +182,36 @@ pub async fn zaehlen(
     ))
 }
 
+/// Die ersten `limit` offenen Aufträge (Kennung, laufende Nummer, Auftragstext) für die Prüfung
+/// vor dem Abschluss (LLH-1814, design.md D1). „Offen“ ist dieselbe Regel wie im Modulzähler:
+/// [`super::AuftragBearbeitungsstatus::ist_offen`] über dasselbe Fragment
+/// `bearbeitungsstatus_sql!`, die offenen Werte als JSON-Liste gebunden.
+pub async fn offene_kurzliste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    limit: i64,
+) -> Result<Vec<(i64, Option<i64>, String)>, AppError> {
+    let offen: Vec<&str> = super::AuftragBearbeitungsstatus::ALLE
+        .iter()
+        .filter(|s| s.ist_offen())
+        .map(|s| s.as_str())
+        .collect();
+    let offen = serde_json::to_string(&offen).map_err(|e| AppError::Internal(e.to_string()))?;
+    const SQL: &str = concat!(
+        "SELECT a.id, a.lfd_nr, a.auftrag_text FROM auftrag a",
+        vollzug_join_sql!(),
+        " WHERE a.einsatz_id = ? AND ",
+        bearbeitungsstatus_sql!(),
+        " IN (SELECT value FROM json_each(?)) ORDER BY a.lfd_nr, a.id LIMIT ?"
+    );
+    Ok(sqlx::query_as(SQL)
+        .bind(einsatz_id)
+        .bind(offen)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?)
+}
+
 /// Lädt einen Auftrag samt Empfängern. `NotFound`, wenn unbekannt.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
 pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<AuftragDetail, AppError> {

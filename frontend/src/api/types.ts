@@ -122,6 +122,12 @@ export type Lagekennzahl = S['Lagekennzahl'];
 /** Antwort der Wahl der Lagekennzahlen (LLH-1371, `PUT …/lagekennzahl-wahl`). */
 export type LagekennzahlWahl = S['LagekennzahlWahl'];
 export type EinsatzAnzeige = S['EinsatzAnzeige'];
+/** Offene Punkte vor dem Einsatzabschluss (LLH-1814). */
+export type AbschlussPruefung = S['AbschlussPruefung'];
+export type AbschlussGruppe = S['AbschlussGruppe'];
+export type AbschlussEintrag = S['AbschlussEintrag'];
+export type AbschlussKraefte = S['AbschlussKraefte'];
+export type AbschlussKraft = S['AbschlussKraft'];
 export type MitgliedAnzeige = S['MitgliedAnzeige'];
 export type MitgliedAuswahl = S['MitgliedAuswahl'];
 export type StichwortVorschlag = S['StichwortVorschlag'];

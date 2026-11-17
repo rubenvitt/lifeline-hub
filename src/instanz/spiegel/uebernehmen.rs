@@ -539,7 +539,14 @@ async fn kopf_uebernehmen(
         // während einer Trennung selbst geschwärzt, ist ihre Bruchstelle schon geschwärzt
         // gesichert, und ein Wechsel auf NULL räumte sie grundlos (Review #1284).
         werte.retain(|(s, v)| !(s == "schwaerzung_marke" && v.is_null()));
+        let wechsel = status_wechsel(conn, id, &werte).await?;
+        if wechsel == Some(StatusWechsel::Wiedereroeffnet) {
+            beende_zugaenge(conn, id).await?;
+        }
         update(conn, t.name, &werte, "id", &id.to_string()).await?;
+        if wechsel == Some(StatusWechsel::Abgeschlossen) {
+            beende_zugaenge(conn, id).await?;
+        }
         // Hat der Führer seither geschwärzt, räumt der Spiegel seine Bruchstelle (LLH-1649). Neu
         // ist nur eine Marke, die dieser Einsatz hier nie hatte: Bringt ein neuer Führer nach
         // einer Trennung die Marke von davor, zählt eine eigene Schwärzung dieser Seite nicht.
@@ -579,6 +586,56 @@ async fn kopf_uebernehmen(
     super::fuehrung::verknuepfe_akte(conn, id, &l.kennung).await?;
     merke_schwaerzung_marke(conn, id).await?;
     Ok(id)
+}
+
+/// Wie sich der Status eines vorhandenen Spiegels mit dem gelieferten Kopf ändert.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StatusWechsel {
+    Abgeschlossen,
+    Wiedereroeffnet,
+}
+
+/// Vergleicht den Status hier mit dem gelieferten; `None`, wenn er gleich bleibt oder fehlt.
+async fn status_wechsel(
+    conn: &mut SqliteConnection,
+    id: i64,
+    werte: &[(String, Value)],
+) -> Result<Option<StatusWechsel>, AppError> {
+    use crate::einsatz::STATUS_ABGESCHLOSSEN;
+    let Some(neu) = werte
+        .iter()
+        .find(|(s, _)| s == "status")
+        .and_then(|(_, v)| v.as_str())
+    else {
+        return Ok(None);
+    };
+    let alt: String = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await?;
+    Ok(if alt == neu {
+        None
+    } else if neu == STATUS_ABGESCHLOSSEN {
+        Some(StatusWechsel::Abgeschlossen)
+    } else if alt == STATUS_ABGESCHLOSSEN {
+        Some(StatusWechsel::Wiedereroeffnet)
+    } else {
+        None
+    })
+}
+
+/// Beendet am Spiegel Gerätekopplungen und Freigaben für Maschinenzugänge (LLH-1814, Spec
+/// `einsatz-abschluss`: beide MUST nach dem Abschluss beendet bleiben). Beide Tabellen werden
+/// nicht gespiegelt ([`super::art`]); was eine Führungsübergabe am abgebenden Ende stehen ließ,
+/// galt bisher nur über den Status als beendet und lebte mit dem Wiederöffnen beim Führer wieder
+/// auf. Der Aufrufer ruft dies, solange der Einsatz hier `abgeschlossen` steht: dann schreibt der
+/// Trigger der Freigabe kein Ereignis (Migration 0345, das Ende ist schon gemeldet). Beim
+/// Abschluss endet beides, beim Rückweg nach `aktiv` noch einmal, was ein älterer Stand am
+/// abgeschlossenen Spiegel stehen ließ.
+async fn beende_zugaenge(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+    crate::geraet::repo::widerrufe_am_spiegel(conn, id).await?;
+    crate::public_api::freigabe::delete_fuer_einsatz_tx(conn, id).await?;
+    Ok(())
 }
 
 /// Jahr und laufende Nummer des Kopfs gehen in die Nummernvergabe dieser Instanz ein; eine

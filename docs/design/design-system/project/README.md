@@ -82,7 +82,7 @@ die Karten deckungsgleich.
 
 - **Paneel** (`components/Paneel/`, Gruppe Flächen)
 - **Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)** (`components/Seitenkopf/`, Gruppe Rahmen)
-- **Dashboard-Baukasten (Verteilung und Matrix)** (`components/Dashboard/`, Gruppe Flächen)
+- **Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)** (`components/Dashboard/`, Gruppe Flächen)
 - **Schrift: Rollen der Skala und Feldetikett** (`components/Schrift/`, Gruppe Daten)
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
@@ -274,11 +274,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Keine erfundenen Daten:** was ohne Datenquelle ist, wird weggelassen,
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
   Evakuiert, Pegel auf Platz 1, Rückmeldung, ETB-Zählung.
-- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Aufträge, Meldungen, Abschnitte, offene
-  Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los ist (Betroffene, Kräfte,
-  Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Kennzahl steht auf genau
-  einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Beide verweisen im Seitenkopf
-  aufeinander..
+- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, Aufträge,
+  Meldungen, Abschnitte, offene Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los
+  ist (Betroffene, Kräfte, Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine
+  Kennzahl steht auf genau einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Die
+  Startliste zeigt Haken, keine Zahl. Beide verweisen im Seitenkopf aufeinander..
 
 ## Farbachsen
 
@@ -432,7 +432,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Ähnliches (Wächter `components/menueFarbe.guard.test.ts`). In der Zeile trennt der rote Knopf,
   im Menü der Trenner.
   **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**: der Einsatzabschluss steht als letzter Abschnitt auf den
-  Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.
+  Einsatzdaten, am aktiven Einsatz nur für die Einsatzleitung. Er ist die Ausnahme von
+  „Unumkehrbares → `Popconfirm`“: ein Dialog
+  (`pages/einsatzdaten/EinsatzAbschlussDialog.tsx`) nennt die offenen Punkte, sperrt aber nicht,
+  und sein roter Knopf „Einsatz abschließen“ wird erst aktiv, wenn Einsatznummer oder Bezeichnung
+  eingetippt sind (geprüft nur im Client). Binnen 24 Stunden öffnen Einsatzleitung und System-Admin
+  der Einsatz-Org ihn mit Pflicht-Grund wieder (`darfEinsatzWiedereroeffnen`).
 - **Ein Iconsatz**: Icons8
   „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IconPaar`, heute Rail und Stern).
   Import nur über `icons/index.ts`; Register, SVG-Quellen und Stempel in `scripts/icons/`
