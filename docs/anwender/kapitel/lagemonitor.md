@@ -2,7 +2,7 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/live/liveVerbindung.ts, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
 ---
 
 ## Überblick
@@ -71,7 +71,8 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
 8. Steigt die Zahl der offenen Sofortmeldungen oder die Zahl in SK I, ist sie eine Minute lang
    farbig hinterlegt, und oben in der Kachel steht „Neue Sofortmeldung“ bzw. „Neu in SK I“.
 9. Die Statusleiste nennt Einsatz, Gerät, Verbindung („live“, „verbinde …“, „getrennt“), den
-   Stand der Daten mit Alter und die Uhr. Bei einer Übung steht vor dem Einsatz die violette
+   Stand der Daten mit Alter und die Uhr. Kommt 45 Sekunden lang nichts über die Leitung, steht
+   dort „verbinde …“, und der Monitor baut die Verbindung neu auf. Bei einer Übung steht vor dem Einsatz die violette
    Marke „ÜBUNG“; „Einsatzart nicht geladen“ heißt, dass der Einsatz gerade nicht abrufbar ist.
 
 ### Gerätemenü öffnen

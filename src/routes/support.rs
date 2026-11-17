@@ -716,6 +716,12 @@ pub fn last_event_id(headers: &HeaderMap) -> Option<String> {
 /// Abgleich aus; der Client hört es nur in `frontend/src/live/liveVerbindung.ts`.
 pub const POSITION_EREIGNIS: &str = "position";
 
+/// Wire-Name des Lebenszeichens jedes Live-Stroms (LLH-1935, Change `l39v43md-sse-herzschlag`,
+/// design.md D2). Wie [`POSITION_EREIGNIS`] ein Kontroll-Ereignis, kein [`LiveEvent`]: ohne
+/// `id:`, ohne Modul, ohne Abgleich. Takt und Strom: [`crate::live::strom::mit_heartbeat`]; der
+/// Client hört es nur in `frontend/src/live/liveVerbindung.ts`.
+pub const HEARTBEAT_EREIGNIS: &str = "heartbeat";
+
 /// Baut den SSE-Ausgabe-Stream mit vorangestelltem Replay (F14/LFH-263): verpasste
 /// Nachrichten (`Replay::Events`) werden VOR dem Live-Kanal ausgeliefert; eine `Luecke`
 /// (Ring-Overflow / Neustart) sendet genau ein `lagged`/`resync`-Signal (Client resynct per

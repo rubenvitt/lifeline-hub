@@ -35,10 +35,11 @@ Der Server mischt einen eigenen Intervall-Strom (`HEARTBEAT_INTERVAL` = 15 s, er
   nicht wach; der Client müsste jedes Ereignis kennen, das der Server je schicken kann.
 - `KeepAlive::default()` bleibt: es kostet nichts (es feuert nach 15 s Leerlauf, das Lebenszeichen
   kommt vorher) und hält Proxys wach, falls der Takt einmal geändert wird.
-- Der Intervall-Strom wird **vor** dem `take_until` der Route eingemischt, damit er mit dem Strom
-  endet (eine Verschmelzung endet sonst erst, wenn beide Seiten enden). Die Funktion
-  `strom::mit_heartbeat(strom)` liefert `strom.merge(intervall)`; beide Routen rufen sie an
-  derselben Stelle wie `retry_ereignis`.
+- `strom::mit_heartbeat(strom, takt)` verschmilzt den Strom mit dem Intervall und endet, sobald
+  der innere Strom endet (eine bloße Verschmelzung liefe sonst ewig weiter). Beide Routen mischen
+  es nach dem Modul- und Gerätefilter und vor ihrem `take_until` ein.
+- Der Takt steht in `StromGrenzen::heartbeat` (Vorgabe `HEARTBEAT_INTERVAL`), damit Tests ihn wie
+  die Lebensdauer auf Millisekunden stellen.
 - `MissedTickBehavior::Delay`: ein blockierter Takt holt keine Schläge im Bündel nach.
 
 ### D2 Wire-Form des Lebenszeichens
@@ -60,7 +61,8 @@ In `verbinde()` je Quelle eine Wache (`setTimeout`, `HEARTBEAT_TIMEOUT_MS` = 45 
   trennen, `verbinde()` neu. Die neue Quelle hat keine `Last-Event-ID`; ihr `open` läuft deshalb in
   `beiWiederaufbau` (Vollabgleich), wie es die Spec für einen Neuaufbau durch das Frontend verlangt.
 - **Stopp** in `onerror` (der Browser verbindet selbst neu, Schonfrist und Backoff übernehmen; ein
-  folgendes `open` startet die Wache neu), beim Pausieren für den Druck und beim Aufräumen.
+  folgendes `open` startet die Wache neu) und beim Aufräumen. Beim Pausieren für den Druck ist die
+  Quelle nicht mehr die aktuelle; die Wache prüft das beim Ablauf und tut dann nichts.
 - Drei verpasste Schläge (45 s gegen 15 s) lassen Raum für langsame Mobilfunk-Zustellung und
   gedrosselte Timer verdeckter Tabs.
 

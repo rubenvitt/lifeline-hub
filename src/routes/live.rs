@@ -20,6 +20,12 @@
 //! seine Sitzung gelöscht ist ([`crate::live::LiveHub::melde_sitzung_ende`]). Der Neuaufbau
 //! bekommt 401, und das Gerät räumt sein Lagebild, ohne dass dort jemand etwas bedient.
 //!
+//! **Lebenszeichen** (LLH-1935): beide Ströme senden im Takt [`strom::HEARTBEAT_INTERVAL`] das
+//! Kontroll-Ereignis `heartbeat` ([`strom::mit_heartbeat`]). Daran erkennt das Frontend eine
+//! Leitung, die offen scheint, aber nichts mehr liefert (halboffenes TCP im Funkloch); die
+//! Keep-Alive-Kommentare sieht eine `EventSource` nicht. Sie bleiben trotzdem gesetzt
+//! (`openspec/changes/l39v43md-sse-herzschlag/design.md`, D1).
+//!
 //! **Zulassung:** beide Ströme stehen außerhalb der routerweiten Zulassung
 //! ([`crate::zulassung::OHNE_ZULASSUNGSGRENZE`]) und belegen stattdessen vor jeder weiteren
 //! Datenbankabfrage einen Platz in [`crate::live::strom::StromZulassung`] (je Benutzer 429,
@@ -91,7 +97,11 @@ pub async fn stream(
         )),
         Some(_) => futures::StreamExt::boxed(futures::stream::empty()),
     };
-    let stream = einsatz_strom.merge(org_strom);
+    // Das Lebenszeichen nach dem Filter: es erreicht jede Verbindung, auch ein Gerät (LLH-1935).
+    let stream = strom::mit_heartbeat(
+        einsatz_strom.merge(org_strom),
+        state.live.stroeme.heartbeat(),
+    );
 
     // Sofort ein erstes Byte: ein Proxy, der die Header erst mit dem ersten Body-Byte weitergibt
     // (etwa der Vite-Dev-Proxy), hielte sie sonst bis zum ersten Keep-Alive zurück, und
@@ -223,7 +233,10 @@ pub async fn org_stream(
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
     let platz = state.live.stroeme.belegen(benutzer.id)?;
     let rx = state.live.abonniere_org();
-    let stream = crate::routes::support::sse_org_stream(rx, OrgAbonnent::aus(&benutzer));
+    let stream = strom::mit_heartbeat(
+        crate::routes::support::sse_org_stream(rx, OrgAbonnent::aus(&benutzer)),
+        state.live.stroeme.heartbeat(),
+    );
     let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")))
         .chain(tokio_stream::once(strom::retry_ereignis()));
     let ende = sitzung_ende(&state, sitzung);

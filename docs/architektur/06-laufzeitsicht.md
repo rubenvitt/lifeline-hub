@@ -131,12 +131,14 @@ sequenceDiagram
 - Puffer `KANAL_KAPAZITAET` und `REPLAY_KAPAZITAET` je 256, `REPLAY_KARENZ` 10 min
   (`src/live/mod.rs`). Nach einem Abriss liefert `Last-Event-ID` das Verpasste nach; nach einem
   Überlauf kommt `lagged`, und der Client gleicht alle Keys ab. Je Benutzer höchstens 16 Ströme,
-  Lebensdauer 30 min plus Streuung (`src/live/strom.rs`).
+  Lebensdauer 30 min plus Streuung (`src/live/strom.rs`). Beide Ströme senden alle 15 s das
+  Kontroll-Ereignis `heartbeat` ohne `id:` (`strom::mit_heartbeat`, LLH-1935).
 - Der Client hält **eine** `EventSource` je Einsatz (`frontend/src/live/useEinsatzLiveStream.ts`)
   und verteilt über `EINSATZ_STREAM_EVENTS` (`frontend/src/api/queryKeys.ts`).
   `liveInvalidierung.ts` bündelt in Fenstern von 300 ms (Modulzähler 1000 ms). Scheitert die
   Verbindung, prüft `liveVerbindung.ts` `/api/auth/me` und übergibt bei 401 an die
-  Sitzungswache. Spec: [`openspec/specs/live-abgleich/`](../../openspec/specs/live-abgleich/spec.md).
+  Sitzungswache. Bleibt eine offene Verbindung 45 s ohne Ereignis (halboffenes TCP im Funkloch),
+  meldet `liveVerbindung.ts` den Wiederaufbau und baut selbst neu auf, mit Vollabgleich. Spec: [`openspec/specs/live-abgleich/`](../../openspec/specs/live-abgleich/spec.md).
 
 ## 6.4 Schreiben ohne Netz und Nachsenden
 

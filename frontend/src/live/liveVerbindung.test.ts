@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { oeffneLiveVerbindung, pausiereLiveStroeme } from './liveVerbindung';
+import {
+  HEARTBEAT_TIMEOUT_MS,
+  oeffneLiveVerbindung,
+  pausiereLiveStroeme,
+  type LiveVerbindungsStatus,
+} from './liveVerbindung';
 
 /** Zeichnet Verbindungen auf; `oeffne` spielt das `open` ein. */
 class FakeEventSource {
@@ -13,11 +18,16 @@ class FakeEventSource {
   readyState = FakeEventSource.CONNECTING;
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  private lauscher: Record<string, EventListener[]> = {};
   constructor(readonly url: string) {
     FakeEventSource.instanzen.push(this);
   }
-  addEventListener() {}
-  removeEventListener() {}
+  addEventListener(typ: string, cb: EventListener) {
+    (this.lauscher[typ] ??= []).push(cb);
+  }
+  removeEventListener(typ: string, cb: EventListener) {
+    this.lauscher[typ] = (this.lauscher[typ] ?? []).filter((l) => l !== cb);
+  }
   close() {
     this.readyState = FakeEventSource.CLOSED;
   }
@@ -25,22 +35,39 @@ class FakeEventSource {
     this.readyState = FakeEventSource.OPEN;
     this.onopen?.();
   }
+  /** Spielt ein Ereignis ein, wie es eine offene Quelle ihren Listenern meldet. */
+  sende(typ: string, data = '{}') {
+    (this.lauscher[typ] ?? []).forEach((cb) => cb(new MessageEvent(typ, { data })));
+  }
+  fehler(readyState: number) {
+    this.readyState = readyState;
+    this.onerror?.();
+  }
 }
 
+/** Zeichnet die gemeldeten Zustände auf (`lfh:live-status`). */
+const gemeldet: LiveVerbindungsStatus[] = [];
+const statusMerken = (e: Event) =>
+  gemeldet.push((e as CustomEvent<{ status: LiveVerbindungsStatus }>).detail.status);
+window.addEventListener('lfh:live-status', statusMerken);
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   FakeEventSource.instanzen = [];
+  gemeldet.length = 0;
 });
 
-function verbinde() {
+function verbinde(listeners: readonly (readonly [string, EventListener])[] = []) {
   vi.stubGlobal('EventSource', FakeEventSource);
   const beiWiederaufbau = vi.fn();
   const beimErstenOpen = vi.fn();
   const schliessen = oeffneLiveVerbindung({
     url: '/api/live',
-    listeners: [],
+    listeners,
     beiWiederaufbau,
     beimErstenOpen,
+    positionsEreignis: 'position',
   });
   return { schliessen, beiWiederaufbau, beimErstenOpen };
 }
@@ -82,5 +109,99 @@ describe('pausiereLiveStroeme (LFH-1105)', () => {
     FakeEventSource.instanzen[0].close();
     expect(pausiereLiveStroeme()).toBeNull();
     schliessen();
+  });
+});
+
+// Spec `live-abgleich`, „Eine stumme Live-Leitung gilt als abgerissen“ (LLH-1935, Change
+// `l39v43md-sse-herzschlag`, design.md D3).
+describe('Wache gegen eine stumme Leitung (LLH-1935)', () => {
+  it('meldet nach 45 s Stille sofort „connecting“ und baut eine neue Verbindung auf', () => {
+    vi.useFakeTimers();
+    const { schliessen, beiWiederaufbau, beimErstenOpen } = verbinde();
+    const erste = FakeEventSource.instanzen[0];
+    erste.oeffne();
+    expect(beimErstenOpen).toHaveBeenCalledTimes(1);
+    expect(HEARTBEAT_TIMEOUT_MS).toBe(45_000);
+
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS - 1);
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    expect(gemeldet.at(-1)).toBe('open');
+
+    vi.advanceTimersByTime(1);
+    expect(gemeldet.at(-1)).toBe('connecting');
+    expect(erste.readyState).toBe(FakeEventSource.CLOSED);
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+    expect(FakeEventSource.offene()).toHaveLength(1);
+
+    FakeEventSource.instanzen[1].oeffne();
+    expect(gemeldet.at(-1)).toBe('open');
+    // Die neue Verbindung hat keine `Last-Event-ID`: Vollabgleich, genau einmal.
+    expect(beiWiederaufbau).toHaveBeenCalledTimes(1);
+    expect(beimErstenOpen).toHaveBeenCalledTimes(1);
+    schliessen();
+  });
+
+  it('hält die Leitung, solange Lebenszeichen, Position oder Fach-Ereignisse eintreffen', () => {
+    vi.useFakeTimers();
+    const etb = vi.fn();
+    const { schliessen } = verbinde([['etb', etb]]);
+    const quelle = FakeEventSource.instanzen[0];
+    quelle.oeffne();
+    const schritt = HEARTBEAT_TIMEOUT_MS - 1000;
+    for (const typ of ['heartbeat', 'position', 'etb', 'heartbeat', 'heartbeat']) {
+      vi.advanceTimersByTime(schritt);
+      quelle.sende(typ);
+    }
+    expect(etb).toHaveBeenCalledTimes(1);
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    expect(gemeldet).not.toContain('connecting');
+
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
+    expect(gemeldet.at(-1)).toBe('connecting');
+    schliessen();
+  });
+
+  it('meldet vor dem ersten „open“ keinen Abriss wegen Stille (Kaltstart)', () => {
+    vi.useFakeTimers();
+    const { schliessen } = verbinde();
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS * 3);
+    expect(gemeldet).toEqual([]);
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    schliessen();
+  });
+
+  it('übergibt nach einem Fehler an den Neuaufbau des Browsers und wacht nach dessen „open“ wieder', () => {
+    vi.useFakeTimers();
+    const { schliessen } = verbinde();
+    const quelle = FakeEventSource.instanzen[0];
+    quelle.oeffne();
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS - 1000);
+    quelle.fehler(FakeEventSource.CONNECTING);
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS * 2);
+    // Nur die Schonfrist des Browser-Neuaufbaus meldet sich, die Wache baut nichts eigenes auf.
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    expect(gemeldet.filter((s) => s === 'connecting')).toHaveLength(1);
+
+    quelle.oeffne();
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS);
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+    schliessen();
+  });
+
+  it('feuert nach dem Pausieren und nach dem Aufräumen nicht mehr', () => {
+    vi.useFakeTimers();
+    const { schliessen } = verbinde();
+    FakeEventSource.instanzen[0].oeffne();
+    const fortsetzen = pausiereLiveStroeme();
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS * 2);
+    expect(FakeEventSource.instanzen).toHaveLength(1);
+    expect(gemeldet).not.toContain('connecting');
+
+    fortsetzen!();
+    FakeEventSource.instanzen[1].oeffne();
+    schliessen();
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS * 2);
+    expect(FakeEventSource.instanzen).toHaveLength(2);
+    expect(gemeldet).not.toContain('connecting');
   });
 });
