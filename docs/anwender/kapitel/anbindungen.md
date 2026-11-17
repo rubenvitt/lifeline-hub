@@ -237,8 +237,9 @@ Einsatzleitung auf der Seite „Geräte“ ihres Einsatzes im Paneel „Anbindun
 hat, und höchstens einen. Ohne Freigabe geht nichts hinaus, auch kein Ereignis.
 Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“,
 solange die Anbindung weder widerrufen noch abgelaufen ist. Die
-Freigabe endet mit dem Abschluss des Einsatzes, mit dem Widerruf oder Ablauf der Anbindung und
-mit jeder Änderung an diesen beiden Rechten, wenn eines dazukommt wie wenn eines wegfällt. Die
+Freigabe endet mit dem Abschluss des Einsatzes (auch wenn er danach wieder geöffnet wird), mit dem
+Widerruf oder Ablauf der Anbindung und mit jeder Änderung an diesen beiden Rechten, wenn eines
+dazukommt wie wenn eines wegfällt. Die
 Einsatzleitung hat Lage oder Einsatzkopf in einem bestimmten Umfang freigegeben und entscheidet
 über einen anderen neu.
 Auch ein verlängertes „Gültig bis“ braucht eine neue Freigabe.

@@ -2,17 +2,20 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs, src/einsatz/nachbereitung.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussPaneel.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussDialog.tsx, frontend/src/pages/einsatzdaten/EinsatzWiedereroeffnenDialog.tsx, src/einsatz/abschluss.rs, src/einsatz/kontext.rs, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs, src/einsatz/nachbereitung.rs]
 ---
 
 ## Überblick
 
-Ist ein Einsatz vorbei, schließt die Einsatzleitung ihn in den Einsatzdaten ab. Danach ist er
-schreibgeschützt: niemand legt mehr Einträge an oder berichtigt sie. Der Einsatzbericht fasst
-den Einsatz zum Drucken oder als PDF zusammen, aus Stammdaten, Zeiten, Führung, Kräften, Lage,
-Bilanz, Hilfeleistungen und einem Auszug des Einsatztagebuchs. Er lässt sich jederzeit erzeugen,
-auch während der Einsatz noch läuft. Für den Auftraggeber eines Sanitätsdienstes gibt es einen
-Kurzbericht ohne Einsatztagebuch und ohne Anlagen.
+Ist ein Einsatz vorbei, schließt die Einsatzleitung ihn in den Einsatzdaten ab. Vorher nennt ein
+Dialog, was noch offen ist, und verlangt die Einsatznummer oder die Bezeichnung des Einsatzes.
+Danach ist er schreibgeschützt: niemand legt mehr Einträge an oder berichtigt sie. War es der
+falsche Einsatz oder zu früh, öffnen Einsatzleitung und System-Admins der Organisation ihn binnen
+24 Stunden mit Grund wieder. Der Einsatzbericht fasst den Einsatz zum Drucken oder als PDF
+zusammen, aus Stammdaten, Zeiten, Führung, Kräften, Lage, Bilanz, Hilfeleistungen und einem
+Auszug des Einsatztagebuchs. Er lässt sich jederzeit erzeugen, auch während der Einsatz noch
+läuft. Für den Auftraggeber eines Sanitätsdienstes gibt es einen Kurzbericht ohne
+Einsatztagebuch und ohne Anlagen.
 
 ## Abläufe
 
@@ -46,21 +49,55 @@ holt den aktuellen Stand, „Zurück zu den Einsatzdaten“ verlässt die Drucka
 Für die Einsatzleitung:
 
 1. Im Einsatz „Einsatzdaten“ öffnen.
-2. Ganz unten im Paneel „Einsatzabschluss“ „Einsatz abschließen“ wählen.
-3. Die Rückfrage „Einsatz abschließen?“ mit „Einsatz endgültig abschließen“ bestätigen.
+2. Ganz unten im Paneel „Einsatzabschluss“ „Einsatz abschließen…“ wählen. Der Dialog „Einsatz
+   abschließen“ nennt Bezeichnung und Einsatznummer in voller Länge.
+3. Unter „Noch offen“ prüfen, was noch offen ist: nicht entlassene Kräfte mit ihrem Status,
+   offene Aufträge und Meldungen, laufende Nachforderungen sowie vermisste Betroffene und solche,
+   deren Verbleib offen oder unterwegs ist. Je Gruppe stehen die Zahl und bis zu drei Einträge;
+   „alle ↗“ springt in das Modul, der Einsatz bleibt dabei aktiv. Steht „Nichts offen“, ist
+   alles erledigt.
+4. In „Zur Bestätigung Einsatznummer oder Bezeichnung eintippen“ die interne Einsatznummer oder
+   die Bezeichnung eintippen. Groß- und Kleinschreibung spielen keine Rolle.
 
-   ![Rückfrage „Einsatz abschließen?“ mit dem Hinweis, dass danach keine Einträge mehr möglich sind](../bilder/einsatzabschluss/abschluss-rueckfrage.png)
+   ![Dialog „Einsatz abschließen“ mit offenen Kräften, Aufträgen, Meldungen und Betroffenen unter „Noch offen“ und der eingetippten Bezeichnung](../bilder/einsatzabschluss/abschluss-dialog.png)
+
+5. „Einsatz abschließen“ wählen. Der Knopf ist erst aktiv, wenn die Eingabe passt.
 
 Die App meldet „Einsatz abgeschlossen“. Am besten den Einsatzbericht vor dem Abschluss einmal
-durchsehen: was danach fehlt, lässt sich nicht mehr nachtragen.
+durchsehen.
+
+### Einsatz wieder öffnen
+
+Für die Einsatzleitung und System-Admins der Organisation des Einsatzes, binnen 24 Stunden nach
+dem Abschluss:
+
+1. Die „Einsatzdaten“ des abgeschlossenen Einsatzes öffnen. Das Paneel „Einsatzabschluss“ nennt
+   „Abgeschlossen am … von …“ und daneben, bis wann der Einsatz wieder zu öffnen ist.
+2. „Einsatz wieder öffnen…“ wählen.
+3. Unter „Grund“ eintragen, warum der Einsatz wieder geöffnet wird.
+
+   ![Dialog „Einsatz wieder öffnen“ mit eingetragenem Grund](../bilder/einsatzabschluss/wieder-oeffnen.png)
+
+4. „Einsatz wieder öffnen“ wählen.
+
+Die App meldet „Einsatz wieder geöffnet“. Der Einsatz ist wieder aktiv und beschreibbar.
 
 ## Hintergrund
 
 ### Was der Abschluss bewirkt
 
-- Der Einsatz ist eingefroren, auch für Einsatzleitung und System-Admins. Es gibt in der App
-  keinen Weg zurück in einen laufenden Einsatz.
-- Alle gekoppelten Geräte verlieren ihre Kopplung.
+- Der Einsatz ist eingefroren, auch für Einsatzleitung und System-Admins. Binnen 24 Stunden lässt
+  er sich wieder öffnen (unten), danach nicht mehr.
+- Das Einsatztagebuch erhält den Systemeintrag „Einsatz abgeschlossen“ mit der Person, die
+  abgeschlossen hat.
+- Offene Punkte warnen nur; der Abschluss geht auch mit offenen Aufträgen oder Betroffenen. Die
+  Zahlen im Dialog zählen den ganzen Einsatz, auch Module, die für die eigene Person gesperrt sind;
+  „alle ↗“ steht nur bei Modulen, die sie öffnen darf.
+- Nicht entlassene Fahrzeuge, Einheiten und Einsatzkräfte bleiben mit ihrem letzten Status in
+  diesem Einsatz stehen; der Abschluss entlässt sie nicht. Für andere Einsätze sind sie frei und
+  lassen sich dort disponieren.
+- Alle gekoppelten Geräte verlieren ihre Kopplung, und die Freigabe für Maschinenzugänge
+  ([Anbindungen](anbindungen.md)) endet.
 - Hat der Einsatz oder die Organisation eine Aufbewahrungs-Dauer und noch keine
   Aufbewahrungsfrist, setzt der Abschluss die Frist auf Abschluss plus Dauer. Das
   Einsatztagebuch hält das fest. Eine schon gesetzte Frist bleibt unverändert.
@@ -73,6 +110,31 @@ durchsehen: was danach fehlt, lässt sich nicht mehr nachtragen.
 Nur Aufbewahrungsfrist und Nachbereitung lassen sich danach noch ändern; das Kapitel
 [Aufbewahrung](aufbewahrung.md) beschreibt den Weg und die Folgen.
 
+### Was das Wiederöffnen bewirkt
+
+- Der Einsatz ist wieder aktiv; Abschlusszeitpunkt und abschließende Person sind geleert.
+- Das Einsatztagebuch erhält einen Systemeintrag „Einsatz wieder geöffnet“ mit dem
+  ursprünglichen Abschlusszeitpunkt, der Person, die abgeschlossen hatte, und dem Grund; Erfasser
+  ist die Person, die wieder öffnet.
+- Was der Abschluss selbst gesetzt hat, nimmt das Wiederöffnen zurück, je mit einem Eintrag im
+  Einsatztagebuch: die Aufbewahrungsfrist, die Fristen je Datenkategorie samt ihrer Vormerkung
+  und das Ende der Nachbereitung. Eine von Hand gesetzte Aufbewahrungsfrist oder Kategorie-Frist
+  bleibt; eine von Hand geänderte Nachbereitung geht mit. Ein erneuter Abschluss setzt die
+  Fristen ab dem neuen Zeitpunkt.
+- Gekoppelte Geräte und Maschinenzugänge bleiben getrennt: Geräte werden neu gekoppelt, die
+  Freigabe einer Anbindung neu erteilt.
+
+### Wann sich ein Einsatz nicht wieder öffnen lässt
+
+- 24 Stunden nach dem Abschluss: der Knopf fehlt dann.
+- Wenn die Aufbewahrung schon greift: der Einsatz oder eine seiner Datenkategorien ist
+  geschwärzt, ein Löschersuchen ist gestellt, der Einsatz ist archiviert, zur Verwahrung
+  übergeben oder zum Abräumen vorgesehen. Der Dialog nennt dann den Grund.
+- Ist der Einsatz zur Löschung vorgemerkt, liest ihn niemand mehr, und er lässt sich auch nicht
+  wieder öffnen.
+- Am Spiegel eines Einsatzes, den eine gekoppelte Installation führt: wieder öffnen kann nur die
+  führende Installation, der Spiegel folgt mit dem nächsten Abgleich.
+
 ### Wer einen abgeschlossenen Einsatz noch liest
 
 Mitglieder des Einsatzes lesen ihn noch 24 Stunden nach dem Abschluss. Danach lesen ihn nur noch
@@ -84,7 +146,12 @@ Aufbewahrungsfrist abgelaufen“.
 ### Wer abschließen und drucken darf
 
 - **Abschließen** darf nur die Einsatzleitung eines laufenden Einsatzes. Ein System-Admin ohne
-  diese Rolle sieht das Paneel nicht.
+  diese Rolle sieht das Paneel am laufenden Einsatz nicht.
+- **Wieder öffnen** dürfen binnen 24 Stunden die Einsatzleitung und System-Admins der
+  Organisation des Einsatzes, auch ohne Rolle im Einsatz. Führungspersonal, Beobachter,
+  Führungskräfte der Organisation, gekoppelte Geräte und System-Admins anderer Organisationen
+  dürfen es nicht; ihnen fehlt der Knopf. Wer den abgeschlossenen Einsatz liest, sieht im Paneel,
+  wann und von wem er abgeschlossen wurde.
 - **Drucken** darf jeder, der die Einsatzdaten liest, auch ein Beobachter. Jeder Block holt
   seine Daten mit den Rechten der Person, die druckt. Sperrt der Einsatz ein Modul für sie, steht
   am Block „– kein Zugriff: …“ mit dem Modul, und die Druckansicht zeigt „Einsatzbericht nicht
