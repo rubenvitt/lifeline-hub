@@ -3,11 +3,13 @@
 //! Sitzung an, lehnt zu große Berichte vor dem Handler ab und prüft jedes Feld gegen seine
 //! Grenze. Die Drossel der Logzeile prüft der Unit-Test in `routes::client_fehler`.
 
-use axum::http::StatusCode;
+use axum::body::Body;
+use axum::http::{header, Request, StatusCode};
 use serde_json::{json, Value};
+use tower::ServiceExt;
 
 mod common;
-use common::{anfrage, anfrage_json, login_cookie, setup};
+use common::{anfrage, anfrage_json, einsatz_anlegen, login_cookie, setup};
 
 use lifeline_hub::app::CLIENT_FEHLER_BODY_MAX;
 use lifeline_hub::routes::client_fehler::{MELDUNG_MAX, ROUTE_MAX, STACK_MAX, VERSION_MAX};
@@ -141,4 +143,49 @@ fn die_feldgrenzen_entsprechen_dem_kuerzen_im_client() {
     // Zeichen; der Server darf nicht enger sein, sonst verlöre er jeden langen Bericht.
     assert_eq!(MELDUNG_MAX, 500);
     assert_eq!(STACK_MAX, 2000);
+}
+
+/// Eine Gerätesitzung ist eine Sitzung (Spec `seiten-zustaende`, „Absturz wird dem Server
+/// gemeldet“): Auch die Gerätehülle meldet ihre Abstürze. `CurrentUser` lässt Geräte nur auf
+/// die Routen in `geraet::ALLE_GERAETE`; ohne Eintrag dort wäre der Bericht 403 und still
+/// verloren. Der Lagemonitor schreibt sonst nichts, den Bericht darf er trotzdem senden.
+#[tokio::test]
+async fn ein_bericht_aus_einer_geraetesitzung_wird_mit_204_angenommen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &admin,
+        Some(&json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().expect("Kopplungscode");
+    let geraet = geraet_einloesen(&app, code).await;
+
+    let (s, j) = anfrage_json(&app, "POST", PFAD, &geraet, Some(&bericht())).await;
+
+    assert_eq!(s, StatusCode::NO_CONTENT, "{j:?}");
+}
+
+/// `POST /api/geraete/koppeln` ohne Sitzung; liefert den Sitzungscookie des Geräts.
+async fn geraet_einloesen(app: &axum::Router, code: &str) -> String {
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/geraete/koppeln")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json!({ "code": code }).to_string()))
+        .unwrap();
+    let resp = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "Code einlösen");
+    resp.headers()
+        .get(header::SET_COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .expect("Sitzungscookie des Geräts")
+        .to_string()
 }

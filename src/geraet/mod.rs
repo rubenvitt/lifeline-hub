@@ -74,6 +74,7 @@ pub struct Stelle {
 }
 
 /// Routen, die jede Gerätesitzung erreicht, gleich welche Ansicht: Anmeldestatus, Abmelden,
+/// Absturzbericht der Hülle (LLH-1822, nur eine gedrosselte Logzeile, auch vom Lagemonitor),
 /// Branding der Organisation, ihr Statuskatalog (Beschriftung und Farbe der Status, ohne
 /// Personenbezug; das Einheitengerät setzt damit seinen Status, LLH-1579) und die lesenden
 /// Kartengrundlagen. Gegen tote Einträge wacht
@@ -81,6 +82,7 @@ pub struct Stelle {
 pub const ALLE_GERAETE: &[(&str, &str)] = &[
     ("GET", "/api/auth/me"),
     ("POST", "/api/auth/logout"),
+    ("POST", "/api/client-fehler"),
     ("GET", "/api/organisation"),
     ("GET", "/api/organisation/logo"),
     ("GET", "/api/fahrzeug-status"),
