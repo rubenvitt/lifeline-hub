@@ -2242,7 +2242,16 @@ export default function Datensicht<T extends object, const K extends string>(
                   {erste.render
                     ? (erste.render(wert, zeile, index) as ReactNode)
                     : zelle(ersteSpalte, zeile, index)}
-                  {aktion.render?.(undefined, zeile, index) as ReactNode}
+                  {/* Bemisst die Kennung nicht mit: `min-content` meldet der Tabelle nur das
+                      breiteste Teil der Reihe, `minWidth: 100%` füllt danach die Zelle. So setzt
+                      der Name die Breite, und ⋮ bricht nur um, wenn der Platz fehlt
+                      (Betreuungsstellen auf 390 px, `e2e/betreuung-stellen-schmal.spec.ts`). */}
+                  <div
+                    data-lfh="datensicht-kennung-aktionsreihe"
+                    style={{ width: 'min-content', minWidth: '100%' }}
+                  >
+                    {aktion.render?.(undefined, zeile, index) as ReactNode}
+                  </div>
                 </div>
               ),
             },

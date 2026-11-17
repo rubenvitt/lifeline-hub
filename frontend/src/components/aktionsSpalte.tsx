@@ -98,8 +98,12 @@ export function AktionsInhalt<T>({
       />
     ) : null;
   if (!knopf && !menue) return null;
+  // Darf umbrechen: ab `md` ist die Spalte so breit gerechnet, dass beides nebeneinander passt
+  // (`aktionsSpaltenBreite`). In der Kennung unter `md` setzte die Reihe sonst die Mindestbreite
+  // der Zelle, und die fixierte Kennung drängte die Kennzahlen aus dem Bild (Betreuungsstellen
+  // auf 390 px, `e2e/betreuung-stellen-schmal.spec.ts`). Untereinander zählt das Breitere.
   return (
-    <Space size="middle" wrap={false}>
+    <Space size="middle" wrap>
       {knopf}
       {menue}
     </Space>

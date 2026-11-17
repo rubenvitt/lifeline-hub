@@ -2711,4 +2711,19 @@ describe('Datensicht · Aktionsspalte (LLH-1789, amEnde)', () => {
     expect(kennung.closest('td')!.className).toMatch(/ant-table-cell-fix-(start|left)/);
     expect(within(kennung).getByRole('button', { name: /^Stand melden für / })).toBeInTheDocument();
   });
+
+  it('unter md bemisst die Aktionsreihe die Kennung nicht: sie meldet nur ihre Mindestbreite', () => {
+    // Nebeneinander setzte die Reihe die Breite der fixierten Kennung (Betreuungsstellen auf
+    // 390 px: +31 px, „frei“ aus dem Bild). `min-content` meldet nur das breiteste Teil,
+    // `minWidth: 100%` füllt danach die Zelle; ⋮ bricht nur um, wenn der Platz fehlt.
+    setzeViewportBreite(390);
+    const { container } = zeige('tabelle');
+    const knopf = container.querySelector<HTMLElement>(
+      'tr.ant-table-row [data-lfh="datensicht-kennung-aktion"] button',
+    )!;
+    const huelle = knopf.closest<HTMLElement>('[data-lfh="datensicht-kennung-aktionsreihe"]');
+    expect(huelle).not.toBeNull();
+    expect(huelle!.style.width).toBe('min-content');
+    expect(huelle!.style.minWidth).toBe('100%');
+  });
 });

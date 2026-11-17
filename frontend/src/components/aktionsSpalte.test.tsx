@@ -69,4 +69,21 @@ describe('aktionsSpalte (LLH-1789)', () => {
     );
     expect(container.querySelector('button')).toBeNull();
   });
+
+  it('Knopf und ⋮ dürfen untereinander umbrechen (Kennung unter md, alpha rot nach LLH-1789)', () => {
+    // In der Kennung unter `md` setzte die Reihe nebeneinander die Mindestbreite der Zelle: die
+    // Kennung wuchs auf 390 px um 31 px, und „frei“ der Betreuungsstellen lief aus dem Bild.
+    const { container } = renderMitProviders(
+      <AktionsInhalt
+        zeile={{ name: 'Nord' }}
+        aktion={{ etikett: 'Stand melden', onKlick: vi.fn() }}
+        weitere={{
+          eintraege: () => [{ key: 'b', label: 'Bearbeiten' }],
+          zugaenglicherName: () => 'Aktionen',
+          onWahl: vi.fn(),
+        }}
+      />,
+    );
+    expect(getComputedStyle(container.querySelector('.ant-space')!).flexWrap).toBe('wrap');
+  });
 });
