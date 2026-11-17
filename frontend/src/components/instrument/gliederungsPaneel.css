@@ -6,7 +6,7 @@
 
    Breit: Kante · Kopf · Inhalt · Zahl in einer Zeile.
    Schmal (Liste unter 560 px; breit braucht 3 + 158 + 132 px, drei Lücken und zwei Polster
-   `padding`, das sind 11 / 18 / 26 px je Dichtestufe, und dem Inhalt bleiben dann noch
+   `padding`, das sind 12 / 20 / 24 px je Dichtestufe, und dem Inhalt bleiben dann noch
    137 bis 177 px): Kopf und Zahl oben, der Inhalt darunter über beide Spalten. Vorher brach
    die Flex-Zeile die Zahl unter den Inhalt, ans Zeilenende, weit weg vom Namen.
    Die DOM-Reihenfolge bleibt, der Linkname bildet sich aus ihr. */

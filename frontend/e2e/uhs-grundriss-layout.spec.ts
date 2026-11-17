@@ -170,6 +170,34 @@ test('Handschirm (390 px): die Fläche läuft seitlich über, „weitere Plätze
 });
 
 /**
+ * Kein Querlauf der Seite am Handschirm (LLH-1793): mit geöffnetem „Plätze anlegen“ (Typ, Menge,
+ * Anlegen, Abbrechen) lief die Werkzeugzeile über der Fläche auf 411 / 416 / 428 px und schob die
+ * ganze Seite seitlich. Die Fläche selbst rollt in sich, die Seite nie.
+ *
+ * Mutationsprobe: `wrap` an der Werkzeugzeile (`Grundriss.tsx`, Kopfzeile der Fläche) entfernen →
+ * die Seite ist breiter als 390 px, der Test wird rot.
+ */
+test('Handschirm (390 px): „Plätze anlegen“ offen, die Seite läuft in keiner Stufe quer', async ({
+  page,
+}) => {
+  await page.setViewportSize(HANDSCHIRM);
+  await anmelden(page);
+  const { pfad } = await aufbauen(page);
+  await seiteSteht(page, pfad);
+  for (const { dichte } of STAFFEL) {
+    await stelleDichte(page, dichte);
+    await page.getByRole('button', { name: 'Plätze bearbeiten', exact: true }).click();
+    await page.getByRole('button', { name: 'Plätze anlegen', exact: true }).click();
+    await expect(page.locator('[data-lfh="plaetze-anlegen"]')).toBeVisible();
+    const masse = await page.evaluate(() => ({
+      voll: document.documentElement.scrollWidth,
+      sicht: document.documentElement.clientWidth,
+    }));
+    expect(masse.voll, `Seitenbreite in ${dichte}`).toBeLessThanOrEqual(masse.sicht);
+  }
+});
+
+/**
  * Trefffläche der Personenmarke in den Listen (U72): die Hülle `PersonenkarteDrag` misst die
  * Steuerhöhe der Stufe. Die Marke allein maß 26 px. `kompakt` misst die Gegenprobe, damit ein
  * Ziel, das in jeder Stufe gleich groß ist, nicht grün bleibt.

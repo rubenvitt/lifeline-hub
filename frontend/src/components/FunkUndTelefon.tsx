@@ -1,4 +1,4 @@
-import { Space, Tag } from 'antd';
+import { Space, Tag, theme } from 'antd';
 import type { KommunikationsVerbindung, Sprechgruppe } from '../api/types';
 import { Datenfeld, zahlStil } from './instrument';
 import { mitBetriebsart, teileSprechgruppen } from './kommunikationsmittel';
@@ -27,6 +27,7 @@ export default function FunkUndTelefon({
   verbindungen?: readonly KommunikationsVerbindung[] | null;
   nurGefuellt?: boolean;
 }) {
+  const { token } = theme.useToken();
   const { tmo, dmo } = teileSprechgruppen(sprechgruppen);
   const ruf = rufname?.trim() || null;
   const hatFunk = ruf != null || tmo.length > 0 || dmo.length > 0;
@@ -38,7 +39,7 @@ export default function FunkUndTelefon({
       {(hatFunk || !nurGefuellt) && (
         <Datenfeld label="Funk" breit>
           {hatFunk ? (
-            <Space size={[4, 4]} wrap>
+            <Space size={[token.marginXS, token.marginXS]} wrap>
               {ruf && (
                 <span data-schrift="kennung" style={zahlStil('text')}>
                   {ruf}

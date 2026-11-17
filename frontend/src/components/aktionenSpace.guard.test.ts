@@ -3,9 +3,9 @@
  * trägt, nennt seinen Abstand.
  *
  * ── Warum ───────────────────────────────────────────────────────────────────────
- * Ohne `size` setzt antd `token.paddingXS` = `abstand.xs` = 3 / 5 / 7 px zwischen die Knöpfe
+ * Ohne `size` setzt antd `token.paddingXS` = Raster `xs` = 4 / 4 / 8 px zwischen die Knöpfe
  * (Herleitung in `aktionsabstand.guard.test.ts`). Die Leitlinie verlangt zwischen zwei Zielen
- * ≥ 8 px in `komfortabel` und ≥ 16 px in `handschuh`; `token.marginSM` hält 7 / 11 / 16. Der Kopf
+ * ≥ 8 px in `komfortabel` und ≥ 16 px in `handschuh`; `token.marginSM` hält 8 / 12 / 16. Der Kopf
  * der `EinsatzSeite` trägt diesen Abstand selbst (`seitenkopf-aktionen`), ein eingeschobenes
  * `<Space>` setzte ihn für seine Kinder wieder auf 7 px herab („Personal disponieren“ neben
  * „Ad-hoc-Person“, Prüfliste LLH-1060).

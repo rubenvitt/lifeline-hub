@@ -36,11 +36,19 @@ export default function QualiSollFeld({
   onChange,
   disabled,
   bekannt,
+  id,
+  'aria-label': ariaLabel,
 }: {
   value?: QualiSollZeile[];
   onChange?: (zeilen: QualiSollZeile[]) => void;
   disabled?: boolean;
   bekannt?: readonly QualiSollEintrag[] | null;
+  /**
+   * Ziel des Etiketts einer Zelle (`DatenfeldEingabe` reicht `id` herein, LLH-1920); mit
+   * `aria-label` ist das Feld eine benannte Gruppe seiner Zeilen.
+   */
+  id?: string;
+  'aria-label'?: string;
 }) {
   const katalog = useQuery({
     queryKey: globalKeys.qualifikationen(),
@@ -57,7 +65,7 @@ export default function QualiSollFeld({
     onChange?.(value.map((z, i) => (i === index ? { ...z, ...aenderung } : z)));
 
   return (
-    <div>
+    <div id={id} role={ariaLabel ? 'group' : undefined} aria-label={ariaLabel}>
       {value.map((zeile, index) => {
         const nummer = index + 1;
         const vergeben = new Set(

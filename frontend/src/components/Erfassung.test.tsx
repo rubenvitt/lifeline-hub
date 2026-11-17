@@ -1042,8 +1042,11 @@ describe('kopfBoden — Abstand des Schließkreuzes zum ersten Feld (LLH-1274)',
     });
   }
 
-  it('lässt den Kopf in kompakt bei der Titelzeile', () => {
+  // Mit dem Raster (Spec `abstandsraster`) sank `paddingMD` in kompakt von 20 auf 16 px; der Boden
+  // greift dort jetzt um 3 px, der Körper beginnt aber nicht tiefer als vorher (20 + 24 + 3 px).
+  it('lässt den Körper in kompakt nicht tiefer beginnen als vor dem Raster', () => {
     const t = theme.getDesignToken(antdThema(true, 'kompakt'));
-    expect(kopfBoden(t)).toBeLessThanOrEqual(titelzeilenHoehe(t));
+    const kopf = Math.max(titelzeilenHoehe(t), kopfBoden(t));
+    expect(t.paddingMD + kopf + t.marginXS).toBeLessThanOrEqual(47);
   });
 });

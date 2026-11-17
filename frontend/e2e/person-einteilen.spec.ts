@@ -57,19 +57,20 @@ test('Einheit und Fahrzeug in der Zeile setzen, Ansicht, Fahrzeugseite und Melde
   const zeile = region.locator('tr.ant-table-row').filter({ hasText: NAME });
   await expect(region.getByText(/1 nicht eingeteilt/)).toBeVisible();
 
-  // ── Einheit: wählen allein schreibt nicht, erst „Speichern“ ──
+  // ── Einheit: wählen allein schreibt nicht, erst „Speichern“ ── Die Bearbeitung schwebt an der
+  //    Zelle, außerhalb der Zeile (LLH-1795).
   await zeile.getByRole('button', { name: `Einheit zu ${NAME} eintragen` }).click();
-  await zeile.getByRole('combobox', { name: `Einheit zu ${NAME}` }).click();
+  await page.getByRole('combobox', { name: `Einheit zu ${NAME}` }).click();
   await waehleStehend(page, EINHEIT);
-  await zeile.getByRole('button', { name: `Einheit zu ${NAME} speichern` }).click();
+  await page.getByRole('button', { name: `Einheit zu ${NAME} speichern` }).click();
   const einheitWert = zeile.getByRole('button', { name: `Einheit zu ${NAME} bearbeiten` });
   await expect(einheitWert).toHaveText(EINHEIT);
 
   // ── Fahrzeug: die Fahrzeuge der eigenen Einheit stehen vorn ──
   await zeile.getByRole('button', { name: `Fahrzeug zu ${NAME} eintragen` }).click();
-  await zeile.getByRole('combobox', { name: `Fahrzeug zu ${NAME}` }).click();
+  await page.getByRole('combobox', { name: `Fahrzeug zu ${NAME}` }).click();
   await waehleStehend(page, FAHRZEUG);
-  await zeile.getByRole('button', { name: `Fahrzeug zu ${NAME} speichern` }).click();
+  await page.getByRole('button', { name: `Fahrzeug zu ${NAME} speichern` }).click();
   await expect(zeile.getByRole('button', { name: `Fahrzeug zu ${NAME} bearbeiten` })).toHaveText(
     FAHRZEUG,
   );

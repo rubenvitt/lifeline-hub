@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/personal/ruecknahme.rs, frontend/src/kraefte/ruecknahmeSatz.ts, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
 ---
 
 ## Überblick
@@ -83,7 +83,7 @@ Für Einsatzleitung und Führungspersonal, in der Liste oder in der Ansicht der 
    ohne Abschnitt stehen zuletzt unter „ohne Abschnitt“. Erst „Speichern“ ändert etwas; Escape
    oder „Abbrechen“ verwirft die Wahl.
 
-   ![Zeile einer nicht eingeteilten Person mit offener Einheitsauswahl, gewählt „Rettungsstaffel“, darunter „Speichern“ und „Abbrechen“](../bilder/personal/einteilen.png)
+   ![Personalliste; an der Zeile einer nicht eingeteilten Person schwebt die Einheitsauswahl, gewählt „Rettungsstaffel“, darunter „Speichern“ und „Abbrechen“](../bilder/personal/einteilen.png)
 
 3. Ebenso in der Spalte „Fahrzeug“ das Fahrzeug wählen. Die Fahrzeuge der eigenen Einheit stehen
    oben unter „Einheit «…»“, die übrigen unter „Weitere Fahrzeuge“.
@@ -103,8 +103,9 @@ stehen und wandert erst in die neue Gruppe, wenn beide die Liste verlassen haben
 
 Für Einsatzleitung und Führungspersonal, wenn eine Person im Einsatz eine Aufgabe übernimmt:
 
-1. In der Spalte „Funktion“ der Person „Funktion eintragen“ wählen, bei einer schon vergebenen
-   Einsatzfunktion auf ihren Text klicken. In der Ansicht der Person steht die Angabe unter
+1. In der Spalte „Funktion“ der Person den Stift neben ihrer Qualifikation wählen (ohne
+   Qualifikation „Funktion eintragen“), bei einer schon vergebenen Einsatzfunktion auf ihren
+   Text klicken. Die Eingabe öffnet an der Zelle. In der Ansicht der Person steht die Angabe unter
    „Einsatzfunktion“.
 2. Eine Funktion aus den Vorschlägen wählen oder einen eigenen Text eingeben, etwa „Sprechfunker“.
 3. „Speichern“ wählen oder Enter drücken. Die Einsatzfunktion steht über der Qualifikation.
@@ -164,7 +165,8 @@ Für Einsatzleitung und Führungspersonal, in der Ansicht der Person:
 1. Ist die Person schon früher gegangen, zuerst in ihrer „Zeitachse“ mit „Nachtragen“ die
    Entlassung mit der richtigen Zeit erfassen. Die App trägt dann keine zweite ein.
 2. Im Paneel „Aus dem Einsatz“ „Entlassen“ wählen. Eine Rückfrage gibt es nicht; der Hinweis unten
-   bietet einige Sekunden lang „Rückgängig“.
+   bietet einige Sekunden lang „Rückgängig“. Es nimmt das Entlassen ganz zurück (siehe „Rückgängig
+   nach dem Entlassen“).
 3. Eine Fehldisposition stattdessen mit „Stornieren“ entfernen und die Rückfrage „… stornieren?“
    mit „Stornieren“ bestätigen. Danach steht wieder die Personalliste da. Nach 15 Minuten ist
    „Stornieren“ gesperrt, daneben steht „nur in den ersten 15 Minuten“. Lehnt die App ab, steht
@@ -201,6 +203,19 @@ Personalstamm erscheinen sie nicht.
 Ein Absenden nimmt höchstens 50 Personen auf und gilt ganz oder gar nicht: Steht eine Person
 inzwischen außer Dienst, ist sie schon disponiert oder entlassen, legt die App niemanden an und
 nennt den Grund je Person.
+
+### Rückgängig nach dem Entlassen
+
+„Rückgängig“ direkt nach dem Entlassen nimmt es zurück, als wäre nichts geschehen: derselbe Status,
+dieselbe Einheit samt Führung, dasselbe Fahrzeug, dieselbe UHS, die Leitung ihrer Abschnitte und
+die Einsatzleitung. Die Zeitachse bekommt keine neue Periode; die Entlassung steht dort gestrichen
+mit dem Grund „Entlassung zurückgenommen“. Was inzwischen anders besetzt ist (die Einheit hat einen
+anderen Führer, ein anderer Einsatzleiter ist eingetragen, die UHS ist aufgelöst) oder wofür das
+Recht im Modul fehlt, bleibt aus; der Hinweis über der Seite und das Einsatztagebuch nennen es. Das
+gelingt nur der Person, die entlassen hat, nur in den ersten zehn Minuten und nur, solange niemand
+die Zeitachse der Person berichtigt hat. Danach führt nur „Erneut disponieren“ zurück, mit dem
+Anfangsstatus und einer neuen Periode. Stornieren lässt sich die Person danach nicht mehr: Sie war
+im Einsatz.
 
 ### Berichtigen nach dem Entlassen
 

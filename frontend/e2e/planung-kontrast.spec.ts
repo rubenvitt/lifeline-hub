@@ -78,7 +78,7 @@ function createMessung(page: Page, modus: 'light' | 'dark') {
     for (const { ziel, text } of knoten) {
       const m = await kontrast(ziel);
       const gesperrt = await ziel.evaluate(
-        (el) => el.closest('button[disabled], .ant-tabs-tab-disabled') != null,
+        (el) => el.closest('button[disabled], [aria-disabled="true"]') != null,
       );
       const schranke = gesperrt ? GESPERRT_BODEN : TEXT[modus];
       messwerte.push({ modus, flaeche, wortlaut: text, gesperrt, ...m });

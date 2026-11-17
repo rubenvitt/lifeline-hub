@@ -363,8 +363,10 @@ const suchfeld = (label: string) => (page: Page) =>
     .locator('.ant-input-affix-wrapper')
     .filter({ has: page.getByRole('textbox', { name: label }) });
 const auftraegeTabs: Ziel = {
-  sorte: 'Aufträge Tabs',
-  ziele: (page) => inMain(page).locator('.ant-tabs-tab'),
+  sorte: 'Aufträge Reiter',
+  // Segmentleiste als Reiter (Spec `bedien-umschalten`): `role="tab"` trägt den Klick selbst.
+  ziele: (page) =>
+    inMain(page).getByRole('tablist', { name: 'Aufträge und Befehle' }).getByRole('tab'),
   mindestens: 2,
 };
 const auftraegeFilter: Ziel[] = [

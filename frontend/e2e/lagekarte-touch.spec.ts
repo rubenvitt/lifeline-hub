@@ -70,6 +70,9 @@ const EINZEL: [number, number] = [MITTE[0] + 0.01, MITTE[1]];
 /** Blickpunkt für die Tipps: zwischen Traube und Einzelzeichen, beide je rund 58 px daneben —
  *  auch bei 390 px im Bild. */
 const ZWISCHEN: [number, number] = [MITTE[0] + 0.005, MITTE[1]];
+/** Blickpunkt für den Tipp aufs Einzelzeichen: knapp westlich davon, damit es bei 390 px nicht
+ *  unter dem Knopfblock liegt — der trägt seit LLH-1751 Wörter und ist breiter als die Kante. */
+const BLICK_EINZEL: [number, number] = [EINZEL[0] - 0.003, EINZEL[1]];
 const TRAUBE = ['Wache Nord', 'Wache Mitte', 'Wache Süd'];
 const ZOOM = 14;
 
@@ -326,6 +329,18 @@ async function tippe(page: Page, p: Punkt) {
 
 const ausgewaehlt = (page: Page) => page.locator('[data-paneel="ausgewaehlt"]');
 
+/**
+ * Leiste beim Laden offen, als hätte die Person sie an diesem Gerät eingeblendet. Unter Touch ist
+ * die Vorgabe sonst zu, auch ab `lg` (LLH-1751); wer die offene Leiste als Ausgangslage braucht,
+ * merkt sie hier vor. `klasse`: Breitenklasse wie in `leistenWahl.ts` (ab `lg` getrennt).
+ */
+async function leisteGemerktOffen(page: Page, klasse: 'ab-lg' | 'unter-lg') {
+  await page.addInitScript(
+    (schluessel) => window.localStorage.setItem(schluessel, '1'),
+    `lfh:lagekarte:leiste-offen:${klasse}`,
+  );
+}
+
 for (const viewport of [
   { width: 390, height: 844 },
   { width: 1024, height: 768 },
@@ -433,7 +448,7 @@ for (const viewport of [
       const einsatzId = await einsatzMitLage(page);
       await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
       await ruhe(page);
-      await springe(page, ZWISCHEN, ZOOM);
+      await springe(page, BLICK_EINZEL, ZOOM);
 
       // Einzelzeichen (WebGL-Layer). Wiederholt, bis die Marker-Quelle steht; ein
       // Wiederholtipp wählt dasselbe Zeichen erneut.
@@ -443,9 +458,17 @@ for (const viewport of [
         await tippe(page, p);
         await expect(ausgewaehlt(page).getByText('Pumpe Ost')).toBeVisible({ timeout: 1_000 });
       }).toPass({ timeout: 20_000 });
-      // Die Auswahl kann die Karte bewegen, und jede Bewegung klappte einen Spider zu. Also
-      // zurück auf den Blickpunkt und erst tippen, wenn die Karte steht. Die Auswahl bleibt offen:
-      // an ihr hängt die Esc-Reihenfolge unten.
+      // LLH-1751: der Tipp wählt nur aus, die Kamera bleibt stehen (früher Anflug auf Zoom 15).
+      await ruhe(page);
+      const nachTipp = await stand(page);
+      expect(nachTipp.zoom, 'Marker-Tipp ändert den Zoom nicht').toBeCloseTo(ZOOM, 5);
+      expect(nachTipp.lng, 'Marker-Tipp verschiebt die Karte nicht').toBeCloseTo(
+        BLICK_EINZEL[0],
+        5,
+      );
+      // Die offene Leiste (unter `lg` unter der Karte) kann die Fläche verändern, und jede
+      // Bewegung klappte einen Spider zu. Also zurück auf den Blickpunkt und erst tippen, wenn die
+      // Karte steht. Die Auswahl bleibt offen: an ihr hängt die Esc-Reihenfolge unten.
       await springe(page, ZWISCHEN, ZOOM);
 
       // Cluster: ein DOM-Donut. GENAU EINMAL tippen — ein zweiter Tipp klappt den Spider zu.
@@ -708,8 +731,148 @@ function quadratEcken(mitte: [number, number], halb: number, grad: number): [num
   });
 }
 
+// LLH-1751: Am Touch-Gerät startet die Leiste auch ab `lg` zu; ein Tipp auf einen Marker bewegt
+// die Kamera nicht, ein Treffer der Objektliste fliegt hin und zoomt dabei nur heran.
+test.describe('Lagekarte am Touch-Gerät quer (LLH-1751)', () => {
+  test.use({ hasTouch: true, viewport: { width: 1280, height: 800 } });
+
+  test('Leiste startet zu, Marker-Tipp ohne Kamera, Listentreffer zoomt nur heran', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const seitenFehler: Error[] = [];
+    page.on('pageerror', (f) => seitenFehler.push(f));
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzMitLage(page);
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await ruhe(page);
+
+    // Ohne gemerkte Wahl: zu, der Knopf im Kartenblock bietet das Einblenden an.
+    await expect(page.locator('#lagekarte-leiste')).toBeHidden();
+    const umschalter = page.getByRole('button', { name: 'Leiste einblenden' });
+    await expect(umschalter).toBeVisible();
+    await expect(umschalter).toContainText('Leiste');
+
+    // Marker nahe dem rechten Rand: die aufgehende Leiste nähme ihm den Platz. Die Karte schiebt
+    // ihn gerade so weit herein, dass er sichtbar bleibt, und zoomt nicht (Review LLH-1751).
+    await springe(page, EINZEL, 16);
+    await page.evaluate(() => {
+      const k = (
+        window as unknown as {
+          __lfhKarte: MapHaken & {
+            panBy(o: [number, number], opt: { duration: number }): void;
+          };
+        }
+      ).__lfhKarte;
+      const c = k.getCanvas();
+      k.panBy([-(c.clientWidth / 2 - 30), -150], { duration: 0 });
+    });
+    await ruhe(page);
+    await expect(async () => {
+      const p = await aufSchirm(page, EINZEL);
+      await aufKarte(page, [p], 'Einzelzeichen am rechten Rand');
+      await tippe(page, p);
+      await expect(ausgewaehlt(page).getByText('Pumpe Ost')).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(page.locator('#lagekarte-leiste')).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          page.evaluate((ll) => {
+            const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+            const px = k.project(ll);
+            const c = k.getCanvas();
+            const r = c.getBoundingClientRect();
+            // Sichtbar heißt: an der Stelle liegt die Karte, nicht Knopfblock oder Leiste.
+            const oben = document.elementFromPoint(r.left + px.x, r.top + px.y);
+            return oben === c;
+          }, EINZEL),
+        { message: 'der gewählte Marker liegt nach dem Öffnen der Leiste frei auf der Karte' },
+      )
+      .toBe(true);
+    await ruhe(page);
+    expect((await stand(page)).zoom, 'Nachführen zoomt nicht').toBeCloseTo(16, 5);
+
+    // Marker-Tipp bei schon offener Leiste: Zoom und Mitte bleiben. Zoom 15, damit das Zeichen
+    // in der um die Leiste schmaleren Karte nicht unter dem Knopfblock liegt.
+    await springe(page, BLICK_EINZEL, 15);
+    await expect(async () => {
+      const p = await aufSchirm(page, EINZEL);
+      await aufKarte(page, [p], 'Einzelzeichen');
+      await tippe(page, p);
+      await expect(ausgewaehlt(page).getByText('Pumpe Ost')).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(page.locator('#lagekarte-leiste')).toBeVisible();
+    await ruhe(page);
+    const nachTipp = await stand(page);
+    expect(nachTipp.zoom, 'Marker-Tipp zoomt nicht').toBeCloseTo(15, 5);
+    expect(nachTipp.lng, 'Marker-Tipp verschiebt nicht').toBeCloseTo(BLICK_EINZEL[0], 5);
+
+    // Listentreffer bei nahem Ausschnitt: fliegt hin, behält Zoom 17.
+    const leiste = page.locator('#lagekarte-leiste');
+    await leiste.getByRole('tab', { name: 'Objekte' }).tap();
+    const suche = leiste.getByLabel('Kartenobjekte suchen');
+    await suche.fill('Pumpe Ost');
+    await springe(page, MITTE, 17);
+    await leiste.getByRole('button', { name: 'Pumpe Ost', exact: true }).tap();
+    await expect
+      .poll(async () => (await stand(page)).lng, { message: 'Treffer fliegt zum Objekt' })
+      .toBeCloseTo(EINZEL[0], 4);
+    await ruhe(page);
+    expect((await stand(page)).zoom, 'Treffer zoomt nicht heraus').toBeCloseTo(17, 5);
+
+    // Listentreffer von weit draußen: zoomt auf den Anflugmaßstab heran.
+    await leiste.getByRole('tab', { name: 'Objekte' }).tap();
+    await springe(page, MITTE, 12);
+    await leiste.getByRole('button', { name: 'Pumpe Ost', exact: true }).tap();
+    await expect
+      .poll(async () => (await stand(page)).zoom, { message: 'Treffer zoomt heran' })
+      .toBeCloseTo(15, 3);
+
+    expect(seitenFehler.map((f) => f.message)).toEqual([]);
+  });
+});
+
+// LLH-1751 (Review): Ob ein Wort in seinen Knopf passt, entscheidet erst die echte Schrift.
+test.describe('Wörter passen in die Kartenknöpfe (LLH-1751)', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  for (const dichte of ['kompakt', 'handschuh'] as const) {
+    test(`kein Wort läuft über, Stufe ${dichte}`, async ({ page }) => {
+      await page.addInitScript(
+        ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+        [DICHTE_SCHLUESSEL, dichte] as const,
+      );
+      await anmelden(page, { startseite: false });
+      const einsatzId = await post(page, '/api/einsaetze', {
+        bezeichnung: `E2E Knopfwörter ${Date.now()}`,
+      });
+      await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      const woerter = page.locator('[data-lfh="karten-knoepfe"] [data-lfh="kartenknopf-wort"]');
+      await expect(woerter.first()).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const maße = await woerter.evaluateAll((els) =>
+        els.map((el) => {
+          const knopf = el.closest('button')!;
+          const stil = getComputedStyle(knopf);
+          const innen =
+            knopf.clientWidth - parseFloat(stil.paddingLeft) - parseFloat(stil.paddingRight);
+          return { wort: el.textContent, breite: el.getBoundingClientRect().width, innen };
+        }),
+      );
+      expect(maße.length, 'Wörter im Knopfblock').toBeGreaterThanOrEqual(3);
+      for (const m of maße) {
+        expect(m.breite, `„${m.wort}“ passt in ${m.innen}px`).toBeLessThanOrEqual(m.innen + 0.5);
+      }
+    });
+  }
+});
+
 test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
   test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
+  // Die Fälle lesen Ebenen und Auswahl in der Leiste: am Tablet eingeblendet (LLH-1751).
+  test.beforeEach(async ({ page }) => leisteGemerktOffen(page, 'ab-lg'));
 
   for (const dichte of ['kompakt', 'handschuh'] as const) {
     test(`Bildgriffe überlappen sich nicht, Stufe ${dichte}`, async ({ page }) => {
@@ -1033,7 +1196,10 @@ for (const viewport of [
 ]) {
   test.describe(`Kartenmodi geben bei ${viewport.width} px die Karte frei (LFH-765)`, () => {
     test.use({ hasTouch: true, viewport });
-    /** Bei 768 px ist die Leiste per Vorgabe offen, bei 390 px zu. */
+    /**
+     * Bei 768 px startet die Leiste offen (gemerkte Wahl; unter Touch ist die Vorgabe zu,
+     * LLH-1751), bei 390 px zu. So prüft der Block beide Ausgangslagen vor einem Modus.
+     */
     const vorgabeOffen = viewport.width >= 768;
 
     let saat: Modussaat;
@@ -1043,6 +1209,7 @@ for (const viewport of [
       test.setTimeout(150_000);
       seitenFehler.length = 0;
       page.on('pageerror', (f) => seitenFehler.push(f));
+      if (vorgabeOffen) await leisteGemerktOffen(page, 'unter-lg');
       await anmelden(page);
       saat = await einsatzFuerModi(page);
     });
@@ -1326,6 +1493,8 @@ function rechteck(w: number, s: number, o: number, n: number) {
 // Trefferzonen behalten die feste Rangfolge.
 test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
   test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
+  // Der Fall schaltet Ebenen in der Leiste: am Tablet eingeblendet (LLH-1751).
+  test.beforeEach(async ({ page }) => leisteGemerktOffen(page, 'ab-lg'));
 
   test('mehrere Flächen öffnen ein Menü, der Ring eines Markers nicht', async ({ page }) => {
     test.setTimeout(180_000);

@@ -248,9 +248,13 @@ export function useZuflussSchleuse<T>(
        * gehören. (Für den Zeiger gilt das von selbst: Reacts `pointerleave` folgt dem React-Baum,
        * das Portal unter der Zeile liegt darin.)
        */
+      // Die schwebende Bearbeitung einer Tabellenzelle (`InlineAngabe` im `Popover`, LLH-1795)
+      // gehört ebenso zur Sicht: ihr Fokus friert die Folge weiter ein.
       if (
         ziel instanceof Node &&
-        (ziel as Element).closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')
+        (ziel as Element).closest?.(
+          '.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown, .ant-popover',
+        )
       ) {
         return;
       }

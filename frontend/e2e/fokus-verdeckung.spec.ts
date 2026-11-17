@@ -322,6 +322,53 @@ test('Datensicht-Tabellenzweig: Tabulaturdurchlauf hinter Werkzeugzeile, Kopfzei
 });
 
 /**
+ * Rechts fixierte Aktionsspalte (LLH-1789, Spec `einsatztauglichkeit-layout`, „Kein Fokusziel
+ * vollständig verdeckt“): vorwärts durch die Zeilen der Fahrzeugliste getabbt, liegt kein Ziel
+ * einer rollenden Spalte ganz hinter dem fixierten ⋮. Tablet quer im Handschuh-Betrieb: dort läuft
+ * die Tabelle waagerecht über.
+ */
+test('Datensicht: kein Fokusziel verschwindet hinter der rechts fixierten Aktionsspalte (1024 × 600, handschuh)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Fokus Aktion ${Date.now()}`);
+  for (let i = 0; i < 8; i += 1) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+      data: {
+        adhoc: {
+          funkrufname: `Florian Musterstadt-Nordwest 44/${i}`,
+          kennzeichen: `MU-NW 46${i}`,
+        },
+      },
+    });
+    expect(antwort.ok(), `Seeding Fahrzeug ${i}: ${antwort.status()}`).toBeTruthy();
+  }
+  await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await page.setViewportSize({ width: 1024, height: 600 });
+  await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  await expect(page.locator('tr.ant-table-row')).toHaveCount(8);
+  const ueber = await page
+    .locator('.ant-table-body, .ant-table-content')
+    .first()
+    .evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(ueber, 'Vorbedingung: die Tabelle läuft waagerecht über').toBeGreaterThan(0);
+  await expect(page.locator('th.ant-table-cell-fix-end, th.ant-table-cell-fix-right')).toHaveCount(
+    1,
+  );
+
+  const ergebnis = await pruefeFokusVerdeckung(page, 70);
+  expect(
+    ergebnis.stoppsInTabelle,
+    `Vorbedingung: Durchlauf muss in der Tabelle landen (${ergebnis.stoppsGesamt} Stopps)`,
+  ).toBeGreaterThanOrEqual(8);
+  expect(
+    ergebnis.verdeckt,
+    `Fokusziele vollständig verdeckt:\n${ergebnis.verdeckt.join('\n')}`,
+  ).toEqual([]);
+});
+
+/**
  * Die sticky Speicherleiste der Einstellungs-Sektionen: eine am unteren Rand verankerte
  * Leiste über einem langen Formular. „Verhalten" ist der scharfe Fall — das letzte von neun
  * Feldern steht unmittelbar über der Leiste.
@@ -2223,7 +2270,8 @@ test('Erste Zeile (LLH-1358): Einheiten — rückwärts steht kein Ziel unter de
     expect(einheit.ok(), await einheit.text()).toBeTruthy();
   }
   const gemessen: string[] = [];
-  for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
+  // Unter `md` steht die Gliederung als Karten (LLH-1787): die Tabelle gilt erst ab `md`.
+  for (const flaeche of ERSTE_ZEILE_FLAECHEN.filter((f) => f.width >= 768)) {
     const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
     await page.setViewportSize(flaeche);
     await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten`, 'handschuh');

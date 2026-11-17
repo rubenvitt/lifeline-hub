@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { App as AntApp } from 'antd';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
@@ -710,5 +711,125 @@ describe('MeldungFormular — Vorschlagsfeld Absender (Tastatur)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(onAnlegen.mock.calls[0][0]).toMatchObject({ absender: 'Flo' });
+  });
+});
+
+/**
+ * Dialog-Form (LLH-1921, design.md D4): die Seite Lagemeldungen erfasst im Erfassungsdialog statt
+ * im Paneel, mit demselben Formular. Kreuz und Escape laufen über den Abbruch der Hülle und leeren.
+ */
+describe('MeldungFormular als Dialog (LLH-1921)', () => {
+  const klappkopf = () => screen.getByRole('button', { name: /Weitere Angaben/ });
+
+  function DialogHarness({
+    onAnlegen,
+    onFertig = () => {},
+  }: {
+    onAnlegen: (d: unknown) => Promise<unknown>;
+    onFertig?: () => void;
+  }) {
+    const [offen, setOffen] = useState(true);
+    return (
+      <AntApp>
+        <button type="button" onClick={() => setOffen(true)}>
+          Öffnen
+        </button>
+        <MeldungFormular
+          senden={false}
+          onAnlegen={onAnlegen}
+          artVorgabe="lagemeldung"
+          serie={false}
+          onFertig={() => {
+            onFertig();
+            setOffen(false);
+          }}
+          dialog={{ offen, titel: 'Lagemeldung erfassen', onAbbrechen: () => setOffen(false) }}
+        />
+      </AntApp>
+    );
+  }
+
+  it('erfasst im Dialog eine Lagemeldung und meldet sich fertig', async () => {
+    const onAnlegen = anlegenMock();
+    const onFertig = vi.fn();
+    render(<DialogHarness onAnlegen={onAnlegen} onFertig={onFertig} />);
+    const dialog = screen.getByRole('dialog', { name: 'Lagemeldung erfassen' });
+    expect(within(dialog).queryByRole('button', { name: 'Speichern und nächste' })).toBeNull();
+    await fuellePflichtfelder('ELW 1', 'Lage ruhig');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({
+      meldungsart: 'lagemeldung',
+      absender: 'ELW 1',
+    });
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+  });
+
+  // Die Rasterstufen richten sich nach dem Fenster, nicht nach dem 520-px-Dialog (Review
+  // LLH-1921): im Dialog stehen Absender, Empfängerfunktion und Empfänger untereinander.
+  it('setzt Absender, Empfängerfunktion und Empfänger im Dialog einspaltig', () => {
+    render(
+      <AntApp>
+        <MeldungFormular
+          senden={false}
+          onAnlegen={anlegenMock()}
+          artVorgabe="lagemeldung"
+          serie={false}
+          funktionsVorschlaege={TEST_VORSCHLAEGE}
+          dialog={{ offen: true, titel: 'Lagemeldung erfassen', onAbbrechen: () => {} }}
+        />
+      </AntApp>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Lagemeldung erfassen' });
+    for (const name of ['Absender', 'Empfängerfunktion', 'Empfänger / Adressat']) {
+      // Die Spalte der Formularzeile, nicht die innere von `Form.Item`.
+      const spalte = within(dialog)
+        .getByLabelText(name)
+        .closest('.ant-form-item')
+        ?.closest('.ant-col');
+      expect(spalte, name).toHaveClass('ant-col-24');
+      expect(spalte?.className, name).not.toMatch(/ant-col-(sm|lg)-/);
+    }
+  });
+
+  it('leert die Eingabe über das Schließkreuz', async () => {
+    render(<DialogHarness onAnlegen={anlegenMock()} />);
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Verworfen');
+    await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    await waitFor(() => expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue(''));
+  });
+
+  // Das Formular bleibt bei geschlossenem Dialog eingehängt (Review LLH-1921): jedes Öffnen
+  // beginnt zugeklappt, nach einem Abbruch wie nach einer erfassten Meldung.
+  it('beginnt nach Abbrechen und nach dem Erfassen wieder zugeklappt', async () => {
+    render(<DialogHarness onAnlegen={anlegenMock()} />);
+    await userEvent.click(klappkopf());
+    expect(klappkopf()).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
+
+    await userEvent.click(klappkopf());
+    await fuellePflichtfelder('ELW 1', 'Lage ruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
+  });
+
+  it('klappt „Weitere Angaben“ auch im Dialog auf, wenn die Prüfung dort scheitert', async () => {
+    const onAnlegen = anlegenMock();
+    render(<DialogHarness onAnlegen={onAnlegen} />);
+    await userEvent.click(klappkopf());
+    await userEvent.click(screen.getByRole('switch', { name: 'Bestätigung erforderlich' }));
+    fireEvent.change(screen.getByLabelText('Bestätigungsfrist in Minuten'), {
+      target: { value: '0' },
+    });
+    await userEvent.click(klappkopf());
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'false'));
+    await fuellePflichtfelder('ELW 1', 'Lage ruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await waitFor(() => expect(klappkopf()).toHaveAttribute('aria-expanded', 'true'));
+    expect(onAnlegen).not.toHaveBeenCalled();
   });
 });

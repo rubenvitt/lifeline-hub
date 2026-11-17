@@ -12,9 +12,10 @@ Ableitungen in `etb/zeitachseModell.ts`)
   im Meta steht (LLH-1039).
 - **Lagemeldungen sind Meldungen** (LLH-1031, Spec `meldungseingang`): die Seite liest die
   lagerelevanten Meldungen, kein eigenes Lageobjekt; Kennung einer Zeile ist die Meldung
-  (`lagemeldung:<meldung-id>`). „Lagemeldung erfassen“ (Seitenkopf und Leerzustand) öffnet ein
-  `Paneel` mit `meldungen/MeldungFormular.tsx` (`artVorgabe="lagemeldung"`, ohne Serie, schließt
-  nach dem Erfassen; kein zweites Formular). Ohne Schreibrecht im Einsatz oder ohne Modul
+  (`lagemeldung:<meldung-id>`). „Lagemeldung erfassen“ (Seitenkopf, Leerzustand, `?neu=1`) öffnet den
+  Erfassungsdialog von `meldungen/MeldungFormular.tsx` (Prop `dialog`, `artVorgabe="lagemeldung"`,
+  ohne Serie, schließt nach dem Erfassen; kein zweites Formular, kein Paneel über der Zeitachse,
+  LLH-1921). Ohne Schreibrecht im Einsatz oder ohne Modul
   Meldungen fehlt es, der Kopf zeigt „Nur Ansicht · Grund“ (`MODUL_MELDUNGEN_GESPERRT`); die
   Kenntnisnahme hängt am Einsatz-Schreibrecht. Die Zeile trägt Typkante „Lage“ (Typwort bei
   übernommener Meldung anderer Art deren Wort), genau eine Marke „Neu“ (Kenntnisnahme, LLH-1206),

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
+import { offeneAngabe } from '../test/angabe';
 import { renderMitProviders } from '../test/utils';
 import MaterialPage from './MaterialPage';
 import { waehle } from '../test/auswahlListe';
@@ -201,17 +202,22 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     await act(async () => {});
     expect(gesendet).toEqual([]);
 
+    // Die Bearbeitung schwebt an der Zelle (LLH-1795): Knöpfe und Grund stehen in ihr.
     await userEvent.click(
-      within(zeile(container, 10)).getByRole('button', { name: 'Ort zu Wolldecke speichern' }),
+      within(offeneAngabe('Ort zu Wolldecke')).getByRole('button', {
+        name: 'Ort zu Wolldecke speichern',
+      }),
     );
-    expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
+    expect(await within(offeneAngabe('Ort zu Wolldecke')).findByRole('alert')).toHaveTextContent(
       'Einheit ist aufgelöst',
     );
     expect(within(zeile(container, 11)).queryByRole('alert')).toBeNull();
     expect(toasts()).toBe(0);
 
     await userEvent.click(
-      within(zeile(container, 10)).getByRole('button', { name: 'Ort zu Wolldecke speichern' }),
+      within(offeneAngabe('Ort zu Wolldecke')).getByRole('button', {
+        name: 'Ort zu Wolldecke speichern',
+      }),
     );
     await waitFor(() => expect(gesendet).toEqual([{ einheit_id: 1 }, { einheit_id: 1 }]));
   });

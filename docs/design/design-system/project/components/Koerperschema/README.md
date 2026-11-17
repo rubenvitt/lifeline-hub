@@ -1,6 +1,6 @@
 # Körperschema (Lesen)
 
-Der Baustein „Körperschema“ (LLH-1120, Spec `koerperschema`, design.md D13): Verletzungen einer
+Der Baustein „Körperschema“ (design.md D13): Verletzungen einer
 Person auf einer Figur nach Geschlecht, vorn und hinten, mit nummerierten Sternchen und der
 Liste als zweitem Kanal daneben.
 
@@ -9,7 +9,7 @@ Flächen (`FlaechenWahl`), der zweite auf eine Fläche speichert, mit der Tippst
 (`sternLage`: außerhalb der Silhouette der Mittelpunkt der Region). Die Schwere ist optional und
 steht als Segmentleiste über den Flächen; sie kostet keinen Pflichttipp. Ein Tipp auf ein
 Sternchen bietet „Aufheben“ an, der zweite hebt auf. Eine Ablehnung bleibt am Schema stehen, die
-Wahl offen; Einhängen und Abbrechen räumen sie (LFH-1077). Jede Region beginnt ohne Schwere.
+Wahl offen; Einhängen und Abbrechen räumen sie. Jede Region beginnt ohne Schwere.
 Nach Speichern, Aufheben und Abbrechen kehrt der Fokus an die Region bzw. das Sternchen zurück.
 
 LAYOUT nach der gemessenen Breite (`schemaLayout`): vorn und hinten stehen nur nebeneinander,

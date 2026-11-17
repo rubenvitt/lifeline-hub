@@ -1,6 +1,6 @@
 # Kopfaktion mit wechselndem Wortlaut (frei und gesperrt)
 
-Beschriftung, die die Breite ihrer breitesten Form hält (LLH-1627). Für Kopfaktionen, deren
+Beschriftung, die die Breite ihrer breitesten Form hält. Für Kopfaktionen, deren
 Wortlaut mit den Daten wechselt, etwa „Auflösen“ ↔ „Auflösen (noch 2 Personen)“: der Seitenkopf
 bricht nach Inhaltsbreite um (`EinsatzSeite`), ein Knopf, der beim Ablegen eines Patienten
 wächst, schob die Aktionen in eine zweite Zeile und alles darunter nach unten.

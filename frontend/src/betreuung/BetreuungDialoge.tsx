@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, Radio } from 'antd';
+import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal } from 'antd';
 import { Typography } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
@@ -27,7 +27,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { sprungGesperrtText } from '../components/Sprung';
-import { Segmentleiste, type SegmentOption } from '../components/instrument';
+import { SegmentFeld, Segmentleiste, type SegmentOption } from '../components/instrument';
 import RadiusEingabe from '../components/RadiusEingabe';
 import type { GebietKreis } from './gebietZeichnen';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
@@ -303,10 +303,9 @@ function nurWennGeaendert<P extends object>(
 
 // ── Bausteine ───────────────────────────────────────────────────────────────────────────
 
-const ERHEBUNG_OPTIONEN = (['gezaehlt', 'geschaetzt'] as const).map((e) => ({
-  value: e,
-  label: ERHEBUNG_LABEL[e],
-}));
+const ERHEBUNG_OPTIONEN: SegmentOption<'gezaehlt' | 'geschaetzt'>[] = (
+  ['gezaehlt', 'geschaetzt'] as const
+).map((e) => ({ wert: e, label: ERHEBUNG_LABEL[e] }));
 
 export const ART_OPTIONEN = (Object.keys(ART_LABEL) as BetreuungsstelleArt[]).map((a) => ({
   value: a,
@@ -339,8 +338,7 @@ export const hoechstensRegel = {
 function erhebungFeld(name: string, label: string) {
   return (
     <Form.Item name={name} label={label} rules={[{ required: true }]}>
-      {/* `name` ausdrücklich: zwei Radio-Gruppen ohne Namen gruppierte der Browser nativ zu EINER. */}
-      <Radio.Group name={name} optionType="button" options={ERHEBUNG_OPTIONEN} />
+      <SegmentFeld beschriftung={label} optionen={ERHEBUNG_OPTIONEN} />
     </Form.Item>
   );
 }
@@ -609,10 +607,9 @@ export function RaeumungDialog({
       onAbbrechen={onSchliessen}
     >
       <Form.Item name="raeumung" label="Räumungszustand" rules={[{ required: true }]}>
-        <Radio.Group
-          name="raeumung"
-          optionType="button"
-          options={RAEUMUNG_FOLGE.map((r) => ({ value: r, label: raeumungszustand[r].label }))}
+        <SegmentFeld
+          beschriftung="Räumungszustand"
+          optionen={RAEUMUNG_FOLGE.map((r) => ({ wert: r, label: raeumungszustand[r].label }))}
         />
       </Form.Item>
       <SpeicherFehler fehler={fehler} titel="Räumungszustand konnte nicht gespeichert werden" />

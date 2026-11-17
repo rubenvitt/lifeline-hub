@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
+import { Link, MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import LagemeldungenPage from './LagemeldungenPage';
 import type { LageMeldung } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
@@ -468,7 +468,16 @@ describe('LagemeldungenPage', () => {
   });
 
   describe('Lagemeldung als Meldungsart (LLH-1031)', () => {
-    it('erfasst eine Lagemeldung im Paneel über der Zeitachse und schließt es danach', async () => {
+    /**
+     * Ist der Erfassungsdialog offen? jsdom beendet die Ausblende-Animation nicht (`ant-zoom-leave`),
+     * ein schließender Dialog bliebe im Baum (wie `stammdaten/verwaltungstabellen.test.tsx`).
+     */
+    const erfassenOffen = () =>
+      [...document.querySelectorAll('.ant-modal')].some(
+        (m) => !m.classList.contains('ant-zoom-leave'),
+      );
+
+    it('erfasst eine Lagemeldung im Dialog und schließt ihn danach (LLH-1921)', async () => {
       ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
       erfasseMeldungOfflineFaehig.mockResolvedValue({
         zustand: 'gesendet',
@@ -477,7 +486,10 @@ describe('LagemeldungenPage', () => {
       renderPage();
       await screen.findByText('Brücke gesperrt');
       await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
-      const paneel = await screen.findByRole('region', { name: 'Lagemeldung erfassen' });
+      const paneel = await screen.findByRole('dialog', { name: 'Lagemeldung erfassen' });
+      // Kein Paneel über der Zeitachse mehr, und der Kopf-Knopf wird kein „Formular schließen“.
+      expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Formular schließen' })).toBeNull();
       await userEvent.type(
         within(paneel).getByRole('textbox', { name: 'Inhalt / Wortlaut' }),
         'Pegel steigt',
@@ -496,10 +508,92 @@ describe('LagemeldungenPage', () => {
         }),
       );
       expect(erfasseMeldungOfflineFaehig.mock.calls[0][2]).not.toHaveProperty('lat');
-      await vi.waitFor(() =>
-        expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull(),
-      );
+      await vi.waitFor(() => expect(erfassenOffen()).toBe(false));
       expect(listeLageMeldungen.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    /**
+     * Der Dialog hält sein Formular eingehängt (LLH-1921); ein anderer Einsatz beginnt mit einem
+     * leeren, der Wortlaut aus dem vorigen geht nicht mit. Mutationsprobe: ohne `key={einsatzId}`
+     * an `MeldungFormular` rot.
+     */
+    it('nimmt den Wortlaut nicht in einen anderen Einsatz mit', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={client}>
+          <AntApp>
+            <MemoryRouter initialEntries={['/einsaetze/2/lagemeldungen']}>
+              <Link to="/einsaetze/1/lagemeldungen">Zu Einsatz 1</Link>
+              <Link to="/einsaetze/2/lagemeldungen">Zu Einsatz 2</Link>
+              <Routes>
+                <Route path="/einsaetze/:id/lagemeldungen" element={<LagemeldungenPage />} />
+              </Routes>
+            </MemoryRouter>
+          </AntApp>
+        </QueryClientProvider>,
+      );
+      // Einsatz 2 einmal geladen: beim Rückweg steht er im Cache, die Seite hängt nicht neu ein.
+      await screen.findByText('Brücke gesperrt');
+      fireEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 1' }));
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Lagemeldung erfassen' });
+      await userEvent.type(
+        within(dialog).getByRole('textbox', { name: 'Inhalt / Wortlaut' }),
+        'Entwurf aus Einsatz 1',
+      );
+      // Die Maske liegt über dem Link; der Wechsel kommt im Einsatz etwa über die Sprungpalette.
+      fireEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
+      // Der Dialog des neuen Einsatzes öffnet nicht einmal kurz (Review LLH-1921): wäre er offen
+      // eingehängt, stünde er jetzt im Ausblenden im Baum. Ein nie geöffneter rendert nichts.
+      expect(document.querySelectorAll('.ant-modal')).toHaveLength(0);
+      // Der Dialog aus Einsatz 1 ist mit seinem Formular ausgehängt (`key={einsatzId}`).
+      await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+      const neu = await screen.findByRole('dialog', { name: 'Lagemeldung erfassen' });
+      expect(within(neu).getByRole('textbox', { name: 'Inhalt / Wortlaut' })).toHaveValue('');
+    });
+
+    // Eine spät ankommende Antwort aus dem vorigen Einsatz schließt den Dialog des neuen nicht
+    // (Review LLH-1921). Mutationsprobe: `schliesseDialog` ohne Einsatzbezug → rot.
+    it('eine späte Antwort aus dem vorigen Einsatz lässt den Dialog des neuen offen', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      let antworte: (v: unknown) => void = () => {};
+      erfasseMeldungOfflineFaehig.mockImplementation(() => new Promise((r) => (antworte = r)));
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={client}>
+          <AntApp>
+            <MemoryRouter initialEntries={['/einsaetze/2/lagemeldungen']}>
+              <Link to="/einsaetze/1/lagemeldungen">Zu Einsatz 1</Link>
+              <Link to="/einsaetze/2/lagemeldungen">Zu Einsatz 2</Link>
+              <Routes>
+                <Route path="/einsaetze/:id/lagemeldungen" element={<LagemeldungenPage />} />
+              </Routes>
+            </MemoryRouter>
+          </AntApp>
+        </QueryClientProvider>,
+      );
+      await screen.findByText('Brücke gesperrt');
+      fireEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 1' }));
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Lagemeldung erfassen' });
+      await userEvent.type(
+        within(dialog).getByRole('textbox', { name: 'Inhalt / Wortlaut' }),
+        'Aus Einsatz 1',
+      );
+      await userEvent.type(within(dialog).getByRole('combobox', { name: 'Absender' }), 'ELW 1');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Lagemeldung erfassen' }));
+      await vi.waitFor(() => expect(erfasseMeldungOfflineFaehig).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Lagemeldung erfassen' }));
+      await vi.waitFor(() => expect(erfassenOffen()).toBe(true));
+
+      await act(async () => antworte({ zustand: 'gesendet', daten: { id: 12, lfd_nr: 6 } }));
+      await act(() => new Promise((r) => setTimeout(r, 30)));
+      expect(erfassenOffen()).toBe(true);
     });
 
     /** Schnellaktion „Lagemeldung erfassen“ (Spec `meldungseingang`, Adresse mit `?neu=1`). */
@@ -507,9 +601,42 @@ describe('LagemeldungenPage', () => {
       ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
       renderPage('/einsaetze/1/lagemeldungen?neu=1');
       expect(
-        await screen.findByRole('region', { name: 'Lagemeldung erfassen' }),
+        await screen.findByRole('dialog', { name: 'Lagemeldung erfassen' }),
       ).toBeInTheDocument();
       await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+    });
+
+    /**
+     * Aus einem anderen Modul per Sprungpalette (Review LLH-1921): Einsatz und Freigaben liegen
+     * schon im Cache, die Seite hängt mit `?neu=1` ein. Der Einsatz-Reset beim Einhängen darf den
+     * eben geöffneten Dialog nicht gleich wieder schließen.
+     */
+    it('?neu=1 öffnet den Dialog auch mit Einsatz und Freigaben im Cache', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={client}>
+          <AntApp>
+            <MemoryRouter initialEntries={['/einsaetze/1/lagemeldungen']}>
+              <Link to="/einsaetze/1/anderes">Anderes Modul</Link>
+              <Link to="/einsaetze/1/lagemeldungen?neu=1">Palette</Link>
+              <Routes>
+                <Route path="/einsaetze/:id/lagemeldungen" element={<LagemeldungenPage />} />
+                <Route path="/einsaetze/:id/anderes" element={<div>ANDERES-MODUL</div>} />
+              </Routes>
+            </MemoryRouter>
+          </AntApp>
+        </QueryClientProvider>,
+      );
+      await screen.findByText('Brücke gesperrt');
+      fireEvent.click(screen.getByRole('link', { name: 'Anderes Modul' }));
+      await screen.findByText('ANDERES-MODUL');
+      fireEvent.click(screen.getByRole('link', { name: 'Palette' }));
+      expect(
+        await screen.findByRole('dialog', { name: 'Lagemeldung erfassen' }),
+      ).toBeInTheDocument();
+      await act(() => new Promise((r) => setTimeout(r, 30)));
+      expect(erfassenOffen()).toBe(true);
     });
 
     /** Der Riegel selbst: die später ankommende Freigabe öffnet das Formular nicht nachträglich. */
@@ -527,7 +654,7 @@ describe('LagemeldungenPage', () => {
       expect(
         await screen.findByRole('button', { name: 'Lagemeldung erfassen' }),
       ).toBeInTheDocument();
-      expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull();
+      expect(erfassenOffen()).toBe(false);
     });
 
     it('?neu=1 öffnet ohne Modul Meldungen nichts, räumt aber den Parameter', async () => {
@@ -536,7 +663,7 @@ describe('LagemeldungenPage', () => {
       renderPage('/einsaetze/1/lagemeldungen?neu=1');
       expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
       await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
-      expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull();
+      expect(erfassenOffen()).toBe(false);
     });
 
     it('ohne Schreibrecht: Nur Ansicht mit Grund, kein Erfassen', async () => {

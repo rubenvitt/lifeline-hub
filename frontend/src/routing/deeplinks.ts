@@ -119,7 +119,8 @@ function mitQuery(pfad: string, params: Record<string, string | number | undefin
  * bleibt in der Adresse stehen, damit ein Link ihn direkt öffnet. Die Vorgabe „Belegung“ (der
  * Grundriss) steht ohne Parameter.
  */
-export type UhsBereich = 'belegung' | 'material' | 'kraefte' | 'bewegungen' | 'dateien';
+/** `angaben`: Stammdaten der UHS, in der Ansicht bearbeitet (LLH-1920). */
+export type UhsBereich = 'belegung' | 'material' | 'kraefte' | 'bewegungen' | 'dateien' | 'angaben';
 
 /** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
 const UHS_BEREICH_ERLAUBT: Record<UhsBereich, true> = {
@@ -128,6 +129,7 @@ const UHS_BEREICH_ERLAUBT: Record<UhsBereich, true> = {
   kraefte: true,
   bewegungen: true,
   dateien: true,
+  angaben: true,
 };
 
 /** Der Query-Teil eines Bereichs (`?bereich=material`), für die Vorgabe leer. */

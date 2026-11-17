@@ -137,7 +137,8 @@ Die vier Stufen und ihre Bezeichnungen sind:
 #### Scenario: Kein Einsatzort
 - **WHEN** der Einsatz keine Koordinate des Einsatzorts hat
 - **THEN** liefert der Endpunkt den Zustand „kein Ort“ ohne Abruf bei der Quelle
-- **AND** die Seite erklärt, dass Warnungen und Vorhersage einen verorteten Einsatzort brauchen, und verweist auf die Einsatzdaten
+- **AND** die Seite erklärt einmal über den Paneelen, dass Warnungen, Vorhersage und aktuelle Bedingungen einen verorteten Einsatzort brauchen, mit dem Knopf „Einsatzort in den Einsatzdaten verorten“
+- **AND** die Paneele Warnungen, Vorhersage und Aktuelle Bedingungen nennen nur „ohne Einsatzort“, ohne eigenen Knopf
 
 ### Requirement: Wettervorhersage für den Einsatzort
 
@@ -215,7 +216,7 @@ Die Seite MUST den Quellenvermerk „Datenbasis: Deutscher Wetterdienst“ trage
 #### Scenario: Kein Einsatzort
 - **WHEN** der Einsatz keine Koordinate des Einsatzorts hat
 - **THEN** liefert der Endpunkt für die aktuellen Bedingungen den Zustand „kein Ort“ ohne Abruf bei der Quelle
-- **AND** das Paneel erklärt, dass es einen verorteten Einsatzort braucht
+- **AND** das Paneel nennt nur „ohne Einsatzort“; erklärt wird einmal auf der Seite (siehe „DWD-Warnungen für den Einsatzort“, Szenario „Kein Einsatzort“)
 
 #### Scenario: Ausfall reißt die anderen Teile nicht mit
 - **WHEN** die Quelle für die aktuellen Bedingungen nicht antwortet und nichts zwischengespeichert ist, Warnungen und Vorhersage aber vorliegen
