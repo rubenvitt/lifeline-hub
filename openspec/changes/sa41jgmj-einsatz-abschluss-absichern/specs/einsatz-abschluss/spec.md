@@ -115,6 +115,12 @@ an einem aktiven Einsatz.
 - **WHEN** die Einsatzleitung einen vor 25 Stunden abgeschlossenen Einsatz wieder öffnen will
 - **THEN** antwortet das System mit 422, und der Einsatz bleibt abgeschlossen
 
+#### Scenario: Zur Löschung vorgemerkt
+
+- **WHEN** ein abgeschlossener Einsatz zur Löschung vorgemerkt ist und die Einsatzleitung ihn
+  wieder öffnen will
+- **THEN** antwortet das System mit 403, und der Einsatz bleibt abgeschlossen
+
 #### Scenario: Admin der Einsatz-Organisation ohne Mitgliedschaft
 
 - **WHEN** ein System-Admin der Organisation des Einsatzes ohne Einsatzrolle ihn binnen 24
@@ -189,9 +195,10 @@ Maschinenzugänge MUST beendet bleiben. Ein erneuter Abschluss MUST die Fristen 
 ### Requirement: Kein Wiederöffnen, wenn die Aufbewahrung schon greift
 
 Das System MUST das Wiederöffnen mit 422 ablehnen, wenn der Einsatz oder eine seiner
-Datenkategorien schon geschwärzt ist, der Einsatz zur Löschung vorgemerkt ist, ein
-Schwärzungsantrag für ihn offen ist, oder der Einsatz archiviert oder zur Verwahrung übergeben
-ist.
+Datenkategorien schon geschwärzt ist, ein Schwärzungsantrag für ihn gestellt ist, oder der
+Einsatz archiviert, zur Verwahrung übergeben oder zum Abräumen vorgesehen ist. Ist der Einsatz
+zur Löschung vorgemerkt, MUST das System ablehnen; weil ein vorgemerkter Einsatz für niemanden
+mehr lesbar ist, antwortet es dann wie bei jedem nicht lesbaren Einsatz mit 403.
 
 #### Scenario: Geschwärzte Kategorie
 

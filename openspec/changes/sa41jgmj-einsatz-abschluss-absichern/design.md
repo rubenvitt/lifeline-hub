@@ -140,7 +140,7 @@ vorhandene Schonfrist, in der ohnehin alle Mitglieder lesen.
 | Kategorie-Zeilen von Hand gesetzt | bleiben |
 | `nachbereitung_bis` | auf `NULL`, ETB, wenn gesetzt (eine von Hand geänderte Nachbereitung geht mit; der erneute Abschluss setzt sie aus der Org-Vorgabe neu) |
 | Freigabe der öffentlichen API | bleibt gelöscht |
-| Gerätekopplungen | bleiben beendet |
+| Gerätekopplungen | bleiben beendet: der Abschluss macht sie nur über den Status ungültig, deshalb widerruft `wiedereroeffnen` jede noch offene Kopplung in seiner Transaktion (`geraet::repo::widerrufen`, Umsetzung 17.11.2026) |
 
 Der Vergleich „automatisch“ hängt an der Gleichheit der Zeitstempel, die der Abschluss in
 derselben Transaktion schreibt (`retention_gesetzt_at = abgeschlossen_at`,
