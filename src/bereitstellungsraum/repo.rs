@@ -33,6 +33,10 @@ pub struct PatchDaten<'a> {
     /// Koordinate (LLH-1107); das wirksame Paar prüft [`update_tx`] gegen den Rohstand.
     pub lat: Option<Option<f64>>,
     pub lon: Option<Option<f64>>,
+    /// Optimistisches Lock (LLH-1920, Muster UHS LFH-241): der beim Öffnen gelesene
+    /// `geaendert_at`. Weicht der Stand ab → `Conflict` (409). `None` schreibt ohne Prüfung
+    /// (Lagekarte, „Meine Änderung übernehmen“).
+    pub basis_geaendert_at: Option<&'a str>,
 }
 
 /// Zeile der Liste: Raum und Name seines Abschnitts (LLH-1095, design.md D4).
@@ -223,6 +227,9 @@ pub async fn create_tx(
 /// Koordinate (LLH-1107, design.md D1): das wirksame Paar entsteht aus Eingabe und Rohstand
 /// DIESER Transaktion und wird vor dem UPDATE geprüft (halbes Paar oder Bereich → 422); so
 /// zerreißen zwei gleichzeitige Teiländerungen (nur `lat`, nur `lon`) das Paar nicht.
+///
+/// Mit `basis_geaendert_at` schreibt das UPDATE nur, solange `geaendert_at` unverändert ist,
+/// sonst `Conflict` (409, LLH-1920).
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -242,6 +249,8 @@ pub async fn update_tx(
     if let Some(Some(abschnitt)) = daten.abschnitt_id {
         crate::einsatzabschnitt::repo::check_im_einsatz(&mut *conn, einsatz_id, abschnitt).await?;
     }
+    // Der Basisstand steht im WHERE (Muster UHS): atomar, auch ohne umschließende Transaktion.
+    // `?13 IS NULL` schaltet die Prüfung ab, wenn kein Stand mitkommt.
     let ergebnis = sqlx::query(
         "UPDATE bereitstellungsraum \
          SET bezeichnung = COALESCE(?1, bezeichnung), \
@@ -251,7 +260,7 @@ pub async fn update_tx(
              lat = ?8, lon = ?9, \
              geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
              geaendert_von = ?10 \
-         WHERE id = ?11 AND einsatz_id = ?12",
+         WHERE id = ?11 AND einsatz_id = ?12 AND (?13 IS NULL OR geaendert_at = ?13)",
     )
     .bind(daten.bezeichnung)
     .bind(daten.abschnitt_id.map(|_| 1_i64))
@@ -265,9 +274,14 @@ pub async fn update_tx(
     .bind(geaendert_von)
     .bind(id)
     .bind(einsatz_id)
+    .bind(daten.basis_geaendert_at)
     .execute(&mut *conn)
     .await;
     match ergebnis {
+        // Die Zeile gibt es (`laden_tx` oben): keine Änderung heißt veralteter Stand.
+        Ok(r) if r.rows_affected() == 0 => Err(AppError::Conflict(
+            "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
+        )),
         Ok(_) => laden_tx(conn, einsatz_id, id).await,
         Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(AppError::Conflict(
             "Ein Bereitstellungsraum mit dieser Bezeichnung existiert bereits in diesem Einsatz"
@@ -672,6 +686,75 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, AppError::NotFound));
+    }
+
+    /// LLH-1920: optimistisches Lock über `geaendert_at` für die Raumdaten (Muster UHS,
+    /// LFH-241). Feste Zeitstempel vermeiden das 1-s-Aliasing im Test.
+    #[tokio::test]
+    async fn update_optimistisches_lock_ueber_geaendert_at() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let br = create(&pool, e, b, neu("BR Lock")).await.unwrap();
+        sqlx::query(
+            "UPDATE bereitstellungsraum SET geaendert_at = '2000-01-01 00:00:00' WHERE id = ?",
+        )
+        .bind(br.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let stand = "2000-01-01 00:00:00";
+
+        let nach = patch(
+            &pool,
+            e,
+            br.id,
+            b,
+            PatchDaten {
+                notiz: Some(Some("A")),
+                basis_geaendert_at: Some(stand),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("aktueller Stand muss durchgehen");
+        assert_eq!(nach.notiz.as_deref(), Some("A"));
+        assert_ne!(nach.geaendert_at, stand);
+
+        let err = patch(
+            &pool,
+            e,
+            br.id,
+            b,
+            PatchDaten {
+                notiz: Some(Some("B")),
+                basis_geaendert_at: Some(stand),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "veralteter Stand muss 409 sein: {err:?}"
+        );
+        let geladen =
+            crate::write_retry!(&pool, |conn| { laden_tx(conn, e, br.id).await }).unwrap();
+        assert_eq!(geladen.notiz.as_deref(), Some("A"), "der 409 ändert nichts");
+
+        // Ohne Basisstand (Lagekarte, „Meine Änderung übernehmen“) schreibt er wie bisher.
+        let blind = patch(
+            &pool,
+            e,
+            br.id,
+            b,
+            PatchDaten {
+                notiz: Some(Some("C")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(blind.notiz.as_deref(), Some("C"));
     }
 
     /// Änderung in einer eigenen Schreibtransaktion, wie die Route sie öffnet.

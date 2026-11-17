@@ -2,9 +2,9 @@
 
 ## 1. Backend: Basisstand am BR-PATCH (D5)
 
-- [ ] 1.1 Test in `src/bereitstellungsraum/repo.rs` (Muster `aktualisiere_optimistisches_lock_ueber_geaendert_at` der UHS) rot: `update_tx` mit veraltetem Basisstand → `AppError::Conflict`, Notiz unverändert; mit aktuellem Basisstand → gespeichert, neues `geaendert_at`; ohne Basisstand → gespeichert
-- [ ] 1.2 `PatchBody.basis_geaendert_at: Option<String>` in `src/routes/einsatz_bereitstellungsraum.rs`, weitergereicht an `br_repo::update_tx`; UPDATE mit `AND geaendert_at = ?` bei gesetzter Basis, keine Zeile → 409 „… zwischenzeitlich geändert“; Test 1.1 grün; Routen-Test in `tests/` (falls es für den BR-PATCH einen gibt) um den 409-Fall ergänzt
-- [ ] 1.3 `cargo test` für `bereitstellungsraum` und die BR-Routen-Tests grün; `scripts/check-typ-codegen.sh` bestätigt: keine Änderung an generierten Dateien
+- [x] 1.1 Test in `src/bereitstellungsraum/repo.rs` (Muster `aktualisiere_optimistisches_lock_ueber_geaendert_at` der UHS) rot: `update_tx` mit veraltetem Basisstand → `AppError::Conflict`, Notiz unverändert; mit aktuellem Basisstand → gespeichert, neues `geaendert_at`; ohne Basisstand → gespeichert
+- [x] 1.2 `PatchBody.basis_geaendert_at: Option<String>` in `src/routes/einsatz_bereitstellungsraum.rs`, weitergereicht an `br_repo::update_tx`; UPDATE mit `AND geaendert_at = ?` bei gesetzter Basis, keine Zeile → 409 „… zwischenzeitlich geändert“; Test 1.1 grün; Routen-Test in `tests/` (falls es für den BR-PATCH einen gibt) um den 409-Fall ergänzt
+- [x] 1.3 `cargo test` für `bereitstellungsraum` und die BR-Routen-Tests grün; `scripts/check-typ-codegen.sh` bestätigt: keine Änderung an generierten Dateien
 
 ## 2. Baustein: Zusatzhandlungen im Paneelkopf (D6)
 
