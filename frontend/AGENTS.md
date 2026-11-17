@@ -317,7 +317,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
   über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
   `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
-  Einheiten. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
+  Einheiten in der Folge der Einheitenliste (`einheitenMitAusfall`). Für den Lagemonitor zählt der
+  Server dieselbe Regel nach (`einsatz::ausfall`, LLH-1929); `tests/fixtures/verdichtung/regeln.json`,
+  Abschnitt `ausfall`, bindet beide Seiten. Wer die Regel ändert, ändert beide und das Fixture.
+  Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
   jüngste Meldung allein (LLH-1739, `abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
   ihm steht (LLH-1744): Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit

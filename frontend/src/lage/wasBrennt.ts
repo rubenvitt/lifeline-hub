@@ -71,7 +71,8 @@ export interface WasBrenntQuellen {
   kritisch: QuellStand<Benannt[]>;
   /** Einheiten mit überfälliger Rückmeldung (schon geurteilt), Minuten seit der Fälligkeit. */
   rueckmeldung: QuellStand<(Benannt & { seitMin: number })[]>;
-  /** Einheiten mit Ausfall; `null`, wo es die Quelle nicht gibt (Lagemonitor, D6). */
+  /** Einheiten mit Ausfall; `null`, wo es die Quelle nicht gibt (Lagemonitor an einem Server vor
+   *  LLH-1929). */
   ausfall: QuellStand<Benannt[]> | null;
 }
 

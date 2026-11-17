@@ -22,9 +22,9 @@ Jede Aufgabe per `superpowers:test-driven-development`: erst den roten Test, dan
 
 ## 4. Doku und Regeln
 
-- [ ] 4.1 `frontend/AGENTS.md`, „Eine Heimat je Zahl“: Server-Zählung `einsatz::ausfall`, Bindung über `regeln.json` (Abschnitt `ausfall`) und Folge der Einheitenliste nennen. Den Kommentar in `src/routes/lagemonitor.rs` und `lage/alarmAusMonitor.ts` („Den Ausfall trägt der Monitor nicht“) berichtigen. Prüfen: `git grep -n "Ausfall trägt der Monitor nicht\|ohne den Ausfall"` trifft nur noch Archiv und ADR-0057.
-- [ ] 4.2 Anwenderdoku `docs/anwender/kapitel/lagemonitor.md`, Punkt 1: Der Monitor nennt den Ausfall, die Einheiten in der Folge der Einheitenliste. Prüfen: Die Wächter für die Anwenderdoku sind grün (`check-all.sh`, Bündel `schnell`).
-- [ ] 4.3 Neue ADR (nächste freie Nummer auf `alpha`): „Ausfall je Einheit zählen Browser und Server, gebunden über das gemeinsame Fixture“, mit `gilt_fuer` auf `frontend/src/lage/ausfallJeEinheit.ts`, `src/einsatz/ausfall.rs` und `tests/fixtures/verdichtung/regeln.json`, und einer Prüfung mit `verlange` auf Abschnitt und beide Tests. Prüfen: `scripts/check-adr-nummern.sh` und die ADR-Wächter sind grün.
+- [x] 4.1 `frontend/AGENTS.md`, „Eine Heimat je Zahl“: Server-Zählung `einsatz::ausfall`, Bindung über `regeln.json` (Abschnitt `ausfall`) und Folge der Einheitenliste nennen. Den Kommentar in `src/routes/lagemonitor.rs` und `lage/alarmAusMonitor.ts` („Den Ausfall trägt der Monitor nicht“) berichtigen. Prüfen: `git grep -n "Ausfall trägt der Monitor nicht\|ohne den Ausfall"` trifft nur noch Archiv und ADR-0057.
+- [x] 4.2 Anwenderdoku `docs/anwender/kapitel/lagemonitor.md`, Punkt 1: Der Monitor nennt den Ausfall, die Einheiten in der Folge der Einheitenliste. Prüfen: Die Wächter für die Anwenderdoku sind grün (`check-all.sh`, Bündel `schnell`).
+- [x] 4.3 Neue ADR (nächste freie Nummer auf `alpha`): „Ausfall je Einheit zählen Browser und Server, gebunden über das gemeinsame Fixture“, mit `gilt_fuer` auf `frontend/src/lage/ausfallJeEinheit.ts`, `src/einsatz/ausfall.rs` und `tests/fixtures/verdichtung/regeln.json`, und einer Prüfung mit `verlange` auf Abschnitt und beide Tests. Prüfen: `scripts/check-adr-nummern.sh` und die ADR-Wächter sind grün.
 
 ## 5. Gesamtprüfung
 

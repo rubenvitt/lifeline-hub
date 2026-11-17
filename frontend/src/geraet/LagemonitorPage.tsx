@@ -823,7 +823,7 @@ export default function LagemonitorPage() {
             Personenbezug“): dieselben Arten, Folge und Wörter wie in Überblick und Lagebild, aus
             dem Block `alarm` der Serverantwort; 28 px, ohne Bedienung. Sie steht über der Karte,
             nicht über die volle Breite: rechts behalten Betroffene, Kräfte und UHS ihre Höhe
-            (entschieden 16.11.2026). Den Ausfall trägt der Monitor nicht (design.md D6). */}
+            (entschieden 16.11.2026). Den Ausfall zählt der Server nach (LLH-1929). */}
           <AlarmZeile
             daten={wasBrennt(alarmAusMonitor(lage, lageQuery.isError), dayjs(jetzt))}
             groesse="gross"
