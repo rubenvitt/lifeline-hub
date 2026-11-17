@@ -26,7 +26,12 @@ import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
 import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { sucheOrtImEinsatz } from '../api/ortSuche';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { einsatzberichtPfad, einsatzEinstellungenPfad, lagekartePfad } from '../routing/deeplinks';
+import {
+  einsatzberichtPfad,
+  einsatzEinstellungenPfad,
+  lagekartePfad,
+  type EinsatzdatenPaneel,
+} from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SPIEGEL_KOPF_ABRUF_MS } from '../einsatz/spiegel/spiegelText';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -448,117 +453,121 @@ function EinsatzortPaneel({
       ? { lat: einsatz.einsatzort_lat, lon: einsatz.einsatzort_lon }
       : null;
   const adresse = einsatz.einsatzort ?? '';
+  // `?paneel=einsatzort` aus der Startliste im Überblick (LLH-1815): das Paneel steht mit dem Einsatz.
+  const sprungRef = usePaneelSprung('einsatzort', true);
 
   return (
-    <Paneel titel="Einsatzort">
-      <Angaben
-        zeilen={[
-          {
-            etikett: 'Adresse',
-            wert: (
-              <InlineAngabe<OrtsfeldWert>
-                etikett="Adresse"
-                // Die gespeicherte Koordinate steht mit in der Bearbeitung: die Vorschau zeigt
-                // sie, die Nadel berichtigt sie. Als `karte` gelöst vom Text, damit eine reine
-                // Textänderung den Punkt nicht leert (LLH-1108).
-                wert={
-                  punkt
-                    ? { text: adresse, koordinate: punkt, quelle: 'karte' }
-                    : { text: adresse, koordinate: null }
-                }
-                anzeige={adresse}
-                leer={(w) => w.text.trim() === ''}
-                // Nach Werten, nicht nach Identität: ein Treffer an anderer Stelle ist eine
-                // Änderung, auch bei gleichem Text.
-                gleich={gleicherOrt}
-                darfSchreiben={darfSchreiben}
-                onSpeichern={(w) =>
-                  speichern(
-                    'Adresse',
-                    // Die Koordinate geht nur mit, wenn sie neu ist (Treffer, Nadel, getippt);
-                    // reiner Text schickt nur die Adresse (Spec `einsatzdaten-bearbeitung`).
-                    // Hat das Feld den gespeicherten Punkt verloren (geleerter Text, LLH-1534),
-                    // geht er als `null` mit: sonst bliebe ein Punkt, den die Maske nicht zeigte.
-                    w.koordinate &&
-                      (w.koordinate.lat !== punkt?.lat || w.koordinate.lon !== punkt?.lon)
-                      ? {
-                          einsatzort: leerZuNull(w.text),
-                          einsatzort_lat: w.koordinate.lat,
-                          einsatzort_lon: w.koordinate.lon,
-                        }
-                      : !w.koordinate && punkt
+    <div ref={sprungRef} data-lfh="einsatzort-paneel" style={{ minWidth: 0 }}>
+      <Paneel titel="Einsatzort">
+        <Angaben
+          zeilen={[
+            {
+              etikett: 'Adresse',
+              wert: (
+                <InlineAngabe<OrtsfeldWert>
+                  etikett="Adresse"
+                  // Die gespeicherte Koordinate steht mit in der Bearbeitung: die Vorschau zeigt
+                  // sie, die Nadel berichtigt sie. Als `karte` gelöst vom Text, damit eine reine
+                  // Textänderung den Punkt nicht leert (LLH-1108).
+                  wert={
+                    punkt
+                      ? { text: adresse, koordinate: punkt, quelle: 'karte' }
+                      : { text: adresse, koordinate: null }
+                  }
+                  anzeige={adresse}
+                  leer={(w) => w.text.trim() === ''}
+                  // Nach Werten, nicht nach Identität: ein Treffer an anderer Stelle ist eine
+                  // Änderung, auch bei gleichem Text.
+                  gleich={gleicherOrt}
+                  darfSchreiben={darfSchreiben}
+                  onSpeichern={(w) =>
+                    speichern(
+                      'Adresse',
+                      // Die Koordinate geht nur mit, wenn sie neu ist (Treffer, Nadel, getippt);
+                      // reiner Text schickt nur die Adresse (Spec `einsatzdaten-bearbeitung`).
+                      // Hat das Feld den gespeicherten Punkt verloren (geleerter Text, LLH-1534),
+                      // geht er als `null` mit: sonst bliebe ein Punkt, den die Maske nicht zeigte.
+                      w.koordinate &&
+                        (w.koordinate.lat !== punkt?.lat || w.koordinate.lon !== punkt?.lon)
                         ? {
                             einsatzort: leerZuNull(w.text),
-                            einsatzort_lat: null,
-                            einsatzort_lon: null,
+                            einsatzort_lat: w.koordinate.lat,
+                            einsatzort_lon: w.koordinate.lon,
                           }
-                        : { einsatzort: leerZuNull(w.text) },
-                  )
-                }
-                eingabe={({ feld, popup, value, onChange }) => (
-                  <Ortsfeld
-                    {...feld}
-                    {...popup}
-                    value={value}
-                    onChange={onChange}
-                    suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
-                    suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
-                    karte={{
-                      etikett: 'Einsatzort',
-                      einsatzId,
-                      // Die Peilung zeigt nicht auf den Einsatzort selbst.
-                      exclude: `einsatzort:${einsatzId}`,
-                      umgebung: punkt,
-                    }}
-                  />
-                )}
-              />
-            ),
-          },
-          {
-            etikett: 'Koordinate',
-            wert: (
-              <KoordinatenAngabe
-                einsatzId={einsatzId}
-                lat={einsatz.einsatzort_lat}
-                lon={einsatz.einsatzort_lon}
-                darfSchreiben={darfSchreiben}
-                speichern={speichern}
-              />
-            ),
-          },
-        ]}
-      />
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: token.marginXS,
-          paddingBlock: token.paddingSM,
-          paddingInline: token.padding,
-        }}
-      >
-        <Kartenausschnitt punkt={punkt} etikett="Einsatzort" />
-        {punkt && lagekarteFrei && (
-          // Link in Knopfgestalt wie „Einsatzbericht drucken“: ein nacktes `<a>` erbt keine
-          // Steuerhöhe (`frontend/AGENTS.md`, Handgebautes Bedienziel); Strg/⌘+Klick öffnet einen Tab.
-          <div data-lfh="inspector-sprung">
-            <Button
-              type="link"
-              href={lagekartePfad(einsatzId, { zentrum: punkt })}
-              style={{ paddingInline: 0 }}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                e.preventDefault();
-                navigate(lagekartePfad(einsatzId, { zentrum: punkt }));
-              }}
-            >
-              Auf Lagekarte zeigen <span aria-hidden="true">↗</span>
-            </Button>
-          </div>
-        )}
-      </div>
-    </Paneel>
+                        : !w.koordinate && punkt
+                          ? {
+                              einsatzort: leerZuNull(w.text),
+                              einsatzort_lat: null,
+                              einsatzort_lon: null,
+                            }
+                          : { einsatzort: leerZuNull(w.text) },
+                    )
+                  }
+                  eingabe={({ feld, popup, value, onChange }) => (
+                    <Ortsfeld
+                      {...feld}
+                      {...popup}
+                      value={value}
+                      onChange={onChange}
+                      suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
+                      suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
+                      karte={{
+                        etikett: 'Einsatzort',
+                        einsatzId,
+                        // Die Peilung zeigt nicht auf den Einsatzort selbst.
+                        exclude: `einsatzort:${einsatzId}`,
+                        umgebung: punkt,
+                      }}
+                    />
+                  )}
+                />
+              ),
+            },
+            {
+              etikett: 'Koordinate',
+              wert: (
+                <KoordinatenAngabe
+                  einsatzId={einsatzId}
+                  lat={einsatz.einsatzort_lat}
+                  lon={einsatz.einsatzort_lon}
+                  darfSchreiben={darfSchreiben}
+                  speichern={speichern}
+                />
+              ),
+            },
+          ]}
+        />
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: token.marginXS,
+            paddingBlock: token.paddingSM,
+            paddingInline: token.padding,
+          }}
+        >
+          <Kartenausschnitt punkt={punkt} etikett="Einsatzort" />
+          {punkt && lagekarteFrei && (
+            // Link in Knopfgestalt wie „Einsatzbericht drucken“: ein nacktes `<a>` erbt keine
+            // Steuerhöhe (`frontend/AGENTS.md`, Handgebautes Bedienziel); Strg/⌘+Klick öffnet einen Tab.
+            <div data-lfh="inspector-sprung">
+              <Button
+                type="link"
+                href={lagekartePfad(einsatzId, { zentrum: punkt })}
+                style={{ paddingInline: 0 }}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                  e.preventDefault();
+                  navigate(lagekartePfad(einsatzId, { zentrum: punkt }));
+                }}
+              >
+                Auf Lagekarte zeigen <span aria-hidden="true">↗</span>
+              </Button>
+            </div>
+          )}
+        </div>
+      </Paneel>
+    </div>
   );
 }
 
@@ -639,6 +648,9 @@ function FuehrungsstellePaneel({
     onSuccess: () => message.success('Sprechgruppen gespeichert'),
   });
   const fahrzeugQuelle = useFahrzeugeQuelle(einsatzId);
+  // `?paneel=fuehrungsstelle` aus der Startliste im Überblick (LLH-1815): erst, wenn die
+  // Führungsstelle steht (auch als Fehler), sonst fehlte die Zeile „Einsatzleiter“ als Fokusziel.
+  const sprungRef = usePaneelSprung('fuehrungsstelle', !query.isPending);
 
   const fs = query.data;
   const text = (
@@ -668,114 +680,116 @@ function FuehrungsstellePaneel({
 
   return (
     // Kein Außenabstand: der Abstand kommt aus dem Paneel-Raster der Seite (LFH-1170).
-    <Paneel titel="Eigene Führungsstelle">
-      <PaneelZustand
-        zustand={query.isPending ? 'laden' : query.isError ? 'fehler' : 'daten'}
-        titel="Eigene Führungsstelle"
-        leerText=""
-        onNeuladen={() => void query.refetch()}
-      >
-        {fs && (
-          <Angaben
-            zeilen={[
-              {
-                etikett: 'Einsatzleiter',
-                wert: (
-                  <EinsatzleiterAngabe
-                    einsatzId={einsatzId}
-                    fs={fs}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(einsatzleiter) => speichern('Einsatzleiter', { einsatzleiter })}
-                  />
-                ),
-              },
-              {
-                etikett: 'Art',
-                wert: (
-                  <ArtAngabe
-                    art={fs.art}
-                    erfasst={fuehrungsstelleErfasst(fs)}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(art) => speichern('Art', { art })}
-                  />
-                ),
-              },
-              {
-                etikett: 'Bezeichnung',
-                wert: text(
-                  'Bezeichnung',
-                  fs.bezeichnung,
-                  'bezeichnung',
-                  FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
-                ),
-              },
-              {
-                etikett: 'Standort',
-                wert: (
-                  <StandortAngabe
-                    fs={fs}
-                    einsatz={einsatz}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(patch) => speichern('Standort', patch)}
-                  />
-                ),
-              },
-              {
-                etikett: 'Rufname',
-                wert: (
-                  <RufnameAngabe
-                    rufname={fs.rufname}
-                    fahrzeugIds={fs.fahrzeug_ids}
-                    quelle={fahrzeugQuelle}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(w) => speichern('Rufname', { rufname: leerZuNull(w) })}
-                  />
-                ),
-              },
-              {
-                etikett: 'Sprechgruppen',
-                wert: (
-                  <SprechgruppenAngabe
-                    sprechgruppen={fs.sprechgruppen}
-                    einsatzId={einsatzId}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(aenderung, onSchritt) =>
-                      sprechgruppen.mutateAsync({ aenderung, onSchritt })
-                    }
-                  />
-                ),
-              },
-              {
-                // Funk (Rufname, Sprechgruppen) und Telefon getrennt (LLH-1134).
-                etikett: 'Telefon und weitere Verbindungen',
-                wert: (
-                  <VerbindungenAngabe
-                    etikett="Telefon und weitere Verbindungen"
-                    verbindungen={fs.verbindungen}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(liste) =>
-                      speichern('Telefon und weitere Verbindungen', { verbindungen: liste })
-                    }
-                  />
-                ),
-              },
-              {
-                etikett: 'Führungsfahrzeuge',
-                wert: (
-                  <FuehrungsfahrzeugeZeile
-                    art={fs.art}
-                    ids={fs.fahrzeug_ids}
-                    quelle={fahrzeugQuelle}
-                    darfSchreiben={darfSchreiben}
-                    onSpeichern={(ids) => speichern('Führungsfahrzeuge', { fahrzeug_ids: ids })}
-                  />
-                ),
-              },
-            ]}
-          />
-        )}
-      </PaneelZustand>
-    </Paneel>
+    <div ref={sprungRef} data-lfh="fuehrungsstelle-paneel" style={{ minWidth: 0 }}>
+      <Paneel titel="Eigene Führungsstelle">
+        <PaneelZustand
+          zustand={query.isPending ? 'laden' : query.isError ? 'fehler' : 'daten'}
+          titel="Eigene Führungsstelle"
+          leerText=""
+          onNeuladen={() => void query.refetch()}
+        >
+          {fs && (
+            <Angaben
+              zeilen={[
+                {
+                  etikett: 'Einsatzleiter',
+                  wert: (
+                    <EinsatzleiterAngabe
+                      einsatzId={einsatzId}
+                      fs={fs}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(einsatzleiter) => speichern('Einsatzleiter', { einsatzleiter })}
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Art',
+                  wert: (
+                    <ArtAngabe
+                      art={fs.art}
+                      erfasst={fuehrungsstelleErfasst(fs)}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(art) => speichern('Art', { art })}
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Bezeichnung',
+                  wert: text(
+                    'Bezeichnung',
+                    fs.bezeichnung,
+                    'bezeichnung',
+                    FUEHRUNGSSTELLE_BEZEICHNUNG_MAX,
+                  ),
+                },
+                {
+                  etikett: 'Standort',
+                  wert: (
+                    <StandortAngabe
+                      fs={fs}
+                      einsatz={einsatz}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(patch) => speichern('Standort', patch)}
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Rufname',
+                  wert: (
+                    <RufnameAngabe
+                      rufname={fs.rufname}
+                      fahrzeugIds={fs.fahrzeug_ids}
+                      quelle={fahrzeugQuelle}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(w) => speichern('Rufname', { rufname: leerZuNull(w) })}
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Sprechgruppen',
+                  wert: (
+                    <SprechgruppenAngabe
+                      sprechgruppen={fs.sprechgruppen}
+                      einsatzId={einsatzId}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(aenderung, onSchritt) =>
+                        sprechgruppen.mutateAsync({ aenderung, onSchritt })
+                      }
+                    />
+                  ),
+                },
+                {
+                  // Funk (Rufname, Sprechgruppen) und Telefon getrennt (LLH-1134).
+                  etikett: 'Telefon und weitere Verbindungen',
+                  wert: (
+                    <VerbindungenAngabe
+                      etikett="Telefon und weitere Verbindungen"
+                      verbindungen={fs.verbindungen}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(liste) =>
+                        speichern('Telefon und weitere Verbindungen', { verbindungen: liste })
+                      }
+                    />
+                  ),
+                },
+                {
+                  etikett: 'Führungsfahrzeuge',
+                  wert: (
+                    <FuehrungsfahrzeugeZeile
+                      art={fs.art}
+                      ids={fs.fahrzeug_ids}
+                      quelle={fahrzeugQuelle}
+                      darfSchreiben={darfSchreiben}
+                      onSpeichern={(ids) => speichern('Führungsfahrzeuge', { fahrzeug_ids: ids })}
+                    />
+                  ),
+                },
+              ]}
+            />
+          )}
+        </PaneelZustand>
+      </Paneel>
+    </div>
   );
 }
 
@@ -1484,6 +1498,33 @@ export default function EinsatzdatenPage() {
   );
 }
 
+/**
+ * Sprungauftrag `?paneel=<name>` (apply-then-clean, LLH-1850; Startliste LLH-1815, design.md D5):
+ * sobald das Paneel `bereit` ist, einmal zu ihm rollen, den Fokus auf seine erste bedienbare
+ * Erfassung setzen (ohne Schreibrecht ist keine da) und den Auftrag aus der Adresse nehmen. Die
+ * Hülle mit dem Ref ist ein Block mit eigener Box: `display: contents` hätte nichts zum Rollen.
+ */
+function usePaneelSprung(
+  paneel: EinsatzdatenPaneel,
+  bereit: boolean,
+  { fokus = true }: { fokus?: boolean } = {},
+) {
+  const [params, setParams] = useSearchParams();
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!bereit || params.get('paneel') !== paneel) return;
+    const ziel = ref.current;
+    ziel?.scrollIntoView?.({ block: 'start' });
+    if (fokus) {
+      ziel?.querySelector<HTMLElement>('button:not([disabled])')?.focus({ preventScroll: true });
+    }
+    const rest = new URLSearchParams(params);
+    rest.delete('paneel');
+    setParams(rest, { replace: true });
+  }, [bereit, fokus, paneel, params, setParams]);
+  return ref;
+}
+
 /** Paneel „Führung“ mit eigener Abfrage (Akte und Verlauf, live über `einsatz`). */
 function FuehrungAbschnitt({
   einsatzId,
@@ -1504,18 +1545,8 @@ function FuehrungAbschnitt({
       query.state.data?.fuehrer_beendet_at ? SPIEGEL_KOPF_ABRUF_MS : false,
   });
   // `?paneel=fuehrung` (Hinweisband „Führung zurückholen“, LLH-1850): einmal zum Paneel rollen,
-  // sobald es steht (auch als Fehlerzustand), dann den Auftrag aus der Adresse nehmen
-  // (apply-then-clean).
-  const [params, setParams] = useSearchParams();
-  const targetRef = useRef<HTMLDivElement>(null);
-  const isPending = q.isPending;
-  useEffect(() => {
-    if (isPending || params.get('paneel') !== 'fuehrung') return;
-    targetRef.current?.scrollIntoView?.({ block: 'start' });
-    const rest = new URLSearchParams(params);
-    rest.delete('paneel');
-    setParams(rest, { replace: true });
-  }, [isPending, params, setParams]);
+  // sobald es steht (auch als Fehlerzustand). Kein Fokus: das Band nennt den Knopf selbst.
+  const targetRef = usePaneelSprung('fuehrung', !q.isPending, { fokus: false });
   return (
     <div ref={targetRef} data-lfh="fuehrung-abschnitt">
       {q.data ? (

@@ -2373,3 +2373,91 @@ describe('Sprung zum Paneel „Führung“ (LLH-1850)', () => {
     }
   });
 });
+
+/*
+ * Sprungaufträge der Startliste im Überblick (LLH-1815, design.md D5): `?paneel=einsatzort` und
+ * `?paneel=fuehrungsstelle` rollen einmal zum Paneel, setzen den Fokus auf dessen erste Erfassung
+ * und nehmen den Auftrag aus der Adresse (Muster LLH-1850).
+ */
+describe('Sprung zu „Einsatzort“ und „Eigene Führungsstelle“ (LLH-1815)', () => {
+  /** Rollt mit; `this` ist das Element, auf dem gerollt wurde. */
+  function rollenMitschreiben() {
+    const ziele: Element[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      ziele.push(this);
+    };
+    return { ziele, zurueck: () => (Element.prototype.scrollIntoView = vorher) };
+  }
+
+  it('?paneel=einsatzort rollt zum Paneel „Einsatzort“, fokussiert die Adresse und räumt den Auftrag', async () => {
+    const { ziele, zurueck } = rollenMitschreiben();
+    try {
+      setup({ route: '/einsaetze/7/einsatzdaten?paneel=einsatzort' });
+      const paneel = await screen.findByRole('region', { name: 'Einsatzort' });
+      await waitFor(() =>
+        expect(screen.getByTestId('adresse')).toHaveTextContent(/^\/einsaetze\/7\/einsatzdaten$/),
+      );
+      expect(ziele).toHaveLength(1);
+      expect(ziele[0].contains(paneel)).toBe(true);
+      expect(ziele[0].contains(screen.getByRole('region', { name: 'Erstmeldung' }))).toBe(false);
+      expect(within(paneel).getByRole('button', { name: 'Adresse eintragen' })).toHaveFocus();
+    } finally {
+      zurueck();
+    }
+  });
+
+  it('?paneel=fuehrungsstelle rollt erst, wenn die Führungsstelle steht, und fokussiert den Einsatzleiter', async () => {
+    let loslassen!: () => void;
+    const tor = new Promise<void>((f) => (loslassen = f));
+    const { ziele, zurueck } = rollenMitschreiben();
+    try {
+      setup({ route: '/einsaetze/7/einsatzdaten?paneel=fuehrungsstelle' });
+      server.use(
+        http.get('/api/einsaetze/7/fuehrungsstelle', async () => {
+          await tor;
+          return HttpResponse.json({
+            art: 'mobil',
+            sprechgruppen: [],
+            verbindungen: [],
+            fahrzeug_ids: [],
+          } satisfies Fuehrungsstelle);
+        }),
+      );
+      await screen.findByRole('region', { name: 'Eigene Führungsstelle' });
+      // Solange die Führungsstelle lädt, bleibt der Auftrag stehen.
+      expect(screen.getByTestId('adresse')).toHaveTextContent('?paneel=fuehrungsstelle');
+      expect(ziele).toHaveLength(0);
+      loslassen();
+      await waitFor(() =>
+        expect(screen.getByTestId('adresse')).toHaveTextContent(/^\/einsaetze\/7\/einsatzdaten$/),
+      );
+      const paneel = screen.getByRole('region', { name: 'Eigene Führungsstelle' });
+      expect(ziele).toHaveLength(1);
+      expect(ziele[0].contains(paneel)).toBe(true);
+      expect(ziele[0].contains(screen.getByRole('region', { name: 'Einsatzort' }))).toBe(false);
+      expect(within(paneel).getByRole('button', { name: /Einsatzleiter/ })).toHaveFocus();
+    } finally {
+      zurueck();
+    }
+  });
+
+  it('ohne Schreibrecht rollt der Auftrag nur und fokussiert nichts', async () => {
+    const { ziele, zurueck } = rollenMitschreiben();
+    try {
+      setup({
+        einsatz: { meine_rolle: 'beobachter' },
+        benutzer: { ...admin, system_rolle: 'benutzer' } as BenutzerAnzeige,
+        route: '/einsaetze/7/einsatzdaten?paneel=einsatzort',
+      });
+      await screen.findByRole('region', { name: 'Einsatzort' });
+      await waitFor(() =>
+        expect(screen.getByTestId('adresse')).toHaveTextContent(/^\/einsaetze\/7\/einsatzdaten$/),
+      );
+      expect(ziele).toHaveLength(1);
+      expect(document.activeElement).toBe(document.body);
+    } finally {
+      zurueck();
+    }
+  });
+});

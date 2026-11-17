@@ -5,13 +5,13 @@ per TDD.
 
 ## 1. Kern der Startliste (D1)
 
-- [ ] 1.1 `pages/fuehrung/startliste.ts` mit `startliste()` und `startlisteOffen()`; `startliste.test.ts` für jede Regel der Spec (Einsatzort mit/ohne Koordinate, Einsatzleiter, Abschnitt, Kräfte nur Einheit/nur Personal, Lage vs. Entscheidung, gesperrt, unbekannt, alle erledigt) rot, dann grün
-- [ ] 1.2 Modulschlüssel je Punkt gegen die Modulliste prüfen und Sperrgrund aus der vorhandenen Logik übernehmen; Test „ETB gesperrt, sonst erledigt → `startlisteOffen` falsch“
+- [x] 1.1 `pages/fuehrung/startliste.ts` mit `startliste()` und `startlisteOffen()`; `startliste.test.ts` für jede Regel der Spec (Einsatzort mit/ohne Koordinate, Einsatzleiter, Abschnitt, Kräfte nur Einheit/nur Personal, Lage vs. Entscheidung, gesperrt, unbekannt, alle erledigt) rot, dann grün
+- [x] 1.2 Modulschlüssel je Punkt gegen die Modulliste prüfen und Sperrgrund aus der vorhandenen Logik übernehmen; Test „ETB gesperrt, sonst erledigt → `startlisteOffen` falsch“
 
 ## 2. Sprungziele (D5)
 
-- [ ] 2.1 `routing/deeplinks.ts`: `einsatzdatenPfad` um `paneel: 'einsatzort' | 'fuehrungsstelle'`; Deeplink-Test grün
-- [ ] 2.2 `EinsatzdatenPage.tsx`: Auftrag `?paneel=einsatzort|fuehrungsstelle` rollt zum Paneel und räumt den Parameter (Muster LLH-1850); `EinsatzdatenPage.test.tsx` mit beiden Aufträgen
+- [x] 2.1 `routing/deeplinks.ts`: `einsatzdatenPfad` um `paneel: 'einsatzort' | 'fuehrungsstelle'`; Deeplink-Test grün
+- [x] 2.2 `EinsatzdatenPage.tsx`: Auftrag `?paneel=einsatzort|fuehrungsstelle` rollt zum Paneel und räumt den Parameter (Muster LLH-1850); `EinsatzdatenPage.test.tsx` mit beiden Aufträgen
 - [ ] 2.3 Leeraktion „Abschnitt anlegen“ im Überblick mit `neu: true`; Test in `UeberblickPage.test.tsx`
 
 ## 3. Paneel im Überblick (D2, D3, D4)
