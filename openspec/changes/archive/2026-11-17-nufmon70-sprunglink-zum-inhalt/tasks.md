@@ -22,7 +22,7 @@
 
 ## 2. Integration
 
-- [ ] 2.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (gemeinsam mit
+- [x] 2.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (gemeinsam mit
   `a12ms7g9-seitenzustaende` im selben Branch).
 
 ## Workflow follow-up

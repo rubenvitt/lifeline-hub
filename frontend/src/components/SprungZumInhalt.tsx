@@ -4,7 +4,7 @@ import { RAHMEN_EBENE } from './rahmenOben';
 /**
  * Sprunglink „Zum Inhalt springen“ (WCAG 2.4.1, nufmon70, Spec `einsatztauglichkeit-layout`, „Ein
  * Sprunglink führt zum Inhalt“; Regel `frontend/AGENTS.md`, Rahmen, „Sprunglink zum Inhalt“).
- * Herleitung: `openspec/changes/nufmon70-sprunglink-zum-inhalt/design.md`.
+ * Herleitung: `openspec/changes/archive/2026-11-17-nufmon70-sprunglink-zum-inhalt/design.md`.
  *
  * EINMAL in `BetriebsLayout` (`App.tsx`) als allererster Tab-Halt, vor der Betriebszeile (D1); die
  * Hilfe liegt außerhalb und bindet ihn selbst ein. Jeder Rahmen markiert sein Inhaltsgebiet mit

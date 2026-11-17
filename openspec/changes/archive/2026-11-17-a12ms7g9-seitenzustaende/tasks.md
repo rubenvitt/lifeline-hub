@@ -93,9 +93,11 @@
 
 ## 5. Integration
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Backend und Frontend) und die
-  e2e-Specs aus 2.3 und 4.5 einzeln grün.
-- [ ] 5.2 Nach dem Review vor dem PR (`dev-zunder-orchestrieren`, Phase 4) bestätigte Befunde
+- [x] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Backend und Frontend) und die
+  e2e-Specs aus 2.3 und 4.5 einzeln grün. (17.11.2026: Bündel `schnell` und `frontend` grün;
+  die Rust-Suite passt nicht ins Plattenkontingent der Cloud-Sitzung und läuft in der
+  PR-Prüfung, die geänderten Rust-Ziele einzeln grün.)
+- [x] 5.2 Nach dem Review vor dem PR (`dev-zunder-orchestrieren`, Phase 4) bestätigte Befunde
   behandelt.
 
 ## Workflow follow-up
