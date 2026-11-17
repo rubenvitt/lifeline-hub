@@ -14,14 +14,14 @@
 
 ## 3. e2e an den Leerzustand anpassen
 
-- [ ] 3.1 Tests, die das ausgeklappte Band ohne Stand voraussetzen, sichern vorher einen Stand per API (mindestens `lagekarte-smoke` erster Test, `lagekarte-touch` mit `einsatzMitLage`/`zeitachseAus`, `lagekarte-werkzeugmenue`, `eingangsband-ausweichen`, `fokus-verdeckung` dort ohne Stand); per `grep 'Zeitachse ausblenden\|Zeitachse einblenden\|data-lfh="zeitachse"'` vollständig abgearbeitet
-- [ ] 3.2 `e2e/leisten-flaeche.spec.ts`: Leerzustand bei 390 × 844 `handschuh` und 1366 × 768 `kompakt` — kein `[data-lfh="zeitachse"]`, Knopf „Stand sichern“ sichtbar, seine Höhe ist die Höhe der Zeitachse; Mutationsprobe (Zweig entfernt → rot)
-- [ ] 3.3 Betroffene e2e-Dateien lokal grün (`mise exec -- pnpm exec playwright test <dateien> --trace off`), soweit die Umgebung sie tragen kann; sonst im PR benannt
+- [x] 3.1 Tests, die das ausgeklappte Band ohne Stand voraussetzen, sichern vorher einen Stand per API (mindestens `lagekarte-smoke` erster Test, `lagekarte-touch` mit `einsatzMitLage`/`zeitachseAus`, `lagekarte-werkzeugmenue`, `eingangsband-ausweichen`, `fokus-verdeckung` dort ohne Stand); per `grep 'Zeitachse ausblenden\|Zeitachse einblenden\|data-lfh="zeitachse"'` vollständig abgearbeitet
+- [x] 3.2 `e2e/leisten-flaeche.spec.ts`: Leerzustand bei 390 × 844 `handschuh` und 1366 × 768 `kompakt` — kein `[data-lfh="zeitachse"]`, Knopf „Stand sichern“ sichtbar, seine Höhe ist die Höhe der Zeitachse; Mutationsprobe (Zweig entfernt → rot)
+- [x] 3.3 Betroffene e2e-Dateien lokal grün (`mise exec -- pnpm exec playwright test <dateien> --trace off`), soweit die Umgebung sie tragen kann; sonst im PR benannt
 
 ## 4. Regel, Doku und Gate
 
-- [ ] 4.1 `frontend/src/pages/lagekarte/AGENTS.md`, Regel „Das Zeitachsen-Band hat höchstens zwei Reihen“: Satz zum Leerzustand und zum Wort, Verweis auf diese Change; Prettier grün
-- [ ] 4.2 Doku-Bilder: prüfen, ob `lagekarte.png` u. a. die leere Zeitachse zeigen; wenn ja `pnpm doku:bilder --grep lagekarte` und Bilder committen (Mitänderungsregel `docs/anwender/AGENTS.md`)
+- [x] 4.1 `frontend/src/pages/lagekarte/AGENTS.md`, Regel „Das Zeitachsen-Band hat höchstens zwei Reihen“: Satz zum Leerzustand und zum Wort, Verweis auf diese Change; Prettier grün
+- [x] 4.2 Doku-Bilder: prüfen, ob `lagekarte.png` u. a. die leere Zeitachse zeigen; wenn ja `pnpm doku:bilder --grep lagekarte` und Bilder committen (Mitänderungsregel `docs/anwender/AGENTS.md`)
 - [ ] 4.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
