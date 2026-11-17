@@ -5,7 +5,7 @@ import { istVeraltet } from '../../api/client';
 import { aktualisiereBr } from '../../api/einsatzBereitstellungsraum';
 import { BR_BEZEICHNUNG_MAX, BR_NOTIZ_MAX, BR_STANDORT_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { Bereitstellungsraum } from '../../api/types';
+import type { Bereitstellungsraum, BrDetail } from '../../api/types';
 import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
 import BearbeitbaresPaneel, {
   type BearbeitbaresFeld,
@@ -79,7 +79,16 @@ export default function BrRaumdaten({
       patch={brPatch}
       // Ohne Basis („Meine Änderung übernehmen“) fehlt der Schlüssel: JSON lässt `undefined` weg.
       onSpeichern={async (patch, basis) => {
-        await aktualisiereBr(einsatzId, br.id, { ...patch, basis_geaendert_at: basis });
+        const neu = await aktualisiereBr(einsatzId, br.id, {
+          ...patch,
+          basis_geaendert_at: basis,
+        });
+        // Der neue Stand sofort in den Raum, nicht erst mit dem Neuabruf: sonst zeigte das Paneel
+        // kurz den alten, und ein gleich wieder geöffnetes fröre das alte `geaendert_at` ein
+        // (falscher 409). Belegung und Kräfte des Details bleiben, sie ändert der PATCH nicht.
+        qc.setQueryData<BrDetail>(einsatzKeys.brDetail(einsatzId, br.id), (alt) =>
+          alt ? { ...alt, ...neu } : alt,
+        );
         message.success('Bereitstellungsraum gespeichert');
         void qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
         void qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, br.id) });

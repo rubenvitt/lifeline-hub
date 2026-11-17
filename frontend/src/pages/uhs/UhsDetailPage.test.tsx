@@ -1,7 +1,15 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
+import {
+  createMemoryRouter,
+  MemoryRouter,
+  RouterProvider,
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+} from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import UhsDetailPage from './UhsDetailPage';
@@ -39,10 +47,24 @@ vi.mock('./MaterialTab', () => ({ default: () => <div>MATERIAL-TAB</div> }));
 vi.mock('./BewegungenTab', () => ({ default: () => <div>BEWEGUNGEN-TAB</div> }));
 vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 // Das Paneel „Angaben“ hat eigene Tests (`UhsAngaben.test.tsx`); hier zählt, ob die Seite es mit dem
-// richtigen Recht einsetzt.
-vi.mock('./UhsAngaben', () => ({
-  default: (p: { bearbeitbar: boolean }) => <div>ANGABEN bearbeitbar={String(p.bearbeitbar)}</div>,
-}));
+// richtigen Recht einsetzt und ob ihr Merker den Bereichswechsel anhält: „ÄNDERN“ meldet eine
+// geänderte Bearbeitung wie das echte Paneel.
+vi.mock('./UhsAngaben', async () => {
+  const { useOffeneBearbeitungBelegung } = await import('../../components/offeneBearbeitung');
+  return {
+    default: function AngabenAttrappe(p: { bearbeitbar: boolean }) {
+      const { melde } = useOffeneBearbeitungBelegung('Angaben');
+      return (
+        <div>
+          ANGABEN bearbeitbar={String(p.bearbeitbar)}
+          <button type="button" onClick={() => melde('geaendert')}>
+            ÄNDERN
+          </button>
+        </div>
+      );
+    },
+  };
+});
 vi.mock('./UhsAnhaenge', () => ({
   default: (p: { darfSchreiben: boolean; zeigeZugriffe: boolean }) => (
     <div>
@@ -95,20 +117,29 @@ async function aufloesenWaehlen(bezeichnung = 'UHS Nord') {
 
 function renderBei(route: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Data Router: der Merker der Seite hält Wechsel mit offener Änderung an (`useBlocker`).
+  const router = createMemoryRouter(
+    [
+      { path: '/einsaetze/:id/unfallhilfsstellen/liste', element: <div>UHS-LISTE</div> },
+      // Ziele außerhalb der Seite (Aufnahme): nur die Adresse zählt.
+      { path: '*', element: <LocationProbe /> },
+      {
+        path: '/einsaetze/:id/unfallhilfsstellen/:uhsId',
+        element: (
+          <>
+            <LocationProbe />
+            <UhsDetailPage />
+          </>
+        ),
+      },
+    ],
+    { initialEntries: [route] },
+  );
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
-          <MemoryRouter initialEntries={[route]}>
-            <LocationProbe />
-            <Routes>
-              <Route
-                path="/einsaetze/:id/unfallhilfsstellen/liste"
-                element={<div>UHS-LISTE</div>}
-              />
-              <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-            </Routes>
-          </MemoryRouter>
+          <RouterProvider router={router} />
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
@@ -644,6 +675,27 @@ describe('UhsDetailPage — Stammdaten im Bereich „Angaben“ (LLH-1407, LLH-1
   it('aufgelöst: Angaben nur zum Lesen', async () => {
     zeige('aufgeloest');
     expect(await screen.findByText('ANGABEN bearbeitbar=false')).toBeInTheDocument();
+  });
+
+  it('geänderte Angaben: ein Bereichswechsel fragt erst nach, „Bleiben“ behält die Bearbeitung', async () => {
+    zeige('aktiv');
+    await userEvent.click(await screen.findByRole('button', { name: 'ÄNDERN' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Material' }));
+    const frage = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=angaben');
+    await userEvent.click(within(frage).getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByText('ANGABEN bearbeitbar=true')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Angaben' })).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Material' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' })).getByRole(
+        'button',
+        { name: 'Verwerfen' },
+      ),
+    );
+    expect(await screen.findByText('MATERIAL-TAB')).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=material');
   });
 
   it('ohne Schreibrecht: Angaben nur zum Lesen', async () => {

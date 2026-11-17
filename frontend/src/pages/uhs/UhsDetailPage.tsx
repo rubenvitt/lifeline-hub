@@ -45,6 +45,10 @@ import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { MenueAusloeser } from '../../components/MenueAusloeser';
 import UhsAngaben from './UhsAngaben';
+import {
+  OffeneBearbeitungProvider,
+  useWechselNachRueckfrage,
+} from '../../components/offeneBearbeitung';
 import { flaeche } from '../../theme/tokens';
 
 /**
@@ -68,7 +72,21 @@ function aufzaehlung(namen: string[]): string {
     : `${namen.slice(0, -1).join(', ')} und ${namen[namen.length - 1]}`;
 }
 
+/**
+ * Merker der Seite (LLH-1920, `components/offeneBearbeitung.tsx`): er umfasst die Bereichsleiste,
+ * damit ein Bereichswechsel eine geänderte Bearbeitung der „Angaben“ erst nach Rückfrage aushängt.
+ * Ein Wechsel der Stelle ändert den Pfad und fragt über den Router.
+ */
 export default function UhsDetailPage() {
+  const { uhsId } = useParams();
+  return (
+    <OffeneBearbeitungProvider schluessel={uhsId}>
+      <UhsDetailInhalt />
+    </OffeneBearbeitungProvider>
+  );
+}
+
+function UhsDetailInhalt() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   // Aufnahme führt ins Modul Personen (LFH-888, design.md D4): gesperrt mit Grund statt ins 403.
@@ -104,15 +122,19 @@ export default function UhsDetailPage() {
   const bereich: UhsBereich = bereichListe.includes(gewuenscht) ? gewuenscht : 'belegung';
   // Ersetzen statt Anhängen: das Zurück des Browsers verlässt die Seite, statt durch die Bereiche
   // zu blättern. Andere Parameter bleiben stehen.
+  // Ein Wechsel hängt den Bereich samt offener Bearbeitung aus: mit Änderung erst die Rückfrage.
+  const nachRueckfrage = useWechselNachRueckfrage();
   const waehleBereich = (neu: UhsBereich) =>
-    setSearchParams(
-      (alt) => {
-        const naechste = new URLSearchParams(alt);
-        naechste.delete('bereich');
-        for (const [k, v] of new URLSearchParams(uhsBereichSuche(neu))) naechste.set(k, v);
-        return naechste;
-      },
-      { replace: true },
+    nachRueckfrage(() =>
+      setSearchParams(
+        (alt) => {
+          const naechste = new URLSearchParams(alt);
+          naechste.delete('bereich');
+          for (const [k, v] of new URLSearchParams(uhsBereichSuche(neu))) naechste.set(k, v);
+          return naechste;
+        },
+        { replace: true },
+      ),
     );
   const bereichFeld = useId();
   // Die Materialzahl im Kopf nur mit Freigabe Material (LLH-1133 D2). Anders als bei einem Sprung
@@ -250,7 +272,17 @@ export default function UhsDetailPage() {
       <span style={{ whiteSpace: 'nowrap' }}>{metaText} ·</span>{' '}
       {/* Ersetzen wie die Bereichsleiste: „Zurück“ verlässt die Seite, statt den Bereich
           zurückzunehmen. */}
-      <KennungsLink to={{ search: uhsBereichSuche('material') }} replace>
+      <KennungsLink
+        to={{ search: uhsBereichSuche('material') }}
+        replace
+        // Wie die Bereichsleiste über den Merker: ein Wechsel nur des Suchteils fragt der Router
+        // nicht nach. Die Adresse bleibt für „In neuem Tab öffnen“.
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          waehleBereich('material');
+        }}
+      >
         {materialKopfzahl(uhs.material)}
       </KennungsLink>
     </span>

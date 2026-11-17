@@ -5,7 +5,7 @@ import { istVeraltet } from '../../api/client';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
 import { UHS_SOLL_ANZAHL_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { Uhs } from '../../api/types';
+import type { Uhs, UhsDetail } from '../../api/types';
 import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
 import BearbeitbaresPaneel, {
   type BearbeitbaresFeld,
@@ -87,7 +87,16 @@ export default function UhsAngaben({
       patch={uhsPatch}
       // Ohne Basis („Meine Änderung übernehmen“) fehlt der Schlüssel: JSON lässt `undefined` weg.
       onSpeichern={async (patch, basis) => {
-        await aktualisiereUhs(einsatzId, uhs.id, { ...patch, basis_geaendert_at: basis });
+        const neu = await aktualisiereUhs(einsatzId, uhs.id, {
+          ...patch,
+          basis_geaendert_at: basis,
+        });
+        // Der neue Stand sofort in die Stelle, nicht erst mit dem Neuabruf: sonst zeigte das Paneel
+        // kurz den alten, und ein gleich wieder geöffnetes fröre das alte `geaendert_at` ein
+        // (falscher 409). Plätze, Belegung und Material des Details bleiben.
+        qc.setQueryData<UhsDetail>(einsatzKeys.uhsDetail(einsatzId, uhs.id), (alt) =>
+          alt ? { ...alt, ...neu } : alt,
+        );
         message.success('Unfallhilfsstelle gespeichert');
         void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
         void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) });

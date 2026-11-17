@@ -1224,11 +1224,13 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
       rolle?: EinsatzAnzeige['meine_rolle'];
     } = {},
   ) {
-    const stand = { br: start, gets: 0, bodies: [] as Record<string, unknown>[] };
+    const stand = { br: start, gets: 0, bodies: [] as Record<string, unknown>[], haengen: false };
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => {
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', async () => {
         stand.gets += 1;
+        // Ein Neuabruf, der (noch) nicht zurückkommt: die Seite hat nur die PATCH-Antwort.
+        if (stand.haengen) await delay('infinite');
         return HttpResponse.json(stand.br);
       }),
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
@@ -1282,6 +1284,26 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
     await waitFor(() => expect(within(paneel()).queryByRole('textbox')).toBeNull());
     expect(await within(paneel()).findByText('Festplatz')).toBeInTheDocument();
     expect(within(paneel()).queryByText('Zufahrt Nord')).toBeNull();
+  });
+
+  it('gleich wieder geöffnet: die Basis ist der gespeicherte Stand, nicht der vor dem Speichern', async () => {
+    const { stand } = seite(brDetail({ notiz: 'A', geaendert_at: 's1' }));
+
+    await userEvent.click(await bearbeiten());
+    await userEvent.clear(feld('Notiz'));
+    await userEvent.type(feld('Notiz'), 'B');
+    stand.haengen = true;
+    await userEvent.click(speichern());
+    await waitFor(() => expect(stand.bodies).toHaveLength(1));
+    // Der Server hat `s1+` geantwortet; der Neuabruf hängt.
+    expect(await within(paneel()).findByText('B')).toBeInTheDocument();
+
+    await userEvent.click(await bearbeiten());
+    await userEvent.clear(feld('Notiz'));
+    await userEvent.type(feld('Notiz'), 'C');
+    await userEvent.click(speichern());
+    await waitFor(() => expect(stand.bodies).toHaveLength(2));
+    expect(stand.bodies[1]).toEqual({ notiz: 'C', basis_geaendert_at: 's1+' });
   });
 
   it('eine Live-Aktualisierung während des Schreibens überschreibt die Eingabe nicht', async () => {

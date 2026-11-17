@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Uhs } from '../../api/types';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { QueryClient } from '@tanstack/react-query';
+import { einsatzKeys } from '../../api/queryKeys';
 import UhsAngaben from './UhsAngaben';
 
 /**
@@ -167,6 +169,30 @@ describe('UhsAngaben · Speichern', () => {
     await userEvent.click(within(paneel()).getByRole('button', { name: 'Speichern' }));
     expect(await within(paneel()).findByText('Bezeichnung erforderlich')).toBeInTheDocument();
     expect(rumpfe).toEqual([]);
+  });
+});
+
+describe('UhsAngaben · Stand nach dem Speichern', () => {
+  it('legt die Antwort des Servers in den Cache der Stelle, vor dem Neuabruf', async () => {
+    mitschnitt(() =>
+      HttpResponse.json({ ...basis, notiz: 'Tor B', geaendert_at: 's2' } as unknown as Uhs),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(einsatzKeys.uhsDetail(1, 9), { ...basis, plaetze: [] });
+    renderMitProviders(<UhsAngaben einsatzId={1} uhs={basis} bearbeitbar onNeuLaden={vi.fn()} />, {
+      datenRouter: true,
+      client: qc,
+    });
+    await oeffne();
+    await userEvent.type(within(paneel()).getByLabelText('Notiz'), 'Tor B');
+    await userEvent.click(within(paneel()).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(qc.getQueryData(einsatzKeys.uhsDetail(1, 9))).toMatchObject({
+        notiz: 'Tor B',
+        geaendert_at: 's2',
+        plaetze: [],
+      }),
+    );
   });
 });
 
