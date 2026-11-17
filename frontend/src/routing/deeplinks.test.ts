@@ -103,6 +103,7 @@ import {
   parseMeldungInhalt,
   hilfePfad,
   parseHilfeGruppe,
+  parseModulHinweis,
 } from './deeplinks';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { STANDARDUMFANG } from '../druck/einsatzbericht/auswahl';
@@ -116,6 +117,30 @@ describe('deeplinks — Basis', () => {
 
   it('einsatzPfad baut den zentralen Einsatz-Workspace', () => {
     expect(einsatzPfad(7)).toBe('/einsaetze/7');
+  });
+
+  it('einsatzPfad trägt das Modul als Hinweis an die Index-Route (LLH-1821)', () => {
+    expect(einsatzPfad(8, { modul: 'fahrzeuge' })).toBe('/einsaetze/8?modul=fahrzeuge');
+    // Ohne Hinweis bleibt die Adresse, wie sie war.
+    expect(einsatzPfad(8, {})).toBe('/einsaetze/8');
+    expect(einsatzPfad(8, { modul: null })).toBe('/einsaetze/8');
+  });
+
+  it('parseModulHinweis nimmt nur bekannte Modulschlüssel', () => {
+    expect(parseModulHinweis(new URLSearchParams('modul=fahrzeuge'))).toBe('fahrzeuge');
+    expect(parseModulHinweis(new URLSearchParams('modul=etb&x=1'))).toBe('etb');
+    // Unbekannt oder manipuliert: verworfen, die Weiche nimmt das bisherige Ziel.
+    expect(parseModulHinweis(new URLSearchParams('modul=gibtsnicht'))).toBeUndefined();
+    expect(parseModulHinweis(new URLSearchParams('modul=toString'))).toBeUndefined();
+    expect(parseModulHinweis(new URLSearchParams('modul='))).toBeUndefined();
+    expect(parseModulHinweis(new URLSearchParams(''))).toBeUndefined();
+  });
+
+  it('Rundweg: einsatzPfad mit Hinweis ergibt über parseModulHinweis denselben Schlüssel', () => {
+    const pfad = einsatzPfad(8, { modul: 'einsatz-einstellungen' });
+    expect(parseModulHinweis(new URLSearchParams(pfad.split('?')[1]))).toBe(
+      'einsatz-einstellungen',
+    );
   });
 
   it('einsatzModulPfad baut /einsaetze/<id>/<modul>', () => {

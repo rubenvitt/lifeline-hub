@@ -27,6 +27,7 @@ import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter
 import type { TiereSicht } from '../pages/tiere/tierHelfer';
 import type { SchaedenSicht } from '../pages/schaeden/schadenHelfer';
 import { istGruppe, type Gruppe } from '../hilfe/gruppen';
+import { modulRegistry } from '../einsatz/modulRegistry';
 
 /** Zentrale Route zur Einsatzliste. */
 export function einsaetzePfad(): string {
@@ -68,9 +69,23 @@ export function parsePlanungReiter(params: URLSearchParams): PlanungReiter {
   return r === 'posten' || r === 'helfer' || r === 'ablauf' ? r : 'plan';
 }
 
-/** Zentrale Route zum Einsatz-Workspace. */
-export function einsatzPfad(einsatzId: number): string {
-  return `/einsaetze/${einsatzId}`;
+/**
+ * Zentrale Route zum Einsatz-Workspace. Die Index-Route leitet weiter (`DefaultModulRedirect`);
+ * `modul` ist ein Hinweis an diese Weiche (LLH-1821, Change `frgky8qr-einsatzwechsel-modul`, D1):
+ * der Einsatzwechsel bleibt im Modul, wenn es im Ziel frei ist, sonst gilt das Standardmodul.
+ */
+export function einsatzPfad(einsatzId: number, opts: { modul?: string | null } = {}): string {
+  return mitQuery(`/einsaetze/${einsatzId}`, { modul: opts.modul ?? undefined });
+}
+
+/**
+ * Umkehr des Modul-Hinweises aus {@link einsatzPfad}: nur ein Schlüssel der Modul-Registry, sonst
+ * `undefined` (unbekannt, leer oder manipuliert). Ob das Modul im Ziel frei ist, entscheidet die
+ * Weiche mit den Freigaben, nicht der Parser.
+ */
+export function parseModulHinweis(params: URLSearchParams): string | undefined {
+  const modul = params.get('modul');
+  return modul && modulRegistry.some((m) => m.key === modul) ? modul : undefined;
 }
 
 /** Basis-Pfad eines Einsatz-Moduls: `/einsaetze/<einsatzId>/<modulRoute>`. */
