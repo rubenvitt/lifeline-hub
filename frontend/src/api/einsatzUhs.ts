@@ -22,6 +22,7 @@ import {
   type UploadFortschritt,
 } from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
+import { zuruecknahmeQuery, type ZuruecknahmeFilter } from './einheiten';
 
 // ---------- UHS ----------
 
@@ -46,8 +47,20 @@ export function listeKraefteOhneUhs(einsatzId: number, uhsId: number): Promise<U
   return apiGet<UhsKraft[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/verfuegbar`);
 }
 
-export function ordneKraftZu(einsatzId: number, uhsId: number, kraftId: number): Promise<UhsKraft> {
-  return apiSend<UhsKraft>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/${kraftId}`, 'PUT');
+/**
+ * Kraft der UHS zuordnen. Das Rückgängig nach „Abziehen“ schickt `nurWennFrei` (LLH-1924): steht
+ * sie inzwischen an einer anderen UHS, 409 statt Wechsel.
+ */
+export function ordneKraftZu(
+  einsatzId: number,
+  uhsId: number,
+  kraftId: number,
+  optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
+): Promise<UhsKraft> {
+  return apiSend<UhsKraft>(
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/${kraftId}${zuruecknahmeQuery(optionen)}`,
+    'PUT',
+  );
 }
 
 export interface AdhocKraftEingabe {

@@ -21,14 +21,14 @@ Jede Aufgabe entsteht per TDD: erst der Test, der ohne die Änderung rot ist.
 
 ## 3. Frontend: Rückwege mit Schalter
 
-- [ ] 3.1 API-Optionen `nurWennFrei` an `updateDisposition`/`setOrt`, `ordneBesatzungZu`, `ordneKraftZu` über `zuruecknahmeQuery`. Nachweis: Tests prüfen die URL `…?nur_wenn_frei=1`
-- [ ] 3.2 Alle Rückgängig-Aufrufe senden den Schalter: `MaterialAmOrt`, `FahrzeugeBesatzung` (`besatzungZurueck`), `FahrzeugePage` (`besatzungZurueckMutation`), `UhsKraefte`; die bewussten Wege nicht. Nachweis: bestehende Tests auf die URL mit Schalter umgestellt, Test für den bewussten Weg ohne Schalter
-- [ ] 3.3 Ablehnung (409) an der gehaltenen Zeile, sonst am bisherigen Ort. Nachweis: Test je Stelle mit 409-Antwort
+- [x] 3.1 API-Optionen `nurWennFrei` an `updateDisposition`/`setOrt`, `ordneBesatzungZu`, `ordneKraftZu` über `zuruecknahmeQuery`. Nachweis: Tests prüfen die URL `…?nur_wenn_frei=1`
+- [x] 3.2 Alle Rückgängig-Aufrufe senden den Schalter: `MaterialAmOrt`, `FahrzeugeBesatzung` (`besatzungZurueck`), `FahrzeugePage` (`besatzungZurueckMutation`), `UhsKraefte`; die bewussten Wege nicht. Nachweis: bestehende Tests auf die URL mit Schalter umgestellt, Test für den bewussten Weg ohne Schalter
+- [x] 3.3 Ablehnung (409) an der gehaltenen Zeile, sonst am bisherigen Ort. Nachweis: Test je Stelle mit 409-Antwort
 
 ## 4. Frontend: gehaltene Zeile
 
-- [ ] 4.1 `UhsKraefte`: `useHoldGeloest`, „Gelöst“ träge an der Stelle von „Abziehen“, „Rückgängig“ an der Stelle der Funktion, übrige Teile unsichtbar, Laufzustand je Zeile. Nachweis: Tests nach `FahrzeugeBesatzung.test.tsx` „Rückweg nach dem Lösen“ (zwei schnelle Tipps, Rückgängig in der Zeile, Fallen nach Verlassen)
-- [ ] 4.2 Besatzungsblock der `FahrzeugePage`: dasselbe, „Rückgängig“ an der Stelle von Position/Funktion, `loading` und Sperre je Zeile. Nachweis: Test zwei schnelle Tipps → genau ein DELETE, gehaltene Zeile mit „Gelöst“
+- [x] 4.1 `UhsKraefte`: `useHoldGeloest`, „Gelöst“ träge an der Stelle von „Abziehen“, „Rückgängig“ an der Stelle der Funktion, übrige Teile unsichtbar, Laufzustand je Zeile. Nachweis: Tests nach `FahrzeugeBesatzung.test.tsx` „Rückweg nach dem Lösen“ (zwei schnelle Tipps, Rückgängig in der Zeile, Fallen nach Verlassen)
+- [x] 4.2 Besatzungsblock der `FahrzeugePage`: dasselbe, „Rückgängig“ an der Stelle von Position/Funktion, `loading` und Sperre je Zeile. Nachweis: Test zwei schnelle Tipps → genau ein DELETE, gehaltene Zeile mit „Gelöst“
 
 ## 5. Frontend: Material am Ort
 

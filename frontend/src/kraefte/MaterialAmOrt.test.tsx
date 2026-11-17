@@ -89,7 +89,8 @@ function patchMitschnitt(antwort?: () => Response) {
   const gesendet: { url: string; body: unknown }[] = [];
   server.use(
     http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
-      gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
+      const url = new URL(request.url);
+      gesendet.push({ url: url.pathname + url.search, body: await request.json() });
       return antwort ? antwort() : HttpResponse.json({});
     }),
   );
@@ -629,7 +630,8 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     await waitFor(() =>
       expect(gesendet).toEqual([
         { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
-        { url: '/api/einsaetze/1/material/2', body: { uhs_id: 7 } },
+        // Nimmt den Posten keinem anderen Ort weg (LLH-1924).
+        { url: '/api/einsaetze/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
       ]),
     );
     neu({ posten: POSTEN });
@@ -693,7 +695,7 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     await waitFor(() =>
       expect(gesendet).toEqual([
         { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
-        { url: '/api/einsaetze/1/material/2', body: { uhs_id: 7 } },
+        { url: '/api/einsaetze/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
       ]),
     );
     neu({ posten: POSTEN });

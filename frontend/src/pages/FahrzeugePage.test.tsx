@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -649,6 +649,71 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('zwei schnelle Tipps auf „Vom Fahrzeug lösen“: ein DELETE, an der Stelle steht „Gelöst“ (LLH-1924)', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', async ({ params }) => {
+        aufrufe.push(`DELETE ${params.epId}`);
+        await delay(20);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+      person({ id: 101, name: 'Ben Crew', fahrzeug_id: 10 }),
+    ]);
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    const knopf = await within(block).findByRole('button', {
+      name: 'Anna Crew vom Fahrzeug lösen',
+    });
+    await userEvent.click(knopf);
+    await userEvent.click(knopf);
+    const marke = await within(block).findByRole('button', { name: 'Anna Crew gelöst' });
+    await userEvent.click(marke);
+    await userEvent.click(knopf);
+    expect(aufrufe).toEqual(['DELETE 100']);
+    expect(marke).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      within(block).getByRole('button', { name: 'Ben Crew vom Fahrzeug lösen' }),
+    ).toBeInTheDocument();
+    // „Rückgängig“ steht in der Zeile, aber nicht an der Stelle des Knopfs.
+    const rueck = within(block).getByRole('button', {
+      name: 'Rückgängig: Anna Crew zurück auf das Fahrzeug',
+    });
+    expect(rueck.parentElement).not.toBe(marke.parentElement);
+  });
+
+  it('„Rückgängig“ in der gehaltenen Besatzungszeile; Ablehnung steht an der Zeile (LLH-1924)', async () => {
+    server.use(
+      http.delete(
+        '/api/einsaetze/7/fahrzeuge/10/besatzung/:epId',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', () =>
+        HttpResponse.json({ error: 'Anna Crew sitzt inzwischen auf «83-2»' }, { status: 409 }),
+      ),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+    ]);
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    await userEvent.click(
+      await within(block).findByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
+    await userEvent.click(
+      await within(block).findByRole('button', {
+        name: 'Rückgängig: Anna Crew zurück auf das Fahrzeug',
+      }),
+    );
+    expect(
+      await within(block).findByText('Anna Crew sitzt inzwischen auf «83-2»'),
+    ).toBeInTheDocument();
+  });
+
   it('nach „Vom Fahrzeug lösen“ setzt „Rückgängig“ die Person wieder auf das Fahrzeug (LLH-1722)', async () => {
     const aufrufe: string[] = [];
     server.use(
@@ -656,8 +721,8 @@ describe('FahrzeugePage', () => {
         aufrufe.push(`DELETE ${params.epId}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params }) => {
-        aufrufe.push(`PUT ${params.epId}`);
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params, request }) => {
+        aufrufe.push(`PUT ${params.epId}${new URL(request.url).search}`);
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -674,7 +739,8 @@ describe('FahrzeugePage', () => {
       '.ant-message-notice',
     ) as HTMLElement;
     await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(aufrufe).toEqual(['DELETE 100', 'PUT 100']));
+    // Nimmt sie keinem anderen Fahrzeug weg (LLH-1924).
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 100', 'PUT 100?nur_wenn_frei=1']));
   });
 
   it('markiert eine Besatzung aus anderer Einheit als das Fahrzeug', async () => {

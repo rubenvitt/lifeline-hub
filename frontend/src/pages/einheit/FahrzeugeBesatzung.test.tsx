@@ -754,8 +754,8 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
         '/api/einsaetze/1/fahrzeuge/30/besatzung/3',
         () => new HttpResponse(null, { status: 204 }),
       ),
-      http.put('/api/einsaetze/1/fahrzeuge/:efId/besatzung/:epId', ({ params }) => {
-        aufrufe.push(`PUT ${params.efId}/${params.epId}`);
+      http.put('/api/einsaetze/1/fahrzeuge/:efId/besatzung/:epId', ({ params, request }) => {
+        aufrufe.push(`PUT ${params.efId}/${params.epId}${new URL(request.url).search}`);
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -765,7 +765,8 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
       '.ant-message-notice',
     ) as HTMLElement;
     await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(aufrufe).toEqual(['PUT 30/3']));
+    // Nimmt sie keinem anderen Fahrzeug weg (LLH-1924).
+    await waitFor(() => expect(aufrufe).toEqual(['PUT 30/3?nur_wenn_frei=1']));
   });
 });
 

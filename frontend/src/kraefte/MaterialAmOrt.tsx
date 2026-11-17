@@ -184,13 +184,15 @@ export default function MaterialAmOrt({
     onError: (e, p) => zeilen.melde(p.id, e, 'Lösen fehlgeschlagen'),
     onSettled: (_d, _e, p) => mark(p.id, false),
   });
-  // „Rückgängig“ ordnet über den einen Schreibweg wieder diesem Ort zu (design.md D5). Der Grund
-  // einer Ablehnung steht über dem Block, nicht an der Zeile: der Platzhalter fiele mit ihm weg.
+  // „Rückgängig“ ordnet über den einen Schreibweg wieder diesem Ort zu (design.md D5), aber nur,
+  // wenn der Posten nicht inzwischen woanders liegt (LLH-1924). Der Grund einer Ablehnung steht
+  // über dem Block, nicht an der Zeile: der Platzhalter fiele mit ihm weg.
   const rueckgaengig = useMutation({
     mutationFn: (p: MaterialAmOrtPosten) =>
       setOrt(
         { id: p.id, einheit_id: null, einsatz_fahrzeug_id: null, uhs_id: null, br_id: null },
         ort,
+        { nurWennFrei: true },
       ),
     onSuccess: (_d, p) => halten.release(p.id),
   });
