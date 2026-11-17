@@ -7,7 +7,7 @@ gilt_fuer:
   - frontend/scripts/design-system/**
   - frontend/src/designSystem.test.ts
 herleitung:
-  - openspec/changes/archive/2026-11-16-v127ps65-design-system-nachschlagewerk/design.md
+  - openspec/changes/archive/2026-11-17-v127ps65-design-system-nachschlagewerk/design.md
   - Zunder LLH-1807 (Variante V1 abgestimmt mit Ruben am 16.11.2026)
 ---
 

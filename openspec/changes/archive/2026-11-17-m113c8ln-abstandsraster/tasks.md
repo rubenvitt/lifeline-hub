@@ -10,7 +10,7 @@
 ## 2. Pins und bestehende Wächter nachziehen
 
 - [x] 2.1 Die Wächter mit Stufenwerten laufen lassen (`aktionsabstand`, `aktionenSpace`, `dichte`, `kopfpolsterung`, `seitenrinne`, `rahmenOben`, `katalogTabelle`, `leistenAbstand`, `dichteQuelle`). Wo sie Zahlen statt Stufen pinnen, wird der Wert berichtigt, nicht die Prüfung gelockert. Erledigt, wenn `vitest run` für `src/theme` und `src/components` grün ist.
-- [ ] 2.2 Die e2e-Pins in `e2e/dialogfuss-dichte.spec.ts` (`titel`, `fuge`) und `e2e/katalogtabelle-kopf-dichte.spec.ts` auf die neuen Werte ziehen. Belegt durch einen Lauf genau dieser Specs gegen den lokal gebauten Stand.
+- [x] 2.2 Die e2e-Pins in `e2e/dialogfuss-dichte.spec.ts` (`titel`, `fuge`) und `e2e/katalogtabelle-kopf-dichte.spec.ts` auf die neuen Werte ziehen. Belegt durch einen Lauf genau dieser Specs gegen den lokal gebauten Stand. Erledigt: beide Specs liefen im e2e-Lauf vom 16.11.2026 grün.
 - [x] 2.3 In `node_modules/antd` prüfen, ob `Space`, `Flex` oder `Form` einen Abstand aus `size*`-Tokens statt aus `padding*`/`margin*` lesen. Falls ja, die betroffenen `size*`-Tokens in `antdToken()` mit abbilden und einen Test ergänzen. Falls nein, das Ergebnis als Kommentar an `antdToken()` festhalten.
 
 ## 3. Wächter gegen neue Literale
@@ -34,7 +34,7 @@
 
 ## 6. Integration
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün, dazu die e2e-Specs aus 2.2. Bilder der geänderten Bausteine (Nacht und Tag, `kompakt` und `handschuh`) liegen für den PR vor.
+- [x] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün, dazu die e2e-Specs aus 2.2. Bilder der geänderten Bausteine (Nacht und Tag, `kompakt` und `handschuh`) liegen für den PR vor. Erledigt: Der Gate-Lauf lief nach zwei Neustarts des Containers geteilt: `--nur schnell` grün, die Frontend-Suite in vier Teilen grün (20 794 Tests). Die e2e-Specs aus 2.2 sind grün. Bilder: vorher/nachher hell in `kompakt` und `handschuh`, dazu nachher Nacht.
 - [x] 6.2 Folgeaufgaben über `zunder-task-anlegen` anlegen und im PR verlinken: Seiten-Literale je Bereich (LLH-1937) und Anwenderdoku-Bilder (LLH-1938). Hilfe und Login sind feste Ausnahmen des Wächters (Spec „Feste Ausnahmen mit Grund“), eine eigene Folgeaufgabe brauchen sie nicht.
 
 ## Workflow follow-up

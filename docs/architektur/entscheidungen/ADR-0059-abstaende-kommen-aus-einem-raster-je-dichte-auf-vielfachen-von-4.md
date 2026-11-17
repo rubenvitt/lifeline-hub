@@ -9,7 +9,7 @@ gilt_fuer:
   - frontend/src/theme/abstandsraster.guard.test.ts
   - frontend/src/**/*.tsx
 herleitung:
-  - openspec/changes/archive/2026-11-16-m113c8ln-abstandsraster/design.md
+  - openspec/changes/archive/2026-11-17-m113c8ln-abstandsraster/design.md
   - Zunder LLH-1809 (Variante „auf 4er runden“ und Ratschen-Wächter abgestimmt mit Ruben am 16.11.2026)
 ---
 

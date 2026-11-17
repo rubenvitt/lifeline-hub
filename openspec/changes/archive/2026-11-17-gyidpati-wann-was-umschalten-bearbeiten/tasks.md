@@ -25,12 +25,12 @@
 - [x] 4.3 `planung/PlanungPage.tsx`: `Tabs` → Segmentleiste. Nur die aktive Fläche wird gerendert, die Zahlen im Reiterwortlaut bleiben. Der Test der Seite ist grün, und `e2e/planung-kontrast.spec.ts` ist auf `getByRole('tab')` umgestellt.
 - [x] 4.4 `fernmeldewesen/FernmeldewesenReiter.tsx`: `Tabs` → Segmentleiste, die Navigation je Reiter bleibt. Die Tests unter `fernmeldewesen/` sind grün, das Spec-Szenario „ohne waagerechten Überlauf“ ist im e2e grün.
 - [x] 4.5 `pages/uhs/Grundriss.tsx`: `Tabs` → Segmentleiste mit Reiterfläche, die die Resthöhe trägt. Ein Komponententest prüft die Höhenkette.
-- [ ] 4.6 Die e2e-Pins auf `.ant-tabs-tab` außerhalb des ETB (`trefflaeche-pruefflaechen.spec.ts`, `gate3-trefflaeche.spec.ts`) auf `getByRole('tab')` stellen. Ein Lauf dieser Specs gegen den lokalen Stand ist grün. Danach findet `rg '<Tabs' frontend/src --glob '!**/etb/entwuerfe/**'` keinen Treffer.
+- [x] 4.6 Die e2e-Pins auf `.ant-tabs-tab` außerhalb des ETB (`trefflaeche-pruefflaechen.spec.ts`, `gate3-trefflaeche.spec.ts`) auf `getByRole('tab')` stellen. Ein Lauf dieser Specs gegen den lokalen Stand ist grün. Danach findet `rg '<Tabs' frontend/src --glob '!**/etb/entwuerfe/**'` keinen Treffer. Erledigt: Der Lauf ist grün. Übrig bleiben die ETB-Entwurfsreiter, also die Ausnahme, und ein Prüfstring in `components/datensicht.guard.test.ts`.
 
 ## 5. ADR und Integration
 
 - [x] 5.1 ADR nach D6 anlegen (nächste freie Nummer nach den ADRs von m113c8ln und v127ps65), `herleitung` auf das Archiv-`design.md` dieser Change. Ihre Prüfung läuft lokal grün, und der ADR-Wächter ist grün.
-- [ ] 5.2 Design System neu erzeugen (README mit der Tabelle, Karte Segmentleiste). `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün, die e2e-Specs aus 3.2, 4.3, 4.4 und 4.6 sind grün. Vorher-nachher-Bilder von Aufträgen, Planung, Fernmeldewesen und Grundriss sowie von einer umgestellten Knopfgruppe liegen für den PR vor.
+- [x] 5.2 Design System neu erzeugen (README mit der Tabelle, Karte Segmentleiste). `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün, die e2e-Specs aus 3.2, 4.3, 4.4 und 4.6 sind grün. Vorher-nachher-Bilder von Aufträgen, Planung, Fernmeldewesen und Grundriss sowie von einer umgestellten Knopfgruppe liegen für den PR vor. Erledigt: Der Gate-Lauf lief nach zwei Neustarts des Containers geteilt: `--nur schnell` grün, die Frontend-Suite in vier Teilen grün (20 794 Tests). Die e2e-Specs sind grün, ausgenommen C10 in `trefflaeche-pruefflaechen.spec.ts`, das auch auf `alpha` rot ist (LLH-1943). Die Bilder liegen vor.
 
 ## Workflow follow-up
 

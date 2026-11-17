@@ -6,7 +6,7 @@ datum: 2026-11-16
 gilt_fuer:
   - frontend/src/**/*.tsx
 herleitung:
-  - openspec/changes/archive/2026-11-16-gyidpati-wann-was-umschalten-bearbeiten/design.md
+  - openspec/changes/archive/2026-11-17-gyidpati-wann-was-umschalten-bearbeiten/design.md
   - Zunder LLH-1808 (Reiterform „nur Segmentleiste“ und Prüfung im Gate abgestimmt mit Ruben am 16.11.2026)
 ---
 

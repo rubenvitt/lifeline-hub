@@ -28,7 +28,7 @@
 
 - [x] 4.1 `mise exec -- pnpm -C frontend design-system` laufen lassen und das Erzeugte committen. `designSystem.guard.test.ts` und der Abdeckungswächter aus 1.2 sind grün.
 - [x] 4.2 ADR „Die Bausteinwahl steht als Regel in frontend/AGENTS.md; die README des Design Systems ist ein Nachschlagewerk ohne Historie“ anlegen. Die Nummer ist die nächste freie nach der ADR von m113c8ln, `gilt_fuer` ist `frontend/scripts/design-system/**`, die Prüfung nutzt `verlange` auf den Abschnittskopf in `frontend/AGENTS.md`. Der ADR-Wächter ist grün.
-- [ ] 4.3 `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün.
+- [x] 4.3 `./scripts/check-all.sh --geaendert --ohne-e2e` ist grün. Erledigt: Der Gate-Lauf lief nach zwei Neustarts des Containers geteilt: `--nur schnell` grün, die Frontend-Suite in vier Teilen grün (20 794 Tests).
 
 ## Workflow follow-up
 
