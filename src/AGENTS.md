@@ -26,7 +26,8 @@ Handler (`JsonBody`, LFH-1074).
   heuristisch (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
   `SchaedenDetailPage.tsx`/`TiereDetailPage.tsx`) — ein neuer 409 in einer
   CAS-Route zieht den Zweig mit. Ausgezeichnet ist der Sperrkonflikt bei UHS und
-  Bereitstellungsraum (LLH-1920): `AppError::Veraltet` antwortet 409 mit `grund: "veraltet"`, das
+  Bereitstellungsraum (LLH-1920) und beim Feld-CAS an Einsatzkopf, Einheit und Führungsstelle
+  (LLH-1831): `AppError::Veraltet` antwortet 409 mit `grund: "veraltet"`, das
   `BearbeitbaresPaneel` fragt dort nur bei ihm (`isVeraltet`); ein anderer 409 derselben Route
   (storniert, doppelte Bezeichnung) steht als Grund am Paneel. Eine neue CAS-Route nimmt
   `Veraltet`.

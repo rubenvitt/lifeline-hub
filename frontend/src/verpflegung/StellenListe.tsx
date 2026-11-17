@@ -14,7 +14,7 @@ import { useKontextMenue } from '../components/useKontextMenue';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
-import { useRollen, schriftGroesse, schriftStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { verpflegungsstelleStatus } from '../theme/statusFarben';
 import { laufendeZeitfensterDerStelle } from './stellenKern';
@@ -238,7 +238,7 @@ export default function StellenListe({
       >
         <Flex justify="space-between" align="center" gap={token.marginXS} wrap>
           <Flex align="baseline" gap={token.marginSM} wrap style={{ minWidth: 0 }}>
-            <Text strong style={{ fontSize: schriftGroesse('text'), overflowWrap: 'anywhere' }}>
+            <Text strong style={{ fontSize: 15, overflowWrap: 'anywhere' }}>
               {s.bezeichnung}
             </Text>
             <span style={{ color: rollen.text2 }}>{STELLE_ART_LABEL[s.art]}</span>
@@ -259,10 +259,7 @@ export default function StellenListe({
               <Flex key={zf.id} gap={token.marginXS} wrap align="baseline">
                 <span>{`${zf.bezeichnung} ${uhrzeitenText(zf, konventionen)}`}</span>
                 <span style={{ color: rollen.text2 }}>·</span>
-                {/* „12 EP ausgegeben“ trägt ein Wort: Textschrift (LLH-1777). */}
-                <span style={{ ...schriftStil('text'), fontWeight: 500 }}>
-                  {`${ausgegeben} EP ausgegeben`}
-                </span>
+                <span style={monoStil(13, 500)}>{`${ausgegeben} EP ausgegeben`}</span>
               </Flex>
             ))
           )}

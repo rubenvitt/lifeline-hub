@@ -1,12 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
 import { useLocation, useParams } from 'react-router';
-import { ladeModulFreigaben } from '../api/einsaetze';
-import { einsatzKeys } from '../api/queryKeys';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
 import { useMarkNichtGefunden } from './nichtGefundenContext';
-import { freiesRueckwegModul, modulZielRoute, modulZuRoute, redirectZiel } from './modulRegistry';
+import { modulZuRoute } from './modulRegistry';
+import { useUeberblickRueckweg } from './useUeberblickRueckweg';
 
 /**
  * Auffangseite für eine unbekannte Adresse im Einsatz (LLH-1729): ein unbekanntes Segment
@@ -19,28 +17,18 @@ import { freiesRueckwegModul, modulZielRoute, modulZuRoute, redirectZiel } from 
  * (`frontend/AGENTS.md`). Keine Zweitadresse für Registry-Schlüssel, jedes Modul hat eine Route.
  *
  * Der Rückweg führt in den Überblick, ist er gesperrt, ins erste freie Modul
- * (`freiesRueckwegModul` ohne das Standardmodul des Einsatzes, anders als Modulwächter und
- * `ModulStub`: der Auftrag nennt den Überblick). Bis die Freigaben geladen sind, steht kein Knopf,
- * sonst wechselte sein Ziel unter dem Finger. Die Adresse merkt der Rahmen nicht als letzten Ort
+ * (`useUeberblickRueckweg`, geteilt mit der Fehlergrenze). Bis die Freigaben geladen sind, steht
+ * kein Knopf, sonst wechselte sein Ziel unter dem Finger. Die Adresse merkt der Rahmen nicht als letzten Ort
  * (`nichtGefundenContext.ts`).
  */
 export default function SeiteNichtGefunden() {
   const einsatzId = parseRouteId(useParams().id);
   const { pathname } = useLocation();
   useMarkNichtGefunden();
-  const freigabenQ = useQuery({
-    queryKey: einsatzKeys.modulFreigaben(einsatzId ?? 0),
-    queryFn: () => ladeModulFreigaben(einsatzId!),
-    enabled: einsatzId !== null,
-  });
+  const zielRoute = useUeberblickRueckweg(einsatzId);
 
   let aktion: { label: string; pfad: string } | undefined;
-  if (einsatzId !== null && !freigabenQ.isLoading) {
-    // Ohne Freigaben (Abruf gescheitert, offline) der feste Einstieg: ein Rückweg ist besser als
-    // keiner, und die Zielseite meldet eine Sperre selbst.
-    const zielRoute = freigabenQ.data
-      ? modulZielRoute(freiesRueckwegModul(freigabenQ.data))
-      : redirectZiel();
+  if (einsatzId !== null && zielRoute !== null) {
     const ziel = modulZuRoute(zielRoute);
     aktion = {
       label: ziel ? `${ziel.label} öffnen` : 'Einstiegsmodul öffnen',

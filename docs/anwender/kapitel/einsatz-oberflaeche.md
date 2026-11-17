@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/einsatzNebenzeile.ts, frontend/src/einsatz/DefaultModulRedirect.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, frontend/src/live/liveVerbindung.ts, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/einsatzNebenzeile.ts, frontend/src/einsatz/DefaultModulRedirect.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, frontend/src/live/liveVerbindung.ts, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx, frontend/src/components/SprungZumInhalt.tsx, frontend/src/components/Fehlergrenze.tsx, frontend/src/components/SeitenZustand.tsx, frontend/src/components/DeeplinkHinweis.tsx, frontend/src/api/clientFehler.ts]
 ---
 
 ## Überblick
@@ -311,6 +311,12 @@ vorgemerkten oder abgelehnten Einträgen und mit „Neue Version verfügbar.“,
 Fassung der App bereitliegt. „Jetzt neu laden“ lädt sie. Auf dem Handy bleibt sie bei einer
 Störung der Verbindung über der Kopfzeile stehen.
 
+Mit der Tastatur ist auf jeder Seite mit Kopfzeile und in der Hilfe der erste Halt der Knopf
+„Zum Inhalt springen“, noch vor der Betriebszeile; er erscheint erst mit dem Fokus, oben links über
+der Kopfzeile. **↵** darauf führt an Kopfzeile, Kategorien und Modulen vorbei an den Anfang der
+Seite, der nächste **Tab** steht auf ihrem ersten Bedienelement. In der Verwaltung führt er auch am
+Menü vorbei, in der Hilfe an der Kapitelliste.
+
 ### Übung oder Realeinsatz
 
 Hat ein Einsatz die Einsatzart „Übung“, ist das überall zu sehen, ohne den Namen zu lesen:
@@ -381,6 +387,43 @@ wenn man im Einsatz inzwischen weitergearbeitet hat. Ist der Einsatz abgeschloss
 Hilfe stattdessen „Zu den Einsätzen“. Am breiten Schirm mit Maus öffnet die Hilfe aus einem
 Einsatz in einem neuen Tab, in der Desktop-App in einem eigenen Fenster; der Einsatz bleibt im
 ersten Tab offen. Am Handy und am Tablet öffnet sie im selben Tab.
+
+### Wenn eine Seite nicht angezeigt werden kann
+
+Scheitert eine Seite beim Anzeigen, etwa an einem unerwarteten Datensatz, steht an ihrer Stelle
+„Diese Seite konnte nicht angezeigt werden“ mit dem Satz „Der Fehler wurde gemeldet. Die anderen
+Module arbeiten weiter.“ Kopfzeile, Kategorien und Modulliste bleiben stehen und lassen sich
+weiter bedienen. Zwei Auswege stehen darunter:
+
+- „Neu laden“ lädt die App neu.
+- „Zum Überblick“ führt in den Überblick des Einsatzes. Ist der Überblick gesperrt, führt der
+  Knopf in das erste freie Modul.
+
+Jedes andere Modul, über Kategorien, Modulliste oder Sprungpalette gewählt, zeigt wieder seine
+normale Seite. Außerhalb eines Einsatzes, auf der Einsatzliste, im Profil und in der Verwaltung,
+heißt der zweite Ausweg „Zur Einsatzliste“, auf einem gekoppelten Gerät „Zur Startseite“.
+Scheitert der Rahmen selbst, steht dieselbe Meldung als ganze Seite, mit „Neu laden“ und „Zur
+Einsatzliste“.
+
+Der Fehler geht von selbst als Bericht an den Server der Organisation. Der Bericht nennt die Art
+der Seite ohne Kennungen aus der Adresse, die Version der App und die technische Meldung; der
+Server schreibt ihn nur in sein Protokoll. Ohne Netz entfällt der Bericht ohne weiteren Hinweis.
+
+### Wenn es ein Objekt nicht (mehr) gibt
+
+Führt eine Adresse auf ein Objekt, das es im Einsatz nicht oder nicht mehr gibt, etwa auf eine
+Person oder einen Befehl aus einem anderen Einsatz, bleibt die Seite im Einsatz und die Adresse in
+der Leiste stehen. An Stelle des Objekts steht „Diese Person gibt es nicht (mehr)“ oder
+entsprechend, mit einem Knopf zur Liste des Moduls, etwa „Zu den Betroffenen“. „Erneut abrufen“
+fehlt dort, denn ein neuer Versuch fände das Objekt auch nicht. Scheitert der Abruf dagegen an der
+Verbindung oder am Server, steht der Fehler mit „Erneut abrufen“. Eine solche Adresse merkt sich
+der Einsatz nicht als letzten Ort: „Zurück zu …“ aus dem Profil führt nicht dorthin.
+
+Zeigt ein Link aus einem anderen Modul auf einen Eintrag einer Liste, etwa auf eine Meldung, einen
+Auftrag oder ein Fahrzeug, den es nicht (mehr) gibt, steht über der Liste ein Hinweis wie „Meldung
+#123 gibt es nicht (mehr)“. Die Zahl ist die Kennung aus dem Link; sie kann von der laufenden
+Nummer abweichen, die die Liste zeigt. Kein Eintrag ist dann gewählt oder hervorgehoben. Der
+Hinweis verschwindet mit ✕, mit der Wahl eines Eintrags oder mit dem nächsten Link.
 
 ### Wo das Kontextmenü gilt
 

@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders, sortTarget } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
@@ -60,6 +60,7 @@ function render(
   entlasseneDaten: unknown[] = [],
   orte: { einheiten?: unknown[]; fahrzeuge?: unknown[]; br?: unknown[] } = {},
   route = '/einsaetze/1/material',
+  client?: QueryClient,
 ) {
   server.use(
     meHandler(admin),
@@ -93,7 +94,7 @@ function render(
         />
       </Routes>
     </>,
-    { route, datenRouter: true },
+    { route, datenRouter: true, client },
   );
 }
 
@@ -223,11 +224,43 @@ describe('MaterialPage', () => {
     await waitFor(() => expect(ort.aktuell).not.toContain('material='));
   });
 
-  it('ein unbekannter Posten in ?material= markiert nichts (LLH-1260)', async () => {
+  it('ein unbekannter Posten in ?material= markiert nichts und zeigt den Hinweis (LLH-1260, LLH-1827)', async () => {
     const { container } = render(einsatzAktiv, [em], [], {}, '/einsaetze/1/material?material=99');
     await screen.findByText('Wolldecke');
     await waitFor(() => expect(ort.aktuell).not.toContain('material='));
     expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+    expect(screen.getByText('Posten #99 gibt es nicht (mehr)')).toBeInTheDocument();
+  });
+
+  // Review a12ms7g9 (F5): ein alter Stand im Cache kennt einen eben disponierten Posten nicht.
+  it('?material=<id> mit altem Stand im Cache: kein Hinweis, der Posten der frischen Antwort ist hervorgehoben', async () => {
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.material(1), [], { updatedAt: 0 });
+    // Die herausgenommenen frisch im Cache: sonst wartete der Sprung schon auf sie.
+    client.setQueryDefaults(einsatzKeys.materialEntlassene(1), { staleTime: Infinity });
+    client.setQueryData(einsatzKeys.materialEntlassene(1), []);
+    const { container } = render(
+      einsatzAktiv,
+      [em],
+      [],
+      {},
+      '/einsaetze/1/material?material=10',
+      client,
+    );
+    await screen.findByText('Wolldecke');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="10"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+  });
+
+  // Review a12ms7g9 (F6): ein herausgenommener Posten steht im Block darunter auf derselben Seite.
+  it('?material=<id> eines herausgenommenen Postens zeigt keinen Hinweis und räumt den Parameter', async () => {
+    const raus = { ...em, id: 12, bezeichnung: 'Feldbett', beendet_at: '2026-05-27 12:00:00' };
+    render(einsatzAktiv, [em], [raus], {}, '/einsaetze/1/material?material=12');
+    expect(await screen.findByText('Aus dem Einsatz genommen (1)')).toBeInTheDocument();
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material'));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
   });
 
   it('auch im Kartenzweig trägt der angesprungene Posten die Markierung (LLH-1260)', async () => {

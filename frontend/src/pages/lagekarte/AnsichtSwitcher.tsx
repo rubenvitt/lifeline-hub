@@ -9,7 +9,7 @@ import {
 import { useState } from 'react';
 import { Button, Dropdown, Input, Modal, Radio, Space, Typography } from 'antd';
 import { Select } from '../../components/Select';
-import { useRollen, schriftGroesse } from '../../components/instrument';
+import { useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import type { KartenAnsicht } from '../../api/types';
 
@@ -157,7 +157,7 @@ export default function AnsichtSwitcher({
   return (
     // Kein Außenabstand: die Polsterung des Paneels „Kartenansicht" trägt den Abstand.
     <div>
-      <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
         Ansicht
       </Typography.Text>
       <Space.Compact block style={{ marginTop: token.marginXS }}>

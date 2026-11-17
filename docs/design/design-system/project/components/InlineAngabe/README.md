@@ -53,7 +53,7 @@ optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
 - Erfüllt `onSpeichern` mit `OFFEN_LASSEN`, bleibt die Eingabe mit dem Entwurf offen, ohne
   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
 
-── WERT BEIM ÖFFNEN UND FREMDE ÄNDERUNG (LLH-1831) ────────────────────────────────────
+── WERT BEIM ÖFFNEN UND FREMDE ÄNDERUNG ────────────────────────────────────
 
 Change `nvhnqynd-konflikt-und-aenderungsvermerk`, design.md D5, Spec `formularseiten`.
 - Beim Öffnen friert die Angabe den Serverstand ein und reicht ihn als zweites Argument

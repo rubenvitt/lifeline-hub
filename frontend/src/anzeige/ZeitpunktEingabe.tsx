@@ -33,7 +33,7 @@ import {
   type RefObject,
   type Ref,
 } from 'react';
-import { schriftStil, useRollen, zahlStil } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import { useViewport, type AbBreitePunkt } from '../components/useViewport';
 import { IconKalender } from '../icons';
 import { serverJetzt } from '../offline/serveruhr';
@@ -43,7 +43,6 @@ import { ZeitKalender } from './ZeitKalender';
 import { ZeitSchnellwahlKnoepfe } from './ZeitSchnellwahlKnoepfe';
 import { deuteZeit, type Deutung, type ZeitArt } from './zeitParser';
 import { browserZone, effektiveZone, istZukunftstag, zuWanduhr } from './zeitEingabe';
-
 import './ZeitpunktEingabe.css';
 
 export type { ZeitArt } from './zeitParser';
@@ -346,8 +345,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
       id={hinweisId}
       aria-live="polite"
       style={{
-        // „= 14.03. 14:32 · morgen“ trägt ein Wort: Textschrift (LLH-1777, Mono-Grenze).
-        ...(grund ? {} : schriftStil('meta')),
+        ...(grund ? {} : monoStil(12)),
         color: grund ? rollen.alarmText : rollen.gedaempft,
       }}
     >
@@ -400,13 +398,11 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         value={text ?? anzeige}
         prefix={
           z.zonenHinweis ? (
-            <span data-schrift="kennung" style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
-              {z.zonenHinweis}
-            </span>
+            <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{z.zonenHinweis}</span>
           ) : undefined
         }
         suffix={suffix}
-        style={{ ...zahlStil('text') }}
+        style={{ ...monoStil(14) }}
         onFocus={(e) => {
           e.target.select();
           onFocus?.(e);

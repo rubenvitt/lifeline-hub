@@ -59,6 +59,8 @@ async fn leitstellen_nr_mit_veraltetem_stand_ist_409_und_schreibt_nichts() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    // Sperrkonflikt ausgezeichnet (src/AGENTS.md, Statuscode-Konvention, LLH-1920).
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
     assert_eq!(
         lesen(&app, &admin, einsatz).await["leitstellen_nr"],
         "ILS-4711"

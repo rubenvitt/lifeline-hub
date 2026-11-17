@@ -30,6 +30,12 @@ import {
 export interface EinsatzPfade {
   personDetail: (einsatzId: number, personId: number) => string;
   personenListe: (einsatzId: number) => string;
+  /**
+   * Beschriftung des Wegs auf {@link personenListe}, etwa im Muster „Diese Person gibt es nicht
+   * (mehr)“ (LLH-1827): die Liste heißt am Stab und am Gerät der Betreuungsstelle „Betroffene“, am
+   * Gerät der UHS „Patienten“.
+   */
+  personenListeLabel: string;
   uhsDetail: (einsatzId: number, uhsId: number) => string;
   aufnahme: (einsatzId: number, opts?: { uhs?: number }) => string;
   verpflegung: (einsatzId: number) => string;
@@ -55,6 +61,7 @@ export interface EinsatzPfade {
 export const STAB_PFADE: EinsatzPfade = {
   personDetail: personDetailPfad,
   personenListe: (einsatzId) => personenPfad(einsatzId),
+  personenListeLabel: 'Zu den Betroffenen',
   uhsDetail: uhsDetailPfad,
   aufnahme: personenAufnahmePfad,
   verpflegung: verpflegungPfad,
@@ -66,6 +73,7 @@ export const STAB_PFADE: EinsatzPfade = {
 export const GERAET_PFADE: EinsatzPfade = {
   personDetail: geraetPersonPfad,
   personenListe: geraetPatientenPfad,
+  personenListeLabel: 'Zu den Patienten',
   uhsDetail: geraetUhsPfad,
   aufnahme: geraetAufnahmePfad,
   verpflegung: geraetVerpflegungPfad,
@@ -82,6 +90,7 @@ export const GERAET_PFADE: EinsatzPfade = {
 export const GERAET_BETREUUNG_PFADE: EinsatzPfade = {
   personDetail: geraetBetroffenerPfad,
   personenListe: geraetBetroffenePfad,
+  personenListeLabel: 'Zu den Betroffenen',
   uhsDetail: (einsatzId) => geraetBetroffenePfad(einsatzId),
   aufnahme: (einsatzId) => geraetBetroffenAufnahmePfad(einsatzId),
   verpflegung: geraetVerpflegungPfad,

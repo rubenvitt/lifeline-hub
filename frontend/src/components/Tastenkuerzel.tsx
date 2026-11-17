@@ -42,7 +42,7 @@ type Props = HTMLAttributes<HTMLElement> & { children: ReactNode };
 export default function Tastenkuerzel({ children, style, ...rest }: Props) {
   const { token } = theme.useToken();
   return (
-    <kbd data-schrift="kennung" {...rest} style={{ ...tastenkuerzelStil(token), ...style }}>
+    <kbd {...rest} style={{ ...tastenkuerzelStil(token), ...style }}>
       {children}
     </kbd>
   );

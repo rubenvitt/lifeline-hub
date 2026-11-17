@@ -90,11 +90,11 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Filterhinweis,
+  monoStil,
   Segmentleiste,
   SegmentUmschalter,
   useRollen,
   type SegmentOption,
-  zahlStil,
 } from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useFunkprotokollLauf } from '../components/useFunkprotokollLauf';
@@ -895,9 +895,8 @@ export default function EtbPage() {
           zusaetze={[
             ausserhalbHier && (
               <span key="ausserhalb">
-                Nr.{' '}
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{ausserhalbHier.lfd_nr}</span>{' '}
-                erfasst – außerhalb des Filters ·{' '}
+                Nr. <span style={monoStil(12)}>{ausserhalbHier.lfd_nr}</span> erfasst – außerhalb
+                des Filters ·{' '}
                 <Button
                   type="link"
                   style={{ paddingInline: 0 }}
@@ -913,11 +912,11 @@ export default function EtbPage() {
             nachtraege.length > 0 && nachtragsGrenze && (
               <span key="nachtraege">
                 +
-                <span style={zahlStil('klein')}>
+                <span style={monoStil(12)}>
                   {nachtraege.length > 99 ? '99+' : nachtraege.length}
                 </span>{' '}
                 {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
-                <span style={zahlStil('klein')}>
+                <span style={monoStil(12)}>
                   {taktisch(lbZeit!, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
                 </span>{' '}
                 erfasst ·{' '}

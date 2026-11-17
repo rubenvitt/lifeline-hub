@@ -1,6 +1,6 @@
 import { Typography } from 'antd';
 import { Fragment } from 'react';
-import { useRollen, zahlStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import { statusFlaeche, type StatusTon } from '../../components/instrument/statusFlaeche';
 import {
   jetztUndNaechstes,
@@ -103,7 +103,7 @@ export default function SchichtplanListe({
               }}
             >
               {wort != null && <span style={{ minWidth: '7em' }}>{wort}</span>}
-              <span style={{ ...zahlStil('klein'), whiteSpace: 'nowrap' }}>{zeit}</span>
+              <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>{zeit}</span>
               <span
                 style={{
                   flex: 1,

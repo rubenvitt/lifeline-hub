@@ -1725,6 +1725,35 @@ async fn geraet_liest_die_antraege_seines_einsatzes() {
     assert_eq!(s, StatusCode::NOT_FOUND, "Tablet erreicht den Handler: {v}");
 }
 
+/// Absturzbericht (LLH-1822, Change `a12ms7g9-seitenzustaende`, D3; Spec `seiten-zustaende`,
+/// „Absturz wird dem Server gemeldet“): Eine Gerätesitzung ist eine Sitzung, auch die Gerätehülle
+/// meldet ihre Abstürze. `CurrentUser` lässt Geräte nur auf die Routen in `geraet::ALLE_GERAETE`;
+/// ohne Eintrag dort wäre der Bericht 403 und still verloren. Der Lagemonitor schreibt sonst
+/// nichts, den Bericht darf er trotzdem senden.
+#[tokio::test]
+async fn ein_bericht_aus_einer_geraetesitzung_wird_mit_204_angenommen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        "/api/client-fehler",
+        &monitor,
+        Some(&json!({
+            "route": "/geraet/lagemonitor",
+            "version": "1.2.3",
+            "meldung": "kaputt",
+            "stack": "Error: kaputt",
+        })),
+    )
+    .await;
+
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v:?}");
+}
+
 /// LFH-1072: der Kachel-Proxy verlangt eine Sitzung; jedes gekoppelte Gerät besteht sie, gleich
 /// welche Ansicht. Die Kachel außerhalb des Rasters ist 204 ohne Abruf, die unbekannte Quelle 404.
 #[tokio::test]

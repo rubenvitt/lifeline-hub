@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { menueSpaltenBreite } from './menueSpalte';
-import { AktionsInhalt, aktionsSpalte, aktionsSpaltenBreite } from './aktionsSpalte';
+import {
+  AktionsInhalt,
+  KennungAktionKontext,
+  aktionsSpalte,
+  aktionsSpaltenBreite,
+} from './aktionsSpalte';
 
 /** 7 px je Zeichen, unabhängig von der Schriftgröße. */
 const messen = (text: string) => text.length * 7;
@@ -68,5 +73,53 @@ describe('aktionsSpalte (LLH-1789)', () => {
       />,
     );
     expect(container.querySelector('button')).toBeNull();
+  });
+
+  const beides = {
+    aktion: { etikett: 'Stand melden', onKlick: vi.fn() },
+    weitere: {
+      eintraege: () => [{ key: 'b', label: 'Bearbeiten' }],
+      zugaenglicherName: () => 'Aktionen',
+      onWahl: vi.fn(),
+    },
+  };
+
+  it('in der eigenen Spalte (ab md) bricht die Reihe nicht um und trägt keine Hülle', () => {
+    // Die Spalte ist breit genug gerechnet; ein Umbruch dort verdoppelte jede Zeilenhöhe.
+    const { container } = renderMitProviders(
+      <AktionsInhalt zeile={{ name: 'Nord' }} {...beides} />,
+    );
+    expect(getComputedStyle(container.querySelector('.ant-space')!).flexWrap).not.toBe('wrap');
+    expect(container.querySelector('[data-lfh="datensicht-kennung-aktionsreihe"]')).toBeNull();
+  });
+
+  it('in der Kennung (unter md): Hülle mit Mindestbreite, Knopf und ⋮ dürfen umbrechen', () => {
+    // Nebeneinander setzte die Reihe die Breite der fixierten Kennung (Betreuungsstellen auf
+    // 390 px: +31 px, „frei“ aus dem Bild). `min-content` meldet nur das breiteste Teil,
+    // `minWidth: 100%` füllt danach die Zelle.
+    const { container } = renderMitProviders(
+      <KennungAktionKontext.Provider value={true}>
+        <AktionsInhalt zeile={{ name: 'Nord' }} {...beides} />
+      </KennungAktionKontext.Provider>,
+    );
+    const huelle = container.querySelector<HTMLElement>(
+      '[data-lfh="datensicht-kennung-aktionsreihe"]',
+    )!;
+    expect(huelle).not.toBeNull();
+    expect(huelle.style.width).toBe('min-content');
+    expect(huelle.style.minWidth).toBe('100%');
+    expect(getComputedStyle(huelle.querySelector('.ant-space')!).flexWrap).toBe('wrap');
+  });
+
+  it('in der Kennung ohne Knopf und ⋮: keine leere Hülle (sie brächte eine Fuge mit)', () => {
+    const { container } = renderMitProviders(
+      <KennungAktionKontext.Provider value={true}>
+        <AktionsInhalt
+          zeile={{ name: 'Nord' }}
+          aktion={{ etikett: 'Stand melden', onKlick: vi.fn(), sichtbar: () => false }}
+        />
+      </KennungAktionKontext.Provider>,
+    );
+    expect(container.querySelector('[data-lfh="datensicht-kennung-aktionsreihe"]')).toBeNull();
   });
 });
