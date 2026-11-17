@@ -8,7 +8,7 @@ Nachsichtung, Patientenkopf und Zeilen-Popover; die ANZEIGE bleibt `SichtungsTag
 Jede Kategorie ist eine gefüllte Fläche aus `sichtungsPalette` (`flaeche`, abgedunkelt bis zum
 Textboden), Kürzel groß, Bedeutungswort darunter. „unverletzt“ hat KEINE Fläche (durchsichtig,
 nur die Kante), „tot“ trägt in JEDEM Zustand eine Schraffur: nachts lagen beide sonst bei
-1,12 : 1 (Change `eon26eat-farbe-entlasten`, D8). Jede Fläche trägt eine Kante in der
+1,12 : 1 (Change `eon26eat-farbe-entlasten`). Jede Fläche trägt eine Kante in der
 Textfarbe des Modus (`sichtungsKante`): nachts verschwänden sonst Rot, Blau, Grün und Schwarz,
 am Tag Gelb.
 
