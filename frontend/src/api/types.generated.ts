@@ -413,6 +413,7 @@ export interface components {
         AbschlussGruppe: {
             /** Format: int64 */
             anzahl: number;
+            /** @description Leer, wenn die Person das Modul nicht lesen darf; `anzahl` zählt trotzdem alle. */
             eintraege: components["schemas"]["AbschlussEintrag"][];
         };
         /**
@@ -423,6 +424,7 @@ export interface components {
         AbschlussKraefte: {
             /** Format: int64 */
             anzahl: number;
+            /** @description Einheiten nur mit lesbarem Modul `einheiten`, Fahrzeuge nur mit `fahrzeuge`. */
             eintraege: components["schemas"]["AbschlussKraft"][];
             /**
              * Format: int64

@@ -3,9 +3,11 @@
 //! `sa41jgmj-einsatz-abschluss-absichern`, design.md D1).
 //!
 //! Die Prüfung warnt nur, sie sperrt den Abschluss nicht. Sie zählt über den ganzen Einsatz,
-//! unabhängig von den Modulfreigaben der anfragenden Person. Die Regel „offen“ jedes Moduls kommt
-//! aus seinem Repo (dieselben Fragmente bzw. Zählfunktionen wie der Modulzähler in
-//! [`super::zaehler`]); hier steht kein zweiter Wortlaut.
+//! unabhängig von den Modulfreigaben der anfragenden Person. Texte und Bezeichnungen der
+//! Kurzliste nennt sie dagegen nur aus Modulen, die die Person lesen darf ([`Lesbar`]): deren
+//! Liste wiese sie sonst mit 403 ab. Die Regel „offen“ jedes Moduls kommt aus seinem Repo
+//! (dieselben Fragmente bzw. Zählfunktionen wie der Modulzähler in [`super::zaehler`]); hier steht
+//! kein zweiter Wortlaut.
 
 use crate::error::AppError;
 use crate::person::{
@@ -14,7 +16,12 @@ use crate::person::{
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use std::collections::HashSet;
 use utoipa::ToSchema;
+
+/// Die Module, deren Einträge die anfragende Person lesen darf
+/// ([`super::berechtigung::erlaubte_module`]). Die Anzahl jeder Gruppe hängt nicht daran.
+pub type Lesbar = HashSet<&'static str>;
 
 /// Höchstzahl der Einträge je Gruppe in der Kurzliste; die Anzahl zählt alle.
 pub const KURZLISTE_MAX: usize = 5;
@@ -43,6 +50,7 @@ pub struct AbschlussEintrag {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AbschlussGruppe {
     pub anzahl: i64,
+    /// Leer, wenn die Person das Modul nicht lesen darf; `anzahl` zählt trotzdem alle.
     pub eintraege: Vec<AbschlussEintrag>,
 }
 
@@ -63,6 +71,7 @@ pub struct AbschlussKraft {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AbschlussKraefte {
     pub anzahl: i64,
+    /// Einheiten nur mit lesbarem Modul `einheiten`, Fahrzeuge nur mit `fahrzeuge`.
     pub eintraege: Vec<AbschlussKraft>,
     /// Davon nicht entlassene Einsatzkräfte (`einsatz_personal`).
     pub personal: i64,
@@ -111,7 +120,11 @@ type PersonZeile = (
     Option<TransportDurch>,
 );
 
-async fn load_betroffene(pool: &SqlitePool, einsatz_id: i64) -> Result<AbschlussGruppe, AppError> {
+async fn load_betroffene(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    lesbar: &Lesbar,
+) -> Result<AbschlussGruppe, AppError> {
     // Dasselbe Prädikat wie `person::repo::liste` und der Lagemonitor: stornierte zählen nicht.
     let zeilen: Vec<PersonZeile> = sqlx::query_as(
         "SELECT id, registrier_nr, status, aktuelle_verbleib_art, aktueller_verbleib_status, \
@@ -134,7 +147,10 @@ async fn load_betroffene(pool: &SqlitePool, einsatz_id: i64) -> Result<Abschluss
             });
         }
     }
-    let (anzahl, eintraege) = kurzliste(offen);
+    let (anzahl, mut eintraege) = kurzliste(offen);
+    if !lesbar.contains("personen") {
+        eintraege.clear();
+    }
     Ok(AbschlussGruppe { anzahl, eintraege })
 }
 
@@ -154,7 +170,11 @@ fn einheit_status_text(status: &crate::einheit::EinheitStatus) -> Option<String>
     (!teile.is_empty()).then(|| teile.join(", "))
 }
 
-async fn load_kraefte(pool: &SqlitePool, einsatz_id: i64) -> Result<AbschlussKraefte, AppError> {
+async fn load_kraefte(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    lesbar: &Lesbar,
+) -> Result<AbschlussKraefte, AppError> {
     // Aktiv heißt: Einheit nicht aufgelöst, Fahrzeug weder entlassen noch storniert (LLH-1079);
     // beides filtern die Listen der Module.
     let einheiten = crate::einheit::repo::liste(pool, einsatz_id).await?;
@@ -188,7 +208,14 @@ async fn load_kraefte(pool: &SqlitePool, einsatz_id: i64) -> Result<AbschlussKra
     .bind(einsatz_id)
     .fetch_one(pool)
     .await?;
-    let (anzahl, eintraege) = kurzliste(alle);
+    let anzahl = i64::try_from(alle.len()).unwrap_or(i64::MAX);
+    alle.retain(|k| {
+        lesbar.contains(match k.art {
+            AbschlussKraftArt::Einheit => "einheiten",
+            AbschlussKraftArt::Fahrzeug => "fahrzeuge",
+        })
+    });
+    let (_, eintraege) = kurzliste(alle);
     Ok(AbschlussKraefte {
         anzahl: anzahl + personal,
         eintraege,
@@ -213,37 +240,52 @@ fn gruppe(anzahl: i64, eintraege: Vec<(i64, Option<i64>, String)>) -> AbschlussG
 }
 
 /// Die offenen Punkte eines Einsatzes vor dem Abschluss. Prüft keine Rechte: das tut die Route
-/// (`EinsatzLeitungszugriff`). `jetzt` im SQLite-Format, wie der Modulzähler es bindet.
+/// (`EinsatzLeitungszugriff`) und nennt in `lesbar` die Module, deren Einträge die Person sehen
+/// darf. `jetzt` im SQLite-Format, wie der Modulzähler es bindet.
 pub async fn load_pruefung(
     pool: &SqlitePool,
     einsatz_id: i64,
     jetzt: &str,
+    lesbar: &Lesbar,
 ) -> Result<AbschlussPruefung, AppError> {
     let max = i64::try_from(KURZLISTE_MAX).unwrap_or(5);
+    let kurz = |modul: &str| lesbar.contains(modul);
     let auftraege = gruppe(
         crate::auftrag::repo::zaehlen(pool, einsatz_id, jetzt)
             .await?
             .offen,
-        crate::auftrag::repo::offene_kurzliste(pool, einsatz_id, max).await?,
+        if kurz("auftraege") {
+            crate::auftrag::repo::offene_kurzliste(pool, einsatz_id, max).await?
+        } else {
+            Vec::new()
+        },
     );
     let meldungen = gruppe(
         crate::meldung::repo::zaehlen(pool, einsatz_id, jetzt)
             .await?
             .offen,
-        crate::meldung::repo::offene_kurzliste(pool, einsatz_id, max).await?,
+        if kurz("meldungen") {
+            crate::meldung::repo::offene_kurzliste(pool, einsatz_id, max).await?
+        } else {
+            Vec::new()
+        },
     );
     let nachforderungen = gruppe(
         crate::nachforderung::repo::zaehlen(pool, einsatz_id, jetzt)
             .await?
             .offen,
-        crate::nachforderung::repo::offene_kurzliste(pool, einsatz_id, max).await?,
+        if kurz("nachforderungen") {
+            crate::nachforderung::repo::offene_kurzliste(pool, einsatz_id, max).await?
+        } else {
+            Vec::new()
+        },
     );
     Ok(AbschlussPruefung {
-        kraefte: load_kraefte(pool, einsatz_id).await?,
+        kraefte: load_kraefte(pool, einsatz_id, lesbar).await?,
         auftraege,
         meldungen,
         nachforderungen,
-        betroffene: load_betroffene(pool, einsatz_id).await?,
+        betroffene: load_betroffene(pool, einsatz_id, lesbar).await?,
     })
 }
 

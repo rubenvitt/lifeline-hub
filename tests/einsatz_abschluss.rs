@@ -241,9 +241,12 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     );
     assert_eq!(p["kraefte"]["anzahl"], 1, "{p}");
     assert_eq!(p["kraefte"]["personal"], 0, "{p}");
+    // Gezählt wird auch im ausgeblendeten Modul, genannt wird dort nichts.
     assert_eq!(p["betroffene"]["anzahl"], 1, "{p}");
+    assert_eq!(p["betroffene"]["eintraege"], json!([]), "{p}");
+    let (_, p_admin) = pruefung(&app, &admin, e).await;
     assert_eq!(
-        p["betroffene"]["eintraege"][0]["bezeichnung"],
+        p_admin["betroffene"]["eintraege"][0]["bezeichnung"],
         "Verbleib offen"
     );
     assert_eq!(p["auftraege"]["anzahl"], 1, "{p}");
@@ -269,6 +272,103 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     assert_eq!(s, StatusCode::OK, "{v}");
     let (s, _) = pruefung(&app, &admin, e).await;
     assert_eq!(s, StatusCode::CONFLICT);
+}
+
+/// Spec „Gesperrtes Modul nennt nur die Zahl“: Ist ein Modul für die Einsatzleitung ausgeblendet
+/// oder an eine Rolle gebunden, die sie nicht hat, zählt die Prüfung seine offenen Punkte weiter,
+/// gibt aber weder Text noch Bezeichnung heraus. Die Liste des Moduls wiese sie mit 403 ab.
+#[tokio::test]
+async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    common::einheit_bilden(&app, &admin, e, "Rettungszug 1").await;
+    anlegen(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/auftraege"),
+        json!({ "auftrag_text": "Deich sichern",
+                "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Nord" }] }),
+    )
+    .await;
+    anlegen(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/meldungen"),
+        json!({ "absender": "Florian 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+                "inhalt": "Frau Muster, Hauptstr. 4, vermisst ihren Sohn",
+                "ereigniszeit": "2026-06-12 09:00:00" }),
+    )
+    .await;
+    anlegen(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        json!({ "art": "RTW", "bezeichnung": "2 RTW", "anzahl": 2,
+                "adressat_kategorie": "leitstelle" }),
+    )
+    .await;
+
+    let helena_id = common::benutzer_anlegen(&app, &admin, "helena", "keine").await;
+    common::rolle_setzen(&app, &admin, e, helena_id, "einsatzleitung").await;
+    let lena = login_cookie(&app, "helena", "helenapw1").await;
+    for (modul, regel) in [
+        ("meldungen", r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+        ("einheiten", r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+        (
+            "auftraege",
+            r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#,
+        ),
+    ] {
+        let (s, v) = anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{e}/modul-overrides/{modul}"),
+            &admin,
+            Some(regel),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{modul}: {v}");
+        let (s, _) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{e}/{modul}"),
+            &lena,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{modul} ist für lena gesperrt");
+    }
+
+    let (s, p) = pruefung(&app, &lena, e).await;
+    assert_eq!(s, StatusCode::OK, "{p}");
+    for gruppe in ["kraefte", "auftraege", "meldungen"] {
+        assert_eq!(p[gruppe]["anzahl"], 1, "{gruppe} zählt weiter: {p}");
+        assert_eq!(
+            p[gruppe]["eintraege"],
+            json!([]),
+            "{gruppe} nennt nichts: {p}"
+        );
+    }
+    assert!(
+        !p.to_string().contains("Hauptstr"),
+        "kein Meldungstext in der Antwort: {p}"
+    );
+    // Ein freigegebenes Modul nennt seine Einträge weiter.
+    assert_eq!(p["nachforderungen"]["eintraege"][0]["bezeichnung"], "2 RTW");
+
+    // Der Admin liest jedes Modul und sieht alle Einträge.
+    let (_, p) = pruefung(&app, &admin, e).await;
+    assert_eq!(
+        p["meldungen"]["eintraege"].as_array().unwrap().len(),
+        1,
+        "{p}"
+    );
+    assert_eq!(
+        p["auftraege"]["eintraege"][0]["bezeichnung"],
+        "Deich sichern"
+    );
+    assert_eq!(p["kraefte"]["eintraege"][0]["bezeichnung"], "Rettungszug 1");
 }
 
 /// Spec „Nichts offen“: ein leerer Einsatz hat in jeder Gruppe 0 und keine Einträge.

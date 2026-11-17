@@ -69,6 +69,15 @@ Die Regeln „offen“ übernimmt die Prüfung aus `einsatz/zaehler.rs` (dieselb
 dasselbe SQL-Prädikat, kein zweiter Wortlaut), aber **ohne** Filter nach Modulfreigabe: der
 Abschluss betrifft den ganzen Einsatz.
 
+Das gilt nur für `anzahl` (Review vor dem PR, 17.11.2026). Die Kurzliste trägt Texte (Meldung:
+`inhalt`, Auftrag: `auftrag_text`) und Bezeichnungen; sie kommt nur aus Modulen, die die Person
+lesen darf (`berechtigung::erlaubte_module`, Modul je Gruppe: `auftraege`, `meldungen`,
+`nachforderungen`, `personen`; bei den Kräften Einheiten über `einheiten`, Fahrzeuge über
+`fahrzeuge`). Sonst bleibt `eintraege` leer, und der Dialog zeigt nur die Zahl mit „nicht
+freigegeben“, ohne Sprung. Die Liste des Moduls wiese die Person mit 403 ab; die Prüfung soll
+sie nicht umgehen. Dass die Zahl auch bei gesperrtem Modul steht, ist entschieden: sie ist die
+Warnung vor dem Abschluss.
+
 *Alternative:* Der Client setzt die Liste aus dem Modulzähler und den Modullisten zusammen. Der
 Zähler ist aber je Person nach Modulfreigabe gefiltert, und Kräfte und Betroffene müssten voll
 geladen werden. Verworfen.

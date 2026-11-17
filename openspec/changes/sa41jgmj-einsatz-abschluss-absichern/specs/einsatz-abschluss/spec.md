@@ -14,7 +14,8 @@ Vor dem Abschluss SHALL das System der Einsatzleitung eines aktiven Einsatzes di
 nennen, je Gruppe mit Anzahl: nicht entlassene Fahrzeuge und Einsatzkräfte, offene Aufträge,
 offene Meldungen, laufende Nachforderungen, Betroffene mit offenem oder unterwegs befindlichem
 Verbleib sowie vermisste Personen. Die Zählung MUST unabhängig von den Modulfreigaben der
-anfragenden Person sein.
+anfragenden Person sein. Texte und Bezeichnungen einzelner Punkte MUST das System nur aus
+Modulen nennen, die die Person lesen darf; für ein gesperrtes Modul nennt es nur die Anzahl.
 
 #### Scenario: Gebundene Einheit und offener Verbleib
 
@@ -22,6 +23,13 @@ anfragenden Person sein.
   eine Betroffene ohne Verbleib hat und die Einsatzleitung den Abschluss öffnet
 - **THEN** nennt der Dialog unter den Kräften die Einheit mit ihrem Status und unter den
   Betroffenen eine offene Person
+
+#### Scenario: Gesperrtes Modul nennt nur die Zahl
+
+- **WHEN** das Modul Meldungen für eine Einsatzleitung ausgeblendet ist und der Einsatz eine
+  offene Meldung hat, und sie den Abschluss öffnet
+- **THEN** nennt der Dialog bei den Meldungen die Anzahl 1, aber weder den Text der Meldung noch
+  einen Sprung ins Modul
 
 #### Scenario: Nichts offen
 

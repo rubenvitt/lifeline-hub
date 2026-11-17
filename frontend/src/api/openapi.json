@@ -916,7 +916,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AbschlussEintrag"
-            }
+            },
+            "description": "Leer, wenn die Person das Modul nicht lesen darf; `anzahl` zählt trotzdem alle."
           }
         }
       },
@@ -937,7 +938,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AbschlussKraft"
-            }
+            },
+            "description": "Einheiten nur mit lesbarem Modul `einheiten`, Fahrzeuge nur mit `fahrzeuge`."
           },
           "personal": {
             "type": "integer",
