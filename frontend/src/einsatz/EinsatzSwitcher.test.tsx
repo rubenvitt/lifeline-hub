@@ -167,6 +167,10 @@ describe('EinsatzSwitcher', () => {
     );
     expect(besucht).toContain('/einsaetze/8?modul=fahrzeuge');
     expect(besucht.some((a) => a.includes('/ueberblick'))).toBe(false);
+    // Die Ankunft ist keine Wahl (Spec `navigation-zuletzt-besucht`, „Einsatzwechsel im selben
+    // Modul“): „Zuletzt besucht“ bleibt in jedem Einsatz unberührt.
+    const zuletzt = Object.keys(localStorage).filter((k) => k.startsWith('lfh:nav:zuletzt:'));
+    expect(zuletzt).toEqual([]);
   });
 
   it('wechselt außerhalb eines Moduls ohne Hinweis', async () => {

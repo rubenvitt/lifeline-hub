@@ -494,6 +494,19 @@ describe('baueBefehle — Einsatz-Wechsel', () => {
     expect(k.navigate).toHaveBeenLastCalledWith('/einsaetze/7?modul=fahrzeuge', 'neuerTab');
   });
 
+  it('zeichnet die Ankunft im selben Modul nicht als Besuch auf (LLH-1821)', () => {
+    const merkeModulBesuch = vi.fn();
+    const k = kontext({
+      einsaetze: [aktiverEinsatz],
+      aktuellerModulKey: 'fahrzeuge',
+      merkeModulBesuch,
+    });
+    const zeile = baueBefehle(k).find((x) => x.id === 'einsatz:7')!;
+    zeile.ausfuehren();
+    zeile.ausfuehren('neuerTab');
+    expect(merkeModulBesuch).not.toHaveBeenCalled();
+  });
+
   it('springt außerhalb eines Moduls ohne Hinweis', () => {
     const k = kontext({ einsatzId: null, einsaetze: [aktiverEinsatz], aktuellerModulKey: null });
     expect(baueBefehle(k).find((x) => x.id === 'einsatz:7')!.ziel).toBe('/einsaetze/7');
