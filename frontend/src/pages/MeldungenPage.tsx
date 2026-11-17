@@ -776,11 +776,15 @@ export default function MeldungenPage() {
       ? abgeschlossene.length
       : null);
   // Solange noch geladen wird, hält der Platzhalter die Breite der Meta; danach steht „—“ für eine
-  // Zahl, die es nicht gibt.
+  // Zahl, die es nicht gibt. Ein ohne Netz angehaltener Abruf ohne Stand lädt nicht: er wartet auf
+  // das Netz, bis dahin ist die Zahl unbekannt (wie auf den Detailseiten, Change
+  // `a12ms7g9-seitenzustaende`).
+  const laedt = (q: { isPending: boolean; fetchStatus: string }) =>
+    q.isPending && q.fetchStatus !== 'paused';
   const metaLaedt =
     offenZahl == null &&
     abgeschlossenZahl == null &&
-    (offeneQuery.isPending || kennzahlenQuery.isPending);
+    (laedt(offeneQuery) || laedt(kennzahlenQuery));
   const meta = metaLaedt
     ? undefined
     : `${offenZahl ?? '—'} offen · ${abgeschlossenZahl ?? '—'} abgeschlossen`;
@@ -788,17 +792,21 @@ export default function MeldungenPage() {
    * Zustand der gezeigten Liste, Muster `ListeDetail`: die erste Lieferung läuft → Skelett; ein
    * Fehler ohne Bestand tritt an die Stelle der Liste („Erneut abrufen“); mit Bestand bleiben die
    * Zeilen stehen, darüber der Hinweis auf den alten Stand. `placeholderData` schützt nur den
-   * Filterwechsel, nicht den ersten Abruf (LLH-1823).
+   * Filterwechsel, nicht den ersten Abruf (LLH-1823). Ohne Netz und ohne Stand wartet der Abruf
+   * angehalten (`fetchStatus` `paused`): das ist ein Abruffehler, kein endloses Skelett.
    */
   const listenQuery = ansicht === 'offen' ? offeneQuery : abgeschlosseneQuery;
   const listenBestand = ansicht === 'offen' ? offene.length : abgeschlossene.length;
-  const listenZustand: 'laden' | 'fehler' | 'veraltet' | 'daten' = listenQuery.isPending
-    ? 'laden'
-    : listenQuery.isError
-      ? listenBestand > 0
-        ? 'veraltet'
-        : 'fehler'
-      : 'daten';
+  const listenAngehalten = listenQuery.isPending && listenQuery.fetchStatus === 'paused';
+  const listenZustand: 'laden' | 'fehler' | 'veraltet' | 'daten' = listenAngehalten
+    ? 'fehler'
+    : listenQuery.isPending
+      ? 'laden'
+      : listenQuery.isError
+        ? listenBestand > 0
+          ? 'veraltet'
+          : 'fehler'
+        : 'daten';
   const erneutAbrufen = () => void listenQuery.refetch();
   /*
    * Steht die Karte eines Grundes in der gezeigten Ansicht nicht (Ansicht gewechselt, Karte

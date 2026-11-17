@@ -377,6 +377,20 @@ describe('MeldungenPage', () => {
       expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
     });
 
+    // Review a12ms7g9 (F9): ein Kaltstart ohne Netz hält den Abruf an; das ist ein Abruffehler,
+    // kein endloses Laden.
+    it('zeigt ohne Netz und ohne Stand den Abruffehler mit „Erneut abrufen“ und „—“ im Kopf', async () => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client.setQueryDefaults(einsatzKeys.einsatz(1), { staleTime: Infinity });
+      client.setQueryData(einsatzKeys.einsatz(1), await ladeEinsatz(1));
+      setzeOnline(false);
+      renderPage(undefined, client);
+      expect(await screen.findByText('Meldungen konnten nicht geladen werden')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+      expect(screen.queryByLabelText('Inhalt wird geladen')).not.toBeInTheDocument();
+      expect(screen.getByText('— offen · — abgeschlossen')).toBeInTheDocument();
+    });
+
     it('zeigt bei einem Fehler mit Bestand die Zeilen und den veralteten Stand', async () => {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       renderPage(undefined, client);
