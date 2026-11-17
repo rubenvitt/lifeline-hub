@@ -1078,7 +1078,12 @@ anwendbar), „nicht geprüft" ist keins.
   im Menü der Trenner.
   **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**
   (LFH-960, Spec `bedien-wortlaut`): der Einsatzabschluss steht als letzter Abschnitt auf den
-  Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.
+  Einsatzdaten, am aktiven Einsatz nur für die Einsatzleitung. Er ist die Ausnahme von
+  „Unumkehrbares → `Popconfirm`“ (LLH-1814, Spec `einsatz-abschluss`): ein Dialog
+  (`pages/einsatzdaten/EinsatzAbschlussDialog.tsx`) nennt die offenen Punkte, sperrt aber nicht,
+  und sein roter Knopf „Einsatz abschließen“ wird erst aktiv, wenn Einsatznummer oder Bezeichnung
+  eingetippt sind (geprüft nur im Client). Binnen 24 Stunden öffnen Einsatzleitung und System-Admin
+  der Einsatz-Org ihn mit Pflicht-Grund wieder (`darfEinsatzWiedereroeffnen`).
 - **Ein Iconsatz** (LFH-595, Spec `iconsatz`,
   `openspec/changes/archive/2026-09-30-lfh-595-ein-ikonensatz/design.md`): Icons8
   „iOS 27 Outlined“, für aktive Zustände „iOS 27 Filled“ (`IconPaar`, heute Rail und Stern).

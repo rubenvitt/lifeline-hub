@@ -32,7 +32,7 @@ per TDD: erst der rote Test, dann der Code.
 - [x] 4.3 `pages/einsatzdaten/EinsatzAbschlussDialog.tsx`: Kopf ohne Kürzung, „Noch offen“ mit Zahl und Sprung je Gruppe (Deeplink-Helfer aus `routing/deeplinks.ts`, nur sichtbare Module), „Nichts offen“, Satz zu Kräften und zu Kopplungen, Eingabefeld, roter Knopf erst bei passender Nummer oder Bezeichnung, Fehler im Dialog; Vitest: Knopf inaktiv bei falschem Text, aktiv bei Nummer in Kleinbuchstaben und bei Bezeichnung ohne Nummer, Lade- und Fehlerzustand
 - [x] 4.4 `EinsatzdatenPage.tsx`: Paneel „Einsatzabschluss“ öffnet den Dialog statt `Popconfirm`; am abgeschlossenen Einsatz „Abgeschlossen am … von …“ und „Einsatz wieder öffnen…“ mit „bis …“ und Pflicht-Grund; Vitest in `EinsatzdatenPage.test.tsx` umstellen (Popconfirm-Erwartungen entfallen), Paneel fehlt für Führungspersonal/Beobachter
 - [x] 4.5 Guard der roten Rückfragen (`bedien-wortlaut`, „Rote Rückfragen werden geprüft“) grün; `pnpm lint`, `tsc` und Prettier im Frontend grün
-- [ ] 4.6 `frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“: Abschluss im Dialog mit Eintippen, binnen 24 h wieder zu öffnen; Prettier grün
+- [x] 4.6 `frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“: Abschluss im Dialog mit Eintippen, binnen 24 h wieder zu öffnen; Prettier grün
 
 ## 5. e2e, Bilder und Anwenderdoku
 
