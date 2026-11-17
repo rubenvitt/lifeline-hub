@@ -28,8 +28,8 @@ import {
  *                  frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx
  *   verlauf.png    frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx,
  *                  frontend/src/pages/bereitstellungsraum/brBelegungKern.ts
- *   bearbeiten.png frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx,
- *                  frontend/src/components/Erfassung.tsx
+ *   bearbeiten.png frontend/src/pages/bereitstellungsraum/BrRaumdaten.tsx,
+ *                  frontend/src/components/instrument/BearbeitbaresPaneel.tsx
  *   eintreffen.png frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx,
  *                  frontend/src/pages/bereitstellungsraum/eintreffenKern.ts
  *   abrufen.png    frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx,
@@ -232,19 +232,19 @@ test.describe(KAPITEL, () => {
     await fotografiere(page.locator('[data-lfh="br-verlauf"]'), KAPITEL, 'verlauf');
   });
 
-  test('Dialog „Bereitstellungsraum bearbeiten“', async ({ page }) => {
+  test('Paneel „Raumdaten“ beim Bearbeiten', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const br = await demoBr(page.request, demo.id);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}`);
-    await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Bereitstellungsraum bearbeiten' });
-    await expect(dialog.getByLabel('Bezeichnung')).toHaveValue(DEMO_BR);
-    // Nur im Dialog, nicht gespeichert: das Bild „raum.png“ zeigt den Raum wie im Demo-Einsatz.
-    await dialog.getByLabel('Notiz (optional)').fill('Zufahrt über Tor 3, Platz für 15 Fahrzeuge');
-    await dialog.getByLabel('Notiz (optional)').blur();
+    await page.getByRole('button', { name: 'Raumdaten bearbeiten' }).click();
+    const paneel = page.getByRole('region', { name: 'Raumdaten' });
+    await expect(paneel.getByLabel('Bezeichnung')).toHaveValue(DEMO_BR);
+    // Nur eingetippt, nicht gespeichert: das Bild „raum.png“ zeigt den Raum wie im Demo-Einsatz.
+    await paneel.getByLabel('Notiz').fill('Zufahrt über Tor 3, Platz für 15 Fahrzeuge');
+    await paneel.getByLabel('Notiz').blur();
     await page.mouse.move(0, 0);
-    await fotografiere(dialog, KAPITEL, 'bearbeiten');
+    await fotografiere(paneel, KAPITEL, 'bearbeiten');
   });
 });

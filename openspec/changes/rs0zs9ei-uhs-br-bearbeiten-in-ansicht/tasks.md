@@ -34,10 +34,10 @@
 
 ## 6. Regeln, Doku, Bilder
 
-- [ ] 6.1 `frontend/AGENTS.md`: In „Ort von ‚Bearbeiten‘ und Form des Anlegens“ die Altstellen auf die Anlegen-Drawer kürzen (LLH-1921); in „Bearbeiten in der Ansicht“ „Bereitstellungsraum“ aus der Liste der umzustellenden Seiten streichen; `BearbeitbaresPaneel` im Bausteinkatalog um den Zusatzplatz ergänzen; Prettier grün
-- [ ] 6.2 `docs/anwender/kapitel/unfallhilfsstellen.md`: Abschnitt zum Bearbeiten auf den Bereich „Angaben“ umschreiben, `quellen` (`UhsBearbeitenModal.tsx` → `UhsAngaben.tsx`, `uhsAngaben.ts`); `docs/anwender/kapitel/bereitstellungsraeume.md`: Schritte auf das Paneel „Raumdaten“, `quellen` nachziehen; Wächter von `docs/anwender/AGENTS.md` grün
+- [x] 6.1 `frontend/AGENTS.md`: In „Ort von ‚Bearbeiten‘ und Form des Anlegens“ die Altstellen auf die Anlegen-Drawer kürzen (LLH-1921); in „Bearbeiten in der Ansicht“ „Bereitstellungsraum“ aus der Liste der umzustellenden Seiten streichen; `BearbeitbaresPaneel` im Bausteinkatalog um den Zusatzplatz ergänzen; Prettier grün
+- [x] 6.2 `docs/anwender/kapitel/unfallhilfsstellen.md`: Abschnitt zum Bearbeiten auf den Bereich „Angaben“ umschreiben, `quellen` (`UhsBearbeitenModal.tsx` → `UhsAngaben.tsx`, `uhsAngaben.ts`); `docs/anwender/kapitel/bereitstellungsraeume.md`: Schritte auf das Paneel „Raumdaten“, `quellen` nachziehen; Wächter von `docs/anwender/AGENTS.md` grün
 - [ ] 6.3 `e2e/doku-bilder/bereitstellungsraeume.bilder.ts`: „Dialog … bearbeiten“ → offenes Paneel „Raumdaten“; Bild `bereitstellungsraeume/bearbeiten.png` im Bildlauf neu aufnehmen (gebautes Backend); geht das nicht, Text angepasst lassen und Nachzug als Aufgabe anlegen
-- [ ] 6.4 Mitänderungsregel `docs/architektur/AGENTS.md` prüfen (Kapitel zu Bausteinen/Querschnitt); `scripts/adr-fuer.sh` für die geänderten Pfade gelesen und eingehalten
+- [x] 6.4 Mitänderungsregel `docs/architektur/AGENTS.md` prüfen (Kapitel zu Bausteinen/Querschnitt); `scripts/adr-fuer.sh` für die geänderten Pfade gelesen und eingehalten
 
 ## 7. Prüfen
 
