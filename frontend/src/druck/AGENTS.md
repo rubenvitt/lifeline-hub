@@ -98,6 +98,12 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   den Rand, außer sie ist überlang (LFH-1009, `etb/druckUmbruch.ts`, Mechanik
   `tr[data-lfh='druck-ueberlang']` in `druck.css`): der freigegebene Lagebericht steht mit vollem
   Text im ETB und beginnt trotzdem auf Seite 1.
+  **Laufzeile** (LLH-1837, Spec `etb-druck`, „Einsatz und Stand auf jeder Seite“): Einsatz und
+  Stand stehen als erste Zeile im `thead` und wiederholen sich mit dem Tabellenkopf (Chromium,
+  Firefox; WebKit nicht), nie als Text im `@page`-Randfeld. Den Einsatznamen bildet
+  `druckEinsatzName` aus `Druckkopf.tsx` für Kopf und Laufzeile gleich. **Systemeinträge stehen
+  verdichtet** an ihrer Nummer: Nr. und Zeit, dann eine Zelle über vier Spalten (`etb/etbDruckTabelle.css`),
+  nie zusammengefasst und ohne Schalter.
 - **Druckansichten am Handy** (LFH-956): Einsatzbericht und ETB-Druck bleiben bei 390 px im
   Layout-Viewport. Ihre Bildschirmregeln stehen in `druck/druckansichtSchmal.css`, nur unter
   `@media screen`, nie in `druck.css`; das Blatt bleibt unberührt. Gate im mobilen Kontext,

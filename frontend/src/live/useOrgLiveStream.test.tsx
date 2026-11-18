@@ -84,16 +84,49 @@ describe('useOrgLiveStream (LFH-734)', () => {
     expect(FakeEventSource.offene()).toEqual(['/api/live']);
   });
 
-  it('gleicht schon beim ersten open die Org-Keys ab (Lücke beim Wechsel aus dem Einsatz)', () => {
+  it('gleicht beim ersten open die Org-Keys ab, die schon vorher im Cache lagen (Wechsel aus dem Einsatz)', () => {
     vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
-    const client = neuerQueryClient();
+    const client = new QueryClient();
+    client.setQueryData(['einsaetze'], []);
+    client.setQueryData(['personal', 'alle'], []);
+    vi.advanceTimersByTime(50);
     const spy = vi.spyOn(client, 'invalidateQueries');
     mount(true, client);
     FakeEventSource.instanzen[0].emit('open');
     vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
     expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
     expect(spy).toHaveBeenCalledWith(...abgleich(['personal']));
+  });
+
+  it('lädt beim ersten open nichts nach, was erst nach dem Verbindungsaufbau geladen wurde (Kaltaufruf, LLH-1839)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    mount(true, client);
+    vi.advanceTimersByTime(50);
+    client.setQueryData(['einsaetze'], []);
+    FakeEventSource.instanzen[0].emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).not.toHaveBeenCalledWith(...abgleich(['einsaetze']));
+  });
+
+  it('gleicht beim ersten open nach einem Fehlversuch alle Org-Keys ab (LLH-1839)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    mount(true, client);
+    vi.advanceTimersByTime(50);
+    client.setQueryData(['einsaetze'], []);
+    const quelle = FakeEventSource.instanzen[0];
+    quelle.readyState = FakeEventSource.CONNECTING;
+    quelle.onerror?.();
+    quelle.readyState = FakeEventSource.OPEN;
+    quelle.emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
   });
 
   it('gleicht auch beim Neuaufbau durch den Browser die Org-Keys ab (kein Nachlieferweg)', () => {

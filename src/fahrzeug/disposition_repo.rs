@@ -471,12 +471,14 @@ pub fn stamm_angaben_error() -> AppError {
 /// `status_id` per COALESCE. `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
 /// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört, `Conflict` an
 /// einem beendeten Fahrzeug (LLH-1079), `UnprocessableEntity` bei Ad-hoc-Angaben an einem
-/// Stamm-Fahrzeug; jede Ablehnung schreibt nichts, auch keinen Status.
+/// Stamm-Fahrzeug, `Veraltet` (409), wenn eine Spalte aus `erwartet` inzwischen einen anderen Wert
+/// trägt (Feld-CAS, LLH-1945); jede Ablehnung schreibt nichts, auch keinen Status.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     patch: FahrzeugPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<(), AppError> {
     // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
@@ -493,6 +495,8 @@ pub async fn update_tx(
             return Err(stamm_angaben_error());
         }
     }
+    // Feld-CAS (LLH-1945): nach 404, 409 (beendet) und 422 (Stamm-Fahrzeug), vor dem Schreiben.
+    crate::feld_cas::check_zeile_tx(conn, "einsatz_fahrzeug", einsatz_id, ef_id, erwartet).await?;
     // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
     // still (Muster LLH-1067). Die `snap_*`-Spalten schreibt das UPDATE nur ohne Stammbezug, auch
     // wenn eine Route die Prüfung oben vergäße.
@@ -546,7 +550,14 @@ pub async fn update(
     patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(&mut conn, einsatz_id, ef_id, patch).await
+    update_tx(
+        &mut conn,
+        einsatz_id,
+        ef_id,
+        patch,
+        &crate::feld_cas::ExpectedValues::new(),
+    )
+    .await
 }
 
 /// Geo-/Symbol-Felder einer Disposition. `Some(None)` = NULL, `None` = unverändert.
@@ -567,32 +578,41 @@ pub async fn update_position(
     ef_id: i64,
     daten: PositionPatch<'_>,
     einsatz_aktiv: bool,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<EinsatzFahrzeugAnzeige, AppError> {
     // Ein beendetes Fahrzeug steht auf keiner Karte mehr (409, LLH-1079).
     require_aktiv_tx(&mut *pool.acquire().await?, einsatz_id, ef_id).await?;
-    let betroffen = sqlx::query(
+    // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
+    let sql = format!(
         "UPDATE einsatz_fahrzeug SET \
-            lat = CASE WHEN ? THEN ? ELSE lat END, \
-            lon = CASE WHEN ? THEN ? ELSE lon END, \
-            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.lat.is_some())
-    .bind(daten.lat.flatten())
-    .bind(daten.lon.is_some())
-    .bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some())
-    .bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some())
-    .bind(daten.tz_organisation.flatten())
-    .bind(ef_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+            lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
+            lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+         WHERE id = ?9 AND einsatz_id = ?10{}",
+        erwartet.sql_suffix(11)
+    );
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.lat.is_some())
+        .bind(daten.lat.flatten())
+        .bind(daten.lon.is_some())
+        .bind(daten.lon.flatten())
+        .bind(daten.tz_fachaufgabe.is_some())
+        .bind(daten.tz_fachaufgabe.flatten())
+        .bind(daten.tz_organisation.is_some())
+        .bind(daten.tz_organisation.flatten())
+        .bind(ef_id)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        return Err(crate::feld_cas::ohne_treffer(
+            pool,
+            "einsatz_fahrzeug",
+            einsatz_id,
+            ef_id,
+            erwartet,
+        )
+        .await);
     }
     let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE ef.id = ? AND ef.einsatz_id = ?"
@@ -1130,19 +1150,23 @@ pub async fn zuruecknehmen_tx(
 
     let mut ergebnis = Ruecknahme::default();
     if let Some(einheit_id) = vorzustand.einheit_id {
+        // Spurlos aufgelöst heißt gelöscht (`einheit::repo::aufloesen_tx`), und die ID kann an
+        // eine danach gebildete Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT). Eine
+        // Einheit, die jünger ist als das Entlassen, war nie der Ort davor (LLH-1949).
         let einheit: Option<(String, Option<String>)> = sqlx::query_as(
-            "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+            "SELECT name, aufgeloest_at FROM einsatz_einheit \
+             WHERE id = ? AND einsatz_id = ? AND angelegt_at <= ?",
         )
         .bind(einheit_id)
         .bind(einsatz_id)
+        .bind(&vorzustand.entlassen_at)
         .fetch_optional(&mut *conn)
         .await?;
         match einheit {
-            // Spurlos aufgelöst und darum gelöscht (`einheit::repo::aufloesen_tx`): den Namen
-            // kennt niemand mehr, die Lücke steht trotzdem in der Antwort.
+            // Den Namen kennt niemand mehr, die Lücke steht trotzdem in der Antwort.
             None => ergebnis
                 .ausgelassen
-                .push(ausgelassen("Einheit", "inzwischen aufgelöst")),
+                .push(ausgelassen("Einheit", "nicht mehr vorhanden")),
             // Ohne Recht kein Name aus dem fremden Modul, nur die allgemeine Bezeichnung
             // (LLH-1951, wie bei der Person in `personal::ruecknahme`).
             Some(_) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
@@ -1384,6 +1408,7 @@ mod tests {
                 tz_organisation: Some(Some("feuerwehr")),
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1398,6 +1423,7 @@ mod tests {
                 tz_organisation: None,
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1794,9 +1820,16 @@ mod tests {
             AppError::Conflict(_)
         ));
         assert!(matches!(
-            update_position(&pool, einsatz, ef, PositionPatch::default(), true)
-                .await
-                .unwrap_err(),
+            update_position(
+                &pool,
+                einsatz,
+                ef,
+                PositionPatch::default(),
+                true,
+                &Default::default()
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -2819,8 +2852,68 @@ mod tests {
             r.ausgelassen,
             [crate::fahrzeug::RuecknahmeAusgelassen {
                 bezeichnung: "Einheit".into(),
-                grund: "inzwischen aufgelöst".into(),
+                grund: "nicht mehr vorhanden".into(),
             }]
         );
+    }
+
+    /// LLH-1949: eine spurlos aufgelöste Einheit ist gelöscht, ihre ID kann an eine danach
+    /// gebildete Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT). Das Fahrzeug kommt dann
+    /// ohne Einheit zurück, und `ausgelassen` nennt keinen fremden Namen.
+    #[tokio::test]
+    async fn ruecknahme_nimmt_keine_neue_einheit_mit_der_alten_id() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        assert_eq!(v.einheit_id, Some(einheit));
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (id, einsatz_id, name, angelegt_at) \
+             VALUES (?, ?, 'Trupp B', '2099-01-01 00:01:00')",
+        )
+        .bind(einheit)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let r = nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        assert_eq!(r.einheit_id, None);
+        assert_eq!(
+            r.ausgelassen,
+            [crate::fahrzeug::RuecknahmeAusgelassen {
+                bezeichnung: "Einheit".into(),
+                grund: "nicht mehr vorhanden".into(),
+            }]
+        );
+        let (einheit_jetzt, beendet): (Option<i64>, Option<String>) =
+            sqlx::query_as("SELECT einheit_id, beendet_at FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((einheit_jetzt, beendet), (None, None));
     }
 }

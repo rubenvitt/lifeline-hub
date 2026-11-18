@@ -579,3 +579,244 @@ async fn altfelder_kommunikationsmittel_und_erreichbarkeit_sind_400() {
         assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
     }
 }
+
+// ---------- LLH-1945: Feld-CAS an den Einzelangaben des Abschnitts ----------
+
+async fn patch_abschnitt(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    aid: i64,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/abschnitte/{aid}"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await
+}
+
+/// Der Name mit Altwert (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf
+/// zwischenzeitliche Änderung“): stimmt der Altwert, wird geschrieben; hat ein anderer den Namen
+/// inzwischen geändert, ist es 409 `veraltet` und nichts wird überschrieben; ohne `erwartet` wie
+/// bisher ohne Vergleich.
+#[tokio::test]
+async fn name_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
+    use serde_json::json;
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = abschnitt_anlegen(&app, &admin, einsatz, "Nord", &[]).await;
+
+    let (s, j) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        json!({"name":"Süd","erwartet":{"name":"Nord"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["name"], "Süd");
+
+    let (s, j) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        json!({"name":"Ost","erwartet":{"name":"Nord"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(eintrag(&liste, aid)["name"], "Süd", "nichts überschrieben");
+
+    let (s, j) = patch_abschnitt(&app, &admin, einsatz, aid, json!({"name":"Ost"})).await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["name"], "Ost");
+}
+
+/// Kurzbezeichnung, Bemerkung, Auftrag, Rufname, Leitung und übergeordneter Abschnitt tragen
+/// je ihren Altwert; ein leerer Altwert (`null`) trifft eine leere Angabe, ein überholter ist 409.
+#[tokio::test]
+async fn einzelangaben_pruefen_ihren_altwert() {
+    use serde_json::json;
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let leiter = stammpersonal_disponieren(&app, &admin, einsatz, "Leiter Nord").await;
+    let oben = abschnitt_anlegen(&app, &admin, einsatz, "Oben", &[]).await;
+    let aid = abschnitt_anlegen(&app, &admin, einsatz, "Nord", &[]).await;
+
+    for (feld, alt, neu) in [
+        ("kurzbezeichnung", json!(null), json!("EA-N")),
+        ("bemerkung", json!(null), json!("Zufahrt Ost")),
+        ("abschnittsauftrag", json!(null), json!("Sichern")),
+        ("rufname", json!(null), json!("Florian Nord")),
+        ("leiter_id", json!(null), json!(leiter)),
+        ("ueber_abschnitt_id", json!(null), json!(oben)),
+    ] {
+        let (s, j) = patch_abschnitt(
+            &app,
+            &admin,
+            einsatz,
+            aid,
+            json!({ feld: neu, "erwartet": { feld: alt } }),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{feld}: {j:?}");
+        // Derselbe leere Altwert ist jetzt überholt.
+        let (s, j) = patch_abschnitt(
+            &app,
+            &admin,
+            einsatz,
+            aid,
+            json!({ feld: null, "erwartet": { feld: alt } }),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{feld}: {j:?}");
+        assert_eq!(j["grund"], "veraltet", "{feld}: {j:?}");
+        // Mit dem gespeicherten Wert als Altwert geht es.
+        let (s, j) = patch_abschnitt(
+            &app,
+            &admin,
+            einsatz,
+            aid,
+            json!({ feld: null, "erwartet": { feld: neu } }),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{feld}: {j:?}");
+    }
+}
+
+/// Die Verbindungen gelten als Ganzes: eine inzwischen geänderte Liste ist 409 und bleibt
+/// stehen; die gespeicherte Liste (Hinweis ohne Angabe als `null`) trifft.
+#[tokio::test]
+async fn verbindungen_als_ganzes_mit_altwert() {
+    use serde_json::json;
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = abschnitt_anlegen(&app, &admin, einsatz, "Nord", &[]).await;
+    let a = json!([{"mittel":"mobil","wert":"0151 1"}]);
+    let b = json!([{"mittel":"mobil","wert":"0151 2"}]);
+
+    let (s, j) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        json!({"verbindungen": a, "erwartet": {"verbindungen": []}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+
+    let (s, j) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        json!({"verbindungen": b, "erwartet": {"verbindungen": []}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(eintrag(&liste, aid)["verbindungen"][0]["wert"], "0151 1");
+
+    let (s, j) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        json!({"verbindungen": b,
+               "erwartet": {"verbindungen": [{"mittel":"mobil","wert":" 0151 1 ","hinweis":null}]}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["verbindungen"][0]["wert"], "0151 2");
+}
+
+/// Eine Änderung an einer ANDEREN Angabe desselben Abschnitts dazwischen löst keinen Konflikt
+/// aus.
+#[tokio::test]
+async fn andere_angabe_dazwischen_ohne_409() {
+    use serde_json::json;
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = abschnitt_anlegen(&app, &admin, einsatz, "Nord", &[]).await;
+    let (s, _) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        json!({"bemerkung":"neu","verbindungen":[{"mittel":"mobil","wert":"1"}],
+               "lagezustand":"kritisch"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, j) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        json!({"name":"Süd","erwartet":{"name":"Nord"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["name"], "Süd");
+}
+
+/// Ein Altwert ohne Änderung derselben Angabe ist eine Feldkombination: 422; ein unbekannter
+/// Abschnitt bleibt 404, auch mit Altwert.
+#[tokio::test]
+async fn altwert_ohne_aenderung_ist_422_und_unbekannt_bleibt_404() {
+    use serde_json::json;
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = abschnitt_anlegen(&app, &admin, einsatz, "Nord", &[]).await;
+    for erwartet in [
+        json!({"name":"Nord"}),
+        json!({"verbindungen":[]}),
+        json!({"rufname":null}),
+    ] {
+        let (s, j) = patch_abschnitt(
+            &app,
+            &admin,
+            einsatz,
+            aid,
+            json!({"bemerkung":"x","erwartet": erwartet}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+    }
+    let (s, _) = patch_abschnitt(
+        &app,
+        &admin,
+        einsatz,
+        aid + 999,
+        json!({"name":"Süd","erwartet":{"name":"Nord"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}

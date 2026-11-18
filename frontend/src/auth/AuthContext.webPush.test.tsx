@@ -36,7 +36,9 @@ describe('AuthContext: Web Push nach einer neuen Sitzung (LLH-1223)', () => {
       </AuthProvider>,
     );
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Admin'));
-    await waitFor(() => expect(push.pushAbgleichen).toHaveBeenCalledWith(admin.id));
+    await waitFor(() =>
+      expect(push.pushAbgleichen).toHaveBeenCalledWith(admin.id, { nurBeiBedarf: true }),
+    );
     const beimStart = push.pushAbgleichen.mock.calls.length;
 
     await userEvent.click(screen.getByText('logout'));

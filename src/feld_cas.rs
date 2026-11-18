@@ -15,7 +15,7 @@
 
 use sqlx::query::Query;
 use sqlx::sqlite::SqliteArguments;
-use sqlx::Sqlite;
+use sqlx::{Sqlite, SqliteConnection};
 
 use crate::error::AppError;
 
@@ -90,6 +90,63 @@ impl<'a> ExpectedValues<'a> {
             };
         }
         q
+    }
+}
+
+/// Prüft die Altwerte einer Zeile des Einsatzes IN der Schreibtransaktion, bevor geschrieben wird
+/// (LLH-1945, Dispositionen von Personal, Fahrzeug und Material): für Schreibwege, die mehr als ein
+/// UPDATE ausführen (Material setzt den Ort getrennt) oder vorher Zusammenhänge prüfen. Der
+/// Aufrufer hat die Zeile schon gefunden und ihren Lebenszyklus geprüft (404/409 kommen vorher);
+/// trägt eine erwartete Spalte inzwischen einen anderen Wert, ist der Altwert überholt
+/// (`Veraltet`, 409). `tabelle` kommt nur aus dem Code. Ohne Altwert kein Vergleich.
+pub async fn check_zeile_tx(
+    conn: &mut SqliteConnection,
+    tabelle: &'static str,
+    einsatz_id: i64,
+    id: i64,
+    erwartet: &ExpectedValues<'_>,
+) -> Result<(), AppError> {
+    if erwartet.is_empty() {
+        return Ok(());
+    }
+    let sql = format!(
+        "SELECT 1 FROM {tabelle} WHERE id = ?1 AND einsatz_id = ?2{}",
+        erwartet.sql_suffix(3)
+    );
+    let q = erwartet.bind_all(
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .bind(id)
+            .bind(einsatz_id),
+    );
+    match q.fetch_optional(&mut *conn).await? {
+        Some(_) => Ok(()),
+        None => Err(AppError::Veraltet),
+    }
+}
+
+/// Ein UPDATE mit Altwerten hat keine Zeile getroffen (LLH-1945, Lagewege): gibt es die Zeile
+/// im Einsatz, war ein Altwert überholt (`Veraltet`, 409), sonst ist sie fremd oder fort (404).
+/// Ohne Altwert bleibt es beim 404. `tabelle` kommt nur aus dem Code.
+pub async fn ohne_treffer(
+    pool: &sqlx::SqlitePool,
+    tabelle: &'static str,
+    einsatz_id: i64,
+    id: i64,
+    erwartet: &ExpectedValues<'_>,
+) -> AppError {
+    if erwartet.is_empty() {
+        return AppError::NotFound;
+    }
+    let sql = format!("SELECT 1 FROM {tabelle} WHERE id = ?1 AND einsatz_id = ?2");
+    let gefunden: Result<Option<i64>, _> = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await;
+    match gefunden {
+        Ok(Some(_)) => AppError::Veraltet,
+        Ok(None) => AppError::NotFound,
+        Err(e) => e.into(),
     }
 }
 

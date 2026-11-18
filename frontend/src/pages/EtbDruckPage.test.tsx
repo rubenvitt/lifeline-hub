@@ -365,11 +365,81 @@ describe('EtbDruckPage', () => {
     expect(nummern()).toEqual([1]);
   });
 
+  it('trägt über den Spaltenköpfen eine Laufzeile mit Einsatz und Stand, die sich je Seite wiederholt (LLH-1837)', async () => {
+    tagebuch([eintrag(1), eintrag(2), eintrag(3)]);
+    rendere('?system=an');
+    await fertig();
+    const kopfzeilen = document.querySelectorAll<HTMLElement>(
+      '[data-lfh="etb-druck-tabelle"] thead tr',
+    );
+    // Die Laufzeile gehört zum wiederholten Tabellenkopf, vor den Spaltenköpfen.
+    expect(kopfzeilen).toHaveLength(2);
+    const lauf = kopfzeilen[0].querySelector<HTMLElement>('[data-lfh="etb-druck-laufzeile"]');
+    expect(lauf).not.toBeNull();
+    expect(lauf!.textContent).toMatch(
+      /^Einsatztagebuch · Hochwasser Nord \(E-2026-0007\) · Stand \S+ · bis Nr\. 3$/,
+    );
+    // Über alle Spalten, damit sie keine Spaltenbreite bestimmt.
+    expect(lauf!.closest('th')).toHaveAttribute('colspan', '6');
+    // Derselbe Stand wie im Druckkopf.
+    const stand = within(document.querySelector<HTMLElement>('[data-lfh="druckkopf"]')!).getByText(
+      /bis Nr\. 3$/,
+    );
+    expect(lauf!.textContent).toContain(`Stand ${stand.textContent}`);
+  });
+
+  it('verdichtet Systemeinträge zu einer Zeile an ihrer Nummer, ohne Lücke in der Folge (LLH-1837)', async () => {
+    tagebuch([
+      eintrag(86, { inhalt: 'Lage stabil', von: 'Florian 1' }),
+      eintrag(87, { typ: 'system', inhalt: 'Einheit „RTW 1“ alarmiert', erfasser_name: 'Erika' }),
+      eintrag(88, { typ: 'system', inhalt: 'Dokument abgelegt', erfasser_name: 'Erika' }),
+      eintrag(89, { typ: 'anordnung', inhalt: 'Erkunden', an: 'ELW' }),
+    ]);
+    rendere('?system=an');
+    await fertig();
+    expect(nummern()).toEqual([86, 87, 88, 89]);
+    for (const nr of [87, 88]) {
+      const zeile = zeileNr(nr);
+      expect(zeile).toHaveAttribute('data-lfh', 'etb-druck-system');
+      const zellen = zeile.querySelectorAll('td');
+      // Nr., Zeit und eine Zelle über Typ, Von/An, Inhalt und Erfasser.
+      expect(zellen).toHaveLength(3);
+      expect(zellen[2]).toHaveAttribute('colspan', '4');
+      expect(zellen[2].textContent).toMatch(/^System · .+ · Erika$/);
+      expect(within(zeile).getByText('251500sep26')).toBeInTheDocument();
+    }
+    expect(within(zeileNr(87)).getByText(/Einheit „RTW 1“ alarmiert/)).toBeInTheDocument();
+    // Gewöhnliche Einträge bleiben in voller Form.
+    for (const nr of [86, 89]) {
+      expect(zeileNr(nr)).not.toHaveAttribute('data-lfh', 'etb-druck-system');
+      expect(zeileNr(nr).querySelectorAll('td')).toHaveLength(6);
+    }
+  });
+
+  it('behält an einem verdichteten Systemeintrag Nachtrag und Berichtigung (LLH-1837)', async () => {
+    tagebuch([
+      eintrag(5, {
+        typ: 'system',
+        inhalt: 'Status geändert',
+        ereigniszeit: '2026-09-25 07:15:00',
+        received_at: '2026-09-25 08:40:00',
+      }),
+      eintrag(6, { typ: 'berichtigung', berichtigt_eintrag_id: 50, inhalt: 'Korrektur' }),
+    ]);
+    rendere('?system=an');
+    await fertig();
+    const zeile = within(zeileNr(5));
+    expect(zeile.getByText('nachgetragen um 1740')).toBeInTheDocument();
+    expect(zeile.getByText('berichtigt durch Nr. 6')).toBeInTheDocument();
+  });
+
   it('bleibt bei leerer Auswahl druckbar und sagt es', async () => {
     tagebuch([]);
     rendere('?q=nichts');
     await fertig();
     expect(screen.getByText('Keine Einträge in dieser Auswahl')).toBeInTheDocument();
+    // Ohne Tabelle keine Laufzeile; Einsatz und Stand nennt der Druckkopf.
+    expect(document.querySelector('[data-lfh="etb-druck-laufzeile"]')).toBeNull();
   });
 
   it('zeigt ohne Lesezugriff keine Einträge und bietet kein Drucken an', async () => {

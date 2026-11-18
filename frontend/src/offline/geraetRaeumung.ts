@@ -247,6 +247,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Nur „diese Person hat hier Push gewählt“ (LLH-1223) und ob mit Absender und Wortlaut (LLH-1369), damit ihre nächste Sitzung das Abo samt Wahl wieder anmeldet; kein Inhalt. Das Abo selbst liegt am Server und fällt mit der Sitzung.',
   },
   {
+    ort: 'localStorage lfh:web-push-endpunkt',
+    datei: 'alarm/webPush.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'SHA-256 des zuletzt angemeldeten Push-Endpunkts dieses Browsers (LLH-1839): der Seitenstart erkennt daran ein rotiertes Abo. Kein Endpunkt, kein Personenbezug; ausschalten entfernt ihn.',
+  },
+  {
     ort: 'localStorage lfh:lagekarte:zeitachse-eingeklappt',
     datei: 'pages/lagekarte/SnapshotLeiste.tsx',
     entscheidung: 'bleibt',

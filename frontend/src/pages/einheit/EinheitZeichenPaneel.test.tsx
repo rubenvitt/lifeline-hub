@@ -53,7 +53,7 @@ describe('EinheitZeichenPaneel', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Organisation speichern' }));
     await waitFor(() => expect(onPatchZeichen).toHaveBeenCalledTimes(1));
-    expect(onPatchZeichen).toHaveBeenCalledWith('Organisation', { tz_organisation: 'thw' });
+    expect(onPatchZeichen).toHaveBeenCalledWith('Organisation', { tz_organisation: 'thw' }, null);
   });
 
   it('Fachaufgabe: genau `tz_fachaufgabe`', async () => {
@@ -64,7 +64,11 @@ describe('EinheitZeichenPaneel', () => {
     await user.click(await screen.findByTitle('Betreuung'));
     await user.click(screen.getByRole('button', { name: 'Fachaufgabe speichern' }));
     await waitFor(() =>
-      expect(onPatchZeichen).toHaveBeenCalledWith('Fachaufgabe', { tz_fachaufgabe: 'betreuung' }),
+      expect(onPatchZeichen).toHaveBeenCalledWith(
+        'Fachaufgabe',
+        { tz_fachaufgabe: 'betreuung' },
+        null,
+      ),
     );
   });
 
@@ -76,7 +80,11 @@ describe('EinheitZeichenPaneel', () => {
     await user.click(feld.querySelector('.ant-select-clear')!);
     await user.click(screen.getByRole('button', { name: 'Fachaufgabe speichern' }));
     await waitFor(() =>
-      expect(onPatchZeichen).toHaveBeenCalledWith('Fachaufgabe', { tz_fachaufgabe: null }),
+      expect(onPatchZeichen).toHaveBeenCalledWith(
+        'Fachaufgabe',
+        { tz_fachaufgabe: null },
+        'betreuung',
+      ),
     );
   });
 

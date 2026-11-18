@@ -222,7 +222,8 @@ pub async fn create_tx(
 /// Aktualisiert BR-Stammfelder und Koordinate (NICHT Status) in der offenen Schreibtransaktion
 /// des Aufrufers (`write_retry!`). `Some(None)` setzt ein Feld explizit auf NULL (z. B. Standort
 /// löschen); `None` lässt unverändert. Fremd oder unbekannt → `NotFound`, storniert → `Conflict`
-/// (409), ein Abschnitt eines anderen Einsatzes → `NotFound` (404, LFH-735).
+/// (409), ebenso ein aufgelöster (LLH-1948), ein Abschnitt eines anderen Einsatzes → `NotFound`
+/// (404, LFH-735).
 ///
 /// Koordinate (LLH-1107, design.md D1): das wirksame Paar entsteht aus Eingabe und Rohstand
 /// DIESER Transaktion und wird vor dem UPDATE geprüft (halbes Paar oder Bereich → 422); so
@@ -241,6 +242,13 @@ pub async fn update_tx(
     if roh.storniert_at.is_some() {
         return Err(AppError::Conflict(
             "Stornierter BR kann nicht geändert werden".into(),
+        ));
+    }
+    // Lebenszyklus wie storniert (LLH-1948, Spec `bereitstellungsraum-bearbeitung`), auch für
+    // das Überschreiben ohne Basisstand und die reine Verortung.
+    if roh.status == super::BrStatus::Aufgeloest {
+        return Err(AppError::Conflict(
+            "Aufgelöster BR kann nicht geändert werden".into(),
         ));
     }
     let lat = daten.lat.unwrap_or(roh.lat);

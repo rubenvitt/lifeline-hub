@@ -350,22 +350,50 @@ async fn check_kurzbezeichnung_frei(
     }
 }
 
-/// Teil-Patch der editierbaren Felder (Parent-Wechsel zyklenfrei); `NotFound`, falls der
-/// Abschnitt nicht zum Einsatz gehört.
+/// Prüft einen Teil-Patch vor der Schreibtransaktion: Existenz im Einsatz (auch für die
+/// Zyklenprüfung) und die gesendeten Bezugsfelder. `NotFound`, falls der Abschnitt nicht zum
+/// Einsatz gehört.
+pub async fn check_patch(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    patch: &AbschnittPatch<'_>,
+) -> Result<(), AppError> {
+    load(pool, einsatz_id, id).await?;
+    validate_patch(pool, einsatz_id, id, patch).await
+}
+
+/// Der gespeicherte Name IN der übergebenen Transaktion (für die Meldung eines echten
+/// Namenswechsels, LLH-1291). `NotFound`, falls der Abschnitt nicht zum Einsatz gehört.
+pub async fn name_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<String, AppError> {
+    sqlx::query_scalar("SELECT name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// Teil-Patch der editierbaren Felder IN der übergebenen Transaktion (Prüfung vorher über
+/// [`check_patch`]). Feld-CAS (LLH-1945, `crate::feld_cas`): je Altwert hängt das UPDATE
+/// `AND <spalte> IS ?` an; trifft es keine Zeile, obwohl der Abschnitt besteht, ist der Altwert
+/// überholt (`Veraltet`, 409), sonst `NotFound`.
 ///
 /// Flag/Wert-Paare mit nummerierten Parametern: nur gesendete Spalten werden angefasst, und eine
 /// verschobene Bind-Kette kann gleichtypige Nachbarn (`bemerkung`↔`rufname`) nicht still
 /// vertauschen.
-pub async fn update(
-    pool: &SqlitePool,
+pub async fn update_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
-    patch: AbschnittPatch<'_>,
-) -> Result<EinsatzabschnittAnzeige, AppError> {
-    // Existenz im Einsatz sichern (auch für die Zyklenprüfung).
-    load(pool, einsatz_id, id).await?;
-    validate_patch(pool, einsatz_id, id, &patch).await?;
-    let resultat = sqlx::query(
+    patch: &AbschnittPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
+) -> Result<(), AppError> {
+    let mut sql = String::from(
         "UPDATE einsatzabschnitt SET \
             ueber_abschnitt_id = CASE WHEN ?1 IS NULL THEN ueber_abschnitt_id ELSE ?2 END, \
             name = CASE WHEN ?3 IS NULL THEN name ELSE ?4 END, \
@@ -376,31 +404,45 @@ pub async fn update(
             kurzbezeichnung = CASE WHEN ?13 IS NULL THEN kurzbezeichnung ELSE ?14 END, \
             abschnittsauftrag = CASE WHEN ?15 IS NULL THEN abschnittsauftrag ELSE ?16 END \
          WHERE id = ?17 AND einsatz_id = ?18",
-    )
-    .bind(patch.ueber_abschnitt_id.map(|_| 1_i64))
-    .bind(patch.ueber_abschnitt_id.and_then(|v| v))
-    .bind(patch.name.map(|_| 1_i64))
-    .bind(patch.name)
-    .bind(patch.leiter_id.map(|_| 1_i64))
-    .bind(patch.leiter_id.and_then(|v| v))
-    .bind(patch.bemerkung.map(|_| 1_i64))
-    .bind(patch.bemerkung.and_then(|v| v))
-    .bind(patch.rufname.map(|_| 1_i64))
-    .bind(patch.rufname.and_then(|v| v))
-    .bind(patch.sortier.map(|_| 1_i64))
-    .bind(patch.sortier)
-    .bind(patch.kurzbezeichnung.map(|_| 1_i64))
-    .bind(patch.kurzbezeichnung.and_then(|v| v))
-    .bind(patch.abschnittsauftrag.map(|_| 1_i64))
-    .bind(patch.abschnittsauftrag.and_then(|v| v))
-    .bind(id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?;
-    if resultat.rows_affected() == 0 {
+    );
+    sql.push_str(&erwartet.sql_suffix(19));
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(patch.ueber_abschnitt_id.map(|_| 1_i64))
+        .bind(patch.ueber_abschnitt_id.and_then(|v| v))
+        .bind(patch.name.map(|_| 1_i64))
+        .bind(patch.name)
+        .bind(patch.leiter_id.map(|_| 1_i64))
+        .bind(patch.leiter_id.and_then(|v| v))
+        .bind(patch.bemerkung.map(|_| 1_i64))
+        .bind(patch.bemerkung.and_then(|v| v))
+        .bind(patch.rufname.map(|_| 1_i64))
+        .bind(patch.rufname.and_then(|v| v))
+        .bind(patch.sortier.map(|_| 1_i64))
+        .bind(patch.sortier)
+        .bind(patch.kurzbezeichnung.map(|_| 1_i64))
+        .bind(patch.kurzbezeichnung.and_then(|v| v))
+        .bind(patch.abschnittsauftrag.map(|_| 1_i64))
+        .bind(patch.abschnittsauftrag.and_then(|v| v))
+        .bind(id)
+        .bind(einsatz_id);
+    let getroffen = erwartet
+        .bind_all(q)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+    if getroffen == 0 {
+        let existiert: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        if existiert.is_some() && !erwartet.is_empty() {
+            return Err(AppError::Veraltet);
+        }
         return Err(AppError::NotFound);
     }
-    load(pool, einsatz_id, id).await
+    Ok(())
 }
 
 /// Ein tatsächlicher Wechsel des Lagezustands: vorheriger Wert und Abschnittsname (für den
@@ -456,27 +498,36 @@ pub async fn update_flaeche(
     einsatz_id: i64,
     aid: i64,
     daten: FlaechePatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
-    let betroffen = sqlx::query(
+    // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
+    let sql = format!(
         "UPDATE einsatzabschnitt SET \
-            flaeche_geojson = CASE WHEN ? THEN ? ELSE flaeche_geojson END, \
-            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.flaeche_geojson.is_some())
-    .bind(daten.flaeche_geojson.flatten())
-    .bind(daten.tz_fachaufgabe.is_some())
-    .bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some())
-    .bind(daten.tz_organisation.flatten())
-    .bind(aid)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+            flaeche_geojson = CASE WHEN ?1 THEN ?2 ELSE flaeche_geojson END, \
+            tz_fachaufgabe  = CASE WHEN ?3 THEN ?4 ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ?5 THEN ?6 ELSE tz_organisation END \
+         WHERE id = ?7 AND einsatz_id = ?8{}",
+        erwartet.sql_suffix(9)
+    );
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.flaeche_geojson.is_some())
+        .bind(daten.flaeche_geojson.flatten())
+        .bind(daten.tz_fachaufgabe.is_some())
+        .bind(daten.tz_fachaufgabe.flatten())
+        .bind(daten.tz_organisation.is_some())
+        .bind(daten.tz_organisation.flatten())
+        .bind(aid)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        return Err(crate::feld_cas::ohne_treffer(
+            pool,
+            "einsatzabschnitt",
+            einsatz_id,
+            aid,
+            erwartet,
+        )
+        .await);
     }
     load(pool, einsatz_id, aid).await
 }
@@ -678,6 +729,29 @@ pub async fn aufloesen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<()
 mod tests {
     use super::*;
 
+    /// Teil-Patch ohne Altwert mit Prüfung, Schreiben und frischer Anzeige (der Weg der Route vor
+    /// LLH-1945, für die Tests hier).
+    async fn update(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        id: i64,
+        patch: AbschnittPatch<'_>,
+    ) -> Result<EinsatzabschnittAnzeige, AppError> {
+        check_patch(pool, einsatz_id, id, &patch).await?;
+        let mut conn = pool.acquire().await?;
+        update_tx(
+            &mut conn,
+            einsatz_id,
+            id,
+            &patch,
+            &crate::feld_cas::ExpectedValues::new(),
+        )
+        .await?;
+        // Der Test-Pool hat eine Verbindung: erst zurückgeben, dann lesen.
+        drop(conn);
+        load(pool, einsatz_id, id).await
+    }
+
     /// Org(1) + Einsatz; liefert einsatz_id.
     async fn setup(pool: &SqlitePool) -> i64 {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -738,6 +812,7 @@ mod tests {
                 tz_fachaufgabe: Some(Some("fuehrung")),
                 tz_organisation: None,
             },
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -751,6 +826,7 @@ mod tests {
                 tz_fachaufgabe: None,
                 tz_organisation: None,
             },
+            &Default::default(),
         )
         .await
         .unwrap();

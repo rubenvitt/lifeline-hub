@@ -1920,6 +1920,238 @@ async fn einheit_und_uhs_tragen_die_einsatzfunktion() {
     assert_eq!(json["kraefte"][0]["funktion"], "Sanitäter", "{json}");
 }
 
+// ---------- Feld-CAS an der Disposition (LLH-1945) ----------
+
+async fn personal_patch(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ep: i64,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage_json(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        cookie,
+        Some(&body),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn bemerkung_mit_ueberholtem_altwert_ist_409_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"bemerkung": "Tor 3"}),
+    )
+    .await;
+    personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"bemerkung": "Tor 5"}),
+    )
+    .await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, j) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({
+            "bemerkung": "Halle 2",
+            "einsatzfunktion": "Melder",
+            "erwartet": {"bemerkung": "Tor 3"}
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+    // Nichts geschrieben, auch nicht die zweite Angabe derselben Anfrage, kein ETB.
+    let (_, a) = personal_patch(&app, &admin, einsatz, ep, serde_json::json!({})).await;
+    assert_eq!(a["bemerkung"], "Tor 5");
+    assert!(a["einsatzfunktion"].is_null(), "{a:?}");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+    // Mit dem aktuellen Altwert geht es.
+    let (s, j) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"bemerkung": "Halle 2", "erwartet": {"bemerkung": " Tor 5 "}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["bemerkung"], "Halle 2");
+}
+
+#[tokio::test]
+async fn andere_angabe_der_kraft_dazwischen_speichert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    // Die Liste öffnet die Einsatzfunktion leer, ein anderer Arbeitsplatz setzt die Bemerkung.
+    personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"bemerkung": "Tor 3"}),
+    )
+    .await;
+    let (s, j) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"einsatzfunktion": "Melder", "erwartet": {"einsatzfunktion": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["einsatzfunktion"], "Melder");
+    assert_eq!(j["bemerkung"], "Tor 3");
+}
+
+#[tokio::test]
+async fn altwert_ohne_aenderung_der_angabe_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    let (s, j) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"bemerkung": "Tor 3", "erwartet": {"einsatzfunktion": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+    // Eine unbekannte Kraft bleibt 404, auch mit Altwert.
+    let (s, _) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        424242,
+        serde_json::json!({"bemerkung": "x", "erwartet": {"bemerkung": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn position_vergleicht_den_wirksamen_wert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, p) = anfrage(
+        &app,
+        "POST",
+        "/api/personal",
+        &admin,
+        Some(r#"{"name":"Thomas","staerke_position":"mannschaft"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p:?}");
+    let person = p["id"].as_i64().unwrap();
+    let (_, d) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&format!(r#"{{"personal_id":{person}}}"#)),
+    )
+    .await;
+    let ep = d["id"].as_i64().unwrap();
+    // Ohne Override zeigt die Liste die Position des Stamms: das ist der Wert beim Öffnen.
+    let (s, j) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"staerke_position": "fuehrer", "erwartet": {"staerke_position": "mannschaft"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["staerke_position"], "fuehrer");
+    // Ein anderer hat inzwischen auf Unterführer gestellt: der Altwert „Führer“ ist überholt.
+    personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"staerke_position": "unterfuehrer"}),
+    )
+    .await;
+    let (s, j) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"staerke_position": null, "erwartet": {"staerke_position": "fuehrer"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+}
+
+#[tokio::test]
+async fn adhoc_angaben_pruefen_ihren_altwert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
+    personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({"name": "Anna B."}),
+    )
+    .await;
+    for (feld, wert, alt) in [
+        ("name", "Anna C.", "Anna"),
+        ("funktion", "Notarzt", "Sanitäter"),
+        ("traegerorganisation", "THW", "DRK"),
+    ] {
+        let (s, j) = personal_patch(
+            &app,
+            &admin,
+            einsatz,
+            ep,
+            serde_json::json!({feld: wert, "erwartet": {feld: alt}}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{feld}: {j:?}");
+    }
+    let (s, j) = personal_patch(
+        &app,
+        &admin,
+        einsatz,
+        ep,
+        serde_json::json!({
+            "name": "Anna C.",
+            "funktion": "Notarzt",
+            "traegerorganisation": "THW",
+            "erwartet": {"name": "Anna B.", "funktion": null, "traegerorganisation": null}
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["name"], "Anna C.");
+}
+
 /// LLH-1952: Jeder ETB-Eintrag des Personalmoduls geht als Ereignis `etb` hinaus. `personal`
 /// frischt das Einsatztagebuch nicht auf; ohne das eigene Ereignis sähe ein zweiter Schirm den
 /// Eintrag erst nach dem Neuladen.

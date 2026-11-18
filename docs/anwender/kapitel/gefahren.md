@@ -2,7 +2,7 @@
 titel: Gefahren
 gruppen: [fuehrung]
 reihenfolge: 430
-quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/gefahren/GefahrenMatrixAuszug.tsx, frontend/src/pages/gefahren/gefahrenPrint.css, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/gefahren/GefahrenMatrixAuszug.tsx, frontend/src/pages/gefahren/gefahrenPrint.css, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/components/useFeldKonflikt.tsx]
 ---
 
 ## Überblick
@@ -82,6 +82,9 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 2. „Umbenennen“ wählen.
 3. Unter „Bezeichnung“ den neuen Namen eingeben und „Speichern“ wählen. Ohne Namen speichert die
    App nichts.
+4. Hat jemand anderes die Bezeichnung seit dem Öffnen geändert, fragt die App „Zwischenzeitlich
+   geändert“ und nennt die neue. „Meine Änderung übernehmen“ speichert die eigene Eingabe,
+   „Verwerfen und neu laden“ übernimmt den neuen Stand; Escape lässt die Eingabe offen.
 
 ## Hintergrund
 

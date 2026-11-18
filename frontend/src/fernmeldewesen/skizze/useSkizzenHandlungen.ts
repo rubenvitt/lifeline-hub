@@ -14,11 +14,12 @@ import type {
   Verbindungsstatus,
 } from '../../api/fernmeldeskizzeVertrag';
 import type { Fernmeldenetz, NetzBereich, NetzVerbindung } from '../fernmeldeskizze';
-import type {
-  BereichsFelder,
-  ExterneStellenart,
-  SkizzenAktionen,
-  VerbindungsFelder,
+import {
+  HandlungVerfallen,
+  type BereichsFelder,
+  type ExterneStellenart,
+  type SkizzenAktionen,
+  type VerbindungsFelder,
 } from '../skizzenAktionen';
 import {
   Befehlsstapel,
@@ -174,7 +175,11 @@ export function useSkizzenHandlungen(
       try {
         await befehl.ausfuehren();
       } catch (e) {
-        melde(befehl.element, befehl.grund?.(e) ?? befehlsGrund(e));
+        // Nach „Verwerfen“ oder Escape in der Rückfrage ist nichts gescheitert, nur nichts geschehen
+        // (LLH-1945): keine Meldung am Element.
+        if (!(e instanceof HandlungVerfallen)) {
+          melde(befehl.element, befehl.grund?.(e) ?? befehlsGrund(e));
+        }
         throw e;
       } finally {
         setLaeuft((alt) => (alt === befehl.beschreibung ? null : alt));
@@ -587,14 +592,36 @@ export function useSkizzenHandlungen(
     [tue, pflicht],
   );
 
+  /**
+   * Rufname mit Feld-CAS (LLH-1945): `alt` ist der Rufname beim Öffnen. Rückgängig und Wiederholen
+   * erwarten jeweils den Wert, den der vorige Schritt geschrieben hat; hat ein anderer Arbeitsplatz
+   * dazwischen geändert, fragt die Rückfrage, und „Verwerfen“ oder Escape lassen den Schritt
+   * scheitern. Verfällt schon die Handlung selbst, erfüllt sie mit `OFFEN_LASSEN` bzw. `VERWORFEN`
+   * für die Eingabe und kommt nicht auf den Stapel.
+   */
   const setzeRufname = useCallback(
-    (stelle: string, neu: string | null, alt: string | null) =>
-      tue({
-        beschreibung: `Rufname von ${name(stelle)}`,
-        element: stelle,
-        ausfuehren: () => pflicht().setzeRufname(stelle, neu),
-        zuruecknehmen: () => pflicht().setzeRufname(stelle, alt),
-      }),
+    async (stelle: string, neu: string | null, alt: string | null) => {
+      // Der gespeicherte Wert vor dem Schreiben (ohne die angezeigte Kurzbezeichnung eines
+      // Abschnitts ohne Rufnamen): ihn stellt Rückgängig wieder her.
+      let vorher = alt;
+      try {
+        await tue({
+          beschreibung: `Rufname von ${name(stelle)}`,
+          element: stelle,
+          ausfuehren: async () => {
+            vorher = await pflicht().setzeRufname(stelle, neu, vorher);
+          },
+          zuruecknehmen: async () => {
+            await pflicht().setzeRufname(stelle, vorher, neu);
+          },
+          grund: (e) =>
+            e instanceof HandlungVerfallen ? 'von einem anderen Arbeitsplatz geändert' : null,
+        });
+      } catch (e) {
+        if (e instanceof HandlungVerfallen) return e.ergebnis;
+        throw e;
+      }
+    },
     [tue, name, pflicht],
   );
 

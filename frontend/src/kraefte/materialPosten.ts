@@ -166,6 +166,19 @@ export function ortPatch(
   return { [ORT_FELD[ziel.art]]: ziel.id };
 }
 
+/**
+ * Der Ort als alle vier Spalten (`null` = nicht dort): Altwert des Feld-CAS (LLH-1945), der den
+ * ganzen Ort vergleicht, auch wenn der Patch nur das neue Ziel nennt.
+ */
+export function ortSpalten(ort: MaterialOrtRef | null): Record<OrtFeld, number | null> {
+  return {
+    einheit_id: ort?.art === 'einheit' ? ort.id : null,
+    einsatz_fahrzeug_id: ort?.art === 'fahrzeug' ? ort.id : null,
+    uhs_id: ort?.art === 'uhs' ? ort.id : null,
+    br_id: ort?.art === 'bereitstellungsraum' ? ort.id : null,
+  };
+}
+
 /** Präfix je Ortsart im Auswahlwert; die IDs der Ortsarten kollidieren (`einheit:3`, `uhs:3`). */
 const WERT_PRAEFIX: Record<MaterialOrtArt, string> = {
   einheit: 'einheit',

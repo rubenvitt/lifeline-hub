@@ -341,3 +341,179 @@ async fn sse_feuert_bei_kum_mutation_und_geo_patch() {
     let n = recv_until_tag(&mut rx, "einheit", kurz).await;
     assert!(n.data.contains(&format!("\"einheit_id\":{eid}")));
 }
+
+// ---------- LLH-1945: Feld-CAS an Position und taktischem Zeichen ----------
+
+/// Verortet eine Kraft per Ad-hoc-Disposition als Fahrzeug → `einsatz_fahrzeug.id`.
+async fn fahrzeug_adhoc(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+/// Gemeinsamer Ablauf für die drei Positionswege (Einheit, Fahrzeug, Person): Konflikt an der
+/// Koordinate und am Zeichen, andere Angabe dazwischen ohne 409, 422 für Altwert ohne Änderung
+/// und für eine halbe Koordinate, ohne `erwartet` ohne Vergleich.
+async fn check_position_cas(app: &axum::Router, admin: &str, uri: &str) {
+    let patch = |body: &'static str| async move {
+        let (s, j) = anfrage(app, "PATCH", uri, admin, Some(body)).await;
+        (s, j)
+    };
+    // Ausgangsstand, den B sieht: 50/8, kein Zeichen.
+    let (s, j) = patch(r#"{"lat":50.0,"lon":8.0}"#).await;
+    assert_eq!(s, StatusCode::OK, "{uri}: {j}");
+    // A verschiebt (ohne Altwert, wie bisher).
+    let (s, j) = patch(r#"{"lat":51.0,"lon":9.0}"#).await;
+    assert_eq!(s, StatusCode::OK, "{uri}: {j}");
+
+    // B platziert auf seinem alten Stand → 409 `veraltet`, nichts überschrieben.
+    let (s, j) = patch(r#"{"lat":52.0,"lon":10.0,"erwartet":{"lat":50.0,"lon":8.0}}"#).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{uri}: {j}");
+    assert_eq!(j["grund"], "veraltet", "{uri}: {j}");
+
+    // Das Zeichen ist eine andere Angabe: die geänderte Koordinate löst keinen Konflikt aus.
+    let (s, j) = patch(r#"{"tz_fachaufgabe":"fuehrung","erwartet":{"tz_fachaufgabe":null}}"#).await;
+    assert_eq!(s, StatusCode::OK, "{uri}: {j}");
+    assert_eq!(j["lat"].as_f64(), Some(51.0), "{uri}: {j}");
+    assert_eq!(j["tz_fachaufgabe"], "fuehrung", "{uri}: {j}");
+
+    // Mit dem aktuellen Paar geht das Verschieben durch.
+    let (s, j) = patch(r#"{"lat":52.0,"lon":10.0,"erwartet":{"lat":51.0,"lon":9.0}}"#).await;
+    assert_eq!(s, StatusCode::OK, "{uri}: {j}");
+    assert_eq!(j["lat"].as_f64(), Some(52.0), "{uri}: {j}");
+
+    // Zeichen auf überholtem Stand → 409, das Zeichen bleibt.
+    let (s, j) = patch(r#"{"tz_fachaufgabe":"sanitaet","erwartet":{"tz_fachaufgabe":null}}"#).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{uri}: {j}");
+    assert_eq!(j["grund"], "veraltet", "{uri}: {j}");
+    let (s, j) = patch(r#"{"tz_organisation":null,"erwartet":{"tz_organisation":null}}"#).await;
+    assert_eq!(s, StatusCode::OK, "{uri}: {j}");
+    assert_eq!(j["tz_fachaufgabe"], "fuehrung", "{uri}: {j}");
+
+    // 422: Altwert ohne Änderung desselben Felds, halbe Koordinate im Altwert.
+    for body in [
+        r#"{"tz_organisation":"thw","erwartet":{"lat":52.0,"lon":10.0}}"#,
+        r#"{"lat":53.0,"lon":11.0,"erwartet":{"lat":52.0}}"#,
+    ] {
+        let (s, j) = anfrage(app, "PATCH", uri, admin, Some(body)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{uri} {body}: {j}");
+    }
+    let (s, j) = patch(r#"{"lat":null,"lon":null}"#).await;
+    assert_eq!(s, StatusCode::OK, "{uri}: {j}");
+    assert!(
+        j["lat"].is_null(),
+        "{uri}: ohne erwartet ohne Vergleich: {j}"
+    );
+}
+
+#[tokio::test]
+async fn position_und_zeichen_pruefen_auf_zwischenzeitliche_aenderung() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let ef = fahrzeug_adhoc(&app, &admin, einsatz).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Helfer").await;
+    for uri in [
+        format!("/api/einsaetze/{einsatz}/einheiten/{eid}/position"),
+        format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/position"),
+        format!("/api/einsaetze/{einsatz}/personal/{ep}/position"),
+    ] {
+        check_position_cas(&app, &admin, &uri).await;
+    }
+}
+
+#[tokio::test]
+async fn abschnittsflaeche_und_zeichen_pruefen_auf_zwischenzeitliche_aenderung() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, a) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(r#"{"name":"Nord"}"#),
+    )
+    .await;
+    assert!(s.is_success(), "{a}");
+    let aid = a["id"].as_i64().unwrap();
+    let uri = format!("/api/einsaetze/{einsatz}/abschnitte/{aid}/flaeche");
+    let poly = |x: f64| {
+        format!(r#"{{"type":"Polygon","coordinates":[[[{x},50],[{x},51],[9,51],[{x},50]]]}}"#)
+    };
+    let alt = poly(8.0);
+    let neu = poly(8.5);
+    let body = |geo: &str, erwartet: serde_json::Value| {
+        serde_json::json!({ "flaeche_geojson": geo, "erwartet": erwartet }).to_string()
+    };
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &uri,
+        &admin,
+        Some(&serde_json::json!({ "flaeche_geojson": alt }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    // A zeichnet die Fläche neu.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &uri,
+        &admin,
+        Some(&serde_json::json!({ "flaeche_geojson": neu }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+
+    // B zeichnet auf dem alten Stand → 409.
+    let b = body(&poly(7.5), serde_json::json!({ "flaeche_geojson": alt }));
+    let (s, j) = anfrage(&app, "PATCH", &uri, &admin, Some(&b)).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(j["grund"], "veraltet", "{j}");
+
+    // Das Zeichen ist eine andere Angabe.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &uri,
+        &admin,
+        Some(r#"{"tz_fachaufgabe":"fuehrung","erwartet":{"tz_fachaufgabe":null}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["flaeche_geojson"], neu.as_str(), "{j}");
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &uri,
+        &admin,
+        Some(r#"{"tz_fachaufgabe":"sanitaet","erwartet":{"tz_fachaufgabe":null}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+
+    // Mit dem aktuellen Stand durch; Löschen der Fläche mit Altwert ebenso.
+    let b = body(&poly(7.5), serde_json::json!({ "flaeche_geojson": neu }));
+    let (s, j) = anfrage(&app, "PATCH", &uri, &admin, Some(&b)).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+
+    // 422: Altwert ohne Änderung desselben Felds.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &uri,
+        &admin,
+        Some(r#"{"tz_organisation":"thw","erwartet":{"flaeche_geojson":null}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j}");
+}

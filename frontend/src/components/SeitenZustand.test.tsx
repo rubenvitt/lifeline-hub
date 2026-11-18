@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
@@ -42,6 +44,28 @@ describe('SeitenSkeleton', () => {
     const { container } = renderMitProviders(<SeitenSkeleton zeilen={5} />);
 
     expect(container.querySelectorAll('.lfh-skelett__balken')).toHaveLength(5);
+  });
+
+  // LLH-1838 (Spec `seiten-zustaende`, „Modulwechsel zeigt sofort Kopf und Gerippe“): das Gerippe
+  // eines Modulwechsels zeigt seine Balken erst nach einer Verzögerung, ein schnelles Modul
+  // flackert sonst. Belegt wird es an der Klasse; die Verzögerung selbst trägt die CSS-Regel.
+  it('verzögert die Balken nur auf Wunsch und meldet sich trotzdem sofort als beschäftigt', () => {
+    const { container, rerender } = renderMitProviders(<SeitenSkeleton />);
+    expect(container.querySelector('.lfh-skelett--verzoegert')).toBeNull();
+
+    rerender(<SeitenSkeleton verzoegert />);
+    const skelett = container.querySelector('.lfh-skelett--verzoegert');
+    expect(skelett).not.toBeNull();
+    expect(skelett).toHaveAttribute('aria-busy', 'true');
+  });
+});
+
+describe('SeitenSkeleton: CSS der Verzögerung', () => {
+  it('hält die Balken des verzögerten Gerippes zuerst unsichtbar und blendet sie spät ein', () => {
+    const css = readFileSync(resolve(__dirname, '../theme/sprache.css'), 'utf8');
+    const regel = css.match(/\.lfh-skelett--verzoegert \.lfh-skelett__balken\s*\{([^}]*)\}/);
+    expect(regel, 'Regel für die verzögerten Balken fehlt').not.toBeNull();
+    expect(regel![1]).toMatch(/animation:[^;]*lfh-skelett-ein[^;]*120ms/);
   });
 });
 

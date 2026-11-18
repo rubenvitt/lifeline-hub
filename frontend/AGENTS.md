@@ -154,6 +154,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block).
     `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die Leiste, nicht
     Hinweis oder Beschreibung darunter.
+  - **Modulwechsel zeigt sofort Kopf und Gerippe** (LLH-1838, Spec `seiten-zustaende`): Der
+    Router zeichnet jeden Wechsel als Übergang und hält das alte Bild, bis die neue Seite fertig
+    ist. Deshalb hängt das `<Outlet />` des Einsatzrahmens in `einsatz/ModulWechselGerippe.tsx`.
+    Wechselt das Modul, steht im ersten Bild `ModulGerippeSeite` (Seitenkopf mit `modulName` und Ortspfad,
+    `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
+    im selben Modul und nicht beim ersten Aufruf. Eine Seite baut kein eigenes Vorab-Gerippe für
+    den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
+    Ladetext. Herleitung: `openspec/changes/archive/2026-11-18-q71gt8zq-modulwechsel-gerippe/design.md`.
   - **Zwei Höhen** (zjt7c073 D2, `components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
     (`useRahmenOben`) dazu der klebende Seitenkopf. Die Kopfhöhe nehmen nur, was neben dem Inhalt
@@ -474,7 +482,11 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    `useFeldKonflikt` lädt beim 409 neu und fragt nur, wenn die Angabe sich wirklich geändert hat.
    Ein fremder Wert im offenen Feld steht dort als Hinweis, die Eingabe bleibt. Wo der Server einen
    Änderungsvermerk liefert (`vermerke`), steht er leise an der Zeile (`VermerkZeile`) und der
-   jüngste im Paneelkopf (`PaneelVermerk`). Noch ohne Feld-CAS: die Schreibwege in LLH-1945.
+   jüngste im Paneelkopf (`PaneelVermerk`). **Wege ohne offenes Feld** (Platzieren, Fläche, Zeichen
+   wählen, Umhängen per Ziehen, Skizze; LLH-1945) schicken den Stand zu Beginn der Handlung als
+   `erwartet` und zeigen beim 409 denselben Dialog; „Übernehmen“ schreibt ohne Altwert,
+   „Verwerfen“ und Escape lassen die Handlung verfallen. Ohne Altwert bleiben Knöpfe und Dialoge,
+   die einen festen oder errechneten Wert setzen (Status, Lagezustand, „Kapazität übernehmen“).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
