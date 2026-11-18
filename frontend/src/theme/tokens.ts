@@ -785,6 +785,21 @@ export const form = {
   uebergang: '120ms cubic-bezier(0.2, 0.8, 0.2, 1)',
 } as const;
 
+/**
+ * Obergrenzen eines Eingabefelds (Spec `feldbreiten`, LLH-1810). Das Feld füllt seine Zeile bis
+ * zu dieser Breite und ragt am schmalen Schirm nie über den Rand; `voll` hat keine Grenze. `kurz`
+ * trägt Zahlen und Kürzel, `schmal` und `mittel` die beiden belegten Obergrenzen des
+ * Verwaltungsteils. CSS-Spiegel `--lfh-feld-*` in `rollen.css`.
+ */
+export const FELDBREITE = {
+  kurz: 120,
+  schmal: 200,
+  mittel: 320,
+  voll: undefined,
+} as const satisfies Record<string, number | undefined>;
+
+export type Feldbreite = keyof typeof FELDBREITE;
+
 /** Schriftrollen. Alle drei Familien werden lokal ausgeliefert (SIL OFL 1.1,
  *  `src/assets/fonts/`) — kein CDN, der Fükw arbeitet ohne Netz. */
 export const schrift = {
@@ -822,6 +837,8 @@ export const schriftskala = {
   ueberschrift: { groesse: 30, gewicht: 600, familie: 'text', sperrung: '-0.02em' },
   /** Seitenkopf: Titel 14/600. */
   seitentitel: { groesse: 14, gewicht: 600, familie: 'text' },
+  /** Titel einer Karte oder eines Listeneintrags (Spec `schriftstufen`, LLH-1810). */
+  kartentitel: { groesse: 15, gewicht: 600, familie: 'text' },
   /** Lauftext-Grundmaß des Entwurfs. */
   text: { groesse: 14, gewicht: 400, familie: 'text' },
   /** Dichter Lauftext in Listen und Paneelen. */

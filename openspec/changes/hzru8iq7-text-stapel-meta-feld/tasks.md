@@ -5,30 +5,30 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
 
 ## 1. Skala und Feldbreiten in den Tokens
 
-- [ ] 1.1 `schriftskala.kartentitel` (15/600, `text`) in `theme/tokens.ts` und
+- [x] 1.1 `schriftskala.kartentitel` (15/600, `text`) in `theme/tokens.ts` und
   `--lfh-typo-kartentitel-*` in `theme/rollen.css`; Test in `theme/tokens.test.ts` (Stufe 15/600)
   und `rollen.guard.test.ts` grün (`pnpm vitest run src/theme`)
-- [ ] 1.2 `FELDBREITE` (`kurz` 120, `schmal` 200, `mittel` 320, `voll` ohne Grenze) in
+- [x] 1.2 `FELDBREITE` (`kurz` 120, `schmal` 200, `mittel` 320, `voll` ohne Grenze) in
   `theme/tokens.ts`, `--lfh-feld-*` in `theme/rollen.css`, Deckungsgleichheit im
   `rollen.guard.test.ts`; Test rot vor dem Eintrag, grün danach
 
 ## 2. Bausteine
 
-- [ ] 2.1 `components/instrument/Textstufe.tsx` mit `Textstufe.test.tsx`: Stufe setzt Größe,
+- [x] 2.1 `components/instrument/Textstufe.tsx` mit `Textstufe.test.tsx`: Stufe setzt Größe,
   Gewicht, Familie, Sperrung, Versalien; Ton setzt die Rollenfarbe (Tag und Nacht); `als="h3"`
   ändert Element, nicht Stil; Zahlenfamilie bekommt `tabular-nums`; Typ lässt keine Zahl als
   Stufe zu (`// @ts-expect-error` im Test). Dateikopf nennt die Regel
-- [ ] 2.2 `components/instrument/Stapel.tsx` mit `Stapel.test.tsx`: Lücke je Stufe aus dem Raster
+- [x] 2.2 `components/instrument/Stapel.tsx` mit `Stapel.test.tsx`: Lücke je Stufe aus dem Raster
   in `kompakt` und `komfortabel` (ConfigProvider mit `antdToken`), `richtung`, `umbruch`,
   `ausrichten`, `verteilen`, `wachsen`, `als`; `@ts-expect-error` für `abstand={12}`
-- [ ] 2.3 `components/instrument/MetaZeile.tsx` mit `MetaZeile.test.tsx`: Trenner zwischen Teilen,
+- [x] 2.3 `components/instrument/MetaZeile.tsx` mit `MetaZeile.test.tsx`: Trenner zwischen Teilen,
   `aria-hidden`, leere Teile samt Trenner weg, `mono` in Stufe `meta`, eigener `ton` je Teil,
   Umbruch erlaubt; Prüfung des zugänglichen Namens ohne „·“
-- [ ] 2.4 `components/instrument/Feld.tsx` mit `Feld.test.tsx`: in einer `<Form>` gebunden,
+- [x] 2.4 `components/instrument/Feld.tsx` mit `Feld.test.tsx`: in einer `<Form>` gebunden,
   Pflichtfehler wie Form.Item, `maxWidth` je Breite, `voll` ohne Grenze, `InputNumber` füllt die
   Breite (Klasse `lfh-feld` in `index.css`), `noStyle`/`dependencies` werden durchgereicht,
   `@ts-expect-error` für `style`
-- [ ] 2.5 Export der vier Bausteine über `components/instrument/index.ts`; `pnpm tsc -b` grün
+- [x] 2.5 Export der vier Bausteine über `components/instrument/index.ts`; `pnpm tsc -b` grün
 
 ## 3. Wächter
 
