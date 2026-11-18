@@ -454,7 +454,14 @@ interface Gruppierung<T> {
  * über der Sicht (Seitentitel = 1, Paneel = 2, …). Getrennt von {@link Gruppierung}, weil
  * `effektiveDaten` nur die Achse liest.
  */
-type SichtGruppierung<T> = Gruppierung<T> & { unterEbene: UnterEbene };
+type SichtGruppierung<T> = Gruppierung<T> & {
+  unterEbene: UnterEbene;
+  /**
+   * `false`: kein Zählerstreifen in der Werkzeugzeile, weil die Seite dieselbe Aufteilung schon im
+   * Kopf trägt (Fahrzeuge, Stärke als Meta, LLH-1786). Die Gruppenköpfe zählen weiter.
+   */
+  zaehler?: false;
+};
 
 /**
  * Feldname, unter dem `T` Kinder DESSELBEN Typs trägt — sonst `never`. `-?` allein genügt
@@ -599,6 +606,14 @@ interface DatensichtProps<T extends object, K extends string> {
   onZeileKlick?: (zeile: T) => void;
   /** Zusatzknöpfe links in der Werkzeugzeile (z. B. „Drucken"). */
   werkzeuge?: ReactNode;
+  /**
+   * Sortierung und Feldfilter der Werkzeugzeile ausblenden (LLH-1786, Change
+   * `z137bgm5-seitenkopf-einzeilig` D5): am Handschirm stehen sie hinter dem Knopf „Filter“ der
+   * Seite, bis er offen ist. Die Suche bleibt stehen.
+   */
+  wahlenVerborgen?: boolean;
+  /** Meldet die Zahl der Feldfilter mit Wahl, damit „Filter (n)“ auch Verborgenes zählt. */
+  onFilterZahl?: (zahl: number) => void;
   /** Einziger Aufklappweg, beschriftet, in beiden Zweigen (LFH-697); schließt `baum` aus. */
   aufklappen?: Aufklappbereich<T>;
   /**
@@ -1145,6 +1160,8 @@ export default function Datensicht<T extends object, const K extends string>(
     zeilenKlasse,
     onZeileKlick,
     werkzeuge,
+    wahlenVerborgen = false,
+    onFilterZahl,
     aufklappen,
     zeilenFehler,
     halten = false,
@@ -1239,6 +1256,11 @@ export default function Datensicht<T extends object, const K extends string>(
   const [filterWerte, setFilterWerte] = useState<Readonly<Record<string, readonly string[]>>>(
     () => gedaechtnis?.start.filter ?? {},
   );
+  // Zahl der Feldfilter mit Wahl, für „Filter (n)“ der Seite (LLH-1786).
+  const filterZahl = Object.values(filterWerte).filter((w) => w.length > 0).length;
+  useEffect(() => {
+    onFilterZahl?.(filterZahl);
+  }, [filterZahl, onFilterZahl]);
   const filterZuruecksetzen = useCallback(() => {
     setSuchbegriff('');
     setFilterWerte({});
@@ -1697,14 +1719,14 @@ export default function Datensicht<T extends object, const K extends string>(
 
   /** Was die Werkzeugzeile außer dem Banner trägt; EINE Wahrheit für Zeile und Schwebeform. */
   const feldFilter =
-    baum != null
+    baum != null || wahlenVerborgen
       ? []
       : alsTabelle
         ? feldSpalten
         : filterSpalten.filter((spalte) => !spalte.filter!.ohneKartenfeld);
   const zeigtSuche = suche != null && baum == null;
-  const zeigtSortierung = !alsTabelle && sortierOptionen.length > 0;
-  const zeigtZaehler = gruppenZaehler.length > 0 && alsTabelle;
+  const zeigtSortierung = !alsTabelle && sortierOptionen.length > 0 && !wahlenVerborgen;
+  const zeigtZaehler = gruppenZaehler.length > 0 && alsTabelle && gruppen?.zaehler !== false;
   /**
    * Schwebender Sammelbanner (LLH-1479): steht der Spaltenschalter bei der Seite und trüge die Zeile
    * sonst nur den Banner, hielte sie im Meldebild fast immer eine leere Standzeile (~40 px) als

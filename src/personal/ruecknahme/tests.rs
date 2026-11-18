@@ -85,11 +85,12 @@ async fn szene() -> Szene {
     drop(conn);
 
     let zug: i64 = sqlx::query_scalar(
-        "INSERT INTO einsatz_einheit (einsatz_id, name, fuehrer_id) VALUES (?, 'Zug 1', ?) \
-         RETURNING id",
+        "INSERT INTO einsatz_einheit (einsatz_id, name, fuehrer_id, angelegt_at) \
+         VALUES (?, 'Zug 1', ?, ?) RETURNING id",
     )
     .bind(einsatz)
     .bind(ep)
+    .bind(DISPONIERT)
     .fetch_one(&pool)
     .await
     .unwrap();
@@ -564,6 +565,55 @@ async fn aufgeloestes_und_ausgetragenes_bleibt_aus() {
     );
     assert_eq!(r.fahrzeug_id, Some(s.fahrzeug));
     assert_eq!(r.uhs_id, Some(s.uhs));
+}
+
+/// LLH-1949: eine spurlos aufgelöste Einheit ist gelöscht, ihre ID kann an eine danach gebildete
+/// Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT). Weder Mitgliedschaft noch Führung
+/// landen dort, und `ausgelassen` nennt keinen fremden Namen.
+#[tokio::test]
+async fn neue_einheit_mit_der_alten_id_bekommt_niemanden() {
+    let s = szene().await;
+    let v = s.entlasse().await;
+    let nicht_mehr_vorhanden = vec![
+        ("Einheit".to_string(), "nicht mehr vorhanden".to_string()),
+        (
+            "Führung einer Einheit".to_string(),
+            "nicht mehr vorhanden".to_string(),
+        ),
+    ];
+
+    // Gelöscht, ohne Nachfolger.
+    s.sql("DELETE FROM einsatz_einheit").await;
+    let mut tx = s.pool.begin().await.unwrap();
+    let r = zuruecknehmen_tx(
+        &mut tx,
+        s.einsatz,
+        s.ep,
+        s.benutzer,
+        KURZ_DANACH,
+        &v,
+        RuecknahmeRechte::ALLE,
+    )
+    .await
+    .unwrap();
+    tx.rollback().await.unwrap();
+    assert_eq!(bezeichnungen(&r), nicht_mehr_vorhanden);
+
+    // Dieselbe ID an einer danach gebildeten Einheit.
+    sqlx::query(
+        "INSERT INTO einsatz_einheit (id, einsatz_id, name, angelegt_at) \
+         VALUES (?, ?, 'Trupp B', '2026-11-17 11:01:00')",
+    )
+    .bind(s.zug)
+    .bind(s.einsatz)
+    .execute(&s.pool)
+    .await
+    .unwrap();
+    let r = s.nimm_zurueck(&v).await;
+    assert_eq!(bezeichnungen(&r), nicht_mehr_vorhanden);
+    assert!(r.einheiten.is_empty());
+    let z = s.zustand().await;
+    assert_eq!((z.einheit, z.fuehrer, z.aktiv), (None, None, true));
 }
 
 /// Ein Einsatzleiter-Vermerk einer ANDEREN, ebenfalls entlassenen Person bleibt ihrer.

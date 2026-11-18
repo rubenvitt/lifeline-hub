@@ -11,7 +11,6 @@ use futures::Stream;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
-use tokio::sync::OwnedSemaphorePermit;
 use tokio::time::Instant;
 
 /// Lesepuffer je Stream-Chunk; die Sicherung (mit BLOB-Anhängen) darf nicht als Ganzes in den
@@ -21,7 +20,7 @@ const CHUNK: usize = 64 * 1024;
 /// So lange darf der Client zwischen zwei Chunks verstreichen lassen (LFH-926). Danach gibt der
 /// Server Kopie und Sperre frei, statt sie für einen hängenden Client bis zum TCP-Timeout zu
 /// halten. Großzügig: selbst bei 10 KB/s ist ein Chunk nach wenigen Sekunden durch.
-const LEERLAUF_FRIST: Duration = Duration::from_secs(60);
+pub(crate) const LEERLAUF_FRIST: Duration = Duration::from_secs(60);
 
 /// GET /api/backup — konsistente Sicherung der Datenbank als Download. Admin-only.
 ///
@@ -76,7 +75,7 @@ pub async fn download(
         Lauf {
             datei,
             _dir: dir,
-            _sperre: sperre,
+            _sperre: Box::new(sperre),
         },
         LEERLAUF_FRIST,
     );
@@ -104,11 +103,11 @@ pub async fn download(
 }
 
 /// Was ein laufender Download hält: die offene Kopie, ihr Verzeichnis (gelöscht beim Fallen)
-/// und den Platz in der Download-Sperre.
-struct Lauf {
-    datei: tokio::fs::File,
-    _dir: tempfile::TempDir,
-    _sperre: OwnedSemaphorePermit,
+/// und den Platz in einer Sperre (Sicherung: `DownloadSperre`, Einsatzakte: `BauPlatz`).
+pub(crate) struct Lauf {
+    pub(crate) datei: tokio::fs::File,
+    pub(crate) _dir: tempfile::TempDir,
+    pub(crate) _sperre: Box<dyn Send + Sync>,
 }
 
 /// Streamt die Kopie in [`CHUNK`]-Stücken und gibt den [`Lauf`] frei, sobald der letzte Chunk
@@ -118,7 +117,10 @@ struct Lauf {
 /// Für den Leerlauf braucht es einen eigenen Wächter-Task: hyper fragt den Body erst nach dem
 /// nächsten Chunk, wenn der Socket wieder schreibbar ist, ein hängender Client weckt den Stream
 /// also nie. Der Wächter hält den Lauf nur schwach und endet mit dem Stream.
-fn chunk_stream(lauf: Lauf, frist: Duration) -> impl Stream<Item = std::io::Result<Bytes>> {
+pub(crate) fn chunk_stream(
+    lauf: Lauf,
+    frist: Duration,
+) -> impl Stream<Item = std::io::Result<Bytes>> {
     let lauf = Arc::new(tokio::sync::Mutex::new(Some(lauf)));
     let zuletzt = Arc::new(Mutex::new(Instant::now()));
 
@@ -181,7 +183,7 @@ mod tests {
         let lauf = Lauf {
             datei: tokio::fs::File::open(&pfad).await.unwrap(),
             _dir: dir,
-            _sperre: sperre.belegen().unwrap(),
+            _sperre: Box::new(sperre.belegen().unwrap()),
         };
         (lauf, verzeichnis)
     }

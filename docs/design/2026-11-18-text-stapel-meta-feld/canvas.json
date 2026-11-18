@@ -1,0 +1,26 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-18T12:50:00Z" },
+  "title": "Text, Stapel, Meta, Feld",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Die vier Bausteine · kompakt, Nacht" },
+    "Pilot-Fahrzeug.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 900, "title": "Pilot Stammdaten · Fahrzeug, vorher und nachher" },
+    "Handy-komfortabel.dc.html": { "x": 0, "y": 1320, "w": 390, "h": 844, "title": "Handy 390 × 844 · dasselbe Formular komfortabel" }
+  },
+  "order": ["Main.dc.html", "Pilot-Fahrzeug.dc.html", "Handy-komfortabel.dc.html"],
+  "notes": {
+    "t1": { "x": 0, "y": -300, "text": "Bausteine statt Inline-Stile", "kind": "title1", "maxW": 2960 },
+    "t2": { "x": 0, "y": 1020, "text": "Dichte: Abstände wachsen, Schrift nicht", "kind": "title1", "maxW": 1400 }
+  },
+  "designSystems": [
+    {
+      "title": "Lifeline Hub",
+      "namespace": "lifeline-hub",
+      "artifact": "https://claude.ai/artifact/DKJZJmJyX8CkE4dBJAPyF5",
+      "version": null,
+      "copiedAt": "2026-11-18T12:50:00Z"
+    }
+  ]
+}

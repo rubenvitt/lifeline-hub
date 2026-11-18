@@ -29,7 +29,7 @@ import type {
   OrgEinstellungenUpdate,
   OrgModulEinstellungUpdate,
 } from '../../api/types';
-import { Formularpaneel } from '../../components/instrument';
+import { Feld, Formularpaneel } from '../../components/instrument';
 import KategorieVorgabenPaneel from './KategorieVorgabenPaneel';
 import { mitVorgabe } from '../../components/vorgabeText';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../../instanz/herkunft';
@@ -194,39 +194,26 @@ export default function EinsatzDefaults() {
         disabled={!darf}
       >
         <Formularpaneel titel="Aufbewahrung">
-          <Form.Item label="Aufbewahrungs-Dauer (Tage)" name="retention_dauer_tage">
-            <InputNumber
-              min={1}
-              max={3650}
-              style={{ width: '100%', maxWidth: 200 }}
-              placeholder={mitVorgabe('keine Frist')}
-            />
-          </Form.Item>
-          <Form.Item
+          <Feld breite="schmal" label="Aufbewahrungs-Dauer (Tage)" name="retention_dauer_tage">
+            <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine Frist')} />
+          </Feld>
+          <Feld
+            breite="schmal"
             label="Skelett endgültig löschen nach (Tage ab Abschluss)"
             name="skelett_dauer_tage"
           >
-            <InputNumber
-              min={1}
-              max={36500}
-              style={{ width: '100%', maxWidth: 200 }}
-              placeholder={mitVorgabe('unbegrenzt')}
-            />
-          </Form.Item>
-          <Form.Item label="Nachbereitung (Tage ab Abschluss)" name="nachbereitung_tage">
-            <InputNumber
-              min={1}
-              max={3650}
-              style={{ width: '100%', maxWidth: 200 }}
-              placeholder={mitVorgabe('keine')}
-            />
-          </Form.Item>
+            <InputNumber min={1} max={36500} placeholder={mitVorgabe('unbegrenzt')} />
+          </Feld>
+          <Feld breite="schmal" label="Nachbereitung (Tage ab Abschluss)" name="nachbereitung_tage">
+            <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine')} />
+          </Feld>
         </Formularpaneel>
 
         <KategorieVorgabenPaneel />
 
         <Formularpaneel titel="Verhalten & Automatik">
-          <Form.Item
+          <Feld
+            breite="schmal"
             label="Präfix Einsatznummer"
             name="einsatz_nummer_praefix"
             extra={`Neue Einsätze: ${einsatznummerVorschau(
@@ -235,60 +222,43 @@ export default function EinsatzDefaults() {
               new Date().getFullYear(),
             )}`}
           >
-            <Input
-              maxLength={8}
-              placeholder={mitVorgabe(EINSATZ_PRAEFIX_VORGABE)}
-              style={{ width: '100%', maxWidth: 200 }}
-            />
-          </Form.Item>
-          <Form.Item label="Präfix ETB" name="etb_nummer_praefix">
-            <Input maxLength={8} placeholder="z. B. EB-" style={{ width: '100%', maxWidth: 200 }} />
-          </Form.Item>
-          <Form.Item label="Präfix Meldungen" name="meldung_nummer_praefix">
-            <Input maxLength={8} placeholder="z. B. M-" style={{ width: '100%', maxWidth: 200 }} />
-          </Form.Item>
-          <Form.Item label="Präfix Aufträge" name="auftrag_nummer_praefix">
-            <Input maxLength={8} placeholder="z. B. A-" style={{ width: '100%', maxWidth: 200 }} />
-          </Form.Item>
+            <Input maxLength={8} placeholder={mitVorgabe(EINSATZ_PRAEFIX_VORGABE)} />
+          </Feld>
+          <Feld breite="schmal" label="Präfix ETB" name="etb_nummer_praefix">
+            <Input maxLength={8} placeholder="z. B. EB-" />
+          </Feld>
+          <Feld breite="schmal" label="Präfix Meldungen" name="meldung_nummer_praefix">
+            <Input maxLength={8} placeholder="z. B. M-" />
+          </Feld>
+          <Feld breite="schmal" label="Präfix Aufträge" name="auftrag_nummer_praefix">
+            <Input maxLength={8} placeholder="z. B. A-" />
+          </Feld>
 
-          <Form.Item
+          <Feld
+            breite="schmal"
             label="Vorgabe-Bestätigungsfrist Meldungen (Minuten)"
             name="meldung_bestaetigung_frist_min"
           >
-            <InputNumber
-              min={1}
-              max={10080}
-              style={{ width: '100%', maxWidth: 200 }}
-              placeholder={mitVorgabe('5')}
-            />
-          </Form.Item>
-          <Form.Item
+            <InputNumber min={1} max={10080} placeholder={mitVorgabe('5')} />
+          </Feld>
+          <Feld
+            breite="schmal"
             label="Vorgabe-Quittierfrist Aufträge (Minuten)"
             name="auftrag_quittierung_frist_min"
           >
-            <InputNumber
-              min={1}
-              max={10080}
-              style={{ width: '100%', maxWidth: 200 }}
-              placeholder={mitVorgabe('keine Frist')}
-            />
-          </Form.Item>
-          <Form.Item label="Rückmeldefrist Einheiten (Minuten)" name="rueckmeldung_frist_min">
-            <InputNumber
-              min={1}
-              max={10080}
-              style={{ width: '100%', maxWidth: 200 }}
-              placeholder={mitVorgabe('60')}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="Automatische ETB-Einträge"
-            name="auto_etb_eintraege"
-            valuePropName="checked"
+            <InputNumber min={1} max={10080} placeholder={mitVorgabe('keine Frist')} />
+          </Feld>
+          <Feld
+            breite="schmal"
+            label="Rückmeldefrist Einheiten (Minuten)"
+            name="rueckmeldung_frist_min"
           >
+            <InputNumber min={1} max={10080} placeholder={mitVorgabe('60')} />
+          </Feld>
+
+          <Feld label="Automatische ETB-Einträge" name="auto_etb_eintraege" valuePropName="checked">
             <Switch />
-          </Form.Item>
+          </Feld>
         </Formularpaneel>
 
         {/* Ohne Recht steht der Knopf gesperrt da, der Grund als `RechteHinweis` im Kopf. */}

@@ -1,4 +1,5 @@
 import { AutoComplete, Form, Input, Typography } from 'antd';
+import { Feld } from '../components/instrument';
 import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -107,32 +108,32 @@ export default function FahrzeugFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Funkrufname"
         name="funkrufname"
         rules={[{ required: true, whitespace: true, message: 'Funkrufname darf nicht leer sein' }]}
       >
         <Input />
-      </Form.Item>
-      <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
+      </Feld>
+      <Feld label="Fahrzeugtyp" name="fahrzeugtyp">
         <AutoComplete
           options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. LF 20, RTW"
           showSearch={teilwortSuche}
         />
-      </Form.Item>
-      <Form.Item label="Trägerorganisation" name="traegerorganisation">
+      </Feld>
+      <Feld label="Trägerorganisation" name="traegerorganisation">
         <AutoComplete
           options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. Feuerwehr Musterstadt"
           showSearch={teilwortSuche}
         />
-      </Form.Item>
-      <Form.Item label="Kennzeichen" name="kennzeichen">
+      </Feld>
+      <Feld label="Kennzeichen" name="kennzeichen">
         <Input />
-      </Form.Item>
+      </Feld>
       {/* NUR im Bearbeiten-Modus: ein neues Fahrzeug hat noch keine id und keine Route. So ist der
          Weg zu den übrigen Feldern von hier aus sichtbar. */}
       {fahrzeug && (

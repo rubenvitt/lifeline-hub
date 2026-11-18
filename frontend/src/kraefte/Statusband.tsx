@@ -50,6 +50,39 @@ const zaehler = (zellen: readonly BandZelle[], einzahl: string, mehrzahl: string
   return `${n} ${n === 1 ? einzahl : mehrzahl}`;
 };
 
+/**
+ * Das Band in einer Zeile, für den eingeklappten Kopf (LLH-1786, `KlappBand`): dieselben Zähler
+ * wie die Paneelköpfe, dazu die Einheiten ohne Rückmeldung, wenn es sie gibt. Rein.
+ */
+export function statusbandKurzform(
+  band: {
+    einheiten: readonly BandZelle[];
+    personal: readonly BandZelle[];
+    rueckmeldung?: BandZelle | null;
+  },
+  zustand: { einheiten: StatusbandZustand; personal: StatusbandZustand } = {
+    einheiten: 'daten',
+    personal: 'daten',
+  },
+): string {
+  // Ohne Daten keine erfundene Null (LLH-1462): „…“ beim Laden, „—“ gesperrt oder gescheitert.
+  const zahl = (
+    z: StatusbandZustand,
+    zellen: readonly BandZelle[],
+    einzahl: string,
+    mehrzahl: string,
+  ) =>
+    z === 'daten' ? zaehler(zellen, einzahl, mehrzahl) : `${z === 'laden' ? '…' : '—'} ${mehrzahl}`;
+  const teile = [
+    zahl(zustand.einheiten, band.einheiten, 'Einheit', 'Einheiten'),
+    zahl(zustand.personal, band.personal, 'Kraft', 'Kräfte'),
+  ];
+  if (band.rueckmeldung && band.rueckmeldung.wert > 0) {
+    teile.push(`${band.rueckmeldung.wert} ohne Rückmeldung`);
+  }
+  return teile.join(' · ');
+}
+
 interface StatusbandProps {
   einheiten: readonly BandZelle[];
   /**

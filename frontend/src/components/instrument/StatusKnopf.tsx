@@ -3,6 +3,7 @@ import type { ButtonProps } from 'antd';
 import { forwardRef } from 'react';
 import type { ReactNode } from 'react';
 import type { StatusDarstellung } from '../../theme/statusFarben';
+import { schriftskala } from '../../theme/tokens';
 import { monoStil, useRollen } from './rollenwerte';
 import { formVonTon } from './Status';
 import { statusFlaeche, tonVonRolle, type StatusTon } from './statusFlaeche';
@@ -106,7 +107,14 @@ export const StatusKnopf = forwardRef<HTMLButtonElement, StatusKnopfProps>(funct
         <span style={{ ...monoStil(40, 500), letterSpacing: '-0.02em', lineHeight: 1 }}>
           {code ?? '—'}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXXS, fontSize: 12 }}>
+        <span
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: token.marginXXS,
+            fontSize: schriftskala.textKlein.groesse,
+          }}
+        >
           {zeichen}
           {punkt}
           <span>{wort}</span>
@@ -130,7 +138,7 @@ export const StatusKnopf = forwardRef<HTMLButtonElement, StatusKnopfProps>(funct
         alignItems: 'center',
         gap: token.marginXXS,
         paddingInline: token.paddingSM,
-        fontSize: 14,
+        fontSize: schriftskala.text.groesse,
         ...style,
       }}
     >
@@ -181,7 +189,14 @@ export function StatusBlock({
       <span style={{ ...monoStil(40, 500), letterSpacing: '-0.02em', lineHeight: 1 }}>
         {code ?? '—'}
       </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXXS, fontSize: 12 }}>
+      <span
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: token.marginXXS,
+          fontSize: schriftskala.textKlein.groesse,
+        }}
+      >
         {form && <span className="lfh-form" data-form={form} data-lfh="formzeichen" />}
         {mandantenfarbe && (
           <span

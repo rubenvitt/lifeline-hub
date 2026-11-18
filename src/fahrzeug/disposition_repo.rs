@@ -1173,19 +1173,23 @@ pub async fn zuruecknehmen_tx(
 
     let mut ergebnis = Ruecknahme::default();
     if let Some(einheit_id) = vorzustand.einheit_id {
+        // Spurlos aufgelöst heißt gelöscht (`einheit::repo::aufloesen_tx`), und die ID kann an
+        // eine danach gebildete Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT). Eine
+        // Einheit, die jünger ist als das Entlassen, war nie der Ort davor (LLH-1949).
         let einheit: Option<(String, Option<String>)> = sqlx::query_as(
-            "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+            "SELECT name, aufgeloest_at FROM einsatz_einheit \
+             WHERE id = ? AND einsatz_id = ? AND angelegt_at <= ?",
         )
         .bind(einheit_id)
         .bind(einsatz_id)
+        .bind(&vorzustand.entlassen_at)
         .fetch_optional(&mut *conn)
         .await?;
         match einheit {
-            // Spurlos aufgelöst und darum gelöscht (`einheit::repo::aufloesen_tx`): den Namen
-            // kennt niemand mehr, die Lücke steht trotzdem in der Antwort.
+            // Den Namen kennt niemand mehr, die Lücke steht trotzdem in der Antwort.
             None => ergebnis
                 .ausgelassen
-                .push(ausgelassen("Einheit", "inzwischen aufgelöst")),
+                .push(ausgelassen("Einheit", "nicht mehr vorhanden")),
             // Ohne Recht kein Name aus dem fremden Modul, nur die allgemeine Bezeichnung
             // (LLH-1951, wie bei der Person in `personal::ruecknahme`).
             Some(_) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
@@ -2871,9 +2875,69 @@ mod tests {
             r.ausgelassen,
             [crate::fahrzeug::RuecknahmeAusgelassen {
                 bezeichnung: "Einheit".into(),
-                grund: "inzwischen aufgelöst".into(),
+                grund: "nicht mehr vorhanden".into(),
             }]
         );
+    }
+
+    /// LLH-1949: eine spurlos aufgelöste Einheit ist gelöscht, ihre ID kann an eine danach
+    /// gebildete Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT). Das Fahrzeug kommt dann
+    /// ohne Einheit zurück, und `ausgelassen` nennt keinen fremden Namen.
+    #[tokio::test]
+    async fn ruecknahme_nimmt_keine_neue_einheit_mit_der_alten_id() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        assert_eq!(v.einheit_id, Some(einheit));
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (id, einsatz_id, name, angelegt_at) \
+             VALUES (?, ?, 'Trupp B', '2099-01-01 00:01:00')",
+        )
+        .bind(einheit)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let r = nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        assert_eq!(r.einheit_id, None);
+        assert_eq!(
+            r.ausgelassen,
+            [crate::fahrzeug::RuecknahmeAusgelassen {
+                bezeichnung: "Einheit".into(),
+                grund: "nicht mehr vorhanden".into(),
+            }]
+        );
+        let (einheit_jetzt, beendet): (Option<i64>, Option<String>) =
+            sqlx::query_as("SELECT einheit_id, beendet_at FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((einheit_jetzt, beendet), (None, None));
     }
 }
 

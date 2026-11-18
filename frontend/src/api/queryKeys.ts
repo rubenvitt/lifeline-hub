@@ -204,6 +204,8 @@ export const EINSATZ_KEYS = {
   schaedenDruck: 'einsatz-schaeden-druck',
   // Einsatzbericht: ein Schnappschuss über alle Quellen (LFH-726).
   einsatzberichtDruck: 'einsatz-einsatzbericht-druck',
+  // Einsatzakte: ein Schnappschuss über alle Kapitel (LLH-1835).
+  einsatzakteDruck: 'einsatz-einsatzakte-druck',
   // Auftragsdruck: ein Auftrag als Schnappschuss, eigener Prefix außerhalb von `auftraege` (LLH-1171).
   auftragDruck: 'einsatz-auftrag-druck',
   // Druckansicht einer Person: Schnappschuss, eigener Prefix außerhalb von `person` (LLH-1120).
@@ -569,6 +571,9 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Auswahl lädt mit dem Dialog neu.
  * - `einsatzberichtDruck`: derselbe Schnappschuss-Grundsatz für den Einsatzbericht (LFH-726): EIN
  *   Stand über alle Quellen; ein Modul-Ereignis darf den geöffneten Bericht nicht still ändern.
+ * - `einsatzakteDruck` (LLH-1835): derselbe Schnappschuss-Grundsatz für die Einsatzakte; sie
+ *   enthält die Betroffenenliste, jeder Abruf schreibt also einen `druck`-Eintrag ins
+ *   Zugriffsprotokoll, ein Live-Refetch schriebe weitere.
  * - `auftragDruck` (LLH-1171): derselbe Schnappschuss-Grundsatz für das Blatt eines Auftrags; eine
  *   Quittung an einem anderen Gerät darf es nicht still ändern. Unter `auftraege` zöge ihn das
  *   Ereignis `auftrag` per Präfix mit.
@@ -616,6 +621,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.tiereDruck,
   EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
+  EINSATZ_KEYS.einsatzakteDruck,
   EINSATZ_KEYS.auftragDruck,
   EINSATZ_KEYS.personDruck,
   EINSATZ_KEYS.registrierlisteDruck,
@@ -851,6 +857,8 @@ export const einsatzKeys = {
   // Quellen und bekommt ihren eigenen Stand.
   einsatzberichtDruck: (einsatzId: number, auswahl: string) =>
     [EINSATZ_KEYS.einsatzberichtDruck, einsatzId, auswahl] as const,
+  // Einsatzakte (LLH-1835): alle Kapitel in einem Abruf, nicht live (siehe NICHT_LIVE_KEYS).
+  einsatzakteDruck: (einsatzId: number) => [EINSATZ_KEYS.einsatzakteDruck, einsatzId] as const,
   // Auftragsdruck (LLH-1171): ein Auftrag einzeln, nicht live (siehe NICHT_LIVE_KEYS).
   auftragDruck: (einsatzId: number, auftragId: number) =>
     [EINSATZ_KEYS.auftragDruck, einsatzId, auftragId] as const,

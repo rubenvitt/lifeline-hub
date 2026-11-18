@@ -8,7 +8,7 @@ import type { VerpflegungVorlage, Verpflegungsart } from '../api/types';
 import { listVerpflegungVorlagen, updateVerpflegungVorlage } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
-import { Status, monoStil } from '../components/instrument';
+import { Status, monoStil, Stapel } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -104,13 +104,13 @@ function VerpflegungsplanInhalt() {
       // Unter `md` gedeckelt, damit Zeit und Aktionen daneben im Bild bleiben (wie Sprechgruppen).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (b: string, m) => (
-        <Space size={[8, 4]} wrap>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('verpflegung_vorlage', m.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {

@@ -138,7 +138,18 @@ export interface BerichtFreigabe {
 /** Zustand einer Quelle aus den Modulfreigaben; ausgeblendet geht vor gesperrt. */
 function freigabeDerQuelle(quelle: Quelle, freigaben: ModulFreigaben): QuellenFreigabe {
   if (quelle.modul == null) return 'abrufen';
-  const modul = modulRegistry.find((m) => m.key === quelle.modul);
+  return freigabeDesModuls(quelle.modul, freigaben);
+}
+
+/**
+ * Zustand eines Moduls aus den Modulfreigaben, fail-closed; ausgeblendet geht vor gesperrt. Auch
+ * die Einsatzakte (LLH-1835) weicht damit.
+ */
+export function freigabeDesModuls(
+  key: string,
+  freigaben: ModulFreigaben,
+): Exclude<QuellenFreigabe, 'nicht-gewaehlt'> {
+  const modul = modulRegistry.find((m) => m.key === key);
   // Ein unbekannter Key ist ein Programmierfehler (Test „nur Modul-Keys der Registry“); im
   // Betrieb fail-closed.
   if (!modul) return 'gesperrt';

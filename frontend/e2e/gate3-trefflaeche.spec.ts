@@ -14,6 +14,7 @@ import { SPERR_SZENARIEN, seedKraefteGesperrt, sperrzweigSteht } from './kraefte
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { tippe } from './fernmeldeskizze-kern';
 import { seedeVorlage } from './vorlage-kern';
+import { weitereOeffnen } from './nebenweg-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import {
   BODEN_KARTE,
@@ -763,7 +764,9 @@ for (const szenario of SPERR_SZENARIEN) {
           await ladeInDichte(page, seite.pfad(sperre), dichte);
           await sperrzweigSteht(page, seite, sperre);
           let minimum = Infinity;
-          const ziele = seite.ziele(page, rolle);
+          const ziele = seite
+            .ziele(page, rolle)
+            .filter((z) => !z.nurIn || z.nurIn.includes(dichte));
           for (const { name, ziel, gesperrt, mindestens } of ziele) {
             const titel = `${seite.name}: ${name} (${dichte})`;
             const hoehe = mindestens
@@ -1301,9 +1304,10 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
-    // In der Zeile gesucht: die Einsatz-Navigation trägt seit LLH-1732 einen gleichnamigen Link.
+    // Im Seitenkopf gesucht (Stärke als Meta, LLH-1786): die Einsatz-Navigation trägt seit
+    // LLH-1732 einen gleichnamigen Link.
     const link = page
-      .locator('[data-lfh="verdichtungszeile"]')
+      .locator('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]')
       .getByRole('link', { name: 'Kräfteübersicht', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
@@ -5387,6 +5391,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       )}`,
       // Sprung und Drucken stehen als Nebenwege im Seitenkopf (LFH-1079).
       aktionen: '[data-lfh="seitenkopf-aktionen"]',
+      weitere: 'Weitere Aktionen zum Lagebericht',
       fortschreiben: 'Fortschreiben',
     },
     {
@@ -5400,6 +5405,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       // Sprung und Drucken stehen in jeder Breite im Seitenkopf (LFH-1079); unter `lg` trägt die
       // verankerte Leiste nur die Handlungen.
       aktionen: '[data-lfh="seitenkopf-aktionen"]',
+      weitere: 'Weitere Aktionen zum Befehl',
       fortschreiben: 'Fortschreiben',
     },
   ];
@@ -5408,14 +5414,26 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
 /**
  * Misst den ETB-Sprung einer Detailseite: Stufe, „↗“ und Abstand zu jedem anderen Ziel im
  * Aktionsblock (Drucken, Fortschreiben). Liefert Höhe und Abstand für die Anmerkung.
+ *
+ * In `komfortabel` und `handschuh` steht der Sprung ab `md` im Menü „Weitere“ (LLH-1786, Spec
+ * `einsatztauglichkeit-layout`): dann misst die Stufe der Menüeintrag, ohne „↗“ (es stünde im
+ * vorgelesenen Namen) und ohne Nachbarabstand (die Einträge eines Menüs stoßen aneinander).
  */
 async function etbSprungMessen(
   page: Page,
   aktionen: string,
+  weitere: string,
   dichte: keyof typeof ZIELABSTAND,
   soll: number,
   name: string,
 ): Promise<{ hoehe: number; abstand: number }> {
+  if (dichte !== 'kompakt') {
+    const eintrag = await weitereOeffnen(page, weitere, 'Zum ETB-Eintrag');
+    // Das Menü steht ausgezoomt (`weitereOeffnen`); gemessen wird der Eintrag selbst.
+    const hoehe = await haeltStufe(eintrag, soll, `${name}: ETB-Sprung im Menü (${dichte})`);
+    await page.keyboard.press('Escape');
+    return { hoehe, abstand: Number.NaN };
+  }
   const sprung = page.getByRole('link', { name: 'Zum ETB-Eintrag', exact: true });
   const hoehe = await haeltStufe(sprung, soll, `${name}: ETB-Sprung (${dichte})`);
   await expect(sprung, `${name}: der Sprung trägt „↗“`).toContainText('↗');
@@ -5451,7 +5469,14 @@ test('Detailseiten (LFH-968): der ETB-Sprung hält die Staffel und den Zielabsta
           `Vorbedingung ${seite.name}: „${seite.fortschreiben}“ steht`,
         ).toHaveCount(1);
         const name = `${seite.name} ${lage.width}`;
-        const { hoehe, abstand } = await etbSprungMessen(page, seite.aktionen, dichte, soll, name);
+        const { hoehe, abstand } = await etbSprungMessen(
+          page,
+          seite.aktionen,
+          seite.weitere,
+          dichte,
+          soll,
+          name,
+        );
         je.set(`${dichte} ${name}`, hoehe);
         gemessen.push(`${name} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}`);
       }
@@ -5487,7 +5512,10 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   for (const { dichte, soll } of STAFFEL) {
     for (const seite of seitenFrei) {
       await ladeInDichte(page, seite.pfad, dichte);
-      await expect(page.getByRole('button', { name: 'Drucken' })).toHaveCount(1);
+      // Drucken steht in `kompakt` als Knopf, in 48 / 72 im Menü (LLH-1786).
+      if (dichte === 'kompakt') {
+        await expect(page.getByRole('button', { name: 'Drucken' })).toHaveCount(1);
+      }
       // Vorbedingung: der Rollenzweig steht — ohne Schreibrecht kein „Fortschreiben“.
       await expect(
         page.getByRole('button', { name: seite.fortschreiben, exact: true }),
@@ -5496,6 +5524,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
       const { hoehe, abstand } = await etbSprungMessen(
         page,
         seite.aktionen,
+        seite.weitere,
         dichte,
         soll,
         seite.name,
@@ -5506,10 +5535,15 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
 
     // Gesperrtes ETB: der Grund steht im Text, nicht nur im `title` (auf Touch unsichtbar).
     await ladeInDichte(page, berichtGesperrt.pfad, dichte);
-    const gesperrterSprung = page.getByRole('button', {
-      name: 'Zum ETB-Eintrag (Keine Berechtigung)',
-      exact: true,
-    });
+    // In 48 / 72 steht der gesperrte Sprung als gesperrter Eintrag im Menü (LLH-1786).
+    const gesperrterSprung =
+      dichte === 'kompakt'
+        ? page.getByRole('button', { name: 'Zum ETB-Eintrag (Keine Berechtigung)', exact: true })
+        : await weitereOeffnen(
+            page,
+            berichtGesperrt.weitere,
+            'Zum ETB-Eintrag (Keine Berechtigung)',
+          );
     const hoehe = await gesperrtHaeltStufe(
       gesperrterSprung,
       soll,

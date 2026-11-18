@@ -5,7 +5,7 @@ import type { Dayjs } from 'dayjs';
 import { Link, useNavigate } from 'react-router';
 import { IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
-import { Paneel, Status, monoStil, useRollen } from '../../components/instrument';
+import { Paneel, Status, monoStil, useRollen, Feld, Stapel } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -238,61 +238,57 @@ export default function Anbindungen() {
                           </span>
                         }
                         description={
-                          <span
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 2,
-                              color: rollen.gedaempft,
-                            }}
-                          >
-                            <RechteText scopes={z.scopes} />
-                            <span>
-                              {z.fingerabdruck ? (
-                                <>
-                                  Schlüssel <span style={monoStil(12, 500)}>{z.fingerabdruck}</span>
-                                </>
-                              ) : widerrufenAm ? (
-                                'ohne Schlüssel'
-                              ) : (
-                                'Code noch nicht eingelöst'
-                              )}
-                              {z.fingerabdruck_neu && (
-                                <>
-                                  {' · neuer Schlüssel '}
-                                  <span style={monoStil(12, 500)}>{z.fingerabdruck_neu}</span>
-                                  {', gilt ab der ersten Anfrage damit'}
-                                </>
-                              )}
-                            </span>
-                            <span>
-                              {z.zuletzt_genutzt_at
-                                ? `zuletzt genutzt ${zeit(z.zuletzt_genutzt_at)}`
-                                : 'noch nie genutzt'}
-                              {z.gueltig_bis && ` · gültig bis ${zeit(z.gueltig_bis)}`}
-                              {z.widerrufen_at &&
-                                ` · widerrufen ${zeit(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
-                            </span>
-                            {einsatz && <span data-lfh="anbindung-einsatz">{einsatz}</span>}
-                            {z.webhook &&
-                              (z.webhook.zustand === 'angehalten' ||
-                                z.webhook.zustand === 'fehler') && (
-                                <span data-lfh="anbindung-webhook">
-                                  <Status
-                                    groesse="klein"
-                                    ton={webhookZustandAnzeige(z.webhook).ton}
-                                    wort={webhookZustandAnzeige(z.webhook).wort}
-                                  />
+                          <span style={{ color: rollen.gedaempft }}>
+                            <Stapel als="span" abstand="xxs">
+                              <RechteText scopes={z.scopes} />
+                              <span>
+                                {z.fingerabdruck ? (
+                                  <>
+                                    Schlüssel{' '}
+                                    <span style={monoStil(12, 500)}>{z.fingerabdruck}</span>
+                                  </>
+                                ) : widerrufenAm ? (
+                                  'ohne Schlüssel'
+                                ) : (
+                                  'Code noch nicht eingelöst'
+                                )}
+                                {z.fingerabdruck_neu && (
+                                  <>
+                                    {' · neuer Schlüssel '}
+                                    <span style={monoStil(12, 500)}>{z.fingerabdruck_neu}</span>
+                                    {', gilt ab der ersten Anfrage damit'}
+                                  </>
+                                )}
+                              </span>
+                              <span>
+                                {z.zuletzt_genutzt_at
+                                  ? `zuletzt genutzt ${zeit(z.zuletzt_genutzt_at)}`
+                                  : 'noch nie genutzt'}
+                                {z.gueltig_bis && ` · gültig bis ${zeit(z.gueltig_bis)}`}
+                                {z.widerrufen_at &&
+                                  ` · widerrufen ${zeit(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
+                              </span>
+                              {einsatz && <span data-lfh="anbindung-einsatz">{einsatz}</span>}
+                              {z.webhook &&
+                                (z.webhook.zustand === 'angehalten' ||
+                                  z.webhook.zustand === 'fehler') && (
+                                  <span data-lfh="anbindung-webhook">
+                                    <Status
+                                      groesse="klein"
+                                      ton={webhookZustandAnzeige(z.webhook).ton}
+                                      wort={webhookZustandAnzeige(z.webhook).wort}
+                                    />
+                                  </span>
+                                )}
+                              {z.letzte_ablehnung && !widerrufenAm && (
+                                <span
+                                  data-lfh="anbindung-ablehnung"
+                                  style={{ color: rollen.achtungText }}
+                                >
+                                  {`Letzte Ablehnung: ${ablehnungText(z.letzte_ablehnung)} · ${zeit(z.letzte_ablehnung.at)}`}
                                 </span>
                               )}
-                            {z.letzte_ablehnung && !widerrufenAm && (
-                              <span
-                                data-lfh="anbindung-ablehnung"
-                                style={{ color: rollen.achtungText }}
-                              >
-                                {`Letzte Ablehnung: ${ablehnungText(z.letzte_ablehnung)} · ${zeit(z.letzte_ablehnung.at)}`}
-                              </span>
-                            )}
+                            </Stapel>
                           </span>
                         }
                       />
@@ -320,7 +316,7 @@ export default function Anbindungen() {
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Name"
           name="name"
           rules={[
@@ -329,28 +325,28 @@ export default function Anbindungen() {
           ]}
         >
           <Input placeholder="Alarm-Adapter Wache 1" maxLength={ANBINDUNG_NAME_MAX} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Rechte"
           name="scopes"
           rules={[
             { required: true, type: 'array', min: 1, message: 'Mindestens ein Recht wählen' },
           ]}
         >
-          <Checkbox.Group
-            style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
-          >
-            {SCOPES.map((s) => (
-              <Checkbox key={s} value={s}>
-                {SCOPE_TEXT[s]}{' '}
-                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
-              </Checkbox>
-            ))}
+          <Checkbox.Group>
+            <Stapel abstand="xxs">
+              {SCOPES.map((s) => (
+                <Checkbox key={s} value={s}>
+                  {SCOPE_TEXT[s]}{' '}
+                  <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+                </Checkbox>
+              ))}
+            </Stapel>
           </Checkbox.Group>
-        </Form.Item>
-        <Form.Item label="Gültig bis" name="gueltig_bis">
+        </Feld>
+        <Feld label="Gültig bis" name="gueltig_bis">
           <ZeitpunktEingabe art="frist" placeholder="bis zum Widerruf" style={{ width: '100%' }} />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <WiderrufDialog

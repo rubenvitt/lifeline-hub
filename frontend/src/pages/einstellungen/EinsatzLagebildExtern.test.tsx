@@ -130,9 +130,8 @@ describe('EinsatzLagebildExtern', () => {
       }),
     ]);
     renderMitProviders(<EinsatzLagebildExtern einsatzId={1} darf />);
-    const oeffnungen = await screen.findAllByText(/Abruf/, {
-      selector: '[data-lfh="lagebild-freigabe-oeffnung"]',
-    });
+    await screen.findAllByText(/Abruf/);
+    const oeffnungen = [...document.querySelectorAll('[data-lfh="lagebild-freigabe-oeffnung"]')];
     expect(oeffnungen).toHaveLength(2);
     expect(oeffnungen[0]).toHaveTextContent('5 Abrufe');
     expect(oeffnungen[1]).toHaveTextContent('1 Abruf');

@@ -1,5 +1,5 @@
-import { Collapse, Form, Input, InputNumber, type TableColumnsType } from 'antd';
-import { monoStil } from '../components/instrument';
+import { Collapse, Input, InputNumber, type TableColumnsType } from 'antd';
+import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
 import {
@@ -123,12 +123,12 @@ const aktualisiere = (id: number, werte: FormWerte) =>
  */
 const felder = (
   <>
-    <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
       <Input />
-    </Form.Item>
-    <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
+    </Feld>
+    <Feld label="Kategorie" name="kategorie" rules={[{ required: true }]}>
       <Select options={kategorien.map((k) => ({ value: k, label: statusKategorie[k].label }))} />
-    </Form.Item>
+    </Feld>
     <Collapse
       ghost
       style={{ marginInline: -8 }}
@@ -138,15 +138,15 @@ const felder = (
           label: 'Weitere Angaben',
           children: (
             <>
-              <Form.Item label="Farbe (Hex, optional)" name="farbe">
+              <Feld label="Farbe (Hex, optional)" name="farbe">
                 <Input placeholder="#22aa55" />
-              </Form.Item>
-              <Form.Item label="FMS-Anker (0–9, optional)" name="fms_anker">
-                <InputNumber min={0} max={9} style={{ width: '100%', maxWidth: 120 }} />
-              </Form.Item>
-              <Form.Item label="Sortierung" name="sortier">
-                <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-              </Form.Item>
+              </Feld>
+              <Feld label="FMS-Anker (0–9, optional)" name="fms_anker" breite="kurz">
+                <InputNumber min={0} max={9} />
+              </Feld>
+              <Feld label="Sortierung" name="sortier" breite="kurz">
+                <InputNumber min={0} />
+              </Feld>
               {markeFeld}
             </>
           ),

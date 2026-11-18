@@ -46,6 +46,7 @@ import {
   istNichtGefunden,
   SeitenFehler,
   SeitenNichtGefunden,
+  SeitenStandVeraltet,
 } from '../../components/SeitenZustand';
 import SektionHeader from '../../components/SektionHeader';
 import {
@@ -463,11 +464,14 @@ export default function BrDetailPage() {
       </div>
     );
   }
-  if (einsatzQuery.error || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1947): React Query setzt `error` auch, wenn nur ein
+  // Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher liegt. Dann
+  // bliebe sonst eine offene Bearbeitung der Raumdaten nicht stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
-  if (detailQuery.error || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <SeitenFehler
         text="Bereitstellungsraum konnte nicht geladen werden"
@@ -479,6 +483,7 @@ export default function BrDetailPage() {
 
   const einsatz = einsatzQuery.data;
   const br = detailQuery.data;
+  const veraltet = einsatzQuery.isError || detailQuery.isError;
   const schreibgeschuetzt =
     !darfImEinsatzSchreiben(einsatz) || br.status === 'geplant' || br.status === 'aufgeloest';
   // Raumdaten ändern (LFH-1147): geplant und aktiv, nicht mehr nach dem Auflösen oder Stornieren
@@ -748,8 +753,19 @@ export default function BrDetailPage() {
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (kopfFehler != null || ohneZeile.length > 0 || austrittZurueckFehler != null) && (
+        (veraltet ||
+          kopfFehler != null ||
+          ohneZeile.length > 0 ||
+          austrittZurueckFehler != null) && (
           <Flex vertical gap={token.marginSM}>
+            {veraltet && (
+              <SeitenStandVeraltet
+                onWiederholen={() => {
+                  if (einsatzQuery.isError) void einsatzQuery.refetch();
+                  if (detailQuery.isError) void detailQuery.refetch();
+                }}
+              />
+            )}
             <SeitenHinweise
               fehler={kopfFehler}
               fehlerTitel="Status nicht geändert"

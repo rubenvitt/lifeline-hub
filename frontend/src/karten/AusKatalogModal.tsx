@@ -1,4 +1,4 @@
-import { Alert, App, Button, Modal, Spin, Typography } from 'antd';
+import { Alert, App, Button, Modal, Spin } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -13,6 +13,7 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { globalKeys } from '../api/queryKeys';
 import { Marke } from '../components/instrument/Marke';
+import { Textstufe } from '../components/instrument';
 
 /**
  * Server-autoritativer Vorschlagskatalog: je Eintrag „Hinzufügen" = POST. Bereits (per URL)
@@ -119,9 +120,9 @@ export default function AusKatalogModal({
                   }
                   description={
                     <>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      <Textstufe stufe="textKlein" ton="gedaempft">
                         {eintrag.url}
-                      </Typography.Text>
+                      </Textstufe>
                       {eintrag.hinweis && (
                         <Alert
                           type="warning"

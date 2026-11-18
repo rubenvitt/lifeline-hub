@@ -8,12 +8,14 @@ import {
   BearbeitbaresPaneel,
   Datenfeld,
   Datenraster,
+  Feld,
+  monoStil,
   Paneel,
   PaneelZeile,
+  Stapel,
   Status,
-  monoStil,
-  useRollen,
   type BearbeitbaresFeld,
+  useRollen,
 } from '../../components/instrument';
 import { SeitenFehler } from '../../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -93,23 +95,22 @@ function ArtenAuswahl({
   value?: EventType[];
   onChange?: (arten: EventType[]) => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   return (
     <div id={id}>
-      <Checkbox.Group<EventType>
-        value={value}
-        onChange={(arten) => onChange?.(arten)}
-        style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
-      >
-        {ARTEN.map((a) => {
-          const grund = artGesperrtGrund(a, scopes);
-          return (
-            <Checkbox key={a} value={a} disabled={grund != null} data-lfh={`webhook-art-${a}`}>
-              {ART_TEXT[a]} <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{a}</span>
-              {grund && <span style={{ color: rollen.gedaempft }}>{` · ${grund}`}</span>}
-            </Checkbox>
-          );
-        })}
+      <Checkbox.Group<EventType> value={value} onChange={(arten) => onChange?.(arten)}>
+        <Stapel abstand="xxs">
+          {ARTEN.map((a) => {
+            const grund = artGesperrtGrund(a, scopes);
+            return (
+              <Checkbox key={a} value={a} disabled={grund != null} data-lfh={`webhook-art-${a}`}>
+                {ART_TEXT[a]}{' '}
+                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{a}</span>
+                {grund && <span style={{ color: rollen.gedaempft }}>{` · ${grund}`}</span>}
+              </Checkbox>
+            );
+          })}
+        </Stapel>
       </Checkbox.Group>
     </div>
   );
@@ -272,19 +273,19 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
           onFertig={() => setEinrichtenOffen(false)}
           onAbbrechen={() => setEinrichtenOffen(false)}
         >
-          <Form.Item label="Ziel-URL" name="url" rules={URL_REGELN}>
+          <Feld label="Ziel-URL" name="url" rules={URL_REGELN}>
             <Input
               placeholder="https://fremdsystem.example/lifeline"
               maxLength={WEBHOOK_URL_MAX}
               autoComplete="off"
             />
-          </Form.Item>
-          <Form.Item label="Ereignisarten" name="arten" rules={ARTEN_REGELN}>
+          </Feld>
+          <Feld label="Ereignisarten" name="arten" rules={ARTEN_REGELN}>
             <ArtenAuswahl scopes={zugang.scopes} />
-          </Form.Item>
-          <Form.Item name="lan_erlaubt" initialValue={false}>
+          </Feld>
+          <Feld name="lan_erlaubt" initialValue={false}>
             <LanSchalter />
-          </Form.Item>
+          </Feld>
         </ErfassungsModal>
       </Paneel>
     );
@@ -547,19 +548,20 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
       ) : (
         versuche.map((v, i) => (
           <PaneelZeile key={`${v.at}-${i}`}>
-            <span
-              data-lfh="webhook-versuch"
-              style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}
-            >
-              <span style={monoStil(12)}>{zeitKurz(v.at, konv)}</span>
-              <span style={monoStil(12)}>
-                {v.test ? 'Test' : v.ereignis_id != null ? `#${v.ereignis_id}` : '—'}
-              </span>
-              <span style={{ color: v.erfolg ? rollen.text : rollen.achtungText }}>
-                {versuchText(v)}
-              </span>
-              <span style={{ ...monoStil(12), color: rollen.gedaempft }}>{`${v.dauer_ms} ms`}</span>
-            </span>
+            <div data-lfh="webhook-versuch">
+              <Stapel richtung="zeile" umbruch abstand="md" ausrichten="baseline">
+                <span style={monoStil(12)}>{zeitKurz(v.at, konv)}</span>
+                <span style={monoStil(12)}>
+                  {v.test ? 'Test' : v.ereignis_id != null ? `#${v.ereignis_id}` : '—'}
+                </span>
+                <span style={{ color: v.erfolg ? rollen.text : rollen.achtungText }}>
+                  {versuchText(v)}
+                </span>
+                <span
+                  style={{ ...monoStil(12), color: rollen.gedaempft }}
+                >{`${v.dauer_ms} ms`}</span>
+              </Stapel>
+            </div>
           </PaneelZeile>
         ))
       )}

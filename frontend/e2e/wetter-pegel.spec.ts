@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefe } from './kontrast-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { weitereOeffnen } from './nebenweg-kern';
 
 /**
  * Browser-Nachweise für „Wetter & Pegel": „Stand unbekannt" ist wirklich SICHTBAR und die
@@ -269,14 +270,18 @@ test('Gate 3: Nebenweg „Pegel festlegen“ und Beschreibungs-Umschalter folgen
     ] as const);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-    // Ab `md` steht der Nebenweg als sekundärer Knopf im Kopf (LLH-1117: keine Primäraktion).
+    // Ab `md` steht der Nebenweg in `kompakt` als sekundärer Knopf im Kopf (LLH-1117: keine
+    // Primäraktion), in 48 / 72 im Menü „Weitere“ (LLH-1786); gemessen wird, was steht.
     const nebenweg = await haeltStufe(
-      page
-        .locator('[data-lfh="seitenkopf-aktionen"]')
-        .getByRole('button', { name: 'Pegel festlegen' }),
+      dichte === 'kompakt'
+        ? page
+            .locator('[data-lfh="seitenkopf-aktionen"]')
+            .getByRole('button', { name: 'Pegel festlegen' })
+        : await weitereOeffnen(page, 'Weitere Aktionen zu Wetter & Pegel', 'Pegel festlegen'),
       soll,
       `Nebenweg ${dichte}`,
     );
+    if (dichte !== 'kompakt') await page.keyboard.press('Escape');
     const umschalter = await haeltStufe(
       page.getByRole('button', { name: 'Beschreibung und Handlungsempfehlung' }),
       soll,

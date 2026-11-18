@@ -37,6 +37,55 @@ export function dreiSpaltenPassen(rahmenBreite: number, flaecheBreite: number): 
   return rahmenBreite >= DREI_SPALTEN_SOCKEL + flaecheBreite;
 }
 
+/** Höchste Streckung des Grundrisses (LLH-1940, abgestimmt 18.11.2026). */
+export const EINPASS_MAX = 2;
+
+/**
+ * Hülle des Inhalts in Grundmaßen (Server-Raster): bis einen Rasterschritt hinter die letzte Karte
+ * (160 × 140, wie die Fläche es seit jeher rechnet) und bis zum Rand des Plans. Ein Platz ohne Lage
+ * steht, wo die Karte ihn zeichnet (10, 10). Die Mindestfläche von 700 × 420 zählt nicht: sonst
+ * wüchse ein Grundriss mit zwei Plätzen nie.
+ */
+export function grundrissInhalt(
+  plaetze: readonly { pos_x?: number | null; pos_y?: number | null }[],
+  plan: { x: number; y: number; breite: number; hoehe: number } | null,
+): { breite: number; hoehe: number } {
+  let breite = 0;
+  let hoehe = 0;
+  for (const p of plaetze) {
+    breite = Math.max(breite, (p.pos_x ?? 10) + 160);
+    hoehe = Math.max(hoehe, (p.pos_y ?? 10) + 140);
+  }
+  if (plan) {
+    breite = Math.max(breite, plan.x + plan.breite);
+    hoehe = Math.max(hoehe, plan.y + plan.hoehe);
+  }
+  return { breite, hoehe };
+}
+
+/**
+ * Einpassfaktor `s` der Fläche (Spec `uhs-grundriss`, „Kartengröße und Layout sind
+ * dichteunabhängig“): so weit gestreckt, wie der Inhalt in beiden Achsen ohne Bildlauf in die Sicht
+ * passt, zwischen 1 und `EINPASS_MAX`. Abgerundet auf zwei Stellen: die gestreckte Fläche läuft so
+ * nie über, und eine zwischen zwei Werten schwankende Messung lässt die Karten nicht zittern.
+ * Unbekannte Sicht (0) oder leerer Inhalt heißt 1.
+ */
+export function einpassFaktor({
+  sichtBreite,
+  sichtHoehe,
+  inhaltBreite,
+  inhaltHoehe,
+}: {
+  sichtBreite: number;
+  sichtHoehe: number;
+  inhaltBreite: number;
+  inhaltHoehe: number;
+}): number {
+  if (sichtBreite <= 0 || sichtHoehe <= 0 || inhaltBreite <= 0 || inhaltHoehe <= 0) return 1;
+  const roh = Math.min(sichtBreite / inhaltBreite, sichtHoehe / inhaltHoehe);
+  return Math.min(EINPASS_MAX, Math.max(1, Math.floor(roh * 100) / 100));
+}
+
 /** Bildlauf-Maße eines Containers, wie `Element` sie liefert. */
 export interface BildlaufMasse {
   scrollLeft: number;

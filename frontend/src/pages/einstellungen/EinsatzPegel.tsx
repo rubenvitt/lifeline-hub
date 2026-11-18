@@ -417,28 +417,30 @@ export default function EinsatzPegel() {
             gap: token.marginSM,
           }}
         >
-          <Select<string>
-            id={auswahlId}
-            style={{ flex: '1 1 16rem', minWidth: 0 }}
-            placeholder="Station suchen (Name, Gewässer, km)"
-            value={auswahl ?? undefined}
-            onChange={(v) => setAuswahl(v)}
-            allowClear
-            onClear={() => setAuswahl(null)}
-            loading={stationenQ.isLoading}
-            disabled={!darf || voll || laeuft || stationenFehlen}
-            showSearch={{
-              filterOption: (eingabe, option) =>
-                String(option?.label ?? '')
-                  .toLowerCase()
-                  .includes(eingabe.trim().toLowerCase()),
-            }}
-            options={stationen.map((s) => ({
-              value: s.uuid,
-              label: stationsLabel(s),
-              disabled: festgelegt.has(s.uuid),
-            }))}
-          />
+          {/* Die Hülle wächst in der Reihe, das Raster streckt die Auswahl auf ihre Breite. */}
+          <div style={{ flex: '1 1 16rem', minWidth: 0, display: 'grid' }}>
+            <Select<string>
+              id={auswahlId}
+              placeholder="Station suchen (Name, Gewässer, km)"
+              value={auswahl ?? undefined}
+              onChange={(v) => setAuswahl(v)}
+              allowClear
+              onClear={() => setAuswahl(null)}
+              loading={stationenQ.isLoading}
+              disabled={!darf || voll || laeuft || stationenFehlen}
+              showSearch={{
+                filterOption: (eingabe, option) =>
+                  String(option?.label ?? '')
+                    .toLowerCase()
+                    .includes(eingabe.trim().toLowerCase()),
+              }}
+              options={stationen.map((s) => ({
+                value: s.uuid,
+                label: stationsLabel(s),
+                disabled: festgelegt.has(s.uuid),
+              }))}
+            />
+          </div>
           <Button
             type="primary"
             disabled={!darf || voll || laeuft || !gewaehlt || festgelegt.has(gewaehlt.uuid)}

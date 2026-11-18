@@ -1,6 +1,7 @@
 import { AutoComplete, Form, Input, Typography } from 'antd';
 import { Link } from 'react-router';
 import { Select } from '../components/Select';
+import { Feld } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -119,32 +120,32 @@ export default function PersonalFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
       >
         <Input />
-      </Form.Item>
-      <Form.Item label="Personalnummer" name="personalnummer">
+      </Feld>
+      <Feld label="Personalnummer" name="personalnummer">
         <Input />
-      </Form.Item>
-      <Form.Item label="Trägerorganisation" name="traegerorganisation">
+      </Feld>
+      <Feld label="Trägerorganisation" name="traegerorganisation">
         <AutoComplete
           options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. DRK Musterstadt"
           showSearch={teilwortSuche}
         />
-      </Form.Item>
-      <Form.Item label="Qualifikationen" name="qualifikation_ids">
+      </Feld>
+      <Feld label="Qualifikationen" name="qualifikation_ids">
         <Select
           mode="multiple"
           allowClear
           options={qualOptionen}
           placeholder="Qualifikationen wählen"
         />
-      </Form.Item>
+      </Feld>
       {/* NUR im Bearbeiten-Modus — beim Anlegen gibt es noch keine id und damit keine Route. */}
       {person && (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>

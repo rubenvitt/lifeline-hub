@@ -67,6 +67,30 @@ pub async fn anlegen(
     Ok(())
 }
 
+/// Wie [`anlegen`], aber in einer offenen Transaktion: das ZIP der Einsatzakte (LLH-1835)
+/// protokolliert jeden UHS-Anhang und liefert nur, wenn alle Einträge stehen.
+pub async fn anlegen_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    anhang_id: i64,
+    ablage: &str,
+    benutzer_id: i64,
+    fassung: ZugriffFassung,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO anhang_zugriff_audit (einsatz_id, anhang_id, ablage, benutzer_id, fassung) \
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(einsatz_id)
+    .bind(anhang_id)
+    .bind(ablage)
+    .bind(benutzer_id)
+    .bind(fassung.als_str())
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Protokoll aller Anhänge eines Besitzers der Ablage `d` (auch entfernter), neueste zuerst.
 /// Der JOIN über den Linker mit `einsatz_id` und Besitzer trennt Einsätze und Besitzer.
 pub async fn liste_je_besitzer(

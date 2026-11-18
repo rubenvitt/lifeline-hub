@@ -22,6 +22,7 @@ import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
+import { Textstufe } from '../components/instrument';
 import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
 
@@ -310,9 +311,9 @@ export default function OfflineRegionPicker({
     }
     // 5) Nicht gebaut und kein Bau möglich: der Grund steht sichtbar da, kein Tooltip (Touch).
     return (
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Textstufe stufe="textKlein" ton="gedaempft">
         Nicht gebaut
-      </Typography.Text>
+      </Textstufe>
     );
   };
 
@@ -350,9 +351,9 @@ export default function OfflineRegionPicker({
                       title={z.name}
                       description={
                         <>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          <Textstufe stufe="textKlein" ton="gedaempft">
                             {z.region}
-                          </Typography.Text>
+                          </Textstufe>
                           {grund && (
                             <div>
                               <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />

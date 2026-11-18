@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react';
-import { Alert, Spin, Switch, theme, Typography } from 'antd';
+import { Alert, Spin, Switch, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { providerListeAdmin, providerSchalten } from '../../api/auth';
 import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
-import { Paneel } from '../../components/instrument';
+import { Paneel, Stapel, Textstufe } from '../../components/instrument';
 import { NUR_ADMIN } from '../../components/nurAnsicht';
 
 /**
@@ -88,59 +88,65 @@ export default function Anmeldeverfahren() {
         ) : providerQuery.isError ? (
           <Alert type="error" title="Anmeldeverfahren nicht ladbar" showIcon />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
-            {provider.map((p) => {
-              const istPasswort = p.id === 'passwort';
-              // Die drei Sperrquellen getrennt: nur zwei sind dauerhaft und verdienen einen Text.
-              // `isPending` ist vorübergehend — ein Grund, der nach 200 ms verschwindet, ist
-              // Rauschen.
-              const bedienbar = istAdmin && !istPasswort;
-              const gesperrt = !bedienbar || schaltenMutation.isPending;
-              const sperrGrund = !istAdmin ? NUR_ADMIN : istPasswort ? 'nicht deaktivierbar' : null;
-              const feldId = `anmeldeverfahren-${p.id}`;
-              // Nur die abgelehnte Zeile markieren; `variables` trägt die zuletzt gescheiterte
-              // Zeile.
-              const hatFehler = schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
-              return (
-                <div
-                  key={p.id}
-                  data-provider-zeile={p.id}
-                  data-fehler={hatFehler ? 'true' : undefined}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
-                  }}
-                >
-                  {/* Ein `<label htmlFor>` nur an der bedienbaren Zeile, sonst ein `<span>`. Das
+          <div style={{ maxWidth: 360 }}>
+            <Stapel abstand="sm">
+              {provider.map((p) => {
+                const istPasswort = p.id === 'passwort';
+                // Die drei Sperrquellen getrennt: nur zwei sind dauerhaft und verdienen einen Text.
+                // `isPending` ist vorübergehend — ein Grund, der nach 200 ms verschwindet, ist
+                // Rauschen.
+                const bedienbar = istAdmin && !istPasswort;
+                const gesperrt = !bedienbar || schaltenMutation.isPending;
+                const sperrGrund = !istAdmin
+                  ? NUR_ADMIN
+                  : istPasswort
+                    ? 'nicht deaktivierbar'
+                    : null;
+                const feldId = `anmeldeverfahren-${p.id}`;
+                // Nur die abgelehnte Zeile markieren; `variables` trägt die zuletzt gescheiterte
+                // Zeile.
+                const hatFehler =
+                  schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
+                return (
+                  <div
+                    key={p.id}
+                    data-provider-zeile={p.id}
+                    data-fehler={hatFehler ? 'true' : undefined}
+                    style={{
+                      borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
+                    }}
+                  >
+                    <Stapel richtung="zeile" abstand="md" ausrichten="mitte">
+                      {/* Ein `<label htmlFor>` nur an der bedienbaren Zeile, sonst ein `<span>`. Das
                       `aria-label` am Switch bleibt und schlägt das Label — wer es als „doppelt"
                       entfernt, ändert still den Accessible Name. */}
-                  {bedienbar ? (
-                    <label
-                      htmlFor={feldId}
-                      style={{ ...zeilenzielStil(token), flex: 1, cursor: 'pointer' }}
-                    >
-                      {p.anzeigename}
-                    </label>
-                  ) : (
-                    <span style={{ ...zeilenzielStil(token), flex: 1 }}>{p.anzeigename}</span>
-                  )}
-                  {sperrGrund && (
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      {sperrGrund}
-                    </Typography.Text>
-                  )}
-                  <Switch
-                    id={feldId}
-                    aria-label={`Anmeldeverfahren: ${p.anzeigename}`}
-                    checked={p.aktiviert}
-                    disabled={gesperrt}
-                    onChange={(aktiviert) => schaltenMutation.mutate({ id: p.id, aktiviert })}
-                  />
-                </div>
-              );
-            })}
+                      {bedienbar ? (
+                        <label
+                          htmlFor={feldId}
+                          style={{ ...zeilenzielStil(token), flex: 1, cursor: 'pointer' }}
+                        >
+                          {p.anzeigename}
+                        </label>
+                      ) : (
+                        <span style={{ ...zeilenzielStil(token), flex: 1 }}>{p.anzeigename}</span>
+                      )}
+                      {sperrGrund && (
+                        <Textstufe stufe="textKlein" ton="gedaempft">
+                          {sperrGrund}
+                        </Textstufe>
+                      )}
+                      <Switch
+                        id={feldId}
+                        aria-label={`Anmeldeverfahren: ${p.anzeigename}`}
+                        checked={p.aktiviert}
+                        disabled={gesperrt}
+                        onChange={(aktiviert) => schaltenMutation.mutate({ id: p.id, aktiviert })}
+                      />
+                    </Stapel>
+                  </div>
+                );
+              })}
+            </Stapel>
           </div>
         )}
       </Paneel>

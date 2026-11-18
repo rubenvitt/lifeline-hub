@@ -36,6 +36,8 @@ pub struct AppState {
     pub auto_aktualisierung: crate::karte::auto_aktualisierung::AutoAktualisierung,
     /// Lässt höchstens einen Sicherungs-Download zugleich zu (LFH-926, `GET /api/backup`).
     pub backup_download: crate::backup::DownloadSperre,
+    /// Ein ZIP der Einsatzakte je Einsatz zugleich (LLH-1835, design.md D7).
+    pub einsatzakte_bau: crate::einsatzakte::BauSperre,
     /// Öffentliche Schlüssel, an die `GET /api/backup` verschlüsselt (LFH-1002); leer → Klartext.
     pub backup_empfaenger: crate::backup::Empfaenger,
     /// Letztes Ergebnis der Datenträgerprüfung (LFH-1100), `GET /api/system/datentraeger`.
@@ -1243,6 +1245,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen/export",
             get(routes::einsatz_person::export),
+        )
+        .route(
+            "/api/einsaetze/{id}/einsatzakte/anlagen.zip",
+            get(routes::einsatzakte::anlagen_zip),
         )
         .route(
             "/api/einsaetze/{id}/personen/druck",
@@ -3120,6 +3126,7 @@ mod tests {
                 reqwest::Client::new(),
             ),
             backup_download: Default::default(),
+            einsatzakte_bau: Default::default(),
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
         }

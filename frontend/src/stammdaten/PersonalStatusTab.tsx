@@ -1,5 +1,5 @@
-import { Collapse, Form, Input, InputNumber, Switch, type TableColumnsType } from 'antd';
-import { monoStil } from '../components/instrument';
+import { Collapse, Input, InputNumber, Switch, type TableColumnsType } from 'antd';
+import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
 import {
@@ -109,18 +109,18 @@ const aktualisiere = (id: number, werte: FormWerte) =>
 
 const felder = (
   <>
-    <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
       <Input />
-    </Form.Item>
-    <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
+    </Feld>
+    <Feld label="Kategorie" name="kategorie" rules={[{ required: true }]}>
       <Select options={kategorien.map((k) => ({ value: k, label: statusKategorie[k].label }))} />
-    </Form.Item>
-    <Form.Item label="Farbe (Hex, optional)" name="farbe">
+    </Feld>
+    <Feld label="Farbe (Hex, optional)" name="farbe">
       <Input placeholder="#22aa55" />
-    </Form.Item>
-    <Form.Item label="Sortierung" name="sortier">
-      <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-    </Form.Item>
+    </Feld>
+    <Feld label="Sortierung" name="sortier" breite="kurz">
+      <InputNumber min={0} />
+    </Feld>
     {/* Die Marke (LFH-552) und der Schalter „Pause“ (LLH-1555) liegen eingeklappt: vier Felder
         stehen schon offen, ein fünftes sprengte das Feldbudget. Ohne `forceRender` — die
         Vorbelegung erreicht sie trotzdem. */}
@@ -134,9 +134,9 @@ const felder = (
           children: (
             <>
               {markeFeld}
-              <Form.Item label="Pause im Schichtplan" name="pause" valuePropName="checked">
+              <Feld label="Pause im Schichtplan" name="pause" valuePropName="checked">
                 <Switch />
-              </Form.Item>
+              </Feld>
             </>
           ),
         },

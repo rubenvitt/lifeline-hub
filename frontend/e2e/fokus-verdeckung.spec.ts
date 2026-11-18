@@ -937,8 +937,11 @@ for (const szenario of SPERR_SZENARIEN) {
           await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
           await sperrzweigSteht(page, seite, sperre);
           const namen: string[] = [];
-          for (const { name, fokus, mindestens, fokusMindestens } of seite.ziele(page, rolle)) {
-            if (!fokus) continue;
+          for (const { name, fokus, mindestens, fokusMindestens, nurIn } of seite.ziele(
+            page,
+            rolle,
+          )) {
+            if (!fokus || (nurIn && !nurIn.includes(dichte))) continue;
             const anzahl = await fokus.count();
             expect(anzahl, `${seite.name}: ${name}`).toBeGreaterThanOrEqual(
               fokusMindestens ?? mindestens ?? 1,

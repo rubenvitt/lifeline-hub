@@ -1,4 +1,4 @@
-import { App, Button, Input, Modal, Spin, Typography } from 'antd';
+import { App, Button, Input, Modal, Spin } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
 import { Marke } from '../components/instrument/Marke';
+import { Textstufe } from '../components/instrument';
 
 /** Dateiname → lesbarer Default-Name: `.mbtiles` weg, `osm.`-Präfix + `.YYYY-MM-DD`-Datum weg. */
 function nameAusDatei(dateiname: string): string {
@@ -109,18 +110,19 @@ export default function OfflineVorhandeneModal({
                      * ist das Bedienziel der Zeile, und ein auf 30 px festgenageltes Eingabefeld verfehlte den
                      * Handschuh-Betrieb.
                      */
-                    <Input
-                      style={{ maxWidth: 260 }}
-                      value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
-                      onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}
-                      aria-label={`Name für ${v.dateiname}`}
-                    />
+                    <div style={{ width: '100%', maxWidth: 'var(--lfh-feld-mittel)' }}>
+                      <Input
+                        value={namen[v.dateiname] ?? nameAusDatei(v.dateiname)}
+                        onChange={(e) => setNamen((n) => ({ ...n, [v.dateiname]: e.target.value }))}
+                        aria-label={`Name für ${v.dateiname}`}
+                      />
+                    </div>
                   }
                   description={
                     <>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      <Textstufe stufe="textKlein" ton="gedaempft">
                         {v.dateiname} <Marke>{formatGroesse(v.groesse)}</Marke>
-                      </Typography.Text>
+                      </Textstufe>
                       {grund && (
                         <div>
                           <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />

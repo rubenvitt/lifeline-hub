@@ -1,16 +1,5 @@
 import { IconChevronRunter, IconLadekreis } from '../icons';
-import {
-  App,
-  Button,
-  Dropdown,
-  Flex,
-  Popconfirm,
-  Progress,
-  Space,
-  theme,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { App, Button, Dropdown, Popconfirm, Progress, Space, theme, Tooltip } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -33,6 +22,7 @@ import {
   type OfflineKarte,
 } from '../api/offlineKarten';
 import AutoAktualisierungZeile from './AutoAktualisierungZeile';
+import { Stapel, Textstufe } from '../components/instrument';
 import { listenTakt, statusTakt } from './aktualisierungTakt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { invalidiereKarte } from './invalidiereKarte';
@@ -190,24 +180,24 @@ export default function OfflineKartenVerwaltung() {
         // LFH-993: seit wann die aktuelle Datei auf dem Gerät liegt (letzter erfolgreicher Download).
         const seit = k.status === 'bereit' ? zeitpunkt(k.download_at) : '';
         return (
-          <div>
+          <Stapel abstand="xxs">
             <div>{name}</div>
             {(stand || seit || k.update_verfuegbar) && (
-              <Space size={6} wrap style={{ marginTop: 2 }}>
+              <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                 {stand && (
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  <Textstufe stufe="textKlein" ton="gedaempft">
                     Stand {stand}
-                  </Typography.Text>
+                  </Textstufe>
                 )}
                 {seit && (
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  <Textstufe stufe="textKlein" ton="gedaempft">
                     auf dem Gerät seit {seit}
-                  </Typography.Text>
+                  </Textstufe>
                 )}
                 {k.update_verfuegbar && <Status darstellung={UPDATE_VERFUEGBAR} />}
-              </Space>
+              </Stapel>
             )}
-          </div>
+          </Stapel>
         );
       },
     },
@@ -249,13 +239,13 @@ export default function OfflineKartenVerwaltung() {
         // Vor dem Download (Neubau, Veröffentlichung) ein Etikett mit Ladekreis.
         if (akt?.phase && akt.phase !== 'laedt' && s !== 'laedt' && k.geladen == null) {
           return (
-            <Space size={8} wrap>
+            <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
               <Status
                 icon={<IconLadekreis drehen />}
                 darstellung={{ ...offlineKarteStatus.laedt, label: PHASE_ETIKETT[akt.phase] }}
               />
               {fehler}
-            </Space>
+            </Stapel>
           );
         }
         // Ein Download läuft bei status 'laedt' (neue Zeile), aktivem In-Place-Reload ODER wenn
@@ -263,10 +253,10 @@ export default function OfflineKartenVerwaltung() {
         const laeuft = s === 'laedt' || k.geladen != null || akt?.phase === 'laedt';
         if (!laeuft) {
           return (
-            <Space size={8} wrap>
+            <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
               <Status darstellung={offlineKarteStatus[s]} />
               {fehler}
-            </Space>
+            </Stapel>
           );
         }
         // Live-Fortschritt (geladen/gesamt); ohne Content-Length geladene Bytes statt Prozent.
@@ -275,7 +265,7 @@ export default function OfflineKartenVerwaltung() {
         // In-Place-Reload einer 'bereit'-Zeile: „aktualisiert" (Karte bleibt aktiv), sonst „lädt".
         const label = s === 'laedt' ? 'lädt' : 'aktualisiert';
         return (
-          <Space size={8}>
+          <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
             <Status
               icon={<IconLadekreis drehen />}
               darstellung={{ ...offlineKarteStatus.laedt, label }}
@@ -283,11 +273,11 @@ export default function OfflineKartenVerwaltung() {
             {prozent != null ? (
               <Progress percent={prozent} size="small" style={{ width: 120, marginBottom: 0 }} />
             ) : k.geladen != null ? (
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <Textstufe stufe="textKlein" ton="gedaempft">
                 {formatGroesse(k.geladen)}
-              </Typography.Text>
+              </Textstufe>
             ) : null}
-          </Space>
+          </Stapel>
         );
       },
     },
@@ -352,7 +342,7 @@ export default function OfflineKartenVerwaltung() {
               const phase = aktualisierungJe.get(k.id)?.phase;
               const grund = zeilen.grund(k.id);
               return (
-                <Flex vertical gap={token.marginXXS} align="flex-start">
+                <Stapel abstand="xxs" ausrichten="start">
                   {/* `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
                       (`components/aktionsabstand.guard.test.ts`). */}
                   <Space size="middle">
@@ -380,7 +370,7 @@ export default function OfflineKartenVerwaltung() {
                     )}
                   </Space>
                   {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
-                </Flex>
+                </Stapel>
               );
             },
           },
@@ -419,17 +409,19 @@ export default function OfflineKartenVerwaltung() {
         <AutoAktualisierungZeile status={statusQuery.data} istAdmin={istAdmin} />
       )}
       {istAdmin && bauVerfuegbar && aktiveBauten.length > 0 && (
-        <Space size={6} wrap style={{ marginBottom: 12 }}>
-          {aktiveBauten.map((j) => (
-            <Status
-              key={j.id}
-              darstellung={{
-                ...kartenBauStatus[j.status.status],
-                label: `${j.slug}: ${kartenBauStatus[j.status.status].label}`,
-              }}
-            />
-          ))}
-        </Space>
+        <div style={{ marginBottom: token.margin }}>
+          <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
+            {aktiveBauten.map((j) => (
+              <Status
+                key={j.id}
+                darstellung={{
+                  ...kartenBauStatus[j.status.status],
+                  label: `${j.slug}: ${kartenBauStatus[j.status.status].label}`,
+                }}
+              />
+            ))}
+          </Stapel>
+        </div>
       )}
       {/* Wiederholt wird GENAU diese Query, nicht der ganze Karten-Zweig: `invalidiereKarte` zöge
          Karten-Config und Bau-Status mit, die nicht gescheitert sind. */}
