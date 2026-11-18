@@ -242,14 +242,23 @@ export default function EtbPage() {
 
   const bausteineQuery = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
-  // Auftrags-Ziele für das ETB→Auftrag-Formular.
+  // Modulrechte: Dokumente mit ETB-Bezug und die Auftrags-Ziele fragen nur mit Freigabe ab.
+  const modulFreigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+
+  // Auftrags-Ziele für das ETB→Auftrag-Formular, nur mit Modulrecht (LLH-1839): ohne liefe ein 403
+  // und mit ihm eine Benutzerprüfung (`api/client.ts`), bei jedem neuen Freigabestand erneut.
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
+    enabled: istKeyFreigegeben('einsatzabschnitte', modulFreigabenQuery.data),
   });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: istKeyFreigegeben('einheiten', modulFreigabenQuery.data),
   });
 
   /**
@@ -324,10 +333,6 @@ export default function EtbPage() {
   // nach Eintrag zugeordnet. Das Modulrecht `dokumente` bleibt maßgeblich — ohne Freigabe (auch
   // solange sie lädt oder scheitert) geht keine Anfrage und es erscheint kein Verweis. Live über
   // das Ereignis `dokument` (derselbe Key wie die Dokumentenseite).
-  const modulFreigabenQuery = useQuery({
-    queryKey: einsatzKeys.modulFreigaben(einsatzId),
-    queryFn: () => ladeModulFreigaben(einsatzId),
-  });
   const dokumenteFrei = istKeyFreigegeben('dokumente', modulFreigabenQuery.data);
   // Die letzte Lagebesprechung für „Seit letzter Lagebesprechung“ (LLH-1080): Freigabe und
   // Minutengrenze im gemeinsamen Hook, dieselben Regeln wie in den Lagemeldungen (LLH-1322).

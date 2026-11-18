@@ -18,6 +18,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { EXTERNE_STELLE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { createExterneStelle } from '../api/externeStellen';
@@ -25,6 +26,7 @@ import { listeFahrzeuge } from '../api/fahrzeuge';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, Einheit, ExterneStelle, Fahrzeug } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import type { Vorschlag, Vorschlagsquelle } from '../components/stammdatenFeldKern';
 import {
   etbStabVorschlaege,
@@ -68,17 +70,25 @@ export function funkrufnamenAusEinsatz(
   return [...namen.values()].sort((a, b) => a.wert.localeCompare(b.wert, 'de'));
 }
 
-/** Die Funkrufnamen des Einsatzes (disponierte Fahrzeuge + Einheiten). */
+/**
+ * Die Funkrufnamen des Einsatzes (disponierte Fahrzeuge + Einheiten). Jede Liste nur mit
+ * Modulrecht (LLH-1839): ohne liefe ein 403 und mit ihm eine Benutzerprüfung (`api/client.ts`).
+ */
 export function useFunkrufnamenEinsatz(einsatzId: number, aktiv = true): Vorschlag[] {
+  const freigaben = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+    enabled: aktiv,
+  }).data;
   const fahrzeuge = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
-    enabled: aktiv,
+    enabled: aktiv && istKeyFreigegeben('fahrzeuge', freigaben),
   });
   const einheiten = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: aktiv,
+    enabled: aktiv && istKeyFreigegeben('einheiten', freigaben),
   });
   return useMemo(
     () => funkrufnamenAusEinsatz(fahrzeuge.data ?? [], einheiten.data ?? []),
