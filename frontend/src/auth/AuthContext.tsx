@@ -130,9 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const benutzerId = benutzer?.id ?? null;
   const istGeraet = benutzer?.geraet != null;
   // Web Push (LLH-1223): Das Abo fiel mit der alten Sitzung; hat diese Person Push auf diesem
-  // Browser gewählt, meldet die neue es wieder an. Wirft nie, fragt nie nach der Erlaubnis.
+  // Browser gewählt, meldet die neue es wieder an. Wirft nie, fragt nie nach der Erlaubnis. Ein
+  // Neuladen derselben Sitzung findet das Abo am Server vor und meldet nicht erneut an (LLH-1839).
   useEffect(() => {
-    if (benutzerId != null && !istGeraet) void pushAbgleichen(benutzerId);
+    if (benutzerId != null && !istGeraet) void pushAbgleichen(benutzerId, { nurBeiBedarf: true });
   }, [benutzerId, istGeraet]);
   // Refs für die Prüfung, die aus Fremd-Ereignissen läuft und nicht an einen Render gebunden
   // sein darf: sie muss den Benutzer von JETZT vergleichen, nicht den ihres Closures.

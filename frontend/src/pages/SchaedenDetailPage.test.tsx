@@ -188,6 +188,33 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     expect(body!.geschaedigt_kontakt).toBeNull();
   });
 
+  // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
+  it.each(['/schaeden/10', ''] as const)(
+    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite und offene Eingabe bleiben, Hinweis zeigt den alten Stand',
+    async (unterpfad) => {
+      const { client } = render(einsatzAktiv, basisSchaden());
+      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      const feld = screen.getByRole('textbox', { name: 'Ort' });
+      await userEvent.clear(feld);
+      await userEvent.type(feld, 'Hauptstr. 19');
+
+      server.use(
+        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Ort' })).toHaveValue('Hauptstr. 19');
+      expect(screen.queryByText('Schaden konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
+
   it('sendet beim Speichern den beim Laden gelesenen Stand als Baseline (LFH-300/F10)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, basisSchaden(), [

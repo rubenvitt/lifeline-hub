@@ -195,14 +195,20 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
       const maxBtnBottom = btns.length
         ? Math.max(...btns.map((b) => b.getBoundingClientRect().bottom))
         : r.bottom;
-      return { h: Math.round(r.height), overflow: Math.round(maxBtnBottom - r.bottom) };
+      return {
+        h: Math.round(r.height),
+        w: r.width,
+        overflow: Math.round(maxBtnBottom - r.bottom),
+      };
     }),
   );
   const hoehen = mess.map((m) => m.h);
   expect(hoehen.length).toBeGreaterThanOrEqual(3);
-  // (a) alle gleich groß (±1px Rundung), (b) ≤ Raster-Zeilenabstand, (c) keine geclippten Icons.
+  // (a) alle gleich groß (±1px Rundung), (b) ≤ Raster-Zeilenabstand im gestreckten Maß (die
+  // Fläche streckt Karte und Raster gemeinsam, LLH-1940), (c) keine geclippten Icons.
+  const faktor = mess[0].w / 140;
   expect(Math.max(...hoehen) - Math.min(...hoehen)).toBeLessThanOrEqual(1);
-  expect(Math.max(...hoehen)).toBeLessThanOrEqual(120);
+  expect(Math.max(...hoehen)).toBeLessThanOrEqual(Math.ceil(120 * faktor));
   for (const m of mess) expect(m.overflow).toBeLessThanOrEqual(1);
 });
 
@@ -342,17 +348,27 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   // Belegung bestätigt (Karte zeigt „belegt").
   await expect(page.getByText('belegt', { exact: true })).toBeVisible();
 
-  // Reale Layout-Höhe der absolut positionierten Karte: ≤ 120 px, sonst ragt sie in Bett 6.
-  const kartenHoehe = await bett1Text.evaluate((el) => {
-    let n: HTMLElement | null = el as HTMLElement;
-    while (n) {
-      if (getComputedStyle(n).position === 'absolute') return n.getBoundingClientRect().height;
-      n = n.parentElement;
-    }
-    return -1;
-  });
-  expect(kartenHoehe).toBeGreaterThan(0);
-  expect(kartenHoehe).toBeLessThanOrEqual(120);
+  // Reale Unterkante der absolut positionierten Karte über der Oberkante von Bett 6: sonst ragt
+  // sie hinein. Im gestreckten Maß gemessen, die Fläche streckt Raster und Karte gemeinsam
+  // (LLH-1940).
+  const kasten = (text: Locator) =>
+    text.evaluate((el) => {
+      let n: HTMLElement | null = el as HTMLElement;
+      while (n) {
+        if (getComputedStyle(n).position === 'absolute') {
+          const r = n.getBoundingClientRect();
+          return { oben: r.top, unten: r.bottom, hoehe: r.height };
+        }
+        n = n.parentElement;
+      }
+      return null;
+    });
+  const bett1 = await kasten(bett1Text);
+  const bett6 = await kasten(page.getByText('Bett 6'));
+  expect(bett1!.hoehe).toBeGreaterThan(0);
+  expect(bett1!.unten, 'Bett 1 ragt nicht in die nächste Rasterzeile').toBeLessThanOrEqual(
+    bett6!.oben,
+  );
 });
 
 // Gegenprobe: das DragOverlay darf die Kollisionserkennung nicht brechen — `over` wird aus
@@ -428,7 +444,7 @@ test('UHS Grundriss: Personenmarke auf der Platzkarte behält ihre Höhe in jede
   const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Bett 1' });
   const marke = karte.locator('[data-lfh="personenkarte"]');
 
-  const messungen: { dichte: string; marke: number; karte: number }[] = [];
+  const messungen: { dichte: string; marke: number; karte: number; breite: number }[] = [];
   for (const dichte of ['kompakt', 'handschuh']) {
     await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
     await page.reload();
@@ -438,6 +454,7 @@ test('UHS Grundriss: Personenmarke auf der Platzkarte behält ihre Höhe in jede
       dichte,
       marke: (await marke.boundingBox())!.height,
       karte: (await karte.boundingBox())!.height,
+      breite: (await karte.boundingBox())!.width,
     });
   }
 
@@ -446,6 +463,13 @@ test('UHS Grundriss: Personenmarke auf der Platzkarte behält ihre Höhe in jede
     24,
   );
   expect(handschuh.marke, 'die Marke wächst nicht mit der Dichte').toBe(kompakt.marke);
-  expect(handschuh.karte, 'die Platzkarte behält ihre Höhe').toBe(kompakt.karte);
-  expect(kompakt.karte).toBeLessThanOrEqual(120);
+  // Die Platzkarte behält ihre Grundgröße; gestreckt wird sie nur mit der Fläche, und die ist in
+  // „Handschuh“ um den höheren Kopf kleiner (LLH-1940, design.md D7). Gleich bleiben deshalb
+  // Seitenverhältnis und Bindung an den Zeilenabstand, nicht die Pixel.
+  for (const m of messungen) {
+    expect(m.karte / m.breite, `Seitenverhältnis in ${m.dichte}`).toBeCloseTo(116 / 140, 2);
+    expect(m.karte, `unter dem gestreckten Zeilenabstand in ${m.dichte}`).toBeLessThanOrEqual(
+      Math.ceil((120 * m.breite) / 140),
+    );
+  }
 });

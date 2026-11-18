@@ -39,6 +39,18 @@ export function pushMerker(benutzerId: number): string {
   return `lfh:web-push:${benutzerId}`;
 }
 
+/**
+ * Kennung (SHA-256) des Endpunkts, den dieser Browser zuletzt angemeldet hat (LLH-1839). Der
+ * Seitenstart lässt ein Abo nur stehen, wenn der Browser noch genau dieses hat; sonst hat der
+ * Push-Dienst rotiert oder die Erlaubnis wurde zurückgesetzt, und der Abgleich meldet neu an.
+ */
+export const ENDPUNKT_MERKER = 'lfh:web-push-endpunkt';
+
+async function endpunktKennung(endpoint: string): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
+  return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 /** Wert des Merkers: Push gewählt, ohne Inhalt. */
 const MERKER_OHNE_INHALT = '1';
 /** Wert des Merkers: Push gewählt, mit Absender und Wortlaut (LLH-1369). */
@@ -119,15 +131,16 @@ let anmeldeKette: Promise<unknown> = Promise.resolve();
  */
 function anmelden(abo: PushSubscription, inhalt: boolean): Promise<void> {
   const json = abo.toJSON();
-  const schritt = anmeldeKette.then(() =>
-    meldeWebPushAn({
+  const schritt = anmeldeKette.then(async () => {
+    await meldeWebPushAn({
       endpoint: abo.endpoint,
       p256dh: json.keys?.p256dh ?? '',
       auth: json.keys?.auth ?? '',
       inhalt,
       stumm: [...stummeArten()],
-    }),
-  );
+    });
+    sicherSchreiben(ENDPUNKT_MERKER, await endpunktKennung(abo.endpoint));
+  });
   anmeldeKette = schritt.catch(() => undefined);
   return schritt;
 }
@@ -189,10 +202,27 @@ export async function pushInhaltSetzen(benutzerId: number, an: boolean): Promise
 /** Schalter aus: erst der Merker, damit ein halber Abbruch nicht wieder anmeldet. */
 export async function pushAusschalten(benutzerId: number): Promise<PushZustand> {
   sicherEntfernen(pushMerker(benutzerId));
+  sicherEntfernen(ENDPUNKT_MERKER);
   await meldeWebPushAb();
   const abo = await (await registrierung()).pushManager.getSubscription();
   await abo?.unsubscribe();
   return 'aus';
+}
+
+/** Hat dieser Browser noch das Abo, das er zuletzt angemeldet hat, zum Schlüssel der Instanz? */
+async function browserHatAngemeldetesAbo(schluessel: string): Promise<boolean> {
+  const gemerkt = sicherLesen(ENDPUNKT_MERKER);
+  if (gemerkt == null) return false;
+  const vorhanden = await (await registrierung()).pushManager.getSubscription();
+  if (!vorhanden || !gleich(vorhanden.options.applicationServerKey, bytesVon(schluessel))) {
+    return false;
+  }
+  return (await endpunktKennung(vorhanden.endpoint)) === gemerkt;
+}
+
+function gleicheArten(a: readonly string[], b: readonly string[]): boolean {
+  const menge = new Set(a);
+  return menge.size === new Set(b).size && b.every((art) => menge.has(art));
 }
 
 /**
@@ -201,8 +231,15 @@ export async function pushAusschalten(benutzerId: number): Promise<PushZustand> 
  * Umschalten von „Stumm auf diesem Gerät“ (LLH-1482), damit der Server die neue Liste kennt;
  * ohne Netz bleibt er bis zur nächsten Anmeldung beim alten Stand. Fragt nie nach der
  * Erlaubnis und wirft nie.
+ *
+ * `nurBeiBedarf` (Seitenstart, LLH-1839): Kennt der Server das Abo dieser Sitzung schon mit
+ * derselben Wahl und hat der Browser noch den zuletzt angemeldeten Endpunkt, bleibt es stehen; ein Neuladen kostet so nur den Abruf des Stands. Nicht nach
+ * einem Umschalten: dort kann der gelesene Stand eine noch laufende Anmeldung nicht kennen.
  */
-export async function pushAbgleichen(benutzerId: number): Promise<void> {
+export async function pushAbgleichen(
+  benutzerId: number,
+  { nurBeiBedarf = false }: { nurBeiBedarf?: boolean } = {},
+): Promise<void> {
   try {
     const merker = moeglich() ? sicherLesen(pushMerker(benutzerId)) : null;
     if (merker == null) return;
@@ -210,7 +247,17 @@ export async function pushAbgleichen(benutzerId: number): Promise<void> {
     const stand = await ladeWebPushStand();
     // Am gekoppelten ELW lehnt der Server jedes Abo ab; das alte ruht bis zum Entkoppeln.
     if (stand.ueber_hub) return;
-    await anmelden(await abonnieren(stand.schluessel), merker === MERKER_MIT_INHALT);
+    const inhalt = merker === MERKER_MIT_INHALT;
+    if (
+      nurBeiBedarf &&
+      stand.angemeldet &&
+      stand.inhalt === inhalt &&
+      gleicheArten(stand.stumm, stummeArten()) &&
+      (await browserHatAngemeldetesAbo(stand.schluessel))
+    ) {
+      return;
+    }
+    await anmelden(await abonnieren(stand.schluessel), inhalt);
   } catch {
     // Ohne Schalter am Server, offline oder ohne Worker: die App meldet weiter im Tab.
   }

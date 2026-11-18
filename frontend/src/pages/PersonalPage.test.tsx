@@ -202,10 +202,29 @@ describe('PersonalPage', () => {
    * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
    * Builder wäre sonst nicht zu unterscheiden.
    */
-  it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
+  it('am Handschirm steht „Ad-hoc-Person“ hinter „Weitere“ (LLH-1786)', async () => {
+    setzeViewportBreite(390);
     render(einsatz());
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    await within(kopf).findByRole('button', { name: 'Personal disponieren' });
+    expect(within(kopf).queryByRole('button', { name: 'Ad-hoc-Person' })).toBeNull();
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Weitere Aktionen zum Personal' }),
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
+  });
+
+  it('trägt Stärke und Meldebild-Link im Seitenkopf, keine Stärkezeile über der Tabelle', async () => {
+    const { container } = render(einsatz());
     const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
+    // LLH-1786: die Stärke ist Meta des Kopfs (Change `z137bgm5-seitenkopf-einzeilig` D2).
+    expect(link.closest('[data-lfh="seitenkopf"]')).not.toBeNull();
+    expect(container.querySelector('[data-lfh="verdichtungszeile"]')).toBeNull();
   });
 
   it('zeigt disponiertes Personal mit Funktion und Position', async () => {

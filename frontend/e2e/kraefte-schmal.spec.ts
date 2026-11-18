@@ -184,9 +184,10 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
       FUNKRUFNAME,
       async () => {
         await expect(karte, 'Vorbedingung: genau eine Fahrzeugkarte').toHaveCount(1);
+        // Bei 390 px steht die Ansicht hinter „Filter“ (LLH-1786); der Knopf bleibt ohne Schreibrecht.
         await expect(
-          page.getByRole('radiogroup', { name: 'Ansicht' }),
-          'Vorbedingung: der Ansicht-Umschalter bleibt auch ohne Schreibrecht',
+          page.locator('[data-lfh="seitenkopf"]').getByRole('button', { name: /^Filter/ }),
+          'Vorbedingung: der Filterknopf mit der Ansicht bleibt auch ohne Schreibrecht',
         ).toBeVisible();
         await expect(
           page.getByRole('button', { name: `Status von ${FUNKRUFNAME} ändern` }),
@@ -280,9 +281,10 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
       'kraefteuebersicht',
       '1. Zug',
       async () => {
+        // Drucken ist ein Nebenweg des Kopfs (LLH-1786), bei 390 px hinter „Weitere“.
         await expect(
-          page.getByRole('button', { name: /Drucken/ }).first(),
-          'Vorbedingung: der Druckknopf bleibt — die Werkzeugzeile ist gerendert',
+          page.getByRole('button', { name: 'Weitere Aktionen zum Meldebild' }),
+          'Vorbedingung: der Auslöser der Nebenwege steht — Drucken bleibt erreichbar',
         ).toBeVisible();
         await expect(
           page.getByRole('button', { name: 'In Lagebericht übernehmen' }),

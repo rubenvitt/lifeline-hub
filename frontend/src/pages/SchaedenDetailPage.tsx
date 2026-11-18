@@ -10,7 +10,12 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { StatusChip, monoStil } from '../components/instrument';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
-import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { useEffect, useState, type ReactElement } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -272,7 +277,10 @@ export default function SchaedenDetailPage() {
       </div>
     );
   }
-  if (einsatzQuery.isError || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1947): React Query setzt `error` auch, wenn nur ein
+  // Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher liegt. Dann
+  // bliebe sonst eine offene Bearbeitung nicht stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
@@ -281,7 +289,7 @@ export default function SchaedenDetailPage() {
   if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
   // Ein anderer Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den
   // neuen Versuch an.
-  if (detailQuery.isError || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <SeitenFehler
         text="Schaden konnte nicht geladen werden"
@@ -291,6 +299,15 @@ export default function SchaedenDetailPage() {
     );
   }
   const s = detailQuery.data;
+  const veraltet = einsatzQuery.isError || detailQuery.isError;
+  const standVeraltet = veraltet && (
+    <SeitenStandVeraltet
+      onWiederholen={() => {
+        if (einsatzQuery.isError) void einsatzQuery.refetch();
+        if (detailQuery.isError) void detailQuery.refetch();
+      }}
+    />
+  );
   const orgId = einsatz.org_id ?? 0;
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
@@ -390,7 +407,14 @@ export default function SchaedenDetailPage() {
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
-      hinweis={storniert && <StornoBanner stand={s} />}
+      hinweis={
+        (storniert || veraltet) && (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            <StornoBanner stand={s} />
+            {standVeraltet}
+          </Space>
+        )
+      }
       aktionen={
         /**
          * Genau eine Primäraktion je Status, „Bearbeiten“ sekundär daneben, der Rest im Menü

@@ -1019,6 +1019,40 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
     expect(onSpeichern).not.toHaveBeenCalled();
   });
 
+  /**
+   * Die Frist der Fokusrückgabe läuft über einen Timer und einen Zeigerdruck-Hörer am Dokument.
+   * Hängt die Zelle vor Ablauf aus (Seitenwechsel, Testende), räumt sie beides; sonst lief der
+   * Timer ins Leere, und nach dem Ende der Testumgebung warf er `document is not defined`
+   * (`alpha` rot am 18.11.2026, Frontend-Suite 3/4).
+   */
+  it('räumt Frist-Timer und Zeigerhörer beim Aushängen', async () => {
+    const setze = vi.spyOn(window, 'setTimeout');
+    const raeume = vi.spyOn(window, 'clearTimeout');
+    const entferne = vi.spyOn(document, 'removeEventListener');
+    try {
+      const { unmount } = renderMitProviders(schwebend(<Zelle wert="ILS-1" />));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+      );
+      const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+      fireEvent.keyDown(feld, { key: 'Escape' });
+      await waitFor(() =>
+        expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
+      );
+      const fristIndex = setze.mock.calls.findIndex(([, ms]) => ms === 1500);
+      expect(fristIndex).toBeGreaterThanOrEqual(0);
+      const fristId = setze.mock.results[fristIndex]!.value;
+      entferne.mockClear();
+      unmount();
+      expect(raeume).toHaveBeenCalledWith(fristId);
+      expect(entferne).toHaveBeenCalledWith('pointerdown', expect.any(Function), {
+        capture: true,
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('eine Tabelle hält eine Bearbeitung: eine unveränderte schließt, eine geänderte behält den Fokus', async () => {
     renderMitProviders(
       schwebend(

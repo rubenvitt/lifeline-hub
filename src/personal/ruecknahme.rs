@@ -127,7 +127,16 @@ pub async fn zuruecknehmen_tx(
 
     let mut ergebnis = Ruecknahme::default();
     if let Some(einheit_id) = vorzustand.einheit_id {
-        bind_einheit_tx(conn, einsatz_id, ep_id, einheit_id, rechte, &mut ergebnis).await?;
+        bind_einheit_tx(
+            conn,
+            einsatz_id,
+            ep_id,
+            einheit_id,
+            &vorzustand.entlassen_at,
+            rechte,
+            &mut ergebnis,
+        )
+        .await?;
     }
     // Der Führer ist Mitglied seiner Einheit (`einheit::repo::check_fuehrer`): ein echter
     // Vorzustand nennt höchstens die eigene Einheit. Alles andere bleibt still aus, sonst stünden
@@ -145,6 +154,7 @@ pub async fn zuruecknehmen_tx(
             ep_id,
             benutzer_id,
             &fuehrung,
+            &vorzustand.entlassen_at,
             rechte,
             &mut ergebnis,
         )
@@ -224,17 +234,22 @@ async fn find_entlassung_tx(
 }
 
 /// Name und Auflösungszeitpunkt einer Einheit des Einsatzes; `None`, wenn sie fehlt (spurlos
-/// aufgelöst und gelöscht, `einheit::repo::aufloesen_tx`).
+/// aufgelöst und gelöscht, `einheit::repo::aufloesen_tx`) oder jünger ist als das Entlassen: die
+/// ID einer gelöschten Einheit kann an eine danach gebildete gehen (`einsatz_einheit.id` ohne
+/// AUTOINCREMENT, LLH-1949).
 async fn load_einheit_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
+    entlassen_at: &str,
 ) -> Result<Option<(String, Option<String>)>, AppError> {
     Ok(sqlx::query_as(
-        "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        "SELECT name, aufgeloest_at FROM einsatz_einheit \
+         WHERE id = ? AND einsatz_id = ? AND angelegt_at <= ?",
     )
     .bind(einheit_id)
     .bind(einsatz_id)
+    .bind(entlassen_at)
     .fetch_optional(&mut *conn)
     .await?)
 }
@@ -250,14 +265,15 @@ async fn bind_einheit_tx(
     einsatz_id: i64,
     ep_id: i64,
     einheit_id: i64,
+    entlassen_at: &str,
     rechte: RuecknahmeRechte,
     ergebnis: &mut Ruecknahme,
 ) -> Result<(), AppError> {
     let aus = |b: String, g: &str| RuecknahmeAusgelassen::new(b, g);
-    match load_einheit_tx(conn, einsatz_id, einheit_id).await? {
+    match load_einheit_tx(conn, einsatz_id, einheit_id, entlassen_at).await? {
         None => ergebnis
             .ausgelassen
-            .push(aus("Einheit".into(), "inzwischen aufgelöst")),
+            .push(aus("Einheit".into(), "nicht mehr vorhanden")),
         Some(_) if !rechte.einheiten => ergebnis
             .ausgelassen
             .push(aus("Einheit".into(), OHNE_RECHT_EINHEITEN)),
@@ -299,21 +315,25 @@ async fn bind_fuehrung_tx(
     ep_id: i64,
     benutzer_id: i64,
     einheiten: &[i64],
+    entlassen_at: &str,
     rechte: RuecknahmeRechte,
     ergebnis: &mut Ruecknahme,
 ) -> Result<(), AppError> {
     let ids = crate::kraefte_disposition::ids_json(einheiten);
+    // Eine Einheit, die jünger ist als das Entlassen, trägt nur die alte ID (LLH-1949,
+    // `load_einheit_tx`): sie zählt als nicht mehr vorhanden.
     if rechte.einheiten {
         let gebunden: Vec<i64> = sqlx::query_scalar(
             "UPDATE einsatz_einheit SET fuehrer_id = ?1 \
              WHERE einsatz_id = ?2 AND id IN (SELECT value FROM json_each(?3)) \
-               AND fuehrer_id IS NULL AND aufgeloest_at IS NULL \
+               AND fuehrer_id IS NULL AND aufgeloest_at IS NULL AND angelegt_at <= ?4 \
                AND id = (SELECT einheit_id FROM einsatz_personal WHERE id = ?1) \
              RETURNING id",
         )
         .bind(ep_id)
         .bind(einsatz_id)
         .bind(&ids)
+        .bind(entlassen_at)
         .fetch_all(&mut *conn)
         .await?;
         for id in gebunden {
@@ -332,11 +352,12 @@ async fn bind_fuehrung_tx(
     let fehlen: Vec<(String, Option<String>, Option<i64>)> = sqlx::query_as(
         "SELECT name, aufgeloest_at, fuehrer_id FROM einsatz_einheit \
          WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2)) \
-           AND fuehrer_id IS NOT ?3 ORDER BY id",
+           AND fuehrer_id IS NOT ?3 AND angelegt_at <= ?4 ORDER BY id",
     )
     .bind(einsatz_id)
     .bind(&ids)
     .bind(ep_id)
+    .bind(entlassen_at)
     .fetch_all(&mut *conn)
     .await?;
     if !rechte.einheiten {
@@ -350,16 +371,18 @@ async fn bind_fuehrung_tx(
     }
     let vorhanden: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM einsatz_einheit \
-         WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2))",
+         WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2)) \
+           AND angelegt_at <= ?3",
     )
     .bind(einsatz_id)
     .bind(&ids)
+    .bind(entlassen_at)
     .fetch_one(&mut *conn)
     .await?;
     if (vorhanden as usize) < einheiten.len() {
         ergebnis.ausgelassen.push(RuecknahmeAusgelassen::new(
             "Führung einer Einheit",
-            "inzwischen aufgelöst",
+            "nicht mehr vorhanden",
         ));
     }
     for (name, aufgeloest_at, fuehrer) in fehlen {

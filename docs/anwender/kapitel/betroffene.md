@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs, frontend/src/personen/VersorgtVon.tsx, frontend/src/anzeige/Ortsfeld.tsx, src/person/repo.rs, frontend/src/components/StornoBanner.tsx, frontend/src/components/useFeldKonflikt.tsx]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs, frontend/src/personen/VersorgtVon.tsx, frontend/src/anzeige/Ortsfeld.tsx, src/person/repo.rs, frontend/src/components/StornoBanner.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FilterKnopf.tsx]
 ---
 
 ## Überblick
@@ -41,7 +41,10 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
    Transportpriorität; die älteste Sichtung steht oben. Ein Tipp auf Kennung oder Name öffnet die
    Person, ein Tipp auf die Sichtung öffnet die Sichtungswahl.
 5. Der Statusfilter („Alle“, „Erfasst“, „Vermisst“, „Betroffen“, „Verstorben“) und die Suche
-   nach R-Nr., PAT-Nr., Name oder Fundort engen die Liste ein. Feiner geht es im Kopf der Spalten
+   nach R-Nr., PAT-Nr., Name oder Fundort engen die Liste ein; in den Zeilen stehen beide mit
+   „Spalten“ in einer Zeile über der Tabelle. Auf dem Handy stehen Ansicht, Statusfilter,
+   „Abgeschlossene zeigen“ und „Sortieren“ hinter dem Knopf „Filter“ im Kopf der Seite; er nennt
+   die Zahl gewählter Filter, etwa „Filter (1)“. Feiner geht es im Kopf der Spalten
    „Sichtung“, „Status“, „Verbleib“ und „Abschnitt“: das Trichterzeichen öffnet die Werte zum
    Ankreuzen, etwa „SK I“ oder „Offen“, „OK“ übernimmt sie. Ein Klick auf einen Spaltenkopf
    sortiert nach dieser Spalte, die Sichtung in der Folge SK I bis unverletzt, ein zweiter kehrt
@@ -49,7 +52,7 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
    und je Wert ein Knopf, etwa „Sichtung: SK I“, der genau diesen Filter entfernt; „Filter
    zurücksetzen“ leert Suche und Filter. Der Abschnitt ist der der Unfallhilfsstelle, in der die
    Person gerade ist; die Spalte steht unter 1600 px Fensterbreite unter „Spalten“.
-6. „Abgeschlossene zeigen“ neben dem Statusfilter nimmt die abgeschlossenen Patienten wieder in
+6. „Abgeschlossene zeigen“ neben den Sichtungszahlen nimmt die abgeschlossenen Patienten wieder in
    Zeilen, Sichtungsraster und Karte auf; die Zahl dahinter sagt, wie viele es sind. Ohne
    abgeschlossene Patienten steht der Schalter nicht da.
 
@@ -78,8 +81,8 @@ Sichtung wird nie übernommen.
 
 Für kleine Hilfeleistungen, die vor Ort enden (Pflaster, Kühlpack, Gespräch):
 
-1. „Versorgt und entlassen“ wählen. Auf dem Handy steht er im Menü „Weitere Aktionen zu den
-   Betroffenen“ (drei Punkte).
+1. „Versorgt und entlassen“ wählen. Er steht im Menü „Weitere Aktionen zu den Betroffenen“ (drei
+   Punkte), am Arbeitsplatz in der Bediendichte „Kompakt“ als Knopf im Kopf der Seite.
 2. Unter „Anlass“ die Fläche antippen, etwa „Hitze / Kälte“. Der Anlass ist Pflicht.
 3. Unter „Maßnahmen“ bis zu drei Flächen antippen, etwa „Kühlung“ oder „Wundversorgung“; ein
    zweiter Tipp nimmt eine Maßnahme zurück.
