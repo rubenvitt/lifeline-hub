@@ -21,8 +21,8 @@ Führungspersonal.
 
 ### Die Personalliste lesen
 
-1. Unter „Kräfte & Mittel“ „Personal“ öffnen. Über der Liste steht die Stärke mit der Verteilung der
-   Kräfte, daneben der Sprung in die „Kräfteübersicht“.
+1. Unter „Kräfte & Mittel“ „Personal“ öffnen. Im Kopf der Seite steht neben dem Titel die Stärke
+   mit der Verteilung der Fahrzeuge, daneben der Sprung in die „Kräfteübersicht“.
 2. Die Liste ist nach Einheit gruppiert. Zuerst steht „nicht eingeteilt“, danach die Einheiten in
    der Folge des Kräftebaums; eine unterstellte Einheit trägt ihren Pfad, etwa „Zug 1 › Staffel A“.
    Über der Tabelle steht je Gruppe die Zahl der Personen, etwa „1 nicht eingeteilt · 4
@@ -33,7 +33,8 @@ Führungspersonal.
    Folge um. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der Treffer und je
    Wert ein Knopf, etwa „Position: Mannschaft“, der genau diesen Filter entfernt; „Filter
    zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Filter und „Sortieren“ als
-   Auswahlfelder über der Liste.
+   Auswahlfelder über der Liste; „Ad-hoc-Person“ steht dort im Menü „Weitere Aktionen zum
+   Personal“.
 
    ![Personalliste mit der Gruppenzeile „1 nicht eingeteilt · 2 Sanitätszug Musterstadt · 4 Rettungsstaffel …“; je Person Name, Funktion, Einheit, Fahrzeug, Position als Kürzel, Status und Einsatzdauer, zuerst die nicht eingeteilte Ad-hoc-Kraft Tim Neu](../bilder/personal/personal.png)
 

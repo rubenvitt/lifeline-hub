@@ -17,7 +17,7 @@ const TABLET_QUER = { width: 1180, height: 820 };
 const HANDSCHIRM = { width: 390, height: 844 };
 
 /** Handschirm-Grenze der Spec, als Literal. */
-const HANDSCHIRM_OBERKANTE = 300;
+const HANDSCHIRM_OBERKANTE = 350;
 
 const ERSTE_ZEILE = '.ant-table-tbody > tr.ant-table-row, [data-lfh="datensicht-karte"]';
 

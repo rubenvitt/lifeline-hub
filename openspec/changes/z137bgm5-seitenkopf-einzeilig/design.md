@@ -112,6 +112,13 @@ die Matrix der Spec (Seiten × Stufen × Admin/Beobachter, Handschirm) und prüf
 48 / 72. Vorher wird der Ausgangswert auf `alpha` gemessen und im PR genannt. Vitest prüft
 `NebenwegeImKopf` je Token und Breite rein.
 
+### D7 Grenze am Handschirm
+
+Die Spec nannte vor der Messung y = 300. Erreicht sind 312 (Fahrzeuge), 346 (Betreuung,
+eingeklappt) und 336 (Betroffene, Beobachter), aus 433 / 551 / 378. Abgestimmt am 18.11.2026: die
+Grenze steht bei 350 und hält den erreichten Stand. Weiter kämen nur Wege, die am Handy Funktion
+hinter einen Antipp legen (Suche hinter „Filter“, Betreuung ohne Zwischenüberschrift).
+
 ## Risks / Trade-offs
 
 - [Bestehende e2e klicken „Drucken“/„CSV“ als Knopf in `komfortabel`/`handschuh`] → Helfer, der

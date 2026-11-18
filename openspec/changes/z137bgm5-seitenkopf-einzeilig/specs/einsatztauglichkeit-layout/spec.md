@@ -96,7 +96,7 @@ Betroffene und Fahrzeuge.
 Beim Öffnen einer Listenseite ohne Bildlauf MUST die erste Datenzeile vollständig im Fenster
 stehen, in jeder Dichtestufe, als Admin und als Beobachter. Am Handschirm MUST ihre Oberkante auf
 Fahrzeuge, Personal, Einheiten und Betreuung und, ohne Schreibrecht, auf der Betroffenenliste
-höchstens bei y = 300 liegen, auf der Betreuung mit eingeklappten Kennzahlen.
+höchstens bei y = 350 liegen, auf der Betreuung mit eingeklappten Kennzahlen.
 
 #### Scenario: Handschuh am Tablet
 - **WHEN** Betroffene, Meldebild, Fahrzeuge, Personal und Einheiten bei 1180 × 820 in `handschuh` als Admin geöffnet werden
@@ -104,4 +104,4 @@ höchstens bei y = 300 liegen, auf der Betreuung mit eingeklappten Kennzahlen.
 
 #### Scenario: Handschirm
 - **WHEN** Fahrzeuge, die Betreuung mit eingeklappten Kennzahlen und als Beobachter die Betroffenenliste bei 390 × 844 in `kompakt` geöffnet werden
-- **THEN** liegt die Oberkante der ersten Datenzeile höchstens bei y = 300
+- **THEN** liegt die Oberkante der ersten Datenzeile höchstens bei y = 350

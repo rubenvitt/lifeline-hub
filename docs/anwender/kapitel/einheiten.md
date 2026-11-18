@@ -25,7 +25,8 @@ zuordnen dürfen Einsatzleitung und Führungspersonal.
 
 ### Die Gliederung lesen
 
-1. Unter „Kräfte & Mittel“ „Einheiten“ öffnen.
+1. Unter „Kräfte & Mittel“ „Einheiten“ öffnen. Im Kopf der Seite steht neben dem Titel die Stärke
+   aller Einheiten mit der Verteilung der Fahrzeuge und dem Sprung in die „Kräfteübersicht“.
 2. In der Tabelle „Gliederung“ je Einheit „Einheitsführer“, „Ist“, „Soll“, „Abschnitt“ und
    „Fahrzeuge“ lesen. Unterstellte Einheiten stehen eingerückt unter ihrer Über-Einheit; das Plus-
    bzw. Minuszeichen vor einer Einheit klappt ihre Untereinheiten auf und zu. Am Handy steht
