@@ -124,6 +124,34 @@ test.describe('Werkzeuganteil am Tablet quer, Handschuh', () => {
   }
 });
 
+test.describe('Klappbare Kennzahlen', () => {
+  test.use({ viewport: TABLET_QUER, hasTouch: true });
+
+  test('Statusband im Handschuh: Klappkopf in Stufenhöhe, eingeklappt nach dem Neuladen, Liste rückt hoch', async ({
+    page,
+  }) => {
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzMitListen(page);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, 'handschuh');
+    const offen = await ersteZeileOben(page, EINHEIT);
+    const kopf = page.getByRole('button', { name: /^Status in Zahlen/ });
+    await expect(kopf).toHaveAttribute('aria-expanded', 'true');
+    const kasten = await kopf.boundingBox();
+    expect(kasten!.height, 'Klappkopf in handschuh').toBeGreaterThanOrEqual(72 - 0.5);
+
+    await kopf.click();
+    await page.reload();
+    await expect(page.getByRole('button', { name: /^Status in Zahlen/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await expect(page.getByRole('button', { name: /^Status in Zahlen/ })).toContainText('Einheit');
+    const zu = await ersteZeileOben(page, EINHEIT);
+    vermerke('kraefteuebersicht handschuh eingeklappt', zu);
+    expect(zu, 'eingeklappt beginnt die Tabelle höher').toBeLessThan(offen);
+  });
+});
+
 test.describe('Werkzeuganteil am Handschirm', () => {
   test.use({ viewport: HANDSCHIRM, hasTouch: true });
 

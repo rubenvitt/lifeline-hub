@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import Statusband from './Statusband';
+import Statusband, { statusbandKurzform } from './Statusband';
 import type { BandZelle } from './meldebildRaster';
 
 function zelle(
@@ -271,5 +271,24 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
     expect(within(personal).queryByRole('button', { name: 'Erneut abrufen' })).toBeNull();
     expect(within(paneel('Einheiten nach FMS-Status')).getByText('2 Einheiten')).toBeVisible();
     expect(screen.queryByText(/nicht abrufbar|Stand unbekannt/)).toBeNull();
+  });
+});
+
+/** Kurzform des eingeklappten Bands (LLH-1786, `KlappBand`): eine Zeile, dieselben Wörter. */
+describe('statusbandKurzform', () => {
+  const zelle = (wert: number) => ({ schluessel: 'x', code: null, wert, wort: 'x' }) as BandZelle;
+  it('nennt Einheiten und Kräfte mit Einzahl und Mehrzahl, dazu Einheiten ohne Rückmeldung', () => {
+    expect(
+      statusbandKurzform({
+        einheiten: [zelle(2), zelle(1)],
+        personal: [zelle(1)],
+        rueckmeldung: zelle(2),
+      }),
+    ).toBe('3 Einheiten · 1 Kraft · 2 ohne Rückmeldung');
+  });
+  it('lässt die Rückmeldung weg, wenn keine fehlt', () => {
+    expect(statusbandKurzform({ einheiten: [zelle(1)], personal: [], rueckmeldung: null })).toBe(
+      '1 Einheit · 0 Kräfte',
+    );
   });
 });

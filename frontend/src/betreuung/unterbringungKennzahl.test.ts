@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Betreuungsstelle, BetreuungsstelleStatus } from '../api/types';
-import { unterbringungKennzahl } from './unterbringungKennzahl';
+import { unterbringungKennzahl, unterbringungKurzform } from './unterbringungKennzahl';
 
 /**
  * „Unterbringung in Zahlen" der Betreuungsübersicht (LLH-1050): je Festlegung ein Test. Dieselben
@@ -154,5 +154,39 @@ describe('unterbringungKennzahl (LLH-1050)', () => {
     )!;
     expect(k.namentlich).toBe(5);
     expect(unterbringungKennzahl([a], [])!.namentlich).toBe(0);
+  });
+});
+
+/** Kurzform des eingeklappten Bands (LLH-1786, `KlappBand`). */
+describe('unterbringungKurzform', () => {
+  it('nennt Belegung, freie Plätze und volle Stellen', () => {
+    expect(
+      unterbringungKurzform({
+        inBetreuung: 12,
+        ohneMeldung: 0,
+        kapazitaet: 30,
+        ohneKapazitaet: 0,
+        frei: 18,
+        freiOhneMeldung: 0,
+        inBetrieb: 2,
+        stellen: 2,
+        voll: 1,
+      }),
+    ).toBe('12 in Betreuung · 18 frei · 1 voll');
+  });
+  it('schreibt „—“ statt einer erfundenen Null und lässt „voll“ ohne volle Stelle weg', () => {
+    expect(
+      unterbringungKurzform({
+        inBetreuung: null,
+        ohneMeldung: 1,
+        kapazitaet: null,
+        ohneKapazitaet: 1,
+        frei: null,
+        freiOhneMeldung: 0,
+        inBetrieb: 0,
+        stellen: 1,
+        voll: 0,
+      }),
+    ).toBe('— in Betreuung · — frei');
   });
 });

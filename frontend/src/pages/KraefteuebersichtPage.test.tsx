@@ -407,6 +407,23 @@ describe('KraefteuebersichtPage — Statusband', () => {
     expect(container.querySelector('[data-lfh="meldebild-bandluecke"]')).toBeNull();
   });
 
+  it('klappt das Statusband ein: eine Zeile mit den Zahlen, gemerkt je Gerät (LLH-1786)', async () => {
+    mitEinheit();
+    try {
+      setup();
+      await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+      const kopf = screen.getByRole('button', { name: /^Status in Zahlen/ });
+      expect(kopf).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(kopf);
+      expect(kopf).toHaveAttribute('aria-expanded', 'false');
+      await waitFor(() => expect(kopf).toHaveTextContent(/1 Einheit · \d+ Kr(aft|äfte)/));
+      expect(screen.queryByRole('region', { name: 'Einheiten nach FMS-Status' })).toBeNull();
+      expect(window.localStorage.getItem('lfh:klappband:meldebild')).toBe('zu');
+    } finally {
+      window.localStorage.clear();
+    }
+  });
+
   it('sagt am Einheitenband, dass Suche/Träger/Status nur die Mittel filtern — und schweigt ohne', async () => {
     mitEinheit();
     const { container } = setup();

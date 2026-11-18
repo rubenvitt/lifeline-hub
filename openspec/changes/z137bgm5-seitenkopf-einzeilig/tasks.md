@@ -23,11 +23,11 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 3. Klappbare Kennzahlen (D3)
 
-- [ ] 3.1 Baustein `components/instrument/KlappBand.tsx` (Klappkopf mit Kurzform, `aria-expanded`, Höhe nach Stufe, Zustand je Seite über `lib/sichererSpeicher`, erst State, dann Speicher); Unit-Tests „Vorgabe offen“, „Wahl überlebt Neuaufbau“, „ohne Speicher wirkt die Wahl“ rot→grün
-- [ ] 3.2 Eintrag in `GERAETESPEICHER` und `frontend/src/offline/AGENTS.md`; zugehöriger Guard grün
-- [ ] 3.3 Meldebild-Statusband und `UnterbringungKennzahlen` (Betreuung) im `KlappBand` mit Kurzform; Seitentests „eingeklappt eine Zeile mit Zahlen“ rot→grün
-- [ ] 3.4 Karte im Design System (Generator `frontend/scripts/design-system/`), Design System neu erzeugen; `designSystem.guard.test.ts` grün
-- [ ] 3.5 e2e „Einklappen und neu laden“ und Klappkopf ≥ 72 px in `handschuh` (in `trefflaeche-pruefflaechen.spec.ts` bzw. neuem Spec); grün
+- [x] 3.1 Baustein `components/instrument/KlappBand.tsx` (Klappkopf mit Kurzform, `aria-expanded`, Höhe nach Stufe, Zustand je Seite über `lib/sichererSpeicher`, erst State, dann Speicher); Unit-Tests „Vorgabe offen“, „Wahl überlebt Neuaufbau“, „ohne Speicher wirkt die Wahl“ rot→grün
+- [x] 3.2 Eintrag in `GERAETESPEICHER` (`offline/geraetRaeumung.ts`, die Liste, auf die `frontend/src/offline/AGENTS.md` verweist); Guard grün
+- [x] 3.3 Meldebild-Statusband und `UnterbringungKennzahlen` (Betreuung) im `KlappBand` mit Kurzform (`statusbandKurzform`, `unterbringungKurzform`, je mit Unit-Tests); im Druck steht das Band offen (`klappBand.css`); Seitentests „eingeklappt eine Zeile mit Zahlen“ rot→grün
+- [x] 3.4 Karte im Design System (Generator `frontend/scripts/design-system/`), Design System neu erzeugen; `designSystem.guard.test.ts` grün
+- [x] 3.5 e2e „Einklappen und neu laden“ und Klappkopf ≥ 72 px in `handschuh` in `e2e/seitenkopf-werkzeuganteil.spec.ts`; grün
 
 ## 4. Meldebild-Nebenwege (D4)
 

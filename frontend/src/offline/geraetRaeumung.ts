@@ -111,6 +111,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Sortierung, Spaltenfilter und Suchbegriff einer Liste für den Rückweg ohne Adressparameter (LLH-1086); ein Suchbegriff kann einen Namen tragen, die nächste Person im Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LLH-1428).',
   },
   {
+    ort: 'localStorage lfh:klappband:<seite>',
+    datei: 'components/instrument/KlappBand.tsx',
+    entscheidung: 'bleibt',
+    grund:
+      'Ob ein Kennzahlenband einer Seite eingeklappt ist (LLH-1786): Geräte-Einstellung „offen“/„zu“, ohne Personenbezug und ohne Einsatzinhalt.',
+  },
+  {
     ort: 'localStorage lfh:spalten:<seite>',
     datei: 'components/listenGedaechtnis.ts',
     entscheidung: 'bleibt',

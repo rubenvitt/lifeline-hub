@@ -76,7 +76,7 @@ import {
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../kraefte/fmsTableauKern';
-import Statusband, { type StatusbandZustand } from '../kraefte/Statusband';
+import Statusband, { statusbandKurzform, type StatusbandZustand } from '../kraefte/Statusband';
 import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
 import {
   besatzungZeilen,
@@ -106,7 +106,7 @@ import {
   toHerausgenommenesMaterial,
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
+import { KlappBand, StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -1396,35 +1396,39 @@ export default function KraefteuebersichtPage() {
         />
 
         <div style={{ marginBlock: token.marginLG }}>
-          <Statusband
-            einheiten={band.einheiten}
-            // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel,
-            // das Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts).
-            einheitenHinweis={
-              filter.traeger || filter.kategorie || filter.suche.trim()
-                ? filter.abschnittId != null
-                  ? 'nur nach Abschnitt gefiltert'
-                  : 'ungefiltert'
-                : null
-            }
-            personal={band.personal}
-            rueckmeldung={band.rueckmeldung}
-            // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
-            // Lagebericht): gefiltert entfällt er.
-            zulauf={gefiltert ? null : zulauf}
-            zulaufZiel={nachforderungenPfad(einsatzId)}
-            // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
-            rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
-            einheitenZustand={bandZustand(frei.einheiten)}
-            personalZustand={bandZustand(frei.personal)}
-            onNeuladen={() => {
-              // Nur freie Listen: `refetch` liefe trotz `enabled: false` in den 403.
-              if (freigabenGescheitert) freigabenWiederholen();
-              if (frei.personal === true) void personalQuery.refetch();
-              if (frei.fahrzeuge === true) void fahrzeugeQuery.refetch();
-              if (frei.einheiten === true) void einheitenQuery.refetch();
-            }}
-          />
+          {/* Einklappbar (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D3): in 48 / 72 nahm das
+              Band die halbe Höhe vor der ersten Zeile. Eingeklappt bleibt die Kurzform. */}
+          <KlappBand seite="meldebild" titel="Status in Zahlen" kurzform={statusbandKurzform(band)}>
+            <Statusband
+              einheiten={band.einheiten}
+              // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel,
+              // das Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts).
+              einheitenHinweis={
+                filter.traeger || filter.kategorie || filter.suche.trim()
+                  ? filter.abschnittId != null
+                    ? 'nur nach Abschnitt gefiltert'
+                    : 'ungefiltert'
+                  : null
+              }
+              personal={band.personal}
+              rueckmeldung={band.rueckmeldung}
+              // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
+              // Lagebericht): gefiltert entfällt er.
+              zulauf={gefiltert ? null : zulauf}
+              zulaufZiel={nachforderungenPfad(einsatzId)}
+              // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
+              rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
+              einheitenZustand={bandZustand(frei.einheiten)}
+              personalZustand={bandZustand(frei.personal)}
+              onNeuladen={() => {
+                // Nur freie Listen: `refetch` liefe trotz `enabled: false` in den 403.
+                if (freigabenGescheitert) freigabenWiederholen();
+                if (frei.personal === true) void personalQuery.refetch();
+                if (frei.fahrzeuge === true) void fahrzeugeQuery.refetch();
+                if (frei.einheiten === true) void einheitenQuery.refetch();
+              }}
+            />
+          </KlappBand>
         </div>
 
         <div className="kraefte-no-print">
