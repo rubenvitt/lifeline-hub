@@ -296,6 +296,10 @@ pub async fn beurteilung_auffrischen_tx(
 
 /// Benennt ein Gefahrengebiet um. `NotFound`, falls nicht zum Einsatz.
 ///
+/// Feld-CAS (LLH-1945): `erwartet` hängt `AND label IS ?` an das UPDATE; trifft es dann keine
+/// Zeile, obwohl das Gebiet besteht, ist die Bezeichnung zwischenzeitlich geändert
+/// (`AppError::Veraltet`, 409). Vergleich und Schreiben sind eine Anweisung.
+///
 /// Teil-Patch (LFH-306, Tri-State): `gefahrengebiet.label` ist nullable, deshalb trägt der
 /// Parameter zwei `Option`-Schichten — `None` = Feld nicht im Patch (Spalte unverändert),
 /// `Some(None)` = Leerwunsch (Spalte auf NULL), `Some(Some(l))` = setzen. Vorher kollabierte
@@ -305,21 +309,31 @@ pub async fn gebiet_umbenennen(
     einsatz_id: i64,
     gid: i64,
     label: Option<Option<&str>>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<GefahrengebietAnzeige, AppError> {
-    let betroffen = sqlx::query(
+    let mut sql = String::from(
         "UPDATE gefahrengebiet SET \
             label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
             geaendert_at = datetime('now') \
          WHERE id = ?3 AND einsatz_id = ?4",
-    )
-    .bind(label.map(|_| 1_i64))
-    .bind(label.and_then(|v| v))
-    .bind(gid)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+    );
+    sql.push_str(&erwartet.sql_suffix(5));
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(label.map(|_| 1_i64))
+        .bind(label.and_then(|v| v))
+        .bind(gid)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
+        let existiert: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM gefahrengebiet WHERE id = ? AND einsatz_id = ?")
+                .bind(gid)
+                .bind(einsatz_id)
+                .fetch_optional(pool)
+                .await?;
+        if existiert.is_some() && !erwartet.is_empty() {
+            return Err(AppError::Veraltet);
+        }
         return Err(AppError::NotFound);
     }
     gebiet_laden(pool, einsatz_id, gid).await

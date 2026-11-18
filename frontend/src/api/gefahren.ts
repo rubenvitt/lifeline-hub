@@ -51,15 +51,21 @@ export function bestaetigeBeurteilung(
   );
 }
 
+/**
+ * Benennt ein Gebiet um. `erwartet` ist die Bezeichnung beim Öffnen (Feld-CAS, LLH-1945): hat sie
+ * ein anderer inzwischen geändert, antwortet der Server 409 `veraltet`; ohne `erwartet` schreibt er
+ * ohne Vergleich.
+ */
 export function benenneGefahrengebiet(
   einsatzId: number,
   gefahrengebietId: number,
   label: string | null,
+  erwartet?: { label: string | null },
 ): Promise<Gefahrengebiet> {
   return apiSend<Gefahrengebiet>(
     `/api/einsaetze/${einsatzId}/gefahrengebiete/${gefahrengebietId}`,
     'PATCH',
-    { label },
+    erwartet ? { label, erwartet } : { label },
   );
 }
 
