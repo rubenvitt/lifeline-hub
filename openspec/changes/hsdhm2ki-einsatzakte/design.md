@@ -102,7 +102,11 @@ Abhängigkeit), `Vec<u8>` im Speicher (unbegrenzte Summe bei 25 MiB je Datei).
 
 **D7 — Parallelität begrenzen.** Ein ZIP-Bau je Einsatz zugleich (Sperre nach dem Muster
 `backup_download.belegen()`, eigene Instanz); ein zweiter Abruf bekommt 409 „ZIP wird bereits
-erstellt“. Schützt Platte und CPU bei Doppelklick.
+erstellt“. Dazu höchstens zwei Bauten auf dem Server (503): jeder legt eine volle Kopie der
+Anhänge neben die Datenbank, eine volle Platte ließe das Schreiben im Einsatz scheitern (Befund
+des Reviews). Der Bau läuft in `tokio::spawn`, vom Request entkoppelt wie die Sicherung: ein
+abgebrochener Download gibt den Platz erst frei, wenn der Bau fertig ist. Anhänge stornierter
+Datensätze (Fehleingaben) fehlen wie in deren Listen und CSVs.
 
 **D8 — Rechte im Client für das ZIP.** Der Knopf steht nur bei `bereit` und lädt über einen
 Link mit `download` (Sitzungs-Cookie, kein Blob im Speicher). Der Server bleibt Türsteher.

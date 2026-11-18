@@ -9,7 +9,7 @@ use crate::einsatz::schwaerzung_nachlauf::zur_entfernung_vorgesehen_sql;
 use crate::error::AppError;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::{Seek, Write};
 use std::sync::{Arc, Mutex};
 use zip::write::SimpleFileOptions;
@@ -42,7 +42,7 @@ pub const AKTE_MODULE: &[&str] = &[
 ];
 
 /// Woher eine Datei im ZIP stammt; bestimmt Ordner, Modul-Key und Protokoll.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Herkunft {
     Etb,
     Dokumentenablage,
@@ -109,6 +109,8 @@ pub struct AkteDatei {
     pub linker_id: i64,
     /// Datensatz in Worten: „Nr. 12“, „R-003“, „UHS BHP 50“, Titel eines Dokuments.
     pub datensatz: String,
+    /// Kennung des Datensatzes: zwei Datensätze mit gleichem Namen bekommen getrennte Ordner.
+    pub besitzer_id: i64,
     /// Betroffene Person (Personen-Protokoll).
     pub person_id: Option<i64>,
     pub dateiname: String,
@@ -123,6 +125,7 @@ struct Zeile {
     anhang_id: i64,
     linker_id: i64,
     datensatz: String,
+    besitzer_id: i64,
     person_id: Option<i64>,
     dateiname: String,
     mime: String,
@@ -148,44 +151,44 @@ pub async fn sammeln(
     let sql = format!(
         "SELECT * FROM ( \
          SELECT 'ETB' AS herkunft, a.id AS anhang_id, e.id AS linker_id, \
-                'Nr. ' || e.lfd_nr AS datensatz, NULL AS person_id, a.dateiname, a.mime, \
-                1 AS rang, e.lfd_nr AS sortierung \
+                'Nr. ' || e.lfd_nr AS datensatz, e.id AS besitzer_id, NULL AS person_id, a.dateiname, \
+                a.mime, 1 AS rang, e.lfd_nr AS sortierung \
            FROM etb_eintrag_anhang l JOIN etb_eintrag e ON e.id = l.eintrag_id \
            JOIN anhang a ON a.id = l.anhang_id WHERE e.einsatz_id = ?1 \
          UNION ALL \
-         SELECT 'Dokumentenablage', a.id, l.id, l.titel, NULL, a.dateiname, a.mime, 2, l.id \
+         SELECT 'Dokumentenablage', a.id, l.id, l.titel, l.id, NULL, a.dateiname, a.mime, 2, l.id \
            FROM einsatz_dokument l JOIN anhang a ON a.id = l.anhang_id \
           WHERE l.einsatz_id = ?1 AND l.geloescht_at IS NULL \
          UNION ALL \
-         SELECT 'Betroffene', a.id, l.id, printf('R-%03d', p.registrier_nr), p.id, a.dateiname, \
+         SELECT 'Betroffene', a.id, l.id, printf('R-%03d', p.registrier_nr), p.id, p.id, a.dateiname, \
                 a.mime, 3, p.registrier_nr \
            FROM einsatz_person_anhang l JOIN einsatz_person p ON p.id = l.person_id \
            JOIN anhang a ON a.id = l.anhang_id \
           WHERE l.einsatz_id = ?1 AND l.geloescht_at IS NULL AND p.storniert_at IS NULL \
          UNION ALL \
-         SELECT 'Schaeden', a.id, l.id, printf('S-%03d', s.registrier_nr), NULL, a.dateiname, \
+         SELECT 'Schaeden', a.id, l.id, printf('S-%03d', s.registrier_nr), s.id, NULL, a.dateiname, \
                 a.mime, 4, s.registrier_nr \
            FROM einsatz_schaden_anhang l JOIN einsatz_schaden s ON s.id = l.schaden_id \
            JOIN anhang a ON a.id = l.anhang_id \
           WHERE l.einsatz_id = ?1 AND l.geloescht_at IS NULL AND s.storniert_at IS NULL \
          UNION ALL \
-         SELECT 'Tiere', a.id, l.id, printf('T-%03d', t.registrier_nr), NULL, a.dateiname, \
+         SELECT 'Tiere', a.id, l.id, printf('T-%03d', t.registrier_nr), t.id, NULL, a.dateiname, \
                 a.mime, 5, t.registrier_nr \
            FROM einsatz_tier_anhang l JOIN einsatz_tier t ON t.id = l.tier_id \
            JOIN anhang a ON a.id = l.anhang_id \
           WHERE l.einsatz_id = ?1 AND l.geloescht_at IS NULL AND t.storniert_at IS NULL \
          UNION ALL \
-         SELECT 'Unfallhilfsstellen', a.id, l.id, 'UHS ' || u.bezeichnung, NULL, a.dateiname, \
+         SELECT 'Unfallhilfsstellen', a.id, l.id, 'UHS ' || u.bezeichnung, u.id, NULL, a.dateiname, \
                 a.mime, 6, u.id \
            FROM uhs_anhang l JOIN uhs u ON u.id = l.uhs_id JOIN anhang a ON a.id = l.anhang_id \
           WHERE l.einsatz_id = ?1 AND l.geloescht_at IS NULL AND u.storniert_at IS NULL \
          UNION ALL \
-         SELECT 'Einsatzbefehle', a.id, l.id, d.titel || ' (Version ' || d.version || ')', NULL, \
+         SELECT 'Einsatzbefehle', a.id, l.id, d.titel || ' (Version ' || d.version || ')', d.id, NULL, \
                 a.dateiname, a.mime, 7, d.id \
            FROM befehl_anlage l JOIN befehl d ON d.id = l.befehl_id \
            JOIN anhang a ON a.id = l.anhang_id WHERE l.einsatz_id = ?1 AND {befehl} \
          UNION ALL \
-         SELECT 'Lageberichte', a.id, l.id, d.titel || ' (Version ' || d.version || ')', NULL, \
+         SELECT 'Lageberichte', a.id, l.id, d.titel || ' (Version ' || d.version || ')', d.id, NULL, \
                 a.dateiname, a.mime, 8, d.id \
            FROM lagebericht_anlage l JOIN lagebericht d ON d.id = l.lagebericht_id \
            JOIN anhang a ON a.id = l.anhang_id WHERE l.einsatz_id = ?1 AND {lagebericht} \
@@ -208,6 +211,7 @@ pub async fn sammeln(
                 anhang_id: z.anhang_id,
                 linker_id: z.linker_id,
                 datensatz: z.datensatz,
+                besitzer_id: z.besitzer_id,
                 person_id: z.person_id,
                 dateiname: z.dateiname,
                 mime: z.mime,
@@ -260,18 +264,33 @@ fn stamm_und_endung(name: &str) -> (&str, &str) {
 }
 
 /// Vergibt jedem Anhang seinen Pfad `<Ordner>/<Datensatz>/<Dateiname>` (die Dokumentenablage
-/// ohne Datensatz-Ordner). Gleiche Pfade, auch nur in Groß-/Kleinschreibung verschieden,
-/// bekommen „ (2)“, „ (3)“ … vor der Endung.
+/// ohne Datensatz-Ordner). Zwei Datensätze, deren Namen gleich ausfallen (gleicher Titel, nach dem
+/// Bereinigen gleicher Name), bekommen getrennte Ordner mit „ (2)“; gleiche Dateinamen in einem
+/// Ordner, auch nur in Groß-/Kleinschreibung verschieden, „ (2)“, „ (3)“ … vor der Endung.
 pub fn vergib_pfade(dateien: &mut [AkteDatei]) {
+    let mut ordner_von: HashMap<(Herkunft, i64), String> = HashMap::new();
+    let mut ordner_belegt: HashSet<String> = HashSet::new();
     let mut belegt: HashSet<String> = HashSet::new();
     for d in dateien.iter_mut() {
         let ordner = match d.herkunft {
             Herkunft::Dokumentenablage => d.herkunft.ordner().to_string(),
-            _ => format!(
-                "{}/{}",
-                d.herkunft.ordner(),
-                sicherer_teil(&d.datensatz, "ohne Bezeichnung")
-            ),
+            _ => ordner_von
+                .entry((d.herkunft, d.besitzer_id))
+                .or_insert_with(|| {
+                    let basis = format!(
+                        "{}/{}",
+                        d.herkunft.ordner(),
+                        sicherer_teil(&d.datensatz, "ohne Bezeichnung")
+                    );
+                    let mut ordner = basis.clone();
+                    let mut n = 2;
+                    while !ordner_belegt.insert(ordner.to_lowercase()) {
+                        ordner = format!("{basis} ({n})");
+                        n += 1;
+                    }
+                    ordner
+                })
+                .clone(),
         };
         let name = sicherer_teil(&d.dateiname, "datei");
         let mut pfad = format!("{ordner}/{name}");
@@ -409,22 +428,36 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Ein ZIP-Bau je Einsatz zugleich (design.md D7): ein Doppelklick baut nicht zweimal. Im
+/// Ein ZIP-Bau je Einsatz zugleich (design.md D7): ein Doppelklick baut nicht zweimal. Dazu
+/// höchstens [`MAX_BAUTEN`] auf dem ganzen Server: jeder Bau legt eine volle Kopie aller Anhänge
+/// neben die Datenbank, und eine volle Platte ließe auch das Schreiben im Einsatz scheitern. Im
 /// `AppState`, nicht prozessweit, damit parallele Tests mit gleicher Einsatz-id sich nicht
 /// sperren.
 #[derive(Clone, Default)]
 pub struct BauSperre(Arc<Mutex<HashSet<i64>>>);
 
+/// Höchstzahl gleichzeitiger ZIP-Bauten auf dem Server.
+pub const MAX_BAUTEN: usize = 2;
+
 /// Meldung des 409, wenn für den Einsatz schon ein ZIP entsteht.
 pub const BAU_LAEUFT_MELDUNG: &str = "ZIP wird bereits erstellt";
 
+/// Meldung des 503, wenn schon [`MAX_BAUTEN`] ZIPs entstehen.
+pub const ZU_VIELE_BAUTEN_MELDUNG: &str =
+    "Es werden gerade andere Einsatzakten erstellt. Bitte gleich noch einmal versuchen.";
+
 impl BauSperre {
-    /// Belegt den Platz des Einsatzes oder meldet 409. Frei wird er mit dem [`BauPlatz`].
+    /// Belegt den Platz des Einsatzes oder meldet 409 (derselbe Einsatz) bzw. 503 (Server voll).
+    /// Frei wird er mit dem [`BauPlatz`].
     pub fn belegen(&self, einsatz_id: i64) -> Result<BauPlatz, AppError> {
         let mut laufend = self.0.lock().unwrap_or_else(|e| e.into_inner());
-        if !laufend.insert(einsatz_id) {
+        if laufend.contains(&einsatz_id) {
             return Err(AppError::Conflict(BAU_LAEUFT_MELDUNG.into()));
         }
+        if laufend.len() >= MAX_BAUTEN {
+            return Err(AppError::ServiceUnavailable(ZU_VIELE_BAUTEN_MELDUNG.into()));
+        }
+        laufend.insert(einsatz_id);
         Ok(BauPlatz {
             einsatz_id,
             sperre: self.0.clone(),
@@ -458,6 +491,7 @@ mod tests {
             anhang_id: 1,
             linker_id: 1,
             datensatz: datensatz.into(),
+            besitzer_id: 1,
             person_id: None,
             dateiname: name.into(),
             mime: "image/jpeg".into(),
@@ -483,13 +517,17 @@ mod tests {
     }
 
     #[test]
-    fn pfade_sind_eindeutig_auch_ohne_gross_klein() {
+    fn pfade_sind_eindeutig_auch_ohne_gross_klein_und_je_datensatz() {
         let mut d = vec![
             datei(Herkunft::Etb, "Nr. 3", "lage.jpg"),
             datei(Herkunft::Etb, "Nr. 3", "lage.jpg"),
             datei(Herkunft::Etb, "Nr. 3", "LAGE.jpg"),
             datei(Herkunft::Dokumentenablage, "Plan", "plan.pdf"),
             datei(Herkunft::Unfallhilfsstellen, "UHS BHP/50", "x.png"),
+            AkteDatei {
+                besitzer_id: 2,
+                ..datei(Herkunft::Unfallhilfsstellen, "UHS BHP_50", "x.png")
+            },
         ];
         vergib_pfade(&mut d);
         let pfade: Vec<&str> = d.iter().map(|d| d.pfad.as_str()).collect();
@@ -501,6 +539,7 @@ mod tests {
                 "ETB/Nr. 3/LAGE (3).jpg",
                 "Dokumentenablage/plan.pdf",
                 "Unfallhilfsstellen/UHS BHP_50/x.png",
+                "Unfallhilfsstellen/UHS BHP_50 (2)/x.png",
             ]
         );
     }
@@ -554,8 +593,13 @@ mod tests {
         let sperre = BauSperre::default();
         let platz = sperre.belegen(7).unwrap();
         assert!(matches!(sperre.belegen(7), Err(AppError::Conflict(_))));
-        let _anderer = sperre.belegen(8).unwrap();
+        let anderer = sperre.belegen(8).unwrap();
+        assert!(matches!(
+            sperre.belegen(9),
+            Err(AppError::ServiceUnavailable(_))
+        ));
         drop(platz);
         assert!(sperre.belegen(7).is_ok());
+        drop(anderer);
     }
 }

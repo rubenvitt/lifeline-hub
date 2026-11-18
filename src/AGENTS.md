@@ -296,8 +296,9 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   (Test `akte_module_wie_im_client`). Protokoll in EINER Transaktion vor dem Bau (`export` der
   Personentabelle, `anhang` je Personen-Anhang, `anhang_zugriff_audit` je UHS-Anhang). Ein neuer
   Linker in `MODUL_LINKER` gehört in `einsatzakte::sammeln` (mit Protokoll, falls seine Route
-  eins schreibt). Gebaut wird in eine Temp-Datei neben der DB, ein Bau je Einsatz (`BauSperre`,
-  409), gestreamt über `routes::backup::chunk_stream`.
+  eins schreibt). Gebaut wird in `tokio::spawn` (vom Request entkoppelt) in eine Temp-Datei
+  neben der DB, ein Bau je Einsatz und höchstens `MAX_BAUTEN` je Server (`BauSperre`, 409/503),
+  gestreamt über `routes::backup::chunk_stream`.
 - **Kartenhintergrundbilder (LLH-1635)** sind keine Anhänge, laufen beim Download aber durch
   dieselbe Bereinigung (`karte_hintergrundbild::bereinigt`; ETag `"<sha256>.b<n>"`,
   `BEREINIGT_CACHE_CONTROL`). Gespeichert bleibt das Original, einen Original-Abruf gibt es

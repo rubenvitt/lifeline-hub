@@ -125,7 +125,7 @@ Abruf oder dem Zwischenspeicher der Liste stammen.
 Die Druckansicht SHALL einen Download „Anhänge und Tabellen (ZIP)“ anbieten. Das ZIP SHALL
 enthalten:
 
-- jeden nicht gelöschten Anhang des Einsatzes aus Einsatztagebuch, Betroffenen, Schäden, Tieren,
+- jeden nicht gelöschten Anhang eines nicht stornierten Datensatzes des Einsatzes aus Einsatztagebuch, Betroffenen, Schäden, Tieren,
   Unfallhilfsstellen, Dokumentenablage sowie den Anlagen freigegebener Einsatzbefehle und
   Lageberichte, in der Fassung, die auch der Einzel-Download liefert (bereinigt), mit dem
   ursprünglichen Dateinamen, je Modul und Datensatz in einem eigenen Ordner;
@@ -172,7 +172,10 @@ MUST der Abruf ohne Daten scheitern.
 ### Requirement: Ein ZIP-Bau je Einsatz zugleich
 
 Läuft für einen Einsatz bereits ein ZIP-Bau, SHALL ein weiterer Abruf mit 409 und dem Hinweis
-„ZIP wird bereits erstellt“ abgelehnt werden, ohne Protokolleintrag.
+„ZIP wird bereits erstellt“ abgelehnt werden, ohne Protokolleintrag. Laufen auf dem Server schon
+zwei ZIP-Bauten, SHALL ein Abruf für einen weiteren Einsatz mit 503 abgelehnt werden, ebenfalls
+ohne Protokolleintrag. Bricht der Client während des Baus ab, SHALL der Bau zu Ende laufen und
+den Platz bis dahin halten.
 
 #### Scenario: Doppelklick
 

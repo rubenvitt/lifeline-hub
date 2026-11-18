@@ -407,3 +407,81 @@ async fn geschwaerzte_anhaenge_fehlen_und_abgelaufene_frist_sperrt() {
         StatusCode::FORBIDDEN
     );
 }
+
+/// Personendaten nie am gekoppelten Gerät (`frontend/src/druck/AGENTS.md`): ein UHS-Tablet
+/// bekommt kein ZIP, auch nicht das seiner eigenen Stelle.
+#[tokio::test]
+async fn gekoppeltes_geraet_bekommt_kein_zip() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anhang(&pool, e).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/uhs"),
+        &admin,
+        Some(&serde_json::json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let uhs = v["id"].as_i64().unwrap();
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/uhs/{uhs}/status"),
+        &admin,
+        Some(&serde_json::json!({"status": "aktiv"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/geraete"),
+        &admin,
+        Some(
+            &serde_json::json!({"ansicht": "uhs-tablet", "uhs_id": uhs, "bezeichnung": "Tablet 1"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().unwrap().to_string();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/geraete/koppeln")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::json!({ "code": code }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let geraet = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+
+    assert_eq!(
+        zip_laden(&app, &geraet, e).await.status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        anzahl(
+            &pool,
+            "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ?",
+            e
+        )
+        .await,
+        0
+    );
+}

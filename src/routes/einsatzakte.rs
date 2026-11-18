@@ -104,7 +104,7 @@ pub async fn anlagen_zip(
     })?;
 
     // Tabellen im selben Stand wie die Einzel-Exporte.
-    let mut tabellen: Vec<(&str, &str, String)> = Vec::new();
+    let mut tabellen: Vec<(&'static str, &'static str, String)> = Vec::new();
     if mit_personen {
         let personen = crate::person::repo::liste(&state.pool, einsatz_id, None).await?;
         tabellen.push((
@@ -143,32 +143,19 @@ pub async fn anlagen_zip(
         .tempdir_in(&basis)
         .map_err(|e| AppError::Internal(format!("Tempverzeichnis fehlgeschlagen: {e}")))?;
     let pfad = dir.path().join("einsatzakte.zip");
-    let datei = std::fs::File::create(&pfad)
-        .map_err(|e| AppError::Internal(format!("ZIP anlegen fehlgeschlagen: {e}")))?;
 
-    let mut bau = ZipBau::neu(std::io::BufWriter::new(datei));
-    bau = blockierend(move || {
-        for (name, modul, csv) in &tabellen {
-            bau.tabelle(name, modul, csv)?;
-        }
-        Ok(bau)
+    // Vom Request entkoppelt (wie `routes::backup`): bricht der Client während des Baus ab, läuft
+    // der Bau zu Ende und hält Bauplatz und Verzeichnis so lange. Sonst begänne ein erneuter Klick
+    // schon einen zweiten vollen Bau, während der erste noch schreibt.
+    let pool = state.pool.clone();
+    let ziel = pfad.clone();
+    let (dir, platz) = tokio::spawn(async move {
+        baue_zip(&pool, &ziel, tabellen, dateien)
+            .await
+            .map(|()| (dir, platz))
     })
-    .await?;
-    for d in dateien {
-        let inhalt = anhang_fuer_akte(&state.pool, d.anhang_id).await?;
-        bau = blockierend(move || {
-            schreibe_anhang(&mut bau, &d, inhalt)?;
-            Ok(bau)
-        })
-        .await?;
-    }
-    blockierend(move || {
-        let mut w = bau.abschliessen()?;
-        std::io::Write::flush(&mut w)
-            .map_err(|e| AppError::Internal(format!("ZIP schreiben: {e}")))?;
-        Ok(())
-    })
-    .await?;
+    .await
+    .map_err(|e| AppError::Internal(format!("ZIP-Bau abgebrochen: {e}")))??;
 
     let datei = tokio::fs::File::open(&pfad)
         .await
@@ -202,6 +189,41 @@ pub async fn anlagen_zip(
         .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
     );
     Ok((headers, Body::from_stream(stream)))
+}
+
+/// Schreibt Tabellen und Anhänge in die Datei `ziel`. Die Bytes je Anhang holt
+/// `support::anhang_fuer_akte`; geschrieben wird synchron außerhalb der Laufzeit-Threads.
+async fn baue_zip(
+    pool: &sqlx::SqlitePool,
+    ziel: &std::path::Path,
+    tabellen: Vec<(&'static str, &'static str, String)>,
+    dateien: Vec<AkteDatei>,
+) -> Result<(), AppError> {
+    let datei = std::fs::File::create(ziel)
+        .map_err(|e| AppError::Internal(format!("ZIP anlegen fehlgeschlagen: {e}")))?;
+    let mut bau = ZipBau::neu(std::io::BufWriter::new(datei));
+    bau = blockierend(move || {
+        for (name, modul, csv) in &tabellen {
+            bau.tabelle(name, modul, csv)?;
+        }
+        Ok(bau)
+    })
+    .await?;
+    for d in dateien {
+        let inhalt = anhang_fuer_akte(pool, d.anhang_id).await?;
+        bau = blockierend(move || {
+            schreibe_anhang(&mut bau, &d, inhalt)?;
+            Ok(bau)
+        })
+        .await?;
+    }
+    blockierend(move || {
+        let mut w = bau.abschliessen()?;
+        std::io::Write::flush(&mut w)
+            .map_err(|e| AppError::Internal(format!("ZIP schreiben: {e}")))?;
+        Ok(())
+    })
+    .await
 }
 
 fn schreibe_anhang<W: std::io::Write + std::io::Seek>(

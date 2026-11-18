@@ -195,7 +195,7 @@ Das Druckstück hat sechs Kapitel, jedes beginnt auf einer neuen Seite mit eigen
 Ein Kapitel ohne Daten steht mit „keine Einträge“ da, ein im Einsatz ausgeblendetes Modul mit
 „nicht genutzt“. Bei einem laufenden Einsatz trägt jeder Druckkopf „Vorläufig – Einsatz läuft“.
 
-Das ZIP enthält jeden nicht gelöschten Anhang aus Einsatztagebuch, Dokumentenablage,
+Das ZIP enthält jeden nicht gelöschten Anhang eines nicht stornierten Eintrags aus Einsatztagebuch, Dokumentenablage,
 Betroffenen, Schäden, Tieren, Unfallhilfsstellen und den Anlagen freigegebener Befehle und
 Lageberichte, je Modul und Datensatz in einem eigenen Ordner, dazu unter `Tabellen/` die Listen
 der Betroffenen, Tiere und Schäden als CSV und die Datei `inhalt.csv` mit Pfad, Größe und
@@ -208,7 +208,8 @@ Die Einsatzakte gibt es nur vollständig: wer eines ihrer Module nicht lesen dar
 öffnet, steht im Zugriffsprotokoll der Betroffenen mit einem Druck; wer das ZIP lädt, mit einem
 Export und je Anhang einer Person einem Eintrag, ebenso im Protokoll der Dateien jeder
 Unfallhilfsstelle. Auf einem gekoppelten Gerät gibt es kein ZIP. Wird das ZIP für einen Einsatz
-gerade erstellt, lehnt Lifeline Hub einen zweiten Abruf ab, bis das erste fertig ist.
+gerade erstellt, lehnt Lifeline Hub einen zweiten Abruf ab, bis das erste fertig ist; entstehen
+auf dem Server schon zwei ZIPs, kommt der Hinweis, es gleich noch einmal zu versuchen.
 
 ### Wer im Bericht als Einsatzleitung steht
 
