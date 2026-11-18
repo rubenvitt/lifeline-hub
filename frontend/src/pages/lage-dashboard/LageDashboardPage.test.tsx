@@ -1029,7 +1029,7 @@ describe('LageDashboardPage — Seitenkopf', () => {
     // eine Minute ist; daneben keine zweite Uhr (Spec `zeitdarstellung`, `modul-benennung`).
     await waitFor(() =>
       expect(document.querySelector('.lfh-seitenkopf__meta')?.textContent).toMatch(
-        /^Stand \d{4}( · offline)?$/,
+        /^Stand \d{4}( · vor 1 min)?( · offline)?$/,
       ),
     );
   });
