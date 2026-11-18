@@ -41,12 +41,10 @@ Ort des Wechsels nehmen.
 
 ### Requirement: Statuswechsel zurücknehmen
 
-„Rückgängig“ SHALL den FMS-Status des Fahrzeugs in einer Transaktion auf den Wert davor setzen,
-mit dem „Status seit“ von davor. Ein Zeitachsen-Ereignis, das der Wechsel geschrieben hat, MUST
-mit dem Grund „Rücknahme“ gestrichen werden, samt seinen Kopien bei der Besatzung. Die Rücknahme
-MUST einen ETB-Eintrag „Fahrzeug «X»: Statuswechsel «A» → «B» zurückgenommen“ schreiben und
-dieselben Live-Meldungen senden wie der Wechsel. Eine schon gesendete Benachrichtigung „wieder
-verfügbar“ bleibt bestehen.
+„Rückgängig“ SHALL in einer Transaktion den Status und „Status seit“ von davor herstellen und das
+Zeitachsen-Ereignis des Wechsels samt Kopien mit dem Grund „Rücknahme“ streichen. Sie MUST einen
+ETB-Eintrag „Fahrzeug «X»: Statuswechsel «A» → «B» zurückgenommen“ schreiben und dieselben
+Live-Meldungen senden wie der Wechsel. Eine gesendete Benachrichtigung bleibt bestehen.
 
 #### Scenario: Wechsel und Rückgängig
 - **WHEN** „85-1“ seit 10:15 auf S2 steht, um 10:40 auf S3 gesetzt und direkt danach „Rückgängig“
