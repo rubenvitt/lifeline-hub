@@ -38,7 +38,8 @@ Bezeichnung, LLH-1747), nie am anderen Rand der Paneelbreite.
 `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/design.md`): `lagebesprechung/LagebesprechungGrossbild.tsx`
 zeigt Termin und Vorbereitung aus `useVorbereitung`, also dieselben Zeilen wie das Paneel, ohne
 Quellenangabe und ohne Bedienung außer der Hülle (`components/grossbild/`). Die Quelle bleibt im
-Paneel und in der Übernahme.
+Paneel und in der Übernahme. Eine Alarmzeile „Was brennt“ trägt es nicht, weil die Seite keine
+trägt; Überfälliges steht in den Zeilen der Vorbereitung (LLH-1931).
 
 **Überfälliger Besprechungstermin** (LFH-859,
 `openspec/changes/archive/2026-10-04-lfh-859-lagebesprechung-ein-warnton/design.md`): ein erreichter
