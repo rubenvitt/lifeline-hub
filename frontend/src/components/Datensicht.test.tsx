@@ -1035,7 +1035,9 @@ describe('Datensicht · Kartenzweig', () => {
     const { container } = rendere({
       karte: { ...karte, status: () => ({ rolle: 'normal', label: 'verfügbar' }) },
     });
-    const etiketten = container.querySelectorAll('[data-lfh="datensicht-karte"] .ant-tag');
+    const etiketten = container.querySelectorAll(
+      '[data-lfh="datensicht-karte"] [data-lfh="status"], [data-marke]',
+    );
     expect(etiketten).toHaveLength(3);
     for (const t of etiketten) expect(t.closest('button')).toBeNull();
   });

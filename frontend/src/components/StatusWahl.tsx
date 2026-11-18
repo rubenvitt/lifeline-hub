@@ -226,6 +226,20 @@ export default function StatusWahl<W extends string | number>({
     },
     [merkeZeile],
   );
+  // Mit Kopf (Menügruppe) setzt antd den Fokus beim Öffnen nicht mehr in die Einträge; das
+  // übernimmt der Kopf selbst: der gewählte Eintrag, sonst der erste (Tastaturweg wie ohne Kopf).
+  const kopf = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (!offen || !titel) return;
+    const t = window.setTimeout(() => {
+      const liste = kopf.current?.closest<HTMLElement>('[role="menu"]');
+      const ziel =
+        liste?.querySelector<HTMLElement>('[role="menuitem"].ant-dropdown-menu-item-selected') ??
+        liste?.querySelector<HTMLElement>('[role="menuitem"]');
+      ziel?.focus();
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [offen, titel]);
   // Öffnet die Palette das Menü, misst es dieselbe Lage.
   useEffect(() => {
     if (offen)
@@ -275,38 +289,35 @@ export default function StatusWahl<W extends string | number>({
       // Die Menüwahl schließt über denselben Weg (antd meldet `false` mit `source: 'menu'`).
       onOpenChange={setzeOffen}
       placement={lage.unten ? 'bottomLeft' : 'topLeft'}
-      popupRender={(menue) => (
-        <div
-          data-lfh="status-menue"
-          data-zweispaltig={lage.zweispaltig || undefined}
-          className={lage.zweispaltig ? 'lfh-statusmenue--zweispaltig' : undefined}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: lage.maxHoehe > 0 ? lage.maxHoehe : undefined,
-            background: token.colorBgElevated,
-            boxShadow: token.boxShadowSecondary,
-          }}
-        >
-          {titel && (
-            <div
-              data-lfh="status-menue-kopf"
-              style={{
-                ...monoStil(dichte === 'handschuh' ? 18 : 14, 500),
-                paddingBlock: token.paddingXS,
-                paddingInline: token.paddingSM,
-                borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                color: token.colorText,
-              }}
-            >
-              {titel}
-            </div>
-          )}
-          <div style={{ overflowY: 'auto', minHeight: 0 }}>{menue}</div>
-        </div>
-      )}
       menu={{
-        items: eintraege,
+        // Kopf als nicht wählbare Gruppe (LLH-1781): antds eigene Form, damit der Fokus beim
+        // Öffnen wie bisher in den Einträgen landet.
+        items: titel
+          ? [
+              {
+                type: 'group' as const,
+                key: 'kopf',
+                label: (
+                  <span
+                    ref={kopf}
+                    data-lfh="status-menue-kopf"
+                    style={{
+                      ...monoStil(dichte === 'handschuh' ? 18 : 14, 500),
+                      color: token.colorText,
+                    }}
+                  >
+                    {titel}
+                  </span>
+                ),
+                children: eintraege,
+              },
+            ]
+          : eintraege,
+        className: lage.zweispaltig ? 'lfh-statusmenue--zweispaltig' : undefined,
+        style: {
+          maxHeight: lage.maxHoehe > 0 ? lage.maxHoehe : undefined,
+          overflowY: 'auto',
+        },
         selectable: true,
         selectedKeys: aktuell != null ? [String(aktuell)] : [],
         // Die Zuordnung liegt am MENÜ, nicht je Eintrag — siehe Dateikopf.

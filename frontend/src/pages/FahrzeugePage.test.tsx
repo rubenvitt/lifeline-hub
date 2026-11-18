@@ -593,7 +593,9 @@ describe('FahrzeugePage', () => {
     // Kein Ist-Wert, der wie eine Unterschreitung aussähe; das Soll bleibt als Auskunft.
     expect(urteil).not.toHaveTextContent('Ist');
     expect(urteil).toHaveTextContent('Soll 0/1/8//9');
-    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
+    expect(urteil.querySelector('[data-lfh="status"], [data-marke]')?.className).not.toMatch(
+      /ant-tag-(blue|green|red)\b/,
+    );
   });
 
   it('zählt Besatzung ohne Stärke-Position als Mannschaft (BOS-Σ ist Kopfzahl)', async () => {
@@ -644,7 +646,9 @@ describe('FahrzeugePage', () => {
     expect(urteil).toHaveAttribute('data-urteil', 'kein_soll');
     expect(urteil).toHaveTextContent('Ist 1/0/0//1');
     expect(urteil).not.toHaveTextContent('Soll 0');
-    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
+    expect(urteil.querySelector('[data-lfh="status"], [data-marke]')?.className).not.toMatch(
+      /ant-tag-(blue|green|red)\b/,
+    );
   });
 
   it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker nach dem Aufklappen', async () => {
@@ -2222,7 +2226,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     act(() => knopf.focus());
     fireEvent.keyDown(knopf, { key: '4' });
     await waitFor(() => expect(abrufe).toBeGreaterThanOrEqual(2));
-    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+    await waitFor(() => expect(within(tableau).getByText('4')).toBeInTheDocument());
     expect(within(tableau).getByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
     expect(within(tableau).queryByText(/Einheiten nicht abrufbar/)).toBeNull();
   });
@@ -2252,7 +2256,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     // Vorher fiel das Tableau für die Dauer des Abrufs aufs Skelett, und der Hinweis verschwand.
     // Frisch gesucht: ein ausgehängtes Tableau fände `within(tableau)` noch.
     const jetzt = () => screen.getByRole('region', { name: 'FMS-Tableau' });
-    await waitFor(() => expect(within(jetzt()).getByText('S4')).toBeInTheDocument());
+    await waitFor(() => expect(within(jetzt()).getByText('4')).toBeInTheDocument());
     expect(within(jetzt()).getByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
     expect(within(jetzt()).getByRole('heading', { name: 'Alle Fahrzeuge' })).toBeInTheDocument();
   });

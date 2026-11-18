@@ -69,7 +69,11 @@ export function StatusZelle({ ton, wert, wort, hoehe = 34, style }: StatusZelleP
   );
 }
 
-/** Formzeichen als dritter Kanal (DV 102, A0-Formensprache), für Vorleser ausgeblendet. */
+/**
+ * Formzeichen als dritter Kanal (DV 102, A0-Formensprache). Gezeichnet über `data-form` und
+ * `.lfh-form::before` in `theme/sprache.css`, damit es nicht im Text steht; hier für Stellen, die
+ * das Zeichen als Wert brauchen.
+ */
 export const FORM_ZEICHEN: Record<NonNullable<StatusDarstellung['form']>, string> = {
   dreieck: '▲',
   kreis: '●',
@@ -153,6 +157,8 @@ export function Status(props: StatusProps) {
       data-lfh="status"
       data-ton={ton}
       data-groesse={groesse}
+      data-form={form}
+      className="lfh-form"
       title={title}
       style={{
         display: 'inline-flex',
@@ -172,7 +178,6 @@ export function Status(props: StatusProps) {
         ...style,
       }}
     >
-      {form && <span aria-hidden="true">{FORM_ZEICHEN[form]}</span>}
       {icon}
       {mandantenfarbe && (
         // Hintergrund statt Textfarbe: ungültiges CSS bleibt transparent.
@@ -191,7 +196,8 @@ export function Status(props: StatusProps) {
       {code != null && <span style={monoStil(masse.schrift, 500)}>{code}</span>}
       {/* Vorgelesen trennt der Abstand, der Punkt ist Optik. */}
       {code != null && trenner && <span aria-hidden="true">·</span>}
-      <span>{wort}</span>
+      {/* Ohne Code steht das Wort direkt im Baustein: `getByText(wort)` trifft dann ihn selbst. */}
+      {code != null ? <span>{wort}</span> : wort}
     </span>
   );
 }

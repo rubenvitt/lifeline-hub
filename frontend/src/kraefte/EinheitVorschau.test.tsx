@@ -74,7 +74,7 @@ describe('EinheitVorschau (LFH-664)', () => {
    * Ein HANDstatus trägt die Mandantenfarbe seines Katalogeintrags, `StatusTag` erzwingt die
    * Rand-Form. Ein aus Fahrzeugen abgeleiteter Status bleibt Fläche.
    */
-  it('gibt die Mandantenfarbe eines Handstatus an den StatusTag (Rand-Form)', async () => {
+  it('gibt die Mandantenfarbe eines Handstatus an den Status (Punkt, keine Rand-Form)', async () => {
     const hand = {
       quelle: 'hand',
       status: { ...S2, farbe: '#00aa00' },
@@ -82,8 +82,7 @@ describe('EinheitVorschau (LFH-664)', () => {
     } as unknown as EinheitStatus;
     liefere([einheit({ status: hand })]);
     renderMitProviders(<EinheitVorschau einsatzId={5} id={3} />);
-    const tag = (await screen.findByText('S2 · Frei auf Wache')).closest('[data-darstellung]');
-    expect(tag).toHaveAttribute('data-darstellung', 'rand');
+    const tag = (await screen.findByText('S2 · Frei auf Wache')).closest('[data-lfh="status"]');
     expect(tag?.querySelector('[data-lfh="mandantenfarbe"]')).not.toBeNull();
   });
 
@@ -95,8 +94,8 @@ describe('EinheitVorschau (LFH-664)', () => {
     } as unknown as EinheitStatus;
     liefere([einheit({ status: abgeleitet })]);
     renderMitProviders(<EinheitVorschau einsatzId={5} id={3} />);
-    const tag = (await screen.findByText('S2 · Frei auf Wache')).closest('[data-darstellung]');
-    expect(tag).toHaveAttribute('data-darstellung', 'flaeche');
+    const tag = (await screen.findByText('S2 · Frei auf Wache')).closest('[data-lfh="status"]');
+    expect(tag?.querySelector('[data-lfh="mandantenfarbe"]')).toBeNull();
   });
 
   it('erfindet keine Soll-Stärke und keinen leeren Funk-Eintrag', async () => {

@@ -735,7 +735,7 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
     expect(screen.getByText('1 von 2 zugesagt')).toBeInTheDocument();
     expect(screen.getByText('Wer: 83-1')).toBeInTheDocument();
     expect(screen.getByText(/^Eintreffen erwartet: /)).toBeInTheDocument();
-    const chip = screen.getByText('überfällig').closest('[data-lfh="status-chip"]');
+    const chip = screen.getByText('überfällig').closest('[data-lfh="status"]');
     expect(chip).toHaveAttribute('data-ton', 'achtung');
   });
 

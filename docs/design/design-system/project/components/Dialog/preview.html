@@ -686,6 +686,23 @@
     inset -2px 0 0 0 var(--lfh-steuer-rahmen),
     inset -10px 0 8px -8px var(--lfh-steuer-rahmen);
 }
+.lfh-statusmenue--zweispaltig .ant-dropdown-menu-item-group-list,
+.ant-dropdown-menu.lfh-statusmenue--zweispaltig:not(:has(.ant-dropdown-menu-item-group-list)) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lfh-form[data-form]::before {
+  margin-inline-end: var(--lfh-luft-0);
+}
+.lfh-form[data-form='dreieck']::before {
+  content: '▲' / '';
+}
+.lfh-form[data-form='balken']::before {
+  content: '▮' / '';
+}
+.lfh-form[data-form='kreis']::before {
+  content: '●' / '';
+}
 html,
 body {
   margin: 0;

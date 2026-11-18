@@ -35,7 +35,10 @@ describe('FachebenenInspector', () => {
     expect(document.body.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(screen.getByText('Amtliche Warnung vor Dauerregen')).toBeInTheDocument(); // volle Headline im Body
     // Schwere mit der amtlichen DWD-Bezeichnung aus dem Vertrag (LFH-662), nicht „Mäßig“.
-    expect(screen.getByText('Markantes Wetter')).toHaveAttribute('data-rolle', 'achtung');
+    expect(screen.getByText('Markantes Wetter').closest('[data-lfh="status"]')).toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
     expect(screen.getByText('Sofort')).toBeInTheDocument();
     expect(screen.getByText('Es tritt Dauerregen auf.')).toBeInTheDocument();
     expect(screen.getByText('Meiden Sie überflutete Bereiche.')).toBeInTheDocument();
@@ -49,32 +52,44 @@ describe('FachebenenInspector', () => {
 
     it('DWD „Minor“ heißt „Wetterwarnung“ in der Achtung-Rolle, nichts in Blau', () => {
       const { container } = warnung('dwd', { EVENT: 'FROST', SEVERITY: 'Minor' });
-      expect(screen.getByText('Wetterwarnung')).toHaveAttribute('data-rolle', 'achtung');
+      expect(screen.getByText('Wetterwarnung').closest('[data-lfh="status"]')).toHaveAttribute(
+        'data-ton',
+        'achtung',
+      );
       expect(screen.queryByText('Gering')).toBeNull();
-      expect(container.querySelector('.ant-tag-blue, [data-rolle="bedien"]')).toBeNull();
+      expect(container.querySelector('[data-ton="bedien"]')).toBeNull();
     });
 
     it('DWD „Extreme“ heißt „Extremes Unwetter“ in der Alarm-Rolle', () => {
       warnung('dwd', { EVENT: 'ORKANBÖEN', SEVERITY: 'Extreme' });
-      expect(screen.getByText('Extremes Unwetter')).toHaveAttribute('data-rolle', 'alarm');
+      expect(screen.getByText('Extremes Unwetter').closest('[data-lfh="status"]')).toHaveAttribute(
+        'data-ton',
+        'alarm',
+      );
     });
 
     it('NINA „Severe“ heißt „Schwer“ in der Alarm-Rolle', () => {
       warnung('nina', { titel: 'Gefahrstoffaustritt', schwere: 'Severe' });
-      expect(screen.getByText('Schwer')).toHaveAttribute('data-rolle', 'alarm');
+      expect(screen.getByText('Schwer').closest('[data-lfh="status"]')).toHaveAttribute(
+        'data-ton',
+        'alarm',
+      );
       expect(screen.queryByText('Unwetterwarnung')).toBeNull();
     });
 
     it('NINA „Minor“ heißt „Gering“ in der Achtung-Rolle, nicht Blau', () => {
       const { container } = warnung('nina', { titel: 'Hinweis', schwere: 'Minor' });
-      expect(screen.getByText('Gering')).toHaveAttribute('data-rolle', 'achtung');
-      expect(container.querySelector('.ant-tag-blue, [data-rolle="bedien"]')).toBeNull();
+      expect(screen.getByText('Gering').closest('[data-lfh="status"]')).toHaveAttribute(
+        'data-ton',
+        'achtung',
+      );
+      expect(container.querySelector('[data-ton="bedien"]')).toBeNull();
     });
 
     it('eine unbekannte Schwere steht als Rohwert ohne Rollenfarbe da', () => {
       warnung('nina', { titel: 'Test', schwere: 'Unknown' });
       const tag = screen.getByText('Unknown');
-      expect(tag).not.toHaveAttribute('data-rolle');
+      expect(tag).not.toHaveAttribute('data-ton');
       expect(tag.className).not.toMatch(/ant-tag-(red|volcano|gold|blue)/);
     });
   });
@@ -491,12 +506,11 @@ describe('FachebenenInspector', () => {
     );
     expect(screen.getByText(/320 cm/)).toBeInTheDocument();
     // Über MHW ist keine Meldestufe: Achtung, nicht Rot, und nie Bedienblau.
-    expect(screen.getByText('Hoch')).toHaveAttribute('data-rolle', 'achtung');
-    expect(
-      container.querySelector(
-        '.ant-tag-red, .ant-tag-blue, [data-rolle="alarm"], [data-rolle="bedien"]',
-      ),
-    ).toBeNull();
+    expect(screen.getByText('Hoch').closest('[data-lfh="status"]')).toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
+    expect(container.querySelector('[data-ton="alarm"], [data-ton="bedien"]')).toBeNull();
     expect(screen.getByText('RHEIN')).toBeInTheDocument();
   });
 
@@ -513,8 +527,11 @@ describe('FachebenenInspector', () => {
           onSchliessen={() => {}}
         />,
       );
-      expect(screen.getByText(wort)).toHaveAttribute('data-rolle', rolle);
-      expect(container.querySelector('.ant-tag-green, .ant-tag-gold')).toBeNull();
+      expect(screen.getByText(wort).closest('[data-lfh="status"]')).toHaveAttribute(
+        'data-ton',
+        rolle,
+      );
+      expect(container.querySelector('[data-ton="bedien"]')).toBeNull();
     },
   );
 
@@ -530,7 +547,7 @@ describe('FachebenenInspector', () => {
       );
       if (zustand) expect(screen.queryByText(zustand)).toBeNull();
       expect(screen.getByText(/100 cm/)).toBeInTheDocument();
-      expect(container.querySelector('.ant-tag')).toBeNull();
+      expect(container.querySelector('[data-lfh="status"], [data-marke]')).toBeNull();
     },
   );
 

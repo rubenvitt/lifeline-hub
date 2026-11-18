@@ -295,10 +295,10 @@ describe('BefehlDetailPage', () => {
     renderAt(7);
     // Die Phase trägt eine getönte Statusfläche (`StatusChip`); die Farbe kommt aus der Phasenachse
     // (`abgeschlossen` → Ton `normal`), nicht aus einem handgeschriebenen Grün.
-    const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status-chip"]');
+    const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status"]');
     expect(etikett).toHaveAttribute('data-ton', 'normal');
     expect(etikett!.closest('[data-phase]')).toHaveAttribute('data-phase', 'abgeschlossen');
-    expect(etikett!.closest('.ant-tag')).toBeNull();
+    expect(etikett!.closest('[data-marke]')).toBeNull();
   });
 });
 

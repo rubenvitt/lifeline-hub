@@ -1120,7 +1120,7 @@ describe('Grundriss – Berührungsbedienung: kein Scroll-Riegel (LFH-367/B5g, A
 
 describe('Grundriss – Personenkarte im Neuentwurf (LFH-621)', () => {
   // Kein antd-`Tag`: die Karte ist eine Personenmarke, die e2e-Specs greifen sie über `data-lfh` —
-  // die Abwesenheit von `.ant-tag` gehört zur Aussage.
+  // die Abwesenheit von `[data-lfh="status"], [data-marke]` gehört zur Aussage.
   it('rendert die Karte als Personenmarke mit Mono-Nummer, nicht als antd-Tag', async () => {
     const p = person({ id: 7, registrier_nr: 7, name: 'Müller', aktuelle_uhs_id: null });
     renderGrundriss(uhsDetail({}), [p]);
@@ -1128,8 +1128,8 @@ describe('Grundriss – Personenkarte im Neuentwurf (LFH-621)', () => {
     const karte = nr.closest('[data-lfh="personenkarte"]') as HTMLElement | null;
     expect(karte).not.toBeNull();
     expect(karte).toHaveTextContent('R-007 · Müller');
-    expect(karte!.closest('.ant-tag')).toBeNull();
-    expect(karte!.querySelector('.ant-tag')).toBeNull();
+    expect(karte!.closest('[data-lfh="status"], [data-marke]')).toBeNull();
+    expect(karte!.querySelector('[data-lfh="status"], [data-marke]')).toBeNull();
     expect(nr.style.fontFamily).toContain('JetBrains Mono');
     expect(nr.style.fontVariantNumeric).toBe('tabular-nums');
   });
@@ -2609,7 +2609,7 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
       '[data-lfh="paneel"]',
     )!;
     const marke = await within(spalte).findByText('dringlich');
-    expect(marke.closest('.ant-tag')).not.toBeNull();
+    expect(marke.closest('[data-lfh="status"], [data-marke]')).not.toBeNull();
     expect(marke.closest('[data-lfh="transport-prioritaet"]')).toHaveAttribute(
       'title',
       'Transportpriorität dringlich',

@@ -50,7 +50,7 @@ export function Marke({
         display: 'inline-flex',
         alignItems: 'center',
         gap: token.marginXXS,
-        height: bedienbar ? token.controlHeightSM : 20,
+        height: bedienbar ? token.controlHeight : 20,
         paddingInlineStart: token.paddingXS,
         paddingInlineEnd: bedienbar ? 0 : token.paddingXS,
         background: rollen.flaeche2,
@@ -70,7 +70,6 @@ export function Marke({
       {bedienbar && (
         <Button
           type="text"
-          size="small"
           aria-label={
             entfernenLabel ?? `${typeof children === 'string' ? children : ''} entfernen`.trim()
           }

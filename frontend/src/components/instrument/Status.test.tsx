@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { farbenHell } from '../../theme/tokens';
-import { Status, StatusZelle } from './Status';
+import { FORM_ZEICHEN, Status, StatusZelle } from './Status';
 
 describe('StatusZelle', () => {
   it('zeigt die Zahl auf getönter Fläche und trägt das Wort für Vorleser mit', () => {
@@ -50,10 +50,12 @@ describe('Status', () => {
     ['alarm', '▲'],
     ['achtung', '▮'],
     ['normal', '●'],
-  ] as const)('%s trägt ohne Angabe das Formzeichen %s, für Vorleser verborgen', (ton, zeichen) => {
+  ] as const)('%s trägt ohne Angabe das Formzeichen %s, nicht im Text', (ton, zeichen) => {
     renderMitProviders(<Status ton={ton} wort="w" />);
-    const z = screen.getByText(zeichen);
-    expect(z).toHaveAttribute('aria-hidden', 'true');
+    const s = document.querySelector<HTMLElement>('[data-lfh="status"]')!;
+    expect(FORM_ZEICHEN[s.dataset.form as keyof typeof FORM_ZEICHEN]).toBe(zeichen);
+    expect(s.className).toContain('lfh-form');
+    expect(s).toHaveTextContent(/^w$/);
   });
 
   it('neutral und bedien tragen kein Zeichen; `form={null}` unterdrückt eines', () => {
@@ -64,7 +66,8 @@ describe('Status', () => {
         <Status ton="alarm" wort="ohne" form={null} />
       </>,
     );
-    for (const z of ['▲', '▮', '●']) expect(screen.queryByText(z)).toBeNull();
+    for (const s of document.querySelectorAll<HTMLElement>('[data-lfh="status"]'))
+      expect(s.dataset.form).toBeUndefined();
   });
 
   it('nimmt eine Darstellung aus dem Statusvertrag; die Rolle `marke` erscheint neutral', () => {
@@ -78,7 +81,10 @@ describe('Status', () => {
       'data-ton',
       'achtung',
     );
-    expect(screen.getByText('●')).toBeInTheDocument();
+    expect(screen.getByText('vermisst').closest('[data-lfh="status"]')).toHaveAttribute(
+      'data-form',
+      'kreis',
+    );
     expect(screen.getByText('Signatur').closest('[data-lfh="status"]')).toHaveAttribute(
       'data-ton',
       'neutral',

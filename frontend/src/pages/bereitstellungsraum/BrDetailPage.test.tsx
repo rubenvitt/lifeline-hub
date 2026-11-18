@@ -2404,9 +2404,9 @@ describe('BrDetailPage — Herkunft an der Belegungszeile (LLH-1075, design.md D
     expect(within(offen).getByText('nicht übernommen')).toBeInTheDocument();
     expect(within(offen).queryByText('unangemeldet')).toBeNull();
     const uebernommen = await zeile('Florian Nachbar 4');
-    expect(within(uebernommen).getByText('unangemeldet').closest('.ant-tag')).not.toHaveAttribute(
-      'data-rolle',
-    );
+    expect(
+      within(uebernommen).getByText('unangemeldet').closest('[data-lfh="status"], [data-marke]'),
+    ).not.toHaveAttribute('data-ton');
     expect(within(uebernommen).queryByText('nicht übernommen')).toBeNull();
     const angemeldet = await zeile('Zug Nord');
     expect(within(angemeldet).queryByText('unangemeldet')).toBeNull();

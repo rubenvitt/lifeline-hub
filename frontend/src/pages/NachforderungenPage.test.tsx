@@ -192,9 +192,7 @@ describe('NachforderungenPage', () => {
     expect(await screen.findByText('2 RTW zur Verstärkung')).toBeInTheDocument();
     expect(stufeVon('2 RTW zur Verstärkung')).toBe('angefordert');
     // Die Stufe nennt der Spaltenkopf, nicht die Karte.
-    expect(
-      screen.queryByText('Angefordert', { selector: '[data-lfh="status-chip"] span' }),
-    ).toBeNull();
+    expect(screen.queryByText('Angefordert', { selector: '[data-lfh="status"]' })).toBeNull();
     expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
@@ -989,7 +987,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
       'data-fehler',
     );
     expect(stufeVon('2 RTW zur Verstärkung')).toBe('unterwegs');
-    expect(within(k).getByText('Eingetroffen', { selector: '[data-lfh="status-chip"] span' }));
+    expect(within(k).getByText('Eingetroffen', { selector: '[data-lfh="status"]' }));
     // Die neue Ordnung bietet der Sammelbanner an; danach steht die Karte mit ihrem Grund dort.
     await zeigeNeueOrdnung();
     expect(stufeVon('2 RTW zur Verstärkung')).toBe('eingetroffen');

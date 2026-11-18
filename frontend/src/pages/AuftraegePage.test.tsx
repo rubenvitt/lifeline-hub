@@ -1505,7 +1505,7 @@ describe('AuftraegePage', () => {
       renderPage();
       await userEvent.click(await screen.findByText(/^Abgeschlossen/));
       await geladen();
-      const chip = within(liste()).getByText('Aufgehoben').closest('[data-lfh="status-chip"]');
+      const chip = within(liste()).getByText('Aufgehoben').closest('[data-lfh="status"]');
       expect(chip).toHaveAttribute('data-ton', 'neutral');
       expect(screen.getByText(/Grund: Lage hat sich erledigt/)).toBeInTheDocument();
       expect(screen.getByText(/Erika Leitung/)).toBeInTheDocument();

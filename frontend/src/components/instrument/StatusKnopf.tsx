@@ -4,7 +4,7 @@ import { forwardRef } from 'react';
 import type { ReactNode } from 'react';
 import type { StatusDarstellung } from '../../theme/statusFarben';
 import { monoStil, useRollen } from './rollenwerte';
-import { FORM_ZEICHEN, formVonTon } from './Status';
+import { formVonTon } from './Status';
 import { statusFlaeche, tonVonRolle, type StatusTon } from './statusFlaeche';
 
 /** Höhe des großen Statusblocks im FMS-Tableau (LLH-1782, Change `eon26eat-status-und-bedienung`, D9). */
@@ -44,7 +44,10 @@ export const StatusKnopf = forwardRef<HTMLButtonElement, StatusKnopfProps>(funct
   const f = statusFlaeche(rollen, ton);
   const form = darstellung?.form ?? formVonTon(ton);
   const mandantenfarbe = farbe?.trim();
-  const zeichen = form ? <span aria-hidden="true">{FORM_ZEICHEN[form]}</span> : null;
+  // Das Formzeichen zeichnet `.lfh-form::before` (`theme/sprache.css`), nicht der Text.
+  const zeichen = form ? (
+    <span className="lfh-form" data-form={form} data-lfh="formzeichen" />
+  ) : null;
   const punkt = mandantenfarbe ? (
     <span
       aria-hidden="true"
@@ -179,7 +182,7 @@ export function StatusBlock({
         {code ?? '—'}
       </span>
       <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXXS, fontSize: 12 }}>
-        {form && <span aria-hidden="true">{FORM_ZEICHEN[form]}</span>}
+        {form && <span className="lfh-form" data-form={form} data-lfh="formzeichen" />}
         {mandantenfarbe && (
           <span
             aria-hidden="true"

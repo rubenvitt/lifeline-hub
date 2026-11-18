@@ -1,4 +1,3 @@
-import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Person } from '../api/types';
 import { renderMitProviders } from '../test/utils';
@@ -22,8 +21,10 @@ describe('ZeilenSichtung — Rahmen heißt bedienbar (LLH-1780, D6)', () => {
   });
 
   it('ohne Sichtung bleibt es der Link „Sichten“, ohne Rahmen', () => {
-    renderMitProviders(<ZeilenSichtung p={person(null)} einsatzId={7} rueckmeldung={rueckmeldung} />);
-    expect(screen.getByRole('button', { name: /Sicht/ })).toHaveTextContent('Sichten');
+    renderMitProviders(
+      <ZeilenSichtung p={person(null)} einsatzId={7} rueckmeldung={rueckmeldung} />,
+    );
+    expect(document.querySelector('[data-lfh="sichtung-ausloeser"]')).toHaveTextContent('Sichten');
     expect(document.querySelector('[data-lfh="status-pfeil"]')).toBeNull();
   });
 });
