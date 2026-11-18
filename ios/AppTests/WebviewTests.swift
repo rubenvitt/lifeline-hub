@@ -4,12 +4,13 @@ import XCTest
 
 @testable import LifelineHub
 
-/// Webview-Host im Simulator (tasks.md 8.4, 8.6, 8.7): Datenspeicher je Server, Init-Skript,
-/// Brücke nur für Hauptframe und aktiven Server, Ladefehler als Fehlerklasse.
+/// Webview-Host im Simulator (tasks.md 8.4, 8.6, 8.7, 8.13): Datenspeicher je Server, Init-Skript,
+/// Brücke nur für Hauptframe und aktiven Server, Dialoge der Seite, Ladefehler als Fehlerklasse.
 @MainActor
 final class WebviewTests: XCTestCase {
     let elw = try! ServerAdresse.parse("https://elw.local:8443")
     let lager = try! ServerAdresse.parse("https://lager.example")
+    let elwOrigin = SeitenOrigin(schema: "https", host: "elw.local", port: 8443)
 
     func eintrag(_ adresse: ServerAdresse) -> ServerEintrag {
         var liste = Serverliste()
@@ -141,6 +142,77 @@ final class WebviewTests: XCTestCase {
         XCTAssertEqual(dienste.meldungen, ["Alarm"])
     }
 
+    // MARK: Dialoge der Seite (tasks.md 8.13)
+
+    func testConfirmFragtNativUnterDemHostDesServers() async throws {
+        let (web, dialoge) = try await dialogseite(basis: elw.url)
+        dialoge.wahl = .ok(text: nil)
+        let ja = try await web.evaluateJavaScript("String(confirm('Tier „Rex“ löschen?'))")
+        XCTAssertEqual(ja as? String, "true")
+        XCTAssertEqual(
+            dialoge.gezeigt,
+            [Seitendialog(art: .rueckfrage, nachricht: "Tier „Rex“ löschen?", origin: elwOrigin)])
+        XCTAssertEqual(dialoge.gezeigt.first?.titel, "elw.local:8443")
+
+        dialoge.wahl = .abgebrochen
+        let nein = try await web.evaluateJavaScript("String(confirm('Nochmal?'))")
+        XCTAssertEqual(nein as? String, "false")
+    }
+
+    func testOhneGezeigtenDialogLehntConfirmAb() async throws {
+        let (web, dialoge) = try await dialogseite(basis: elw.url)
+        dialoge.wahl = nil
+        let wert = try await web.evaluateJavaScript("String(confirm('Löschen?'))")
+        XCTAssertEqual(wert as? String, "false")
+        XCTAssertEqual(dialoge.gezeigt.count, 1)
+    }
+
+    func testAlertWartetAufDieAntwort() async throws {
+        let (web, dialoge) = try await dialogseite(basis: elw.url)
+        dialoge.wahl = .ok(text: nil)
+        let wert = try await web.evaluateJavaScript("alert('Gespeichert'); 'weiter'")
+        XCTAssertEqual(wert as? String, "weiter")
+        XCTAssertEqual(dialoge.gezeigt.map(\.art), [.hinweis])
+        XCTAssertNil(dialoge.gezeigt.first?.abbrechenTitel)
+    }
+
+    func testPromptLiefertDenTextOderNull() async throws {
+        let (web, dialoge) = try await dialogseite(basis: elw.url)
+        dialoge.wahl = .ok(text: "Rex")
+        let text = try await web.evaluateJavaScript("JSON.stringify(prompt('Name?', 'Hund'))")
+        XCTAssertEqual(text as? String, "\"Rex\"")
+        XCTAssertEqual(dialoge.gezeigt.first?.art, .eingabe(vorgabe: "Hund"))
+        dialoge.wahl = .abgebrochen
+        let nichts = try await web.evaluateJavaScript("JSON.stringify(prompt('Name?'))")
+        XCTAssertEqual(nichts as? String, "null")
+    }
+
+    /// Eine fremde Origin (etwa der Identitätsanbieter) darf fragen, aber nur unter ihrem Namen.
+    func testEineFremdeOriginFragtUnterIhremEigenenHost() async throws {
+        let (web, dialoge) = try await dialogseite(basis: URL(string: "https://idp.example/login")!)
+        dialoge.wahl = .ok(text: nil)
+        _ = try await web.evaluateJavaScript("String(confirm('Weiter?'))")
+        XCTAssertEqual(dialoge.gezeigt.map(\.titel), ["idp.example"])
+    }
+
+    /// Ohne Fenster kann kein Dialog erscheinen: die Antwort kommt sofort und genau einmal.
+    func testOhneFensterAntwortenDieSystemdialogeSofortMitNichts() {
+        var antworten: [Seitendialog.Ergebnis?] = []
+        let dialog = Seitendialog(
+            art: .rueckfrage, nachricht: "Löschen?", origin: elwOrigin)
+        Systemdialoge().zeige(dialog, in: WKWebView()) { antworten.append($0) }
+        XCTAssertEqual(antworten.count, 1)
+        XCTAssertEqual(antworten.first, .some(nil))
+    }
+
+    func testDieAntwortGehtHoechstensEinmalAnWebKit() {
+        var antworten: [Seitendialog.Ergebnis?] = []
+        let einmal = EinmaligeAntwort { antworten.append($0) }
+        einmal.call(.abgebrochen)
+        einmal.call(.ok(text: nil))
+        XCTAssertEqual(antworten, [.abgebrochen])
+    }
+
     // MARK: Ladefehler
 
     func testEinUnerreichbarerServerMeldetSeineFehlerklasse() async throws {
@@ -180,6 +252,17 @@ final class WebviewTests: XCTestCase {
         return (web, dienste, zeiger)
     }
 
+    /// Eine Seite unter `basis`, deren Dialoge der Navigationsbegleiter an die Attrappe gibt.
+    private func dialogseite(basis: URL) async throws -> (WKWebView, DialogAttrappe) {
+        let (web, _, _) = try await lade(basis: basis, aktiv: elw, html: "<p>Tiere</p>")
+        let dialoge = DialogAttrappe()
+        let server = elw
+        let begleiter = Navigationsbegleiter(aktiverServer: { server }, dialoge: dialoge) { _, _ in }
+        web.uiDelegate = begleiter
+        halter += [begleiter, dialoge]
+        return (web, dialoge)
+    }
+
     private func titel(_ web: WKWebView) async -> String {
         (try? await web.evaluateJavaScript("document.title")) as? String ?? ""
     }
@@ -203,6 +286,22 @@ private extension Ablauf.Seite {
 private final class Zeiger {
     var adresse: ServerAdresse?
     init(_ adresse: ServerAdresse?) { self.adresse = adresse }
+}
+
+/// Merkt sich jeden Dialog und antwortet, wie ein Mensch es täte, erst nach dem Aufruf.
+@MainActor
+private final class DialogAttrappe: Dialogzeiger {
+    var gezeigt: [Seitendialog] = []
+    var wahl: Seitendialog.Ergebnis?
+
+    func zeige(
+        _ dialog: Seitendialog, in webView: WKWebView,
+        antwort: @escaping @MainActor (Seitendialog.Ergebnis?) -> Void
+    ) {
+        gezeigt.append(dialog)
+        let wahl = self.wahl
+        Task { @MainActor in antwort(wahl) }
+    }
 }
 
 @MainActor

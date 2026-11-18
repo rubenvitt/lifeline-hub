@@ -178,6 +178,26 @@ final class ScreenshotTests: XCTestCase {
         attachScreenshot(named: "web-lange-beruehrung")
     }
 
+    /// Dialoge der Seite (tasks.md 8.13): `confirm` erscheint als nativer Dialog mit dem Host des
+    /// Servers als Titel, und „OK“ kommt bei der Seite als Zustimmung an. Der Knopf steht auf
+    /// `Testzustand.beispielseite`.
+    @MainActor
+    func testEineRueckfrageDerSeiteErscheintNativ() {
+        let app = launch("web")
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.waitForExistence(timeout: 15))
+        let knopf = web.buttons["Eintrag löschen"]
+        XCTAssertTrue(knopf.waitForExistence(timeout: 10))
+        knopf.tap()
+        let dialog = app.alerts["elw.local:8443"]
+        XCTAssertTrue(dialog.waitForExistence(timeout: 5), "kein nativer Dialog")
+        XCTAssertTrue(dialog.staticTexts["Eintrag wirklich löschen?"].exists)
+        XCTAssertTrue(dialog.buttons["Abbrechen"].exists)
+        attachScreenshot(named: "dialog-confirm")
+        dialog.buttons["OK"].tap()
+        XCTAssertTrue(web.staticTexts["Bestätigt"].waitForExistence(timeout: 5))
+    }
+
     @MainActor
     private func launch(_ testzustand: String) -> XCUIApplication {
         let app = XCUIApplication()

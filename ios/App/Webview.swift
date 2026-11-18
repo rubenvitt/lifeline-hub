@@ -135,22 +135,26 @@ final class Brueckenempfang: NSObject, WKScriptMessageHandler {
 /// Begleitet die Navigation des Webviews: Linkregeln, neue Fenster, Downloads (Entwurf D8; Spec
 /// `ios-huelle`, „Links, Downloads und Druck laufen nicht ins Leere“), dazu Ladefehler und das Ende
 /// des Web-Prozesses an das Modell (Entwurf D6). Was geschieht, entscheidet `Linkweiche` im Kern.
+/// Dialoge der Seite (`alert`, `confirm`, `prompt`) zeigt er nativ (tasks.md 8.13, `Seitendialog`).
 @MainActor
 final class Navigationsbegleiter: NSObject, WKNavigationDelegate, WKUIDelegate {
     private let aktiverServer: @MainActor () -> ServerAdresse?
     private let oeffne: @MainActor (URL) -> Void
     private let downloads: Downloads
     private let melde: @MainActor (WKWebView, Ablauf.Event) -> Void
+    private let dialoge: any Dialogzeiger
 
     init(
         aktiverServer: @escaping @MainActor () -> ServerAdresse?,
         oeffne: @escaping @MainActor (URL) -> Void = { UIApplication.shared.open($0) },
         downloads: Downloads = Downloads(),
+        dialoge: any Dialogzeiger = Systemdialoge(),
         melde: @escaping @MainActor (WKWebView, Ablauf.Event) -> Void
     ) {
         self.aktiverServer = aktiverServer
         self.oeffne = oeffne
         self.downloads = downloads
+        self.dialoge = dialoge
         self.melde = melde
     }
 
@@ -246,6 +250,108 @@ final class Navigationsbegleiter: NSObject, WKNavigationDelegate, WKUIDelegate {
             break
         }
         return nil
+    }
+
+    // MARK: Dialoge der Seite
+
+    /// Zeigt den Dialog und ruft `antwort` genau einmal, auch wenn er nicht erscheinen kann.
+    private func zeige(
+        _ art: Seitendialog.Art, nachricht: String, frame: WKFrameInfo, in webView: WKWebView,
+        antwort: @escaping @MainActor (Seitendialog.Ergebnis?) -> Void
+    ) {
+        let origin = SeitenOrigin(
+            schema: frame.securityOrigin.`protocol`, host: frame.securityOrigin.host,
+            port: frame.securityOrigin.port)
+        let einmal = EinmaligeAntwort(antwort)
+        dialoge.zeige(Seitendialog(art: art, nachricht: nachricht, origin: origin), in: webView) {
+            einmal.call($0)
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping @MainActor @Sendable () -> Void
+    ) {
+        zeige(.hinweis, nachricht: message, frame: frame, in: webView) { _ in completionHandler() }
+    }
+
+    func webView(
+        _ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping @MainActor @Sendable (Bool) -> Void
+    ) {
+        zeige(.rueckfrage, nachricht: message, frame: frame, in: webView) {
+            completionHandler(Seitendialog.confirmWert($0))
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+        defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping @MainActor @Sendable (String?) -> Void
+    ) {
+        zeige(.eingabe(vorgabe: defaultText), nachricht: prompt, frame: frame, in: webView) {
+            completionHandler(Seitendialog.promptWert($0))
+        }
+    }
+}
+
+/// Zeigt einen Dialog der Seite und meldet die Wahl; `nil`, wenn er nicht erscheinen kann.
+@MainActor
+protocol Dialogzeiger: AnyObject {
+    func zeige(
+        _ dialog: Seitendialog, in webView: WKWebView,
+        antwort: @escaping @MainActor (Seitendialog.Ergebnis?) -> Void)
+}
+
+/// Ruft eine Antwort höchstens einmal; WebKit verlangt den Rückruf genau einmal.
+@MainActor
+final class EinmaligeAntwort {
+    private var antwort: (@MainActor (Seitendialog.Ergebnis?) -> Void)?
+
+    init(_ antwort: @escaping @MainActor (Seitendialog.Ergebnis?) -> Void) {
+        self.antwort = antwort
+    }
+
+    func call(_ ergebnis: Seitendialog.Ergebnis?) {
+        let offen = antwort
+        antwort = nil
+        offen?(ergebnis)
+    }
+}
+
+/// `UIAlertController` über dem obersten View-Controller des Fensters, in dem der Webview liegt.
+/// Kein Fenster, oder der oberste Controller kommt oder geht gerade (etwa ein zweiter Dialog,
+/// solange der erste offen ist): dann kein Dialog, und die Seite bekommt sofort die Ablehnung.
+@MainActor
+final class Systemdialoge: Dialogzeiger {
+    func zeige(
+        _ dialog: Seitendialog, in webView: WKWebView,
+        antwort: @escaping @MainActor (Seitendialog.Ergebnis?) -> Void
+    ) {
+        guard var oben = webView.window?.rootViewController else { return antwort(nil) }
+        while let gezeigt = oben.presentedViewController { oben = gezeigt }
+        guard !oben.isBeingPresented, !oben.isBeingDismissed, !(oben is UIAlertController) else {
+            return antwort(nil)
+        }
+        // `.alert` braucht auch auf dem iPad keinen Popover-Anker.
+        let fenster = UIAlertController(title: dialog.titel, message: dialog.nachricht, preferredStyle: .alert)
+        if let vorgabe = dialog.feldVorgabe {
+            fenster.addTextField { feld in
+                feld.text = vorgabe
+                feld.accessibilityIdentifier = "seitendialog-feld"
+            }
+        }
+        if let abbrechen = dialog.abbrechenTitel {
+            fenster.addAction(UIAlertAction(title: abbrechen, style: .cancel) { _ in antwort(.abgebrochen) })
+        }
+        let ok = UIAlertAction(title: Seitendialog.okTitel, style: .default) { [weak fenster] _ in
+            antwort(.ok(text: fenster?.textFields?.first?.text))
+        }
+        fenster.addAction(ok)
+        fenster.preferredAction = ok
+        oben.present(fenster, animated: true)
     }
 }
 
