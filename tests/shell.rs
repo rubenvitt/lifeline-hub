@@ -42,11 +42,17 @@ fn pruefe_pflichtfelder(json: &Value) {
         objekt.contains_key("shell_contract"),
         "shell_contract fehlt: {json}"
     );
-    assert!(json["version"].is_string(), "version ist keine Zeichenkette");
+    assert!(
+        json["version"].is_string(),
+        "version ist keine Zeichenkette"
+    );
     let vertrag = json["shell_contract"]
         .as_u64()
         .expect("shell_contract ist eine ganze Zahl ≥ 0");
-    assert!(vertrag >= 1, "shell_contract ist mindestens 1, war {vertrag}");
+    assert!(
+        vertrag >= 1,
+        "shell_contract ist mindestens 1, war {vertrag}"
+    );
 }
 
 #[tokio::test]
