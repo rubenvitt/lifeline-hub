@@ -2127,6 +2127,38 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull();
   });
 
+  it('am Handschirm steht „Ad-hoc-Fahrzeug“ hinter „Weitere“, die Aufteilung nur in den Gruppen (LLH-1786)', async () => {
+    setzeViewportBreite(390);
+    renderTableau(undefined, '/einsaetze/7/fahrzeuge');
+    await screen.findByText('Florian 1');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(within(kopf).queryByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toBeNull();
+    expect(within(kopf).getByRole('button', { name: 'Fahrzeuge disponieren' })).toBeInTheDocument();
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Weitere Aktionen zu den Fahrzeugen' }),
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Ad-hoc-Fahrzeug' })).toBeInTheDocument();
+    await waitFor(() => expect(within(kopf).getByText('Stärke F/UF/M//Σ')).toBeInTheDocument());
+    expect(within(kopf).queryByText(/\d+ (verfügbar|gebunden)/)).toBeNull();
+  });
+
+  it('am Handschirm steht die Ansicht hinter „Filter“ und zählt mit (LLH-1786)', async () => {
+    setzeViewportBreite(390);
+    renderTableau(undefined, '/einsaetze/7/fahrzeuge');
+    await screen.findByText('Florian 1');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    const knopf = within(kopf).getByRole('button', { name: 'Filter' });
+    expect(screen.queryByRole('radiogroup', { name: 'Ansicht' })).toBeNull();
+    // Auch die Wahlen der Liste (Sortierung, Status) stehen erst offen da; die Suche bleibt.
+    expect(screen.queryByRole('combobox', { name: 'Sortieren' })).toBeNull();
+    await userEvent.click(knopf);
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    expect(screen.getByRole('combobox', { name: 'Sortieren' })).toBeInTheDocument();
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'FMS-Tableau' }));
+    expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Filter (1)' })).toBeInTheDocument();
+  });
+
   it('schaltet über die Segmentleiste zwischen Liste und Tableau', async () => {
     renderTableau(undefined, '/einsaetze/7/fahrzeuge');
     const ansicht = await screen.findByRole('radiogroup', { name: 'Ansicht' });

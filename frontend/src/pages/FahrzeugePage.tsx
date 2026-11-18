@@ -76,6 +76,8 @@ import {
 import { besatzungsUrteil, kategorieDarstellung } from '../theme/statusFarben';
 import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
+import { useViewport } from '../components/useViewport';
+import FilterKnopf from '../components/FilterKnopf';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
 import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
@@ -364,6 +366,9 @@ function BesatzungsBlock({
  * FMS-Tableau als Überblicksfläche mit Statuswahl. Beide lesen dieselbe Query und bedienen dieselbe
  * `statusMutation` — das Tableau ist kein zweites Modul.
  */
+/** Wahlfläche hinter „Filter (n)“ am Handschirm (`aria-controls`, LLH-1786). */
+const FILTERFLAECHE_ID = 'fahrzeuge-wahlen';
+
 const ANSICHT_OPTIONEN = [
   { wert: 'liste', label: 'Liste' },
   { wert: 'tableau', label: 'FMS-Tableau' },
@@ -464,6 +469,10 @@ function FahrzeugeInhalt() {
     {},
   );
   const ansicht = ansichtNachEinsatz[einsatzId] ?? 'liste';
+  const { istSchmal } = useViewport();
+  // Am Handschirm hinter „Filter (n)“ (LLH-1786); der Zustand offen/zu ist flüchtig.
+  const [filterOffen, setFilterOffen] = useState(false);
+  const [listenFilterZahl, setListenFilterZahl] = useState(0);
   /** Ein Wechsel hängt die Liste samt offener Angabe aus: mit Änderung erst die Rückfrage. */
   const nachRueckfrage = useWechselNachRueckfrage();
   const setzeAnsicht = (a: FahrzeugeAnsicht) =>
@@ -1198,6 +1207,15 @@ function FahrzeugeInhalt() {
       : []),
   ]);
 
+  const ansichtWahl = (
+    <Segmentleiste<FahrzeugeAnsicht>
+      beschriftung="Ansicht"
+      optionen={ANSICHT_OPTIONEN}
+      wert={ansicht}
+      onWechsel={setzeAnsicht}
+    />
+  );
+
   return (
     <EinsatzSeite
       dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
@@ -1211,6 +1229,8 @@ function FahrzeugeInhalt() {
           pfad={kraefteuebersichtPfad(einsatzId)}
           form="meta"
           fahrzeugzahl={false}
+          // Am Handschirm nennen die Gruppenköpfe der Karten die Aufteilung (LLH-1786).
+          aufteilung={!istSchmal}
         />
       }
       titel={modulName('fahrzeuge')}
@@ -1224,23 +1244,38 @@ function FahrzeugeInhalt() {
         />
       }
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
+      weitere={{
+        name: 'Weitere Aktionen zu den Fahrzeugen',
+        eintraege:
+          darfSchreiben && istSchmal
+            ? [{ key: 'adhoc', label: 'Ad-hoc-Fahrzeug', onWahl: () => setAdhocOffen(true) }]
+            : [],
+      }}
       aktionen={
         // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
         // `paddingXS` ließ 3 / 5 / 7 px.
         <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
-          {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
-          <Segmentleiste<FahrzeugeAnsicht>
-            beschriftung="Ansicht"
-            optionen={ANSICHT_OPTIONEN}
-            wert={ansicht}
-            onWechsel={setzeAnsicht}
-          />
+          {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. Am
+              Handschirm hinter „Filter (n)“ (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig`
+              D5), samt Sortierung und Status der Liste. */}
+          {istSchmal ? (
+            <FilterKnopf
+              offen={filterOffen}
+              onWechsel={setFilterOffen}
+              zahl={Number(ansicht !== 'liste') + (ansicht === 'liste' ? listenFilterZahl : 0)}
+              steuert={FILTERFLAECHE_ID}
+            />
+          ) : (
+            ansichtWahl
+          )}
           {darfSchreiben && (
             <>
               <Button type="primary" onClick={() => setDisponierenOffen(true)}>
                 Fahrzeuge disponieren
               </Button>
-              <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
+              {/* Am Handschirm steht genau eine Erfassung sichtbar (`frontend/AGENTS.md`,
+                  „Nebenwege im Kopf“); die zweite geht hinter „Weitere“ (LLH-1786). */}
+              {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>}
             </>
           )}
         </Space>
@@ -1310,6 +1345,11 @@ function FahrzeugeInhalt() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
           <DeeplinkHinweis lage={deeplinkHinweis} sache="Fahrzeug" />
+          {istSchmal && filterOffen && (
+            <div id={FILTERFLAECHE_ID} style={{ marginBlockEnd: token.marginSM }}>
+              {ansichtWahl}
+            </div>
+          )}
           {ansicht === 'tableau' ? (
             <FmsTableau
               fahrzeuge={efs}
@@ -1338,6 +1378,8 @@ function FahrzeugeInhalt() {
             />
           ) : (
             <Datensicht
+              wahlenVerborgen={istSchmal && !filterOffen}
+              onFilterZahl={setListenFilterZahl}
               bezeichnung="Fahrzeuge im Einsatz"
               spalten={spalten}
               daten={efs}

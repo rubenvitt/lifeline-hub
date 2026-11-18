@@ -604,6 +604,14 @@ interface DatensichtProps<T extends object, K extends string> {
   onZeileKlick?: (zeile: T) => void;
   /** Zusatzknöpfe links in der Werkzeugzeile (z. B. „Drucken"). */
   werkzeuge?: ReactNode;
+  /**
+   * Sortierung und Feldfilter der Werkzeugzeile ausblenden (LLH-1786, Change
+   * `z137bgm5-seitenkopf-einzeilig` D5): am Handschirm stehen sie hinter dem Knopf „Filter“ der
+   * Seite, bis er offen ist. Die Suche bleibt stehen.
+   */
+  wahlenVerborgen?: boolean;
+  /** Meldet die Zahl der Feldfilter mit Wahl, damit „Filter (n)“ auch Verborgenes zählt. */
+  onFilterZahl?: (zahl: number) => void;
   /** Einziger Aufklappweg, beschriftet, in beiden Zweigen (LFH-697); schließt `baum` aus. */
   aufklappen?: Aufklappbereich<T>;
   /**
@@ -1150,6 +1158,8 @@ export default function Datensicht<T extends object, const K extends string>(
     zeilenKlasse,
     onZeileKlick,
     werkzeuge,
+    wahlenVerborgen = false,
+    onFilterZahl,
     aufklappen,
     zeilenFehler,
     halten = false,
@@ -1244,6 +1254,11 @@ export default function Datensicht<T extends object, const K extends string>(
   const [filterWerte, setFilterWerte] = useState<Readonly<Record<string, readonly string[]>>>(
     () => gedaechtnis?.start.filter ?? {},
   );
+  // Zahl der Feldfilter mit Wahl, für „Filter (n)“ der Seite (LLH-1786).
+  const filterZahl = Object.values(filterWerte).filter((w) => w.length > 0).length;
+  useEffect(() => {
+    onFilterZahl?.(filterZahl);
+  }, [filterZahl, onFilterZahl]);
   const filterZuruecksetzen = useCallback(() => {
     setSuchbegriff('');
     setFilterWerte({});
@@ -1702,13 +1717,13 @@ export default function Datensicht<T extends object, const K extends string>(
 
   /** Was die Werkzeugzeile außer dem Banner trägt; EINE Wahrheit für Zeile und Schwebeform. */
   const feldFilter =
-    baum != null
+    baum != null || wahlenVerborgen
       ? []
       : alsTabelle
         ? feldSpalten
         : filterSpalten.filter((spalte) => !spalte.filter!.ohneKartenfeld);
   const zeigtSuche = suche != null && baum == null;
-  const zeigtSortierung = !alsTabelle && sortierOptionen.length > 0;
+  const zeigtSortierung = !alsTabelle && sortierOptionen.length > 0 && !wahlenVerborgen;
   const zeigtZaehler = gruppenZaehler.length > 0 && alsTabelle && gruppen?.zaehler !== false;
   /**
    * Schwebender Sammelbanner (LLH-1479): steht der Spaltenschalter bei der Seite und trüge die Zeile

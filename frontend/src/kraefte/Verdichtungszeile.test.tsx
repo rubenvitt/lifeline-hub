@@ -329,6 +329,31 @@ describe('Verdichtungszeile — Form meta', () => {
     expect(screen.queryByText(/^Fahrzeuge \d+$/)).toBeNull();
   });
 
+  it('lässt die Aufteilung weg, wenn die Liste sie schon in ihren Gruppenköpfen nennt', async () => {
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { status_kategorie: 'verfuegbar' },
+    ] as never);
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/fahrzeuge"
+          element={
+            <Verdichtungszeile
+              einsatzId={1}
+              pfad={kraefteuebersichtPfad(1)}
+              form="meta"
+              fahrzeugzahl={false}
+              aufteilung={false}
+            />
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/1/fahrzeuge' },
+    );
+    expect(await screen.findByText('0/0/0//0')).toBeInTheDocument();
+    expect(screen.queryByText(/verfügbar|gebunden/)).toBeNull();
+  });
+
   it('hält beim Laden die Breite mit einem stummen Platzhalter in derselben Form', () => {
     vi.mocked(listeEinsatzPersonal).mockReturnValue(new Promise(() => {}));
     vi.mocked(listeEinsatzFahrzeuge).mockReturnValue(new Promise(() => {}));

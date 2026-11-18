@@ -96,12 +96,18 @@ export default function Verdichtungszeile({
   pfad,
   form = 'zeile',
   fahrzeugzahl = true,
+  aufteilung = true,
 }: {
   einsatzId: number;
   pfad: string;
   form?: VerdichtungForm;
   /** `false` auf der Fahrzeugseite: ihr Kopf nennt die Zahl schon („3 Fahrzeuge“, LLH-1786). */
   fahrzeugzahl?: boolean;
+  /**
+   * `false`, wo die Liste die Aufteilung verfügbar / gebunden / nicht verfügbar schon in ihren
+   * Gruppenköpfen nennt (Fahrzeuge als Karten am Handschirm, LLH-1786): sie steht dann nur einmal.
+   */
+  aufteilung?: boolean;
 }) {
   const { token, rollen } = useRollen();
   // Kein Link in ein gesperrtes Meldebild (LFH-888, design.md D4); die Zahlen bleiben.
@@ -151,7 +157,7 @@ export default function Verdichtungszeile({
       <strong title={personalFrei === false || laedt ? undefined : STAERKE_AUSGESCHRIEBEN}>
         {personalFrei === false ? '—' : staerkeText(v.staerke)}
       </strong>
-      {fahrzeugeFrei !== false && (
+      {fahrzeugeFrei !== false && (fahrzeugzahl || aufteilung) && (
         <>
           <span aria-hidden>·</span>
           {fahrzeugzahl && (
@@ -160,14 +166,15 @@ export default function Verdichtungszeile({
           {/* Zahl vor Wort, dieselben Wörter wie der Zählerstreifen der Tabelle darunter
               (LFH-973, `statusKategorie`): „verfügbar“ statt „frei“, „nicht verfügbar“
               ausgeschrieben. */}
-          {KATEGORIEN.map((k, i) => (
-            <Fragment key={k}>
-              {i > 0 && <span aria-hidden>·</span>}
-              <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie[k].rolle) }}>
-                {v.fahrzeugStatus[k]} {statusKategorie[k].label}
-              </span>
-            </Fragment>
-          ))}
+          {aufteilung &&
+            KATEGORIEN.map((k, i) => (
+              <Fragment key={k}>
+                {i > 0 && <span aria-hidden>·</span>}
+                <span style={{ color: verdichtungsTextfarbe(rollen, statusKategorie[k].rolle) }}>
+                  {v.fahrzeugStatus[k]} {statusKategorie[k].label}
+                </span>
+              </Fragment>
+            ))}
         </>
       )}
       {sperre && (

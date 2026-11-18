@@ -37,9 +37,9 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 5. „Filter (n)“ am Handschirm (D5)
 
-- [ ] 5.1 `pages/PersonenPage.tsx`: unter `md` Knopf „Filter (n)“ im Kopf, Ansicht-Segmentleiste und Statusfilter nur offen; Zählung abseits der Vorgabe. Tests „Filter (1) mit Abgeschlossenen“, „ab md ohne Knopf“ rot→grün
-- [ ] 5.2 `pages/FahrzeugePage.tsx`: dasselbe für die Ansichtswahl; Tests rot→grün
-- [ ] 5.3 e2e `betroffene-handy.spec.ts` (erste Person und Sichtungszeile im Bild, Filter über Knopf) grün
+- [x] 5.1 `components/FilterKnopf.tsx`, `Datensicht` (`wahlenVerborgen`, `onFilterZahl`, Tests rot→grün); `pages/PersonenPage.tsx`: unter `md` Knopf „Filter (n)“ im Kopf, Ansicht und Statusfilter nur offen, Zählung abseits der Vorgabe (`sichtFilterZahl`); ab `md` Lagezahl und „Abgeschlossene“ in einer Zeile, die Statusreiter in der Werkzeugzeile der Liste, Fokus kehrt nach dem Wechsel zurück. Tests „Filter (1) mit Abgeschlossenen“, „ab md ohne Knopf“, „Reiter in der Werkzeugzeile“, „Fokus bleibt“ rot→grün
+- [x] 5.2 `pages/FahrzeugePage.tsx`: dasselbe für Ansichtswahl, Sortierung und Status; am Handschirm „Ad-hoc-Fahrzeug“ hinter „Weitere“ und die Aufteilung nur in den Gruppenköpfen (`aufteilung`); `pages/PersonalPage.tsx`: „Ad-hoc-Person“ am Handschirm hinter „Weitere“. Tests rot→grün
+- [x] 5.3 e2e `betroffene-handy.spec.ts` (erste Person und Sichtungszeile im Bild, Filter über Knopf) grün
 
 ## 6. Gesamtnachweis
 

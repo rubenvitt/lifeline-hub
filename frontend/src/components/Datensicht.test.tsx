@@ -2743,3 +2743,48 @@ describe('Datensicht · Aktionsspalte (LLH-1789, amEnde)', () => {
     expect(huelle!.style.width).toBe('min-content');
   });
 });
+
+/**
+ * Wahlen hinter dem Filterknopf der Seite (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D5):
+ * am Handschirm blendet die Seite Sortierung und Feldfilter der Werkzeugzeile aus, bis „Filter“
+ * offen ist; die Suche bleibt stehen. Die Zahl gewählter Feldfilter meldet die Sicht der Seite,
+ * damit „Filter (n)“ auch Verborgenes zählt.
+ */
+describe('Datensicht · Wahlen verborgen (LLH-1786)', () => {
+  it('blendet Sortierung und Feldfilter aus, die Suche bleibt', () => {
+    setzeViewportBreite(390);
+    rendere({ suche: { platzhalter: 'Suche' }, wahlenVerborgen: true });
+    expect(screen.getByRole('searchbox', { name: /Suche in/ })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Sortieren' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Träger' })).toBeNull();
+  });
+
+  it('zeigt sie ohne die Angabe wie bisher', () => {
+    setzeViewportBreite(390);
+    rendere({ suche: { platzhalter: 'Suche' } });
+    expect(screen.getByRole('combobox', { name: 'Sortieren' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Träger' })).toBeInTheDocument();
+  });
+
+  it('meldet die Zahl gewählter Feldfilter, auch verborgen', async () => {
+    setzeViewportBreite(390);
+    const onFilterZahl = vi.fn();
+    const { rerender } = rendere({ onFilterZahl });
+    await waitFor(() => expect(onFilterZahl).toHaveBeenLastCalledWith(0));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
+    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    await waitFor(() => expect(onFilterZahl).toHaveBeenLastCalledWith(1));
+    rerender(
+      <Datensicht<Fahrzeug, FahrzeugKey>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={spalten}
+        daten={DREI}
+        zeilenSchluessel="id"
+        karte={karte}
+        onFilterZahl={onFilterZahl}
+        wahlenVerborgen
+      />,
+    );
+    expect(onFilterZahl).toHaveBeenLastCalledWith(1);
+  });
+});

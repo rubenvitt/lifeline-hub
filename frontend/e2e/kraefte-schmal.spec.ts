@@ -184,9 +184,10 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
       FUNKRUFNAME,
       async () => {
         await expect(karte, 'Vorbedingung: genau eine Fahrzeugkarte').toHaveCount(1);
+        // Bei 390 px steht die Ansicht hinter „Filter“ (LLH-1786); der Knopf bleibt ohne Schreibrecht.
         await expect(
-          page.getByRole('radiogroup', { name: 'Ansicht' }),
-          'Vorbedingung: der Ansicht-Umschalter bleibt auch ohne Schreibrecht',
+          page.locator('[data-lfh="seitenkopf"]').getByRole('button', { name: /^Filter/ }),
+          'Vorbedingung: der Filterknopf mit der Ansicht bleibt auch ohne Schreibrecht',
         ).toBeVisible();
         await expect(
           page.getByRole('button', { name: `Status von ${FUNKRUFNAME} ändern` }),

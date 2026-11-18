@@ -202,6 +202,22 @@ describe('PersonalPage', () => {
    * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
    * Builder wäre sonst nicht zu unterscheiden.
    */
+  it('am Handschirm steht „Ad-hoc-Person“ hinter „Weitere“ (LLH-1786)', async () => {
+    setzeViewportBreite(390);
+    render(einsatz());
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    await within(kopf).findByRole('button', { name: 'Personal disponieren' });
+    expect(within(kopf).queryByRole('button', { name: 'Ad-hoc-Person' })).toBeNull();
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Weitere Aktionen zum Personal' }),
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
+  });
+
   it('trägt Stärke und Meldebild-Link im Seitenkopf, keine Stärkezeile über der Tabelle', async () => {
     const { container } = render(einsatz());
     const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
