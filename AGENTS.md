@@ -33,6 +33,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs), ihre Nummern und Prüfungen |
 | `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App |
 | `src/AGENTS.md` | Statuscodes, Typ-Codegen, öffentliche API v1, Anhänge, Schutzköpfe, Instanzkopplung, Admin-Schreibwege am Einsatz, Org-Ereignisse, Benachrichtigungen, Demo-Daten, Aufbewahrung, ClamAV |
+| `migrations/AGENTS.md` | Migrationsvergabe (Nummern, Autofix, Stau-Wächter), Tabellenumbau und `-- no-transaction` |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
 | `scripts/AGENTS.md` | Sammel-Gate im Detail, Stau-Wächter, Werkzeugversionen, Bauziel, Advisories, Release |
@@ -171,37 +172,3 @@ oder im PR mit Label `voll` (LLH-1889; Schritte und Bündel im Skriptkopf, Mecha
   Backend (`scripts/check-fmt.sh`).
 - Nach jeder Response-DTO-/Enum-Änderung `scripts/check-typ-codegen.sh` und beide generierten
   Dateien mitcommitten (LFH-120, `src/AGENTS.md`).
-
-## Backend — Migrationsvergabe (LFH-658)
-
-- **Anhängen, nicht einschieben:** neue Migrationen tragen eine Nummer **größer als jede auf dem
-  Ziel-Branch**; bestehende werden nie geändert, umbenannt oder gelöscht, auch nicht im
-  Kommentar: sqlx prüft die Checksumme der ganzen Datei, jede bestehende DB bräche mit
-  `VersionMismatch`. Ein überholter Kommentar wird im Code berichtigt, der die Spalte schreibt.
-- `scripts/check-migrationen.sh` (gegen `origin/alpha`, vorher `git fetch`), Umlegen mit
-  `--umnummerieren`. Durchgesetzt über `migrationen.yml` und `migrationen-kanal.yml` (Required
-  Check `Migrationsnummern`, Prüfung des Rulesets: `scripts/AGENTS.md`); Netz
-  `db::tests::migrationsnummern_sind_eindeutig`.
-- **Autofix nur auf dem PR-Branch** (LFH-1014): ein reiner Nummernkonflikt wird per Bot-Commit
-  umgelegt (`scripts/migrationen-autofix.sh`), nie auf `alpha`. Danach vor dem nächsten Push
-  den Branch holen. Herleitung:
-  `openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md`.
-- **Stau-Wächter** (LLH-1660): meldet Konflikte am PR und mergt bei fehlendem CI-Lauf den
-  Ziel-Branch in den PR-Branch; auch danach erst holen, dann pushen. Regeln: `scripts/AGENTS.md`.
-- **Falle: sqlx spielt eine kleinere, noch nicht eingespielte Migration still nach**
-  (`db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`).
-- **Migrationen entstehen nur über `alpha`**; Freigaben als Merge-Commit, nicht Squash.
-  Herleitung: `openspec/changes/archive/2026-09-29-lfh-658-migrationsnummern-vor-dem-merge/design.md`.
-
-## Backend — Tabellenumbau und `-- no-transaction` (LLH-1659)
-
-- **Marker nur für `PRAGMA foreign_keys = OFF`:** `-- no-transaction` (erste Zeile) braucht nur
-  ein Umbau einer Tabelle, auf die andere verweisen; das Pragma wirkt in einer Transaktion
-  nicht. Ein Blatt-Umbau kommt ohne Marker aus und läuft in der Transaktion von sqlx (Muster
-  0208, 0324). Wächter: `db::migrationslauf::tests::neue_marker_migration_schaltet_fremdschluessel_aus`.
-- **Atomar trotz Marker:** `db::migrate` rahmt jede Marker-Migration ohne eigenes `COMMIT` in
-  eine Transaktion und schaltet die Fremdschlüssel bei Bedarf davor aus und danach wieder ein
-  (`src/db/migrationslauf.rs`). Ein eigenes `BEGIN … COMMIT` ist nicht nötig; wer es schreibt
-  (0325), läuft ohne äußere Transaktion.
-- Tests, die Migrationen über einen eigenen `Migrator { … }` einspielen, laufen an diesem
-  Rahmen vorbei; ein Umbau mit Marker ist dort nicht atomar.

@@ -24,7 +24,7 @@ herleitung:
 - MUST NOT: kein zweiter Datenbanktreiber und kein ORM (Postgres, MySQL, `sqlx`-Feature
   `any`, diesel, rusqlite, sea-orm) im Server, in der Hülle oder im Karten-Service.
 - MUST: Das Schema ändert sich nur über Dateien in `migrations/`, eingespielt mit
-  `sqlx::migrate!`; Vergabe der Nummern: Wurzel-`AGENTS.md`, „Backend — Migrationsvergabe“.
+  `sqlx::migrate!`; Vergabe der Nummern: `migrations/AGENTS.md`, „Backend — Migrationsvergabe“.
 - SHOULD: Externe Nachschlage-Caches schreiben in die eigene Cache-Datei (`src/cache_db.rs`),
   nicht in die operative Datenbank.
 - SHOULD: Eine schreibende Transaktion, die zuerst liest, läuft über `write_retry!`

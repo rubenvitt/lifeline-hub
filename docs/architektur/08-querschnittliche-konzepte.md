@@ -95,7 +95,7 @@ Der Server hält alles in einer SQLite-Datei über sqlx (`src/db.rs`: WAL, Fremd
 einer eigenen Datei, damit sie nicht um den Schreiber konkurrieren (`src/cache_db.rs`). Das
 Schema wächst nur über Migrationen in `migrations/`, eingespielt beim Start
 (`sqlx::migrate!` in `src/db.rs`). Wie sie nummeriert werden und dass sie unveränderlich sind,
-regelt die [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Migrationsvergabe“.
+regelt die [`migrations/AGENTS.md`](../../migrations/AGENTS.md), Abschnitt „Migrationsvergabe“.
 
 Zwei Regeln sitzen als SQLite-Trigger in der Datenbank statt im Code, damit kein Schreibweg sie
 umgeht (LLH-1493, `migrations/0306_stammdaten_verteilung.sql`): Jede Änderung an einer
