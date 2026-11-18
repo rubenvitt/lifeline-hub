@@ -4,13 +4,13 @@
 
 - [x] 1.1 Reine Stilfunktion für das Kreuz in `frontend/src/theme/tokens.ts` mit Unit-Test (Böden als Literale 24 / 48 / 72, negativer Rand = halber Zuwachs über `fontSizeIcon`); Test zuerst rot, dann grün
 - [x] 1.2 Am `ConfigProvider` in `frontend/src/theme/ThemeModeProvider.tsx` als `alert.styles.close` setzen; Vitest belegt am gerenderten `DeeplinkHinweis`, dass der Knopf den Stil trägt
-- [x] 1.3 e2e-Messung „Hinweis schließen“ (Deeplink auf unbekannten Posten, alle drei Stufen, Fükw): wirksame Fläche per `elementFromPoint` ≥ 24/48/72 auf beiden Achsen, Hinweishöhe gleich wie in `kompakt` bei gleichem Text; Spec läuft grün
+- [x] 1.3 e2e-Messung „Hinweis schließen“ (Deeplink auf unbekannten Posten, alle drei Stufen, Fükw): wirksame Fläche per `elementFromPoint` ≥ 24/48/72 auf beiden Achsen, Hinweis mit und ohne Boden gleich hoch (Stil im Browser zurückgenommen); Spec läuft grün
 
 ## 2. Sortierauswahl (D2)
 
-- [ ] 2.1 Vitest in `frontend/src/components/` zuerst rot: Kartenzweig zeigt „wie geliefert“ als Eintrag und Wert ohne Sortierung, die Wahl setzt die Sortierung zurück, kein `.ant-select-clear`
-- [ ] 2.2 `Datensicht.tsx` umbauen (Eintrag „wie geliefert“, `allowClear` weg); Test grün, bestehende Datensicht-Tests grün
-- [ ] 2.3 e2e am Handschirm (Betroffene, 390 × 844): sortieren und über „wie geliefert“ zurück; Spec läuft grün
+- [x] 2.1 Vitest in `frontend/src/components/` zuerst rot: Kartenzweig zeigt „wie geliefert“ als Eintrag und Wert ohne Sortierung, die Wahl setzt die Sortierung zurück, kein `.ant-select-clear`
+- [x] 2.2 `Datensicht.tsx` umbauen (Eintrag „wie geliefert“, `allowClear` weg); Test grün, bestehende Datensicht-Tests grün
+- [x] 2.3 Kein eigener e2e-Fall: Sortierlogik einer einzelnen Seite gehört nach Vitest (`frontend/e2e/AGENTS.md`, Spec `e2e-zuschnitt`). Den Ablauf belegt der Test aus 2.1; Mutationsprobe: ohne den Umbau in `Datensicht.tsx` rot
 
 ## 3. Brotkrume (D3)
 
