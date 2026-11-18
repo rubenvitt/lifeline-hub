@@ -54,13 +54,20 @@ Benutzers liefern, solange er nicht geschwärzt ist.
 
 ### Requirement: Eine offene Eingabe bleibt beim Sperren lesbar
 
-Ist beim Sperren ein Feld, ein Paneel oder ein Notizentwurf geöffnet, SHALL sein Text
-schreibgeschützt stehen bleiben, sodass er sich markieren und kopieren lässt. Speichern MUST NOT
-mehr möglich sein. Schließen MUST den Entwurf verwerfen, ohne nachzufragen.
+Ist beim Sperren ein Feld, ein Bearbeiten-Formular oder ein Notizentwurf mit geändertem Inhalt
+geöffnet, SHALL sein Text schreibgeschützt stehen bleiben, sodass er sich markieren und kopieren
+lässt; Auswahlfelder darin MUST gesperrt sein. Speichern MUST NOT mehr möglich sein. Schließen
+MUST den Entwurf verwerfen, ohne nachzufragen. Eine unveränderte Bearbeitung und ein Paneel des
+Patientenkopfs, das nur Auswahlen trägt, MUST schließen.
 
 #### Scenario: Notiz in Arbeit
 - **WHEN** B gerade eine Notiz an der Person schreibt und A die Person storniert
 - **THEN** bleibt Bs Text sichtbar und kopierbar, und der Knopf „Notiz anlegen“ ist verschwunden
+
+#### Scenario: Bearbeitung an Tier oder Schaden
+- **WHEN** B die Angaben eines Tiers bearbeitet und A das Tier storniert
+- **THEN** bleiben Bs Eingaben schreibgeschützt stehen, „Speichern“ ist verschwunden, und nur
+  „Schließen“ bleibt
 
 ### Requirement: Die Personen-Detailseite erkennt den Storno ohne Zugriffsprotokoll
 

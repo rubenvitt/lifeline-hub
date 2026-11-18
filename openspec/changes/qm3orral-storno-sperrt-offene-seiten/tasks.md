@@ -79,10 +79,13 @@
   offen. B zeigt binnen weniger Sekunden „Storniert von …“, der Notiztext steht noch, und es gibt
   keinen Knopf „Notiz anlegen“. Das Zugriffsprotokoll der Person hat danach genau den einen
   Eintrag vom Öffnen bei B.
-- [ ] 7.2 Regeln nachziehen:
+- [x] 7.2 Regeln nachziehen:
   - `frontend/src/personen/AGENTS.md`: Detail nicht live, Stand-Abfrage, kein Fokus-Neuladen;
   - `frontend/AGENTS.md`: Query-Key-Registry, Storno-Banner;
   - Anwenderdoku zu Betroffenen, Tieren und Schäden, falls dort das Stornieren beschrieben ist.
+
+  - ADR-0065 (protokolliertes Detail nie live, protokollfreier Stand), weil Route `entwurf` mit E1
+    (`docs/architektur/AGENTS.md`, Mitänderungsregel).
 
   Prüfen: Doku-Wächter grün.
 - [ ] 7.3 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün. Dazu Bilder der Änderung

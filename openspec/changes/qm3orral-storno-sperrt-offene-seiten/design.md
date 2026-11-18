@@ -119,7 +119,8 @@ mehrdeutig, und der Abruf schriebe trotzdem eine Protokollzeile).
 - Tier: der Key kommt in `EINSATZ_STREAM_EVENTS.tier` (es gibt keinen gezielten Abgleich, der
   Präfix trifft alle offenen Tierdetails, das ist billig).
 - Schaden: der Key kommt in `EINSATZ_STREAM_EVENTS.schaden` und in `EINSATZ_STREAM_ZIELE.schaden`
-  als `key(einsatzKeys.schaden(e, sid))`, auch im Zweig `anhang`, nicht nur dort.
+  als `key(einsatzKeys.schaden(e, sid))`, nicht im Zweig `anhang` (eine Datei ändert das Detail
+  nicht).
 - `useEditSitzung` hält den Basisstand beim Öffnen fest. Ein Live-Neuabruf während einer offenen
   Bearbeitung ändert also weder Entwurf noch Konfliktprüfung. Das sichert ein Test ab.
 
@@ -162,6 +163,9 @@ mehrdeutig, und der Abruf schriebe trotzdem eine Protokollzeile).
 - `BearbeitbaresPaneel` steht auf keiner der vier Seiten und bleibt unverändert.
 - Ein schon laufender Speicherversuch, der danach mit 409 endet, zeigt keinen Konfliktdialog.
   Das Banner sagt genug, der Grund am Feld entfällt.
+
+- Die Paneele des Patientenkopfs (Sichten, Verbleib, Transport, Maßnahme, Verletzung) tragen
+  fast nur Auswahlen; sie schließen beim Storno wie bisher.
 
 ## Risks / Trade-offs
 

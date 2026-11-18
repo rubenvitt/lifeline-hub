@@ -1654,6 +1654,15 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   Seitenkette (`useInfiniteQuery`) bekommt eine Zeile nur innerhalb des geladenen Fensters
   (`fensterEinsortieren`, LFH-1075); entscheidet über die Zugehörigkeit nur der Server
   (Suchbegriff), geht die Kette an den Sammler. Kennzahlen gleicht immer der Sammler ab.
+- **Storno sperrt offene Detailseiten** (LLH-1832, Spec `storno-sperre`): Person, Tier, Schaden
+  und Betreuungsstelle zeigen einen Storno ohne Zutun. Oben steht `components/StornoBanner.tsx`
+  („Storniert von … um …“), alle Schreibwege hängen an `storniert_at`. Tier- und Schadendetail
+  sind dafür live; die Person gleicht ihren protokollfreien Stand ab (`personStand`), die
+  Betreuungsstelle fragt ihn erst ab, wenn sie aus der Übersicht fällt
+  (`betreuungsstelleStand`). Eine offene Eingabe verliert dabei ihren Text nicht: `InlineAngabe`
+  hält einen geänderten Entwurf schreibgeschützt, wenn `darfSchreiben` wegfällt; Formulare
+  sperren ihre Felder über `entwurfNurLesen` (Text `readOnly`, sonst `disabled`) und zeigen nur
+  „Schließen“. Eine unberührte Bearbeitung schließt.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der
