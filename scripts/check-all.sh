@@ -300,7 +300,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version und XcodeGen (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version, XcodeGen und Bildablage (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -338,6 +338,10 @@ schritt_8() {
   # Upload zu TestFlight (LLH-1978): ein Alpha-Build in TestFlight, ein Build mit fremder Version
   # oder ein API-Schlüssel im Log fiele erst am Release auf. Attrappen statt Xcode, ohne Netz.
   "$ROOT/scripts/ios/testflight.test.sh"
+  # Bildschirmbilder des Simulator-Laufs (LLH-1978): ein Name mit " oder : lässt
+  # `actions/upload-artifact` das ganze Artefakt abweisen, und eine Debug-Beschreibung ist kein
+  # Bild — beides fiele erst auf dem macOS-Runner auf. Ohne Xcode.
+  "$ROOT/scripts/ios/bilder-ablegen.test.sh"
 }
 
 schritt_9() {

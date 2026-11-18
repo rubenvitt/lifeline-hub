@@ -9,7 +9,8 @@
 # scripts/ios/xcodegen-installieren.sh, muss im PATH stehen) → je ein iPhone und ein iPad der
 # neuesten iOS-Laufzeit wählen → `xcodebuild test` mit dem Schema `LifelineHub`: App-Tests
 # (ios/AppTests), UI-Tests (ios/AppUITests) und die Suite des Swift-Kerns auf iOS → die
-# Bildschirmbilder der UI-Tests (XCTAttachment) aus dem Ergebnisbündel nach <ausgabe>/bilder.
+# Bildschirmbilder der UI-Tests (XCTAttachment) aus dem Ergebnisbündel nach <ausgabe>/bilder
+# (scripts/ios/bilder-ablegen.sh: nur Bilder, Namen ohne Zeichen, die das Artefakt abweist).
 #
 # Der Simulator braucht keine Signatur (CODE_SIGNING_ALLOWED=NO); signiert wird erst beim
 # Archivieren für TestFlight. Die Bilder werden auch nach roten Tests exportiert; der Exit-Code
@@ -59,24 +60,11 @@ xcodebuild test \
 if [ -d "$ERGEBNIS" ]; then
   # `export attachments` gibt es ab Xcode 16.3; die Namen stehen in manifest.json.
   xcrun xcresulttool export attachments --path "$ERGEBNIS" --output-path "$AUSGABE/roh"
-  # Je Bild ein sprechender Name mit laufender Nummer (iPhone und iPad liefern gleiche Namen).
-  if [ -f "$AUSGABE/roh/manifest.json" ]; then
-    nr=0
-    while IFS="$(printf '\t')" read -r datei name; do
-      [ -n "$datei" ] || continue
-      if [ -f "$AUSGABE/roh/$datei" ]; then
-        nr=$((nr + 1))
-        name="${name//\//_}"
-        case "$name" in *.png) ;; *) name="$name.png" ;; esac
-        cp "$AUSGABE/roh/$datei" "$AUSGABE/bilder/$(printf '%02d' "$nr")-$name"
-      fi
-    done <<< "$(jq -r '.[] | .attachments[]?
-      | [.exportedFileName, ((.deviceName // "") + (if .deviceName then "-" else "" end)
-         + (.suggestedHumanReadableName // .exportedFileName))] | @tsv' "$AUSGABE/roh/manifest.json")"
-  fi
+  # Nur echte Bilder, mit Namen, die `actions/upload-artifact` annimmt (bilder-ablegen.sh).
+  "$WURZEL/scripts/ios/bilder-ablegen.sh" "$AUSGABE/roh" "$AUSGABE/bilder"
 fi
 
-anzahl="$(find "$AUSGABE/bilder" -type f -name '*.png' | wc -l | tr -d ' ')"
+anzahl="$(find "$AUSGABE/bilder" -type f \( -name '*.png' -o -name '*.jpg' \) | wc -l | tr -d ' ')"
 echo "Bildschirmbilder: $anzahl in $AUSGABE/bilder"
 if [ "$rc" = 0 ] && [ "$anzahl" = 0 ]; then
   echo "FEHLER: keine Bildschirmbilder im Ergebnis (ios/AppUITests/ScreenshotTests.swift)." >&2
