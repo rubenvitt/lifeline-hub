@@ -5,7 +5,7 @@ https://zunder.rubeen.dev/#/aufgabe/t3q2y33zhnvqykd2of5j4oh8
 
 ## 1. Treffer je Einheit (rein)
 
-- [ ] 1.1 `einheitenTreffer` in `kraefte/meldebildRaster.ts` (D1, D4): `null` ohne wirksamen
+- [x] 1.1 `einheitenTreffer` in `kraefte/meldebildRaster.ts` (D1, D4): `null` ohne wirksamen
   Schalter; „ohne Auftrag“ über `offeneAuftraegeJeEinheit`; „Rückmeldung fehlt oder überfällig“
   über `rueckmeldungZustand` (überfällig und keine); beide gesetzt = Schnitt; nicht lesbare Quelle
   macht ihren Schalter unwirksam. Nachweis: neue Fälle in `meldebildRaster.test.ts` grün
@@ -13,11 +13,11 @@ https://zunder.rubeen.dev/#/aufgabe/t3q2y33zhnvqykd2of5j4oh8
 
 ## 2. Filter in `filtereKraefte`
 
-- [ ] 2.1 `FilterWerte` um `ohneAuftrag` und `rueckmeldungFehlt` erweitern, `filtereKraefte` nimmt
+- [x] 2.1 `FilterWerte` um `ohneAuftrag` und `rueckmeldungFehlt` erweitern, `filtereKraefte` nimmt
   die Treffermenge: Treffer mit Mitteln, Obereinheiten als Rahmen ohne eigene Mittel, „Ohne
   Einheit“ fällt weg (D3). Nachweis: Fälle in `kraeftebild.test.ts` grün (Treffer, Rahmen-
   Obereinheit, Mittel ohne Einheit, ohne Treffermenge unverändert).
-- [ ] 2.2 `rendereMeldebildMarkdown` mit gesetztem Einheiten-Filter: Lagebericht-Text nennt nur
+- [x] 2.2 `rendereMeldebildMarkdown` mit gesetztem Einheiten-Filter: Lagebericht-Text nennt nur
   die Auswahl. Nachweis: Test in `kraeftebild.test.ts` grün.
 
 ## 3. Meldebild-Seite
