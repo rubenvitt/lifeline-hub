@@ -11,6 +11,7 @@ import {
   Spin,
   Tag,
   Typography,
+  theme,
 } from 'antd';
 import type { FormRule } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -160,6 +161,7 @@ function halterAnzeige(t: Tier): ReactNode {
 
 export default function TiereDetailPage() {
   const { id, tierId: tierIdParam } = useParams();
+  const { token } = theme.useToken();
   const einsatzId = Number(id);
   const tierId = Number(tierIdParam);
   const idGueltig = parseRouteId(tierIdParam) != null;
@@ -485,7 +487,7 @@ export default function TiereDetailPage() {
         />
       }
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>
             Tier <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
@@ -571,13 +573,13 @@ export default function TiereDetailPage() {
           >
             {detailAnsicht}
             {editFehler != null && (
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginTop: token.marginLG }}>
                 <SpeicherFehler fehler={editFehler} />
               </div>
             )}
             {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
                 Feldern scrollten die Knöpfe sonst aus dem Bild. */}
-            <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
+            <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: token.marginLG }}>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
                 Speichern
               </Button>
@@ -675,7 +677,7 @@ export default function TiereDetailPage() {
       >
         Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
         {stornoMutation.error != null && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: token.marginLG }}>
             <SpeicherFehler
               fehler={stornoMutation.error}
               titel="Nicht storniert"

@@ -935,8 +935,8 @@ function MaterialInhalt() {
             display: 'inline-flex',
             flexWrap: 'wrap',
             alignItems: 'center',
-            columnGap: 12,
-            rowGap: 4,
+            columnGap: token.margin,
+            rowGap: token.marginXS,
           }}
         >
           {/* Eine Zahl bricht nicht um: im Kartenfeld stand „50“ sonst als „5“ über „0“. */}

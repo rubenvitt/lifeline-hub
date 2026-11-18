@@ -1319,7 +1319,7 @@ export default function EtbPage() {
               style={{ marginTop: token.marginSM }}
               title={`${ausstehend.length === 1 ? '1 Eintrag' : `${ausstehend.length} Einträge`} offline vorgemerkt`}
               description={
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul style={{ margin: 0, paddingLeft: '1.2em' }}>
                   {ausstehend.map((a) => (
                     <li key={a.id}>{a.eintrag.inhalt}</li>
                   ))}
@@ -1334,7 +1334,7 @@ export default function EtbPage() {
               style={{ marginTop: token.marginSM }}
               title={`${abgelehnt.length === 1 ? '1 gepufferter Eintrag' : `${abgelehnt.length} gepufferte Einträge`} abgelehnt und NICHT gespeichert`}
               description={
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul style={{ margin: 0, paddingLeft: '1.2em' }}>
                   {abgelehnt.map((a) => (
                     <li key={a.id}>
                       {a.eintrag.inhalt} — {a.grund}

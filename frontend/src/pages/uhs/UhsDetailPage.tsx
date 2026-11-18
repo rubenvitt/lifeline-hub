@@ -548,7 +548,7 @@ function UhsDetailInhalt() {
       }}
     >
       {geraet && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: token.marginLG }}>
           <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />
         </div>
       )}

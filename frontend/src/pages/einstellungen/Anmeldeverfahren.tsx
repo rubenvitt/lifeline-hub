@@ -88,7 +88,9 @@ export default function Anmeldeverfahren() {
         ) : providerQuery.isError ? (
           <Alert type="error" title="Anmeldeverfahren nicht ladbar" showIcon />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM, maxWidth: 360 }}
+          >
             {provider.map((p) => {
               const istPasswort = p.id === 'passwort';
               // Die drei Sperrquellen getrennt: nur zwei sind dauerhaft und verdienen einen Text.
@@ -109,7 +111,7 @@ export default function Anmeldeverfahren() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
+                    gap: token.margin,
                     borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
                   }}
                 >

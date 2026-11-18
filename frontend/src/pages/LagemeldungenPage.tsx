@@ -365,21 +365,23 @@ export default function LagemeldungenPage() {
         // Deeplink zur Meldung — der Weg zum Vorgang; ihr Stand steht dabei, solange er nicht
         // „neu“ ist (die Marke „Neu“ ist die Kenntnisnahme der Lage, nicht der Meldungsstatus).
         <>
-          {l.is_neu && <StatusChip ton="bedien" wort="Neu" style={{ marginInlineEnd: 8 }} />}
+          {l.is_neu && (
+            <StatusChip ton="bedien" wort="Neu" style={{ marginInlineEnd: token.marginSM }} />
+          )}
           {l.prioritaet !== 'normal' && (
-            <span style={{ marginInlineEnd: 8 }}>
+            <span style={{ marginInlineEnd: token.marginSM }}>
               <PrioBadge prio={l.prioritaet} />
             </span>
           )}
           {l.richtung === 'extern' && (
-            <StatusChip ton="neutral" wort="Extern" style={{ marginInlineEnd: 8 }} />
+            <StatusChip ton="neutral" wort="Extern" style={{ marginInlineEnd: token.marginSM }} />
           )}
           {/* Der Text bleibt Lage-Text oder Wortlaut, die Berichtigung steht im ETB (LLH-1382, D1). */}
           <BerichtigtMarke
             einsatzId={l.einsatz_id}
             berichtigungId={l.etb_berichtigung_id}
             berichtigungLfdNr={l.etb_berichtigung_lfd_nr}
-            style={{ marginInlineEnd: 8 }}
+            style={{ marginInlineEnd: token.marginSM }}
           />
           <KennungsLink to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
             {`Meldung #${l.meldung_lfd_nr}`}

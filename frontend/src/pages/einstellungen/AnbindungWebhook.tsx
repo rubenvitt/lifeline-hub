@@ -493,7 +493,7 @@ function LanSchalter({
   value?: boolean;
   onChange?: (wert: boolean) => void;
 }) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   return (
     <Checkbox
       id={id}
@@ -502,14 +502,16 @@ function LanSchalter({
       data-lfh="webhook-lan"
     >
       Ziel im lokalen Netz erlauben
-      <div style={{ color: rollen.achtungText, marginBlockStart: 4 }}>{LAN_WARNUNG}</div>
+      <div style={{ color: rollen.achtungText, marginBlockStart: token.marginXS }}>
+        {LAN_WARNUNG}
+      </div>
     </Checkbox>
   );
 }
 
 /** Paneel „Zustellungen“: die letzten Versuche, neueste zuerst, ohne Rumpf der Antwort. */
 function Zustellungen({ zugangId }: { zugangId: string }) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
   const q = useQuery({
     queryKey: globalKeys.anbindungWebhookVersuche(zugangId),
@@ -549,7 +551,12 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
           <PaneelZeile key={`${v.at}-${i}`}>
             <span
               data-lfh="webhook-versuch"
-              style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}
+              style={{
+                display: 'flex',
+                gap: token.margin,
+                flexWrap: 'wrap',
+                alignItems: 'baseline',
+              }}
             >
               <span style={monoStil(12)}>{zeitKurz(v.at, konv)}</span>
               <span style={monoStil(12)}>

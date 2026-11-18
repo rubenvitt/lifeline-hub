@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Form, Space } from 'antd';
 import type { Ausmass, Gefahrentyp, Schadensgrad } from '../../api/types';
 import { Select } from '../../components/Select';
+import { useRollen } from '../../components/instrument';
 import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
 import { useZeichenTheme } from '../../zeichen/useZeichenTheme';
 import { schadenTz } from '../lagekarte/taktischesZeichen';
@@ -30,6 +31,7 @@ export function GefahrAuswahl({
   id?: string;
 }) {
   const theme = useZeichenTheme();
+  const { token } = useRollen();
   return (
     <Select<
       Gefahrentyp | null,
@@ -47,7 +49,7 @@ export function GefahrAuswahl({
         // Das Etikett ist ein Element; der Titel trägt das Wort für Hover und Auswahl per Titel.
         title: GEFAHR_LABEL[g],
         label: (
-          <Space size={8} align="center">
+          <Space size={token.marginSM} align="center">
             <EinsatzZeichen
               tz={schadenTz(ausmass, g, schadensgrad)}
               size={VORSCHAU_PX}

@@ -1,4 +1,4 @@
-import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography } from 'antd';
+import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography, theme } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -101,6 +101,7 @@ const HALTER_UNBEKANNT_TEXT =
 
 export default function BenutzerPage() {
   const { benutzer: angemeldeterBenutzer, laedt: authLaedt } = useAuth();
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const [offen, setOffen] = useState(false);
   const [form] = Form.useForm<NeuerBenutzer>();
@@ -359,7 +360,7 @@ export default function BenutzerPage() {
       // `routes/benutzer.rs` liefert ORDER BY id.
       sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
       render: (t: string, b) => (
-        <Space size={4} wrap>
+        <Space size={token.marginXS} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{t}</span>
           <HerkunftAbzeichen herkunft={herkunft.herkunft('konto', b.id)} quelle={herkunft.quelle} />
           {herkunft.ohnePasskey(b.id) && (
@@ -390,7 +391,7 @@ export default function BenutzerPage() {
       render: (_, b) => (
         // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage (Blau
         // hieße Bedienung).
-        <Space size={4} wrap>
+        <Space size={token.marginXS} wrap>
           {b.system_rolle === 'admin' && <StatusChip ton="neutral" wort="Admin" />}
           {b.org_rolle === 'fuehrungskraft' && <StatusChip ton="neutral" wort="Führungskraft" />}
           {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && (
@@ -539,7 +540,7 @@ export default function BenutzerPage() {
             oben. */}
         <Collapse
           ghost
-          style={{ marginInline: -8 }}
+          style={{ marginInline: -token.paddingSM }}
           items={[
             {
               key: 'rollen',
@@ -605,7 +606,7 @@ export default function BenutzerPage() {
             type="info"
             showIcon
             title={`Name und Rollen: ${VOM_HUB_TEXT}. Ein Einmalpasswort für die Anmeldung hier geht.`}
-            style={{ marginBlockEnd: 16 }}
+            style={{ marginBlockEnd: token.marginLG }}
           />
         )}
         <Form.Item
@@ -628,7 +629,7 @@ export default function BenutzerPage() {
             <Alert
               type="warning"
               showIcon
-              style={{ marginBlockEnd: 16 }}
+              style={{ marginBlockEnd: token.marginLG }}
               message={warnText(zuBearbeiten)}
             />
           )}

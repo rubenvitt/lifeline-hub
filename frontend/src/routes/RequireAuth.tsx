@@ -2,6 +2,7 @@ import { Spin } from 'antd';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { warGeraet } from '../geraet/geraetMarke';
+import { flaeche } from '../theme/tokens';
 import { GERAET_START_PFAD, KOPPLUNG_BEENDET_PFAD } from '../routing/deeplinks';
 
 /**
@@ -17,7 +18,7 @@ export default function RequireAuth() {
 
   if (laedt) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 120 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

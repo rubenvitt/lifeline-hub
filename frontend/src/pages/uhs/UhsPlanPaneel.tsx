@@ -31,7 +31,7 @@ import { UPLOAD_MAX_GROESSE } from '../../api/upload';
 import type { UhsDetail } from '../../api/types';
 import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { Paneel } from '../../components/instrument';
+import { Paneel, useRollen } from '../../components/instrument';
 import { IconHochladen } from '../../icons';
 
 /** Formate, die der Server als Plan annimmt (`src/uhs/plan.rs`, D3). HEIC bleibt draußen. */
@@ -51,6 +51,7 @@ interface Props {
  */
 export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
   const qc = useQueryClient();
+  const { token } = useRollen();
   const { message } = App.useApp();
   const plan = uhs.plan ?? null;
 
@@ -107,7 +108,7 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
     hochladen.isPending || uebernehmen.isPending || aendern.isPending || entfernen.isPending;
 
   return (
-    <Paneel titel="Plan" ueberschrift="h4" koerperPolster style={{ marginBottom: 8 }}>
+    <Paneel titel="Plan" ueberschrift="h4" koerperPolster style={{ marginBottom: token.marginSM }}>
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         {/* Datenschutz- und Protokollhinweis in einer Zeile (LFH-1078: erlaubt, kurz). */}
         <Typography.Text type="secondary">
@@ -115,7 +116,7 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
         </Typography.Text>
         <SpeicherFehler fehler={fehler} />
         <Space wrap size="middle" align="end">
-          <Flex vertical gap={4} data-lfh="plan-datei">
+          <Flex vertical gap={token.marginXS} data-lfh="plan-datei">
             <Upload
               accept={PLAN_ACCEPT}
               maxCount={1}

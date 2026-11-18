@@ -152,6 +152,8 @@ const NACHFUEHR_RAND = 48;
 /** Luft zwischen nachgeführtem Marker und Knopfblock (LLH-1751, Review). */
 const NACHFUEHR_LUFT = 24;
 
+const KARTENRAND_PX = 60; // Rand des Kartenausschnitts, kein Layoutabstand (Abstandsraster)
+
 /** So lange nach einem Marker-Tipp wartet das Nachführen auf das `resize` der aufgehenden Leiste. */
 const NACHFUEHR_FRIST_MS = 1000;
 
@@ -690,7 +692,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         if (!map) return;
         const b = new maplibregl.LngLatBounds();
         for (const e of ecken) b.extend(e as [number, number]);
-        map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 }, BEDIENUNG);
+        map.fitBounds(b, { padding: KARTENRAND_PX, maxZoom: 18, duration: 600 }, BEDIENUNG);
       },
       zoneAbschliessen() {
         return zoneDrawRef.current?.abschliessen() ?? false;
@@ -1038,7 +1040,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           [startAnsicht.west, startAnsicht.sued],
           [startAnsicht.ost, startAnsicht.nord],
         ],
-        { padding: 60, maxZoom: PUNKT_ZOOM, duration: 0 },
+        { padding: KARTENRAND_PX, maxZoom: PUNKT_ZOOM, duration: 0 },
         AUTOMATISCH,
       );
     }

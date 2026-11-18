@@ -444,7 +444,7 @@ export default function SchaedenPage() {
         wert={sicht}
         onWechsel={wechsleSicht}
         optionen={SCHAEDEN_SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
-        style={{ marginBottom: 12 }}
+        style={{ marginBottom: token.margin }}
       />
 
       {listeGescheitert ? (
