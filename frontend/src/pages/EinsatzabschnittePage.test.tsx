@@ -1595,8 +1595,11 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       expect(within(dialog).getByRole('button', { name: 'Nord (jetziger Ort)' })).toBeDisabled();
       await userEvent.click(within(dialog).getByRole('button', { name: 'Süd' }));
 
+      // Der Ort zu Beginn der Handlung geht als Altwert mit (Feld-CAS, LLH-1945).
       await waitFor(() =>
-        expect(abschnittPatches).toEqual([{ id: 7, body: { ueber_abschnitt_id: 6 } }]),
+        expect(abschnittPatches).toEqual([
+          { id: 7, body: { ueber_abschnitt_id: 6, erwartet: { ueber_abschnitt_id: 5 } } },
+        ]),
       );
       expect(await screen.findByText('„Nord-Ost“ unter „Süd“ verschoben')).toBeInTheDocument();
       await waitFor(() => expect(knoten('Nord-Ost').stelle).toBeGreaterThan(knoten('Süd').stelle));
@@ -1635,10 +1638,45 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }));
       await waitFor(() =>
         expect(abschnittPatches).toEqual([
-          { id: 7, body: { ueber_abschnitt_id: null } },
-          { id: 7, body: { ueber_abschnitt_id: 5 } },
+          { id: 7, body: { ueber_abschnitt_id: null, erwartet: { ueber_abschnitt_id: 5 } } },
+          // Beim Rückgängig ist der Altwert der zuletzt gesetzte Ort.
+          { id: 7, body: { ueber_abschnitt_id: 5, erwartet: { ueber_abschnitt_id: null } } },
         ]),
       );
+    });
+
+    // Feld-CAS (LLH-1945): Escape in der Rückfrage lässt das Umhängen verfallen; die Gliederung
+    // zeigt den frischen Stand, nichts wird als verschoben gemeldet.
+    it('aus altem Stand umgehängt: Escape in der Rückfrage lässt die Handlung verfallen', async () => {
+      const { abschnittPatches } = mitPatches();
+      let liste = [nord, nordOst, sued];
+      server.use(
+        http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(liste)),
+        http.patch('/api/einsaetze/1/abschnitte/:aid', async ({ request, params }) => {
+          abschnittPatches.push({ id: Number(params.aid), body: await request.json() });
+          return HttpResponse.json(
+            { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
+            { status: 409 },
+          );
+        }),
+      );
+      renderPage();
+      await userEvent.click(await screen.findByText('Nord-Ost'));
+      await weitereAktion('Nord-Ost', 'Verschieben unter …');
+      const dialog = await screen.findByRole('dialog', { name: '„Nord-Ost“ verschieben unter …' });
+      // Ein anderer Arbeitsplatz hängt Nord-Ost inzwischen unter Süd.
+      liste = [nord, { ...nordOst, ueber_abschnitt_id: 6 }, sued];
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Oberste Ebene' }));
+
+      const rueckfrage = await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' });
+      expect(rueckfrage).toHaveTextContent(/Über-Abschnitt von „Nord-Ost“ inzwischen: „Süd“/);
+      await userEvent.keyboard('{Escape}');
+
+      await waitFor(() => expect(knoten('Nord-Ost').stelle).toBeGreaterThan(knoten('Süd').stelle));
+      expect(abschnittPatches).toEqual([
+        { id: 7, body: { ueber_abschnitt_id: null, erwartet: { ueber_abschnitt_id: 5 } } },
+      ]);
+      expect(screen.queryByText(/auf die oberste Ebene verschoben/)).not.toBeInTheDocument();
     });
 
     it('eine Ablehnung steht im Dialog, der Dialog bleibt offen, kein Toast', async () => {
@@ -1766,7 +1804,9 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       loslassen();
 
       await waitFor(() =>
-        expect(abschnittPatches).toEqual([{ id: 7, body: { ueber_abschnitt_id: 6 } }]),
+        expect(abschnittPatches).toEqual([
+          { id: 7, body: { ueber_abschnitt_id: 6, erwartet: { ueber_abschnitt_id: 5 } } },
+        ]),
       );
       expect(await screen.findByText('„Nord-Ost“ unter „Süd“ verschoben')).toBeInTheDocument();
       messung.mockRestore();
@@ -1796,7 +1836,9 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       loslassen();
 
       await waitFor(() =>
-        expect(abschnittPatches).toEqual([{ id: 7, body: { ueber_abschnitt_id: null } }]),
+        expect(abschnittPatches).toEqual([
+          { id: 7, body: { ueber_abschnitt_id: null, erwartet: { ueber_abschnitt_id: 5 } } },
+        ]),
       );
       messung.mockRestore();
     });
@@ -1810,7 +1852,58 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
 
       zieheBis(griff('einheit', 10), mitte('Süd'))();
 
-      await waitFor(() => expect(einheitPatches).toEqual([{ id: 10, body: { abschnitt_id: 6 } }]));
+      await waitFor(() =>
+        expect(einheitPatches).toEqual([
+          { id: 10, body: { abschnitt_id: 6, erwartet: { abschnitt_id: 5 } } },
+        ]),
+      );
+      expect(await screen.findByText('„1. Zug“ zu „Süd“ zugeordnet')).toBeInTheDocument();
+      messung.mockRestore();
+    });
+
+    // Feld-CAS (LLH-1945): hat ein anderer die Einheit inzwischen umgehängt, fragt die Seite;
+    // „Meine Änderung übernehmen“ schreibt ohne Altwert.
+    it('Einheit aus altem Stand gezogen: Rückfrage, übernehmen schreibt ohne Altwert', async () => {
+      const messung = messeZiele();
+      const { einheitPatches } = mitPatches();
+      let stand = { ...zug };
+      server.use(
+        http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([stand])),
+        http.patch('/api/einsaetze/1/einheiten/:eid', async ({ request, params }) => {
+          const body = (await request.json()) as {
+            abschnitt_id: number | null;
+            erwartet?: { abschnitt_id: number | null };
+          };
+          einheitPatches.push({ id: Number(params.eid), body });
+          if (body.erwartet && body.erwartet.abschnitt_id !== stand.abschnitt_id) {
+            return HttpResponse.json(
+              { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
+              { status: 409 },
+            );
+          }
+          stand = { ...stand, abschnitt_id: body.abschnitt_id as number };
+          return HttpResponse.json(stand);
+        }),
+      );
+      renderPage();
+      await userEvent.click(await findInTree('Nord'));
+      await screen.findByText('1. Zug');
+      // Ein anderer Arbeitsplatz hängt den Zug inzwischen nach Nord-Ost.
+      stand = { ...stand, abschnitt_id: 7, abschnitt_name: 'Nord-Ost' } as typeof stand;
+
+      zieheBis(griff('einheit', 10), mitte('Süd'))();
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+      expect(dialog).toHaveTextContent(/Abschnitt von „1\. Zug“ inzwischen: „Nord-Ost“/);
+      expect(screen.queryByText('„1. Zug“ zu „Süd“ zugeordnet')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+      await waitFor(() =>
+        expect(einheitPatches).toEqual([
+          { id: 10, body: { abschnitt_id: 6, erwartet: { abschnitt_id: 5 } } },
+          { id: 10, body: { abschnitt_id: 6 } },
+        ]),
+      );
       expect(await screen.findByText('„1. Zug“ zu „Süd“ zugeordnet')).toBeInTheDocument();
       messung.mockRestore();
     });
@@ -1834,8 +1927,9 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }));
       await waitFor(() =>
         expect(einheitPatches).toEqual([
-          { id: 11, body: { abschnitt_id: 6 } },
-          { id: 11, body: { abschnitt_id: null } },
+          // Altwert ist das gespeicherte `abschnitt_id` (geerbt = `null`), nicht der wirksame.
+          { id: 11, body: { abschnitt_id: 6, erwartet: { abschnitt_id: null } } },
+          { id: 11, body: { abschnitt_id: null, erwartet: { abschnitt_id: 6 } } },
         ]),
       );
       messung.mockRestore();

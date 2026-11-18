@@ -447,19 +447,79 @@ export default function EinsatzabschnittePage() {
    * gleichzeitige Umbenennung. Der Rückweg ist serverseitig derselbe PATCH, deshalb Rückgängig im
    * Toast statt Rückfrage (LFH-343). Der Zwischenspeicher zieht sofort nach, und die Schleuse
    * übernimmt das Ergebnis: die eigene Handlung wartet nicht hinter dem Banner.
+   *
+   * Feld-CAS (LLH-1945): `von` ist der gespeicherte Wert zu Beginn der Handlung (beim Rückgängig der
+   * zuletzt gesetzte) und geht als `erwartet` mit. Hat ein anderer Arbeitsplatz inzwischen umgehängt,
+   * fragt `useFeldKonflikt`; „Verwerfen und neu laden“ und Escape lassen die Handlung verfallen, die
+   * Gliederung zeigt den frischen Stand, nichts wird als verschoben gemeldet.
    */
   const verschieben = useMutation({
-    mutationFn: async (v: Verschiebung): Promise<void> => {
-      if (v.art === 'abschnitt')
-        await patcheAbschnitt(v.einsatzId, v.id, { ueber_abschnitt_id: v.nach });
-      else await patcheEinheit(v.einsatzId, v.id, { abschnitt_id: v.nach });
+    mutationFn: async (v: Verschiebung): Promise<'verschoben' | 'verfallen'> => {
+      const ergebnis =
+        v.art === 'abschnitt'
+          ? await konflikt({
+              etikett: `Über-Abschnitt von „${v.name}“`,
+              erwartet: { ueber_abschnitt_id: v.von },
+              speichern: async (erwartet) => {
+                await patcheAbschnitt(v.einsatzId, v.id, { ueber_abschnitt_id: v.nach }, erwartet);
+              },
+              ladeFrisch: () =>
+                qc.fetchQuery({
+                  queryKey: einsatzKeys.abschnitte(v.einsatzId),
+                  queryFn: () => listeAbschnitte(v.einsatzId),
+                  staleTime: 0,
+                }),
+              aktuell: (liste) => {
+                const a = liste.find((x) => x.id === v.id);
+                if (!a) return undefined;
+                const ueber = a.ueber_abschnitt_id ?? null;
+                return {
+                  wert: { ueber_abschnitt_id: ueber },
+                  anzeige: liste.find((x) => x.id === ueber)?.name,
+                };
+              },
+              text: (w) => String(w.ueber_abschnitt_id),
+              leer: (w) => w.ueber_abschnitt_id == null,
+            })
+          : await konflikt({
+              etikett: `Abschnitt von „${v.name}“`,
+              erwartet: { abschnitt_id: v.von },
+              speichern: async (erwartet) => {
+                await patcheEinheit(v.einsatzId, v.id, { abschnitt_id: v.nach }, erwartet);
+              },
+              ladeFrisch: async () =>
+                (
+                  await qc.fetchQuery({
+                    queryKey: einsatzKeys.einheiten(v.einsatzId),
+                    queryFn: () => listeEinheiten(v.einsatzId),
+                    staleTime: 0,
+                  })
+                ).find((x) => x.id === v.id),
+              aktuell: (e) =>
+                e && {
+                  wert: { abschnitt_id: e.abschnitt_id ?? null },
+                  anzeige: e.abschnitt_name ?? undefined,
+                },
+              text: (w) => String(w.abschnitt_id),
+              leer: (w) => w.abschnitt_id == null,
+            });
+      return ergebnis === undefined ? 'verschoben' : 'verfallen';
     },
     // Jede Quelle räumt nur ihren eigenen Grund: ein Rückgängig aus dem Toast nimmt dem offenen
     // Dialog seinen nicht.
     onMutate: (v) => setzeFehler(v.quelle, null),
-    onSuccess: (_antwort, v) => {
+    onSuccess: (ergebnis, v) => {
       // Nach einem Einsatzwechsel gehört die Antwort nicht mehr zu dieser Ansicht.
       if (v.einsatzId !== einsatzRef.current) return;
+      if (ergebnis === 'verfallen') {
+        // Der frische Stand liegt schon im Cache (`ladeFrisch`); die Gliederung übernimmt ihn,
+        // statt ihn hinter dem Banner warten zu lassen.
+        const frisch = qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(v.einsatzId));
+        if (v.art === 'abschnitt' && frisch) zufluss.uebernehmen(buildGliederungKnoten(frisch));
+        invalidate();
+        if (v.quelle === 'menue') setVerschiebenFuer(null);
+        return;
+      }
       if (v.art === 'abschnitt') {
         const neu = (
           qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(v.einsatzId)) ?? []
