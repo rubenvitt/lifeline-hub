@@ -599,6 +599,17 @@ describe('Nachreichen (tasks.md 2.3)', () => {
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
 
+  it('ein beim Öffnen nachgespielter Alarm tönt dezent, also ohne Alarmton und Haptik (t39ltxxi)', async () => {
+    const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
+    serverMit([], [ueberfaellig]);
+    renderZentrale();
+
+    expect(await screen.findByText('Auftrag überfällig')).toBeInTheDocument();
+    await waitFor(() => expect(ton).toHaveBeenCalled());
+    // Haptik `warning` gibt allein `spieleAlarmTon('alarm')` (alarmTon.test.ts).
+    expect(ton).not.toHaveBeenCalledWith('alarm');
+  });
+
   it('was der Tab schon zeigt, kommt nicht ein zweites Mal und klingt nicht', async () => {
     const auftrag = benachrichtigung(40, 'auftrag_erteilt', 'auftrag', 12);
     const s = serverMit([auftrag], [auftrag]);
