@@ -6734,6 +6734,13 @@ export interface components {
             rtw_angefordert?: boolean;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355 und ungelöscht.
+             */
+            storniert_von?: number | null;
+            /** @description Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“. */
+            storniert_von_name?: string | null;
             transport_art?: components["schemas"]["TransportArt"] | null;
             /** @description Erfassungszeit des aktuellen Transportstands. */
             transport_at?: string | null;
@@ -7595,6 +7602,8 @@ export interface components {
             storniert_at?: string | null;
             /** Format: int64 */
             storniert_von?: number | null;
+            /** @description Anzeigename von `storniert_von` (LLH-1832), für das Banner „Storniert von … um …“. */
+            storniert_von_name?: string | null;
             typ: components["schemas"]["SchadenTyp"];
             uebergeben_an?: string | null;
             uebergeben_at?: string | null;
@@ -8149,6 +8158,15 @@ export interface components {
             vorlage_id?: number | null;
         };
         /**
+         * @description Storno-Stand eines Datensatzes für eine offene Detailseite (LLH-1832, Spec `storno-sperre`):
+         *     nur ob und wann storniert, und von wem (Anzeigename, `None` bei Altbestand). Trägt keine
+         *     Fachangaben, damit die Abfrage protokollfrei und live abrufbar bleibt.
+         */
+        StornoStand: {
+            storniert_at?: string | null;
+            storniert_von_name?: string | null;
+        };
+        /**
          * @description System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
          * @enum {string}
          */
@@ -8220,6 +8238,13 @@ export interface components {
             spezies: components["schemas"]["Spezies"];
             status: components["schemas"]["TierStatus"];
             storniert_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355.
+             */
+            storniert_von?: number | null;
+            /** @description Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“. */
+            storniert_von_name?: string | null;
         };
         /**
          * @description Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).

@@ -194,6 +194,12 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   die Liste lädt erst mit dem Abschnitt. Jeder Download steht serverseitig im Zugriffsprotokoll, deshalb nur als bewusster
   Verweis, nie als Vorschau. `personAnhaenge` hängt am `person`-Ereignis, das Detail (`person`)
   bleibt nicht live, und die Anhangliste steht nicht im Lagebild offline.
+- **Detail nicht live, Stand schon** (LLH-1832, Spec `storno-sperre`): jeder Detailabruf schreibt
+  eine Zeile ins Zugriffsprotokoll. Das Detail lädt deshalb weder live noch beim Fensterwechsel
+  neu (`refetchOnWindowFocus: false`, kein Retry). Ob die Person inzwischen storniert ist, sagt der
+  protokollfreie Stand (`GET …/personen/{pid}/stand`, `einsatzKeys.personStand`), live über das
+  `person`-Ereignis; beim Öffnen trägt das Detail ihn schon (`initialData`). Meldet er einen
+  Storno, führt die Seite ihn mit dem Detail zusammen; eine Notiz in Arbeit bleibt lesbar.
 - **Zugriffsprotokoll** (LFH-916, Spec `personen-zugriffsprotokoll`): nur die Einsatzleitung sieht
   es, die Einsicht selbst ist unprotokolliert und nicht live. Die Listenzugriffe (Export, Druck)
   öffnet der Kopf-Knopf „Listenzugriffe“ der Personenliste als Schnellansicht

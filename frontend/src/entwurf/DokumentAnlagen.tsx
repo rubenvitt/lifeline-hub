@@ -254,21 +254,39 @@ export default function DokumentAnlagen({
         </Paneel>
         {aufnahme}
       </div>
-      <div className="dokument-anlagen-druck">
-        {anlagen.map((a) => (
-          <section key={a.id} data-lfh="druck-anlage" className="dokument-anlage-blatt">
-            <div data-lfh="titelblock">
-              <Typography.Title level={2}>
-                {anlageName(a)}, Stand <ZeitAnzeige wert={a.stand_at} />
-                {/* Das Blatt hat keinen Druckkopf; ohne Marke sähe eine abgetrennte Anlage einer
-                    Übung aus wie die eines Realeinsatzes (LLH-1725). */}
-                {uebung && <DruckUebung />}
-              </Typography.Title>
-              <img src={pfad(a)} alt={anlageName(a)} />
-            </div>
-          </section>
-        ))}
-      </div>
+      <DokumentAnlagenBlaetter anlagen={anlagen} pfad={pfad} uebung={uebung} />
     </>
+  );
+}
+
+/**
+ * Die Druckfassung der Anlagen: je Anlage ein Blatt A4 quer. Auch die Einsatzakte (LLH-1835)
+ * setzt sie hinter Befehle und Lageberichte, mit den Anlagen ihres Schnappschusses.
+ */
+export function DokumentAnlagenBlaetter({
+  anlagen,
+  pfad,
+  uebung,
+}: {
+  anlagen: readonly DokumentAnlage[];
+  pfad: (a: DokumentAnlage) => string;
+  uebung: boolean;
+}) {
+  return (
+    <div className="dokument-anlagen-druck">
+      {anlagen.map((a) => (
+        <section key={a.id} data-lfh="druck-anlage" className="dokument-anlage-blatt">
+          <div data-lfh="titelblock">
+            <Typography.Title level={2}>
+              {anlageName(a)}, Stand <ZeitAnzeige wert={a.stand_at} />
+              {/* Das Blatt hat keinen Druckkopf; ohne Marke sähe eine abgetrennte Anlage einer
+                  Übung aus wie die eines Realeinsatzes (LLH-1725). */}
+              {uebung && <DruckUebung />}
+            </Typography.Title>
+            <img src={pfad(a)} alt={anlageName(a)} />
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }

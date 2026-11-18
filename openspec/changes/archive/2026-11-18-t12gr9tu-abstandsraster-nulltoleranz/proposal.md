@@ -14,7 +14,7 @@ Wächter bleibt als Nulltoleranz.
   `abstandsraster.guard.test.ts` prüft ohne Schuld: jedes Abstands-Literal über 2 px ist rot.
 - Spec `abstandsraster`: Die Regel „Keine neuen Abstands-Literale“ wird zu „Abstände ohne Literal“, ohne den Satz zur Schuld je
   Datei, das Szenario „Schuld sinkt“ entfällt.
-- Neue ADR-0066 ersetzt ADR-0059: dieselben Raster-Regeln, statt der Schuld-Regel die
+- Neue ADR-0067 ersetzt ADR-0059: dieselben Raster-Regeln, statt der Schuld-Regel die
   Nulltoleranz des bleibenden Wächters. ADR-0059 bekommt `status: ersetzt`.
 - `frontend/AGENTS.md`, Spiegelstrich „Abstandsraster“: ohne den Satz zur Altlast; das Design
   System (README) wird neu erzeugt.
@@ -33,6 +33,6 @@ Wächter bleibt als Nulltoleranz.
 ## Impact
 
 - `frontend/src/theme/abstandsraster.guard.test.ts`, `abstandsraster.schuld.ts` (gelöscht)
-- `docs/architektur/entscheidungen/ADR-0059-…`, neue `ADR-0066-…`, `docs/architektur/11-risiken-und-technische-schulden.md`
+- `docs/architektur/entscheidungen/ADR-0059-…`, neue `ADR-0067-…`, `docs/architektur/11-risiken-und-technische-schulden.md`
 - `frontend/AGENTS.md`, `docs/design/design-system/project/README.md` (generiert)
 - Kein Laufzeitcode, keine Daten, kein Server.

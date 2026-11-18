@@ -439,6 +439,12 @@ pub struct PersonAnzeige {
     pub geaendert_at: String,
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
+    /// Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355 und ungelöscht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storniert_von: Option<i64>,
+    /// Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storniert_von_name: Option<String>,
     // E‑2: denormalisierter medizinischer Cache (NULL = ungesichtet / vor Ort).
     pub aktuelle_sichtung: Option<Sichtungskategorie>,
     pub aktuelle_sichtung_at: Option<String>,

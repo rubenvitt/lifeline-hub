@@ -14,6 +14,8 @@ const SELECT_ALLE: &str = "\
            s.uebergeben_an, s.uebergeben_at, s.abschluss_grund, s.abschluss_at, \
            s.erfasst_at, s.erfasst_von, s.geaendert_at, s.geaendert_von, \
            s.storniert_at, s.storniert_von, \
+           (SELECT b.anzeigename FROM benutzer b WHERE b.id = s.storniert_von) \
+             AS storniert_von_name, \
            gp.registrier_nr AS geschaedigt_registrier_nr, \
            gp.storniert_at  AS geschaedigt_storniert_at, \
            gpe.snap_name    AS geschaedigt_personal_name, \
@@ -785,6 +787,7 @@ mod tests {
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert!(neu.storniert_at.is_some());
         assert_eq!(neu.storniert_von, Some(b));
+        assert_eq!(neu.storniert_von_name.as_deref(), Some("A"));
     }
 
     #[tokio::test]

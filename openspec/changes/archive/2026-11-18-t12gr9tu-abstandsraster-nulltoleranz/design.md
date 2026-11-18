@@ -32,8 +32,8 @@ mindestens einem Literal; die Prüfungen zu „Schuld senken“, „Datei fehlt�
 Schuld“ entfallen samt ihren Unit-Tests. Kopfkommentar: Abschnitt SCHULD weg, Grenzen bleiben.
 Die Test-Fälle an Texten (Erkennung) bleiben unverändert, sie belegen die Regeln.
 
-**D3: Neue ADR-0066 ersetzt ADR-0059.** Eine Abkehr ist nach `docs/architektur/AGENTS.md` eine
-neue ADR (`ersetzt: ADR-0059`); die alte bekommt `status: ersetzt`, `ersetzt_durch: ADR-0066`.
+**D3: Neue ADR-0067 ersetzt ADR-0059.** Eine Abkehr ist nach `docs/architektur/AGENTS.md` eine
+neue ADR (`ersetzt: ADR-0059`); die alte bekommt `status: ersetzt`, `ersetzt_durch: ADR-0067`.
 Die neue übernimmt die Raster-Regeln unverändert und ersetzt die Schuld-Regel durch: MUST NOT eine
 Schuld- oder Ausnahmeliste für Abstands-Literale außer `AUSNAHMEN` im Wächter. Prüfung:
 `test -f` Wächter, `test ! -e` Schuld-Datei, dazu die Token-Prüfungen der alten ADR. Nummer 0065
@@ -41,7 +41,7 @@ ist auf `alpha` frei; vor dem Push `scripts/adr-fuer.sh --alle` und offene PRs p
 
 **D4: Kapitel 11, neuer Eintrag.** Nach dem Muster von R20: Schuld leer, Grenzen des Wächters
 (Variablen und Rechnungen, `<Space size>` nach einer Pfeilfunktion, benannte Nicht-Layout-Werte),
-Auswirkung (ein Literal über diesen Weg folgt der Dichte nicht), Beleg Wächter + ADR-0066.
+Auswirkung (ein Literal über diesen Weg folgt der Dichte nicht), Beleg Wächter + ADR-0067.
 
 ## Risks / Trade-offs
 

@@ -2,7 +2,7 @@
 titel: Tiere
 gruppen: [alle, fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/TierePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/tiere/TierVerortung.tsx, frontend/src/pages/lagekarte/tierMarker.ts, src/routes/einsatz_tier.rs, src/tier/mod.rs]
+quellen: [frontend/src/pages/TierePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/tiere/TierVerortung.tsx, frontend/src/pages/lagekarte/tierMarker.ts, src/routes/einsatz_tier.rs, src/tier/mod.rs, frontend/src/components/StornoBanner.tsx]
 ---
 
 ## Überblick
@@ -121,7 +121,9 @@ passt, meldet sich unter ihrem Feld, etwa ein Alter über 120 Jahre („Höchste
 gespeichert wird erst, wenn sie stimmt. Wer die Seite mit ungespeicherten Eingaben verlassen
 will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ behält die Eingaben,
 „Verwerfen“ verlässt die Seite ohne sie. Fotos und Dateien zum Tier liegen auf seiner Seite.
-„Stornieren“ im Menü „Weitere Aktionen“ nimmt eine Fehlerfassung aus der Liste.
+„Stornieren“ im Menü „Weitere Aktionen“ nimmt eine Fehlerfassung aus der Liste. Wer die Seite des
+Tiers gerade offen hat, sieht oben „Storniert von … um …“; eine laufende Bearbeitung bleibt mit
+ihren Eingaben lesbar stehen und lässt sich nur noch schließen.
 
 ### Tiere auf der Lagekarte
 

@@ -289,6 +289,8 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
+    // Storno-Stand der offenen Detailseite (LLH-1832), dieselbe Bindung wie das Detail.
+    ("GET", "/api/einsaetze/{id}/personen/{pid}/stand"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
     ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
     // Vorschläge zum Rettungsmittel (LLH-1332): Fahrzeuge im Einsatz ohne Modul Fahrzeuge.
@@ -354,6 +356,8 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
+    // Storno-Stand der offenen Detailseite (LLH-1832), dieselbe Bindung wie das Detail.
+    ("GET", "/api/einsaetze/{id}/personen/{pid}/stand"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
     ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
     // Vorschläge zum Rettungsmittel (LLH-1332): Fahrzeuge im Einsatz ohne Modul Fahrzeuge.
@@ -480,6 +484,8 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
 /// [`stelle`].
 const BETREUUNGSSTELLE: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/betreuung"),
+    // Storno-Stand der offenen Detailseite (LLH-1832).
+    ("GET", "/api/einsaetze/{id}/betreuung/stellen/{sid}/stand"),
     (
         "GET",
         "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
@@ -497,6 +503,8 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
+    // Storno-Stand der offenen Detailseite (LLH-1832), dieselbe Bindung wie das Detail.
+    ("GET", "/api/einsaetze/{id}/personen/{pid}/stand"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
     ("GET", "/api/einsaetze/{id}/personen/transportmittel"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),

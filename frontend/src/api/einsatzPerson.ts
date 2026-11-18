@@ -12,6 +12,7 @@ import type {
   PersonAnlass,
   PersonAuswahl,
   PersonDetail,
+  StornoStand,
   PersonKostform,
   PersonStatus,
   PersonZugriff,
@@ -216,6 +217,15 @@ export function ladePersonenExport(einsatzId: number): Promise<Blob> {
 export function ladePerson(einsatzId: number, personId: number): Promise<PersonDetail> {
   // Schreibt serverseitig EINEN detail-Audit-Eintrag.
   return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
+}
+
+/**
+ * Storno-Stand einer Person für ihre offene Detailseite (LLH-1832, Spec `storno-sperre`): nur
+ * `storniert_at` und der Name des Stornierenden. Schreibt KEINEN Audit-Eintrag, deshalb darf ihn
+ * der Live-Abgleich bei jedem `person`-Ereignis abrufen; das Detail nicht.
+ */
+export function loadPersonStand(einsatzId: number, personId: number): Promise<StornoStand> {
+  return apiGet<StornoStand>(`/api/einsaetze/${einsatzId}/personen/${personId}/stand`);
 }
 
 /**

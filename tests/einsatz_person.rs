@@ -3340,6 +3340,82 @@ async fn zeile_ohne_modulzugriff_ist_403() {
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
+// ---------- Stand einer Person für die offene Detailseite (LLH-1832) ----------
+
+#[tokio::test]
+async fn stand_ohne_audit_und_storniert_mit_namen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Stand"}"#).await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/stand");
+    let (status, stand) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "{stand}");
+    assert!(stand["storniert_at"].is_null(), "{stand}");
+    assert!(stand["storniert_von_name"].is_null(), "{stand}");
+    assert!(
+        !stand.to_string().contains("Stand\""),
+        "keine Personalien: {stand}"
+    );
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, stand) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "storniert bleibt 200: {stand}");
+    assert!(stand["storniert_at"].is_string(), "{stand}");
+    assert!(stand["storniert_von_name"].is_string(), "{stand}");
+    assert_eq!(audit_anzahl(&app, &admin, e, p).await, 0);
+}
+
+#[tokio::test]
+async fn stand_fremder_einsatz_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{anderer}/personen/{p}/stand"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn stand_ohne_modulzugriff_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, frieda, "fuehrungspersonal").await;
+    let frieda_c = login_cookie(&app, "frieda", "friedapw1").await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/stand");
+    let (status, _) = anfrage(&app, "GET", &pfad, &frieda_c, None).await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: mit Modul sichtbar");
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override: {v}");
+    let (status, _) = anfrage(&app, "GET", &pfad, &frieda_c, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
 /// Eine unbekannte Route unter `/api` antwortet mit 404 ohne `grund`: so unterscheidet der Client
 /// sie vom 404 der Zeilen-Route, etwa nach einem Server-Rollback (LLH-1682, design.md D4).
 #[tokio::test]

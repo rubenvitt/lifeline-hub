@@ -542,6 +542,8 @@ export type Verbleib = S['VerbleibAnzeige'];
 export type Bestaetiger = S['Bestaetiger'];
 export type Abgleich = S['AbgleichAnzeige'];
 export type PersonDetail = S['PersonDetail'];
+/** Storno-Stand einer offenen Detailseite (LLH-1832, Spec `storno-sperre`). */
+export type StornoStand = S['StornoStand'];
 /** Stand des für eine Person angeforderten Rettungsmittels (LLH-1573). */
 export type RettungsmittelStand = S['RettungsmittelStand'];
 export type PersonZugriff = S['ZugriffAnzeige'];

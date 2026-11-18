@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
+import { focusManager } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -2530,4 +2531,75 @@ describe('PersonenDetailPage — Dialoge und Paneele auf der Erfassungshülle (L
       expect(screen.queryByRole('dialog')).toBeNull();
     },
   );
+});
+
+describe('PersonenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () => {
+  it('sperrt sich ohne Neuladen, wenn der Stand „storniert“ meldet; die Notiz bleibt lesbar', async () => {
+    let stand = { storniert_at: null as string | null, storniert_von_name: null as string | null };
+    let detailAbrufe = 0;
+    const { client } = render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () => {
+        detailAbrufe += 1;
+        return HttpResponse.json(detail);
+      }),
+      http.get('/api/einsaetze/1/personen/10/stand', () => HttpResponse.json(stand)),
+    ]);
+    const user = userEvent.setup();
+    const notiz = await screen.findByRole('textbox', { name: 'Verlaufsnotiz' });
+    await user.type(notiz, 'Klagt über Schwindel');
+    expect(screen.getByRole('button', { name: 'Notiz anlegen' })).toBeInTheDocument();
+
+    stand = { storniert_at: '2026-05-27 09:30:00', storniert_von_name: 'Anna Beispiel' };
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.personStand(1, 10) }));
+
+    expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Notiz anlegen' })).toBeNull();
+    const gesperrt = screen.getByRole('textbox', { name: 'Verlaufsnotiz' });
+    expect(gesperrt).toHaveValue('Klagt über Schwindel');
+    expect(gesperrt).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: /^Weitere Aktionen/ })).toBeNull();
+    // Das protokollierte Detail lädt dafür nicht neu.
+    expect(detailAbrufe).toBe(1);
+  });
+
+  it('zeigt das Banner auch beim Öffnen einer schon stornierten Person, ohne Stand-Abruf', async () => {
+    let standAbrufe = 0;
+    render(
+      einsatzAktiv,
+      { ...detail, storniert_at: '2026-05-27 09:30:00', storniert_von_name: 'Anna Beispiel' },
+      [
+        http.get('/api/einsaetze/1/personen/10/stand', () => {
+          standAbrufe += 1;
+          return HttpResponse.json({ storniert_at: null, storniert_von_name: null });
+        }),
+      ],
+    );
+    expect(await screen.findByText(/^Storniert von Anna Beispiel/)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Verlaufsnotiz' })).toBeNull();
+    expect(standAbrufe).toBe(0);
+  });
+
+  it('lädt das Detail beim Fensterwechsel nicht neu (Zugriffsprotokoll)', async () => {
+    let detailAbrufe = 0;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () => {
+        detailAbrufe += 1;
+        return HttpResponse.json(detail);
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.advanceTimersByTime(60_000);
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      focusManager.setFocused(undefined);
+      vi.useRealTimers();
+    }
+    expect(detailAbrufe).toBe(1);
+  });
 });

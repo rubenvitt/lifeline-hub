@@ -62,6 +62,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.personenTransportmittel,
       // Registrierliste der Betreuungsstelle (LLH-1612): Kostform, Verbleib, Storno.
       EINSATZ_KEYS.registrierliste,
+      // Stand der offenen Detailseite, protokollfrei (LLH-1832); das Detail selbst nicht.
+      EINSATZ_KEYS.personStand,
     ]);
   });
 
@@ -130,6 +132,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.verpflegung,
       // Registrieren und Abmelden senden `betreuung` (LLH-1612).
       EINSATZ_KEYS.registrierliste,
+      // Stand einer Stelle, die aus der Übersicht fiel (LLH-1832).
+      EINSATZ_KEYS.betreuungsstelleStand,
     ]);
   });
 
@@ -168,17 +172,24 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   });
 
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Marker der Karte hängen am Schaden.
-  it('schaden invalidiert Schadensliste, Marker und Anhanglisten', () => {
+  it('schaden invalidiert Schadensliste, Marker, Anhanglisten und Detail', () => {
     expect(EINSATZ_STREAM_EVENTS.schaden).toEqual([
       'einsatz-schaeden',
       'einsatz-schaden-marker',
       'einsatz-schaden-anhaenge',
+      // Das offene Detail sperrt sich beim Storno (LLH-1832).
+      'einsatz-schaden',
     ]);
   });
 
   // LFH-758: dasselbe an Tieren und UHS; das UHS-Zugriffsprotokoll bleibt draußen.
   it('tier und uhs invalidieren ihre Listen und Anhanglisten, nie das Zugriffsprotokoll', () => {
-    expect(EINSATZ_STREAM_EVENTS.tier).toEqual(['einsatz-tiere', 'einsatz-tier-anhaenge']);
+    // Das Detail ist live, damit es sich beim Storno sperrt (LLH-1832).
+    expect(EINSATZ_STREAM_EVENTS.tier).toEqual([
+      'einsatz-tiere',
+      'einsatz-tier-anhaenge',
+      'einsatz-tier',
+    ]);
     // Dazu das Detail mit den Plätzen und die Belegung je UHS des Lagemonitors (LFH-892).
     expect(EINSATZ_STREAM_EVENTS.uhs).toEqual([
       'einsatz-uhs',
@@ -948,6 +959,8 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
     ]);
     expect(ziele('schaden', { einsatz_id: 7, schaden_id: 9 })).toEqual([
       { art: 'zeile', ziel: 'schaeden', id: 9 },
+      // LLH-1832: das offene Detail dieses Schadens gleicht mit ab (Storno-Sperre).
+      { art: 'key', key: einsatzKeys.schaden(7, 9) },
       { art: 'key', key: einsatzKeys.schaedenGeschaedigtAlle(7) },
       { art: 'key', key: einsatzKeys.schaedenKennzahlenAlle(7) },
     ]);
@@ -958,6 +971,8 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
   it('ein person-Ereignis mit Kennung trifft die Zeile und die übrigen Abnehmer', () => {
     expect(ziele('person', { einsatz_id: 7, person_id: 4 })).toEqual([
       { art: 'zeile', ziel: 'personen', id: 4 },
+      // LLH-1832: der protokollfreie Stand der offenen Detailseite, nicht das Detail.
+      { art: 'key', key: einsatzKeys.personStand(7, 4) },
       { art: 'key', key: einsatzKeys.modulZaehler(7) },
       { art: 'key', key: einsatzKeys.betreuung(7) },
       { art: 'key', key: einsatzKeys.personAnhaenge(7, 4) },
@@ -986,6 +1001,30 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
         }
       }
     }
+  });
+});
+
+describe('Storno-Sperre offener Detailseiten (LLH-1832)', () => {
+  it('das Person-Detail bleibt nicht live, sein Stand ist es', () => {
+    expect(NICHT_LIVE_KEYS).toContain(EINSATZ_KEYS.person);
+    expect(EINSATZ_STREAM_EVENTS.person).not.toContain(EINSATZ_KEYS.person);
+    expect(EINSATZ_STREAM_EVENTS.person).toContain(EINSATZ_KEYS.personStand);
+  });
+
+  it('Tier- und Schadendetail sind live', () => {
+    expect(NICHT_LIVE_KEYS).not.toContain(EINSATZ_KEYS.tier);
+    expect(NICHT_LIVE_KEYS).not.toContain(EINSATZ_KEYS.schaden);
+    expect(EINSATZ_STREAM_EVENTS.tier).toContain(EINSATZ_KEYS.tier);
+    expect(EINSATZ_STREAM_EVENTS.schaden).toContain(EINSATZ_KEYS.schaden);
+  });
+
+  it('der Stand einer Betreuungsstelle ist live über betreuung', () => {
+    expect(EINSATZ_STREAM_EVENTS.betreuung).toContain(EINSATZ_KEYS.betreuungsstelleStand);
+    expect(einsatzKeys.betreuungsstelleStand(7, 3)).toEqual([
+      EINSATZ_KEYS.betreuungsstelleStand,
+      7,
+      3,
+    ]);
   });
 });
 

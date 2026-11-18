@@ -11,7 +11,7 @@ import {
 } from '../test/ratsche';
 
 /**
- * Abstandsraster (Spec `abstandsraster`, „Abstände ohne Literal“; ADR-0066): **kein
+ * Abstandsraster (Spec `abstandsraster`, „Abstände ohne Literal“; ADR-0067): **kein
  * Abstands-Literal.** Innen- und Außenabstände und Lücken kommen aus dem Raster der aktiven
  * Dichte: in TSX über die antd-Tokens (`token.paddingSM`, `token.margin` …), in CSS über
  * `var(--lfh-luft-0…5)` aus `theme/rollen.css`.
@@ -123,7 +123,7 @@ export function befunde(
   dateien: Readonly<Record<string, string>>,
   ausnahmen: Readonly<Record<string, string>> = AUSNAHMEN,
 ): string[] {
-  // Leere Schuld: Nulltoleranz (ADR-0066), jeder Fund ist rot.
+  // Leere Schuld: Nulltoleranz (ADR-0067), jeder Fund ist rot.
   return ratschenBefunde(
     {
       funde: abstandsliterale,
