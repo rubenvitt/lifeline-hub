@@ -21,7 +21,6 @@ const HANDSCHIRM_OBERKANTE = 300;
 
 const ERSTE_ZEILE = '.ant-table-tbody > tr.ant-table-row, [data-lfh="datensicht-karte"]';
 
-const PERSON = 'Werkzeug, Wilma';
 const FAHRZEUG = 'Florian Werkzeug 1';
 const KRAFT = 'Werkzeug, Kurt';
 const EINHEIT = 'Werkzeugzug';

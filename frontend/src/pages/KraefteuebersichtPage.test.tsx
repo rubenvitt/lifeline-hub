@@ -1430,20 +1430,23 @@ describe('KraefteuebersichtPage — Druck', () => {
     await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
   });
 
-  it('„Drucken" und „Spalten" stehen in der Werkzeugzeile der Seite, nicht in der des Primitivs', async () => {
+  it('„Spalten" steht in der Werkzeugzeile der Seite, nicht in der des Primitivs; Drucken im Kopf', async () => {
     // `.kraefte-no-print` ist innerhalb von `Datensicht` nicht setzbar (kein `className`), und
     // Fokus in der Sicht hielte die Zeilen (LLH-1417). Vom Primitiv bleibt nur der Anker ohne
-    // Höhe, an dem der Sammelbanner als Pille über dem Tabellenkopf schwebt (LLH-1479).
+    // Höhe, an dem der Sammelbanner als Pille über dem Tabellenkopf schwebt (LLH-1479). Drucken
+    // ist seit LLH-1786 ein Nebenweg des Seitenkopfs, den der Druck ausblendet
+    // (`kraefteuebersichtPrint.css`).
     mitEinheit();
     const { container } = setup();
     await screen.findByText('1. Zug');
     const seite = container.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
     const primitiv = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
+    const kopf = container.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
     expect(primitiv).not.toBeNull();
     expect(primitiv).toHaveAttribute('data-schwebend');
     expect(within(primitiv).queryByRole('button', { name: /Drucken/i })).toBeNull();
     expect(within(primitiv).queryByRole('button', { name: /Spalten/ })).toBeNull();
-    expect(within(seite).getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
     expect(within(seite).getByRole('button', { name: /^Spalten/ })).toBeInTheDocument();
     expect(seite).toHaveClass('kraefte-no-print');
   });
@@ -1828,14 +1831,36 @@ describe('KraefteuebersichtPage Sprungziele (LFH-888)', () => {
     expect(screen.queryByText(/Keine Einheiten und keine Kräfte im Einsatz/)).toBeNull();
   });
 
+  it('Drucken und „In Lagebericht übernehmen“ stehen als Nebenwege im Seitenkopf (LLH-1786)', async () => {
+    mitEinheit();
+    setup();
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    expect(
+      await within(kopf).findByRole('button', { name: /In Lagebericht übernehmen/ }),
+    ).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /^Drucken/ })).toBeInTheDocument();
+    const werkzeuge = document.querySelector<HTMLElement>('[data-lfh="meldebild-werkzeuge"]')!;
+    expect(
+      within(werkzeuge).queryByRole('button', { name: /In Lagebericht übernehmen/ }),
+    ).toBeNull();
+    expect(within(werkzeuge).queryByRole('button', { name: /^Drucken/ })).toBeNull();
+  });
+
   it('gesperrte Lageberichte: „In Lagebericht übernehmen" gesperrt mit Grund', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
       freigabenFixture({ lageberichte: { zugriff: false } }),
     );
     setup();
-    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    // Der Grund steht im sichtbaren Namen des Nebenwegs (LFH-1079), ein `title` erscheint auf
+    // Touch nie.
+    const knopf = await screen.findByRole('button', {
+      name: 'In Lagebericht übernehmen (Keine Berechtigung)',
+    });
     await waitFor(() => expect(knopf).toBeDisabled());
-    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
     // Gegenprobe im selben Bild: der Einheiten-Knopf bleibt frei.
     expect(screen.getByRole('button', { name: /^Einheit$/ })).toBeEnabled();
   });

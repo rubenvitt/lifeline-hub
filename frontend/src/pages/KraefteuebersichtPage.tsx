@@ -95,9 +95,9 @@ import { kategorieDarstellung, statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/SpaltenSchalter';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
-import EinsatzSeite from '../components/EinsatzSeite';
+import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import {
@@ -1085,6 +1085,15 @@ export default function KraefteuebersichtPage() {
   // nur so bleibt sie einzeilig, und sein Fokus hält die Zeilenschleuse nicht.
   const spaltenSchalter = useSpaltenSchalterZustand<(typeof spalten)[number]['key']>();
 
+  // Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel): `useDrucken` löst den
+  // Dialog nach dem Commit aus.
+  const druckNebenwege = useDruckNebenwege({
+    vorbereiten: async () => {
+      setGewaehlteStufe('alles');
+      setExpandedKeys(schluesselBisStufe(raster, 'alles'));
+      return true;
+    },
+  });
   const uebernehmen = useMutation({
     mutationFn: async () => {
       // Stand in der Anzeigezone: die DTG landet als Text im Lagebericht (LFH-692).
@@ -1317,6 +1326,32 @@ export default function KraefteuebersichtPage() {
     gefiltert,
   });
 
+  /**
+   * Nebenwege des Kopfs (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D4): Drucken und die
+   * Übernahme in den Lagebericht standen in der Werkzeugzeile über dem Baum; jetzt folgen sie der
+   * Regel aller Seiten (`frontend/AGENTS.md`, „Nebenwege im Kopf“). Der Grund einer Sperre steht
+   * im sichtbaren Namen (LFH-1079), ein `title` erscheint auf Touch nie. Ein Bericht ohne eine der
+   * Listen meldete eine Lage, die niemand geprüft hat (LLH-1462).
+   */
+  const lageberichtSperre = lageberichtGesperrt ? KEINE_BERECHTIGUNG : berichtGesperrt;
+  const nebenwege: Nebenweg[] = [
+    ...(darfSchreiben
+      ? [
+          {
+            key: 'lagebericht',
+            label:
+              lageberichtSperre != null
+                ? `In Lagebericht übernehmen (${lageberichtSperre})`
+                : 'In Lagebericht übernehmen',
+            laeuft: uebernehmen.isPending,
+            ...(lageberichtSperre != null || !berichtQuellenDa ? { gesperrt: true as const } : {}),
+            onWahl: () => uebernehmen.mutate(),
+          },
+        ]
+      : []),
+    ...druckNebenwege,
+  ];
+
   return (
     // `kraefte-print-root` bleibt die äußere Hülle: `kraefteuebersichtPrint.css` hängt daran, und
     // `EinsatzSeite` nimmt kein `className`.
@@ -1335,6 +1370,7 @@ export default function KraefteuebersichtPage() {
         meta={metaLaedt ? undefined : meta}
         metaPlatzhalter={metaPlatzhalter}
         dataUpdatedAt={datenstand}
+        weitere={{ name: 'Weitere Aktionen zum Meldebild', eintraege: nebenwege }}
         aktionen={
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
@@ -1559,27 +1595,6 @@ export default function KraefteuebersichtPage() {
             bezeichnung={modulName('kraefteuebersicht')}
             spalten={spalten}
             {...spaltenSchalter}
-          />
-          {darfSchreiben && (
-            <Button
-              loading={uebernehmen.isPending}
-              // Ein Bericht ohne eine der Listen meldete eine Lage, die niemand geprüft hat
-              // (LLH-1462): gesperrt, der Grund steht sichtbar in derselben Zeile.
-              disabled={lageberichtGesperrt || berichtGesperrt != null || !berichtQuellenDa}
-              title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : (berichtGesperrt ?? undefined)}
-              aria-describedby={berichtGesperrt != null && mittelGesperrt ? sperreId : undefined}
-              onClick={() => uebernehmen.mutate()}
-            >
-              In Lagebericht übernehmen
-            </Button>
-          )}
-          {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel) — `useDrucken`
-              löst den Dialog nach dem Commit aus. */}
-          <DruckKnopf
-            vorbereiten={() => {
-              setGewaehlteStufe('alles');
-              setExpandedKeys(schluesselBisStufe(raster, 'alles'));
-            }}
           />
         </div>
         {uebernehmen.error != null && (

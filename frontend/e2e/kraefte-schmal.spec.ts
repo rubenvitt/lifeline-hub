@@ -280,9 +280,10 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
       'kraefteuebersicht',
       '1. Zug',
       async () => {
+        // Drucken ist ein Nebenweg des Kopfs (LLH-1786), bei 390 px hinter „Weitere“.
         await expect(
-          page.getByRole('button', { name: /Drucken/ }).first(),
-          'Vorbedingung: der Druckknopf bleibt — die Werkzeugzeile ist gerendert',
+          page.getByRole('button', { name: 'Weitere Aktionen zum Meldebild' }),
+          'Vorbedingung: der Auslöser der Nebenwege steht — Drucken bleibt erreichbar',
         ).toBeVisible();
         await expect(
           page.getByRole('button', { name: 'In Lagebericht übernehmen' }),

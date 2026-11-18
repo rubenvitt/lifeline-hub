@@ -31,9 +31,9 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 4. Meldebild-Nebenwege (D4)
 
-- [ ] 4.1 `pages/KraefteuebersichtPage.tsx`: „Drucken“ und „In Lagebericht übernehmen“ als `weitere` („Weitere Aktionen zum Meldebild“), aus der Werkzeugzeile entfernt, Sperrgrund im `label`; Seitentests rot→grün
-- [ ] 4.2 e2e `meldebild-druck.spec.ts` und Lagebericht-Übernahme über den Helfer aus 1.3; grün
-- [ ] 4.3 `frontend/AGENTS.md`: Ausnahme „Kräfteübersicht … kein Nebenweg“ streichen
+- [x] 4.1 `pages/KraefteuebersichtPage.tsx`: „Drucken“ und „In Lagebericht übernehmen“ als `weitere` („Weitere Aktionen zum Meldebild“), aus der Werkzeugzeile entfernt, Sperrgrund im `label`; Seitentests rot→grün
+- [x] 4.2 e2e `meldebild-druck.spec.ts` (Drucken über `nebenwegWaehlen`) und `kraefte-schmal.spec.ts` (Vorbedingung „Weitere“) nachgezogen; Chromium grün (Firefox/WebKit fehlen lokal, laufen in der CI)
+- [x] 4.3 `frontend/AGENTS.md`: Ausnahme „Kräfteübersicht … kein Nebenweg“ streichen
 
 ## 5. „Filter (n)“ am Handschirm (D5)
 
