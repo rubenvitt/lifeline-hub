@@ -43,7 +43,7 @@ final class WebviewTests: XCTestCase {
 
     /// tasks.md 8.10: kein Nachfedern, kein Pull-to-Refresh, keine Linkvorschau, Ränder nur über
     /// die Safe Area der Ansicht.
-    func testDerWebviewFuehltSichNativAn() {
+    func testDerWebviewFuehltSichNativAn() throws {
         let web = Webviewfabrik.make(
             fuer: eintrag(elw), skript: "",
             empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }), navigation: nil)
@@ -53,7 +53,17 @@ final class WebviewTests: XCTestCase {
         XCTAssertEqual(web.scrollView.contentInsetAdjustmentBehavior, .never)
         XCTAssertFalse(web.allowsLinkPreview)
         XCTAssertFalse(web.isOpaque)
-        XCTAssertEqual(web.underPageBackgroundColor, UIColor(named: "Kopfschwarz"))
+        // WebKit gibt die Farbe als eigenes Objekt zurück: gleich ist sie in ihren Anteilen.
+        let kopfschwarz = try XCTUnwrap(UIColor(named: "Kopfschwarz"))
+        XCTAssertEqual(anteile(web.underPageBackgroundColor), anteile(kopfschwarz))
+    }
+
+    /// RGBA im erweiterten sRGB, auf drei Stellen gerundet.
+    private func anteile(_ farbe: UIColor?) -> [Double] {
+        guard let farbe else { return [] }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard farbe.getRed(&r, green: &g, blue: &b, alpha: &a) else { return [] }
+        return [r, g, b, a].map { (Double($0) * 1000).rounded() / 1000 }
     }
 
     func testDerStilDerHuelleSperrtDieAuswahlNurAusserhalbVonEingaben() async throws {
@@ -167,6 +177,19 @@ final class WebviewTests: XCTestCase {
         XCTAssertEqual(dialoge.gezeigt.count, 1)
     }
 
+    /// WebKit fragt per `respondsToSelector:`; antwortet der Begleiter nicht, übergeht WebKit den
+    /// Dialog still (`alert` wie „OK“, `confirm` und `prompt` wie „Abbrechen“).
+    func testDerBegleiterBeantwortetAlleDialogeDerSeite() {
+        let begleiter = Navigationsbegleiter(aktiverServer: { nil }) { _, _ in }
+        for selektor in [
+            "webView:runJavaScriptAlertPanelWithMessage:initiatedByFrame:completionHandler:",
+            "webView:runJavaScriptConfirmPanelWithMessage:initiatedByFrame:completionHandler:",
+            "webView:runJavaScriptTextInputPanelWithPrompt:defaultText:initiatedByFrame:completionHandler:",
+        ] {
+            XCTAssertTrue(begleiter.responds(to: NSSelectorFromString(selektor)), selektor)
+        }
+    }
+
     func testAlertWartetAufDieAntwort() async throws {
         let (web, dialoge) = try await dialogseite(basis: elw.url)
         dialoge.wahl = .ok(text: nil)
@@ -224,11 +247,15 @@ final class WebviewTests: XCTestCase {
             empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }),
             navigation: begleiter)
         web.load(URLRequest(url: ziel.url))
-        await warte(sekunden: 15) { !gemeldet.isEmpty }
-        guard case .navigationFehlgeschlagen(let code, _)? = gemeldet.first else {
+        // Vor dem Fehler kann WebKit eine leere Seite übernehmen (`seiteGeladen(about:blank)`);
+        // die lässt `Ablauf` auf einer fremden Adresse ohne Wirkung.
+        await warte(sekunden: 15) { gemeldet.contains(where: \.isNavigationsfehler) }
+        guard let ereignis = gemeldet.first(where: \.isNavigationsfehler),
+            case .navigationFehlgeschlagen(let code, _) = ereignis
+        else {
             return XCTFail("kein Ladefehler gemeldet: \(gemeldet)")
         }
-        XCTAssertEqual(Ablauf.next(.web(eintrag(ziel), vertrag: 1), gemeldet[0]).seite.isNichtErreichbar, true, "\(code)")
+        XCTAssertEqual(Ablauf.next(.web(eintrag(ziel), vertrag: 1), ereignis).seite.isNichtErreichbar, true, "\(code)")
     }
 
     // MARK: Hilfen
@@ -247,7 +274,9 @@ final class WebviewTests: XCTestCase {
             fuer: eintrag(aktiv), skript: skript, empfang: empfang, navigation: warter)
         halter += [empfang, warter, web]
         web.loadHTMLString("<!doctype html><html><head><title></title></head><body>\(html)</body></html>", baseURL: basis)
-        await warte { warter.fertig }
+        // Großzügig: im CI laufen iPhone und iPad nebeneinander, eine Seite mit Unterframe braucht
+        // dort mehr als fünf Sekunden.
+        await warte(sekunden: 20) { warter.fertig }
         XCTAssertTrue(warter.fertig, "Seite nicht geladen")
         return (web, dienste, zeiger)
     }
@@ -272,6 +301,13 @@ final class WebviewTests: XCTestCase {
         while !(await bedingung()), Date() < ende {
             try? await Task.sleep(for: .milliseconds(50))
         }
+    }
+}
+
+private extension Ablauf.Event {
+    var isNavigationsfehler: Bool {
+        if case .navigationFehlgeschlagen = self { return true }
+        return false
     }
 }
 

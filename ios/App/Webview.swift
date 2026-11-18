@@ -259,46 +259,47 @@ final class Navigationsbegleiter: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     // MARK: Dialoge der Seite
 
-    /// Zeigt den Dialog und ruft `antwort` genau einmal, auch wenn er nicht erscheinen kann.
-    private func zeige(
-        _ art: Seitendialog.Art, nachricht: String, frame: WKFrameInfo, in webView: WKWebView,
-        antwort: @escaping @MainActor (Seitendialog.Ergebnis?) -> Void
-    ) {
+    // Die async-Formen der Anforderungen: die Formen mit `completionHandler` erkennt Swift 6 je
+    // nach Reihenfolge der Konformitäten im Modul nicht als Erfüllung („nearly matches optional
+    // requirement“); WebKit sah die Methode dann nicht und überging `alert` still mit „OK“. Die
+    // async-Form hat keinen Rückruf im Typ, und Swift ruft den Rückruf von WebKit genau einmal,
+    // wenn sie zurückkehrt. `testDerBegleiterBeantwortetAlleDialogeDerSeite` hält das fest.
+
+    /// Zeigt den Dialog und kehrt genau einmal zurück, auch wenn er nicht erscheinen kann.
+    private func frage(
+        _ art: Seitendialog.Art, nachricht: String, frame: WKFrameInfo, in webView: WKWebView
+    ) async -> Seitendialog.Ergebnis? {
         let origin = SeitenOrigin(
             schema: frame.securityOrigin.`protocol`, host: frame.securityOrigin.host,
             port: frame.securityOrigin.port)
-        let einmal = EinmaligeAntwort(antwort)
-        dialoge.zeige(Seitendialog(art: art, nachricht: nachricht, origin: origin), in: webView) {
-            einmal.call($0)
+        return await withCheckedContinuation { fortsetzung in
+            let einmal = EinmaligeAntwort { fortsetzung.resume(returning: $0) }
+            dialoge.zeige(Seitendialog(art: art, nachricht: nachricht, origin: origin), in: webView) {
+                einmal.call($0)
+            }
         }
     }
 
     func webView(
         _ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable () -> Void
-    ) {
-        zeige(.hinweis, nachricht: message, frame: frame, in: webView) { _ in completionHandler() }
+        initiatedByFrame frame: WKFrameInfo
+    ) async {
+        _ = await frage(.hinweis, nachricht: message, frame: frame, in: webView)
     }
 
     func webView(
         _ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable (Bool) -> Void
-    ) {
-        zeige(.rueckfrage, nachricht: message, frame: frame, in: webView) {
-            completionHandler(Seitendialog.confirmWert($0))
-        }
+        initiatedByFrame frame: WKFrameInfo
+    ) async -> Bool {
+        Seitendialog.confirmWert(await frage(.rueckfrage, nachricht: message, frame: frame, in: webView))
     }
 
     func webView(
         _ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
-        defaultText: String?, initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping @MainActor @Sendable (String?) -> Void
-    ) {
-        zeige(.eingabe(vorgabe: defaultText), nachricht: prompt, frame: frame, in: webView) {
-            completionHandler(Seitendialog.promptWert($0))
-        }
+        defaultText: String?, initiatedByFrame frame: WKFrameInfo
+    ) async -> String? {
+        Seitendialog.promptWert(
+            await frage(.eingabe(vorgabe: defaultText), nachricht: prompt, frame: frame, in: webView))
     }
 }
 
