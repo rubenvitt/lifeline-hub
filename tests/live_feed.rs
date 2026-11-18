@@ -410,3 +410,97 @@ async fn neuverbinden_mit_der_position_holt_genau_das_verpasste() {
         "genau das verpasste Ereignis: {anfang:?}"
     );
 }
+
+/// Grenzen mit einem Lebenszeichen im Takt von 50 ms (LLH-1935).
+fn schneller_takt() -> StromGrenzen {
+    StromGrenzen {
+        heartbeat: Duration::from_millis(50),
+        ..StromGrenzen::default()
+    }
+}
+
+/// Ist das Frame ein Lebenszeichen: `heartbeat` mit Daten, ohne `id:`?
+fn ist_heartbeat(f: &SseFrame) -> bool {
+    f.event.as_deref() == Some("heartbeat") && f.data.as_deref() == Some("{}") && f.id.is_none()
+}
+
+/// Spec `live-abgleich`, „Live-Ströme senden ein regelmäßiges Lebenszeichen“ (LLH-1935): Einsatz-
+/// und Org-Strom senden es im Takt, ohne `id:` und ohne Daten außer `{}`. Ein Lebenszeichen mit
+/// `id:` verschöbe die `Last-Event-ID` des Browsers.
+#[tokio::test]
+async fn einsatz_und_org_strom_senden_lebenszeichen_ohne_id() {
+    let (app, _pool, _live) = setup_mit_grenzen(schneller_takt()).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    for pfad in [
+        format!("/api/einsaetze/{eid}/live"),
+        "/api/live".to_string(),
+    ] {
+        let resp = oeffnen(&app, &pfad, &admin, None).await;
+        assert_eq!(resp.status(), StatusCode::OK, "{pfad}");
+        let mut body = resp.into_body();
+        let gelesen = common::sse_lesen_fuer(&mut body, Duration::from_millis(400)).await;
+        let fs = sse_frames(&gelesen);
+        let schlaege = fs.iter().filter(|f| ist_heartbeat(f)).count();
+        assert!(
+            schlaege >= 3,
+            "{pfad}: {schlaege} Lebenszeichen in {gelesen:?}"
+        );
+        assert!(
+            fs.iter()
+                .filter(|f| f.event.as_deref() == Some("heartbeat"))
+                .all(ist_heartbeat),
+            "{pfad}: jedes Lebenszeichen ohne id: und mit `{{}}`: {gelesen:?}"
+        );
+    }
+}
+
+/// Lebenszeichen lassen die Position unberührt: wer nach ihnen mit der gemeldeten Position neu
+/// verbindet, bekommt nichts nachgeliefert und kein `lagged` (LLH-1935, Spec „Neuverbinden nach
+/// Lebenszeichen“).
+#[tokio::test]
+async fn neuverbinden_nach_lebenszeichen_liefert_nichts_nach() {
+    let (app, _pool, _live) = setup_mit_grenzen(schneller_takt()).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let feed = format!("/api/einsaetze/{eid}/live");
+
+    let resp = oeffnen(&app, &feed, &admin, None).await;
+    let mut body = resp.into_body();
+    let gelesen = common::sse_lesen_fuer(&mut body, Duration::from_millis(300)).await;
+    let fs = sse_frames(&gelesen);
+    let position = fs
+        .iter()
+        .find(|f| ist_position(f))
+        .and_then(|f| f.id.clone())
+        .unwrap_or_else(|| panic!("keine Position: {gelesen:?}"));
+    assert!(fs.iter().any(ist_heartbeat), "{gelesen:?}");
+    drop(body);
+
+    let wieder = oeffnen(&app, &feed, &admin, Some(&position)).await;
+    let mut body = wieder.into_body();
+    let gelesen = common::sse_lesen_fuer(&mut body, Duration::from_millis(200)).await;
+    let ereignisse: Vec<_> = sse_frames(&gelesen)
+        .into_iter()
+        .filter(|f| !ist_position(f) && !ist_heartbeat(f))
+        .filter_map(|f| f.event)
+        .collect();
+    assert!(ereignisse.is_empty(), "nichts nachzuliefern: {gelesen:?}");
+}
+
+/// Der Takt hält einen Strom nicht offen: endet die Sitzung, enden beide Ströme trotzdem
+/// (LLH-1935, design.md D1).
+#[tokio::test]
+async fn takt_haelt_den_strom_nach_der_abmeldung_nicht_offen() {
+    let (app, _pool, _live) = setup_mit_grenzen(schneller_takt()).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+
+    let einsatz_strom = oeffnen(&app, &format!("/api/einsaetze/{eid}/live"), &admin, None).await;
+    let org_strom = oeffnen(&app, "/api/live", &admin, None).await;
+    let (status, _) = anfrage(&app, "POST", "/api/auth/logout", &admin, None).await;
+    assert!(status.is_success(), "Abmeldung: {status}");
+
+    bis_zum_ende(einsatz_strom, Duration::from_secs(5)).await;
+    bis_zum_ende(org_strom, Duration::from_secs(5)).await;
+}
