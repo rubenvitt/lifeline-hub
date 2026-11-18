@@ -133,6 +133,15 @@ final class AblaufTests: XCTestCase {
         XCTAssertEqual(schritt.effects, [])
     }
 
+    /// Ohne Vertrauen ins Zertifikat arbeitet die Oberfläche nicht weiter; die Anleitung zum
+    /// CA-Profil geht vor, auch wenn sie schon geladen war.
+    func testRueckkehrMitZertifikatsfehlerZeigtDieAnleitungAuchBeiGeladenerSeite() {
+        let schritt = step(
+            .web(elw, vertrag: 1), .ergebnis(.nichtErreichbar(.zertifikat), healthVersion: nil, fuer: elw.id))
+        XCTAssertEqual(schritt.seite, .status(elw, .zertifikat))
+        XCTAssertEqual(schritt.effects, [])
+    }
+
     func testRueckkehrZuEinemGehobenenServerZeigtAppAktualisieren() {
         let neu = ShellInfo(version: "2.0.0", shellContract: 2)
         let schritt = step(

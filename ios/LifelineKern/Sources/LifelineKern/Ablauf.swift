@@ -144,9 +144,10 @@ public enum Ablauf {
                 ])
             }
             return loaded(eintrag, info)
-        case .nichtErreichbar where geladen:
+        case .nichtErreichbar(let klasse) where geladen && klasse != .zertifikat:
             // Die geladene Oberfläche arbeitet ohne Netz weiter (Schreib-Queue, Lagebild aus
-            // IndexedDB); eine Status-Seite nähme ihr das.
+            // IndexedDB); eine Status-Seite nähme ihr das. Ein Zertifikatsfehler dagegen heilt
+            // nicht von selbst: die Anleitung zum CA-Profil geht vor.
             return Step(seite)
         default:
             guard let status = Statusseite(ergebnis, healthVersion: healthVersion) else {
