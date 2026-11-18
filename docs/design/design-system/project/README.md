@@ -29,6 +29,7 @@ die Karten deckungsgleich.
 | Lagebild aus Zahlen, Verteilung und Listen                                                      | Dashboard-Baukasten                                                                                                                              | `Dashboard`, `DashboardListen`     |
 | Kopfaktion mit wechselndem Wortlaut                                                             | `BreiteHalten`                                                                                                                                   | `BreiteHalten`                     |
 | Übung kennzeichnen                                                                              | `UebungsBand`/`UebungsMarke` (Rahmen, „Übung“)                                                                                                   | `Uebung`                           |
+| Navigation im Einsatz (Kategorien und Module)                                                   | `IconRail`/`ModulPanel` ab `lg`, darunter Navigations-Drawer („UI-Form-Leitlinie“)                                                               | `Navigation`                       |
 | **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
@@ -81,6 +82,7 @@ die Karten deckungsgleich.
 
 - **Paneel** (`components/Paneel/`, Gruppe Flächen)
 - **Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)** (`components/Seitenkopf/`, Gruppe Rahmen)
+- **Navigation im Einsatz (Rail und Modulpanel)** (`components/Navigation/`, Gruppe Rahmen)
 - **Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)** (`components/Dashboard/`, Gruppe Flächen)
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
@@ -160,7 +162,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
   handschuh 4·8·16·24·44·64. In TSX nimmst du das antd-Token (`paddingXXS…XL`, `marginXXS…XL`;
-  MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. Ein festes Kompakt-Raster gibt es nicht.
+  MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. antds Steuerelement-Polster
+  (`controlPaddingHorizontal`/`…SM`) stehen auf `md`/`sm`; die Inhaltspolster (`paddingContent*`:
+  Knopf, Modal, Alert, Liste) bleiben bewusst antds feste Werte. Ein festes Kompakt-Raster gibt es nicht.
   Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
   `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
   `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
@@ -206,6 +210,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block).
     `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die Leiste, nicht
     Hinweis oder Beschreibung darunter.
+  - **Modulwechsel zeigt sofort Kopf und Gerippe**: Der
+    Router zeichnet jeden Wechsel als Übergang und hält das alte Bild, bis die neue Seite fertig
+    ist. Deshalb hängt das `<Outlet />` des Einsatzrahmens in `einsatz/ModulWechselGerippe.tsx`.
+    Wechselt das Modul, steht im ersten Bild `ModulGerippeSeite` (Seitenkopf mit `modulName` und Ortspfad,
+    `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
+    im selben Modul und nicht beim ersten Aufruf. Eine Seite baut kein eigenes Vorab-Gerippe für
+    den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
+    Ladetext.
   - **Zwei Höhen** (`components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
     (`useRahmenOben`) dazu der klebende Seitenkopf. Die Kopfhöhe nehmen nur, was neben dem Inhalt
@@ -492,7 +504,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   „Filter zurücksetzen“ leert Suche und Filter, nicht die Sortierung). Die gefilterte Kopfzelle
   trägt eine 2-px-Linie in `bedien`. Was man nicht sieht, wirkt nicht: der Filter einer
   ausgeblendeten Spalte schneidet nichts und steht nicht als Chip da. Der Kartenzweig zeigt
-  dieselbe Menge und sortiert über „Sortieren“. Im Servermodus zählt das Kopfmenü nicht und die
+  dieselbe Menge und sortiert über „Sortieren“; zurück geht es über den Eintrag „wie geliefert“,
+  nicht über ein Löschkreuz (es war 12 × 12 px und der
+  einzige Rückweg). Im Servermodus zählt das Kopfmenü nicht und die
   Zahlen kommen vom Server (`serverseitig.zahlen`). Sortierung, Filter und Suche stehen in der
   Adresse (`?sort=ort:auf&f.ausmass=gross&q=`, `routing/deeplinks.ts`), sonst gilt der Stand der
   Sitzung; die Spaltenwahl liegt am Gerät — beides über `useListenGedaechtnis`
@@ -584,6 +598,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (21,5/36). Ohne Text (antds Tabellenfilter) kein Boden; im Menüeintrag hebt
   `style={{ minHeight: 0 }}` ihn auf, dort ist der Eintrag das Ziel (`SpaltenSchalter`).
   Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7).
+- **Schließen-Kreuz eines Hinweises**: jedes
+  schließbare `Alert` bekommt den Boden über den Kontext (`antdHinweis(dichte)` in
+  `theme/tokens.ts`, `alert` am `ConfigProvider`: 24 / 48 / 72 auf beiden Achsen am Knopf selbst),
+  höhenneutral über einen negativen Rand; antd zeichnete es 12 × 14 px in jeder Stufe. Kein eigenes
+  `closeIcon` oder `styles.close` je Stelle. Nachweis `e2e/gate3-trefflaeche.spec.ts` („Hinweis-Kreuz
+  und kurzer Ortspfad-Link“, wirksame Fläche per `elementFromPoint`).
 - **Handgebautes Bedienziel**: `minHeight: token.controlHeight` **plus** `padding` aus
   `token.paddingSM`/`token.padding` (aufgelöste Tokens, nie `var(--lfh-*)`), geprüft über eine
   reine exportierte Stilfunktion (`bedienzielStil`) mit Böden als **Literalen**. **Ein `<a>` erbt
@@ -594,8 +614,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   trägt die Karte, ein Klick darauf wählt über den Kartenhalter.
 - **Die Brotkrume hat keine Dichte-Ausnahme**: jeder Link im Ortspfad des Seitenkopfs
   hält die Staffel über `ortspfadStil` (`components/EinsatzSeite.tsx`) und die Pfad-Link-Regel in
-  `EinsatzSeite.css`, durchsichtiger Rand statt Schrift (bleibt 12 px). Die CSS liest
-  `--lfh-ortspfad-ziel`, die Stilfunktion setzt dort den aufgelösten Token, kein `var(--lfh-*)`
+  `EinsatzSeite.css`, durchsichtiger Rand statt Schrift (bleibt 12 px), dazu die Mindestbreite eines
+  Knopfs der Stufe (`controlHeightSM`, „ETB“ war 32 px breit). Die CSS liest
+  `--lfh-ortspfad-ziel` und `--lfh-ortspfad-breite`, die Stilfunktion setzt dort den aufgelösten Token, kein `var(--lfh-*)`
   der Dichte. Seiten geben nur ihre `Breadcrumb` hinein, kein eigener Boden je Seite.
 - **Tastenkürzel als Marke**, nie nacktes `<kbd>`: `components/Tastenkuerzel.tsx`
   (Flex mit `gap`, `currentColor`, **kein** `controlHeight`-Boden; `tastenkuerzelStil` pinnt die

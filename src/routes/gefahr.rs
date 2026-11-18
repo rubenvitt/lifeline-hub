@@ -170,6 +170,16 @@ pub async fn beurteilen(
 pub struct UmbenennenBody {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub label: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+    /// Änderung“): die Bezeichnung beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<UmbenennenErwartet>,
+}
+
+/// Altwert der Bezeichnung, dreiwertig wie [`UmbenennenBody`].
+#[derive(Debug, Default, Deserialize)]
+pub struct UmbenennenErwartet {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub label: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/gefahrengebiete/{gid} — Label des Gefahrengebiets ändern.
@@ -181,12 +191,23 @@ pub async fn umbenennen(
 ) -> Result<Json<GefahrengebietAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let label = optional_max_tri(body.label, "Bezeichnung", gefahr::GEBIET_LABEL_MAX)?;
+    let erwartet = body.erwartet.unwrap_or_default();
+    crate::feld_cas::pruefe_felder(&[("label", erwartet.label.is_some(), label.is_some())], &[])?;
+    let erwartet_label = optional_max_tri(erwartet.label, "Bezeichnung", gefahr::GEBIET_LABEL_MAX)?;
+    let mut w = crate::feld_cas::ExpectedValues::new();
+    w.push(
+        "label",
+        erwartet_label
+            .as_ref()
+            .map(|v| crate::feld_cas::ExpectedValue::Text(v.as_deref())),
+    );
     gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
     let g = gefahr_repo::gebiet_umbenennen(
         &state.pool,
         einsatz_id,
         gid,
         label.as_ref().map(|v| v.as_deref()),
+        &w,
     )
     .await?;
     sse_gefahr(&state, einsatz_id, gid);

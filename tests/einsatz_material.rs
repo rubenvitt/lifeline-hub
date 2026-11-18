@@ -4138,3 +4138,113 @@ async fn ort_zuruecknehmen_nur_wenn_frei() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
+
+// ---------- Feld-CAS an der Disposition (LLH-1945) ----------
+
+fn ort_leer() -> Value {
+    serde_json::json!({"einheit_id": null, "einsatz_fahrzeug_id": null, "uhs_id": null, "br_id": null})
+}
+
+#[tokio::test]
+async fn bemerkung_mit_ueberholtem_altwert_ist_409_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 20).await;
+    material_patch(&app, &admin, einsatz, em, r#"{"bemerkung":"Tor 3"}"#).await;
+    material_patch(&app, &admin, einsatz, em, r#"{"bemerkung":"Tor 5"}"#).await;
+    let (s, j) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        r#"{"bemerkung":"Halle 2","erwartet":{"bemerkung":"Tor 3"}}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, em).await["bemerkung"],
+        "Tor 5"
+    );
+    // Eine Ad-hoc-Angabe ebenso; der richtige Altwert schreibt.
+    let (s, j) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        r#"{"kategorie":"Betreuung","erwartet":{"kategorie":"Sanität"}}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    let (s, j) = material_patch(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        r#"{"bemerkung":null,"kategorie":"Betreuung","erwartet":{"bemerkung":"Tor 5","kategorie":null}}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["kategorie"], "Betreuung");
+}
+
+#[tokio::test]
+async fn ort_vergleicht_alle_vier_spalten_gemeinsam() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 20).await;
+    // Die Liste öffnet den Ort an der Einheit; inzwischen kommt der Posten an die UHS.
+    let einheit = in_einheit(&app, &admin, einsatz, em).await;
+    let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
+    let mut alt = ort_leer();
+    alt["einheit_id"] = einheit.into();
+    let (s, _) = material_patch(&app, &admin, einsatz, em, &format!(r#"{{"uhs_id":{uhs}}}"#)).await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Lösen von der Einheit mit dem Ort beim Öffnen: überholt, der Posten bleibt an der UHS.
+    let body = serde_json::json!({"einheit_id": null, "erwartet": {"ort": alt}});
+    let (s, j) = material_patch(&app, &admin, einsatz, em, &body.to_string()).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+    let zeile = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(zeile["uhs_id"], uhs, "{zeile:?}");
+
+    // Mit dem aktuellen Ort geht der Wechsel an die Einheit.
+    let mut alt = ort_leer();
+    alt["uhs_id"] = uhs.into();
+    let body = serde_json::json!({"einheit_id": einheit, "erwartet": {"ort": alt}});
+    let (s, j) = material_patch(&app, &admin, einsatz, em, &body.to_string()).await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["einheit_id"], einheit);
+    assert!(j["uhs_id"].is_null());
+}
+
+#[tokio::test]
+async fn andere_angabe_des_postens_dazwischen_speichert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 20).await;
+    let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
+    // Ein anderer setzt die Bemerkung, dann geht der Ort mit dem Stand beim Öffnen (ohne Ort).
+    material_patch(&app, &admin, einsatz, em, r#"{"bemerkung":"Tor 3"}"#).await;
+    let body = serde_json::json!({"uhs_id": uhs, "erwartet": {"ort": ort_leer()}});
+    let (s, j) = material_patch(&app, &admin, einsatz, em, &body.to_string()).await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["uhs_id"], uhs);
+    assert_eq!(j["bemerkung"], "Tor 3");
+}
+
+#[tokio::test]
+async fn ort_altwert_ohne_ortswechsel_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Wolldecke", 20).await;
+    let body = serde_json::json!({"bemerkung": "Tor 3", "erwartet": {"ort": ort_leer()}});
+    let (s, j) = material_patch(&app, &admin, einsatz, em, &body.to_string()).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+    assert!(material_zeile(&app, &admin, einsatz, em).await["bemerkung"].is_null());
+}

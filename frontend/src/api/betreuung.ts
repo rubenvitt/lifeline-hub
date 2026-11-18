@@ -58,8 +58,18 @@ export function aendereStelle(
   einsatzId: number,
   stelleId: number,
   body: BetreuungsstellePatch,
+  /**
+   * Werte beim Öffnen (Feld-CAS, LLH-1945): hat ein anderer eine dieser Angaben inzwischen
+   * geändert, antwortet der Server 409 `veraltet`; ohne `erwartet` schreibt er ohne Vergleich.
+   * Der Status trägt keinen Altwert, die Koordinate nur als Paar.
+   */
+  erwartet?: Partial<Omit<BetreuungsstellePatch, 'status'>>,
 ): Promise<Betreuungsstelle> {
-  return apiSend<Betreuungsstelle>(`${basis(einsatzId)}/stellen/${stelleId}`, 'PATCH', body);
+  return apiSend<Betreuungsstelle>(
+    `${basis(einsatzId)}/stellen/${stelleId}`,
+    'PATCH',
+    erwartet ? { ...body, erwartet } : body,
+  );
 }
 
 /**

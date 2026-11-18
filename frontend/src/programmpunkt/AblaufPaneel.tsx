@@ -18,6 +18,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Programmpunkt } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { InlineAngabe } from '../components/InlineAngabe';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Paneel, PaneelZeile, useRollen } from '../components/instrument';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -37,8 +39,26 @@ function gleicherZeitpunkt(a: Dayjs | null, b: Dayjs | null): boolean {
 /** Schreibwege des Ablaufs: am Einsatz oder an einer Planung (LLH-1583). */
 export interface AblaufSchreiben {
   anlegen: (daten: ProgrammpunktEingabe) => Promise<unknown>;
-  aendern: (id: number, daten: Partial<ProgrammpunktEingabe>) => Promise<unknown>;
+  /** `erwartet`: Wert beim Öffnen je geänderter Angabe; nur gesetzt, wenn `ladeFrisch` da ist. */
+  aendern: (
+    id: number,
+    daten: Partial<ProgrammpunktEingabe>,
+    erwartet?: Partial<ProgrammpunktEingabe>,
+  ) => Promise<unknown>;
   loeschen: (id: number) => Promise<unknown>;
+  /**
+   * Lädt die Programmpunkte frisch (am Cache vorbei). Gesetzt, wenn der Weg den Feld-CAS kennt
+   * (am Einsatz, LLH-1945): dann geht je Angabe der Wert beim Öffnen mit, ein 409 fragt
+   * „Zwischenzeitlich geändert“. Die Planung speichert ohne Altwert.
+   */
+  ladeFrisch?: () => Promise<readonly Programmpunkt[]>;
+}
+
+/** Wire-Form einer Angabe, wie sie der Vergleich nach einem 409 braucht. */
+function angabeWire(p: Programmpunkt, angabe: keyof ProgrammpunktEingabe): string {
+  if (angabe === 'bezeichnung') return p.bezeichnung;
+  const z = alsZeitpunkt(p.zeitpunkt_at);
+  return z ? alsBackendZeit(z) : p.zeitpunkt_at;
 }
 
 /**
@@ -63,12 +83,18 @@ export default function AblaufPaneel({
     qc.invalidateQueries({ queryKey: einsatzKeys.programmpunkte(einsatzId) });
   const schreiben: AblaufSchreiben = {
     anlegen: (daten) => legeProgrammpunktAn(einsatzId, daten).then(auffrischen),
-    aendern: (id, daten) =>
-      aendereProgrammpunkt(einsatzId, id, daten).then((p) => {
+    aendern: (id, daten, erwartet) =>
+      aendereProgrammpunkt(einsatzId, id, daten, erwartet).then((p) => {
         void auffrischen();
         return p;
       }),
     loeschen: (id) => loescheProgrammpunkt(einsatzId, id).then(auffrischen),
+    ladeFrisch: () =>
+      qc.fetchQuery({
+        queryKey: einsatzKeys.programmpunkte(einsatzId),
+        queryFn: () => ladeProgrammpunkte(einsatzId),
+        staleTime: 0,
+      }),
   };
   const punkte = query.data ?? [];
   return (
@@ -121,12 +147,50 @@ export function AblaufListe({
       }),
   });
   const aendern = useMutation({
-    mutationFn: ({ id, daten }: { id: number; daten: Partial<ProgrammpunktEingabe> }) =>
-      schreiben.aendern(id, daten),
+    mutationFn: ({
+      id,
+      daten,
+      erwartet,
+    }: {
+      id: number;
+      daten: Partial<ProgrammpunktEingabe>;
+      erwartet?: Partial<ProgrammpunktEingabe>;
+    }) => schreiben.aendern(id, daten, erwartet),
     onSuccess: () => {
       message.success('Programmpunkt gespeichert');
     },
   });
+  /*
+   * Eine Angabe einer Zeile (LLH-1945, `components/useFeldKonflikt`): mit `ladeFrisch` geht ihr
+   * Wert beim Öffnen als Altwert mit, ein 409 fragt mit dem frischen Stand. „Verwerfen“ und
+   * Escape melden nichts als gespeichert.
+   */
+  const konflikt = useFeldKonflikt();
+  const { zeitKurz } = useAnzeigeKonventionen();
+  const updateAngabe = (
+    id: number,
+    angabe: keyof ProgrammpunktEingabe,
+    neu: string,
+    beimOeffnen: string,
+  ) => {
+    const daten = { [angabe]: neu };
+    const ladeFrisch = schreiben.ladeFrisch;
+    if (!ladeFrisch) return aendern.mutateAsync({ id, daten });
+    return konflikt<string, Programmpunkt | undefined>({
+      etikett: angabe === 'bezeichnung' ? 'Bezeichnung' : 'Zeitpunkt',
+      erwartet: beimOeffnen,
+      speichern: async (alt) => {
+        await aendern.mutateAsync({
+          id,
+          daten,
+          erwartet: alt === undefined ? undefined : { [angabe]: alt },
+        });
+      },
+      ladeFrisch: async () => (await ladeFrisch()).find((x) => x.id === id),
+      aktuell: (frisch) => frisch && { wert: angabeWire(frisch, angabe) },
+      text: (w) => (angabe === 'zeitpunkt_at' ? zeitKurz(w) : w),
+    });
+  };
   const loeschen = useMutation({
     mutationFn: (id: number) => schreiben.loeschen(id),
   });
@@ -155,7 +219,7 @@ export function AblaufListe({
             verstrichen={istVerstrichen(p, jetzt)}
             darfSchreiben={darfSchreiben}
             loeschtGerade={loeschen.isPending && loeschen.variables === p.id}
-            onAendern={(daten) => aendern.mutateAsync({ id: p.id, daten })}
+            onAendern={(angabe, neu, beimOeffnen) => updateAngabe(p.id, angabe, neu, beimOeffnen)}
             onLoeschen={() => loeschen.mutate(p.id)}
           />
         ))}
@@ -207,7 +271,12 @@ function AblaufZeile({
   verstrichen: boolean;
   darfSchreiben: boolean;
   loeschtGerade: boolean;
-  onAendern: (daten: Partial<ProgrammpunktEingabe>) => Promise<unknown>;
+  /** Neue Wire-Form der Angabe und ihre Wire-Form beim Öffnen (Altwert des Feld-CAS). */
+  onAendern: (
+    angabe: keyof ProgrammpunktEingabe,
+    neu: string,
+    beimOeffnen: string,
+  ) => Promise<unknown>;
   onLoeschen: () => void;
 }) {
   const { token, rollen } = useRollen();
@@ -231,7 +300,13 @@ function AblaufZeile({
           gleich={gleicherZeitpunkt}
           pflicht
           darfSchreiben={darfSchreiben}
-          onSpeichern={(d) => onAendern({ zeitpunkt_at: alsBackendZeit(d!) })}
+          onSpeichern={(d, { beimOeffnen }) =>
+            onAendern(
+              'zeitpunkt_at',
+              alsBackendZeit(d!),
+              beimOeffnen ? alsBackendZeit(beimOeffnen) : punkt.zeitpunkt_at,
+            )
+          }
           eingabe={({ feld, popup, value, onChange }) => (
             <ZeitpunktEingabe
               art="frist"
@@ -254,7 +329,9 @@ function AblaufZeile({
           gleich={(a, b) => a.trim() === b.trim()}
           pflicht
           darfSchreiben={darfSchreiben}
-          onSpeichern={(w) => onAendern({ bezeichnung: w.trim() })}
+          onSpeichern={(w, { beimOeffnen }) =>
+            onAendern('bezeichnung', w.trim(), beimOeffnen.trim())
+          }
           eingabe={({ feld, value, onChange }) => (
             <Input
               {...feld}

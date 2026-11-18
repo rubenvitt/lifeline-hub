@@ -10,8 +10,14 @@ export interface PositionAngabeProps {
   darfSchreiben: boolean;
   /** Ganze Wörter statt Kürzel (Ansicht); die Liste zeigt F/UF/M. */
   ausgeschrieben?: boolean;
-  /** `null` leert die Position. */
-  onSpeichern: (neu: StaerkePosition | null) => Promise<unknown>;
+  /**
+   * `null` leert die Position. `kontext.beimOeffnen` ist die angezeigte (wirksame) Position beim
+   * Öffnen, Altwert des Feld-CAS (LLH-1945).
+   */
+  onSpeichern: (
+    neu: StaerkePosition | null,
+    kontext: { beimOeffnen: StaerkePosition | null },
+  ) => Promise<unknown>;
 }
 
 /**

@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/personal/ruecknahme.rs, frontend/src/kraefte/ruecknahmeSatz.ts, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/personal/ruecknahme.rs, frontend/src/kraefte/ruecknahmeSatz.ts, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/BemerkungZelle.tsx, frontend/src/components/useBemerkungMitAltwert.ts]
 ---
 
 ## Überblick
@@ -282,6 +282,17 @@ gewählt ändert nichts.
 
 Die Stärke-Position bestimmt, ob die Person als Führer, Unterführer oder Mannschaft zählt;
 Einheitsführer ist ein eigenes Merkmal der Einheit.
+
+### Gleichzeitige Änderungen
+
+Einsatzfunktion, Position und Bemerkung, in der Liste wie in der Ansicht der Person, und Name,
+Qualifikation und Träger einer Ad-hoc-Person werden je für sich gespeichert. Hat ein anderer
+Arbeitsplatz **dieselbe** Angabe seit dem Öffnen geändert, fragt die App beim Speichern
+„Zwischenzeitlich geändert“ und nennt den neuen Wert: „Meine Änderung übernehmen“ speichert die
+eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand, Escape lässt die Eingabe
+offen. Die Position gilt dabei mit dem Wert, den die Zeile zeigt, auch wenn er aus dem Stamm
+kommt. Eine Änderung an einer anderen Angabe derselben Person löst keine Frage aus. Status,
+Einheit und Fahrzeug fragen nicht nach.
 
 ### Entlassen und Stornieren
 

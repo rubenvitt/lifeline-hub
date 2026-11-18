@@ -239,6 +239,12 @@ pub async fn aktualisieren(
             "Stornierte UHS kann nicht geändert werden".into(),
         ));
     }
+    // Lebenszyklus wie storniert (LLH-1948, Spec `uhs-bearbeitung`); das Rennen schließt das Repo.
+    if vorher.status == crate::uhs::UhsStatus::Aufgeloest {
+        return Err(AppError::Conflict(
+            "Aufgelöste UHS kann nicht geändert werden".into(),
+        ));
+    }
 
     // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
     let eff_lat = body.lat.unwrap_or(vorher.lat);

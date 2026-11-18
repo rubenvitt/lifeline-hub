@@ -43,8 +43,9 @@ use serde::Deserialize;
 use crate::app::AppState;
 use crate::betreuung::repo::{self, BelegungEingabe, StelleAenderung, StelleEingabe};
 use crate::betreuung::{
-    enum_wert, BelegungKopfzahl, BelegungVerlaufEintrag, BetreuungUebersicht,
-    BetreuungsstelleAnzeige, StelleMeldungAnzeige, StelleNamentlich, KONTAKTWEG_MAX, LEITUNG_MAX,
+    enum_wert, BelegungKopfzahl, BelegungVerlaufEintrag, Belegungsart, BetreuungUebersicht,
+    BetreuungsstelleAnzeige, BetreuungsstelleArt, StelleMeldungAnzeige, StelleNamentlich,
+    KONTAKTWEG_MAX, LEITUNG_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
@@ -316,6 +317,38 @@ pub struct StelleAendern {
     /// `namentlich` meldet die Zahl der Registrierten im selben Vorgang.
     #[serde(default)]
     belegungsart: Option<String>,
+    /// Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+    /// Änderung“): je Feld der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    /// Der Status trägt keinen Altwert: jeder Wechsel ist eine Handlung mit eigenem ETB-Eintrag.
+    #[serde(default)]
+    erwartet: Option<StelleErwartet>,
+}
+
+/// Altwerte der Stelle, dreiwertig wie [`StelleAendern`]; die Koordinate nur als Paar.
+#[derive(Debug, Default, Deserialize)]
+struct StelleErwartet {
+    #[serde(default)]
+    bezeichnung: Option<String>,
+    #[serde(default)]
+    art: Option<String>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    abschnitt_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    kapazitaet_personen: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    standort: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    notiz: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    leitung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    kontaktweg: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    lon: Option<Option<f64>>,
+    #[serde(default)]
+    belegungsart: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/betreuung/stellen/{sid}
@@ -331,6 +364,86 @@ pub async fn stelle_aendern(
         "erreichbarkeit",
         "kontaktweg",
     )?;
+    let erwartet = req.erwartet.unwrap_or_default();
+    // Altwert nur mit Änderung desselben Felds, die Koordinate nur als Paar (422).
+    crate::feld_cas::pruefe_felder(
+        &[
+            (
+                "bezeichnung",
+                erwartet.bezeichnung.is_some(),
+                req.bezeichnung.is_some(),
+            ),
+            ("art", erwartet.art.is_some(), req.art.is_some()),
+            (
+                "abschnitt_id",
+                erwartet.abschnitt_id.is_some(),
+                req.abschnitt_id.is_some(),
+            ),
+            (
+                "kapazitaet_personen",
+                erwartet.kapazitaet_personen.is_some(),
+                req.kapazitaet_personen.is_some(),
+            ),
+            (
+                "standort",
+                erwartet.standort.is_some(),
+                req.standort.is_some(),
+            ),
+            ("notiz", erwartet.notiz.is_some(), req.notiz.is_some()),
+            ("leitung", erwartet.leitung.is_some(), req.leitung.is_some()),
+            (
+                "kontaktweg",
+                erwartet.kontaktweg.is_some(),
+                req.kontaktweg.is_some(),
+            ),
+            ("lat", erwartet.lat.is_some(), req.lat.is_some()),
+            ("lon", erwartet.lon.is_some(), req.lon.is_some()),
+            (
+                "belegungsart",
+                erwartet.belegungsart.is_some(),
+                req.belegungsart.is_some(),
+            ),
+        ],
+        &[(
+            "lat",
+            "lon",
+            "erwartet trägt die Koordinate nur als Paar (lat und lon)",
+        )],
+    )?;
+    let erwartet_art: Option<BetreuungsstelleArt> = enum_opt(erwartet.art)?;
+    let erwartet_belegungsart: Option<Belegungsart> = enum_opt(erwartet.belegungsart)?;
+    let erwartet_bezeichnung = erwartet.bezeichnung.as_deref().map(str::trim);
+    let erwartet_texte = [
+        support::trimme_tri(erwartet.standort),
+        support::trimme_tri(erwartet.notiz),
+        support::trimme_tri(erwartet.leitung),
+        support::trimme_tri(erwartet.kontaktweg),
+    ];
+    let altwerte = {
+        use crate::feld_cas::ExpectedValue::{Integer, Real, Text};
+        fn text(v: &Option<Option<String>>) -> Option<crate::feld_cas::ExpectedValue<'_>> {
+            v.as_ref().map(|v| Text(v.as_deref()))
+        }
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        w.push("bezeichnung", erwartet_bezeichnung.map(|b| Text(Some(b))));
+        w.push("art", erwartet_art.map(|a| Text(Some(a.as_str()))));
+        w.push("abschnitt_id", erwartet.abschnitt_id.map(Integer));
+        w.push(
+            "kapazitaet_personen",
+            erwartet.kapazitaet_personen.map(Integer),
+        );
+        w.push("standort", text(&erwartet_texte[0]));
+        w.push("notiz", text(&erwartet_texte[1]));
+        w.push("leitung", text(&erwartet_texte[2]));
+        w.push("kontaktweg", text(&erwartet_texte[3]));
+        w.push("lat", erwartet.lat.map(Real));
+        w.push("lon", erwartet.lon.map(Real));
+        w.push(
+            "belegungsart",
+            erwartet_belegungsart.map(|b| Text(Some(b.as_str()))),
+        );
+        w
+    };
     let eingabe = StelleAenderung {
         bezeichnung: req.bezeichnung,
         art: enum_opt(req.art)?,
@@ -349,7 +462,16 @@ pub async fn stelle_aendern(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::stelle_aendern_tx(conn, einsatz_id, sid, benutzer_id, startwert, &eingabe).await
+        repo::update_stelle_mit_altwert_tx(
+            conn,
+            einsatz_id,
+            sid,
+            benutzer_id,
+            startwert,
+            &eingabe,
+            &altwerte,
+        )
+        .await
     })?;
     publiziere_wirksam(&state, einsatz_id, &g);
     Ok(Json(

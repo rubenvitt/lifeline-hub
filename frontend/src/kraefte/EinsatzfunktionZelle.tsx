@@ -14,8 +14,15 @@ export interface EinsatzfunktionZelleProps {
   funktion?: string | null;
   vorschlaege: readonly string[];
   darfSchreiben: boolean;
-  /** Übernahme; `null` leert. Lehnt bei Ablehnung ab, dann bleibt die Eingabe offen. */
-  onSpeichern: (einsatzfunktion: string | null) => Promise<unknown>;
+  /**
+   * Übernahme; `null` leert. Lehnt bei Ablehnung ab, dann bleibt die Eingabe offen.
+   * `kontext.beimOeffnen` ist die Einsatzfunktion beim Öffnen (`null` = leer), Altwert des
+   * Feld-CAS (LLH-1945).
+   */
+  onSpeichern: (
+    einsatzfunktion: string | null,
+    kontext: { beimOeffnen: string | null },
+  ) => Promise<unknown>;
 }
 
 /**
@@ -81,7 +88,9 @@ export default function EinsatzfunktionZelle({
         leer={(w) => w.trim() === ''}
         gleich={(a, b) => a.trim() === b.trim()}
         darfSchreiben={darfSchreiben}
-        onSpeichern={(w) => onSpeichern(w.trim() || null)}
+        onSpeichern={(w, { beimOeffnen }) =>
+          onSpeichern(w.trim() || null, { beimOeffnen: beimOeffnen.trim() || null })
+        }
         onOeffnen={() => setOffen(true)}
         onSchliessen={() => setOffen(false)}
         ausloeser={

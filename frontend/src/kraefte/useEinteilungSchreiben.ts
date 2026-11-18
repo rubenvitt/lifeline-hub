@@ -1,11 +1,37 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { gibPersonalFrei, ordnePersonalZu } from '../api/einheiten';
 import { gibBesatzungFrei, ordneBesatzungZu } from '../api/einsatzFahrzeuge';
 import { ordneKraftZu, zieheKraftAb } from '../api/einsatzUhs';
-import { updateDisposition, type DispositionPatch } from '../api/einsatzPersonal';
+import {
+  listeEinsatzPersonal,
+  updateDisposition,
+  type DispositionErwartet,
+  type DispositionPatch,
+} from '../api/einsatzPersonal';
+import { POSITION_LABELS } from '../api/personal';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzPersonal } from '../api/types';
+import { ausschnitt, ausschnittLeer, ausschnittText } from '../components/feldVermerk';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
+
+/** Altwert einer Einzelangabe (Feld-CAS, LLH-1945): Name der Angabe und Wert beim Öffnen. */
+export interface AngabeAltwert {
+  etikett: string;
+  erwartet: DispositionErwartet;
+}
+
+/** Die Angaben der Disposition in der Wire-Form des PATCH: Vergleichswert nach einem 409. */
+function personalWire(ep: EinsatzPersonal): Record<string, unknown> {
+  return {
+    staerke_position: ep.staerke_position ?? null,
+    bemerkung: ep.bemerkung ?? null,
+    einsatzfunktion: ep.einsatzfunktion ?? null,
+    name: ep.name,
+    funktion: ep.funktion ?? null,
+    traegerorganisation: ep.traegerorganisation ?? null,
+  };
+}
 
 /** Übernahme einer Zuordnung mit neuem und bisherigem Ziel (`EinheitAngabe`, `FahrzeugAngabe`). */
 export type ZuordnungSpeichern = (neu: number | null, alt: number | null) => Promise<void>;
@@ -38,6 +64,11 @@ async function switchZuordnung(
  */
 export function useEinteilungSchreiben(einsatzId: number) {
   const qc = useQueryClient();
+  // Die Rückfrage braucht den App-Kontext; `useFeldKonflikt` liefert je Render eine neue Funktion,
+  // über die Ref bleibt der Schreibweg stabil (Muster `fernmeldewesen/useSkizzenAktionen.ts`).
+  const konflikt = useFeldKonflikt();
+  const konfliktRef = useRef(konflikt);
+  konfliktRef.current = konflikt;
   return useMemo(() => {
     const syncCache = async (weitere: readonly (readonly unknown[])[]) => {
       for (const k of weitere) void qc.invalidateQueries({ queryKey: k });
@@ -81,16 +112,44 @@ export function useEinteilungSchreiben(einsatzId: number) {
       /**
        * Eine Angabe des PATCH (Position, Bemerkung, Einsatzfunktion, Ad-hoc-Angaben). Die Antwort
        * ist die neue Zeile; sie steht sofort im Cache, damit die Angabe mit dem neuen Wert schließt.
+       *
+       * Mit `alt` (Wert beim Öffnen) prüft der Server auf zwischenzeitliche Änderung (Feld-CAS,
+       * LLH-1945); ein 409 fragt über `useFeldKonflikt`. Liefert dessen Ergebnis: `OFFEN_LASSEN`
+       * (Eingabe bleibt offen) oder `VERWORFEN` (nichts gespeichert, der frische Stand im Cache).
        */
-      angabe: async (epId: number, felder: DispositionPatch) => {
-        const neu = await updateDisposition(einsatzId, epId, felder);
-        qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (liste) =>
-          liste?.map((ep) => (ep.id === neu.id ? neu : ep)),
-        );
-        void qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
-        void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-        return neu;
-      },
+      angabe: (epId: number, felder: DispositionPatch, alt?: AngabeAltwert) =>
+        konfliktRef.current({
+          etikett: alt?.etikett ?? 'Angabe',
+          erwartet: alt?.erwartet,
+          speichern: async (erwartet) => {
+            const neu = await updateDisposition(einsatzId, epId, felder, erwartet);
+            qc.setQueryData<EinsatzPersonal[]>(einsatzKeys.personal(einsatzId), (liste) =>
+              liste?.map((ep) => (ep.id === neu.id ? neu : ep)),
+            );
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          },
+          ladeFrisch: async () => {
+            const liste = await qc.fetchQuery({
+              queryKey: einsatzKeys.personal(einsatzId),
+              queryFn: () => listeEinsatzPersonal(einsatzId),
+              staleTime: 0,
+            });
+            return liste.find((ep) => ep.id === epId);
+          },
+          // Eine inzwischen entlassene Kraft fehlt in der Liste: dann kein Feldkonflikt, der Grund
+          // des Servers steht an der Angabe.
+          aktuell: (frisch) =>
+            frisch && {
+              wert: ausschnitt(personalWire(frisch), felder) as DispositionErwartet,
+              anzeige:
+                'staerke_position' in felder && frisch.staerke_position
+                  ? POSITION_LABELS[frisch.staerke_position]
+                  : undefined,
+            },
+          text: ausschnittText,
+          leer: ausschnittLeer,
+        }),
     };
   }, [qc, einsatzId]);
 }
