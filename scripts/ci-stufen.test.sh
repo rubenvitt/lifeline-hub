@@ -22,6 +22,7 @@ E2E="$WF/e2e.yml"
 MIG="$WF/migrationen.yml"
 MIGK="$WF/migrationen-kanal.yml"
 RULESET="$WF/ruleset.yml"
+IOS="$WF/ios-pruefung.yml"
 fehler=0
 
 ok() { echo "  ok   $1"; }
@@ -31,7 +32,7 @@ pruefe() { # <name> <bedingung …>
   if "$@"; then ok "$name"; else fehl "$name"; fi
 }
 
-for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET"; do
+for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET" "$IOS"; do
   [ -f "$datei" ] || { echo "FEHLER: $datei fehlt." >&2; fehler=$((fehler + 1)); }
 done
 [ "$fehler" = 0 ] || { echo "==> FEHLER: $fehler Datei(en) fehlen im Selbsttest ci-stufen." >&2; exit 1; }
@@ -202,6 +203,20 @@ pruefe "e2e.yml kennt das Label e2e nicht mehr" fehlt "$(code_ohne_kommentar "$E
 pruefe "Binary heißt e2e-Binary" enthaelt "$(job "$E2E" binaer)" "name: e2e-Binary"
 pruefe "Anteile heißen e2e k/4" enthaelt "$(job "$E2E" e2e)" "name: e2e \${{ matrix.shard }}/4"
 pruefe "Anteile nur nach grünem Binary" enthaelt "$(job_if "$E2E" e2e)" "needs.binaer.result == 'success'"
+
+echo "==> ci-stufen: ios-pruefung.yml"
+# Der macOS-Lauf der iOS-Hülle (LLH-1978): nur am PR, nur bei Änderungen an der Hülle oder den
+# gemeinsamen Fällen, und nie Pflicht (Spec `ios-auslieferung`).
+pruefe "ios-pruefung.yml hört nur auf pull_request" nur_ausloeser "$IOS" "pull_request "
+for pfad in '"ios/**"' '"src-tauri/faelle/**"' '"scripts/ios/**"' '".github/workflows/ios-pruefung.yml"'; do
+  pruefe "ios-pruefung.yml: Pfadfilter $pfad" enthaelt "$(kopf_code "$IOS")" "      - $pfad"
+done
+pruefe "ios-pruefung.yml liest nur" test "$(code_ohne_kommentar "$IOS" | grep -cE ': write')" = 0
+pruefe "ios-pruefung.yml fährt scripts/ios/simulator-pruefung.sh" \
+  enthaelt "$(job "$IOS" simulator)" "run: ./scripts/ios/simulator-pruefung.sh"
+pruefe "ios-pruefung.yml installiert XcodeGen nur über das Skript" \
+  fehlt "$(code_ohne_kommentar "$IOS")" "brew install"
+pruefe "iOS-Simulator ist kein Pflicht-Check" fehlt "$(cat "$SKRIPTE/ruleset-pruefen.sh")" "iOS-Simulator"
 
 echo "==> ci-stufen: ruleset.yml"
 pruefe "ruleset.yml: Push auf alpha, Zeitplan, Anstoß" nur_ausloeser "$RULESET" "push schedule workflow_dispatch "

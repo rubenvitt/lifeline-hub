@@ -6,7 +6,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 
 `./scripts/check-all.sh` (voller Lauf; vor dem PR genügt `--geaendert --ohne-e2e`, s. „Leichte PR-Prüfung“): `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` + `ios/version.test.sh` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
+`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` + `ios/version.test.sh` + `ios/xcodegen-installieren.test.sh` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
@@ -62,6 +62,10 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Anteile, Bericht, Runner-Wahl). Der Release wartet auf den ganzen Aufruf; der Vitest-Bericht
     darin scheitert, ohne ihn rot zu machen (`continue-on-error`).
   - Die Form hält `scripts/ci-stufen.test.sh` (Schritt 11) fest.
+  - **iOS-Prüfung** (LLH-1978): `ios-pruefung.yml` baut und testet die iOS-App auf einem
+    macOS-Runner nur an PRs, die `ios/`, `scripts/ios/` oder `src-tauri/faelle/` ändern, und ist
+    kein Pflicht-Check. Ablauf in `scripts/ios/simulator-pruefung.sh`, XcodeGen nur über
+    `scripts/ios/xcodegen-installieren.sh` (einzige Stelle der Version, mit Prüfsumme).
   - Folge: Testbrüche landen auf `alpha` und gehen über „alpha rot“ (Stau-Wächter, unten).
   - Herleitung: `openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md`,
     `openspec/changes/archive/2026-11-15-czjhc4qq-ci-pr-schlank/design.md`.
