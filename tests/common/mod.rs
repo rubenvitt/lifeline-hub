@@ -581,6 +581,62 @@ pub async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) 
         .collect()
 }
 
+/// Kennungen der ETB-Einträge mit typ='system'.
+pub async fn system_etb_ids(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<i64> {
+    let (_, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    json.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "system")
+        .map(|e| e["id"].as_i64().unwrap())
+        .collect()
+}
+
+/// Prüft, dass jeder neue System-Eintrag im ETB als Ereignis `etb` live hinausgeht (LLH-1952):
+/// ein zweiter Schirm mit offenem Einsatztagebuch sieht ihn sofort. Merkt sich die bekannten
+/// Einträge; [`EtbLive::pruefe`] vergleicht die seither geschriebenen mit den seither verteilten.
+pub struct EtbLive {
+    rx: Receiver<LiveNachricht>,
+    bekannt: Vec<i64>,
+}
+
+impl EtbLive {
+    pub async fn neu(app: &axum::Router, cookie: &str, einsatz: i64, live: &LiveHub) -> Self {
+        let rx = live.abonniere(einsatz);
+        let bekannt = system_etb_ids(app, cookie, einsatz).await;
+        Self { rx, bekannt }
+    }
+
+    /// `was` beschreibt die Handlung für die Fehlermeldung; mindestens ein neuer Eintrag.
+    pub async fn pruefe(&mut self, app: &axum::Router, cookie: &str, einsatz: i64, was: &str) {
+        let alle = system_etb_ids(app, cookie, einsatz).await;
+        let mut neu: Vec<i64> = alle
+            .iter()
+            .copied()
+            .filter(|id| !self.bekannt.contains(id))
+            .collect();
+        neu.sort_unstable();
+        let mut verteilt = Vec::new();
+        while let Ok(n) = self.rx.try_recv() {
+            if n.event.as_str() == "etb" {
+                let data: Value = serde_json::from_str(&n.data).unwrap();
+                verteilt.push(data["etb_id"].as_i64().unwrap());
+            }
+        }
+        verteilt.sort_unstable();
+        assert!(!neu.is_empty(), "{was}: kein neuer System-Eintrag im ETB");
+        assert_eq!(verteilt, neu, "{was}: ETB-Einträge gehen live hinaus");
+        self.bekannt = alle;
+    }
+}
+
 /// Liest vom Live-Kanal, bis ein Event mit `tag` kommt; Timeout oder geschlossener Kanal
 /// lassen den Test scheitern.
 pub async fn recv_until_tag(
