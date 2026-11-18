@@ -81,8 +81,8 @@ export function huelleAppBadge(): ((count: number) => Promise<void>) | null {
 }
 
 /**
- * Läuft die Seite in der Desktop-Hülle? Dort meldet die Hülle selbst (D7); Web Push (LLH-1223)
- * bietet die Seite dort nicht an.
+ * Läuft die Seite in einer App-Hülle (Desktop oder iOS)? Dort meldet die Hülle selbst (D7); Web
+ * Push (LLH-1223) bietet die Seite in keiner Hülle an (Spec `web-push`).
  */
 export function inHuelle(): boolean {
   return window.__LIFELINE_HUELLE__ != null;
