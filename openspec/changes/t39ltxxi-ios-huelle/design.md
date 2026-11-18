@@ -251,7 +251,7 @@ Nach ADR-0048 ein Auslöser je Workflow:
 
 - Die Wurzel-`AGENTS.md` hat 207 Zeilen (Grenze 200). Vor der neuen Tabellenzeile wandern die
   zwei Abschnitte „Backend — Migrationsvergabe“ und „Backend — Tabellenumbau“ nach
-  `src/AGENTS.md` (eigener `refactor`-Commit, Verweise gegreppt).
+  `migrations/AGENTS.md` (neue Bereichsdatei bei den Migrationen; `src/AGENTS.md` verweist darauf) (eigener `refactor`-Commit, Verweise gegreppt).
 - Architektur-Wächter lernt das Teilprojekt `ios`; arc42 Kapitel 5 (Bausteine), 7 (Verteilung),
   8 (Konzepte, Hüllen-Vertrag), 11 (Risiken) nachziehen.
 - `docs/betrieb/ios-app.md` (TestFlight, CA-Profil, Grenzen: kein Push im Hintergrund, kein

@@ -4,7 +4,8 @@ Gilt für den Server (`src/`, `tests/`, `migrations/`), zusätzlich zur `AGENTS.
 Pfade ohne Präfix sind relativ zu `src/`. Fachblöcke mit Server- und Client-Anteil stehen
 einmal, beim Client: ETB-Zähler und Modulzähler in `frontend/src/etb/AGENTS.md`, Betreuung und
 Verpflegung in `frontend/src/betreuung/AGENTS.md`, Sitzung über mehrere Tabs (412) in
-`frontend/src/auth/AGENTS.md`.
+`frontend/src/auth/AGENTS.md`. Migrationsvergabe und Tabellenumbau (auch für `db/migrationslauf.rs`)
+stehen in `migrations/AGENTS.md`.
 
 ## Backend — Statuscode-Konvention (LFH-267/F22)
 
