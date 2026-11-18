@@ -447,7 +447,7 @@ pub async fn stelle_aendern(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::stelle_aendern_mit_altwert_tx(
+        repo::update_stelle_mit_altwert_tx(
             conn,
             einsatz_id,
             sid,

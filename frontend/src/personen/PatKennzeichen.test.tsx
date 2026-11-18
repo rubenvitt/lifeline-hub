@@ -49,7 +49,7 @@ function serverMitStand(start: PersonDetail) {
   };
 }
 
-function zeige() {
+function renderPat() {
   const onGeschrieben = vi.fn();
   renderMitProviders(
     <PatKennzeichen einsatzId={1} person={person} bedienbar onGeschrieben={onGeschrieben} />,
@@ -60,7 +60,7 @@ function zeige() {
 describe('PatKennzeichen', () => {
   it('schickt die PAT-Nummer mit dem Wert beim Öffnen', async () => {
     const cas = serverMitStand(person);
-    const { onGeschrieben } = zeige();
+    const { onGeschrieben } = renderPat();
     await userEvent.click(screen.getByRole('button', { name: 'PAT-Nummer bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'PAT-Nummer' });
     await userEvent.clear(feld);
@@ -73,7 +73,7 @@ describe('PatKennzeichen', () => {
 
   it('veraltete PAT-Nummer: Rückfrage, „Meine Änderung übernehmen“ schreibt ohne Altwert', async () => {
     const cas = serverMitStand(person);
-    zeige();
+    renderPat();
     await userEvent.click(screen.getByRole('button', { name: 'PAT-Nummer bearbeiten' }));
     cas.fremdAendern({ pat_nummer: 'C-3' });
     const feld = screen.getByRole('textbox', { name: 'PAT-Nummer' });
@@ -89,7 +89,7 @@ describe('PatKennzeichen', () => {
 
   it('veraltete Kontamination: Rückfrage, „Verwerfen und neu laden“ sendet nichts mehr', async () => {
     const cas = serverMitStand(person);
-    const { onGeschrieben } = zeige();
+    const { onGeschrieben } = renderPat();
     await userEvent.click(screen.getByRole('button', { name: 'Kontamination bearbeiten' }));
     cas.fremdAendern({ kontamination: true });
     await userEvent.click(screen.getByRole('combobox', { name: 'Kontamination' }));

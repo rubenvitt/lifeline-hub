@@ -353,7 +353,7 @@ async fn check_kurzbezeichnung_frei(
 /// Prüft einen Teil-Patch vor der Schreibtransaktion: Existenz im Einsatz (auch für die
 /// Zyklenprüfung) und die gesendeten Bezugsfelder. `NotFound`, falls der Abschnitt nicht zum
 /// Einsatz gehört.
-pub async fn pruefe_patch(
+pub async fn check_patch(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
@@ -379,7 +379,7 @@ pub async fn name_tx(
 }
 
 /// Teil-Patch der editierbaren Felder IN der übergebenen Transaktion (Prüfung vorher über
-/// [`pruefe_patch`]). Feld-CAS (LLH-1945, `crate::feld_cas`): je Altwert hängt das UPDATE
+/// [`check_patch`]). Feld-CAS (LLH-1945, `crate::feld_cas`): je Altwert hängt das UPDATE
 /// `AND <spalte> IS ?` an; trifft es keine Zeile, obwohl der Abschnitt besteht, ist der Altwert
 /// überholt (`Veraltet`, 409), sonst `NotFound`.
 ///
@@ -737,7 +737,7 @@ mod tests {
         id: i64,
         patch: AbschnittPatch<'_>,
     ) -> Result<EinsatzabschnittAnzeige, AppError> {
-        pruefe_patch(pool, einsatz_id, id, &patch).await?;
+        check_patch(pool, einsatz_id, id, &patch).await?;
         let mut conn = pool.acquire().await?;
         update_tx(
             &mut conn,

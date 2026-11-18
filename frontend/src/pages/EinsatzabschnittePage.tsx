@@ -365,7 +365,7 @@ export default function EinsatzabschnittePage() {
    * Seite mit der Wire-Form des frisch geladenen Abschnitts.
    */
   const konflikt = useFeldKonflikt();
-  const ladeAbschnittFrisch = async (aid: number) => {
+  const loadAbschnittFrisch = async (aid: number) => {
     const liste = await qc.fetchQuery({
       queryKey: einsatzKeys.abschnitte(einsatzId),
       queryFn: () => listeAbschnitte(einsatzId),
@@ -382,7 +382,7 @@ export default function EinsatzabschnittePage() {
         speichern: async (erwartet) => {
           await patch.mutateAsync({ aid, etikett, patch: p, erwartet });
         },
-        ladeFrisch: () => ladeAbschnittFrisch(aid),
+        ladeFrisch: () => loadAbschnittFrisch(aid),
         // Ein inzwischen aufgelöster Abschnitt fehlt in der Liste: dann kein Feldkonflikt, der
         // Grund des Servers steht an der Angabe.
         aktuell: (frisch) =>

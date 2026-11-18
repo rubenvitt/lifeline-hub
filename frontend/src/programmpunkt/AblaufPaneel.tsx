@@ -167,7 +167,7 @@ export function AblaufListe({
    */
   const konflikt = useFeldKonflikt();
   const { zeitKurz } = useAnzeigeKonventionen();
-  const aendereAngabe = (
+  const updateAngabe = (
     id: number,
     angabe: keyof ProgrammpunktEingabe,
     neu: string,
@@ -219,7 +219,7 @@ export function AblaufListe({
             verstrichen={istVerstrichen(p, jetzt)}
             darfSchreiben={darfSchreiben}
             loeschtGerade={loeschen.isPending && loeschen.variables === p.id}
-            onAendern={(angabe, neu, beimOeffnen) => aendereAngabe(p.id, angabe, neu, beimOeffnen)}
+            onAendern={(angabe, neu, beimOeffnen) => updateAngabe(p.id, angabe, neu, beimOeffnen)}
             onLoeschen={() => loeschen.mutate(p.id)}
           />
         ))}

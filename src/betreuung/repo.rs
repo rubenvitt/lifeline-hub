@@ -1445,7 +1445,7 @@ pub async fn stelle_aendern_tx(
     eingabe: &StelleAenderung,
 ) -> Result<Geschrieben, AppError> {
     let ohne_altwert = crate::feld_cas::ExpectedValues::new();
-    stelle_aendern_mit_altwert_tx(
+    update_stelle_mit_altwert_tx(
         conn,
         einsatz_id,
         id,
@@ -1461,7 +1461,7 @@ pub async fn stelle_aendern_tx(
 /// anderen Wert, ist der Altwert überholt (409 `veraltet`) und nichts wird geschrieben, auch kein
 /// ETB-Eintrag. Verglichen wird in DIESER Transaktion nach 404, 409 (storniert) und den Feld- und
 /// Zusammenhangsprüfungen, vor dem Leerlauf-Riegel und dem ersten Schreiben.
-pub async fn stelle_aendern_mit_altwert_tx(
+pub async fn update_stelle_mit_altwert_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
@@ -1530,7 +1530,7 @@ pub async fn stelle_aendern_mit_altwert_tx(
     let verortung_neu = lat != roh.lat || lon != roh.lon;
     let belegungsart = eingabe.belegungsart.unwrap_or(roh.belegungsart);
     let belegungsart_neu = belegungsart != roh.belegungsart;
-    crate::feld_cas::pruefe_zeile_tx(conn, "betreuungsstelle", einsatz_id, id, erwartet).await?;
+    crate::feld_cas::check_zeile_tx(conn, "betreuungsstelle", einsatz_id, id, erwartet).await?;
     if stammdaten.leer() && !status_neu && !verortung_neu && !belegungsart_neu {
         return Ok(Geschrieben {
             id,

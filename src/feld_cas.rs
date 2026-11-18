@@ -99,7 +99,7 @@ impl<'a> ExpectedValues<'a> {
 /// Aufrufer hat die Zeile schon gefunden und ihren Lebenszyklus geprüft (404/409 kommen vorher);
 /// trägt eine erwartete Spalte inzwischen einen anderen Wert, ist der Altwert überholt
 /// (`Veraltet`, 409). `tabelle` kommt nur aus dem Code. Ohne Altwert kein Vergleich.
-pub async fn pruefe_zeile_tx(
+pub async fn check_zeile_tx(
     conn: &mut SqliteConnection,
     tabelle: &'static str,
     einsatz_id: i64,

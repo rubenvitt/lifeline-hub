@@ -494,7 +494,7 @@ function MaterialInhalt() {
     onFehler: (e, v) => zeilen.melde(v.emId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
-  // Der Grund einer Ablehnung kommt aus `speichereBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // Der Grund einer Ablehnung kommt aus `saveBemerkung` an die Zeile: ein 409 mit Rückfrage
   // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
     mutationFn: (v: { emId: number; bemerkung: string; erwartet?: string | null }) =>
@@ -507,7 +507,7 @@ function MaterialInhalt() {
     onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: invalidate,
   });
-  const speichereBemerkung = useBemerkungMitAltwert({
+  const saveBemerkung = useBemerkungMitAltwert({
     queryKey: einsatzKeys.material(einsatzId),
     laden: () => listEinsatzMaterial(einsatzId),
     speichern: (emId, bemerkung, erwartet) =>
@@ -1013,7 +1013,7 @@ function MaterialInhalt() {
           darfSchreiben={darfSchreiben}
           max={MATERIAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val, { beimOeffnen }) => speichereBemerkung(em.id, val, beimOeffnen)}
+          onSpeichern={(val, { beimOeffnen }) => saveBemerkung(em.id, val, beimOeffnen)}
         />
       ),
     },

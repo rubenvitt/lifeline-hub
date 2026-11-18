@@ -461,7 +461,7 @@ pub async fn update_tx(
         }
     }
     // Feld-CAS (LLH-1945): nach 404, 409 (beendet) und 422 (Stamm-Person), vor dem Schreiben.
-    crate::feld_cas::pruefe_zeile_tx(conn, "einsatz_personal", einsatz_id, ep_id, erwartet).await?;
+    crate::feld_cas::check_zeile_tx(conn, "einsatz_personal", einsatz_id, ep_id, erwartet).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
          SET status_id = COALESCE(?, status_id), \

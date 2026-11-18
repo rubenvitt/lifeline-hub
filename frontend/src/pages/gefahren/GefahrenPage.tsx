@@ -175,7 +175,7 @@ export default function GefahrenPage() {
    * geht als Altwert mit; nach einem 409 fragt die Seite mit dem frisch geladenen Stand.
    */
   const konflikt = useFeldKonflikt();
-  const speichereBezeichnung = (gebietId: number, neu: string, beimOeffnen: string) =>
+  const saveBezeichnung = (gebietId: number, neu: string, beimOeffnen: string) =>
     konflikt({
       etikett: 'Bezeichnung',
       erwartet: { label: beimOeffnen.trim() === '' ? null : beimOeffnen.trim() },
@@ -409,7 +409,7 @@ export default function GefahrenPage() {
                     </Button>
                   )}
                   onSpeichern={(w, { beimOeffnen }) =>
-                    speichereBezeichnung(aktuell.id, w.trim(), beimOeffnen)
+                    saveBezeichnung(aktuell.id, w.trim(), beimOeffnen)
                   }
                 />
               </div>

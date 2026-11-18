@@ -33,7 +33,7 @@ import { useFeldKonflikt } from '../../components/useFeldKonflikt';
 import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from './taktischesZeichen';
 import {
   istLageTyp,
-  ladeLageStand,
+  loadLageStand,
   lageAusschnitt,
   lageStandImCache,
   type LageFeld,
@@ -377,7 +377,7 @@ export function useKartenInteraktion({
   );
 
   /** Schickt eine Lageangabe über den Weg ihres Typs, mit oder ohne Altwert. */
-  function sendeLage(
+  function sendLage(
     typ: LageTyp,
     id: number,
     patch: LageWerte,
@@ -425,7 +425,7 @@ export function useKartenInteraktion({
    * Änderung übernehmen“ schreibt ohne Altwert; „Verwerfen und neu laden“ und Escape lassen die
    * Handlung verfallen (`false`), der frische Stand liegt dann schon im Cache. `true` = gespeichert.
    */
-  async function schreibeLage(
+  async function saveLage(
     typ: LageTyp,
     id: number,
     patch: LageWerte,
@@ -437,9 +437,9 @@ export function useKartenInteraktion({
       etikett,
       erwartet: beginn ? lageAusschnitt(beginn, felder) : undefined,
       speichern: async (erwartet) => {
-        await sendeLage(typ, id, patch, erwartet);
+        await sendLage(typ, id, patch, erwartet);
       },
-      ladeFrisch: () => ladeLageStand(qc, einsatzId, typ, id),
+      ladeFrisch: () => loadLageStand(qc, einsatzId, typ, id),
       aktuell: (frisch) => frisch && { wert: lageAusschnitt(frisch, felder) },
       text: lageText,
       leer: (w) => Object.values(w).every((v) => v == null),
@@ -585,7 +585,7 @@ export function useKartenInteraktion({
             ? { einsatzort_lat: p.lat, einsatzort_lon: p.lon }
             : { lat: p.lat, lon: p.lon };
         const etikett = typ === 'einsatzort' ? 'Einsatzort' : 'Ort auf der Karte';
-        const gespeichert = await schreibeLage(typ, platzierungZiel.id, patch, beginn, etikett);
+        const gespeichert = await saveLage(typ, platzierungZiel.id, patch, beginn, etikett);
         return { ziel: platzierungZiel, punkt: p, verfallen: !gespeichert };
       }
       if (platzierungZiel.typ === 'uhs') {
@@ -619,7 +619,7 @@ export function useKartenInteraktion({
         });
       }
       // Einheit, Fahrzeug, Personal, Betreuungsstelle und Einsatzort laufen oben über
-      // `schreibeLage`. Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, wem der PATCH
+      // `saveLage`. Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, wem der PATCH
       // galt, unabhängig vom inzwischen laufenden Modus.
       return { ziel: platzierungZiel, punkt: p, verfallen: false };
     },
@@ -941,7 +941,7 @@ export function useKartenInteraktion({
       `Symbol nicht gespeichert · ${marker.label}`,
     );
     const etikett = `${'tz_fachaufgabe' in patch ? 'Fachaufgabe' : 'Organisation'} von „${marker.label}“`;
-    schreibeLage(typ, marker.id, patch, lageStandImCache(qc, einsatzId, typ, marker.id), etikett)
+    saveLage(typ, marker.id, patch, lageStandImCache(qc, einsatzId, typ, marker.id), etikett)
       .then((gespeichert) => {
         if (gespeichert) erfolg('Symbol gespeichert');
         return qc.invalidateQueries({ queryKey: fach });
@@ -1368,7 +1368,7 @@ export function useKartenInteraktion({
     const beginn =
       (lauf.art === 'abschnitt' ? lauf.beginn : undefined) ??
       lageStandImCache(qc, einsatzId, 'abschnitt', zeichneAbschnittId!);
-    schreibeLage(
+    saveLage(
       'abschnitt',
       zeichneAbschnittId!,
       { flaeche_geojson: JSON.stringify(poly) },

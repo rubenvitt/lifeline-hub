@@ -45,7 +45,7 @@ Handler (`JsonBody`, LFH-1074).
 - **Feld-CAS ohne Änderungsvermerk** (LLH-1945): Abschnitt, Gefahrengebiet, Programmpunkt, die
   Dispositionen von Personal, Fahrzeug und Material, die Betreuungsstelle sowie `…/position` und
   `…/flaeche` nehmen `erwartet` in derselben Form (Prüfung `feld_cas::pruefe_felder`, Vergleich in
-  der Schreibtransaktion über `pruefe_zeile_tx` oder als Suffix des einen UPDATE, 0 Zeilen über
+  der Schreibtransaktion über `check_zeile_tx` oder als Suffix des einen UPDATE, 0 Zeilen über
   `ohne_treffer` zu 409 `Veraltet` oder 404). Die Stärke-Position vergleicht den wirksamen Wert,
   der Material-Ort ist eine Gruppe aller vier Spalten. Kein Eintrag in `einsatz_feld_vermerk`.
 - **Personendaten nutzen Feld-CAS** (LLH-1103, design.md D1 der Change

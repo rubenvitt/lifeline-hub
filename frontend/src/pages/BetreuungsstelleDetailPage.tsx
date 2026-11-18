@@ -349,7 +349,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
    * nach einem 409 vergleicht die Seite mit dem frisch geladenen Stand derselben Angaben.
    */
   const konflikt = useFeldKonflikt();
-  const ladeStelleFrisch = async () => {
+  const loadStelleFrisch = async () => {
     const frisch = await qc.fetchQuery({
       queryKey: einsatzKeys.betreuung(einsatzId),
       queryFn: () => ladeBetreuung(einsatzId),
@@ -357,14 +357,14 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     });
     return frisch.stellen.find((x) => x.id === stelleId);
   };
-  const speichereMitAltwert = (beimOeffnen: Betreuungsstelle, patch: BetreuungsstellePatch) =>
+  const saveMitAltwert = (beimOeffnen: Betreuungsstelle, patch: BetreuungsstellePatch) =>
     konflikt({
       etikett: angabenName(patch),
       erwartet: ausschnitt(beimOeffnen, patch),
       speichern: async (erwartet) => {
         await speichernMut.mutateAsync({ patch, erwartet });
       },
-      ladeFrisch: ladeStelleFrisch,
+      ladeFrisch: loadStelleFrisch,
       // Eine inzwischen stornierte Stelle fehlt in der Übersicht: dann kein Feldkonflikt, der
       // Grund des Servers steht am Formular.
       aktuell: (frisch) =>
@@ -719,7 +719,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
                   return;
                 }
                 const fassung = schutz.fassung();
-                speichereMitAltwert(sitzung.beimOeffnen, patch).then(
+                saveMitAltwert(sitzung.beimOeffnen, patch).then(
                   (ergebnis) => {
                     // Escape oder Schließen der Rückfrage: die Sitzung bleibt offen, ohne Fehler.
                     if (ergebnis === OFFEN_LASSEN) {

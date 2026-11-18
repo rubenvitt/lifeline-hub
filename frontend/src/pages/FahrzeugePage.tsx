@@ -619,7 +619,7 @@ function FahrzeugeInhalt() {
     onFehler: (e, v) => zeilen.melde(v.efId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
-  // Der Grund einer Ablehnung kommt aus `speichereBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // Der Grund einer Ablehnung kommt aus `saveBemerkung` an die Zeile: ein 409 mit Rückfrage
   // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
     mutationFn: (v: { efId: number; bemerkung: string; erwartet?: string | null }) =>
@@ -632,7 +632,7 @@ function FahrzeugeInhalt() {
     onMutate: (v) => zeilen.beginne(v.efId),
     onSuccess: invalidate,
   });
-  const speichereBemerkung = useBemerkungMitAltwert({
+  const saveBemerkung = useBemerkungMitAltwert({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     laden: () => listeEinsatzFahrzeuge(einsatzId),
     speichern: (efId, bemerkung, erwartet) =>
@@ -1183,7 +1183,7 @@ function FahrzeugeInhalt() {
           kennung={ef.funkrufname}
           darfSchreiben={darfSchreiben}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val, { beimOeffnen }) => speichereBemerkung(ef.id, val, beimOeffnen)}
+          onSpeichern={(val, { beimOeffnen }) => saveBemerkung(ef.id, val, beimOeffnen)}
         />
       ),
     },

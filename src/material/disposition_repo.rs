@@ -548,7 +548,7 @@ pub async fn update_tx(
     )?;
     // Feld-CAS (LLH-1945): nach allen Prüfungen der Zeile und vor dem ersten Schreiben, also auch
     // vor dem Ort, den `set_ort_tx` getrennt schreibt.
-    crate::feld_cas::pruefe_zeile_tx(conn, "einsatz_material", einsatz_id, em_id, erwartet).await?;
+    crate::feld_cas::check_zeile_tx(conn, "einsatz_material", einsatz_id, em_id, erwartet).await?;
     // Der Ort zuletzt geprüft und vor der Zeile geschrieben: `set_ort_tx` prüft nur ein neues Ziel
     // (Lösen und ein unveränderter Wert gehen immer, auch an einer aufgelösten UHS) und schreibt
     // erst danach.

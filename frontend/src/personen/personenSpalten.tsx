@@ -390,7 +390,7 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
   const beimOeffnen = useRef<string | null>(p.zustand ?? null);
   // Solange die Rückfrage klärt, ist der 409 der ersten Anfrage kein Fehler an der Zelle.
   const [klaert, setKlaert] = useState(false);
-  const speichere = async (zustand: string) => {
+  const save = async (zustand: string) => {
     setKlaert(true);
     const ergebnis = await konflikt({
       etikett: 'Zustand / Verdacht',
@@ -443,7 +443,7 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
         // Ohne Zusage: die Zelle schließt sofort und zeigt den getippten Wert mit Ladeanzeige
         // (LFH-650); ein Fehler steht an der Zelle, die Rückfrage kommt als Dialog.
         onSpeichern={(wert) => {
-          speichere(wert).catch(() => undefined);
+          save(wert).catch(() => undefined);
         }}
       />
       {fehler && (

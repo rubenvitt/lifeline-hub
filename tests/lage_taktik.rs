@@ -361,7 +361,7 @@ async fn fahrzeug_adhoc(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
 /// Gemeinsamer Ablauf für die drei Positionswege (Einheit, Fahrzeug, Person): Konflikt an der
 /// Koordinate und am Zeichen, andere Angabe dazwischen ohne 409, 422 für Altwert ohne Änderung
 /// und für eine halbe Koordinate, ohne `erwartet` ohne Vergleich.
-async fn pruefe_position_cas(app: &axum::Router, admin: &str, uri: &str) {
+async fn check_position_cas(app: &axum::Router, admin: &str, uri: &str) {
     let patch = |body: &'static str| async move {
         let (s, j) = anfrage(app, "PATCH", uri, admin, Some(body)).await;
         (s, j)
@@ -426,7 +426,7 @@ async fn position_und_zeichen_pruefen_auf_zwischenzeitliche_aenderung() {
         format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/position"),
         format!("/api/einsaetze/{einsatz}/personal/{ep}/position"),
     ] {
-        pruefe_position_cas(&app, &admin, &uri).await;
+        check_position_cas(&app, &admin, &uri).await;
     }
 }
 

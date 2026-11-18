@@ -158,7 +158,7 @@ export function useSkizzenAktionen(
       }
     };
     /** Der gespeicherte Rufname im frisch geladenen Datensatz; `undefined` = es gibt ihn nicht mehr. */
-    const ladeRufnameFrisch = async (ziel: ZuordnungsZiel): Promise<string | null | undefined> => {
+    const loadRufnameFrisch = async (ziel: ZuordnungsZiel): Promise<string | null | undefined> => {
       switch (ziel.art) {
         case 'abschnitt': {
           const liste = await qc.fetchQuery({
@@ -210,7 +210,7 @@ export function useSkizzenAktionen(
         throw new Error(`„${stelle}“ trägt kein Feld rufname`);
       }
       const vorher = gespeicherterAltwert(ziel, angezeigt);
-      const schreibe = async (erwartet: string | null | undefined) => {
+      const save = async (erwartet: string | null | undefined) => {
         switch (ziel.art) {
           case 'abschnitt':
             await patcheAbschnitt(
@@ -244,8 +244,8 @@ export function useSkizzenAktionen(
       const ergebnis = await konfliktRef.current({
         etikett: 'Rufname',
         erwartet: vorher,
-        speichern: schreibe,
-        ladeFrisch: () => ladeRufnameFrisch(ziel),
+        speichern: save,
+        ladeFrisch: () => loadRufnameFrisch(ziel),
         aktuell: (frisch) => (frisch === undefined ? undefined : { wert: frisch }),
         text: (w) => w ?? '',
         leer: (w) => w == null,

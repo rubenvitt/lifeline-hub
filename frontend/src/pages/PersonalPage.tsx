@@ -229,7 +229,7 @@ export default function PersonalPage() {
     onFehler: (e, v) => zeilen.melde(v.epId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
-  // Der Grund einer Ablehnung kommt aus `speichereBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // Der Grund einer Ablehnung kommt aus `saveBemerkung` an die Zeile: ein 409 mit Rückfrage
   // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
     mutationFn: (v: { epId: number; bemerkung: string; erwartet?: string | null }) =>
@@ -242,7 +242,7 @@ export default function PersonalPage() {
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
   });
-  const speichereBemerkung = useBemerkungMitAltwert({
+  const saveBemerkung = useBemerkungMitAltwert({
     queryKey: einsatzKeys.personal(einsatzId),
     laden: () => listeEinsatzPersonal(einsatzId),
     speichern: (epId, bemerkung, erwartet) =>
@@ -611,7 +611,7 @@ export default function PersonalPage() {
           darfSchreiben={darfSchreiben}
           max={PERSONAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val, { beimOeffnen }) => speichereBemerkung(ep.id, val, beimOeffnen)}
+          onSpeichern={(val, { beimOeffnen }) => saveBemerkung(ep.id, val, beimOeffnen)}
         />
       ),
     },

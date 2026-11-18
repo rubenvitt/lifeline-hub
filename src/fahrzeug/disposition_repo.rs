@@ -496,7 +496,7 @@ pub async fn update_tx(
         }
     }
     // Feld-CAS (LLH-1945): nach 404, 409 (beendet) und 422 (Stamm-Fahrzeug), vor dem Schreiben.
-    crate::feld_cas::pruefe_zeile_tx(conn, "einsatz_fahrzeug", einsatz_id, ef_id, erwartet).await?;
+    crate::feld_cas::check_zeile_tx(conn, "einsatz_fahrzeug", einsatz_id, ef_id, erwartet).await?;
     // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
     // still (Muster LLH-1067). Die `snap_*`-Spalten schreibt das UPDATE nur ohne Stammbezug, auch
     // wenn eine Route die Prüfung oben vergäße.

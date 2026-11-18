@@ -36,7 +36,7 @@ export type LageFeld =
 
 interface Quelle<D> {
   key: (einsatzId: number) => QueryKey;
-  lade: (einsatzId: number) => Promise<D>;
+  load: (einsatzId: number) => Promise<D>;
   finde: (daten: D, id: number) => LageWerte | undefined;
 }
 
@@ -53,7 +53,7 @@ const position = (x: {
 });
 
 /**
- * Bindet eine getypte Quelle in die Tabelle (die Daten bleiben je Quelle in sich stimmig). `lade`
+ * Bindet eine getypte Quelle in die Tabelle (die Daten bleiben je Quelle in sich stimmig). `load`
  * greift erst beim Aufruf auf die API zu, nicht beim Laden des Moduls.
  */
 const quelle = <D>(q: Quelle<D>) => q as unknown as Quelle<unknown>;
@@ -61,7 +61,7 @@ const quelle = <D>(q: Quelle<D>) => q as unknown as Quelle<unknown>;
 const QUELLEN: Record<LageTyp, Quelle<unknown>> = {
   einheit: quelle<Einheit[]>({
     key: einsatzKeys.einheiten,
-    lade: (e) => listeEinheiten(e),
+    load: (e) => listeEinheiten(e),
     finde: (liste: Einheit[], id) => {
       const x = liste.find((e) => e.id === id);
       return x && position(x);
@@ -69,7 +69,7 @@ const QUELLEN: Record<LageTyp, Quelle<unknown>> = {
   }),
   fahrzeug: quelle<EinsatzFahrzeug[]>({
     key: einsatzKeys.fahrzeuge,
-    lade: (e) => listeEinsatzFahrzeuge(e),
+    load: (e) => listeEinsatzFahrzeuge(e),
     finde: (liste: EinsatzFahrzeug[], id) => {
       const x = liste.find((e) => e.id === id);
       return x && position(x);
@@ -77,7 +77,7 @@ const QUELLEN: Record<LageTyp, Quelle<unknown>> = {
   }),
   fuehrung: quelle<FuehrungskraftKarte[]>({
     key: einsatzKeys.fuehrungskraefte,
-    lade: (e) => listeFuehrungskraefte(e),
+    load: (e) => listeFuehrungskraefte(e),
     finde: (liste: FuehrungskraftKarte[], id) => {
       const x = liste.find((e) => e.id === id);
       return x && position(x);
@@ -85,7 +85,7 @@ const QUELLEN: Record<LageTyp, Quelle<unknown>> = {
   }),
   abschnitt: quelle<Einsatzabschnitt[]>({
     key: einsatzKeys.abschnitte,
-    lade: (e) => listeAbschnitte(e),
+    load: (e) => listeAbschnitte(e),
     finde: (liste: Einsatzabschnitt[], id) => {
       const x = liste.find((e) => e.id === id);
       return (
@@ -99,7 +99,7 @@ const QUELLEN: Record<LageTyp, Quelle<unknown>> = {
   }),
   betreuungsstelle: quelle<BetreuungUebersicht>({
     key: einsatzKeys.betreuung,
-    lade: (e) => ladeBetreuung(e),
+    load: (e) => ladeBetreuung(e),
     finde: (u: BetreuungUebersicht, id) => {
       const x = u.stellen.find((s) => s.id === id);
       return x && { lat: x.lat ?? null, lon: x.lon ?? null };
@@ -107,7 +107,7 @@ const QUELLEN: Record<LageTyp, Quelle<unknown>> = {
   }),
   einsatzort: quelle<EinsatzAnzeige>({
     key: einsatzKeys.einsatz,
-    lade: (e) => ladeEinsatz(e),
+    load: (e) => ladeEinsatz(e),
     finde: (e: EinsatzAnzeige) => ({
       einsatzort_lat: e.einsatzort_lat ?? null,
       einsatzort_lon: e.einsatzort_lon ?? null,
@@ -132,7 +132,7 @@ export function lageStandImCache(
 }
 
 /** Lädt den Stand frisch am Cache vorbei und legt ihn dort ab (nach einem 409). */
-export async function ladeLageStand(
+export async function loadLageStand(
   qc: QueryClient,
   einsatzId: number,
   typ: LageTyp,
@@ -141,7 +141,7 @@ export async function ladeLageStand(
   const q = QUELLEN[typ];
   const daten = await qc.fetchQuery({
     queryKey: q.key(einsatzId),
-    queryFn: () => q.lade(einsatzId),
+    queryFn: () => q.load(einsatzId),
     staleTime: 0,
   });
   return q.finde(daten, id);

@@ -405,7 +405,7 @@ pub async fn update(
         kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
         abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
     };
-    abschnitt_repo::pruefe_patch(&state.pool, einsatz_id, aid, &patch).await?;
+    abschnitt_repo::check_patch(&state.pool, einsatz_id, aid, &patch).await?;
     // Altwerte, Spaltenfelder und Verbindungen in EINER Schreibtransaktion (LLH-1945, Vorbild
     // Einheit): ein überholter Altwert schreibt nichts. Nur ein echter Namenswechsel meldet die
     // Träger des Namens (LLH-1291).

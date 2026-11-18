@@ -87,7 +87,7 @@ export default function PatKennzeichen({
       queryFn: () => ladePerson(einsatzId, person.id),
       staleTime: 0,
     });
-  const speicherePat = (wert: string | null, beimOeffnen: string) =>
+  const savePat = (wert: string | null, beimOeffnen: string) =>
     konflikt({
       etikett: 'PAT-Nummer',
       erwartet: patWire(beimOeffnen),
@@ -98,7 +98,7 @@ export default function PatKennzeichen({
       aktuell: (frisch) => ({ wert: patWire(frisch.pat_nummer) }),
       text: (w) => w ?? '',
     });
-  const speichereKontamination = (wert: boolean | null, beimOeffnen: KontaminationWert) =>
+  const saveKontamination = (wert: boolean | null, beimOeffnen: KontaminationWert) =>
     konflikt({
       etikett: 'Kontamination',
       erwartet: kontaminationWire(beimOeffnen),
@@ -129,7 +129,7 @@ export default function PatKennzeichen({
           gleich={(a, b) => a.trim() === b.trim()}
           isValid={(w) => !istZuLang(w, PAT_NUMMER_MAX)}
           darfSchreiben
-          onSpeichern={(w, { beimOeffnen }) => speicherePat(patWire(w), beimOeffnen)}
+          onSpeichern={(w, { beimOeffnen }) => savePat(patWire(w), beimOeffnen)}
           eingabe={({ feld, value, onChange }) => (
             <Input
               {...feld}
@@ -156,9 +156,7 @@ export default function PatKennzeichen({
           }
           leer={(w) => w == null}
           darfSchreiben
-          onSpeichern={(w, { beimOeffnen }) =>
-            speichereKontamination(kontaminationWire(w), beimOeffnen)
-          }
+          onSpeichern={(w, { beimOeffnen }) => saveKontamination(kontaminationWire(w), beimOeffnen)}
           eingabe={({ feld, value, onChange, popup }) => (
             <Select<'ja' | 'nein'>
               {...feld}
