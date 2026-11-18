@@ -21,6 +21,7 @@ export {
   type KennzahlZustand,
 } from './Kennzahl';
 export { Aufgliederung, Balken, type Segment } from './Aufgliederung';
+export { default as KlappBand, klappBandKopfStil, klappBandSchluessel } from './KlappBand';
 export { default as Zeitachseneintrag } from './Zeitachseneintrag';
 export { StatusZelle, StatusChip, NUR_VORLESER } from './Status';
 export { tonVonRolle, type StatusTon } from './statusFlaeche';
@@ -80,3 +81,12 @@ export {
 export { default as WarnstufenHinweis } from './WarnstufenHinweis';
 export { default as AlarmZeile, alarmEintragHoehe, ALARMZEILE_SCHRIFT } from './AlarmZeile';
 export { EINSATZKOPF_REFETCH_MS, UNBEKANNT, UebungsBand, UebungsMarke } from './Uebung';
+export {
+  default as Textstufe,
+  textstufeFarbe,
+  type Textton,
+  type TextstufeProps,
+} from './Textstufe';
+export { default as Stapel, rasterAbstand, type Abstandsstufe, type StapelProps } from './Stapel';
+export { default as MetaZeile } from './MetaZeile';
+export { default as Feld, FELD_KLASSE, type FeldProps } from './Feld';

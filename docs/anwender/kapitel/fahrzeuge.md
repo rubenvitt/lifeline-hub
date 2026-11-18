@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/useBemerkungMitAltwert.ts, frontend/src/components/FilterKnopf.tsx]
 ---
 
 ## Überblick
@@ -39,9 +39,10 @@ entlassen dürfen Einsatzleitung und Führungspersonal.
    Spaltenkopf sortiert nach dieser Spalte, ein zweiter kehrt die Folge um; die Gruppen nach Status
    bleiben dabei stehen. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der
    Treffer und je Wert ein Knopf, etwa „Träger: ASB“, der genau diesen Filter entfernt; „Filter
-   zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Filter und „Sortieren“ als
-   Auswahlfelder über der Liste; „wie geliefert“ in „Sortieren“ stellt die Reihenfolge ohne
-   Sortierung wieder her.
+   zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Ansicht, Filter und „Sortieren“
+   hinter dem Knopf „Filter“ im Kopf der Seite; er nennt die Zahl gewählter Filter, etwa
+   „Filter (1)“; „wie geliefert“ in „Sortieren“ stellt die Reihenfolge ohne Sortierung wieder
+   her. „Ad-hoc-Fahrzeug“ steht dort im Menü „Weitere Aktionen zu den Fahrzeugen“.
 
 ### Fahrzeuge aus dem Stamm disponieren
 
@@ -312,6 +313,13 @@ dem Fahrzeugstamm der Organisation und lassen sich im Einsatz nicht ändern; die
 Im Einsatz änderbar sind sie nur bei einem Ad-hoc-Fahrzeug. Jede Angabe hat höchstens 200 Zeichen,
 die Bemerkung höchstens 2.000.
 
+### Gleichzeitige Änderungen
+
+Hat ein anderer Arbeitsplatz die Bemerkung eines Fahrzeugs seit dem Öffnen geändert, fragt die App
+beim Speichern „Zwischenzeitlich geändert“ und nennt den neuen Wert: „Meine Änderung übernehmen“
+speichert die eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand, Escape lässt
+die Eingabe offen. Der FMS-Status fragt nicht nach.
+
 ### Status der Einheit und Zeitachse
 
 Aus dem Status ihrer Fahrzeuge leitet sich der Status der Einheit in der Kräfteübersicht ab. Trägt ein
@@ -362,7 +370,7 @@ gebildete Einheit, das zugeordnete Fahrzeug und, wenn Personen mitkommen, die mi
 
 Lesen darf, wer das Modul Fahrzeuge sieht; beide Ansichten stehen auch ohne Schreibrecht offen.
 Ohne das Modul Personal steht in der Spalte „Besatzung“ und im aufgeklappten Fahrzeug „Modul
-Personal gesperrt“ statt einer Besatzung, und die Stärke über der Liste steht als „—“. Ohne das
+Personal gesperrt“ statt einer Besatzung, und die Stärke im Kopf der Seite steht als „—“. Ohne das
 Modul Einheiten zeigt das FMS-Tableau die Fahrzeuge ungegliedert mit „Modul Einheiten gesperrt“.
 Disponieren, Status setzen, die Einheit wählen, Angaben ändern, Besatzung zuordnen oder aus der
 Einheit übernehmen, entlassen und stornieren dürfen Einsatzleitung und Führungspersonal, solange

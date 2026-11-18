@@ -1,9 +1,9 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { ApiError } from '../api/client';
-import { patcheFuehrungsstelle } from '../api/einsaetze';
-import { patcheEinheit } from '../api/einheiten';
-import { patcheAbschnitt } from '../api/einsatzabschnitte';
+import { ladeFuehrungsstelle, patcheFuehrungsstelle } from '../api/einsaetze';
+import { listeEinheiten, patcheEinheit } from '../api/einheiten';
+import { listeAbschnitte, patcheAbschnitt } from '../api/einsatzabschnitte';
 import {
   aendereBereich,
   aendereKomponente,
@@ -28,6 +28,7 @@ import {
 } from '../api/kommunikationsplan';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
+  Einsatzabschnitt,
   Fernmeldeskizze,
   KommunikationsStelle,
   ModulFreigaben,
@@ -40,8 +41,9 @@ import {
   type BenutzerOrgKontext,
   type EinsatzOrgKontext,
 } from '../einsatz/schreibrecht';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
 import type { NetzRechte } from './fernmeldeskizze';
-import type { SkizzenAktionen } from './skizzenAktionen';
+import { HandlungVerfallen, type SkizzenAktionen } from './skizzenAktionen';
 
 /**
  * Die Schreibwege der Fernmeldeskizze (LFH-893, `fernmeldewesen/skizzenAktionen.ts`) gegen das API
@@ -54,7 +56,8 @@ import type { SkizzenAktionen } from './skizzenAktionen';
  *   anderen Tab; die Skizzendaten hängen unter dem Prefix des Fernmeldewesens (LLH-1180).
  * - **Zuordnung am Datensatz** (D5): `ab-`, `eh-`, `fs`, `ks-`, `ko-` am Pfad des Datensatzes;
  *   der Rufname über dessen PATCH (Abschnitt `rufname`, LLH-1134; Einheit `funkrufname`,
- *   Führungsstelle `rufname`), je nur das eine Feld.
+ *   Führungsstelle `rufname`), je nur das eine Feld, mit dem Rufnamen zu Beginn der Handlung als
+ *   `erwartet` (Feld-CAS, LLH-1945) und der Rückfrage aus `useFeldKonflikt`.
  * - **409** (abweichende Version): der Hook holt den Stand des Servers und reicht den Fehler
  *   weiter; die Fläche meldet ihn am Element (`befehlsGrund`).
  * - **Ohne Schreibrecht im Einsatz** gibt es keine Aktionen (`null`, D8): die Fläche ist dann
@@ -117,6 +120,10 @@ export function useSkizzenAktionen(
   darfSchreiben: boolean,
 ): SkizzenAktionen | null {
   const qc = useQueryClient();
+  // Die Rückfrage braucht den App-Kontext; über die Ref bleiben die Aktionen dasselbe Objekt.
+  const konflikt = useFeldKonflikt();
+  const konfliktRef = useRef(konflikt);
+  konfliktRef.current = konflikt;
   const aktionen = useMemo<SkizzenAktionen>(() => {
     const skizzeKey = einsatzKeys.fernmeldewesenSkizze(einsatzId);
     const holeSkizze = () => qc.invalidateQueries({ queryKey: skizzeKey });
@@ -150,26 +157,101 @@ export function useSkizzenAktionen(
           return holeSkizze();
       }
     };
-    const rufnameDesDatensatzes = async (stelle: string, wert: string | null) => {
-      const ziel = zielAus(stelle);
+    /** Der gespeicherte Rufname im frisch geladenen Datensatz; `undefined` = es gibt ihn nicht mehr. */
+    const loadRufnameFrisch = async (ziel: ZuordnungsZiel): Promise<string | null | undefined> => {
       switch (ziel.art) {
-        case 'abschnitt':
-          await patcheAbschnitt(einsatzId, ziel.id, { rufname: wert });
-          await holeDatensatz(ziel);
-          return;
-        case 'einheit':
-          await patcheEinheit(einsatzId, ziel.id, { funkrufname: wert });
-          await holeDatensatz(ziel);
-          return;
-        case 'fuehrungsstelle': {
-          const fs = await patcheFuehrungsstelle(einsatzId, { rufname: wert });
-          qc.setQueryData(einsatzKeys.fuehrungsstelle(einsatzId), fs);
-          return;
+        case 'abschnitt': {
+          const liste = await qc.fetchQuery({
+            queryKey: einsatzKeys.abschnitte(einsatzId),
+            queryFn: () => listeAbschnitte(einsatzId),
+            staleTime: 0,
+          });
+          const a = liste.find((x) => x.id === ziel.id);
+          return a && (a.rufname?.trim() || null);
         }
-        default:
-          // Externe Stellen und Komponenten tragen keinen Rufname.
-          throw new Error(`„${stelle}“ trägt kein Feld rufname`);
+        case 'einheit': {
+          const liste = await qc.fetchQuery({
+            queryKey: einsatzKeys.einheiten(einsatzId),
+            queryFn: () => listeEinheiten(einsatzId),
+            staleTime: 0,
+          });
+          const e = liste.find((x) => x.id === ziel.id);
+          return e && (e.funkrufname?.trim() || null);
+        }
+        default: {
+          const fs = await qc.fetchQuery({
+            queryKey: einsatzKeys.fuehrungsstelle(einsatzId),
+            queryFn: () => ladeFuehrungsstelle(einsatzId),
+            staleTime: 0,
+          });
+          return fs.rufname?.trim() || null;
+        }
       }
+    };
+    /**
+     * Die Stelle eines Abschnitts zeigt ohne eigenen Rufnamen seine Kurzbezeichnung
+     * (`funkplan.ts`). Das ist kein gespeicherter Rufname: als Altwert gilt dann „leer“.
+     */
+    const gespeicherterAltwert = (ziel: ZuordnungsZiel, angezeigt: string | null) => {
+      if (ziel.art !== 'abschnitt' || angezeigt == null) return angezeigt;
+      const a = qc
+        .getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(einsatzId))
+        ?.find((x) => x.id === ziel.id);
+      return a && !a.rufname?.trim() && a.kurzbezeichnung === angezeigt ? null : angezeigt;
+    };
+    const rufnameDesDatensatzes = async (
+      stelle: string,
+      wert: string | null,
+      angezeigt: string | null,
+    ): Promise<string | null> => {
+      const ziel = zielAus(stelle);
+      if (ziel.art === 'stelle' || ziel.art === 'komponente') {
+        // Externe Stellen und Komponenten tragen keinen Rufname.
+        throw new Error(`„${stelle}“ trägt kein Feld rufname`);
+      }
+      const vorher = gespeicherterAltwert(ziel, angezeigt);
+      const save = async (erwartet: string | null | undefined) => {
+        switch (ziel.art) {
+          case 'abschnitt':
+            await patcheAbschnitt(
+              einsatzId,
+              ziel.id,
+              { rufname: wert },
+              erwartet === undefined ? undefined : { rufname: erwartet },
+            );
+            await holeDatensatz(ziel);
+            return;
+          case 'einheit':
+            await patcheEinheit(
+              einsatzId,
+              ziel.id,
+              { funkrufname: wert },
+              erwartet === undefined ? undefined : { funkrufname: erwartet },
+            );
+            await holeDatensatz(ziel);
+            return;
+          case 'fuehrungsstelle': {
+            const fs = await patcheFuehrungsstelle(
+              einsatzId,
+              { rufname: wert },
+              erwartet === undefined ? undefined : { rufname: erwartet },
+            );
+            qc.setQueryData(einsatzKeys.fuehrungsstelle(einsatzId), fs);
+            return;
+          }
+        }
+      };
+      const ergebnis = await konfliktRef.current({
+        etikett: 'Rufname',
+        erwartet: vorher,
+        speichern: save,
+        ladeFrisch: () => loadRufnameFrisch(ziel),
+        aktuell: (frisch) => (frisch === undefined ? undefined : { wert: frisch }),
+        text: (w) => w ?? '',
+        leer: (w) => w == null,
+      });
+      if (ergebnis !== undefined) throw new HandlungVerfallen(ergebnis);
+      return vorher;
     };
 
     return {
@@ -304,7 +386,7 @@ export function useSkizzenAktionen(
         return schriftfeld;
       },
 
-      setzeRufname: (stelle, rufname) => rufnameDesDatensatzes(stelle, rufname),
+      setzeRufname: (stelle, rufname, erwartet) => rufnameDesDatensatzes(stelle, rufname, erwartet),
     };
   }, [qc, einsatzId]);
   return darfSchreiben ? aktionen : null;

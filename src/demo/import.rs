@@ -699,6 +699,7 @@ impl Ablauf<'_> {
                         status_id: Some(status_id),
                         ..Default::default()
                     },
+                    &crate::feld_cas::ExpectedValues::new(),
                 )
                 .await?;
                 let nachher = crate::fahrzeug::disposition_repo::load_anzeige_tx(
@@ -872,6 +873,7 @@ impl Ablauf<'_> {
                         status: Some(status),
                         ..Default::default()
                     },
+                    &crate::feld_cas::ExpectedValues::new(),
                 )
                 .await?;
                 if vorher.status != status {

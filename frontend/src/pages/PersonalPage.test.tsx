@@ -202,10 +202,29 @@ describe('PersonalPage', () => {
    * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
    * Builder wäre sonst nicht zu unterscheiden.
    */
-  it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
+  it('am Handschirm steht „Ad-hoc-Person“ hinter „Weitere“ (LLH-1786)', async () => {
+    setzeViewportBreite(390);
     render(einsatz());
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    await within(kopf).findByRole('button', { name: 'Personal disponieren' });
+    expect(within(kopf).queryByRole('button', { name: 'Ad-hoc-Person' })).toBeNull();
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Weitere Aktionen zum Personal' }),
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Ad-hoc-Person' })).toBeInTheDocument();
+  });
+
+  it('trägt Stärke und Meldebild-Link im Seitenkopf, keine Stärkezeile über der Tabelle', async () => {
+    const { container } = render(einsatz());
     const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
+    // LLH-1786: die Stärke ist Meta des Kopfs (Change `z137bgm5-seitenkopf-einzeilig` D2).
+    expect(link.closest('[data-lfh="seitenkopf"]')).not.toBeNull();
+    expect(container.querySelector('[data-lfh="verdichtungszeile"]')).toBeNull();
   });
 
   it('zeigt disponiertes Personal mit Funktion und Position', async () => {
@@ -287,7 +306,12 @@ describe('PersonalPage', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Funktion zu Thomas Müller speichern' }),
     );
-    await waitFor(() => expect(patchBody).toEqual({ einsatzfunktion: 'Notfallsanitäter' }));
+    await waitFor(() =>
+      expect(patchBody).toEqual({
+        einsatzfunktion: 'Notfallsanitäter',
+        erwartet: { einsatzfunktion: null },
+      }),
+    );
     expect(
       await screen.findByRole('button', { name: 'Funktion zu Thomas Müller bearbeiten' }),
     ).toHaveAccessibleDescription('Notfallsanitäter');
@@ -649,7 +673,51 @@ describe('PersonalPage', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Position zu Thomas Müller speichern' }),
     );
-    await waitFor(() => expect(patchBody).toEqual({ staerke_position: null }));
+    await waitFor(() =>
+      expect(patchBody).toEqual({
+        staerke_position: null,
+        erwartet: { staerke_position: 'fuehrer' },
+      }),
+    );
+  });
+
+  it('Position mit überholtem Stand: Rückfrage nennt die aktuelle Position, „Meine Änderung übernehmen“ ohne Altwert (LLH-1945)', async () => {
+    const koerper: Record<string, unknown>[] = [];
+    let stand = { ...disponiert[0] };
+    server.use(
+      http.patch('/api/einsaetze/7/personal/10', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        koerper.push(body);
+        const erwartet = body.erwartet as { staerke_position?: string | null } | undefined;
+        if (erwartet && erwartet.staerke_position !== stand.staerke_position) {
+          return HttpResponse.json({ error: 'veraltet', grund: 'veraltet' }, { status: 409 });
+        }
+        stand = { ...stand, staerke_position: body.staerke_position as string };
+        return HttpResponse.json(stand);
+      }),
+    );
+    render(einsatz(), [stand]);
+    await bereit();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Position zu Thomas Müller bearbeiten' }),
+    );
+    // Ein anderer Arbeitsplatz stellt inzwischen auf Unterführer.
+    stand = { ...stand, staerke_position: 'unterfuehrer' };
+    server.use(http.get('/api/einsaetze/7/personal', () => HttpResponse.json([stand])));
+    await waehle('Position zu Thomas Müller', 'Mannschaft');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Position zu Thomas Müller speichern' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent('Position inzwischen: „Unterführer“');
+    expect(koerper[0]).toEqual({
+      staerke_position: 'mannschaft',
+      erwartet: { staerke_position: 'fuehrer' },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await waitFor(() => expect(koerper).toHaveLength(2));
+    expect(koerper[1]).toEqual({ staerke_position: 'mannschaft' });
   });
 
   // ── Einteilung in der Zeile (D3–D5) ──
@@ -801,6 +869,41 @@ describe('PersonalPage', () => {
       within(zeile).getByRole('button', { name: 'Bemerkung zu Thomas Müller hinzufügen' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
+  });
+
+  it('Bemerkung mit überholtem Stand: Rückfrage statt Fehler, „Verwerfen“ schreibt nichts (LLH-1945)', async () => {
+    setzeViewportBreite(1600);
+    const koerper: Record<string, unknown>[] = [];
+    let stand = { ...disponiert[0], bemerkung: 'Tor 3' };
+    server.use(
+      http.patch('/api/einsaetze/7/personal/10', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        koerper.push(body);
+        return HttpResponse.json({ error: 'veraltet', grund: 'veraltet' }, { status: 409 });
+      }),
+    );
+    const { container } = render(einsatz(), [stand]);
+    await bereit();
+    await blendeEin('Bemerkung');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bemerkung zu Thomas Müller bearbeiten' }),
+    );
+    stand = { ...stand, bemerkung: 'Tor 5' };
+    server.use(http.get('/api/einsaetze/7/personal', () => HttpResponse.json([stand])));
+    const feld = screen.getByRole('textbox');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Halle 2');
+    fireEvent.blur(feld);
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Bemerkung inzwischen: „Tor 5“');
+    expect(koerper).toEqual([{ bemerkung: 'Halle 2', erwartet: { bemerkung: 'Tor 3' } }]);
+    // Kein Grund an der Zeile, solange die Rückfrage klärt.
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    expect(within(zeile).queryByRole('alert')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    await waitFor(() => expect(within(zeile).getByText('Tor 5')).toBeInTheDocument());
+    expect(koerper).toHaveLength(1);
+    expect(within(zeile).queryByRole('alert')).toBeNull();
   });
 
   it('der Spaltenschalter meldet Träger, Ruhe, Bemerkung und (unter xxl) Abschnitt als ausgeblendet, als TEXT', async () => {

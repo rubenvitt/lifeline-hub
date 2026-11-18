@@ -1,20 +1,19 @@
-# Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)
+# Eingabefeld (Feld mit Breitenstufe, Pflicht mit Fehlerzeile, FeldFehler)
 
-FeldFehler — die Fehlerzeile unter einer Eingabe, auch ohne antd-`Form` (Nutzer
-außerhalb eines `Form.Item`, etwa die feldweise Bearbeitung der Personendaten).
+Feld — ein Formularfeld mit benannter Obergrenze. Hülle um antds
+`Form.Item`: Beschriftung, Pflichtzeichen, Hinweis, Prüfung und Fehlerzeile bleiben antds. Das
+Steuerelement füllt die Zeile bis zur Obergrenze der Stufe (`FELDBREITE`) und ragt am schmalen
+Schirm nie über den Rand. `InputNumber`, `DatePicker` und `TimePicker`, die antd nicht von sich
+aus 100 % breit setzt, füllt die Klasse `FELD_KLASSE` in `index.css`.
 
-EINE OPTIK MIT ANTDS FORMULARMELDUNG: Farbe `alarmText` (dieselbe Rolle, die `antdKomponenten`
-dem `Form`-Token `colorError` gibt, `frontend/AGENTS.md`, „Geerbter Text auf Textrollen“; nie
-antds Füllfarbe `colorError`), Schrift und Zeilenhöhe aus `fontSize`/`lineHeight` wie
-`.ant-form-item-explain`. Wer in einem `Form.Item` steht, nimmt antds eigene Meldung
-(`DatenfeldEingabe`); beide sehen gleich aus.
+Bewusst ohne `style`: eine Pixelbreite lässt sich nicht ausdrücken. Ein Sonderfall wird eine
+neue Stufe, keine Ausnahme. Regel: `frontend/AGENTS.md`, „Gestaltungssprache“, Bausteine;
+Wächter `components/feld.guard.test.ts`.
 
-ZUGANG: die Zeile trägt `id`; die Eingabe verweist per `aria-describedby` darauf und setzt
-`aria-invalid`. Kein eigener Live-Bereich: der Grund erscheint nach dem Absenden, und der Fokus
-geht ins Feld, dessen Beschreibung der Vorleser dann liest. Die Marke `data-fehler` ist dieselbe
-wie an `InlineAngabe` und `BemerkungZelle`.
+Aus `frontend/src/components/instrument/FeldFehler.tsx`:
 
-Ohne Grund rendert sie nichts — kein leerer Abstand unter dem Feld.
+FeldFehler — die Fehlerzeile unter einer Eingabe, auch ohne antd-`Form` (LLH-1101; Nutzer
+außerhalb eines `Form.Item`, etwa die feldweise Bearbeitung der Personendaten, LLH-1103).
 
-Quelle: `frontend/src/components/instrument/FeldFehler.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
+Quelle: `frontend/src/components/instrument/Feld.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert (der Zustand nach einer Bedienung im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

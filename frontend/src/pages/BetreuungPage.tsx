@@ -31,6 +31,8 @@ import {
 import { personenZahl, volleStellenSegment } from '../betreuung/betreuungText';
 import StellenBlock, { type StelleAktion } from '../betreuung/StellenBlock';
 import UnterbringungKennzahlen from '../betreuung/UnterbringungKennzahlen';
+import { unterbringungKennzahl, unterbringungKurzform } from '../betreuung/unterbringungKennzahl';
+import { KlappBand } from '../components/instrument';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   SeitenFehler,
@@ -261,6 +263,12 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
   const gescheitert = betreuungQuery.isError && betreuungQuery.data == null;
   const veraltet = betreuungQuery.isError && betreuungQuery.data != null;
   const ladend = betreuungQuery.isLoading;
+  // Kurzform für das eingeklappte Band (LLH-1786); beim Laden „…“, keine erfundene Null. Ohne
+  // Hook: die Stelle liegt hinter frühen Rückgaben.
+  const unterbringungK = ladend
+    ? null
+    : unterbringungKennzahl(stellen, betreuungQuery.data?.namentlich);
+  const unterbringungKurzZeile = unterbringungK ? unterbringungKurzform(unterbringungK) : '…';
   const leer = !ladend && stellen.length === 0;
   const inBetrieb = stellen.filter((s) => s.status === 'in_betrieb').length;
 
@@ -321,11 +329,20 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
       ) : (
         <>
           {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
-          <UnterbringungKennzahlen
-            stellen={stellen}
-            namentlich={betreuungQuery.data?.namentlich}
-            ladend={ladend}
-          />
+          {/* Einklappbar (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D3): am Handy stand die
+              erste Stelle unter dem Band bei y = 731. Der Kopf steht auch beim Laden, sonst kämen
+              mit den Daten eine Zeile und ein Sprung dazu. */}
+          <KlappBand
+            seite="betreuung"
+            titel="Unterbringung in Zahlen"
+            kurzform={unterbringungKurzZeile}
+          >
+            <UnterbringungKennzahlen
+              stellen={stellen}
+              namentlich={betreuungQuery.data?.namentlich}
+              ladend={ladend}
+            />
+          </KlappBand>
           <StellenBlock
             einsatzId={einsatzId}
             stellen={stellen}

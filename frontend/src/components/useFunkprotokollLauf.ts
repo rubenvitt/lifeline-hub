@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
  * Zeile oben, neueste unten direkt über einer angepinnten Erfassung. Genutzt von ETB und
  * Informationstelefon, damit es nur eine Leserichtung gibt.
  *
- * Drei Aufgaben, alle ohne eigenen Bildlauf-Container (der bräche Rahmen, klebende Köpfe und
+ * Vier Aufgaben, alle ohne eigenen Bildlauf-Container (der bräche Rahmen, klebende Köpfe und
  * Fokusabstand):
  *
  * 1. **Öffnen am Ende.** Steht die Liste zum ersten Mal (`bereit`), rollt die Seite einmal ans
@@ -22,7 +22,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
  *    `fernmeldewesen/skizze/useAmSchirmHalten.ts`): Chromium und Firefox glichen sonst teilweise selbst aus,
  *    beide zusammen schöben doppelt, und WebKit kennt sie nicht.
  *
- * Gemessen wird nur in Effekten und im Bildlauf-Zuhörer, nie im Render.
+ * 4. **Höhe ohne Bildlauf.** Wächst oder schrumpft die Liste, ohne dass gerollt wird, misst ein
+ *    `ResizeObserver` „am Ende“ neu; in der Öffnungsphase hält er die Seite am Ende (LLH-1833).
+ *
+ * Gemessen wird nur in Effekten, im Bildlauf-Zuhörer und im Beobachter, nie im Render.
  */
 
 /**
@@ -138,6 +141,8 @@ export function useFunkprotokollLauf({
   const amEndeRef = useRef(true);
   const anker = useRef<Anker | null>(null);
   const gestartet = useRef(false);
+  /** Öffnungsphase: vom Startlauf bis zur ersten Eingabe bleibt die Seite am Ende (Punkt 4). */
+  const isOpening = useRef(false);
 
   const merke = useCallback(() => {
     const jetzt = istAmEnde(endeRef.current);
@@ -176,6 +181,42 @@ export function useFunkprotokollLauf({
   }, [merke]);
 
   /*
+   * 4. Höhe ändert sich ohne Bildlauf (LLH-1833). Eine Stundengruppe mit `content-visibility: auto`
+   * hat beim Startlauf nur ihre geschätzte Höhe und wächst erst danach; ein Bildlauf-Ereignis
+   * kommt dabei nicht. Ohne Beobachter griffe der Startlauf ins Leere, die Seite stünde oben und
+   * hielte sich doch für „am Ende“ — der nächste Eintrag risse sie nach unten. In der
+   * Öffnungsphase (bis zur ersten Eingabe) bleibt die Seite deshalb am Ende; danach wird nur neu
+   * gemessen, nie mitgezogen: was über der Lesestelle aufgeht („mehr“), schiebt sie nicht weg.
+   */
+  useEffect(() => {
+    const targets = [wurzel.current, ende?.spalte.current].filter(
+      (el): el is HTMLElement => el != null,
+    );
+    if (!bereit || targets.length === 0 || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (isOpening.current && amEndeRef.current) zumEnde();
+      else merke();
+    });
+    for (const el of targets) observer.observe(el);
+    return () => observer.disconnect();
+    // Die Ränder in den Abhängigkeiten: hängt die Liste erst nach `bereit` ein (Skelett), findet
+    // der nächste Lauf sie. Ein neues `observe` meldet sich einmal, das misst nur nach.
+  }, [bereit, juengste, aelteste, wurzel, ende?.spalte, merke, zumEnde]);
+
+  useEffect(() => {
+    const handleInput = () => {
+      isOpening.current = false;
+    };
+    const eventTypes = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+    for (const t of eventTypes) {
+      window.addEventListener(t, handleInput, { capture: true, passive: true });
+    }
+    return () => {
+      for (const t of eventTypes) window.removeEventListener(t, handleInput, { capture: true });
+    };
+  }, []);
+
+  /*
    * Ein Effekt für alle drei Fälle, nach jeder Änderung der Ränder. Am Ende merkt er die neue
    * Lesestelle: die nächste Änderung braucht den Anker VOR sich, und ein Bildlauf-Ereignis kommt
    * nicht, wenn sich nur der Inhalt ändert.
@@ -195,6 +236,7 @@ export function useFunkprotokollLauf({
       // beim Auslegen kennt (`content-visibility: auto` schätzt sie vorher).
       gestartet.current = true;
       if (!ohneStartlauf) {
+        isOpening.current = true;
         zumEnde();
         rahmen = requestAnimationFrame(() => {
           if (amEndeRef.current) rolleAnsEnde(endeRef.current);

@@ -153,6 +153,54 @@ describe('useEtbErfassung – Antwort an den Aufrufer (LLH-1071)', () => {
   });
 });
 
+/*
+ * LLH-1833: Die Zeitachse lässt hochgerollt nur Einträge durch, die DIESES Gerät schrieb. Der Hook
+ * kennt sie an der client_id: selbst vergeben (Direktversand und Einreihen) oder aus der
+ * gerätweiten Warteschlange gelesen (ein anderer Tab hat eingereiht). Die Menge wächst nur, damit
+ * ein gesendeter Eintrag nach dem Leeren der Warteschlange weiter als eigener gilt.
+ */
+describe('useEtbErfassung – client_ids dieses Geräts (LLH-1833)', () => {
+  it('merkt sich direkt gesendete, eingereihte und vorgefundene client_ids', async () => {
+    await queueEinreihen(11, 9, { ...eintrag, client_id: 'anderer-tab' });
+    let versuch = 0;
+    server.use(
+      http.post('/api/einsaetze/9/etb', () => {
+        versuch += 1;
+        return versuch === 1
+          ? HttpResponse.json({ id: 7, lfd_nr: 1 }, { status: 201 })
+          : HttpResponse.error();
+      }),
+    );
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await waitFor(() => expect(result.current.eigeneClientIds.has('anderer-tab')).toBe(true));
+
+    await act(async () => {
+      await result.current.erfassen({ ...eintrag, client_id: 'direkt' });
+    });
+    await act(async () => {
+      await result.current.erfassen({ ...eintrag, client_id: 'eingereiht' });
+    });
+    await waitFor(() => expect(result.current.eigeneClientIds.has('eingereiht')).toBe(true));
+    expect(result.current.eigeneClientIds.has('direkt')).toBe(true);
+
+    // Gesendet und aus der Warteschlange genommen: die Kennung bleibt bekannt.
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ id: 8, lfd_nr: 2 }, { status: 201 }),
+      ),
+    );
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+    expect([...result.current.eigeneClientIds].sort()).toEqual([
+      'anderer-tab',
+      'direkt',
+      'eingereiht',
+    ]);
+  });
+});
+
 describe('useEtbErfassung', () => {
   it('reiht bei Netzwerkfehler ein und sendet beim Flush nach', async () => {
     let versuch = 0;

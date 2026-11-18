@@ -3558,6 +3558,13 @@ export interface components {
             /** Format: int64 */
             berichtigt_eintrag_id?: number | null;
             /**
+             * @description Die Kennung, die das erfassende Gerät beim Senden vergab (Idempotenz der Warteschlange,
+             *     LFH-261). Das Gerät erkennt daran seine eigenen Einträge: die Zeitachse lässt hochgerollt
+             *     nur sie sofort durch, Einträge desselben Kontos von einem anderen Gerät warten hinter dem
+             *     Sammelbanner (LLH-1833). Fehlt bei Einträgen ohne Kennung (Systemeinträge, ältere).
+             */
+            client_id?: string | null;
+            /**
              * @description Die Einheiten, die dieser Eintrag festhält (LLH-1266, Spec `etb-vorgaenge`, „Verweis auf
              *     genannte Einheiten“; Tabelle `etb_eintrag_einheit`): die Empfänger eines Auftrags beim
              *     Schreiben (LLH-1175) und die Einheit des Systemeintrags ihrer Auflösung. Nach `id`, leer

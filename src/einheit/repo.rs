@@ -1140,30 +1140,39 @@ pub async fn aktualisiere_position(
     einsatz_id: i64,
     einheit_id: i64,
     daten: PositionPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<EinheitAnzeige, AppError> {
-    let betroffen = sqlx::query(
+    // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
+    let sql = format!(
         "UPDATE einsatz_einheit SET \
-            lat = CASE WHEN ? THEN ? ELSE lat END, \
-            lon = CASE WHEN ? THEN ? ELSE lon END, \
-            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.lat.is_some())
-    .bind(daten.lat.flatten())
-    .bind(daten.lon.is_some())
-    .bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some())
-    .bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some())
-    .bind(daten.tz_organisation.flatten())
-    .bind(einheit_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+            lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
+            lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+         WHERE id = ?9 AND einsatz_id = ?10{}",
+        erwartet.sql_suffix(11)
+    );
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.lat.is_some())
+        .bind(daten.lat.flatten())
+        .bind(daten.lon.is_some())
+        .bind(daten.lon.flatten())
+        .bind(daten.tz_fachaufgabe.is_some())
+        .bind(daten.tz_fachaufgabe.flatten())
+        .bind(daten.tz_organisation.is_some())
+        .bind(daten.tz_organisation.flatten())
+        .bind(einheit_id)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        return Err(crate::feld_cas::ohne_treffer(
+            pool,
+            "einsatz_einheit",
+            einsatz_id,
+            einheit_id,
+            erwartet,
+        )
+        .await);
     }
     laden(pool, einsatz_id, einheit_id).await
 }
@@ -2129,6 +2138,7 @@ mod tests {
                 tz_fachaufgabe: Some(Some("rettungswesen")),
                 tz_organisation: None,
             },
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -2146,6 +2156,7 @@ mod tests {
                 tz_fachaufgabe: None,
                 tz_organisation: None,
             },
+            &Default::default(),
         )
         .await
         .unwrap();

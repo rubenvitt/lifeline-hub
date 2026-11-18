@@ -80,7 +80,9 @@ describe('EinsatzfunktionZelle (LLH-1067)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Funktion zu Anna Muster speichern' }),
     );
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('Sprechfunker'));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith('Sprechfunker', { beimOeffnen: null }),
+    );
   });
 
   it('ein geleertes Feld sendet null', async () => {
@@ -92,7 +94,7 @@ describe('EinsatzfunktionZelle (LLH-1067)', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Funktion zu Anna Muster speichern' }),
     );
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith(null));
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith(null, { beimOeffnen: 'Melder' }));
   });
 
   it('ohne Schreibrecht: Einsatzfunktion und Qualifikation als Text, ohne Knopf', () => {

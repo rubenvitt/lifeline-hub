@@ -2,7 +2,7 @@
 titel: Personal
 gruppen: [fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/personal/ruecknahme.rs, frontend/src/kraefte/ruecknahmeSatz.ts, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs]
+quellen: [frontend/src/pages/PersonalPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/EinsatzkraftPage.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabe.tsx, frontend/src/kraefte/PositionAngabe.tsx, frontend/src/kraefte/einteilungKern.ts, frontend/src/kraefte/useEinteilungSchreiben.ts, frontend/src/kraefte/EinsatzfunktionZelle.tsx, frontend/src/kraefte/einsatzfunktionKern.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/kraefte/PersonalDisponierenModal.tsx, frontend/src/kraefte/SammelGruende.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/AdhocPersonModal.tsx, frontend/src/kraefte/statusAchse.ts, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_personal.rs, src/routes/zeitachse.rs, src/routes/einsatz_einheit.rs, src/personal/repo.rs, src/personal/disposition_repo.rs, src/personal/ruecknahme.rs, frontend/src/kraefte/ruecknahmeSatz.ts, src/kraefte_disposition.rs, src/entlassung.rs, src/auth/bootstrap.rs, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/BemerkungZelle.tsx, frontend/src/components/useBemerkungMitAltwert.ts]
 ---
 
 ## Überblick
@@ -21,8 +21,8 @@ Führungspersonal.
 
 ### Die Personalliste lesen
 
-1. Unter „Kräfte & Mittel“ „Personal“ öffnen. Über der Liste steht die Stärke mit der Verteilung der
-   Kräfte, daneben der Sprung in die „Kräfteübersicht“.
+1. Unter „Kräfte & Mittel“ „Personal“ öffnen. Im Kopf der Seite steht neben dem Titel die Stärke
+   mit der Verteilung der Fahrzeuge, daneben der Sprung in die „Kräfteübersicht“.
 2. Die Liste ist nach Einheit gruppiert. Zuerst steht „nicht eingeteilt“, danach die Einheiten in
    der Folge des Kräftebaums; eine unterstellte Einheit trägt ihren Pfad, etwa „Zug 1 › Staffel A“.
    Über der Tabelle steht je Gruppe die Zahl der Personen, etwa „1 nicht eingeteilt · 4
@@ -33,7 +33,8 @@ Führungspersonal.
    Folge um. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der Treffer und je
    Wert ein Knopf, etwa „Position: Mannschaft“, der genau diesen Filter entfernt; „Filter
    zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Filter und „Sortieren“ als
-   Auswahlfelder über der Liste.
+   Auswahlfelder über der Liste; „Ad-hoc-Person“ steht dort im Menü „Weitere Aktionen zum
+   Personal“.
 
    ![Personalliste mit der Gruppenzeile „1 nicht eingeteilt · 2 Sanitätszug Musterstadt · 4 Rettungsstaffel …“; je Person Name, Funktion, Einheit, Fahrzeug, Position als Kürzel, Status und Einsatzdauer, zuerst die nicht eingeteilte Ad-hoc-Kraft Tim Neu](../bilder/personal/personal.png)
 
@@ -282,6 +283,17 @@ gewählt ändert nichts.
 
 Die Stärke-Position bestimmt, ob die Person als Führer, Unterführer oder Mannschaft zählt;
 Einheitsführer ist ein eigenes Merkmal der Einheit.
+
+### Gleichzeitige Änderungen
+
+Einsatzfunktion, Position und Bemerkung, in der Liste wie in der Ansicht der Person, und Name,
+Qualifikation und Träger einer Ad-hoc-Person werden je für sich gespeichert. Hat ein anderer
+Arbeitsplatz **dieselbe** Angabe seit dem Öffnen geändert, fragt die App beim Speichern
+„Zwischenzeitlich geändert“ und nennt den neuen Wert: „Meine Änderung übernehmen“ speichert die
+eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand, Escape lässt die Eingabe
+offen. Die Position gilt dabei mit dem Wert, den die Zeile zeigt, auch wenn er aus dem Stamm
+kommt. Eine Änderung an einer anderen Angabe derselben Person löst keine Frage aus. Status,
+Einheit und Fahrzeug fragen nicht nach.
 
 ### Entlassen und Stornieren
 

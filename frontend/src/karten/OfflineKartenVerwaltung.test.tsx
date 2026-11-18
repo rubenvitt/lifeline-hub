@@ -701,9 +701,10 @@ describe('OfflineKartenVerwaltung · automatische Aktualisierung (LFH-993)', () 
       await within(z).findByRole('switch', { name: 'Automatisch aktualisieren' }),
     ).toBeChecked();
     expect(within(z).getByText('alle 6 h')).toBeInTheDocument();
-    expect(within(z).getByText(/zuletzt geprüft 021000okt26/)).toBeInTheDocument();
-    expect(within(z).getByText(/nächste Prüfung 021600okt26/)).toBeInTheDocument();
-    expect(within(z).getByText(/nächster Kartenbau 010400jan27/)).toBeInTheDocument();
+    // Wort und Zeit stehen in getrennten Elementen (Zeit in Mono), der Text der Zeile hält beide.
+    expect(z).toHaveTextContent('zuletzt geprüft 021000okt26');
+    expect(z).toHaveTextContent('nächste Prüfung 021600okt26');
+    expect(z).toHaveTextContent('nächster Kartenbau 010400jan27');
   });
 
   it('Automatik aus: keine nächste Prüfung', async () => {

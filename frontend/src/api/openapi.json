@@ -8857,6 +8857,13 @@
             ],
             "format": "int64"
           },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die Kennung, die das erfassende Gerät beim Senden vergab (Idempotenz der Warteschlange,\nLFH-261). Das Gerät erkennt daran seine eigenen Einträge: die Zeitachse lässt hochgerollt\nnur sie sofort durch, Einträge desselben Kontos von einem anderen Gerät warten hinter dem\nSammelbanner (LLH-1833). Fehlt bei Einträgen ohne Kennung (Systemeinträge, ältere)."
+          },
           "einheiten": {
             "type": "array",
             "items": {

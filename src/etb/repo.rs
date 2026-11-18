@@ -416,7 +416,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
                 e.befehl_id, e.meldung_id, \
                 (SELECT m.lfd_nr FROM meldung m WHERE m.id = e.meldung_id) AS meldung_lfd_nr, \
-                e.nachforderung_id \
+                e.nachforderung_id, e.client_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
          WHERE e.id = ?",
     )
@@ -835,7 +835,7 @@ pub async fn abfrage(
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
                 e.befehl_id, e.meldung_id, \
                 (SELECT m.lfd_nr FROM meldung m WHERE m.id = e.meldung_id) AS meldung_lfd_nr, \
-                e.nachforderung_id \
+                e.nachforderung_id, e.client_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
     );
     filter_bedingung(&mut qb, einsatz_id, &filter.merkmale());

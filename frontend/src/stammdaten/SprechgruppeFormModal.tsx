@@ -1,5 +1,6 @@
 import { Collapse, Form, Input } from 'antd';
 import { Select } from '../components/Select';
+import { Feld } from '../components/instrument';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -76,14 +77,14 @@ export default function SprechgruppeFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. 412_F_DRK" />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Betriebsart"
         name="betriebsart"
         rules={[{ required: true, message: 'Betriebsart ist erforderlich' }]}
@@ -94,10 +95,10 @@ export default function SprechgruppeFormModal({
             { value: 'DMO', label: 'DMO – Direct Mode' },
           ]}
         />
-      </Form.Item>
-      <Form.Item label="Hinweis" name="hinweis">
+      </Feld>
+      <Feld label="Hinweis" name="hinweis">
         <Input placeholder="Optionaler Hinweis" />
-      </Form.Item>
+      </Feld>
       {/* Feldbudget (LFH-19): drei Felder offen, Netz und Sicherheit (LFH-1030) zugeklappt. Trägt
          die Sprechgruppe schon eine der beiden, steht der Bereich offen (je Sprechgruppe neu
          montiert, `key`): zugeklappt wären die Felder nicht montiert, `onFinish` ließe sie aus,
@@ -113,12 +114,12 @@ export default function SprechgruppeFormModal({
             label: 'Netz und Sicherheit',
             children: (
               <>
-                <Form.Item label="Netz" name="netz">
+                <Feld label="Netz" name="netz">
                   <Input placeholder="z. B. Gateway" maxLength={SPRECHGRUPPE_BEDINGUNG_MAX} />
-                </Form.Item>
-                <Form.Item label="Sicherheit" name="sicherheit">
+                </Feld>
+                <Feld label="Sicherheit" name="sicherheit">
                   <Input placeholder="z. B. E2E" maxLength={SPRECHGRUPPE_BEDINGUNG_MAX} />
-                </Form.Item>
+                </Feld>
               </>
             ),
           },

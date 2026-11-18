@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereMaterial, legeMaterialAn, type MaterialEingabe } from '../api/material';
 import type { Material, MaterialArt } from '../api/types';
-import { Segmentleiste } from '../components/instrument';
+import { Feld, Segmentleiste } from '../components/instrument';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { teilwortSuche } from '../components/teilwortSuche';
@@ -32,7 +32,7 @@ const kurzRegel = (feld: string) => zeichenRegel(MATERIAL_STAMM_TEXT_MAX, feld);
 /** Vorgabe der Art: ein einzeln verfolgtes Gerät (D1). */
 const ART_VORGABE: MaterialArt = 'geraet';
 
-/** Die Segmentleiste als Formularfeld: `Form.Item` reicht `value`/`onChange` hinein. */
+/** Die Segmentleiste als Formularfeld: `Feld` reicht `value`/`onChange` hinein. */
 function ArtFeld({
   value,
   onChange,
@@ -130,7 +130,7 @@ export default function MaterialFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[
@@ -142,13 +142,13 @@ export default function MaterialFormModal({
           placeholder="z. B. Wolldecke, Stromerzeuger 5 kVA"
           maxLength={MATERIAL_STAMM_TEXT_MAX}
         />
-      </Form.Item>
+      </Feld>
       {/* Die Art entscheidet, wie der Posten im Einsatz steht (LLH-1224 D1/D16): sie gilt für neue
           Dispositionen, nie rückwirkend. Ohne das Feld ließe sich kein Verbrauchsgut anlegen. */}
-      <Form.Item label="Art" name="art">
+      <Feld label="Art" name="art">
         <ArtFeld />
-      </Form.Item>
-      <Form.Item label="Kategorie" name="kategorie" rules={[kurzRegel('Kategorie')]}>
+      </Feld>
+      <Feld label="Kategorie" name="kategorie" rules={[kurzRegel('Kategorie')]}>
         <AutoComplete
           options={kategorien.map((k) => ({ value: k }))}
           allowClear
@@ -156,10 +156,10 @@ export default function MaterialFormModal({
           placeholder="z. B. Betreuung, Sanität, Hochwasser"
           showSearch={teilwortSuche}
         />
-      </Form.Item>
-      <Form.Item label="Bestandsnummer" name="bestandsnummer" rules={[kurzRegel('Bestandsnummer')]}>
+      </Feld>
+      <Feld label="Bestandsnummer" name="bestandsnummer" rules={[kurzRegel('Bestandsnummer')]}>
         <Input placeholder="Inventarnr. (optional)" maxLength={MATERIAL_STAMM_TEXT_MAX} />
-      </Form.Item>
+      </Feld>
       {/* FELDBUDGET: vier sichtbare Felder (mit der Art, LLH-1224), drei eingeklappt. Pflicht ist allein die Bezeichnung,
          und die steht oben — kein Pflichtfeld wandert hinter den Collapse (LFH-343).
 
@@ -179,23 +179,23 @@ export default function MaterialFormModal({
             label: 'Weitere Angaben',
             children: (
               <>
-                <Form.Item
+                <Feld
                   label="Trägerorganisation"
                   name="traegerorganisation"
                   rules={[kurzRegel('Trägerorganisation')]}
                 >
                   <Input maxLength={MATERIAL_STAMM_TEXT_MAX} />
-                </Form.Item>
-                <Form.Item label="Standort" name="standort" rules={[kurzRegel('Standort')]}>
+                </Feld>
+                <Feld label="Standort" name="standort" rules={[kurzRegel('Standort')]}>
                   <Input placeholder="z. B. Lagerhalle 2" maxLength={MATERIAL_STAMM_TEXT_MAX} />
-                </Form.Item>
-                <Form.Item
+                </Feld>
+                <Feld
                   label="Bemerkung"
                   name="bemerkung"
                   rules={[zeichenRegel(MATERIAL_STAMM_BEMERKUNG_MAX, 'Bemerkung')]}
                 >
                   <Input.TextArea rows={2} count={zeichenGrenze(MATERIAL_STAMM_BEMERKUNG_MAX)} />
-                </Form.Item>
+                </Feld>
               </>
             ),
           },

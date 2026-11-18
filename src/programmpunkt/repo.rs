@@ -3,7 +3,8 @@
 
 use super::{Programmpunkt, PROGRAMMPUNKTE_MAX};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use crate::feld_cas::ExpectedValues;
+use sqlx::{FromRow, SqlitePool};
 
 /// Alle Programmpunkte des Einsatzes nach Zeitpunkt, auch die verstrichenen: das Paneel zeigt den
 /// ganzen Ablauf, nur die Marken lassen Verstrichenes fallen.
@@ -66,28 +67,45 @@ pub async fn anlegen(
 }
 
 /// Ändert Bezeichnung und/oder Zeitpunkt; `None` lässt das Feld stehen. Unbekannt oder fremd: 404.
+///
+/// Feld-CAS (LLH-1945): `erwartet` hängt je Angabe `AND <spalte> IS ?` an dieselbe Anweisung;
+/// trifft sie dann keine Zeile, obwohl der Punkt besteht, ist die Angabe zwischenzeitlich
+/// geändert (`AppError::Veraltet`, 409).
 pub async fn aendern(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     bezeichnung: Option<&str>,
     zeitpunkt_at: Option<&str>,
+    erwartet: &ExpectedValues<'_>,
 ) -> Result<Programmpunkt, AppError> {
-    sqlx::query_as::<_, Programmpunkt>(
+    let mut sql = String::from(
         "UPDATE programmpunkt SET \
-           bezeichnung = COALESCE(?, bezeichnung), \
-           zeitpunkt_at = COALESCE(?, zeitpunkt_at), \
+           bezeichnung = COALESCE(?1, bezeichnung), \
+           zeitpunkt_at = COALESCE(?2, zeitpunkt_at), \
            geaendert_at = datetime('now') \
-         WHERE id = ? AND einsatz_id = ? \
-         RETURNING id, bezeichnung, zeitpunkt_at",
-    )
-    .bind(bezeichnung)
-    .bind(zeitpunkt_at)
-    .bind(id)
-    .bind(einsatz_id)
-    .fetch_optional(pool)
-    .await?
-    .ok_or(AppError::NotFound)
+         WHERE id = ?3 AND einsatz_id = ?4",
+    );
+    sql.push_str(&erwartet.sql_suffix(5));
+    sql.push_str(" RETURNING id, bezeichnung, zeitpunkt_at");
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(bezeichnung)
+        .bind(zeitpunkt_at)
+        .bind(id)
+        .bind(einsatz_id);
+    if let Some(zeile) = erwartet.bind_all(q).fetch_optional(pool).await? {
+        return Ok(Programmpunkt::from_row(&zeile)?);
+    }
+    let existiert: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM programmpunkt WHERE id = ? AND einsatz_id = ?")
+            .bind(id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    if existiert.is_some() && !erwartet.is_empty() {
+        return Err(AppError::Veraltet);
+    }
+    Err(AppError::NotFound)
 }
 
 /// Löscht einen Programmpunkt. Unbekannt oder fremd: 404.

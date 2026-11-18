@@ -2,7 +2,7 @@
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
 reihenfolge: 170
-quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css]
+quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/etbDruckTabelle.css, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css]
 ---
 
 ## Überblick
@@ -36,7 +36,7 @@ exportieren“.
 2. Im Kopf der Seite „Drucken / als PDF“ wählen. Die „ETB – Druckansicht“ öffnet sich mit
    demselben Filter.
 
-   ![ETB – Druckansicht mit Druckkopf (Organisation, Einsatz, Auswahl, Umfang, Stand, gedruckt von und am) und der Tabelle mit Nr., Zeit, Typ, Von/An, Inhalt und Erfasser](../bilder/drucken-export/etb-druckansicht.png)
+   ![ETB – Druckansicht mit Druckkopf (Organisation, Einsatz, Auswahl, Umfang, Stand, gedruckt von und am), der Laufzeile mit Einsatz und Stand und der Tabelle mit Nr., Zeit, Typ, Von/An, Inhalt und Erfasser; Systemeinträge stehen einzeilig](../bilder/drucken-export/etb-druckansicht.png)
 
 3. Warten, bis die Tabelle steht. Bis alle Einträge geladen sind, ist „Drucken / als PDF“
    gesperrt.
@@ -48,8 +48,8 @@ Zeitachse zurück.
 ### Eine Liste drucken
 
 1. In „Betroffene“, „Tiere“ oder „Schäden“ bei Bedarf die Liste filtern.
-2. Im Kopf der Seite „Drucken / als PDF“ wählen; auf schmalen Bildschirmen steht der Punkt unter
-   „Weitere“. Die Druckansicht übernimmt bei den Betroffenen den Statusfilter und „Nur Lücken
+2. Im Kopf der Seite „Drucken / als PDF“ wählen; auf schmalen Bildschirmen und in der
+   Bediendichte „Komfortabel“ oder „Handschuh“ steht der Punkt unter „Weitere“. Die Druckansicht übernimmt bei den Betroffenen den Statusfilter und „Nur Lücken
    zeigen“, bei den Tieren die Sicht und die Spezies aus dem Spaltenfilter, bei den Schäden die
    Sicht; weitere Spaltenfilter und die Suche druckt sie nicht mit.
 
@@ -73,7 +73,7 @@ Aufbau des Blatts beschreibt [Aufträge und Befehle](auftraege-befehle.md).
 ### Eine Liste als CSV exportieren
 
 1. In „Betroffene“ oder „Tiere“ im Kopf der Seite „CSV exportieren“ wählen; auf schmalen
-   Bildschirmen unter „Weitere“.
+   Bildschirmen und in der Bediendichte „Komfortabel“ oder „Handschuh“ unter „Weitere“.
 2. Die Datei wird heruntergeladen.
 
 Auch jeder CSV-Export der Betroffenen steht im Zugriffsprotokoll. Ohne Verbindung scheitert der
@@ -82,8 +82,9 @@ Export sofort und meldet das an der Seite.
 ### Ein Dokument oder einen Plan drucken
 
 1. Den Einsatzbefehl, Lagebericht oder den Plan öffnen.
-2. „Drucken / als PDF“ wählen. Bei Dokumenten steht der Punkt im Kopf der Seite, bei Kräfteübersicht,
-   Funkplan, Kommunikationsplan und Organigramm an der Ansicht selbst.
+2. „Drucken / als PDF“ wählen. Bei Dokumenten und der Kräfteübersicht steht der Punkt im Kopf der
+   Seite (auf schmalen Bildschirmen und in der Bediendichte „Komfortabel“ oder „Handschuh“ unter
+   „Weitere“), bei Funkplan, Kommunikationsplan und Organigramm an der Ansicht selbst.
 3. Im Druckdialog des Browsers drucken oder als PDF speichern.
 
 Kräfteübersicht, Funkplan und Organigramm klappen zum Drucken alle Zweige auf.
@@ -92,8 +93,9 @@ Kräfteübersicht, Funkplan und Organigramm klappen zum Drucken alle Zweige auf.
 
 1. In der „Lagekarte“ den Ausschnitt so einstellen, wie er auf dem Blatt stehen soll (siehe
    [Lagekarte, Zeichnen und Messen](lagekarte.md)).
-2. Im Kopf der Seite „Drucken / als PDF“ wählen; auf schmalen Bildschirmen steht der Punkt unter
-   „Weitere“. Gedruckt wird ein Blatt A4 quer mit dem Ausschnitt als Bild.
+2. Im Kopf der Seite „Drucken / als PDF“ wählen; auf schmalen Bildschirmen und in der
+   Bediendichte „Komfortabel“ oder „Handschuh“ steht der Punkt unter „Weitere“. Gedruckt wird ein
+   Blatt A4 quer mit dem Ausschnitt als Bild.
 
    ![Druckblatt „Lageplan“ mit Druckkopf (Organisation, Einsatz, Stand, Ansicht, Kartengrundlage, gedruckt von und am), dem Kartenausschnitt, Maßstabsleiste, „Maßstab ca. 1 : …“, Nordpfeil und der Legende mit Ebenen und Zonen](../bilder/drucken-export/lageplan-druckblatt.png)
 
@@ -133,6 +135,17 @@ Nur die Hilfe druckt ohne Organisation.
 
 Die Tabelle zeigt die Einträge in der Reihenfolge ihrer Nummer mit Nr., Zeit, Typ, Von/An, Inhalt
 und Erfasser. Berichtigungen und Nachträge sind wie in der Zeitachse gekennzeichnet.
+
+Über den Spaltenköpfen steht eine Laufzeile mit Einsatz und Stand, etwa „Einsatztagebuch ·
+Hochwasser Elbe (2026-042) · Stand 181400nov26 · bis Nr. 220“. Sie wiederholt sich mit dem
+Tabellenkopf auf jeder Seite, damit ein einzelnes Blatt seinem Einsatz zugeordnet werden kann.
+Chrome, Edge und Firefox drucken sie auf jeder Seite; Safari wiederholt den Tabellenkopf nicht und
+zeigt sie nur auf der ersten Seite.
+
+Systemeinträge stehen verdichtet: jeder behält seine Zeile mit Nummer und Zeit, Typ, Inhalt und
+Erfasser stehen kleiner in einer Zeile dahinter („System · Dokument abgelegt · Erika Muster“). So
+bleibt die Nummernfolge lückenlos, und ein Tagebuch mit vielen Systemeinträgen braucht weniger
+Seiten.
 
 Gedruckt wird, was die Zeitachse zeigt: Sind dort die Systemeinträge ausgeblendet, fehlen sie auch
 im Druck, und der Druckkopf nennt „ohne Systemeinträge“. Eine Druckansicht ohne Auswahl, etwa über

@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 130
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/abschnittStaerke.ts, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/einsatz/einsatzleiter.ts, frontend/src/components/SprechgruppenPicker.tsx]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/abschnittStaerke.ts, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/einsatz/einsatzleiter.ts, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/components/useFeldKonflikt.tsx]
 ---
 
 ## Überblick
@@ -58,6 +58,10 @@ Für Einsatzleitung und Führungspersonal:
 2. Auf den Wert der Angabe tippen, etwa auf den Abschnittsleiter; eine leere Angabe heißt
    „… eintragen“.
 3. Den neuen Wert eingeben und „Speichern“ wählen. „Abbrechen“ lässt den alten Wert stehen.
+4. Hat ein anderer Arbeitsplatz dieselbe Angabe seit dem Öffnen geändert, fragt die App
+   „Zwischenzeitlich geändert“ und nennt den neuen Wert. „Meine Änderung übernehmen“ speichert
+   die eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand. Wer die Rückfrage mit
+   Escape schließt, entscheidet nichts: die Eingabe bleibt offen.
 
 Funk und Telefon stehen getrennt: „Rufname“ ist der Funkrufname der Abschnittsleitung, etwa
 „Rotkreuz Musterstadt 1/10-1“ (höchstens 200 Zeichen), dazu die „Sprechgruppen“. Unter „Telefon
@@ -152,7 +156,11 @@ lautet er „Auf Karte zeigen (Keine Berechtigung)“ und ist gesperrt. Einzelhe
 ### Regeln der Gliederung
 
 - Jede Angabe wird für sich gespeichert. Was ein anderer Arbeitsplatz inzwischen an einer anderen
-  Angabe geändert hat, bleibt dabei stehen.
+  Angabe geändert hat, bleibt dabei stehen. Hat er **dieselbe** Angabe geändert, fragt die App
+  nach (Ablauf „Eine Angabe ändern“): „Name“, „Kurzbezeichnung“, „Abschnittsleiter“,
+  „Abschnittsauftrag“, „Rufname“, „Bemerkung“ und „Telefon und weitere Verbindungen“ (als ganze
+  Liste); ebenso das Umhängen (unten). Die Sprechgruppen und der „Lagezustand“ fragen nicht: jede
+  Wahl im Lagezustand ist eine neue Beurteilung.
 - Die Lage eines Abschnitts trägt der Lagezustand, seinen Arbeitsstand zeigen die offenen
   Aufträge des Abschnitts im Führungsüberblick.
 - Jede Wahl in „Lagezustand“ gilt sofort, auch mit den Pfeiltasten, und jeder Wechsel steht im
@@ -183,6 +191,14 @@ bis „anzeigen“ sie übernimmt. Namen, Lage und Stärke der übrigen Abschnit
 weiter sofort; ein fremd umgehängter Abschnitt zeigt bis „anzeigen“ seinen alten Stand an seinem
 alten Ort. Ein aufgelöster Abschnitt verschwindet gleich. Eigene Änderungen erscheinen immer
 sofort.
+
+Umhängen per Ziehen oder über „Verschieben unter …“ und das Zuordnen einer Einheit per Ziehen
+gehen vom Stand zu Beginn der Handlung aus, beim Greifen bzw. beim Öffnen des Dialogs. Hat ein
+anderer Arbeitsplatz denselben Abschnitt oder dieselbe Einheit inzwischen umgehängt, fragt die
+App „Zwischenzeitlich geändert“ und nennt den neuen Ort. „Meine Änderung übernehmen“ hängt
+trotzdem um; „Verwerfen und neu laden“ oder Escape lassen das Umhängen verfallen, die Gliederung
+zeigt den neuen Stand, und kein Hinweis meldet ein Verschieben. „Rückgängig“ fragt ebenso, wenn
+der Abschnitt oder die Einheit inzwischen woanders steht.
 
 ### Das Organigramm
 

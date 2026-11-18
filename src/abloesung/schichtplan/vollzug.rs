@@ -602,6 +602,7 @@ async fn status_setzen_tx(
             status_id: Some(status_id),
             ..Default::default()
         },
+        &crate::feld_cas::ExpectedValues::new(),
     )
     .await?;
     if !ereignis {

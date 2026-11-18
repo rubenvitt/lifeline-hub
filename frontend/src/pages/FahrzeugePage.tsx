@@ -1,6 +1,7 @@
 import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
+import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -76,6 +77,8 @@ import {
 import { besatzungsUrteil, kategorieDarstellung } from '../theme/statusFarben';
 import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
+import { useViewport } from '../components/useViewport';
+import FilterKnopf from '../components/FilterKnopf';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
 import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
@@ -364,6 +367,9 @@ function BesatzungsBlock({
  * FMS-Tableau als Überblicksfläche mit Statuswahl. Beide lesen dieselbe Query und bedienen dieselbe
  * `statusMutation` — das Tableau ist kein zweites Modul.
  */
+/** Wahlfläche hinter „Filter (n)“ am Handschirm (`aria-controls`, LLH-1786). */
+const FILTERFLAECHE_ID = 'fahrzeuge-wahlen';
+
 const ANSICHT_OPTIONEN = [
   { wert: 'liste', label: 'Liste' },
   { wert: 'tableau', label: 'FMS-Tableau' },
@@ -464,6 +470,10 @@ function FahrzeugeInhalt() {
     {},
   );
   const ansicht = ansichtNachEinsatz[einsatzId] ?? 'liste';
+  const { istSchmal } = useViewport();
+  // Am Handschirm hinter „Filter (n)“ (LLH-1786); der Zustand offen/zu ist flüchtig.
+  const [filterOffen, setFilterOffen] = useState(false);
+  const [listenFilterZahl, setListenFilterZahl] = useState(0);
   /** Ein Wechsel hängt die Liste samt offener Angabe aus: mit Änderung erst die Rückfrage. */
   const nachRueckfrage = useWechselNachRueckfrage();
   const setzeAnsicht = (a: FahrzeugeAnsicht) =>
@@ -618,12 +628,25 @@ function FahrzeugeInhalt() {
     onFehler: (e, v) => zeilen.melde(v.efId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
+  // Der Grund einer Ablehnung kommt aus `saveBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
-    mutationFn: (v: { efId: number; bemerkung: string }) =>
-      updateDisposition(einsatzId, v.efId, { bemerkung: v.bemerkung }),
+    mutationFn: (v: { efId: number; bemerkung: string; erwartet?: string | null }) =>
+      updateDisposition(
+        einsatzId,
+        v.efId,
+        { bemerkung: v.bemerkung },
+        v.erwartet === undefined ? undefined : { bemerkung: v.erwartet },
+      ),
     onMutate: (v) => zeilen.beginne(v.efId),
     onSuccess: invalidate,
-    onError: (e, v) => zeilen.melde(v.efId, e, 'Bemerkung nicht gespeichert'),
+  });
+  const saveBemerkung = useBemerkungMitAltwert({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    laden: () => listeEinsatzFahrzeuge(einsatzId),
+    speichern: (efId, bemerkung, erwartet) =>
+      bemerkungMutation.mutateAsync({ efId, bemerkung, erwartet }),
+    melde: (efId, e) => zeilen.melde(efId, e, 'Bemerkung nicht gespeichert'),
   });
   /** Entlassen löst die Einheit; deren Mitglieder und Status nicht erst mit dem Live-Ereignis. */
   function invalidateNachEntlassen() {
@@ -1169,7 +1192,7 @@ function FahrzeugeInhalt() {
           kennung={ef.funkrufname}
           darfSchreiben={darfSchreiben}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val) => bemerkungMutation.mutateAsync({ efId: ef.id, bemerkung: val })}
+          onSpeichern={(val, { beimOeffnen }) => saveBemerkung(ef.id, val, beimOeffnen)}
         />
       ),
     },
@@ -1198,10 +1221,32 @@ function FahrzeugeInhalt() {
       : []),
   ]);
 
+  const ansichtWahl = (
+    <Segmentleiste<FahrzeugeAnsicht>
+      beschriftung="Ansicht"
+      optionen={ANSICHT_OPTIONEN}
+      wert={ansicht}
+      onWechsel={setzeAnsicht}
+    />
+  );
+
   return (
     <EinsatzSeite
       dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
       meta={efQuery.isSuccess ? `${efs.length} Fahrzeuge` : undefined}
+      metaPlatzhalter="0 Fahrzeuge"
+      // Die Stärke steht als Meta im Kopf, nicht als eigene Zeile über der Liste (LLH-1786, Change
+      // `z137bgm5-seitenkopf-einzeilig` D2); sie hält ihre Breite beim Laden selbst.
+      metaZusatz={
+        <Verdichtungszeile
+          einsatzId={einsatzId}
+          pfad={kraefteuebersichtPfad(einsatzId)}
+          form="meta"
+          fahrzeugzahl={false}
+          // Am Handschirm nennen die Gruppenköpfe der Karten die Aufteilung (LLH-1786).
+          aufteilung={!istSchmal}
+        />
+      }
       titel={modulName('fahrzeuge')}
       breadcrumb={
         <Breadcrumb
@@ -1213,23 +1258,38 @@ function FahrzeugeInhalt() {
         />
       }
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
+      weitere={{
+        name: 'Weitere Aktionen zu den Fahrzeugen',
+        eintraege:
+          darfSchreiben && istSchmal
+            ? [{ key: 'adhoc', label: 'Ad-hoc-Fahrzeug', onWahl: () => setAdhocOffen(true) }]
+            : [],
+      }}
       aktionen={
         // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
         // `paddingXS` ließ 3 / 5 / 7 px.
         <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
-          {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
-          <Segmentleiste<FahrzeugeAnsicht>
-            beschriftung="Ansicht"
-            optionen={ANSICHT_OPTIONEN}
-            wert={ansicht}
-            onWechsel={setzeAnsicht}
-          />
+          {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. Am
+              Handschirm hinter „Filter (n)“ (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig`
+              D5), samt Sortierung und Status der Liste. */}
+          {istSchmal ? (
+            <FilterKnopf
+              offen={filterOffen}
+              onWechsel={setFilterOffen}
+              zahl={Number(ansicht !== 'liste') + (ansicht === 'liste' ? listenFilterZahl : 0)}
+              steuert={FILTERFLAECHE_ID}
+            />
+          ) : (
+            ansichtWahl
+          )}
           {darfSchreiben && (
             <>
               <Button type="primary" onClick={() => setDisponierenOffen(true)}>
                 Fahrzeuge disponieren
               </Button>
-              <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
+              {/* Am Handschirm steht genau eine Erfassung sichtbar (`frontend/AGENTS.md`,
+                  „Nebenwege im Kopf“); die zweite geht hinter „Weitere“ (LLH-1786). */}
+              {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>}
             </>
           )}
         </Space>
@@ -1299,7 +1359,11 @@ function FahrzeugeInhalt() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
           <DeeplinkHinweis lage={deeplinkHinweis} sache="Fahrzeug" />
-          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
+          {istSchmal && filterOffen && (
+            <div id={FILTERFLAECHE_ID} style={{ marginBlockEnd: token.marginSM }}>
+              {ansichtWahl}
+            </div>
+          )}
           {ansicht === 'tableau' ? (
             <FmsTableau
               fahrzeuge={efs}
@@ -1328,6 +1392,8 @@ function FahrzeugeInhalt() {
             />
           ) : (
             <Datensicht
+              wahlenVerborgen={istSchmal && !filterOffen}
+              onFilterZahl={setListenFilterZahl}
               bezeichnung="Fahrzeuge im Einsatz"
               spalten={spalten}
               daten={efs}
@@ -1342,6 +1408,8 @@ function FahrzeugeInhalt() {
               spaltenAusVoreinstellung={['bemerkung']}
               zeilenFehler={(f) => zeilen.grund(f.id)}
               gruppen={{
+                // Die Aufteilung steht schon als Meta im Kopf (LLH-1786): kein zweiter Streifen.
+                zaehler: false,
                 schluessel: (ef) => kategorieVon(ef.status_kategorie),
                 etikett: kategorieEtikett,
                 reihenfolge: KATEGORIE_REIHENFOLGE,

@@ -22,6 +22,7 @@ import { theme } from 'antd';
 import { seitenrinne } from './tokens';
 import { SCHRIFTSCHNITTE } from './schriften';
 import {
+  FELDBREITE,
   etbTypFarbenDunkel,
   etbTypFarbenHell,
   rahmenFarben,
@@ -171,6 +172,7 @@ const RAHMEN_ABBILDUNG: Record<keyof typeof rahmenFarben, string> = {
 const TYPO_ABBILDUNG: Record<Schriftstufenname, string> = {
   ueberschrift: '--lfh-typo-ueberschrift',
   seitentitel: '--lfh-typo-seitentitel',
+  kartentitel: '--lfh-typo-kartentitel',
   text: '--lfh-typo-text',
   textKlein: '--lfh-typo-text-klein',
   augenbraue: '--lfh-typo-augenbraue',
@@ -431,6 +433,8 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
       versal: true,
     });
     expect(schriftskala.seitentitel).toMatchObject({ groesse: 14, gewicht: 600 });
+    // Spec `schriftstufen`: Titel einer Karte oder eines Listeneintrags (LLH-1810).
+    expect(schriftskala.kartentitel).toEqual({ groesse: 15, gewicht: 600, familie: 'text' });
     expect(
       [schriftskala.datenwertKlein, schriftskala.datenwert, schriftskala.datenwertGross].map(
         (s) => [s.groesse, s.gewicht, s.familie],
@@ -457,5 +461,22 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
       );
       expect(treffer, `${fam} ${stufe.gewicht}`).toHaveLength(1);
     }
+  });
+});
+
+describe('Feldbreiten — CSS und TS tragen dieselben Stufen (Spec `feldbreiten`, LLH-1810)', () => {
+  it('pinnt die Obergrenzen kurz, schmal, mittel und voll', () => {
+    expect(FELDBREITE).toEqual({ kurz: 120, schmal: 200, mittel: 320, voll: undefined });
+  });
+
+  it.each(['kurz', 'schmal', 'mittel'] as const)('%s stimmt überein', (stufe) => {
+    expect(hell[`--lfh-feld-${stufe}`]).toBe(`${FELDBREITE[stufe]}px`);
+  });
+
+  it('die CSS-Seite trägt keine Feldbreite, die TS nicht kennt', () => {
+    const fremd = Object.keys(hell).filter(
+      (k) => k.startsWith('--lfh-feld-') && !['kurz', 'schmal', 'mittel'].includes(k.slice(11)),
+    );
+    expect(fremd).toEqual([]);
   });
 });

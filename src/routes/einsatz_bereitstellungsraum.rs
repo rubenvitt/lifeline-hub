@@ -426,7 +426,7 @@ pub async fn update(
         lon: body.lon,
         basis_geaendert_at: body.basis_geaendert_at.as_deref(),
     };
-    // Storniert (409), fremd (404) und das Koordinatenpaar (422) prüft `update_tx` gegen den
+    // Storniert und aufgelöst (409), fremd (404) und das Koordinatenpaar (422) prüft `update_tx` gegen den
     // Stand dieser Transaktion.
     let nachher = crate::write_retry!(&state.pool, |conn| {
         br_repo::update_tx(conn, einsatz_id, br_id, ctx.benutzer.id, &daten).await

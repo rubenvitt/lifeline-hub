@@ -838,3 +838,119 @@ async fn beurteilung_braucht_schreibrecht_und_eigenes_gebiet() {
         StatusCode::NOT_FOUND
     );
 }
+
+// ---------- LLH-1945: Feld-CAS an der Bezeichnung ----------
+
+/// Die Bezeichnung mit Altwert (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf
+/// zwischenzeitliche Änderung“): stimmt der Altwert, wird geschrieben; hat ein anderer die
+/// Bezeichnung inzwischen geändert, ist es 409 `veraltet` und nichts wird überschrieben.
+#[tokio::test]
+async fn bezeichnung_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}");
+
+    let (s, g) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"label":"Süd","erwartet":{"label":"Nord"}}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{g:?}");
+    assert_eq!(g["label"], "Süd");
+
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"label":"Ost","erwartet":{"label":"Nord"}}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["label"], "Süd", "der Konflikt überschreibt nichts");
+
+    // Ohne `erwartet` wie bisher ohne Vergleich.
+    let (s, g) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"label":"Ost"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{g:?}");
+    assert_eq!(g["label"], "Ost");
+}
+
+/// Ein leerer Altwert (`null`) trifft eine leere Bezeichnung; eine Änderung an einer anderen
+/// Angabe des Gebiets (Matrix, Beurteilung) dazwischen löst keinen Konflikt aus.
+#[tokio::test]
+async fn bezeichnung_leer_erwartet_und_andere_angabe_dazwischen_ohne_409() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let u = format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"label":null}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("{u}/matrix/bewertung"),
+        &admin,
+        Some(&bewertung("brand", "menschen", "hoch")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, g) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"label":"West","erwartet":{"label":null}}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{g:?}");
+    assert_eq!(g["label"], "West");
+}
+
+/// Ein Altwert ohne Änderung derselben Angabe ist eine Feldkombination: 422.
+#[tokio::test]
+async fn bezeichnung_altwert_ohne_aenderung_ist_422() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}"),
+        &admin,
+        Some(&json!({"erwartet":{"label":"Nord"}}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+}

@@ -377,6 +377,10 @@ export function InlineAngabe<T>({
   // ein später Render (neuer Status per SSE) holt den Fokus sonst noch Minuten danach zurück.
   // Ein Zeigerdruck anderswo löscht sie.
   const fokusZurAnzeigeRef = useRef(0);
+  // Räumt Timer und Zeigerhörer der laufenden Frist. Auch beim Aushängen: sonst liefe der Timer nach
+  // dem Ende der Seite (oder der Testumgebung) ins Leere (`alpha` rot am 18.11.2026).
+  const fristRaeumenRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => fristRaeumenRef.current?.(), []);
   const popoverInhaltRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
@@ -495,15 +499,19 @@ export function InlineAngabe<T>({
   }
 
   function merkeFokusRueckgabe() {
+    fristRaeumenRef.current?.();
     fokusZurAnzeigeRef.current = performance.now() + FOKUS_RUECKGABE_MS;
     const clear = () => {
       fokusZurAnzeigeRef.current = 0;
     };
     document.addEventListener('pointerdown', clear, { capture: true, once: true });
-    window.setTimeout(
-      () => document.removeEventListener('pointerdown', clear, { capture: true }),
-      FOKUS_RUECKGABE_MS,
-    );
+    const raeumen = () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('pointerdown', clear, { capture: true });
+      if (fristRaeumenRef.current === raeumen) fristRaeumenRef.current = null;
+    };
+    const timer = window.setTimeout(raeumen, FOKUS_RUECKGABE_MS);
+    fristRaeumenRef.current = raeumen;
   }
   schliessenRef.current = schliessen;
 
