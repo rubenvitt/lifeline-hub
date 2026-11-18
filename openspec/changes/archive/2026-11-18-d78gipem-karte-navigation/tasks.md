@@ -15,7 +15,7 @@
 
 ## 3. Abschluss
 
-- [ ] 3.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 3.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
 
