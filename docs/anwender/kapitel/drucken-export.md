@@ -36,7 +36,7 @@ exportieren“.
 2. Im Kopf der Seite „Drucken / als PDF“ wählen. Die „ETB – Druckansicht“ öffnet sich mit
    demselben Filter.
 
-   ![ETB – Druckansicht mit Druckkopf (Organisation, Einsatz, Auswahl, Umfang, Stand, gedruckt von und am) und der Tabelle mit Nr., Zeit, Typ, Von/An, Inhalt und Erfasser](../bilder/drucken-export/etb-druckansicht.png)
+   ![ETB – Druckansicht mit Druckkopf (Organisation, Einsatz, Auswahl, Umfang, Stand, gedruckt von und am), der Laufzeile mit Einsatz und Stand und der Tabelle mit Nr., Zeit, Typ, Von/An, Inhalt und Erfasser; Systemeinträge stehen einzeilig](../bilder/drucken-export/etb-druckansicht.png)
 
 3. Warten, bis die Tabelle steht. Bis alle Einträge geladen sind, ist „Drucken / als PDF“
    gesperrt.

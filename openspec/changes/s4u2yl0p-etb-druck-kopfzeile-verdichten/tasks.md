@@ -17,7 +17,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/s4u2yl0p5icigp4lx42mgu4e
 ## 3. Regeln und Doku
 
 - [x] 3.1 `frontend/src/druck/AGENTS.md`, „ETB-Druck“: Laufzeile im `thead` statt `@page`-Text, Systemeinträge verdichtet; Prettier über `frontend/` grün
-- [ ] 3.2 `docs/anwender/kapitel/drucken-export.md`, Abschnitt ETB-Druckansicht: Laufzeile (mit Hinweis Safari nur Seite 1) und verdichtete Systemeinträge beschreiben; Bild nach `docs/anwender/AGENTS.md` erneuern, falls es die Stelle zeigt; Doku-Wächter grün
+- [x] 3.2 `docs/anwender/kapitel/drucken-export.md`, Abschnitt ETB-Druckansicht: Laufzeile (mit Hinweis Safari nur Seite 1) und verdichtete Systemeinträge beschreiben; Bild nach `docs/anwender/AGENTS.md` erneuern, falls es die Stelle zeigt; Doku-Wächter grün
 
 ## 4. Gesamtprüfung
 
