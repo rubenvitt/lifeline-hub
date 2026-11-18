@@ -453,7 +453,8 @@ pub async fn update(
     // Response; SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (vorher, nachher, betroffen) = crate::write_retry!(&state.pool, |conn| {
+    let (vorher, nachher, betroffen, etb_ids) = crate::write_retry!(&state.pool, |conn| {
+        let mut etb_ids = Vec::new();
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         disposition_repo::update_tx(conn, einsatz_id, ep_id, patch, &altwerte).await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
@@ -473,19 +474,23 @@ pub async fn update(
             }
             let alt = vorher.status_label.as_deref().unwrap_or("—");
             let neu = nachher.status_label.as_deref().unwrap_or("—");
-            crate::etb::system_audit_tx(
-                conn,
-                einsatz_id,
-                ctx.benutzer.id,
-                startwert,
-                &format!("Person «{}»: Status «{}» → «{}»", nachher.name, alt, neu),
-            )
-            .await?;
+            etb_ids.push(
+                crate::etb::system_audit_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    startwert,
+                    &format!("Person «{}»: Status «{}» → «{}»", nachher.name, alt, neu),
+                )
+                .await?,
+            );
         }
         // LLH-1067, design.md D4: ein Eintrag für alle geänderten Personenangaben.
         if let Some(text) = crate::personal::etb_text_angaben(&vorher, &nachher) {
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
+            etb_ids.push(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                    .await?,
+            );
         }
         // D5: Name und Funktionstext lesen andere Ansichten live mit.
         let name_geaendert = vorher.name != nachher.name;
@@ -497,8 +502,13 @@ pub async fn update(
         } else {
             None
         };
-        Ok((vorher, nachher, betroffen))
+        Ok((vorher, nachher, betroffen, etb_ids))
     })?;
+    // `personal` frischt das Einsatztagebuch nicht auf, jeder Eintrag geht eigens hinaus
+    // (LLH-1952).
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     sse_personal(&state, einsatz_id, ep_id);
     if let Some(betroffen) = &betroffen {
         betroffen.melden(&state, einsatz_id).await;
@@ -534,7 +544,7 @@ pub async fn entlassen(
     // F06/LFH-244 Tier-A: Bindungen lösen, Endzustand, Zeitachse und System-ETB atomar in EINER
     // Tx. Was die Person außerhalb des Personalmoduls trug, fragt die Tx vor dem Lösen; SSE erst
     // nach dem Commit.
-    let (betroffen, anzeige, vorzustand) = crate::write_retry!(&state.pool, |conn| {
+    let (betroffen, anzeige, vorzustand, etb_id) = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, ep_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         let betroffen =
@@ -542,7 +552,7 @@ pub async fn entlassen(
         let ergebnis =
             disposition_repo::entlassen_tx(conn, einsatz_id, ep_id, ctx.benutzer.id, &jetzt)
                 .await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -555,8 +565,9 @@ pub async fn entlassen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
-        Ok((betroffen, anzeige, ergebnis.vorzustand(&jetzt)))
+        Ok((betroffen, anzeige, ergebnis.vorzustand(&jetzt), etb_id))
     })?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_personal(&state, einsatz_id, ep_id);
     betroffen.melden(&state, einsatz_id).await;
     Ok(Json(PersonalEntlassungAntwort {
@@ -670,7 +681,7 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, ep_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, ep_id, ctx.benutzer.id, &jetzt).await?;
@@ -681,9 +692,9 @@ pub async fn stornieren(
             startwert,
             &crate::personal::etb_text_storniert(&vorher.name, vorher.funktion_text()),
         )
-        .await?;
-        Ok(())
+        .await
     })?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -698,7 +709,7 @@ pub async fn reaktivieren(
 ) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::reaktivieren_tx(
             conn,
             einsatz_id,
@@ -710,7 +721,7 @@ pub async fn reaktivieren(
         .await?;
         disposition_repo::start_zeitachse_tx(conn, einsatz_id, ctx.benutzer.id, ep_id).await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -718,8 +729,9 @@ pub async fn reaktivieren(
             &crate::personal::etb_text_erneut_disponiert(&anzeige.name, anzeige.funktion_text()),
         )
         .await?;
-        Ok(anzeige)
+        Ok((anzeige, etb_id))
     })?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(Json(anzeige))
 }
