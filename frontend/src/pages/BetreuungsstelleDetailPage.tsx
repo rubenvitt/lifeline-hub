@@ -645,6 +645,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           einsatzId={einsatzId}
           stelleId={s.id}
           kapazitaet={s.kapazitaet_personen ?? null}
+          planbar={!storniert}
         />
         <RegistrierungPaneel
           einsatzId={einsatzId}

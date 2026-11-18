@@ -315,7 +315,7 @@ export default function SchaedenDetailPage() {
     <SchadenDaten
       schaden={s}
       einsatzId={einsatzId}
-      verortenLink={darfSchreiben}
+      verortenLink={darfSchreiben && !storniert}
       karteGesperrt={karteGesperrt}
       // Im Bearbeiten-Modus wird jede Zelle eine `DatenfeldEingabe` (LLH-1101): benannt, und eine
       // Regel meldet sich sichtbar am Feld statt das Speichern still zu verhindern.

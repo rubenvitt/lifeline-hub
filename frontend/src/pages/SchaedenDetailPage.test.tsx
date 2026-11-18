@@ -1227,6 +1227,9 @@ describe('SchaedenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', 
   it('am stornierten Schaden steht das Banner mit Wer und Wann', async () => {
     render(einsatzAktiv, storniert);
     expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
+    // Verorten schreibt den Punkt am Schaden: am stornierten entfällt der Auftrag.
+    expect(screen.queryByRole('link', { name: 'Auf Karte verorten' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Auf Karte verorten' })).toBeNull();
   });
 
   it('wird er während der Bearbeitung storniert, bleibt der Entwurf lesbar, Speichern entfällt', async () => {

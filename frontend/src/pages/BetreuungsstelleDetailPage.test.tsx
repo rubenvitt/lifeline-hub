@@ -809,6 +809,7 @@ describe('BetreuungsstelleDetailPage — Storno-Sperre (LLH-1832, Spec storno-sp
     const { client } = renderPage();
     await screen.findByRole('heading', { level: 1, name: /Turnhalle Ost/ });
     expect(screen.getByRole('button', { name: 'Belegung melden' })).toBeInTheDocument();
+    expect(screen.getByText('Unterkunft planen')).toBeInTheDocument();
 
     api.ladeBetreuung.mockResolvedValue({ ...MIT_DATEN, stellen: [STADION] });
     await client.invalidateQueries({ queryKey: einsatzKeys.betreuung(1) });
@@ -817,6 +818,7 @@ describe('BetreuungsstelleDetailPage — Storno-Sperre (LLH-1832, Spec storno-sp
     expect(screen.getByRole('heading', { level: 1, name: /Turnhalle Ost/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Belegung melden' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(screen.queryByText('Unterkunft planen')).toBeNull();
     expect(screen.queryByText('Diese Betreuungsstelle gibt es nicht (mehr)')).toBeNull();
     expect(api.loadBetreuungsstelleStand).toHaveBeenCalledWith(1, 8);
   });
