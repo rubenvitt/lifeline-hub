@@ -64,68 +64,110 @@ pub fn pruefe_adresse(eingabe: &str) -> Result<Url, AdressFehler> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use serde::Deserialize;
+
     use super::*;
 
-    #[test]
-    fn https_mit_host_und_port_ist_gueltig() {
-        let url = pruefe_adresse("https://elw.local:8443").unwrap();
-        assert_eq!(url.as_str(), "https://elw.local:8443/");
+    /// Gemeinsame Fälle beider Hüllen (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“): dieselbe
+    /// Datei prüft der Swift-Kern der iOS-Hülle (`ios/LifelineKern`).
+    const FAELLE: &str = include_str!("../faelle/adresse.json");
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Datei {
+        #[allow(dead_code)]
+        zweck: String,
+        meldungen: BTreeMap<String, String>,
+        faelle: Vec<Fall>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Fall {
+        beschreibung: String,
+        eingabe: String,
+        #[serde(default)]
+        adresse: Option<String>,
+        #[serde(default)]
+        fehler: Option<String>,
+    }
+
+    const ALLE_FEHLER: [AdressFehler; 5] = [
+        AdressFehler::Leer,
+        AdressFehler::Unlesbar,
+        AdressFehler::KeinHttps,
+        AdressFehler::OhneHost,
+        AdressFehler::MitZugangsdaten,
+    ];
+
+    /// Kennwort eines Fehlers in den gemeinsamen Fällen.
+    fn kennwort(fehler: &AdressFehler) -> &'static str {
+        match fehler {
+            AdressFehler::Leer => "leer",
+            AdressFehler::Unlesbar => "unlesbar",
+            AdressFehler::KeinHttps => "kein_https",
+            AdressFehler::OhneHost => "ohne_host",
+            AdressFehler::MitZugangsdaten => "mit_zugangsdaten",
+        }
+    }
+
+    fn datei() -> Datei {
+        serde_json::from_str(FAELLE).expect("faelle/adresse.json ist lesbar")
     }
 
     #[test]
-    fn leerraum_wird_getrimmt() {
-        let url = pruefe_adresse("  https://elw.local:8443 \n").unwrap();
-        assert_eq!(url.host_str(), Some("elw.local"));
+    fn jeder_gemeinsame_fall_gilt() {
+        let faelle = datei().faelle;
+        assert!(faelle.len() >= 11, "nur {} Fälle gelesen", faelle.len());
+        for fall in faelle {
+            let ist = pruefe_adresse(&fall.eingabe);
+            match (&fall.adresse, &fall.fehler) {
+                (Some(adresse), None) => assert_eq!(
+                    ist.as_ref().map(Url::as_str),
+                    Ok(adresse.as_str()),
+                    "{}",
+                    fall.beschreibung
+                ),
+                (None, Some(fehler)) => assert_eq!(
+                    ist.as_ref().map_err(kennwort).map(Url::as_str),
+                    Err(fehler.as_str()),
+                    "{}",
+                    fall.beschreibung
+                ),
+                _ => panic!(
+                    "{}: genau eins von „adresse“ und „fehler“",
+                    fall.beschreibung
+                ),
+            }
+        }
     }
 
+    /// Die iOS-Hülle zeigt dieselben Texte; die Fälle tragen sie, damit beide dagegen prüfen.
     #[test]
-    fn http_wird_mit_verweis_auf_https_abgelehnt() {
-        let fehler = pruefe_adresse("http://elw.local:8080").unwrap_err();
-        assert_eq!(fehler, AdressFehler::KeinHttps);
-        assert!(fehler.to_string().contains("https"));
-    }
-
-    #[test]
-    fn andere_schemata_werden_abgelehnt() {
-        assert_eq!(
-            pruefe_adresse("file:///etc/passwd"),
-            Err(AdressFehler::KeinHttps)
-        );
-        assert_eq!(
-            pruefe_adresse("lifeline://verbinden"),
-            Err(AdressFehler::KeinHttps)
-        );
-    }
-
-    #[test]
-    fn https_ohne_hostname_nennt_den_hostnamen() {
-        for eingabe in ["https://", "https:///einsatz"] {
-            let fehler = pruefe_adresse(eingabe).unwrap_err();
-            assert!(
-                matches!(fehler, AdressFehler::OhneHost),
-                "{eingabe}: {fehler:?}"
+    fn meldungen_stehen_wortgleich_in_den_faellen() {
+        let meldungen = datei().meldungen;
+        assert_eq!(meldungen.len(), ALLE_FEHLER.len(), "{:?}", meldungen.keys());
+        for fehler in ALLE_FEHLER {
+            assert_eq!(
+                meldungen.get(kennwort(&fehler)).map(String::as_str),
+                Some(fehler.to_string().as_str()),
+                "{fehler:?}"
             );
-            assert!(fehler.to_string().contains("Hostname"));
         }
     }
 
     #[test]
-    fn zugangsdaten_in_der_adresse_werden_abgelehnt() {
-        // `elw.local` ist hier Benutzername, der Host ist `evil.example` — im Bestätigungsdialog
-        // läse sich das wie der vertraute Server.
-        for eingabe in [
-            "https://elw.local:8443@evil.example",
-            "https://nutzer@elw.local:8443",
-        ] {
-            let fehler = pruefe_adresse(eingabe).unwrap_err();
-            assert_eq!(fehler, AdressFehler::MitZugangsdaten, "{eingabe}");
-            assert!(fehler.to_string().contains("@"));
+    fn jeder_fehler_hat_einen_fall() {
+        let faelle = datei().faelle;
+        for fehler in ALLE_FEHLER {
+            assert!(
+                faelle
+                    .iter()
+                    .any(|fall| fall.fehler.as_deref() == Some(kennwort(&fehler))),
+                "kein Fall für {fehler:?}"
+            );
         }
-    }
-
-    #[test]
-    fn leere_eingabe_und_unsinn() {
-        assert_eq!(pruefe_adresse("   "), Err(AdressFehler::Leer));
-        assert_eq!(pruefe_adresse("elw.local"), Err(AdressFehler::Unlesbar));
     }
 }

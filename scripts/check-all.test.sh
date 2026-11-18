@@ -172,6 +172,40 @@ rc=0; fahren "ROOT='$ARBEIT/s6'; $schritt_6_def" 0 6 || rc=$?
 pruefe "12c beide rot: Schritt 6 rot" 1 "$rc"
 enthaelt "12c beide rot: die Karenz-Prüfung lief" '^karenz-rot$'
 
+# 14 — Schritt 18, der Swift-Kern der iOS-Hülle (LLH-1978): eigenes Bündel `ios`, Teil des vollen
+# Laufs und von `--geaendert`, wenn ios/ oder die gemeinsamen Fälle sich ändern.
+rc=0; "$CHECK_ALL" --nur ios --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+pruefe "14 Bündel ios ist bekannt" 0 "$rc"
+enthaelt "14 Bündel ios fährt nur den Swift-Schritt" '^Schritte: 18$'
+rc=0; "$CHECK_ALL" --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+enthaelt "14 voller Lauf fährt den Swift-Schritt" '^Schritte: .*\b18\b'
+rc=0; "$CHECK_ALL" --nur schnell --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+fehlt "14 schnell fährt den Swift-Schritt nicht" '^Schritte: .*\b18\b'
+
+# 15 — Schritt 18 ohne Toolchain: lokal eine Lücke (nie grün), in der CI mit IOS_SWIFT_PFLICHT=1
+# rot; mit Toolchain fährt er `swift test` im Paket und übernimmt dessen Ergebnis. Gefahren wird
+# der echte Schritt gegen eine Attrappe von `swift`; PATH zeigt nur auf deren Verzeichnis, damit
+# eine installierte Toolchain den Fall „fehlt“ nicht verdeckt (der Schritt nutzt sonst nur
+# Builtins).
+mkdir -p "$ARBEIT/s18/ios/LifelineKern" "$ARBEIT/s18/leer" "$ARBEIT/s18/gruen" "$ARBEIT/s18/rot"
+printf '#!/bin/sh\necho "swift-lief $* in $(pwd)"\n' > "$ARBEIT/s18/gruen/swift"
+printf '#!/bin/sh\necho swift-rot; exit 1\n' > "$ARBEIT/s18/rot/swift"
+chmod +x "$ARBEIT/s18/gruen/swift" "$ARBEIT/s18/rot/swift"
+schritt_18_def="$(sed -n '/^schritt_18() {/,/^}/p' "$CHECK_ALL")"
+[ -n "$schritt_18_def" ] || { echo "FAIL 15 schritt_18 fehlt in check-all.sh" >&2; fehler=1; }
+rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/leer'; $schritt_18_def" 0 18 || rc=$?
+pruefe "15 ohne swift → Exit 0" 0 "$rc"
+enthaelt "15 ohne swift → übersprungen, nicht grün" '\[18/9\] +übersprungen'
+enthaelt "15 ohne swift → OK mit Lücke" '^==> OK mit Lücke'
+rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/leer'; IOS_SWIFT_PFLICHT=1; $schritt_18_def" 0 18 || rc=$?
+pruefe "15 ohne swift mit IOS_SWIFT_PFLICHT=1 → rot" 1 "$rc"
+enthaelt "15 IOS_SWIFT_PFLICHT nennt den Grund" 'IOS_SWIFT_PFLICHT'
+rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/gruen'; $schritt_18_def" 0 18 || rc=$?
+pruefe "15 mit swift → grün" 0 "$rc"
+enthaelt "15 mit swift → swift test im Paket" "^swift-lief test in $ARBEIT/s18/ios/LifelineKern\$"
+rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/rot'; $schritt_18_def" 0 18 || rc=$?
+pruefe "15 rotes swift test → rot" 1 "$rc"
+
 if [ "$fehler" -ne 0 ]; then
   echo "check-all.test.sh: ROT" >&2
   exit 1

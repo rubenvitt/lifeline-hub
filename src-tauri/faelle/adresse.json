@@ -1,0 +1,67 @@
+{
+  "zweck": "Gemeinsame Fälle der Adressprüfung (src-tauri/src/adresse.rs, ios/LifelineKern). Beide Hüllen prüfen jeden Fall und zeigen die Meldungen wortgleich; Quelle der Regel bleibt die Desktop-Hülle.",
+  "meldungen": {
+    "leer": "Bitte die Adresse des Einsatzservers eingeben.",
+    "unlesbar": "Das ist keine gültige Adresse. Beispiel: https://elw.local:8443",
+    "kein_https": "Nur https-Adressen sind möglich: Offline-Betrieb und Passkey brauchen eine gesicherte Verbindung.",
+    "ohne_host": "Der Adresse fehlt der Hostname, z. B. elw.local.",
+    "mit_zugangsdaten": "Die Adresse darf keinen Namen und kein Passwort vor „@“ enthalten."
+  },
+  "faelle": [
+    {
+      "beschreibung": "https mit Host und Port ist gültig",
+      "eingabe": "https://elw.local:8443",
+      "adresse": "https://elw.local:8443/"
+    },
+    {
+      "beschreibung": "Leerraum an den Rändern wird getrimmt",
+      "eingabe": "  https://elw.local:8443 \n",
+      "adresse": "https://elw.local:8443/"
+    },
+    {
+      "beschreibung": "http wird mit Verweis auf https abgelehnt",
+      "eingabe": "http://elw.local:8080",
+      "fehler": "kein_https"
+    },
+    {
+      "beschreibung": "andere Schemata werden abgelehnt: file",
+      "eingabe": "file:///etc/passwd",
+      "fehler": "kein_https"
+    },
+    {
+      "beschreibung": "andere Schemata werden abgelehnt: lifeline",
+      "eingabe": "lifeline://verbinden",
+      "fehler": "kein_https"
+    },
+    {
+      "beschreibung": "https ohne Hostname nennt den Hostnamen",
+      "eingabe": "https://",
+      "fehler": "ohne_host"
+    },
+    {
+      "beschreibung": "drei Schrägstriche gelten als fehlender Hostname, nicht als Host „einsatz“",
+      "eingabe": "https:///einsatz",
+      "fehler": "ohne_host"
+    },
+    {
+      "beschreibung": "Zugangsdaten vor dem Host: der Host wäre evil.example, vorn stünde der vertraute Name",
+      "eingabe": "https://elw.local:8443@evil.example",
+      "fehler": "mit_zugangsdaten"
+    },
+    {
+      "beschreibung": "ein Benutzername vor dem Host wird abgelehnt",
+      "eingabe": "https://nutzer@elw.local:8443",
+      "fehler": "mit_zugangsdaten"
+    },
+    {
+      "beschreibung": "leere Eingabe",
+      "eingabe": "   ",
+      "fehler": "leer"
+    },
+    {
+      "beschreibung": "ein Hostname ohne Schema ist keine Adresse",
+      "eingabe": "elw.local",
+      "fehler": "unlesbar"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "zweck": "Gemeinsame Fälle des Deeplinks lifeline://verbinden?server=… (src-tauri/src/deeplink.rs, ios/LifelineKern). „deute“ liest den Link (ziel null: wirkungslos), „entscheide“ legt fest, was ein gültiger Link gegenüber dem gespeicherten Server bewirkt. Adressen stehen in normalisierter Form.",
+  "deute": [
+    {
+      "beschreibung": "verbinden mit Server wird gelesen",
+      "link": "lifeline://verbinden?server=https://elw.local:8443",
+      "ziel": "https://elw.local:8443/"
+    },
+    {
+      "beschreibung": "eine prozentkodierte Adresse wird gelesen",
+      "link": "lifeline://verbinden?server=https%3A%2F%2Felw.local%3A8443%2F",
+      "ziel": "https://elw.local:8443/"
+    },
+    {
+      "beschreibung": "verbinden mit abschließendem Schrägstrich im Pfad",
+      "link": "lifeline://verbinden/?server=https://elw.local",
+      "ziel": "https://elw.local/"
+    },
+    {
+      "beschreibung": "ein fremder Befehl wird verworfen",
+      "link": "lifeline://trennen?server=https://elw.local:8443",
+      "ziel": null
+    },
+    {
+      "beschreibung": "ein fremder Pfad unter verbinden wird verworfen",
+      "link": "lifeline://verbinden/mehr?server=https://elw.local",
+      "ziel": null
+    },
+    {
+      "beschreibung": "den Rücksprung der Anmeldung nimmt nur die laufende Anmeldesitzung an; von außen bewirkt er nichts",
+      "link": "lifeline://anmeldung?code=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "ziel": null
+    },
+    {
+      "beschreibung": "ein fremdes Schema wird verworfen",
+      "link": "https://verbinden?server=https://elw.local",
+      "ziel": null
+    },
+    {
+      "beschreibung": "ohne Ziel wird verworfen",
+      "link": "lifeline://verbinden",
+      "ziel": null
+    },
+    {
+      "beschreibung": "ein leeres Ziel wird verworfen",
+      "link": "lifeline://verbinden?server=",
+      "ziel": null
+    },
+    {
+      "beschreibung": "ein ungültiges Ziel (http) wird verworfen",
+      "link": "lifeline://verbinden?server=http://elw.local",
+      "ziel": null
+    }
+  ],
+  "entscheide": [
+    {
+      "beschreibung": "ohne gespeicherte Adresse wird vorbelegt",
+      "gespeichert": null,
+      "neu": "https://elw.local:8443",
+      "aktion": "vorbelegen"
+    },
+    {
+      "beschreibung": "eine abweichende Adresse braucht Bestätigung",
+      "gespeichert": "https://elw.local:8443",
+      "neu": "https://fremd.example",
+      "aktion": "bestaetigen"
+    },
+    {
+      "beschreibung": "ein anderer Port ist eine andere Adresse",
+      "gespeichert": "https://elw.local:8443",
+      "neu": "https://elw.local:9443",
+      "aktion": "bestaetigen"
+    },
+    {
+      "beschreibung": "die gleiche Adresse mit Schrägstrich bewirkt nichts",
+      "gespeichert": "https://elw.local:8443",
+      "neu": "https://elw.local:8443/",
+      "aktion": "nichts"
+    },
+    {
+      "beschreibung": "die gleiche Adresse in anderer Schreibung des Hosts bewirkt nichts",
+      "gespeichert": "https://elw.local:8443",
+      "neu": "https://ELW.local:8443",
+      "aktion": "nichts"
+    }
+  ]
+}

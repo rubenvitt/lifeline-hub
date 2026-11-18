@@ -49,109 +49,81 @@ pub fn entscheide(gespeichert: Option<&Url>, neu: &Url) -> Aktion {
 
 #[cfg(test)]
 mod tests {
+    use serde::Deserialize;
+
     use super::*;
+
+    /// Gemeinsame Fälle beider Hüllen (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“): dieselbe
+    /// Datei prüft der Swift-Kern der iOS-Hülle (`ios/LifelineKern`).
+    const FAELLE: &str = include_str!("../faelle/deeplink.json");
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Datei {
+        #[allow(dead_code)]
+        zweck: String,
+        deute: Vec<DeuteFall>,
+        entscheide: Vec<EntscheideFall>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct DeuteFall {
+        beschreibung: String,
+        link: String,
+        ziel: Option<String>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct EntscheideFall {
+        beschreibung: String,
+        gespeichert: Option<String>,
+        neu: String,
+        aktion: String,
+    }
 
     fn url(s: &str) -> Url {
         Url::parse(s).unwrap()
     }
 
-    #[test]
-    fn verbinden_mit_server_wird_gelesen() {
-        let ziel = deute(&url("lifeline://verbinden?server=https://elw.local:8443")).unwrap();
-        assert_eq!(ziel, url("https://elw.local:8443"));
+    fn datei() -> Datei {
+        serde_json::from_str(FAELLE).expect("faelle/deeplink.json ist lesbar")
     }
 
     #[test]
-    fn prozentkodierte_adresse_wird_gelesen() {
-        let ziel = deute(&url(
-            "lifeline://verbinden?server=https%3A%2F%2Felw.local%3A8443%2F",
-        ))
-        .unwrap();
-        assert_eq!(ziel, url("https://elw.local:8443/"));
+    fn jeder_gemeinsame_fall_von_deute_gilt() {
+        let faelle = datei().deute;
+        assert!(faelle.len() >= 10, "nur {} Fälle gelesen", faelle.len());
+        for fall in faelle {
+            assert_eq!(
+                deute(&url(&fall.link)).as_ref().map(Url::as_str),
+                fall.ziel.as_deref(),
+                "{}",
+                fall.beschreibung
+            );
+        }
     }
 
     #[test]
-    fn verbinden_mit_abschliessendem_schraegstrich_im_pfad() {
-        assert!(deute(&url("lifeline://verbinden/?server=https://elw.local")).is_some());
-    }
-
-    #[test]
-    fn fremder_pfad_wird_verworfen() {
-        assert_eq!(
-            deute(&url("lifeline://trennen?server=https://elw.local:8443")),
-            None
-        );
-        assert_eq!(
-            deute(&url("lifeline://verbinden/mehr?server=https://elw.local")),
-            None
-        );
-    }
-
-    /// Den Rücksprung der Anmeldung nimmt nur die laufende `ASWebAuthenticationSession` an
-    /// (LFH-818). Von außen bewirkt er über den globalen Weg nichts.
-    #[test]
-    fn anmeldung_von_aussen_bewirkt_nichts() {
-        let code = "0123456789abcdef".repeat(4);
-        assert_eq!(
-            deute(&url(&format!("lifeline://anmeldung?code={code}"))),
-            None
-        );
-    }
-
-    #[test]
-    fn fremdes_schema_wird_verworfen() {
-        assert_eq!(
-            deute(&url("https://verbinden?server=https://elw.local")),
-            None
-        );
-    }
-
-    #[test]
-    fn fehlendes_oder_ungueltiges_ziel_wird_verworfen() {
-        assert_eq!(deute(&url("lifeline://verbinden")), None);
-        assert_eq!(deute(&url("lifeline://verbinden?server=")), None);
-        assert_eq!(
-            deute(&url("lifeline://verbinden?server=http://elw.local")),
-            None
-        );
-    }
-
-    #[test]
-    fn ohne_gespeicherte_adresse_wird_vorbelegt() {
-        let neu = url("https://elw.local:8443");
-        assert_eq!(entscheide(None, &neu), Aktion::Vorbelegen(neu.clone()));
-    }
-
-    #[test]
-    fn abweichende_adresse_braucht_bestaetigung() {
-        let alt = url("https://elw.local:8443");
-        let neu = url("https://fremd.example");
-        assert_eq!(
-            entscheide(Some(&alt), &neu),
-            Aktion::Bestaetigen(neu.clone())
-        );
-    }
-
-    #[test]
-    fn anderer_port_ist_eine_andere_adresse() {
-        let alt = url("https://elw.local:8443");
-        let neu = url("https://elw.local:9443");
-        assert_eq!(
-            entscheide(Some(&alt), &neu),
-            Aktion::Bestaetigen(neu.clone())
-        );
-    }
-
-    #[test]
-    fn gleiche_adresse_bewirkt_nichts() {
-        let alt = url("https://elw.local:8443");
-        assert_eq!(
-            entscheide(Some(&alt), &url("https://elw.local:8443/")),
-            Aktion::Nichts
-        );
-        assert_eq!(
-            entscheide(Some(&alt), &url("https://ELW.local:8443")),
-            Aktion::Nichts
-        );
+    fn jeder_gemeinsame_fall_von_entscheide_gilt() {
+        let faelle = datei().entscheide;
+        assert!(faelle.len() >= 5, "nur {} Fälle gelesen", faelle.len());
+        for fall in faelle {
+            let neu = url(&fall.neu);
+            let gespeichert = fall.gespeichert.as_deref().map(url);
+            let soll = match fall.aktion.as_str() {
+                "vorbelegen" => Aktion::Vorbelegen(neu.clone()),
+                "bestaetigen" => Aktion::Bestaetigen(neu.clone()),
+                "nichts" => Aktion::Nichts,
+                andere => panic!("{}: unbekannte Aktion {andere}", fall.beschreibung),
+            };
+            assert_eq!(
+                entscheide(gespeichert.as_ref(), &neu),
+                soll,
+                "{}",
+                fall.beschreibung
+            );
+        }
     }
 }

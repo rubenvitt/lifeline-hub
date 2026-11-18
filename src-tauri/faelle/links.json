@@ -1,0 +1,273 @@
+{
+  "zweck": "Gemeinsame Fälle der Linkregeln (src-tauri/src/links.rs, ios/LifelineKern). „neues_fenster“ gilt für window.open und target=_blank, „navigation“ für das Wegnavigieren im Fenster. Ziele: huelle (läuft im Webview), nebenfenster (Desktop: weiteres Fenster; iOS: derselbe Webview), download, system, verwerfen. server null heißt: noch kein Server verbunden.",
+  "neues_fenster": [
+    {
+      "beschreibung": "eine eigene Seite öffnet ein Nebenfenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/einsaetze/1/etb?eintrag=4",
+      "erwartet": "nebenfenster"
+    },
+    {
+      "beschreibung": "die eigene Startseite öffnet ein Nebenfenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/",
+      "erwartet": "nebenfenster"
+    },
+    {
+      "beschreibung": "eine Dateiroute der eigenen Origin wird heruntergeladen",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "erwartet": "download"
+    },
+    {
+      "beschreibung": "der OIDC-Start ist keine Datei: ein Download hieße, niemand käme per OIDC hinein",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api/auth/oidc/start?von=%2Feinsaetze",
+      "erwartet": "nebenfenster"
+    },
+    {
+      "beschreibung": "der OIDC-Rücksprung ist keine Datei",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api/auth/oidc/callback?code=x&state=y",
+      "erwartet": "nebenfenster"
+    },
+    {
+      "beschreibung": "nur der Pfadanfang /api/ zählt",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/einsaetze/api/1",
+      "erwartet": "nebenfenster"
+    },
+    {
+      "beschreibung": "eine fremde Webseite geht ans System",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://www.govdata.de/dl-de/by-2-0",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "eine fremde http-Seite geht ans System",
+      "server": "https://elw.local:8443/",
+      "ziel": "http://example.org/",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "mailto geht ans System",
+      "server": "https://elw.local:8443/",
+      "ziel": "mailto:lage@example.org",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "tel geht ans System",
+      "server": "https://elw.local:8443/",
+      "ziel": "tel:+4930123",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "ein anderer Port auf demselben Host ist eine fremde Origin",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local/einsaetze",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "ein anderes Schema auf demselben Host und Port ist eine fremde Origin",
+      "server": "https://elw.local:8443/",
+      "ziel": "http://elw.local:8443/einsaetze",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "eine Dateiroute einer fremden Origin geht ans System",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local/api/einsaetze/1/anhaenge/7",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "Standardport und ausgeschriebener Port sind dieselbe Origin",
+      "server": "https://elw.local/",
+      "ziel": "https://elw.local:443/x",
+      "erwartet": "nebenfenster"
+    },
+    {
+      "beschreibung": "file wird verworfen",
+      "server": "https://elw.local:8443/",
+      "ziel": "file:///etc/passwd",
+      "erwartet": "verwerfen"
+    },
+    {
+      "beschreibung": "javascript wird verworfen",
+      "server": "https://elw.local:8443/",
+      "ziel": "javascript:alert(1)",
+      "erwartet": "verwerfen"
+    },
+    {
+      "beschreibung": "data wird verworfen",
+      "server": "https://elw.local:8443/",
+      "ziel": "data:text/html,x",
+      "erwartet": "verwerfen"
+    },
+    {
+      "beschreibung": "blob als neues Fenster wird verworfen",
+      "server": "https://elw.local:8443/",
+      "ziel": "blob:https://elw.local:8443/1b2c",
+      "erwartet": "verwerfen"
+    },
+    {
+      "beschreibung": "die lokale Maske der Desktop-Hülle wird als neues Fenster verworfen",
+      "server": "https://elw.local:8443/",
+      "ziel": "tauri://localhost/index.html",
+      "erwartet": "verwerfen"
+    },
+    {
+      "beschreibung": "ein Deeplink als neues Fenster wird verworfen",
+      "server": "https://elw.local:8443/",
+      "ziel": "lifeline://verbinden?server=https://boese.example",
+      "erwartet": "verwerfen"
+    },
+    {
+      "beschreibung": "about:blank als neues Fenster wird verworfen",
+      "server": "https://elw.local:8443/",
+      "ziel": "about:blank",
+      "erwartet": "verwerfen"
+    },
+    {
+      "beschreibung": "ohne Server gibt es keine eigene Origin: die Dateiroute geht ans System",
+      "server": null,
+      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "erwartet": "system"
+    }
+  ],
+  "navigation": [
+    {
+      "beschreibung": "eine Dateiroute der eigenen Origin wird heruntergeladen",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "erwartet": "download"
+    },
+    {
+      "beschreibung": "eine tiefe Dateiroute der eigenen Origin wird heruntergeladen",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/schaeden/3/anhaenge/2/datei",
+      "erwartet": "download"
+    },
+    {
+      "beschreibung": "der OIDC-Start läuft im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api/auth/oidc/start?von=%2Feinsaetze",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "der OIDC-Rücksprung läuft im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api/auth/oidc/callback?code=x&state=y",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "nur der Pfadanfang /api/ zählt: /apiarchiv ist eine Seite",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/apiarchiv",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "/api ohne Schrägstrich ist keine Dateiroute",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/api",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "eine Dateiroute einer fremden Origin bleibt im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local/api/einsaetze/1/anhaenge/7",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "eine eigene Seite bleibt im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://elw.local:8443/einsaetze/1",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "der Weg zum Identitätsanbieter bleibt im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "https://login.example.org/authorize?client_id=x",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "die lokale Maske der Desktop-Hülle bleibt im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "tauri://localhost/index.html",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "die lokale Maske der Desktop-Hülle unter Windows bleibt im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "http://tauri.localhost/index.html",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "eine leere Seite bleibt im Fenster",
+      "server": "https://elw.local:8443/",
+      "ziel": "about:blank",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "mailto geht ans System",
+      "server": "https://elw.local:8443/",
+      "ziel": "mailto:lage@example.org",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "tel geht ans System",
+      "server": "https://elw.local:8443/",
+      "ziel": "tel:+4930123",
+      "erwartet": "system"
+    },
+    {
+      "beschreibung": "der CSV-Export bietet seine Datei als blob der Serverseite an: die Navigation läuft weiter, der Webview lädt herunter",
+      "server": "https://elw.local:8443/",
+      "ziel": "blob:https://elw.local:8443/6f1c2a9e-8d3b-4e7a-9c55-0b1d2e3f4a5b",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "ohne Server gibt es keine eigene Origin: die Dateiroute bleibt im Fenster",
+      "server": null,
+      "ziel": "https://elw.local:8443/api/einsaetze/1/anhaenge/7",
+      "erwartet": "huelle"
+    },
+    {
+      "beschreibung": "ohne Server bleibt die lokale Maske im Fenster",
+      "server": null,
+      "ziel": "tauri://localhost/index.html",
+      "erwartet": "huelle"
+    }
+  ],
+  "gehoert_zum_server": [
+    {
+      "beschreibung": "eine Seite derselben Origin gehört zum Server",
+      "server": "https://elw.local:8443/",
+      "seite": "https://elw.local:8443/einsaetze/1/lageberichte/3",
+      "erwartet": true
+    },
+    {
+      "beschreibung": "der Pfad der Serveradresse zählt nicht",
+      "server": "https://elw.local:8443/einsaetze",
+      "seite": "https://elw.local:8443/einsaetze/1/lageberichte/3",
+      "erwartet": true
+    },
+    {
+      "beschreibung": "ein anderer Host gehört nicht zum Server",
+      "server": "https://fuekw.local:8443/",
+      "seite": "https://elw.local:8443/einsaetze/1/lageberichte/3",
+      "erwartet": false
+    },
+    {
+      "beschreibung": "eine leere Seite gehört nicht zum Server",
+      "server": "https://elw.local:8443/",
+      "seite": "about:blank",
+      "erwartet": false
+    },
+    {
+      "beschreibung": "ein blob der Serverseite ist keine Adresse, die ein Fenster laden kann",
+      "server": "https://elw.local:8443/",
+      "seite": "blob:https://elw.local:8443/6f1c2a9e-8d3b-4e7a-9c55-0b1d2e3f4a5b",
+      "erwartet": false
+    }
+  ]
+}
