@@ -1326,6 +1326,33 @@ test('Fahrzeuge: der Besatzungs-Auslöser folgt in Tabelle und Karte der Dichte-
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+test('Fahrzeuge: der Statusknopf ist sichtbar so hoch wie die Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  // LLH-1780 (Change `eon26eat-status-und-bedienung`, D4): der Rahmen des Statusknopfs ist
+  // die Trefffläche, also misst die sichtbare Höhe — nicht ein unsichtbar vergrößerter Kasten.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Statusknopf`);
+  const funkrufname = 'Florian Musterstadt 3/83-1';
+  await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, 'Fahrzeug');
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
+    const knopf = page.getByRole('button', { name: `Status von ${funkrufname} ändern` });
+    // Vorbedingung: es ist der bedienbare Knopf, nicht die randlose Anzeige.
+    await expect(knopf).toHaveAttribute('data-lfh', 'status-knopf');
+    const hoehe = await haeltStufe(knopf, soll, `Statusknopf (${dichte})`);
+    // Sichtbar = Rahmen: der Rand liegt auf dem gemessenen Kasten.
+    const rand = await knopf.evaluate((k) => getComputedStyle(k).borderTopWidth);
+    expect(rand, `Statusknopf (${dichte}) trägt einen Rahmen`).not.toBe('0px');
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${hoehe}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Frei-Pool fehlt', async ({
   page,
 }) => {

@@ -132,11 +132,17 @@ innen bleibt Anzeige.
 (`type: 'group'`, Label = Titel), der Kopf ist nicht wählbar. Fahrzeugstellen (Fahrzeugliste,
 Tableau, Einheit-Besatzung) setzen den Rufnamen; andere Abnehmer bleiben ohne Kopf.
 
-Für alle Abnehmer: `placement` `bottomLeft` mit `autoAdjustOverflow`, dazu am Menü
-`maxHeight: calc(100dvh - 2 × paddingXS)` und `overflowY: auto`. Im Handschuh-Betrieb, wenn
-Einträge × 72 px nicht in die Fensterhöhe passen, stehen die Einträge in einem Raster mit zwei
-Spalten (CSS am Menü über `[data-dichte='handschuh']`). Der Befund y = −52 kommt aus der fehlenden
+Für alle Abnehmer misst `menueLage` beim Öffnen den Platz über und unter dem Auslöser: das Menü
+öffnet nach unten, wenn es dort passt oder unten mehr Platz ist, sonst nach oben, und `maxHeight`
+begrenzt es auf den Platz dieser Seite (`overflowY: auto`). Im Handschuh-Betrieb, wenn eine Spalte
+nicht auf die größere Seite passt, stehen die Einträge in einem Raster mit zwei Spalten, und wenn
+auch zwei nicht passen, mit drei (Klassen `lfh-statusmenue--spalten-N` in `theme/sprache.css`). Der
+Kopf ist kein Ziel und bleibt flach (höchstens 40 px). Der Befund y = −52 kommt aus der fehlenden
 Höhenbegrenzung; antd kippt nur, wenn das Menü auf einer Seite passt.
+
+Nachtrag bei der Umsetzung: Auf der Fahrzeugliste steht der Knopf der obersten Zeile bei
+1366 × 520 erst bei y = 385. Oben bleiben 369 px, zwei Spalten brauchen fünf Zeilen à 73 px und den
+Kopf (gemessen 450 px). Deshalb die dritte Spalte; zwei Spalten reichen in jedem höheren Fenster.
 
 ### D8 — Rücknahme im Server
 

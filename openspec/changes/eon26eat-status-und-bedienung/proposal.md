@@ -32,7 +32,7 @@ der Fahrzeugtyp fehlt, und die Fläche bleibt größtenteils leer.
   tragen ebenfalls einen Rahmen. **BREAKING** für Tests und e2e, die `.ant-tag` oder
   `data-lfh="status-chip"` suchen.
 - **Statuswechsel mit Quittung** (`cfv89pp5`): Das Statusmenü eines Fahrzeugs nennt den Rufnamen
-  als Kopf und liegt immer ganz im Fenster (im Handschuh-Betrieb zweispaltig). Nach jeder Wahl,
+  als Kopf und liegt immer ganz im Fenster (im Handschuh-Betrieb in zwei oder drei Spalten). Nach jeder Wahl,
   auch per Zifferntaste im Tableau, erscheint „85-1: S2 → S3 · Rückgängig“. Rückgängig ist ein
   echter Rücknahmeweg im Server: Status und „seit“ von vorher, das Zeitachsen-Ereignis gestrichen,
   ein ETB-Eintrag „zurückgenommen“, 409 wenn inzwischen geändert. Zunächst nur Fahrzeug-FMS.

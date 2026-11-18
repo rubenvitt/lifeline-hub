@@ -14,7 +14,7 @@ Systems.
 | Datei             | Zeichenfläche                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------ |
 | `Main.dc.html`    | `Status` (klein, normal), `Marke` (mit und ohne Entfernen), Statusknopf, Nacht und Tag |
-| `Menue.dc.html`   | Statusmenü mit Rufname als Kopf, kompakt und Handschuh zweispaltig, Quittung         |
+| `Menue.dc.html`   | Statusmenü mit Rufname als Kopf, kompakt und Handschuh mehrspaltig, Quittung        |
 | `Tableau.dc.html` | FMS-Tableau: Kacheln mit großem Statusblock, Rufname 22 px, Typ und Einheit          |
 
 Abweichungen vom Design der Change: keine. Die `Marke` trägt die zweite Textstufe (`gedaempft`) auf

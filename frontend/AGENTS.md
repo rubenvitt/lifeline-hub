@@ -1203,7 +1203,7 @@ anwendbar), „nicht geprüft" ist keins.
 - **Statusmenü und Quittung bei Fahrzeugen** (LLH-1781, Spec `fahrzeugstatus-quittung`):
   `StatusWahl` mit `titel` = Rufname als Menükopf; das Menü misst beim Öffnen den Platz
   (`menueLage`), öffnet zur größeren Seite, begrenzt die Höhe und steht im Handschuh-Betrieb
-  zweispaltig, wenn eine Spalte nicht passt. Nach jedem Wechsel des Fahrzeug-FMS die Quittung
+  in zwei Spalten, wenn eine nicht passt, in drei, wenn auch zwei nicht passen. Nach jedem Wechsel des Fahrzeug-FMS die Quittung
   „85-1: S2 → S3 · Rückgängig“ (`kraefte/useFahrzeugStatusQuittung.ts`, Schlüssel je Fahrzeug)
   mit dem Beleg aus der PATCH-Antwort an `…/status/zuruecknehmen`. Personal-, Material- und
   Einheitsstatus haben noch keinen Rückweg.

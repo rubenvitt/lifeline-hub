@@ -4,9 +4,11 @@ import { anmeldenPerApi } from './anmelde-kern';
 /**
  * FMS-Tableau im echten Browser:
  *  1. Kein waagerechter Querlauf auf 390, 1024 und 1366 px (Raster
- *     `minmax(min(100%, 208px), 1fr)`).
+ *     `repeat(auto-fill, minmax(min(100%, 240px), 1fr))`, LLH-1782); eine einzelne Kachel in
+ *     einem Abschnitt ist bei 1366 px nicht breiter als eine Spalte.
  *  2. Die Ziffer setzt den Status gegen das echte Backend, und der Wechsel überlebt das
- *     Neuladen — derselbe PATCH wie das Menü.
+ *     Neuladen — derselbe PATCH wie das Menü. Nach jeder Ziffer steht die Quittung
+ *     „<Rufname>: <alt> → <neu>“, und der Fokus bleibt auf der Kachel (LLH-1781).
  *
  * Die Wache vor jeder Messung zeigt auf einen Wortlaut, der erst MIT den Daten erscheint. Kein
  * `networkidle` (SSE-Strom).
@@ -76,6 +78,23 @@ test('das Tableau läuft auf 390, 1024 und 1366 px nicht waagerecht über', asyn
   }
 });
 
+test('eine einzelne Kachel ist bei 1366 px nicht breiter als eine Spalte', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await seede(page);
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/fahrzeuge?ansicht=tableau`);
+  // Im Abschnitt „EA Tableau“ steht genau ein Fahrzeug (über die Einheit).
+  const knopf = tableau(page).getByRole('button', {
+    name: `Status von ${FAHRZEUG_EINHEIT} ändern`,
+  });
+  await expect(knopf).toBeVisible();
+  // `auto-fill` hält leere Spuren frei: die Kachel bleibt eine Spalte breit (240 px Boden,
+  // bei 1366 px also deutlich unter der halben Zeile), statt sich über die Zeile zu ziehen.
+  const kachel = knopf.locator('xpath=ancestor::*[@data-lfh="fms-kachel"][1]');
+  const breite = (await kachel.boundingBox())!.width;
+  expect(breite, `Kachel ${breite} px`).toBeLessThan(1366 / 2);
+});
+
 test('Ziffern setzen den Status der fokussierten Kachel nacheinander, und er übersteht das Neuladen', async ({
   page,
 }) => {
@@ -87,26 +106,29 @@ test('Ziffern setzen den Status der fokussierten Kachel nacheinander, und er üb
     name: `Status von ${FAHRZEUG_EINHEIT} ändern`,
   });
   // Startstatus der Disposition: der erste gebundene Katalogeintrag, im Seed „3 – Auf Anfahrt".
-  await expect(knopf).toContainText('S3');
+  // Die Kachel zeigt die Ziffer groß und das Wort darunter (LLH-1782), ohne „S“.
+  await expect(knopf).toHaveText(/^3Auf Anfahrt/);
   await knopf.focus();
   await page.keyboard.press('4');
-  await expect(knopf).toContainText('S4');
-  await expect(knopf).toContainText('Am Einsatzort');
+  await expect(knopf).toHaveText(/^4Am Einsatzort/);
+  // Die Quittung steht, ohne den Fokus von der Kachel zu nehmen (Spec
+  // `fahrzeugstatus-quittung`, „Zifferntaste im Tableau“).
+  await expect(page.getByText(`${FAHRZEUG_EINHEIT}: S3 → S4`)).toBeVisible();
 
   // Während der Mutation ist der Knopf `disabled`, und der Browser wirft den Fokus auf
   // <body>. Das Tableau gibt ihn zurück — sonst ginge die zweite Ziffer ins Leere.
   await expect(knopf).toBeFocused();
   await page.keyboard.press('5');
-  await expect(knopf).toContainText('S5');
+  await expect(knopf).toHaveText(/^5\D/);
   await expect(knopf).toBeFocused();
 
   // Die andere Kachel bleibt unberührt — die Ziffer wirkt nur, wo der Fokus steht.
   await expect(
     tableau(page).getByRole('button', { name: `Status von ${FAHRZEUG_FREI} ändern` }),
-  ).toContainText('S3');
+  ).toHaveText(/^3Auf Anfahrt/);
 
   await page.goto(`/einsaetze/${einsatzId}/fahrzeuge?ansicht=tableau`);
   await expect(
     tableau(page).getByRole('button', { name: `Status von ${FAHRZEUG_EINHEIT} ändern` }),
-  ).toContainText('S5');
+  ).toHaveText(/^5\D/);
 });

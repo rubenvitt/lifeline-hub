@@ -510,13 +510,22 @@
     inset -10px 0 8px -8px var(--lfh-steuer-rahmen);
 }
 
-/* Statusmenü im Handschuh-Betrieb (LLH-1781, Change `eon26eat-status-und-bedienung`, D7):
-   passt eine Spalte nicht ins Fenster, stehen die Einträge zweispaltig. Die Klasse setzt
-   `components/StatusWahl.tsx`. */
-.lfh-statusmenue--zweispaltig .ant-dropdown-menu-item-group-list,
-.ant-dropdown-menu.lfh-statusmenue--zweispaltig:not(:has(.ant-dropdown-menu-item-group-list)) {
+/* Statusmenü (LLH-1781, Change `eon26eat-status-und-bedienung`, D7): passt im Handschuh-Betrieb
+   eine Spalte nicht ins Fenster, stehen die Einträge in zwei, sonst in drei Spalten. Die
+   Klassen und die Rechnung (`menueLage`, Kopf höchstens 40 px) setzt
+   `components/StatusWahl.tsx`. Der Kopf ist kein Ziel und bleibt flach. */
+.lfh-statusmenue .ant-dropdown-menu-item-group-title {
+  padding-block: var(--lfh-luft-0);
+}
+.lfh-statusmenue--spalten-2 .ant-dropdown-menu-item-group-list,
+.ant-dropdown-menu.lfh-statusmenue--spalten-2:not(:has(.ant-dropdown-menu-item-group-list)) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lfh-statusmenue--spalten-3 .ant-dropdown-menu-item-group-list,
+.ant-dropdown-menu.lfh-statusmenue--spalten-3:not(:has(.ant-dropdown-menu-item-group-list)) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 /* Formzeichen eines Zustands (LLH-1779, Spec `status-darstellung`): als erzeugter Inhalt, damit

@@ -13,8 +13,8 @@ Rufnamen des Fahrzeugs als Kopf zeigen. Der Kopf ist kein wählbarer Eintrag.
 
 Jedes Statusmenü SHALL vollständig im sichtbaren Fenster liegen: Es öffnet nach oben oder unten,
 je nachdem wo Platz ist, und kein Eintrag MUST außerhalb des Fensters beginnen. Reicht die Höhe für
-eine Spalte nicht, MUST das Menü im Handschuh-Betrieb zweispaltig stehen, in den übrigen Dichten
-innerhalb des Fensters rollen.
+eine Spalte nicht, MUST das Menü im Handschuh-Betrieb in zwei Spalten stehen, und reichen auch zwei
+nicht, in drei; in den übrigen Dichten MUST es innerhalb des Fensters rollen.
 
 #### Scenario: Tablet, Zeile oben
 - **WHEN** am Tablet (1024 × 768) das Statusmenü der obersten Zeile geöffnet wird

@@ -38,7 +38,7 @@ import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
  * `titel` setzt einen Kopf über die Einträge (Fahrzeuge: der Rufname). Beim Öffnen misst das
  * Primitiv den Platz über und unter dem Auslöser, öffnet zur größeren Seite und begrenzt die
  * Höhe auf diesen Platz; was nicht passt, rollt im Menü. Im Handschuh-Betrieb stehen die
- * Einträge zweispaltig, sobald eine Spalte nicht ins Fenster passt.
+ * Einträge in zwei Spalten, wenn eine nicht passt, und in drei, wenn auch zwei nicht passen.
  *
  * ── FARBE ──────────────────────────────────────────────────────────────────────────────
  *
@@ -206,10 +206,10 @@ export default function StatusWahl<W extends string | number>({
 
   // Lage des Menüs: beim Öffnen gemessen, damit es ganz im Fenster liegt (D7).
   const knopf = useRef<HTMLButtonElement | null>(null);
-  const [lage, setLage] = useState<{ unten: boolean; maxHoehe: number; zweispaltig: boolean }>({
+  const [lage, setLage] = useState<{ unten: boolean; maxHoehe: number; spalten: MenueSpalten }>({
     unten: true,
     maxHoehe: 0,
-    zweispaltig: false,
+    spalten: 1,
   });
   const setzeOffen = useCallback(
     (neu: boolean) => {
@@ -313,7 +313,7 @@ export default function StatusWahl<W extends string | number>({
               },
             ]
           : eintraege,
-        className: lage.zweispaltig ? 'lfh-statusmenue--zweispaltig' : undefined,
+        className: `lfh-statusmenue lfh-statusmenue--spalten-${lage.spalten}`,
         // Der Kopf ist auch der zugängliche Name des Menüs (Review vor dem PR).
         ...(titel ? { 'aria-label': `Status von ${titel}` } : {}),
         style: {
@@ -350,11 +350,17 @@ export default function StatusWahl<W extends string | number>({
 
 /** Abstand des Menüs zum Fensterrand und zum Auslöser. */
 const RAND = 8;
+/** Zuschlag je Zeile: antd setzt zwischen die Einträge einen Pixel (gemessen 73 bei 72). */
+const ZEILENZUSCHLAG = 2;
+/** Höchste Höhe des Kopfs; `sprache.css` hält ihn flach (er ist kein Ziel). */
+const KOPF_HOEHE = 40;
+
+export type MenueSpalten = 1 | 2 | 3;
 
 /**
  * Lage des Menüs (D7), rein: nach unten, wenn es dort passt oder unten mehr Platz ist, sonst
- * nach oben; Höhe auf den Platz der gewählten Seite begrenzt. Im Handschuh-Betrieb zweispaltig,
- * sobald eine Spalte nicht ins Fenster passt.
+ * nach oben; Höhe auf den Platz der gewählten Seite begrenzt. Im Handschuh-Betrieb so viele
+ * Spalten (zwei, sonst drei), wie es braucht, damit alle Einträge auf die größere Seite passen.
  */
 export function menueLage(
   ausloeser: HTMLElement | null,
@@ -363,15 +369,17 @@ export function menueLage(
   dichte: string,
   titel: string | undefined,
   fensterhoehe: number = typeof window === 'undefined' ? 0 : window.innerHeight,
-): { unten: boolean; maxHoehe: number; zweispaltig: boolean } {
-  const kopf = titel ? zeilenhoehe : 0;
-  const einspaltig = eintraege * zeilenhoehe + kopf + RAND;
-  const zweispaltig = dichte === 'handschuh' && einspaltig > fensterhoehe - 2 * RAND;
-  const benoetigt = zweispaltig ? Math.ceil(eintraege / 2) * zeilenhoehe + kopf + RAND : einspaltig;
-  if (!ausloeser || fensterhoehe <= 0) return { unten: true, maxHoehe: 0, zweispaltig };
+): { unten: boolean; maxHoehe: number; spalten: MenueSpalten } {
+  const kopf = titel ? Math.min(zeilenhoehe, KOPF_HOEHE) : 0;
+  const benoetigt = (spalten: number) =>
+    Math.ceil(eintraege / spalten) * (zeilenhoehe + ZEILENZUSCHLAG) + kopf + RAND;
+  if (!ausloeser || fensterhoehe <= 0) return { unten: true, maxHoehe: 0, spalten: 1 };
   const r = ausloeser.getBoundingClientRect();
   const unten = Math.max(0, fensterhoehe - r.bottom - 2 * RAND);
   const oben = Math.max(0, r.top - 2 * RAND);
-  const nachUnten = unten >= benoetigt || unten >= oben;
-  return { unten: nachUnten, maxHoehe: Math.floor(nachUnten ? unten : oben), zweispaltig };
+  const platz = Math.max(unten, oben);
+  let spalten: MenueSpalten = 1;
+  if (dichte === 'handschuh' && benoetigt(1) > platz) spalten = benoetigt(2) > platz ? 3 : 2;
+  const nachUnten = unten >= benoetigt(spalten) || unten >= oben;
+  return { unten: nachUnten, maxHoehe: Math.floor(nachUnten ? unten : oben), spalten };
 }

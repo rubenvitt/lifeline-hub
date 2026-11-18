@@ -210,7 +210,7 @@ describe('StatusWahl', () => {
       expect(menueLage(ausloeser(100, 130), 10, 30, 'kompakt', '85-1', 900)).toEqual({
         unten: true,
         maxHoehe: 754,
-        zweispaltig: false,
+        spalten: 1,
       });
     });
 
@@ -222,19 +222,20 @@ describe('StatusWahl', () => {
 
     it('bleibt unten mit begrenzter Höhe, wenn unten mehr Platz ist als oben', () => {
       const l = menueLage(ausloeser(40, 70), 10, 48, 'komfortabel', undefined, 500);
-      expect(l).toEqual({ unten: true, maxHoehe: 414, zweispaltig: false });
+      expect(l).toEqual({ unten: true, maxHoehe: 414, spalten: 1 });
     });
 
-    it('Handschuh: zweispaltig, sobald eine Spalte nicht ins Fenster passt', () => {
-      expect(menueLage(ausloeser(100, 172), 10, 72, 'handschuh', '85-1', 520).zweispaltig).toBe(
-        true,
-      );
-      expect(menueLage(ausloeser(100, 172), 4, 72, 'handschuh', '85-1', 520).zweispaltig).toBe(
-        false,
-      );
-      expect(menueLage(ausloeser(100, 130), 10, 30, 'kompakt', '85-1', 200).zweispaltig).toBe(
-        false,
-      );
+    it('Handschuh: zweispaltig, sobald eine Spalte nicht auf die größere Seite passt', () => {
+      expect(menueLage(ausloeser(100, 172), 10, 72, 'handschuh', '85-1', 900).spalten).toBe(2);
+      expect(menueLage(ausloeser(100, 172), 3, 72, 'handschuh', '85-1', 520).spalten).toBe(1);
+      expect(menueLage(ausloeser(100, 130), 10, 30, 'kompakt', '85-1', 200).spalten).toBe(1);
+    });
+
+    it('Handschuh: dreispaltig, wenn auch zwei Spalten nicht passen (1366 × 520, Knopf unten)', () => {
+      // Gemessen im Browser: Knopf bei 385–457 px, oben 369 px Platz. Zwei Spalten brauchen
+      // fünf Zeilen à 74 px und den Kopf, drei Spalten vier Zeilen.
+      const l = menueLage(ausloeser(385, 457), 10, 72, 'handschuh', '85-1', 520);
+      expect(l).toEqual({ unten: false, maxHoehe: 369, spalten: 3 });
     });
   });
 });

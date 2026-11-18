@@ -32,7 +32,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`, im Backend zu `src/`. Entsche
 - [ ] 4.3 Route `POST …/fahrzeuge/{ef_id}/status/zuruecknehmen` nach D8; Integrationstests je Szenario der Spec `fahrzeugstatus-quittung` (Rückgängig mit „seit“ von davor und gestrichenem Ereignis samt Kopien, ETB-Text, inzwischen gewechselt → 409, andere Person → 409, elf Minuten → 409, Streichen scheitert → 409 und nichts geändert, ohne Schreibrecht → 403) rot→grün
 - [ ] 4.4 `api/einsatzFahrzeuge.ts`: `nimmStatuswechselZurueck`; `zeigeStatusQuittung` in `kommunikation/rueckgaengig.tsx` (D10) mit Tests (Text, Schlüssel je Fahrzeug, 409-Wortlaut)
 - [ ] 4.5 `FahrzeugePage` (Liste, Karte, Tableau) und `einheit/FahrzeugeBesatzung.tsx` zeigen die Quittung nach jedem Wechsel; Tests rot→grün, im Tableau auch nach Zifferntaste und mit Fokus auf der Kachel
-- [ ] 4.6 `StatusWahl`: `titel` als Menügruppe, Höhenbegrenzung, Kippen, Handschuh zweispaltig (D7); Fahrzeugstellen setzen den Rufnamen; Tests rot→grün; e2e neu: Tablet 1024 × 768 oberste Zeile (S1 im Fenster) und Handschuh 1366 × 520 (S9 und S0 sichtbar) grün
+- [ ] 4.6 `StatusWahl`: `titel` als Menügruppe, Höhenbegrenzung, Kippen, Handschuh in zwei oder drei Spalten (D7); Fahrzeugstellen setzen den Rufnamen; Tests rot→grün; e2e neu: Tablet 1024 × 768 oberste Zeile (S1 im Fenster) und Handschuh 1366 × 520 (S9 und S0 sichtbar) grün
 
 ## 5. i1f9s2w7 (LLH-1782): FMS-Tableau
 
