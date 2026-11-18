@@ -84,7 +84,7 @@
   - `frontend/AGENTS.md`: Query-Key-Registry, Storno-Banner;
   - Anwenderdoku zu Betroffenen, Tieren und Schäden, falls dort das Stornieren beschrieben ist.
 
-  - ADR-0065 (protokolliertes Detail nie live, protokollfreier Stand), weil Route `entwurf` mit E1
+  - ADR-0066 (protokolliertes Detail nie live, protokollfreier Stand), weil Route `entwurf` mit E1
     (`docs/architektur/AGENTS.md`, Mitänderungsregel).
 
   Prüfen: Doku-Wächter grün.

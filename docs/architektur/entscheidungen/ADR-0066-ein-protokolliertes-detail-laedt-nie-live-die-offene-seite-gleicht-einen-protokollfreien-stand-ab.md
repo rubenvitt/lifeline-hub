@@ -1,5 +1,5 @@
 ---
-id: ADR-0065
+id: ADR-0066
 titel: Ein protokolliertes Detail lädt nie live, die offene Seite gleicht einen protokollfreien Stand ab
 status: akzeptiert
 datum: 2026-11-18
@@ -12,7 +12,7 @@ herleitung:
   - openspec/changes/archive/2026-11-18-qm3orral-storno-sperrt-offene-seiten/design.md
 ---
 
-# ADR-0065: Ein protokolliertes Detail lädt nie live, die offene Seite gleicht einen protokollfreien Stand ab
+# ADR-0066: Ein protokolliertes Detail lädt nie live, die offene Seite gleicht einen protokollfreien Stand ab
 
 ## Regeln
 
