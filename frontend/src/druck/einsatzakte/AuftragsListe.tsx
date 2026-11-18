@@ -1,7 +1,7 @@
 import type { Auftrag } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import DruckTabelle, { type DruckSpalte } from '../DruckTabelle';
-import { auftragsZeilen, type AuftragsZeile } from './auftragsListe';
+import { auftragsZeilen, type AuftragsZeile } from './auftragsZeilen';
 
 /** Papierform der Auftragsliste der Einsatzakte (LLH-1835, design.md D5). */
 export default function AuftragsListe({ auftraege }: { auftraege: readonly Auftrag[] }) {

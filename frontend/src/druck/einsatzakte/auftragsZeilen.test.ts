@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Auftrag } from '../../api/types';
-import { auftragsZeilen } from './auftragsListe';
+import { auftragsZeilen } from './auftragsZeilen';
 
 function auftrag(teil: Partial<Auftrag>): Auftrag {
   return {
