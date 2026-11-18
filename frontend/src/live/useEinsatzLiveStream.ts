@@ -13,7 +13,7 @@ import { meldeEinsatzStrom } from './einsatzStromStore';
 import { erzeugeLiveSammler, ZAEHLER_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { oeffneLiveVerbindung } from './liveVerbindung';
 import { erzeugeZeilenSammler } from './zeilenAbgleich';
-import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
+import { invalidiereOrgLiveKeys, merkeOrgStand, orgListener } from './orgListener';
 
 /**
  * EINE SSE-Verbindung für den gesamten Einsatz-Live-Feed.
@@ -173,7 +173,8 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // `Last-Event-ID` nach oder meldet `lagged`; dann laden nur die Org-Keys nach, die keinen
     // Nachlieferweg haben. Der Erst-Open lädt nur die Org-Keys nach (die
     // Einsatz-Abfragen laden beim Mount ohnehin): ein Org-Ereignis kann beim Wechsel aus dem
-    // Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734).
+    // Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734). Und nur die mit einem Stand
+    // von vor dem Verbindungsaufbau, damit ein Kaltaufruf nichts doppelt lädt (LLH-1839).
     const orgAbgleich = () => invalidiereOrgLiveKeys(sammler);
     const verbinde = (beimErstenOpen: () => void) => {
       schliessen = oeffneLiveVerbindung({
@@ -192,7 +193,8 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         },
       });
     };
-    verbinde(orgAbgleich);
+    const erstAbgleich = merkeOrgStand(qc);
+    verbinde(() => erstAbgleich(sammler));
     const abmelden = meldeEinsatzStrom();
     return () => {
       wartenBeenden?.();

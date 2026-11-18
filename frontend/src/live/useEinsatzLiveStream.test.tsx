@@ -639,7 +639,11 @@ describe('useEinsatzLiveStream', () => {
   it('invalidiert beim ersten open keinen Einsatz-Key und meldet Status open (skip-first, F14)', () => {
     vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);
-    const client = neuerQueryClient();
+    const client = new QueryClient();
+    // Stand aus der Zeit des Org-Stroms, vor dem Verbindungsaufbau (LLH-1839).
+    client.setQueryData(['einsaetze'], []);
+    client.setQueryData(['fahrzeuge', 'alle'], []);
+    vi.advanceTimersByTime(50);
     const spy = vi.spyOn(client, 'invalidateQueries');
     const status: string[] = [];
     const onStatus = (e: Event) =>
@@ -660,7 +664,27 @@ describe('useEinsatzLiveStream', () => {
     // zwischen beiden Verbindungen verloren gehen.
     expect(keys).toContainEqual(['einsaetze']);
     expect(keys).toContainEqual(['fahrzeuge']);
+    // … und nur die mit altem Stand: was beim Kaltaufruf frisch lud, bleibt (LLH-1839).
+    expect(keys).not.toContainEqual(['etb-bausteine']);
     window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('lädt beim ersten open keinen Org-Key nach, der erst nach dem Verbindungsaufbau lud (Kaltaufruf, LLH-1839)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    vi.advanceTimersByTime(50);
+    client.setQueryData(['einsaetze'], []);
+    client.setQueryData(['etb-bausteine'], []);
+    FakeEventSource.letzte?.emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(keysVon(spy)).toEqual([]);
   });
 
   // LFH-922, design.md D3: verbindet der Browser dieselbe EventSource neu, liefert der Server per
