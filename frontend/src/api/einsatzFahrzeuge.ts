@@ -59,12 +59,21 @@ export interface AngabenPatch {
 /** Der Zeilen-PATCH einer Disposition: Status, Bemerkung und die Ad-hoc-Angaben. */
 export type DispositionPatch = AngabenPatch & { status_id?: number; bemerkung?: string | null };
 
+/**
+ * Ändert eine Disposition. `erwartet` trägt die Werte beim Öffnen (Feld-CAS, LLH-1945): hat ein
+ * anderer eine dieser Angaben inzwischen geändert, antwortet der Server 409 `veraltet`.
+ */
 export function updateDisposition(
   einsatzId: number,
   efId: number,
   felder: DispositionPatch,
+  erwartet?: Partial<Omit<DispositionPatch, 'status_id'>>,
 ): Promise<EinsatzFahrzeug> {
-  return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`, 'PATCH', felder);
+  return apiSend<EinsatzFahrzeug>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`,
+    'PATCH',
+    erwartet ? { ...felder, erwartet } : felder,
+  );
 }
 
 /** Entlassene Fahrzeuge des Einsatzes (LLH-1079 Teil II, Block „Entlassen“). */

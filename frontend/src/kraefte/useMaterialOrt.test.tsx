@@ -150,4 +150,32 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
     ].map((k) => JSON.stringify(k));
     expect(keys()).toEqual(expect.arrayContaining(erwartet));
   });
+
+  it('mit dem Ort beim Öffnen geht er als Altwert mit allen vier Spalten mit (LLH-1945)', async () => {
+    const { setOrt, gesendet } = renderSetOrt();
+    await setOrt(
+      posten({ einheit_id: 2 }),
+      { art: 'uhs', id: 7 },
+      {
+        beimOeffnen: { art: 'einheit', id: 2 },
+      },
+    );
+    expect(gesendet).toEqual([
+      {
+        url: '/api/einsaetze/1/material/10',
+        body: {
+          uhs_id: 7,
+          erwartet: {
+            ort: { einheit_id: 2, einsatz_fahrzeug_id: null, uhs_id: null, br_id: null },
+          },
+        },
+      },
+    ]);
+  });
+
+  it('Handlungen ohne offenes Feld (Lösen, Rückgängig) schicken keinen Altwert', async () => {
+    const { setOrt, gesendet } = renderSetOrt();
+    await setOrt(posten({ einheit_id: 2 }), null);
+    expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/10', body: { einheit_id: null } }]);
+  });
 });

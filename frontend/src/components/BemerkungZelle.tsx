@@ -1,6 +1,7 @@
 import { IconStift } from '../icons';
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button, Typography } from 'antd';
+import { OFFEN_LASSEN } from './InlineAngabe';
 import { useRollen } from './instrument/rollenwerte';
 import { useSeitenSperre } from './offeneBearbeitung';
 import { useFokusRueckgabe } from './useFokusRueckgabe';
@@ -91,11 +92,15 @@ interface BemerkungZelleProps {
    * zeigt der Aufrufer an der Zeile. Solange sie aussteht, ist das Feld nur lesbar, sendet ein
    * weiteres Verlassen nichts und Escape bricht nicht ab. Den abgelehnten Wortlaut schickt nur
    * Enter erneut, nicht das Verlassen.
+   *
+   * `kontext.beimOeffnen` ist der Wert beim Öffnen des Felds (`null` = leer), wie bei
+   * `InlineAngabe`: der Aufrufer schickt ihn als Altwert des Feld-CAS (LLH-1945).
+   * Erfüllt die Zusage mit `OFFEN_LASSEN`, bleibt das Feld mit dem Entwurf offen.
    */
-  onSpeichern: (wert: string) => void | Promise<unknown>;
+  onSpeichern: (wert: string, kontext: { beimOeffnen: string | null }) => void | Promise<unknown>;
   /**
-   * Das Feld öffnet. Der Aufrufer hält hier den Wert beim Öffnen fest und schickt ihn als Altwert
-   * des Feld-CAS (LLH-1945, wie `beimOeffnen` bei `InlineAngabe`).
+   * Das Feld öffnet. Für Aufrufer, die den Wert beim Öffnen selbst festhalten (LLH-1945); sonst
+   * reicht `kontext.beimOeffnen` an `onSpeichern`.
    */
   onOeffnen?: () => void;
   /**
@@ -176,6 +181,8 @@ export function BemerkungZelle({
   const huelleRef = useRef<HTMLDivElement>(null);
   // Der getippte Wortlaut für Zähler und Sperre; antds `editable` meldet ihn erst beim Übernehmen.
   const [entwurf, setEntwurf] = useState('');
+  // Der Wert beim Öffnen (Feld-CAS, LLH-1945), fest bis zum nächsten Öffnen; leer ist `null`.
+  const beimOeffnenRef = useRef<string | null>(wert || null);
   const zuLang = max != null && istZuLang(entwurf, max);
   const gefuellt = !!wert;
 
@@ -206,6 +213,7 @@ export function BemerkungZelle({
 
   const oeffnen = () => {
     onOeffnen?.();
+    beimOeffnenRef.current = wert || null;
     setEntwurf(wert ?? '');
     setBearbeitet(true);
   };
@@ -289,7 +297,8 @@ export function BemerkungZelle({
     if (max != null && istZuLang(val, max)) return;
     // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen Riegel kostete
     // ein Fehlklick ein PATCH samt Invalidierung und Live-Ereignis.
-    const ergebnis = val !== (wert ?? '') ? onSpeichern(val) : undefined;
+    const ergebnis =
+      val !== (wert ?? '') ? onSpeichern(val, { beimOeffnen: beimOeffnenRef.current }) : undefined;
     if (!(ergebnis instanceof Promise)) {
       schliessen();
       return;
@@ -297,10 +306,13 @@ export function BemerkungZelle({
     sendetRef.current = true;
     setSendet(true);
     ergebnis.then(
-      () => {
+      (antwort) => {
         sendetRef.current = false;
         setSendet(false);
-        schliessen();
+        // Rückfrage mit Escape geschlossen (`useFeldKonflikt`, LLH-1945): nichts gespeichert, das
+        // Feld bleibt mit dem Entwurf offen; wie nach einer Ablehnung schickt nur Enter erneut.
+        if (antwort === OFFEN_LASSEN) abgelehntRef.current = val;
+        else schliessen();
       },
       () => {
         // Abgelehnt: Feld und Wortlaut bleiben, der Grund steht an der Zeile.

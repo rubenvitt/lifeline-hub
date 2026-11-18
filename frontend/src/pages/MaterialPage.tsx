@@ -2,6 +2,7 @@ import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, th
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
+import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
 import { ErfassungsModal } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
 import Datensicht, {
@@ -493,12 +494,25 @@ function MaterialInhalt() {
     onFehler: (e, v) => zeilen.melde(v.emId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
+  // Der Grund einer Ablehnung kommt aus `speichereBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
-    mutationFn: (v: { emId: number; bemerkung: string }) =>
-      updateDisposition(einsatzId, v.emId, { bemerkung: v.bemerkung }),
+    mutationFn: (v: { emId: number; bemerkung: string; erwartet?: string | null }) =>
+      updateDisposition(
+        einsatzId,
+        v.emId,
+        { bemerkung: v.bemerkung },
+        v.erwartet === undefined ? undefined : { erwartet: { bemerkung: v.erwartet } },
+      ),
     onMutate: (v) => zeilen.beginne(v.emId),
     onSuccess: invalidate,
-    onError: (e, v) => zeilen.melde(v.emId, e, 'Bemerkung nicht gespeichert'),
+  });
+  const speichereBemerkung = useBemerkungMitAltwert({
+    queryKey: einsatzKeys.material(einsatzId),
+    laden: () => listEinsatzMaterial(einsatzId),
+    speichern: (emId, bemerkung, erwartet) =>
+      bemerkungMutation.mutateAsync({ emId, bemerkung, erwartet }),
+    melde: (emId, e) => zeilen.melde(emId, e, 'Bemerkung nicht gespeichert'),
   });
   /*
    * Erneut disponieren (LLH-1079) hat zwei Wege mit je eigenem Fehlerort (`frontend/AGENTS.md`,
@@ -915,7 +929,12 @@ function MaterialInhalt() {
           ort={ortVon(em)}
           kontext={ortKontext}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(ziel) => setOrt(em, ziel)}
+          onSpeichern={(ziel, { beimOeffnen }) =>
+            setOrt(em, ziel, {
+              beimOeffnen,
+              ortText: (ort) => ortText(ort, ortKontext.namen),
+            })
+          }
         />
       ),
     },
@@ -994,7 +1013,7 @@ function MaterialInhalt() {
           darfSchreiben={darfSchreiben}
           max={MATERIAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val) => bemerkungMutation.mutateAsync({ emId: em.id, bemerkung: val })}
+          onSpeichern={(val, { beimOeffnen }) => speichereBemerkung(em.id, val, beimOeffnen)}
         />
       ),
     },
