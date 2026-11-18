@@ -2058,3 +2058,288 @@ async fn besatzung_zuruecknehmen_nur_wenn_frei() {
     );
     assert_eq!(fahrzeug_von().await, a);
 }
+
+// ── Statuswechsel zurücknehmen (LLH-1781, Spec `fahrzeugstatus-quittung`) ───────────────────
+
+/// Ein Fahrzeug in einer Einheit auf S2, dann ein Wechsel auf einen Status mit Zeitachsen-Marke.
+/// Liefert (app, pool, admin, einsatz, ef, einheit, s2, s4, Antwort des Wechsels).
+async fn statuswechsel_welt() -> (
+    axum::Router,
+    sqlx::SqlitePool,
+    String,
+    i64,
+    i64,
+    i64,
+    i64,
+    i64,
+    serde_json::Value,
+) {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "85-1").await;
+    let einheit = in_einheit(&app, &admin, einsatz, ef).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let nach_anfang = |p: &str| {
+        stati
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["label"].as_str().unwrap().starts_with(p))
+            .unwrap()["id"]
+            .as_i64()
+            .unwrap()
+    };
+    let (s2, s4) = (nach_anfang("2"), nach_anfang("4"));
+    sqlx::query("UPDATE fahrzeug_status SET zeitachse_marke = 'eintreffen' WHERE id = ?")
+        .bind(s4)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    // „Status seit“ von S2 in die Vergangenheit, damit vorher und nachher verschieden sind.
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET status_seit = datetime('now', '-5 minutes') WHERE id = ?",
+    )
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, wechsel) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{wechsel}");
+    (app, pool, admin, einsatz, ef, einheit, s2, s4, wechsel)
+}
+
+async fn status_zuruecknehmen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+    beleg: &serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/status/zuruecknehmen"),
+        cookie,
+        Some(&beleg.to_string()),
+    )
+    .await
+}
+
+/// Ereignisse der Einheit: (Art, gestrichen?).
+async fn einheit_ereignisse(pool: &sqlx::SqlitePool, einheit: i64) -> Vec<(String, bool)> {
+    sqlx::query_as::<_, (String, bool)>(
+        "SELECT art, gestrichen_at IS NOT NULL FROM einsatz_kraft_zeitachse \
+         WHERE einheit_id = ? ORDER BY id",
+    )
+    .bind(einheit)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Spec „Statuswechsel zurücknehmen“, Szenario „Wechsel und Rückgängig“.
+#[tokio::test]
+async fn statuswechsel_zuruecknehmen_stellt_status_und_seit_her_und_streicht_das_ereignis() {
+    let (app, pool, admin, einsatz, ef, einheit, s2, s4, wechsel) = statuswechsel_welt().await;
+    let beleg = wechsel["status_ruecknahme"].clone();
+    assert_eq!(beleg["vorher_status_id"], s2);
+    assert_eq!(beleg["status_id"], s4);
+    assert!(beleg["ereignis_id"].is_i64(), "{beleg}");
+    let vorher_seit = beleg["vorher_seit"].clone();
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), false)]
+    );
+
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status_id"], s2);
+    assert_eq!(json["status_seit"], vorher_seit);
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), true)]
+    );
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.starts_with("Fahrzeug «85-1»: Statuswechsel «")
+                && t.ends_with("» zurückgenommen")),
+        "{etb:?}"
+    );
+
+    // Ein zweites Mal: der Status steht nicht mehr → 409 veraltet.
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(json["grund"], "veraltet", "{json}");
+}
+
+/// Ein Wechsel ohne Änderung liefert keinen Beleg.
+#[tokio::test]
+async fn gleicher_status_liefert_keinen_beleg() {
+    let (app, _pool, admin, einsatz, ef, _einheit, _s2, s4, _) = statuswechsel_welt().await;
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(json.get("status_ruecknahme").is_none(), "{json}");
+    assert_eq!(
+        json["status_id"], s4,
+        "die Anzeige steht flach in der Antwort"
+    );
+}
+
+/// Szenario „Inzwischen erneut gewechselt“.
+#[tokio::test]
+async fn rueckname_nach_erneutem_wechsel_ist_409_und_aendert_nichts() {
+    let (app, pool, admin, einsatz, ef, einheit, s2, _s4, wechsel) = statuswechsel_welt().await;
+    let (s, _) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) =
+        status_zuruecknehmen(&app, &admin, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s2
+    );
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), false)]
+    );
+}
+
+/// Szenario „Andere Person“.
+#[tokio::test]
+async fn rueckname_durch_andere_person_ist_409() {
+    let (app, _pool, admin, einsatz, ef, _einheit, _s2, s4, wechsel) = statuswechsel_welt().await;
+    let id = benutzer_anlegen(&app, &admin, "fritz", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "fuehrungspersonal").await;
+    let fritz = login_cookie(&app, "fritz", "fritzpw1").await;
+    let (s, json) =
+        status_zuruecknehmen(&app, &fritz, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s4
+    );
+}
+
+/// Szenario „Nach elf Minuten“.
+#[tokio::test]
+async fn rueckname_nach_elf_minuten_ist_409() {
+    let (app, pool, admin, einsatz, ef, _einheit, _s2, s4, wechsel) = statuswechsel_welt().await;
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET status_seit = datetime('now', '-11 minutes') WHERE id = ?",
+    )
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let seit: String = sqlx::query_scalar("SELECT status_seit FROM einsatz_fahrzeug WHERE id = ?")
+        .bind(ef)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let mut beleg = wechsel["status_ruecknahme"].clone();
+    beleg["status_seit"] = serde_json::json!(seit);
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_ne!(
+        json["grund"], "veraltet",
+        "kein CAS-Fall, sondern die Frist"
+    );
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s4
+    );
+}
+
+/// Szenario „Zeitachse lässt sich nicht streichen“: nach dem Wechsel kam ein späteres Ereignis
+/// dazu, das ohne das Eintreffen die Ordnung bräche; die Rücknahme ist 409 und ändert nichts.
+#[tokio::test]
+async fn rueckname_scheitert_an_der_zeitachse_und_aendert_nichts() {
+    let (app, pool, admin, einsatz, ef, einheit, _s2, s4, wechsel) = statuswechsel_welt().await;
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let heim = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"].as_str().unwrap().starts_with("1"))
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    sqlx::query("UPDATE fahrzeug_status SET zeitachse_marke = 'entlassung' WHERE id = ?")
+        .bind(heim)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // Die Entlassung der Einheit von Hand, damit der Status S4 bleibt.
+    let ereignis = wechsel["status_ruecknahme"]["ereignis_id"]
+        .as_i64()
+        .unwrap();
+    let admin_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_kraft_zeitachse (einsatz_id, einheit_id, art, zeitpunkt_at, quelle, erfasst_von) \
+         SELECT einsatz_id, einheit_id, 'entlassung', datetime(zeitpunkt_at, '+1 minutes'), 'nachtrag', ? \
+         FROM einsatz_kraft_zeitachse WHERE id = ?",
+    )
+    .bind(admin_id)
+    .bind(ereignis)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, json) =
+        status_zuruecknehmen(&app, &admin, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s4
+    );
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), false), ("entlassung".into(), false)]
+    );
+}
+
+/// Ohne Schreibrecht im Modul: 403, wie beim Wechsel.
+#[tokio::test]
+async fn rueckname_ohne_schreibrecht_ist_403() {
+    let (app, _pool, admin, einsatz, ef, _einheit, _s2, _s4, wechsel) = statuswechsel_welt().await;
+    let id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "beobachter").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let (s, _) =
+        status_zuruecknehmen(&app, &erika, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}

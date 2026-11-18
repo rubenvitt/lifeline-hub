@@ -28,7 +28,7 @@ import {
   Augenbraue,
   monoStil,
   Segmentleiste,
-  StatusChip,
+  Status,
   useRollen,
   Zeitachseneintrag,
   type SegmentOption,
@@ -365,14 +365,16 @@ export default function LagemeldungenPage() {
         // Deeplink zur Meldung — der Weg zum Vorgang; ihr Stand steht dabei, solange er nicht
         // „neu“ ist (die Marke „Neu“ ist die Kenntnisnahme der Lage, nicht der Meldungsstatus).
         <>
-          {l.is_neu && <StatusChip ton="bedien" wort="Neu" style={{ marginInlineEnd: 8 }} />}
+          {l.is_neu && (
+            <Status groesse="klein" ton="bedien" wort="Neu" style={{ marginInlineEnd: 8 }} />
+          )}
           {l.prioritaet !== 'normal' && (
             <span style={{ marginInlineEnd: 8 }}>
               <PrioBadge prio={l.prioritaet} />
             </span>
           )}
           {l.richtung === 'extern' && (
-            <StatusChip ton="neutral" wort="Extern" style={{ marginInlineEnd: 8 }} />
+            <Status groesse="klein" ton="neutral" wort="Extern" style={{ marginInlineEnd: 8 }} />
           )}
           {/* Der Text bleibt Lage-Text oder Wortlaut, die Berichtigung steht im ETB (LLH-1382, D1). */}
           <BerichtigtMarke

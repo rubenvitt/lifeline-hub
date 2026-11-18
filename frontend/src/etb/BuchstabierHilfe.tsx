@@ -1,7 +1,8 @@
 import { IconLautsprecher } from '../icons';
 import { useState } from 'react';
-import { Button, Popover, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
+import { Button, Popover, Segmented, Space, Tooltip, Typography } from 'antd';
 import { buchstabiere, type Buchstabiertafel } from './buchstabieren';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Additive Eingabehilfe (LFH-110): zeigt auf Klick die zeichenweise Buchstabierung eines
@@ -54,9 +55,9 @@ export default function BuchstabierHilfe({
           <Space wrap size={[4, 4]}>
             {zeichen.map((z, i) =>
               z.wort ? (
-                <Tag key={i} style={{ margin: 0 }}>
+                <Marke key={i} style={{ margin: 0 }}>
                   <Typography.Text strong>{z.zeichen}</Typography.Text> <span>{z.wort}</span>
-                </Tag>
+                </Marke>
               ) : (
                 <Typography.Text key={i} type="secondary">
                   {z.zeichen === ' ' ? '␣' : z.zeichen}

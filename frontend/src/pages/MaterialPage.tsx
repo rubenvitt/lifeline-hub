@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Typography, theme } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
@@ -101,6 +101,7 @@ import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { nachforderungName } from '../nachforderungen/nachforderungName';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -142,11 +143,11 @@ function BezeichnungZelle({
 }) {
   const kategorieAusgeblendet = useSpalteAusgeblendet('kategorie');
   const marken = [
-    em.ist_adhoc && <Tag key="adhoc">ad-hoc</Tag>,
+    em.ist_adhoc && <Marke key="adhoc">ad-hoc</Marke>,
     em.ist_demo && <DemoMarke key="demo" />,
     // Bestandsdoppel eines bestimmten Stücks (LLH-1528): aufgelöst über „Aus dem Einsatz nehmen“
     // oder „Als Gerät führen“.
-    em.is_bestandsdoppel && <Tag key="doppelt">doppelt</Tag>,
+    em.is_bestandsdoppel && <Marke key="doppelt">doppelt</Marke>,
   ];
   // Herkunft aus einer Nachforderung (LLH-1226 D11) als eigene Zeile darunter, auch im Kartenmodus.
   // Dort rendert der Kartentitel diese Zelle in einem fetten `<strong>` (einem Inline-Element):

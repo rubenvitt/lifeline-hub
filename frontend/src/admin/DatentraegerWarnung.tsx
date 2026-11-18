@@ -5,7 +5,7 @@ import { globalKeys } from '../api/queryKeys';
 import type { DatentraegerOrt, DatentraegerStatus } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { istAdmin } from '../einsatz/schreibrecht';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Status, monoStil, useRollen } from '../components/instrument';
 
 /**
  * Warnleiste über der Verwaltung, solange der Server-Rechner einen Ort ohne erkennbare
@@ -97,11 +97,12 @@ export default function DatentraegerWarnung() {
             >
               <span>{ORT[o.art]}</span>
               <span style={{ ...monoStil(12), overflowWrap: 'anywhere' }}>{o.pfad}</span>
-              <StatusChip
+              <Status
+                groesse="klein"
                 ton={o.wert === 'unverschluesselt' ? 'alarm' : 'achtung'}
                 wort={o.wert === 'unverschluesselt' ? 'unverschlüsselt' : 'unbekannt'}
               />
-              {o.grund && <StatusChip ton="neutral" wort={GRUND[o.grund]} />}
+              {o.grund && <Status groesse="klein" ton="neutral" wort={GRUND[o.grund]} />}
             </li>
           ))}
         </ul>

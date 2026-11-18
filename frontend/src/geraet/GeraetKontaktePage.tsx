@@ -19,7 +19,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { Paneel, StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Status, monoStil, useRollen } from '../components/instrument';
 import type { StatusTon } from '../components/instrument/statusFlaeche';
 import { darfBeantragen } from '../einsatz/schreibrecht';
 import { IconPersonPlus } from '../icons';
@@ -329,7 +329,7 @@ function KontaktZeile({
       <span style={monoStil(14, 500)}>{reg}</span>
       <span style={{ ...monoStil(13), color: rollen.gedaempft }}>{zeit}</span>
       {anlass && <span>{anlass}</span>}
-      <StatusChip ton={marke.ton} wort={marke.wort} style={{ marginLeft: 'auto' }} />
+      <Status groesse="klein" ton={marke.ton} wort={marke.wort} style={{ marginLeft: 'auto' }} />
     </Flex>
   );
 }

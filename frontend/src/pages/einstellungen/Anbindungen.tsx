@@ -5,7 +5,7 @@ import type { Dayjs } from 'dayjs';
 import { Link, useNavigate } from 'react-router';
 import { IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
-import { Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
+import { Paneel, Status, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -234,7 +234,7 @@ export default function Anbindungen() {
                             <Link data-lfh="anbindung-name" to={anbindungPath(z.id)}>
                               {z.name}
                             </Link>
-                            <StatusChip ton={zustand.ton} wort={zustand.wort} />
+                            <Status groesse="klein" ton={zustand.ton} wort={zustand.wort} />
                           </span>
                         }
                         description={
@@ -278,7 +278,8 @@ export default function Anbindungen() {
                               (z.webhook.zustand === 'angehalten' ||
                                 z.webhook.zustand === 'fehler') && (
                                 <span data-lfh="anbindung-webhook">
-                                  <StatusChip
+                                  <Status
+                                    groesse="klein"
                                     ton={webhookZustandAnzeige(z.webhook).ton}
                                     wort={webhookZustandAnzeige(z.webhook).wort}
                                   />

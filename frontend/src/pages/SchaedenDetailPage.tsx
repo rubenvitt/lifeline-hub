@@ -1,4 +1,3 @@
-import StatusTag from '../components/StatusTag';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, theme } from 'antd';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../api/eingabegrenzen';
@@ -7,7 +6,7 @@ import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder, ortRegeln, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil } from '../components/instrument';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
@@ -355,8 +354,8 @@ export default function SchaedenDetailPage() {
           <span>
             Schaden <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
-          <StatusTag darstellung={STATUS_META[s.status]} />
-          {s.storniert_at && <StatusChip ton="neutral" wort="storniert" />}
+          <Status darstellung={STATUS_META[s.status]} />
+          {s.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}
         </Space>
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}

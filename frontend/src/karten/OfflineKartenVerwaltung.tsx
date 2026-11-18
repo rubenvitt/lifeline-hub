@@ -7,7 +7,6 @@ import {
   Popconfirm,
   Progress,
   Space,
-  Tag,
   theme,
   Tooltip,
   Typography,
@@ -42,8 +41,9 @@ import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
 import OfflineRegionPicker from './OfflineRegionPicker';
 import OfflineVorhandeneModal from './OfflineVorhandeneModal';
 import { globalKeys } from '../api/queryKeys';
-import StatusTag from '../components/StatusTag';
 import { kartenBauStatus, offlineKarteStatus, type StatusDarstellung } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 /** Bau-Status-Werte, während derer die Bau-Status-Zeile pollt (2 s) — analog Download-Polling. */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -204,7 +204,7 @@ export default function OfflineKartenVerwaltung() {
                     auf dem Gerät seit {seit}
                   </Typography.Text>
                 )}
-                {k.update_verfuegbar && <StatusTag darstellung={UPDATE_VERFUEGBAR} />}
+                {k.update_verfuegbar && <Status darstellung={UPDATE_VERFUEGBAR} />}
               </Space>
             )}
           </div>
@@ -242,7 +242,7 @@ export default function OfflineKartenVerwaltung() {
         const fehler = akt?.fehler ? (
           <Tooltip title={akt.fehler}>
             <span>
-              <StatusTag darstellung={UPDATE_FEHLGESCHLAGEN} />
+              <Status darstellung={UPDATE_FEHLGESCHLAGEN} />
             </span>
           </Tooltip>
         ) : null;
@@ -250,7 +250,7 @@ export default function OfflineKartenVerwaltung() {
         if (akt?.phase && akt.phase !== 'laedt' && s !== 'laedt' && k.geladen == null) {
           return (
             <Space size={8} wrap>
-              <StatusTag
+              <Status
                 icon={<IconLadekreis drehen />}
                 darstellung={{ ...offlineKarteStatus.laedt, label: PHASE_ETIKETT[akt.phase] }}
               />
@@ -264,7 +264,7 @@ export default function OfflineKartenVerwaltung() {
         if (!laeuft) {
           return (
             <Space size={8} wrap>
-              <StatusTag darstellung={offlineKarteStatus[s]} />
+              <Status darstellung={offlineKarteStatus[s]} />
               {fehler}
             </Space>
           );
@@ -276,7 +276,7 @@ export default function OfflineKartenVerwaltung() {
         const label = s === 'laedt' ? 'lädt' : 'aktualisiert';
         return (
           <Space size={8}>
-            <StatusTag
+            <Status
               icon={<IconLadekreis drehen />}
               darstellung={{ ...offlineKarteStatus.laedt, label }}
             />
@@ -310,10 +310,10 @@ export default function OfflineKartenVerwaltung() {
       title: 'Anzeige',
       key: 'anzeige',
       render: (_: unknown, k: OfflineKarte) => {
-        if (k.status !== 'bereit') return <Tag>—</Tag>;
+        if (k.status !== 'bereit') return <Marke>—</Marke>;
         const istRaster = k.format === 'png' || k.format === 'jpg' || k.format === 'webp';
         return (
-          <StatusTag
+          <Status
             darstellung={{
               ...offlineKarteStatus.bereit,
               label: istRaster ? 'bereit' : 'wird angezeigt',
@@ -421,7 +421,7 @@ export default function OfflineKartenVerwaltung() {
       {istAdmin && bauVerfuegbar && aktiveBauten.length > 0 && (
         <Space size={6} wrap style={{ marginBottom: 12 }}>
           {aktiveBauten.map((j) => (
-            <StatusTag
+            <Status
               key={j.id}
               darstellung={{
                 ...kartenBauStatus[j.status.status],

@@ -1,9 +1,10 @@
-import { Space, Tag, theme } from 'antd';
+import { Space, theme } from 'antd';
 import type { KommunikationsVerbindung, Sprechgruppe } from '../api/types';
 import { Datenfeld, monoStil } from './instrument';
 import { mitBetriebsart, teileSprechgruppen } from './kommunikationsmittel';
 import { istTelefon } from './verbindungen';
 import { VerbindungenListe } from './VerbindungenFeld';
+import { Marke } from './instrument/Marke';
 
 /**
  * Funk und Telefon getrennt (LLH-1134, Entscheidung LLH-1126 Option B): Lesezeilen für Abschnitt
@@ -42,10 +43,10 @@ export default function FunkUndTelefon({
             <Space size={[token.marginXS, token.marginXS]} wrap>
               {ruf && <span style={monoStil(13)}>{ruf}</span>}
               {tmo.map((s) => (
-                <Tag key={s.id}>{mitBetriebsart('TMO', s.bezeichnung)}</Tag>
+                <Marke key={s.id}>{mitBetriebsart('TMO', s.bezeichnung)}</Marke>
               ))}
               {dmo.map((s) => (
-                <Tag key={s.id}>{mitBetriebsart('DMO', s.bezeichnung)}</Tag>
+                <Marke key={s.id}>{mitBetriebsart('DMO', s.bezeichnung)}</Marke>
               ))}
             </Space>
           ) : (

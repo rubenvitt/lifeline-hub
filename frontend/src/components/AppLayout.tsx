@@ -1,6 +1,6 @@
 import { OrgAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { IconSchloss } from '../icons';
-import { Layout, Tag, Typography, theme } from 'antd';
+import { Layout, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
 import { useEinsatzRueckweg } from '../einsatz/einsatzRueckweg';
@@ -27,6 +27,7 @@ import { ebene1Seite } from './ebene1Seite';
 import { planungenPfad } from '../routing/deeplinks';
 import { Ebene1OrtProvider, type Ebene1OrtWert } from './Ebene1OrtKontext';
 import { sprungzielInhalt } from './SprungZumInhalt';
+import { Marke } from './instrument/Marke';
 
 const { Header, Content } = Layout;
 
@@ -105,7 +106,7 @@ function GlobalLink({
             bei ≥ `lg` und behält seinen Grund. Der gedämpfte Link bleibt auf JEDER Breite stehen:
             „gesperrt statt versteckt" ist die Regel, nicht der Tag. */}
         {grundSichtbar && (
-          <Tag
+          <Marke
             style={{
               margin: 0,
               color: farbenDunkel.text,
@@ -114,7 +115,7 @@ function GlobalLink({
             }}
           >
             Keine Berechtigung
-          </Tag>
+          </Marke>
         )}
       </Typography.Text>
     );

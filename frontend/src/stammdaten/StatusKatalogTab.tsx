@@ -11,10 +11,10 @@ import {
 import type { FahrzeugStatus, StatusKategorie, ZeitachseMarke } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
-import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
+import { Status } from '../components/instrument/Status';
 
 interface FormWerte {
   label: string;
@@ -58,7 +58,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     onFilter: (wert, s) => s.kategorie === String(wert),
     // In der Folge der Kategorien, nicht nach dem Wort (LLH-1096).
     sorter: nachZahl((s: FahrzeugStatus) => kategorien.indexOf(s.kategorie)),
-    render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
+    render: (k: StatusKategorie) => <Status darstellung={statusKategorie[k]} />,
   },
   {
     title: 'Farbe',

@@ -1092,7 +1092,9 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     // (3) Filter setzen — der Suchfilter kommt als einziger ohne Stammdaten aus.
     await page.getByPlaceholder('Suche...').fill('Messkraft');
-    const marke = page.locator('.ant-tag').filter({ hasText: 'Suche:' });
+    const marke = page
+      .locator(':is([data-lfh="status"],[data-marke])')
+      .filter({ hasText: 'Suche:' });
     await expect(marke).toHaveCount(1);
 
     // (4) Der Zweitweg, an dem die Ausnahme der Marke hängt: zuerst DA, dann groß genug.
@@ -1101,7 +1103,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     // (5) Die Marke selbst, protokolliert statt gepinnt.
     const markenKasten = (await marke.boundingBox())!;
-    const kreuz = (await marke.locator('.ant-tag-close-icon').boundingBox())!;
+    const kreuz = (await marke.locator('button').boundingBox())!;
 
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Umschalter-Segment ${segment}, ` +
@@ -1172,7 +1174,9 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
       `Filter-Suchfeld (${dichte})`,
     );
     await page.getByPlaceholder('Suche...').fill('Messkraft');
-    await expect(page.locator('.ant-tag').filter({ hasText: 'Suche:' })).toHaveCount(1);
+    await expect(
+      page.locator(':is([data-lfh="status"],[data-marke])').filter({ hasText: 'Suche:' }),
+    ).toHaveCount(1);
     const knopf = await haeltStufe(
       page.getByRole('button', { name: 'Filter zurücksetzen', exact: true }),
       soll,

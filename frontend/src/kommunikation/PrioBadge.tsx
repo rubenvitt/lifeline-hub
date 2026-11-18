@@ -1,4 +1,4 @@
-import { StatusChip } from '../components/instrument';
+import { Status } from '../components/instrument';
 import { prioTon } from './kartenKante';
 import { PRIO_META, type KommPrio } from './phase';
 
@@ -6,7 +6,8 @@ import { PRIO_META, type KommPrio } from './phase';
 export default function PrioBadge({ prio }: { prio: KommPrio }) {
   const meta = PRIO_META[prio] ?? PRIO_META.normal;
   return (
-    <StatusChip
+    <Status
+      groesse="klein"
       ton={prioTon(prio in PRIO_META ? prio : 'normal')}
       wort={meta.label}
       style={{ fontWeight: 600 }}

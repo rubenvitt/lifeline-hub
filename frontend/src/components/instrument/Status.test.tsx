@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { farbenHell } from '../../theme/tokens';
-import { Status, StatusChip, StatusZelle } from './Status';
+import { Status, StatusZelle } from './Status';
 
 describe('StatusZelle', () => {
   it('zeigt die Zahl auf getönter Fläche und trägt das Wort für Vorleser mit', () => {
@@ -21,35 +21,6 @@ describe('StatusZelle', () => {
     const wort = screen.getByText('Ausfall', { exact: false });
     expect(wort).not.toHaveAttribute('aria-hidden');
     expect(wort).toHaveStyle({ position: 'absolute', width: '1px' });
-  });
-});
-
-describe('StatusChip', () => {
-  it('Höhe 22, Fläche, Code Mono und Wort — beides sichtbar', () => {
-    renderMitProviders(<StatusChip ton="bedien" code="4" wort="gebunden" />);
-    const chip = document.querySelector<HTMLElement>('[data-lfh="status-chip"]')!;
-    expect(chip).toHaveStyle({ height: '22px', background: farbenHell.bedienFlaeche });
-    expect(screen.getByText('4')).toHaveStyle({ fontWeight: '500' });
-    expect(screen.getByText('gebunden')).toBeVisible();
-  });
-
-  it('mit `trenner` steht der FMS-Punkt zwischen Code und Wort, ohne bleibt die Zahl am Wort', () => {
-    renderMitProviders(
-      <>
-        <StatusChip ton="bedien" code="S4" wort="Am Einsatzort" trenner />
-        <StatusChip ton="achtung" code={2} wort="ausstehend" />
-      </>,
-    );
-    const [fms, zahl] = document.querySelectorAll<HTMLElement>('[data-lfh="status-chip"]');
-    expect(fms.textContent).toBe('S4·Am Einsatzort');
-    expect(zahl.textContent).toBe('2ausstehend');
-  });
-
-  it('ohne Code steht das Wort allein', () => {
-    renderMitProviders(<StatusChip ton="neutral" wort="abgemeldet" />);
-    const chip = document.querySelector<HTMLElement>('[data-lfh="status-chip"]')!;
-    expect(chip.textContent).toBe('abgemeldet');
-    expect(chip.dataset.ton).toBe('neutral');
   });
 });
 

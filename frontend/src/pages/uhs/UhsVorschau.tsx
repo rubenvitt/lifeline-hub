@@ -3,11 +3,11 @@ import { Space, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import type { Uhs } from '../../api/types';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
-import StatusTag from '../../components/StatusTag';
 import { Datenfeld, Datenraster } from '../../components/instrument';
 import { datensatzAbfrage } from '../../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../../command-palette/VorschauZustand';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Lese-Vorschau einer Unfallhilfsstelle in der Sprungpalette.
@@ -30,7 +30,7 @@ export default function UhsVorschau({ einsatzId, id }: { einsatzId: number; id: 
           <Datenfeld label="Bezeichnung">{u.bezeichnung}</Datenfeld>
           <Datenfeld label="Status">
             <Space wrap>
-              <StatusTag darstellung={uhsStatus[u.status]} />
+              <Status darstellung={uhsStatus[u.status]} />
               {u.storniert_at && <Typography.Text type="secondary">storniert</Typography.Text>}
             </Space>
           </Datenfeld>

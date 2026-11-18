@@ -19,7 +19,6 @@ import Datensicht, {
 import { KennungsLink } from '../components/kennungsLink';
 import { betreuungsstellePfad } from '../routing/deeplinks';
 import type { MenueEintrag } from '../components/MenueAusloeser';
-import StatusTag from '../components/StatusTag';
 import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { aktionsSpalte } from '../components/aktionsSpalte';
@@ -36,6 +35,7 @@ import {
   personenZahl,
 } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Block „Betreuungsstellen" der Betreuungsseite (seit LLH-1034 ihr einziger Block).
@@ -221,7 +221,7 @@ const stellenSpalten = (
         return (
           <Space wrap>
             <span>{personenZahl(s.belegung.belegt)}</span>
-            {stufe && <StatusTag darstellung={stufe} />}
+            {stufe && <Status darstellung={stufe} />}
             {hinweis}
           </Space>
         );
@@ -246,7 +246,7 @@ const stellenSpalten = (
         werte: STATUS.map((st) => ({ text: betreuungsstelleStatus[st].label, value: st })),
         trifft: (s, w) => s.status === w,
       },
-      render: (_, s) => <StatusTag darstellung={betreuungsstelleStatus[s.status]} />,
+      render: (_, s) => <Status darstellung={betreuungsstelleStatus[s.status]} />,
     },
     {
       key: 'kapazitaet',

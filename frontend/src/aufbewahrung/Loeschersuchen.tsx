@@ -9,13 +9,13 @@ import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle
 import { nachFolge, nachText, werteAusKatalog } from '../components/katalogVergleich';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import StatusTag from '../components/StatusTag';
 import { Paneel } from '../components/instrument';
 import { schwaerzungsantragStand } from '../theme/statusFarben';
 import { ZIEL_ART } from './archivText';
 import ArchivPersonAntragDialog from './ArchivPersonAntragDialog';
 import PersonensucheDialog from './PersonensucheDialog';
 import SchwaerzungsantragDialog, { type AntragZielWahl } from './SchwaerzungsantragDialog';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Paneel „Löschersuchen (Art. 17)“ der Archivakte (LFH-751, Spec `aufbewahrung-loeschersuchen`,
@@ -124,7 +124,7 @@ export default function Loeschersuchen({
       sorter: nachFolge(Object.keys(schwaerzungsantragStand), (a: Schwaerzungsantrag) => a.stand),
       filters: werteAusKatalog(schwaerzungsantragStand),
       onFilter: (w, a) => a.stand === w,
-      render: (_, a) => <StatusTag darstellung={schwaerzungsantragStand[a.stand]} />,
+      render: (_, a) => <Status darstellung={schwaerzungsantragStand[a.stand]} />,
     },
     {
       key: 'beantragt',

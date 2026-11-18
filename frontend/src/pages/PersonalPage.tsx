@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { Breadcrumb, Button, Space, Tag, theme } from 'antd';
+import { Breadcrumb, Button, Space, theme } from 'antd';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -64,6 +64,7 @@ import { abschnittDerEinheit, buildEinheitOptions } from '../kraefte/kraeftebaum
 import { POSITION_LABELS } from '../api/personal';
 import type { StaerkePosition } from '../api/types';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Die Personalliste eines Einsatzes (LLH-1060, Spec `personal-ansicht`): gruppiert nach Einheit,
@@ -403,7 +404,7 @@ export default function PersonalPage() {
       render: (_, ep) => (
         <Space wrap size={4}>
           {ep.name}
-          {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
+          {ep.ist_adhoc && <Marke>ad-hoc</Marke>}
           {ep.ist_demo && <DemoMarke />}
         </Space>
       ),
@@ -458,7 +459,7 @@ export default function PersonalPage() {
                 marke={
                   ep.einheit_id != null &&
                   einheiten.find((e) => e.id === ep.einheit_id)?.fuehrer_id === ep.id ? (
-                    <Tag>Einheitsführer</Tag>
+                    <Marke>Einheitsführer</Marke>
                   ) : undefined
                 }
                 onSpeichern={schreiben.einheit(ep.id)}

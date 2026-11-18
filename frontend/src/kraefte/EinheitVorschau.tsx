@@ -4,11 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkUndTelefon from '../components/FunkUndTelefon';
-import StatusTag from '../components/StatusTag';
 import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { einheitStatusAnzeige } from './meldebildRaster';
+import { Status } from '../components/instrument/Status';
 
 function gleicheStaerke(a: Staerke, b: Staerke): boolean {
   return (
@@ -51,7 +51,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
               <span
                 style={{ display: 'inline-flex', flexDirection: 'column', gap: token.marginXXS }}
               >
-                <StatusTag
+                <Status
                   darstellung={{
                     rolle: status.ton,
                     label: status.code ? `${status.code} · ${status.wort}` : status.wort,

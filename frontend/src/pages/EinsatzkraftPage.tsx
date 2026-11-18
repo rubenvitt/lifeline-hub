@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { Alert, App, Breadcrumb, Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Input, Popconfirm, Space, Typography } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Fragment, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,7 +42,14 @@ import {
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
-import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  Paneel,
+  Status,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
@@ -73,6 +80,7 @@ import {
 } from '../routing/deeplinks';
 import { personalDetailPfad } from '../stammdaten/stammdatenDetail';
 import { statusKategorie } from '../theme/statusFarben';
+import { Marke } from '../components/instrument/Marke';
 import './EinsatzkraftPage.css';
 
 dayjs.extend(utc);
@@ -441,9 +449,9 @@ export default function EinsatzkraftPage() {
   const titel: ReactNode = (
     <Space size={8} wrap>
       {ep.name}
-      {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
+      {ep.ist_adhoc && <Marke>ad-hoc</Marke>}
       {ep.ist_demo && <DemoMarke />}
-      {isEntlassen && <Tag>entlassen</Tag>}
+      {isEntlassen && <Status ton="neutral" wort="entlassen" groesse="klein" />}
     </Space>
   );
 
@@ -564,7 +572,7 @@ export default function EinsatzkraftPage() {
                   wert={ep.einheit_id ?? null}
                   optionen={einheitOptionen}
                   darfSchreiben={darfSchreiben}
-                  marke={fuehrtEinheit ? <Tag>Einheitsführer</Tag> : undefined}
+                  marke={fuehrtEinheit ? <Marke>Einheitsführer</Marke> : undefined}
                   onSpeichern={mitToast('Einheit', schreiben.einheit(ep.id))}
                 />
               </Datenfeld>

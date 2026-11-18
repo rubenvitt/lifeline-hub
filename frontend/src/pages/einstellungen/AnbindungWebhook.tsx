@@ -10,7 +10,7 @@ import {
   Datenraster,
   Paneel,
   PaneelZeile,
-  StatusChip,
+  Status,
   monoStil,
   useRollen,
   type BearbeitbaresFeld,
@@ -325,7 +325,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
       <BearbeitbaresPaneel<WebhookWerte, WebhookPatch>
         key={webhook.id}
         titel="Webhook"
-        meta={<StatusChip ton={zustand.ton} wort={zustand.wort} />}
+        meta={<Status groesse="klein" ton={zustand.ton} wort={zustand.wort} />}
         datensatz={webhook}
         werte={{
           url: webhook.url ?? '',

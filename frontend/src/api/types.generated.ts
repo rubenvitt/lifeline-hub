@@ -3823,6 +3823,13 @@ export interface components {
             traegerorganisation?: string | null;
         };
         /**
+         * @description Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der
+         *     Beleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781).
+         */
+        FahrzeugPatchAntwort: components["schemas"]["EinsatzFahrzeugAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["StatusRuecknahmeBeleg"] | null;
+        };
+        /**
          * @description Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
          *     (Listen-Endpunkt liefert ohnehin nur aktive).
          */
@@ -8068,6 +8075,32 @@ export interface components {
          * @enum {string}
          */
         StatusKategorie: "verfuegbar" | "gebunden" | "nicht_verfuegbar";
+        /**
+         * @description Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,
+         *     Change `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,
+         *     wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+         */
+        StatusRuecknahmeBeleg: {
+            /**
+             * Format: int64
+             * @description Zeitachsen-Ereignis der Einheit, das der Wechsel geschrieben hat.
+             */
+            ereignis_id?: number | null;
+            /**
+             * Format: int64
+             * @description Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht.
+             */
+            status_id: number;
+            /** @description „Status seit“ des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt. */
+            status_seit: string;
+            /** @description „Status seit“ vor dem Wechsel. */
+            vorher_seit?: string | null;
+            /**
+             * Format: int64
+             * @description Status vor dem Wechsel; `null`, wenn keiner gesetzt war.
+             */
+            vorher_status_id?: number | null;
+        };
         /**
          * @description Ein aufgelöster Eintrag des FMS-Statuskatalogs (`fahrzeug_status`), wie ihn Fahrzeug
          *     und Einheit tragen (LFH-609).

@@ -1,4 +1,4 @@
-import { Button, Space, Tag } from 'antd';
+import { Button, Space } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -33,6 +33,7 @@ import {
 } from './dienststatus';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
+import { Marke } from '../components/instrument/Marke';
 
 const POSITION_FOLGE = Object.keys(POSITION_LABELS) as StaerkePosition[];
 
@@ -128,7 +129,7 @@ export default function PersonalTab() {
         p.qualifikationen.length ? (
           <Space size={[0, 4]} wrap>
             {p.qualifikationen.map((q) => (
-              <Tag key={q.id}>{q.label}</Tag>
+              <Marke key={q.id}>{q.label}</Marke>
             ))}
           </Space>
         ) : (

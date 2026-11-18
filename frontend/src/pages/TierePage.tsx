@@ -1,5 +1,5 @@
-import { Breadcrumb, Button, Collapse, Form, Input, Space, Tag, Typography } from 'antd';
-import { Segmentleiste, StatusChip } from '../components/instrument';
+import { Breadcrumb, Button, Collapse, Form, Input, Space, Typography } from 'antd';
+import { Segmentleiste, Status } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -50,6 +50,7 @@ import { modulName } from '../einsatz/modulRegistry';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortEingabe } from '../anzeige/ortsfeldFormular';
+import { Marke } from '../components/instrument/Marke';
 
 /** Formularwerte: der Fundort ist ein Ortsfeld mit Text und Koordinate (LLH-1114). */
 type TierFormular = Omit<TierEingabe, 'antreff_ort' | 'antreff_lat' | 'antreff_lon'> & {
@@ -91,7 +92,7 @@ function halterAnzeige(t: Tier): React.ReactNode {
     return t.halter_storniert_at ? (
       <Typography.Text type="secondary">Halter (storniert): {label}</Typography.Text>
     ) : (
-      <Tag>{label}</Tag>
+      <Marke>{label}</Marke>
     );
   }
   if (t.halter_kontakt) return <Typography.Text>{t.halter_kontakt}</Typography.Text>;
@@ -130,7 +131,7 @@ const tierSpalten = spaltenFuer<Tier>()([
     sortWert: (t) => STATUS_FOLGE.indexOf(t.status),
     filter: { werte: STATUS_WERTE, trifft: (t, w) => t.status === w, ohneKartenfeld: true },
     render: (_, t) => (
-      <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
+      <Status groesse="klein" ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
     ),
   },
   {

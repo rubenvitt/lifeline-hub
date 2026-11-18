@@ -4,7 +4,7 @@ import { monoStil, useRollen } from './rollenwerte';
 import { statusFlaeche, tonVonRolle, type StatusTon } from './statusFlaeche';
 
 /**
- * StatusZelle und StatusChip — Status als getönte Fläche (Neuentwurf S1 „Statuszelle",
+ * StatusZelle und Status — Status als getönte Fläche (Neuentwurf S1 „Statuszelle",
  * S2 Abschnittsraster, S6 Einheitenliste). Die Farbwerte und ihre Kontrastrechnung stehen
  * in {@link statusFlaeche}; hier wird nur angeordnet.
  *
@@ -66,50 +66,6 @@ export function StatusZelle({ ton, wert, wort, hoehe = 34, style }: StatusZelleP
       {wert}
       <span style={NUR_VORLESER}> {wort}</span>
     </div>
-  );
-}
-
-interface StatusChipProps {
-  ton: StatusTon;
-  /** Zweiter Kanal — Pflicht (Wort neben dem Code). */
-  wort: string;
-  /** Optionaler Code vor dem Wort (FMS „2", „SK III"), Mono 11/500. */
-  code?: ReactNode;
-  /**
-   * Sichtbarer Punkt zwischen Code und Wort, das FMS-Format „S4 · Am Einsatzort“ (LFH-973).
-   * Nur für einen Status-Code: eine Zahl als Code („2 ausstehend“) bleibt ohne Punkt.
-   */
-  trenner?: boolean;
-  title?: string;
-  style?: CSSProperties;
-}
-
-/** Inline-Chip, Höhe 22 (Entwurf S6): Fläche + Code Mono + Wort 11. */
-export function StatusChip({ ton, wort, code, trenner, title, style }: StatusChipProps) {
-  const { token, rollen } = useRollen();
-  const f = statusFlaeche(rollen, ton);
-  return (
-    <span
-      data-lfh="status-chip"
-      data-ton={ton}
-      title={title}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: token.marginXS,
-        height: 22,
-        paddingInline: token.paddingSM,
-        background: f.grund,
-        color: f.text,
-        whiteSpace: 'nowrap',
-        ...style,
-      }}
-    >
-      {code != null && <span style={monoStil(11, 500)}>{code}</span>}
-      {/* Vorgelesen trennt der Abstand, der Punkt ist Optik. */}
-      {code != null && trenner && <span aria-hidden="true">·</span>}
-      <span style={{ fontSize: 11 }}>{wort}</span>
-    </span>
   );
 }
 

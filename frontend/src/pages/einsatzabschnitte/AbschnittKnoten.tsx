@@ -1,9 +1,8 @@
 import { IconPerson, IconTelefon } from '../../icons';
 import { Space, theme } from 'antd';
-import { StatusChip, monoStil } from '../../components/instrument';
+import { Status, monoStil } from '../../components/instrument';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
-import StatusTag from '../../components/StatusTag';
 import { telefonVerbindungen } from '../../components/verbindungen';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 
@@ -34,7 +33,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
   return (
     <Space size={token.marginXXS} wrap>
       <span>{abschnitt.name}</span>
-      {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
+      {lage && <Status darstellung={lage} />}
       {/* Zahlen in Mono, kein farbiges Etikett: Blau ist die Bedienrolle. */}
       <span style={{ ...monoStil(12), color: token.colorText }}>
         <StaerkeAnzeige wert={staerke} />
@@ -44,7 +43,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
             zählt „inkl. UA“. */}
         {anzahlEinheiten === 1 ? '1 Einheit' : `${anzahlEinheiten} Einheiten`} direkt
       </span>
-      {!besetzt && <StatusChip ton="achtung" wort="ohne Leiter" />}
+      {!besetzt && <Status groesse="klein" ton="achtung" wort="ohne Leiter" />}
       {abschnitt.leiter_name && (
         <span style={{ color: token.colorTextSecondary }}>
           <span aria-hidden="true">

@@ -11,10 +11,10 @@ import {
 import type { PersonalStatus, StatusKategorie, ZeitachseMarke } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
-import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
+import { Status } from '../components/instrument/Status';
 
 interface FormWerte {
   label: string;
@@ -53,7 +53,7 @@ const spalten: TableColumnsType<PersonalStatus> = [
     onFilter: (wert, s) => s.kategorie === wert,
     // In der Folge der Kategorien, nicht nach dem Wort (LLH-1096).
     sorter: nachZahl((s: PersonalStatus) => kategorien.indexOf(s.kategorie)),
-    render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
+    render: (k: StatusKategorie) => <Status darstellung={statusKategorie[k]} />,
   },
   {
     title: 'Farbe',

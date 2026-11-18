@@ -9,12 +9,12 @@ import type { Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import StatusTag from '../components/StatusTag';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { abschnittDerEinheit } from '../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../kraefte/meldebildRaster';
 import AbschnittDaten from '../pages/einsatzabschnitte/AbschnittDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Einheiten nach Abschnitt (der eigene zuerst), darin nach Sortierung und Name. Es zählt der
@@ -66,7 +66,7 @@ function EinheitZeile({
           {abschnittName && <span style={{ color: rollen.gedaempft }}> · {abschnittName}</span>}
           {ueber && <span style={{ color: rollen.gedaempft }}> · über {ueber}</span>}
         </span>
-        <StatusTag
+        <Status
           darstellung={{
             rolle: status.ton,
             label: status.code ? `${status.code} · ${status.wort}` : status.wort,

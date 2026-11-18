@@ -3,7 +3,7 @@ import { Alert, App, Button, Form, Input, Modal, Radio, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { IconKreuz, IconPlus } from '../../icons';
-import { Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
+import { Paneel, Status, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -439,7 +439,7 @@ export default function EinwurfZugaenge() {
                             }}
                           >
                             <span data-lfh="einwurf-name">{z.name}</span>
-                            <StatusChip ton={zustand.ton} wort={zustand.wort} />
+                            <Status groesse="klein" ton={zustand.ton} wort={zustand.wort} />
                           </span>
                         }
                         description={

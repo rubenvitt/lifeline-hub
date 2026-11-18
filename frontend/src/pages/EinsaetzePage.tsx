@@ -1,5 +1,5 @@
 import { IconOrtsmarke, IconPlus } from '../icons';
-import { Alert, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
+import { Alert, AutoComplete, Button, Form, Input, theme } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
@@ -34,7 +34,6 @@ import { globalKeys } from '../api/queryKeys';
 import { einsatzPfad } from '../routing/deeplinks';
 import EinsatzSeite from '../components/EinsatzSeite';
 import SektionHeader from '../components/SektionHeader';
-import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import { flaeche } from '../theme/tokens';
 import { einsatzStatus } from '../theme/statusFarben';
@@ -54,6 +53,8 @@ import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../einsatz/einsatzlei
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
 interface AnlegeWerte {
@@ -461,17 +462,17 @@ function EinsaetzeInhalt() {
         </div>
         <div className="lfh-einsatzkachel__leib">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}>
-            <StatusTag darstellung={einsatzStatus[e.status]} />
+            <Status darstellung={einsatzStatus[e.status]} />
             {/* Eine Übung trägt die Übungsmarke statt des neutralen Tags (LLH-1725, Spec
                 `uebungsmarke`); die übrigen Arten bleiben grau. */}
             {isUebung(e) ? (
               <UebungsMarke einsatz={e} />
             ) : (
-              <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
+              <Marke>{EINSATZART_LABELS[e.einsatzart]}</Marke>
             )}
             {/* Mit Kontext: allein gelesen hielte man „Einsatzleitung“ für eine Eigenschaft des
                 Einsatzes, nicht für die eigene Rolle (LFH-946). */}
-            {e.meine_rolle && <Tag>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Tag>}
+            {e.meine_rolle && <Marke>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
           </div>
           {/* Ort und Beginn beantworten „welcher ist meiner?". Das Icon trägt eine
               `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}

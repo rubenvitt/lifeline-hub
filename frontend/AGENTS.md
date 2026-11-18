@@ -71,8 +71,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Bausteine** in `components/instrument/` (Import über `index.ts`, Dateikopf nennt die Regel):
   `Augenbraue` (`als="h2…h6"`) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
-  Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`StatusChip` (`wort` Pflicht, Übersetzung
-  nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; wann welche Form: Bausteinwahl, „Umschalten“;
+  Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`Status` (`wort` Pflicht, Übersetzung
+  nur in `statusFlaeche.ts`; `Status` randlos, getönt, Formzeichen, Größen `klein`/`normal`) ·
+  `Marke` (Kennzeichnung ohne Zustand, neutral, randlos; `onEntfernen` macht sie bedienbar) ·
+  `StatusKnopf`/`StatusBlock` (bedienbarer Status, nur über `StatusWahl`; Spec
+  `status-darstellung`, Change `eon26eat-status-und-bedienung`) · `Segmentleiste` (statt antds `Segmented`; wann welche Form: Bausteinwahl, „Umschalten“;
   `SegmentFeld` als Formularfeld; `SegmentUmschalter` als ein Umschaltknopf daneben, LLH-1065; Wortlaut einzeilig; ein `\n` im `label` bricht ihn in zwei
   Zeilen, nur wo die Höhe sie trägt und einzeilig kein Platz bliebe: „Ohne\nSchicht“ der
   Ablösung im Handschuh-Betrieb auf dem Handschirm, LLH-1128) · `Sammelbanner` ·
@@ -369,7 +372,9 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
-| Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
+| Zustand eines Datensatzes (Status, Urteil, storniert)                                           | `Status`, im Raster `StatusZelle` (Farbachsen, „Rahmen heißt bedienbar“)                                                                         | `Status`                           |
+| Status, den man wechseln kann                                                                   | `StatusWahl` (rendert `StatusKnopf`; Tableau `variante="gross"`)                                                                                 | `Status`                           |
+| Kennzeichnung ohne Zustand (ad-hoc, Rolle, Typ, Herkunft)                                       | `Marke` (entfernbar mit `onEntfernen`), nie rohes `Tag`                                                                                          | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
 | Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts`, Dauer `anzeige/dauer.ts` („Zeitdarstellung“, „Uhr, Dauer und Datenstand“)                                          | `Zeitdarstellung`                  |
 | Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
@@ -506,8 +511,10 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `personen/Sichtungsboard.tsx`): es ordnet dieselbe Menge in Spalten je Kategorie, statt dieselbe
   Liste als Tabelle oder Karten zu zeigen.
 - **FMS-Tableau** (LFH-642, `kraefte/FmsTableau.tsx`): Ansicht `?ansicht=tableau` der
-  Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl`), Kachel selbst nicht
-  klickbar; Sortierung Abschnitt → Einheit → Funkrufname, nie Status; der Abschnitt ist der
+  Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl` `variante="gross"`: der
+  Statusblock mit Ziffer 40 px, LLH-1782, Spec `fms-tableau`), Kachel selbst nicht klickbar;
+  Rufname 22 px Mono, Typ und Einheit darunter, Kacheln ab 240 px (`auto-fill`, eine einzelne wird
+  nie fensterbreit); Sortierung Abschnitt → Einheit → Funkrufname, nie Status; der Abschnitt ist der
   eigene der Einheit, sonst der geerbte (`abschnittDerEinheit`, dieselbe Lesart wie die
   Abschnitt-Spalte der Liste, LLH-1073); `fms_anker` 0–9 nur Beschleuniger (Doppelbelegung setzt
   nichts) (`docs/superpowers/specs/2026-09-23-lfh-642-pruefliste.md`).
@@ -560,7 +567,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 
 **Farbachsen** (Vertrag `theme/statusFarben.ts`)
 
-- **Betroffene** (LFH-455, `StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
+- **Betroffene** (LFH-455, `Status`): Personenstatus neutral, „vermisst" `achtung`; Schaden
   „offen" neutral (Eingang, Spec `statusrollen`), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (LFH-608, `abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
@@ -594,11 +601,17 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
   jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
   nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung (LLH-1083, LLH-1785,
-  Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
-  Spec `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): kein Preset hält
-  den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
-  Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
-  Demo-Marke, Blau bedient.
+  Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein rohes antds `Tag`**
+  (LLH-1779, Spec `status-darstellung`, ESLint `no-restricted-imports`; Ausnahme nur
+  `SichtungsTag`): ein Zustand steht in `Status` mit einer Rolle aus dem Vertrag; eine
+  Kennzeichnung ohne Zustand (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist eine neutrale `Marke`,
+  Blau bedient. Urteile („unterbesetzt“, „Soll erfüllt“) sind Zustände, keine Marken.
+- **Rahmen heißt bedienbar** (LLH-1780, Spec `status-darstellung`): einen Rahmen trägt nur, was
+  man bedienen kann. `Status` und `Marke` sind randlos; der bedienbare Status ist der
+  `StatusKnopf` (Fläche der Rolle, Rahmen in ihrer Kante, Pfeil ▾, 14 px, sichtbar so hoch wie
+  die Dichtehöhe 30/48/72), eine entfernbare Marke trägt Rahmen und ✕. Die Sichtung bleibt das
+  umrandete BBK-Feld; wo sie bedienbar ist, legt sich der Knopfrahmen außen darum. Nachweis
+  `theme/statusKnopfKontrast.test.ts`.
   Übergabe, Geschädigt-Bezug, UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind
   unabhängig.
 - **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)
@@ -1183,10 +1196,17 @@ anwendbar), „nicht geprüft" ist keins.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
-- **Statusfarbe: Rollenfarben als getönte Fläche, Mandantenfarben nur am Rand** (Neuentwurf
-  22.09.2026): `StatusTag` Vorgabe `flaeche`, Werte/Kontrast nur in
-  `components/instrument/statusFlaeche.ts`; gesetzte `status_farbe` erzwingt `rand`
-  (`wirksameDarstellungsart`). Gemessen in `kraefte-kontrast.spec.ts`.
+- **Statusfarbe: Rollenfarben als getönte Fläche, Mandantenfarben nur als Punkt** (Neuentwurf
+  22.09.2026, LLH-1779): `Status` und `StatusKnopf` tönen nach der Rolle, Werte/Kontrast nur in
+  `components/instrument/statusFlaeche.ts`; eine gesetzte `status_farbe` ist ein Punkt neben dem
+  Wort, nie Fläche oder Rand. Der Knopfrand ist gemessen in `kraefte-kontrast.spec.ts`.
+- **Statusmenü und Quittung bei Fahrzeugen** (LLH-1781, Spec `fahrzeugstatus-quittung`):
+  `StatusWahl` mit `titel` = Rufname als Menükopf; das Menü misst beim Öffnen den Platz
+  (`menueLage`), öffnet zur größeren Seite, begrenzt die Höhe und steht im Handschuh-Betrieb
+  zweispaltig, wenn eine Spalte nicht passt. Nach jedem Wechsel des Fahrzeug-FMS die Quittung
+  „85-1: S2 → S3 · Rückgängig“ (`kraefte/useFahrzeugStatusQuittung.ts`, Schlüssel je Fahrzeug)
+  mit dem Beleg aus der PATCH-Antwort an `…/status/zuruecknehmen`. Personal-, Material- und
+  Einheitsstatus haben noch keinen Rückweg.
 - **Material** (LFH-341, `materialStatus`): `im_einsatz` `bedien`, `defekt`/`verbraucht` `alarm`;
   `pages/MaterialPage.tsx` und `kraefte/MaterialAmOrt.tsx` (Material am Ort) lesen beide von dort — zwei
   Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss. Am Ort (LLH-1133,
@@ -1211,7 +1231,7 @@ anwendbar), „nicht geprüft" ist keins.
   `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5,
   `pegelZustand` in `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D2,
   `besatzungsUrteil` in `openspec/changes/archive/2026-10-06-lfh-962-farbvertrag-wort/design.md` D1). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
-  der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
+  der Datei; rohes `Tag` sperrt ESLint (LLH-1779).
 
 **Farbe und Zeichen**
 

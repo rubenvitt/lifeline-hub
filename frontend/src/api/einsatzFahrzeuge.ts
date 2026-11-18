@@ -1,6 +1,8 @@
 import type {
   EinsatzFahrzeug,
   EntlassungAntwort,
+  FahrzeugPatchAntwort,
+  StatusRuecknahmeBeleg,
   EntlassungRuecknahmeAntwort,
   EntlassungVorzustand,
 } from './types';
@@ -59,12 +61,37 @@ export interface AngabenPatch {
 /** Der Zeilen-PATCH einer Disposition: Status, Bemerkung und die Ad-hoc-Angaben. */
 export type DispositionPatch = AngabenPatch & { status_id?: number; bemerkung?: string | null };
 
+/**
+ * Die Antwort ist das Fahrzeug; bei einem echten Statuswechsel trägt sie zusätzlich den Beleg
+ * `status_ruecknahme` für „Rückgängig“ (LLH-1781, {@link nimmStatuswechselZurueck}).
+ */
 export function updateDisposition(
   einsatzId: number,
   efId: number,
   felder: DispositionPatch,
+): Promise<FahrzeugPatchAntwort> {
+  return apiSend<FahrzeugPatchAntwort>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`,
+    'PATCH',
+    felder,
+  );
+}
+
+/**
+ * „Rückgängig“ nach einem Statuswechsel (LLH-1781, Spec `fahrzeugstatus-quittung`): Status und
+ * „seit“ von davor, das Zeitachsen-Ereignis gestrichen. Nur direkt danach und nur für die Person,
+ * die gewechselt hat; inzwischen geändert → 409 `veraltet`, sonst 409 mit Grund.
+ */
+export function nimmStatuswechselZurueck(
+  einsatzId: number,
+  efId: number,
+  beleg: StatusRuecknahmeBeleg,
 ): Promise<EinsatzFahrzeug> {
-  return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`, 'PATCH', felder);
+  return apiSend<EinsatzFahrzeug>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/status/zuruecknehmen`,
+    'POST',
+    beleg,
+  );
 }
 
 /** Entlassene Fahrzeuge des Einsatzes (LLH-1079 Teil II, Block „Entlassen“). */

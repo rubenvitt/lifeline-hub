@@ -20,7 +20,7 @@ import {
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
-import { StatusChip, UebungsBand, UebungsMarke } from '../components/instrument';
+import { Status, UebungsBand, UebungsMarke } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
 import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
@@ -604,7 +604,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 Paneel „Führung“ auf Einsatzdaten; der Kopf bleibt dem Einsatznamen. */}
               {mittel && einsatz?.fuehrung && !einsatz.fuehrung.fuehrend && (
                 <span data-lfh="kopf-fuehrung">
-                  <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
+                  <Status
+                    groesse="klein"
+                    ton="achtung"
+                    wort={fuehrungBeiKurz(einsatz.fuehrung.bei)}
+                  />
                 </span>
               )}
               {/* Übung (LLH-1725, D5): ab `md` vor dem Namen; darunter trägt das klebende Band.

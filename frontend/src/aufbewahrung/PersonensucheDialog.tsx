@@ -6,9 +6,9 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachFolge, nachText, werteAusKatalog } from '../components/katalogVergleich';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import StatusTag from '../components/StatusTag';
 import { personStatus, schwaerzungsantragStand } from '../theme/statusFarben';
 import { ZIEL_ART } from './archivText';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Pseudonyme Personensuche für ein Löschersuchen (LFH-751, Spec `aufbewahrung-loeschersuchen`,
@@ -79,7 +79,7 @@ export default function PersonensucheDialog({
       width: 140,
       sorter: nachFolge(Object.keys(personStatus), (t: PersonTreffer) => t.person_status),
       render: (_, t) =>
-        t.person_status ? <StatusTag darstellung={personStatus[t.person_status]} /> : leer,
+        t.person_status ? <Status darstellung={personStatus[t.person_status]} /> : leer,
     },
     {
       key: 'antrag',
@@ -87,7 +87,7 @@ export default function PersonensucheDialog({
       width: 150,
       sorter: nachFolge(Object.keys(schwaerzungsantragStand), (t: PersonTreffer) => t.antrag),
       render: (_, t) =>
-        t.antrag != null ? <StatusTag darstellung={schwaerzungsantragStand[t.antrag]} /> : leer,
+        t.antrag != null ? <Status darstellung={schwaerzungsantragStand[t.antrag]} /> : leer,
     },
     {
       key: 'aktion',

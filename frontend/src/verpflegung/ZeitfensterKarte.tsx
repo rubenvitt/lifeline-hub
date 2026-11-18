@@ -1,4 +1,4 @@
-import { Button, Collapse, Flex, Tag, Typography } from 'antd';
+import { Button, Collapse, Flex, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -14,7 +14,6 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { useKartenKontext } from '../components/useKartenKontext';
 import { useOffeneBearbeitungGrund } from '../components/offeneBearbeitung';
 import { SprungKnopf } from '../components/Sprung';
-import StatusTag from '../components/StatusTag';
 import {
   Augenbraue,
   Kennzahl,
@@ -43,6 +42,8 @@ import {
   zeitfensterKennung,
   zeitraumText,
 } from './verpflegungText';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 const { Text } = Typography;
 
@@ -303,12 +304,12 @@ export default function ZeitfensterKarte({
           </span>
           {zf.verpflegungsart && (
             // Neutrale Marke ohne `color`: kein Status, der Text trägt die Bedeutung.
-            <Tag data-lfh="verpflegungsart" style={{ marginInlineEnd: 0 }}>
+            <Marke data-lfh="verpflegungsart" style={{ marginInlineEnd: 0 }}>
               {VERPFLEGUNGSART_LABEL[zf.verpflegungsart]}
-            </Tag>
+            </Marke>
           )}
         </Flex>
-        <StatusTag darstellung={darstellung} />
+        <Status darstellung={darstellung} />
       </Flex>
 
       {bearbeiten && onBedarfSpeichern ? (

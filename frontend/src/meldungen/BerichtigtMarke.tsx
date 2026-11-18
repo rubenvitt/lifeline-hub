@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { KennungsLink } from '../components/kennungsLink';
-import { StatusChip } from '../components/instrument';
+import { Status } from '../components/instrument';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { etbPfad } from '../routing/deeplinks';
 
@@ -50,7 +50,7 @@ function Verweis({
     <span
       style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', ...style }}
     >
-      <StatusChip ton="achtung" wort="berichtigt" />
+      <Status groesse="klein" ton="achtung" wort="berichtigt" />
       <KennungsLink
         to={etbPfad(einsatzId, { eintrag: berichtigungId })}
         aria-label={`Berichtigung im ETB, Nr. ${berichtigungLfdNr}`}

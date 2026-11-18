@@ -106,6 +106,8 @@ export interface StatusBedienung {
   laeuft?: boolean;
   gesperrt?: boolean;
   kennung: string;
+  /** Kopf des Menüs, bei Fahrzeugen der Rufname (LLH-1781). */
+  titel?: string;
 }
 
 interface StatusWahlProps<W> {

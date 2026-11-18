@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -133,9 +133,9 @@ export default function EinheitVorlagenTab() {
       onFilter: (value, { vorlage }) => vorlage.aktiv === value,
       render: (_, { vorlage }) =>
         vorlage.aktiv ? (
-          <StatusChip ton="normal" wort="Aktiv" />
+          <Status groesse="klein" ton="normal" wort="Aktiv" />
         ) : (
-          <StatusChip ton="neutral" wort="Inaktiv" />
+          <Status groesse="klein" ton="neutral" wort="Inaktiv" />
         ),
     },
   ];

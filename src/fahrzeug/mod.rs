@@ -388,6 +388,50 @@ pub fn etb_text_status_wechsel(funkrufname: &str, alt: Option<&str>, neu: Option
     )
 }
 
+/// Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,
+/// Change `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,
+/// wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct StatusRuecknahmeBeleg {
+    /// Status vor dem Wechsel; `null`, wenn keiner gesetzt war.
+    #[serde(default)]
+    pub vorher_status_id: Option<i64>,
+    /// „Status seit“ vor dem Wechsel.
+    #[serde(default)]
+    pub vorher_seit: Option<String>,
+    /// Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht.
+    pub status_id: i64,
+    /// „Status seit“ des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt.
+    pub status_seit: String,
+    /// Zeitachsen-Ereignis der Einheit, das der Wechsel geschrieben hat.
+    #[serde(default)]
+    pub ereignis_id: Option<i64>,
+}
+
+/// Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der
+/// Beleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct FahrzeugPatchAntwort {
+    #[serde(flatten)]
+    pub fahrzeug: EinsatzFahrzeugAnzeige,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_ruecknahme: Option<StatusRuecknahmeBeleg>,
+}
+
+/// System-ETB der Rücknahme eines Statuswechsels (LLH-1781).
+pub fn etb_text_statuswechsel_zurueckgenommen(
+    funkrufname: &str,
+    alt: Option<&str>,
+    neu: Option<&str>,
+) -> String {
+    format!(
+        "Fahrzeug «{}»: Statuswechsel «{}» → «{}» zurückgenommen",
+        funkrufname,
+        alt.unwrap_or("—"),
+        neu.unwrap_or("—")
+    )
+}
+
 /// System-ETB beim erneuten Disponieren eines entlassenen oder stornierten Fahrzeugs (LLH-1079,
 /// design.md D7).
 pub fn etb_text_erneut_disponiert(funkrufname: &str) -> String {

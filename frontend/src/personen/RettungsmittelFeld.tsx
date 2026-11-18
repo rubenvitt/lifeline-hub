@@ -3,13 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { ladeTransportmittel } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
-import StatusTag from '../components/StatusTag';
 import { transportDurch } from '../theme/statusFarben';
 import {
   rettungsmittelOptionen,
   type RettungsmittelOption,
   type VerbleibFormWerte,
 } from './verbleibErfassungKern';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Das Feld „Rettungsmittel“ der Verbleib-Maske beim Transport (LLH-1332, Change
@@ -50,7 +50,7 @@ export default function RettungsmittelFeld({
         label={
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             Rettungsmittel
-            <StatusTag darstellung={transportDurch[durch]} />
+            <Status darstellung={transportDurch[durch]} />
           </span>
         }
         name="transportmittel"

@@ -34,6 +34,14 @@ describe.each(MODI)('%s', (_modus, rollen, textboden) => {
     expect(kontrast(rollen.text, rollen.flaeche2)).toBeGreaterThanOrEqual(textboden);
   });
 
+  it('Rahmen einer entfernbaren Marke und der bedienbaren Sichtung (`steuerRahmen`) ≥ 3 : 1', () => {
+    for (const umgebung of [rollen.flaeche2, rollen.flaeche, rollen.grund, rollen.paneel]) {
+      expect(kontrast(rollen.steuerRahmen, umgebung), `gegen ${umgebung}`).toBeGreaterThanOrEqual(
+        3,
+      );
+    }
+  });
+
   it('eine Marke ist vom neutralen Status unterscheidbar (andere Fläche oder andere Schrift)', () => {
     const neutral = statusFlaeche(rollen, 'neutral');
     expect(rollen.flaeche2 !== neutral.grund || rollen.gedaempft !== neutral.text).toBe(true);

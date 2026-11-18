@@ -14,6 +14,7 @@ use crate::fahrzeug::disposition_repo::{self, AdhocDaten, FahrzeugPatch};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::{
     EinsatzFahrzeugAnzeige, EntlassungAntwort, EntlassungRuecknahmeAntwort, EntlassungVorzustand,
+    FahrzeugPatchAntwort, StatusRuecknahmeBeleg,
 };
 use crate::fahrzeug::{ADHOC_TEXT_MAX, BEMERKUNG_MAX};
 use crate::fuehrung::Fuehrungsfunktion;
@@ -299,7 +300,7 @@ pub async fn update(
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<DispoPatchBody>,
-) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
+) -> Result<Json<FahrzeugPatchAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     // Status muss (aktiv) zur Org gehören.
     if let Some(sid) = body.status_id {
@@ -329,6 +330,7 @@ pub async fn update(
     }
     let patch = FahrzeugPatch {
         status_id: body.status_id,
+        gesetzt_von: Some(ctx.benutzer.id),
         bemerkung: tri(&bemerkung),
         funkrufname: funkrufname.as_deref(),
         fahrzeugtyp: tri(&fahrzeugtyp),
@@ -343,18 +345,19 @@ pub async fn update(
     // auf den alten Status ETB, Zeitachse und Ereignis. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (vorher, nachher, beruehrt, traegt_fuehrungsstelle) =
+    let (vorher, nachher, beruehrt, traegt_fuehrungsstelle, ereignis_id) =
         crate::write_retry!(&state.pool, |conn| {
             let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
             disposition_repo::update_tx(conn, einsatz_id, ef_id, patch).await?;
             let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
             let mut beruehrt = crate::zeitachse::repo::Beruehrt::default();
+            let mut ereignis_id = None;
             if vorher.status_id != nachher.status_id {
                 // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
                 // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung) und per Fan-out auf die
                 // ihrer Personen; deren Leser erreicht nach dem Commit `personal`.
                 if let Some(sid) = nachher.status_id {
-                    if let Some((_, b)) = crate::zeitachse::repo::aus_fahrzeugstatus_tx(
+                    if let Some((_, id, b)) = crate::zeitachse::repo::aus_fahrzeugstatus_tx(
                         conn,
                         einsatz_id,
                         ctx.benutzer.id,
@@ -365,6 +368,7 @@ pub async fn update(
                     .await?
                     {
                         beruehrt = b;
+                        ereignis_id = Some(id);
                     }
                 }
                 crate::etb::system_audit_tx(
@@ -389,7 +393,13 @@ pub async fn update(
                 traegt_fuehrungsstelle =
                     crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
             }
-            Ok((vorher, nachher, beruehrt, traegt_fuehrungsstelle))
+            Ok((
+                vorher,
+                nachher,
+                beruehrt,
+                traegt_fuehrungsstelle,
+                ereignis_id,
+            ))
         })?;
     let has_status_changed = vorher.status_id != nachher.status_id;
     let has_angaben_changed = vorher.funkrufname != nachher.funkrufname
@@ -441,7 +451,80 @@ pub async fn update(
         )
         .await;
     }
-    Ok(Json(nachher))
+    // Beleg für „Rückgängig“ (LLH-1781, design.md D8), nur bei einem echten Wechsel.
+    let status_ruecknahme = match (has_status_changed, nachher.status_id, &nachher.status_seit) {
+        (true, Some(status_id), Some(status_seit)) => Some(StatusRuecknahmeBeleg {
+            vorher_status_id: vorher.status_id,
+            vorher_seit: vorher.status_seit.clone(),
+            status_id,
+            status_seit: status_seit.clone(),
+            ereignis_id,
+        }),
+        _ => None,
+    };
+    Ok(Json(FahrzeugPatchAntwort {
+        fahrzeug: nachher,
+        status_ruecknahme,
+    }))
+}
+
+/// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/status/zuruecknehmen — „Rückgängig“ nach einem
+/// Statuswechsel (LLH-1781, Spec `fahrzeugstatus-quittung`, Change
+/// `eon26eat-status-und-bedienung`, design.md D8). Body ist der Beleg aus der Antwort des
+/// Status-PATCH. Status inzwischen anders → 409 `veraltet`; andere Person, abgelaufene Frist oder
+/// eine Zeitachse, die das Streichen nicht trägt → 409 mit Grund. Ein ETB-Eintrag, Live-Meldungen
+/// wie beim Wechsel, keine Benachrichtigung.
+pub async fn status_zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
+    JsonBody(beleg): JsonBody<StatusRuecknahmeBeleg>,
+) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        let ergebnis = disposition_repo::status_zuruecknehmen_tx(
+            conn,
+            ctx.einsatz.org_id,
+            einsatz_id,
+            ef_id,
+            ctx.benutzer.id,
+            &jetzt,
+            &beleg,
+        )
+        .await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::fahrzeug::etb_text_statuswechsel_zurueckgenommen(
+                &anzeige.funkrufname,
+                anzeige.status_label.as_deref(),
+                vorher.status_label.as_deref(),
+            ),
+        )
+        .await?;
+        Ok((ergebnis, anzeige))
+    })?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
+    if let Some(einheit_id) = ergebnis.einheit_id {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    for ep_id in &ergebnis.beruehrt.personen {
+        sse_personal(&state, einsatz_id, *ep_id);
+    }
+    super::abloesung::publish_kopplung(
+        &state,
+        einsatz_id,
+        &ergebnis.beruehrt.abloesung,
+        &ergebnis.beruehrt.hinweise,
+    )
+    .await;
+    Ok(Json(anzeige))
 }
 
 /// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen — aus dem Einsatz entlassen (LLH-1079,

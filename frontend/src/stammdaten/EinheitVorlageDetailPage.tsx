@@ -4,7 +4,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { Formularpaneel, StatusChip } from '../components/instrument';
+import { Formularpaneel, Status } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -315,7 +315,7 @@ function DetailContent({
           <Space size={8} wrap>
             <span>{vorlage.name}</span>
             {vorlage.ist_demo && <DemoMarke />}
-            {!vorlage.aktiv && <StatusChip ton="neutral" wort="Inaktiv" />}
+            {!vorlage.aktiv && <Status groesse="klein" ton="neutral" wort="Inaktiv" />}
           </Space>
         }
         hinweis={

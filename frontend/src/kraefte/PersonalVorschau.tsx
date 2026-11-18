@@ -2,11 +2,11 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { EinsatzPersonal } from '../api/types';
 import { POSITION_LABELS } from '../api/personal';
-import StatusTag from '../components/StatusTag';
 import { Datenfeld, Datenraster } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { personalStatusDarstellung } from './mittelStatus';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Lese-Vorschau einer disponierten Einsatzkraft in der Sprungpalette. Daten aus dem Listenfach
@@ -24,7 +24,7 @@ export default function PersonalVorschau({ einsatzId, id }: { einsatzId: number;
         <Datenraster spalten={2} beschriftung={`Einsatzkraft ${p.name}`}>
           <Datenfeld label="Name">{p.name}</Datenfeld>
           <Datenfeld label="Status">
-            <StatusTag darstellung={personalStatusDarstellung(p)} farbe={p.status_farbe} />
+            <Status darstellung={personalStatusDarstellung(p)} farbe={p.status_farbe} />
           </Datenfeld>
           {p.einsatzfunktion && <Datenfeld label="Funktion">{p.einsatzfunktion}</Datenfeld>}
           {p.funktion && <Datenfeld label="Qualifikation">{p.funktion}</Datenfeld>}

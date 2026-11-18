@@ -1,6 +1,7 @@
-import { Button, Tag, Typography } from 'antd';
+import { Button, Typography } from 'antd';
 import type { SelectProps } from 'antd';
 import type { ReactNode } from 'react';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Gründe je Kraft einer abgelehnten Sammel-Disposition (LLH-1100, Change
@@ -52,10 +53,10 @@ export function gruendeTagRender(
     const grund = gruende.get(id);
     const text = label === value || label == null ? name(id) : label;
     return (
-      <Tag
-        closable={closable}
-        onClose={onClose}
-        // Ein Mausdruck auf den Tag öffnet sonst die Liste (antd-Muster für `tagRender`).
+      <Marke
+        onEntfernen={closable ? () => onClose() : undefined}
+        entfernenLabel={`${typeof text === 'string' ? text : 'Kraft'} entfernen`}
+        // Ein Mausdruck auf die Marke öffnet sonst die Liste (antd-Muster für `tagRender`).
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -69,7 +70,7 @@ export function gruendeTagRender(
         ) : (
           text
         )}
-      </Tag>
+      </Marke>
     );
   };
 }

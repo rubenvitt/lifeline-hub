@@ -1,7 +1,6 @@
 import { Button, Typography } from 'antd';
 import type { CSSProperties } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -41,6 +40,7 @@ import {
   type VerbleibKlasse,
 } from './personenBilanz';
 import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Das EINE Spaltenregister der Betroffenen-Listen; speist Zeilen- und Rasteransicht und über den
@@ -124,7 +124,7 @@ function PersonZelle({ p }: { p: Person }) {
         {/* Kontamination „ja“ als Marke (LLH-1326, design.md D11): Gefahr für die Kräfte, Rolle
             `achtung` mit Wort; „nein“ und „keine Angabe“ tragen keine. Die Personenzelle steht
             in Liste, Karte und Patientenliste am Gerät. */}
-        {p.kontamination === true && <StatusTag darstellung={kontamination} />}
+        {p.kontamination === true && <Status darstellung={kontamination} />}
       </span>
       {offen && (
         <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtungText }}>
@@ -568,7 +568,7 @@ export function personenSpalten(
       width: 118,
       sortWert: (p) => STATUS_FOLGE.indexOf(p.status),
       filter: { werte: STATUS_WERTE, trifft: (p, w) => p.status === w, ohneKartenfeld: true },
-      render: (_, p) => <StatusTag darstellung={STATUS_META[p.status]} />,
+      render: (_, p) => <Status darstellung={STATUS_META[p.status]} />,
     },
     {
       title: 'Fundort',

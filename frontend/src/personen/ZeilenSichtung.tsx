@@ -153,17 +153,40 @@ export default function ZeilenSichtung({
         destroyOnHidden
         content={inhalt}
       >
+        {/* Rahmen heißt bedienbar (LLH-1780, Change `eon26eat-status-und-bedienung`, D6): das
+            BBK-Feld bleibt Anzeige, der Knopfrahmen mit Pfeil legt sich außen darum. */}
         <Button
           ref={ausloeser}
-          type={gezeigt ? 'text' : 'link'}
+          type={gezeigt ? 'default' : 'link'}
           aria-label={name}
           aria-expanded={offen}
           aria-busy={laeuft || undefined}
           loading={laeuft}
           data-lfh="sichtung-ausloeser"
-          style={{ paddingInline: token.paddingXS }}
+          style={
+            gezeigt
+              ? {
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: token.marginXXS,
+                  paddingInline: token.paddingXS,
+                  borderRadius: 0,
+                  borderColor: rollen.steuerRahmen,
+                  background: 'transparent',
+                }
+              : { paddingInline: token.paddingXS }
+          }
         >
-          {gezeigt ? <SichtungsTag kategorie={gezeigt} /> : 'Sichten'}
+          {gezeigt ? (
+            <>
+              <SichtungsTag kategorie={gezeigt} />
+              <span aria-hidden="true" data-lfh="status-pfeil">
+                ▾
+              </span>
+            </>
+          ) : (
+            'Sichten'
+          )}
         </Button>
       </Popover>
       {vorgemerkt && (

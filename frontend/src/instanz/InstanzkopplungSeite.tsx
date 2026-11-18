@@ -1,17 +1,5 @@
 import { useState } from 'react';
-import {
-  Alert,
-  App,
-  Button,
-  Form,
-  Input,
-  Modal,
-  Space,
-  Spin,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { Alert, App, Button, Form, Input, Modal, Space, Spin, Tooltip, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
@@ -65,6 +53,7 @@ import {
   zertifikatWarnt,
   zertifikatZeile,
 } from './instanzText';
+import { Marke } from '../components/instrument/Marke';
 
 /** Längste Bezeichnung eines Unterschriftsschlüssels (`routes::instanz::BEZEICHNUNG_MAX`). */
 const BEZEICHNUNG_MAX = 80;
@@ -362,13 +351,12 @@ export default function InstanzkopplungSeite() {
                           {k.gegenueber_name} · {richtungText(k)}
                           {!standard && (
                             <Tooltip title={VOR_ORT_ERKLAERUNG}>
-                              <Tag
-                                bordered
+                              <Marke
                                 style={{ marginInlineStart: token.marginXS }}
                                 data-lfh="instanz-kopplung-vor-ort"
                               >
                                 {VOR_ORT_CHIP}
-                              </Tag>
+                              </Marke>
                             </Tooltip>
                           )}
                         </span>

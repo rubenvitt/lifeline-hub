@@ -266,7 +266,9 @@ test.describe('Aufbewahrung (LFH-23)', () => {
           zustaendeSetzen();
           await page.goto('/admin/aufbewahrung');
           for (const [zustand, f] of Object.entries(faelle) as [keyof typeof woerter, Angelegt][]) {
-            await expect(zeile(page, f.nummer).locator('.ant-tag')).toHaveText(woerter[zustand], {
+            await expect(
+              zeile(page, f.nummer).locator(':is([data-lfh="status"],[data-marke])'),
+            ).toHaveText(woerter[zustand], {
               timeout: 3_000,
             });
           }
@@ -288,7 +290,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
       await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
       const messwerte: Record<string, unknown> = {};
       for (const [zustand, f] of Object.entries(faelle) as [keyof typeof woerter, Angelegt][]) {
-        const etikett = zeile(page, f.nummer).locator('.ant-tag');
+        const etikett = zeile(page, f.nummer).locator(':is([data-lfh="status"],[data-marke])');
         await expect(etikett).toHaveText(woerter[zustand]);
         // Erst den eingeschwungenen Stand messen: beim Nachladen liegt die Tabelle unter antds
         // Lade-Schleier (Opacity), den der Messkern ablehnt.
@@ -324,7 +326,9 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         await expect(zeile(page, faelle.vorgemerkt.nummer)).toBeVisible();
         // Der Zustand steht neben der fixierten Nummer auch am Handschirm ohne Querscrollen im
         // Blick — `toBeInViewport`, nicht `toBeVisible`.
-        await expect(zeile(page, faelle.vorgemerkt.nummer).locator('.ant-tag')).toBeInViewport();
+        await expect(
+          zeile(page, faelle.vorgemerkt.nummer).locator(':is([data-lfh="status"],[data-marke])'),
+        ).toBeInViewport();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           breite,
         );

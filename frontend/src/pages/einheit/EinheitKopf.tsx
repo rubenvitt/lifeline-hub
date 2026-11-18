@@ -26,14 +26,13 @@ import {
   Datenfeld,
   Datenraster,
   Paneel,
-  StatusChip,
+  Status,
   monoStil,
   useRollen,
 } from '../../components/instrument';
 import { nichtGefundenInhalt } from '../../components/SeitenZustand';
 import { Select } from '../../components/Select';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
-import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
 import { grenzeText, istZuLang, zeichenGrenze } from '../../components/zeichenGrenze';
 import EinheitZeichen from '../../kraefte/EinheitZeichen';
@@ -513,7 +512,7 @@ function IstAnzeige({
           </>
         )}
       </span>
-      {urteil !== 'kein_soll' && <StatusTag darstellung={einheitStaerkeUrteil[urteil]} umbrechen />}
+      {urteil !== 'kein_soll' && <Status darstellung={einheitStaerkeUrteil[urteil]} umbrechen />}
     </span>
   );
 }
@@ -580,7 +579,9 @@ function StatusZeile({
       />
     );
   } else {
-    status = <StatusChip ton={s.ton} code={s.code ?? undefined} wort={s.wort} trenner />;
+    status = (
+      <Status groesse="klein" ton={s.ton} code={s.code ?? undefined} wort={s.wort} trenner />
+    );
   }
 
   return (

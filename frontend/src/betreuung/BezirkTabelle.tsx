@@ -11,7 +11,6 @@ import Datensicht, {
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KennungsLink } from '../components/kennungsLink';
 import type { MenueEintrag } from '../components/MenueAusloeser';
-import StatusTag from '../components/StatusTag';
 import { Balken, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { aktionsSpalte } from '../components/aktionsSpalte';
@@ -24,6 +23,7 @@ import { raeumungszustand } from '../theme/statusFarben';
 import { evakuiertText, personenZahl, RAEUMUNG_FOLGE } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
 import { gebietZeichnenText } from './gebietZeichnen';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Die Bezirkstabelle der Evakuierungsseite (LLH-1034, ersetzt die Bezirkskarten der früheren
@@ -198,7 +198,7 @@ const bezirkSpalten = (
       title: 'Räumung',
       sortWert: (b) => RAEUMUNG_FOLGE.indexOf(b.raeumung),
       filter: { werte: RAEUMUNG_WERTE, trifft: (b, w) => b.raeumung === w },
-      render: (_, b) => <StatusTag darstellung={raeumungszustand[b.raeumung]} />,
+      render: (_, b) => <Status darstellung={raeumungszustand[b.raeumung]} />,
     },
     {
       key: 'evakuiert',

@@ -19,7 +19,7 @@ import KommKarte from '../kommunikation/KommKarte';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
-import { StatusChip } from '../components/instrument';
+import { Status } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { vorText } from '../anzeige/dauer';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -648,7 +648,7 @@ function NachforderungKarte({
             <StatusBadge phase={status.phase} label={status.label} ton={status.ton} />
           )}
           {/* Das Wort ist der zweite Kanal neben dem Ton (LLH-1097 D7); kein Alarm. */}
-          {ueberfaellig && <StatusChip ton="achtung" wort="überfällig" />}
+          {ueberfaellig && <Status groesse="klein" ton="achtung" wort="überfällig" />}
         </Space>
         {jetzt != null && (
           <span

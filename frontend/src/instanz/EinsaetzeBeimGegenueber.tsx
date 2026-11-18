@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Alert, Button, Modal } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Paneel, PaneelZustand, StatusChip, useRollen } from '../components/instrument';
+import { Paneel, PaneelZustand, Status, useRollen } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenStandVeraltet } from '../components/SeitenZustand';
 import { ApiError } from '../api/client';
@@ -125,7 +125,8 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
               }
               description={
                 <span>
-                  <StatusChip
+                  <Status
+                    groesse="klein"
                     ton={a.offen ? 'achtung' : a.fuehrend ? 'normal' : 'neutral'}
                     wort={fuehrungKurz({
                       fuehrend: a.fuehrend,

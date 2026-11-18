@@ -1,7 +1,7 @@
 import { Button, Typography } from 'antd';
 import type { Gefahrengebiet } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { StatusChip, monoStil, useRollen } from '../../components/instrument';
+import { Status, monoStil, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { BESTAETIGT, UNBESTAETIGT } from './beurteilung';
 
@@ -57,7 +57,7 @@ export default function GefahrenBeurteilung({
             {gebiet.beurteilt_von_name ? ` · ${gebiet.beurteilt_von_name}` : ''}
           </Typography.Text>
         ) : (
-          <StatusChip ton="achtung" wort={UNBESTAETIGT} />
+          <Status groesse="klein" ton="achtung" wort={UNBESTAETIGT} />
         )}
         {darfSchreiben && (
           // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).

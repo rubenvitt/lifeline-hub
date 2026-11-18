@@ -2014,6 +2014,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     optionen: { adresseSteht?: boolean; daneben?: ReactNode } = {},
   ) {
     const patches: unknown[] = [];
+    const ruecknahmen: unknown[] = [];
     // Der Serverstand wandert mit dem PATCH — sonst holte der Refetch nach `onSettled` den alten
     // Status zurück.
     let stand: Record<string, unknown> = {
@@ -2032,11 +2033,32 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       http.patch('/api/einsaetze/7/fahrzeuge/10', async ({ request }) => {
         const body = await request.json();
         patches.push(body);
+        const vorher = stand;
         stand = {
           ...stand,
           status_id: 3,
           status_label: 'vor_ort',
           status_seit: '2026-05-26 09:30:00',
+        };
+        // Beleg für „Rückgängig“ (LLH-1781).
+        return HttpResponse.json({
+          ...stand,
+          status_ruecknahme: {
+            vorher_status_id: vorher.status_id,
+            vorher_seit: vorher.status_seit,
+            status_id: 3,
+            status_seit: '2026-05-26 09:30:00',
+            ereignis_id: 77,
+          },
+        });
+      }),
+      http.post('/api/einsaetze/7/fahrzeuge/10/status/zuruecknehmen', async ({ request }) => {
+        ruecknahmen.push(await request.json());
+        stand = {
+          ...stand,
+          status_id: 2,
+          status_label: 'disponiert',
+          status_seit: '2026-05-26 09:10:00',
         };
         return HttpResponse.json(stand);
       }),
@@ -2061,7 +2083,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       </>,
       { route, datenRouter: true },
     );
-    return { patches };
+    return { patches, ruecknahmen };
   }
 
   /**
@@ -2128,8 +2150,35 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     act(() => knopf.focus());
     fireEvent.keyDown(knopf, { key: '4' });
     await waitFor(() => expect(patches).toEqual([{ status_id: 3 }]));
-    // Serverstand übernommen: der Chip zeigt S4, „seit" die Zeit aus der Antwort.
-    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+    // Serverstand übernommen: der Statusblock zeigt die Ziffer 4.
+    await waitFor(() => expect(within(knopf).getByText('4')).toBeInTheDocument());
+  });
+
+  it('nach dem Wechsel per Ziffer quittiert ein Hinweis mit Rückgängig, der Fokus bleibt (LLH-1781)', async () => {
+    const { ruecknahmen } = renderTableau();
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    const knopf = await within(tableau).findByRole('button', {
+      name: 'Status von Florian 1 ändern',
+    });
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: '4' });
+    expect(await screen.findByText('Florian 1: S3 → S4')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.activeElement?.closest('[data-lfh="fms-kachel"]')).not.toBeNull(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(ruecknahmen).toEqual([
+        {
+          vorher_status_id: 2,
+          vorher_seit: '2026-05-26 09:10:00',
+          status_id: 3,
+          status_seit: '2026-05-26 09:30:00',
+          ereignis_id: 77,
+        },
+      ]),
+    );
+    await waitFor(() => expect(within(knopf).getByText('3')).toBeInTheDocument());
   });
 
   it('bleibt ohne Einheiten (Modul gesperrt) bedienbar und sagt, warum ungegliedert', async () => {

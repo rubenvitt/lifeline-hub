@@ -1,8 +1,8 @@
 import { Button } from 'antd';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { useRollen } from './rollenwerte';
 
-interface MarkeProps {
+interface MarkeProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'children' | 'style'> {
   children: ReactNode;
   title?: string;
   /**
@@ -14,7 +14,9 @@ interface MarkeProps {
   /** Vorgelesener Name des Entfernen-Knopfs; ohne Angabe „<Inhalt> entfernen“. */
   entfernenLabel?: string;
   style?: CSSProperties;
-  'data-testid'?: string;
+  /** Eigene Kennung statt `marke`, wenn Tests oder Wächter eine bestimmte Marke suchen. */
+  'data-lfh'?: string;
+  [daten: `data-${string}`]: string | undefined;
 }
 
 /**
@@ -33,14 +35,16 @@ export function Marke({
   onEntfernen,
   entfernenLabel,
   style,
-  'data-testid': testId,
+  'data-lfh': lfh = 'marke',
+  ...rest
 }: MarkeProps) {
   const { token, rollen } = useRollen();
   const bedienbar = onEntfernen != null;
   return (
     <span
-      data-lfh="marke"
-      data-testid={testId}
+      {...rest}
+      data-lfh={lfh}
+      data-marke=""
       title={title}
       style={{
         display: 'inline-flex',
@@ -51,7 +55,7 @@ export function Marke({
         paddingInlineEnd: bedienbar ? 0 : token.paddingXS,
         background: rollen.flaeche2,
         color: bedienbar ? rollen.text : rollen.gedaempft,
-        border: bedienbar ? `1px solid ${rollen.linieStark}` : undefined,
+        border: bedienbar ? `1px solid ${rollen.steuerRahmen}` : undefined,
         fontSize: bedienbar ? 12 : 11,
         fontWeight: 500,
         letterSpacing: bedienbar ? undefined : '0.02em',

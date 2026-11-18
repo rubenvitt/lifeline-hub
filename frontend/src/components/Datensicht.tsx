@@ -21,7 +21,6 @@ import KatalogTabelle, { type KatalogSpalte } from './KatalogTabelle';
 import { Liste, ListenEintrag, type ListenKopf } from './Liste';
 import type { UnterEbene } from './Markdown';
 import { Select } from './Select';
-import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
 import Filterhinweis from './instrument/Filterhinweis';
@@ -64,6 +63,7 @@ import { FENSTER_EINTRAG, FENSTER_ENDE, useFensterAusschnitt } from './fensterAu
 import { schleuse as baumSchleuse, type Wartend } from './organigramm/baumSchleuse';
 import { aktiveFilter, FilterChips, filterMerkmale, kopfGefiltertStil } from './tabellenFilter';
 import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGedaechtnis';
+import { Status } from './instrument/Status';
 
 /**
  * Datensicht-Primitiv der Einsatzmodule (LFH-330 · B2): EINE Spaltendefinition je Modul, zwei
@@ -2652,7 +2652,7 @@ export default function Datensicht<T extends object, const K extends string>(
                   darfSchreiben
                 />
               ) : (
-                status && <StatusTag darstellung={status} />
+                status && <Status darstellung={status} />
               )}
             </div>
             {felder.length > 0 && (

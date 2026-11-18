@@ -629,7 +629,7 @@ test('Fachebenen-Inspector ohne Schreibrecht (Beobachter): Festlegen fehlt, Tref
   // grün, wenn der Block aus einem anderen Grund (kein `pegelBezug`, keine `uuid`) entfiele.
   const mitMarke = await inspectorOeffnen(page, einsatzId, 'HANN. MÜNDEN');
   await expect(
-    mitMarke.locator('[data-lfh="pegel-massgeblich"] .ant-tag'),
+    mitMarke.locator('[data-lfh="pegel-massgeblich"] :is([data-lfh="status"],[data-marke])'),
     'Vorbedingung: die Marke steht ohne Schreibrecht',
   ).toHaveText('maßgeblicher Pegel · Leitpegel');
 
@@ -697,7 +697,9 @@ for (const modus of ['light', 'dark'] as const) {
 
     // Marke: der Leitpegel, die erste Station der Liste.
     const mitMarke = await inspectorOeffnen(page, einsatzId, 'HANN. MÜNDEN');
-    const marke = mitMarke.locator('[data-lfh="pegel-massgeblich"] .ant-tag');
+    const marke = mitMarke.locator(
+      '[data-lfh="pegel-massgeblich"] :is([data-lfh="status"],[data-marke])',
+    );
     await expect(marke).toHaveText('maßgeblicher Pegel · Leitpegel');
     await page.mouse.move(0, 0);
     const tag = await kontrast(marke);

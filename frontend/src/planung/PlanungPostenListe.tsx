@@ -10,7 +10,7 @@ import {
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung, PlanungPosten } from '../api/types';
-import { monoStil, StatusChip, useRollen } from '../components/instrument';
+import { monoStil, Status, useRollen } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -105,7 +105,7 @@ export default function PlanungPostenListe({
       render: (_, p) => (
         <Space size={4} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{p.bezeichnung}</span>
-          {p.nicht_verfuegbar && <StatusChip ton="achtung" wort="nicht verfügbar" />}
+          {p.nicht_verfuegbar && <Status groesse="klein" ton="achtung" wort="nicht verfügbar" />}
         </Space>
       ),
     },

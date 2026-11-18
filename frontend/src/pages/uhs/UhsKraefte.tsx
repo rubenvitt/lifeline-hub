@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { App, Button, Form, Input, Space, Tag, Typography } from 'antd';
+import { App, Button, Form, Input, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   erfasseAdhocKraft,
@@ -25,6 +25,7 @@ import { useHoldGeloest } from '../../components/useHoldGeloest';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { freieEinheiten, kraftAuswahlText, zaehleQualifikationen } from './uhsKraefteKern';
+import { Marke } from '../../components/instrument/Marke';
 
 interface Props {
   einsatzId: number;
@@ -316,9 +317,9 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           ) : (
             <Space wrap size={[4, 4]}>
               {qualifikationen.map((q) => (
-                <Tag key={q.bezeichnung}>
+                <Marke key={q.bezeichnung}>
                   {q.bezeichnung} {q.anzahl}
-                </Tag>
+                </Marke>
               ))}
             </Space>
           )}

@@ -33,7 +33,7 @@ import type { ZeilenGrund } from '../components/useZeilenFehler';
 import {
   Augenbraue,
   Sammelbanner,
-  StatusChip,
+  Status,
   useRollen,
   Zeitachseneintrag,
 } from '../components/instrument';
@@ -1118,9 +1118,9 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
     if (z.art === 'eintrag') return null;
     return z.art === 'ausstehend' ? (
       // Ein Antrag am Spiegel (LLH-1492) steht wie ein vorgemerkter Eintrag.
-      <StatusChip ton="achtung" wort={z.puffer.antrag ? 'beantragt' : 'vorgemerkt'} />
+      <Status groesse="klein" ton="achtung" wort={z.puffer.antrag ? 'beantragt' : 'vorgemerkt'} />
     ) : (
-      <StatusChip ton="alarm" wort="abgelehnt" />
+      <Status groesse="klein" ton="alarm" wort="abgelehnt" />
     );
   }
 

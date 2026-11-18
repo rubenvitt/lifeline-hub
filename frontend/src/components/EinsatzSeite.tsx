@@ -20,10 +20,10 @@ import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
 import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useRollen } from './instrument/rollenwerte';
-import StatusTag from './StatusTag';
 import { useEinsatzRahmen, useImEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
 import type { EinsatzAnzeige } from '../api/types';
+import { Status } from './instrument/Status';
 
 /** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — in
  *  `komfortabel`/`handschuh` wächst sie mit der Staffel (48/72, {@link titelblockStil}), eine
@@ -228,7 +228,7 @@ export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | unde
       }}
     >
       Einsatzstatus
-      <StatusTag darstellung={einsatzStatus[einsatz.status]} />
+      <Status darstellung={einsatzStatus[einsatz.status]} />
     </span>
   );
 }

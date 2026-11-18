@@ -16,7 +16,6 @@ import { listeEinheiten } from '../../api/einheiten';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrListenEintrag, BrStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
-import StatusTag from '../../components/StatusTag';
 import {
   SeitenFehler,
   SeitenLeer,
@@ -34,6 +33,7 @@ import BrAnlegenModal from './BrAnlegenModal';
 import { KennungsLink } from '../../components/kennungsLink';
 import { useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
+import { Status } from '../../components/instrument/Status';
 
 /** Status in der Reihenfolge des Lebenslaufs (geplant → aktiv → aufgelöst), nicht nach Alphabet. */
 const STATUS_FOLGE = Object.keys(brStatus) as BrStatus[];
@@ -159,7 +159,7 @@ export default function BereitstellungsraeumePage() {
       sorter: (a, b) => STATUS_FOLGE.indexOf(a.status) - STATUS_FOLGE.indexOf(b.status),
       filters: STATUS_FILTER,
       onFilter: (wert, br) => br.status === wert,
-      render: (s: BrStatus) => <StatusTag darstellung={brStatus[s]} />,
+      render: (s: BrStatus) => <Status darstellung={brStatus[s]} />,
     },
     {
       key: 'abschnitt',

@@ -1,4 +1,4 @@
-import { Button, Flex, Popconfirm, Space, Tag, theme } from 'antd';
+import { Button, Flex, Popconfirm, Space, theme } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -11,8 +11,9 @@ import { invalidiereKarte } from './invalidiereKarte';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
 import AusKatalogModal from './AusKatalogModal';
 import { globalKeys } from '../api/queryKeys';
-import StatusTag from '../components/StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 /** Schalter einer Quelle (LFH-1022: Statusrolle statt antd-Preset `green`). */
 const QUELLE_AKTIV: StatusDarstellung = { rolle: 'normal', label: 'aktiv' };
@@ -76,7 +77,7 @@ export default function OnlineQuellenVerwaltung() {
        * Wahrheitswert keine Suche erreicht.
        */
       // Neutral (LFH-891): der Typ ist eine Kennzeichnung, das Wort trägt ihn; Blau bedient.
-      render: (t: OnlineQuelle['typ']) => <Tag>{t}</Tag>,
+      render: (t: OnlineQuelle['typ']) => <Marke>{t}</Marke>,
     },
     {
       title: 'URL',
@@ -133,7 +134,7 @@ export default function OnlineQuellenVerwaltung() {
         { text: 'inaktiv', value: false },
       ],
       onFilter: (wert, q) => q.aktiv === wert,
-      render: (_, q) => <StatusTag darstellung={q.aktiv ? QUELLE_AKTIV : QUELLE_INAKTIV} />,
+      render: (_, q) => <Status darstellung={q.aktiv ? QUELLE_AKTIV : QUELLE_INAKTIV} />,
     },
     ...(istAdmin
       ? ([

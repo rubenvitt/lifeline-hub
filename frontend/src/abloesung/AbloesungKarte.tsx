@@ -8,7 +8,6 @@ import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import StatusTag from '../components/StatusTag';
 import { monoStil, useRollen } from '../components/instrument';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
@@ -21,6 +20,7 @@ import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { abloesungZeit, einstufungOf } from './einstufung';
 import { planungEntfallenText, planungWarnungText } from './planungWarnung';
 import { lautPlanText } from './lautPlan';
+import { Status } from '../components/instrument/Status';
 
 const { Text } = Typography;
 
@@ -245,7 +245,7 @@ export default function AbloesungKarte({
           <Text strong style={{ fontSize: 15 }}>
             {s.einheit_name}
           </Text>
-          {darstellung && <StatusTag darstellung={darstellung} />}
+          {darstellung && <Status darstellung={darstellung} />}
         </Flex>
         <Space orientation="vertical" size={2} style={{ width: '100%', marginTop: 4 }}>
           {laufend && <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>}

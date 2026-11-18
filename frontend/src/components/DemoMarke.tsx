@@ -1,4 +1,4 @@
-import { Tag } from 'antd';
+import { Marke } from './instrument/Marke';
 
 /**
  * Marke „Demo“ an Stammdaten aus dem Demo-Import (LFH-733, Spec `demo-daten`,
@@ -11,5 +11,5 @@ import { Tag } from 'antd';
  * über diese Komponente.
  */
 export default function DemoMarke() {
-  return <Tag title="Stammdaten aus dem Demo-Import">Demo</Tag>;
+  return <Marke title="Stammdaten aus dem Demo-Import">Demo</Marke>;
 }

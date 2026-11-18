@@ -37,7 +37,6 @@ import {
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusWahl from '../components/StatusWahl';
-import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';

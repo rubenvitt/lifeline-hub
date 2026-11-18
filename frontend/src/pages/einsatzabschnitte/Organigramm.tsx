@@ -14,8 +14,7 @@ import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
-import { monoStil, schriftStil, StatusChip, useRollen } from '../../components/instrument';
-import StatusTag from '../../components/StatusTag';
+import { monoStil, schriftStil, Status, useRollen } from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 import HaengenderBaum, {
@@ -247,7 +246,9 @@ function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: str
       }}
     >
       {teile.length > 0
-        ? teile.map((teil) => <StatusChip key={teil} ton="achtung" wort={teil} title={teil} />)
+        ? teile.map((teil) => (
+            <Status groesse="klein" key={teil} ton="achtung" wort={teil} title={teil} />
+          ))
         : ruhe && (
             <span style={{ fontSize: token.fontSizeSM, color: rollen.gedaempft }}>{ruhe}</span>
           )}
@@ -342,10 +343,7 @@ function KnotenInhalt({
           {/* Dieselbe Form wie Gliederungsbaum und Überblick; nicht beurteilt = kein Etikett. */}
           {knoten.art === 'abschnitt' && knoten.lagezustand && (
             <span data-lfh="org-lagezustand" style={{ display: 'inline-flex' }}>
-              <StatusTag
-                darstellung={abschnittLagezustand[knoten.lagezustand]}
-                darstellungsart="rand"
-              />
+              <Status darstellung={abschnittLagezustand[knoten.lagezustand]} />
             </span>
           )}
         </div>

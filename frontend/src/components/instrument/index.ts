@@ -22,7 +22,9 @@ export {
 } from './Kennzahl';
 export { Aufgliederung, Balken, type Segment } from './Aufgliederung';
 export { default as Zeitachseneintrag } from './Zeitachseneintrag';
-export { StatusZelle, StatusChip, NUR_VORLESER } from './Status';
+export { Status, StatusZelle, NUR_VORLESER, type StatusGroesse } from './Status';
+export { Marke } from './Marke';
+export { StatusKnopf, StatusBlock } from './StatusKnopf';
 export { tonVonRolle, type StatusTon } from './statusFlaeche';
 export {
   default as Segmentleiste,

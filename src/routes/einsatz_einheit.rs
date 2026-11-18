@@ -1606,7 +1606,7 @@ pub async fn status_setzen(
                 StatusKategorie::wird_wieder_verfuegbar(w.vorher_kategorie, w.nachher_kategorie);
             // LFH-552: ein markierter Handstatus wirkt wie ein Wechsel an der Einheit.
             if let Some(sid) = status_id {
-                if let Some((_, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
+                if let Some((_, _, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
                     conn,
                     einsatz_id,
                     ctx.benutzer.id,

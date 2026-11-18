@@ -1,4 +1,4 @@
-import { StatusChip } from '../components/instrument';
+import { Status } from '../components/instrument';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 
 /**
@@ -17,10 +17,11 @@ export default function QuittungIndikator({
 }) {
   // Quittierzeit in der Anzeigezone (LFH-692).
   const { zeitpunkt } = useAnzeigeKonventionen();
-  if (!quittiert) return <StatusChip ton="neutral" wort="Quittung offen" />;
+  if (!quittiert) return <Status groesse="klein" ton="neutral" wort="Quittung offen" />;
   const zeit = zeitpunkt(am);
   return (
-    <StatusChip
+    <Status
+      groesse="klein"
       ton="normal"
       wort={`✓ Quittiert${von ? ` von ${von}` : ''}${zeit ? ` ${zeit}` : ''}`}
     />

@@ -19,7 +19,7 @@ import { formatRegel } from '../abloesung/schichtmodellText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -195,7 +195,7 @@ function SchichtmodelleInhalt() {
       render: (_: string, m) => (
         <Space size={[8, 4]} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
-          {m.ist_vorgabe && <StatusChip ton="normal" wort="Vorgabe der Organisation" />}
+          {m.ist_vorgabe && <Status groesse="klein" ton="normal" wort="Vorgabe der Organisation" />}
           {m.ist_demo && <DemoMarke />}
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('schichtmodell', m.id)}
