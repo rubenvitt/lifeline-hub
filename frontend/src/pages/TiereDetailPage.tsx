@@ -303,6 +303,12 @@ export default function TiereDetailPage() {
   useEffect(() => {
     if (storniert && bearbeiten && !editForm.isFieldsTouched()) beendeSitzung();
   }, [storniert, bearbeiten, editForm, beendeSitzung]);
+  // Offene Dialoge sind Schreibaktionen: der Storno schließt sie (Spec `storno-sperre`).
+  useEffect(() => {
+    if (!storniert) return;
+    setStornoOffen(false);
+    setAbschlussOffen(false);
+  }, [storniert]);
 
   // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
   // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks (Rules-of-Hooks).

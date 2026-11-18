@@ -235,6 +235,10 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   useEffect(() => {
     if (storniert && bearbeiten && !form.isFieldsTouched()) setSitzung(null);
   }, [storniert, bearbeiten, form]);
+  // Offene Dialoge sind Schreibaktionen: der Storno schließt sie (Spec `storno-sperre`).
+  useEffect(() => {
+    if (storniert) setDialog(null);
+  }, [storniert]);
   // Ohne Personenrecht liefert die Übersicht kein `namentlich`: Zahl und Paneel entfallen.
   const namentlichListe = betreuungQuery.data?.namentlich;
   const personenFrei = namentlichListe != null;

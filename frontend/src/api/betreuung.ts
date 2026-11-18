@@ -62,7 +62,6 @@ export function aendereStelle(
   return apiSend<Betreuungsstelle>(`${basis(einsatzId)}/stellen/${stelleId}`, 'PATCH', body);
 }
 
-/** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */
 /**
  * Storno-Stand einer Stelle (LLH-1832, Spec `storno-sperre`): die Übersicht lässt stornierte Stellen
  * weg; fällt eine gesehene heraus, nennt dieser Abruf Wann und Wer.
@@ -74,6 +73,7 @@ export function loadBetreuungsstelleStand(
   return apiGet<StornoStand>(`${basis(einsatzId)}/stellen/${stelleId}/stand`);
 }
 
+/** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */
 export function storniereStelle(einsatzId: number, stelleId: number): Promise<Betreuungsstelle> {
   return apiSend<Betreuungsstelle>(
     `${basis(einsatzId)}/stellen/${stelleId}/stornieren`,

@@ -248,6 +248,13 @@ export default function SchaedenDetailPage() {
   useEffect(() => {
     if (storniert && bearbeiten && !editForm.isFieldsTouched()) beendeSitzung();
   }, [storniert, bearbeiten, editForm, beendeSitzung]);
+  // Offene Dialoge sind Schreibaktionen: der Storno schließt sie (Spec `storno-sperre`).
+  useEffect(() => {
+    if (!storniert) return;
+    setUebergebenOffen(false);
+    setAbschlussOffen(false);
+    setStornoFuer(null);
+  }, [storniert]);
 
   // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
   // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks (Rules-of-Hooks).
@@ -301,7 +308,7 @@ export default function SchaedenDetailPage() {
   }
 
   /** Nach einem Storno nur noch lesen (LLH-1832): Text `readOnly`, Auswahl gesperrt. */
-  const lesen = <P,>(feld: ReactElement<P>): ReactElement<P> =>
+  const lockIfStorniert = <P,>(feld: ReactElement<P>): ReactElement<P> =>
     storniert ? entwurfNurLesen(feld) : feld;
 
   const detailAnsicht = (
@@ -315,16 +322,20 @@ export default function SchaedenDetailPage() {
       eingabe={
         bearbeiten
           ? {
-              typ: { feld: lesen(<Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />) },
-              ausmass: {
-                feld: lesen(<Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />),
+              typ: {
+                feld: lockIfStorniert(<Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />),
               },
-              gefahrenart: { feld: lesen(<GefahrAuswahlImFormular />) },
-              schadensgrad: { feld: lesen(<SchadensgradAuswahl />) },
+              ausmass: {
+                feld: lockIfStorniert(
+                  <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
+                ),
+              },
+              gefahrenart: { feld: lockIfStorniert(<GefahrAuswahlImFormular />) },
+              schadensgrad: { feld: lockIfStorniert(<SchadensgradAuswahl />) },
               // Ortsfeld mit Vorschau (LLH-1121): ein Treffer verortet, eine Textkorrektur behält
               // einen gespeicherten Punkt (design.md D3).
               ort: {
-                feld: lesen(
+                feld: lockIfStorniert(
                   <EinsatzOrtsfeld
                     einsatzId={einsatzId}
                     etikett="Schadensort"
@@ -337,13 +348,13 @@ export default function SchaedenDetailPage() {
               // Eine ältere, längere Beschreibung bleibt stehen: der Zähler nennt die Überlänge,
               // Speichern scheitert an der Regel, bis gekürzt ist (LFH-937, design.md Risiken).
               beschreibung: {
-                feld: lesen(
+                feld: lockIfStorniert(
                   <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />,
                 ),
                 rules: [zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')],
               },
               geschaedigt: {
-                feld: lesen(
+                feld: lockIfStorniert(
                   <GeschaedigtPicker
                     einsatzId={einsatzId}
                     orgName={einsatz.org_name ?? 'Eigene Organisation'}

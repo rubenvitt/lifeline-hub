@@ -1154,6 +1154,24 @@ describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () 
     expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull();
   });
 
+  it('ein offener Dialog schließt beim Storno', async () => {
+    let stand: Tier = tierBasis;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib erfassen' }));
+    await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) }));
+    await screen.findByText(/^Storniert von Anna Beispiel/);
+    // Geschlossen: das Modal blendet aus (`ant-zoom-leave`); die Animation endet in jsdom nicht.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: 'Verbleib von T-001' }).closest('.ant-modal'),
+      ).toHaveClass('ant-zoom-leave'),
+    );
+  });
+
   it('eine unberührte Bearbeitung schließt beim Storno', async () => {
     let stand: Tier = tierBasis;
     const { client } = render(einsatzAktiv, tierBasis, [
