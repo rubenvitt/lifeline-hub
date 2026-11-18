@@ -67,6 +67,18 @@ setzen Status, tragen nach und streichen.
    alle Filter auf. Trifft die Suche ein Fahrzeug, steht seine ganze Beladung
    darunter; trifft sie einen Posten der Beladung, steht das Fahrzeug mit seiner Einheit darüber,
    aber nur mit diesem Posten.
+8. Um Einheiten zu finden, die gerade nichts zu tun haben oder von denen nichts kommt, unter
+   „Filter“ das Häkchen „ohne Auftrag“ oder „Rückmeldung fehlt oder überfällig“ setzen. „Ohne
+   Auftrag“ zeigt die Einheiten, an die kein offener oder laufender Auftrag gerichtet ist;
+   „Rückmeldung fehlt oder überfällig“ zeigt die Einheiten, deren Rückmeldung über der Frist ist
+   oder die sich noch nie zurückgemeldet haben, und nimmt eine Einheit von selbst auf, sobald ihre
+   Frist verstreicht. Beide zusammen zeigen nur Einheiten, auf die beides zutrifft. Mit einem
+   dieser Häkchen zeigen auch Statusband, Lagebericht und Druck nur diese Einheiten mit ihren
+   Kräften, und „Ohne Einheit“ entfällt. Trifft es nur eine Untereinheit, bleibt ihre Obereinheit
+   als Rahmen darüber stehen, ohne eigene Fahrzeuge, Personal oder Material, und zählt nicht mit.
+   Kann die App die Aufträge oder Rückmeldungen gerade nicht lesen (keine Freigabe, Laden, Fehler),
+   ist das Häkchen grau und nennt darunter den Grund; ein schon gesetzter Filter wirkt dann nicht,
+   und seine Marke trägt „(wirkt gerade nicht)“.
 
 Die Zeile „Ohne Einheit“ sammelt Fahrzeuge und Personal, die keiner Einheit zugeordnet sind, und
 Material ohne Ort; ein Fahrzeug ohne Einheit bringt seine Beladung mit. Material an einer UHS oder

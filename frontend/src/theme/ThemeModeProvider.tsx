@@ -228,24 +228,48 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Ein fester Modus ohne Speicher, Medienabfrage und Umschalten, für die Vorschauen des Design
+ * Systems (d78gipem D5): dort stehen Nacht und Tag untereinander, jeder Abschnitt braucht seinen
+ * eigenen Modus. Ohne ihn lesen Bausteine mit `useModusFarben` im Tag-Abschnitt die Nacht-Rollen
+ * der Vorgabe. Den antd-Provider setzt der Aufrufer selbst; die App nimmt {@link ThemeModeProvider}.
+ */
+export function ThemeModusFest({
+  effektiv,
+  dichte,
+  children,
+}: {
+  effektiv: EffektivesTheme;
+  dichte: Dichte;
+  children: ReactNode;
+}) {
+  const wert = useMemo<ThemeModeWert>(
+    () => ({ ...THEME_MODE_VORGABE, modus: effektiv, effektiv, dichte }),
+    [effektiv, dichte],
+  );
+  return <ThemeModeContext.Provider value={wert}>{children}</ThemeModeContext.Provider>;
+}
+
+/** Der Wert außerhalb jedes Providers: Nacht, wie die App startet, und nichts schaltet. */
+const THEME_MODE_VORGABE: ThemeModeWert = {
+  modus: MODUS_DEFAULT,
+  effektiv: 'dark',
+  setModus: () => {},
+  dichte: DICHTE_DEFAULT,
+  setDichte: () => {},
+  helligkeit: HELLIGKEIT_DEFAULT,
+  setHelligkeit: () => {},
+  helligkeitWirksam: HELLIGKEIT_DEFAULT,
+  warnungAktiv: false,
+  meldeWarnung: () => {},
+};
+
+/**
  * Liefert den aktuellen Theme-Modus. Außerhalb des Providers (z. B. in isolierten Tests) wird
  * die Vorgabe `dark` zurückgegeben statt zu werfen, dieselbe, mit der die App startet.
  */
 export function useThemeMode(): ThemeModeWert {
   const wert = useContext(ThemeModeContext);
-  if (wert) return wert;
-  return {
-    modus: MODUS_DEFAULT,
-    effektiv: 'dark',
-    setModus: () => {},
-    dichte: DICHTE_DEFAULT,
-    setDichte: () => {},
-    helligkeit: HELLIGKEIT_DEFAULT,
-    setHelligkeit: () => {},
-    helligkeitWirksam: HELLIGKEIT_DEFAULT,
-    warnungAktiv: false,
-    meldeWarnung: () => {},
-  };
+  return wert ?? THEME_MODE_VORGABE;
 }
 
 /**

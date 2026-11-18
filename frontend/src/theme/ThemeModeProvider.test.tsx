@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Alert, Button, Checkbox, Collapse, Popconfirm, Radio, Switch, theme } from 'antd';
-import { ThemeModeProvider, useDichte, useThemeMode } from './ThemeModeProvider';
+import { ThemeModeProvider, ThemeModusFest, useDichte, useThemeMode } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { sendeZeigerAenderung, setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
 
@@ -511,5 +511,31 @@ describe('Gesperrter Browserspeicher (LFH-942)', () => {
       length: 0,
     });
     pruefeOhneSpeicher();
+  });
+});
+
+/**
+ * Fester Modus für das Design System (d78gipem D5): jeder Abschnitt einer Karte (Nacht, Tag)
+ * braucht seinen eigenen Modus, sonst lesen Bausteine mit `useModusFarben` im Tag-Abschnitt die
+ * Nacht-Rollen. Kein Speicher, keine Medienabfrage.
+ */
+describe('ThemeModusFest', () => {
+  function Sonde() {
+    const { modus, effektiv, dichte } = useThemeMode();
+    return <span data-testid="sonde">{`${modus} ${effektiv} ${dichte}`}</span>;
+  }
+
+  it('liefert den gesetzten Modus und die Dichte, unabhängig vom Speicher', () => {
+    window.localStorage.setItem('lifeline-hub.theme', 'dark');
+    try {
+      render(
+        <ThemeModusFest effektiv="light" dichte="kompakt">
+          <Sonde />
+        </ThemeModusFest>,
+      );
+      expect(screen.getByTestId('sonde')).toHaveTextContent('light light kompakt');
+    } finally {
+      window.localStorage.removeItem('lifeline-hub.theme');
+    }
   });
 });

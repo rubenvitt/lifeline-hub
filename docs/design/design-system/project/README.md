@@ -29,6 +29,7 @@ die Karten deckungsgleich.
 | Lagebild aus Zahlen, Verteilung und Listen                                                      | Dashboard-Baukasten                                                                                                                              | `Dashboard`, `DashboardListen`     |
 | Kopfaktion mit wechselndem Wortlaut                                                             | `BreiteHalten`                                                                                                                                   | `BreiteHalten`                     |
 | Übung kennzeichnen                                                                              | `UebungsBand`/`UebungsMarke` (Rahmen, „Übung“)                                                                                                   | `Uebung`                           |
+| Navigation im Einsatz (Kategorien und Module)                                                   | `IconRail`/`ModulPanel` ab `lg`, darunter Navigations-Drawer („UI-Form-Leitlinie“)                                                               | `Navigation`                       |
 | **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
@@ -81,6 +82,7 @@ die Karten deckungsgleich.
 
 - **Paneel** (`components/Paneel/`, Gruppe Flächen)
 - **Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)** (`components/Seitenkopf/`, Gruppe Rahmen)
+- **Navigation im Einsatz (Rail und Modulpanel)** (`components/Navigation/`, Gruppe Rahmen)
 - **Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)** (`components/Dashboard/`, Gruppe Flächen)
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
