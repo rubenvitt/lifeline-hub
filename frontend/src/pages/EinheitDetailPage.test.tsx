@@ -290,8 +290,8 @@ async function waehleImMenue(name: string, eintrag: string) {
 }
 
 const PANEELE = [
-  'Kopfdaten',
   'Fahrzeuge und Besatzung',
+  'Kopfdaten',
   'Zeitachse',
   'Material',
   'Funk',
@@ -337,7 +337,8 @@ describe('EinheitDetailPage · die Route selbst', () => {
     expect(feld).toHaveAttribute('maxLength', String(EINHEIT_NAME_MAX));
   });
 
-  it('die Paneele stehen in der Folge aus D2', async () => {
+  // LLH-1797: Fahrzeuge und Besatzung vor den Kopfdaten (Übernahme, wenn offen, bleibt darüber).
+  it('die Paneele stehen in der Folge aus D2, Besatzung vor den Kopfdaten (LLH-1797)', async () => {
     server.use(...handlers());
     rendere();
     await screen.findByRole('region', { name: 'Einheit auflösen oder stornieren' });
@@ -346,6 +347,36 @@ describe('EinheitDetailPage · die Route selbst', () => {
       .map((r) => r.querySelector('h2')?.textContent ?? '')
       .filter((t) => PANEELE.includes(t));
     expect(titel).toEqual(PANEELE);
+  });
+
+  it('die Gliederung springt zu jedem Paneel und setzt den Fokus dorthin (LLH-1797)', async () => {
+    const gerollt: Element[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      gerollt.push(this);
+    };
+    try {
+      server.use(...handlers());
+      rendere();
+      const gliederung = await screen.findByRole('navigation', { name: 'Gliederung' });
+      const spruenge = within(gliederung)
+        .getAllByRole('button')
+        .map((b) => b.textContent);
+      expect(spruenge).toEqual([
+        'Fahrzeuge und Besatzung',
+        'Kopfdaten',
+        'Zeitachse',
+        'Material',
+        'Funk',
+        'Taktisches Zeichen',
+      ]);
+      await userEvent.click(within(gliederung).getByRole('button', { name: 'Material' }));
+      const ziel = document.activeElement as HTMLElement;
+      expect(ziel).toContainElement(screen.getByRole('region', { name: 'Material' }));
+      expect(gerollt).toEqual([ziel]);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
   });
 
   it('eine unbekannte Einheiten-Kennung meldet das und führt zurück, statt einen Ausfall zu behaupten', async () => {
