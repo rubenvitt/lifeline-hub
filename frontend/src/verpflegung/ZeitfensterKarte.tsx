@@ -120,7 +120,7 @@ interface Aktion {
 /**
  * Ein Verpflegungszeitfenster.
  *
- * Einstufung mit zwei Kanälen: Wort im `StatusTag` und EINE Randfarbe (`alarm` bei
+ * Einstufung mit zwei Kanälen: Wort im `Status` und EINE Randfarbe (`alarm` bei
  * Unterdeckung). Die Fehlmenge steht IMMER als Zahl da; bei Unterdeckung über `alarmText`.
  * Nichts blinkt.
  *

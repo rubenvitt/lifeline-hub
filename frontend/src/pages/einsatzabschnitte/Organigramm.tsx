@@ -221,7 +221,7 @@ export function OrganigrammBild({
   );
 }
 
-/** Höhe der Sammelzeile = die eines `StatusChip`: mit und ohne Lücke gleich hoch. */
+/** Höhe der Sammelzeile = die eines `Status`: mit und ohne Lücke gleich hoch. */
 const OHNE_LEITUNG_PX = 22;
 
 /**

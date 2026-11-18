@@ -10,7 +10,7 @@ import { Status } from '../components/instrument/Status';
 
 /**
  * Lese-Vorschau einer disponierten Einsatzkraft in der Sprungpalette. Daten aus dem Listenfach
- * der Palette mit `select` auf die `id`; Status als `StatusTag`, die Mandantenfarbe erzwingt
+ * der Palette mit `select` auf die `id`; Status als `Status`, die Mandantenfarbe erzwingt
  * die Rand-Form. Einheit und Fahrzeug fehlen (nur IDs in der Liste). Leere optionale Angaben
  * fehlen ganz. Einsatzfunktion und Qualifikation stehen getrennt (LLH-1067).
  */

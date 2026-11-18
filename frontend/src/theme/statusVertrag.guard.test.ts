@@ -400,7 +400,7 @@ describe('Statusfarb-Vertrag: keine Karte neben der Vertragsdatei (LFH-358)', ()
   it('lässt Konsumenten in Ruhe — Prop, Rückgabetyp, Schlüsselrolle', () => {
     expect(
       kartenBefunde({
-        // Genau die drei Formen, die im Bestand stehen (StatusTag, Datensicht, MaterialPage).
+        // Genau die drei Formen, die im Bestand stehen (Status, Datensicht, MaterialPage).
         '/src/components/Attrappe.tsx': [
           "const FORM: Record<NonNullable<StatusDarstellung['form']>, string> = {};",
           'interface P { darstellung: StatusDarstellung }',

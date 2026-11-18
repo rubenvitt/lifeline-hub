@@ -1124,7 +1124,7 @@ function abschnittGliederung(
       zeile.abschnittId != null
         ? einsatzabschnittePfad(einsatzId, { abschnitt: zeile.abschnittId })
         : einheitenPfad(einsatzId),
-    // Lagekante: Farbe nur als Rand, das Wort steht im StatusTag daneben.
+    // Lagekante: Farbe nur als Rand, das Wort steht im `Status` daneben.
     kante: lage ? { farbe: rollenFarbe(lage.rolle, token), rolle: lage.rolle } : null,
     kopf: (
       <>

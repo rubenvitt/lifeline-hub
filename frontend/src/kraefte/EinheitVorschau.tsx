@@ -28,7 +28,7 @@ function mittelText(e: Einheit): string {
  * DATEN: das Listenfach der Palette (`datensatzAbfrage.einheiten`) mit `select` auf die `id`.
  *
  * STATUS aus `einheitStatusAnzeige` wie im Meldebild: „S2 · Frei auf Wache"; bei „gemischt"
- * steht die Verteilung darunter, statt einen Status zu erfinden. Als `StatusTag`, weil ein
+ * steht die Verteilung darunter, statt einen Status zu erfinden. Als `Status`, weil ein
  * HANDstatus die Mandantenfarbe seines Katalogeintrags trägt, die die Rand-Form erzwingt.
  *
  * STÄRKE F/UF/M//Σ; die Soll-Stärke nur, wenn gesetzt. Die Stärke inklusive Unterstellter nur,

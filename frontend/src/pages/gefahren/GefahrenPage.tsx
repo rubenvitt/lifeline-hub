@@ -290,7 +290,7 @@ export default function GefahrenPage() {
               {/* `wrap`: in der 240-px-Spalte bricht die Zeile zwischen den Angaben um, nicht in
                   einem Wort. */}
               <Space wrap>
-                {/* Etikett über `StatusTag`, nicht `color`-Prop: für einen Nicht-Preset rechnet
+                {/* Etikett über `Status`, nicht `color`-Prop: für einen Nicht-Preset rechnet
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 {/* Stufe und Vorläufigkeit in EINEM Etikett: „hoch · unbestätigt“ (LLH-1745). */}
                 <Status darstellung={gebietEtikett(g)} />

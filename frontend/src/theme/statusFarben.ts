@@ -88,7 +88,7 @@ import type { BauStatus, OfflineKarteStatus } from '../api/offlineKarten';
  *
  * `theme/statusVertrag.guard.test.ts` hält die Grenzen maschinell: keine
  * `Record<…, StatusDarstellung>` außerhalb DIESER DATEI (nicht bloß des Verzeichnisses) und kein
- * `<Tag color={…}>`, das ein Vertrags-Enum einfärbt (dafür `components/StatusTag.tsx`). Die
+ * `<Tag color={…}>`, das ein Vertrags-Enum einfärbt (dafür `components/instrument/Status.tsx`). Die
  * blinden Flecken stehen im Kopf des Guards.
  */
 
@@ -231,7 +231,7 @@ export const verfuegbarkeit: Record<Verfuegbarkeit, StatusDarstellung> = {
 };
 
 /**
- * ETB-Eintragstyp als ETIKETT (`StatusTag`) und Quelle des Wortlauts (`label`).
+ * ETB-Eintragstyp als ETIKETT (`Status`) und Quelle des Wortlauts (`label`).
  *
  * Die Zeitachse zeigt den Typ als farbige KANTE plus TYPWORT; diese Farbe liefert
  * {@link etbTypFarbe} aus einer eigenen Palette, weil ein Eintragstyp eine Kategorie ist und

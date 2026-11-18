@@ -293,7 +293,7 @@ describe('BefehlDetailPage', () => {
   it('malt den freigegebenen Status in der Phasenfarbe, nicht im Preset-Grün', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
     renderAt(7);
-    // Die Phase trägt eine getönte Statusfläche (`StatusChip`); die Farbe kommt aus der Phasenachse
+    // Die Phase trägt eine getönte Statusfläche (`Status`); die Farbe kommt aus der Phasenachse
     // (`abgeschlossen` → Ton `normal`), nicht aus einem handgeschriebenen Grün.
     const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status"]');
     expect(etikett).toHaveAttribute('data-ton', 'normal');

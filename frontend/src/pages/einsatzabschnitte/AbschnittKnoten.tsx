@@ -22,7 +22,7 @@ interface Props {
  * sichtbarem Wort (WCAG 1.4.1, „Rot bedient nichts" in `frontend/AGENTS.md`): ein reiner
  * Farbpunkt für die Führung las sich in Gelb wie der Lagezustand „angespannt" (LFH-962). Deshalb
  * zeigt ein besetzter Abschnitt nur den Leiternamen, ein unbesetzter den Chip „ohne Leiter", und
- * der Lagezustand steht in derselben Form wie im Überblick (`StatusTag` am Rand, leer = nicht
+ * der Lagezustand steht in derselben Form wie im Überblick (`Status` am Rand, leer = nicht
  * beurteilt). Icons in `aria-hidden`-Hülle, weil antd-Icons `role="img"` mit englischem Namen
  * mitbringen.
  */

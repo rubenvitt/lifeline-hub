@@ -115,7 +115,7 @@ import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 
 /**
- * Besatzung als Urteil (`StatusTag` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
+ * Besatzung als Urteil (`Status` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
  * „Ist 1/0/0//1 · Soll 0/1/8//9". Rot steht nur bei echter Unterbesetzung; das Wort ist der
  * zweite Kanal, nicht die Farbe.
  */

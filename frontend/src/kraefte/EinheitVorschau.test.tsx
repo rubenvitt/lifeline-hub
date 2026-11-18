@@ -71,7 +71,7 @@ describe('EinheitVorschau (LFH-664)', () => {
   });
 
   /**
-   * Ein HANDstatus trägt die Mandantenfarbe seines Katalogeintrags, `StatusTag` erzwingt die
+   * Ein HANDstatus trägt die Mandantenfarbe seines Katalogeintrags, `Status` erzwingt die
    * Rand-Form. Ein aus Fahrzeugen abgeleiteter Status bleibt Fläche.
    */
   it('gibt die Mandantenfarbe eines Handstatus an den Status (Punkt, keine Rand-Form)', async () => {

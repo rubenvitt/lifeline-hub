@@ -238,7 +238,7 @@ export default function OfflineKartenVerwaltung() {
         const s = k.status;
         const akt = aktualisierungJe.get(k.id);
         // LFH-993: Ein fehlgeschlagenes Update steht neben dem Status, der Grund im Tooltip.
-        // Die Hülle trägt den Tooltip: `StatusTag` reicht keinen Ref durch.
+        // Die Hülle trägt den Tooltip: `Status` reicht keinen Ref durch.
         const fehler = akt?.fehler ? (
           <Tooltip title={akt.fehler}>
             <span>

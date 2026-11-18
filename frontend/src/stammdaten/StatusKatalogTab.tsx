@@ -65,7 +65,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     dataIndex: 'farbe',
     key: 'farbe',
     // Der gepflegte Code als Wert (Mono), keine Farbfläche: `status_farbe` ist ungeprüfter
-    // Freitext, sein Kontrast ist nicht zugesichert (siehe `StatusTag`, Mandantenfarbe).
+    // Freitext, sein Kontrast ist nicht zugesichert (siehe `Status`, Mandantenfarbe).
     render: (f: string | null) => (f ? <span style={monoStil(12)}>{f}</span> : '—'),
   },
   {

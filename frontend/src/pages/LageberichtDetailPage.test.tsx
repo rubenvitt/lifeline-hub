@@ -128,7 +128,7 @@ describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     } as never);
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
     renderBei('/einsaetze/1/lageberichte/9');
-    // Die Phase trägt eine getönte Statusfläche (`StatusChip`); die Farbe kommt aus der Phasenachse
+    // Die Phase trägt eine getönte Statusfläche (`Status`); die Farbe kommt aus der Phasenachse
     // (`abgeschlossen` → Ton `normal`), nicht aus einem handgeschriebenen Grün.
     const etikett = (await screen.findByText('Freigegeben')).closest('[data-lfh="status"]');
     expect(etikett).toHaveAttribute('data-ton', 'normal');

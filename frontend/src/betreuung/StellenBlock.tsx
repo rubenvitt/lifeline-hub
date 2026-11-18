@@ -44,7 +44,7 @@ import { Status } from '../components/instrument/Status';
  * Kennung ist die Bezeichnung, nie die DB-`id`.
  *
  * „frei" nur bei gesetzter Kapazität. Die Auslastung („fast voll", „voll", „überbelegt") steht
- * als `StatusTag` neben der Belegung, das Wort ist der zweite Kanal; unter 90 % kein Wort und
+ * als `Status` neben der Belegung, das Wort ist der zweite Kanal; unter 90 % kein Wort und
  * keine Farbe.
  *
  * RANGFOLGE NACH DER ZIELFRAGE (LFH-967): belegt und frei stehen direkt hinter der Kennung,

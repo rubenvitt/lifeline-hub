@@ -212,7 +212,7 @@ export function fmsWort(label: string, anker: number | null | undefined): string
 /**
  * Das EINE Format eines FMS-Status als Text: „S4 · Am Einsatzort“ (LFH-973, Klärungsrunde
  * Welle 4, Entscheidung 2) — im Meldebild, im FMS-Tableau und auf der Fahrzeugseite. Ohne Anker
- * bleibt das Katalogwort. Der Chip (`StatusChip`) setzt Code, Trenner und Wort selbst.
+ * bleibt das Katalogwort. Der Chip (`Status`) setzt Code, Trenner und Wort selbst.
  */
 export function fmsEtikett(label: string, anker: number | null | undefined): string {
   return anker != null ? `S${anker} · ${fmsWort(label, anker)}` : label;
