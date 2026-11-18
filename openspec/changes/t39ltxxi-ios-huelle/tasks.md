@@ -45,7 +45,7 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 - [x] 6.3 `scripts/bereiche.sh` kennt `ios/*` und den Querbezug `src-tauri/faelle/*` (Desktop- und iOS-Prüfung); Selbsttest grün
 - [ ] 6.4 `suiten.yml`: Job `ios` auf `ubuntu-latest` mit `IOS_SWIFT_PFLICHT=1`; Lauf mit Label `voll` grün
 - [ ] 6.5 XcodeGen-Version unter `scripts/` pinnen (eine Stelle); `ios-pruefung.yml` (`pull_request`, Pfadfilter `ios/**`, `src-tauri/faelle/**`, `macos-latest`): Projekt erzeugen, Simulatorbau, Swift-Tests auf iOS, Simulator-Bilder als Artefakt; erster Lauf grün
-- [ ] 6.6 Architektur-Wächter kennt das Teilprojekt `ios`, Kapitel 5 der arc42 nennt es; `check-architektur.sh` grün
+- [x] 6.6 Architektur-Wächter kennt das Teilprojekt `ios`, Kapitel 5 der arc42 nennt es; `check-architektur.sh` grün
 
 ## 7. Swift-Kern `LifelineKern`
 
@@ -60,7 +60,7 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 ## 8. iOS-App
 
 - [ ] 8.1 `ios/project.yml` (XcodeGen), App-Target ab iOS 17.4, iPhone und iPad, Bundle-ID `dev.rubeen.lifeline.ios`, Info.plist-Schlüssel (`LifelineVersion`, `ITSAppUsesNonExemptEncryption`, Kamera, lokales Netz, Schema `lifeline`); `ios/AGENTS.md` angelegt und in der Wurzel-Tabelle; ADR-0065 im selben Commit; `ios-pruefung.yml` grün
-- [ ] 8.2 Versionsskript unter `scripts/` schreibt Marketing-Version, `LifelineVersion` und Build-Nummer (Zeitstempel) aus `[workspace.package]`; Selbsttest für Alpha-, Beta- und stabile Version grün
+- [x] 8.2 Versionsskript unter `scripts/` schreibt Marketing-Version, `LifelineVersion` und Build-Nummer (Zeitstempel) aus `[workspace.package]`; Selbsttest für Alpha-, Beta- und stabile Version grün
 - [ ] 8.3 App-Symbol aus der Bildmarke (1024 px, Kopf-Schwarz) und Startbildschirm; Simulator-Bild im Artefakt
 - [ ] 8.4 Webview-Host: Datenspeicher je Server, Init-Skript aus 4.1, Brücke nur Hauptframe und Origin des aktiven Servers (Test mit fremder Origin und nach Serverwechsel, Mutationsprobe)
 - [ ] 8.5 Native Seiten: Onboarding (Eingabe, QR-Scan, Vorbelegung per Deeplink), Serverliste, Einstellungen (Schalter Haptik), Status-Seiten kein Server, nicht erreichbar (mit Wiederholung und automatischem Laden), Zertifikat nicht vertrauenswürdig (Anleitung), nicht verträglich (Richtung, Versionen); Simulator-Bilder je Seite
@@ -70,12 +70,12 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 - [ ] 8.9 Links, `target=_blank`/`window.open`, Downloads über `WKDownload` (auch `blob:`) mit Teilen-Blatt, Drucken über `UIPrintInteractionController`; Tests gegen die Linkregeln
 - [ ] 8.10 Natives Gefühl: Safe Area, kein Nachfedern, kein Pull-to-Refresh, keine Lupe und kein Textmenü außerhalb von Eingaben; Simulator-Bild und UI-Test
 - [ ] 8.11 Entfernen eines Servers: Rückfrage, Webview schließen, Datenspeicher löschen, Fehler melden; Test
-- [ ] 8.12 `docs/betrieb/ios-app.md` (Installation über TestFlight, CA-Profil für das Einsatz-LAN, mkcert statt Rückfall-Zertifikat, Grenzen: keine Meldung im Hintergrund, kein Passkey im Webview, kein Start ohne Server) und `docs/betrieb/endgeraete.md` verweisen; Prettier grün
+- [x] 8.12 `docs/betrieb/ios-app.md` (Installation über TestFlight, CA-Profil für das Einsatz-LAN, mkcert statt Rückfall-Zertifikat, Grenzen: keine Meldung im Hintergrund, kein Passkey im Webview, kein Start ohne Server) und `docs/betrieb/endgeraete.md` verweisen; Prettier grün
 
 ## 9. Auslieferung
 
 - [ ] 9.1 `ios.yml` (`workflow_call` und `workflow_dispatch`): Versionsskript, Archiv, automatische Signierung per API-Schlüssel, Upload zu TestFlight; `artefakte.yml` ruft ihn nach `freigeben` nur für Tags der Kanäle `beta` und `main`, ohne das Release aufzuhalten; actionlint grün
-- [ ] 9.2 arc42 Kapitel 7 (Verteilung), 8 (Hüllen-Vertrag) und 11 (Risiken) nachziehen; Wächter der Architekturdoku grün
+- [x] 9.2 arc42 Kapitel 7 (Verteilung), 8 (Hüllen-Vertrag) und 11 (Risiken) nachziehen; Wächter der Architekturdoku grün
 
 ## 10. Übergaben an Ruben und Abnahme
 
