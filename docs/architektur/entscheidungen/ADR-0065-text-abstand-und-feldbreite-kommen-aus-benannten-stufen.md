@@ -37,7 +37,7 @@ herleitung:
 ```sh
 verlange 'kartentitel: \{ groesse: 15, gewicht: 600' frontend/src/theme/tokens.ts
 verlange '^export const FELDBREITE' frontend/src/theme/tokens.ts
-verlange "Omit<FormItemProps, 'style'>" frontend/src/components/instrument/Feld.tsx
+verlange "Omit<FormItemProps<Values>, 'style'>" frontend/src/components/instrument/Feld.tsx
 verbiete '^  style\??:' frontend/src/components/instrument/Textstufe.tsx frontend/src/components/instrument/Stapel.tsx
 verbiete 'useDichte|dichten\[' frontend/src/components/instrument/Textstufe.tsx
 test -f frontend/src/theme/schriftgroesse.guard.test.ts
