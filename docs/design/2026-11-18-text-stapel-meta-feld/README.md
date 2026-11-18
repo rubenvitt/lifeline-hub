@@ -8,7 +8,7 @@ Feldbreiten werden an jeder Stelle neu erfunden und von Wächtern und Regeltext 
 https://claude.ai/artifact/7JwMvNyGBTvAoqNytBZpFa (Artifact-Typ „Design“, Design System „Lifeline
 Hub“). Die Schriften lädt der Canvas aus `ds/lifeline-hub/`; im Repo fallen die Flächen auf die
 Systemschrift zurück. Der Lösungsweg wurde am 18.11.2026 mit Ruben abgestimmt
-(Phase-1-Checkpoint), die Change dazu ist `openspec/changes/hzru8iq7-text-stapel-meta-feld/`.
+(Phase-1-Checkpoint), die Change dazu ist `openspec/changes/archive/2026-11-18-hzru8iq7-text-stapel-meta-feld/`.
 
 | Datei                       | Zeichenfläche                                         | Dichte      |
 | --------------------------- | ----------------------------------------------------- | ----------- |
