@@ -475,6 +475,45 @@ pub async fn anhang_bereinigt_kopieren(
     Ok((mime, daten))
 }
 
+/// Was ein Anhang zum ZIP der Einsatzakte beiträgt (LLH-1835, design.md D6).
+pub enum AkteInhalt {
+    /// Die bereinigten Bytes, wie sie auch der Einzel-Download liefert.
+    Datei(Vec<u8>),
+    /// Kein Inhalt; der Grund steht im Inhaltsverzeichnis.
+    NichtEnthalten(&'static str),
+}
+
+/// Bereinigte Bytes eines Anhangs für das ZIP der Einsatzakte. Wie
+/// [`anhang_bereinigt_kopieren`] eine Lesestelle von `anhang::repo::laden_bytes` und deshalb
+/// hier (Guard in `tests/anhang_metadaten.rs`); gibt nie das Original heraus. Statt eines
+/// Fehlers, der das ganze ZIP kippte, meldet er „nicht enthalten“: unbereinigbar, am Spiegel
+/// noch nicht geholt, inzwischen entfernt. Zugriffsprüfung und Protokoll macht der Aufrufer
+/// VORHER.
+pub async fn anhang_fuer_akte(pool: &SqlitePool, anhang_id: i64) -> Result<AkteInhalt, AppError> {
+    match crate::instanz::spiegel::anhang::pruefe_vorhanden(pool, "anhang", &anhang_id.to_string())
+        .await
+    {
+        Ok(()) => {}
+        Err(AppError::Conflict(_)) => {
+            return Ok(AkteInhalt::NichtEnthalten("Inhalt wird noch geholt"));
+        }
+        Err(e) => return Err(e),
+    }
+    let (_, mime, daten) = match anhang::repo::laden_bytes(pool, anhang_id).await {
+        Ok(t) => t,
+        Err(AppError::NotFound) => return Ok(AkteInhalt::NichtEnthalten("entfernt")),
+        Err(e) => return Err(e),
+    };
+    Ok(match anhang::metadaten::bereinigen(&daten, &mime) {
+        Ok(Cow::Owned(neu)) => AkteInhalt::Datei(neu),
+        Ok(Cow::Borrowed(_)) => AkteInhalt::Datei(daten),
+        Err(anhang::metadaten::Unbereinigbar(grund)) => {
+            tracing::warn!(anhang_id, grund, "Anhang lässt sich nicht bereinigen");
+            AkteInhalt::NichtEnthalten("lässt sich nicht bereinigen")
+        }
+    })
+}
+
 /// Schalter aus der Query (`?entlassene=1`): fehlt, leer, `0` oder `false` = aus, `1` oder
 /// `true` = an, alles andere 400 mit dem Namen (LLH-1079).
 pub fn parse_flag(wert: Option<&str>, name: &str) -> Result<bool, AppError> {

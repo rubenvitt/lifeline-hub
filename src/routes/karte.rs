@@ -2702,6 +2702,7 @@ mod finalisierung_tests {
                 reqwest::Client::new(),
             ),
             backup_download: Default::default(),
+            einsatzakte_bau: Default::default(),
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
         };

@@ -322,26 +322,13 @@ fn csv_feld(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-/// GET /api/einsaetze/{id}/schaeden/export — CSV aller nicht stornierten Schäden, älteste Nummer
-/// zuerst (LLH-1115). Aufzählungen in Worten wie die Oberfläche; Gefahr und Schadensgrad leer,
-/// wenn nicht angegeben. Ohne Geschädigte: die Liste ist eine Lageübersicht, kein Register
-/// betroffener Personen. Gleiches Gate wie die Liste, nicht auditiert.
-pub async fn export(
-    State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Schaeden>,
-) -> Result<Response, AppError> {
-    let mut schaeden = schaden_repo::liste(
-        &state.pool,
-        ctx.einsatz.id,
-        &schaden_repo::SchadenFilter::default(),
-        None,
-    )
-    .await?;
-    schaeden.reverse();
+/// CSV der Schäden wie `GET …/schaeden/export`, in der übergebenen Reihenfolge; geteilt mit
+/// dem ZIP der Einsatzakte (`openspec/changes/hsdhm2ki-einsatzakte/design.md` D6).
+pub fn schaeden_csv(schaeden: &[SchadenAnzeige]) -> String {
     let mut csv = String::from(
         "registrier_nr;status;typ;ausmass;gefahr;schadensgrad;ort;lat;lon;beschreibung;erfasst_at\n",
     );
-    for s in &schaeden {
+    for s in schaeden {
         let status = match s.status {
             SchadenStatus::Offen => "offen",
             SchadenStatus::Uebergeben => "übergeben",
@@ -362,6 +349,26 @@ pub async fn export(
             csv_feld(&s.erfasst_at),
         ));
     }
+    csv
+}
+
+/// GET /api/einsaetze/{id}/schaeden/export — CSV aller nicht stornierten Schäden, älteste Nummer
+/// zuerst (LLH-1115). Aufzählungen in Worten wie die Oberfläche; Gefahr und Schadensgrad leer,
+/// wenn nicht angegeben. Ohne Geschädigte: die Liste ist eine Lageübersicht, kein Register
+/// betroffener Personen. Gleiches Gate wie die Liste, nicht auditiert.
+pub async fn export(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Schaeden>,
+) -> Result<Response, AppError> {
+    let mut schaeden = schaden_repo::liste(
+        &state.pool,
+        ctx.einsatz.id,
+        &schaden_repo::SchadenFilter::default(),
+        None,
+    )
+    .await?;
+    schaeden.reverse();
+    let csv = schaeden_csv(&schaeden);
     Ok((
         [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
         csv,

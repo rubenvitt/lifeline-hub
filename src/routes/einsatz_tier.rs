@@ -477,17 +477,12 @@ fn csv_feld(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-/// GET /api/einsaetze/{id}/tiere/export — CSV aller (nicht-stornierten) Tiere.
-/// NICHT auditiert (Tiere sind keine besondere Kategorie).
-pub async fn export(
-    State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Tiere>,
-) -> Result<Response, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let tiere = tier_repo::liste(&state.pool, einsatz_id, None, None, None).await?;
+/// CSV der Tiere wie `GET …/tiere/export`; geteilt mit dem ZIP der Einsatzakte
+/// (`openspec/changes/hsdhm2ki-einsatzakte/design.md` D6).
+pub fn tiere_csv(tiere: &[TierAnzeige]) -> String {
     let mut csv =
         String::from("registrier_nr;status;spezies;rufname;rasse;geschlecht;alter;antreff_ort\n");
-    for t in &tiere {
+    for t in tiere {
         let alter = t
             .alter_geschaetzt
             .map(|a| a.to_string())
@@ -504,6 +499,18 @@ pub async fn export(
             csv_feld(t.antreff_ort.as_deref().unwrap_or("")),
         ));
     }
+    csv
+}
+
+/// GET /api/einsaetze/{id}/tiere/export — CSV aller (nicht-stornierten) Tiere.
+/// NICHT auditiert (Tiere sind keine besondere Kategorie).
+pub async fn export(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Tiere>,
+) -> Result<Response, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let tiere = tier_repo::liste(&state.pool, einsatz_id, None, None, None).await?;
+    let csv = tiere_csv(&tiere);
     Ok((
         [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
         csv,

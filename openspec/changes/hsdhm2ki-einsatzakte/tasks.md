@@ -2,17 +2,17 @@
 
 ## 1. Backend: Bausteine für das ZIP
 
-- [ ] 1.1 CSV-Builder der Exporte Personen, Tiere, Schäden als Funktionen herausziehen und von den bestehenden Export-Routen nutzen lassen; Nachweis: bestehende Tests `tests/einsatz_person.rs`, `tests/einsatz_tier.rs`, `tests/einsatz_schaden.rs` grün, Ausgabe bytegleich
-- [ ] 1.2 `routes/support.rs`: Funktion für bereinigte Bytes eines Anhangs für die Akte (Fehler „unbereinigbar“ getrennt); Nachweis: Unit-Test und Wächter `nur_support_liefert_anhang_bytes_aus` grün
-- [ ] 1.3 `src/einsatzakte/`: Sammeln aller Anhänge des Einsatzes über `MODUL_LINKER` (ohne gelöschte, ohne Chat, Lagebericht/Befehl nur freigegeben, ausgeblendete Module raus) mit Ordnerpfad, sanitisiertem und kollisionsfreiem Dateinamen; Nachweis: Tests für Pfade, `..`/Steuerzeichen, Dubletten ` (2)`
-- [ ] 1.4 ZIP-Schreiber in Temp-Datei (Anhänge `Stored`, CSVs `Deflated`, `inhalt.csv` mit Pfad, Modul, Datensatz, Dateiname, Größe, SHA-256, „nicht enthalten“ mit Grund); Nachweis: Test liest das ZIP zurück und prüft Einträge und Prüfsummen
+- [x] 1.1 CSV-Builder der Exporte Personen, Tiere, Schäden als Funktionen herausziehen und von den bestehenden Export-Routen nutzen lassen; Nachweis: bestehende Tests `tests/einsatz_person.rs`, `tests/einsatz_tier.rs`, `tests/einsatz_schaden.rs` grün, Ausgabe bytegleich
+- [x] 1.2 `routes/support.rs`: Funktion für bereinigte Bytes eines Anhangs für die Akte (Fehler „unbereinigbar“ getrennt); Nachweis: Unit-Test und Wächter `nur_support_liefert_anhang_bytes_aus` grün
+- [x] 1.3 `src/einsatzakte/`: Sammeln aller Anhänge des Einsatzes über `MODUL_LINKER` (ohne gelöschte, ohne Chat, Lagebericht/Befehl nur freigegeben, ausgeblendete Module raus) mit Ordnerpfad, sanitisiertem und kollisionsfreiem Dateinamen; Nachweis: Tests für Pfade, `..`/Steuerzeichen, Dubletten ` (2)`
+- [x] 1.4 ZIP-Schreiber in Temp-Datei (Anhänge `Stored`, CSVs `Deflated`, `inhalt.csv` mit Pfad, Modul, Datensatz, Dateiname, Größe, SHA-256, „nicht enthalten“ mit Grund); Nachweis: Test liest das ZIP zurück und prüft Einträge und Prüfsummen
 
 ## 2. Backend: Route
 
-- [ ] 2.1 `GET /api/einsaetze/{id}/einsatzakte/anlagen.zip` in `src/app.rs`, Handler `src/routes/einsatzakte.rs`, Gate `EinsatzLesezugriff<OhneModul>` + `PFAD_KEY`, je Modul ausgeblendet → weg, sonst `fordere_zielmodul` (403); Nachweis: Integrationstest „Modul gesperrt → 403“, „ausgeblendet → Teil fehlt“, Guard `tests/einsatz_kontext_guard.rs` grün
-- [ ] 2.2 Audit in einer Transaktion vor dem Bau (`export` Personen, `anhang` je Personen-Anhang, `anhang_zugriff_audit` je UHS-Anhang), scheitert → keine Daten; Nachweis: Integrationstest prüft die Protokollzeilen
-- [ ] 2.3 Streaming-Antwort mit `Content-Type`, `Content-Disposition` (Einsatznummer, Datum), Temp-Datei danach gelöscht; Sperre je Einsatz → 409 ohne Audit; Nachweis: Integrationstests ZIP-Inhalt (ETB-Foto, gelöschter Schaden-Anhang fehlt, Dubletten) und 409
-- [ ] 2.4 Aufbewahrung: abgelaufene Frist bzw. geschwärzte Anhänge → 403 bzw. fehlen; Nachweis: Integrationstest
+- [x] 2.1 `GET /api/einsaetze/{id}/einsatzakte/anlagen.zip` in `src/app.rs`, Handler `src/routes/einsatzakte.rs`, Gate `EinsatzLesezugriff<OhneModul>` + `PFAD_KEY`, je Modul ausgeblendet → weg, sonst `fordere_zielmodul` (403); Nachweis: Integrationstest „Modul gesperrt → 403“, „ausgeblendet → Teil fehlt“, Guard `tests/einsatz_kontext_guard.rs` grün
+- [x] 2.2 Audit in einer Transaktion vor dem Bau (`export` Personen, `anhang` je Personen-Anhang, `anhang_zugriff_audit` je UHS-Anhang), scheitert → keine Daten; Nachweis: Integrationstest prüft die Protokollzeilen
+- [x] 2.3 Streaming-Antwort mit `Content-Type`, `Content-Disposition` (Einsatznummer, Datum), Temp-Datei danach gelöscht; Sperre je Einsatz → 409 ohne Audit; Nachweis: Integrationstests ZIP-Inhalt (ETB-Foto, gelöschter Schaden-Anhang fehlt, Dubletten) und 409
+- [x] 2.4 Aufbewahrung: abgelaufene Frist bzw. geschwärzte Anhänge → 403 bzw. fehlen; Nachweis: Integrationstest
 
 ## 3. Frontend: Bausteine herauslösen
 
