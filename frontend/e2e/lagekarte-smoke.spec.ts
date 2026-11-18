@@ -94,6 +94,12 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
 
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
+  // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur der Knopf „Stand sichern“
+  // (LLH-1936), und die Überdeckungsmessung unten hätte kein Band.
+  const stand = await page.request.post(`/api/einsaetze/${eid}/lage-snapshots`, {
+    data: { bezeichnung: 'Stand vor Ort' },
+  });
+  expect(stand.ok(), await stand.text()).toBeTruthy();
   await page.goto(`/einsaetze/${eid}/lagekarte`);
 
   // Anker statt Timeout: das Canvas erzeugt erst MapLibre, und die Seite zeigt bis zur

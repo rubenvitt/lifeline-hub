@@ -562,6 +562,74 @@ describe('SnapshotLeiste — zwei Gruppen, Abstände aus der Staffel (LFH-899)',
     renderLeiste([snapshot()], { darfSichern: true });
     expect(screen.getByRole('button', { name: 'Stand sichern' })).toBeInTheDocument();
   });
+
+  it('„Stand sichern" trägt im Band das Wort als sichtbaren Text (LLH-1936)', () => {
+    renderLeiste([snapshot()], { darfSichern: true });
+    const knopf = screen.getByRole('button', { name: 'Stand sichern' });
+    expect(knopf).toHaveTextContent('Stand sichern');
+    // Der Name kommt aus dem sichtbaren Wort, nicht aus einem zweiten Etikett.
+    expect(knopf.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('die Basis der Stand-Gruppe trägt den Knopf mit Wort (LLH-1936)', () => {
+    // Gemessen im Browser (antd 6, App-Schrift): 136 / 151 / 165 px in kompakt / komfortabel /
+    // handschuh. Die Basis darf ihn nicht unterschätzen, sonst bliebe die Gruppe in der ersten
+    // Zeile, obwohl sie dort nicht passt.
+    for (const [token, knopf] of [
+      [KOMPAKT, 136],
+      [HANDSCHUH, 165],
+    ] as const) {
+      expect(bandStile(token).standBasis).toBeGreaterThanOrEqual(160 + token.marginSM + knopf);
+    }
+  });
+});
+
+/**
+ * LLH-1936 (Spec `lagekarte-zeitachse`, „Ohne Stände steht nur ein Knopf ‚Stand sichern‘“): ohne
+ * Stand gibt es kein Band, nur den Knopf mit Wort, und die gemerkte Klappwahl gilt noch nicht.
+ */
+describe('SnapshotLeiste — ohne Stände nur ein Knopf (LLH-1936)', () => {
+  beforeEach(() => {
+    ladeLageSnapshots.mockReset();
+    erzeugeLageSnapshot.mockReset();
+  });
+
+  it('ohne Stände steht nur „Stand sichern“ mit Wort, ohne Band und ohne Ausblenden', () => {
+    const { container } = renderLeiste([], { darfSichern: true });
+    const knopf = screen.getByRole('button', { name: 'Stand sichern' });
+    // Das Wort steht sichtbar am Knopf, nicht nur im zugänglichen Namen.
+    expect(knopf).toHaveTextContent('Stand sichern');
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(container.querySelector('[data-lfh="zeitachse"]')).toBeNull();
+    expect(knopf.getAttribute('data-lfh')).toBe('zeitachse-sichern');
+    // Linksbündig im Fluss des KartenFuss, wie der eingeklappte Knopf.
+    expect(knopf.style.position).toBe('');
+    expect(knopf.style.alignSelf).toBe('flex-start');
+    expect(knopf.style.pointerEvents).toBe('auto');
+  });
+
+  it.each([390, 1440])(
+    'bei %i px mit gemerkter Wahl „eingeklappt“ steht „Stand sichern“ statt „Zeitachse einblenden“',
+    (breite) => {
+      setzeViewportBreite(breite);
+      localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '1');
+      renderLeiste([], { darfSichern: true });
+      expect(screen.getByRole('button', { name: 'Stand sichern' })).toHaveTextContent(
+        'Stand sichern',
+      );
+      expect(screen.queryByRole('button', { name: 'Zeitachse einblenden' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Zeitachse ausblenden' })).toBeNull();
+      // Die gemerkte Wahl bleibt unberührt.
+      expect(localStorage.getItem('lfh:lagekarte:zeitachse-eingeklappt')).toBe('1');
+    },
+  );
+
+  it('ab dem ersten Stand gilt wieder die gemerkte Wahl', () => {
+    localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '1');
+    renderLeiste([snapshot()], { darfSichern: true });
+    expect(screen.getByRole('button', { name: 'Zeitachse einblenden' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stand sichern' })).toBeNull();
+  });
 });
 
 /** LFH-913 (Spec `zeiteingabe`): ein Stand ohne Bezeichnung heißt nach seiner Zeit in der Anzeigezone. */

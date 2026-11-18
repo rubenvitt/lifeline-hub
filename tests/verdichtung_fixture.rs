@@ -6,13 +6,19 @@
 
 use lifeline_hub::auftrag::AuftragBearbeitungsstatus;
 use lifeline_hub::einheit::repo::kumuliere;
+use lifeline_hub::einsatz::ausfall::{
+    einheiten_mit_ausfall, AusfallEingabe, EinheitMerkmale, FahrzeugMerkmale, MaterialMerkmale,
+    MittelMerkmale,
+};
 use lifeline_hub::einsatz::zaehler::{
     count_kraefte, zaehle_auftraege, zaehle_meldungen, zaehle_nachforderungen, AuftragsMerkmale,
     AuftragsZaehler, KraefteZaehler, KraftMerkmale, MeldungsMerkmale, MeldungsZaehler,
     NachforderungsMerkmale, NachforderungsZaehler,
 };
 use lifeline_hub::entlassung::BeendetAls;
+use lifeline_hub::katalog::StatusKategorie;
 use lifeline_hub::kommunikation::Prioritaet;
+use lifeline_hub::material::{ort::MaterialOrt, MaterialArt, MaterialStatus};
 use lifeline_hub::meldung::{ist_sofort, MeldungStatus, Meldungsart};
 use lifeline_hub::nachforderung::NachforderungStatus;
 use lifeline_hub::person::{
@@ -289,5 +295,90 @@ fn versorgung_und_lagesichtung_wie_das_fixture() {
             zahl(&e["sk3"]),
             zahl(&e["sk4"])
         ]
+    );
+}
+
+fn kategorie(v: &Value) -> Option<StatusKategorie> {
+    v["status_kategorie"]
+        .as_str()
+        .map(|s| StatusKategorie::parse(s).expect("bekannte Statuskategorie"))
+}
+
+fn id(v: &Value, feld: &str) -> Option<i64> {
+    v[feld].as_i64()
+}
+
+/// Ausfall je Einheit (LLH-1929): dieselben Einheiten in derselben Folge wie der Browser
+/// (`einheitenMitAusfall` über die Tönung des Meldebilds).
+#[test]
+fn ausfall_je_einheit_wie_das_fixture() {
+    let fx = fixture();
+    let faelle = fx["ausfall"]["faelle"].as_array().expect("Fälle");
+    for a in faelle {
+        ausfall_fall(a);
+    }
+}
+
+fn ausfall_fall(a: &Value) {
+    let liste = |feld: &str| a[feld].as_array().expect("Liste").clone();
+    let eingabe = AusfallEingabe {
+        einheiten: liste("einheiten")
+            .iter()
+            .map(|e| EinheitMerkmale {
+                id: zahl(&e["id"]),
+                name: e["name"].as_str().unwrap().to_string(),
+                sortier: zahl(&e["sortier"]),
+                aufgeloest: flag(e, "aufgeloest"),
+                status_kategorie: kategorie(e),
+            })
+            .collect(),
+        personal: liste("personal")
+            .iter()
+            .map(|p| MittelMerkmale {
+                einheit_id: id(p, "einheit_id"),
+                status_kategorie: kategorie(p),
+                beendet: flag(p, "beendet"),
+            })
+            .collect(),
+        fahrzeuge: liste("fahrzeuge")
+            .iter()
+            .map(|f| FahrzeugMerkmale {
+                id: zahl(&f["id"]),
+                mittel: MittelMerkmale {
+                    einheit_id: id(f, "einheit_id"),
+                    status_kategorie: kategorie(f),
+                    beendet: flag(f, "beendet"),
+                },
+            })
+            .collect(),
+        material: liste("material")
+            .iter()
+            .map(|m| MaterialMerkmale {
+                ort: MaterialOrt::aus_spalten(
+                    id(m, "einheit_id"),
+                    id(m, "einsatz_fahrzeug_id"),
+                    id(m, "uhs_id"),
+                    id(m, "br_id"),
+                ),
+                status: MaterialStatus::parse(m["status"].as_str().unwrap())
+                    .expect("bekannter Materialstatus"),
+                art: MaterialArt::parse(m["art"].as_str().unwrap()).expect("bekannte Materialart"),
+                menge: zahl(&m["menge"]),
+                ausgegeben: zahl(&m["ausgegeben"]),
+                beendet: flag(m, "beendet"),
+            })
+            .collect(),
+    };
+    let erwartet: Vec<String> = a["erwartet"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        einheiten_mit_ausfall(&eingabe),
+        erwartet,
+        "Fall „{}“",
+        a["name"]
     );
 }
