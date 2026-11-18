@@ -9046,6 +9046,24 @@ async fn lagemonitor_bekommt_sofortmeldung_im_live_kanal_ohne_inhalt() {
     assert!(!gelesen.contains("Verborgen"), "{gelesen}");
 }
 
+/// Spec `live-abgleich`, „Gerät ohne Modulrechte“ (LLH-1935): der Lagemonitor bekommt das
+/// Lebenszeichen wie jede andere Verbindung, obwohl sein Strom nach Ansicht gefiltert ist.
+#[tokio::test]
+async fn lagemonitor_bekommt_das_lebenszeichen() {
+    let (app, _pool, _live) =
+        common::setup_mit_stromgrenzen(lifeline_hub::live::strom::StromGrenzen {
+            heartbeat: Duration::from_millis(50),
+            ..Default::default()
+        })
+        .await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let mut body = live_geraet(&app, &monitor, einsatz).await;
+    let gelesen = common::sse_lesen_fuer(&mut body, Duration::from_millis(300)).await;
+    assert!(gelesen.contains("event: heartbeat\ndata: {}"), "{gelesen}");
+}
+
 // ---------- Rücknahme am Gerät (LLH-1924, Review) ----------
 
 /// Das UHS-Tablet nimmt ein Austragen aus der eigenen UHS zurück, eines aus einer fremden nicht.

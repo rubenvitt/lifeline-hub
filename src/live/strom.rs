@@ -53,6 +53,14 @@ pub const RETRY_MIN: Duration = Duration::from_secs(1);
 /// einige Sekunden neu statt im selben Augenblick.
 pub const RETRY_STREUUNG: Duration = Duration::from_secs(4);
 
+/// Takt des Lebenszeichens (LLH-1935, Change `l39v43md-sse-herzschlag`, design.md D1/D5): so oft
+/// sendet jeder Live-Strom das Kontroll-Ereignis
+/// [`HEARTBEAT_EREIGNIS`](crate::routes::support::HEARTBEAT_EREIGNIS), auch ohne Fach-Ereignis.
+/// Das Frontend hält eine Leitung nach drei verpassten Schlägen für stumm und baut sie neu auf
+/// (`HEARTBEAT_TIMEOUT_MS` in `frontend/src/live/liveVerbindung.ts`). Die Keep-Alive-Kommentare
+/// von axum reichen dafür nicht: eine `EventSource` meldet Kommentare keinem Listener.
+pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
+
 const ZU_VIELE_STROEME: &str =
     "Zu viele offene Live-Verbindungen für diesen Benutzer — bitte nicht benötigte Tabs schließen.";
 
@@ -66,6 +74,8 @@ pub struct StromGrenzen {
     pub gesamt: usize,
     pub lebensdauer: Duration,
     pub streuung: Duration,
+    /// Takt des Lebenszeichens, Vorgabe [`HEARTBEAT_INTERVAL`].
+    pub heartbeat: Duration,
 }
 
 impl Default for StromGrenzen {
@@ -75,6 +85,7 @@ impl Default for StromGrenzen {
             gesamt: STROEME_GESAMT,
             lebensdauer: STROM_LEBENSDAUER,
             streuung: STROM_LEBENSDAUER_STREUUNG,
+            heartbeat: HEARTBEAT_INTERVAL,
         }
     }
 }
@@ -139,6 +150,11 @@ impl StromZulassung {
     pub fn lebensdauer(&self) -> Duration {
         self.grenzen.lebensdauer + zufall_bis(self.grenzen.streuung)
     }
+
+    /// Takt des Lebenszeichens für den nächsten Strom ([`mit_heartbeat`]).
+    pub fn heartbeat(&self) -> Duration {
+        self.grenzen.heartbeat
+    }
 }
 
 impl Default for StromZulassung {
@@ -196,6 +212,41 @@ where
 /// Browser verwirft es nach dem Übernehmen der Wartezeit, `Last-Event-ID` bleibt unberührt).
 pub fn retry_ereignis() -> Result<Event, Infallible> {
     Ok(Event::default().retry(RETRY_MIN + zufall_bis(RETRY_STREUUNG)))
+}
+
+/// Mischt das Lebenszeichen im Takt `takt` in `strom` (LLH-1935, design.md D1): erster Schlag
+/// nach einem Takt, danach im Takt, unabhängig von Fach-Ereignissen. Endet `strom`, endet auch
+/// der Takt; eine bloße Verschmelzung liefe sonst ewig weiter.
+///
+/// Das Lebenszeichen trägt kein `id:` (die `Last-Event-ID` des Browsers bleibt die gemeldete
+/// Position) und läuft an jedem Modul- und Gerätefilter vorbei: die Route mischt es nach dem
+/// Filter ein.
+pub fn mit_heartbeat<S>(strom: S, takt: Duration) -> impl Stream<Item = Result<Event, Infallible>>
+where
+    S: Stream<Item = Result<Event, Infallible>>,
+{
+    use tokio_stream::StreamExt as _;
+    let mut intervall = tokio::time::interval_at(tokio::time::Instant::now() + takt, takt);
+    // Ein blockierter Takt holt keine Schläge im Bündel nach.
+    intervall.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let schlaege = futures::stream::unfold(intervall, |mut intervall| async move {
+        intervall.tick().await;
+        Some((Some(heartbeat_ereignis()), intervall))
+    });
+    // `None` markiert das Ende des inneren Stroms und beendet die Verschmelzung.
+    strom
+        .map(Some)
+        .chain(tokio_stream::once(None))
+        .merge(schlaege)
+        .map_while(|ereignis| ereignis)
+}
+
+/// Das Lebenszeichen: `event: heartbeat`, `data: {}`, ohne `id:` (design.md D2). Ohne Daten
+/// meldete eine `EventSource` das Ereignis keinem Listener.
+fn heartbeat_ereignis() -> Result<Event, Infallible> {
+    Ok(Event::default()
+        .event(crate::routes::support::HEARTBEAT_EREIGNIS)
+        .data("{}"))
 }
 
 /// Gleichverteilte Dauer in `[0, max]`, millisekundengenau. Quelle ist der Zufall von
@@ -298,5 +349,61 @@ mod tests {
         .expect("der Strom muss nach der Lebensdauer enden");
         assert!(gesammelt.is_empty());
         assert_eq!(z.offen(9), 0, "mit dem Strom fällt der Platz");
+    }
+
+    /// Wire-Text eines Ereignisses; `Event` legt seinen Puffer nur über `Debug` offen.
+    fn draht(e: &Result<Event, Infallible>) -> String {
+        format!("{:?}", e.as_ref().unwrap())
+    }
+
+    #[test]
+    fn heartbeat_takt_ist_15_s() {
+        assert_eq!(HEARTBEAT_INTERVAL, Duration::from_secs(15));
+        assert_eq!(StromGrenzen::default().heartbeat, HEARTBEAT_INTERVAL);
+        assert_eq!(StromZulassung::default().heartbeat(), HEARTBEAT_INTERVAL);
+    }
+
+    /// Spec `live-abgleich`, „Live-Ströme senden ein regelmäßiges Lebenszeichen“ (LLH-1935): erster
+    /// Schlag nach einem Takt, dann im Takt, ohne `id:`; Fach-Ereignisse laufen durch, und mit dem
+    /// inneren Strom endet auch der Takt.
+    #[tokio::test(start_paused = true)]
+    async fn heartbeat_schlaegt_im_takt_ohne_id_und_endet_mit_dem_strom() {
+        use tokio_stream::StreamExt as _;
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(4);
+        let takt = Duration::from_secs(15);
+        let mut strom = Box::pin(mit_heartbeat(
+            tokio_stream::wrappers::ReceiverStream::new(rx),
+            takt,
+        ));
+
+        let vor_dem_takt =
+            tokio::time::timeout(takt - Duration::from_millis(1), strom.next()).await;
+        assert!(vor_dem_takt.is_err(), "vor dem ersten Takt kein Schlag");
+
+        let erster = strom.next().await.expect("erster Schlag");
+        let d = draht(&erster);
+        assert!(d.contains("event: heartbeat"), "{d}");
+        assert!(d.contains("data: {}"), "{d}");
+        assert!(
+            !d.contains("id:"),
+            "das Lebenszeichen trägt keine Position: {d}"
+        );
+
+        tx.send(Ok(Event::default()
+            .event(crate::live::LiveEvent::Etb.as_str())
+            .data("{}")))
+            .await
+            .unwrap();
+        assert!(draht(&strom.next().await.unwrap()).contains("event: etb"));
+
+        let zweiter = strom.next().await.expect("zweiter Schlag");
+        assert!(draht(&zweiter).contains("event: heartbeat"));
+
+        drop(tx);
+        let rest = tokio::time::timeout(takt * 4, strom.next()).await;
+        assert!(
+            matches!(rest, Ok(None)),
+            "endet der innere Strom, endet auch der Takt"
+        );
     }
 }
