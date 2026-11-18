@@ -335,6 +335,9 @@ schritt_8() {
   # Die gepinnte XcodeGen-Version (LLH-1978): ein Zip mit falscher Prüfsumme darf nie ins Projekt
   # der App gelangen. Ohne Netz.
   "$ROOT/scripts/ios/xcodegen-installieren.test.sh"
+  # Upload zu TestFlight (LLH-1978): ein Alpha-Build in TestFlight, ein Build mit fremder Version
+  # oder ein API-Schlüssel im Log fiele erst am Release auf. Attrappen statt Xcode, ohne Netz.
+  "$ROOT/scripts/ios/testflight.test.sh"
 }
 
 schritt_9() {
