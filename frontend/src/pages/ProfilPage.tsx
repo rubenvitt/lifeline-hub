@@ -246,7 +246,7 @@ export default function ProfilPage() {
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
                   Passkey
                 </Augenbraue>
-                {/* Den Weg in die Mac-App nur nennen, wenn die Hülle „Im Browser anmelden“
+                {/* Den Weg in die Lifeline-App nur nennen, wenn die Hülle „Im Browser anmelden“
                     anbietet (LFH-818); sonst nichts versprechen (LFH-817). */}
                 <Typography.Paragraph type="secondary">
                   {huelleAnmeldungImBrowser()

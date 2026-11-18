@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beendeHuelle, starteIosHuelle, starteMacHuelle } from '../test/huelle';
 import type { RouteObject } from 'react-router';
 import { RUECKMELDUNG_FORMULAR, routenMuster, rueckmeldungsAdresse } from './adresse';
 
@@ -61,5 +62,28 @@ describe('rueckmeldungsAdresse (LLH-1549)', () => {
       huelle: false,
     });
     expect(adresse).toBe(`${RUECKMELDUNG_FORMULAR}&version=1.0.0&oberflaeche=Browser`);
+  });
+});
+
+describe('Oberfläche der Rückmeldung je Hülle (t39ltxxi)', () => {
+  afterEach(beendeHuelle);
+
+  const oberflaeche = () =>
+    new URL(rueckmeldungsAdresse({ version: '1.0.0', pfad: '/', routen: null })).searchParams.get(
+      'oberflaeche',
+    );
+
+  it('nennt in der iOS-Hülle die iOS-App (ausgeliefertes Init-Skript)', () => {
+    starteIosHuelle({ bruecke: { postMessage: vi.fn() } });
+    expect(oberflaeche()).toBe('iOS-App');
+  });
+
+  it('nennt in der Desktop-Hülle ohne Plattform weiter die Desktop-App', () => {
+    starteMacHuelle();
+    expect(oberflaeche()).toBe('Desktop-App');
+  });
+
+  it('nennt im Browser den Browser', () => {
+    expect(oberflaeche()).toBe('Browser');
   });
 });

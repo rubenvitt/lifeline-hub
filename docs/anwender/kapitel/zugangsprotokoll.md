@@ -125,7 +125,7 @@ in dieser Spur, und eine Anmeldung, die nur abläuft, endet still.
 - **„Konto“**: der angemeldete Name, beim Fehlversuch der versuchte. Gekoppelte Geräte stehen mit
   ihrem Gerätekonto „geraet-…“. Namen über 64 Zeichen stehen gekürzt mit „…“.
 - **„Anmeldeweg“**: „Passwort“, „SSO“, „Passkey“, „Zweiter Faktor“ (Passwort und Code),
-  „Gerätecode“ (gekoppelte Geräte) oder „Mac-App“ (Anmeldung der Mac-App über den Browser). Bei
+  „Gerätecode“ (gekoppelte Geräte) oder „Lifeline-App“ (Anmeldung der Mac-App über den Browser). Bei
   „Abmeldung“ und „Sitzung beendet“ steht der Weg, auf dem die beendete Anmeldung entstand. Ist
   er nicht bekannt, steht „—“: so bei Anmeldungen, die schon vor dem Update mit diesem Klartext
   bestanden. Ältere Abmeldungen zeigen noch „Passwort“, auch wenn die Anmeldung anders entstand.

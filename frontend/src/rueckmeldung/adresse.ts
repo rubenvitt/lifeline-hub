@@ -1,5 +1,5 @@
 import { matchRoutes, type RouteObject } from 'react-router';
-import { inHuelle } from '../huelle/faehigkeiten';
+import { huellePlatform, inHuelle } from '../huelle/faehigkeiten';
 
 /**
  * Der Rückmeldeweg (LLH-1549): „Rückmeldung geben“ in der Übersicht der Hilfe (seit LLH-1642,
@@ -50,20 +50,28 @@ export function gemerktesRoutenMuster(pfad: string): string {
   return routenMuster(gemerkteRouten, pfad.split(/[?#]/)[0]);
 }
 
+/** Oberfläche im Formular: iOS-Hülle nach ihrer Plattform (t39ltxxi), Desktop-Hülle ohne. */
+function oberflaecheText(huelle: boolean, platform: string | null): string {
+  if (platform === 'ios') return 'iOS-App';
+  return huelle ? 'Desktop-App' : 'Browser';
+}
+
 export function rueckmeldungsAdresse({
   version,
   pfad,
   routen = gemerkteRouten,
   huelle = inHuelle(),
+  platform = huellePlatform(),
 }: {
   version: string;
   pfad: string;
   routen?: RouteObject[] | null;
   huelle?: boolean;
+  platform?: string | null;
 }): string {
   const adresse = new URL(RUECKMELDUNG_FORMULAR);
   adresse.searchParams.set('version', version);
-  adresse.searchParams.set('oberflaeche', huelle ? 'Desktop-App' : 'Browser');
+  adresse.searchParams.set('oberflaeche', oberflaecheText(huelle, platform));
   const muster = routen ? routenMuster(routen, pfad) : '';
   if (muster) adresse.searchParams.set('seite', muster);
   return adresse.toString();

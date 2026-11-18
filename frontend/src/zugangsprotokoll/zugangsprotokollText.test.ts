@@ -17,7 +17,7 @@ describe('anmeldewegText', () => {
     ['dev', 'Entwicklung'],
     ['totp', 'Zweiter Faktor'],
     ['geraetecode', 'Gerätecode'],
-    ['systembrowser', 'Mac-App'],
+    ['systembrowser', 'Lifeline-App'],
     ['unbekannt', '—'],
   ])('%s → %s', (id, text) => {
     expect(anmeldewegText(id)).toBe(text);

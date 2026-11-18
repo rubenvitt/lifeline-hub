@@ -5,6 +5,7 @@
  * Web-Audio statt Audiodatei: kein Asset, kein Netz. Scheitert das Abspielen an der
  * Autoplay-Policy, bleibt es still (die visuelle Spur trägt).
  */
+import { huelleHaptics } from '../huelle/faehigkeiten';
 import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 
 type AlarmStufe = 'dezent' | 'alarm';
@@ -201,9 +202,16 @@ function starteTon(context: AudioContext, stufe: AlarmStufe): void {
   }
 }
 
-/** Spielt den Alarmton der gegebenen Stufe, sofern nicht gemutet. Fehler werden geschluckt. */
+/**
+ * Spielt den Alarmton der gegebenen Stufe, sofern nicht gemutet. Fehler werden geschluckt.
+ *
+ * In der Hülle gibt die Stufe `alarm` zudem einmal die Haptik `warning` (Change t39ltxxi, Spec
+ * `huellen-vertrag`): hier läuft jeder neu eingehende Alarm durch, nachgespielte tönen dezent.
+ * Stumm heißt auch ohne Haptik; ein gesperrter Ton nimmt ihr nichts.
+ */
 export function spieleAlarmTon(stufe: AlarmStufe): void {
   if (istAlarmGemutet()) return;
+  if (stufe === 'alarm') huelleHaptics('warning');
   try {
     const context = audioContext();
     if (!context) {

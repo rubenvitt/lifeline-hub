@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
+import { beendeHuelle, starteIosHuelle } from '../test/huelle';
 import { setzeStumm, vergesseStummStand } from './eingaengeStumm';
 import {
   ladePushStand,
@@ -117,6 +118,19 @@ describe('webPush: ob der Schalter erscheint (D8)', () => {
     expect(await ladePushZustand()).toBe('fehlt');
     server.use(http.get('/api/web-push', () => HttpResponse.json({ error: 'x' }, { status: 403 })));
     expect(await ladePushZustand()).toBe('fehlt');
+  });
+
+  it('fehlt in der iOS-Hülle, auch wenn der Webview alles meldet (t39ltxxi, Spec web-push)', async () => {
+    serverMitPush();
+    browser();
+    expect(await ladePushZustand()).toBe('aus');
+    starteIosHuelle({ bruecke: { postMessage: vi.fn() } });
+    try {
+      expect(await ladePushZustand()).toBe('fehlt');
+      expect((await ladePushStand()).zustand).toBe('fehlt');
+    } finally {
+      beendeHuelle();
+    }
   });
 
   it('am gekoppelten ELW läuft Push über den Hub, auch bei blockierter Erlaubnis (LLH-1495)', async () => {
