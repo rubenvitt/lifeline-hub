@@ -1944,6 +1944,18 @@ describe('AbloesungPage — Schichtplan (LLH-1554)', () => {
     await waitFor(() => expect(adresse.suche).toBe(''));
   });
 
+  it('„Druckansicht“ und „Excel“ stehen im Seitenkopf, nur beim Schichtplan (LLH-1836)', async () => {
+    renderPage();
+    await screen.findByRole('region', { name: 'Schichtplan' });
+    const kopf = () => document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf()).getByRole('link', { name: 'Druckansicht' })).toBeInTheDocument();
+    expect(within(kopf()).getByRole('button', { name: /^Excel/ })).toBeInTheDocument();
+    await userEvent.click(segment(/^Laufend/));
+    await waitFor(() =>
+      expect(within(kopf()).queryByRole('link', { name: 'Druckansicht' })).toBeNull(),
+    );
+  });
+
   it('in einem anderen Einsatz steht der Plan unter ?ansicht=plan', async () => {
     einsatz.wert = {
       id: 1,

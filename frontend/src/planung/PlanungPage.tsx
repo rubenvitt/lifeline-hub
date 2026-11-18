@@ -12,6 +12,7 @@ import {
   createPlanungHelfer,
   deletePlanung,
   deletePlanungHelfer,
+  loadPlanungMappe,
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import AdminPage from '../components/AdminPage';
@@ -24,6 +25,7 @@ import {
   parsePlanungReiter,
   einsatzPfad,
   parseRouteId,
+  planungDruckPfad,
   planungenPfad,
   type PlanungReiter,
 } from '../routing/deeplinks';
@@ -31,6 +33,9 @@ import PlanungAblauf from './PlanungAblauf';
 import PlanungKopf from './PlanungKopf';
 import PlanungPostenListe from './PlanungPostenListe';
 import PlanungSchichtplan from './PlanungSchichtplan';
+import { useAusgabeNebenwege } from '../abloesung/schichtplan/ausgabe/useSchichtplanAusgabe';
+import { mappeDateiname } from '../abloesung/schichtplan/ausgabe/mappeDateiname';
+import { NebenwegeImKopf } from '../components/EinsatzSeite';
 import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
 
 /** Name der Reiterfläche je Reiter, ohne die Zahl im Wortlaut des Reiters. */
@@ -86,6 +91,15 @@ export default function PlanungPage() {
   };
 
   const planung = query.data;
+  // Ausgabe wie im Einsatz (LLH-1593) im Seitenkopf, solange der Reiter „Plan“ steht (LLH-1836).
+  // Wer die Planung lesen darf, sieht auch das Personal; „Excel“ ist deshalb nie gesperrt.
+  const ausgabe = useAusgabeNebenwege({
+    druckPfad: planungDruckPfad(planungId ?? 0),
+    schluessel: `planung-${planungId}`,
+    ladeMappe: () => loadPlanungMappe(planungId as number),
+    dateiname: () => mappeDateiname(planung?.kopf.bezeichnung ?? '', `planung-${planungId}`),
+    personalFrei: true,
+  });
   const pfad = [
     { title: <Link to={planungenPfad()}>Planungen</Link> },
     { title: planung?.kopf.bezeichnung ?? 'Planung' },
@@ -118,7 +132,9 @@ export default function PlanungPage() {
   const uebernahme = planung.kopf.uebernahme;
   const readOnly = uebernahme != null;
   const reiterInhalt: Record<PlanungReiter, ReactNode> = {
-    plan: <PlanungSchichtplan planung={planung} readOnly={readOnly} />,
+    plan: (
+      <PlanungSchichtplan planung={planung} readOnly={readOnly} ausgabeFehler={ausgabe.fehler} />
+    ),
     posten: <PlanungPostenListe planung={planung} readOnly={readOnly} />,
     helfer: (
       <HelferListe
@@ -145,6 +161,12 @@ export default function PlanungPage() {
       pfad={pfad}
       aktionen={
         <Flex gap={token.marginSM} align="center">
+          {reiter === 'plan' && (
+            <NebenwegeImKopf
+              name={`Weitere Aktionen zu ${planung.kopf.bezeichnung}`}
+              eintraege={ausgabe.nebenwege}
+            />
+          )}
           {!readOnly && (
             <Button type="primary" onClick={() => setUebernahmeOpen(true)}>
               In Einsatz übernehmen

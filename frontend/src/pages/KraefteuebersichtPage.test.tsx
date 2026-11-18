@@ -1413,7 +1413,17 @@ describe('KraefteuebersichtPage — Druck', () => {
     await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
   });
 
-  it('„Drucken" und „Spalten" stehen in der Werkzeugzeile der Seite, nicht in der des Primitivs', async () => {
+  it('„Drucken / als PDF“ steht im Seitenkopf, nicht in einer Werkzeugzeile (LLH-1836)', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const kopf = container.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
+    const seite = container.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
+    expect(within(kopf).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(within(seite).queryByRole('button', { name: /Drucken/i })).toBeNull();
+  });
+
+  it('„Spalten" steht in der Werkzeugzeile der Seite, nicht in der des Primitivs', async () => {
     // `.kraefte-no-print` ist innerhalb von `Datensicht` nicht setzbar (kein `className`), und
     // Fokus in der Sicht hielte die Zeilen (LLH-1417). Vom Primitiv bleibt nur der Anker ohne
     // Höhe, an dem der Sammelbanner als Pille über dem Tabellenkopf schwebt (LLH-1479).
@@ -1424,9 +1434,7 @@ describe('KraefteuebersichtPage — Druck', () => {
     const primitiv = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
     expect(primitiv).not.toBeNull();
     expect(primitiv).toHaveAttribute('data-schwebend');
-    expect(within(primitiv).queryByRole('button', { name: /Drucken/i })).toBeNull();
     expect(within(primitiv).queryByRole('button', { name: /Spalten/ })).toBeNull();
-    expect(within(seite).getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
     expect(within(seite).getByRole('button', { name: /^Spalten/ })).toBeInTheDocument();
     expect(seite).toHaveClass('kraefte-no-print');
   });

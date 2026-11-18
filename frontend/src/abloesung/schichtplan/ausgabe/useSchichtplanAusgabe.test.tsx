@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../../test/server';
@@ -7,23 +7,50 @@ import { renderMitProviders } from '../../../test/utils';
 import * as dateiSpeichern from '../../../components/dateiSpeichern';
 import { MODUL_PERSONAL_GESPERRT } from '../../../components/nurAnsicht';
 import { schichtplanDruckPfad } from '../../../routing/deeplinks';
-import SchichtplanAusgabeKnoepfe from './SchichtplanAusgabeKnoepfe';
+import EinsatzSeite from '../../../components/EinsatzSeite';
+import { setzeViewportBreite, setzeViewportZurueck } from '../../../test/viewport';
+import { useSchichtplanAusgabe } from './useSchichtplanAusgabe';
 
 const EXPORT = '/api/einsaetze/4/abloesungen/schichtplan/export';
 
-function zeige(personalFrei: boolean | undefined) {
-  return renderMitProviders(
-    <SchichtplanAusgabeKnoepfe
-      einsatzId={4}
-      einsatzBezeichnung="Sanitätsdienst Stadtfest"
-      personalFrei={personalFrei}
-    />,
+/** Wie die Ablösung: Ausgabewege im Seitenkopf, der Fehler an der Ansicht (LLH-1836). */
+function Seite({ personalFrei }: { personalFrei: boolean | undefined }) {
+  const ausgabe = useSchichtplanAusgabe({
+    einsatzId: 4,
+    einsatzBezeichnung: () => 'Sanitätsdienst Stadtfest',
+    personalFrei,
+  });
+  return (
+    <EinsatzSeite
+      titel="Ablösung"
+      weitere={{ name: 'Weitere Aktionen zur Ablösung', eintraege: ausgabe.nebenwege }}
+    >
+      <div data-testid="ansicht">{ausgabe.fehler}</div>
+    </EinsatzSeite>
   );
 }
 
-afterEach(() => vi.restoreAllMocks());
+function zeige(personalFrei: boolean | undefined) {
+  setzeViewportBreite(1180);
+  return renderMitProviders(<Seite personalFrei={personalFrei} />);
+}
 
-describe('SchichtplanAusgabeKnoepfe (LLH-1557)', () => {
+afterEach(() => {
+  vi.restoreAllMocks();
+  setzeViewportZurueck();
+});
+
+describe('useSchichtplanAusgabe (LLH-1557, LLH-1836)', () => {
+  it('„Druckansicht“ und „Excel“ stehen im Seitenkopf', () => {
+    zeige(true);
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).getByRole('link', { name: 'Druckansicht' })).toHaveAttribute(
+      'href',
+      schichtplanDruckPfad(4),
+    );
+    expect(within(kopf).getByRole('button', { name: 'Excel' })).toBeEnabled();
+  });
+
   it('„Excel“ lädt die Mappe und speichert sie unter dem Namen des Einsatzes', async () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     server.use(http.get(EXPORT, () => new HttpResponse('PK-mappe')));
@@ -44,8 +71,11 @@ describe('SchichtplanAusgabeKnoepfe (LLH-1557)', () => {
     );
     zeige(true);
     await userEvent.click(screen.getByRole('button', { name: 'Excel' }));
-    expect(await screen.findByText('Kein Zugriff auf das Modul Personal')).toBeInTheDocument();
-    expect(screen.getByText('Excel fehlgeschlagen')).toBeInTheDocument();
+    const ansicht = screen.getByTestId('ansicht');
+    expect(
+      await within(ansicht).findByText('Kein Zugriff auf das Modul Personal'),
+    ).toBeInTheDocument();
+    expect(within(ansicht).getByText('Excel fehlgeschlagen')).toBeInTheDocument();
     expect(speichern).not.toHaveBeenCalled();
 
     server.use(http.get(EXPORT, () => new HttpResponse('PK')));
@@ -54,12 +84,11 @@ describe('SchichtplanAusgabeKnoepfe (LLH-1557)', () => {
     expect(screen.queryByText('Excel fehlgeschlagen')).not.toBeInTheDocument();
   });
 
-  it('ohne Modul Personal ist „Excel“ gesperrt und nennt den Grund', () => {
+  it('ohne Modul Personal ist „Excel“ gesperrt und nennt den Grund im Text', () => {
     zeige(false);
-    const knopf = screen.getByRole('button', { name: 'Excel' });
+    const knopf = screen.getByRole('button', { name: `Excel (${MODUL_PERSONAL_GESPERRT})` });
     expect(knopf).toBeDisabled();
-    expect(knopf).toHaveAccessibleDescription(MODUL_PERSONAL_GESPERRT);
-    expect(screen.getByRole('link', { name: 'Drucken' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Druckansicht' })).toHaveAttribute(
       'href',
       schichtplanDruckPfad(4),
     );
@@ -69,7 +98,6 @@ describe('SchichtplanAusgabeKnoepfe (LLH-1557)', () => {
     zeige(undefined);
     const knopf = screen.getByRole('button', { name: 'Excel' });
     expect(knopf).toBeDisabled();
-    expect(knopf).not.toHaveAttribute('aria-describedby');
-    expect(screen.queryByText(MODUL_PERSONAL_GESPERRT)).not.toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(MODUL_PERSONAL_GESPERRT))).not.toBeInTheDocument();
   });
 });

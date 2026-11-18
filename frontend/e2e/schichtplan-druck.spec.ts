@@ -98,7 +98,7 @@ test('Aushang je Posten: Blatt je Posten auf neuer Seite, Zeilen ganz, nichts ra
 
   // Einstieg aus der Ansicht Schichtplan.
   await page.goto(`/einsaetze/${einsatzId}/abloesung?ansicht=plan`);
-  await page.getByRole('link', { name: 'Drucken' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(/\/abloesung\/schichtplan\/druck$/);
 
   const blaetter = page.locator('[data-lfh="druckwurzel"] [data-lfh="druck-kapitel"]');
@@ -249,7 +249,7 @@ test('Planung: Aushang von der Planungsseite, der Kopf nennt die Planung', async
   await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
 
   await page.goto(`/planungen/${planungId}`);
-  await page.getByRole('link', { name: 'Drucken' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/planungen/${planungId}/druck$`));
 
   const blaetter = page.locator('[data-lfh="druckwurzel"] [data-lfh="druck-kapitel"]');

@@ -97,7 +97,7 @@ import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/Spalte
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import {
@@ -125,7 +125,7 @@ import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
  *
  * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Paneele
  * Einheiten nach FMS-Status und Personal nach Status, „keine Rückmeldung"; LLH-1140) → Werkzeugzeile außerhalb des
- * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Spalten, Lagebericht, Druck) → Raster als
+ * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Spalten, Lagebericht; Druck im Seitenkopf) → Raster als
  * Baum: Einheit → Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, „Ohne Fahrzeug“ und das
  * Material als Gruppe. Die Elternzeile zeigt die kumulierte Stärke, Verteilung und Tönung bleiben
  * eigen. Die Baumlogik steht in `kraefte/kraeftebaumKern.ts`, die Zeilen in
@@ -1178,6 +1178,16 @@ export default function KraefteuebersichtPage() {
     if (sprungZeile != null) scrolleZurZeile(sprungZeile);
   }, [sprungZeile]);
 
+  // Drucken im Seitenkopf (LLH-1836, `druck/AGENTS.md`, „Wortlaut und Platz“). Erst nach
+  // committetem Aufklappen drucken (sonst fehlen die Mittel): `useDrucken` löst den Dialog nach
+  // dem Commit aus.
+  const druckWege = useDruckNebenwege({
+    vorDemDruck: () => {
+      setGewaehlteStufe('alles');
+      setExpandedKeys(schluesselBisStufe(raster, 'alles'));
+    },
+  });
+
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -1335,6 +1345,7 @@ export default function KraefteuebersichtPage() {
         meta={metaLaedt ? undefined : meta}
         metaPlatzhalter={metaPlatzhalter}
         dataUpdatedAt={datenstand}
+        weitere={{ name: 'Weitere Aktionen zum Meldebild', eintraege: druckWege }}
         aktionen={
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
@@ -1569,14 +1580,6 @@ export default function KraefteuebersichtPage() {
               In Lagebericht übernehmen
             </Button>
           )}
-          {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel) — `useDrucken`
-              löst den Dialog nach dem Commit aus. */}
-          <DruckKnopf
-            vorbereiten={() => {
-              setGewaehlteStufe('alles');
-              setExpandedKeys(schluesselBisStufe(raster, 'alles'));
-            }}
-          />
         </div>
         {uebernehmen.error != null && (
           <div className="kraefte-no-print" style={{ marginBlockEnd: token.margin }}>

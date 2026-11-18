@@ -16,6 +16,9 @@ import type {
 import type { Quelle } from '../../api/abrufZustand';
 import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
+import { useState } from 'react';
+import EinsatzSeite from '../../components/EinsatzSeite';
+import { useDruckNebenwege } from '../../components/druck/useDruckNebenwege';
 import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { antdToken, dichten, farbenDunkel } from '../../theme/tokens';
@@ -864,7 +867,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
 
   it('fehlt ohne Schreibrecht', async () => {
     container({ ...EINSATZ, meine_rolle: 'beobachter' } as EinsatzAnzeige);
-    expect(await screen.findByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Alle aufklappen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 
@@ -896,11 +899,32 @@ describe('Organigramm — Druck', () => {
     expect(container.querySelectorAll('[data-lfh="druckwurzel"]')).toHaveLength(1);
   });
 
-  it('klappt vor dem Druck alles auf', async () => {
-    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+  it('trägt selbst keinen Druckknopf: gedruckt wird aus dem Seitenkopf (LLH-1836)', () => {
     renderMitProviders(
       <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
     );
+    expect(screen.queryByRole('button', { name: /Drucken/ })).toBeNull();
+  });
+
+  it('klappt vor dem Druck aus dem Seitenkopf alles auf', async () => {
+    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    // Dieselbe Verdrahtung wie `EinsatzabschnittePage`: Klappzustand außen, Druck im Kopf.
+    function MitKopf() {
+      const [zu, setZu] = useState<ReadonlySet<string>>(new Set());
+      const wege = useDruckNebenwege({ vorDemDruck: () => setZu(new Set()) });
+      return (
+        <EinsatzSeite titel="Abschnitte" weitere={{ name: 'Weitere', eintraege: wege }}>
+          <Organigramm
+            einsatz={EINSATZ}
+            abschnitte={ABSCHNITTE}
+            einheiten={daten(EINHEITEN)}
+            zugeklappt={zu}
+            onZugeklappt={setZu}
+          />
+        </EinsatzSeite>
+      );
+    }
+    renderMitProviders(<MitKopf />);
     await userEvent.click(screen.getByRole('button', { name: 'Alle zuklappen' }));
     expect(screen.queryByRole('link', { name: '1. Zug' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));

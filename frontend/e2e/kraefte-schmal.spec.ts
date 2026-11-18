@@ -280,9 +280,10 @@ test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)',
       'kraefteuebersicht',
       '1. Zug',
       async () => {
+        // Der Druck steht im Seitenkopf, schmal hinter „Weitere“ (LLH-1836).
         await expect(
-          page.getByRole('button', { name: /Drucken/ }).first(),
-          'Vorbedingung: der Druckknopf bleibt — die Werkzeugzeile ist gerendert',
+          page.getByRole('button', { name: 'Weitere Aktionen zum Meldebild' }),
+          'Vorbedingung: der Seitenkopf ist gerendert',
         ).toBeVisible();
         await expect(
           page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
