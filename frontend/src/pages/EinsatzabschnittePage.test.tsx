@@ -80,7 +80,10 @@ function recordPatches(basis: Record<string, unknown>, aid = 5) {
     http.patch(`/api/einsaetze/1/abschnitte/${aid}`, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       bodies.push(body);
-      return HttpResponse.json(Object.assign(basis, body));
+      // Der Altwert (Feld-CAS, LLH-1945) ist kein Feld des Abschnitts.
+      const felder = { ...body };
+      delete felder.erwartet;
+      return HttpResponse.json(Object.assign(basis, felder));
     }),
   );
   return bodies;
@@ -631,7 +634,11 @@ describe('EinsatzabschnittePage', () => {
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Rotkreuz Nord 2');
     await userEvent.click(within(detail).getByRole('button', { name: 'Rufname speichern' }));
-    await waitFor(() => expect(bodies).toEqual([{ rufname: 'Rotkreuz Nord 2' }]));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { rufname: 'Rotkreuz Nord 2', erwartet: { rufname: 'Rotkreuz Nord 1/10-1' } },
+      ]),
+    );
     expect(
       await within(detail).findByRole('button', { name: 'Rufname bearbeiten' }),
     ).toHaveAccessibleDescription('Rotkreuz Nord 2');
@@ -661,7 +668,7 @@ describe('EinsatzabschnittePage', () => {
     await userEvent.click(
       within(detail).getByRole('button', { name: 'Abschnittsleiter speichern' }),
     );
-    await waitFor(() => expect(bodies).toEqual([{ leiter_id: 4 }]));
+    await waitFor(() => expect(bodies).toEqual([{ leiter_id: 4, erwartet: { leiter_id: 3 } }]));
   });
 
   it('Gegenprobe: eine Zeile aus altem Stand überschreibt die Änderung eines anderen Arbeitsplatzes nicht', async () => {
@@ -678,7 +685,10 @@ describe('EinsatzabschnittePage', () => {
       'Zufahrt Nord',
     );
     await userEvent.click(within(detail).getByRole('button', { name: 'Bemerkung speichern' }));
-    await waitFor(() => expect(bodies).toEqual([{ bemerkung: 'Zufahrt Nord' }]));
+    // Eine andere Angabe (Lagezustand) dazwischen: der Altwert nennt nur die Bemerkung.
+    await waitFor(() =>
+      expect(bodies).toEqual([{ bemerkung: 'Zufahrt Nord', erwartet: { bemerkung: null } }]),
+    );
     // Nach dem Speichern zeigt das Detail den Stand des Servers, „kritisch“ bleibt.
     const leiste = within(detail).getByRole('radiogroup', { name: 'Lagezustand' });
     await waitFor(() =>
@@ -687,6 +697,78 @@ describe('EinsatzabschnittePage', () => {
         'true',
       ),
     );
+  });
+
+  // Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+  // Änderung“): hat ein anderer die Angabe inzwischen geändert, fragt die Seite; „Meine Änderung
+  // übernehmen“ schreibt ohne Altwert, „Verwerfen und neu laden“ schreibt nichts.
+  it('Name aus altem Stand: Rückfrage „Zwischenzeitlich geändert“, übernehmen ohne Altwert', async () => {
+    const nord = { ...funkAbschnitt };
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [nord]),
+      http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
+        const body = (await request.json()) as { name: string; erwartet?: { name: string } };
+        bodies.push(body);
+        if (body.erwartet && body.erwartet.name !== nord.name) {
+          return HttpResponse.json(
+            { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
+            { status: 409 },
+          );
+        }
+        nord.name = body.name;
+        return HttpResponse.json(nord);
+      }),
+    );
+    renderPage();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    await userEvent.click(within(detail).getByRole('button', { name: 'Name bearbeiten' }));
+    nord.name = 'Nord-West';
+    const feld = within(detail).getByRole('textbox', { name: 'Name' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Nord-Ost{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent(/Name inzwischen: „Nord-West“/);
+    expect(bodies[0]).toEqual({ name: 'Nord-Ost', erwartet: { name: 'Nord' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1]).toEqual({ name: 'Nord-Ost' });
+  });
+
+  it('Verbindungen aus altem Stand: „Verwerfen und neu laden“ schreibt nichts', async () => {
+    const nord = { ...funkAbschnitt };
+    const bodies: unknown[] = [];
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [nord]),
+      http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(
+          { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
+          { status: 409 },
+        );
+      }),
+    );
+    renderPage();
+    const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Telefon und weitere Verbindungen bearbeiten' }),
+    );
+    nord.verbindungen = [{ id: 2, mittel: 'mobil', wert: '0170 999', hinweis: null }];
+    await userEvent.type(within(detail).getByRole('textbox', { name: 'Hinweis 1' }), 'Lage');
+    await userEvent.click(
+      within(detail).getByRole('button', { name: 'Telefon und weitere Verbindungen speichern' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/Telefon und weitere Verbindungen inzwischen: „0170 999“/);
+    expect(bodies[0]).toEqual({
+      verbindungen: [{ mittel: 'mobil', wert: '0151 23456', hinweis: 'Lage' }],
+      erwartet: { verbindungen: [{ mittel: 'mobil', wert: '0151 23456' }] },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    // Der frische Stand steht, kein zweiter PATCH.
+    expect(await within(detail).findByRole('link', { name: '0170 999' })).toBeInTheDocument();
+    expect(bodies).toHaveLength(1);
   });
 
   it('Lagezustand mit einem Klick: genau `lagezustand` geht hinaus (LFH-1208)', async () => {
@@ -1028,7 +1110,11 @@ describe('EinsatzabschnittePage', () => {
     const feld = within(detail).getByRole('textbox', { name: 'Kurzbezeichnung' });
     await userEvent.clear(feld);
     await userEvent.type(feld, 'EA-Süd{Enter}');
-    await waitFor(() => expect(bodies).toEqual([{ kurzbezeichnung: 'EA-Süd' }]));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { kurzbezeichnung: 'EA-Süd', erwartet: { kurzbezeichnung: 'EA-S' } },
+      ]),
+    );
     expect(screen.queryByText(/Schon vergeben/)).not.toBeInTheDocument();
   });
 

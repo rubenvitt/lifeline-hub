@@ -52,8 +52,17 @@ export function patcheAbschnitt(
   einsatzId: number,
   aid: number,
   patch: AbschnittPatch,
+  /**
+   * Werte beim Öffnen (Feld-CAS, LLH-1945): hat ein anderer eine dieser Angaben inzwischen
+   * geändert, antwortet der Server 409 `veraltet`; ohne `erwartet` schreibt er ohne Vergleich.
+   */
+  erwartet?: Partial<AbschnittPatch>,
 ): Promise<Einsatzabschnitt> {
-  return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/abschnitte/${aid}`, 'PATCH', patch);
+  return apiSend<Einsatzabschnitt>(
+    `/api/einsaetze/${einsatzId}/abschnitte/${aid}`,
+    'PATCH',
+    erwartet ? { ...patch, erwartet } : patch,
+  );
 }
 
 /**

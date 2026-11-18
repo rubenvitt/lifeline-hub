@@ -50,6 +50,12 @@ import {
 } from '../components/SprechgruppenAngabe';
 import AbschnittDetail, { type AbschnittPatchHandler } from './einsatzabschnitte/AbschnittDetail';
 import AbschnittAnlegenModal from './einsatzabschnitte/AbschnittAnlegenModal';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import { ausschnitt, ausschnittLeer, ausschnittText } from '../components/feldVermerk';
+import {
+  alsEingabe as alsVerbindungsEingabe,
+  bereinigeVerbindungen,
+} from '../components/verbindungen';
 import { abrufZustand } from '../api/abrufZustand';
 import {
   einheitenPfad,
@@ -90,6 +96,30 @@ import {
 } from './einsatzabschnitte/GliederungDrag';
 import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
+
+/**
+ * Der Abschnitt in der Wire-Form des PATCH (LLH-1945): Altwert und Vergleichswert des Feld-CAS
+ * nach einem 409; Verbindungen ohne Kennung, wie die Zeile sie schickt.
+ */
+function abschnittWire(a: Einsatzabschnitt): Record<string, unknown> {
+  return {
+    name: a.name,
+    kurzbezeichnung: a.kurzbezeichnung ?? null,
+    leiter_id: a.leiter_id ?? null,
+    ueber_abschnitt_id: a.ueber_abschnitt_id ?? null,
+    bemerkung: a.bemerkung ?? null,
+    rufname: a.rufname ?? null,
+    abschnittsauftrag: a.abschnittsauftrag ?? null,
+    verbindungen: bereinigeVerbindungen(alsVerbindungsEingabe(a.verbindungen)),
+  };
+}
+
+/** Der aktuelle Wert lesbar für die Rückfrage: Namen statt Kennungen, Verbindungen als Werte. */
+function abschnittAnzeige(a: Einsatzabschnitt, patch: AbschnittPatch): string | undefined {
+  if ('leiter_id' in patch) return a.leiter_name ?? undefined;
+  if ('verbindungen' in patch) return a.verbindungen.map((v) => v.wert).join(', ');
+  return undefined;
+}
 
 /**
  * Zwei Ansichten derselben Daten (LFH-626): die Gliederung bearbeitet, das Organigramm liest,
@@ -300,8 +330,16 @@ export default function EinsatzabschnittePage() {
   // überschreibt keine Zeile, was ein anderer Arbeitsplatz inzwischen geändert hat. Der Fehler
   // geht an die Zeile (`mutateAsync` lehnt ab), deshalb kein `onError`-Toast.
   const patch = useMutation({
-    mutationFn: ({ aid, patch: p }: { aid: number; etikett: string; patch: AbschnittPatch }) =>
-      patcheAbschnitt(einsatzId, aid, p),
+    mutationFn: ({
+      aid,
+      patch: p,
+      erwartet,
+    }: {
+      aid: number;
+      etikett: string;
+      patch: AbschnittPatch;
+      erwartet?: Partial<AbschnittPatch>;
+    }) => patcheAbschnitt(einsatzId, aid, p, erwartet),
     onSuccess: (aktualisiert, { etikett }) => {
       // Erst in den Cache, dann erfüllen: die Zeile zeigt den neuen Wert in derselben Runde, in der
       // sie die Eingabe schließt (Muster Einsatzdaten).
@@ -312,10 +350,40 @@ export default function EinsatzabschnittePage() {
       message.success(`${etikett} gespeichert`);
     },
   });
+  /*
+   * Feld-CAS mit dem einen Konfliktablauf (LLH-1945, `components/useFeldKonflikt`): die Schlüssel
+   * des Patches gehen mit ihrem Wert beim Öffnen als `erwartet` mit; nach einem 409 vergleicht die
+   * Seite mit der Wire-Form des frisch geladenen Abschnitts.
+   */
+  const konflikt = useFeldKonflikt();
+  const ladeAbschnittFrisch = async (aid: number) => {
+    const liste = await qc.fetchQuery({
+      queryKey: einsatzKeys.abschnitte(einsatzId),
+      queryFn: () => listeAbschnitte(einsatzId),
+      staleTime: 0,
+    });
+    return liste.find((a) => a.id === aid);
+  };
   const patchHandler =
     (aid: number): AbschnittPatchHandler =>
-    (etikett, p) =>
-      patch.mutateAsync({ aid, etikett, patch: p });
+    (etikett, p, alt) =>
+      konflikt({
+        etikett,
+        erwartet: alt ? ausschnitt(alt, p) : undefined,
+        speichern: async (erwartet) => {
+          await patch.mutateAsync({ aid, etikett, patch: p, erwartet });
+        },
+        ladeFrisch: () => ladeAbschnittFrisch(aid),
+        // Ein inzwischen aufgelöster Abschnitt fehlt in der Liste: dann kein Feldkonflikt, der
+        // Grund des Servers steht an der Angabe.
+        aktuell: (frisch) =>
+          frisch && {
+            wert: ausschnitt(abschnittWire(frisch), p),
+            anzeige: abschnittAnzeige(frisch, p),
+          },
+        text: ausschnittText,
+        leer: ausschnittLeer,
+      });
   /*
    * Sprechgruppen über die Einzelwege (LLH-1456, D1/D5): erst lösen, dann zuordnen, eine Anfrage
    * nach der anderen; die erste Ablehnung hält an und steht an der Zeile. Die Wege antworten ohne
