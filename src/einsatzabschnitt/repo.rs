@@ -498,27 +498,36 @@ pub async fn update_flaeche(
     einsatz_id: i64,
     aid: i64,
     daten: FlaechePatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
-    let betroffen = sqlx::query(
+    // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
+    let sql = format!(
         "UPDATE einsatzabschnitt SET \
-            flaeche_geojson = CASE WHEN ? THEN ? ELSE flaeche_geojson END, \
-            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.flaeche_geojson.is_some())
-    .bind(daten.flaeche_geojson.flatten())
-    .bind(daten.tz_fachaufgabe.is_some())
-    .bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some())
-    .bind(daten.tz_organisation.flatten())
-    .bind(aid)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+            flaeche_geojson = CASE WHEN ?1 THEN ?2 ELSE flaeche_geojson END, \
+            tz_fachaufgabe  = CASE WHEN ?3 THEN ?4 ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ?5 THEN ?6 ELSE tz_organisation END \
+         WHERE id = ?7 AND einsatz_id = ?8{}",
+        erwartet.sql_suffix(9)
+    );
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.flaeche_geojson.is_some())
+        .bind(daten.flaeche_geojson.flatten())
+        .bind(daten.tz_fachaufgabe.is_some())
+        .bind(daten.tz_fachaufgabe.flatten())
+        .bind(daten.tz_organisation.is_some())
+        .bind(daten.tz_organisation.flatten())
+        .bind(aid)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        return Err(crate::feld_cas::ohne_treffer(
+            pool,
+            "einsatzabschnitt",
+            einsatz_id,
+            aid,
+            erwartet,
+        )
+        .await);
     }
     load(pool, einsatz_id, aid).await
 }
@@ -803,6 +812,7 @@ mod tests {
                 tz_fachaufgabe: Some(Some("fuehrung")),
                 tz_organisation: None,
             },
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -816,6 +826,7 @@ mod tests {
                 tz_fachaufgabe: None,
                 tz_organisation: None,
             },
+            &Default::default(),
         )
         .await
         .unwrap();

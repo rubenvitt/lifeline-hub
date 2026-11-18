@@ -124,6 +124,32 @@ pub async fn pruefe_zeile_tx(
     }
 }
 
+/// Ein UPDATE mit Altwerten hat keine Zeile getroffen (LLH-1945, Lagewege): gibt es die Zeile
+/// im Einsatz, war ein Altwert überholt (`Veraltet`, 409), sonst ist sie fremd oder fort (404).
+/// Ohne Altwert bleibt es beim 404. `tabelle` kommt nur aus dem Code.
+pub async fn ohne_treffer(
+    pool: &sqlx::SqlitePool,
+    tabelle: &'static str,
+    einsatz_id: i64,
+    id: i64,
+    erwartet: &ExpectedValues<'_>,
+) -> AppError {
+    if erwartet.is_empty() {
+        return AppError::NotFound;
+    }
+    let sql = format!("SELECT 1 FROM {tabelle} WHERE id = ?1 AND einsatz_id = ?2");
+    let gefunden: Result<Option<i64>, _> = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await;
+    match gefunden {
+        Ok(Some(_)) => AppError::Veraltet,
+        Ok(None) => AppError::NotFound,
+        Err(e) => e.into(),
+    }
+}
+
 /// Ein Feld des Patches für [`pruefe_felder`]: Name, steht es in `erwartet`, steht es im Patch.
 pub type FeldLage = (&'static str, bool, bool);
 

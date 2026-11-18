@@ -594,6 +594,8 @@ pub struct FlaecheBody {
     pub tz_fachaufgabe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_organisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945): je Feld der Wert zu Beginn der Handlung; fehlt = kein Vergleich.
+    pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid}/flaeche — Lage-Pflege, KEIN ETB.
@@ -604,6 +606,12 @@ pub async fn flaeche(
     JsonBody(body): JsonBody<FlaecheBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let erwartet = body.erwartet.unwrap_or_default();
+    let altwerte = erwartet.altwerte(&[
+        ("flaeche_geojson", body.flaeche_geojson.is_some()),
+        ("tz_fachaufgabe", body.tz_fachaufgabe.is_some()),
+        ("tz_organisation", body.tz_organisation.is_some()),
+    ])?;
     if let Some(Some(gj)) = &body.flaeche_geojson {
         // Größe vor dem Parsen, Struktur nach den bestehenden 422 (LFH-937, design.md D7).
         crate::lage_zone::pruefe_geometrie_groesse(gj, "flaeche_geojson")?;
@@ -627,6 +635,7 @@ pub async fn flaeche(
             tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
             tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
         },
+        &altwerte,
     )
     .await?;
     sse_abschnitt(&state, einsatz_id, aid);

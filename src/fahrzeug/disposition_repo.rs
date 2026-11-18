@@ -578,32 +578,41 @@ pub async fn update_position(
     ef_id: i64,
     daten: PositionPatch<'_>,
     einsatz_aktiv: bool,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<EinsatzFahrzeugAnzeige, AppError> {
     // Ein beendetes Fahrzeug steht auf keiner Karte mehr (409, LLH-1079).
     require_aktiv_tx(&mut *pool.acquire().await?, einsatz_id, ef_id).await?;
-    let betroffen = sqlx::query(
+    // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
+    let sql = format!(
         "UPDATE einsatz_fahrzeug SET \
-            lat = CASE WHEN ? THEN ? ELSE lat END, \
-            lon = CASE WHEN ? THEN ? ELSE lon END, \
-            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.lat.is_some())
-    .bind(daten.lat.flatten())
-    .bind(daten.lon.is_some())
-    .bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some())
-    .bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some())
-    .bind(daten.tz_organisation.flatten())
-    .bind(ef_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+            lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
+            lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+         WHERE id = ?9 AND einsatz_id = ?10{}",
+        erwartet.sql_suffix(11)
+    );
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.lat.is_some())
+        .bind(daten.lat.flatten())
+        .bind(daten.lon.is_some())
+        .bind(daten.lon.flatten())
+        .bind(daten.tz_fachaufgabe.is_some())
+        .bind(daten.tz_fachaufgabe.flatten())
+        .bind(daten.tz_organisation.is_some())
+        .bind(daten.tz_organisation.flatten())
+        .bind(ef_id)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        return Err(crate::feld_cas::ohne_treffer(
+            pool,
+            "einsatz_fahrzeug",
+            einsatz_id,
+            ef_id,
+            erwartet,
+        )
+        .await);
     }
     let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE ef.id = ? AND ef.einsatz_id = ?"
@@ -1393,6 +1402,7 @@ mod tests {
                 tz_organisation: Some(Some("feuerwehr")),
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1407,6 +1417,7 @@ mod tests {
                 tz_organisation: None,
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1803,9 +1814,16 @@ mod tests {
             AppError::Conflict(_)
         ));
         assert!(matches!(
-            update_position(&pool, einsatz, ef, PositionPatch::default(), true)
-                .await
-                .unwrap_err(),
+            update_position(
+                &pool,
+                einsatz,
+                ef,
+                PositionPatch::default(),
+                true,
+                &Default::default()
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
     }

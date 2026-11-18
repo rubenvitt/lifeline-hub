@@ -928,6 +928,8 @@ pub struct PositionBody {
     pub tz_fachaufgabe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_organisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945): je Feld der Wert zu Beginn der Handlung; fehlt = kein Vergleich.
+    pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
 /// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id}/position — reine Lage-Pflege, KEIN ETB.
@@ -938,6 +940,13 @@ pub async fn position(
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let erwartet = body.erwartet.unwrap_or_default();
+    let altwerte = erwartet.altwerte(&[
+        ("lat", body.lat.is_some()),
+        ("lon", body.lon.is_some()),
+        ("tz_fachaufgabe", body.tz_fachaufgabe.is_some()),
+        ("tz_organisation", body.tz_organisation.is_some()),
+    ])?;
     // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
     let vorher: (Option<f64>, Option<f64>) =
         sqlx::query_as("SELECT lat, lon FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?")
@@ -961,6 +970,7 @@ pub async fn position(
             tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
         },
         ctx.einsatz.ist_aktiv(),
+        &altwerte,
     )
     .await?;
     sse_fahrzeug(&state, einsatz_id, ef_id);

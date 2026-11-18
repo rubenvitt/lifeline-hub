@@ -834,6 +834,8 @@ pub struct PositionBody {
     pub tz_fachaufgabe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_organisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945): je Feld der Wert zu Beginn der Handlung; fehlt = kein Vergleich.
+    pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
 /// PATCH /api/einsaetze/{id}/personal/{ep_id}/position — reine Lage-Pflege, KEIN ETB.
@@ -845,6 +847,13 @@ pub async fn position(
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<FuehrungskraftKarte>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let erwartet = body.erwartet.unwrap_or_default();
+    let altwerte = erwartet.altwerte(&[
+        ("lat", body.lat.is_some()),
+        ("lon", body.lon.is_some()),
+        ("tz_fachaufgabe", body.tz_fachaufgabe.is_some()),
+        ("tz_organisation", body.tz_organisation.is_some()),
+    ])?;
     // Eine beendete Kraft ist nicht mehr verortbar (409, LLH-1079); fremd → 404.
     {
         let mut conn = state.pool.acquire().await?;
@@ -872,6 +881,7 @@ pub async fn position(
             tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
             tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
         },
+        &altwerte,
     )
     .await?;
     sse_personal(&state, einsatz_id, ep_id);
