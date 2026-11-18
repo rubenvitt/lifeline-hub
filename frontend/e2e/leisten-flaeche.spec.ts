@@ -577,6 +577,79 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
   expect(verstoesse, 'Deckel verletzt').toEqual([]);
 });
 
+/**
+ * LLH-1936 (Spec `lagekarte-zeitachse`, „Ohne Stände steht nur ein Knopf ‚Stand sichern‘“): ohne
+ * gesicherten Stand ist die Zeitachse ein einzelner Knopf mit Wort, kein Band, und nimmt nicht
+ * mehr Höhe ein als dieser Knopf; die gemerkte Klappwahl gilt noch nicht. Mutationsprobe: der
+ * Zweig `snapshots.length === 0` in `SnapshotLeiste.tsx` entfernt → rot.
+ */
+test('Lagekarte (LLH-1936): ohne Stände ist die Zeitachse nur der Knopf „Stand sichern“', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Flaeche 1936 leer ${Date.now()}`);
+  const SOLL = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
+  const gemessen: string[] = [];
+
+  for (const lage of [
+    { name: 'Fükw', width: 1366, height: 768, dichte: 'kompakt', eingeklappt: '0' },
+    { name: 'Handschirm', width: 390, height: 844, dichte: 'handschuh', eingeklappt: '1' },
+  ] as const) {
+    const lauf = `${lage.name}/${lage.dichte}`;
+    await page.setViewportSize({ width: lage.width, height: lage.height });
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    // Beide gemerkten Wahlen: ausgeklappt (Fükw) und eingeklappt (Handschirm) — ohne Stand gilt
+    // keine von beiden.
+    await page.evaluate((wert) => {
+      localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', wert);
+      localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
+      localStorage.removeItem('lfh:lagekarte:leiste-offen:unter-lg');
+    }, lage.eingeklappt);
+    await stelleDichte(page, lage.dichte);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+      { timeout: 60_000 },
+    );
+    const knopf = page.locator('[data-lfh="zeitachse-sichern"]');
+    await expect(knopf, `${lauf}: Knopf „Stand sichern“`).toBeVisible();
+    await expect(knopf).toHaveAccessibleName('Stand sichern');
+    await expect(knopf, `${lauf}: das Wort steht am Knopf`).toHaveText('Stand sichern');
+    await expect(page.locator('[data-lfh="zeitachse"]'), `${lauf}: kein Band`).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Zeitachse einblenden' })).toHaveCount(0);
+    await schriftenGeladen(page);
+
+    const m = await knopf.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const k = document.querySelector('[data-lfh="kartenspalte"]')!.getBoundingClientRect();
+      return {
+        breite: r.width,
+        hoehe: r.height,
+        links: r.left - k.left,
+        inSpalte:
+          r.left >= k.left - 0.5 &&
+          r.right <= k.right + 0.5 &&
+          r.top >= k.top - 0.5 &&
+          r.bottom <= k.bottom + 0.5,
+      };
+    });
+    gemessen.push(`${lauf}: ${Math.round(m.breite)}×${Math.round(m.hoehe)} px`);
+    expect(m.inSpalte, `${lauf}: der Knopf steht in der Kartenspalte`).toBe(true);
+    // Die Höhe der Zeitachse ist die eines Knopfs der Stufe: kein Band, keine Polsterung darum.
+    expect(
+      m.hoehe,
+      `${lauf}: Höhe ${m.hoehe} px, Soll ${SOLL[lage.dichte]}`,
+    ).toBeGreaterThanOrEqual(SOLL[lage.dichte] - 0.5);
+    expect(m.hoehe, `${lauf}: Höhe ${m.hoehe} px, Soll ${SOLL[lage.dichte]}`).toBeLessThanOrEqual(
+      SOLL[lage.dichte] + SUBPIXEL,
+    );
+    // Linksbündig wie der eingeklappte Knopf, nicht über die Fußbreite gestreckt.
+    expect(m.links, `${lauf}: steht links in der Karte`).toBeLessThan(lage.width / 4);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 /** Einsatz mit zwei Gefahrengebieten per API (`POST …/zonen`, ohne WebGL). */
 async function matrixEinsatz(
   page: Page,
