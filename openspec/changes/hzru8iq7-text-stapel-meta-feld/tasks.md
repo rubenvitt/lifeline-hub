@@ -75,7 +75,7 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
 ## 6. Prüfung
 
 - [x] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (aus der Repo-Wurzel)
-- [ ] 6.2 Bilder vorher/nachher einer Stammdaten-Seite in `kompakt` und `komfortabel` aufgenommen
+- [x] 6.2 Bilder vorher/nachher einer Stammdaten-Seite in `kompakt` und `komfortabel` aufgenommen
   (Wegwerf-Spec im Bildlauf, nicht committet)
 
 ## Workflow follow-up

@@ -80,7 +80,7 @@ schlecht prüfen.
 ### D6 `Feld` als Hülle um `Form.Item` (abgestimmt)
 
 `<Feld name label breite="mittel" …FormItemProps>` reicht alle Form.Item-Props außer `style`
-durch und setzt `style={{ maxWidth: FELDBREITE[breite] }}` auf das Form.Item. antds Steuerelemente
+durch und setzt die Grenze als Custom Property `--lfh-feldgrenze` am Form.Item; `index.css` begrenzt damit nur die Steuerzeile (`.ant-form-item-control-input`), damit die Beschriftung nicht umbricht (im Bildvergleich am Handy aufgefallen). antds Steuerelemente
 sind in einem Form.Item schon 100 % breit (`Input`, `Select`); für `InputNumber`, `DatePicker`
 und `TimePicker`, die das nicht sind, setzt `Feld` per Klasse `lfh-formfeld` in `index.css` (`lfh-feld` ist der Werteblock in `theme/sprache.css`)
 `width: 100%` auf das Steuerelement. Breiten: `kurz` 120 (Zahlen, Kürzel), `schmal` 200 (häufigste

@@ -4,7 +4,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Button, Form, Input } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
-import Feld, { FELD_KLASSE } from './Feld';
+import Feld, { FELD_GRENZE, FELD_KLASSE } from './Feld';
 
 function formularItem(beschriftung: string): HTMLElement {
   return screen.getByLabelText(beschriftung).closest('.ant-form-item') as HTMLElement;
@@ -24,7 +24,9 @@ describe('Feld (Spec `feldbreiten`)', () => {
       </Form>,
     );
     const item = formularItem('Wert');
-    expect(item.style.maxWidth).toBe(grenze);
+    // Die Grenze gilt dem Steuerelement, nicht der Beschriftung: sie bricht sonst unnötig um.
+    expect(item.style.maxWidth).toBe('');
+    expect(item.style.getPropertyValue(FELD_GRENZE)).toBe(grenze);
     expect(item.style.width).toBe('');
   });
 
@@ -36,7 +38,7 @@ describe('Feld (Spec `feldbreiten`)', () => {
         </Feld>
       </Form>,
     );
-    expect(formularItem('Bemerkung').style.maxWidth).toBe('');
+    expect(formularItem('Bemerkung').style.getPropertyValue(FELD_GRENZE)).toBe('');
   });
 
   it('trägt die Klasse, mit der InputNumber und Datumsfelder die Breite füllen', () => {
@@ -51,6 +53,11 @@ describe('Feld (Spec `feldbreiten`)', () => {
     expect(item).toHaveClass(FELD_KLASSE);
     expect(item).toHaveClass('eigen');
     const css = readFileSync(join(process.cwd(), 'src', 'index.css'), 'utf-8');
+    expect(css).toMatch(
+      new RegExp(
+        `\\.${FELD_KLASSE} \\.ant-form-item-control-input[^{]*\\{[^}]*max-width: var\\(${FELD_GRENZE}`,
+      ),
+    );
     for (const steuer of ['.ant-input-number', '.ant-picker', '.ant-select']) {
       expect(css).toMatch(
         new RegExp(`\\.${FELD_KLASSE} ${steuer.replace('.', '\\.')}[^{]*\\{[^}]*width: 100%`),

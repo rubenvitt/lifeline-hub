@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { Form, type FormItemProps } from 'antd';
 import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
 
@@ -15,6 +16,13 @@ import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
 
 export const FELD_KLASSE = 'lfh-formfeld';
 
+/**
+ * Custom Property, die die Obergrenze trägt. `index.css` setzt sie an die Steuerzeile des
+ * Formularfelds, nicht an das ganze Feld: die Beschriftung darüber bleibt so breit wie die Spalte
+ * und bricht nicht unnötig um.
+ */
+export const FELD_GRENZE = '--lfh-feldgrenze';
+
 /** `Values` bindet `name` an die Formularwerte wie `Form.Item<Values>`. */
 export interface FeldProps<Values = unknown> extends Omit<FormItemProps<Values>, 'style'> {
   /** Obergrenze der Breite; Vorgabe `voll` (ganze Zeile). */
@@ -31,7 +39,7 @@ export default function Feld<Values = unknown>({
     <Form.Item<Values>
       {...props}
       className={className ? `${FELD_KLASSE} ${className}` : FELD_KLASSE}
-      style={grenze === undefined ? undefined : { maxWidth: grenze }}
+      style={grenze === undefined ? undefined : ({ [FELD_GRENZE]: `${grenze}px` } as CSSProperties)}
     />
   );
 }
