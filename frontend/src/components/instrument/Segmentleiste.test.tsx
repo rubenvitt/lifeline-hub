@@ -1,7 +1,8 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beendeHuelle, type IosNachricht, starteIosHuelle } from '../../test/huelle';
 import { renderMitProviders } from '../../test/utils';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -504,5 +505,65 @@ describe('Segmentleiste mit manueller Aktivierung', () => {
     expect(onWechsel).not.toHaveBeenCalled();
     await userEvent.keyboard('{Enter}');
     expect(onWechsel).toHaveBeenCalledWith('meldung');
+  });
+});
+
+/**
+ * Haptik beim Segmentwechsel (Change t39ltxxi, Spec `huellen-vertrag`): zentral in der Leiste,
+ * nicht im Aufrufer, je Wechsel genau einmal `selection`.
+ */
+describe('Segmentleiste — Haptik in der Hülle', () => {
+  afterEach(beendeHuelle);
+
+  function mitIosHuelle() {
+    const nachrichten: IosNachricht[] = [];
+    starteIosHuelle({ bruecke: { postMessage: (n) => nachrichten.push(n) } });
+    return () => nachrichten.filter((n) => n.cmd === 'haptics').map((n) => n.kind);
+  }
+
+  it('meldet je Wechsel per Klick genau einmal `selection`', async () => {
+    const haptik = mitIosHuelle();
+    renderMitProviders(<Gesteuert />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Lage' }));
+    expect(haptik()).toEqual(['selection']);
+    await userEvent.click(screen.getByRole('radio', { name: /Meldung/ }));
+    expect(haptik()).toEqual(['selection', 'selection']);
+  });
+
+  it('meldet beim Wechsel per Pfeiltaste, nicht beim Klick auf das gewählte Segment', async () => {
+    const haptik = mitIosHuelle();
+    renderMitProviders(<Gesteuert />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Alle' }));
+    expect(haptik()).toEqual([]);
+    await userEvent.keyboard('{ArrowRight}');
+    expect(haptik()).toEqual(['selection']);
+  });
+
+  it('meldet nichts bei einem gesperrten Segment', async () => {
+    const haptik = mitIosHuelle();
+    renderMitProviders(
+      <Segmentleiste
+        optionen={[
+          { wert: 'a', label: 'A' },
+          { wert: 'b', label: 'B', gesperrt: 'Nicht jetzt' },
+        ]}
+        wert="a"
+        onWechsel={vi.fn()}
+        beschriftung="Wahl"
+      />,
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'B' }));
+    expect(haptik()).toEqual([]);
+  });
+
+  it('meldet auch im Formularfeld genau einmal je Wechsel', async () => {
+    const haptik = mitIosHuelle();
+    function Feld() {
+      const [wert, setWert] = useState<string>('alle');
+      return <SegmentFeld value={wert} onChange={setWert} optionen={OPTIONEN} beschriftung="Typ" />;
+    }
+    renderMitProviders(<Feld />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Lage' }));
+    expect(haptik()).toEqual(['selection']);
   });
 });

@@ -1,5 +1,6 @@
 import { Tooltip } from 'antd';
 import { useId, useRef, type CSSProperties, type KeyboardEvent } from 'react';
+import { huelleHaptics } from '../../huelle/faehigkeiten';
 import { monoStil, useRollen } from './rollenwerte';
 import { zielEinzug } from './zielEinzug';
 import '../../theme/sprache.css';
@@ -209,11 +210,20 @@ export default function Segmentleiste<W extends string | number>({
   const aktivIndex = Math.max(0, gewaehltIndex);
   const alsTab = rolle === 'tablist';
 
+  /**
+   * Jede Wahl geht hier durch. Ein Wechsel auf ein anderes Segment gibt in der Hülle einmal die
+   * Haptik `selection` (Change t39ltxxi, Spec `huellen-vertrag`) — zentral, nicht im Aufrufer.
+   */
+  const waehle = (neu: W) => {
+    if (neu !== wert) huelleHaptics('selection');
+    onWechsel(neu);
+  };
+
   const taste = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const ziel = naechsterIndex(e.key, index, optionen.length, (i) => !!optionen[i].gesperrt);
     if (ziel == null) return;
     e.preventDefault();
-    if (aktivierung === 'sofort') onWechsel(optionen[ziel].wert);
+    if (aktivierung === 'sofort') waehle(optionen[ziel].wert);
     knoepfe.current[ziel]?.focus();
   };
 
@@ -256,7 +266,7 @@ export default function Segmentleiste<W extends string | number>({
             tabIndex={i === aktivIndex ? 0 : -1}
             className={aktiv ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
             onClick={() => {
-              if (!gesperrt) onWechsel(o.wert);
+              if (!gesperrt) waehle(o.wert);
             }}
             onKeyDown={(e) => taste(e, i)}
             style={{
