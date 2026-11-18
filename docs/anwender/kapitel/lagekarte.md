@@ -335,6 +335,9 @@ bis die Lagekarte verlassen wird. Betroffene zeigt die Karte auch so nur mit Zug
 Unfallhilfsstelle wird in der Leiste unter „Objekte“ verortet und hat deshalb keinen Rückweg. Ein
 Objekt, das aus der Leiste platziert wird, meldet sich wie bisher mit „Objekt verortet“.
 
+Eine aufgelöste Unfallhilfsstelle fehlt auf der Karte und unter „Nicht verortet“, wie ein
+aufgelöster Bereitstellungsraum. Ihr Ort lässt sich danach nicht mehr ändern.
+
 ### Fokus auf einen Abschnitt
 
 Der Fokus ändert nur, wie die Karte aussieht. Kräfte anderer Abschnitte bleiben auf der Karte und
