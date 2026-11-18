@@ -3,7 +3,7 @@
 Dieser Ordner enthält den Entwurf für Welle 2 von LLH-1720 („Design System: Farbe, Status und Affordanz“) mit den
 Unteraufgaben LLH-1779, 1780, 1781 und 1782. Der Lösungsweg wurde am 16.11.2026 mit Ruben
 abgestimmt, die Change am 18.11.2026 freigegeben:
-`openspec/changes/eon26eat-status-und-bedienung/` (Entscheidungen D1–D11 in `design.md`).
+`openspec/changes/archive/2026-11-18-eon26eat-status-und-bedienung/` (Entscheidungen D1–D11 in `design.md`).
 
 **Stand dieses Ordners:** Er enthält die Zeichenflächen des Canvas
 https://claude.ai/artifact/Ru8XsxoHtYRvKhfNyN6b57 (Artifact-Typ „Design“, Design System „Lifeline
