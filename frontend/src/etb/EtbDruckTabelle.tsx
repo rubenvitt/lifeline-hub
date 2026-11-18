@@ -167,15 +167,17 @@ export default function EtbDruckTabelle({
         {geordnet.map((e) => {
           const grund = index.grundeintrag(e);
           const durch = index.berichtigtDurch(e);
+          // Systemeinträge stehen verdichtet (LLH-1837): kleinere Schrift, kaum Polsterung.
+          const system = e.typ === 'system';
+          const groesse = system ? token.fontSizeSM : token.fontSize;
+          const rand = system ? { ...zelle, paddingBlock: 0 } : zelle;
           const nummerZelle = (
-            <td style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}>
-              {e.lfd_nr}
-            </td>
+            <td style={{ ...rand, ...monoStil(groesse), whiteSpace: 'nowrap' }}>{e.lfd_nr}</td>
           );
           const zeitZelle = (
             <td
               className="druckansicht-zeit"
-              style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}
+              style={{ ...rand, ...monoStil(groesse), whiteSpace: 'nowrap' }}
             >
               <div>{zeitpunkt(e.ereigniszeit, konventionen)}</div>
               {istNachgetragen(e.ereigniszeit, e.received_at) && (
@@ -205,13 +207,12 @@ export default function EtbDruckTabelle({
               )}
             </>
           );
-          if (e.typ === 'system') {
-            const knapp = { paddingBlock: 0 };
+          if (system) {
             return (
               <tr key={e.id} data-lfh="etb-druck-system" style={{ fontSize: token.fontSizeSM }}>
                 {nummerZelle}
                 {zeitZelle}
-                <td colSpan={4} className="druckansicht-textspalte" style={{ ...zelle, ...knapp }}>
+                <td colSpan={4} className="druckansicht-textspalte" style={rand}>
                   <div className="etb-druck-system-zeile" style={{ columnGap: token.marginXXS }}>
                     <span>{`${etbTyp[e.typ].label} · `}</span>
                     <Markdown variante="kompakt" unterEbene={2}>
