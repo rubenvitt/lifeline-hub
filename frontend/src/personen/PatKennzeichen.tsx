@@ -1,9 +1,11 @@
 import { Input } from 'antd';
-import { useMutation } from '@tanstack/react-query';
-import { aktualisierePerson, type PersonEingabe } from '../api/einsatzPerson';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ladePerson, savePersonFeld } from '../api/einsatzPerson';
 import { PAT_NUMMER_MAX } from '../api/eingabegrenzen';
+import { einsatzKeys } from '../api/queryKeys';
 import type { PersonDetail } from '../api/types';
 import { InlineAngabe } from '../components/InlineAngabe';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
 import { monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import StatusTag from '../components/StatusTag';
@@ -15,7 +17,8 @@ import { kontamination as KONTAMINATION } from '../theme/statusFarben';
  * Die Kopfzeile des Patientenkopfs (LLH-1326, design.md D3/D14): PAT-Nummer und Kontamination.
  * Beide sind Stammdaten der Person und gehen einzeln über den PATCH (ein Feld je Anfrage, nie ein
  * Formular), inline über `InlineAngabe`. Sie bleiben online (D8): ohne Netz stehen sie nur lesend,
- * mit Grund.
+ * mit Grund. Der Wert beim Öffnen geht als Altwert mit (Feld-CAS, LLH-1945); hat ein anderer die
+ * Angabe inzwischen geändert, fragt `useFeldKonflikt` „Zwischenzeitlich geändert“.
  *
  * Lesend erscheint die Zeile nur, wenn es etwas zu nennen gibt: eine PAT-Nummer oder
  * „kontaminiert“. „nicht kontaminiert“ trägt keine Marke (Spec `personen-detail`), steht aber
@@ -31,6 +34,15 @@ const KONTAMINATION_OPTIONEN = [
 
 function kontaminationWert(k: boolean | null | undefined): KontaminationWert {
   return k == null ? null : k ? 'ja' : 'nein';
+}
+
+function kontaminationWire(w: KontaminationWert): boolean | null {
+  return w == null ? null : w === 'ja';
+}
+
+/** Die PAT-Nummer, wie der Server sie hält: leer ist `null`. */
+function patWire(w: string | null | undefined): string | null {
+  return w?.trim() || null;
 }
 
 /** Der Grund der Sperre ohne Netz, in wenigen Wörtern (LFH-966). */
@@ -56,11 +68,47 @@ export default function PatKennzeichen({
   // Ohne Verbindung: Browser offline oder Server unerreichbar (`useOhneVerbindung`).
   const ohneVerbindung = useOhneVerbindung();
   const schreibt = bedienbar && !ohneVerbindung;
+  const qc = useQueryClient();
+  const konflikt = useFeldKonflikt();
   const mutation = useMutation({
-    mutationFn: (daten: Pick<PersonEingabe, 'pat_nummer' | 'kontamination'>) =>
-      aktualisierePerson(einsatzId, person.id, daten),
+    mutationFn: (
+      v:
+        | { feld: 'pat_nummer'; wert: string | null; erwartet?: string | null }
+        | { feld: 'kontamination'; wert: boolean | null; erwartet?: boolean | null },
+    ) =>
+      v.feld === 'pat_nummer'
+        ? savePersonFeld(einsatzId, person.id, 'pat_nummer', v.wert, v.erwartet)
+        : savePersonFeld(einsatzId, person.id, 'kontamination', v.wert, v.erwartet),
     onSuccess: () => onGeschrieben?.(),
   });
+  const ladeFrisch = () =>
+    qc.fetchQuery({
+      queryKey: einsatzKeys.person(einsatzId, person.id),
+      queryFn: () => ladePerson(einsatzId, person.id),
+      staleTime: 0,
+    });
+  const savePat = (wert: string | null, beimOeffnen: string) =>
+    konflikt({
+      etikett: 'PAT-Nummer',
+      erwartet: patWire(beimOeffnen),
+      speichern: async (erwartet) => {
+        await mutation.mutateAsync({ feld: 'pat_nummer', wert, erwartet });
+      },
+      ladeFrisch,
+      aktuell: (frisch) => ({ wert: patWire(frisch.pat_nummer) }),
+      text: (w) => w ?? '',
+    });
+  const saveKontamination = (wert: boolean | null, beimOeffnen: KontaminationWert) =>
+    konflikt({
+      etikett: 'Kontamination',
+      erwartet: kontaminationWire(beimOeffnen),
+      speichern: async (erwartet) => {
+        await mutation.mutateAsync({ feld: 'kontamination', wert, erwartet });
+      },
+      ladeFrisch,
+      aktuell: (frisch) => ({ wert: frisch.kontamination ?? null }),
+      text: (w) => (w ? KONTAMINATION.label : 'nicht kontaminiert'),
+    });
 
   if (!bedienbar && !hatKennzeichen(person)) return null;
 
@@ -81,7 +129,7 @@ export default function PatKennzeichen({
           gleich={(a, b) => a.trim() === b.trim()}
           isValid={(w) => !istZuLang(w, PAT_NUMMER_MAX)}
           darfSchreiben
-          onSpeichern={(w) => mutation.mutateAsync({ pat_nummer: w.trim() || null })}
+          onSpeichern={(w, { beimOeffnen }) => savePat(patWire(w), beimOeffnen)}
           eingabe={({ feld, value, onChange }) => (
             <Input
               {...feld}
@@ -108,9 +156,7 @@ export default function PatKennzeichen({
           }
           leer={(w) => w == null}
           darfSchreiben
-          onSpeichern={(w) =>
-            mutation.mutateAsync({ kontamination: w == null ? null : w === 'ja' })
-          }
+          onSpeichern={(w, { beimOeffnen }) => saveKontamination(kontaminationWire(w), beimOeffnen)}
           eingabe={({ feld, value, onChange, popup }) => (
             <Select<'ja' | 'nein'>
               {...feld}

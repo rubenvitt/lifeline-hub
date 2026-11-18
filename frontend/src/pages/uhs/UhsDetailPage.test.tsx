@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   createMemoryRouter,
@@ -54,13 +54,23 @@ vi.mock('./UhsSwitcher', () => ({ default: () => <div>SWITCHER</div> }));
 // geänderte Bearbeitung wie das echte Paneel.
 vi.mock('./UhsAngaben', async () => {
   const { useOffeneBearbeitungBelegung } = await import('../../components/offeneBearbeitung');
+  const { useState } = await import('react');
   return {
     default: function AngabenAttrappe(p: { bearbeitbar: boolean }) {
       const { melde } = useOffeneBearbeitungBelegung('Angaben');
+      // Eigener Zustand wie eine offene Eingabe: er überlebt nur, solange das Paneel steht.
+      const [geaendert, setGeaendert] = useState(false);
       return (
         <div>
           ANGABEN bearbeitbar={String(p.bearbeitbar)}
-          <button type="button" onClick={() => melde('geaendert')}>
+          {geaendert && <span>EINGABE-OFFEN</span>}
+          <button
+            type="button"
+            onClick={() => {
+              setGeaendert(true);
+              melde('geaendert');
+            }}
+          >
             ÄNDERN
           </button>
         </div>
@@ -138,7 +148,7 @@ function renderBei(route: string) {
     ],
     { initialEntries: [route] },
   );
-  return render(
+  const ergebnis = render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
@@ -147,6 +157,7 @@ function renderBei(route: string) {
       </AntApp>
     </QueryClientProvider>,
   );
+  return { ...ergebnis, qc };
 }
 
 describe('UhsDetailPage — Deeplink-Robustheit (LFH-25)', () => {
@@ -734,6 +745,30 @@ describe('UhsDetailPage — Stammdaten im Bereich „Angaben“ (LLH-1407, LLH-1
     expect(await screen.findByText('MATERIAL-TAB')).toBeInTheDocument();
     expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=material');
   });
+
+  // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
+  it.each([
+    ['der UHS', () => vi.mocked(ladeUhs).mockRejectedValue(new ApiError(500, 'kaputt'))],
+    ['des Einsatzes', () => vi.mocked(ladeEinsatz).mockRejectedValue(new ApiError(500, 'kaputt'))],
+  ])(
+    'gescheiterter Neuabruf %s: Seite und offene Eingabe bleiben, der Hinweis zeigt den alten Stand',
+    async (_was, scheitere) => {
+      const { qc } = zeige('aktiv');
+      await userEvent.click(await screen.findByRole('button', { name: 'ÄNDERN' }));
+      expect(screen.getByText('EINGABE-OFFEN')).toBeInTheDocument();
+
+      scheitere();
+      await act(() => qc.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('EINGABE-OFFEN')).toBeInTheDocument();
+      expect(screen.queryByText('UHS konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
 
   it('geänderte Angaben: auch die Kopfzahl des Materials fragt erst nach', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());

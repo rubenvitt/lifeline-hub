@@ -363,9 +363,40 @@ describe('teileZufluss', () => {
 
   it('hält einen fremden NEUEN Eintrag über der Wassermarke zurück, zeigt gepufferte immer', () => {
     expect(stand.wassermarke).toBe(2);
-    const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, stand, 99);
+    const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, stand, new Set());
     expect(zurueckgehalten).toBe(1);
     expect(sichtbar.map((z) => z.schluessel)).toEqual(['ausstehend-1', 'eintrag-2', 'eintrag-1']);
+  });
+
+  /*
+   * LLH-1833: „hier geschrieben“ heißt auf DIESEM Gerät, nicht vom selben Konto. Derselbe Benutzer
+   * auf einem zweiten Gerät schreibt aus Sicht dieser Zeitachse fremd: hochgerollt wartet sein
+   * Eintrag hinter dem Banner. Nur eine client_id, die dieses Gerät vergab, geht sofort durch.
+   */
+  it('hält einen neuen Eintrag desselben Kontos von einem anderen Gerät zurück', () => {
+    const mitZweitgeraet = baueZeilen({
+      eintraege: [e({ id: 3, lfd_nr: 3, client_id: 'anderes-geraet' }), e({ id: 2, lfd_nr: 2 })],
+      ausstehend: [],
+      abgelehnt: [],
+    });
+    const { sichtbar, zurueckgehalten } = teileZufluss(mitZweitgeraet, stand, new Set(['hier']), 1);
+    expect(zurueckgehalten).toBe(1);
+    expect(sichtbar.map((z) => z.schluessel)).toEqual(['eintrag-2']);
+  });
+
+  /*
+   * Review LLH-1833: Ein Folgeeintrag, den der Server auf eine Handlung dieses Geräts hin schreibt
+   * („Auftrag aus ETB-Eintrag erteilen“, Freigaben), trägt keine client_id. Vom eigenen Konto
+   * steht er sofort wie bisher; ein fremder ohne Kennung bleibt zurück.
+   */
+  it('zeigt einen Folgeeintrag des eigenen Kontos ohne client_id sofort', () => {
+    const folge = baueZeilen({
+      eintraege: [e({ id: 3, lfd_nr: 3, erfasser_id: 42 }), e({ id: 2, lfd_nr: 2 })],
+      ausstehend: [],
+      abgelehnt: [],
+    });
+    expect(teileZufluss(folge, stand, new Set(), 42).zurueckgehalten).toBe(0);
+    expect(teileZufluss(folge, stand, new Set(), 7).zurueckgehalten).toBe(1);
   });
 
   it('lässt entfallene Einträge sofort fallen', () => {
@@ -387,7 +418,7 @@ describe('teileZufluss', () => {
     const eng = einfrieren(
       baueZeilen({ eintraege: [e({ id: 2, lfd_nr: 2 })], ausstehend: [], abgelehnt: [] }),
     )!;
-    const { sichtbar, zurueckgehalten } = teileZufluss(mitAelteren, eng, 99);
+    const { sichtbar, zurueckgehalten } = teileZufluss(mitAelteren, eng, new Set());
     expect(zurueckgehalten).toBe(0);
     expect(sichtbar.map((z) => z.schluessel)).toEqual(['eintrag-2', 'eintrag-1', 'eintrag-7']);
   });
@@ -395,19 +426,19 @@ describe('teileZufluss', () => {
   /*
    * Der eigene gepufferte Eintrag wird gesendet — die Pufferzeile geht, die Serverzeile kommt
    * mit neuem Schlüssel. Hielte die Achse sie zurück, wäre der eigene Eintrag für diesen Moment
-   * nirgends zu sehen.
+   * nirgends zu sehen. Erkannt wird er an der client_id, die dieses Gerät vergab (LLH-1833).
    */
-  it('hält den EIGENEN gerade gesendeten Eintrag nie zurück', () => {
+  it('hält den auf DIESEM Gerät gerade gesendeten Eintrag nie zurück', () => {
     const nachSenden = baueZeilen({
-      eintraege: [e({ id: 3, lfd_nr: 3, erfasser_id: 42 }), e({ id: 2, lfd_nr: 2 })],
+      eintraege: [e({ id: 3, lfd_nr: 3, client_id: 'hier' }), e({ id: 2, lfd_nr: 2 })],
       ausstehend: [],
       abgelehnt: [],
     });
-    const { sichtbar, zurueckgehalten } = teileZufluss(nachSenden, stand, 42);
+    const { sichtbar, zurueckgehalten } = teileZufluss(nachSenden, stand, new Set(['hier']));
     expect(zurueckgehalten).toBe(0);
     expect(sichtbar.map((z) => z.schluessel)).toEqual(['eintrag-3', 'eintrag-2']);
-    // Gegenprobe: derselbe Eintrag eines ANDEREN Erfassers bleibt zurück.
-    expect(teileZufluss(nachSenden, stand, 7).zurueckgehalten).toBe(1);
+    // Gegenprobe: dieselbe Zeile, deren Kennung dieses Gerät nicht kennt, bleibt zurück.
+    expect(teileZufluss(nachSenden, stand, new Set(['anders'])).zurueckgehalten).toBe(1);
   });
 
   it('friert nur gesendete Einträge ein und merkt sich die höchste Nummer', () => {

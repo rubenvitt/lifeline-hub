@@ -7,14 +7,21 @@ import { orgVorgabe } from '../../components/vorgabeText';
 import EinheitZeichen from '../../kraefte/EinheitZeichen';
 import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from '../lagekarte/taktischesZeichen';
 
-/** Speichert EIN Zeichenfeld über den Lageweg; Vertrag wie {@link EinheitPatchHandler}. */
+/**
+ * Speichert EIN Zeichenfeld über den Lageweg; Vertrag wie {@link EinheitPatchHandler}. `alt` ist
+ * der Wert beim Öffnen der Zeile (Feld-CAS, LLH-1945).
+ */
 export type EinheitZeichenHandler = (
   etikett: string,
   patch: EinheitZeichenPatch,
+  alt?: string | null,
 ) => Promise<unknown>;
 
 /** Beschriftung eines gespeicherten Werts; ein Wert außerhalb der Auswahl erscheint roh. */
-function labelOf(optionen: readonly { value: string; label: string }[], wert: string | null) {
+export function labelOf(
+  optionen: readonly { value: string; label: string }[],
+  wert: string | null,
+) {
   if (wert == null) return null;
   return optionen.find((o) => o.value === wert)?.label ?? wert;
 }
@@ -66,7 +73,9 @@ export default function EinheitZeichenPaneel({
             anzeige={labelOf(FACHAUFGABE_OPTIONS, fachaufgabe)}
             leer={(w) => w == null}
             darfSchreiben={canEdit}
-            onSpeichern={(w) => onPatchZeichen('Fachaufgabe', { tz_fachaufgabe: w })}
+            onSpeichern={(w, { beimOeffnen }) =>
+              onPatchZeichen('Fachaufgabe', { tz_fachaufgabe: w }, beimOeffnen)
+            }
             eingabe={({ feld, popup, value, onChange }) =>
               zeile(
                 <Select<string>
@@ -91,7 +100,9 @@ export default function EinheitZeichenPaneel({
             anzeige={labelOf(ORGANISATION_OPTIONS, organisation)}
             leer={(w) => w == null}
             darfSchreiben={canEdit}
-            onSpeichern={(w) => onPatchZeichen('Organisation', { tz_organisation: w })}
+            onSpeichern={(w, { beimOeffnen }) =>
+              onPatchZeichen('Organisation', { tz_organisation: w }, beimOeffnen)
+            }
             eingabe={({ feld, popup, value, onChange }) =>
               zeile(
                 <Select<string>

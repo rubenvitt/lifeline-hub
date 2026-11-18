@@ -29,6 +29,7 @@ import {
   istNichtGefunden,
   SeitenFehler,
   SeitenNichtGefunden,
+  SeitenStandVeraltet,
 } from '../../components/SeitenZustand';
 import { useRollen } from '../../components/instrument/rollenwerte';
 import { useViewport } from '../../components/useViewport';
@@ -247,11 +248,14 @@ function UhsDetailInhalt() {
       </div>
     );
   }
-  if (einsatzQuery.error || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1947): React Query setzt `error` auch, wenn nur ein
+  // Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher liegt. Dann
+  // bliebe sonst eine offene Bearbeitung in „Angaben“ nicht stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
-  if (detailQuery.error || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <SeitenFehler
         text="UHS konnte nicht geladen werden"
@@ -263,6 +267,7 @@ function UhsDetailInhalt() {
 
   const einsatz = einsatzQuery.data;
   const uhs = detailQuery.data;
+  const veraltet = einsatzQuery.isError || detailQuery.isError;
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz);
   const verwalten = !schreibgeschuetzt && darf('uhs-verwalten');
   // Stammdaten ändern (LLH-1407): geplant und aktiv, nicht mehr nach dem Auflösen (Muster BR). Der
@@ -343,14 +348,26 @@ function UhsDetailInhalt() {
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        kopfFehler != null && (
-          <SeitenHinweise
-            fehler={kopfFehler}
-            fehlerTitel={statusMut.error != null ? 'Status nicht geändert' : 'Nicht storniert'}
-            fehlerFallback={
-              statusMut.error != null ? 'Statuswechsel fehlgeschlagen' : 'Stornieren fehlgeschlagen'
-            }
-          />
+        (veraltet || kopfFehler != null) && (
+          <Flex vertical gap={token.marginSM}>
+            {veraltet && (
+              <SeitenStandVeraltet
+                onWiederholen={() => {
+                  if (einsatzQuery.isError) void einsatzQuery.refetch();
+                  if (detailQuery.isError) void detailQuery.refetch();
+                }}
+              />
+            )}
+            <SeitenHinweise
+              fehler={kopfFehler}
+              fehlerTitel={statusMut.error != null ? 'Status nicht geändert' : 'Nicht storniert'}
+              fehlerFallback={
+                statusMut.error != null
+                  ? 'Statuswechsel fehlgeschlagen'
+                  : 'Stornieren fehlgeschlagen'
+              }
+            />
+          </Flex>
         )
       }
       /* Datenstand im Kopf über das Primitiv — der Grundriss läuft live mit. */

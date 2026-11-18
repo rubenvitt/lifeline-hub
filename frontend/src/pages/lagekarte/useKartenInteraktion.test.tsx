@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act, waitFor, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { App } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
@@ -41,6 +43,7 @@ vi.mock('../../api/einsatzUhs', () => einsatzUhsApi);
 // Einsatzort verorten: der Kopf geht als Teil-PATCH hinaus.
 const einsaetzeApi = vi.hoisted(() => ({
   patcheEinsatz: vi.fn(() => Promise.resolve({ id: 1 })),
+  ladeEinsatz: vi.fn(() => Promise.resolve({ id: 1 })),
 }));
 vi.mock('../../api/einsaetze', () => einsaetzeApi);
 
@@ -53,6 +56,7 @@ vi.mock('../../api/einsatzPerson', () => einsatzPersonApi);
 // Betreuungsstelle verorten: der Platzier-Auftrag `betreuungsstelle` PATCHt die Stelle.
 const betreuungApi = vi.hoisted(() => ({
   aendereStelle: vi.fn(() => Promise.resolve({ id: 4 })),
+  ladeBetreuung: vi.fn(() => Promise.resolve({ stellen: [] })),
 }));
 vi.mock('../../api/betreuung', () => betreuungApi);
 
@@ -75,18 +79,22 @@ const einsatzSchadenApi = vi.hoisted(() => ({
 vi.mock('../../api/einsatzSchaden', () => einsatzSchadenApi);
 const einheitenApi = vi.hoisted(() => ({
   verorteEinheit: vi.fn(() => Promise.resolve({ id: 5 })),
+  listeEinheiten: vi.fn(() => Promise.resolve([] as unknown[])),
 }));
 vi.mock('../../api/einheiten', () => einheitenApi);
 const einsatzFahrzeugeApi = vi.hoisted(() => ({
   verorteFahrzeug: vi.fn(() => Promise.resolve({ id: 6 })),
+  listeEinsatzFahrzeuge: vi.fn(() => Promise.resolve([] as unknown[])),
 }));
 vi.mock('../../api/einsatzFahrzeuge', () => einsatzFahrzeugeApi);
 const einsatzPersonalApi = vi.hoisted(() => ({
   verortePerson: vi.fn(() => Promise.resolve({ id: 7 })),
+  listeFuehrungskraefte: vi.fn(() => Promise.resolve([] as unknown[])),
 }));
 vi.mock('../../api/einsatzPersonal', () => einsatzPersonalApi);
 const einsatzabschnitteApi = vi.hoisted(() => ({
   zeichneAbschnitt: vi.fn(() => Promise.resolve({ id: 8 })),
+  listeAbschnitte: vi.fn(() => Promise.resolve([] as unknown[])),
 }));
 vi.mock('../../api/einsatzabschnitte', () => einsatzabschnitteApi);
 
@@ -310,10 +318,12 @@ describe('useKartenInteraktion — Einsatzort verorten (LFH-1006)', () => {
     await waitFor(() => expect(einsaetzeApi.patcheEinsatz).toHaveBeenCalledTimes(1));
     // Genau die zwei Schlüssel: jede weitere Zeile aus dem Cache (Leitstellen-Nr., Stichwort …)
     // überschriebe die Änderung einer anderen Person mit dem alten Stand.
-    expect(einsaetzeApi.patcheEinsatz).toHaveBeenCalledWith(1, {
-      einsatzort_lat: 50.1,
-      einsatzort_lon: 8.6,
-    });
+    // Ohne Kopf im Cache kein Altwert (LLH-1945): geschrieben wird ohne Vergleich.
+    expect(einsaetzeApi.patcheEinsatz).toHaveBeenCalledWith(
+      1,
+      { einsatzort_lat: 50.1, einsatzort_lon: 8.6 },
+      undefined,
+    );
     await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
     // Ein Start aus der Leiste ist kein Auftrag von außen: keine Rückmeldung am Ort (LLH-1125).
     expect(result.current.verortetZiel).toBeNull();
@@ -1142,7 +1152,12 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
     act(() => result.current.onPlatzierenStart({ typ: 'betreuungsstelle', id: 4 }));
     act(() => result.current.onKarteKlick({ lng: 8.87, lat: 51.93 }));
     await waitFor(() => expect(betreuungApi.aendereStelle).toHaveBeenCalledTimes(1));
-    expect(betreuungApi.aendereStelle).toHaveBeenCalledWith(1, 4, { lat: 51.93, lon: 8.87 });
+    expect(betreuungApi.aendereStelle).toHaveBeenCalledWith(
+      1,
+      4,
+      { lat: 51.93, lon: 8.87 },
+      undefined,
+    );
     await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
     const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
     expect(keys).toContainEqual(['einsatz-betreuung', 1]);
@@ -1404,7 +1419,7 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     const { result } = rendere(fehler, erfolg);
     act(() => result.current.aendereSymbol(markerVon(typ, 9), { tz_fachaufgabe: 'betreuung' }));
     await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Symbol gespeichert'));
-    expect(api).toHaveBeenCalledWith(1, 9, { tz_fachaufgabe: 'betreuung' });
+    expect(api).toHaveBeenCalledWith(1, 9, { tz_fachaufgabe: 'betreuung' }, undefined);
     expect(fehler).not.toHaveBeenCalled();
   });
 
@@ -1438,9 +1453,12 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     act(() => result.current.onAbschnittZeichnenStart(8));
     act(() => result.current.onFlaecheGezeichnet(POLY));
     await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Fläche gespeichert'));
-    expect(einsatzabschnitteApi.zeichneAbschnitt).toHaveBeenCalledWith(1, 8, {
-      flaeche_geojson: JSON.stringify(POLY),
-    });
+    expect(einsatzabschnitteApi.zeichneAbschnitt).toHaveBeenCalledWith(
+      1,
+      8,
+      { flaeche_geojson: JSON.stringify(POLY) },
+      undefined,
+    );
     expect(fehler).not.toHaveBeenCalled();
     await waitFor(() => expect(result.current.zeichneAbschnittId).toBeNull());
   });
@@ -1877,5 +1895,197 @@ describe('useKartenInteraktion — Auswahl mit oder ohne Anflug (LLH-1751, D4)',
     act(() => result.current.onMarkerWaehlen('uhs-1', { anfliegen: true }));
     expect(result.current.auswahl).toBe('uhs-1');
     expect(result.current.flyToZiel).toEqual({ lng: 8.8, lat: 53.1 });
+  });
+});
+
+describe('useKartenInteraktion — Feld-CAS der Lagewege (LLH-1945)', () => {
+  /** Hook mit eigenem Client (Cache vorbelegbar) und antd-`App` für die Rückfrage. */
+  function mitCache(vorbelegen: (client: ReturnType<typeof neuerQueryClient>) => void) {
+    const client = neuerQueryClient();
+    vorbelegen(client);
+    const erfolg = vi.fn();
+    const fehler = vi.fn();
+    const r = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          darfSchreiben: true,
+          waehlbarRef: { current: [] },
+          beginneHandlung: () => fehler,
+          verwirfHandlung: vi.fn(),
+          erfolg,
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>
+            <App>{children}</App>
+          </QueryClientProvider>
+        ),
+      },
+    );
+    return { ...r, client, erfolg, fehler };
+  }
+  const veraltet = () => new ApiError(409, 'Das Feld wurde zwischenzeitlich geändert.');
+  const einheit = (werte: Record<string, unknown>) => [{ id: 5, ...werte }];
+
+  it('Platzieren schickt den Ort beim Start als erwartet, auch wenn der Cache inzwischen wechselt', async () => {
+    einheitenApi.verorteEinheit.mockClear();
+    const { result, client, erfolg } = mitCache((c) =>
+      c.setQueryData(einsatzKeys.einheiten(1), einheit({ lat: 50, lon: 8 })),
+    );
+    act(() => result.current.onPlatzierenStart({ typ: 'einheit', id: 5 }));
+    // Ein anderer Arbeitsplatz verschiebt währenddessen; der Altwert bleibt der Stand beim Start.
+    act(() => client.setQueryData(einsatzKeys.einheiten(1), einheit({ lat: 51, lon: 9 })));
+    act(() => result.current.onKarteKlick({ lng: 10, lat: 52 }));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    expect(einheitenApi.verorteEinheit).toHaveBeenCalledWith(
+      1,
+      5,
+      { lat: 52, lon: 10 },
+      { lat: 50, lon: 8 },
+    );
+  });
+
+  it('Einsatzort und Betreuungsstelle tragen ihr Koordinatenpaar als erwartet', async () => {
+    einsaetzeApi.patcheEinsatz.mockClear();
+    betreuungApi.aendereStelle.mockClear();
+    const { result, client, erfolg } = mitCache((c) =>
+      c.setQueryData(einsatzKeys.einsatz(1), { id: 1, einsatzort_lat: null, einsatzort_lon: null }),
+    );
+    act(() => result.current.onEinsatzortPlatzieren());
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledTimes(1));
+    expect(einsaetzeApi.patcheEinsatz).toHaveBeenCalledWith(
+      1,
+      { einsatzort_lat: 50.1, einsatzort_lon: 8.6 },
+      { einsatzort_lat: null, einsatzort_lon: null },
+    );
+    // Ohne Beobachter räumt der Test-Client den Cache sofort; die Stelle kommt deshalb erst jetzt.
+    act(() => {
+      client.setQueryData(einsatzKeys.betreuung(1), { stellen: [{ id: 4, lat: 51.9, lon: 8.8 }] });
+      result.current.onVerortungsauftragStart({ typ: 'betreuungsstelle', id: 4, zurueck: true });
+    });
+    act(() => result.current.onKarteKlick({ lng: 8.87, lat: 51.93 }));
+    await waitFor(() => expect(betreuungApi.aendereStelle).toHaveBeenCalledTimes(1));
+    expect(betreuungApi.aendereStelle).toHaveBeenCalledWith(
+      1,
+      4,
+      { lat: 51.93, lon: 8.87 },
+      { lat: 51.9, lon: 8.8 },
+    );
+  });
+
+  it('409 beim Platzieren: „Verwerfen und neu laden“ lässt die Handlung verfallen, ohne Erfolg', async () => {
+    einheitenApi.verorteEinheit.mockClear();
+    einheitenApi.verorteEinheit.mockRejectedValueOnce(veraltet());
+    einheitenApi.listeEinheiten.mockResolvedValueOnce(einheit({ lat: 51, lon: 9 }));
+    const { result, erfolg, fehler } = mitCache((c) =>
+      c.setQueryData(einsatzKeys.einheiten(1), einheit({ lat: 50, lon: 8 })),
+    );
+    act(() => result.current.onPlatzierenStart({ typ: 'einheit', id: 5 }));
+    act(() => result.current.onKarteKlick({ lng: 10, lat: 52 }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    await waitFor(() => expect(result.current.platzierungZiel).toBeNull());
+    expect(einheitenApi.verorteEinheit).toHaveBeenCalledTimes(1);
+    expect(erfolg).not.toHaveBeenCalled();
+    expect(fehler).not.toHaveBeenCalled();
+    expect(result.current.verortetZiel).toBeNull();
+  });
+
+  it('409 beim Platzieren: „Meine Änderung übernehmen“ schreibt ohne Altwert', async () => {
+    einsatzFahrzeugeApi.verorteFahrzeug.mockClear();
+    einsatzFahrzeugeApi.verorteFahrzeug.mockRejectedValueOnce(veraltet());
+    einsatzFahrzeugeApi.listeEinsatzFahrzeuge.mockResolvedValueOnce([{ id: 6, lat: 51, lon: 9 }]);
+    const { result, erfolg } = mitCache((c) =>
+      c.setQueryData(einsatzKeys.fahrzeuge(1), [{ id: 6, lat: null, lon: null }]),
+    );
+    act(() => result.current.onPlatzierenStart({ typ: 'fahrzeug', id: 6 }));
+    act(() => result.current.onKarteKlick({ lng: 10, lat: 52 }));
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    expect(einsatzFahrzeugeApi.verorteFahrzeug).toHaveBeenNthCalledWith(
+      1,
+      1,
+      6,
+      { lat: 52, lon: 10 },
+      { lat: null, lon: null },
+    );
+    expect(einsatzFahrzeugeApi.verorteFahrzeug).toHaveBeenNthCalledWith(
+      2,
+      1,
+      6,
+      { lat: 52, lon: 10 },
+      undefined,
+    );
+  });
+
+  it('Symbol: das gespeicherte Zeichen ist der Altwert, ein verworfener 409 quittiert nichts', async () => {
+    einsatzPersonalApi.verortePerson.mockClear();
+    einsatzPersonalApi.verortePerson.mockRejectedValueOnce(veraltet());
+    einsatzPersonalApi.listeFuehrungskraefte.mockResolvedValueOnce([
+      { id: 7, tz_fachaufgabe: 'fuehrung' },
+    ]);
+    let invalidiert: ReturnType<typeof vi.fn> | undefined;
+    const { result, erfolg, fehler } = mitCache((c) => {
+      c.setQueryData(einsatzKeys.fuehrungskraefte(1), [{ id: 7, tz_fachaufgabe: null }]);
+      invalidiert = vi.spyOn(c, 'invalidateQueries') as unknown as ReturnType<typeof vi.fn>;
+    });
+    const marker: KarteMarker = {
+      schluessel: 'fuehrung-7',
+      typ: 'fuehrung',
+      id: 7,
+      lat: 50,
+      lon: 8,
+      label: 'Kraft',
+      farbe: '#000',
+    };
+    act(() => result.current.aendereSymbol(marker, { tz_fachaufgabe: 'betreuung' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Fachaufgabe von „Kraft“');
+    expect(einsatzPersonalApi.verortePerson).toHaveBeenCalledWith(
+      1,
+      7,
+      { tz_fachaufgabe: 'betreuung' },
+      { tz_fachaufgabe: null },
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    // Die Kette endet mit dem Neuladen des Fachs, ohne Quittung.
+    await waitFor(() =>
+      expect(invalidiert).toHaveBeenCalledWith({ queryKey: einsatzKeys.fuehrungskraefte(1) }),
+    );
+    expect(einsatzPersonalApi.verortePerson).toHaveBeenCalledTimes(1);
+    expect(erfolg).not.toHaveBeenCalled();
+    expect(fehler).not.toHaveBeenCalled();
+  });
+
+  it('Abschnittsfläche: Altwert ist die Fläche beim Start des Zeichnens', async () => {
+    const POLY: GeoJsonPolygon = {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [8, 50],
+          [8, 51],
+          [9, 51],
+          [8, 50],
+        ],
+      ],
+    };
+    einsatzabschnitteApi.zeichneAbschnitt.mockClear();
+    const { result, client, erfolg } = mitCache((c) =>
+      c.setQueryData(einsatzKeys.abschnitte(1), [{ id: 8, flaeche_geojson: 'ALT' }]),
+    );
+    act(() => result.current.onAbschnittZeichnenStart(8));
+    act(() => client.setQueryData(einsatzKeys.abschnitte(1), [{ id: 8, flaeche_geojson: 'NEU' }]));
+    act(() => result.current.onFlaecheGezeichnet(POLY));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Fläche gespeichert'));
+    expect(einsatzabschnitteApi.zeichneAbschnitt).toHaveBeenCalledWith(
+      1,
+      8,
+      { flaeche_geojson: JSON.stringify(POLY) },
+      { flaeche_geojson: 'ALT' },
+    );
   });
 });

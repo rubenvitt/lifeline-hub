@@ -2059,6 +2059,148 @@ async fn besatzung_zuruecknehmen_nur_wenn_frei() {
     assert_eq!(fahrzeug_von().await, a);
 }
 
+// ---------- Feld-CAS an der Disposition (LLH-1945) ----------
+
+async fn fahrzeug_patch_json(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage_json(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        cookie,
+        Some(&body),
+    )
+    .await
+}
+
+async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn bemerkung_mit_ueberholtem_altwert_ist_409_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 3"}),
+    )
+    .await;
+    fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 5"}),
+    )
+    .await;
+
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Halle 2", "erwartet": {"bemerkung": "Tor 3"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+    let (_, a) = fahrzeug_patch_json(&app, &admin, einsatz, ef, serde_json::json!({})).await;
+    assert_eq!(a["bemerkung"], "Tor 5");
+
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": null, "erwartet": {"bemerkung": "Tor 5"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert!(j["bemerkung"].is_null());
+}
+
+#[tokio::test]
+async fn andere_angabe_des_fahrzeugs_dazwischen_speichert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = adhoc_fahrzeug(&app, &admin, einsatz).await;
+    fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"kennzeichen": "M-X 1"}),
+    )
+    .await;
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 3", "erwartet": {"bemerkung": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["kennzeichen"], "M-X 1");
+    // Die Ad-hoc-Angabe selbst prüft ihren Altwert.
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"kennzeichen": "M-X 2", "erwartet": {"kennzeichen": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"funkrufname": "FW Extern 2", "erwartet": {"funkrufname": "FW Extern 1"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+}
+
+#[tokio::test]
+async fn altwert_ohne_aenderung_der_angabe_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 3", "erwartet": {"opta": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+}
+
 /// LLH-1952: Jeder ETB-Eintrag des Fahrzeugmoduls geht als Ereignis `etb` hinaus. `fahrzeug`
 /// frischt das Einsatztagebuch nicht auf; ohne das eigene Ereignis sähe ein zweiter Schirm den
 /// Eintrag erst nach dem Neuladen.

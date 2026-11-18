@@ -242,15 +242,29 @@ export default function EtbPage() {
 
   const bausteineQuery = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
-  // Auftrags-Ziele für das ETB→Auftrag-Formular.
+  // Modulrechte: Dokumente mit ETB-Bezug und die Auftrags-Ziele fragen nur mit Freigabe ab.
+  const modulFreigabenQuery = useQuery({
+    queryKey: einsatzKeys.modulFreigaben(einsatzId),
+    queryFn: () => ladeModulFreigaben(einsatzId),
+  });
+
+  // Auftrags-Ziele für das ETB→Auftrag-Formular, nur mit Modulrecht (LLH-1839): ohne liefe ein 403
+  // und mit ihm eine Benutzerprüfung (`api/client.ts`), bei jedem neuen Freigabestand erneut.
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', modulFreigabenQuery.data);
+  const einheitenFrei = istKeyFreigegeben('einheiten', modulFreigabenQuery.data);
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
+    enabled: abschnitteFrei,
   });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: einheitenFrei,
   });
+  // `enabled: false` hält nur den Abruf an: ein Stand von vor dem Rechteentzug bleibt im Cache.
+  const abschnitte = abschnitteFrei ? abschnitteQuery.data : undefined;
+  const einheiten = einheitenFrei ? einheitenQuery.data : undefined;
 
   /**
    * Seitenfenster (LFH-947, `etb/seitenfenster.ts`): höchstens `ETB_MAX_SEITEN` Seiten, in beide
@@ -324,10 +338,6 @@ export default function EtbPage() {
   // nach Eintrag zugeordnet. Das Modulrecht `dokumente` bleibt maßgeblich — ohne Freigabe (auch
   // solange sie lädt oder scheitert) geht keine Anfrage und es erscheint kein Verweis. Live über
   // das Ereignis `dokument` (derselbe Key wie die Dokumentenseite).
-  const modulFreigabenQuery = useQuery({
-    queryKey: einsatzKeys.modulFreigaben(einsatzId),
-    queryFn: () => ladeModulFreigaben(einsatzId),
-  });
   const dokumenteFrei = istKeyFreigegeben('dokumente', modulFreigabenQuery.data);
   // Die letzte Lagebesprechung für „Seit letzter Lagebesprechung“ (LLH-1080): Freigabe und
   // Minutengrenze im gemeinsamen Hook, dieselben Regeln wie in den Lagemeldungen (LLH-1322).
@@ -488,7 +498,7 @@ export default function EtbPage() {
   // Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht als `scroll-margin` an der
   // Zeitachse (`index.css`), nicht am Dokument.
   const erfassungRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ETB);
-  const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
+  const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen, eigeneClientIds } = useEtbErfassung(
     einsatzId,
     benutzer?.id,
   );
@@ -837,7 +847,7 @@ export default function EtbPage() {
    * Die Einheiten als Filterwahl. Steht eine Einheit in der URL, die nicht in der Liste ist (lädt
    * noch oder aufgelöst), bekommt sie eine eigene Zeile — sonst zeigte der Select die rohe Zahl.
    */
-  const einheitOptionen = (einheitenQuery.data ?? []).map((e) => ({ value: e.id, label: e.name }));
+  const einheitOptionen = (einheiten ?? []).map((e) => ({ value: e.id, label: e.name }));
   if (filter.einheit_id != null && !einheitOptionen.some((o) => o.value === filter.einheit_id)) {
     einheitOptionen.push({ value: filter.einheit_id, label: `Einheit ${filter.einheit_id}` });
   }
@@ -877,7 +887,7 @@ export default function EtbPage() {
   const merkmale = filterMerkmale(filter, {
     bezug: { jetzt: serverJetzt(), zone: konventionen.zeitzone, letzteLb },
     typWort: (t) => etbTyp[t].label,
-    einheitName: (id) => einheitenQuery.data?.find((x) => x.id === id)?.name,
+    einheitName: (id) => einheiten?.find((x) => x.id === id)?.name,
   });
   // Einmalig (Spec „Eigener Eintrag außerhalb des Filters“): ein anderer Filter räumt den Hinweis,
   // er kehrt mit dem alten nicht zurück.
@@ -1264,6 +1274,7 @@ export default function EtbPage() {
               buendeln={filter.typ !== 'system'}
               kopfKlebt={kleben.klebt}
               sprungMarke={hervorhebung?.marke}
+              eigeneClientIds={eigeneClientIds}
               eigeneBenutzerId={benutzer?.id}
               amEnde={amEnde}
               onZumEnde={zumEnde}
@@ -1364,8 +1375,8 @@ export default function EtbPage() {
         <AuftragAusEtbModal
           einsatzId={einsatzId}
           eintrag={auftragZu}
-          abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
-          einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
+          abschnitte={(abschnitte ?? []).map((a) => ({ id: a.id, name: a.name }))}
+          einheiten={(einheiten ?? []).map((e) => ({ id: e.id, name: e.name }))}
           senden={auftragSpeicherung.isPending}
           speicherung={auftragSpeicherung}
           onAbbrechen={() => setAuftragZu(null)}

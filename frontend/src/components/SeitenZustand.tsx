@@ -22,16 +22,25 @@ const { useToken } = theme;
 interface SeitenSkeletonProps {
   /** Anzahl der Balken unter der Kopfzeile. Default 3 — die Form der A0-Referenz. */
   zeilen?: number;
+  /**
+   * Balken erst nach 120 ms zeigen (`.lfh-skelett--verzoegert`): das Gerippe eines Modulwechsels
+   * (LLH-1838, `einsatz/ModulWechselGerippe.tsx`), damit ein schnelles Modul nicht flackert.
+   */
+  verzoegert?: boolean;
 }
 
 /**
  * Ladezustand als Skelettbalken in Kachelform — **kein drehender `Spin`**: die Balken zeigen
  * die Form des kommenden Inhalts. Die Ansage für Screenreader steckt im `aria-label`.
  */
-export function SeitenSkeleton({ zeilen = 3 }: SeitenSkeletonProps) {
+export function SeitenSkeleton({ zeilen = 3, verzoegert = false }: SeitenSkeletonProps) {
   return (
     <div style={{ paddingTop: flaeche.zustandOben }}>
-      <div className="lfh-skelett" aria-busy="true" aria-label="Inhalt wird geladen">
+      <div
+        className={verzoegert ? 'lfh-skelett lfh-skelett--verzoegert' : 'lfh-skelett'}
+        aria-busy="true"
+        aria-label="Inhalt wird geladen"
+      >
         {Array.from({ length: zeilen }, (_, i) => (
           <span
             key={i}

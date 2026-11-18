@@ -5,6 +5,7 @@ import {
   disponiereAdhoc,
   disponiereMaterial,
   loeseNachforderung,
+  updateDisposition,
   verknuepfeNachforderung,
 } from './einsatzMaterial';
 
@@ -109,5 +110,27 @@ describe('api/einsatzMaterial — Fehlzuordnung lösen (LLH-1403 D1)', () => {
     );
     await expect(loeseNachforderung(5, 7)).resolves.toMatchObject({ id: 7 });
     expect(aufrufe).toEqual([{ pfad: '5/7', koerper: '' }]);
+  });
+});
+
+describe('api/einsatzMaterial — Altwert am PATCH (LLH-1945)', () => {
+  it('legt `erwartet` in den Körper, `nurWennFrei` bleibt in der Adresse', async () => {
+    const aufrufe: { url: string; koerper: unknown }[] = [];
+    server.use(
+      http.patch('/api/einsaetze/:id/material/:em', async ({ request }) => {
+        const url = new URL(request.url);
+        aufrufe.push({ url: `${url.pathname}${url.search}`, koerper: await request.json() });
+        return HttpResponse.json({ id: 7 });
+      }),
+    );
+    await updateDisposition(5, 7, { bemerkung: 'Tor 3' }, { erwartet: { bemerkung: null } });
+    await updateDisposition(5, 7, { einheit_id: null }, { nurWennFrei: true });
+    expect(aufrufe).toEqual([
+      {
+        url: '/api/einsaetze/5/material/7',
+        koerper: { bemerkung: 'Tor 3', erwartet: { bemerkung: null } },
+      },
+      { url: '/api/einsaetze/5/material/7?nur_wenn_frei=1', koerper: { einheit_id: null } },
+    ]);
   });
 });

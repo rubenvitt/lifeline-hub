@@ -1,0 +1,13 @@
+/* Verdichteter Systemeintrag im ETB-Druck (LLH-1837, `EtbDruckTabelle.tsx`): Typwort, Inhalt und
+   Erfasser in einer Zeile, solange der Platz reicht; sonst bricht sie um. Gilt am Bildschirm und auf
+   Papier gleich; Druckmechanik steht in `druck/druck.css`. */
+.etb-druck-system-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+/* Der Inhalt steht im Fluss der Zeile: keine Absatzränder, kein Block vor dem Erfasser. */
+.etb-druck-system-zeile .markdown :is(p, ul, ol, blockquote, pre) {
+  margin-block: 0;
+}

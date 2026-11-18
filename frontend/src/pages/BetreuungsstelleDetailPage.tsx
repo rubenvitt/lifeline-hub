@@ -75,6 +75,9 @@ import {
 import RegistrierungPaneel from '../betreuung/registrierung/RegistrierungPaneel';
 import { STATUS_HANDLUNG, schliessenBrauchtLeermeldung } from '../betreuung/stelleStatus';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { ausschnitt, ausschnittLeer, ausschnittText } from '../components/feldVermerk';
+import { OFFEN_LASSEN } from '../components/InlineAngabe';
+import { useFeldKonflikt, VERWORFEN } from '../components/useFeldKonflikt';
 import {
   Datenfeld,
   DatenfeldEingabe,
@@ -121,6 +124,52 @@ interface Sitzung {
 }
 
 const leer = <Typography.Text type="secondary">—</Typography.Text>;
+
+/** Name je Angabe für die Rückfrage „Zwischenzeitlich geändert“; die Koordinate ist eine. */
+const ANGABE_NAME: Record<Exclude<keyof BetreuungsstellePatch, 'status' | 'lon'>, string> = {
+  bezeichnung: 'Bezeichnung',
+  art: 'Art',
+  belegungsart: 'Belegungsart',
+  kapazitaet_personen: 'Kapazität',
+  abschnitt_id: 'Einsatzabschnitt',
+  standort: 'Standort',
+  lat: 'Koordinate',
+  leitung: 'Leitung',
+  kontaktweg: 'Kontakt',
+  notiz: 'Notiz',
+};
+
+/** Die Angaben eines Patches, wie die Rückfrage sie nennt. */
+function angabenName(patch: BetreuungsstellePatch): string {
+  return (Object.keys(ANGABE_NAME) as (keyof typeof ANGABE_NAME)[])
+    .filter((k) => k in patch)
+    .map((k) => ANGABE_NAME[k])
+    .join(', ');
+}
+
+/**
+ * Der aktuelle Stand der Angaben eines Patches lesbar für die Rückfrage: Bezeichnungen statt
+ * Codes und Kennungen, die Koordinate als ein Wert.
+ */
+function angabenAnzeige(s: Betreuungsstelle, patch: BetreuungsstellePatch): string {
+  const werte: (string | null)[] = (Object.keys(ANGABE_NAME) as (keyof typeof ANGABE_NAME)[])
+    .filter((k) => k in patch)
+    .map((k) => {
+      switch (k) {
+        case 'art':
+          return ART_LABEL[s.art];
+        case 'belegungsart':
+          return BELEGUNGSART_LABEL[s.belegungsart];
+        case 'abschnitt_id':
+          return s.abschnitt_name ?? null;
+        case 'lat':
+          return s.lat != null && s.lon != null ? `${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}` : null;
+        default:
+          return s[k] != null && s[k] !== '' ? String(s[k]) : null;
+      }
+    });
+  return werte.filter((w) => w != null).join(', ');
+}
 
 const BELEGUNGSART_OPTIONEN = (Object.keys(BELEGUNGSART_LABEL) as Belegungsart[]).map((a) => ({
   value: a,
@@ -296,13 +345,48 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       message.success(`Betreuungsstelle ${s.bezeichnung}: geschlossen`);
     },
   });
+  /*
+   * Feld-CAS mit dem einen Konfliktablauf (LLH-1945, `components/useFeldKonflikt`): die Schlüssel
+   * des Patches gehen mit ihrem Wert beim Öffnen als `erwartet` mit (die Koordinate als Paar);
+   * nach einem 409 vergleicht die Seite mit dem frisch geladenen Stand derselben Angaben. Die
+   * Mutation umfasst den ganzen Ablauf: ihr Fehler (`speichernMut.error`, Grund am Formular) ist
+   * erst der endgültige, nicht der 409, den die Rückfrage gerade klärt.
+   */
+  const konflikt = useFeldKonflikt();
+  const loadStelleFrisch = async () => {
+    const frisch = await qc.fetchQuery({
+      queryKey: einsatzKeys.betreuung(einsatzId),
+      queryFn: () => ladeBetreuung(einsatzId),
+      staleTime: 0,
+    });
+    return frisch.stellen.find((x) => x.id === stelleId);
+  };
   const speichernMut = useMutation({
-    mutationFn: (patch: BetreuungsstellePatch) => aendereStelle(einsatzId, stelleId, patch),
-    onSuccess: (s) => {
+    mutationFn: async (v: { beimOeffnen: Betreuungsstelle; patch: BetreuungsstellePatch }) => {
+      let gespeichert: Betreuungsstelle | undefined;
+      const ergebnis = await konflikt({
+        etikett: angabenName(v.patch),
+        erwartet: ausschnitt(v.beimOeffnen, v.patch),
+        speichern: async (erwartet) => {
+          gespeichert = await aendereStelle(einsatzId, stelleId, v.patch, erwartet);
+        },
+        ladeFrisch: loadStelleFrisch,
+        // Eine inzwischen stornierte Stelle fehlt in der Übersicht: dann kein Feldkonflikt, der
+        // Grund des Servers steht am Formular.
+        aktuell: (frisch) =>
+          frisch && { wert: ausschnitt(frisch, v.patch), anzeige: angabenAnzeige(frisch, v.patch) },
+        text: ausschnittText,
+        leer: ausschnittLeer,
+      });
+      return { ergebnis, gespeichert };
+    },
+    onSuccess: ({ gespeichert }) => {
       invalidiere();
-      message.success(`Betreuungsstelle ${s.bezeichnung} gespeichert`);
+      if (gespeichert) message.success(`Betreuungsstelle ${gespeichert.bezeichnung} gespeichert`);
     },
   });
+  const saveMitAltwert = async (beimOeffnen: Betreuungsstelle, patch: BetreuungsstellePatch) =>
+    (await speichernMut.mutateAsync({ beimOeffnen, patch })).ergebnis;
   const stornoMut = useMutation({
     mutationFn: () => storniereStelle(einsatzId, stelleId),
     onSuccess: (s) => {
@@ -650,12 +734,21 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
                   return;
                 }
                 const fassung = schutz.fassung();
-                speichernMut.mutate(patch, {
-                  onSuccess: () => {
+                saveMitAltwert(sitzung.beimOeffnen, patch).then(
+                  (ergebnis) => {
+                    // Escape oder Schließen der Rückfrage: die Sitzung bleibt offen, ohne Fehler.
+                    if (ergebnis === OFFEN_LASSEN) {
+                      resetSpeichern();
+                      return;
+                    }
+                    // Verworfen: nichts gespeichert, die Ansicht zeigt den frischen Stand.
+                    if (ergebnis === VERWORFEN) resetSpeichern();
                     schutz.gespeichert(fassung);
                     setSitzung(null);
                   },
-                });
+                  // Der Grund steht am Formular (`speichernMut.error`).
+                  () => undefined,
+                );
               }}
             >
               {stammdaten}
