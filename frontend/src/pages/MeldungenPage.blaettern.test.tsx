@@ -10,6 +10,7 @@ import type { Meldung, MeldungKennzahlen } from '../api/types';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
+import { waehle } from '../test/auswahlListe';
 
 /**
  * Meldungsseite mit getrennten Abrufen (LFH-940, Spec `meldungen-blaettern`): offene, Kennzahlen
@@ -321,15 +322,21 @@ describe('MeldungenPage — schmaler Schirm (LFH-974)', () => {
     await waitFor(() => expect(listeOffeneMeldungen).toHaveBeenLastCalledWith(1, 'extern'));
   });
 
-  it('behält ab md Band und Segmentleiste', async () => {
+  // Eine Umschaltleiste je Ebene (Spec `bedien-umschalten`): „Ansicht“ bleibt die Leiste,
+  // „Richtung“ steht als Auswahlfeld daneben (LLH-1942).
+  it('behält ab md das Band und filtert die Richtung über ein Auswahlfeld', async () => {
     setzeViewportBreite(1024);
     renderPage();
     await screen.findByText('Florian Nord 1');
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="kennzahl-wert"]')).not.toBeNull(),
     );
-    expect(screen.getByRole('radiogroup', { name: 'Richtung' })).toBeInTheDocument();
+    expect(screen.getAllByRole('radiogroup')).toHaveLength(1);
+    expect(screen.getByRole('radiogroup', { name: 'Ansicht' })).toBeInTheDocument();
     expect(zeile()).toBeNull();
     expect(screen.queryByRole('button', { name: /^Filter/ })).not.toBeInTheDocument();
+
+    await waehle('Richtung', 'Extern');
+    await waitFor(() => expect(listeOffeneMeldungen).toHaveBeenLastCalledWith(1, 'extern'));
   });
 });
