@@ -99,7 +99,8 @@ function TextAngabe({
   darf: boolean;
   mehrzeilig?: boolean;
   maxLaenge?: number;
-  onSpeichern: (w: string | null) => Promise<unknown>;
+  /** `beimOeffnen`: der Wert beim Öffnen, Altwert des Feld-CAS (LLH-1945). */
+  onSpeichern: (w: string | null, beimOeffnen: string | null) => Promise<unknown>;
 }) {
   return (
     <InlineAngabe<string>
@@ -110,7 +111,7 @@ function TextAngabe({
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darf}
       mehrzeilig={mehrzeilig}
-      onSpeichern={(w) => onSpeichern(zuNull(w))}
+      onSpeichern={(w, { beimOeffnen }) => onSpeichern(zuNull(w), zuNull(beimOeffnen))}
       eingabe={({ feld, value, onChange }) =>
         mehrzeilig ? (
           <Input.TextArea
@@ -375,7 +376,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                     etikett="Rufname"
                     wert={stelle.rufname}
                     darf={darf}
-                    onSpeichern={(r) => h.setzeRufname(stelle.key, r, stelle.rufname)}
+                    onSpeichern={(r, beimOeffnen) => h.setzeRufname(stelle.key, r, beimOeffnen)}
                   />
                 )}
               </Datenfeld>

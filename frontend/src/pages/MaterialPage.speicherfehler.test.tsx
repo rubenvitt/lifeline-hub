@@ -222,7 +222,22 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
         name: 'Ort zu Wolldecke speichern',
       }),
     );
-    await waitFor(() => expect(gesendet).toEqual([{ einheit_id: 1 }, { einheit_id: 1 }]));
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        {
+          einheit_id: 1,
+          erwartet: {
+            ort: { einheit_id: null, einsatz_fahrzeug_id: null, uhs_id: null, br_id: null },
+          },
+        },
+        {
+          einheit_id: 1,
+          erwartet: {
+            ort: { einheit_id: null, einsatz_fahrzeug_id: null, uhs_id: null, br_id: null },
+          },
+        },
+      ]),
+    );
   });
 
   it('Menge ändern: der Grund steht im Dialog, kein Toast', async () => {

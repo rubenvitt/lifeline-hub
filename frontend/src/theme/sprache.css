@@ -102,6 +102,25 @@
   width: 35%;
 }
 
+/* Gerippe eines Modulwechsels (LLH-1838, Spec `seiten-zustaende`): die Balken stehen ab dem
+   ersten Bild an ihrem Platz, werden aber erst nach 120 ms sichtbar. Ein Modul, das schneller
+   gezeichnet ist, zeigt nur den neuen Kopf und flackert nicht. `visibility` statt `opacity`,
+   damit der Puls unberührt bleibt; `aria-busy` am Gerippe gilt sofort. */
+.lfh-skelett--verzoegert .lfh-skelett__balken {
+  animation:
+    lfh-skelett-ein 0s linear 120ms both,
+    lfh-puls 1.4s ease-in-out infinite;
+}
+
+@keyframes lfh-skelett-ein {
+  from {
+    visibility: hidden;
+  }
+  to {
+    visibility: visible;
+  }
+}
+
 @keyframes lfh-puls {
   0%,
   100% {

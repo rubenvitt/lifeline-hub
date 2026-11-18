@@ -15,7 +15,7 @@ use crate::material::{
     MaterialRuecknahmeAntwort, MaterialStatus, ADHOC_TEXT_MAX, BEMERKUNG_MAX,
 };
 use crate::routes::support::{
-    deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
+    deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max, trimme_tri,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -324,6 +324,40 @@ pub struct DispoPatchBody {
     pub bestandsnummer: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub traegerorganisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+    /// Änderung“): je Angabe der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<DispoErwartet>,
+}
+
+/// Altwerte des Postens, dreiwertig wie [`DispoPatchBody`]. Der Ort ist EINE Angabe und wird als
+/// Ganzes verglichen (alle vier Spalten, fehlend = leer): ein Wechsel nennt im Patch nur das neue
+/// Ziel, gesehen hat die Oberfläche den ganzen Ort. Menge, Ausgabe, Status und Art tragen keinen:
+/// sie gehen über Dialoge und Handlungen mit eigenem ETB-Eintrag, nicht über eine Einzelangabe.
+#[derive(Debug, Default, Deserialize)]
+pub struct DispoErwartet {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+    pub ort: Option<OrtErwartet>,
+    pub bezeichnung: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kategorie: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bestandsnummer: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub traegerorganisation: Option<Option<String>>,
+}
+
+/// Der Ort beim Öffnen: die vier Spalten des einen Orts (höchstens eine gesetzt).
+#[derive(Debug, Default, Deserialize)]
+pub struct OrtErwartet {
+    #[serde(default)]
+    pub einheit_id: Option<i64>,
+    #[serde(default)]
+    pub einsatz_fahrzeug_id: Option<i64>,
+    #[serde(default)]
+    pub uhs_id: Option<i64>,
+    #[serde(default)]
+    pub br_id: Option<i64>,
 }
 
 /// PATCH /api/einsaetze/{id}/material/{em_id} — Menge, Ausgabe, Status, Art, Bemerkung, der eine
@@ -394,6 +428,69 @@ pub async fn update(
     fn tri(w: &Option<Option<String>>) -> Option<Option<&str>> {
         w.as_ref().map(|o| o.as_deref())
     }
+
+    // Feld-CAS (LLH-1945): Altwert nur mit Änderung derselben Angabe (422), nach allen 400 und
+    // der Ortskombination; Formen wie der Patch (getrimmt, leer = ohne Angabe).
+    let erwartet = body.erwartet.unwrap_or_default();
+    crate::feld_cas::pruefe_felder(
+        &[
+            (
+                "bemerkung",
+                erwartet.bemerkung.is_some(),
+                bemerkung.is_some(),
+            ),
+            ("ort", erwartet.ort.is_some(), !ort_patch.is_empty()),
+            (
+                "bezeichnung",
+                erwartet.bezeichnung.is_some(),
+                bezeichnung.is_some(),
+            ),
+            (
+                "kategorie",
+                erwartet.kategorie.is_some(),
+                kategorie.is_some(),
+            ),
+            (
+                "bestandsnummer",
+                erwartet.bestandsnummer.is_some(),
+                bestandsnummer.is_some(),
+            ),
+            (
+                "traegerorganisation",
+                erwartet.traegerorganisation.is_some(),
+                traeger.is_some(),
+            ),
+        ],
+        &[],
+    )?;
+    let erwartet_bemerkung = trimme_tri(erwartet.bemerkung);
+    let erwartet_bezeichnung = erwartet.bezeichnung.as_deref().map(str::trim);
+    let erwartet_kategorie = trimme_tri(erwartet.kategorie);
+    let erwartet_bestandsnummer = trimme_tri(erwartet.bestandsnummer);
+    let erwartet_traeger = trimme_tri(erwartet.traegerorganisation);
+    let altwerte = {
+        use crate::feld_cas::ExpectedValue::{Integer, Text};
+        fn text(v: &Option<Option<String>>) -> Option<crate::feld_cas::ExpectedValue<'_>> {
+            v.as_ref().map(|v| Text(v.as_deref()))
+        }
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        w.push("bemerkung", text(&erwartet_bemerkung));
+        if let Some(o) = &erwartet.ort {
+            w.push("einheit_id", Some(Integer(o.einheit_id)));
+            w.push("einsatz_fahrzeug_id", Some(Integer(o.einsatz_fahrzeug_id)));
+            w.push("uhs_id", Some(Integer(o.uhs_id)));
+            w.push("br_id", Some(Integer(o.br_id)));
+        }
+        w.push(
+            "snap_bezeichnung",
+            erwartet_bezeichnung.map(|n| Text(Some(n))),
+        );
+        w.push("snap_kategorie", text(&erwartet_kategorie));
+        w.push("snap_bestandsnummer", text(&erwartet_bestandsnummer));
+        w.push("snap_traegerorganisation", text(&erwartet_traeger));
+        w
+    };
+
     let patch = MaterialPatch {
         menge: body.menge,
         ausgegeben: body.ausgegeben,
@@ -421,7 +518,7 @@ pub async fn update(
                 ort::require_ort_frei_tx(conn, einsatz_id, em_id, ziel).await?;
             }
         }
-        disposition_repo::update_tx(conn, einsatz_id, em_id, patch).await?;
+        disposition_repo::update_tx(conn, einsatz_id, em_id, patch, &altwerte).await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let mut texte = Vec::new();
         if vorher.menge != nachher.menge {

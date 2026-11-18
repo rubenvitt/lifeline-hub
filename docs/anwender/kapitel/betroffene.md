@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs, frontend/src/personen/VersorgtVon.tsx, frontend/src/anzeige/Ortsfeld.tsx, src/person/repo.rs, frontend/src/components/FilterKnopf.tsx]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/personen/VerbleibText.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs, frontend/src/personen/AnlassWahl.tsx, frontend/src/personen/LeichterFallModal.tsx, frontend/src/personen/FlaechenWahl.tsx, src/routes/person_anlass.rs, src/person/anlass_repo.rs, frontend/src/personen/VersorgtVon.tsx, frontend/src/anzeige/Ortsfeld.tsx, src/person/repo.rs, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FilterKnopf.tsx]
 ---
 
 ## Überblick
@@ -239,7 +239,9 @@ sich auch mit der Tastatur erreichen: die Pfeiltasten wandern von Stelle zu Stel
    „Speichern“ wählen.
 
 Ein Klick auf einen eingetragenen Wert öffnet ihn wieder zum Bearbeiten. Nur „kontaminiert“ trägt
-eine Marke, in Kopf und Liste.
+eine Marke, in Kopf und Liste. Hat jemand anderes PAT-Nummer, Kontamination oder „Zustand /
+Verdacht“ seit dem Öffnen geändert, fragt die App wie bei den Personendaten „Zwischenzeitlich
+geändert“.
 
 ### Die versorgende Einheit eintragen
 
@@ -456,6 +458,11 @@ neu eintreffende Personen nicht in die Liste, und die Reihenfolge bleibt; ein Ba
 nennt sie („1 neuer Eintrag — anzeigen“). So springt keine Zeile unter dem Finger weg. Wird eine
 Sichtung aus der Liste abgelehnt, steht der Grund an der Zeile; ist die Zeile gerade nicht zu
 sehen, über der Liste.
+
+„Zustand / Verdacht“ in der Liste schließt nach der Eingabe sofort und zeigt den getippten Wert.
+Hat jemand anderes den Zustand seit dem Öffnen der Zelle geändert, fragt die App
+„Zwischenzeitlich geändert“: „Meine Änderung übernehmen“ speichert die eigene Eingabe;
+„Verwerfen und neu laden“ oder Escape lassen sie verfallen, die Zelle zeigt den neuen Stand.
 
 ### Filter und Sortierung bleiben stehen
 

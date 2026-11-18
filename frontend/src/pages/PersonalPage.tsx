@@ -1,6 +1,7 @@
 import { dauer } from '../anzeige/dauer';
 import { Breadcrumb, Button, Space, Tag, theme } from 'antd';
 import { BemerkungZelle } from '../components/BemerkungZelle';
+import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -230,12 +231,25 @@ export default function PersonalPage() {
     onFehler: (e, v) => zeilen.melde(v.epId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
+  // Der Grund einer Ablehnung kommt aus `saveBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
-    mutationFn: (v: { epId: number; bemerkung: string }) =>
-      updateDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
+    mutationFn: (v: { epId: number; bemerkung: string; erwartet?: string | null }) =>
+      updateDisposition(
+        einsatzId,
+        v.epId,
+        { bemerkung: v.bemerkung },
+        v.erwartet === undefined ? undefined : { bemerkung: v.erwartet },
+      ),
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
-    onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),
+  });
+  const saveBemerkung = useBemerkungMitAltwert({
+    queryKey: einsatzKeys.personal(einsatzId),
+    laden: () => listeEinsatzPersonal(einsatzId),
+    speichern: (epId, bemerkung, erwartet) =>
+      bemerkungMutation.mutateAsync({ epId, bemerkung, erwartet }),
+    melde: (epId, e) => zeilen.melde(epId, e, 'Bemerkung nicht gespeichert'),
   });
   // Erneut disponieren (LLH-1079) bleibt im Block „Entlassen“ unter der Liste; die Ablehnung steht
   // an ihrem Eintrag.
@@ -426,7 +440,13 @@ export default function PersonalPage() {
           funktion={ep.funktion}
           vorschlaege={vorschlaege}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(einsatzfunktion) => schreiben.angabe(ep.id, { einsatzfunktion })}
+          onSpeichern={(einsatzfunktion, { beimOeffnen }) =>
+            schreiben.angabe(
+              ep.id,
+              { einsatzfunktion },
+              { etikett: 'Funktion', erwartet: { einsatzfunktion: beimOeffnen } },
+            )
+          }
         />
       ),
     },
@@ -523,7 +543,13 @@ export default function PersonalPage() {
           kennung={ep.name}
           wert={ep.staerke_position ?? null}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(staerke_position) => schreiben.angabe(ep.id, { staerke_position })}
+          onSpeichern={(staerke_position, { beimOeffnen }) =>
+            schreiben.angabe(
+              ep.id,
+              { staerke_position },
+              { etikett: 'Position', erwartet: { staerke_position: beimOeffnen } },
+            )
+          }
         />
       ),
     },
@@ -587,7 +613,7 @@ export default function PersonalPage() {
           darfSchreiben={darfSchreiben}
           max={PERSONAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val) => bemerkungMutation.mutateAsync({ epId: ep.id, bemerkung: val })}
+          onSpeichern={(val, { beimOeffnen }) => saveBemerkung(ep.id, val, beimOeffnen)}
         />
       ),
     },
