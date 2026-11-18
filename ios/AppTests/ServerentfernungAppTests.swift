@@ -9,16 +9,24 @@ import XCTest
 /// Webview vorher schließt.
 @MainActor
 final class ServerentfernungAppTests: XCTestCase {
+    /// WebKit löscht einen Speicher nur, wenn ihn kein `WKWebsiteDataStore` mehr hält („Data store
+    /// is in use“); in der App ist das nach `closeWebView` so, hier nach dem Ende des Blocks.
     func testDerDatenspeicherIstNachDemLoeschenWeg() async throws {
         let id = UUID()
-        let speicher = WKWebsiteDataStore(forIdentifier: id)
-        let cookie = try XCTUnwrap(
-            HTTPCookie(properties: [
-                .domain: "elw.local", .path: "/", .name: "sitzung", .value: "1", .secure: "TRUE",
-            ]))
-        await speicher.httpCookieStore.setCookie(cookie)
+        weak var gehalten: WKWebsiteDataStore?
+        do {
+            let speicher = WKWebsiteDataStore(forIdentifier: id)
+            gehalten = speicher
+            let cookie = try XCTUnwrap(
+                HTTPCookie(properties: [
+                    .domain: "elw.local", .path: "/", .name: "sitzung", .value: "1", .secure: "TRUE",
+                ]))
+            await speicher.httpCookieStore.setCookie(cookie)
+        }
         let vorher = await Datenspeicher.fetchIdentifiers()
         XCTAssertTrue(vorher.contains(id))
+        for _ in 0..<100 where gehalten != nil { try await Task.sleep(for: .milliseconds(20)) }
+        XCTAssertNil(gehalten, "der Speicher wird noch gehalten")
         try await Datenspeicher.remove(id)
         let nachher = await Datenspeicher.fetchIdentifiers()
         XCTAssertFalse(nachher.contains(id))
@@ -39,6 +47,7 @@ final class ServerentfernungAppTests: XCTestCase {
 
     func testDerWebviewDesSpeichersWirdVorherGeschlossen() throws {
         let modell = AppModell(argumente: ["App", "-LifelineTestzustand", "web"], info: [:])
+        modell.start()
         let speicher = try XCTUnwrap(modell.webView?.configuration.websiteDataStore.identifier)
         modell.closeWebView(datenspeicher: UUID())
         XCTAssertNotNil(modell.webView)

@@ -71,17 +71,23 @@ final class AppModell {
             guard let self, webView === self.webView else { return }
             self.send(event)
         }
-        // Erst jetzt: der Testzustand `web` braucht Brücke und Begleiter.
         if let testzustand { zeige(testzustand) }
     }
 
     // MARK: Ablauf
 
-    /// Einmal beim ersten Erscheinen der Oberfläche.
+    /// Einmal beim ersten Erscheinen der Oberfläche. Erst hier entsteht ein Webview: das Modell
+    /// entsteht mit der App, bevor UIKit läuft, und ein Webview aus dieser Zeit bringt seine
+    /// Gesten nie in die Gestenumgebung des Fensters (die erste Berührung beendet die App mit
+    /// „Invalid parameter not satisfying: targetNode“).
     func start() {
-        guard !gestartet, testzustand == nil else { return }
+        guard !gestartet else { return }
         gestartet = true
-        send(.start(aktiv: liste.aktiv))
+        if let testzustand {
+            zeigeBeispielseite(testzustand)
+        } else {
+            send(.start(aktiv: liste.aktiv))
+        }
     }
 
     func send(_ event: Ablauf.Event) {
@@ -326,17 +332,23 @@ final class AppModell {
         case .zuNeu:
             seite = .status(elw, .nichtVertraeglich(.zuNeu, serverVersion: "2.0.0"))
         case .web, .fremdeSeite:
-            let webView = Webviewfabrik.make(
-                fuer: elw, skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
-                empfang: empfang, navigation: navigation)
-            let fremd = testzustand == .fremdeSeite
-            webView.loadHTMLString(
-                Testzustand.beispielseite,
-                baseURL: fremd ? URL(string: "https://idp.example/") : elw.adresse.url)
-            self.webView = webView
+            // Den Webview baut `start()` (`zeigeBeispielseite`).
             seite = .web(elw, vertrag: 1)
-            zeigtZurOberflaeche = fremd
+            zeigtZurOberflaeche = testzustand == .fremdeSeite
         }
+    }
+
+    /// Die Beispielseite der Testzustände `web` und `fremde-seite`, mit Brücke und Begleiter.
+    private func zeigeBeispielseite(_ testzustand: Testzustand) {
+        guard testzustand == .web || testzustand == .fremdeSeite, case .web(let elw, _) = seite
+        else { return }
+        let webView = Webviewfabrik.make(
+            fuer: elw, skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
+            empfang: empfang, navigation: navigation)
+        webView.loadHTMLString(
+            Testzustand.beispielseite,
+            baseURL: testzustand == .fremdeSeite ? URL(string: "https://idp.example/") : elw.adresse.url)
+        self.webView = webView
     }
 }
 
