@@ -193,15 +193,52 @@ describe('webPush: Inhalt der Meldung nur auf Wunsch (LLH-1369)', () => {
 });
 
 describe('webPush: Abgleich nur bei Bedarf (LLH-1839)', () => {
-  it('meldet beim Neuladen nicht erneut an, wenn der Server das Abo mit derselben Wahl hat', async () => {
-    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
+  /** Ein Browser, dessen Abo `endpoint` schon einmal am Server angemeldet wurde. */
+  async function schonAngemeldet(endpoint = 'https://fcm.googleapis.com/alt') {
+    const b = browser({ vorhanden: abo(endpoint) });
     b.notification.permission = 'granted';
+    serverMitPush();
+    localStorage.setItem(pushMerker(7), '1');
+    await pushAbgleichen(7);
+    return b;
+  }
+
+  it('meldet beim Neuladen nicht erneut an, wenn der Server das Abo mit derselben Wahl hat', async () => {
+    await schonAngemeldet();
     const s = serverMitPush(true, true, false, ['lagebericht', 'meldung']);
     localStorage.setItem(pushMerker(7), MERKER_MIT_INHALT);
     setzeStumm('meldung', true);
     setzeStumm('lagebericht', true);
     await pushAbgleichen(7, { nurBeiBedarf: true });
     expect(s.anmeldungen).toEqual([]);
+  });
+
+  it('meldet an, wenn der Browser inzwischen einen anderen Endpunkt hat (Push-Dienst rotiert)', async () => {
+    const b = await schonAngemeldet('https://fcm.googleapis.com/alt');
+    b.pushManager.getSubscription.mockResolvedValue(abo('https://fcm.googleapis.com/rotiert'));
+    const s = serverMitPush(true, false);
+    await pushAbgleichen(7, { nurBeiBedarf: true });
+    expect(s.anmeldungen).toEqual([
+      expect.objectContaining({ endpoint: 'https://fcm.googleapis.com/rotiert' }),
+    ]);
+  });
+
+  it('meldet an, wenn der Browser kein Abo mehr hat (Erlaubnis zurückgesetzt)', async () => {
+    const b = await schonAngemeldet();
+    b.pushManager.getSubscription.mockResolvedValue(null);
+    const s = serverMitPush(true, false);
+    await pushAbgleichen(7, { nurBeiBedarf: true });
+    expect(s.anmeldungen).toEqual([
+      expect.objectContaining({ endpoint: 'https://fcm.googleapis.com/neu' }),
+    ]);
+  });
+
+  it('meldet an, wenn das Abo des Browsers zu einem anderen Schlüssel gehört', async () => {
+    const b = await schonAngemeldet();
+    b.pushManager.getSubscription.mockResolvedValue(abo('https://fcm.googleapis.com/alt', [9, 9]));
+    const s = serverMitPush(true, false);
+    await pushAbgleichen(7, { nurBeiBedarf: true });
+    expect(s.anmeldungen).toHaveLength(1);
   });
 
   it('meldet an, wenn diese Sitzung am Server kein Abo hat', async () => {
@@ -214,12 +251,19 @@ describe('webPush: Abgleich nur bei Bedarf (LLH-1839)', () => {
   });
 
   it('meldet an, wenn die Wahl „Mit Inhalt“ am Server abweicht', async () => {
-    const b = browser({ vorhanden: abo('https://fcm.googleapis.com/alt') });
-    b.notification.permission = 'granted';
+    await schonAngemeldet();
     const s = serverMitPush(true, false);
     localStorage.setItem(pushMerker(7), MERKER_MIT_INHALT);
     await pushAbgleichen(7, { nurBeiBedarf: true });
     expect(s.anmeldungen).toEqual([expect.objectContaining({ inhalt: true })]);
+  });
+
+  it('meldet an, wenn die stummen Arten am Server abweichen', async () => {
+    await schonAngemeldet();
+    const s = serverMitPush(true, false, false, ['meldung']);
+    localStorage.setItem(pushMerker(7), '1');
+    await pushAbgleichen(7, { nurBeiBedarf: true });
+    expect(s.anmeldungen).toEqual([expect.objectContaining({ stumm: [] })]);
   });
 
   it('ohne `nurBeiBedarf` (nach dem Umschalten) meldet er auch bei gleichem Stand an', async () => {
