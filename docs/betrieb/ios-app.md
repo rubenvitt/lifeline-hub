@@ -62,6 +62,14 @@ Speicher nach einer Rückfrage; noch nicht übertragene Einträge dieses Servers
 verloren. Lässt sich der Speicher nicht löschen, bleibt der Server in der Liste, und die App
 meldet den Fehler.
 
+**Zur Oberfläche:** Fremde Seiten dürfen im Webview laufen, weil die Anmeldung beim
+Identitätsanbieter dort stattfindet. Bleibt der Webview auf einer fremden Seite ohne Rücklink
+stehen, führt „Zur Oberfläche“ oben in der Serverliste zurück: es lädt die Startseite des aktiven
+Servers neu, ebenso ein Tipp auf den aktiven Server. Kehrt die App auf einer fremden Seite in den
+Vordergrund zurück und läuft keine „Im Browser anmelden“-Sitzung, bleibt die Seite stehen, und
+oben erscheint der Hinweis „Fremde Seite“ mit „Zur Oberfläche“; er verschwindet, sobald wieder
+eine Seite des Servers geladen ist.
+
 **Einstellungen** (aus der Serverliste): Schalter „Haptik“, Vorgabe an. Spürbar ist sie nur auf
 dem iPhone.
 
@@ -72,12 +80,18 @@ dem iPhone.
 | Server nicht erreichbar | der Server antwortet nicht (aus, falsche Adresse, kein Netz) | die App prüft alle 5 Sekunden weiter und lädt die Oberfläche, sobald er antwortet; „Erneut prüfen“, „Serverliste“ |
 | Zertifikat nicht vertrauenswürdig | das Gerät vertraut dem Zertifikat des Servers nicht | Anleitung auf der Seite, siehe „CA-Profil für das Einsatz-LAN“ |
 | App aktualisieren | der Server hat einen neueren Vertrag, als die App kennt | neuen Build über TestFlight installieren |
-| Server ist zu alt für diese App | der Server kennt `GET /api/shell` nicht oder hat einen älteren Vertrag | Server aktualisieren; die Seite nennt seine Version |
+| Server ist zu alt für diese App | der Server antwortet auf `GET /api/shell` mit 404 oder mit JSON ohne lesbaren Vertrag, oder er hat einen älteren Vertrag | Server aktualisieren; die Seite nennt seine Version |
 
 Texte: `ios/LifelineKern/Sources/LifelineKern/Statustext.swift`. Ohne Netz gilt der zuletzt
 bestätigte Vertrag eines Servers. Ist die Oberfläche schon geladen und das Netz fällt weg, bleibt
 sie stehen und arbeitet offline mit Lagebild und Warteschlange weiter; nur ein unverträglicher
-Vertrag ersetzt sie durch die Status-Seite.
+Vertrag oder ein Zertifikatsfehler ersetzt sie durch die Status-Seite.
+
+**Captive Portal und Auth-Proxy:** Die Prüfung folgt Weiterleitungen nur auf derselben Origin.
+Leitet ein Hotel-WLAN oder ein vorgeschalteter Proxy auf eine eigene Seite um oder antwortet mit
+HTML statt JSON, gilt das wie „ohne Verbindung“: der zuletzt bestätigte Vertrag bleibt, eine
+geladene Oberfläche bleibt stehen, sonst erscheint „Server nicht erreichbar“. Erst nach der
+Anmeldung im Portal (in Safari) erreicht die App den Server wieder.
 
 ## CA-Profil für das Einsatz-LAN
 
@@ -142,7 +156,8 @@ im Browser ein, nicht in der App.
   Anmeldedienst, deren Adresse.
 - **Meldungen und Zahl am App-Symbol:** Bei laufender App zeigt sie eine Benachrichtigung als
   Mitteilung des Systems und setzt die Zahl der ungelesenen Eingänge am Symbol. iOS fragt beim
-  ersten Mal nach der Erlaubnis; ändern unter Einstellungen → Mitteilungen → „Lifeline“.
+  ersten Mal nach der Erlaubnis, auch wenn zuerst eine Zahl kommt (nur das Entfernen der Zahl
+  fragt nie); ändern unter Einstellungen → Mitteilungen → „Lifeline“.
 - **Haptik:** beim Speichern einer Erfassung, bei einem eingehenden Alarm und beim Wechsel eines
   Segments, nur auf dem iPhone und nur mit eingeschaltetem Schalter.
 
@@ -151,7 +166,9 @@ im Browser ein, nicht in der App.
 Die App hat keine eigene Datenbank. Was sie offline vorhält, liegt im Datenspeicher des
 Webviews, je Server getrennt: Lagebild, Warteschlange und ETB-Entwürfe, wie im Browser. Die
 Serverliste liegt als `server.json` in Application Support der App, der Schalter „Haptik“ in den
-Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`). Vorgaben für
+Einstellungen der App (`ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift`). Das
+Privacy-Manifest (`ios/App/PrivacyInfo.xcprivacy`) erklärt dafür UserDefaults mit Grund CA92.1,
+kein Tracking und keine erhobenen Daten. Vorgaben für
 Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 
 ## Grenzen (offen)
