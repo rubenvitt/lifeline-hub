@@ -20,9 +20,10 @@ Systemadmin und nicht lesbar (Zunder LLH-1835).
   Empfänger, Status und Zeiten), weil es bisher nur das Einzelblatt gibt.
 - Neuer Download **„Anhänge und Tabellen (ZIP)“** auf derselben Seite:
   `GET /api/einsaetze/{id}/einsatzakte/anlagen.zip` mit allen Anhängen des Einsatzes als
-  Originaldateien, geordnet nach Modul und Datensatz, und den vorhandenen Tabellen als CSV
-  (Betroffene). Der Server schreibt den Abruf der Betroffenendaten ins Zugriffsprotokoll, bevor
-  Daten ihn verlassen.
+  eigene Dateien (in der bereinigten Fassung des Einzel-Downloads), geordnet nach Modul und
+  Datensatz, den vorhandenen Tabellen als CSV (Betroffene, Tiere, Schäden) und einem
+  Inhaltsverzeichnis. Der Server schreibt den Abruf der Betroffenendaten und ihrer Anhänge ins
+  Zugriffsprotokoll, bevor Daten ihn verlassen.
 - **Rechte wie beim Einsatzbericht:** Akte und ZIP gibt es nur, wenn die Person jedes enthaltene
   Modul lesen darf (vollständig oder gar nicht); ein im Einsatz ausgeblendetes Modul steht als
   „nicht genutzt“ in der Akte. Die Akte steht jederzeit im Lesefenster des Einsatzes bereit, ein
