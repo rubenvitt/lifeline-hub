@@ -96,14 +96,18 @@ export default function EtbFilterleiste({ onChange, startWerte, vorn, mitte }: P
           {vorn}
         </div>
       )}
-      <div data-lfh="etb-filter-weitere" style={{ ...gruppe, flexWrap: 'wrap', flex: '1 1 420px' }}>
+      {/* Grundbreite und Mindestbreite der Suche knapp: bei 1180 px füllten Typleiste (622 px)
+          und diese Gruppe (438 px) die Zeile auf den Pixel, ein klassischer Scrollbalken (15 px,
+          Windows, CI) brach die Leiste um, und Seitenkopf, Leiste und Spaltenkopf klebten nicht
+          mehr (`e2e/rahmen-stehen-bleiben.spec.ts`, 1180 × 600). Mit Platz wächst die Suche. */}
+      <div data-lfh="etb-filter-weitere" style={{ ...gruppe, flexWrap: 'wrap', flex: '1 1 360px' }}>
         {mitte}
         <Input.Search
           placeholder="Volltextsuche"
           aria-label="Volltextsuche"
           allowClear
           defaultValue={startWerte?.q}
-          style={{ flex: '1 1 180px', minWidth: 180 }}
+          style={{ flex: '1 1 140px', minWidth: 140 }}
           onChange={(e) => aktualisiere({ q: e.target.value })}
         />
       </div>
