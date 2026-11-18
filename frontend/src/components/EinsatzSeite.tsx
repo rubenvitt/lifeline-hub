@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
-import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
+import { dichten, flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
 // Seiten unter diesem Primitiv benutzen die `.lfh-*`-Klassen aus `sprache.css`. Alle Selektoren
 // dort sind klassengebunden, sie färben nichts ein, was sie nicht anfassen.
 import '../theme/sprache.css';
@@ -272,15 +272,40 @@ export interface SeitenNebenwege {
 }
 
 /**
- * Die Nebenwege im Kopf (LFH-963): ab `md` je Eintrag ein sekundärer Knopf, unter `md` EIN
- * Auslöser „Weitere“ — Regel `frontend/AGENTS.md`, Aktionen. Der Dreipunkt ist derselbe Baustein
- * wie im ETB-Kopf (`MenueAusloeser`), damit der Weg auf jeder Seite gleich aussieht. Exportiert für
- * Seiten mit eigenem Kopf (Lagekarte, LLH-1051).
+ * Steuerhöhe der Stufe `komfortabel`; ab ihr (48 / 72) bündelt der Kopf seine Nebenwege. Als
+ * Untergrenze statt „über `kompakt`“: ohne Thema setzt antd 32 px (Tests, fremde Hüllen), und das
+ * ist keine Touch-Stufe.
+ */
+const BUENDELN_AB_STEUERHOEHE = dichten.komfortabel.zeilenhoehe;
+
+/**
+ * Stehen die Nebenwege hinter „Weitere“? Unter `md` immer (LFH-963), ab `md` in den Stufen 48 und
+ * 72 (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D1): dort brachen bis zu vier Knöpfe den
+ * Kopf in eine zweite Zeile. Entschieden am Token der Stufe, nicht an `useDichte`, damit auch die
+ * Karte im Design System dem Thema der Karte folgt. Rein und exportiert.
+ */
+export function nebenwegeImMenue(istSchmal: boolean, controlHeight: number): boolean {
+  return istSchmal || controlHeight >= BUENDELN_AB_STEUERHOEHE;
+}
+
+/** Die Weiche für Kopf und Seiten mit eigenem Kopf (Lagekarte): Breite und Stufe zusammen. */
+export function useNebenwegeImMenue(): boolean {
+  const { istSchmal } = useViewport();
+  const { token } = theme.useToken();
+  return nebenwegeImMenue(istSchmal, token.controlHeight);
+}
+
+/**
+ * Die Nebenwege im Kopf (LFH-963, LLH-1786): in `kompakt` ab `md` je Eintrag ein sekundärer Knopf,
+ * unter `md` und in den Stufen 48 / 72 EIN Auslöser „Weitere“ ({@link nebenwegeImMenue}) — Regel
+ * `frontend/AGENTS.md`, Aktionen. Der Dreipunkt ist derselbe Baustein wie im ETB-Kopf
+ * (`MenueAusloeser`), damit der Weg auf jeder Seite gleich aussieht. Exportiert für Seiten mit
+ * eigenem Kopf (Lagekarte, LLH-1051).
  */
 export function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
-  const { istSchmal } = useViewport();
+  const imMenue = useNebenwegeImMenue();
   if (eintraege.length === 0) return null;
-  if (istSchmal) {
+  if (imMenue) {
     return (
       <MenueAusloeser
         // Ein laufender Nebenweg sperrt nur seinen Eintrag, nicht den Auslöser: ein Knopf im
@@ -641,8 +666,9 @@ export default function EinsatzSeite({
           >
             {/* Unter `md` steht der Auslöser „Weitere“ VORN (LFH-963): hinten bräche er bei 390 px in
                 eine eigene Zeile und kostete die erste Personenzeile ihren Platz; vorn teilt er die
-                Zeile mit der Segmentleiste. Ab `md` folgen die Knöpfe den Aktionen. Umgestellt wird
-                im Baum, nicht per CSS-`order`: Lese- und Tabfolge bleiben die sichtbare Folge. */}
+                Zeile mit der Segmentleiste. Ab `md` folgen Knöpfe bzw. Auslöser (Stufen 48 / 72)
+                den Aktionen. Umgestellt wird im Baum, nicht per CSS-`order`: Lese- und Tabfolge
+                bleiben die sichtbare Folge. */}
             {weitere && istSchmal && <NebenwegeImKopf {...weitere} />}
             {aktionen}
             {weitere && !istSchmal && <NebenwegeImKopf {...weitere} />}

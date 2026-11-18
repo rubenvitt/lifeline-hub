@@ -5,14 +5,14 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 0. Ausgangswert
 
-- [ ] 0.1 Wegwerf-Messung auf dem Stand vor der Änderung: Oberkante der ersten Datenzeile auf Betroffene, Meldebild, Fahrzeuge, Personal, Einheiten (1440 × 900 `kompakt`, 1180 × 820 `komfortabel`/`handschuh`) und Fahrzeuge, Betroffene, Betreuung (390 × 844); Werte als Kommentar an LLH-1786 (Nachweis: Kommentar)
+- [x] 0.1 Wegwerf-Messung auf dem Stand vor der Änderung: Oberkante der ersten Datenzeile auf Betroffene, Meldebild, Fahrzeuge, Personal, Einheiten (1440 × 900 `kompakt`, 1180 × 820 `komfortabel`/`handschuh`) und Fahrzeuge, Betroffene, Betreuung (390 × 844); Werte als Kommentar an LLH-1786 (Nachweis: Kommentar)
 
 ## 1. Nebenwege nach Breite und Stufe (D1)
 
-- [ ] 1.1 `components/EinsatzSeite.tsx`: `NebenwegeImKopf` bündelt bei `istSchmal` oder `controlHeight` > `kompakt`; ab `md` steht der Auslöser hinter den Aktionen. Tests in `components/EinsatzSeite.weitere.test.tsx` „komfortabel ab md: ein Auslöser hinter den Aktionen“, „handschuh ab md: kein Nebenweg als Knopf“, „kompakt ab md: Knöpfe wie bisher“ rot→grün
-- [ ] 1.2 Seitentests nachziehen, die Nebenwege als Knopf in 48/72 erwarten (`pages/PersonenPage.test.tsx` u. a.); alle grün
-- [ ] 1.3 e2e-Helfer „Nebenweg wählen“ (Knopf oder Menü) und betroffene Specs umstellen: `betroffene-handy`, `modul-listen-druck`, `druck-fluss`, `gate1-ueberlauf`, `gate3-trefflaeche`, `trefflaeche-pruefflaechen`, Bildlauf `e2e/doku-bilder/*`; einzeln grün
-- [ ] 1.4 `frontend/AGENTS.md`, „Nebenwege im Kopf“: Regel auf Breite und Stufe; Nachweis Prettier grün
+- [x] 1.1 `components/EinsatzSeite.tsx`: `NebenwegeImKopf` bündelt bei `istSchmal` oder `controlHeight` > `kompakt`; ab `md` steht der Auslöser hinter den Aktionen. Tests in `components/EinsatzSeite.weitere.test.tsx` „komfortabel ab md: ein Auslöser hinter den Aktionen“, „handschuh ab md: kein Nebenweg als Knopf“, „kompakt ab md: Knöpfe wie bisher“ rot→grün
+- [x] 1.2 Seitentests nachziehen, die Nebenwege als Knopf in 48/72 erwarten (`pages/PersonenPage.test.tsx` u. a.); alle grün
+- [x] 1.3 e2e-Helfer „Nebenweg wählen“ (Knopf oder Menü) und betroffene Specs umstellen: `betroffene-handy`, `modul-listen-druck`, `druck-fluss`, `gate1-ueberlauf`, `gate3-trefflaeche`, `trefflaeche-pruefflaechen`, Bildlauf `e2e/doku-bilder/*`; einzeln grün
+- [x] 1.4 `frontend/AGENTS.md`, „Nebenwege im Kopf“: Regel auf Breite und Stufe; Nachweis Prettier grün
 
 ## 2. Stärke im Seitenkopf (D2)
 
