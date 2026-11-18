@@ -64,16 +64,19 @@ describe('AppAnmeldungPage (LFH-818)', () => {
     );
     setup(`/app-anmeldung?challenge=${CHALLENGE}`);
     expect(
-      await screen.findByRole('heading', { name: 'In der Mac-App anmelden als Gerda Maier' }),
+      await screen.findByRole('heading', { name: 'In der Lifeline-App anmelden als Gerda Maier' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'In der App anmelden' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mit anderem Konto' })).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Bestätige nur, wenn du gerade in der Mac-App auf „Im Browser anmelden“ geklickt hast.',
+        'Bestätige nur, wenn du gerade in der Lifeline-App auf „Im Browser anmelden“ gewählt hast.',
       ),
     ).toBeInTheDocument();
     expect(ausgestellt).not.toHaveBeenCalled();
+    // Plattformneutral (t39ltxxi): die Seite dient Mac- und iOS-App.
+    expect(screen.getByText('Anmeldung für die Lifeline-App')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Mac|iOS/);
   });
 
   it('fordert bei einem schnellen Doppelklick nur einen Code an', async () => {
@@ -111,7 +114,7 @@ describe('AppAnmeldungPage (LFH-818)', () => {
     );
     expect(body).toEqual({ challenge: CHALLENGE });
     expect(
-      await screen.findByText('An die Mac-App übergeben. Dieses Fenster kann zu.'),
+      await screen.findByText('An die Lifeline-App übergeben. Dieses Fenster kann zu.'),
     ).toBeInTheDocument();
     // Der Code steht nie auf der Seite.
     expect(document.body.textContent).not.toContain(CODE);
@@ -147,7 +150,7 @@ describe('AppAnmeldungPage (LFH-818)', () => {
       const { unmount } = renderMitProviders(<AppAnmeldungPage navigiere={vi.fn()} />, { route });
       expect(
         await screen.findByText(
-          'Dieser Link ist unvollständig. Starte die Anmeldung in der Mac-App erneut.',
+          'Dieser Link ist unvollständig. Starte die Anmeldung in der Lifeline-App erneut.',
         ),
       ).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'In der App anmelden' })).toBeNull();

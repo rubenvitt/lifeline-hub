@@ -393,7 +393,7 @@ export const appRouten = createRoutesFromElements(
           <Route path="*" element={<GeraetStart />} />
         </Route>
       </Route>
-      {/* Bestätigung im Systembrowser für die Mac-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
+      {/* Bestätigung im Systembrowser für die Lifeline-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
       <Route path="/app-anmeldung" element={<AppAnmeldungPage />} />
       <Route element={<BetriebsLayout />}>
         {/* Ebene 1 — globale Shell */}
