@@ -70,6 +70,7 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 - [ ] 8.9 Links, `target=_blank`/`window.open`, Downloads über `WKDownload` (auch `blob:`) mit Teilen-Blatt, Drucken über `UIPrintInteractionController`; Tests gegen die Linkregeln
 - [ ] 8.10 Natives Gefühl: Safe Area, kein Nachfedern, kein Pull-to-Refresh, keine Lupe und kein Textmenü außerhalb von Eingaben; Simulator-Bild und UI-Test
 - [ ] 8.11 Entfernen eines Servers: Rückfrage, Webview schließen, Datenspeicher löschen, Fehler melden; Test
+- [ ] 8.13 JS-Dialoge der Seite (`alert`, `confirm`, `prompt`) als native Dialoge über `WKUIDelegate` (sonst liefert `confirm` still `false`, etwa bei Feldkonflikt, Kartenkontext, Blockmenü, Tier löschen); App-Test und Bild im Artefakt
 - [x] 8.12 `docs/betrieb/ios-app.md` (Installation über TestFlight, CA-Profil für das Einsatz-LAN, mkcert statt Rückfall-Zertifikat, Grenzen: keine Meldung im Hintergrund, kein Passkey im Webview, kein Start ohne Server) und `docs/betrieb/endgeraete.md` verweisen; Prettier grün
 
 ## 9. Auslieferung
@@ -79,7 +80,7 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## 10. Übergaben an Ruben und Abnahme
 
-- [ ] 10.1 Ruben: Bundle-ID registrieren, App in App Store Connect anlegen, API-Schlüssel mit Rolle App Manager als Secrets (`APP_STORE_CONNECT_*`) hinterlegen; Aufgabe bis dahin `blocked`
+- [ ] 10.1 Ruben: Bundle-ID registrieren, App in App Store Connect anlegen, API-Schlüssel (Rolle Admin, falls die Cloud-Signierung mit App Manager scheitert, siehe docs/betrieb/ios-app.md) als Secrets (`APP_STORE_CONNECT_*`) hinterlegen; Aufgabe bis dahin `blocked`
 - [ ] 10.2 Handstart von `ios.yml` auf einem Beta-Stand lädt einen Build zu TestFlight; Link zum grünen Lauf im Kommentar
 - [ ] 10.3 Ruben prüft auf iPhone und iPad: Onboarding mit `elw.local` (CA-Profil), zwei Server mit getrennten Sitzungen, Anmeldung im Browser mit Passkey, Haptik beim ETB-Eintrag (iPhone), Alarm mit Meldung bei offener App, CSV-Export, Drucken; Ergebnis im Kommentar
 
