@@ -286,6 +286,21 @@ describe('statusbandKurzform', () => {
       }),
     ).toBe('3 Einheiten · 1 Kraft · 2 ohne Rückmeldung');
   });
+  it('erfindet keine Null, solange ein Paneel lädt, gesperrt oder gescheitert ist', () => {
+    expect(
+      statusbandKurzform(
+        { einheiten: [], personal: [], rueckmeldung: null },
+        { einheiten: 'laden', personal: 'daten' },
+      ),
+    ).toBe('… Einheiten · 0 Kräfte');
+    expect(
+      statusbandKurzform(
+        { einheiten: [zelle(1)], personal: [], rueckmeldung: null },
+        { einheiten: 'daten', personal: 'gesperrt' },
+      ),
+    ).toBe('1 Einheit · — Kräfte');
+  });
+
   it('lässt die Rückmeldung weg, wenn keine fehlt', () => {
     expect(statusbandKurzform({ einheiten: [zelle(1)], personal: [], rueckmeldung: null })).toBe(
       '1 Einheit · 0 Kräfte',

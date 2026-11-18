@@ -686,7 +686,9 @@ for (const szenario of SPERR_SZENARIEN) {
           await ladeInDichte(page, seite.pfad(sperre), dichte);
           await sperrzweigSteht(page, seite, sperre);
           let minimum = Infinity;
-          const ziele = seite.ziele(page, rolle);
+          const ziele = seite
+            .ziele(page, rolle)
+            .filter((z) => !z.nurIn || z.nurIn.includes(dichte));
           for (const { name, ziel, gesperrt, mindestens } of ziele) {
             const titel = `${seite.name}: ${name} (${dichte})`;
             const hoehe = mindestens
@@ -1220,9 +1222,10 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
-    // In der Zeile gesucht: die Einsatz-Navigation trägt seit LLH-1732 einen gleichnamigen Link.
+    // Im Seitenkopf gesucht (Stärke als Meta, LLH-1786): die Einsatz-Navigation trägt seit
+    // LLH-1732 einen gleichnamigen Link.
     const link = page
-      .locator('[data-lfh="verdichtungszeile"]')
+      .locator('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]')
       .getByRole('link', { name: 'Kräfteübersicht', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.

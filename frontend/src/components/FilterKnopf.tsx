@@ -28,7 +28,12 @@ export default function FilterKnopf({
   steuert: string;
 }) {
   return (
-    <Button aria-expanded={offen} aria-controls={steuert} onClick={() => onWechsel(!offen)}>
+    // `aria-controls` nur offen: zu steht die Wahlfläche nicht im Baum.
+    <Button
+      aria-expanded={offen}
+      aria-controls={offen ? steuert : undefined}
+      onClick={() => onWechsel(!offen)}
+    >
       {filterKnopfText(zahl)}
     </Button>
   );

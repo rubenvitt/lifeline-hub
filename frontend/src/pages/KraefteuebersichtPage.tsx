@@ -1333,6 +1333,15 @@ export default function KraefteuebersichtPage() {
    * im sichtbaren Namen (LFH-1079), ein `title` erscheint auf Touch nie. Ein Bericht ohne eine der
    * Listen meldete eine Lage, die niemand geprüft hat (LLH-1462).
    */
+  // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel, das
+  // Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts). Steht auch in der
+  // Kurzform des eingeklappten Bands (LLH-1786).
+  const einheitenFilterHinweis =
+    filter.traeger || filter.kategorie || filter.suche.trim()
+      ? filter.abschnittId != null
+        ? 'nur nach Abschnitt gefiltert'
+        : 'ungefiltert'
+      : null;
   const lageberichtSperre = lageberichtGesperrt ? KEINE_BERECHTIGUNG : berichtGesperrt;
   const nebenwege: Nebenweg[] = [
     ...(darfSchreiben
@@ -1342,7 +1351,9 @@ export default function KraefteuebersichtPage() {
             label:
               lageberichtSperre != null
                 ? `In Lagebericht übernehmen (${lageberichtSperre})`
-                : 'In Lagebericht übernehmen',
+                : berichtQuellenDa
+                  ? 'In Lagebericht übernehmen'
+                  : 'In Lagebericht übernehmen (Listen laden …)',
             laeuft: uebernehmen.isPending,
             ...(lageberichtSperre != null || !berichtQuellenDa ? { gesperrt: true as const } : {}),
             onWahl: () => uebernehmen.mutate(),
@@ -1434,18 +1445,19 @@ export default function KraefteuebersichtPage() {
         <div style={{ marginBlock: token.marginLG }}>
           {/* Einklappbar (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D3): in 48 / 72 nahm das
               Band die halbe Höhe vor der ersten Zeile. Eingeklappt bleibt die Kurzform. */}
-          <KlappBand seite="meldebild" titel="Status in Zahlen" kurzform={statusbandKurzform(band)}>
+          <KlappBand
+            seite="meldebild"
+            titel="Status in Zahlen"
+            kurzform={
+              statusbandKurzform(band, {
+                einheiten: bandZustand(frei.einheiten),
+                personal: bandZustand(frei.personal),
+              }) + (einheitenFilterHinweis ? ` (${einheitenFilterHinweis})` : '')
+            }
+          >
             <Statusband
               einheiten={band.einheiten}
-              // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel,
-              // das Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts).
-              einheitenHinweis={
-                filter.traeger || filter.kategorie || filter.suche.trim()
-                  ? filter.abschnittId != null
-                    ? 'nur nach Abschnitt gefiltert'
-                    : 'ungefiltert'
-                  : null
-              }
+              einheitenHinweis={einheitenFilterHinweis}
               personal={band.personal}
               rueckmeldung={band.rueckmeldung}
               // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
