@@ -471,11 +471,25 @@ describe('wertKnopfStil (LFH-650)', () => {
   it('zieht Höhe UND Polsterung über die Stufen mit, statt auf einer zu kleben', () => {
     const k = wertKnopfStil(tokenFuer('kompakt'));
     const h = wertKnopfStil(tokenFuer('handschuh'));
-    expect(k.paddingBlock).toBe(4);
-    expect(h.paddingBlock).toBe(8);
+    // Raster `xs` (4 / 8) abzüglich des 1-px-Knopfrands.
+    expect(k.paddingBlock).toBe(3);
+    expect(h.paddingBlock).toBe(7);
     expect(k.paddingInline).toBe(8);
     expect(h.paddingInline).toBe(16);
     expect(Number(k.minHeight)).toBeLessThan(Number(h.minHeight));
+  });
+
+  it('hält mit einer Zeile genau die Stufe: Zeile + Polsterung + Rand ≤ controlHeight', () => {
+    // Zeilenhöhe der Grundschrift je Stufe (13,5 / 15 px), wie sie der Browser rechnet; der Rand
+    // ist antds `lineWidth` (1 px oben und unten).
+    const zeile = { kompakt: 21.5, komfortabel: 23, handschuh: 23 } as const;
+    for (const stufe of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const stil = wertKnopfStil(tokenFuer(stufe));
+      expect(
+        zeile[stufe] + 2 * Number(stil.paddingBlock) + 2,
+        `${stufe}: eine Zeile bricht über die Stufe`,
+      ).toBeLessThanOrEqual(Number(stil.minHeight));
+    }
   });
 
   it('darf umbrechen: feste antd-Höhe aufgehoben, Text links', () => {

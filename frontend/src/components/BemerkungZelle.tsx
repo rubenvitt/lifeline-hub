@@ -60,8 +60,10 @@ export function wertKnopfStil(token: {
     height: 'auto',
     minHeight: token.controlHeight,
     // Beide Achsen gesetzt, sonst hinge die Inline-Polsterung an antds Knopfvorgabe statt an der
-    // Stufe.
-    paddingBlock: token.paddingXS,
+    // Stufe. Senkrecht zählt der 1-px-Rand des Knopfs (antds `lineWidth`) zur Polsterung: eine
+    // Zeile (21,5 px) hält so in `kompakt` die Stufe von 30 px, mit vollem `paddingXS` des Rasters
+    // (4 px, LLH-1809) stand sie bei 31,5 (`e2e/inline-angabe-dichte.spec.ts`).
+    paddingBlock: token.paddingXS - 1,
     paddingInline: token.paddingSM,
     maxWidth: '100%',
     whiteSpace: 'normal',
