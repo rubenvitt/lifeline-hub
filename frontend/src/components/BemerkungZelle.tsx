@@ -94,6 +94,11 @@ interface BemerkungZelleProps {
    */
   onSpeichern: (wert: string) => void | Promise<unknown>;
   /**
+   * Das Feld öffnet. Der Aufrufer hält hier den Wert beim Öffnen fest und schickt ihn als Altwert
+   * des Feld-CAS (LLH-1945, wie `beimOeffnen` bei `InlineAngabe`).
+   */
+  onOeffnen?: () => void;
+  /**
    * Menschenlesbare Zeilenkennung (Funkrufname, Name, Bezeichnung) für den zugänglichen Namen —
    * sonst liefern n Zeilen n gleichnamige Knöpfe. Optional für den Einzelgebrauch außerhalb einer
    * Liste.
@@ -141,6 +146,7 @@ export function BemerkungZelle({
   wert,
   darfSchreiben,
   onSpeichern,
+  onOeffnen,
   kennung,
   bezeichnung = 'Bemerkung',
   laeuft = false,
@@ -199,6 +205,7 @@ export function BemerkungZelle({
   ) : null;
 
   const oeffnen = () => {
+    onOeffnen?.();
     setEntwurf(wert ?? '');
     setBearbeitet(true);
   };
