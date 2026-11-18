@@ -206,7 +206,7 @@ describe('wasBrennt (Spec lage-alarmzeile)', () => {
     expect(wasBrennt(q, JETZT)).toEqual({ eintraege: [], stand: 'vollstaendig', fehlend: [] });
   });
 
-  it('Quelle, die es nicht gibt (Monitor ohne Ausfall), zählt nicht als unvollständig', () => {
+  it('Quelle, die es nicht gibt (Monitor an älterem Server), zählt nicht als unvollständig', () => {
     const q: WasBrenntQuellen = { ...ruhig(), ausfall: null };
     expect(wasBrennt(q, JETZT).stand).toBe('vollstaendig');
   });

@@ -21,6 +21,7 @@ import {
 import { monitorAusschnitt } from './LagemonitorKarte';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
+import { GROSS_BEZUG, grossMass } from '../components/grossbild';
 
 // Ob der Monitor einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -115,6 +116,16 @@ function renderApp(route: string) {
     </QueryClientProvider>,
   );
   return router;
+}
+
+/**
+ * Pixel einer Großbild-Länge am Monitor: dort setzt die Wurzel `--lfh-gross-einheit: 1px`, also
+ * zählt der Faktor aus `grossMass(px)`.
+ */
+function monitorPx(fontSize: string): number {
+  const m = /^calc\(var\(--lfh-gross-einheit, [^)]*\)\) \* ([\d.]+)\)$/.exec(fontSize);
+  if (!m) throw new Error(`keine Großbild-Länge: ${fontSize}`);
+  return Number(m[1]);
 }
 
 const wakeRequest = vi.fn();
@@ -280,9 +291,25 @@ describe('Lagemonitor — Großbild', () => {
     expect(zahlen.length).toBeGreaterThan(5);
     for (const z of zahlen) {
       const [zahl, text] = z.children as unknown as HTMLElement[];
-      expect(parseInt(zahl.style.fontSize, 10)).toBeGreaterThanOrEqual(72);
-      expect(parseInt(text.style.fontSize, 10)).toBeGreaterThanOrEqual(28);
+      expect(monitorPx(zahl.style.fontSize)).toBeGreaterThanOrEqual(72);
+      expect(monitorPx(text.style.fontSize)).toBeGreaterThanOrEqual(28);
     }
+  });
+
+  it('Größen aus der Großbild-Skala, fest auf 1 px je Bezugspixel (LLH-1930)', async () => {
+    bereit();
+    renderApp('/geraet/7/monitor');
+    const kachel = await screen.findByRole('region', { name: 'Betroffene' });
+    // Der Monitor wächst nicht mit dem Fenster: seine Abstände stehen in Pixeln.
+    const wurzel = document.querySelector<HTMLElement>('.lagemonitor');
+    expect(wurzel?.style.getPropertyValue('--lfh-gross-einheit')).toBe('1px');
+    expect(within(kachel).getByRole('heading', { name: 'Betroffene' }).style.fontSize).toBe(
+      grossMass(GROSS_BEZUG.titel),
+    );
+    const [zahl, text] = kachel.querySelector('[data-lfh="monitor-zahl"]')!
+      .children as unknown as HTMLElement[];
+    expect(zahl.style.fontSize).toBe(grossMass(GROSS_BEZUG.zahl));
+    expect(text.style.fontSize).toBe(grossMass(GROSS_BEZUG.text));
   });
 
   it('ein Monitor hat keine UHS-Seiten, ein Tablet kein Großbild', async () => {

@@ -94,10 +94,12 @@ test.describe(KAPITEL, () => {
         meldeweg: 'funk',
       });
     }
-    await expect(page.getByText('2 neue Einträge')).toBeVisible();
+    // Der Hinweis steht als Kurzform im Paneelkopf (LLH-1934); der volle Satz nur für Vorleser.
+    const anzeigen = strom.getByRole('button', { name: '2 neu anzeigen' });
+    await expect(anzeigen).toBeVisible();
     await fotografiere(strom, KAPITEL, 'etb-eintraege-neu');
-    await strom.getByRole('button', { name: 'anzeigen' }).click();
-    await expect(page.getByText('2 neue Einträge')).toBeHidden();
+    await anzeigen.click();
+    await expect(anzeigen).toHaveCount(0);
     await expect(
       strom.getByText('UHS Turnhalle meldet freie Kapazität für vier Patienten.'),
     ).toBeVisible();

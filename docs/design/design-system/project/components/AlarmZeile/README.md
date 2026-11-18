@@ -1,4 +1,4 @@
-# AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)
+# AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig, Großbild)
 
 AlarmZeile „Was brennt“ (design.md D3; Regel
 „Dashboard-Baukasten“, `frontend/AGENTS.md`): das erste Element unter dem Seitenkopf von
@@ -13,6 +13,9 @@ kommen aus `lage/wasBrennt.ts`.
 - **Rolle und Wort:** Alarm- und Achtungsfläche aus `statusFlaeche`; das Wort im Eintrag ist
   der zweite Kanal zur Farbe. `role="status"` (höflich), denn `alert` gehört der Alarmzone.
 - **`gross`** für den Lagemonitor: 28 px, ohne Bedienung und ohne Links.
+- **`grossbild`** für das Großbild des Lagebilds (design.md
+  D2 der Change `t14j0wpt-alarmzeile-grossbild`): wie `gross`, aber jedes Maß über `grossMass`,
+  also 28 px bei 1920 × 1080 und mit dem Fenster wachsend.
 
 Quelle: `frontend/src/components/instrument/AlarmZeile.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

@@ -11,8 +11,9 @@ import {
   GrossbildFlaeche,
   grossMass,
 } from '../../components/grossbild';
-import { useRollen } from '../../components/instrument';
+import { AlarmZeile, useRollen } from '../../components/instrument';
 import { modulName } from '../../einsatz/modulRegistry';
+import type { AlarmZeilenDaten } from '../../lage/useWasBrennt';
 import { sichtung, warnstufeBalkenFarbe } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
 import { NICHT_FREIGEGEBEN } from './fuehrungsZahlen';
@@ -21,17 +22,25 @@ import { KENNZAHL_PLAETZE, warnstufeTon, type Quellzustand } from './lagebild';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { VERLAUF_STUNDEN, type Verlauf } from './verlauf';
 
-/** So viele Gefahrentypen passen bei 1920 × 1080 unter das Band; der Rest steht als „+ n weitere“. */
-export const GEFAHREN_HOECHSTENS = 5;
 /**
- * So viele Stunden des Verlaufs, jüngste zuerst. Fünf Zeilen samt „Spitze …“ ragten bei 16:9 um
- * rund 16 px über die untere Reihe (Review vor dem PR).
+ * So viele Gefahrentypen passen bei 1920 × 1080 unter Alarmzeile und Band, samt „+ n weitere“ und
+ * zwei Zeilen Hinweis; der Rest steht als „+ n weitere“. Fünf schnitten seit der Alarmzeile den
+ * Hinweis unten ab (LLH-1931, design.md D3 der Change `t14j0wpt-alarmzeile-grossbild`).
  */
-const VERLAUF_ZEILEN = 4;
+export const GEFAHREN_HOECHSTENS = 4;
+/**
+ * So viele Stunden des Verlaufs, jüngste zuerst. Vier Zeilen samt „Spitze …“ ragen seit der
+ * Alarmzeile bei 16:9 um rund 30 px über die untere Reihe (LLH-1931, D3).
+ */
+export const VERLAUF_ZEILEN = 3;
 /** Zeilen eines Hinweissatzes; Gebietsnamen dürfen 200 Zeichen lang sein. */
 const SATZ_HOECHSTENS_ZEILEN = 2;
-/** Ab so vielen Sichtungszeilen zwei Spaltenpaare, damit nichts unten abreißt. */
-const SICHTUNG_EINSPALTIG_HOECHSTENS = 5;
+/**
+ * Ab mehr Sichtungszeilen zwei Spaltenpaare, damit nichts unten abreißt. Seit der Alarmzeile
+ * passen fünf (SK I–IV und „ohne Sichtung“) nicht mehr untereinander (LLH-1931, D3, mit Ruben am
+ * 17.11.2026).
+ */
+const SICHTUNG_EINSPALTIG_HOECHSTENS = 4;
 /** Längere Werte (Stärke „0/12/58//70“) stehen in der kleinen Zahl, sonst sprengen sie die Spalte. */
 const LANG_AB_ZEICHEN = 7;
 
@@ -56,6 +65,11 @@ interface LagebildGrossbildProps {
     ohneSichtung: number;
   };
   fuehrung: readonly KennzahlAnzeige[];
+  /**
+   * Die Alarmzeile der Seite, wie `useWasBrennt` sie dort liefert (LLH-1931, ADR-0057, design.md D1
+   * der Change `t14j0wpt-alarmzeile-grossbild`): kein zweiter Abruf, keine zweite Uhr.
+   */
+  alarm: Pick<AlarmZeilenDaten, 'eintraege' | 'stand' | 'fehlend'>;
   onVerlassen: () => void;
 }
 
@@ -65,7 +79,8 @@ interface LagebildGrossbildProps {
  *
  * Die Seite reicht ihre schon berechneten Werte herein, das Großbild rechnet nichts selbst: das Band
  * und der Stand (Lagebericht, UHS) kommen als {@link KennzahlAnzeige} aus `kennzahlAnzeige.ts`, Gefahren,
- * Sichtung und Verlauf aus denselben Verdichtungen wie die Paneele. Aufteilung bei 16:9: das Band in
+ * Sichtung und Verlauf aus denselben Verdichtungen wie die Paneele. Aufteilung bei 16:9: ganz oben die
+ * Alarmzeile „Was brennt“ der Seite in der Größe `grossbild`, ohne Sprünge (LLH-1931), das Band in
  * drei Spalten und zwei Reihen, darunter Gefahren (oder der Verlauf in der Reihe
  * „Sanitätsdienst“), Sichtung und Stand. Der Meldungsstrom fehlt: ETB-Text ist aus 3 m
  * kein Lagewert.
@@ -79,6 +94,7 @@ export default function LagebildGrossbild({
   verlauf,
   sichtung: sichtungsDaten,
   fuehrung,
+  alarm,
   onVerlassen,
 }: LagebildGrossbildProps) {
   return (
@@ -88,6 +104,9 @@ export default function LagebildGrossbild({
       einsatz={einsatz}
       onVerlassen={onVerlassen}
     >
+      <div style={{ flexShrink: 0 }}>
+        <AlarmZeile daten={alarm} groesse="grossbild" />
+      </div>
       <div
         role="group"
         aria-label="Lage in Zahlen"
@@ -129,7 +148,7 @@ export default function LagebildGrossbild({
         {sanitaetsdienst ? <VerlaufBlock {...verlauf} /> : <GefahrenBlock {...gefahren} />}
         <SichtungsBlock {...sichtungsDaten} />
         {/* Stand: Lagebericht und UHS; Aufträge und Meldungen zeigt nur der Überblick (LLH-1743),
-            ihr Überfällig-Signal kommt mit der Alarmzeile (LLH-1931). */}
+            ihr Überfällig-Signal trägt die Alarmzeile oben (LLH-1931). */}
         <Block titel="Stand">
           <div
             style={{

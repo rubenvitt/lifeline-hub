@@ -1460,9 +1460,40 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     expect(within(box).queryByText('Deichbruch km 4')).toBeNull();
     expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(2);
 
-    await userEvent.click(within(box).getByRole('button', { name: 'anzeigen' }));
+    await userEvent.click(within(box).getByRole('button', { name: '1 neu anzeigen' }));
     expect(within(box).getByText('Deichbruch km 4')).toBeInTheDocument();
     expect(within(box).queryByText('1 neuer Eintrag')).toBeNull();
+  });
+
+  /*
+   * LLH-1934: der Banner steht im Paneelkopf an der Stelle des Verbindungsworts. Bei offener
+   * Leitung weicht „live“ (der Banner belegt sie ja); eine Störung bleibt daneben sichtbar.
+   */
+  it('der Banner ersetzt „live“ im Kopf, eine abgerissene Leitung bleibt daneben stehen', async () => {
+    setzeLiveStatusFuerTest('open');
+    const daten: Daten = { etb: [etb(1)] };
+    mockEndpunkte(daten);
+    // Ohne Antwort hielte die Seite den Server für unerreichbar und sagte „offline“ statt „live“.
+    server.use(
+      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+        HttpResponse.json({ abschnitte: [], einheiten: [], frist_min: 60 }),
+      ),
+      http.get('/api/einsaetze/1/schaeden/marker', () => HttpResponse.json([])),
+    );
+    const { client } = render();
+    const box = paneel('Jüngste ETB-Einträge');
+    const live = () => box.querySelector('[data-lfh="strom-live"]');
+    await waitFor(() => expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(1));
+    expect(live()?.textContent).toBe('live');
+
+    daten.etb = [etb(1), etb(2)];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(1) }));
+    expect(await within(box).findByText('1 neuer Eintrag')).toBeInTheDocument();
+    expect(live()).toBeNull();
+
+    act(() => setzeLiveStatusFuerTest('lost'));
+    await waitFor(() => expect(live()?.textContent).toBe('Verbindung unterbrochen'));
+    expect(within(box).getByText('1 neuer Eintrag')).toBeInTheDocument();
   });
 
   /*

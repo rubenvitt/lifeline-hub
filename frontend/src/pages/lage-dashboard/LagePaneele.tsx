@@ -275,22 +275,28 @@ export function MeldungsstromPaneel({
       : liveStatus === 'lost'
         ? rollen.alarmText
         : rollen.schwach;
+  // Der Sammelbanner steht an der Stelle des Verbindungsworts (LLH-1934). „live“ weicht ihm, denn
+  // dass Neues kam, sagt er selbst; eine Störung bleibt daneben stehen (der Kopf darf dann
+  // umbrechen, nur im Störfall).
+  const wortWeicht = neu > 0 && !ohneVerbindung && liveStatus === 'open';
   return (
     <StromPaneel
       titel={STROM_TITEL}
       zustand={zustand}
       meta={
-        <span
-          data-lfh="strom-live"
-          style={{
-            color: metaFarbe,
-            display: 'inline-block',
-            minWidth: VERBINDUNG_BREITE,
-            textAlign: 'end',
-          }}
-        >
-          {ohneVerbindung ? OHNE_VERBINDUNG : VERBINDUNG[liveStatus]}
-        </span>
+        wortWeicht ? undefined : (
+          <span
+            data-lfh="strom-live"
+            style={{
+              color: metaFarbe,
+              display: 'inline-block',
+              minWidth: VERBINDUNG_BREITE,
+              textAlign: 'end',
+            }}
+          >
+            {ohneVerbindung ? OHNE_VERBINDUNG : VERBINDUNG[liveStatus]}
+          </span>
+        )
       }
       sprung={{ label: 'ETB', onKlick: onEtb }}
       leerText="Noch keine Einträge im Einsatztagebuch."
@@ -300,6 +306,7 @@ export function MeldungsstromPaneel({
       listeName="Jüngste Einträge"
       neu={neu}
       bannerText={bannerText(neu, neuMindestens)}
+      bannerBreite={VERBINDUNG_BREITE}
       onAnzeigen={onAnzeigen}
     >
       {sichtbar.map((e) => (

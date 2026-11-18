@@ -115,7 +115,9 @@ einem Rust-Test und von einem Vitest-Test. Es MUST mindestens diese Regeln abdec
 - Stärke eines Abschnitts;
 - entlassene und stornierte Kräfte zählen in keiner Stärke und keiner Statusverteilung;
 - Versorgungszustand einer Person aus ihrem jüngsten Verbleib, und abgeschlossene Patienten
-  zählen in keiner Sichtungsverteilung der Lage.
+  zählen in keiner Sichtungsverteilung der Lage;
+- Ausfall je Einheit: welche Einheiten einen Ausfall haben und in welcher Folge sie genannt
+  werden.
 
 Eine Änderung an einer Regel, die nur eine Seite nachzieht, MUST einen der beiden Tests rot machen.
 
@@ -133,6 +135,10 @@ Eine Änderung an einer Regel, die nur eine Seite nachzieht, MUST einen der beid
 
 #### Scenario: Versorgungszustand weicht ab
 - **WHEN** eine Seite einen Transport mit `angemeldet` als abgeschlossen ableitet
+- **THEN** schlägt der Test ihrer Sprache fehl
+
+#### Scenario: Ausfall weicht ab
+- **WHEN** eine Seite Material an einer Unfallhilfsstelle einer Einheit als Ausfall zurechnet
 - **THEN** schlägt der Test ihrer Sprache fehl
 
 ### Requirement: Abgeschlossene Patienten zählen nicht als Patienten

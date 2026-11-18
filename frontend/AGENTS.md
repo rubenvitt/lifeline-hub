@@ -267,7 +267,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
   am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
   Quellen, Sprungziele aus `lage/alarmZiel.ts`. Sie zeigt Zustände, die Alarmzone Ereignisse; keine
-  Seite baut eine zweite Sammlung. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**
+  Seite baut eine zweite Sammlung. Im Großbild des Lagebilds steht sie in der Größe `grossbild`
+  (Maße über `grossMass`, ohne Sprünge), mit den Daten der Seite (LLH-1931); das Großbild der
+  Lagebesprechung trägt keine. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**
   (LLH-1815, Spec `ueberblick-startliste`): eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
   Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
   ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über dem
@@ -311,7 +313,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
   über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
   `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
-  Einheiten. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
+  Einheiten in der Folge der Einheitenliste (`einheitenMitAusfall`). Für den Lagemonitor zählt der
+  Server dieselbe Regel nach (`einsatz::ausfall`, LLH-1929); `tests/fixtures/verdichtung/regeln.json`,
+  Abschnitt `ausfall`, bindet beide Seiten. Wer die Regel ändert, ändert beide und das Fixture.
+  Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
   jüngste Meldung allein (LLH-1739, `abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
   ihm steht (LLH-1744): Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit

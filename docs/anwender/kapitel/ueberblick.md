@@ -90,7 +90,8 @@ Für die Einsatzleitung und das Führungspersonal:
   verschwindet ein Eintrag erst, wenn der Grund weg ist. Dieselbe Zeile steht im Lagebild und
   auf dem Lagemonitor. Die Zahlen sind dieselben wie in den Modulen: Sofortmeldungen,
   Bestätigungen, Aufträge, Erinnerungen und Nachforderungen aus deren Zählung, Rückmeldung und
-  Ausfall wie in der Kräfteübersicht, Vermisste wie bei den Betroffenen. Eine Rückmeldung, die
+  Ausfall wie in der Kräfteübersicht, Vermisste wie bei den Betroffenen. Einheiten mit Ausfall
+  stehen in der Reihenfolge der Einheitenliste. Eine Rückmeldung, die
   ohne neue Daten überfällig wird, steht spätestens nach einer halben Minute in der Zeile. Ein
   Abschnitt im Lagezustand „angespannt“ steht nicht darin. Ist eine Quelle nicht abrufbar,
   steht „Stand unvollständig“ mit ihrem Namen, nie „Nichts brennt“; ein gesperrtes Modul fehlt
