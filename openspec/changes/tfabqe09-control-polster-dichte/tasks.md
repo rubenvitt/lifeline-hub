@@ -2,9 +2,9 @@
 
 ## 1. Token abbilden
 
-- [ ] 1.1 In `frontend/src/theme/tokens.test.ts` einen Test ergänzen, der je Dichte `controlPaddingHorizontal` = `abstand.md` und `controlPaddingHorizontalSM` = `abstand.sm` erwartet, `kompakt` zusätzlich als Literale 12/8 (pixelgleich mit antd), und der die `paddingContent*`-Token in `antdToken` als nicht gesetzt festhält; Test läuft zuerst rot (`mise exec -- pnpm -C frontend exec vitest run src/theme/tokens.test.ts`)
-- [ ] 1.2 In `antdToken()` (`frontend/src/theme/tokens.ts`) beide Token aus der Stufe setzen, Kommentar mit Verweis auf diese Change (D1/D2) und die Ausnahme `paddingContent*`; Test aus 1.1 grün
-- [ ] 1.3 Den Halbsatz zur Ausnahme in `frontend/AGENTS.md`, Gestaltungssprache, „Abstandsraster“ ergänzen und den Dateikopf von `tokens.test.ts` nachziehen; Prettier über `frontend/` grün
+- [x] 1.1 In `frontend/src/theme/tokens.test.ts` einen Test ergänzen, der je Dichte `controlPaddingHorizontal` = `abstand.md` und `controlPaddingHorizontalSM` = `abstand.sm` erwartet, `kompakt` zusätzlich als Literale 12/8 (pixelgleich mit antd), und der die `paddingContent*`-Token in `antdToken` als nicht gesetzt festhält; Test läuft zuerst rot (`mise exec -- pnpm -C frontend exec vitest run src/theme/tokens.test.ts`)
+- [x] 1.2 In `antdToken()` (`frontend/src/theme/tokens.ts`) beide Token aus der Stufe setzen, Kommentar mit Verweis auf diese Change (D1/D2) und die Ausnahme `paddingContent*`; Test aus 1.1 grün
+- [x] 1.3 Den Halbsatz zur Ausnahme in `frontend/AGENTS.md`, Gestaltungssprache, „Abstandsraster“ ergänzen und den Dateikopf von `tokens.test.ts` nachziehen; Prettier über `frontend/` grün
 
 ## 2. Prüfen
 
