@@ -58,23 +58,17 @@ function zeileVon(text: string, index: number): number {
   return text.slice(0, index).split('\n').length;
 }
 
-/**
- * Befunde über die Quellen. `offen` nennt Dateien, deren Formularfelder noch nicht auf `Feld`
- * umgestellt sind (Übergang während des Pilots); für sie entfallen Regel 1 und 2.
- */
+/** Befunde über die Quellen. Leer = in Ordnung. */
 export function feldBefunde(
   quellen: readonly Quelle[],
   zugelassen: typeof ZUGELASSEN = ZUGELASSEN,
-  offen: readonly string[] = [],
 ): string[] {
   const meldungen: string[] = [];
   for (const { pfad, text } of quellen) {
-    if (!offen.includes(pfad)) {
-      for (const m of text.matchAll(FORM_ITEM)) {
-        meldungen.push(`${pfad}:${zeileVon(text, m.index)}  Form.Item — Feld mit breite nehmen`);
-      }
+    for (const m of text.matchAll(FORM_ITEM)) {
+      meldungen.push(`${pfad}:${zeileVon(text, m.index)}  Form.Item — Feld mit breite nehmen`);
     }
-    for (const m of offen.includes(pfad) ? [] : text.matchAll(EINGABE_STIL)) {
+    for (const m of text.matchAll(EINGABE_STIL)) {
       meldungen.push(
         `${pfad}:${zeileVon(text, m.index)}  Breite am Eingabefeld — Feld breite="kurz|schmal|mittel|voll"`,
       );
@@ -88,14 +82,6 @@ export function feldBefunde(
           .join(', ')})`,
       );
     }
-  }
-  for (const pfad of offen) {
-    const quelle = quellen.find((q) => q.pfad === pfad);
-    if (!quelle || (!FORM_ITEM.test(quelle.text) && !EINGABE_STIL.test(quelle.text))) {
-      meldungen.push(`${pfad}: umgestellt — aus OFFEN streichen`);
-    }
-    FORM_ITEM.lastIndex = 0;
-    EINGABE_STIL.lastIndex = 0;
   }
   return meldungen;
 }
@@ -121,34 +107,11 @@ function sammleDateien(bereich: string): Quelle[] {
   return treffer;
 }
 
-/** Pilotdateien, deren Formularfelder noch `Form.Item` sind; sinkt mit der Umstellung auf leer. */
-const OFFEN: readonly string[] = [
-  'karten/AutoAktualisierungZeile.tsx',
-  'karten/OfflineDownloadUrlModal.tsx',
-  'karten/OfflineVorhandeneModal.tsx',
-  'karten/OnlineQuelleFormModal.tsx',
-  'pages/BenutzerPage.tsx',
-  'pages/einstellungen/AnbindungWebhook.tsx',
-  'pages/einstellungen/Anbindungen.tsx',
-  'pages/einstellungen/AnzeigeEinstellungen.tsx',
-  'pages/einstellungen/ArchivSchluessel.tsx',
-  'pages/einstellungen/EinsatzAllgemein.tsx',
-  'pages/einstellungen/EinsatzAufbewahrung.tsx',
-  'pages/einstellungen/EinsatzDefaults.tsx',
-  'pages/einstellungen/EinsatzGeraete.tsx',
-  'pages/einstellungen/EinsatzLagebildExtern.tsx',
-  'pages/einstellungen/EinsatzVerhalten.tsx',
-  'pages/einstellungen/EinwurfZugaenge.tsx',
-  'pages/einstellungen/KategorieVorgabenPaneel.tsx',
-  'pages/einstellungen/ModulEinstellungsListe.tsx',
-  'pages/einstellungen/PegelPrognoseModal.tsx',
-];
-
 const QUELLEN = BEREICHE.flatMap(sammleDateien);
 
 describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => {
   it('kein Form.Item, keine Breite am Eingabefeld, keine feste Zahlbreite außer zugelassen', () => {
-    const meldungen = feldBefunde(QUELLEN, ZUGELASSEN, OFFEN);
+    const meldungen = feldBefunde(QUELLEN, ZUGELASSEN);
     expect(meldungen, meldungen.join('\n')).toEqual([]);
   });
 
@@ -163,13 +126,6 @@ describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => 
     it('meldet Form.Item mit Zeile', () => {
       expect(feldBefunde(q('a\n<Form.Item name="a">'), {})).toEqual([
         'x.tsx:2  Form.Item — Feld mit breite nehmen',
-      ]);
-    });
-
-    it('lässt Form.Item in offenen Dateien zu und meldet eine Datei, die es nicht mehr ist', () => {
-      expect(feldBefunde(q('<Form.Item>'), {}, ['x.tsx'])).toEqual([]);
-      expect(feldBefunde(q('<Feld>'), {}, ['x.tsx'])).toEqual([
-        'x.tsx: umgestellt — aus OFFEN streichen',
       ]);
     });
 

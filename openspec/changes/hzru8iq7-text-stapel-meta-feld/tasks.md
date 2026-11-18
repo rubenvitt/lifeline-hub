@@ -45,15 +45,15 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
 
 ## 4. Pilot im Verwaltungsteil
 
-- [ ] 4.1 `stammdaten/`: `Form.Item` → `Feld` mit Breitenstufe, `maxWidth`/`width` an Feldern
+- [x] 4.1 `stammdaten/`: `Form.Item` → `Feld` mit Breitenstufe, `maxWidth`/`width` an Feldern
   entfernt, `fontSize`-Stellen → `Textstufe` (13 → `text`/`textKlein`, 15 → `kartentitel`),
   Stapel und Metaangaben auf `Stapel`/`MetaZeile`; bestehende Tests der Dateien grün, Schulden
   in `schriftgroesse.schuld.ts` und `abstandsraster.schuld.ts` gesenkt
-- [ ] 4.2 `karten/` wie 4.1; Kommentarverweise auf den alten Wächter in
+- [x] 4.2 `karten/` wie 4.1; Kommentarverweise auf den alten Wächter in
   `karten/OnlineQuellenVerwaltung*.tsx` nachgezogen
-- [ ] 4.3 `pages/einstellungen/` und `pages/BenutzerPage.tsx` wie 4.1; Verweis in
+- [x] 4.3 `pages/einstellungen/` und `pages/BenutzerPage.tsx` wie 4.1; Verweis in
   `pages/einstellungen/EinsatzVerhalten.tsx` nachgezogen
-- [ ] 4.4 Liste der offenen Pilotdateien im `feld.guard.test.ts` ist leer und entfernt;
+- [x] 4.4 Liste der offenen Pilotdateien im `feld.guard.test.ts` ist leer und entfernt;
   `pnpm vitest run src/stammdaten src/karten src/pages/einstellungen src/pages/BenutzerPage src/components src/theme`
   grün
 

@@ -1,6 +1,6 @@
 import { Button, Modal } from 'antd';
 import KopierbarerText from '../../components/KopierbarerText';
-import { monoStil, useRollen } from '../../components/instrument';
+import { Stapel, monoStil, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
@@ -33,7 +33,7 @@ export function CodeDialog({
   code: AnbindungCode | null;
   onFertig: () => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
   const kommando = code ? `lifeline-hub zugang redeem ${window.location.origin} ${code.code}` : '';
   return (
@@ -51,25 +51,24 @@ export function CodeDialog({
       destroyOnHidden
     >
       {code && (
-        <div
-          data-lfh="anbindung-code"
-          style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
-        >
-          <KopierbarerText text={code.code} bezeichnung="Code">
-            <span data-lfh="anbindung-code-text" style={monoStil(22, 500)}>
-              {code.code}
+        <div data-lfh="anbindung-code">
+          <Stapel abstand="sm">
+            <KopierbarerText text={code.code} bezeichnung="Code">
+              <span data-lfh="anbindung-code-text" style={monoStil(22, 500)}>
+                {code.code}
+              </span>
+            </KopierbarerText>
+            <span style={{ color: rollen.gedaempft }}>
+              gilt bis {zeitKurz(code.laeuft_ab_at, konv)}, einmal einlösbar · nur jetzt sichtbar
             </span>
-          </KopierbarerText>
-          <span style={{ color: rollen.gedaempft }}>
-            gilt bis {zeitKurz(code.laeuft_ab_at, konv)}, einmal einlösbar · nur jetzt sichtbar
-          </span>
-          <KopierbarerText text={kommando} bezeichnung="Kommando">
-            <span style={{ ...monoStil(12, 500), wordBreak: 'break-all' }}>{kommando}</span>
-          </KopierbarerText>
-          <span style={{ color: rollen.gedaempft }}>
-            Nach dem Einlösen steht der Fingerabdruck des Fremdsystems am Zugang. Das Kommando zeigt
-            denselben.
-          </span>
+            <KopierbarerText text={kommando} bezeichnung="Kommando">
+              <span style={{ ...monoStil(12, 500), wordBreak: 'break-all' }}>{kommando}</span>
+            </KopierbarerText>
+            <span style={{ color: rollen.gedaempft }}>
+              Nach dem Einlösen steht der Fingerabdruck des Fremdsystems am Zugang. Das Kommando
+              zeigt denselben.
+            </span>
+          </Stapel>
         </div>
       )}
     </Modal>

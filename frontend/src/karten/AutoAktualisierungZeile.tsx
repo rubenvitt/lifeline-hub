@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { Space, Switch, theme, Typography } from 'antd';
+import { Switch, theme, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,6 +10,7 @@ import {
 import { globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { MetaZeile, Stapel } from '../components/instrument';
 
 /** Auswahl des Prüfabstands (Stunden); der Server nimmt 1…168. */
 const ABSTAENDE = [1, 3, 6, 12, 24, 168];
@@ -62,10 +63,10 @@ export default function AutoAktualisierungZeile({
 
   return (
     <div data-testid="auto-aktualisierung" style={{ marginBottom: 12 }}>
-      <Space wrap size={12}>
+      <Stapel richtung="zeile" umbruch abstand="md" ausrichten="mitte">
         {istAdmin ? (
           <>
-            <Space size={8}>
+            <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
               <Switch
                 aria-label="Automatisch aktualisieren"
                 checked={status.automatisch}
@@ -78,17 +79,19 @@ export default function AutoAktualisierungZeile({
                 }
               />
               <Typography.Text>Automatisch aktualisieren</Typography.Text>
-            </Space>
-            <Select
-              aria-label="Prüfabstand"
-              value={status.intervall_stunden}
-              disabled={speichern.isPending}
-              style={{ minWidth: 130 }}
-              options={abstaende.map((h) => ({ value: h, label: `alle ${abstandText(h)}` }))}
-              onChange={(h: number) =>
-                speichern.mutate({ automatisch: status.automatisch, intervall_stunden: h })
-              }
-            />
+            </Stapel>
+            {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+            <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-kurz)' }}>
+              <Select
+                aria-label="Prüfabstand"
+                value={status.intervall_stunden}
+                disabled={speichern.isPending}
+                options={abstaende.map((h) => ({ value: h, label: `alle ${abstandText(h)}` }))}
+                onChange={(h: number) =>
+                  speichern.mutate({ automatisch: status.automatisch, intervall_stunden: h })
+                }
+              />
+            </div>
           </>
         ) : (
           <Typography.Text>
@@ -97,10 +100,12 @@ export default function AutoAktualisierungZeile({
               : 'Automatisch aktualisieren: aus'}
           </Typography.Text>
         )}
-        {zeiten.length > 0 && (
-          <Typography.Text type="secondary">{zeiten.join(' · ')}</Typography.Text>
-        )}
-      </Space>
+        <MetaZeile>
+          {zeiten.map((z) => (
+            <MetaZeile.Teil key={z}>{z}</MetaZeile.Teil>
+          ))}
+        </MetaZeile>
+      </Stapel>
       {speichern.error != null && (
         <div style={{ marginTop: token.marginXS }}>
           <SpeicherFehler fehler={speichern.error} titel="Einstellung nicht gespeichert" />

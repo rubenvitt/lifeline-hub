@@ -3,7 +3,14 @@ import { Alert, Button, Form, Input, Modal, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { QRCodeSVG } from 'qrcode.react';
 import { IconPlus } from '../../icons';
-import { Formularpaneel, monoStil, useRollen } from '../../components/instrument';
+import {
+  Feld,
+  Formularpaneel,
+  MetaZeile,
+  monoStil,
+  Stapel,
+  useRollen,
+} from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import { Select } from '../../components/Select';
 import KopierbarerText from '../../components/KopierbarerText';
@@ -166,17 +173,25 @@ export default function EinsatzLagebildExtern({
               <ListenEintragMeta
                 title={<span data-lfh="lagebild-freigabe-titel">{f.empfaenger}</span>}
                 description={
-                  <span style={{ display: 'grid', gap: 2, color: rollen.gedaempft }}>
-                    <span data-lfh="lagebild-freigabe-zustand">{freigabeZeile(f, zeit)}</span>
-                    {f.protokoll.slice(0, PROTOKOLL_SICHTBAR).map((o) => (
-                      <span
-                        key={o.begonnen_at + o.zuletzt_at}
-                        data-lfh="lagebild-freigabe-oeffnung"
-                        style={{ fontSize: token.fontSizeSM }}
-                      >
-                        {`${zeit(o.begonnen_at)} – ${zeit(o.zuletzt_at)} · ${o.abrufe} ${o.abrufe === 1 ? 'Abruf' : 'Abrufe'}`}
-                      </span>
-                    ))}
+                  <span style={{ color: rollen.gedaempft }}>
+                    <Stapel als="span" abstand="xxs">
+                      <span data-lfh="lagebild-freigabe-zustand">{freigabeZeile(f, zeit)}</span>
+                      {f.protokoll.slice(0, PROTOKOLL_SICHTBAR).map((o) => (
+                        <div
+                          key={o.begonnen_at + o.zuletzt_at}
+                          data-lfh="lagebild-freigabe-oeffnung"
+                        >
+                          <MetaZeile>
+                            <MetaZeile.Teil mono>
+                              {`${zeit(o.begonnen_at)} – ${zeit(o.zuletzt_at)}`}
+                            </MetaZeile.Teil>
+                            <MetaZeile.Teil>
+                              {`${o.abrufe} ${o.abrufe === 1 ? 'Abruf' : 'Abrufe'}`}
+                            </MetaZeile.Teil>
+                          </MetaZeile>
+                        </div>
+                      ))}
+                    </Stapel>
                   </span>
                 }
               />
@@ -198,7 +213,7 @@ export default function EinsatzLagebildExtern({
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Empfänger"
           name="empfaenger"
           rules={[
@@ -210,8 +225,8 @@ export default function EinsatzLagebildExtern({
           ]}
         >
           <Input placeholder="Krisenstab Kreis" maxLength={LAGEBILD_EMPFAENGER_MAX} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Stufe"
           name="stufe"
           extra={gewaehlteStufe ? STUFE_INHALT[gewaehlteStufe] : undefined}
@@ -222,15 +237,15 @@ export default function EinsatzLagebildExtern({
               label: STUFE_LABEL[s],
             }))}
           />
-        </Form.Item>
-        <Form.Item label="Gültig" name="dauer">
+        </Feld>
+        <Feld label="Gültig" name="dauer">
           <Select<LagebildDauer>
             options={(['2h', '12h', '24h', 'einsatzende'] as const).map((d) => ({
               value: d,
               label: DAUER_LABEL[d],
             }))}
           />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <Modal

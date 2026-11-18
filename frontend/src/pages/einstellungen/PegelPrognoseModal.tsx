@@ -9,7 +9,7 @@ import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
 import { DezimalFeld } from '../../components/DezimalFeld';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { useRollen } from '../../components/instrument';
+import { Feld, useRollen } from '../../components/instrument';
 import {
   prognoseBody,
   prognoseVorbelegung,
@@ -109,7 +109,7 @@ export default function PegelPrognoseModal({
       onAbbrechen={onSchliessen}
     >
       <div style={{ marginBlockEnd: token.margin }}>{hinweis}</div>
-      <Form.Item
+      <Feld
         label="Erwarteter Höchststand (m)"
         name="hoechststand_m"
         rules={[{ required: true, message: 'Höchststand angeben' }]}
@@ -122,14 +122,14 @@ export default function PegelPrognoseModal({
           style={{ width: '100%' }}
           placeholder="z. B. 7,10"
         />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Zeitpunkt"
         name="zeitpunkt"
         rules={[{ required: true, message: 'Zeitpunkt angeben' }]}
       >
         <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={speichern.error} titel="Prognose nicht gespeichert" />
     </ErfassungsModal>
   );

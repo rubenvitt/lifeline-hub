@@ -11,6 +11,7 @@ import {
   type ModulEintrag,
 } from '../../einsatz/modulRegistry';
 import { ROLLEN_OPTIONEN } from './optionen';
+import { Stapel, Textstufe } from '../../components/instrument';
 
 /**
  * Trefflächenboden der Beschriftungszeile — rein und exportiert, damit die Zusicherung ohne Render
@@ -217,9 +218,9 @@ export default function ModulEinstellungsListe({
       <>
         <span>{m.label}</span>
         {sperrWort && (
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             {sperrWort}
-          </Typography.Text>
+          </Textstufe>
         )}
       </>
     );
@@ -271,10 +272,9 @@ export default function ModulEinstellungsListe({
             />
           </div>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <Stapel abstand="xxs">
           <Select
             aria-label={`Benötigte Rolle: ${m.label}`}
-            style={{ width: '100%' }}
             value={rolleVon(m.key)}
             disabled={gesperrt}
             loading={laeuft}
@@ -282,18 +282,18 @@ export default function ModulEinstellungsListe({
             onChange={(val) => aufRolle(m.key, val)}
           />
           {hinweis && (
-            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+            <Textstufe stufe="textKlein" ton="gedaempft">
               {hinweis}
-            </Typography.Text>
+            </Textstufe>
           )}
-        </div>
+        </Stapel>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
-      <div style={{ maxWidth: 260 }}>
+    <Stapel abstand="md">
+      <div style={{ width: '100%', maxWidth: 'var(--lfh-feld-mittel)' }}>
         <label htmlFor={filterId} style={{ display: 'block', marginBottom: token.marginXXS }}>
           Modul filtern
         </label>
@@ -310,24 +310,24 @@ export default function ModulEinstellungsListe({
       ) : (
         <>
           {!istSchmal && (
-            <div style={{ ...raster, fontSize: token.fontSizeSM, opacity: 0.6 }}>
-              <span>Modul</span>
+            <div style={{ ...raster, opacity: 0.6 }}>
+              <Textstufe stufe="textKlein">Modul</Textstufe>
               {sichtbarSpalte && (
-                <span style={{ textAlign: 'center' }}>{sichtbarSpalte.titel}</span>
+                <span style={{ textAlign: 'center' }}>
+                  <Textstufe stufe="textKlein">{sichtbarSpalte.titel}</Textstufe>
+                </span>
               )}
-              <span>{rollenSpalte}</span>
+              <Textstufe stufe="textKlein">{rollenSpalte}</Textstufe>
             </div>
           )}
           {gruppen.map((g) => (
             <div key={g.kategorie.key}>
               <SektionHeader titel={g.kategorie.label} ueberschrift="h3" />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
-                {g.module.map(zeile)}
-              </div>
+              <Stapel abstand="xxs">{g.module.map(zeile)}</Stapel>
             </div>
           ))}
         </>
       )}
-    </div>
+    </Stapel>
   );
 }
