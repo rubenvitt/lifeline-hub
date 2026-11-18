@@ -33,6 +33,8 @@ import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
 import { schrift } from '../theme/tokens';
+import { GROSS_BEZUG, grossMass } from '../components/grossbild/grossMass';
+import { useBildschirmWach } from '../components/grossbild/useBildschirmWach';
 import LagemonitorKarte from './LagemonitorKarte';
 import { AlarmZeile } from '../components/instrument';
 import { alarmAusMonitor } from '../lage/alarmAusMonitor';
@@ -63,54 +65,8 @@ export const ABRUF_TAKT_MS = 30_000;
  */
 export const HERVORHEBUNG_MS = 60_000;
 
-/** Kennzahlen mindestens 72 px, jeder Text mindestens 28 px (Großbild-Regel, `geraet/AGENTS.md`). */
-export const GROSS = { kennzahl: 96, kennzahlKlein: 72, text: 28, titel: 32 } as const;
-
 export function istVeraltet(standMs: number, jetztMs: number): boolean {
   return standMs > 0 && jetztMs - standMs > VERALTET_AB_MS;
-}
-
-type WachZustand = 'aus' | 'an' | 'nicht-unterstuetzt';
-
-/**
- * Bildschirm-Wachhalten (Spec `lagemonitor`, „Bildschirm bleibt an“): nach „Anzeige starten“
- * angefordert und bei jeder Rückkehr in den Vordergrund neu, denn der Browser gibt die Sperre
- * beim Verstecken des Tabs frei. Ohne `navigator.wakeLock` bleibt der Zustand
- * `nicht-unterstuetzt`, und die Seite zeigt den Hinweis zum Bildschirmschoner.
- */
-export function useBildschirmWach(gestartet: boolean): WachZustand {
-  const unterstuetzt = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
-  const [an, setAn] = useState(false);
-  useEffect(() => {
-    if (!gestartet || !unterstuetzt) return;
-    let sperre: WakeLockSentinel | null = null;
-    let aktiv = true;
-    const anfordern = async () => {
-      try {
-        sperre = await navigator.wakeLock.request('screen');
-        if (!aktiv) {
-          void sperre.release();
-          return;
-        }
-        setAn(true);
-        sperre.addEventListener('release', () => setAn(false));
-      } catch {
-        setAn(false);
-      }
-    };
-    const sichtbar = () => {
-      if (document.visibilityState === 'visible') void anfordern();
-    };
-    void anfordern();
-    document.addEventListener('visibilitychange', sichtbar);
-    return () => {
-      aktiv = false;
-      document.removeEventListener('visibilitychange', sichtbar);
-      void sperre?.release();
-    };
-  }, [gestartet, unterstuetzt]);
-  if (!unterstuetzt) return 'nicht-unterstuetzt';
-  return an ? 'an' : 'aus';
 }
 
 /**
@@ -180,7 +136,7 @@ function Kachel({
         <h2
           style={{
             margin: 0,
-            fontSize: GROSS.titel,
+            fontSize: grossMass(GROSS_BEZUG.titel),
             lineHeight: 1.2,
             fontWeight: 600,
             color: rollen.gedaempft,
@@ -193,7 +149,7 @@ function Kachel({
             data-lfh="monitor-zusatz"
             style={{
               marginLeft: 'auto',
-              fontSize: GROSS.text,
+              fontSize: grossMass(GROSS_BEZUG.text),
               lineHeight: 1.2,
               fontVariantNumeric: 'tabular-nums',
               fontWeight: zusatzAlarm ? 700 : 400,
@@ -213,14 +169,15 @@ function Kachel({
 function Zahl({
   wert,
   bezeichnung,
-  groesse = GROSS.kennzahlKlein,
+  groesse = 'zahlKlein',
   farbe,
   zeilen = 1,
   hervorgehoben,
 }: {
   wert: number | string;
   bezeichnung: string;
-  groesse?: number;
+  /** Stufe der Großbild-Skala: 96 bzw. 72 px. */
+  groesse?: 'zahl' | 'zahlKlein';
   farbe?: string;
   /** Zeilen der Bezeichnung; ein UHS-Name bricht um, statt in der Mitte abzureißen. */
   zeilen?: 1 | 2;
@@ -251,7 +208,7 @@ function Zahl({
         style={{
           fontFamily: schrift.zahl,
           fontVariantNumeric: 'tabular-nums',
-          fontSize: groesse,
+          fontSize: grossMass(GROSS_BEZUG[groesse]),
           lineHeight: 1,
           fontWeight: 600,
           color: hervorgehoben ? rollen.alarmText : (farbe ?? rollen.text),
@@ -263,14 +220,14 @@ function Zahl({
         style={
           zeilen === 1
             ? {
-                fontSize: GROSS.text,
+                fontSize: grossMass(GROSS_BEZUG.text),
                 color: hervorgehoben ? rollen.alarmText : rollen.gedaempft,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
               }
             : {
-                fontSize: GROSS.text,
+                fontSize: grossMass(GROSS_BEZUG.text),
                 lineHeight: 1.2,
                 color: hervorgehoben ? rollen.alarmText : rollen.gedaempft,
                 display: '-webkit-box',
@@ -308,16 +265,12 @@ function SanitaetsdienstKachel({
       zusatzAlarm={sk1Neu}
     >
       <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
-        <Zahl wert={san.kontakte} bezeichnung="Kontakte" groesse={GROSS.kennzahl} />
-        <Zahl
-          wert={san.kontakte_letzte_stunde}
-          bezeichnung="letzte Stunde"
-          groesse={GROSS.kennzahl}
-        />
+        <Zahl wert={san.kontakte} bezeichnung="Kontakte" groesse="zahl" />
+        <Zahl wert={san.kontakte_letzte_stunde} bezeichnung="letzte Stunde" groesse="zahl" />
         <Zahl
           wert={b.vermisst}
           bezeichnung="vermisst"
-          groesse={GROSS.kennzahl}
+          groesse="zahl"
           farbe={b.vermisst > 0 ? rollen.achtungText : undefined}
         />
       </div>
@@ -368,12 +321,12 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
       ) : (
         <Kachel titel="Betroffene" zusatz={sk1Neu ? 'Neu in SK I' : undefined} zusatzAlarm={sk1Neu}>
           <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
-            <Zahl wert={b.gesamt} bezeichnung="gesamt" groesse={GROSS.kennzahl} />
-            <Zahl wert={b.patienten} bezeichnung="Patienten" groesse={GROSS.kennzahl} />
+            <Zahl wert={b.gesamt} bezeichnung="gesamt" groesse="zahl" />
+            <Zahl wert={b.patienten} bezeichnung="Patienten" groesse="zahl" />
             <Zahl
               wert={b.vermisst}
               bezeichnung="vermisst"
-              groesse={GROSS.kennzahl}
+              groesse="zahl"
               farbe={b.vermisst > 0 ? rollen.achtungText : undefined}
             />
           </div>
@@ -412,7 +365,7 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
         style={{ flex: '1 1 0' }}
       >
         {lage.uhs.length === 0 ? (
-          <span style={{ fontSize: GROSS.text, color: rollen.gedaempft }}>
+          <span style={{ fontSize: grossMass(GROSS_BEZUG.text), color: rollen.gedaempft }}>
             Keine Unfallhilfsstelle eingerichtet
           </span>
         ) : (
@@ -436,7 +389,9 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
           </div>
         )}
         {weitere > 0 && (
-          <span style={{ fontSize: GROSS.text, color: rollen.gedaempft }}>+{weitere} weitere</span>
+          <span style={{ fontSize: grossMass(GROSS_BEZUG.text), color: rollen.gedaempft }}>
+            +{weitere} weitere
+          </span>
         )}
       </Kachel>
     </>
@@ -493,7 +448,7 @@ function Geraetemenue({ onSchliessen }: { onSchliessen: () => void }) {
   }, [nachspannen]);
 
   const knopf = (aktiv: boolean): CSSProperties => ({
-    fontSize: GROSS.text,
+    fontSize: grossMass(GROSS_BEZUG.text),
     minHeight: 72,
     padding: '8px 24px',
     borderRadius: 8,
@@ -631,7 +586,7 @@ function Statusleiste({
         gap: 48,
         padding: '0 24px',
         minHeight: 72,
-        fontSize: GROSS.text,
+        fontSize: grossMass(GROSS_BEZUG.text),
         background: rollen.kopf,
         borderTop: `1px solid ${rollen.linie}`,
         color: rollen.text,
@@ -712,7 +667,7 @@ function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: numbe
               gridTemplateColumns: 'max-content minmax(0, 1fr)',
               columnGap: 24,
               alignItems: 'baseline',
-              fontSize: GROSS.text,
+              fontSize: grossMass(GROSS_BEZUG.text),
               lineHeight: 1.25,
               minWidth: 0,
             }}
@@ -761,6 +716,8 @@ export default function LagemonitorPage() {
   const einsatzId = geraet?.einsatz_id ?? 0;
   const [gestartet, setGestartet] = useState(false);
   const [menueOffen, setMenueOffen] = useState(false);
+  // Bildschirm bleibt an (Spec `lagemonitor`): nach „Anzeige starten“; ohne `navigator.wakeLock`
+  // steht der Hinweis zum Bildschirmschoner.
   const wach = useBildschirmWach(gestartet);
   const jetzt = useJetzt(10_000);
 
@@ -794,14 +751,20 @@ export default function LagemonitorPage() {
   return (
     <div
       className="lagemonitor"
-      style={{
-        height: '100dvh',
-        overflow: 'hidden',
-        display: 'grid',
-        gridTemplateRows: 'minmax(0, 1fr) auto auto',
-        background: rollen.grund,
-        color: rollen.text,
-      }}
+      style={
+        {
+          height: '100dvh',
+          overflow: 'hidden',
+          display: 'grid',
+          gridTemplateRows: 'minmax(0, 1fr) auto auto',
+          background: rollen.grund,
+          color: rollen.text,
+          // Die Großbild-Skala (`components/grossbild/grossMass.ts`) fest auf ein Pixel je
+          // Bezugspixel: der Monitor ist für 1920 × 1080 gekachelt, seine Abstände stehen in
+          // Pixeln, und unter 72 bzw. 28 px darf nichts schrumpfen (`geraet/AGENTS.md`).
+          '--lfh-gross-einheit': '1px',
+        } as CSSProperties
+      }
     >
       <main
         style={{
@@ -850,7 +813,7 @@ export default function LagemonitorPage() {
             <Kacheln lage={lage} sk1Neu={sk1Neu} />
           ) : (
             <Kachel titel="Lagebild">
-              <span style={{ fontSize: GROSS.text }}>
+              <span style={{ fontSize: grossMass(GROSS_BEZUG.text) }}>
                 {lageQuery.isError ? 'Lagebild nicht erreichbar' : 'Lagebild wird geladen …'}
               </span>
             </Kachel>
@@ -862,7 +825,7 @@ export default function LagemonitorPage() {
           role="note"
           data-lfh="monitor-wach-hinweis"
           style={{
-            fontSize: GROSS.text,
+            fontSize: grossMass(GROSS_BEZUG.text),
             padding: '8px 24px',
             background: rollen.achtungFuellung,
             color: rollen.text,
@@ -899,7 +862,7 @@ export default function LagemonitorPage() {
               setGestartet(true);
             }}
             style={{
-              fontSize: GROSS.titel,
+              fontSize: grossMass(GROSS_BEZUG.titel),
               minHeight: 96,
               padding: '16px 48px',
               borderRadius: 12,

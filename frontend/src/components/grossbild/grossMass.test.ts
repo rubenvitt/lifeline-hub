@@ -35,7 +35,7 @@ describe('grossMass', () => {
     expect(evaluateMass(grossMass(GROSS_BEZUG.text), 720, 400, 0.5)).toBe(14);
   });
 
-  it('hält die Bezugswerte des Lagemonitors', () => {
+  it('trägt die Schriftgrößen des Lagemonitors (LLH-1930)', () => {
     expect(GROSS_BEZUG).toMatchObject({ zahl: 96, zahlKlein: 72, titel: 32, text: 28 });
   });
 });
