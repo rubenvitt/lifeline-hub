@@ -300,7 +300,7 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung (Selbsttests)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster, KI-Notizen, Desktop-Manifest und -Kanäle, Kanal-Nachzug, Abbild-Tags, PR-Kommentare, Drittanbieter-Quellen, Rückmeldung, iOS-Version (Selbsttests)"
   # Im `schnell`-Bündel: prüft nicht das Release, sondern die Entscheidung, ob ein Lauf
   # releasen darf — die ist in beide Richtungen still.
   "$ROOT/scripts/release-ruhefenster.test.sh"
@@ -329,6 +329,9 @@ schritt_8() {
   # Hinweis und Quelltext der LGPL-Bibliotheken (LFH-1000): fehlt die Quelle am Release, ist die
   # Weitergabe des Binarys nicht mehr lizenzgerecht — und niemand merkt es. Ohne Netz.
   "$ROOT/scripts/release/drittanbieter-quellen.test.sh"
+  # Die Version der iOS-App aus [workspace.package] (LLH-1978): ein Vorab-Suffix in der
+  # Marketing-Version oder eine nicht steigende Build-Nummer lehnt erst Apple beim Upload ab.
+  "$ROOT/scripts/ios/version.test.sh"
 }
 
 schritt_9() {
