@@ -45,7 +45,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`, im Backend zu `src/`. Entsche
 - [x] 6.1 `frontend/AGENTS.md`: Bausteine (`Status`, `Marke`, Statusknopf), Bausteinwahl (Zeilen Status, Kennzeichnung, bedienbarer Status), Farbachsen (Rahmen heißt bedienbar, Sichtung als Ausnahme), FMS-Tableau-Absatz, Rückwege (Quittung Fahrzeugstatus); Kommentare in `StatusWahl.tsx`, `statusFlaeche.ts` nachziehen; Prettier grün
 - [x] 6.2 Design System: Karten in `frontend/scripts/design-system/previews.tsx` (Status, Marke, Statusknopf, Tableau-Kachel; alte Karte ersetzen), `mise exec -- pnpm -C frontend design-system`, `designSystem.guard.test.ts` grün, Erzeugtes mitcommitten
 - [x] 6.3 Anwenderdoku: `docs/anwender/kapitel/fahrzeuge.md` (Tableau, Quittung, Rückgängig), Alt-Texte; Bildlauf für alle Kapitel neu (`docs/anwender/AGENTS.md`), Wächter der Anwenderdoku grün
-- [ ] 6.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
+- [x] 6.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
 ## Workflow follow-up
 
