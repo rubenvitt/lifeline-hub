@@ -1,4 +1,4 @@
-//! Einsatzakte (LLH-1835, `openspec/changes/hsdhm2ki-einsatzakte/design.md` D6/D7): das ZIP mit
+//! Einsatzakte (LLH-1835, `openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6/D7): das ZIP mit
 //! allen Anhängen und Tabellen eines Einsatzes. Den lesbaren Teil der Akte druckt der Browser
 //! (`frontend/src/druck/einsatzakte/`); hier entsteht nur, was sich nicht drucken lässt.
 //!

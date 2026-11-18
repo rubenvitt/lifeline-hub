@@ -34,7 +34,7 @@ import PersonenDruckTabelle from '../personen/PersonenDruckTabelle';
 import { einsatzakteZipPfad, einsatzdatenPfad } from '../routing/deeplinks';
 
 /**
- * Druckansicht der Einsatzakte (LLH-1835, `openspec/changes/hsdhm2ki-einsatzakte/`): das ganze
+ * Druckansicht der Einsatzakte (LLH-1835, `openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/`): das ganze
  * Einsatzgeschehen als EIN Druckstück, Kapitel für Kapitel mit eigenem Druckkopf, gespeichert
  * über „Als PDF speichern“ im Druckdialog. Daneben das ZIP mit Anhängen und Tabellen.
  *

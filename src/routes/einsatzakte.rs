@@ -1,5 +1,5 @@
 //! Einsatzakte (LLH-1835): `GET /api/einsaetze/{id}/einsatzakte/anlagen.zip` — alle Anhänge und
-//! Tabellen eines Einsatzes in einem ZIP (`openspec/changes/hsdhm2ki-einsatzakte/design.md` D6,
+//! Tabellen eines Einsatzes in einem ZIP (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6,
 //! D7). Den lesbaren Teil der Akte druckt der Browser.
 
 use crate::anhang::audit_repo::{self as anhang_audit, ZugriffFassung};

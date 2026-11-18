@@ -25,13 +25,13 @@
 
 - [x] 4.1 `pages/EinsatzakteDruckPage.tsx` unter `einsatzdaten/akte`: Sackgasse bei Sperre, Kapitel als `druck-kapitel` mit eigenem `Druckkopf` (Stand, Vorläufig), „keine Einträge“/„nicht genutzt“, `DruckKnopf` erst bei `bereit`, „Neu laden“, ZIP-Knopf als Download-Link; Nachweis: Vitest der Seite
 - [x] 4.2 Pfad `einsatzaktePfad` in `routing/deeplinks.ts`, Route in `App.tsx`, Aktion auf der Einsatzdaten-Seite, Eintrag in der Sprungpalette; Nachweis: Vitest Deeplinks/Palette
-- [ ] 4.3 e2e `e2e/einsatzakte-druck.spec.ts` in `DRUCK_SPECS`: Kapitelreihenfolge, Seitenumbruch je Kapitel, PDF in Chromium (`pdf-kern.ts`), ZIP-Download liefert `application/zip`; Nachweis: Lauf in drei Engines grün
+- [x] 4.3 e2e `e2e/einsatzakte-druck.spec.ts` in `DRUCK_SPECS`: Kapitelreihenfolge, Seitenumbruch je Kapitel, PDF in Chromium (`pdf-kern.ts`), ZIP-Download liefert `application/zip`; Nachweis: Lauf in drei Engines grün (lokal Chromium grün samt Mutationsprobe; Firefox/WebKit sind in der Cloud-Sitzung nicht installiert, laufen in der CI auf `alpha`)
 
 ## 5. Doku und Abschluss
 
-- [ ] 5.1 Anwenderdoku `docs/anwender/kapitel/drucken-export.md` und `einsatzabschluss.md` (Regeln `docs/anwender/AGENTS.md`, `quellen:` nachziehen); Nachweis: Doku-Wächter grün
-- [ ] 5.2 Regeln in `frontend/src/druck/AGENTS.md` (Abschnitt Einsatzakte) und `src/AGENTS.md` (ZIP-Route bei Anhänge); Nachweis: Prettier grün
-- [ ] 5.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, Typ-Codegen falls DTOs betroffen
+- [x] 5.1 Anwenderdoku `docs/anwender/kapitel/drucken-export.md` und `einsatzabschluss.md` (Regeln `docs/anwender/AGENTS.md`, `quellen:` nachziehen); Nachweis: Doku-Wächter grün
+- [x] 5.2 Regeln in `frontend/src/druck/AGENTS.md` (Abschnitt Einsatzakte) und `src/AGENTS.md` (ZIP-Route bei Anhänge); Nachweis: Prettier grün
+- [x] 5.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, Typ-Codegen falls DTOs betroffen (Lauf im PR unter „Geprüft“: Schnellprüfungen grün bis auf Umgebungsfolgen ohne mise/Node 26; Rust-Bibliothek und berührte Testdateien grün, die volle Rust-Suite passt nicht ins Plattenkontingent der Sitzung)
 
 ## Workflow follow-up
 

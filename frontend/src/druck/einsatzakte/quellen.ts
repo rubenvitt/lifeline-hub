@@ -3,7 +3,7 @@ import { BLOECKE, type BlockSchluessel } from '../einsatzbericht/auswahl';
 import { freigabeDesModuls, modulLabel, type QuellenFreigabe } from '../einsatzbericht/quellen';
 
 /**
- * Einsatzakte (LLH-1835, `openspec/changes/hsdhm2ki-einsatzakte/design.md` D3): woraus die Akte
+ * Einsatzakte (LLH-1835, `openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D3): woraus die Akte
  * schöpft und ob sie es abrufen darf. Vollständig oder gar nicht wie der Einsatzbericht: die
  * Weiche fällt VOR dem Abruf, ein gesperrtes Modul führt in die Sackgasse, ein im Einsatz
  * ausgeblendetes steht als „nicht genutzt“.

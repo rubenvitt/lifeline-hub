@@ -31,7 +31,7 @@ import {
 } from './quellen';
 
 /**
- * Abruf der Einsatzakte (LLH-1835, `openspec/changes/hsdhm2ki-einsatzakte/design.md` D4): alle
+ * Abruf der Einsatzakte (LLH-1835, `openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D4): alle
  * Kapitel parallel in EINEN Schnappschuss. Jedes Kapitel trägt seinen Zustand wie eine Quelle des
  * Berichts; die Seite druckt nur, wenn alles da ist.
  *

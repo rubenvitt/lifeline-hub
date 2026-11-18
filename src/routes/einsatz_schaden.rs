@@ -323,7 +323,7 @@ fn csv_feld(s: &str) -> String {
 }
 
 /// CSV der Schäden wie `GET …/schaeden/export`, in der übergebenen Reihenfolge; geteilt mit
-/// dem ZIP der Einsatzakte (`openspec/changes/hsdhm2ki-einsatzakte/design.md` D6).
+/// dem ZIP der Einsatzakte (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6).
 pub fn schaeden_csv(schaeden: &[SchadenAnzeige]) -> String {
     let mut csv = String::from(
         "registrier_nr;status;typ;ausmass;gefahr;schadensgrad;ort;lat;lon;beschreibung;erfasst_at\n",

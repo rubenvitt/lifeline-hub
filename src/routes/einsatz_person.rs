@@ -2118,7 +2118,7 @@ fn csv_feld(s: &str) -> String {
 }
 
 /// CSV der Personen wie `GET …/personen/export`; geteilt mit dem ZIP der Einsatzakte
-/// (`openspec/changes/hsdhm2ki-einsatzakte/design.md` D6). Protokolliert nicht: das tut, wer
+/// (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6). Protokolliert nicht: das tut, wer
 /// die Daten ausliefert.
 pub fn personen_csv(personen: &[PersonAnzeige]) -> String {
     let mut csv =

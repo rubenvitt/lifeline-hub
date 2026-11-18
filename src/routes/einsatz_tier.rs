@@ -478,7 +478,7 @@ fn csv_feld(s: &str) -> String {
 }
 
 /// CSV der Tiere wie `GET …/tiere/export`; geteilt mit dem ZIP der Einsatzakte
-/// (`openspec/changes/hsdhm2ki-einsatzakte/design.md` D6).
+/// (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6).
 pub fn tiere_csv(tiere: &[TierAnzeige]) -> String {
     let mut csv =
         String::from("registrier_nr;status;spezies;rufname;rasse;geschlecht;alter;antreff_ort\n");
