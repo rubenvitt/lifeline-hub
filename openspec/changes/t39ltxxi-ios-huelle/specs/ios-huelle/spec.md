@@ -75,22 +75,22 @@ aktiven Server nichts tun. Ein Deeplink mit ungültiger Adresse MUST wirkungslos
 
 ### Requirement: Die App lädt nur einen verträglichen Server
 Vor dem Laden der Oberfläche — beim Start, beim Wechsel, im Onboarding und beim Neuladen nach
-Rückkehr in den Vordergrund — MUST die App `GET /api/huelle` abfragen. Kennt sie den
-`huelle_vertrag` nicht, MUST sie die Oberfläche nicht laden und eine native Seite mit der Version
+Rückkehr in den Vordergrund — MUST die App `GET /api/shell` abfragen. Kennt sie den
+`shell_contract` nicht, MUST sie die Oberfläche nicht laden und eine native Seite mit der Version
 des Servers, der Version der App und der Richtung zeigen: „App aktualisieren“ bei größerem,
 „Server ist zu alt für diese App“ bei kleinerem Vertrag.
 
 #### Scenario: Server wurde auf einen neuen Vertrag gehoben
-- **WHEN** ein gespeicherter Server nach einem Update einen unbekannten, größeren `huelle_vertrag` meldet
+- **WHEN** ein gespeicherter Server nach einem Update einen unbekannten, größeren `shell_contract` meldet
 - **THEN** zeigt die App beim nächsten Laden „App aktualisieren“ und lädt die Oberfläche nicht
 
 ### Requirement: Server ohne Vertrag gelten als zu alt
-Antwortet ein Server auf `GET /api/huelle` mit 404, MUST die App ihn als zu alt behandeln, die
+Antwortet ein Server auf `GET /api/shell` mit 404, MUST die App ihn als zu alt behandeln, die
 Version aus `GET /api/health` nennen und ihn im Onboarding nicht speichern. Ohne Verbindung zum
 Server MUST der zuletzt bestätigte Vertrag dieses Servers gelten.
 
 #### Scenario: Server ohne Endpunkt
-- **WHEN** jemand einen Server hinzufügt, der `GET /api/huelle` nicht kennt
+- **WHEN** jemand einen Server hinzufügt, der `GET /api/shell` nicht kennt
 - **THEN** zeigt die App „Server ist zu alt für diese App“ mit dessen Version und speichert ihn nicht
 
 #### Scenario: Ohne Verbindung
@@ -123,7 +123,7 @@ anderen Frames oder Origins MUST ohne Wirkung bleiben.
 
 ### Requirement: Die App meldet ihre Fähigkeiten und sperrt Passkeys im Webview
 Die App MUST der Seite die Kennung `window.__LIFELINE_HUELLE__` mit `platform: 'ios'`, `version`,
-`passkey: false`, `anmeldungImBrowser`, `haptik`, `benachrichtigungZeigen` und `setAppBadge` geben,
+`passkey: false`, `anmeldungImBrowser`, `haptics`, `benachrichtigungZeigen` und `setAppBadge` geben,
 bevor das erste Skript der Seite läuft.
 
 #### Scenario: Anmeldeseite in der App
@@ -146,13 +146,13 @@ bleiben. Bricht die Person ab, MUST die Anmeldeseite stehen bleiben.
 - **THEN** entsteht keine Sitzung
 
 ### Requirement: Haptik nur auf Wunsch der Seite und abschaltbar
-Die App MUST `haptik(art)` auf die Arten abbilden: `erfolg`, `warnung`, `fehler` auf die
-entsprechende Benachrichtigungs-Rückmeldung, `auswahl` auf die Auswahl-Rückmeldung, `tippen` auf
+Die App MUST `haptics(kind)` auf die Arten abbilden: `success`, `warning`, `error` auf die
+entsprechende Benachrichtigungs-Rückmeldung, `selection` auf die Auswahl-Rückmeldung, `tap` auf
 einen leichten Stoß. Die App MUST einen Schalter „Haptik“ in ihren Einstellungen haben (Vorgabe
-an); ausgeschaltet MUST `haptik` nichts tun.
+an); ausgeschaltet MUST `haptics` nichts tun.
 
 #### Scenario: Haptik aus
-- **WHEN** der Schalter „Haptik“ aus ist und die Seite `haptik('erfolg')` aufruft
+- **WHEN** der Schalter „Haptik“ aus ist und die Seite `haptics('success')` aufruft
 - **THEN** spürt die Person nichts
 
 ### Requirement: Meldung und Badge bei laufender App

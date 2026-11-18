@@ -63,7 +63,7 @@ natives Gefühl und Haptik; Verteilung über TestFlight.
 
 **Non-Goals:** Geräte untereinander ohne Server (R). Eigene Fachlogik oder nachgebaute
 Bildschirme in Swift (R). App Store, vorerst (R). Push über APNs; im Hintergrund meldet die App
-nichts (V). Android (V). Nutzung von `/api/huelle` durch die Desktop-Hülle (V, später möglich).
+nichts (V). Android (V). Nutzung von `/api/shell` durch die Desktop-Hülle (V, später möglich).
 
 **Anti-Goals:** stilles Umlenken auf einen anderen Server; vermischte Sitzungen oder
 Offline-Daten zweier Server; iOS-Sonderwege im Frontend, die nicht über die Kennung laufen.
@@ -102,7 +102,7 @@ Offline-Daten zweier Server; iOS-Sonderwege im Frontend, die nicht über die Ken
 - Ohne gespeicherten Server nur das Onboarding: Adresse eingeben, QR-Code scannen
   (`DataScannerViewController`; Inhalt Deeplink oder https-Adresse), oder per Deeplink
   vorbelegt.
-- Ablauf: Adresse prüfen → `GET /api/huelle` → nur bei verträglichem Server speichern und laden.
+- Ablauf: Adresse prüfen → `GET /api/shell` → nur bei verträglichem Server speichern und laden.
   Die Adressprüfung folgt `src-tauri/src/adresse.rs` Regel für Regel, mit denselben
   Meldungstexten. Die Fälle stehen als JSON unter `src-tauri/faelle/` und werden von Rust und
   Swift geprüft (Quelle bleibt die Desktop-Hülle).
@@ -134,21 +134,21 @@ dem allgemeinen Hinweis, dass noch nicht übertragene Einträge dieses Servers v
 
 ### D4 Versionen und Vertrag (R: Ziel und Mindestversion; V: Form)
 
-- **Server → App:** `GET /api/huelle` liefert anonym `{ version, huelle_vertrag }`
-  (OpenAPI-Schema `HuelleInfo`, Typ-Codegen). `huelle_vertrag` ist eine ganze Zahl, anfangs `1`,
+- **Server → App:** `GET /api/shell` liefert anonym `{ version, shell_contract }`
+  (OpenAPI-Schema `ShellInfo`, Typ-Codegen). `shell_contract` ist eine ganze Zahl, anfangs `1`,
   und steigt nur bei einem Bruch zwischen Hülle und Server; neue Felder kommen nur hinzu. Keine
   Datenbank, also auch bei gestörter DB 200 — Erreichbarkeit prüft die App über das Laden, nicht
   über diesen Endpunkt.
-- **Mindestversion (R):** die erste Server-Version mit `/api/huelle`. Ein 404 heißt „Server ist
+- **Mindestversion (R):** die erste Server-Version mit `/api/shell`. Ein 404 heißt „Server ist
   zu alt für diese App“; die Seite nennt `version` aus `GET /api/health`.
 - **App prüft** bei jedem Start, Wechsel und Neuladen nach Rückkehr in den Vordergrund, nicht nur
   im Onboarding. Kennt sie den Vertrag nicht, lädt sie die Oberfläche nicht und zeigt die
   Richtung: Server-Vertrag größer → „App aktualisieren“, kleiner → „Server ist zu alt“. Ohne
   Netz gilt der zuletzt bestätigte Vertrag dieses Servers.
 - **App → Seite:** Die Kennung `__LIFELINE_HUELLE__` bekommt `platform` (`'ios'`), `version`
-  (volle Workspace-Version) und `haptik(art)`. Die Desktop-Hüllen setzen `platform` und `version`
+  (volle Workspace-Version) und `haptics(kind)`. Die Desktop-Hüllen setzen `platform` und `version`
   vorerst nicht; `platform` fehlt dort, und das Frontend fällt auf „Desktop-App“ zurück.
-  Feldnamen nach der Bezeichner-Sprache (Technik englisch, Fachwort `haptik` deutsch); als Grenzwert
+  Feldnamen nach der Bezeichner-Sprache (Technik englisch, Fachwort `haptics` deutsch); als Grenzwert
   danach fest. Gelesen wird die Kennung weiter nur in `frontend/src/huelle/faehigkeiten.ts`.
 - Das Init-Skript der iOS-Hülle liegt als reines JS unter `ios/App/Huelle/huelle.js`, damit
   `frontend/src/test/huelle.ts` es per vitest ausführt wie die Tauri-Skripte (kein driftender
@@ -167,7 +167,7 @@ Kaltstart, Server weg und wieder da, Speicherdruck):
 1. Gespeicherte `index.html` per `loadSimulatedRequest(_:responseHTML:)` unter der Server-URL;
    die gehashten Assets kommen aus dem HTTP-Cache des Datenspeichers. Nach jedem Online-Laden
    wärmt die Hülle den Cache mit allen Assets vor (auch nie geöffnete `lazy()`-Seiten); die Liste
-   kommt dann aus einem **neuen Feld von `/api/huelle`** (entschieden im Spike, additiv).
+   kommt dann aus einem **neuen Feld von `/api/shell`** (entschieden im Spike, additiv).
 2. Wie 1, aber die Hülle hält die Assets selbst in Application Support vor, falls iOS den
    Disk-Cache räumt.
 3. Eigenes URL-Schema mit Vermittlung von Oberfläche und `/api` — nur nach neuer Entscheidung
@@ -186,20 +186,20 @@ dem Spike; diese Change baut nur die Seite und die Erreichbarkeitsprüfung.
   Browser die Kopfleiste unter die Notch, und ältere Server hätten es ohnehin nicht.
 - Status-Seiten der Hülle (kein Server, nicht erreichbar, Zertifikat, nicht verträglich) sind
   SwiftUI.
-- **Haptik:** `__LIFELINE_HUELLE__.haptik(art)` mit dem Vokabular
-  `'erfolg' | 'warnung' | 'fehler' | 'auswahl' | 'tippen'` →
+- **Haptik:** `__LIFELINE_HUELLE__.haptics(kind)` mit dem Vokabular
+  `'success' | 'warning' | 'error' | 'selection' | 'tap'` →
   `UINotificationFeedbackGenerator` (`.success/.warning/.error`),
   `UISelectionFeedbackGenerator`, `UIImpactFeedbackGenerator(.light)`. Unbekannte Art: nichts.
   Abschaltbar über einen Schalter in den Einstellungen der Hülle (Vorgabe an). Auf dem iPad
   wirkungslos.
-- **Auslöser im Frontend** über `huelleHaptik(art)` in `faehigkeiten.ts` (feuern und vergessen,
+- **Auslöser im Frontend** über `huelleHaptics(kind)` in `faehigkeiten.ts` (feuern und vergessen,
   wirft nie, ohne Hülle nichts):
-  - Erfassung vom Server angenommen → `erfolg`; ohne Netz nur vorgemerkt → `tippen` (kein
-    „gespeichert“-Gefühl); vom Server abgelehnt → `fehler`. Gilt für die gemeinsame
+  - Erfassung vom Server angenommen → `success`; ohne Netz nur vorgemerkt → `tap` (kein
+    „gespeichert“-Gefühl); vom Server abgelehnt → `error`. Gilt für die gemeinsame
     Erfassungs-Hülle und die ETB-Schnellerfassung.
-  - Eingehender Alarm der Stufe `alarm` (auch Unwetter) → `warnung`, nur beim ersten Eintreffen,
+  - Eingehender Alarm der Stufe `alarm` (auch Unwetter) → `warning`, nur beim ersten Eintreffen,
     nicht beim Nachspielen, und nicht bei stummgeschaltetem Alarm.
-  - Wechsel in einem Segment → `auswahl` (zentral in der Segmentleiste, nicht im Aufrufer).
+  - Wechsel in einem Segment → `selection` (zentral in der Segmentleiste, nicht im Aufrufer).
   - Die übrigen rund 200 Erfolgsmeldungen bleiben ohne Haptik.
 - Native Meldung (`benachrichtigungZeigen`, `UNUserNotificationCenter`, Berechtigung beim ersten
   Aufruf) und App-Badge (`setAppBadge`, `setBadgeCount`) mit denselben Kennungsfeldern wie die
@@ -279,7 +279,7 @@ Nach ADR-0048 ein Auslöser je Workflow:
 ## Migration Plan
 
 Neu und additiv: Browser und Desktop-Hülle ändern sich nur in Texten. Rückweg: Workflows
-abschalten, App in TestFlight zurückziehen; `/api/huelle` bleibt harmlos stehen.
+abschalten, App in TestFlight zurückziehen; `/api/shell` bleibt harmlos stehen.
 
 ## Open Questions
 

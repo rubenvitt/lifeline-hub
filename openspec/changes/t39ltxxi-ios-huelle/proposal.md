@@ -18,11 +18,11 @@ Server-Versionen verträglich (Entscheidung Ruben, 18.11.2026, siehe `design.md`
   Serverliste, einem getrennten Datenspeicher je Server, nativen Status-Seiten (kein Server,
   nicht erreichbar, Zertifikat nicht vertrauenswürdig, nicht verträglich), Anmeldung im
   Systembrowser, Links, Downloads, Druck, nativer Meldung, App-Badge und Haptik.
-- Neuer anonymer Endpunkt `GET /api/huelle` mit `version` und `huelle_vertrag`. Die App lädt
-  die Oberfläche nur, wenn sie den `huelle_vertrag` des Servers kennt; Server ohne Endpunkt gelten
+- Neuer anonymer Endpunkt `GET /api/shell` mit `version` und `shell_contract`. Die App lädt
+  die Oberfläche nur, wenn sie den `shell_contract` des Servers kennt; Server ohne Endpunkt gelten
   als zu alt.
 - Die Kennung `window.__LIFELINE_HUELLE__` bekommt die Felder `platform`, `version` und die
-  Funktion `haptik(art)`. Das Frontend löst Haptik an wenigen festen Stellen aus (Erfassung
+  Funktion `haptics(kind)`. Das Frontend löst Haptik an wenigen festen Stellen aus (Erfassung
   angenommen oder abgelehnt, eingehender Alarm, Wechsel in Segmenten).
 - Die Bestätigungsseite der Anmeldung im Systembrowser und das Zugangsprotokoll sprechen
   plattformneutral von der „Lifeline-App“ statt der „Mac-App“.
@@ -36,9 +36,9 @@ Server-Versionen verträglich (Entscheidung Ruben, 18.11.2026, siehe `design.md`
 
 ### New Capabilities
 
-- `huellen-vertrag`: Was Server und jede App-Hülle einander zusagen — `GET /api/huelle`
-  (`version`, `huelle_vertrag`, Felder kommen nur hinzu) und die Felder der Kennung
-  `__LIFELINE_HUELLE__` (`platform`, `version`, `haptik`).
+- `huellen-vertrag`: Was Server und jede App-Hülle einander zusagen — `GET /api/shell`
+  (`version`, `shell_contract`, Felder kommen nur hinzu) und die Felder der Kennung
+  `__LIFELINE_HUELLE__` (`platform`, `version`, `haptics`).
 - `ios-huelle`: Verhalten der iOS-App — Onboarding, Serverliste, Datenspeicher je Server,
   Verträglichkeitsprüfung, Zertifikats- und Status-Seiten, Brücke nur für die aktive Origin,
   Anmeldung, Links, Downloads, Druck, Meldung, Badge, Haptik, Neuladen nach Prozessende.
@@ -55,7 +55,7 @@ Server-Versionen verträglich (Entscheidung Ruben, 18.11.2026, siehe `design.md`
 ## Impact
 
 - **Neu:** `ios/` (Xcode-Projekt per XcodeGen, Swift-Paket `LifelineKern`, Init-Skript der
-  Hülle), `src/routes/huelle.rs`, `tests/huelle.rs`, Workflows `ios-pruefung.yml` und
+  Hülle), `src/routes/shell.rs`, `tests/shell.rs`, Workflows `ios-pruefung.yml` und
   `ios.yml`, `ios/AGENTS.md`, ADR-0065, `docs/betrieb/ios-app.md`.
 - **Geändert:** `src/app.rs`, `src/routes/mod.rs`, `src/api_doc.rs` samt generierter Typen,
   `frontend/src/huelle/faehigkeiten.ts` und wenige Auslöser der Haptik,

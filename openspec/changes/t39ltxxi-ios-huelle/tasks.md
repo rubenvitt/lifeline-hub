@@ -9,12 +9,12 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 - [ ] 1.1 Abschnitte „Backend — Migrationsvergabe“ und „Backend — Tabellenumbau und `-- no-transaction`“ aus der Wurzel-`AGENTS.md` nach `src/AGENTS.md` verschieben (eigener `refactor`-Commit), Verweise per `git grep` nachziehen; belegt durch `wc -l AGENTS.md` < 190 und grünes `scripts/check-all.sh --nur schnell`
 - [ ] 1.2 Freie ADR-Nummer gegen offene PRs prüfen und für ADR-0065 vormerken; belegt durch den Befund im Kommentar an LLH-1978
 
-## 2. Server-Vertrag `GET /api/huelle`
+## 2. Server-Vertrag `GET /api/shell`
 
-- [ ] 2.1 Roter Integrationstest `tests/huelle.rs`: anonym 200, `version` gleich `/api/health`, `huelle_vertrag` ganze Zahl ≥ 1 (Pflichtfelder per `contains_key`, keine feste Feldzahl), erreichbar mit Gerätesitzung, 200 auch bei gestörter DB
-- [ ] 2.2 `src/routes/huelle.rs` (`load_huelle`, `HUELLE_VERTRAG = 1` mit Doc-Kommentar zur Bruchregel, DTO `HuelleInfo`), Route in `src/app.rs`, Modul in `src/routes/mod.rs`; Test aus 2.1 grün
-- [ ] 2.3 `HuelleInfo` in `src/api_doc.rs` aufnehmen, `scripts/check-typ-codegen.sh` laufen lassen, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten; Gate grün
-- [ ] 2.4 Mutationsprobe: `huelle_vertrag` testweise auf 0 bzw. Route hinter `CurrentUser` → Test rot; Ergebnis im Kommentar
+- [ ] 2.1 Roter Integrationstest `tests/shell.rs`: anonym 200, `version` gleich `/api/health`, `shell_contract` ganze Zahl ≥ 1 (Pflichtfelder per `contains_key`, keine feste Feldzahl), erreichbar mit Gerätesitzung, 200 auch bei gestörter DB
+- [ ] 2.2 `src/routes/shell.rs` (`load_shell`, `SHELL_CONTRACT = 1` mit Doc-Kommentar zur Bruchregel, DTO `ShellInfo`), Route in `src/app.rs`, Modul in `src/routes/mod.rs`; Test aus 2.1 grün
+- [ ] 2.3 `ShellInfo` in `src/api_doc.rs` aufnehmen, `scripts/check-typ-codegen.sh` laufen lassen, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten; Gate grün
+- [ ] 2.4 Mutationsprobe: `shell_contract` testweise auf 0 bzw. Route hinter `CurrentUser` → Test rot; Ergebnis im Kommentar
 
 ## 3. Plattformneutrale Texte (Lifeline-App)
 
@@ -24,12 +24,12 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## 4. Frontend: Kennung und Haptik
 
-- [ ] 4.1 Init-Skript der iOS-Hülle `ios/App/Huelle/huelle.js` (reines JS: Kennung mit `platform`, `version`, `passkey: false`, `anmeldungImBrowser`, `haptik`, `benachrichtigungZeigen`, `setAppBadge`, Ersatz für `window.print`, Message-Handler `lifeline`) und Testhelfer in `frontend/src/test/huelle.ts`, der es wie die Tauri-Skripte ausführt; Test „Kennung vollständig“ grün
-- [ ] 4.2 `frontend/src/huelle/faehigkeiten.ts`: `huellePlatform()`, `huelleVersion()`, `huelleHaptik(art)` (feuern und vergessen, wirft nie, ohne Hülle nichts); Tests für Browser, Desktop-Hülle ohne Felder, iOS-Hülle, werfende Brücke
+- [ ] 4.1 Init-Skript der iOS-Hülle `ios/App/Huelle/huelle.js` (reines JS: Kennung mit `platform`, `version`, `passkey: false`, `anmeldungImBrowser`, `haptics`, `benachrichtigungZeigen`, `setAppBadge`, Ersatz für `window.print`, Message-Handler `lifeline`) und Testhelfer in `frontend/src/test/huelle.ts`, der es wie die Tauri-Skripte ausführt; Test „Kennung vollständig“ grün
+- [ ] 4.2 `frontend/src/huelle/faehigkeiten.ts`: `huellePlatform()`, `huelleVersion()`, `huelleHaptics(kind)` (feuern und vergessen, wirft nie, ohne Hülle nichts); Tests für Browser, Desktop-Hülle ohne Felder, iOS-Hülle, werfende Brücke
 - [ ] 4.3 Rückmeldung (`rueckmeldung/adresse.ts`) nennt bei `platform: 'ios'` die iOS-App, sonst wie bisher; bestehende Tests unverändert grün, neuer Fall grün
-- [ ] 4.4 Haptik in der gemeinsamen Erfassung und der ETB-Schnellerfassung: angenommen → `erfolg`, vorgemerkt → `tippen`, abgelehnt → `fehler`, je genau einmal; Tests je Fall, Mutationsprobe (Aufruf entfernt → rot)
-- [ ] 4.5 Haptik beim neu eingehenden Alarm der Stufe `alarm` (`warnung`), nicht beim Nachspielen, nicht bei Stummschaltung; Tests
-- [ ] 4.6 Haptik in der Segmentleiste (`auswahl`, einmal je Wechsel, zentral); Test
+- [ ] 4.4 Haptik in der gemeinsamen Erfassung und der ETB-Schnellerfassung: angenommen → `success`, vorgemerkt → `tap`, abgelehnt → `error`, je genau einmal; Tests je Fall, Mutationsprobe (Aufruf entfernt → rot)
+- [ ] 4.5 Haptik beim neu eingehenden Alarm der Stufe `alarm` (`warning`), nicht beim Nachspielen, nicht bei Stummschaltung; Tests
+- [ ] 4.6 Haptik in der Segmentleiste (`selection`, einmal je Wechsel, zentral); Test
 - [ ] 4.7 Test: Push-Schalter fehlt bei `platform: 'ios'`; Test: Start ohne `navigator.serviceWorker` (Registrierung, Alarm, Web Push) bleibt still und meldet keinen Client-Fehler
 - [ ] 4.8 Kapitel der Anwenderdoku zur Haptik nur, wenn ein bestehendes Kapitel die Rückmeldung beim Speichern beschreibt; sonst Begründung im Kommentar
 
@@ -53,7 +53,7 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 - [ ] 7.2 Deeplink deuten und entscheiden (vorbelegen, bestätigen, nichts) gegen die gemeinsamen Fälle; grün
 - [ ] 7.3 Linkregeln (Webview, Download, System) gegen die gemeinsamen Fälle; grün
 - [ ] 7.4 Serverliste (Codable: UUID, Name, Adresse, zuletzt verbunden, zuletzt bestätigter Vertrag): hinzufügen, umbenennen, wechseln, entfernen nur nicht-aktiv, Vorgabename Hostname; grün
-- [ ] 7.5 Vertragsprüfung: `HuelleInfo` lesen, bekannte Verträge `[1]`, Richtung bei unbekanntem Vertrag, 404 → zu alt, ohne Netz letzter bestätigter Vertrag; grün
+- [ ] 7.5 Vertragsprüfung: `ShellInfo` lesen, bekannte Verträge `[1]`, Richtung bei unbekanntem Vertrag, 404 → zu alt, ohne Netz letzter bestätigter Vertrag; grün
 - [ ] 7.6 Onboarding-Ablauf als Zustandsfunktion (Adresse → Prüfung → speichern nur bei verträglich) und Fehlerklassen (Zertifikat, nicht erreichbar, zu alt, zu neu) aus URL-Fehlercodes; grün
 - [ ] 7.7 Haptik-Abbildung Art → Rückmeldungsart (unbekannt → nichts, Schalter aus → nichts); grün
 
@@ -89,5 +89,5 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## Workflow follow-up
 
-- Zunder-Folgeaufgaben anlegen: Spike und Change „Start ohne Server in der iOS-App“ (D5), Push über APNs, Nutzung von `/api/huelle` durch die Desktop-Hülle.
+- Folgeaufgaben (angelegt 18.11.2026): LLH-1980 Start ohne Server (D5, im Blick behalten), LLH-1981 APNs, LLH-1982 Desktop-Hülle nutzt `/api/shell`, LLH-1979 API-Routen englisch.
 - `/opsx:archive` samt Spec-Sync vor dem PR, dann PR gegen `alpha` mit Bildern der Änderung (Simulator-Artefakte).
