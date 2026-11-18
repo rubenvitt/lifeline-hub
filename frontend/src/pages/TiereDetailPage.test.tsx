@@ -1149,6 +1149,10 @@ describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () 
     const gesperrt = screen.getByRole('textbox', { name: 'Rufname' });
     expect(gesperrt).toHaveValue('Bello');
     expect(gesperrt).toHaveAttribute('readonly');
+    // Auch der Fundort: lesbar, ohne Suche und Karte (Ortsfeld `readOnly`).
+    expect(screen.getByRole('textbox', { name: 'Fundort' })).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Ort suchen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Auf Karte wählen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Schließen' }));
     expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull();

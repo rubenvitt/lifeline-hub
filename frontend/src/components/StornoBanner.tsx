@@ -2,6 +2,8 @@ import { Alert, Input } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { cloneElement, type ReactElement } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import { Ortsfeld } from '../anzeige/Ortsfeld';
 import type { AnzeigeKonventionen } from '../anzeige/format';
 import { uhrzeit, zeitKurz } from '../anzeige/zeitDarstellung';
 
@@ -56,11 +58,15 @@ export function StornoBanner({ stand }: StornoBannerProps) {
 /**
  * Ein Eingabeelement eines offenen Bearbeiten-Formulars, nachdem der Datensatz storniert wurde
  * (LLH-1832, Spec `storno-sperre`, „Eine offene Eingabe bleibt beim Sperren lesbar“): Textfelder
- * werden `readOnly`, damit ihr Text markier- und kopierbar bleibt; alles andere (Auswahl, Zahl,
- * Ort) wird `disabled`.
+ * und Ortsfelder werden `readOnly`, damit ihr Text markier- und kopierbar bleibt; alles andere
+ * (Auswahl, Zahl) wird `disabled`.
  */
 export function entwurfNurLesen<P>(input: ReactElement<P>): ReactElement<P> {
-  const istText = input.type === Input || input.type === Input.TextArea;
+  const istText =
+    input.type === Input ||
+    input.type === Input.TextArea ||
+    input.type === Ortsfeld ||
+    input.type === EinsatzOrtsfeld;
   const sperre = istText ? { readOnly: true } : { disabled: true };
   return cloneElement(input, sperre as unknown as Partial<P>);
 }
