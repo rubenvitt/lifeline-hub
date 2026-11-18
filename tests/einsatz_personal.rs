@@ -1919,3 +1919,41 @@ async fn einheit_und_uhs_tragen_die_einsatzfunktion() {
     assert_eq!(json["kraefte"][0]["einsatzfunktion"], "Melder", "{json}");
     assert_eq!(json["kraefte"][0]["funktion"], "Sanitäter", "{json}");
 }
+
+/// LLH-1952: Jeder ETB-Eintrag des Personalmoduls geht als Ereignis `etb` hinaus. `personal`
+/// frischt das Einsatztagebuch nicht auf; ohne das eigene Ereignis sähe ein zweiter Schirm den
+/// Eintrag erst nach dem Neuladen.
+#[tokio::test]
+async fn etb_eintraege_des_personals_gehen_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let fehl = adhoc_kraft(&app, &admin, einsatz, "Fehl").await;
+    let (_, stati) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let im_einsatz = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == "im Einsatz")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+
+    let body = format!(r#"{{"status_id":{im_einsatz},"name":"Anna B."}}"#);
+    let (s, json) = patch_kraft(&app, &admin, einsatz, ep, &body).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "Status und Angaben ändern")
+        .await;
+
+    for (kraft, was, erwartet) in [
+        (ep, "entlassen", StatusCode::OK),
+        (ep, "reaktivieren", StatusCode::OK),
+        (fehl, "stornieren", StatusCode::NO_CONTENT),
+    ] {
+        let (s, json) = aktion(&app, &admin, einsatz, kraft, was).await;
+        assert_eq!(s, erwartet, "{was}: {json}");
+        etb.pruefe(&app, &admin, einsatz, was).await;
+    }
+}

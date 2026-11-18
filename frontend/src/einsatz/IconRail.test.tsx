@@ -164,6 +164,35 @@ describe('IconRail', () => {
     expect(haupt.querySelector('[aria-label="Einstellungen"]')).toBeNull();
   });
 
+  /**
+   * Ohne Kleben (d78gipem D1): die Karte „Navigation“ des Design Systems zeigt die Rail in einem
+   * Träger fester Höhe. Die Spalte klebt dann nicht, füllt den Träger und misst nichts am Fenster;
+   * sonst wäre die Karte so hoch wie das Fenster des Betrachters.
+   */
+  it('ohne Kleben füllt die Spalte den Träger und misst keinen Vorlauf', () => {
+    const beobachtet = vi.spyOn(ResizeObserver.prototype, 'observe');
+    try {
+      renderMitProviders(
+        <IconRail
+          kategorien={kategorien}
+          aktiveKategorie={null}
+          onKategorieKlick={() => {}}
+          kleben={false}
+        />,
+      );
+      const nav = screen.getByRole('navigation', { name: 'Kategorien' });
+      const spalte = nav.querySelector<HTMLElement>('[data-lfh="rail-spalte"]')!;
+      expect(spalte.style.position).toBe('');
+      expect(spalte.style.top).toBe('');
+      expect(spalte.style.height).toBe('100%');
+      expect(spalte.style.overflowY).toBe('auto');
+      expect(nav.style.getPropertyValue('--lfh-rail-vorlauf')).toBe('');
+      expect(beobachtet).not.toHaveBeenCalled();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('meldet Klick mit dem Kategorie-Key', async () => {
     const onKlick = vi.fn();
     renderMitProviders(

@@ -880,6 +880,39 @@ describe('ModulPanel — Spalte endet am Fensterrand', () => {
 });
 
 /**
+ * Ohne Kleben (d78gipem D1): die Karte „Navigation“ des Design Systems zeigt das Panel in einem
+ * Träger fester Höhe. Die Spalte klebt dann nicht, füllt den Träger und nimmt keine Höhe aus dem
+ * Fenster, auch nicht nach Bildlauf oder Größenänderung.
+ */
+describe('ModulPanel — ohne Kleben', () => {
+  it('füllt den Träger und misst nichts am Fenster', () => {
+    const { container } = renderMitProviders(
+      <ModulPanel
+        einsatzId={7}
+        titel="Erfassung"
+        einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: '2026-11-15T11:12:00Z' }}
+        module={module}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        kleben={false}
+      />,
+    );
+    const spalte = container.querySelector<HTMLElement>('[data-lfh="modul-panel-spalte"]')!;
+    expect(spalte.style.position).toBe('');
+    expect(spalte.style.top).toBe('');
+    expect(spalte.style.height).toBe('100%');
+    fireEvent.scroll(window);
+    fireEvent(window, new Event('resize'));
+    expect(spalte.style.height).toBe('100%');
+    // Kopf, rollende Liste und Fuß bleiben, wie sie sind.
+    const liste = spalte.querySelector<HTMLElement>('[data-lfh="modul-panel-liste"]')!;
+    expect(liste.style.overflowY).toBe('auto');
+    expect(spalte.querySelector('[data-lfh="modul-panel-fuss"]')).toHaveTextContent('3 h 12 min');
+  });
+});
+
+/**
  * Echte Links (LLH-1732): Strg/⌘+Klick, Mittelklick und das Kontextmenü des Browsers legen ein
  * Modul in einen neuen Tab, etwa auf den zweiten Monitor im Führungsraum. Der einfache Klick
  * bleibt beim Rahmen (Zuletzt-Speicher, Drawer schließen). Geprüft über `fireEvent`, weil nur

@@ -1,5 +1,6 @@
 import { IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -27,11 +28,9 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
   monoStil,
-  Segmentleiste,
   StatusChip,
   useRollen,
   Zeitachseneintrag,
-  type SegmentOption,
 } from '../components/instrument';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useModulFreigabenStand, useSprungSperre } from '../einsatz/useSprungSperre';
@@ -68,16 +67,16 @@ import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 import { flaeche } from '../theme/tokens';
 
-const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
-  { wert: 'alle', label: 'Alle Orte' },
-  { wert: 'mit', label: 'Mit Koordinaten' },
-  { wert: 'ohne', label: 'Ohne Koordinaten' },
+const ORT_OPTIONEN: { value: Ortsfilter; label: string }[] = [
+  { value: 'alle', label: 'Alle Orte' },
+  { value: 'mit', label: 'Mit Koordinaten' },
+  { value: 'ohne', label: 'Ohne Koordinaten' },
 ];
 
-const HERKUNFT_OPTIONEN: SegmentOption<Herkunftsfilter>[] = [
-  { wert: 'alle', label: 'Alle' },
-  { wert: 'geraet', label: 'Gerät' },
-  { wert: 'uebernommen', label: 'Übernommen' },
+const HERKUNFT_OPTIONEN: { value: Herkunftsfilter; label: string }[] = [
+  { value: 'alle', label: 'Alle Herkünfte' },
+  { value: 'geraet', label: 'Gerät' },
+  { value: 'uebernommen', label: 'Übernommen' },
 ];
 
 /**
@@ -585,17 +584,22 @@ export default function LagemeldungenPage() {
             onWahl={zeitraumWaehlen}
             kennung="lagemeldungen-zeitraum"
           />
-          <Segmentleiste
-            beschriftung="Ort"
-            optionen={ORT_OPTIONEN}
-            wert={filter.ort}
-            onWechsel={(ort) => setFilter((f) => ({ ...f, ort }))}
+          {/* Keine Segmentleiste: „Ort“ und „Herkunft“ schalten keine Sicht, sie schränken die
+              Achse ein und stehen als Filter neben Suche und Zeitraum (Spec `bedien-umschalten`,
+              LLH-1942). */}
+          <Select
+            aria-label="Ort"
+            style={{ minWidth: 170 }}
+            options={ORT_OPTIONEN}
+            value={filter.ort}
+            onChange={(ort: Ortsfilter) => setFilter((f) => ({ ...f, ort }))}
           />
-          <Segmentleiste
-            beschriftung="Herkunft"
-            optionen={HERKUNFT_OPTIONEN}
-            wert={filter.herkunft}
-            onWechsel={(herkunft) => setFilter((f) => ({ ...f, herkunft }))}
+          <Select
+            aria-label="Herkunft"
+            style={{ minWidth: 150 }}
+            options={HERKUNFT_OPTIONEN}
+            value={filter.herkunft}
+            onChange={(herkunft: Herkunftsfilter) => setFilter((f) => ({ ...f, herkunft }))}
           />
         </div>
       )}
