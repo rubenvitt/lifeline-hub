@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Space } from 'antd';
+import { Button, Popconfirm, Space, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenHinweise, ZeilenFehler } from '../components/SpeicherHinweis';
@@ -27,6 +27,7 @@ import { auswahlWert, vorlageAusWert, vorlagenOptionen } from './einsatzVorlageM
 const OHNE_VORLAGE = 'ohne';
 
 export default function StichworteTab() {
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
@@ -139,7 +140,7 @@ export default function StichworteTab() {
        */
       sorter: (a, b) => a.text.localeCompare(b.text, 'de', { numeric: true }),
       render: (text: string, v) => (
-        <Space size={[8, 4]} wrap>
+        <Space size={[token.marginSM, token.marginXS]} wrap>
           <span>{text}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('stichwort_vorschlag', v.id)}

@@ -1,5 +1,5 @@
 import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { Button, Space } from 'antd';
+import { Button, Space, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -35,6 +35,7 @@ const INDENT_PX = 20;
  * Typ, Unterstellung und Fahrzeuge. Gepflegt wird auf der Detailseite, angelegt im Dialog.
  */
 export default function EinheitVorlagenTab() {
+  const { token } = theme.useToken();
   const herkunft = useStammdatenHerkunft();
   const { benutzer } = useAuth();
   const isAdmin = benutzer?.system_rolle === 'admin';
@@ -65,7 +66,12 @@ export default function EinheitVorlagenTab() {
       // Für die Suche: die Zeile trägt den Namen nur verschachtelt.
       dataIndex: ['vorlage', 'name'],
       render: (_, { vorlage, depth }) => (
-        <Space size={4} wrap data-tiefe={depth} style={{ paddingInlineStart: depth * INDENT_PX }}>
+        <Space
+          size={token.marginXS}
+          wrap
+          data-tiefe={depth}
+          style={{ paddingInlineStart: depth * INDENT_PX }}
+        >
           <KennungsLink
             to={einheitVorlageDetailPath(vorlage.id)}
             style={{ overflowWrap: 'anywhere' }}
@@ -96,7 +102,7 @@ export default function EinheitVorlagenTab() {
         vorlage.fahrzeuge.length === 0 ? (
           '—'
         ) : (
-          <Space size={[8, 0]} wrap>
+          <Space size={[token.marginSM, 0]} wrap>
             {vorlage.fahrzeuge.map((f) => (
               <span key={f.fahrzeug_id} style={monoStil(12)}>
                 {f.funkrufname}

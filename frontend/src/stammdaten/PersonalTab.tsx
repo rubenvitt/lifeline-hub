@@ -1,4 +1,4 @@
-import { Button, Space, Tag } from 'antd';
+import { Button, Space, Tag, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -37,6 +37,7 @@ import { KennungsLink } from '../components/kennungsLink';
 const POSITION_FOLGE = Object.keys(POSITION_LABELS) as StaerkePosition[];
 
 export default function PersonalTab() {
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const herkunft = useStammdatenHerkunft();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -98,7 +99,7 @@ export default function PersonalTab() {
        * ohne ihn fiele der Name aus dem Suchkorpus.
        */
       render: (_, p) => (
-        <Space size={4} wrap>
+        <Space size={token.marginXS} wrap>
           <KennungsLink to={personalDetailPfad(p.id)} style={{ overflowWrap: 'anywhere' }}>
             {p.name}
           </KennungsLink>
@@ -126,7 +127,7 @@ export default function PersonalTab() {
       onFilter: (wert, p) => p.qualifikationen.some((q) => q.label === wert),
       render: (_, p) =>
         p.qualifikationen.length ? (
-          <Space size={[0, 4]} wrap>
+          <Space size={[0, token.marginXS]} wrap>
             {p.qualifikationen.map((q) => (
               <Tag key={q.id}>{q.label}</Tag>
             ))}

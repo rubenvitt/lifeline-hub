@@ -1,4 +1,4 @@
-import { AutoComplete, Collapse, Form, Input } from 'antd';
+import { AutoComplete, Collapse, Form, Input, theme } from 'antd';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -61,6 +61,7 @@ export default function MaterialFormModal({
   kategorien: string[];
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
 
@@ -172,7 +173,7 @@ export default function MaterialFormModal({
          Bereich offen, ein `resetFields` schließt ihn nicht. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         items={[
           {
             key: 'weitere',

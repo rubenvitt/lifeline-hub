@@ -1,4 +1,4 @@
-import { Button, Space, Typography } from 'antd';
+import { Button, Space, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -52,6 +52,7 @@ export default function VerpflegungsplanTab() {
 }
 
 function VerpflegungsplanInhalt() {
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const { konventionen } = useAnzeigeKonventionen();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -104,7 +105,7 @@ function VerpflegungsplanInhalt() {
       // Unter `md` gedeckelt, damit Zeit und Aktionen daneben im Bild bleiben (wie Sprechgruppen).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (b: string, m) => (
-        <Space size={[8, 4]} wrap>
+        <Space size={[token.marginSM, token.marginXS]} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('verpflegung_vorlage', m.id)}
@@ -125,7 +126,10 @@ function VerpflegungsplanInhalt() {
             {uhrzeitOhneDatum(m.beginn, konventionen)}–{uhrzeitOhneDatum(m.ende, konventionen)}
           </span>
           {m.folgetag && (
-            <Typography.Text type="secondary" style={{ ...monoStil(12), marginInlineStart: 6 }}>
+            <Typography.Text
+              type="secondary"
+              style={{ ...monoStil(12), marginInlineStart: token.marginSM }}
+            >
               +1 Tag
             </Typography.Text>
           )}

@@ -178,7 +178,7 @@ export default function BefehlDetail({
           style={{ marginBottom: token.marginSM }}
         />
       )}
-      <Space size={6} wrap style={{ marginBottom: 6 }}>
+      <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
         <StatusBadge phase={status.phase} label={status.label} />
       </Space>
       <Typography.Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block' }}>

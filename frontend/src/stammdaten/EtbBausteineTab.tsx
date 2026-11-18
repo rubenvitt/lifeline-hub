@@ -69,7 +69,7 @@ export default function EtbBausteineTab() {
       render: (label: string, b: EtbBaustein) => (
         <>
           {/* Die Marke trägt die Testabfrage: der `textContent` der Zelle enthält Label UND Inhalt. */}
-          <Space size={[8, 4]} wrap>
+          <Space size={[token.marginSM, token.marginXS]} wrap>
             <div data-lfh="baustein-label" style={{ fontWeight: token.fontWeightStrong }}>
               {label}
             </div>

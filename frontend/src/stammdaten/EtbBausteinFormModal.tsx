@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, Typography } from 'antd';
+import { Collapse, Form, Input, InputNumber, Typography, theme } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -30,6 +30,7 @@ export default function EtbBausteinFormModal({
   baustein: EtbBaustein | null;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
 
@@ -127,7 +128,7 @@ export default function EtbBausteinFormModal({
          Felder" nicht prüfbar. Gegenmittel am `onErfassen` oben. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         items={[
           {
             key: 'weitere',

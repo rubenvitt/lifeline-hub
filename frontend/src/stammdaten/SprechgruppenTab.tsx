@@ -1,4 +1,4 @@
-import { Button, Modal, Space, Tag } from 'antd';
+import { Button, Modal, Space, Tag, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -27,6 +27,7 @@ import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 
 export default function SprechgruppenTab() {
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
@@ -115,7 +116,7 @@ export default function SprechgruppenTab() {
       // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (b: string, sg) => (
-        <Space size={[8, 4]} wrap>
+        <Space size={[token.marginSM, token.marginXS]} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('sprechgruppe', sg.id)}

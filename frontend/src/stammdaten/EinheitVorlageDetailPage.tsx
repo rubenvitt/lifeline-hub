@@ -312,7 +312,7 @@ function DetailContent({
           { title: vorlage.name },
         ]}
         titel={
-          <Space size={8} wrap>
+          <Space size={token.marginSM} wrap>
             <span>{vorlage.name}</span>
             {vorlage.ist_demo && <DemoMarke />}
             {!vorlage.aktiv && <StatusChip ton="neutral" wort="Inaktiv" />}

@@ -53,7 +53,7 @@ export function markeHinweis(eintraege: readonly { zeitachse_marke?: ZeitachseMa
     <Alert
       type="info"
       showIcon
-      style={{ marginBottom: 12 }}
+      style={{ marginBottom: 'var(--lfh-luft-3)' }}
       title="Zeitachse: kein Status trägt ein Ereignis"
     />
   );

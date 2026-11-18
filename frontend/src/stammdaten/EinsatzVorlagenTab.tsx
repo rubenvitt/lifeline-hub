@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Space } from 'antd';
+import { Button, Popconfirm, Space, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -34,6 +34,7 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 const EINSATZART_FOLGE = Object.keys(EINSATZART_LABELS) as Einsatzart[];
 
 export default function EinsatzVorlagenTab() {
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
@@ -75,7 +76,7 @@ export default function EinsatzVorlagenTab() {
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       sorter: nachText((v: EinsatzVorlage) => v.bezeichnung),
       render: (text: string, v) => (
-        <Space size={[8, 4]} wrap>
+        <Space size={[token.marginSM, token.marginXS]} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{text}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('einsatz_vorlage', v.id)}

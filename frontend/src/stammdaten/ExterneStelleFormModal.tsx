@@ -1,4 +1,4 @@
-import { Checkbox, Collapse, Form, Input } from 'antd';
+import { Checkbox, Collapse, Form, Input, theme } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -71,6 +71,7 @@ export default function ExterneStelleFormModal({
   zustaendigVomHub?: boolean;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
   const art = Form.useWatch('art', form);
@@ -156,7 +157,7 @@ export default function ExterneStelleFormModal({
       <Collapse
         key={stelle?.id ?? 'neu'}
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         defaultActiveKey={stelle?.rufnummer || stelle?.funkrufname ? ['kontakt'] : []}
         items={[
           {

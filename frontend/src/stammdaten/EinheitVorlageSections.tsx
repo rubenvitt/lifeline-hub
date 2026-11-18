@@ -68,7 +68,7 @@ function Row({ children, actions }: { children: ReactNode; actions?: ReactNode }
         rowGap: token.marginSM,
       }}
     >
-      <Space size={8} wrap style={{ flex: '1 1 240px', minWidth: 0 }}>
+      <Space size={token.marginSM} wrap style={{ flex: '1 1 240px', minWidth: 0 }}>
         {children}
       </Space>
       {actions != null && (
@@ -114,6 +114,7 @@ export function UntereinheitenSection({
   isAdmin,
   onCreated,
 }: SectionProps & { onCreated: (v: EinheitVorlage) => void }) {
+  const { token } = theme.useToken();
   const [modalOpen, setModalOpen] = useState(false);
   const children = vorlagen.filter((v) => v.ueber_vorlage_id === vorlage.id);
   return (
@@ -125,7 +126,7 @@ export function UntereinheitenSection({
           Untereinheit anlegen
         </Button>
       }
-      style={{ marginBlockStart: 16 }}
+      style={{ marginBlockStart: token.marginLG }}
     >
       {children.length === 0 ? (
         <PaneelZeile>Keine Untereinheiten</PaneelZeile>
@@ -153,6 +154,7 @@ export function UntereinheitenSection({
 // ── Fahrzeuge ────────────────────────────────────────────────────────────────────────────────
 
 export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const names = useNames(vorlagen);
   const [selected, setSelected] = useState<number | undefined>();
@@ -177,7 +179,11 @@ export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
   );
 
   return (
-    <Paneel titel="Fahrzeuge" meta={vorlage.fahrzeuge.length} style={{ marginBlockStart: 16 }}>
+    <Paneel
+      titel="Fahrzeuge"
+      meta={vorlage.fahrzeuge.length}
+      style={{ marginBlockStart: token.marginLG }}
+    >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.fahrzeuge.length === 0 ? (
         <PaneelZeile>Keine Fahrzeuge</PaneelZeile>
@@ -261,6 +267,7 @@ function toInput(
 }
 
 export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const names = useNames(vorlagen);
   const [selected, setSelected] = useState<number | undefined>();
@@ -290,7 +297,11 @@ export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionPro
   }));
 
   return (
-    <Paneel titel="Stammbesetzung" meta={vorlage.personal.length} style={{ marginBlockStart: 16 }}>
+    <Paneel
+      titel="Stammbesetzung"
+      meta={vorlage.personal.length}
+      style={{ marginBlockStart: token.marginLG }}
+    >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.personal.length === 0 ? (
         <PaneelZeile>Keine Stammbesetzung</PaneelZeile>
@@ -460,6 +471,7 @@ function MengeFeld({
 }
 
 export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<number | undefined>();
   const materialQuery = useQuery({
@@ -490,7 +502,11 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
   }));
 
   return (
-    <Paneel titel="Material" meta={vorlage.material.length} style={{ marginBlockStart: 16 }}>
+    <Paneel
+      titel="Material"
+      meta={vorlage.material.length}
+      style={{ marginBlockStart: token.marginLG }}
+    >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.material.length === 0 ? (
         <PaneelZeile>Kein Material</PaneelZeile>

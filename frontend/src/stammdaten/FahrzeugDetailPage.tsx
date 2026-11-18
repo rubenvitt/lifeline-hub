@@ -161,7 +161,7 @@ export default function FahrzeugDetailPage() {
         ]}
         breite="schmal"
         titel={
-          <Space size={8}>
+          <Space size={token.marginSM}>
             <span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>
             {fahrzeug.ist_demo && <DemoMarke />}
           </Space>

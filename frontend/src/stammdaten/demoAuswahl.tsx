@@ -21,7 +21,12 @@ export const DEMO_GROUP = 'Demo-Daten';
  * deshalb der Text, nie die Marke: ohne `flex: none` an der Marke schnitt antds Ellipse beim
  * längsten Demo-Eintrag „Demo“ zu „De“ ab (gesehen im Stack-Durchgang zu LFH-733).
  */
-const demoLabelStil: CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 };
+const demoLabelStil: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--lfh-luft-1)',
+  minWidth: 0,
+};
 const demoTextStil: CSSProperties = {
   minWidth: 0,
   overflow: 'hidden',

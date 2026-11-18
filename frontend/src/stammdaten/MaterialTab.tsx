@@ -1,4 +1,4 @@
-import { Button, Space } from 'antd';
+import { Button, Space, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
@@ -30,6 +30,7 @@ import {
 } from './dienststatus';
 
 export default function MaterialTab() {
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const herkunft = useStammdatenHerkunft();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -87,7 +88,7 @@ export default function MaterialTab() {
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
       // LFH-733: die Marke steht neben der Bezeichnung; `dataIndex` hält den Suchkorpus beim Rohwert.
       render: (_, m) => (
-        <Space size={4} wrap>
+        <Space size={token.marginXS} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
           {m.ist_demo && <DemoMarke />}
           <HerkunftAbzeichen

@@ -141,7 +141,7 @@ export default function PersonalDetailPage() {
         pfad={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
         breite="schmal"
         titel={
-          <Space size={8}>
+          <Space size={token.marginSM}>
             {person.name}
             {person.ist_demo && <DemoMarke />}
           </Space>

@@ -131,7 +131,7 @@ const felder = (
     </Form.Item>
     <Collapse
       ghost
-      style={{ marginInline: -8 }}
+      style={{ marginInline: 'calc(-1 * var(--lfh-luft-2))' }}
       items={[
         {
           key: 'weitere',

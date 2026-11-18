@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { App, Button, Modal, Space } from 'antd';
+import { App, Button, Modal, Space, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -73,6 +73,7 @@ export default function SchichtmodelleTab() {
 }
 
 function SchichtmodelleInhalt() {
+  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const { konventionen } = useAnzeigeKonventionen();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -193,7 +194,7 @@ function SchichtmodelleInhalt() {
       sorter: nachText((m: Schichtmodell) => m.bezeichnung),
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (_: string, m) => (
-        <Space size={[8, 4]} wrap>
+        <Space size={[token.marginSM, token.marginXS]} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
           {m.ist_vorgabe && <StatusChip ton="normal" wort="Vorgabe der Organisation" />}
           {m.ist_demo && <DemoMarke />}
