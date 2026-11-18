@@ -1,6 +1,6 @@
 import { Button, Modal, Space, Tag } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Stapel, StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -115,7 +115,7 @@ export default function SprechgruppenTab() {
       // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (b: string, sg) => (
-        <Space size={[8, 4]} wrap>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('sprechgruppe', sg.id)}
@@ -128,7 +128,7 @@ export default function SprechgruppenTab() {
               auch lokal in {auchLokal.get(sg.id)?.join(', ')}
             </Tag>
           )}
-        </Space>
+        </Stapel>
       ),
     },
     {

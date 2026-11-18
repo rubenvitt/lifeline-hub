@@ -17,7 +17,7 @@ import {
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
-import { Formularpaneel } from '../../components/instrument';
+import { Feld, Formularpaneel } from '../../components/instrument';
 import FristPaneel from '../../aufbewahrung/FristPaneel';
 import NachbereitungPaneel from '../../aufbewahrung/NachbereitungPaneel';
 import { EINSATZ_ABGESCHLOSSEN } from '../../components/nurAnsicht';
@@ -95,7 +95,8 @@ export default function EinsatzAufbewahrung() {
         disabled={!daten.darfBearbeiten}
       >
         <Formularpaneel titel="Aufbewahrung & Archiv">
-          <Form.Item
+          <Feld
+            breite="schmal"
             label="Aufbewahrungs-Dauer (Tage)"
             name="retention_dauer_tage"
             // Abgeschlossen steht kein „Nur Ansicht“ im Seitenkopf (die Frist oben bleibt
@@ -115,11 +116,10 @@ export default function EinsatzAufbewahrung() {
             <InputNumber
               min={1}
               max={3650}
-              style={{ width: '100%', maxWidth: 200 }}
               // Einsatz ?? Org (`einsatz/effektiv.rs`): der Platzhalter nennt den wirksamen Wert.
               placeholder={platzhalterVorgabe(orgDauer, 'keine')}
             />
-          </Form.Item>
+          </Feld>
         </Formularpaneel>
 
         <div {...speicherLeiste}>

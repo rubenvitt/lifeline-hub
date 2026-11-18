@@ -994,6 +994,10 @@ describe('EinsatzdatenPage — Einstieg in den Einsatzbericht (LFH-726)', () => 
     const k = await kopf();
     const link = await within(k).findByRole('link', { name: 'Einsatzbericht – Druckansicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/einsatzdaten/bericht');
+    // LLH-1835: daneben die ganze Akte, ebenso sekundär.
+    const akte = await within(k).findByRole('link', { name: 'Einsatzakte – Druckansicht' });
+    expect(akte).toHaveAttribute('href', '/einsaetze/7/einsatzdaten/akte');
+    expect(akte).not.toHaveClass('ant-btn-primary');
     expect(link).not.toHaveClass('ant-btn-primary');
     expect(k.querySelectorAll('.ant-btn-primary').length).toBeLessThanOrEqual(1);
   });

@@ -529,6 +529,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .map(|t| t.als_str().to_string()),
         auto_aktualisierung,
         backup_download: Default::default(),
+        einsatzakte_bau: Default::default(),
         backup_empfaenger,
         datentraeger: datentraeger.clone(),
     };

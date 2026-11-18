@@ -1,4 +1,4 @@
-import { Button, Flex, Popconfirm, Space, Tag, theme } from 'antd';
+import { Button, Popconfirm, Space, Tag } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -13,6 +13,7 @@ import AusKatalogModal from './AusKatalogModal';
 import { globalKeys } from '../api/queryKeys';
 import StatusTag from '../components/StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
+import { Stapel } from '../components/instrument';
 
 /** Schalter einer Quelle (LFH-1022: Statusrolle statt antd-Preset `green`). */
 const QUELLE_AKTIV: StatusDarstellung = { rolle: 'normal', label: 'aktiv' };
@@ -26,7 +27,6 @@ export default function OnlineQuellenVerwaltung() {
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
-  const { token } = theme.useToken();
   const [formOffen, setFormOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<OnlineQuelle | null>(null);
   const [katalogOffen, setKatalogOffen] = useState(false);
@@ -91,7 +91,7 @@ export default function OnlineQuellenVerwaltung() {
        * mit fixierter erster Spalte wählt rc-table `table-layout: auto`, und dort ist eine
        * Spaltenbreite nur ein Wunsch (im Browser gemessen: trotz `<col width="280">` ungekürzt;
        * antds `.ant-table-cell-ellipsis` senkt den Platzbedarf nicht). `maxWidth` bindet — und eine
-       * zusätzliche `width` wäre ein Verstoß gegen `components/feldbreiten.guard.test.ts`.
+       * zusätzliche `width` wäre ein Verstoß gegen `components/feld.guard.test.ts`.
        */
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 280 } }),
@@ -145,7 +145,7 @@ export default function OnlineQuellenVerwaltung() {
             render: (_, q: OnlineQuelle) => {
               const grund = zeilen.grund(q.id);
               return (
-                <Flex vertical gap={token.marginXXS} align="flex-start">
+                <Stapel abstand="xxs" ausrichten="start">
                   {/* `size="middle"` trennt die destruktive von der neutralen Aktion
                     (`components/aktionsabstand.guard.test.ts`). */}
                   <Space size="middle">
@@ -168,7 +168,7 @@ export default function OnlineQuellenVerwaltung() {
                     </Popconfirm>
                   </Space>
                   {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
-                </Flex>
+                </Stapel>
               );
             },
           },

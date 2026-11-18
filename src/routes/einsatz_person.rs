@@ -2117,19 +2117,13 @@ fn csv_feld(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-/// GET /api/einsaetze/{id}/personen/export — CSV aller (nicht-stornierten)
-/// Personen. **Schreibt einen `export`-Audit-Eintrag** (person_id = NULL).
-pub async fn export(
-    State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Personen>,
-) -> Result<Response, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let personen = repo::liste(&state.pool, einsatz_id, None).await?;
-    audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "export").await?;
-
+/// CSV der Personen wie `GET …/personen/export`; geteilt mit dem ZIP der Einsatzakte
+/// (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6). Protokolliert nicht: das tut, wer
+/// die Daten ausliefert.
+pub fn personen_csv(personen: &[PersonAnzeige]) -> String {
     let mut csv =
         String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
-    for p in &personen {
+    for p in personen {
         let alter = p
             .alter_geschaetzt
             .map(|a| a.to_string())
@@ -2146,6 +2140,20 @@ pub async fn export(
             csv_feld(p.antreff_ort.as_deref().unwrap_or("")),
         ));
     }
+    csv
+}
+
+/// GET /api/einsaetze/{id}/personen/export — CSV aller (nicht-stornierten)
+/// Personen. **Schreibt einen `export`-Audit-Eintrag** (person_id = NULL).
+pub async fn export(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Response, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let personen = repo::liste(&state.pool, einsatz_id, None).await?;
+    audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "export").await?;
+
+    let csv = personen_csv(&personen);
     Ok((
         [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
         csv,

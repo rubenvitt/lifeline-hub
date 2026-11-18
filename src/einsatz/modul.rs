@@ -219,6 +219,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Sprechgruppen, Ort-Vorschau und die Ortssuche des Ortsfelds (LFH-1175) gehören keinem
     // Modul (wie die Einsatz-Kopfdaten).
     ("/api/einsaetze/{id}/sprechgruppen", None),
+    // Die Einsatzakte (LLH-1835) prüft jedes ihrer Module im Handler, nicht im Extractor.
+    ("/api/einsaetze/{id}/einsatzakte", None),
     // Programmpunkte (LLH-1570) gehören wie die Kopfdaten keinem Modul.
     ("/api/einsaetze/{id}/programmpunkte", None),
     ("/api/einsaetze/{id}/ort-vorschau", None),

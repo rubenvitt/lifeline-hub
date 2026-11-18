@@ -1,5 +1,5 @@
-import { Form, Input, InputNumber, type TableColumnsType } from 'antd';
-import { monoStil } from '../components/instrument';
+import { Input, InputNumber, type TableColumnsType } from 'antd';
+import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { STAERKE_SCHREIBWEISE, staerkeSumme } from '../anzeige/staerke';
 import { aktualisiereTyp, deaktiviereTyp, legeTypAn, listeEinheitTypen } from '../api/einheitTypen';
@@ -86,19 +86,19 @@ const aktualisiere = (id: number, werte: FormWerte) =>
 
 const felder = (bearbeite: EinheitTyp | null) => (
   <>
-    <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
       <Input placeholder="z. B. Zug" />
-    </Form.Item>
+    </Feld>
     {/* „Alle drei oder keiner“ setzt `StaerkeEingabe` selbst durch (leere Felder zählen als 0). */}
-    <Form.Item label="Soll-Stärke" name="soll">
+    <Feld label="Soll-Stärke" name="soll">
       <StaerkeEingabe />
-    </Form.Item>
-    <Form.Item label="Qualifikationssoll" name="quali_soll">
+    </Feld>
+    <Feld label="Qualifikationssoll" name="quali_soll">
       <QualiSollFeld bekannt={bearbeite?.quali_soll} />
-    </Form.Item>
-    <Form.Item label="Sortierung" name="sortier">
-      <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-    </Form.Item>
+    </Feld>
+    <Feld label="Sortierung" name="sortier" breite="kurz">
+      <InputNumber min={0} />
+    </Feld>
   </>
 );
 

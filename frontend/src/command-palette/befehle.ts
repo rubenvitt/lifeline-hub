@@ -31,6 +31,7 @@ import {
   einsaetzePfad,
   einsatzabschnittePfad,
   einsatzEinstellungenPfad,
+  einsatzaktePfad,
   einsatzberichtPfad,
   einsatzModulPfad,
   einsatzPfad,
@@ -506,6 +507,16 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         icon: IconDokument,
         schlagworte: ['einsatzbericht', 'abschlussbericht', 'nachbereitung', 'pdf', 'drucken'],
         ...sprungZu(einsatzberichtPfad(k.einsatzId), k.navigate),
+      });
+      // LLH-1835: die ganze Akte; die Rechte prüft die Seite wie beim Bericht.
+      befehle.push({
+        id: 'sprung:einsatzakte',
+        gruppe: 'module',
+        label: druckansichtVon('Einsatzakte'),
+        kontext: kategorieKontext('fuehrung'),
+        icon: IconDokument,
+        schlagworte: ['einsatzakte', 'akte', 'übergabe', 'archiv', 'zip', 'pdf', 'drucken'],
+        ...sprungZu(einsatzaktePfad(k.einsatzId), k.navigate),
       });
     }
 

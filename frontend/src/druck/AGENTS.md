@@ -13,7 +13,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
   `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
   `einsatzbericht-deckel-druck`, `koerperschema-druck`, `gefahren-druck`, `schichtplan-druck`,
-  `registrierliste-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `registrierliste-druck`, `einsatzakte-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium). Druck-Specs mit Lagekarte (`lagekarte-druck`) stehen in `KARTEN_DRUCK_SPECS`:
   Chromium und WebKit, denn der headless Firefox hat kein WebGL2 (LLH-1051).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
@@ -227,5 +227,15 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nur eine Voreinstellung der Auswahl (`KURZBERICHT` in `auswahl.ts`) mit eigenem Namen im Kopf,
   kein Dokument und kein Parameter. Die Anlage `materialverbrauch` liest aktives und
   herausgenommenes Material.
+- **Einsatzakte** (LLH-1835, Spec `einsatzakte`, Change `hsdhm2ki-einsatzakte`):
+  `einsatzdaten/akte` (`pages/EinsatzakteDruckPage.tsx`, `druck/einsatzakte/`), EINE Druckwurzel,
+  je Kapitel ein `druck-kapitel` mit eigenem `Druckkopf` (`ebene={2}`). Die Kapitel bauen auf den
+  Bausteinen der Einzeldrucke (`Bloecke`, `EtbDruckTabelle`, `PersonenDruckTabelle`,
+  `AbschnittsText`/`LageberichtText`, `DokumentAnlagenBlaetter`), nie auf deren Seiten. Weiche
+  `akteFreigabe` vor dem Abruf über `AKTE_MODULE` (gespiegelt in `src/einsatzakte/mod.rs`),
+  `freigabeDesModuls` aus dem Bericht, alles oder nichts. Ein Abruf, nicht-live Key
+  `einsatzakteDruck`, `DRUCK_ABFRAGE`, `gcTime: 0` (Betroffene über `…/personen/druck`). Befehle
+  und Lageberichte nur freigegeben, je Kette der Kopf (`kettenKoepfe`), wie das ZIP. Das ZIP ist
+  ein Link mit `download`, kein Blob.
 - **Org-Branding** (`PATCH /api/organisation`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
   Virenscan) liegt außerhalb der Schwärzung (`schwaerzung_registry.rs`).
