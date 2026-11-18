@@ -43,10 +43,21 @@ beforeEach(() => {
       return HttpResponse.json(neu, { status: 201 });
     }),
     http.patch('/api/einsaetze/1/programmpunkte/:pid', async ({ request, params }) => {
-      const body = (await request.json()) as Partial<Programmpunkt>;
+      const body = (await request.json()) as Partial<Programmpunkt> & {
+        erwartet?: Partial<Programmpunkt>;
+      };
       gesendet.push({ methode: 'PATCH', pfad: new URL(request.url).pathname, body });
       const id = Number(params.pid);
-      punkte = punkte.map((p) => (p.id === id ? { ...p, ...body } : p));
+      const { erwartet, ...daten } = body;
+      const alt = punkte.find((p) => p.id === id);
+      // Feld-CAS wie der Server (LLH-1945): ein abweichender Altwert ist 409 `veraltet`.
+      if (alt && erwartet && Object.entries(erwartet).some(([k, v]) => alt[k as 'id'] !== v)) {
+        return HttpResponse.json(
+          { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
+          { status: 409 },
+        );
+      }
+      punkte = punkte.map((p) => (p.id === id ? { ...p, ...daten } : p));
       return HttpResponse.json(punkte.find((p) => p.id === id));
     }),
     http.delete('/api/einsaetze/1/programmpunkte/:pid', ({ request, params }) => {
@@ -99,7 +110,7 @@ describe('AblaufPaneel', () => {
     expect(await within(p).findByText('Ende')).toBeInTheDocument();
   });
 
-  it('ändert die Bezeichnung in der Zeile und sendet nur sie', async () => {
+  it('ändert die Bezeichnung in der Zeile und sendet nur sie, mit dem Wert beim Öffnen', async () => {
     const user = userEvent.setup();
     const p = await zeige();
     await user.click(
@@ -112,8 +123,46 @@ describe('AblaufPaneel', () => {
     expect(gesendet[0]).toEqual({
       methode: 'PATCH',
       pfad: '/api/einsaetze/1/programmpunkte/2',
-      body: { bezeichnung: 'Höhenfeuerwerk' },
+      body: { bezeichnung: 'Höhenfeuerwerk', erwartet: { bezeichnung: 'Feuerwerk' } },
     });
+  });
+
+  // Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+  // Änderung“): auch der Zeitpunkt geht mit seinem Wert beim Öffnen.
+  it('ändert den Zeitpunkt in der Zeile mit dem Wert beim Öffnen', async () => {
+    const user = userEvent.setup();
+    const p = await zeige();
+    await user.click(within(p).getByRole('button', { name: 'Zeitpunkt zu Feuerwerk bearbeiten' }));
+    await tippeZeit(
+      user,
+      within(p).getByRole('textbox', { name: /Zeitpunkt/ }),
+      wireAb(120).slice(0, 16),
+    );
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    // Die getippte Wanduhr gilt in der Anzeigezone; hier zählt der Altwert.
+    expect(gesendet[0].body).toEqual({
+      zeitpunkt_at: expect.any(String),
+      erwartet: { zeitpunkt_at: wireAb(90) },
+    });
+  });
+
+  it('veraltete Bezeichnung: Rückfrage, „Verwerfen und neu laden“ sendet nichts mehr', async () => {
+    const user = userEvent.setup();
+    const p = await zeige();
+    await user.click(
+      within(p).getByRole('button', { name: 'Bezeichnung zu Feuerwerk bearbeiten' }),
+    );
+    punkte = punkte.map((x) => (x.id === 2 ? { ...x, bezeichnung: 'Raketen' } : x));
+    const feld = within(p).getByRole('textbox', { name: /Bezeichnung/ });
+    await user.clear(feld);
+    await user.type(feld, 'Höhenfeuerwerk{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent(/Bezeichnung inzwischen: „Raketen“/);
+    await user.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    expect(await within(p).findByText('Raketen')).toBeInTheDocument();
+    expect(gesendet).toHaveLength(1);
+    expect(screen.queryByText('Programmpunkt gespeichert')).toBeNull();
   });
 
   it('löscht nach Rückfrage', async () => {

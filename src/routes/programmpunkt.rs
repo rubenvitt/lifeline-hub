@@ -28,6 +28,17 @@ pub struct NeuerProgrammpunkt {
 pub struct ProgrammpunktPatch {
     pub bezeichnung: Option<String>,
     pub zeitpunkt_at: Option<String>,
+    /// Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+    /// Änderung“): je geänderter Angabe ihr Wert beim Öffnen; fehlt = kein Vergleich. Die Planung
+    /// (`planung::update_programmpunkt`) hat einen eigenen Weg und kennt das Feld nicht.
+    pub erwartet: Option<ProgrammpunktErwartet>,
+}
+
+/// Altwerte eines Programmpunkts. Beide Angaben sind Pflicht, ein leerer Altwert kommt nicht vor.
+#[derive(Debug, Default, Deserialize)]
+pub struct ProgrammpunktErwartet {
+    pub bezeichnung: Option<String>,
+    pub zeitpunkt_at: Option<String>,
 }
 
 /// Formulareingabe → kanonischer UTC-Zeitstempel mit Jahr im Bereich (400, LFH-924). Auch für
@@ -93,12 +104,49 @@ pub async fn aendern(
         .as_deref()
         .map(parse_zeitpunkt)
         .transpose()?;
+    let erwartet = req.erwartet.unwrap_or_default();
+    crate::feld_cas::pruefe_felder(
+        &[
+            (
+                "bezeichnung",
+                erwartet.bezeichnung.is_some(),
+                bezeichnung.is_some(),
+            ),
+            (
+                "zeitpunkt_at",
+                erwartet.zeitpunkt_at.is_some(),
+                zeitpunkt.is_some(),
+            ),
+        ],
+        &[],
+    )?;
+    // Der Altwert des Zeitpunkts in derselben kanonischen Form, in der die Spalte ihn trägt.
+    let erwartet_zeitpunkt = erwartet
+        .zeitpunkt_at
+        .as_deref()
+        .map(parse_zeitpunkt)
+        .transpose()?;
+    let mut w = crate::feld_cas::ExpectedValues::new();
+    w.push(
+        "bezeichnung",
+        erwartet
+            .bezeichnung
+            .as_deref()
+            .map(|b| crate::feld_cas::ExpectedValue::Text(Some(b.trim()))),
+    );
+    w.push(
+        "zeitpunkt_at",
+        erwartet_zeitpunkt
+            .as_deref()
+            .map(|z| crate::feld_cas::ExpectedValue::Text(Some(z))),
+    );
     let p = repo::aendern(
         &state.pool,
         ctx.einsatz.id,
         pid,
         bezeichnung.as_deref(),
         zeitpunkt.as_deref(),
+        &w,
     )
     .await?;
     melden(&state, ctx.einsatz.id);
