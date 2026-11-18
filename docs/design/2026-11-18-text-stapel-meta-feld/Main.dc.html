@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Die vier Bausteine</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-500.woff2") format("woff2");font-weight:500}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;box-sizing:border-box;padding:32px;background:#08090b;color:#e8ebee;font-family:'LFH Archivo',system-ui,sans-serif;font-size:14px;line-height:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;overflow:hidden">
+
+  <section style="background:#151719;border:1px solid #22262b;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <h2 style="margin:0;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#9199a2">Textstufe</h2>
+      <code style="font-family:'LFH Mono',monospace;font-size:11px;color:#9fa7b0">&lt;Textstufe stufe ton als&gt;</code>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:grid;grid-template-columns:120px minmax(0,1fr) 80px;align-items:baseline;gap:12px;border-bottom:1px solid #22262b;padding-bottom:8px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">kartentitel</span>
+        <span style="font-size:15px;font-weight:600">RTW 1/83-1 · Wache Nord</span>
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#8ec2f0">15/600 neu</span>
+      </div>
+      <div style="display:grid;grid-template-columns:120px minmax(0,1fr) 80px;align-items:baseline;gap:12px;border-bottom:1px solid #22262b;padding-bottom:8px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">seitentitel</span>
+        <span style="font-size:14px;font-weight:600">Fahrzeuge</span>
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">14/600</span>
+      </div>
+      <div style="display:grid;grid-template-columns:120px minmax(0,1fr) 80px;align-items:baseline;gap:12px;border-bottom:1px solid #22262b;padding-bottom:8px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">text</span>
+        <span style="font-size:14px">Fahrzeug steht ab 06:00 wieder bereit.</span>
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">14/400</span>
+      </div>
+      <div style="display:grid;grid-template-columns:120px minmax(0,1fr) 80px;align-items:baseline;gap:12px;border-bottom:1px solid #22262b;padding-bottom:8px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">textKlein</span>
+        <span style="font-size:12px;color:#9fa7b0">Hinweis unter einem Feld, gedämpft</span>
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">12/400</span>
+      </div>
+      <div style="display:grid;grid-template-columns:120px minmax(0,1fr) 80px;align-items:baseline;gap:12px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">meta</span>
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">14:32 · Nr. 0412</span>
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">11 mono</span>
+      </div>
+    </div>
+    <p style="margin:0;font-size:12px;color:#9fa7b0">Ton: <b style="color:#e8ebee;font-weight:500">text</b> · <b style="color:#c6ccd2;font-weight:500">text2</b> · <b style="color:#9fa7b0;font-weight:500">gedaempft</b> · <b style="color:#9199a2;font-weight:500">schwach</b> · <b style="color:#ff6b6b;font-weight:500">alarm</b>. Größen fest, unabhängig von der Dichte. 13 px rastet auf 14 oder 12, 15 px wird <code style="font-family:'LFH Mono',monospace">kartentitel</code>.</p>
+  </section>
+
+  <section style="background:#151719;border:1px solid #22262b;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <h2 style="margin:0;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#9199a2">Stapel</h2>
+      <code style="font-family:'LFH Mono',monospace;font-size:11px;color:#9fa7b0">&lt;Stapel abstand richtung ausrichten umbruch&gt;</code>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">xs · 4</span>
+        <div style="display:flex;flex-direction:column;gap:4px"><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">sm · 8</span>
+        <div style="display:flex;flex-direction:column;gap:8px"><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">md · 12</span>
+        <div style="display:flex;flex-direction:column;gap:12px"><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">lg · 16</span>
+        <div style="display:flex;flex-direction:column;gap:16px"><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div><div style="height:20px;background:#27292b"></div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">richtung="zeile" abstand="sm" umbruch</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><div style="width:96px;height:24px;background:#27292b"></div><div style="width:64px;height:24px;background:#27292b"></div><div style="width:120px;height:24px;background:#27292b"></div><div style="width:80px;height:24px;background:#27292b"></div></div>
+    </div>
+    <p style="margin:0;font-size:12px;color:#9fa7b0">Senkrecht ist die Vorgabe. Die Stufe kommt aus dem Raster der aktiven Dichte (kompakt 4·4·8·12·16·24); eine Zahl lässt sich nicht übergeben. Ersetzt <code style="font-family:'LFH Mono',monospace">Space vertical</code>, <code style="font-family:'LFH Mono',monospace">Flex vertical gap</code> und <code style="font-family:'LFH Mono',monospace">flexDirection: column</code>.</p>
+  </section>
+
+  <section style="background:#151719;border:1px solid #22262b;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <h2 style="margin:0;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#9199a2">MetaZeile</h2>
+      <code style="font-family:'LFH Mono',monospace;font-size:11px;color:#9fa7b0">&lt;MetaZeile&gt;&lt;MetaZeile.Teil mono&gt;</code>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600">RTW 1/83-1</span>
+        <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:12px;color:#9199a2">
+          <span style="font-family:'LFH Mono',monospace;font-size:11px">HH-RK 1083</span><span aria-hidden="true">·</span><span>Wache Nord</span><span aria-hidden="true">·</span><span>geändert <span style="font-family:'LFH Mono',monospace;font-size:11px">17.11. 14:32</span></span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600">Externe Stelle: Leitstelle Nord</span>
+        <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:12px;color:#9199a2">
+          <span>Leitstelle</span><span aria-hidden="true">·</span><span style="font-family:'LFH Mono',monospace;font-size:11px">040 4285-0</span><span aria-hidden="true">·</span><span style="color:#e8cc3a">nicht erreichbar</span>
+        </div>
+      </div>
+    </div>
+    <p style="margin:0;font-size:12px;color:#9fa7b0">Teile in <code style="font-family:'LFH Mono',monospace">textKlein</code>/<code style="font-family:'LFH Mono',monospace">schwach</code>, Trenner „·“ setzt der Baustein und versteckt ihn vor dem Screenreader. Ein leerer Teil fällt samt Trenner weg. <code style="font-family:'LFH Mono',monospace">mono</code> für Zahl, Zeit, Kennzeichen.</p>
+  </section>
+
+  <section style="background:#151719;border:1px solid #22262b;padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <h2 style="margin:0;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#9199a2">Feld</h2>
+      <code style="font-family:'LFH Mono',monospace;font-size:11px;color:#9fa7b0">&lt;Feld name label breite hinweis&gt; = Form.Item</code>
+    </div>
+    <form style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:4px;max-width:120px">
+        <label for="m-sitz" style="font-size:14px">Sitzplätze <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">kurz · bis 120</span></label>
+        <input id="m-sitz" value="4" style="height:30px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;font-family:'LFH Mono',monospace;border-radius:0">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;max-width:320px">
+        <label for="m-funk" style="font-size:14px">Funkrufname <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">mittel · bis 320</span></label>
+        <input id="m-funk" value="RK 1/83" style="height:30px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #ff6b6b;color:#e8ebee;padding:0 8px;font:inherit;font-family:'LFH Mono',monospace;border-radius:0">
+        <span style="font-size:12px;color:#ff6b6b">Funkrufname ist schon vergeben (RTW 1/83-2).</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label for="m-bem" style="font-size:14px">Bemerkung <span style="font-family:'LFH Mono',monospace;font-size:11px;color:#9199a2">voll · Vorgabe</span></label>
+        <input id="m-bem" value="" placeholder="z. B. Trage mit Raupe" style="height:30px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;border-radius:0">
+        <span style="font-size:12px;color:#9fa7b0">Erscheint in der Fahrzeugliste unter dem Namen.</span>
+      </div>
+    </form>
+    <p style="margin:0;font-size:12px;color:#9fa7b0">Breite immer 100 % bis zur Obergrenze der Stufe; eine Pixelbreite nimmt der Baustein nicht an. Fehlerzeile und Pflichtzeichen bleiben antds.</p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

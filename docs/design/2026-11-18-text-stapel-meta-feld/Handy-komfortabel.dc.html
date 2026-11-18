@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Fahrzeug am Handy, komfortabel</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-400.woff2") format("woff2");font-weight:400}
+body{margin:0}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#08090b;color:#e8ebee;font-family:'LFH Archivo',system-ui,sans-serif;font-size:15px;line-height:22px;display:flex;flex-direction:column;overflow:hidden">
+  <header style="height:56px;flex:none;background:#151719;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:12px;padding:0 16px">
+    <a href="#" aria-label="Zurück zu Fahrzeuge" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:#8ec2f0;margin-left:-12px">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg>
+    </a>
+    <span style="font-size:14px;font-weight:600">Fahrzeug bearbeiten</span>
+  </header>
+  <main style="flex:1;padding:20px 16px;display:flex;flex-direction:column;gap:28px;overflow:hidden">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:15px;font-weight:600">RTW 1/83-1</span>
+      <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:12px;color:#9199a2">
+        <span style="font-family:'LFH Mono',monospace;font-size:11px">HH-RK 1083</span><span aria-hidden="true">·</span><span>Wache Nord</span><span aria-hidden="true">·</span><span>geändert <span style="font-family:'LFH Mono',monospace;font-size:11px">17.11. 14:32</span></span>
+      </div>
+    </div>
+    <form style="display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;flex-direction:column;gap:4px;max-width:320px">
+        <label for="h-funk">Funkrufname</label>
+        <input id="h-funk" value="RK 1/83-1" style="height:48px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 12px;font:inherit;font-family:'LFH Mono',monospace;border-radius:0">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;max-width:120px">
+        <label for="h-sitz">Sitzplätze</label>
+        <input id="h-sitz" value="4" style="height:48px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 12px;font:inherit;font-family:'LFH Mono',monospace;border-radius:0">
+        <span style="font-size:12px;line-height:16px;color:#9fa7b0">Ohne Fahrerin oder Fahrer.</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label for="h-bem">Bemerkung</label>
+        <input id="h-bem" value="" style="height:48px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 12px;font:inherit;border-radius:0">
+      </div>
+    </form>
+    <p style="margin:0;font-size:12px;line-height:16px;color:#9fa7b0;border-top:1px solid #22262b;padding-top:12px">Komfortabel: Steuerhöhe 48, Stapel md = 20 und lg = 28. Kartentitel, Meta und Hinweis behalten ihre Größe; nur antds Grundschrift steigt (15). „Mittel“ endet bei 320 und passt in 358 px Breite, „voll“ füllt die Zeile.</p>
+  </main>
+  <footer style="flex:none;border-top:1px solid #22262b;background:#151719;padding:12px 16px;display:flex;gap:12px">
+    <button type="button" style="flex:1;height:48px;background:transparent;border:1px solid #2e343a;color:#e8ebee;font:inherit;border-radius:0">Abbrechen</button>
+    <button type="button" style="flex:1;height:48px;background:#4d94d6;border:1px solid #4d94d6;color:#08090b;font:inherit;font-weight:600;border-radius:0">Speichern</button>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
