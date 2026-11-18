@@ -39,7 +39,12 @@ export default function GefahrenBeurteilung({
     <div
       data-lfh="gefahrengebiet-beurteilung"
       className={className}
-      style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, marginBottom: 12 }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: token.marginXS,
+        marginBottom: token.margin,
+      }}
     >
       <div
         style={{

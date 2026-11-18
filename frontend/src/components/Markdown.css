@@ -58,7 +58,7 @@
 .markdown pre {
   background: var(--md-flaeche);
   border-radius: 6px;
-  padding: 12px 14px;
+  padding: var(--lfh-luft-3) var(--lfh-luft-4);
   overflow-x: auto;
 }
 .markdown pre code {
@@ -74,7 +74,7 @@
    `e2e/etb-druck-kontrast.spec.ts` (Druckvorschau); auf Papier färbt `druck/druck.css` schwarz. */
 .markdown blockquote {
   margin: 0.75em 0;
-  padding: 2px 14px;
+  padding: 2px var(--lfh-luft-4);
   border-left: 3px solid var(--md-akzent);
   color: var(--lfh-text-2);
 }
@@ -87,7 +87,7 @@
 .markdown th,
 .markdown td {
   border: 1px solid var(--md-rahmen);
-  padding: 6px 10px;
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
   text-align: left;
 }
 .markdown th {
@@ -178,5 +178,5 @@
   margin: 0.35em 0;
 }
 .markdown--kompakt pre {
-  padding: 8px 10px;
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
 }

@@ -189,6 +189,8 @@ pub struct SchadenAnzeige {
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
     pub storniert_von: Option<i64>,
+    /// Anzeigename von `storniert_von` (LLH-1832), für das Banner „Storniert von … um …“.
+    pub storniert_von_name: Option<String>,
     // Read-only Join-Felder (Geschädigt-Auflösung über einsatz_person):
     pub geschaedigt_registrier_nr: Option<i64>,
     pub geschaedigt_storniert_at: Option<String>,

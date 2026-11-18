@@ -37,7 +37,7 @@ function AuftragListenKarte({
   hervorgehoben: boolean;
   auswahl: AuswahlZielProps;
 }) {
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   const kennung = auftragKennung(a);
   const empfaenger = a.empfaenger
     .map((e) => mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung))
@@ -71,7 +71,7 @@ function AuftragListenKarte({
           {a.auftrag_text}
         </Text>
       </AuswahlZiel>
-      <Flex align="baseline" gap={8} wrap style={{ marginTop: 4 }}>
+      <Flex align="baseline" gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
         <AuftragQuittungsstand auftrag={a} />
         {empfaenger !== '' && (
           <Text style={{ fontSize: 13, color: rollen.text2, minWidth: 0 }} ellipsis>

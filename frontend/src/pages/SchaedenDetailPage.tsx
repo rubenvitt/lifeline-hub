@@ -15,7 +15,7 @@ import {
   SeitenNichtGefunden,
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -47,6 +47,7 @@ import {
   geschaedigtFelder,
 } from './schaeden/schadenHelfer';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
 import { ErfassungsModal } from '../components/Erfassung';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
@@ -129,13 +130,6 @@ export default function SchaedenDetailPage() {
   const sitzung = editSitzung.sitzung;
   const bearbeiten = sitzung != null;
   const speicherLeiste = useSpeicherLeiste({ hasAbbrechen: true });
-  // Verlassen-Schutz (LLH-1101, `frontend/AGENTS.md` „Formularseiten“): aktiv, solange die
-  // Bearbeiten-Sitzung offen ist. Der `schluessel` hängt an der Sitzung, nicht nur an der ID: eine
-  // abgebrochene Eingabe zählt beim nächsten „Bearbeiten“ nicht als offene Änderung.
-  const schutz = useFormularVerlassenSchutz({
-    aktiv: bearbeiten,
-    schluessel: bearbeiten ? schadenId : null,
-  });
   const [uebergebenOffen, setUebergebenOffen] = useState(false);
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   /**
@@ -165,6 +159,16 @@ export default function SchaedenDetailPage() {
     queryKey: einsatzKeys.schaden(einsatzId, schadenId),
     queryFn: () => ladeSchaden(einsatzId, schadenId),
     enabled: idGueltig,
+  });
+  /** Storniert, auch während die Seite offen ist: das Detail ist live (LLH-1832). */
+  const storniert = detailQuery.data?.storniert_at != null;
+  // Verlassen-Schutz (LLH-1101, `frontend/AGENTS.md` „Formularseiten“): aktiv, solange die
+  // Bearbeiten-Sitzung offen ist. Der `schluessel` hängt an der Sitzung, nicht nur an der ID: eine
+  // abgebrochene Eingabe zählt beim nächsten „Bearbeiten“ nicht als offene Änderung. Nach einem
+  // Storno ist nichts mehr zu speichern, also auch nichts zu verlieren (LLH-1832).
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: bearbeiten && !storniert,
+    schluessel: bearbeiten ? schadenId : null,
   });
 
   // Optimistisches Lock: `basis` trägt den beim Öffnen der Maske eingefrorenen geaendert_at-Stand
@@ -243,6 +247,19 @@ export default function SchaedenDetailPage() {
     setStornoFuer(null);
   }, [schadenId, editReset, stornoReset, beendeSitzung]);
 
+  // Storno während der Bearbeitung (LLH-1832, Spec `storno-sperre`): eine unberührte Sitzung
+  // schließt, ein Entwurf bleibt schreibgeschützt stehen, bis „Schließen“.
+  useEffect(() => {
+    if (storniert && bearbeiten && !editForm.isFieldsTouched()) beendeSitzung();
+  }, [storniert, bearbeiten, editForm, beendeSitzung]);
+  // Offene Dialoge sind Schreibaktionen: der Storno schließt sie (Spec `storno-sperre`).
+  useEffect(() => {
+    if (!storniert) return;
+    setUebergebenOffen(false);
+    setAbschlussOffen(false);
+    setStornoFuer(null);
+  }, [storniert]);
+
   // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
   // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks (Rules-of-Hooks).
   const nichtGefunden = (
@@ -306,46 +323,58 @@ export default function SchaedenDetailPage() {
     else setStornoFuer(schadenId);
   }
 
+  /** Nach einem Storno nur noch lesen (LLH-1832): Text `readOnly`, Auswahl gesperrt. */
+  const lockIfStorniert = <P,>(feld: ReactElement<P>): ReactElement<P> =>
+    storniert ? entwurfNurLesen(feld) : feld;
+
   const detailAnsicht = (
     <SchadenDaten
       schaden={s}
       einsatzId={einsatzId}
-      verortenLink={darfSchreiben}
+      verortenLink={darfSchreiben && !storniert}
       karteGesperrt={karteGesperrt}
       // Im Bearbeiten-Modus wird jede Zelle eine `DatenfeldEingabe` (LLH-1101): benannt, und eine
       // Regel meldet sich sichtbar am Feld statt das Speichern still zu verhindern.
       eingabe={
         bearbeiten
           ? {
-              typ: { feld: <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} /> },
-              ausmass: { feld: <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} /> },
-              gefahrenart: { feld: <GefahrAuswahlImFormular /> },
-              schadensgrad: { feld: <SchadensgradAuswahl /> },
+              typ: {
+                feld: lockIfStorniert(<Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />),
+              },
+              ausmass: {
+                feld: lockIfStorniert(
+                  <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
+                ),
+              },
+              gefahrenart: { feld: lockIfStorniert(<GefahrAuswahlImFormular />) },
+              schadensgrad: { feld: lockIfStorniert(<SchadensgradAuswahl />) },
               // Ortsfeld mit Vorschau (LLH-1121): ein Treffer verortet, eine Textkorrektur behält
               // einen gespeicherten Punkt (design.md D3).
               ort: {
-                feld: (
+                feld: lockIfStorniert(
                   <EinsatzOrtsfeld
                     einsatzId={einsatzId}
                     etikett="Schadensort"
                     exclude={`schaden:${s.id}`}
                     count={zeichenGrenze(SCHADEN_ORT_MAX)}
-                  />
+                  />,
                 ),
                 rules: ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort ist Pflicht' }),
               },
               // Eine ältere, längere Beschreibung bleibt stehen: der Zähler nennt die Überlänge,
               // Speichern scheitert an der Regel, bis gekürzt ist (LFH-937, design.md Risiken).
               beschreibung: {
-                feld: <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />,
+                feld: lockIfStorniert(
+                  <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />,
+                ),
                 rules: [zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')],
               },
               geschaedigt: {
-                feld: (
+                feld: lockIfStorniert(
                   <GeschaedigtPicker
                     einsatzId={einsatzId}
                     orgName={einsatz.org_name ?? 'Eigene Organisation'}
-                  />
+                  />,
                 ),
               },
             }
@@ -367,7 +396,7 @@ export default function SchaedenDetailPage() {
         />
       }
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>
             Schaden <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
@@ -377,7 +406,14 @@ export default function SchaedenDetailPage() {
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
-      hinweis={standVeraltet || undefined}
+      hinweis={
+        (storniert || veraltet) && (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            <StornoBanner stand={s} />
+            {standVeraltet}
+          </Space>
+        )
+      }
       aktionen={
         /**
          * Genau eine Primäraktion je Status, „Bearbeiten“ sekundär daneben, der Rest im Menü
@@ -431,6 +467,7 @@ export default function SchaedenDetailPage() {
           // Nach gescheiterter Prüfung steht der Fokus im ersten Feld mit Meldung (LLH-1101).
           scrollToFirstError={{ focus: true }}
           onFinish={(daten) => {
+            if (storniert) return;
             const ort = ortFelder(daten.ort);
             const vorher = ortFelder(sitzung.werte.ort);
             const patch: SchadenPatch = {
@@ -457,20 +494,30 @@ export default function SchaedenDetailPage() {
         >
           {detailAnsicht}
           {editFehler != null && (
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
               <SpeicherFehler fehler={editFehler} />
             </div>
           )}
           {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei langer
               Beschreibung scrollten die Knöpfe sonst aus dem Bild. */}
-          <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
-              Speichern
-            </Button>
-            {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-            <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
-              Abbrechen
-            </Button>
+          <div
+            {...speicherLeiste}
+            style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+          >
+            {storniert ? (
+              // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
+              <Button onClick={editSitzung.beende}>Schließen</Button>
+            ) : (
+              <>
+                <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
+                  Speichern
+                </Button>
+                {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
+                  Abbrechen
+                </Button>
+              </>
+            )}
           </div>
         </Form>
       ) : (
@@ -480,7 +527,7 @@ export default function SchaedenDetailPage() {
       {/* Fotos und Dateien: unter dem Datenraster und außerhalb des Bearbeiten-<Form> — der
           Ablegen-Dialog trägt ein eigenes Formular, verschachtelt schickte es beim Absenden das
           äußere nativ ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
         <SchadenAnhaenge einsatzId={einsatzId} schaden={s} darfSchreiben={darfSchreiben} />
       </div>
 
@@ -555,7 +602,7 @@ export default function SchaedenDetailPage() {
       >
         Der Schaden verschwindet aus der Liste. Das Einsatztagebuch vermerkt das Stornieren.
         {stornoMutation.error != null && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
             <SpeicherFehler
               fehler={stornoMutation.error}
               titel="Nicht storniert"

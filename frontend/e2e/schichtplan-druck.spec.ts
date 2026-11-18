@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import { pdfAuszug } from './pdf-kern';
 import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
+import { waehleDruckweg } from './druckweg-kern';
 
 /**
  * Druck des Schichtplans (LLH-1557, Change `jwqanxja-schichtplan-ausgeben` D3/D7): Aushang je
@@ -98,7 +99,7 @@ test('Aushang je Posten: Blatt je Posten auf neuer Seite, Zeilen ganz, nichts ra
 
   // Einstieg aus der Ansicht Schichtplan.
   await page.goto(`/einsaetze/${einsatzId}/abloesung?ansicht=plan`);
-  await page.getByRole('link', { name: 'Drucken' }).click();
+  await waehleDruckweg(page, { name: 'Druckansicht', weitere: 'Weitere Aktionen zum Schichtplan' });
   await expect(page).toHaveURL(/\/abloesung\/schichtplan\/druck$/);
 
   const blaetter = page.locator('[data-lfh="druckwurzel"] [data-lfh="druck-kapitel"]');
@@ -249,7 +250,8 @@ test('Planung: Aushang von der Planungsseite, der Kopf nennt die Planung', async
   await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
 
   await page.goto(`/planungen/${planungId}`);
-  await page.getByRole('link', { name: 'Drucken' }).click();
+  // Schmal steht „Druckansicht“ im Menü der Planung (LLH-1836).
+  await waehleDruckweg(page, { name: 'Druckansicht', weitere: /^Aktionen zu E2E Planung Druck/ });
   await expect(page).toHaveURL(new RegExp(`/planungen/${planungId}/druck$`));
 
   const blaetter = page.locator('[data-lfh="druckwurzel"] [data-lfh="druck-kapitel"]');

@@ -1,4 +1,4 @@
-import { Breadcrumb } from 'antd';
+import { Breadcrumb, theme } from 'antd';
 import { useCallback, useId } from 'react';
 import { Segmentleiste } from '../components/instrument';
 import {
@@ -133,6 +133,7 @@ function sektionAus(pathname: string): EinstellungenSektion {
  */
 export default function EinsatzEinstellungenPage() {
   const { id } = useParams();
+  const { token } = theme.useToken();
   const einsatzId = Number(id);
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -208,7 +209,7 @@ export default function EinsatzEinstellungenPage() {
           label: s.label,
           steuert: panelId,
         }))}
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: token.marginLG }}
       />
       <div
         role="tabpanel"

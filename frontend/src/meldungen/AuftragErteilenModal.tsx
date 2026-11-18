@@ -1,4 +1,4 @@
-import { Modal, Typography } from 'antd';
+import { Modal, Typography, theme } from 'antd';
 import { useEffect, useRef } from 'react';
 import type { Meldung, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
@@ -42,6 +42,7 @@ export default function AuftragErteilenModal({
   onAnlegen,
   speicherung,
 }: Props) {
+  const { token } = theme.useToken();
   const offen = meldung !== null;
   const sperrt = speicherung?.isPending === true;
   // Öffnen und Schließen räumen den Grund: ein schließender Dialog bleibt bis zum Ende seiner
@@ -77,7 +78,7 @@ export default function AuftragErteilenModal({
           meldung && (
             // Read-only Wortlaut der Quellmeldung: der vorbelegte Auftragstext wird beim Formulieren
             // überschrieben, dann fehlte sonst der Urtext.
-            <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            <Typography.Paragraph type="secondary" style={{ marginBottom: token.margin }}>
               <Typography.Text strong>{meldung.absender}:</Typography.Text> {meldung.inhalt}
             </Typography.Paragraph>
           )

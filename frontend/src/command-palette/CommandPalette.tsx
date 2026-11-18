@@ -62,7 +62,7 @@ function kernId(b: Befehl): string {
  * und eine mitwachsende Polsterung bräche die Fußzeile in `komfortabel` auf zwei Zeilen. Ein-Zeichen-
  * Tasten (↵, →, >, #, @) werden gleich breite Quadrate, damit die Legende nicht flattert.
  */
-const tasteStil = { padding: '0 4px', fontSize: 11, lineHeight: '16px' } as const;
+const tasteStil = { padding: '0 var(--lfh-luft-1)', fontSize: 11, lineHeight: '16px' } as const;
 /** Label und Nebenzeile enden einzeilig in „…“. */
 const einzeilig = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
 const tasteQuadrat = { ...tasteStil, minWidth: 18, justifyContent: 'center' } as const;
@@ -438,7 +438,11 @@ export function CommandPalette({
   }
 
   const aktiverId = flach[aktiv]?.id;
-  const hinweisStil = { display: 'inline-flex', alignItems: 'center', gap: 6 } as const;
+  const hinweisStil = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: token.marginXS,
+  } as const;
   // Gilt für JEDEN Modus, der Datensätze durchsucht, auch für den Vorgabemodus. Ab dem PRÄFIX, nicht
   // erst ab dem Zeichen dahinter: wer '@' tippt, soll nicht „Keine Treffer“ lesen. Im präfixlosen
   // Vorgabemodus bleibt die leere Eingabe die Startansicht.
@@ -512,7 +516,7 @@ export function CommandPalette({
           <span style={einzeilig}>
             {/* Übung (LLH-1725): Marke vor dem Namen; `aria-hidden`, der Name bleibt das Label. */}
             {b.uebung && (
-              <span aria-hidden="true" style={{ marginInlineEnd: 6 }}>
+              <span aria-hidden="true" style={{ marginInlineEnd: token.marginSM }}>
                 <UebungsMarke einsatz={{ einsatzart: 'uebung' }} />
               </span>
             )}
@@ -881,9 +885,9 @@ export function CommandPalette({
               display: 'flex',
               alignItems: 'center',
               flexWrap: 'wrap',
-              columnGap: 12,
-              rowGap: 4,
-              padding: '6px 16px',
+              columnGap: token.margin,
+              rowGap: token.marginXS,
+              padding: `${token.paddingSM}px ${token.paddingLG}px`,
               borderTop: `1px solid ${token.colorBorderSecondary}`,
               fontFamily: schrift.text,
               fontSize: schriftskala.textKlein.groesse,
@@ -912,7 +916,7 @@ export function CommandPalette({
                   </span>
                 )}
                 {/* Die Präfixe als eigene Gruppe rechts: sie filtern, die übrigen Tasten handeln. */}
-                <span style={{ ...hinweisStil, gap: 12, marginInlineStart: 'auto' }}>
+                <span style={{ ...hinweisStil, gap: token.margin, marginInlineStart: 'auto' }}>
                   {modiMitPraefix().map((m) => (
                     <span key={m.modus} style={hinweisStil}>
                       <Tastenkuerzel style={tasteQuadrat}>{m.praefix}</Tastenkuerzel>

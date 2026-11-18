@@ -10,6 +10,7 @@ import {
   Space,
   Spin,
   Typography,
+  theme,
 } from 'antd';
 import type { FormRule } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -55,6 +56,7 @@ import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
 import { ErfassungsModal } from '../components/Erfassung';
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
@@ -164,6 +166,7 @@ function halterAnzeige(t: Tier): ReactNode {
 }
 
 export default function TiereDetailPage() {
+  const { token } = theme.useToken();
   const { id, tierId: tierIdParam } = useParams();
   const einsatzId = Number(id);
   const tierId = Number(tierIdParam);
@@ -180,13 +183,6 @@ export default function TiereDetailPage() {
   const sitzung = editSitzung.sitzung;
   const bearbeiten = sitzung != null;
   const speicherLeiste = useSpeicherLeiste({ hasAbbrechen: true });
-  // Verlassen-Schutz (LLH-1101, `frontend/AGENTS.md` „Formularseiten“): aktiv, solange die
-  // Bearbeiten-Sitzung offen ist. Der `schluessel` hängt an der Sitzung, nicht nur an der ID: eine
-  // abgebrochene Eingabe zählt beim nächsten „Bearbeiten“ nicht als offene Änderung.
-  const schutz = useFormularVerlassenSchutz({
-    aktiv: bearbeiten,
-    schluessel: bearbeiten ? tierId : null,
-  });
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   // Rückfrage als `<Modal>` außerhalb des Menüs, nicht als `Popconfirm` (`frontend/AGENTS.md`,
   // Aktionen): ein Etikett im Menü ist Text.
@@ -213,6 +209,16 @@ export default function TiereDetailPage() {
     queryKey: einsatzKeys.tier(einsatzId, tierId),
     queryFn: () => ladeTier(einsatzId, tierId),
     enabled: idGueltig,
+  });
+  /** Storniert, auch während die Seite offen ist: das Detail ist live (LLH-1832). */
+  const storniert = detailQuery.data?.storniert_at != null;
+  // Verlassen-Schutz (LLH-1101, `frontend/AGENTS.md` „Formularseiten“): aktiv, solange die
+  // Bearbeiten-Sitzung offen ist. Der `schluessel` hängt an der Sitzung, nicht nur an der ID: eine
+  // abgebrochene Eingabe zählt beim nächsten „Bearbeiten“ nicht als offene Änderung. Nach einem
+  // Storno ist nichts mehr zu speichern, also auch nichts zu verlieren (LLH-1832).
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: bearbeiten && !storniert,
+    schluessel: bearbeiten ? tierId : null,
   });
 
   // Optimistisches Lock: `basis` trägt den beim Öffnen der Maske eingefrorenen geaendert_at-Stand
@@ -298,6 +304,18 @@ export default function TiereDetailPage() {
     setAbschlussOffen(false);
     abschlussForm.resetFields();
   }, [tierId, editReset, statusReset, stornoReset, beendeSitzung, abschlussForm]);
+
+  // Storno während der Bearbeitung (LLH-1832, Spec `storno-sperre`): eine unberührte Sitzung
+  // schließt, ein Entwurf bleibt schreibgeschützt stehen, bis „Schließen“.
+  useEffect(() => {
+    if (storniert && bearbeiten && !editForm.isFieldsTouched()) beendeSitzung();
+  }, [storniert, bearbeiten, editForm, beendeSitzung]);
+  // Offene Dialoge sind Schreibaktionen: der Storno schließt sie (Spec `storno-sperre`).
+  useEffect(() => {
+    if (!storniert) return;
+    setStornoOffen(false);
+    setAbschlussOffen(false);
+  }, [storniert]);
 
   // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
   // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks (Rules-of-Hooks).
@@ -409,7 +427,7 @@ export default function TiereDetailPage() {
   ) =>
     bearbeiten ? (
       <DatenfeldEingabe label={label} name={name} rules={rules} breit={breit}>
-        {input}
+        {storniert ? entwurfNurLesen(input) : input}
       </DatenfeldEingabe>
     ) : (
       <Datenfeld label={label} mono={mono} breit={breit}>
@@ -502,7 +520,7 @@ export default function TiereDetailPage() {
         />
       }
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>
             Tier <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
@@ -546,8 +564,9 @@ export default function TiereDetailPage() {
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (veraltet || statusMutation.error != null) && (
+        (storniert || veraltet || statusMutation.error != null) && (
           <Space orientation="vertical" style={{ width: '100%' }}>
+            <StornoBanner stand={t} />
             {standVeraltet}
             <SeitenHinweise
               fehler={statusMutation.error}
@@ -567,6 +586,7 @@ export default function TiereDetailPage() {
             // Nach gescheiterter Prüfung steht der Fokus im ersten Feld mit Meldung (LLH-1101).
             scrollToFirstError={{ focus: true }}
             onFinish={(daten) => {
+              if (storniert) return;
               const h = daten.halter ?? null;
               const fundort = ortFelder(daten.antreff_ort);
               const patch: TierPatch = {
@@ -595,20 +615,30 @@ export default function TiereDetailPage() {
           >
             {detailAnsicht}
             {editFehler != null && (
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
                 <SpeicherFehler fehler={editFehler} />
               </div>
             )}
             {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
                 Feldern scrollten die Knöpfe sonst aus dem Bild. */}
-            <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
-              <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
-                Speichern
-              </Button>
-              {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-              <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
-                Abbrechen
-              </Button>
+            <div
+              {...speicherLeiste}
+              style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+            >
+              {storniert ? (
+                // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
+                <Button onClick={editSitzung.beende}>Schließen</Button>
+              ) : (
+                <>
+                  <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
+                    Speichern
+                  </Button>
+                  {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                  <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
+                    Abbrechen
+                  </Button>
+                </>
+              )}
             </div>
           </Form>
         ) : (
@@ -699,7 +729,7 @@ export default function TiereDetailPage() {
       >
         Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
         {stornoMutation.error != null && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
             <SpeicherFehler
               fehler={stornoMutation.error}
               titel="Nicht storniert"

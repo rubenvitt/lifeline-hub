@@ -87,7 +87,7 @@ export default function AusKatalogModal({
       destroyOnHidden
     >
       {katalogQuery.isLoading ? (
-        <div style={{ textAlign: 'center', padding: 24 }}>
+        <div style={{ textAlign: 'center', padding: 'var(--lfh-luft-5)' }}>
           <Spin />
         </div>
       ) : (
@@ -128,7 +128,7 @@ export default function AusKatalogModal({
                           type="warning"
                           showIcon
                           title={eintrag.hinweis}
-                          style={{ marginTop: 8 }}
+                          style={{ marginTop: 'var(--lfh-luft-2)' }}
                         />
                       )}
                       {grund && (

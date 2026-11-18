@@ -131,7 +131,7 @@ export default function EtbBausteinFormModal({
          Felder" nicht prüfbar. Gegenmittel am `onErfassen` oben. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: 'calc(-1 * var(--lfh-luft-2))' }}
         items={[
           {
             key: 'weitere',

@@ -802,7 +802,7 @@ function PersonendatenInhalt({
           <Typography.Paragraph
             type="secondary"
             data-lfh="ohne-angabe"
-            style={{ marginTop: 8, marginBottom: 0 }}
+            style={{ marginTop: token.marginSM, marginBottom: 0 }}
           >
             Ohne Angabe: {ohne.map((a) => a.etikett).join(', ')}
           </Typography.Paragraph>

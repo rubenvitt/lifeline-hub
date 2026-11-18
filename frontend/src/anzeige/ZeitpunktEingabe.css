@@ -40,6 +40,6 @@
 .lfh-zeit-blatt .lfh-zeit-fuss {
   position: sticky;
   bottom: 0;
-  padding-block: 8px;
+  padding-block: var(--lfh-luft-2);
   background: var(--ant-color-bg-elevated);
 }

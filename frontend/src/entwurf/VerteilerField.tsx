@@ -1,4 +1,4 @@
-import { Form, type FormRule } from 'antd';
+import { Form, theme, type FormRule } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef } from 'react';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -179,10 +179,11 @@ export function VerteilerAnzeige({
   verteiler: readonly VerteilerEintrag[] | undefined;
   className?: string;
 }) {
+  const { token } = theme.useToken();
   const namen = verteilerNames(verteiler);
   if (namen.length === 0) return null;
   return (
-    <div className={className} style={{ marginBottom: 16 }}>
+    <div className={className} style={{ marginBottom: token.marginLG }}>
       <Datenraster spalten={1}>
         <Datenfeld label="Verteiler" breit>
           {namen.join(', ')}

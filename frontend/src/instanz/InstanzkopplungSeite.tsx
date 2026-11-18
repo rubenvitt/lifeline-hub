@@ -887,9 +887,9 @@ function ImNetzGefunden({
   onSuchen: () => void;
   onWahl: (adresse: string) => void;
 }) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   return (
-    <div style={{ marginBlockEnd: 16 }} data-lfh="instanz-im-netz">
+    <div style={{ marginBlockEnd: token.marginLG }} data-lfh="instanz-im-netz">
       <Button onClick={onSuchen} loading={laeuft} data-lfh="instanz-im-netz-suchen">
         Im Netz suchen
       </Button>
@@ -898,7 +898,7 @@ function ImNetzGefunden({
         <Alert
           type="info"
           showIcon
-          style={{ marginBlockStart: 8 }}
+          style={{ marginBlockStart: token.marginSM }}
           title={LAN_AUS}
           data-lfh="instanz-im-netz-aus"
         />
@@ -906,7 +906,7 @@ function ImNetzGefunden({
       {antwort && !antwort.aus && (
         <Liste<InstanzGefunden>
           bordered
-          style={{ marginBlockStart: 8 }}
+          style={{ marginBlockStart: token.marginSM }}
           dataSource={antwort.gefunden}
           // Kennung UND Fingerabdruck: eine fremde Ankündigung unter derselben Kennung ist ein
           // eigener Eintrag (Review LLH-1497).

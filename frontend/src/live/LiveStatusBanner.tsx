@@ -134,10 +134,10 @@ export default function LiveStatusBanner({
         : 'info';
 
   const queueBadges = (
-    <Space size={12} wrap>
+    <Space size={token.margin} wrap>
       {queue.ausstehend > 0 && (
         <Space
-          size={4}
+          size={token.marginXS}
           aria-label={anzahl(
             queue.ausstehend,
             'ausstehende Offline-Aktion',
@@ -159,7 +159,7 @@ export default function LiveStatusBanner({
           )}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={4}>
+          <Space size={token.marginXS}>
             <Badge count={queue.abgelehnt} overflowCount={999} color={token.colorError} />
             <span>abgelehnt – prüfen</span>
           </Space>
@@ -173,7 +173,7 @@ export default function LiveStatusBanner({
           aria-label={`Anträge abgelehnt (${anzahl(abgelehnteAntraege, 'Antrag', 'Anträge')})`}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={4}>
+          <Space size={token.marginXS}>
             <Badge count={abgelehnteAntraege} overflowCount={999} color={token.colorError} />
             <span>Anträge abgelehnt</span>
           </Space>
@@ -185,7 +185,7 @@ export default function LiveStatusBanner({
           aria-label={`Aus früherer Kopplung (${anzahl(fruehereKopplung, 'Eintrag', 'Einträge')})`}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={4}>
+          <Space size={token.marginXS}>
             <Badge count={fruehereKopplung} overflowCount={999} color={token.colorWarning} />
             <span>Aus früherer Kopplung</span>
           </Space>
@@ -198,7 +198,7 @@ export default function LiveStatusBanner({
           aria-label={`Alte Offline-Daten ansehen (${anzahl(queue.nicht_zugeordnet, 'Aktion', 'Aktionen')} ohne Zuordnung)`}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={4}>
+          <Space size={token.marginXS}>
             <Badge count={queue.nicht_zugeordnet} overflowCount={999} color={token.colorWarning} />
             {/* Der Knopf öffnet nur den Drawer; dort fragt das Verwerfen nach. „verwerfen“ las
                 sich wie die Löschung selbst und wurde gemieden (LFH-944). */}
@@ -223,7 +223,7 @@ export default function LiveStatusBanner({
             showIcon
             banner
             title={
-              <Space size={12} wrap>
+              <Space size={token.margin} wrap>
                 {hinweise.length > 0 && <span>{hinweise.join(' · ')}</span>}
                 {queueBadges}
               </Space>

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Space } from 'antd';
+import { Space, theme } from 'antd';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { Select } from '../components/Select';
 import { groupEinheitOptions, type EinheitOption } from './kraeftebaumKern';
@@ -52,6 +52,7 @@ export default function EinheitAngabe({
   ohneOption,
   onSpeichern,
 }: EinheitAngabeProps) {
+  const { token } = theme.useToken();
   const aktuell = wert != null ? optionen.find((o) => o.id === wert) : undefined;
   // Kein Umbruch mitten im Wort (Entscheidung 14.10.2026, LLH-1073): der Wertknopf bricht überall
   // (`overflow-wrap: anywhere` aus `wertKnopfStil`), damit lange Freitexte die Zelle nicht
@@ -81,7 +82,7 @@ export default function EinheitAngabe({
       wert={wert}
       anzeige={
         marke ? (
-          <Space size={4} wrap>
+          <Space size={token.marginXS} wrap>
             {name}
             {marke}
           </Space>

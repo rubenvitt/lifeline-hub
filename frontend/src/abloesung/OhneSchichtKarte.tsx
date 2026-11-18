@@ -72,7 +72,11 @@ export default function OhneSchichtKarte({
           {e.einheit_name}
         </Text>
         {(e.abschnitt_name || e.abloeser_fuer) && (
-          <Space orientation="vertical" size={2} style={{ width: '100%', marginTop: 4 }}>
+          <Space
+            orientation="vertical"
+            size={2}
+            style={{ width: '100%', marginTop: token.marginXS }}
+          >
             {e.abschnitt_name && <Text type="secondary">{e.abschnitt_name}</Text>}
             {e.abloeser_fuer && (
               <Text type="secondary" data-lfh="abloesung-abloeser-fuer">

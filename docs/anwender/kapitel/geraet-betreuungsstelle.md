@@ -56,9 +56,10 @@ Betreuungsstelle untergebracht.
 
 Die Maske und die Liste sind dieselben wie auf der Seite der Stelle ([Betreuung](betreuung.md)).
 
-### Registrierliste drucken
+### Die Registrierliste drucken
 
-1. Unten „Stelle“ öffnen, oben „Registrierung“ wählen und „Registrierliste drucken“ wählen.
+1. Unten „Stelle“ öffnen, oben „Registrierung“ wählen und im Kopf von
+   „Registrierung“ „Registrierliste – Druckansicht“ wählen.
 2. Die Druckansicht zeigt die Registrierten der eigenen Stelle, mit Summen je Kostform und einer
    Spalte zum Abhaken. „Unverträglichkeiten mitdrucken“ nimmt die Gesundheitsangaben auf das
    Blatt.

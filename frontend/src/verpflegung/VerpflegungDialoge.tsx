@@ -241,11 +241,11 @@ function eingeklappt(
 function sonderkostFelder(vorschlag?: { hinweis: string | null; beruehrt: (k: Kostform) => void }) {
   return (
     <>
-      <Augenbraue als="div" style={{ marginBottom: 8 }}>
+      <Augenbraue als="div" style={{ marginBottom: 'var(--lfh-luft-2)' }}>
         davon Sonderkost (EP)
       </Augenbraue>
       {vorschlag?.hinweis && (
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 'var(--lfh-luft-2)' }}>
           {vorschlag.hinweis}
         </Typography.Paragraph>
       )}

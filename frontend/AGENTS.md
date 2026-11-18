@@ -70,9 +70,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. antds Steuerelement-Polster
   (`controlPaddingHorizontal`/`…SM`) stehen auf `md`/`sm`; die Inhaltspolster (`paddingContent*`:
   Knopf, Modal, Alert, Liste) bleiben bewusst antds feste Werte. Ein festes Kompakt-Raster gibt es nicht.
-  Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
-  `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
-  `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
+  Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und `gutter`
+  verbietet `theme/abstandsraster.guard.test.ts` ohne Schuldliste (ADR-0067). Wo kein `token` zur
+  Hand ist (Stil auf Modulebene, `tagRender`), nimmst du `var(--lfh-luft-*)`; ein Wert, der kein
+  Layoutabstand ist (Kartenrand bei `fitBounds`), steht als benannte Konstante. Feste Ausnahmen
   (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter. Elemente
   reiht `Stapel abstand="…"` (Stufe, nie Zahl) statt `Space direction="vertical"` oder eines
   Flex-`div` mit `gap`.
@@ -1065,8 +1066,9 @@ anwendbar), „nicht geprüft" ist keins.
   melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht und
   Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
   `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
-  Das Meldebild (Kräfteübersicht) trägt Drucken und „In Lagebericht übernehmen“ als Nebenwege
-  (LLH-1786); Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
+  Das Meldebild (Kräfteübersicht) trägt „In Lagebericht übernehmen“ als Nebenweg (LLH-1786).
+  Wortlaut und Platz jedes Druckeinstiegs: `src/druck/AGENTS.md`, „Wortlaut und Platz der
+  Druckeinstiege“ (LLH-1836).
   Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`,
   Stufen 48 / 72: `openspec/changes/archive/2026-11-18-z137bgm5-seitenkopf-einzeilig/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
@@ -1719,6 +1721,15 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   Seitenkette (`useInfiniteQuery`) bekommt eine Zeile nur innerhalb des geladenen Fensters
   (`fensterEinsortieren`, LFH-1075); entscheidet über die Zugehörigkeit nur der Server
   (Suchbegriff), geht die Kette an den Sammler. Kennzahlen gleicht immer der Sammler ab.
+- **Storno sperrt offene Detailseiten** (LLH-1832, Spec `storno-sperre`): Person, Tier, Schaden
+  und Betreuungsstelle zeigen einen Storno ohne Zutun. Oben steht `components/StornoBanner.tsx`
+  („Storniert von … um …“), alle Schreibwege hängen an `storniert_at`. Tier- und Schadendetail
+  sind dafür live; die Person gleicht ihren protokollfreien Stand ab (`personStand`), die
+  Betreuungsstelle fragt ihn erst ab, wenn sie aus der Übersicht fällt
+  (`betreuungsstelleStand`). Eine offene Eingabe verliert dabei ihren Text nicht: `InlineAngabe`
+  hält einen geänderten Entwurf schreibgeschützt, wenn `darfSchreiben` wegfällt; Formulare
+  sperren ihre Felder über `entwurfNurLesen` (Text `readOnly`, sonst `disabled`) und zeigen nur
+  „Schließen“. Eine unberührte Bearbeitung schließt.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

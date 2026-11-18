@@ -75,7 +75,7 @@ export default function AutoAktualisierungZeile({
   }
 
   return (
-    <div data-testid="auto-aktualisierung" style={{ marginBottom: 12 }}>
+    <div data-testid="auto-aktualisierung" style={{ marginBottom: 'var(--lfh-luft-3)' }}>
       <Stapel richtung="zeile" umbruch abstand="md" ausrichten="mitte">
         {istAdmin ? (
           <>

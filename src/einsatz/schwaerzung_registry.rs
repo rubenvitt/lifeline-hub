@@ -281,6 +281,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
             retain("geaendert_von", G_FK),
             retain("storniert_at", G_ZEIT),
+            retain("storniert_von", G_FK),
             retain("aktuelle_sichtung", G_TRIAGE),
             retain("aktuelle_sichtung_at", G_ZEIT),
             // Denormalisierter Cache: trägt bei Transporten „Transport → {Klinik}“ im Klartext.
@@ -615,6 +616,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
             retain("geaendert_von", G_FK),
             retain("storniert_at", G_ZEIT),
+            retain("storniert_von", G_FK),
         ],
     },
     // ---------- Schäden ----------

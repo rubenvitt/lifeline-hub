@@ -140,7 +140,7 @@ export default function BesatzungUebernehmenDialog({
         ]}
         extra={
           ohneZeile.length > 0 ? (
-            <ul aria-label="Nicht übernommen" style={{ margin: 0, paddingInlineStart: 18 }}>
+            <ul aria-label="Nicht übernommen" style={{ margin: 0, paddingInlineStart: '1.2em' }}>
               {ohneZeile.map(([id, grund]) => (
                 <li key={id}>
                   <Typography.Text type="danger">

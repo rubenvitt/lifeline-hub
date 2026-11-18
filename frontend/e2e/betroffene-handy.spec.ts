@@ -123,13 +123,13 @@ async function pruefeListeAmHandy(page: Page, einsatzId: string, mitSchreibrecht
       kopf(page).getByRole('button', { name: 'Vermisst melden', exact: true }),
     ).toBeVisible();
   }
-  await expect(kopf(page).getByText('Drucken / als PDF')).toHaveCount(0);
+  await expect(kopf(page).getByText('Druckansicht')).toHaveCount(0);
   await expect(kopf(page).getByText('CSV exportieren')).toHaveCount(0);
 
   await kopf(page).getByRole('button', { name: NEBENWEGE }).click();
   const menue = page.getByRole('menu');
   await expect(menue.getByRole('menuitem', { name: 'CSV exportieren' })).toBeVisible();
-  await menue.getByRole('menuitem', { name: 'Drucken / als PDF' }).click();
+  await menue.getByRole('menuitem', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/druck`));
 }
 
@@ -291,7 +291,7 @@ test('Gegenprobe bei 1180 px: Nebenwege als Knöpfe, Patientenkopf über den Per
   await page.setViewportSize(TABLET_QUER);
   await ladeInDichte(page, `/einsaetze/${einsatzId}/personen`, 'kompakt');
   await expect(page.getByText('Handtest').first()).toBeVisible();
-  await expect(kopf(page).getByRole('link', { name: 'Drucken / als PDF' })).toBeVisible();
+  await expect(kopf(page).getByRole('link', { name: 'Druckansicht' })).toBeVisible();
   await expect(kopf(page).getByRole('button', { name: 'CSV exportieren' })).toBeVisible();
   await expect(kopf(page).getByRole('button', { name: NEBENWEGE })).toHaveCount(0);
   await expect(kopf(page).locator('.ant-btn-primary')).toHaveCount(1);

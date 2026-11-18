@@ -380,7 +380,7 @@ export default function NachrichtenStrom({
                     <AnhangVorschauGruppe>
                       <Space
                         orientation="vertical"
-                        size={4}
+                        size={token.marginXS}
                         data-lfh="chat-nachricht-text"
                         style={{ width: '100%', maxWidth: NACHRICHT_LESEBREITE }}
                       >

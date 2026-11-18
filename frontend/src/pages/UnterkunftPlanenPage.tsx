@@ -188,7 +188,7 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
   return (
     <EinsatzSeite
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>Unterkunft planen</span>
           {quelle === 'basis' && <Marke>Basiswerte</Marke>}
         </Space>

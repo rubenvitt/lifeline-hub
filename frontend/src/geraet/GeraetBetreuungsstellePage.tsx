@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Alert, App, Button, Space, Spin, Typography } from 'antd';
+import { Alert, App, Button, Space, Spin, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ladeBetreuung } from '../api/betreuung';
@@ -64,6 +64,7 @@ function BelegungBereich({
  * „davon namentlich“ zählt nur die hier Aufgenommenen.
  */
 export default function GeraetBetreuungsstellePage() {
+  const { token } = theme.useToken();
   const { geraet, benutzer } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const stelleId = geraet?.stelle_id ?? null;
@@ -161,7 +162,7 @@ export default function GeraetBetreuungsstellePage() {
             wert={bereich}
             onWechsel={setBereich}
             optionen={BEREICHE.map((b) => ({ wert: b, label: BEREICH_NAME[b], steuert: feld }))}
-            style={{ marginBottom: 12 }}
+            style={{ marginBottom: token.margin }}
           />
           <div role="tabpanel" id={feld} aria-label={BEREICH_NAME[bereich]}>
             {bereich === 'belegung' ? (

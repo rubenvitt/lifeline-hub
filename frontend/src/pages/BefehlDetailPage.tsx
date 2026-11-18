@@ -383,7 +383,7 @@ function BefehlDetail() {
         breite="schmal"
         titel={befehl.titel}
         meta={
-          <Space size={6} wrap>
+          <Space size={token.marginSM} wrap>
             {/* Derselbe Träger wie in der Liste: Fachlabel und Phasenfarbe aus der geteilten
                 Achse. `istEntwurf` steuert die Knöpfe, nicht das Etikett. */}
             <StatusBadge

@@ -3,6 +3,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
   Augenbraue,
@@ -1477,18 +1478,12 @@ export default function EinsatzdatenPage() {
   const akteZiel = einsatzaktePfad(einsatzId);
   const zugriffZiel = einsatzEinstellungenPfad(einsatzId, 'zugriff');
   const nebenwege: Nebenweg[] = [
-    {
-      key: 'einsatzbericht',
-      label: 'Einsatzbericht drucken',
-      ziel: berichtZiel,
-      onWahl: () => navigate(berichtZiel),
-    },
+    // Druckseiten anderer Dokumente: „<Dokument> – Druckansicht“ (LLH-1836).
+    druckansichtNebenweg({ ziel: berichtZiel, navigate, dokument: 'Einsatzbericht' }),
     // Die ganze Akte (LLH-1835): Bericht, ETB, Betroffene, Aufträge, Befehle, Lageberichte.
     {
+      ...druckansichtNebenweg({ ziel: akteZiel, navigate, dokument: 'Einsatzakte' }),
       key: 'einsatzakte',
-      label: 'Einsatzakte',
-      ziel: akteZiel,
-      onWahl: () => navigate(akteZiel),
     },
     ...(darfLeiten
       ? [

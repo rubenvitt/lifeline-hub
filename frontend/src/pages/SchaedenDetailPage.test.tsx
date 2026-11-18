@@ -1243,3 +1243,54 @@ describe('SchaedenDetailPage — Schadensort über die Ortssuche (LLH-1121)', ()
     expect(koerper[0]).toMatchObject({ ort: 'Bahnhofstraße 3', lat: 52.3, lon: 9.7 });
   });
 });
+
+describe('SchaedenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () => {
+  const storniert = basisSchaden({
+    storniert_at: '2026-05-29 12:00:00',
+    storniert_von: 1,
+    storniert_von_name: 'Anna Beispiel',
+  });
+
+  it('am stornierten Schaden steht das Banner mit Wer und Wann', async () => {
+    render(einsatzAktiv, storniert);
+    expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
+    // Verorten schreibt den Punkt am Schaden: am stornierten entfällt der Auftrag.
+    expect(screen.queryByRole('link', { name: 'Auf Karte verorten' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Auf Karte verorten' })).toBeNull();
+  });
+
+  it('wird er während der Bearbeitung storniert, bleibt der Entwurf lesbar, Speichern entfällt', async () => {
+    let stand: Record<string, unknown> = basisSchaden();
+    const { client } = render(einsatzAktiv, basisSchaden(), [
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+    ]);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const beschreibung = await screen.findByRole('textbox', { name: 'Beschreibung' });
+    await user.type(beschreibung, ', Ast auf Fahrbahn');
+
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) }));
+
+    expect(await screen.findByText(/^Storniert von Anna Beispiel/)).toBeInTheDocument();
+    const gesperrt = screen.getByRole('textbox', { name: 'Beschreibung' });
+    expect(gesperrt).toHaveValue('Umgestürzter Baum, Ast auf Fahrbahn');
+    expect(gesperrt).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('textbox', { name: 'Beschreibung' })).toBeNull();
+  });
+
+  it('eine unberührte Bearbeitung schließt beim Storno', async () => {
+    let stand: Record<string, unknown> = basisSchaden();
+    const { client } = render(einsatzAktiv, basisSchaden(), [
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('textbox', { name: 'Beschreibung' });
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) }));
+    await screen.findByText(/^Storniert von Anna Beispiel/);
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Beschreibung' })).toBeNull());
+  });
+});

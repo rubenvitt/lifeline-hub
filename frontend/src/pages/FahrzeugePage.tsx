@@ -216,7 +216,7 @@ function BesatzungsBlock({
   const { token } = theme.useToken();
   if (gesperrt || unbekannt) {
     return (
-      <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }}>
+      <div data-lfh="besatzung-block" style={{ paddingLeft: token.paddingSM }}>
         <Space size={token.marginSM}>
           <Typography.Text type="secondary">Besatzung</Typography.Text>
           <Typography.Text
@@ -234,7 +234,7 @@ function BesatzungsBlock({
   const gehalten = new Set(crewZeilen.filter((z) => z.isGeloest).map((z) => z.p.id));
   const frei = personal.filter((p) => p.fahrzeug_id == null && !gehalten.has(p.id));
   return (
-    <div data-lfh="besatzung-block" style={{ paddingLeft: 8 }} {...haltenProps}>
+    <div data-lfh="besatzung-block" style={{ paddingLeft: token.paddingSM }} {...haltenProps}>
       <Space size={token.marginSM} style={{ marginBottom: token.marginSM }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
         <BesatzungsStaerkeBadge crew={crew} soll={ef.soll_besatzung ?? null} />
@@ -343,7 +343,7 @@ function BesatzungsBlock({
       )}
       {darfSchreiben && (
         <Select
-          style={{ width: '100%', maxWidth: 420, marginTop: 8 }}
+          style={{ width: '100%', maxWidth: 420, marginTop: token.marginSM }}
           placeholder="Kraft zur Besatzung …"
           value={null}
           notFoundContent={freiInhalt}
@@ -1484,7 +1484,7 @@ function FahrzeugeInhalt() {
                     {materialFrei && (
                       <div
                         data-lfh="beladung-block"
-                        style={{ paddingLeft: 8, marginTop: token.margin }}
+                        style={{ paddingLeft: token.paddingSM, marginTop: token.margin }}
                       >
                         <MaterialAmOrt
                           einsatzId={einsatzId}

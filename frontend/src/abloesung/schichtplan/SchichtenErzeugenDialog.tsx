@@ -174,7 +174,7 @@ export default function SchichtenErzeugenDialog({
           data-lfh="schichtplan-erzeugen-konflikte"
           title="Keine Schichten erzeugt"
           description={
-            <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+            <ul style={{ margin: 0, paddingInlineStart: '1.2em' }}>
               {konflikte.map((k) => (
                 <li key={k}>{k}</li>
               ))}

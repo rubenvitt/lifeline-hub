@@ -24,9 +24,10 @@ export interface VerortetMeldung {
  * (ab `lg`), damit beide denselben Wortlaut tragen. Gerendert wird er je Breite nur an einer Stelle.
  */
 export function VerortetInhalt({ meldung }: { meldung: VerortetMeldung }) {
+  const { token } = theme.useToken();
   const { kennung, titel, onZurueck, onBleiben } = meldung;
   return (
-    <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
       <Typography.Text strong>
         {titel ?? (kennung ? `${kennung} verortet` : 'Objekt verortet')}
       </Typography.Text>
@@ -98,7 +99,7 @@ export function ModusBedienung({
   if (modus.art === 'verortet')
     return bedienung ? <VerortetInhalt meldung={modus.meldung} /> : null;
   return (
-    <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
       <Typography.Text strong>{modusTitel(modus)}</Typography.Text>
       {zusatz}
       {bedienung && modus.art === 'platzieren' && (

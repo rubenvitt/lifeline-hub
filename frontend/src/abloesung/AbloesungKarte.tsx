@@ -247,7 +247,7 @@ export default function AbloesungKarte({
           </Text>
           {darstellung && <Status darstellung={darstellung} />}
         </Flex>
-        <Space orientation="vertical" size={2} style={{ width: '100%', marginTop: 4 }}>
+        <Space orientation="vertical" size={2} style={{ width: '100%', marginTop: token.marginXS }}>
           {laufend && <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>}
           <Text type="secondary">
             {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}

@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { KennungsLink } from '../components/kennungsLink';
 import { Status } from '../components/instrument';
@@ -45,10 +46,17 @@ function Verweis({
   style,
 }: BerichtigtMarkeProps & { berichtigungId: number; berichtigungLfdNr: number }) {
   const darf = useGeraetDarf();
+  const { token } = theme.useToken();
   if (!darf('fremde-module')) return null;
   return (
     <span
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', ...style }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: token.marginSM,
+        flexWrap: 'wrap',
+        ...style,
+      }}
     >
       <Status groesse="klein" ton="achtung" wort="berichtigt" />
       <KennungsLink

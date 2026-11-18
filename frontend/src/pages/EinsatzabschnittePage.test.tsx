@@ -1206,6 +1206,17 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     expect(screen.queryByTestId('abschnitte-gliederung')).not.toBeInTheDocument();
   });
 
+  it('druckt nur das Organigramm, aus dem Seitenkopf (LLH-1836)', async () => {
+    server.use(...handlers('beobachter', 'aktiv'), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte');
+    const ansicht = await screen.findByRole('radiogroup', { name: 'Ansicht' });
+    const kopf = () => document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf()).queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Organigramm' }));
+    await screen.findByRole('region', { name: 'Organigramm' });
+    expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+  });
+
   it('?ansicht=organigramm öffnet das Organigramm und räumt den Parameter', async () => {
     server.use(...handlers(), ...organigrammHandler);
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');

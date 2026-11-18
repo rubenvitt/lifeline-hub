@@ -159,7 +159,7 @@ function BefehlKarte({
       }
       nr={`v${b.version}`}
     >
-      <Space size={6} wrap style={{ marginBottom: 6 }}>
+      <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
           {befehlSchemaLabel(b.vorlage)}
         </Text>
@@ -168,7 +168,11 @@ function BefehlKarte({
         {b.titel}
       </Text>
       {b.freigegeben_at && (
-        <Flex gap={8} wrap style={{ marginTop: 4, ...monoStil(11), color: rollen.gedaempft }}>
+        <Flex
+          gap={token.marginSM}
+          wrap
+          style={{ marginTop: token.marginXS, ...monoStil(11), color: rollen.gedaempft }}
+        >
           <span>
             freigegeben <ZeitAnzeige wert={b.freigegeben_at} rolle="kurz" />
             {b.freigegeben_von_name ? ` von ${b.freigegeben_von_name}` : ''}

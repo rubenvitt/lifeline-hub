@@ -91,7 +91,7 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
         minWidth: 'min(320px, 100%)',
       }}
     >
-      <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
         <div style={zeile}>
           <Typography.Text strong>
             {props.bezirk != null ? `Bezirk ${props.bezirk} · Kreis` : 'Kreis'}

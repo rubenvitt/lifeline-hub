@@ -38,7 +38,7 @@ const KOEPFE = [
  * zweites `Space`.
  */
 function etikettengruppe(inhalt: string, datei: string): string {
-  const auf = inhalt.indexOf('<Space size={6} wrap');
+  const auf = inhalt.indexOf('<Space size={token.marginSM} wrap');
   if (auf === -1) throw new Error(`${datei}: keine Etikettengruppe im Kopf gefunden`);
   const zu = inhalt.indexOf('</Space>', auf);
   if (zu === -1) throw new Error(`${datei}: Etikettengruppe nicht geschlossen`);

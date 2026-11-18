@@ -1,4 +1,4 @@
-import { Breadcrumb, Button, Collapse, Form, Input, Space, Typography } from 'antd';
+import { Breadcrumb, Button, Collapse, Form, Input, Space, Typography, theme } from 'antd';
 import { Segmentleiste, Status } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -19,6 +19,7 @@ import Datensicht, {
   spaltenFuer,
   type Kartenplan,
 } from '../components/Datensicht';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import FormularEingehaengt from '../components/FormularEingehaengt';
@@ -213,6 +214,7 @@ const tierKarte = (einsatzId: number): Kartenplan<Tier, TierSpaltenKey> => ({
 
 export default function TierePage() {
   const { id } = useParams();
+  const { token } = theme.useToken();
   const einsatzId = Number(id);
   const navigate = useNavigate();
   const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
@@ -430,12 +432,7 @@ export default function TierePage() {
       weitere={{
         name: 'Weitere Aktionen zu den Tieren',
         eintraege: [
-          {
-            key: 'druck',
-            label: 'Drucken / als PDF',
-            ziel: druckPfad,
-            onWahl: () => navigate(druckPfad),
-          },
+          druckansichtNebenweg({ ziel: druckPfad, navigate }),
           {
             key: 'csv',
             label: 'CSV exportieren',
@@ -463,7 +460,7 @@ export default function TierePage() {
       {/* Die Statussicht als Reiter. Eine Wahl, die die Liste darunter filtert — `radiogroup`, nicht
           `tablist`: es gibt kein eigenes Feld je Segment. Die Spezies filtert im Spaltenkopf
           (LLH-1096), im Kartenzweig als Auswahlfeld der Sicht. */}
-      <Space wrap size="middle" align="center" style={{ marginBottom: 12 }}>
+      <Space wrap size="middle" align="center" style={{ marginBottom: token.margin }}>
         <Segmentleiste
           beschriftung="Tiere nach Status filtern"
           wert={sicht}
@@ -605,7 +602,7 @@ export default function TierePage() {
             eingeklappten Werte in `onFinish`, und die Feldzählung des Budgets wäre nicht prüfbar. */}
         <Collapse
           ghost
-          style={{ marginInline: -8 }}
+          style={{ marginInline: -token.paddingSM }}
           items={[
             {
               key: 'weitere',

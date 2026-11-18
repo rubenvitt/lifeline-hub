@@ -1,4 +1,4 @@
-import { Collapse, Form, Input } from 'antd';
+import { Collapse, Form, Input, theme } from 'antd';
 import { Select } from '../components/Select';
 import { Feld } from '../components/instrument';
 import { useEffect } from 'react';
@@ -27,6 +27,7 @@ export default function SprechgruppeFormModal({
   sprechgruppe: Sprechgruppe | null; // null = neu
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
 
@@ -106,7 +107,7 @@ export default function SprechgruppeFormModal({
       <Collapse
         key={sprechgruppe?.id ?? 'neu'}
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         defaultActiveKey={sprechgruppe?.netz || sprechgruppe?.sicherheit ? ['bedingung'] : []}
         items={[
           {

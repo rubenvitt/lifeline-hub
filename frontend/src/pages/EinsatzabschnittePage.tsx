@@ -38,6 +38,7 @@ import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Augenbraue, Paneel, Segmentleiste, monoStil, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
@@ -227,6 +228,10 @@ export default function EinsatzabschnittePage() {
     {},
   );
   const ansicht = ansichtNachEinsatz[einsatzId] ?? 'gliederung';
+  // Klappzustand des Organigramms hier, weil sein Druck im Seitenkopf steht (LLH-1836): vor dem
+  // Druck alles aufklappen, im selben Zug (`useDrucken` öffnet den Dialog nach dem Commit).
+  const [orgZugeklappt, setOrgZugeklappt] = useState<ReadonlySet<string>>(new Set());
+  const druckWege = useDruckNebenwege({ vorDemDruck: () => setOrgZugeklappt(new Set()) });
   const setzeAnsicht = (a: AbschnitteAnsicht) =>
     setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
 
@@ -767,6 +772,12 @@ export default function EinsatzabschnittePage() {
 
       meta={abschnitteQuery.isSuccess ? `${abschnitte.length} Abschnitte` : undefined}
       metaPlatzhalter="0 Abschnitte"
+      // Gedruckt wird nur das Organigramm; die Gliederung hat keine Druckwurzel.
+      weitere={
+        ansicht === 'organigramm'
+          ? { name: 'Weitere Aktionen zu den Einsatzabschnitten', eintraege: druckWege }
+          : undefined
+      }
       dataUpdatedAt={gemeinsamerDatenstand(
         abschnitteQuery.dataUpdatedAt,
         einheitenQuery.dataUpdatedAt,
@@ -840,6 +851,8 @@ export default function EinsatzabschnittePage() {
               <SeitenStandVeraltet onWiederholen={() => void abschnitteQuery.refetch()} />
             )}
             <Organigramm
+              zugeklappt={orgZugeklappt}
+              onZugeklappt={setOrgZugeklappt}
               einsatz={einsatz}
               abschnitte={abschnitte}
               einheiten={einheitenQuelle}

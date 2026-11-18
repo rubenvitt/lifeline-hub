@@ -2,7 +2,7 @@
 titel: Schäden
 gruppen: [alle, fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/pages/schaeden/GefahrAuswahl.tsx, frontend/src/pages/schaeden/gefahrWorte.ts, frontend/src/pages/schaeden/SchaedenDruckTabelle.tsx, frontend/src/zeichen/fachobjektZeichen.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
+quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/pages/schaeden/GefahrAuswahl.tsx, frontend/src/pages/schaeden/gefahrWorte.ts, frontend/src/pages/schaeden/SchaedenDruckTabelle.tsx, frontend/src/zeichen/fachobjektZeichen.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs, frontend/src/components/StornoBanner.tsx]
 ---
 
 ## Überblick
@@ -100,7 +100,8 @@ Ein Schaden geht von „offen“ nach „übergeben“ oder direkt nach „abges
 nach „abgeschlossen“. „Bearbeiten“ auf der Seite des Schadens ändert Typ, Ausmaß, Gefahr,
 Schadensgrad, Ort, Beschreibung und Geschädigt, auch nach dem Abschluss. „Stornieren“ nimmt eine Fehlerfassung aus
 der Liste, in jedem Status; ein stornierter Schaden trägt im Titel „storniert“ und lässt sich
-nicht mehr ändern. Fotos und Dateien zum Schaden liegen auf seiner Seite.
+nicht mehr ändern. Wer seine Seite gerade offen hat, sieht oben „Storniert von … um …“; eine
+laufende Bearbeitung bleibt mit ihren Eingaben lesbar stehen und lässt sich nur noch schließen. Fotos und Dateien zum Schaden liegen auf seiner Seite.
 
 ### Gefahr und Schadensgrad
 
@@ -147,7 +148,7 @@ ausgeblendet sind, merkt sich das Gerät.
 
 ### Druck und Export
 
-„Drucken / als PDF“ druckt die Liste in der gewählten Sicht, „CSV exportieren“ gibt alle nicht
+„Druckansicht“ öffnet die Liste in der gewählten Sicht zum Drucken, „CSV exportieren“ gibt alle nicht
 stornierten Schäden als Tabelle aus, ohne Angaben zu Geschädigten. Beide nennen Gefahr und
 Schadensgrad in Worten.
 

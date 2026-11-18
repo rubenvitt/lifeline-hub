@@ -180,7 +180,7 @@ export default function OnlineQuellenVerwaltung() {
   return (
     <>
       {istAdmin && (
-        <Space style={{ marginBottom: 12 }}>
+        <Space style={{ marginBottom: 'var(--lfh-luft-3)' }}>
           <Button
             type="primary"
             onClick={() => {

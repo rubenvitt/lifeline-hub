@@ -207,7 +207,7 @@ export default function BenutzerMenu({
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
-                columnGap: 6,
+                columnGap: token.marginSM,
                 rowGap: token.marginXS,
               }}
             >
@@ -240,7 +240,7 @@ export default function BenutzerMenu({
               </Typography.Text>
             )}
             {!isKnapp && rollenTags.length > 0 && (
-              <div style={{ marginTop: 6 }}>
+              <div style={{ marginTop: token.marginSM }}>
                 <Space size={token.marginXS} wrap>
                   {rollenTags}
                 </Space>
@@ -249,7 +249,7 @@ export default function BenutzerMenu({
             {!isKnapp && (
               <Typography.Text
                 type="secondary"
-                style={{ display: 'block', fontSize: 11, marginTop: 6 }}
+                style={{ display: 'block', fontSize: 11, marginTop: token.marginSM }}
               >
                 Version {__APP_VERSION__}
               </Typography.Text>
@@ -345,7 +345,7 @@ export default function BenutzerMenu({
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: inNavigation ? 'flex-start' : undefined,
-            gap: 9,
+            gap: token.marginSM,
           }}
         >
           {/* Initialen-Kachel 24 px, quadratisch. Kein antd-`Avatar`: der färbt über

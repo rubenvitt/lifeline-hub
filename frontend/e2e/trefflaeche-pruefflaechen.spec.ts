@@ -777,7 +777,7 @@ function einstellungenFlaechen(einsatzId: string): Flaeche[] {
         },
         {
           sorte: 'Einsatzdaten Nebenwege',
-          ziele: nebenweg(/^(Einsatzbericht drucken|Zugriff verwalten)/),
+          ziele: nebenweg(/^(Einsatzbericht – Druckansicht|Zugriff verwalten)/),
           mindestens: 2,
         },
       ],
@@ -841,7 +841,9 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
       pfad: `${R}/einsatzdaten`,
       // In `handschuh` steht der Nebenweg im Menü: Anker ist dann der Auslöser (LLH-1786).
       anker: (page) =>
-        nebenweg(/^Einsatzbericht drucken/)(page).or(weitereAusloeser(page, EINSATZDATEN_WEITERE)),
+        nebenweg(/^Einsatzbericht – Druckansicht/)(page).or(
+          weitereAusloeser(page, EINSATZDATEN_WEITERE),
+        ),
       vorbereiten: weitereAufklappen(EINSATZDATEN_WEITERE),
       hinweis: /nur Einsatzleitung, Führungspersonal oder Org-Admin$/,
       fehlt: knopf('Bezeichnung bearbeiten'),
@@ -849,7 +851,7 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
         {
           // „Zugriff verwalten“ fehlt dem Beobachter (LFH-1170); der Einsatzbericht bleibt.
           sorte: 'Einsatzdaten Nebenwege',
-          ziele: nebenweg(/^(Einsatzbericht drucken|Zugriff verwalten)/),
+          ziele: nebenweg(/^(Einsatzbericht – Druckansicht|Zugriff verwalten)/),
           mindestens: 1,
         },
       ],

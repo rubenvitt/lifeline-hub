@@ -8,6 +8,7 @@ import type {
   BetreuungsstelleEingabe,
   BetreuungsstellePatch,
   StelleMeldung,
+  StornoStand,
 } from './types';
 
 /**
@@ -69,6 +70,17 @@ export function aendereStelle(
     'PATCH',
     erwartet ? { ...body, erwartet } : body,
   );
+}
+
+/**
+ * Storno-Stand einer Stelle (LLH-1832, Spec `storno-sperre`): die Übersicht lässt stornierte Stellen
+ * weg; fällt eine gesehene heraus, nennt dieser Abruf Wann und Wer.
+ */
+export function loadBetreuungsstelleStand(
+  einsatzId: number,
+  stelleId: number,
+): Promise<StornoStand> {
+  return apiGet<StornoStand>(`${basis(einsatzId)}/stellen/${stelleId}/stand`);
 }
 
 /** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */

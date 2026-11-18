@@ -36,7 +36,7 @@ import Datensicht, {
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import { NUR_VORLESER, Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
@@ -599,6 +599,9 @@ export default function KommunikationsplanPage() {
   );
   const spalten = useMemo(() => planSpalten(ohneVerbindung, aktionen), [ohneVerbindung, aktionen]);
 
+  // Drucken im Seitenkopf (LLH-1836, `druck/AGENTS.md`, „Wortlaut und Platz“).
+  const druckWege = useDruckNebenwege();
+
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -636,6 +639,7 @@ export default function KommunikationsplanPage() {
         titel={modulName('fernmeldewesen')}
         meta={umfang}
         dataUpdatedAt={datenstand}
+        weitere={{ name: 'Weitere Aktionen zum Kommunikationsplan', eintraege: druckWege }}
         breadcrumb={
           <Breadcrumb
             items={[
@@ -727,13 +731,6 @@ export default function KommunikationsplanPage() {
             </Paneel>
           )}
 
-          <Space
-            className="kommunikationsplan-no-print"
-            wrap
-            style={{ marginBlockEnd: token.margin }}
-          >
-            <DruckKnopf />
-          </Space>
           {rufnummerFehler != null && (
             <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
               <SpeicherFehler fehler={rufnummerFehler} titel="Rufnummer nicht übernommen" />

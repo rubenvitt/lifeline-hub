@@ -59,7 +59,7 @@ describe('EtbPage – kein Einsatzabschluss (LFH-960)', () => {
         { route: '/einsaetze/7/etb' },
       );
       // Vorbedingung: der Kopf steht mit seinen Aktionen.
-      expect(await screen.findByRole('link', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: 'Druckansicht' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
       expect(screen.queryByText('Einsatz abschließen')).toBeNull();
     },

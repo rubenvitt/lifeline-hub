@@ -541,7 +541,7 @@ export default function BenutzerPage() {
             oben. */}
         <Collapse
           ghost
-          style={{ marginInline: -8 }}
+          style={{ marginInline: 'calc(-1 * var(--lfh-luft-2))' }}
           items={[
             {
               key: 'rollen',
@@ -607,7 +607,7 @@ export default function BenutzerPage() {
             type="info"
             showIcon
             title={`Name und Rollen: ${VOM_HUB_TEXT}. Ein Einmalpasswort für die Anmeldung hier geht.`}
-            style={{ marginBlockEnd: 16 }}
+            style={{ marginBlockEnd: 'var(--lfh-luft-4)' }}
           />
         )}
         <Feld
@@ -630,7 +630,7 @@ export default function BenutzerPage() {
             <Alert
               type="warning"
               showIcon
-              style={{ marginBlockEnd: 16 }}
+              style={{ marginBlockEnd: 'var(--lfh-luft-4)' }}
               message={warnText(zuBearbeiten)}
             />
           )}

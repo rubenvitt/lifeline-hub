@@ -431,7 +431,11 @@ export default function RegistrierMaske({
                   Person hinzufügen
                 </Button>
                 {felder.length >= REGISTRIERUNG_PERSONEN_MAX && (
-                  <Typography.Text id={`${basis}-voll`} type="secondary" style={{ marginLeft: 8 }}>
+                  <Typography.Text
+                    id={`${basis}-voll`}
+                    type="secondary"
+                    style={{ marginLeft: token.marginSM }}
+                  >
                     Höchstens {REGISTRIERUNG_PERSONEN_MAX} Personen je Registrierung
                   </Typography.Text>
                 )}

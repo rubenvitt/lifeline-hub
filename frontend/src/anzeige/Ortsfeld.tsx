@@ -169,6 +169,11 @@ export interface OrtsfeldGemeinsam {
    * passende Regel (`ortZeichenRegel`) prüft der Aufrufer am Text des Werts.
    */
   count?: InputProps['count'];
+  /**
+   * Schreibgeschützt (LLH-1832, Spec `storno-sperre`): nur der Text, markier- und kopierbar, ohne
+   * Suche, Karte und Knöpfe. So steht ein offener Entwurf, wenn sein Datensatz storniert wurde.
+   */
+  readOnly?: boolean;
 }
 
 interface MitSuche {
@@ -224,7 +229,7 @@ const TREFFER_FRISCH_MS = 10 * 60_000;
  * am Gerät eine 403, auch eine, die das Gerät nicht selbst abfängt.
  */
 export function Ortsfeld(props: OrtsfeldProps) {
-  if (props.ohneSuche !== undefined) {
+  if (props.ohneSuche !== undefined || props.readOnly) {
     const {
       ref,
       id,
@@ -235,10 +240,13 @@ export function Ortsfeld(props: OrtsfeldProps) {
       value,
       onChange,
       count,
+      readOnly,
     } = props;
-    // Nur Text: kein Knopf, Enter wie in jedem Feld, keine Erkennung, keine Karte.
+    // Nur Text: kein Knopf, Enter wie in jedem Feld, keine Erkennung, keine Karte. Beim
+    // Schreibschutz bleibt die Koordinate am Wert unberührt; es gibt keine Änderung.
     return (
       <Input
+        readOnly={readOnly}
         ref={ref}
         id={id}
         aria-label={ariaLabel}
@@ -247,7 +255,9 @@ export function Ortsfeld(props: OrtsfeldProps) {
         autoFocus={autoFocus}
         value={value?.text ?? ''}
         count={count}
-        onChange={(e) => onChange?.({ text: e.target.value, koordinate: null })}
+        onChange={(e) => {
+          if (!readOnly) onChange?.({ text: e.target.value, koordinate: null });
+        }}
       />
     );
   }
