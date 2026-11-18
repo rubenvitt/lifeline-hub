@@ -203,7 +203,7 @@ export function buildFuehrungsstelleMarker(
   };
 }
 
-/** Leitet verortete Marker + Nicht-verortet-Liste aus den geladenen Objekten ab. */
+/** Leitet verortete Marker + Nicht-verortet-Liste aus den geladenen Objekten ab; ohne aufgelöste UHS. */
 export function buildMarker(
   einsatz: EinsatzAnzeige | undefined,
   uhsListe: Uhs[],
@@ -229,6 +229,9 @@ export function buildMarker(
   }
 
   for (const u of uhsListe) {
+    // Aufgelöste fallen heraus wie beim Bereitstellungsraum (LLH-1948): der Server lehnt ihr
+    // Verorten ab. Stornierte liefert die Liste nicht.
+    if (u.status === 'aufgeloest') continue;
     if (u.lat != null && u.lon != null) {
       verortet.push({
         schluessel: `uhs-${u.id}`,

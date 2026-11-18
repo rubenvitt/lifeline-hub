@@ -165,6 +165,10 @@ pub async fn anlegen_tx(
 /// Stand; das UPDATE schreibt nur, solange `geaendert_at` unverändert ist — sonst `Veraltet`
 /// (409 mit `grund`, LLH-1920) statt stillem Overwrite. `None` = bewusstes Overwrite („Meine
 /// Änderung übernehmen“).
+///
+/// Lebenszyklus (LLH-1948): eine aufgelöste oder stornierte UHS ändert sich nicht mehr (409 ohne
+/// `grund`, `src/AGENTS.md`, Statuscode-Konvention). Der Handler prüft vorab, das WHERE schließt
+/// das Rennen mit einem gleichzeitigen Auflösen; auch das Überschreiben ohne Basisstand.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -188,7 +192,8 @@ pub async fn aktualisiere(
              quali_soll = CASE WHEN ?18 IS NULL THEN quali_soll ELSE ?19 END, \
              geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
              geaendert_von = ?12 \
-         WHERE id = ?13 AND einsatz_id = ?14",
+         WHERE id = ?13 AND einsatz_id = ?14 \
+           AND status <> 'aufgeloest' AND storniert_at IS NULL",
     );
     if erwartet_geaendert_at.is_some() {
         sql.push_str(" AND geaendert_at = ?15");
@@ -217,21 +222,28 @@ pub async fn aktualisiere(
         .bind(daten.quali_soll.flatten());
     match q.execute(pool).await {
         Ok(r) if r.rows_affected() == 0 => {
-            // Mit Guard: existiert die Zeile → veralteter Stand (409), sonst fehlt sie (404).
-            if erwartet_geaendert_at.is_some() {
-                let existiert: Option<i64> =
-                    sqlx::query_scalar("SELECT 1 FROM uhs WHERE id = ? AND einsatz_id = ?")
-                        .bind(id)
-                        .bind(einsatz_id)
-                        .fetch_optional(pool)
-                        .await?;
-                if existiert.is_some() {
-                    // Eigener Grund (LLH-1920): der Client fragt nur hier „Zwischenzeitlich
-                    // geändert“, nicht bei einer doppelten Bezeichnung.
-                    return Err(AppError::Veraltet);
-                }
+            // Keine Zeile: fehlt sie (404), ist sie am Ende ihres Lebenszyklus (409 ohne Grund,
+            // LLH-1948) oder, mit Guard, ist der Stand veraltet (409 `veraltet`).
+            let zustand: Option<(String, Option<String>)> = sqlx::query_as(
+                "SELECT status, storniert_at FROM uhs WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+            match zustand {
+                None => Err(AppError::NotFound),
+                Some((_, Some(_))) => Err(AppError::Conflict(
+                    "Stornierte UHS kann nicht geändert werden".into(),
+                )),
+                Some((status, None)) if status == "aufgeloest" => Err(AppError::Conflict(
+                    "Aufgelöste UHS kann nicht geändert werden".into(),
+                )),
+                // Eigener Grund (LLH-1920): der Client fragt nur hier „Zwischenzeitlich
+                // geändert“, nicht bei einer doppelten Bezeichnung.
+                Some(_) if erwartet_geaendert_at.is_some() => Err(AppError::Veraltet),
+                Some(_) => Err(AppError::NotFound),
             }
-            Err(AppError::NotFound)
         }
         Ok(_) => laden(pool, einsatz_id, id).await,
         Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(AppError::Conflict(
@@ -487,6 +499,43 @@ mod tests {
         assert_eq!(u.erfasst_von, b);
         assert_eq!(u.geaendert_von, b);
         assert!(u.storniert_at.is_none());
+    }
+
+    /// LLH-1948: das Repo selbst lehnt Aufgelöstes und Storniertes ab (Rennen mit dem Auflösen
+    /// nach der Vorprüfung des Handlers), mit und ohne Basisstand, und schreibt nichts.
+    #[tokio::test]
+    async fn aktualisiere_lehnt_aufgeloeste_und_stornierte_ab() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let notiz = || PatchDaten {
+            notiz: Some(Some("spät")),
+            ..PatchDaten::default()
+        };
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP A"))
+            .await
+            .unwrap();
+        setze_status(&pool, e, u.id, "aufgeloest", b).await.unwrap();
+        let stand = laden(&pool, e, u.id).await.unwrap().geaendert_at;
+        for basis in [None, Some(stand.as_str())] {
+            assert!(matches!(
+                aktualisiere(&pool, e, u.id, b, basis, notiz()).await.unwrap_err(),
+                AppError::Conflict(m) if m == "Aufgelöste UHS kann nicht geändert werden"
+            ));
+        }
+        assert!(laden(&pool, e, u.id).await.unwrap().notiz.is_none());
+
+        let s = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP S"))
+            .await
+            .unwrap();
+        storniere(&pool, e, s.id, b).await.unwrap();
+        assert!(matches!(
+            aktualisiere(&pool, e, s.id, b, None, notiz()).await.unwrap_err(),
+            AppError::Conflict(m) if m == "Stornierte UHS kann nicht geändert werden"
+        ));
+        assert!(matches!(
+            aktualisiere(&pool, e, 999_999, b, None, notiz()).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     /// LFH-241/F10: optimistisches Lock über `geaendert_at` für die UHS-Stammfelder.

@@ -4210,6 +4210,42 @@ async fn verortung_stornierter_raum_409() {
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
 }
 
+/// LLH-1948: Ein aufgelöster Raum ist Lebenszyklus wie ein stornierter (409 mit Grund, nicht
+/// „veraltet“), für Raumdaten wie für die Verortung.
+#[tokio::test]
+async fn patch_aufgeloester_raum_409() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume"),
+        &cookie,
+        Some(&json!({"bezeichnung": "BR Ende"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let br = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/status", br_pfad(eid, br)),
+        &cookie,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert!(s.is_success(), "auflösen: {s} {v}");
+    for body in [json!({"notiz": "zu spät"}), json!({"lat": 51.9, "lon": 8.8})] {
+        let (s, v) = patch_br(&app, &cookie, eid, br, body).await;
+        assert_eq!(s, StatusCode::CONFLICT, "{v}");
+        assert!(v.get("grund").is_none(), "kein Sperrkonflikt: {v}");
+        assert_eq!(v["error"], "Aufgelöster BR kann nicht geändert werden", "{v}");
+    }
+    let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
+    assert!(detail.get("notiz").is_none() || detail["notiz"].is_null(), "{detail}");
+}
+
 /// Anlegen mit Standort und Koordinate trägt beide.
 #[tokio::test]
 async fn anlegen_mit_koordinate() {
