@@ -23,7 +23,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`, im Backend zu `src/`. Entsche
 - [x] 3.1 `StatusKnopf` nach D4 (Fläche, Rahmen in der Rollenkante, Zeichen, 14 px, Pfeil ▾, volle Knopfhöhe) und `StatusWahl` darauf umstellen; Tests in `components/StatusWahl.test.tsx` rot→grün (mit Schreibrecht Rahmen und Pfeil, ohne weder noch, sichtbare Höhe = `controlHeight` je Dichte)
 - [x] 3.2 Kontrastnachweis in `theme/statusKnopfKontrast.test.ts` (eigene Datei neben `bedienKontrast.test.ts`): Knopfrand je Rolle gegen Zeilenfläche und eigene Fläche ≥ 3 : 1, Tag und Nacht; Beschriftung ≥ Textboden
 - [x] 3.3 `personen/ZeilenSichtung.tsx` nach D6 (äußerer Rahmen, Pfeil, Dichtehöhe um das BBK-Feld); Test rot→grün
-- [ ] 3.4 e2e: `kraefte-kontrast.spec.ts` misst den Knopfrand statt des Etiketts; `marken-kontrast`, `verpflegung-kontrast`, `betroffene-kontrast`, `aufbewahrung`, `betreuung-pruefliste`, `pegel-pruefliste`, `abloesung-kontrast`, `gate3-trefflaeche` und die übrigen Specs mit `.ant-tag`/`status-chip` nachziehen; neu in `gate3-trefflaeche`: sichtbare Höhe des Statusknopfs im Handschuh-Betrieb = 72 px. Nachweis: die geänderten Specs einzeln grün
+- [x] 3.4 e2e: `kraefte-kontrast.spec.ts` misst den Knopfrand statt des Etiketts; `marken-kontrast`, `verpflegung-kontrast`, `betroffene-kontrast`, `aufbewahrung`, `betreuung-pruefliste`, `pegel-pruefliste`, `abloesung-kontrast`, `gate3-trefflaeche` und die übrigen Specs mit `.ant-tag`/`status-chip` nachziehen; neu in `gate3-trefflaeche`: sichtbare Höhe des Statusknopfs im Handschuh-Betrieb = 72 px. Nachweis: die geänderten Specs einzeln grün
 
 ## 4. cfv89pp5 (LLH-1781): Statuswechsel mit Quittung
 
@@ -44,7 +44,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`, im Backend zu `src/`. Entsche
 
 - [x] 6.1 `frontend/AGENTS.md`: Bausteine (`Status`, `Marke`, Statusknopf), Bausteinwahl (Zeilen Status, Kennzeichnung, bedienbarer Status), Farbachsen (Rahmen heißt bedienbar, Sichtung als Ausnahme), FMS-Tableau-Absatz, Rückwege (Quittung Fahrzeugstatus); Kommentare in `StatusWahl.tsx`, `statusFlaeche.ts` nachziehen; Prettier grün
 - [x] 6.2 Design System: Karten in `frontend/scripts/design-system/previews.tsx` (Status, Marke, Statusknopf, Tableau-Kachel; alte Karte ersetzen), `mise exec -- pnpm -C frontend design-system`, `designSystem.guard.test.ts` grün, Erzeugtes mitcommitten
-- [ ] 6.3 Anwenderdoku: `docs/anwender/kapitel/fahrzeuge.md` (Tableau, Quittung, Rückgängig), Alt-Texte; Bildlauf für alle Kapitel neu (`docs/anwender/AGENTS.md`), Wächter der Anwenderdoku grün
+- [x] 6.3 Anwenderdoku: `docs/anwender/kapitel/fahrzeuge.md` (Tableau, Quittung, Rückgängig), Alt-Texte; Bildlauf für alle Kapitel neu (`docs/anwender/AGENTS.md`), Wächter der Anwenderdoku grün
 - [ ] 6.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
 ## Workflow follow-up
