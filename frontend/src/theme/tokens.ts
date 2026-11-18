@@ -1072,6 +1072,37 @@ export function antdKlappkopf(dichte: Dichte): NonNullable<ConfigProviderProps['
 }
 
 /**
+ * Das Schließen-Kreuz JEDES schließbaren Hinweises (`Alert`, LLH-1798, Spec
+ * `einsatztauglichkeit-layout`): kleine Steuerhöhe der Stufe auf beiden Achsen, also 24 / 48 / 72,
+ * das Kreuz mittig.
+ *
+ * antd zeichnet den Knopf `.ant-alert-close-icon` mit Schrift und Zeilenhöhe `fontSizeIcon` und ohne
+ * Polster, gemessen 12 × 14 px in jeder Stufe. Der Boden sitzt am Knopf selbst (semantischer Stil
+ * `close`), nicht an einem Span darin: antd setzt `overflow: hidden` und schnitte ihn ab.
+ *
+ * HÖHENNEUTRAL wie das Kreuz des ETB-Entwurfstabs (`entfernenStil`): der negative Rand nimmt den
+ * Zuwachs über die Kreuzgröße (`1em`) aus dem Layout, der Hinweis bleibt so hoch wie ohne Boden. Die
+ * Fläche ragt mittig über die Zeile hinaus und bleibt der Knopf.
+ *
+ * Am Kontext, damit jeder Hinweis den Boden hat, auch ein künftiger. Muster {@link antdKlappkopf}.
+ */
+export function antdHinweis(dichte: Dichte): NonNullable<ConfigProviderProps['alert']> {
+  const boden = dichten[dichte].kleineZeilenhoehe;
+  return {
+    styles: {
+      close: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: boden,
+        minHeight: boden,
+        marginBlock: `calc((1em - ${boden}px) / 2)`,
+      },
+    },
+  };
+}
+
+/**
  * Der Boden des beschrifteten Kästchens für JEDE `Checkbox` (LFH-907): `minHeight` = kurze Achse
  * der Stufe, also 24 / 48 / 72 (A1 Gate 3), dazu Box und Text senkrecht mittig.
  *
@@ -1238,6 +1269,13 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     marginMD: stufe.abstand.lg,
     marginLG: stufe.abstand.lg,
     marginXL: stufe.abstand.xl,
+    // Seitliches Steuerelement-Polster (Select-Option und -Einrückung, Dropdown-Eintrag, Input
+    // SM/LG, Segmented) aus dem Raster: normal `md`, klein `sm`, in `kompakt` antds 12/8
+    // (Change `tfabqe09-control-polster-dichte`, D1). Die `paddingContent*`-Token (Knopf, Modal,
+    // Notification, Alert, Liste) bleiben bewusst antds feste Werte: im Handschuh ergäben sie
+    // 44 px Knopfpolster und 64 px Dialogrand (D2, Spec `abstandsraster`).
+    controlPaddingHorizontal: stufe.abstand.md,
+    controlPaddingHorizontalSM: stufe.abstand.sm,
 
     motionDurationMid: '120ms',
     motionDurationSlow: '150ms',

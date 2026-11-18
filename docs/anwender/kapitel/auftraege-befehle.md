@@ -55,7 +55,8 @@ Priorität und Richtung stehen.
 ### Aufträge finden und quittieren
 
 1. Im Reiter „Einzelaufträge“ die Ansicht „Offen“ oder „Abgeschlossen“ wählen. Bei Bedarf im
-   Suchfeld „Kennung, Text oder Empfänger“ suchen, eine Richtung wählen oder „Empfänger filtern“.
+   Suchfeld „Kennung, Text oder Empfänger“ suchen, im Feld „Richtung“ „Intern“ oder „Extern“
+   wählen oder „Empfänger filtern“.
 
    ![Einzelaufträge mit der Liste der offenen Aufträge links und dem gewählten Auftrag rechts, darin „Bearbeitung beginnen“, „Vollzug melden“, dem Menü der weiteren Aktionen, „Quittung offen:“ mit „Quittieren“ und unten „Druckansicht“](../bilder/auftraege-befehle/auftraege-liste.png)
 
