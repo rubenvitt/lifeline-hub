@@ -250,16 +250,21 @@ export default function EtbPage() {
 
   // Auftrags-Ziele für das ETB→Auftrag-Formular, nur mit Modulrecht (LLH-1839): ohne liefe ein 403
   // und mit ihm eine Benutzerprüfung (`api/client.ts`), bei jedem neuen Freigabestand erneut.
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', modulFreigabenQuery.data);
+  const einheitenFrei = istKeyFreigegeben('einheiten', modulFreigabenQuery.data);
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
-    enabled: istKeyFreigegeben('einsatzabschnitte', modulFreigabenQuery.data),
+    enabled: abschnitteFrei,
   });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: istKeyFreigegeben('einheiten', modulFreigabenQuery.data),
+    enabled: einheitenFrei,
   });
+  // `enabled: false` hält nur den Abruf an: ein Stand von vor dem Rechteentzug bleibt im Cache.
+  const abschnitte = abschnitteFrei ? abschnitteQuery.data : undefined;
+  const einheiten = einheitenFrei ? einheitenQuery.data : undefined;
 
   /**
    * Seitenfenster (LFH-947, `etb/seitenfenster.ts`): höchstens `ETB_MAX_SEITEN` Seiten, in beide
@@ -842,7 +847,7 @@ export default function EtbPage() {
    * Die Einheiten als Filterwahl. Steht eine Einheit in der URL, die nicht in der Liste ist (lädt
    * noch oder aufgelöst), bekommt sie eine eigene Zeile — sonst zeigte der Select die rohe Zahl.
    */
-  const einheitOptionen = (einheitenQuery.data ?? []).map((e) => ({ value: e.id, label: e.name }));
+  const einheitOptionen = (einheiten ?? []).map((e) => ({ value: e.id, label: e.name }));
   if (filter.einheit_id != null && !einheitOptionen.some((o) => o.value === filter.einheit_id)) {
     einheitOptionen.push({ value: filter.einheit_id, label: `Einheit ${filter.einheit_id}` });
   }
@@ -882,7 +887,7 @@ export default function EtbPage() {
   const merkmale = filterMerkmale(filter, {
     bezug: { jetzt: serverJetzt(), zone: konventionen.zeitzone, letzteLb },
     typWort: (t) => etbTyp[t].label,
-    einheitName: (id) => einheitenQuery.data?.find((x) => x.id === id)?.name,
+    einheitName: (id) => einheiten?.find((x) => x.id === id)?.name,
   });
   // Einmalig (Spec „Eigener Eintrag außerhalb des Filters“): ein anderer Filter räumt den Hinweis,
   // er kehrt mit dem alten nicht zurück.
@@ -1369,8 +1374,8 @@ export default function EtbPage() {
         <AuftragAusEtbModal
           einsatzId={einsatzId}
           eintrag={auftragZu}
-          abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
-          einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
+          abschnitte={(abschnitte ?? []).map((a) => ({ id: a.id, name: a.name }))}
+          einheiten={(einheiten ?? []).map((e) => ({ id: e.id, name: e.name }))}
           senden={auftragSpeicherung.isPending}
           speicherung={auftragSpeicherung}
           onAbbrechen={() => setAuftragZu(null)}

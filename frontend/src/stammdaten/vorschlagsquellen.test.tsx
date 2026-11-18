@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, Einheit, ExterneStelle, Fahrzeug } from '../api/types';
 import { AuthProvider } from '../auth/AuthContext';
 import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixtures';
@@ -205,6 +206,23 @@ describe('useFunkrufnamenEinsatz', () => {
     await waitFor(() => expect(freigabenGeladen).toBe(true));
     await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(abgefragt).toEqual([]);
+  });
+
+  it('zeigt nach Entzug des Modulrechts keine Namen aus dem Cache mehr', async () => {
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.einheiten(4), [{ id: 1, name: 'Florian 3' } as Einheit]);
+    server.use(
+      http.get('/api/einsaetze/4/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({ fahrzeuge: { zugriff: false }, einheiten: { zugriff: false } }),
+        ),
+      ),
+    );
+    const { result } = renderHook(() => useFunkrufnamenEinsatz(4), { wrapper: wrapper(client) });
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(4))?.status).toBe('success'),
+    );
+    expect(result.current).toEqual([]);
   });
 
   it('schlägt mit Modulrecht Funkrufnamen aus Fahrzeugen und Einheiten vor', async () => {

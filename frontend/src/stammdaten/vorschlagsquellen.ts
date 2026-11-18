@@ -80,19 +80,24 @@ export function useFunkrufnamenEinsatz(einsatzId: number, aktiv = true): Vorschl
     queryFn: () => ladeModulFreigaben(einsatzId),
     enabled: aktiv,
   }).data;
+  const fahrzeugeFrei = istKeyFreigegeben('fahrzeuge', freigaben);
+  const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
   const fahrzeuge = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
-    enabled: aktiv && istKeyFreigegeben('fahrzeuge', freigaben),
+    enabled: aktiv && fahrzeugeFrei,
   });
   const einheiten = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
-    enabled: aktiv && istKeyFreigegeben('einheiten', freigaben),
+    enabled: aktiv && einheitenFrei,
   });
+  // `enabled: false` hält nur den Abruf an: ein Stand von vor dem Rechteentzug bleibt im Cache.
+  const fahrzeugListe = fahrzeugeFrei ? fahrzeuge.data : undefined;
+  const einheitListe = einheitenFrei ? einheiten.data : undefined;
   return useMemo(
-    () => funkrufnamenAusEinsatz(fahrzeuge.data ?? [], einheiten.data ?? []),
-    [fahrzeuge.data, einheiten.data],
+    () => funkrufnamenAusEinsatz(fahrzeugListe ?? [], einheitListe ?? []),
+    [fahrzeugListe, einheitListe],
   );
 }
 
