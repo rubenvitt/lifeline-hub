@@ -3880,26 +3880,32 @@ async function personAnlegen(page: Page, einsatzId: string, daten: object): Prom
 
 /**
  * Kleinster Achsen-Abstand von `ziel` zu irgendeinem anderen Bedienziel in `bereich`.
- * Vorfahren und Nachfahren des Ziels zählen nicht — sie SIND das Ziel.
+ * Vorfahren und Nachfahren des Ziels zählen nicht — sie SIND das Ziel. `ohne` nimmt Ziele
+ * unter einem Selektor aus (etwa die rechts fixierte Aktionsspalte, unter die rollende Spalten
+ * laufen dürfen).
  */
-async function abstandZuNachbarn(bereich: Locator, ziel: Locator): Promise<number> {
+async function abstandZuNachbarn(bereich: Locator, ziel: Locator, ohne?: string): Promise<number> {
   const zielGriff = await ziel.elementHandle();
-  const abstand = await bereich.evaluate((wurzel, z) => {
-    const a = (z as Element).getBoundingClientRect();
-    const kandidaten = wurzel.querySelectorAll<HTMLElement>(
-      'a[href], button, [role="button"], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    let min = Number.POSITIVE_INFINITY;
-    for (const k of kandidaten) {
-      if (k === z || k.contains(z as Element) || (z as Element).contains(k)) continue;
-      const b = k.getBoundingClientRect();
-      if (b.width === 0 || b.height === 0) continue;
-      const dx = Math.max(b.left - a.right, a.left - b.right, 0);
-      const dy = Math.max(b.top - a.bottom, a.top - b.bottom, 0);
-      min = Math.min(min, Math.max(dx, dy));
-    }
-    return min;
-  }, zielGriff);
+  const abstand = await bereich.evaluate(
+    (wurzel, [z, ausnahme]) => {
+      const a = (z as Element).getBoundingClientRect();
+      const kandidaten = wurzel.querySelectorAll<HTMLElement>(
+        'a[href], button, [role="button"], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      let min = Number.POSITIVE_INFINITY;
+      for (const k of kandidaten) {
+        if (k === z || k.contains(z as Element) || (z as Element).contains(k)) continue;
+        if (ausnahme && k.closest(ausnahme)) continue;
+        const b = k.getBoundingClientRect();
+        if (b.width === 0 || b.height === 0) continue;
+        const dx = Math.max(b.left - a.right, a.left - b.right, 0);
+        const dy = Math.max(b.top - a.bottom, a.top - b.bottom, 0);
+        min = Math.min(min, Math.max(dx, dy));
+      }
+      return min;
+    },
+    [zielGriff, ohne ?? null] as const,
+  );
   // Ohne jedes Nachbarziel bliebe der Wert +∞ und „≥ 16 px" trivial grün.
   expect(Number.isFinite(abstand), 'mindestens ein Nachbarziel in der Zeile').toBe(true);
   return abstand;
@@ -3965,7 +3971,16 @@ test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abst
         24 - SUBPIXEL,
       );
     }
-    const abstand = await abstandZuNachbarn(personZeile(page, gefuellt), voll);
+    // Gegen die Ziele der mitrollenden Spalten. Das ⋮ steht in der rechts fixierten Aktionsspalte
+    // (LLH-1721); läuft die Tabelle waagerecht über (Fükw im Handschuh), rollen die Spalten unter
+    // sie, und ihr Abstand zum Zustand-Knopf hängt an der Rollstellung. Dafür gilt die Regel
+    // „nicht ganz dahinter“ (Spec `einsatztauglichkeit-layout`, „Durch eine Zeile neben der
+    // fixierten Aktionsspalte“), geprüft in `e2e/fokus-verdeckung.spec.ts`.
+    const abstand = await abstandZuNachbarn(
+      personZeile(page, gefuellt),
+      voll,
+      '.ant-table-cell-fix-end',
+    );
     if (dichte === 'handschuh') {
       expect(abstand, `Abstand Zustand-Knopf → Nachbarziel (handschuh)`).toBeGreaterThanOrEqual(
         16 - SUBPIXEL,
@@ -5660,6 +5675,9 @@ async function kopfZielLuecken(kopf: Locator): Promise<{ ziele: number; luecken:
 /** Trefferhöhe der Sortierfläche einer Kopfzelle: senkrecht abgetastet in ihrer Textmitte. */
 async function sortierTrefferHoehe(kopfZelle: Locator): Promise<number> {
   return kopfZelle.evaluate((th) => {
+    // Erst ins Bild: läuft die Tabelle waagerecht über (Fükw im Handschuh), läge ein Kopf rechts
+    // außerhalb ihres Rahmens, und das Abtasten träfe ihn nicht, obwohl er nach dem Rollen trifft.
+    th.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     const titel = th.querySelector('.ant-table-column-title') ?? th;
     const t = titel.getBoundingClientRect();
     const x = t.left + Math.min(t.width / 2, 8);

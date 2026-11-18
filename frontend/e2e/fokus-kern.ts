@@ -5,6 +5,21 @@ import type { Page } from '@playwright/test';
  * Kopie je Spec driftete still auseinander und machte beide Nachweise wertlos.
  */
 
+/**
+ * Blendet den Knopf der TanStack-Query-Devtools aus: er steht nur im DEV-Build, gegen den die
+ * Suite fährt, als `position: fixed` unten rechts, ein Verdecker, den es im Betrieb nicht gibt.
+ * Per Init-Skript, also vor dem `goto` aufrufen; es gilt auch nach jedem Neuladen.
+ */
+export async function ohneDevtoolsKnopf(page: Page) {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const stil = document.createElement('style');
+      stil.textContent = '[class*="tsqd-open-btn"] { display: none !important; }';
+      document.head.append(stil);
+    });
+  });
+}
+
 export interface Verdeckungsbefund {
   verdeckt: string[];
   stoppsInTabelle: number;
