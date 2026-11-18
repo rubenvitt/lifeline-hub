@@ -35,7 +35,7 @@ https://zunder.rubeen.dev/#/aufgabe/t3q2y33zhnvqykd2of5j4oh8
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Bilder der Änderung aufgenommen
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Bilder der Änderung aufgenommen
   (Filter-Menü, gefiltertes Meldebild, deaktivierter Schalter).
 
 ## Workflow follow-up
