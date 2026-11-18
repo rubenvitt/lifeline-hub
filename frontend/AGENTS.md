@@ -98,7 +98,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`). Im
   Verwaltungsteil verlangt `components/feld.guard.test.ts` `Feld` statt `Form.Item` und keine
   Breite am Eingabefeld; ein Feld ohne Formular steht in einem `div` mit
-  `maxWidth: 'var(--lfh-feld-…)'`.
+  `className={FELD_KLASSE}` und `maxWidth: 'var(--lfh-feld-…)'` (dann füllen auch Zahl, Datum
+  und Auswahl die Hülle).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
   `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
   `anzeige/Ortsfeld.tsx`, im Einsatz `anzeige/EinsatzOrtsfeld.tsx` (Ortsfeld) ·

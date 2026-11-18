@@ -48,17 +48,30 @@ export default function AutoAktualisierungZeile({
     ? ABSTAENDE
     : [...ABSTAENDE, status.intervall_stunden].sort((a, b) => a - b);
 
-  const zeiten: string[] = [];
+  // Wort und Zeit getrennt: die Zeit steht in Mono (Spec `schriftstufen`, Metazeile).
+  const zeiten: { schluessel: string; wort: string; zeit?: string }[] = [];
   if (status.letzte_pruefung_at) {
-    zeiten.push(`zuletzt geprüft ${zeitpunkt(status.letzte_pruefung_at)}`);
+    zeiten.push({
+      schluessel: 'letzte',
+      wort: 'zuletzt geprüft',
+      zeit: zeitpunkt(status.letzte_pruefung_at),
+    });
   }
   if (status.automatisch && status.naechste_pruefung_at) {
-    zeiten.push(`nächste Prüfung ${zeitpunkt(status.naechste_pruefung_at)}`);
+    zeiten.push({
+      schluessel: 'naechste',
+      wort: 'nächste Prüfung',
+      zeit: zeitpunkt(status.naechste_pruefung_at),
+    });
   }
   if (status.bau_dienst === 'unerreichbar') {
-    zeiten.push('Kartenbau-Dienst nicht erreichbar');
+    zeiten.push({ schluessel: 'bau', wort: 'Kartenbau-Dienst nicht erreichbar' });
   } else if (status.bau_dienst === 'erreichbar' && status.naechster_bau_at) {
-    zeiten.push(`nächster Kartenbau ${zeitpunkt(status.naechster_bau_at)}`);
+    zeiten.push({
+      schluessel: 'bau',
+      wort: 'nächster Kartenbau',
+      zeit: zeitpunkt(status.naechster_bau_at),
+    });
   }
 
   return (
@@ -102,7 +115,15 @@ export default function AutoAktualisierungZeile({
         )}
         <MetaZeile>
           {zeiten.map((z) => (
-            <MetaZeile.Teil key={z}>{z}</MetaZeile.Teil>
+            <MetaZeile.Teil key={z.schluessel}>
+              {z.wort}
+              {z.zeit && (
+                <>
+                  {' '}
+                  <MetaZeile.Zahl>{z.zeit}</MetaZeile.Zahl>
+                </>
+              )}
+            </MetaZeile.Teil>
           ))}
         </MetaZeile>
       </Stapel>

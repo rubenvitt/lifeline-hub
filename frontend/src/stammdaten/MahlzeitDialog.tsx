@@ -144,7 +144,7 @@ export default function MahlzeitDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Feld
+      <Feld<FormWerte>
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
@@ -157,9 +157,9 @@ export default function MahlzeitDialog({
           count={zeichenGrenze(VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX)}
         />
       </Feld>
-      <Stapel richtung="zeile" umbruch abstand="lg">
+      <Stapel richtung="zeile" umbruch abstand="md">
         <div style={{ flex: '1 1 120px' }}>
-          <Feld
+          <Feld<FormWerte>
             name="beginn"
             label="Beginn"
             rules={[
@@ -171,7 +171,7 @@ export default function MahlzeitDialog({
           </Feld>
         </div>
         <div style={{ flex: '1 1 120px' }}>
-          <Feld
+          <Feld<FormWerte>
             name="ende"
             label="Ende"
             dependencies={['beginn']}
@@ -194,7 +194,7 @@ export default function MahlzeitDialog({
           </Feld>
         </div>
       </Stapel>
-      <Feld name="verpflegungsart" label="Art">
+      <Feld<FormWerte> name="verpflegungsart" label="Art">
         <Select allowClear placeholder="ohne Angabe" options={ART_OPTIONEN} />
       </Feld>
     </ErfassungsModal>

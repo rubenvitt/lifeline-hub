@@ -185,9 +185,9 @@ describe('EinsatzGeraete (LFH-892)', () => {
     const zustaende = Array.from(document.querySelectorAll('[data-lfh="geraet-zustand"]')).map(
       (z) => z.textContent ?? '',
     );
-    expect(zustaende[0]).toMatch(/^UHS-Tablet·gekoppelt·bis /);
-    expect(zustaende[1]).toMatch(/^UHS-Tablet·widerrufen·von Erika Leitung um /);
-    expect(zustaende[2]).toMatch(/^UHS-Tablet·abgelaufen·bis /);
+    expect(zustaende[0]).toMatch(/^UHS-Tablet · gekoppelt · bis /);
+    expect(zustaende[1]).toMatch(/^UHS-Tablet · widerrufen · von Erika Leitung um /);
+    expect(zustaende[2]).toMatch(/^UHS-Tablet · abgelaufen · bis /);
     // Eine widerrufene oder abgelaufene Kopplung ist zu Ende: kein Aktionsmenü. Der Server lehnt
     // Verlängern und neuen Code für beide ab (LFH-1143).
     expect(

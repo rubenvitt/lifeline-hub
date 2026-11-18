@@ -16,6 +16,8 @@ import Textstufe, { type Textton } from './Textstufe';
  * Kennzeichen und Nummer stehen mit `mono` in der Stufe `meta` (Zahlenfamilie, gleich breite
  * Ziffern). Reicht die Breite nicht, bricht die Zeile zwischen den Teilen um.
  *
+ * Steht eine Zeit in einem Wortteil („bis 14:32“), trägt `MetaZeile.Zahl` sie in Mono.
+ *
  * Ersetzt `Text type="secondary" style={{ fontSize: 12 }}` mit Trennern von Hand. Regel:
  * `frontend/AGENTS.md`, „Gestaltungssprache“, Bausteine.
  */
@@ -36,8 +38,18 @@ function Teil({ children, mono = false, ton = 'schwach' }: TeilProps) {
   );
 }
 
+/** Eine Zahl, Zeit oder Nummer inmitten eines Wortteils („bis 14:32“): Stufe `meta`. */
+function Zahl({ children }: { children: ReactNode }) {
+  return (
+    <Textstufe stufe="meta" ton="schwach">
+      {children}
+    </Textstufe>
+  );
+}
+
+/** Leer ist ein Inhalt, von dem nach `null`, `false` und leeren Texten nichts bleibt. */
 function istLeer(inhalt: ReactNode): boolean {
-  return inhalt === null || inhalt === undefined || inhalt === false || inhalt === '';
+  return Children.toArray(inhalt).every((kind) => kind === '');
 }
 
 interface MetaZeileProps extends Pick<AriaAttributes, 'aria-label'> {
@@ -46,10 +58,12 @@ interface MetaZeileProps extends Pick<AriaAttributes, 'aria-label'> {
 }
 
 function MetaZeile({ children, className, ...aria }: MetaZeileProps) {
-  const teile = Children.toArray(children).filter(
-    (kind): kind is ReactElement<TeilProps> =>
-      isValidElement<TeilProps>(kind) && !istLeer(kind.props.children),
-  );
+  // Text ohne `Teil` wird ein eigener Teil, statt still zu verschwinden.
+  const teile = Children.toArray(children)
+    .map((kind, i) =>
+      isValidElement<TeilProps>(kind) ? kind : <Teil key={`text-${i}`}>{kind}</Teil>,
+    )
+    .filter((kind): kind is ReactElement<TeilProps> => !istLeer(kind.props.children));
   if (teile.length === 0) return null;
   return (
     <Stapel
@@ -62,11 +76,15 @@ function MetaZeile({ children, className, ...aria }: MetaZeileProps) {
     >
       {teile.map((teil, i) => (
         <Fragment key={teil.key ?? i}>
+          {/* Weißraum außerhalb des versteckten Trenners: Vorleser und Kopieren trennen die
+              Teile; im Flex-Container zählt reiner Weißraum nicht als Element. */}
+          {i > 0 && ' '}
           {i > 0 && (
             <Textstufe stufe="textKlein" ton="schwach">
               <span aria-hidden="true">·</span>
             </Textstufe>
           )}
+          {i > 0 && ' '}
           {teil}
         </Fragment>
       ))}
@@ -75,5 +93,6 @@ function MetaZeile({ children, className, ...aria }: MetaZeileProps) {
 }
 
 MetaZeile.Teil = Teil;
+MetaZeile.Zahl = Zahl;
 
 export default MetaZeile;

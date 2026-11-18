@@ -15,7 +15,8 @@ import { quellwurzel } from '../test/ratsche';
  *
  * 1. kein `<Form.Item` — Formularfelder sind `Feld`;
  * 2. keine Breite (`width`, `maxWidth`, `minWidth`, als Zahl, String oder Konstante) im `style`
- *    eines Eingabefelds (`Input`, `InputNumber`, `Select`, `DatePicker`, `TimePicker`,
+ *    eines Eingabefelds und keine Stil-Konstante dort (`style={SELECT_STIL}`), die eine Breite
+ *    verstecken könnte (`Input`, `InputNumber`, `Select`, `DatePicker`, `TimePicker`,
  *    `AutoComplete` samt Unterformen);
  * 3. keine feste Zahlbreite (`width: <Zahl>`) überhaupt, außer an den zugelassenen Stellen, die
  *    keine Eingabefelder sind (Tabellenspalten, Fortschrittsbalken).
@@ -46,7 +47,9 @@ const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = 
 
 const FORM_ITEM = /<Form\.Item\b/g;
 const EINGABE_STIL =
-  /<(?:Input(?:\.(?:TextArea|Password|Search))?|InputNumber|Select|DatePicker(?:\.RangePicker)?|TimePicker|AutoComplete)\b[^>]*?\bstyle=\{\{[^}]*?\b(?:width|maxWidth|minWidth)\s*:/g;
+  /<(?:Input(?:\.(?:TextArea|Password|Search))?|InputNumber|Select|DatePicker(?:\.RangePicker)?|TimePicker|AutoComplete)(?:<[^<>]*>)?(?=[\s/>])[^>]*?\bstyle=\{\{[^}]*?\b(?:width|maxWidth|minWidth)\s*:/g;
+const EINGABE_STIL_KONSTANTE =
+  /<(?:Input(?:\.(?:TextArea|Password|Search))?|InputNumber|Select|DatePicker(?:\.RangePicker)?|TimePicker|AutoComplete)(?:<[^<>]*>)?(?=[\s/>])[^>]*?\bstyle=\{\s*[A-Za-z_$][\w$.]*\s*\}/g;
 const FESTE_BREITE = /\bwidth:\s*\d/g;
 
 export interface Quelle {
@@ -71,6 +74,11 @@ export function feldBefunde(
     for (const m of text.matchAll(EINGABE_STIL)) {
       meldungen.push(
         `${pfad}:${zeileVon(text, m.index)}  Breite am Eingabefeld — Feld breite="kurz|schmal|mittel|voll"`,
+      );
+    }
+    for (const m of text.matchAll(EINGABE_STIL_KONSTANTE)) {
+      meldungen.push(
+        `${pfad}:${zeileVon(text, m.index)}  Stil-Konstante am Eingabefeld — Breite nur über Feld bzw. Hülle`,
       );
     }
     const fest = [...text.matchAll(FESTE_BREITE)];
@@ -135,9 +143,21 @@ describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => 
         '<InputNumber min={0} style={{ maxWidth: BREITE }} />',
         '<Select\n  options={o}\n  style={{ minWidth: 160 }}\n/>',
         '<Input.TextArea style={{ resize: "none" }} />',
+        '<Select<number>\n  value={v}\n  style={{ width: 200 }}\n/>',
       ].join('\n');
       const meldungen = feldBefunde(q(text), { 'x.tsx': { anzahl: 0, grund: '' } });
-      expect(meldungen.filter((m) => m.includes('Breite am Eingabefeld'))).toHaveLength(3);
+      expect(meldungen.filter((m) => m.includes('Breite am Eingabefeld'))).toHaveLength(4);
+    });
+
+    it('meldet eine Stil-Konstante am Eingabefeld, aber keinen Stil-Aufruf', () => {
+      const text = [
+        '<Select<number> options={o} style={SELECT_STYLE} />',
+        '<Input style={monoStil(14)} />',
+      ].join('\n');
+      const meldungen = feldBefunde(q(text), {});
+      expect(meldungen).toEqual([
+        'x.tsx:1  Stil-Konstante am Eingabefeld — Breite nur über Feld bzw. Hülle',
+      ]);
     });
 
     it('meldet feste Zahlbreiten auch abseits von Feldern, außer zugelassen in genauer Zahl', () => {

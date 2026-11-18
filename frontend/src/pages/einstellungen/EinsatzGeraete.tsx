@@ -368,14 +368,27 @@ export default function EinsatzGeraete() {
                         <MetaZeile.Teil>{ANSICHT_LABEL[k.ansicht]}</MetaZeile.Teil>
                         <MetaZeile.Teil>{STATUS_WORT[k.status]}</MetaZeile.Teil>
                         <MetaZeile.Teil>
-                          {k.status === 'widerrufen'
-                            ? `von ${k.widerrufen_von_name ?? '—'} um ${zeitKurz(k.widerrufen_at, konv)}`
-                            : `bis ${zeitKurz(k.laeuft_ab_at, konv)}`}
+                          {k.status === 'widerrufen' ? (
+                            <>
+                              {`von ${k.widerrufen_von_name ?? '—'} um `}
+                              <MetaZeile.Zahl>{zeitKurz(k.widerrufen_at, konv)}</MetaZeile.Zahl>
+                            </>
+                          ) : (
+                            <>
+                              {'bis '}
+                              <MetaZeile.Zahl>{zeitKurz(k.laeuft_ab_at, konv)}</MetaZeile.Zahl>
+                            </>
+                          )}
                         </MetaZeile.Teil>
                         <MetaZeile.Teil>
-                          {k.letzter_zugriff_at
-                            ? `zuletzt ${zeitKurz(k.letzter_zugriff_at, konv)}`
-                            : null}
+                          {k.letzter_zugriff_at ? (
+                            <>
+                              {'zuletzt '}
+                              <MetaZeile.Zahl>
+                                {zeitKurz(k.letzter_zugriff_at, konv)}
+                              </MetaZeile.Zahl>
+                            </>
+                          ) : null}
                         </MetaZeile.Teil>
                         <MetaZeile.Teil>{`angelegt von ${k.erstellt_von_name}`}</MetaZeile.Teil>
                       </MetaZeile>

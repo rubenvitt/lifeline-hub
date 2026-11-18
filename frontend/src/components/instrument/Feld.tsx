@@ -15,15 +15,20 @@ import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
 
 export const FELD_KLASSE = 'lfh-formfeld';
 
-export interface FeldProps extends Omit<FormItemProps, 'style'> {
+/** `Values` bindet `name` an die Formularwerte wie `Form.Item<Values>`. */
+export interface FeldProps<Values = unknown> extends Omit<FormItemProps<Values>, 'style'> {
   /** Obergrenze der Breite; Vorgabe `voll` (ganze Zeile). */
   breite?: Feldbreite;
 }
 
-export default function Feld({ breite = 'voll', className, ...props }: FeldProps) {
+export default function Feld<Values = unknown>({
+  breite = 'voll',
+  className,
+  ...props
+}: FeldProps<Values>) {
   const grenze = FELDBREITE[breite];
   return (
-    <Form.Item
+    <Form.Item<Values>
       {...props}
       className={className ? `${FELD_KLASSE} ${className}` : FELD_KLASSE}
       style={grenze === undefined ? undefined : { maxWidth: grenze }}

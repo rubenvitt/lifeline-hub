@@ -21,10 +21,11 @@ describe('MetaZeile (Spec `schriftstufen`, „Metazeile in einer Form")', () => 
       </MetaZeile>,
     );
     const zeile = screen.getByLabelText('Angaben');
-    expect(zeile.textContent).toBe('HH-RK 1083·Wache Nord·geändert');
+    expect(zeile.textContent).toBe('HH-RK 1083 · Wache Nord · geändert');
     const trenner = zeile.querySelectorAll('[aria-hidden="true"]');
     expect(trenner).toHaveLength(2);
-    expect(vorleseText(zeile)).toBe('HH-RK 1083Wache Nordgeändert');
+    // Zwischen den Teilen bleibt Weißraum, damit Vorleser und Kopieren keine Wörter verkleben.
+    expect(vorleseText(zeile).replace(/\s+/g, ' ')).toBe('HH-RK 1083 Wache Nord geändert');
   });
 
   it('lässt leere Teile samt Trenner weg', () => {
@@ -38,7 +39,46 @@ describe('MetaZeile (Spec `schriftstufen`, „Metazeile in einer Form")', () => 
         <MetaZeile.Teil>17.11. 14:32</MetaZeile.Teil>
       </MetaZeile>,
     );
-    expect(screen.getByLabelText('Angaben').textContent).toBe('HH-RK 1083·17.11. 14:32');
+    expect(screen.getByLabelText('Angaben').textContent).toBe('HH-RK 1083 · 17.11. 14:32');
+  });
+
+  it('wertet einen Teil, dessen Kinder alle leer sind, als leer', () => {
+    const a: string | null = null;
+    const b: string | null = null;
+    renderMitProviders(
+      <MetaZeile aria-label="Angaben">
+        <MetaZeile.Teil>Wache Nord</MetaZeile.Teil>
+        <MetaZeile.Teil>
+          {a}
+          {b}
+        </MetaZeile.Teil>
+        <MetaZeile.Teil>geändert</MetaZeile.Teil>
+      </MetaZeile>,
+    );
+    expect(screen.getByLabelText('Angaben').textContent).toBe('Wache Nord · geändert');
+  });
+
+  it('verliert Text ohne Teil nicht, sondern setzt ihn als eigenen Teil', () => {
+    renderMitProviders(
+      <MetaZeile aria-label="Angaben">
+        {'Leitstelle'}
+        <MetaZeile.Teil>Nord</MetaZeile.Teil>
+      </MetaZeile>,
+    );
+    expect(screen.getByLabelText('Angaben').textContent).toBe('Leitstelle · Nord');
+  });
+
+  it('setzt eine Zahl in einem Wortteil mit `MetaZeile.Zahl` in die Zahlenfamilie', () => {
+    renderMitProviders(
+      <MetaZeile>
+        <MetaZeile.Teil>
+          bis <MetaZeile.Zahl>14:32</MetaZeile.Zahl>
+        </MetaZeile.Teil>
+      </MetaZeile>,
+    );
+    const zeit = screen.getByText('14:32');
+    expect(zeit).toHaveStyle({ fontSize: '11px' });
+    expect(zeit.style.fontVariantNumeric).toBe('tabular-nums');
   });
 
   it('rendert ohne gefüllten Teil nichts', () => {

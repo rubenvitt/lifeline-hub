@@ -174,7 +174,7 @@ export default function EinsatzLagebildExtern({
                 title={<span data-lfh="lagebild-freigabe-titel">{f.empfaenger}</span>}
                 description={
                   <span style={{ color: rollen.gedaempft }}>
-                    <Stapel als="span" abstand="xxs">
+                    <Stapel abstand="xxs">
                       <span data-lfh="lagebild-freigabe-zustand">{freigabeZeile(f, zeit)}</span>
                       {f.protokoll.slice(0, PROTOKOLL_SICHTBAR).map((o) => (
                         <div

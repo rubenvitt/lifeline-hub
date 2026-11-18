@@ -18,8 +18,9 @@ import { SCHULD } from './schriftgroesse.schuld';
  * `schriftStil(stufe)`, in CSS über `var(--lfh-typo-<stufe>-groesse)`.
  *
  * Gezählt wird außerhalb von Kommentaren:
- * - TS/TSX: `fontSize` mit einer Zahl oder einem px-String;
- * - CSS: `font-size` mit einem px-Wert, außer in `theme/`.
+ * - TS/TSX: `fontSize` mit einer Zahl oder einem px-String, als JSX-Attribut (`fontSize={9}`) und
+ *   CSS in Strings (`'font-size:10px'`, `font: 600 13px/…`);
+ * - CSS: `font-size` und die Kurzform `font` mit einem px-Wert, außer in der Rollenquelle.
  *
  * ── SCHULD (`schriftgroesse.schuld.ts`) ──
  * Die Zahl der Literale je Datei beim Einführen. Mehr Funde als die Schuld sind rot, weniger
@@ -33,20 +34,28 @@ import { SCHULD } from './schriftgroesse.schuld';
 
 const SRC = quellwurzel('Schriftgrößen-Wächter');
 
-/** `theme/` trägt die Skala selbst und antds Grundschrift je Dichte. */
+/** Die Quellen der Skala und der Grundschrift je Dichte; übriges CSS in `theme/` zählt. */
 export const AUSNAHMEN: Readonly<Record<string, string>> = {
   ...DICHTE_AUSNAHMEN,
-  'theme/': 'Quelle der Skala und der Grundschrift je Dichte',
+  'theme/tokens.ts': 'Quelle der Skala und der Grundschrift je Dichte',
+  'theme/rollen.css': 'CSS-Spiegel der Skala (`--lfh-typo-*`)',
 };
 
 const TS_ZAHL = /\bfontSize\s*:\s*(\d+(?:\.\d+)?)(?![\w.])/g;
 const TS_TEXT = /\bfontSize\s*:\s*(['"`])(\d+(?:\.\d+)?)px\1/g;
-const CSS_DEKL = /(?:^|[\s;{])font-size\s*:\s*(\d+(?:\.\d+)?)px\b/g;
+/** JSX-Attribut, etwa an SVG-`<text>`: `fontSize={9}` oder `fontSize="9"`. */
+const JSX_ATTR = /\bfontSize=(?:\{\s*|["'])(\d+(?:\.\d+)?)(?:px)?(?:\s*\}|["'])/g;
+/** CSS-Deklaration, in `.css` und in Strings in TS: `font-size: 13px`. */
+const CSS_DEKL = /(?:^|[\s;{'"`])font-size\s*:\s*(\d+(?:\.\d+)?)px\b/g;
+/** Kurzform `font: 600 13px/1.4 …` — die Größe ist der px-Wert vor `/` oder der Familie. */
+const CSS_KURZ = /(?:^|[\s;{'"`])font\s*:[^;}'"`]*?(\d+(?:\.\d+)?)px\b/g;
 
 /** Alle Schriftgrößen-Literale einer Datei (`.css` oder TS/TSX) außerhalb von Kommentaren. */
 export function schriftgroessen(pfad: string, inhalt: string): Fund[] {
   const text = ohneKommentare(inhalt).join('\n');
-  const muster = pfad.endsWith('.css') ? [CSS_DEKL] : [TS_ZAHL, TS_TEXT];
+  const muster = pfad.endsWith('.css')
+    ? [CSS_DEKL, CSS_KURZ]
+    : [TS_ZAHL, TS_TEXT, JSX_ATTR, CSS_DEKL, CSS_KURZ];
   const funde: Fund[] = [];
   for (const m of muster) {
     for (const t of text.matchAll(m)) {
@@ -115,6 +124,28 @@ describe('Schriftstufen: keine neue freie Schriftgröße (Spec `schriftstufen`)'
         '.b { font-size: var(--lfh-typo-text-groesse); }',
       ].join('\n');
       expect(schriftgroessen('a.css', css)).toEqual([{ zeile: 1, wert: 13 }]);
+    });
+
+    it('meldet fontSize als JSX-Attribut und CSS in TS-Strings', () => {
+      const ts = [
+        '<text fontSize={9} x={2}>',
+        '<text fontSize="7">',
+        "el.style.cssText = 'font-size:10px;color:red';",
+        'const css = `.a { font: 600 13px/1.4 sans-serif; }`;',
+      ].join('\n');
+      expect(schriftgroessen('a.tsx', ts).map((f) => f.wert)).toEqual([9, 7, 10, 13]);
+    });
+
+    it('meldet die Kurzform font in CSS', () => {
+      expect(schriftgroessen('a.css', '.a { font: 600 17px/1.2 var(--x); }')).toEqual([
+        { zeile: 1, wert: 17 },
+      ]);
+    });
+
+    it('nimmt in theme/ nur Skala und Rollenquelle aus, nicht handgeschriebenes CSS', () => {
+      const css = '.lfh-zahl--mittel { font-size: 17px; }';
+      expect(befunde({ 'theme/rollen.css': css, 'theme/tokens.ts': 'x' }, {})).toEqual([]);
+      expect(befunde({ 'theme/sprache.css': css }, {})).toHaveLength(1);
     });
 
     it('lässt Kommentare in Ruhe', () => {

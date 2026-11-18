@@ -51,7 +51,7 @@ describe('Feld (Spec `feldbreiten`)', () => {
     expect(item).toHaveClass(FELD_KLASSE);
     expect(item).toHaveClass('eigen');
     const css = readFileSync(join(process.cwd(), 'src', 'index.css'), 'utf-8');
-    for (const steuer of ['.ant-input-number', '.ant-picker']) {
+    for (const steuer of ['.ant-input-number', '.ant-picker', '.ant-select']) {
       expect(css).toMatch(
         new RegExp(`\\.${FELD_KLASSE} ${steuer.replace('.', '\\.')}[^{]*\\{[^}]*width: 100%`),
       );
@@ -87,5 +87,14 @@ describe('Feld (Spec `feldbreiten`)', () => {
     void (<Feld style={{ width: 280 }}>x</Feld>);
     // @ts-expect-error — eine Zahl ist keine Breitenstufe
     void (<Feld breite={280}>x</Feld>);
+  });
+
+  it('prüft mit Werttyp den Feldnamen gegen die Formularwerte', () => {
+    interface Werte {
+      beginn: string;
+    }
+    void (<Feld<Werte> name="beginn">x</Feld>);
+    // @ts-expect-error — „begin“ ist kein Feld der Werte
+    void (<Feld<Werte> name="begin">x</Feld>);
   });
 });

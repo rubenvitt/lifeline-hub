@@ -235,7 +235,7 @@ export default function OrganisationTab() {
           koerperPolster
           style={{ marginBlockEnd: token.marginLG }}
         >
-          <Stapel abstand="lg">
+          <Stapel abstand="md">
             {logo && kaputtesLogo === logo.sha256 ? (
               // Anders als im Druckkopf mit Hinweis: hier ist der Ort, an dem man es behebt.
               <Alert
@@ -339,7 +339,7 @@ export default function OrganisationTab() {
       >
         {/* Scheitert das Entfernen, bleibt der Dialog offen — der Grund steht deshalb HIER, nicht
            hinter seiner Maske an der Seite (Bauform `FreigabeDialog`). */}
-        <Stapel abstand="lg">
+        <Stapel abstand="md">
           <Typography.Paragraph style={{ margin: 0 }}>
             Das Logo wird unwiderruflich gelöscht.
           </Typography.Paragraph>
