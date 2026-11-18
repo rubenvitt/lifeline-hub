@@ -13,7 +13,7 @@ dayjs.extend(utc);
  * sich „5:01“ als Uhrzeit) und unabhängig von der Zeitdarstellung. Mit `tage` ab 24 h „2 d 14 h“:
  * nur für die Einsatzdauer des Einsatzes und relative Angaben. Kräfte-Dauern und eingestellte
  * Längen (Rhythmus, Grenzwerte) laufen in Stunden weiter, weil sie neben Stunden-Grenzwerten
- * stehen (Entscheidung D2 in `openspec/changes/…/aovwhho1-zeitformate/design.md`).
+ * stehen (Entscheidung D2 in `openspec/changes/archive/2026-11-18-aovwhho1-zeitformate/design.md`).
  *
  * Ganze Minuten, abgerundet; negativ gilt als 0. Der Server bildet dieselbe Form ohne Tage in
  * `src/zeitdarstellung.rs` (`dauer_text`); beide lesen `dauer.faelle.json`.

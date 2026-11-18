@@ -34,12 +34,12 @@ Jede Aufgabe stellt die Tests ihrer Aufrufer mit um und streicht ihre Dateien au
 
 ## 6. Doku und Regeln
 
-- [ ] 6.1 `frontend/AGENTS.md`, „Zeitdarstellung“: Dauerkern, Wächter, Uhr folgt der Darstellung (E5), Datenstand-Baustein; Verweise auf `formatVor`/`einsatzDauer` greppen und nachziehen. Prüfung: `rg 'formatVor|einsatzDauer|formatDauer|lagebildZeit|standText' frontend/ docs/ .claude/` leer bzw. nur Archiv.
+- [x] 6.1 `frontend/AGENTS.md`, „Zeitdarstellung“: Dauerkern, Wächter, Uhr folgt der Darstellung (E5), Datenstand-Baustein; Verweise auf `formatVor`/`einsatzDauer` greppen und nachziehen. Prüfung: `rg 'formatVor|einsatzDauer|formatDauer|lagebildZeit|standText' frontend/ docs/ .claude/` leer bzw. nur Archiv.
 - [x] 6.2 Anwenderdoku: Texte mit alten Dauern oder Uhren berichtigen (`rg '[0-9]:[0-9]{2} h|Stand vor' docs/anwender`), betroffene Bilder per Bildlauf neu aufnehmen. Prüfung: Doku-Wächter von `check-all.sh` grün.
 
 ## 7. Integration
 
-- [ ] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; e2e-Specs, die Uhr, Stand oder Dauern lesen (`lagebild-offline`, `lagekarte-smoke`, `abloesung-zufluss`), einzeln laufen lassen.
+- [x] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; e2e-Specs, die Uhr, Stand oder Dauern lesen (`lagebild-offline`, `lagekarte-smoke`, `abloesung-zufluss`), einzeln laufen lassen.
 
 ## Workflow follow-up
 

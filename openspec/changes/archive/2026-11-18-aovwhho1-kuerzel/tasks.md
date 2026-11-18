@@ -25,4 +25,4 @@ Jede Aufgabe stellt die Tests der Fläche mit um und streicht sie aus der Schuld
 
 ## 4. Integration
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, zusammen mit Change `aovwhho1-zeitformate`.
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, zusammen mit Change `aovwhho1-zeitformate`.

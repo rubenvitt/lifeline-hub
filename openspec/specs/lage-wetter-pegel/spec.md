@@ -372,7 +372,7 @@ Ereignis und springt zur Modulseite. Sie MUST verschwinden, sobald die Warnung g
 
 #### Scenario: Angekündigtes Unwetter
 - **WHEN** eine Warnung „ORKANBÖEN“ der Stufe „schwer“ in 2 Stunden beginnt
-- **THEN** zeigt der Überblick eine Marke „Unwetterwarnung: Orkanböen“ zur Beginnzeit mit dem Wort „in 2 h 00 min“
+- **THEN** zeigt der Überblick eine Marke „Unwetterwarnung: Orkanböen“ zur Beginnzeit mit dem Wort „in 2 h“
 
 #### Scenario: Warnung beginnt
 - **WHEN** der Beginn einer markierten Unwetterwarnung erreicht ist

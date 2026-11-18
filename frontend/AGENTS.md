@@ -738,7 +738,7 @@ anwendbar), „nicht geprüft" ist keins.
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer (seit LFH-1078 P7); neue Einträge gibt es nicht, ein Treffer wird umgebaut.
 - **Kürzel sind eingeführt oder erklärt** (LLH-1750, Spec `bedien-wortlaut`,
-  `openspec/changes/archive/2026-11-17-aovwhho1-kuerzel/design.md`): Die Oberfläche zeigt ein
+  `openspec/changes/archive/2026-11-18-aovwhho1-kuerzel/design.md`): Die Oberfläche zeigt ein
   Kürzel nur, wenn es in `anzeige/kuerzel.ts` (`EINGEFUEHRTE_KUERZEL`) steht oder auf derselben
   Fläche sichtbar erklärt wird; sonst wird es ausgeschrieben („Unterabschnitte“, nicht „UA“). Ein
   neues Kürzel kommt in die Liste und in die Tabelle des Kapitels `zeiten-und-kuerzel.md`
@@ -1163,7 +1163,7 @@ anwendbar), „nicht geprüft" ist keins.
   Zeitraums), `leereUhrzeit` (Lücke in Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe,
   Zeitraumende) über das `jetzt` von `zeitKurz`.
 - **Uhr, Dauer und Datenstand** (LLH-1750, Spec `zeitdarstellung`, Entscheidung E5,
-  `openspec/changes/archive/2026-11-17-aovwhho1-zeitformate/design.md`): Die **Uhr** im Kopf, im
+  `openspec/changes/archive/2026-11-18-aovwhho1-zeitformate/design.md`): Die **Uhr** im Kopf, im
   Lagemonitor und im Großbild zeigt die Gerätezeit in der Rolle „Uhrzeit“ der Darstellung (`1731`
   bzw. `17:31`; `formatiereUhr` in `anzeige/zeitDarstellung.ts`, Darstellung über
   `useUhrDarstellung`). Keine Seite stellt eine zweite Uhr neben ihren Titel. Eine **Dauer** bildet

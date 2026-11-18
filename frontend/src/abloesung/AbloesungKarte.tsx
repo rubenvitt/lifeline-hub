@@ -18,7 +18,6 @@ import { besatzungPlanText, besatzungText, nachBesatzungswechselText } from './b
 import { verbleibText } from './verbleib';
 import { beginnWort } from './beginnText';
 import { abloeserStandText, type AbloeserStand } from './abloeserStand';
-
 import { abloesungZeit, einstufungOf } from './einstufung';
 import { planungEntfallenText, planungWarnungText } from './planungWarnung';
 import { lautPlanText } from './lautPlan';
