@@ -8,6 +8,9 @@
  * der Hülle nicht einlöst. Jede Hülle, auch die unter Windows, trägt dort zudem die native Meldung
  * ein (`src-tauri/src/benachrichtigung.js`, Benachrichtigungskonzept D7), dazu das App-Badge
  * (LLH-1423). Ohne Kennung (Browser) oder ohne Feld bleibt alles wie bisher.
+ *
+ * Die iOS-Hülle (`ios/App/Huelle/huelle.js`, Change t39ltxxi, Spec `huellen-vertrag`) setzt dazu
+ * `platform: 'ios'`, `version` und `haptics(kind)`. Jedes Feld wird einzeln geprüft.
  */
 
 declare global {
@@ -83,4 +86,41 @@ export function huelleAppBadge(): ((count: number) => Promise<void>) | null {
  */
 export function inHuelle(): boolean {
   return window.__LIFELINE_HUELLE__ != null;
+}
+
+/** Kennwort der Plattform der Hülle (`'ios'`); `null` im Browser und in den Desktop-Hüllen. */
+export function huellePlatform(): string | null {
+  const platform = window.__LIFELINE_HUELLE__?.platform;
+  return typeof platform === 'string' ? platform : null;
+}
+
+/** Volle Version der Hülle; `null`, wo die Hülle keine nennt (Browser, Desktop-Hülle). */
+export function huelleVersion(): string | null {
+  const version = window.__LIFELINE_HUELLE__?.version;
+  return typeof version === 'string' ? version : null;
+}
+
+/**
+ * Die Arten der Haptik (Spec `huellen-vertrag`, design.md D6): angenommen, Alarm, abgelehnt,
+ * Wechsel im Segment, nur vorgemerkt.
+ */
+export type HapticsKind = 'success' | 'warning' | 'error' | 'selection' | 'tap';
+
+/**
+ * Haptische Rückmeldung der Hülle: feuern und vergessen. Ohne Hülle oder ohne `haptics` tut sie
+ * nichts; sie wartet nicht und wirft nie, auch nicht, wenn die Hülle wirft oder ablehnt — die
+ * Handlung, die sie auslöst, bleibt davon unberührt.
+ */
+export function huelleHaptics(kind: HapticsKind): void {
+  try {
+    const haptics = window.__LIFELINE_HUELLE__?.haptics;
+    if (typeof haptics !== 'function') return;
+    const ergebnis: unknown = haptics(kind);
+    // Auch ein Thenable aus der Hülle: seine Ablehnung bleibt keine unbehandelte Zurückweisung.
+    if (typeof (ergebnis as PromiseLike<unknown> | null)?.then === 'function') {
+      Promise.resolve(ergebnis).catch(() => {});
+    }
+  } catch {
+    // Ohne Haptik geht es weiter.
+  }
 }
