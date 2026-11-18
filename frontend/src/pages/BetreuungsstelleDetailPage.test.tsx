@@ -276,6 +276,8 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
     expect(dialog).toHaveTextContent(/Kapazität inzwischen: „180“/);
+    // Solange die Rückfrage klärt, steht kein Grund am Formular.
+    expect(screen.queryByText('Betreuungsstelle konnte nicht gespeichert werden')).toBeNull();
     expect(api.aendereStelle).toHaveBeenNthCalledWith(
       1,
       1,

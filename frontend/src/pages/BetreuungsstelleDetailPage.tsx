@@ -333,20 +333,12 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       message.success(`Betreuungsstelle ${s.bezeichnung}: geschlossen`);
     },
   });
-  const speichernMut = useMutation({
-    mutationFn: (v: {
-      patch: BetreuungsstellePatch;
-      erwartet: Partial<BetreuungsstellePatch> | undefined;
-    }) => aendereStelle(einsatzId, stelleId, v.patch, v.erwartet),
-    onSuccess: (s) => {
-      invalidiere();
-      message.success(`Betreuungsstelle ${s.bezeichnung} gespeichert`);
-    },
-  });
   /*
    * Feld-CAS mit dem einen Konfliktablauf (LLH-1945, `components/useFeldKonflikt`): die Schlüssel
    * des Patches gehen mit ihrem Wert beim Öffnen als `erwartet` mit (die Koordinate als Paar);
-   * nach einem 409 vergleicht die Seite mit dem frisch geladenen Stand derselben Angaben.
+   * nach einem 409 vergleicht die Seite mit dem frisch geladenen Stand derselben Angaben. Die
+   * Mutation umfasst den ganzen Ablauf: ihr Fehler (`speichernMut.error`, Grund am Formular) ist
+   * erst der endgültige, nicht der 409, den die Rückfrage gerade klärt.
    */
   const konflikt = useFeldKonflikt();
   const loadStelleFrisch = async () => {
@@ -357,21 +349,32 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     });
     return frisch.stellen.find((x) => x.id === stelleId);
   };
-  const saveMitAltwert = (beimOeffnen: Betreuungsstelle, patch: BetreuungsstellePatch) =>
-    konflikt({
-      etikett: angabenName(patch),
-      erwartet: ausschnitt(beimOeffnen, patch),
-      speichern: async (erwartet) => {
-        await speichernMut.mutateAsync({ patch, erwartet });
-      },
-      ladeFrisch: loadStelleFrisch,
-      // Eine inzwischen stornierte Stelle fehlt in der Übersicht: dann kein Feldkonflikt, der
-      // Grund des Servers steht am Formular.
-      aktuell: (frisch) =>
-        frisch && { wert: ausschnitt(frisch, patch), anzeige: angabenAnzeige(frisch, patch) },
-      text: ausschnittText,
-      leer: ausschnittLeer,
-    });
+  const speichernMut = useMutation({
+    mutationFn: async (v: { beimOeffnen: Betreuungsstelle; patch: BetreuungsstellePatch }) => {
+      let gespeichert: Betreuungsstelle | undefined;
+      const ergebnis = await konflikt({
+        etikett: angabenName(v.patch),
+        erwartet: ausschnitt(v.beimOeffnen, v.patch),
+        speichern: async (erwartet) => {
+          gespeichert = await aendereStelle(einsatzId, stelleId, v.patch, erwartet);
+        },
+        ladeFrisch: loadStelleFrisch,
+        // Eine inzwischen stornierte Stelle fehlt in der Übersicht: dann kein Feldkonflikt, der
+        // Grund des Servers steht am Formular.
+        aktuell: (frisch) =>
+          frisch && { wert: ausschnitt(frisch, v.patch), anzeige: angabenAnzeige(frisch, v.patch) },
+        text: ausschnittText,
+        leer: ausschnittLeer,
+      });
+      return { ergebnis, gespeichert };
+    },
+    onSuccess: ({ gespeichert }) => {
+      invalidiere();
+      if (gespeichert) message.success(`Betreuungsstelle ${gespeichert.bezeichnung} gespeichert`);
+    },
+  });
+  const saveMitAltwert = async (beimOeffnen: Betreuungsstelle, patch: BetreuungsstellePatch) =>
+    (await speichernMut.mutateAsync({ beimOeffnen, patch })).ergebnis;
   const stornoMut = useMutation({
     mutationFn: () => storniereStelle(einsatzId, stelleId),
     onSuccess: (s) => {
