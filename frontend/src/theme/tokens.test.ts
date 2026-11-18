@@ -10,6 +10,7 @@ import { seitenrinne } from './tokens';
 import { navDrawerBreite, navDrawerRand } from './tokens';
 import {
   antdAlgorithmus,
+  antdHinweis,
   antdKaestchen,
   antdKlappkopf,
   antdKomponenten,
@@ -314,6 +315,32 @@ describe('Klappkopf folgt der Staffel (LFH-653)', () => {
       expect((kopf as { header?: unknown }).header, d).toEqual({
         minHeight: SOLL[d],
         alignItems: 'center',
+      });
+    }
+  });
+});
+
+/**
+ * Schließen-Kreuz eines Hinweises (LLH-1798, Spec `einsatztauglichkeit-layout`): antd zeichnet es in
+ * jeder Stufe 12 × 14 px groß. Unbeschriftetes Ziel, also die kleine Steuerhöhe auf BEIDEN Achsen,
+ * 24 / 48 / 72. Höhenneutral: der negative Rand nimmt den Zuwachs über die Kreuzgröße (`1em`, antd
+ * setzt Schrift und Zeilenhöhe des Knopfs auf `fontSizeIcon`) aus dem Layout. Literale, nicht die
+ * Quelle.
+ */
+describe('Schließen-Kreuz eines Hinweises folgt der Staffel (LLH-1798)', () => {
+  const SOLL: Record<Dichte, number> = { kompakt: 24, komfortabel: 48, handschuh: 72 };
+
+  it('setzt den Boden der GEWÄHLTEN Stufe auf beiden Achsen, mittig und höhenneutral', () => {
+    for (const d of Object.keys(SOLL) as Dichte[]) {
+      const stile = antdHinweis(d).styles;
+      expect(typeof stile, d).toBe('object');
+      expect((stile as { close?: unknown }).close, d).toEqual({
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: SOLL[d],
+        minHeight: SOLL[d],
+        marginBlock: `calc((1em - ${SOLL[d]}px) / 2)`,
       });
     }
   });

@@ -5,6 +5,7 @@ import deDE from 'antd/locale/de_DE';
 import {
   antdKaestchen,
   antdKlappkopf,
+  antdHinweis,
   antdKnopf,
   antdOptionsknopf,
   antdThema,
@@ -166,6 +167,7 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
   const klappkopf = useMemo(() => antdKlappkopf(dichte), [dichte]);
   const kaestchen = useMemo(() => antdKaestchen(dichte), [dichte]);
   const optionsknopf = useMemo(() => antdOptionsknopf(dichte), [dichte]);
+  const hinweis = useMemo(() => antdHinweis(dichte), [dichte]);
 
   const wert = useMemo<ThemeModeWert>(
     () => ({
@@ -209,6 +211,9 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
         checkbox={kaestchen}
         // Boden des beschrifteten Optionsknopfs (LFH-1048): gebaut wie das Kästchen-Label.
         radio={optionsknopf}
+        // Boden des Schließen-Kreuzes jedes Hinweises (LLH-1798): antd zeichnet es in jeder Stufe
+        // 12 × 14 px, ohne Komponenten-Token für seine Größe.
+        alert={hinweis}
         // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
         // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine
         // Steuerhöhe mit, sonst rechnete antd sie unter den Boden aus A1 Gate 3. Nachts hält
