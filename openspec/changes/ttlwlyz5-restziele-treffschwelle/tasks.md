@@ -2,9 +2,9 @@
 
 ## 1. Hinweis-Kreuz (D1)
 
-- [ ] 1.1 Reine Stilfunktion für das Kreuz in `frontend/src/theme/tokens.ts` mit Unit-Test (Böden als Literale 24 / 48 / 72, negativer Rand = halber Zuwachs über `fontSizeIcon`); Test zuerst rot, dann grün
-- [ ] 1.2 Am `ConfigProvider` in `frontend/src/theme/ThemeModeProvider.tsx` als `alert.styles.close` setzen; Vitest belegt am gerenderten `DeeplinkHinweis`, dass der Knopf den Stil trägt
-- [ ] 1.3 e2e-Messung „Hinweis schließen“ (Deeplink auf unbekannten Posten, alle drei Stufen, Fükw): wirksame Fläche per `elementFromPoint` ≥ 24/48/72 auf beiden Achsen, Hinweishöhe gleich wie in `kompakt` bei gleichem Text; Spec läuft grün
+- [x] 1.1 Reine Stilfunktion für das Kreuz in `frontend/src/theme/tokens.ts` mit Unit-Test (Böden als Literale 24 / 48 / 72, negativer Rand = halber Zuwachs über `fontSizeIcon`); Test zuerst rot, dann grün
+- [x] 1.2 Am `ConfigProvider` in `frontend/src/theme/ThemeModeProvider.tsx` als `alert.styles.close` setzen; Vitest belegt am gerenderten `DeeplinkHinweis`, dass der Knopf den Stil trägt
+- [x] 1.3 e2e-Messung „Hinweis schließen“ (Deeplink auf unbekannten Posten, alle drei Stufen, Fükw): wirksame Fläche per `elementFromPoint` ≥ 24/48/72 auf beiden Achsen, Hinweishöhe gleich wie in `kompakt` bei gleichem Text; Spec läuft grün
 
 ## 2. Sortierauswahl (D2)
 
@@ -14,8 +14,8 @@
 
 ## 3. Brotkrume (D3)
 
-- [ ] 3.1 `ortspfadStil`-Test um die Breite erweitern (Literal), zuerst rot; dann `ortspfadStil` und `EinsatzSeite.css` (`min-width`, mittig); Test grün
-- [ ] 3.2 e2e: Link „ETB“ der ETB-Druckansicht in `kompakt` ≥ 24 px und in `handschuh` ≥ 72 px breit, Schrift 12 px, Seitenkopf in `kompakt` weiter 44 px; Spec läuft grün
+- [x] 3.1 `ortspfadStil`-Test um die Breite erweitern (Literal), zuerst rot; dann `ortspfadStil` und `EinsatzSeite.css` (`min-width`, mittig); Test grün
+- [x] 3.2 e2e: Link „ETB“ der ETB-Druckansicht in `kompakt` ≥ 24 px und in `handschuh` ≥ 72 px breit, Schrift 12 px, Seitenkopf in `kompakt` weiter 44 px; Spec läuft grün
 
 ## 4. Regeln und Abschluss
 
