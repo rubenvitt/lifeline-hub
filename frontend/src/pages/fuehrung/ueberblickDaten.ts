@@ -10,6 +10,7 @@
  * (`dayjs.utc`), nie über `dayjs(s)` — das läse Ortszeit und verschöbe das 60-Minuten-Fenster still
  * um den Zonenversatz.
  */
+import { relativ } from '../../anzeige/dauer';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type {
@@ -50,10 +51,7 @@ import {
 import { type ToenungsGrund } from '../../kraefte/meldebildRaster';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { ausfallJeEinheit, OHNE_EINHEIT } from '../../lage/ausfallJeEinheit';
-import {
-  dauerText,
-  lagebesprechungUeberfaellig,
-} from '../../lagebesprechung/lagebesprechungZustand';
+import { lagebesprechungUeberfaellig } from '../../lagebesprechung/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
 import { ERINNERUNG_FAELLIG, erinnerungZustand } from '../../erinnerung/erinnerungZustand';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
@@ -588,7 +586,7 @@ export function markenBewertung(
 
 /** „in 23 min“, unter einer Minute „in < 1 min“. */
 function abstandText(minuten: number): string {
-  return minuten <= 0 ? 'in < 1 min' : `in ${dauerText(minuten)}`;
+  return relativ(minuten, 'in');
 }
 
 /** „HANN. MÜNDEN (WESER)" — Station mit Gewässer, ohne Gewässer nur die Station. Rein. */

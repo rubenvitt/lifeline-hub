@@ -62,8 +62,8 @@ const terminKennzahl = (page: Page) =>
     .locator('[data-lfh="kennzahl"]')
     .filter({ hasText: 'Nächste Lagebesprechung' });
 
-/** Zustand eines Termins in rund zwei Stunden („in 1 h 59 min“ oder „in 2 h 00 min“). */
-const IN_ZWEI_STUNDEN = /in (1 h 5\d|2 h 00) min/;
+/** Zustand eines Termins in rund zwei Stunden („in 1 h 59 min“ oder „in 2 h“). */
+const IN_ZWEI_STUNDEN = /in (1 h 5\d min|2 h)\b/;
 
 test('LLH-1111: ein anderer Schirm setzt den Termin, die offene Seite Lagebesprechung folgt', async ({
   page,

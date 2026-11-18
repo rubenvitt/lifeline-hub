@@ -1,3 +1,4 @@
+import { relativ } from '../anzeige/dauer';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
@@ -362,12 +363,9 @@ export function nachtragMinuten(
   return minuten >= 1 ? minuten : null;
 }
 
-/** „Nachtrag · Ereignis vor 14 min“, ab einer Stunde in Stunden und Minuten. */
+/** „Nachtrag · Ereignis vor 14 min“, ab einer Stunde „vor 1 h 05 min“ (`anzeige/dauer.ts`). */
 export function nachtragHinweis(minuten: number): string {
-  const h = Math.floor(minuten / 60);
-  const m = minuten % 60;
-  const dauer = h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`;
-  return `Nachtrag · Ereignis vor ${dauer}`;
+  return `Nachtrag · Ereignis ${relativ(minuten, 'vor')}`;
 }
 
 /** Die fehlenden Pflichtseiten in Feldfolge (Spec „Pflicht im Client“: fehlen beide, beide). */

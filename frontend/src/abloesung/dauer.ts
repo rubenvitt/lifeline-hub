@@ -1,4 +1,5 @@
 import type { FormRule } from 'antd';
+import { dauer } from '../anzeige/dauer';
 import type { AnzeigeKonventionen } from '../anzeige/format';
 import { uhrzeitOhneDatum } from '../anzeige/zeitDarstellung';
 
@@ -6,10 +7,11 @@ import { uhrzeitOhneDatum } from '../anzeige/zeitDarstellung';
  * Dauern und Wanduhrzeiten der Ablösung (LLH-1122): Dauern in Anzeige und Eingabe in einer Form,
  * Wechselzeiten getrennt (LLH-1437).
  *
- * - **Dauer** („Rhythmus 8 h“, „7:30 h“, „45 min“): nie „8.0“ oder „7,5“ in der Anzeige. Die
- *   Lage spricht vom 8-Stunden-Rhythmus; eine halbe Stunde steht als „:30“ wie auf der Uhr. Das
- *   Feld liest jede Anzeige zurück und dazu bloße Stunden („8“), „h:mm“, Minuten („90 min“) und
- *   das Dezimalkomma („7,5“), weil das die Eingaben sind, die eine Führungskraft tippt.
+ * - **Dauer** („Rhythmus 8 h“, „7 h 30 min“, „45 min“): nie „8.0“ oder „7,5“ in der Anzeige; die
+ *   Form bildet der Kern `anzeige/dauer.ts` (LLH-1750, Spec `zeitdarstellung`, „Eine Form für
+ *   Dauern“). Das Feld liest jede Anzeige zurück („7 h 30 min“, auch „7 h 30“) und dazu bloße
+ *   Stunden („8“), „h:mm“, Minuten („90 min“) und das Dezimalkomma („7,5“), weil das die Eingaben
+ *   sind, die eine Führungskraft tippt.
  * - **Wechselzeiten** zeigt {@link formatUhrzeiten} in der Zeitdarstellung („0600/1800“ bzw.
  *   „06:00/18:00“, Rolle `uhrzeit` über `anzeige/zeitDarstellung.ts:uhrzeitOhneDatum`); das Feld
  *   steht immer taktisch ({@link uhrzeitenFeldText}), so wie man sie tippt. Die Maske liest beide
@@ -19,14 +21,6 @@ import { uhrzeitOhneDatum } from '../anzeige/zeitDarstellung';
  * Rein; die Grenzen kommen aus `api/eingabegrenzen.ts`.
  */
 
-/** „45 min“ · „8 h“ · „7:30 h“ — ganze Minuten. */
-export function formatDauer(minuten: number): string {
-  if (minuten < 60) return `${minuten} min`;
-  const h = Math.floor(minuten / 60);
-  const m = minuten % 60;
-  return m === 0 ? `${h} h` : `${h}:${String(m).padStart(2, '0')} h`;
-}
-
 /** Ergebnis einer Dauer-Eingabe. */
 export type ParsedDauer =
   { art: 'leer' } | { art: 'ungueltig' } | { art: 'minuten'; minuten: number };
@@ -35,6 +29,7 @@ const STUNDEN = /^(\d{1,3})\s*h?$/i;
 const STUNDEN_MINUTEN = /^(\d{1,3}):([0-5]\d)\s*h?$/i;
 const DEZIMAL = /^(\d{1,3})[,.](\d{1,2})\s*h?$/i;
 const MINUTEN = /^(\d{1,5})\s*min$/i;
+const STUNDEN_UND_MINUTEN = /^(\d{1,3})\s*h\s*([0-5]?\d)(?:\s*min)?$/i;
 
 /** Liest eine Dauer (Regeln im Dateikopf); leer und unlesbar sind eigene Ergebnisse. */
 export function parseDauer(text: string | null | undefined): ParsedDauer {
@@ -44,6 +39,8 @@ export function parseDauer(text: string | null | undefined): ParsedDauer {
   if (treffer) return { art: 'minuten', minuten: Number(treffer[1]) };
   treffer = STUNDEN.exec(t);
   if (treffer) return { art: 'minuten', minuten: Number(treffer[1]) * 60 };
+  treffer = STUNDEN_UND_MINUTEN.exec(t);
+  if (treffer) return { art: 'minuten', minuten: Number(treffer[1]) * 60 + Number(treffer[2]) };
   treffer = STUNDEN_MINUTEN.exec(t);
   if (treffer) return { art: 'minuten', minuten: Number(treffer[1]) * 60 + Number(treffer[2]) };
   treffer = DEZIMAL.exec(t);
@@ -62,7 +59,7 @@ export function dauerMinuten(text: string | null | undefined): number | null {
 
 /** Vorbelegung eines Dauerfeldes: dieselbe Form wie die Anzeige. */
 export function dauerFeldText(minuten: number | null | undefined): string | undefined {
-  return minuten == null ? undefined : formatDauer(minuten);
+  return minuten == null ? undefined : dauer(minuten);
 }
 
 /**
@@ -84,12 +81,10 @@ export function dauerRegel(opts: {
           : Promise.resolve();
       }
       if (p.art === 'ungueltig') {
-        return Promise.reject(new Error('Dauer wie „8 h“, „7:30 h“ oder „45 min“'));
+        return Promise.reject(new Error('Dauer wie „8 h“, „7 h 30 min“ oder „45 min“'));
       }
       if (p.minuten < opts.min || p.minuten > opts.max) {
-        return Promise.reject(
-          new Error(`Zwischen ${formatDauer(opts.min)} und ${formatDauer(opts.max)}`),
-        );
+        return Promise.reject(new Error(`Zwischen ${dauer(opts.min)} und ${dauer(opts.max)}`));
       }
       return Promise.resolve();
     },

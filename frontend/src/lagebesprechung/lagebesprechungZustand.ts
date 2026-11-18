@@ -1,3 +1,4 @@
+import { relativ } from '../anzeige/dauer';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { alsZeitpunkt } from '../anzeige/zeitEingabe';
@@ -12,13 +13,6 @@ dayjs.extend(utc);
  */
 export function terminZeitpunkt(wire: string | null | undefined): Dayjs | null {
   return alsZeitpunkt(wire) ?? null;
-}
-
-/** „23 min" · „2 h 05 min" — ganze Minuten. */
-export function dauerText(minuten: number): string {
-  if (minuten < 60) return `${minuten} min`;
-  const stunden = Math.floor(minuten / 60);
-  return `${stunden} h ${String(minuten % 60).padStart(2, '0')} min`;
 }
 
 /**
@@ -43,7 +37,7 @@ export function lagebesprechungZustand(
   const ueberfaellig = lagebesprechungUeberfaellig(termin, jetzt);
   if (ueberfaellig) return ueberfaellig;
   const minuten = Math.floor((termin.valueOf() - jetzt.valueOf()) / 60_000);
-  return { rolle: 'neutral', label: minuten === 0 ? 'in < 1 min' : `in ${dauerText(minuten)}` };
+  return { rolle: 'neutral', label: relativ(minuten, 'in') };
 }
 
 /**
@@ -64,5 +58,5 @@ export function lagebesprechungUeberfaellig(
   if (seitMs < 0) return null;
   const minuten = Math.floor(seitMs / 60_000);
   if (minuten === 0) return { rolle: 'achtung', label: 'jetzt fällig' };
-  return { rolle: 'achtung', label: `seit ${dauerText(minuten)} überfällig` };
+  return { rolle: 'achtung', label: `${relativ(minuten, 'seit')} überfällig` };
 }

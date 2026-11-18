@@ -21,7 +21,7 @@ import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
 import { StatusChip } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
-import { formatVor } from '../anzeige/abstand';
+import { vorText } from '../anzeige/dauer';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { monoStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -655,7 +655,7 @@ function NachforderungKarte({
             data-lfh="nachforderung-alter"
             style={{ ...monoStil(token.fontSizeSM), color: rollen.gedaempft }}
           >
-            {formatVor(n.angefordert_at, jetzt)}
+            {vorText(n.angefordert_at, jetzt)}
           </span>
         )}
       </Flex>

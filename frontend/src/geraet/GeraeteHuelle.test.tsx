@@ -570,7 +570,7 @@ describe('Gerätehülle — Kopfzeile', () => {
     const kopf = screen.getByRole('banner');
     await waitFor(() =>
       expect(kopf.querySelector('[data-lfh="kopf-datenstand"]')?.textContent).toBe(
-        `Stand ${formatiereDatenstand(JETZT)}`,
+        `Stand ${formatiereDatenstand(JETZT)} · offline`,
       ),
     );
     expect(kopf.querySelector('[data-lfh="kopf-sync"]')?.getAttribute('data-zustand')).toBe(
@@ -1302,6 +1302,11 @@ describe('Bausteine', () => {
     expect(kopplungRestText('2026-10-04 15:40:00', JETZT)).toEqual({
       kurz: 'noch 5 h',
       lang: 'noch 5 Stunden',
+    });
+    // Über einen Tag weiter ganze Stunden (LLH-1750, D7), keine Tage.
+    expect(kopplungRestText('2026-10-07 09:30:00', JETZT)).toEqual({
+      kurz: 'noch 71 h',
+      lang: 'noch 71 Stunden',
     });
     expect(kopplungRestText('2026-10-04 11:00:00', JETZT)).toEqual({
       kurz: 'noch 1 h',

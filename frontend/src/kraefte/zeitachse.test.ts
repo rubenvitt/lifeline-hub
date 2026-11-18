@@ -1,9 +1,9 @@
+import { dauer } from '../anzeige/dauer';
 import { describe, expect, it } from 'vitest';
 import type { Einsatzperiode, SchichtplanGrenzwerte, ZeitachseEreignis } from '../api/types';
 import {
   abschliessendeEntlassungId,
   ankerText,
-  dauerText,
   einstufungText,
   EINSTUFUNG_WORT,
   HERKUNFT_WORT,
@@ -21,25 +21,25 @@ function w(uhr: string): string {
 }
 
 describe('kraftDauern (Spec „Einsatzdauer und Ruhezeit")', () => {
-  it('„Laufende Einsatzdauer": Anker Alarmierung, 7 h 40', () => {
+  it('„Laufende Einsatzdauer": Anker Alarmierung, 7 h 40 min', () => {
     const p: Einsatzperiode[] = [
       { beginn_at: w('06:10'), anker: 'alarmierung', eintreffen_at: w('06:40') },
     ];
     const d = kraftDauern(p, um('13:50'));
     expect(d.laufend).toEqual({ minuten: 460, anker: 'alarmierung', beginnAt: w('06:10') });
-    expect(dauerText(d.laufend!.minuten)).toBe('7 h 40');
+    expect(dauer(d.laufend!.minuten)).toBe('7 h 40 min');
     expect(d.gesamtMinuten).toBe(460);
     expect(d.ruheMinuten).toBeNull();
   });
 
-  it('„Ruhezeit": 3 h 20 nach dem Ende, keine laufende Dauer', () => {
+  it('„Ruhezeit": 3 h 20 min nach dem Ende, keine laufende Dauer', () => {
     const p: Einsatzperiode[] = [
       { beginn_at: w('06:40'), anker: 'eintreffen', ende_at: w('14:40'), ende_art: 'abloesung' },
     ];
     const d = kraftDauern(p, um('18:00'));
     expect(d.laufend).toBeNull();
     expect(d.ruheMinuten).toBe(200);
-    expect(dauerText(d.ruheMinuten!)).toBe('3 h 20');
+    expect(dauer(d.ruheMinuten!)).toBe('3 h 20 min');
     expect(d.gesamtMinuten).toBe(480);
   });
 
@@ -66,15 +66,6 @@ describe('kraftDauern (Spec „Einsatzdauer und Ruhezeit")', () => {
   it('liest UTC, nicht Ortszeit', () => {
     const p: Einsatzperiode[] = [{ beginn_at: w('06:00'), anker: 'eintreffen' }];
     expect(kraftDauern(p, um('07:00')).laufend?.minuten).toBe(60);
-  });
-});
-
-describe('dauerText', () => {
-  it('unter einer Stunde in Minuten, sonst Stunden mit zweistelligen Minuten', () => {
-    expect(dauerText(0)).toBe('0 min');
-    expect(dauerText(40)).toBe('40 min');
-    expect(dauerText(60)).toBe('1 h 00');
-    expect(dauerText(1865)).toBe('31 h 05');
   });
 });
 
@@ -191,7 +182,7 @@ describe('stufeEin (Spec „Einstufung gegen die Grenzwerte des Einsatzes", LLH-
     ende_art: 'entlassung',
   });
 
-  it('„Zu lang in einer Periode": 12 h 20 seit 06:10', () => {
+  it('„Zu lang in einer Periode": 12 h 20 min seit 06:10', () => {
     expect(stufeEin([offen('06:10')], VORGABE, um('18:30'))).toEqual({
       wort: 'zu_lang',
       streckeBeginnAt: w('06:10'),
@@ -200,7 +191,7 @@ describe('stufeEin (Spec „Einstufung gegen die Grenzwerte des Einsatzes", LLH-
     });
   });
 
-  it('„Genau am Höchstwert": 12 h 00 bleibt ohne Einstufung (streng wie der Plan)', () => {
+  it('„Genau am Höchstwert": 12 h bleibt ohne Einstufung (streng wie der Plan)', () => {
     expect(stufeEin([offen('06:10')], VORGABE, um('18:10'))).toBeNull();
   });
 
@@ -242,7 +233,7 @@ describe('stufeEin (Spec „Einstufung gegen die Grenzwerte des Einsatzes", LLH-
     expect(stufeEin([zu('06:00', '14:00'), offen('14:00')], g, um('20:30'))?.wort).toBe('zu_lang');
   });
 
-  it('„Eigener Wert des Einsatzes": 6 h → 6 h 20 ist zu lang', () => {
+  it('„Eigener Wert des Einsatzes": 6 h → 6 h 20 min ist zu lang', () => {
     const g = { ...VORGABE, max_dienst_minuten: 360, max_dienst_eigen: true };
     expect(stufeEin([offen('06:10')], g, um('12:30'))?.wort).toBe('zu_lang');
   });
@@ -287,14 +278,14 @@ describe('einstufungText', () => {
         VORGABE,
         zeit,
       ),
-    ).toBe('Im Dienst seit 08:00: 14 h 30, Höchstwert 12 h · Ruhe davor 2 h 00, Mindestruhe 8 h');
+    ).toBe('Im Dienst seit 08:00: 14 h 30 min, Höchstwert 12 h · Ruhe davor 2 h, Mindestruhe 8 h');
     expect(
       einstufungText(
         { wort: 'zu_lang', streckeBeginnAt: w('06:10'), streckeMinuten: 740, ruheMinuten: null },
         VORGABE,
         zeit,
       ),
-    ).toBe('Im Dienst seit 06:10: 12 h 20, Höchstwert 12 h');
+    ).toBe('Im Dienst seit 06:10: 12 h 20 min, Höchstwert 12 h');
   });
 
   it('nennt nach durchgehendem Dienst (Lücke 0) keine Ruhe', () => {
@@ -304,7 +295,7 @@ describe('einstufungText', () => {
         VORGABE,
         zeit,
       ),
-    ).toBe('Im Dienst seit 08:00: 12 h 30, Höchstwert 12 h');
+    ).toBe('Im Dienst seit 08:00: 12 h 30 min, Höchstwert 12 h');
   });
 
   it('„Ruhe zu kurz" nennt zuerst die Ruhe', () => {
@@ -319,6 +310,6 @@ describe('einstufungText', () => {
         { ...VORGABE, min_ruhe_minuten: 450 },
         zeit,
       ),
-    ).toBe('Ruhe davor 2 h 00, Mindestruhe 7:30 h · Im Dienst seit 08:00: 9 h 00, Höchstwert 12 h');
+    ).toBe('Ruhe davor 2 h, Mindestruhe 7 h 30 min · Im Dienst seit 08:00: 9 h, Höchstwert 12 h');
   });
 });

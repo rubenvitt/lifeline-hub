@@ -19,7 +19,7 @@ import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
-import { einsatzDauer } from './einsatzDauer';
+import { dauerZwischen } from '../anzeige/dauer';
 import { MODUL_PANEL_ID } from './IconRail';
 import { bringIntoView } from '../components/bringIntoView';
 import { abonniereRahmenOben } from '../components/rahmenOben';
@@ -442,7 +442,9 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
   const jetzt = useMinutenTakt();
-  const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
+  const dauer = einsatz
+    ? dauerZwischen(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt)
+    : null;
   const linie = `1px solid ${farben.linie}`;
   // Die Liste rollt in sich (zjt7c073, Review B8): eine neue Kategorie beginnt oben, statt die
   // Rollposition der vorigen zu erben, und der aktive Eintrag kommt ins Bild, auch nach einem

@@ -92,7 +92,7 @@ Für Einsatzleitung und Führungspersonal:
    ![Paneel „Dienst und Ruhe“ mit Höchstdienst 10 h und Mindestruhe 8 h (Vorgabe), darüber das Schichtmodell des Einsatzes](../bilder/einsatz-einstellungen/dienst-und-ruhe.png)
 
 2. „Werte ändern“ wählen. Im Dialog „Dienst und Ruhe“ unter „Höchstdienst“ und „Mindestruhe“ eine
-   Dauer eintragen, etwa „10 h“, „7:30 h“ oder „90 min“. Ein leeres Feld heißt Vorgabe; der
+   Dauer eintragen, etwa „10 h“, „7 h 30 min“ oder „90 min“. Ein leeres Feld heißt Vorgabe; der
    graue Text im Feld nennt sie. „Speichern“ wählen.
 3. Um alle eigenen Werte auf die Vorgabe zu setzen, „Vorgaben wiederherstellen“ wählen. Der Knopf
    steht nur, solange ein eigener Wert gilt. War das ein Versehen, in der Meldung „Rückgängig“

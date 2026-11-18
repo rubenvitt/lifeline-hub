@@ -1,8 +1,9 @@
+import { useUhrDarstellung } from '../anzeige/AnzeigeKonventionenContext';
+import { formatiereUhr } from '../anzeige/zeitDarstellung';
 import { IconWlanVerbunden, IconWlanGetrennt } from '../icons';
 import { useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { theme } from 'antd';
 import { Link } from 'react-router';
-import dayjs from 'dayjs';
 import { useAuth } from '../auth/AuthContext';
 import { Bildmarke } from '../marke/Bildmarke';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
@@ -198,15 +199,12 @@ export function Wortmarke() {
   );
 }
 
-/** Uhrzeit HH:MM in Browserzeit. */
-export function formatiereUhr(ms: number): string {
-  return dayjs(ms).format('HH:mm');
-}
-
 /**
- * Die Uhr der Kommandoleiste (Mono 14/500). Browserzeit, nicht die Anzeigezone eines Einsatzes:
- * der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider` und steht auch auf der Einsatzliste.
- * Eine Uhr, die je Route die Zone wechselt, wäre schlimmer.
+ * Die Uhr der Kommandoleiste (Mono 14/500). Gerätezeit, nicht die Anzeigezone eines Einsatzes:
+ * der Kopf steht auch auf der Einsatzliste, und eine Uhr, die je Route die Zone wechselt, wäre
+ * schlimmer. Die Schreibweise folgt der Zeitdarstellung (`1731` bzw. `17:31`, LLH-1750,
+ * Entscheidung E5): Gerät vor Einsatz vor Vorgabe (`useUhrDarstellung`), damit nie „17:31“ neben
+ * „1731“ steht.
  */
 export function Uhr({
   zelle,
@@ -217,12 +215,12 @@ export function Uhr({
 }) {
   const { token } = theme.useToken();
   const jetzt = useMinutenTakt();
-  const text = formatiereUhr(jetzt);
+  const text = formatiereUhr(jetzt, useUhrDarstellung());
   // `zelle`: die Polsterung der Nachbarzellen; unter `md` die schmale des Handy-Kopfs (LLH-1728, D3).
   return (
     <div data-lfh="kopf-uhr" style={kopfZelleStil(zelle ?? token, trenner)}>
       <time
-        dateTime={dayjs(jetzt).format('HH:mm')}
+        dateTime={formatiereUhr(jetzt, 'datum_uhrzeit')}
         aria-label={`Uhrzeit ${text}`}
         style={{
           fontFamily: schrift.zahl,

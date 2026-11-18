@@ -140,7 +140,7 @@ test.describe(KAPITEL, () => {
     await expect(region.getByRole('link', { name: 'Anna Probe' })).toBeVisible();
     // Gruppen erst mit der Einheitenliste, Dauer erst mit den Perioden.
     await expect(region.getByText(/nicht eingeteilt/).first()).toBeVisible();
-    await expect(region.getByText('4 h 47').first()).toBeVisible();
+    await expect(region.getByText('4 h 47 min').first()).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(page, KAPITEL, 'personal');
   });

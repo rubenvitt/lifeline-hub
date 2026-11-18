@@ -59,7 +59,7 @@ describe('GrenzwerteModal (LLH-1603)', () => {
       min_ruhe_eigen: true,
     });
     expect(max).toHaveValue('10 h');
-    expect(ruhe).toHaveValue('7:30 h');
+    expect(ruhe).toHaveValue('7 h 30 min');
   });
 
   it('sendet nur das geänderte Feld', async () => {

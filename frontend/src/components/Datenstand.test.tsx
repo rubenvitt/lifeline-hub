@@ -1,7 +1,11 @@
 import { act, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import Datenstand, { formatiereDatenstand, gemeinsamerDatenstand } from './Datenstand';
+import Datenstand, {
+  datenstandText,
+  formatiereDatenstand,
+  gemeinsamerDatenstand,
+} from './Datenstand';
 
 /** Heute um hh:mm in der Browserzone — der Datenstand rechnet bewusst in Gerätezeit. */
 function heuteUm(stunde: number, minute: number): number {
@@ -89,5 +93,51 @@ describe('Datenstand', () => {
   it('nimmt bei zusammengesetzten Ansichten den ältesten geladenen Teil', () => {
     expect(gemeinsamerDatenstand(300, undefined, 100, 200)).toBe(100);
     expect(gemeinsamerDatenstand(0, undefined)).toBe(0);
+  });
+});
+
+describe('Eine Form für den Datenstand (LLH-1750, Spec zeitdarstellung)', () => {
+  const stand = heuteUm(17, 31);
+  const um = (stunde: number, minute: number, sekunde = 0) =>
+    heuteUm(stunde, minute) + sekunde * 1000;
+
+  it('nennt den Stand absolut, das Alter nur auf Wunsch und erst ab einer Minute', () => {
+    expect(datenstandText(stand, um(17, 31, 20))).toBe('Stand 1731');
+    expect(datenstandText(stand, um(17, 31, 20), { alter: true })).toBe('Stand 1731');
+    expect(datenstandText(stand, um(17, 33), { alter: true })).toBe('Stand 1731 · vor 2 min');
+    expect(datenstandText(stand, um(17, 40))).toBe('Stand 1731');
+  });
+
+  it('zählt das Alter in ganzen Minuten der Uhr, wie die Kopfuhr', () => {
+    // Abruf 17:31:45, die Uhr zeigt 1733: „vor 2 min“, nicht „vor 1 min“.
+    expect(datenstandText(um(17, 31, 45), um(17, 33), { alter: true })).toBe(
+      'Stand 1731 · vor 2 min',
+    );
+    expect(datenstandText(um(17, 31, 45), um(17, 31, 59), { alter: true })).toBe('Stand 1731');
+  });
+
+  it('setzt „offline“ ans Ende und kennt kein „vor 0 s“', () => {
+    expect(datenstandText(stand, um(17, 40), { alter: true, offline: true })).toBe(
+      'Stand 1731 · vor 9 min · offline',
+    );
+    expect(datenstandText(stand, um(17, 40), { offline: true })).toBe('Stand 1731 · offline');
+    expect(datenstandText(stand, um(17, 31, 5), { alter: true })).not.toMatch(/ s$/);
+  });
+
+  it('ohne Abruf behauptet er keinen Stand', () => {
+    expect(datenstandText(0, um(17, 31), { alter: true })).toBe('Stand wird abgerufen');
+  });
+
+  it('zeigt das Alter im Baustein mit `alter`', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(um(17, 33));
+    try {
+      renderMitProviders(<Datenstand dataUpdatedAt={stand} alter offline={false} />);
+      expect(screen.getByText('Stand 1731 · vor 2 min')).toHaveAccessibleName(
+        'Datenstand 1731, vor 2 min',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

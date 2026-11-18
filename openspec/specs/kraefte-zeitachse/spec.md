@@ -11,7 +11,9 @@ Ablösung auf: er schreibt Ereignisse nur an Personen (die alte Besatzung geht a
 kommt), die Einheit behält ihre Periode. Grenzwerte und Ruhezeitrechnung entstehen daraus nicht;
 eingestuft wird nur nach der Anforderung „Einstufung gegen die Grenzwerte des Einsatzes“ (LLH-730,
 vormals LFH-860).
+
 ## Requirements
+
 ### Requirement: Ereignisse der Zeitachse
 
 Das System SHALL je Einheit und je Person eines Einsatzes ein Ereignisprotokoll führen. Ein
@@ -387,7 +389,7 @@ zeigen.
 
 #### Scenario: Meldebild mit laufender Periode
 - **WHEN** eine Einheit seit Alarmierung 06:10 im Einsatz ist und um 13:50 betrachtet wird
-- **THEN** zeigt ihre Zelle „7 h 40“, und die zugängliche Beschreibung nennt „seit Alarmierung 06:10“
+- **THEN** zeigt ihre Zelle „7 h 40 min“, und die zugängliche Beschreibung nennt „seit Alarmierung 06:10“
 
 #### Scenario: Herkunft sichtbar
 - **WHEN** ein Personen-Ereignis per Fan-out entstanden ist
@@ -407,7 +409,7 @@ zeigen.
 
 #### Scenario: Ruhe bleibt neutral
 - **WHEN** eine Person seit 2 h in Ruhe ist und die Mindestruhe 8 h beträgt
-- **THEN** zeigt die Spalte „Ruhe“ „2 h 00“ ohne Einfärbung und ohne Wort
+- **THEN** zeigt die Spalte „Ruhe“ „2 h“ ohne Einfärbung und ohne Wort
 
 ### Requirement: Keine Kraft verliert ihre Zeitachse
 
@@ -476,31 +478,31 @@ ohne Einstufung zeigen.
 
 #### Scenario: Zu lang in einer Periode
 - **WHEN** die Vorgaben 12 h / 8 h gelten und eine Einheit seit Alarmierung 06:10 im Einsatz ist und um 18:30 betrachtet wird
-- **THEN** zeigt ihre Zelle „Im Einsatz“ „12 h 20“ mit dem Wort „zu lang“ in der Rolle `achtung`
+- **THEN** zeigt ihre Zelle „Im Einsatz“ „12 h 20 min“ mit dem Wort „zu lang“ in der Rolle `achtung`
 
 #### Scenario: Genau am Höchstwert
 - **WHEN** die Vorgaben 12 h / 8 h gelten und eine Einheit seit Alarmierung 06:10 im Einsatz ist und um 18:10 betrachtet wird
-- **THEN** zeigt ihre Zelle „12 h 00“ ohne Einstufung
+- **THEN** zeigt ihre Zelle „12 h“ ohne Einstufung
 
 #### Scenario: Kurze Pause trennt die Strecke nicht
 - **WHEN** die Vorgaben 12 h / 8 h gelten und eine Person 08:00–14:00 im Einsatz war und seit 16:00 wieder im Einsatz ist und um 22:30 betrachtet wird
-- **THEN** zeigt ihre Zelle „Einsatzdauer“ „6 h 30“ mit dem Wort „zu lang“, und die Beschreibung nennt die Strecke seit 08:00 mit 14 h 30
+- **THEN** zeigt ihre Zelle „Einsatzdauer“ „6 h 30 min“ mit dem Wort „zu lang“, und die Beschreibung nennt die Strecke seit 08:00 mit 14 h 30 min
 
 #### Scenario: Ruhe zu kurz
 - **WHEN** die Vorgaben 12 h / 8 h gelten und eine Person 08:00–14:00 im Einsatz war und seit 16:00 wieder im Einsatz ist und um 17:00 betrachtet wird
-- **THEN** zeigt ihre Zelle „Einsatzdauer“ „1 h 00“ mit dem Wort „Ruhe zu kurz“, und die Beschreibung nennt 2 h 00 Ruhe bei 8 h Mindestruhe
+- **THEN** zeigt ihre Zelle „Einsatzdauer“ „1 h“ mit dem Wort „Ruhe zu kurz“, und die Beschreibung nennt 2 h Ruhe bei 8 h Mindestruhe
 
 #### Scenario: Genug Ruhe
 - **WHEN** die Vorgaben 12 h / 8 h gelten und eine Person 06:00–12:00 im Einsatz war und seit 20:00 wieder im Einsatz ist und um 23:00 betrachtet wird
-- **THEN** zeigt ihre Zelle „3 h 00“ ohne Einstufung
+- **THEN** zeigt ihre Zelle „3 h“ ohne Einstufung
 
 #### Scenario: Eigener Wert des Einsatzes
 - **WHEN** der Einsatz den Höchstdienst auf 6 h setzt und eine Einheit seit Alarmierung 06:10 im Einsatz ist und um 12:30 betrachtet wird
-- **THEN** zeigt ihre Zelle „6 h 20“ mit dem Wort „zu lang“, und der Plan prüft mit demselben Wert
+- **THEN** zeigt ihre Zelle „6 h 20 min“ mit dem Wort „zu lang“, und der Plan prüft mit demselben Wert
 
 #### Scenario: Ohne offene Periode
 - **WHEN** eine Person, deren Periode nach 13 h um 19:00 endete, um 20:00 betrachtet wird
-- **THEN** zeigt ihre Zelle „Einsatzdauer“ „—“ ohne Einstufung, und die Spalte „Ruhe“ zeigt „1 h 00“ neutral
+- **THEN** zeigt ihre Zelle „Einsatzdauer“ „—“ ohne Einstufung, und die Spalte „Ruhe“ zeigt „1 h“ neutral
 
 #### Scenario: Ohne Ereignis
 - **WHEN** eine Einheit ohne Ereignisse im Meldebild steht
@@ -535,4 +537,3 @@ die geöffneten Ansichten live erreichen.
 #### Scenario: Änderung live
 - **WHEN** jemand im Schichtplan den Höchstdienst auf 6 h setzt, während das Meldebild offen ist
 - **THEN** stuft das Meldebild ohne Neuladen gegen 6 h ein
-

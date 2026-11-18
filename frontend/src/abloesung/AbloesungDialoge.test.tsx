@@ -285,7 +285,7 @@ describe('Ablösung — Platzhalter statt Feldhilfe (LFH-1078)', () => {
   });
 });
 
-/** LLH-1122: Rhythmus als Dauer „8 h“ / „7:30 h“, nie „8.0“; die Einsatzvorgabe als Platzhalter. */
+/** LLH-1122: Rhythmus als Dauer „8 h“ / „7 h 30 min“, nie „8.0“; die Einsatzvorgabe als Platzhalter. */
 describe('Ablösung — Rhythmus als Dauer (LLH-1122)', () => {
   function rhythmus(props: Partial<Parameters<typeof RhythmusDialog>[0]> = {}) {
     const onErfassen = vi.fn().mockResolvedValue(undefined);

@@ -393,6 +393,11 @@ interface EinsatzSeiteProps {
   /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
   dataUpdatedAt?: number;
   /**
+   * Den Datenstand mit Alter zeigen („Stand 1731 · vor 2 min“), nur auf Lageflächen (LLH-1750,
+   * Spec `zeitdarstellung`, „Eine Form für den Datenstand“).
+   */
+  datenstandAlter?: boolean;
+  /**
    * Breite des Inhalts unter der Kopfleiste. Vorgabe `'voll'`: die Instrumententafel füllt die
    * Inhaltsbreite. `'schmal'` (`flaeche.seiteSchmal`) ist die Lesebreite reiner
    * Formular-/Editor-/Leseseiten — die begründete Ausnahme, AUSDRÜCKLICH gesetzt, nie geerbt.
@@ -468,6 +473,7 @@ export default function EinsatzSeite({
   kopfKlebt,
   kopfRef,
   dataUpdatedAt,
+  datenstandAlter = false,
   breite = 'voll',
   fensterInhalt,
   bereiche,
@@ -615,6 +621,7 @@ export default function EinsatzSeite({
                 <Datenstand
                   dataUpdatedAt={dataUpdatedAt}
                   platzHalten={dataUpdatedAt !== undefined}
+                  alter={datenstandAlter}
                 />
               </span>
             </span>

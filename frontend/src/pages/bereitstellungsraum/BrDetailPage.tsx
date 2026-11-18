@@ -1,3 +1,5 @@
+import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
+import { dauer } from '../../anzeige/dauer';
 import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, useParams } from 'react-router';
@@ -64,7 +66,6 @@ import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { staerkeDerEinheitImRaum, staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useUhr } from '../../abloesung/useUhr';
-import { dauerText } from '../../kraefte/zeitachse';
 import { SeitenHinweise, SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
 import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
@@ -865,7 +866,7 @@ export default function BrDetailPage() {
                 titel="Bereitgestellt"
                 groesse="klein"
                 wert={unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />}
-                einheit={unvollstaendig ? undefined : 'F/UF/M//Σ'}
+                einheit={unvollstaendig ? undefined : STAERKE_SCHREIBWEISE}
                 // Gesperrt ist kein Ausfall (LLH-1462): neutraler Ton, das Modul als Grund.
                 ton={unvollstaendig && einheitenFrei !== false ? 'achtung' : 'neutral'}
                 notiz={
@@ -889,7 +890,7 @@ export default function BrDetailPage() {
               <Kennzahl
                 titel="Längste Wartezeit"
                 groesse="klein"
-                wert={laengsteSeit ? dauerText(wartezeitMinuten(laengsteSeit, jetzt)) : '—'}
+                wert={laengsteSeit ? dauer(wartezeitMinuten(laengsteSeit, jetzt)) : '—'}
                 notiz={laengsteSeit ? `seit ${zeitKurz(laengsteSeit)}` : undefined}
               />
             </Kennzahlenband>

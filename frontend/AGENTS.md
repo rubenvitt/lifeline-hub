@@ -364,7 +364,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
 | Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
-| Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts` („Zeitdarstellung“)                                                                                                 | `Zeitdarstellung`                  |
+| Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts`, Dauer `anzeige/dauer.ts` („Zeitdarstellung“, „Uhr, Dauer und Datenstand“)                                          | `Zeitdarstellung`                  |
 | Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
 | Taktisches Zeichen                                                                              | `EinsatzZeichen`                                                                                                                                 | `TaktischeZeichen`                 |
 | Verletzungen am Körper                                                                          | `Koerperschema`                                                                                                                                  | `Koerperschema`                    |
@@ -735,6 +735,17 @@ anwendbar), „nicht geprüft" ist keins.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer (seit LFH-1078 P7); neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+- **Kürzel sind eingeführt oder erklärt** (LLH-1750, Spec `bedien-wortlaut`,
+  `openspec/changes/archive/2026-11-18-aovwhho1-kuerzel/design.md`): Die Oberfläche zeigt ein
+  Kürzel nur, wenn es in `anzeige/kuerzel.ts` (`EINGEFUEHRTE_KUERZEL`) steht oder auf derselben
+  Fläche sichtbar erklärt wird; sonst wird es ausgeschrieben („Unterabschnitte“, nicht „UA“). Ein
+  neues Kürzel kommt in die Liste und in die Tabelle des Kapitels `zeiten-und-kuerzel.md`
+  (`anzeige/kuerzel.test.ts` hält beide gleich). Kurzbezeichnungen der Organisation („EA 1.1“) sind
+  Daten und bleiben. **Die Stärke** schreibt nur `anzeige/staerke.ts` (`staerkeText`, Wert
+  „1/2/5//8“); jede Fläche mit Stärke nennt `STAERKE_SCHREIBWEISE` („F/UF/M//Σ“) einmal sichtbar
+  (Spaltenkopf, Feldetikett, Legende), der Wert trägt `STAERKE_AUSGESCHRIEBEN` als `title`
+  (`StaerkeAnzeige`, `Kennzahl notizBeschreibung`). „Ges“, „Gesamt“ und eine Stärke ohne Summe gibt
+  es nicht (Wächter `anzeige/staerke.guard.test.ts`).
 
 **Tabelle und Dichte**
 
@@ -1136,7 +1147,7 @@ anwendbar), „nicht geprüft" ist keins.
   Organisation vor Vorgabe (`wirksameZeitdarstellung`), die Gerätewahl liegt in
   `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
   **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
-  sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
+  sie unter `useDruckModus` weg. Kein
   `.format('…')` und kein `formatiere(…, '…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/`
   (Maschinenformate ab `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`,
   Schuldmenge `OFFEN` leer (seit LLH-1061). Titelvorschlag und Startinhalt eines Lagevortrags werden
@@ -1145,8 +1156,23 @@ anwendbar), „nicht geprüft" ist keins.
   `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26` bzw. `10.10.26`), `uhrzeitOhneDatum`
   (Wanduhrzeit `HH:MM` ohne Tag: Verpflegungsplan, Wechselzeiten), `tagUndUhrzeit` (Anfang eines
   Zeitraums), `leereUhrzeit` (Lücke in Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe,
-  Zeitraumende) über das `jetzt` von `zeitKurz`. Der Datenstand rechnet in Gerätezeit
-  (`components/Datenstand.tsx`), die Uhr des Lagemonitors nimmt `formatiereUhr` der Kopfleiste.
+  Zeitraumende) über das `jetzt` von `zeitKurz`.
+- **Uhr, Dauer und Datenstand** (LLH-1750, Spec `zeitdarstellung`, Entscheidung E5,
+  `openspec/changes/archive/2026-11-18-aovwhho1-zeitformate/design.md`): Die **Uhr** im Kopf, im
+  Lagemonitor und im Großbild zeigt die Gerätezeit in der Rolle „Uhrzeit“ der Darstellung (`1731`
+  bzw. `17:31`; `formatiereUhr` in `anzeige/zeitDarstellung.ts`, Darstellung über
+  `useUhrDarstellung`). Keine Seite stellt eine zweite Uhr neben ihren Titel. Eine **Dauer** bildet
+  nur `anzeige/dauer.ts`: `dauer` („45 min“, „8 h“, „5 h 01 min“, nie mit Doppelpunkt; mit `tage`
+  ab 24 h „2 d 14 h“, nur für die Einsatzdauer des Einsatzes), `relativ` („vor/seit/in/noch …“,
+  mit Tagen, unter einer Minute „gerade eben“ bzw. „in < 1 min“), `vorText`, `dauerZwischen`,
+  `dauerAusgeschrieben` (zugänglicher Name). Kräfte-Dauern und eingestellte Längen laufen in Stunden
+  weiter, weil sie neben Stunden-Grenzwerten stehen. Der Server schreibt dieselbe Form
+  (`src/zeitdarstellung.rs:dauer_text`), beide lesen `anzeige/dauer.faelle.json`. Wächter
+  `anzeige/dauer.guard.test.ts` (keine `${n} min`, `${h} h`, `{n} min</…>` und kein Stunden:Minuten mit `padStart` außerhalb von
+  `anzeige/`; ausgeschriebene Einheiten in festen Sätzen sieht er nicht).
+  Der **Datenstand** heißt überall „Stand 1731“, ohne Netz „· offline“ am Ende, in Gerätezeit
+  (`components/Datenstand.tsx`, Text `datenstandText`; Alter in ganzen Minuten der Uhr); mit `alter` (Lagebild, Großbild,
+  Lagemonitor, `EinsatzSeite datenstandAlter`) ab einer Minute „· vor 2 min“. Nie „Stand vor 0 s“.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).

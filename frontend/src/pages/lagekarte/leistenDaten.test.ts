@@ -467,7 +467,7 @@ describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
     const raster = auswahlRaster(marker('bereitstellungsraum', 7), roh, zeit);
     expect(raster.map((f) => [f.label, f.wert])).toEqual([
       ['Status', 'aktiv'],
-      ['Stärke', '0/2/9//11'],
+      ['Stärke F/UF/M//Σ', '0/2/9//11'],
       ['Fahrzeuge', '3'],
       ['Einheiten', '1'],
       ['Wartet seit', 'Z(2026-10-16 08:15:00)'],
@@ -477,7 +477,7 @@ describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
   });
   it('fehlt eine Einheit in der Liste, steht „—" statt einer zu kleinen Stärke', () => {
     const raster = auswahlRaster(marker('bereitstellungsraum', 7), { ...roh, einheiten: [] }, zeit);
-    expect(raster.find((f) => f.label === 'Stärke')?.wert).toBe('—');
+    expect(raster.find((f) => f.label === 'Stärke F/UF/M//Σ')?.wert).toBe('—');
   });
   it('leerer Raum: keine Stärke, keine Wartezeit — „—", nichts erfunden', () => {
     const leer = {
@@ -490,7 +490,7 @@ describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
       { ...roh, bereitstellungsraeume: [leer] },
       zeit,
     );
-    expect(raster.find((f) => f.label === 'Stärke')?.wert).toBe('—');
+    expect(raster.find((f) => f.label === 'Stärke F/UF/M//Σ')?.wert).toBe('—');
     expect(raster.find((f) => f.label === 'Wartet seit')?.wert).toBe('—');
   });
   it('Unterzeile nennt die Objektart', () => {
@@ -532,7 +532,7 @@ describe('auswahlRaster', () => {
   it('Einheit: Stärke in BOS-Schreibweise, Status mit Code, Seit, Abschnitt, Führer (LFH-609)', () => {
     const raster = auswahlRaster(marker('einheit', 1), ROH, zeit);
     expect(raster.map((f) => [f.label, f.wert])).toEqual([
-      ['Stärke', '1/2/9//12'],
+      ['Stärke F/UF/M//Σ', '1/2/9//12'],
       ['Status', 'S4 · Am Einsatzort'],
       ['Seit', 'Z(2026-09-21 09:12:00)'],
       ['Abschnitt', 'Nord'],

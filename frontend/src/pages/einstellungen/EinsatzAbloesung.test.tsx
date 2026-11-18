@@ -345,14 +345,14 @@ describe('EinsatzAbloesung, Paneel „Dienst und Ruhe“ (LLH-1603)', () => {
     });
     rendern();
     const p = await grenzPaneel();
-    await within(p).findByText('7:30 h');
+    await within(p).findByText('7 h 30 min');
     await userEvent.click(within(p).getByRole('button', { name: 'Vorgaben wiederherstellen' }));
     await waitFor(() => expect(patches).toEqual([{ min_ruhe_minuten: null }]));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(await within(p).findByText('8 h (Vorgabe)')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
     await waitFor(() => expect(patches[1]).toEqual({ min_ruhe_minuten: 450 }));
-    expect(await within(p).findByText('7:30 h')).toBeInTheDocument();
+    expect(await within(p).findByText('7 h 30 min')).toBeInTheDocument();
   });
 
   it('ohne Schreibrecht: Werte sichtbar, keine Wege zum Ändern', async () => {

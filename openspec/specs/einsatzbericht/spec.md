@@ -394,13 +394,13 @@ zum Abschluss zählen. Einheiten ohne Zeitachse MUST NOT mit einer Einsatzzeit v
 #### Scenario: Einheit noch im Einsatz
 
 - **WHEN** eine Einheit seit 11.10.2026 08:00 Uhr im laufenden Einsatz ist und der Bericht um 14:32 Uhr gedruckt wird
-- **THEN** steht sie mit Beginn `110800okt26`, Ende „läuft“ und Einsatzzeit 6 h 32
+- **THEN** steht sie mit Beginn `110800okt26`, Ende „läuft“ und Einsatzzeit 6 h 32 min
 
 #### Scenario: Offene Periode nach dem Abschluss
 
 - **WHEN** eine Einheit seit 08:00 im Einsatz steht, ohne entlassen zu sein, und der Einsatz um
   12:00 abgeschlossen wurde
-- **THEN** steht sie mit Ende „nicht erfasst“ und Einsatzzeit 4 h 00
+- **THEN** steht sie mit Ende „nicht erfasst“ und Einsatzzeit 4 h
 
 #### Scenario: Einheit ohne Zeitachse
 

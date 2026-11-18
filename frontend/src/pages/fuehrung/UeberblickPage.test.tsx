@@ -732,7 +732,7 @@ describe('UeberblickPage', () => {
     expect(
       zeile.querySelector('[data-lfh="ueberblick-abschnitt-kante"]')!.getAttribute('data-rolle'),
     ).toBe('normal');
-    expect(within(zeile).getByText('UA kritisch')).toBeInTheDocument();
+    expect(within(zeile).getByText('Unterabschnitt kritisch')).toBeInTheDocument();
   });
 
   it('Abschnittszeile ohne gepflegte Lage: keine Kantenfarbe, kein Balken, Auftrag wie bisher', async () => {

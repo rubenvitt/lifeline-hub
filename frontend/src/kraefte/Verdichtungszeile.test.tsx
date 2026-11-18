@@ -245,7 +245,7 @@ describe('Verdichtungszeile · Nachbarmodul gesperrt (LLH-1462)', () => {
     const { container } = setup();
     expect(await screen.findByText('Modul Personal gesperrt')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
-    expect(screen.getByText('Fzg 1')).toBeInTheDocument();
+    expect(screen.getByText('Fahrzeuge 1')).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\d\/\d\/\d\/\/\d/);
     expect(listeEinsatzPersonal).not.toHaveBeenCalled();
   });

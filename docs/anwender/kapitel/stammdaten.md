@@ -400,7 +400,7 @@ Sicherheit bleiben pflegbar.
   und der Planungsvorlauf, wie lange vorher der Hinweis „Keine ablösende Einheit geplant“
   erscheint, solange keine geplant ist (Kapitel [Ablösung](abloesung.md)); beide höchstens einen
   Tag und mit dem Modell in den Einsatz übernommen.
-- Dauern stehen als „8 h“, „7:30 h“ oder „45 min“. Wechselzeiten stehen in der Zeitdarstellung,
+- Dauern stehen als „8 h“, „7 h 30 min“ oder „45 min“. Wechselzeiten stehen in der Zeitdarstellung,
   taktisch wie „0600/1800“, bei „Datum und Uhrzeit“ wie „06:00/18:00“; im Feld „Wechselzeiten“
   stehen sie immer taktisch.
 - Höchstens ein Modell ist die „Vorgabe der Organisation“. Wer ein anderes als Vorgabe setzt,

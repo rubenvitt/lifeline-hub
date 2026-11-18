@@ -12,6 +12,7 @@ import { useKoordinatenSystemOverride } from './koordinatenSystemStore';
 import { useZeitdarstellungGeraet } from './zeitDarstellungStore';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import { uhrzeit, wirksameZeitdarstellung, zeitKurz, zeitpunkt } from './zeitDarstellung';
+import type { Zeitdarstellung } from '../api/types';
 import {
   DEFAULT_KONVENTIONEN,
   effektivesKoordinatenformat,
@@ -59,6 +60,17 @@ const AnzeigeKonventionenContext = createContext<AnzeigeKonventionenHook>(
 /** Liefert die an den Einsatz gebundenen Formatter + rohe Konventionen. */
 export function useAnzeigeKonventionen(): AnzeigeKonventionenHook {
   return useContext(AnzeigeKonventionenContext);
+}
+
+/**
+ * Darstellung der Uhr (LLH-1750, E5): Gerät vor Einsatz bzw. Organisation vor Vorgabe. Der Kopf
+ * liegt außerhalb der Einsatz-Provider; dort gilt die Gerätewahl, sonst die Vorgabe. Innerhalb
+ * eines Providers ist dessen Darstellung schon die wirksame.
+ */
+export function useUhrDarstellung(): Zeitdarstellung {
+  const { konventionen } = useAnzeigeKonventionen();
+  const geraet = useZeitdarstellungGeraet();
+  return wirksameZeitdarstellung({ geraet, einsatz: konventionen.zeitdarstellung });
 }
 
 /**

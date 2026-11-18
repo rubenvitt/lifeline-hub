@@ -24,7 +24,8 @@ setzen Status, tragen nach und streichen.
 ### Die Kräfteübersicht lesen
 
 1. Unter „Kräfte & Mittel“ die „Kräfteübersicht“ öffnen. Der Kopf nennt die Zahl der Einheiten und die
-   Stärke (Führer/Unterführer/Mannschaft//Gesamt).
+   Stärke; die Spalte heißt „Stärke F/UF/M//Σ“ (Führer/Unterführer/Mannschaft//Summe, Kapitel
+   [Zeiten und Kürzel](zeiten-und-kuerzel.md)).
 2. Im Statusband unter „Einheiten nach FMS-Status“ je Status Code, Wort und Zahl lesen, etwa
    „S3 Anfahrt 2“; der Balken darunter zeigt den Anteil, die Summe steht oben rechts. Daneben
    gliedert „Personal nach Status“ das Personal nach Kategorie. „Rückmeldung“ mit dem Wort „keine
@@ -90,7 +91,7 @@ Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschir
 
 1. Unter „Einheiten“ eine Einheit öffnen und zum Paneel „Zeitachse“ gehen. Für eine Person unter
    „Personal“ ihren Namen wählen; ihre Ansicht trägt dasselbe Paneel.
-2. Die Dauerzeile lesen, etwa „Im Einsatz 4 h 47 · seit Alarmierung 07:24 · gesamt 4 h 47“. Nach
+2. Die Dauerzeile lesen, etwa „Im Einsatz 4 h 47 min · seit Alarmierung 07:24 · gesamt 4 h 47 min“. Nach
    einer Entlassung oder Ablösung steht dort die Ruhezeit.
 
    ![Paneel „Zeitachse“ einer Einheit mit Dauerzeile, Alarmierung, Eintreffen und einem gestrichenen Eintreffen mit Grund](../bilder/meldebild/zeitachse.png)
@@ -277,8 +278,8 @@ Kräfte sofort neu ein, ohne Neuladen.
 - **„Ruhe zu kurz“:** Die Kraft ist wieder im Einsatz, obwohl ihre Ruhe davor kürzer als die
   Mindestruhe war.
 
-Wer mit der Maus auf die Zelle zeigt, liest die Begründung, etwa „Im Dienst seit 08:00: 14 h 30,
-Höchstwert 12 h · Ruhe davor 2 h 00, Mindestruhe 8 h“. Die Spalte „Ruhe“ bleibt ohne Wort, denn
+Wer mit der Maus auf die Zelle zeigt, liest die Begründung, etwa „Im Dienst seit 08:00: 14 h 30 min,
+Höchstwert 12 h · Ruhe davor 2 h, Mindestruhe 8 h“. Die Spalte „Ruhe“ bleibt ohne Wort, denn
 wer ruht, braucht nichts. Ohne Ereignis, nach der Entlassung und solange die Grenzwerte nicht
 geladen sind, steht kein Wort. Die Einstufung löst keinen Hinweis in der AlarmZentrale und keinen
 Zähler aus; sie steht nur in der Zelle und auf dem Meldeblatt.

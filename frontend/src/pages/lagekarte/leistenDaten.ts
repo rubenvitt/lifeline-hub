@@ -40,7 +40,7 @@ import type { TierKartenEintrag } from './tierMarker';
 import { SPEZIES_META, TIER_STATUS } from '../tiere/tierHelfer';
 import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { ART_LABEL, evakuiertText, personenZahl } from '../../betreuung/betreuungText';
-import { staerkeText } from '../../anzeige/staerke';
+import { STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { GEFAHR_LABEL, SCHADENSGRAD_LABEL } from '../schaeden/gefahrWorte';
 import { einheitenImAbschnitt } from '../einsatzabschnitte/abschnittStaerke';
@@ -556,7 +556,7 @@ export function auswahlRaster(
       const st = einheitStatusAnzeige(e.status);
       const statusText = st.code ? `${st.code} · ${st.wort}` : st.wort;
       return [
-        { label: 'Stärke', wert: staerkeText(e.ist) },
+        { label: `Stärke ${STAERKE_SCHREIBWEISE}`, wert: staerkeText(e.ist) },
         {
           label: 'Status',
           wert: st.verteilung ? `${statusText} (${st.verteilung})` : statusText,
@@ -667,7 +667,10 @@ export function auswahlRaster(
       const { staerke, unvollstaendig } = staerkeImRaum(r.einheit_ids, roh.einheiten);
       return [
         { label: 'Status', wert: st?.label ?? r.status, rolle: st?.rolle, mono: false },
-        { label: 'Stärke', wert: unvollstaendig ? '—' : staerkeText(staerke) },
+        {
+          label: `Stärke ${STAERKE_SCHREIBWEISE}`,
+          wert: unvollstaendig ? '—' : staerkeText(staerke),
+        },
         { label: 'Fahrzeuge', wert: String(r.belegung.fahrzeuge) },
         { label: 'Einheiten', wert: String(r.belegung.einheiten) },
         {

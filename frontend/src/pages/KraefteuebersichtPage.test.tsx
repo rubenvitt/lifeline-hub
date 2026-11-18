@@ -1656,7 +1656,7 @@ describe('KraefteuebersichtPage — Im Einsatz (LFH-552)', () => {
       expect(z).not.toBeNull();
       return z as HTMLElement;
     });
-    expect(zelle).toHaveTextContent('7 h 40');
+    expect(zelle).toHaveTextContent('7 h 40 min');
     expect(zelle).toHaveTextContent(/seit Alarmierung/);
     expect(zelle.getAttribute('title')).toMatch(/^seit Alarmierung /);
     expect(zelle.style.fontVariantNumeric).toBe('tabular-nums');
@@ -1681,7 +1681,7 @@ describe('KraefteuebersichtPage — Im Einsatz (LFH-552)', () => {
     },
   ];
 
-  it('„Zu lang in einer Periode": 12 h 20 mit dem Wort „zu lang“ und Begründung', async () => {
+  it('„Zu lang in einer Periode": 12 h 20 min mit dem Wort „zu lang“ und Begründung', async () => {
     mitEinheit();
     vi.mocked(listeEinheitenPerioden).mockResolvedValue(seit(12, 20));
     const { container } = setup();
@@ -1693,14 +1693,14 @@ describe('KraefteuebersichtPage — Im Einsatz (LFH-552)', () => {
     });
     expect(wort).toHaveTextContent('zu lang');
     const zelle = imEinsatz(container) as HTMLElement;
-    expect(zelle).toHaveTextContent('12 h 20');
+    expect(zelle).toHaveTextContent('12 h 20 min');
     expect(zelle.getAttribute('title')).toMatch(
-      /^seit Alarmierung .* · Im Dienst seit .*: 12 h 20, Höchstwert 12 h$/,
+      /^seit Alarmierung .* · Im Dienst seit .*: 12 h 20 min, Höchstwert 12 h$/,
     );
     expect(ladeZeitachseGrenzwerte).toHaveBeenCalledWith(1, 'einheiten');
   });
 
-  it('„Eigener Wert des Einsatzes": 6 h aus dem Schichtplan stuft 6 h 20 ein', async () => {
+  it('„Eigener Wert des Einsatzes": 6 h aus dem Schichtplan stuft 6 h 20 min ein', async () => {
     mitEinheit();
     vi.mocked(listeEinheitenPerioden).mockResolvedValue(seit(6, 20));
     vi.mocked(ladeZeitachseGrenzwerte).mockResolvedValue({
@@ -1729,7 +1729,7 @@ describe('KraefteuebersichtPage — Im Einsatz (LFH-552)', () => {
       return z as HTMLElement;
     });
     await waitFor(() => expect(ladeZeitachseGrenzwerte).toHaveBeenCalled());
-    expect(zelle).toHaveTextContent('14 h 00');
+    expect(zelle).toHaveTextContent('14 h');
     expect(zelle.querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
   });
 

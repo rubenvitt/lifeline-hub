@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Input } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -9,7 +10,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitraumEingabe, type Zeitraum } from '../anzeige/ZeitpunktEingabe';
 import { tagUndUhrzeit } from '../anzeige/zeitDarstellung';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
-import { dauerFeldText, dauerMinuten, formatDauer } from '../abloesung/dauer';
+import { dauerFeldText, dauerMinuten } from '../abloesung/dauer';
 import BearbeitbaresPaneel, {
   type BearbeitbaresFeld,
 } from '../components/instrument/BearbeitbaresPaneel';
@@ -138,21 +139,17 @@ export default function PlanungKopf({
       name: 'max_dienst',
       label: 'Höchstens im Dienst',
       anzeige: g.max_dienst_eigen
-        ? formatDauer(g.max_dienst_minuten)
-        : mitVorgabe(formatDauer(g.max_dienst_minuten)),
-      eingabe: (
-        <Input placeholder={mitVorgabe(formatDauer(MAX_DIENST_VORGABE))} autoComplete="off" />
-      ),
+        ? dauer(g.max_dienst_minuten)
+        : mitVorgabe(dauer(g.max_dienst_minuten)),
+      eingabe: <Input placeholder={mitVorgabe(dauer(MAX_DIENST_VORGABE))} autoComplete="off" />,
       regeln: [maxDienstRegel],
       mono: true,
     },
     {
       name: 'min_ruhe',
       label: 'Mindestens Ruhe',
-      anzeige: g.min_ruhe_eigen
-        ? formatDauer(g.min_ruhe_minuten)
-        : mitVorgabe(formatDauer(g.min_ruhe_minuten)),
-      eingabe: <Input placeholder={mitVorgabe(formatDauer(MIN_RUHE_VORGABE))} autoComplete="off" />,
+      anzeige: g.min_ruhe_eigen ? dauer(g.min_ruhe_minuten) : mitVorgabe(dauer(g.min_ruhe_minuten)),
+      eingabe: <Input placeholder={mitVorgabe(dauer(MIN_RUHE_VORGABE))} autoComplete="off" />,
       regeln: [minRuheRegel],
       mono: true,
     },

@@ -27,7 +27,12 @@ import {
   useDienststatusMutation,
   type DienststatusOptionen,
 } from './dienststatus';
-import { staerkeSumme, staerkeText } from '../anzeige/staerke';
+import {
+  STAERKE_AUSGESCHRIEBEN,
+  STAERKE_SCHREIBWEISE,
+  staerkeSumme,
+  staerkeText,
+} from '../anzeige/staerke';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
 
@@ -138,11 +143,15 @@ export default function FahrzeugeTab() {
       render: (t) => (t ? <span style={monoStil(12)}>{t}</span> : '—'),
     },
     {
-      title: 'Stärke',
+      title: `Stärke ${STAERKE_SCHREIBWEISE}`,
       key: 'staerke',
       // Nach der Gesamtstärke (Σ), wie sie hinter „//“ steht.
       sorter: nachZahl((f: Fahrzeug) => staerkeSumme(f.staerke)),
-      render: (_, f) => <span style={monoStil(12)}>{staerkeText(f.staerke)}</span>,
+      render: (_, f) => (
+        <span style={monoStil(12)} title={f.staerke ? STAERKE_AUSGESCHRIEBEN : undefined}>
+          {staerkeText(f.staerke)}
+        </span>
+      ),
     },
     ...dienststatusSpalten<Fahrzeug>(dienstOptionen),
   ];

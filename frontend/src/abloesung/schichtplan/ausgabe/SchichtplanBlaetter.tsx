@@ -1,3 +1,4 @@
+import { dauer } from '../../../anzeige/dauer';
 import { theme } from 'antd';
 import { useMemo, type ReactNode } from 'react';
 import dayjs from 'dayjs';
@@ -5,7 +6,7 @@ import { useAnzeigeKonventionen } from '../../../anzeige/AnzeigeKonventionenCont
 import { datum, inZone, uhrzeit, zeitpunkt } from '../../../anzeige/zeitDarstellung';
 import Druckkopf, { type DruckEinsatz } from '../../../components/druck/Druckkopf';
 import DruckTabelle, { type DruckSpalte } from '../../../druck/DruckTabelle';
-import { formatDauer } from '../../dauer';
+
 import {
   aushaenge,
   besetzungText,
@@ -182,7 +183,7 @@ export default function SchichtplanBlaetter({
             wert: (r) => (r.mit.length > 0 ? r.mit.map((p) => p.name).join(', ') : '–'),
           },
         ];
-        const umfang = `${z.schichten === 1 ? '1 Schicht' : `${z.schichten} Schichten`}, ${formatDauer(z.minuten)}`;
+        const umfang = `${z.schichten === 1 ? '1 Schicht' : `${z.schichten} Schichten`}, ${dauer(z.minuten)}`;
         return kapitel(
           z.person.schluessel,
           <>
