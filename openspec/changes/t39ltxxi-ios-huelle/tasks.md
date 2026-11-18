@@ -6,8 +6,8 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## 1. Vorarbeit Regeln
 
-- [ ] 1.1 Abschnitte „Backend — Migrationsvergabe“ und „Backend — Tabellenumbau und `-- no-transaction`“ aus der Wurzel-`AGENTS.md` nach `src/AGENTS.md` verschieben (eigener `refactor`-Commit), Verweise per `git grep` nachziehen; belegt durch `wc -l AGENTS.md` < 190 und grünes `scripts/check-all.sh --nur schnell`
-- [ ] 1.2 Freie ADR-Nummer gegen offene PRs prüfen und für ADR-0065 vormerken; belegt durch den Befund im Kommentar an LLH-1978
+- [x] 1.1 Abschnitte „Backend — Migrationsvergabe“ und „Backend — Tabellenumbau und `-- no-transaction`“ aus der Wurzel-`AGENTS.md` nach `src/AGENTS.md` verschieben (eigener `refactor`-Commit), Verweise per `git grep` nachziehen; belegt durch `wc -l AGENTS.md` < 190 und grünes `scripts/check-all.sh --nur schnell`
+- [x] 1.2 Freie ADR-Nummer gegen offene PRs prüfen und für ADR-0065 vormerken; belegt durch den Befund im Kommentar an LLH-1978
 
 ## 2. Server-Vertrag `GET /api/shell`
 
