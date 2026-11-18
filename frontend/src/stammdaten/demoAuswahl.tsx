@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import DemoMarke from '../components/DemoMarke';
+import { Stapel } from '../components/instrument';
 
 /**
  * Auswahllisten zum Disponieren aus den Stammdaten (LFH-733, Spec `demo-daten`, Anforderung
@@ -21,7 +22,6 @@ export const DEMO_GROUP = 'Demo-Daten';
  * deshalb der Text, nie die Marke: ohne `flex: none` an der Marke schnitt antds Ellipse beim
  * längsten Demo-Eintrag „Demo“ zu „De“ ab (gesehen im Stack-Durchgang zu LFH-733).
  */
-const demoLabelStil: CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 };
 const demoTextStil: CSSProperties = {
   minWidth: 0,
   overflow: 'hidden',
@@ -51,12 +51,12 @@ export interface AuswahlGroup {
  */
 export function DemoLabel({ children }: { children: ReactNode }) {
   return (
-    <span style={demoLabelStil}>
+    <Stapel richtung="zeile" abstand="xs" ausrichten="mitte" als="span">
       <span style={demoTextStil}>{children}</span>
       <span style={{ flex: 'none' }}>
         <DemoMarke />
       </span>
-    </span>
+    </Stapel>
   );
 }
 

@@ -1,5 +1,6 @@
-import { Button, Space, Tag } from 'antd';
+import { Button, Tag } from 'antd';
 import DemoMarke from '../components/DemoMarke';
+import { Stapel } from '../components/instrument';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
@@ -98,7 +99,7 @@ export default function PersonalTab() {
        * ohne ihn fiele der Name aus dem Suchkorpus.
        */
       render: (_, p) => (
-        <Space size={4} wrap>
+        <Stapel richtung="zeile" abstand="xs" umbruch ausrichten="mitte">
           <KennungsLink to={personalDetailPfad(p.id)} style={{ overflowWrap: 'anywhere' }}>
             {p.name}
           </KennungsLink>
@@ -107,7 +108,7 @@ export default function PersonalTab() {
             herkunft={herkunft.herkunft('personal', p.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {
@@ -126,11 +127,11 @@ export default function PersonalTab() {
       onFilter: (wert, p) => p.qualifikationen.some((q) => q.label === wert),
       render: (_, p) =>
         p.qualifikationen.length ? (
-          <Space size={[0, 4]} wrap>
+          <Stapel richtung="zeile" abstand="xs" umbruch>
             {p.qualifikationen.map((q) => (
               <Tag key={q.id}>{q.label}</Tag>
             ))}
-          </Space>
+          </Stapel>
         ) : (
           '—'
         ),

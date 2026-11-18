@@ -153,14 +153,6 @@ const OFFEN: readonly string[] = [
   'stammdaten/FahrzeugFormModal.tsx',
   'stammdaten/MahlzeitDialog.tsx',
   'stammdaten/MaterialFormModal.tsx',
-  'stammdaten/OrganisationTab.tsx',
-  'stammdaten/PersonalDetailPage.tsx',
-  'stammdaten/PersonalFormModal.tsx',
-  'stammdaten/PersonalStatusTab.tsx',
-  'stammdaten/QualifikationenTab.tsx',
-  'stammdaten/SprechgruppeFormModal.tsx',
-  'stammdaten/StatusKatalogTab.tsx',
-  'stammdaten/zeitachseMarke.tsx',
 ];
 
 const QUELLEN = BEREICHE.flatMap(sammleDateien);
