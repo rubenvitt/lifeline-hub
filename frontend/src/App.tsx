@@ -138,7 +138,8 @@ import SeiteNichtGefunden from './einsatz/SeiteNichtGefunden';
 import ModulRedirect from './einsatz/ModulRedirect';
 import AltpfadWeiterleitung from './einsatz/AltpfadWeiterleitung';
 import ModulStub from './einsatz/ModulStub';
-import { modulName, modulRegistry } from './einsatz/modulRegistry';
+import { ModulGerippeSeite } from './einsatz/ModulWechselGerippe';
+import { modulRegistry } from './einsatz/modulRegistry';
 import {
   EINSTELLUNGEN_SEKTIONEN,
   GERAET_START_PFAD,
@@ -209,21 +210,14 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   tiere: <TierePage />,
   schaeden: <SchaedenPage />,
   lageberichte: <LageberichtePage />,
+  // Nachgeladene Module: derselbe Kopf mit Gerippe wie beim Modulwechsel (LLH-1838, D3).
   lagekarte: (
-    <Suspense
-      fallback={<div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>Karte wird geladen…</div>}
-    >
+    <Suspense fallback={<ModulGerippeSeite modulKey="lagekarte" />}>
       <LagekartePage />
     </Suspense>
   ),
   kraefteuebersicht: (
-    <Suspense
-      fallback={
-        <div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
-          {modulName('kraefteuebersicht')} wird geladen…
-        </div>
-      }
-    >
+    <Suspense fallback={<ModulGerippeSeite modulKey="kraefteuebersicht" />}>
       <KraefteuebersichtPage />
     </Suspense>
   ),
