@@ -43,9 +43,9 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 6. Gesamtnachweis
 
-- [ ] 6.1 `e2e/seitenkopf-werkzeuganteil.spec.ts` (D6): Matrix der Spec „Die erste Datenzeile steht oben im Fenster“ und Menü statt Knopf in 48/72; grün, Messwerte vorher/nachher im PR
-- [ ] 6.2 Anwenderdoku: Kapitel, die Drucken/CSV/Stärkezeile/Filter beschreiben, nach `docs/anwender/AGENTS.md` nachziehen; Wächter grün
-- [ ] 6.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 6.1 `e2e/seitenkopf-werkzeuganteil.spec.ts` (D6): Matrix der Spec „Die erste Datenzeile steht oben im Fenster“ und Menü statt Knopf in 48/72; grün, Messwerte vorher/nachher im PR
+- [x] 6.2 Anwenderdoku: Kapitel, die Drucken/CSV/Stärkezeile/Filter beschreiben, nach `docs/anwender/AGENTS.md` nachziehen; Wächter grün
+- [x] 6.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
 
