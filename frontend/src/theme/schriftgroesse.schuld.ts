@@ -101,7 +101,6 @@ export const SCHULD: Readonly<Record<string, number>> = {
   'personen/Sichtungszeile.tsx': 1,
   'personen/ZeilenSichtung.tsx': 1,
   'personen/personenSpalten.tsx': 10,
-  'stammdaten/EtbBausteinFormModal.tsx': 1,
   'verpflegung/AusgabeAnsicht.tsx': 1,
   'verpflegung/StellenListe.tsx': 1,
   'verpflegung/ZeitfensterKarte.tsx': 1,

@@ -2,7 +2,7 @@ import { Button, InputNumber, Space, Typography, theme } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DemoMarke from '../components/DemoMarke';
-import { Paneel, PaneelZeile, StatusChip, monoStil } from '../components/instrument';
+import { Paneel, PaneelZeile, Stapel, StatusChip, monoStil } from '../components/instrument';
 import { KennungsLink } from '../components/kennungsLink';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -68,9 +68,11 @@ function Row({ children, actions }: { children: ReactNode; actions?: ReactNode }
         rowGap: token.marginSM,
       }}
     >
-      <Space size={8} wrap style={{ flex: '1 1 240px', minWidth: 0 }}>
-        {children}
-      </Space>
+      <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+        <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
+          {children}
+        </Stapel>
+      </div>
       {actions != null && (
         <Space size="middle" wrap>
           {actions}
@@ -444,18 +446,19 @@ function MengeFeld({
     onCommit(wert);
   };
   return (
-    <InputNumber
-      aria-label={`Menge ${bezeichnung}`}
-      min={1}
-      max={max}
-      precision={0}
-      disabled={disabled}
-      style={{ width: '100%', maxWidth: 120 }}
-      value={wert}
-      onChange={setWert}
-      onBlur={commit}
-      onPressEnter={commit}
-    />
+    <div style={{ width: '100%', maxWidth: 'var(--lfh-feld-kurz)' }}>
+      <InputNumber
+        aria-label={`Menge ${bezeichnung}`}
+        min={1}
+        max={max}
+        precision={0}
+        disabled={disabled}
+        value={wert}
+        onChange={setWert}
+        onBlur={commit}
+        onPressEnter={commit}
+      />
+    </div>
   );
 }
 

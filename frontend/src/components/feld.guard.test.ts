@@ -142,17 +142,6 @@ const OFFEN: readonly string[] = [
   'pages/einstellungen/KategorieVorgabenPaneel.tsx',
   'pages/einstellungen/ModulEinstellungsListe.tsx',
   'pages/einstellungen/PegelPrognoseModal.tsx',
-  'stammdaten/EinheitTypenTab.tsx',
-  'stammdaten/EinheitVorlageDetailPage.tsx',
-  'stammdaten/EinheitVorlageFormModal.tsx',
-  'stammdaten/EinheitVorlageSections.tsx',
-  'stammdaten/EinsatzVorlageFormModal.tsx',
-  'stammdaten/EtbBausteinFormModal.tsx',
-  'stammdaten/ExterneStelleFormModal.tsx',
-  'stammdaten/FahrzeugDetailPage.tsx',
-  'stammdaten/FahrzeugFormModal.tsx',
-  'stammdaten/MahlzeitDialog.tsx',
-  'stammdaten/MaterialFormModal.tsx',
 ];
 
 const QUELLEN = BEREICHE.flatMap(sammleDateien);
