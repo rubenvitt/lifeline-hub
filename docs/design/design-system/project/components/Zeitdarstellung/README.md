@@ -11,7 +11,7 @@ Vorgabe, oder `datum_uhrzeit`) steht in den Konventionen; wirksam ist Gerät vor
 Organisation vor Vorgabe (`wirksameZeitdarstellung`), die Gerätewahl liegt in
 `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
 **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
-sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
+sie unter `useDruckModus` weg. Kein
 `.format('…')` und kein `formatiere(…, '…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/`
 (Maschinenformate ab `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`,
 Schuldmenge `OFFEN` leer. Titelvorschlag und Startinhalt eines Lagevortrags werden
@@ -20,8 +20,7 @@ Druck und Servertexte); ein Eingabefeld zeigt seinen Wert taktisch. Nebenformen 
 `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26` bzw. `10.10.26`), `uhrzeitOhneDatum`
 (Wanduhrzeit `HH:MM` ohne Tag: Verpflegungsplan, Wechselzeiten), `tagUndUhrzeit` (Anfang eines
 Zeitraums), `leereUhrzeit` (Lücke in Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe,
-Zeitraumende) über das `jetzt` von `zeitKurz`. Der Datenstand rechnet in Gerätezeit
-(`components/Datenstand.tsx`), die Uhr des Lagemonitors nimmt `formatiereUhr` der Kopfleiste.
+Zeitraumende) über das `jetzt` von `zeitKurz`.
 
 Quelle: `frontend/src/anzeige/zeitDarstellung.ts` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
 dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
