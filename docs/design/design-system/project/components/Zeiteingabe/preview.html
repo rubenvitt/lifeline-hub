@@ -367,6 +367,19 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
 .lfh-skelett__balken--kurz {
   width: 35%;
 }
+.lfh-skelett--verzoegert .lfh-skelett__balken {
+  animation:
+    lfh-skelett-ein 0s linear 120ms both,
+    lfh-puls 1.4s ease-in-out infinite;
+}
+@keyframes lfh-skelett-ein {
+  from {
+    visibility: hidden;
+  }
+  to {
+    visibility: visible;
+  }
+}
 @keyframes lfh-puls {
   0%,
   100% {
