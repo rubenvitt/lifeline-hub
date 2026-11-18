@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 17.11.2026 (Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 18.11.2026 (Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -305,7 +305,8 @@ Umgebungsvariable; kein anderes Modul liest `std::env::var` (`tests/env_config_g
 
 Schreibwege und Scheduler melden nach dem Commit über `benachrichtigung::melden`
 (`src/benachrichtigung/`); zugestellt wird über die Live-Ströme, mit Schalter `--web-push` auch per
-Web Push an geschlossene Tabs (`src/web_push/`) und in der Desktop-Hülle als native Meldung.
+Web Push an geschlossene Tabs (`src/web_push/`) und in Desktop- und iOS-Hülle als native Meldung,
+in der iOS-Hülle nur bei laufender App (8.31).
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Benachrichtigungen“; Spec
 [`benachrichtigungen`](../../openspec/specs/benachrichtigungen/spec.md); Betrieb
 [`docs/betrieb/web-push.md`](../betrieb/web-push.md).
@@ -421,3 +422,36 @@ Warteschlange; ein Fehler beim Senden wird verschluckt. Der Server (`src/routes/
 (`geraet::ALLE_GERAETE`), begrenzt Body (`CLIENT_FEHLER_BODY_MAX` in `src/app.rs`) und Felder
 (`*_MAX`, Abschnitt 8.4), speichert nichts und schreibt höchstens eine Warnzeile je Minute über
 `log_drossel::Sammelzeile` (Abschnitt 8.16), ohne Benutzer und Organisation.
+
+## 8.31 Hüllen-Vertrag
+
+Desktop-Hülle (`src-tauri`) und iOS-Hülle (`ios`) laden die Weboberfläche des Servers und tragen
+keine Anwendungslogik ([ADR-0065](entscheidungen/ADR-0065-die-ios-huelle-ist-eine-eigene-swift-app-ohne-anwendungslogik-die-die-serveroberflaeche-laedt.md)).
+Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; drei Teile:
+
+- **Server → Hülle:** `GET /api/shell` liefert anonym und ohne Datenbank `version` und
+  `shell_contract` (`load_shell`, `ShellInfo` und `SHELL_CONTRACT` in `src/routes/shell.rs`,
+  Typ-Codegen wie 8.5). Die Zahl steigt nur bei einem Bruch zwischen Hülle und Server, neue Felder
+  kommen nur hinzu. Die iOS-Hülle lädt einen Server nur, wenn sie seinen Vertrag kennt
+  (`bekannteVertraege` in `ios/LifelineKern/Sources/LifelineKern/LifelineKern.swift`,
+  `Vertragspruefung` in `Vertrag.swift` daneben), bei Start, Wechsel und Rückkehr in den
+  Vordergrund; ein Server ohne Endpunkt gilt als zu alt. Die Desktop-Hülle liest den Endpunkt noch
+  nicht (Zunder LLH-1982).
+- **Hülle → Seite, die Kennung:** `window.__LIFELINE_HUELLE__` meldet die Fähigkeiten der Hülle
+  (`passkey`, `anmeldungImBrowser`, `benachrichtigungZeigen`, `setAppBadge`, bei iOS dazu
+  `platform`, `version` und `haptics`). Gelesen wird sie nur in `frontend/src/huelle/faehigkeiten.ts`;
+  das Frontend unterscheidet die Hüllen nur darüber. Gesetzt wird sie von den Init-Skripten der
+  Desktop-Hülle (`src-tauri/src/*.js`) und von `ios/App/Huelle/huelle.js`; Vitest führt beide aus
+  (`frontend/src/test/huelle.ts`).
+- **Seite → Hülle, die Brücke:** in der iOS-Hülle der Message-Handler `lifeline`, Wire-Format im
+  Kopf von `ios/App/Huelle/huelle.js`. Er nimmt Aufrufe nur aus dem Hauptframe und von der Origin
+  des aktiven Servers an (`Bruecke.accepts` in `ios/LifelineKern/Sources/LifelineKern/Bruecke.swift`);
+  jeder Server hat einen eigenen Datenspeicher. Die Anmeldung im Systembrowser
+  (`POST /api/auth/app-code[/einloesen]`) nutzen beide Hüllen gleich.
+
+Adressprüfung, Deeplink und Linkregeln stehen einmal in Rust (`src-tauri/src/adresse.rs`,
+`deeplink.rs`, `links.rs`) und einmal im Swift-Kern; zusammengehalten werden sie von den
+gemeinsamen Fällen unter `src-tauri/faelle/`, die beide Suiten prüfen. Regeln:
+[`ios/AGENTS.md`](../../ios/AGENTS.md), [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md),
+„Gemeinsame Fälle“; Betrieb: [`ios-app.md`](../betrieb/ios-app.md),
+[`desktop-app.md`](../betrieb/desktop-app.md).
