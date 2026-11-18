@@ -48,7 +48,7 @@ flowchart LR
 | Backend `lifeline-hub` | Ein Binary: REST-API unter `/api`, Live-Kanal per SSE, SQLite-Datenbank, Hintergrund-Scheduler (u. a. Erinnerung, Purge, Sicherung) und Auslieferung des Frontends | HTTP(S), `GET /api/einsaetze/{id}/live` und `GET /api/live` (`src/routes/live.rs`), CLI-Subkommandos `backup`/`restore` (`src/config.rs`) | `src/`, Start `src/main.rs` |
 | `frontend` | React-19/antd-6-Oberfläche als PWA (`frontend/package.json`); Stabsoberfläche und Gerätehülle | ruft `/api` über `frontend/src/api/client.ts`, Live über `EventSource` (`frontend/src/live/liveVerbindung.ts`) | `frontend/src/` |
 | Desktop-Hülle `src-tauri` | Tauri-2-Crate `lifeline-desktop`, lädt die https-Adresse des Servers, keine Anwendungslogik | Commands nach `src-tauri/build.rs`, Deeplink `lifeline://verbinden`, `POST /api/auth/app-code[/einloesen]` | `src-tauri/` ([AGENTS.md](../../src-tauri/AGENTS.md)) |
-| iOS-Hülle `ios` | Eigene Swift-App für iPhone und iPad (SwiftUI + WKWebView), lädt die Oberfläche des gewählten Servers, keine Anwendungslogik; testbare Logik im Swift-Paket `ios/LifelineKern`, App-Target unter `ios/App` | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `ios/App/Huelle/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/` | `ios/` |
+| iOS-Hülle `ios` | Eigene Swift-App für iPhone und iPad (SwiftUI + WKWebView), lädt die Oberfläche des gewählten Servers, keine Anwendungslogik; testbare Logik im Swift-Paket `ios/LifelineKern`, App-Target unter `ios/App` | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `ios/App/Huelle/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/` | `ios/` ([AGENTS.md](../../ios/AGENTS.md)) |
 | `karten-service` | Zentraler Dienst, der Offline-Kartenregionen baut und in S3 ablegt | `/regions`, `/builds`, `/builds/{id}`, `/zeitplan`, `/healthz` (`karten-service/src/api.rs`) | `karten-service/` |
 | `karten-build` | Bau-zeitiges Erzeugen der Shortbread-MBTiles mit Planetiler, nie zur Laufzeit der App | `make tiles AREA=…`, `make validate` (`karten-build/README.md`) | `karten-build/` |
 | `crates/karten-katalog` | Geteilte Wire-Typen des Offline-Kartenkatalogs und der Bau-Jobs | Lib-Crate, Feature `schema` für den Typ-Codegen (`crates/karten-katalog/Cargo.toml`) | `crates/karten-katalog/src/lib.rs` |
@@ -420,14 +420,17 @@ das Laden des Servers; `kanal.rs` und `update.rs` Update-Kanal und Updater. Die 
 
 ### `ios`
 
-Die iOS-Hülle (LLH-1978, Change `t39ltxxi-ios-huelle`). `ios/LifelineKern` ist ein Swift-Paket
+Die iOS-Hülle (LLH-1978, ADR-0065), Regeln in [ios/AGENTS.md](../../ios/AGENTS.md). `ios/LifelineKern` ist ein Swift-Paket
 ohne UIKit und WebKit (`ios/LifelineKern/Package.swift`): Adressprüfung (`Adresse.swift`),
 Deeplink (`Deeplink.swift`), Linkregeln (`Linkregeln.swift`), Serverliste (`Serverliste.swift`),
 Vertragsprüfung gegen `GET /api/shell` (`Vertrag.swift`), Onboarding (`Onboarding.swift`) und
 Haptik-Abbildung (`Haptik.swift`). Seine Suite liest die gemeinsamen Fälle der Desktop-Hülle aus
-`src-tauri/faelle/` und läuft auch unter Linux (Schritt 18 von `scripts/check-all.sh`). `ios/App`
-trägt das App-Target; das Init-Skript `ios/App/Huelle/huelle.js` meldet der Seite die Kennung
-`__LIFELINE_HUELLE__` und beschreibt das Wire-Format der Brücke in seinem Kopf.
+`src-tauri/faelle/` und läuft auch unter Linux (Schritt 18 von `scripts/check-all.sh`);
+`AppVersion.swift` liest die Version aus der Info.plist. `ios/App` trägt das App-Target
+`LifelineHub` (Einstieg `ios/App/LifelineHubApp.swift`); das Init-Skript `ios/App/Huelle/huelle.js`
+meldet der Seite die Kennung `__LIFELINE_HUELLE__` und beschreibt das Wire-Format der Brücke in
+seinem Kopf. Das Xcode-Projekt erzeugt XcodeGen aus `ios/project.yml` (App, `ios/AppTests`,
+`ios/AppUITests`, lokales Paket `LifelineKern`), die Version schreibt `scripts/ios/version.sh`.
 
 ### `karten-service`
 
