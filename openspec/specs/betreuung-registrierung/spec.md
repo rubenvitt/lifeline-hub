@@ -186,14 +186,15 @@ derselben Kennung MUST nach der Rechteprüfung und vor jeder Zustandsprüfung la
 
 ### Requirement: Registrierliste drucken
 
-Die Oberfläche SHALL im Paneel „Registrierung“ einer Betreuungsstelle „Registrierliste drucken“
-anbieten, mit Zugriff auf Betreuung und Personen auch ohne Schreibrecht. Das Blatt MUST die
+Die Oberfläche SHALL im Kopf des Paneels „Registrierung“ einer Betreuungsstelle
+„Registrierliste – Druckansicht“ anbieten, mit Zugriff auf Betreuung und Personen auch ohne
+Schreibrecht. Das Blatt MUST die
 Summen je Kostform samt „ohne Angabe“ zeigen und je Haushalt Nummer, Bezugsperson und die hier
 registrierten Personen mit Registriernummer, Name, Geburtsdatum oder Alter, Kostform und einer
 leeren Spalte zum Abhaken. Es MUST ein Schnappschuss sein, der sich erst mit „Neu laden“ ändert.
 
 #### Scenario: Blatt einer Stelle
-- **WHEN** an „Turnhalle Ost“ der Haushalt „H-1“ mit drei Personen registriert ist und jemand „Registrierliste drucken“ wählt
+- **WHEN** an „Turnhalle Ost“ der Haushalt „H-1“ mit drei Personen registriert ist und jemand „Registrierliste – Druckansicht“ wählt
 - **THEN** zeigt das Blatt „H-1“ mit drei Personen, die Summen 1 Normalkost, 1 vegetarisch, 1 Säugling/Kleinkind und je Person ein leeres Abhakfeld
 
 #### Scenario: Personen ohne Haushalt
@@ -202,7 +203,7 @@ leeren Spalte zum Abhaken. Es MUST ein Schnappschuss sein, der sich erst mit „
 
 #### Scenario: Ohne Personenrecht
 - **WHEN** ein Benutzer mit Zugriff auf Betreuung, aber ohne Zugriff auf Personen die Detailseite öffnet
-- **THEN** fehlt „Registrierliste drucken“, und der Druckabruf antwortet mit 403
+- **THEN** fehlt „Registrierliste – Druckansicht“, und der Druckabruf antwortet mit 403
 
 #### Scenario: Live-Änderung nach dem Öffnen
 - **WHEN** nach dem Öffnen der Druckansicht ein weiterer Haushalt registriert wird
@@ -264,7 +265,7 @@ bevor etwas gelesen oder protokolliert wird. Andere Gerätearten MUST den Drucka
 erreichen.
 
 #### Scenario: Eigene Stelle
-- **WHEN** das Gerät von „Turnhalle Ost“ im Bereich „Registrierung“ „Registrierliste drucken“ wählt
+- **WHEN** das Gerät von „Turnhalle Ost“ im Bereich „Registrierung“ „Registrierliste – Druckansicht“ wählt
 - **THEN** öffnet sich die Druckansicht der Registrierliste von „Turnhalle Ost“, und das Protokoll nennt das Gerätekonto
 
 #### Scenario: Fremde Stelle

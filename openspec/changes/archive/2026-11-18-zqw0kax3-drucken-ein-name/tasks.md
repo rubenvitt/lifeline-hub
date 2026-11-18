@@ -35,7 +35,7 @@ Wortlaut bzw. Platz, dann die Änderung. Pfade relativ zu `frontend/`.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die Druck-Specs aus 2–4 lokal in Chromium grün.
+- [x] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die Druck-Specs aus 2–4 lokal in Chromium grün.
 
 ## Workflow follow-up
 

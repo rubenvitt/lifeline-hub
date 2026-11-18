@@ -29,7 +29,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
 - **Wortlaut und Platz der Druckeinstiege** (LLH-1836, Spec `druck-dokumente`, „Druckeinstiege
   heißen nach ihrer Wirkung“, „Druckeinstiege stehen im Kopf“, „Module ohne eigenen Druck“;
-  Herleitung `openspec/changes/zqw0kax3-drucken-ein-name/design.md`):
+  Herleitung `openspec/changes/archive/2026-11-18-zqw0kax3-drucken-ein-name/design.md`):
   - **Zwei Wörter nach Wirkung.** „Drucken / als PDF“ öffnet sofort den Druckdialog,
     „Druckansicht“ öffnet eine eigene Druckseite; druckt diese ein anderes Dokument als die Seite des
     Einstiegs, steht es davor („Einsatzbericht – Druckansicht“, „Registrierliste – Druckansicht“).
