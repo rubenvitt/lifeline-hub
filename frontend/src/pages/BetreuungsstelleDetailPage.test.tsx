@@ -43,6 +43,7 @@ const api = vi.hoisted(() => ({
   nimmBelegungZurueck: vi.fn(),
   ladeBelegungKopfzahl: vi.fn(),
   ladeBelegungVerlauf: vi.fn(),
+  loadBetreuungsstelleStand: vi.fn(),
 }));
 vi.mock('../api/betreuung', () => api);
 
@@ -784,5 +785,61 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
       expect(linie).toHaveAccessibleName(/2 Meldungen$/);
       expect(document.querySelector('[data-lfh="standlinie-bezug"]')).toBeNull();
     });
+  });
+});
+
+describe('BetreuungsstelleDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () => {
+  beforeEach(() => {
+    personenAnfragen = [];
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'einsatzleitung' };
+    freigaben.wert = undefined;
+    api.ladeBetreuung.mockResolvedValue(MIT_DATEN);
+    api.ladeBelegungVerlauf.mockResolvedValue([]);
+  });
+  afterEach(async () => {
+    vi.clearAllMocks();
+    await queueLeerenFuerTests();
+  });
+
+  it('fällt die gesehene Stelle wegen Storno heraus, bleibt sie gesperrt mit Banner stehen', async () => {
+    api.loadBetreuungsstelleStand.mockResolvedValue({
+      storniert_at: '2026-09-23 11:00:00',
+      storniert_von_name: 'Anna Beispiel',
+    });
+    const { client } = renderPage();
+    await screen.findByRole('heading', { level: 1, name: /Turnhalle Ost/ });
+    expect(screen.getByRole('button', { name: 'Belegung melden' })).toBeInTheDocument();
+
+    api.ladeBetreuung.mockResolvedValue({ ...MIT_DATEN, stellen: [STADION] });
+    await client.invalidateQueries({ queryKey: einsatzKeys.betreuung(1) });
+
+    expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /Turnhalle Ost/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Belegung melden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(screen.queryByText('Diese Betreuungsstelle gibt es nicht (mehr)')).toBeNull();
+    expect(api.loadBetreuungsstelleStand).toHaveBeenCalledWith(1, 8);
+  });
+
+  it('ohne Storno (etwa fremde Stelle) zeigt sie wie bisher das Muster', async () => {
+    api.loadBetreuungsstelleStand.mockResolvedValue({
+      storniert_at: null,
+      storniert_von_name: null,
+    });
+    const { client } = renderPage();
+    await screen.findByRole('heading', { level: 1, name: /Turnhalle Ost/ });
+    api.ladeBetreuung.mockResolvedValue({ ...MIT_DATEN, stellen: [STADION] });
+    await client.invalidateQueries({ queryKey: einsatzKeys.betreuung(1) });
+    expect(
+      await screen.findByText('Diese Betreuungsstelle gibt es nicht (mehr)'),
+    ).toBeInTheDocument();
+  });
+
+  it('ein Direktaufruf einer nicht geführten Stelle fragt keinen Stand ab', async () => {
+    renderPage('/einsaetze/1/betreuung/77');
+    expect(
+      await screen.findByText('Diese Betreuungsstelle gibt es nicht (mehr)'),
+    ).toBeInTheDocument();
+    expect(api.loadBetreuungsstelleStand).not.toHaveBeenCalled();
   });
 });

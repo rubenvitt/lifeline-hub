@@ -301,9 +301,8 @@ export default function SchaedenDetailPage() {
   }
 
   /** Nach einem Storno nur noch lesen (LLH-1832): Text `readOnly`, Auswahl gesperrt. */
-  const lesen = <P extends { readOnly?: boolean; disabled?: boolean }>(
-    feld: ReactElement<P>,
-  ): ReactElement<P> => (storniert ? entwurfNurLesen(feld) : feld);
+  const lesen = <P,>(feld: ReactElement<P>): ReactElement<P> =>
+    storniert ? entwurfNurLesen(feld) : feld;
 
   const detailAnsicht = (
     <SchadenDaten

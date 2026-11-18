@@ -59,9 +59,8 @@ export function StornoBanner({ stand }: StornoBannerProps) {
  * werden `readOnly`, damit ihr Text markier- und kopierbar bleibt; alles andere (Auswahl, Zahl,
  * Ort) wird `disabled`.
  */
-export function entwurfNurLesen<P extends { readOnly?: boolean; disabled?: boolean }>(
-  input: ReactElement<P>,
-): ReactElement<P> {
+export function entwurfNurLesen<P>(input: ReactElement<P>): ReactElement<P> {
   const istText = input.type === Input || input.type === Input.TextArea;
-  return cloneElement(input, (istText ? { readOnly: true } : { disabled: true }) as Partial<P>);
+  const sperre = istText ? { readOnly: true } : { disabled: true };
+  return cloneElement(input, sperre as unknown as Partial<P>);
 }

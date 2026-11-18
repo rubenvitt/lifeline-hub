@@ -65,7 +65,7 @@
 
 ## 6. Frontend: Betreuungsstelle
 
-- [ ] 6.1 `einsatzKeys.betreuungsstelleStand` (live über `betreuung`) und
+- [x] 6.1 `einsatzKeys.betreuungsstelleStand` (live über `betreuung`) und
   `BetreuungsstelleDetailPage` nach D6:
   - verschwindet eine gesehene Stelle, Stand abfragen;
   - mit `storniert_at` letzten Stand gesperrt mit Banner zeigen;
