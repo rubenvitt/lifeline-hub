@@ -121,8 +121,12 @@ interface Props {
    * Einfrieren auf: das Ziel könnte sonst hinter dem Sammelbanner stehen.
    */
   sprungMarke?: number;
-  /** Die angemeldete Person — ihre eigenen Einträge werden nie zurückgehalten. */
-  eigeneBenutzerId?: number | null;
+  /**
+   * Die client_ids, die DIESES Gerät vergab (Warteschlange und Direktversand,
+   * `offline/useEtbErfassung.ts`): solche Einträge werden nie zurückgehalten. Das Konto zählt
+   * nicht — derselbe Benutzer auf einem anderen Gerät schreibt fremd (LLH-1833).
+   */
+  eigeneClientIds?: ReadonlySet<string>;
   /**
    * Steht die Seite am Ende (LLH-1149, `components/useFunkprotokollLauf.ts`)? Wer hochgerollt
    * hat, liest: dann hält die Zeitachse neue fremde Einträge zurück wie bei Fokus darin. Vorgabe
@@ -300,9 +304,9 @@ function hinweisZeile(teile: ReactNode[], luft: number): ReactNode {
  * ── LIVE-ZUFLUSS SPRINGT NICHT UNTER DEM CURSOR ─────────────────────────────────────
  *
  * Solange der Fokus in der Zeitachse liegt (Aktionsmenü, Verweis) oder die Seite nicht am Ende
- * steht (`amEnde`), ist die Menge der gesendeten Einträge eingefroren; NEUES fremder Erfasser
- * (s. `teileZufluss`) wird als Sammelbanner am unteren Rand gezählt und erst auf „anzeigen"
- * eingefügt — nachgeladene ältere und eigene Einträge stehen sofort, ein Sprung taut auf
+ * steht (`amEnde`), ist die Menge der gesendeten Einträge eingefroren; NEUES, das nicht auf
+ * diesem Gerät entstand (s. `teileZufluss`), wird als Sammelbanner am unteren Rand gezählt und erst auf „anzeigen"
+ * eingefügt — nachgeladene ältere und hier geschriebene Einträge stehen sofort, ein Sprung taut auf
  * (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5). Am Ende ohne Fokus steht unter der Lesestelle
  * nichts mehr: dort läuft die Seite neuen Einträgen nach. Das Banner liegt als Überlagerung über
  * der Liste, nicht in ihrem Fluss — sonst schöbe es genau die Zeilen weg, die es schützen soll.
@@ -316,7 +320,7 @@ export default function EtbZeitachse({
   buendeln = true,
   kopfKlebt = false,
   sprungMarke,
-  eigeneBenutzerId,
+  eigeneClientIds,
   amEnde = true,
   onZumEnde,
   onGezeigt,
@@ -402,8 +406,8 @@ export default function EtbZeitachse({
   );
   const index = useMemo(() => berichtigungsindex(eintraege), [eintraege]);
   const { sichtbar, zurueckgehalten } = useMemo(
-    () => teileZufluss(zeilen, gefroren, eigeneBenutzerId),
-    [zeilen, gefroren, eigeneBenutzerId],
+    () => teileZufluss(zeilen, gefroren, eigeneClientIds),
+    [zeilen, gefroren, eigeneClientIds],
   );
   // Funkprotokoll-Ordnung (LLH-1149): erst nach dem Zufluss gekehrt, damit Einfrieren und
   // Wassermarke weiter auf der Serverordnung rechnen (`funkprotokollFolge`).

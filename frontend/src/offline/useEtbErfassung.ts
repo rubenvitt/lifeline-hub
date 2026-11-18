@@ -50,6 +50,20 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
     scope: string;
     werte: AbgelehnterEintrag[];
   }>({ scope: scopeKey, werte: [] });
+  /*
+   * Die client_ids, die DIESES Gerät vergab (LLH-1833): selbst vergeben beim Erfassen oder aus der
+   * gerätweiten Warteschlange gelesen (ein anderer Tab hat eingereiht). Die Zeitachse lässt
+   * hochgerollt nur diese Einträge sofort durch; derselbe Benutzer auf einem anderen Gerät
+   * schreibt fremd. Die Menge wächst nur: ein gesendeter Eintrag verlässt die Warteschlange, bleibt
+   * aber der eigene. Kennungen sind zufällig, ein Wechsel von Einsatz oder Person stört nicht.
+   */
+  const [eigeneClientIds, setEigeneClientIds] = useState<ReadonlySet<string>>(() => new Set());
+  const merkeClientIds = useCallback((ids: readonly (string | null | undefined)[]) => {
+    setEigeneClientIds((vorher) => {
+      const neu = ids.filter((id): id is string => id != null && !vorher.has(id));
+      return neu.length === 0 ? vorher : new Set([...vorher, ...neu]);
+    });
+  }, []);
   const aktiverScope = useRef({ key: scopeKey, generation: 0 });
   if (aktiverScope.current.key !== scopeKey) {
     aktiverScope.current = {
@@ -77,9 +91,11 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       montiert.current &&
       aktiverScope.current.key === scopeKey &&
       aktiverScope.current.generation === generation
-    )
+    ) {
+      merkeClientIds(geladen.map((a) => a.eintrag.client_id));
       setAusstehendStand({ scope: scopeKey, werte: geladen });
-  }, [benutzerId, einsatzId, scopeKey]);
+    }
+  }, [benutzerId, einsatzId, scopeKey, merkeClientIds]);
 
   const ladeAbgelehnt = useCallback(async () => {
     const generation = aktiverScope.current.generation;
@@ -218,6 +234,8 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         client_id: eintrag.client_id ?? neueClientId(),
       };
       if (benutzerId == null) throw new Error('Nicht angemeldet');
+      // Vor dem Senden: die Live-Meldung des eigenen Eintrags kann vor der Antwort eintreffen.
+      merkeClientIds([mitId.client_id]);
       try {
         const angenommen: EtbEintragAnzeige | AntragAngenommen = await erfasseEtb(
           einsatzId,
@@ -245,7 +263,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         }
       }
     },
-    [benutzerId, einsatzId, qc, ladeAusstehend],
+    [benutzerId, einsatzId, qc, ladeAusstehend, merkeClientIds],
   );
 
   // Einen persistent abgelegten abgelehnten Eintrag bewusst verwerfen (Dismiss-UX).
@@ -264,5 +282,6 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
     flush,
     abgelehnt: abgelehntStand.scope === scopeKey ? abgelehntStand.werte : KEINE_ABGELEHNTEN,
     abgelehntVerwerfen,
+    eigeneClientIds,
   };
 }

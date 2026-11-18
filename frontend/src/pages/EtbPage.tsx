@@ -488,7 +488,7 @@ export default function EtbPage() {
   // Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht als `scroll-margin` an der
   // Zeitachse (`index.css`), nicht am Dokument.
   const erfassungRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ETB);
-  const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
+  const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen, eigeneClientIds } = useEtbErfassung(
     einsatzId,
     benutzer?.id,
   );
@@ -1264,7 +1264,7 @@ export default function EtbPage() {
               buendeln={filter.typ !== 'system'}
               kopfKlebt={kleben.klebt}
               sprungMarke={hervorhebung?.marke}
-              eigeneBenutzerId={benutzer?.id}
+              eigeneClientIds={eigeneClientIds}
               amEnde={amEnde}
               onZumEnde={zumEnde}
               onGezeigt={setGezeigt}
