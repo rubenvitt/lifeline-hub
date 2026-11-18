@@ -75,7 +75,7 @@
 
 ## 7. Ende zu Ende, Doku, Gate
 
-- [ ] 7.1 e2e (zwei Kontexte): A storniert eine Person, B hat ihr Detail mit einer Notiz in Arbeit
+- [x] 7.1 e2e (zwei Kontexte): A storniert eine Person, B hat ihr Detail mit einer Notiz in Arbeit
   offen. B zeigt binnen weniger Sekunden „Storniert von …“, der Notiztext steht noch, und es gibt
   keinen Knopf „Notiz anlegen“. Das Zugriffsprotokoll der Person hat danach genau den einen
   Eintrag vom Öffnen bei B.
