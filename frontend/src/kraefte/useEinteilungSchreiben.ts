@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { gibPersonalFrei, ordnePersonalZu } from '../api/einheiten';
 import { gibBesatzungFrei, ordneBesatzungZu } from '../api/einsatzFahrzeuge';
@@ -64,7 +64,11 @@ async function switchZuordnung(
  */
 export function useEinteilungSchreiben(einsatzId: number) {
   const qc = useQueryClient();
+  // Die Rückfrage braucht den App-Kontext; `useFeldKonflikt` liefert je Render eine neue Funktion,
+  // über die Ref bleibt der Schreibweg stabil (Muster `fernmeldewesen/useSkizzenAktionen.ts`).
   const konflikt = useFeldKonflikt();
+  const konfliktRef = useRef(konflikt);
+  konfliktRef.current = konflikt;
   return useMemo(() => {
     const syncCache = async (weitere: readonly (readonly unknown[])[]) => {
       for (const k of weitere) void qc.invalidateQueries({ queryKey: k });
@@ -114,7 +118,7 @@ export function useEinteilungSchreiben(einsatzId: number) {
        * (Eingabe bleibt offen) oder `VERWORFEN` (nichts gespeichert, der frische Stand im Cache).
        */
       angabe: (epId: number, felder: DispositionPatch, alt?: AngabeAltwert) =>
-        konflikt({
+        konfliktRef.current({
           etikett: alt?.etikett ?? 'Angabe',
           erwartet: alt?.erwartet,
           speichern: async (erwartet) => {
@@ -147,5 +151,5 @@ export function useEinteilungSchreiben(einsatzId: number) {
           leer: ausschnittLeer,
         }),
     };
-  }, [qc, einsatzId, konflikt]);
+  }, [qc, einsatzId]);
 }

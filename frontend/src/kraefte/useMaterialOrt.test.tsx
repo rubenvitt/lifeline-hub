@@ -178,4 +178,15 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
     await setOrt(posten({ einheit_id: 2 }), null);
     expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/10', body: { einheit_id: null } }]);
   });
+
+  it('`setOrt` bleibt über ein neues Rendern dieselbe Funktion', () => {
+    const client = new QueryClient();
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result, rerender } = renderHook(() => useMaterialOrt(1), { wrapper: Wrapper });
+    const vorher = result.current.setOrt;
+    rerender();
+    expect(result.current.setOrt).toBe(vorher);
+  });
 });

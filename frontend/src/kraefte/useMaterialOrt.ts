@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { ZuruecknahmeFilter } from '../api/einheiten';
 import { listEinsatzMaterial, teileAuf, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
@@ -20,7 +20,11 @@ import type { OrtPosten } from './materialOrtWahl';
  */
 export function useMaterialOrt(einsatzId: number) {
   const qc = useQueryClient();
+  // Die Rückfrage braucht den App-Kontext; `useFeldKonflikt` liefert je Render eine neue Funktion,
+  // über die Ref bleibt der Schreibweg stabil (Muster `fernmeldewesen/useSkizzenAktionen.ts`).
   const konflikt = useFeldKonflikt();
+  const konfliktRef = useRef(konflikt);
+  konfliktRef.current = konflikt;
   /** Die Einheit trägt ihr Material im DTO, UHS und Bereitstellungsraum im Detail. */
   const syncOrte = useCallback(
     async (orte: readonly (MaterialOrtRef | null)[]): Promise<void> => {
@@ -61,7 +65,7 @@ export function useMaterialOrt(einsatzId: number) {
       const patch = ortPatch(ziel, vorher);
       if (patch == null) return;
       const { beimOeffnen, ortText, nurWennFrei } = optionen ?? {};
-      const ergebnis = await konflikt({
+      const ergebnis = await konfliktRef.current({
         etikett: 'Ort',
         erwartet: beimOeffnen === undefined ? undefined : ortSpalten(beimOeffnen),
         speichern: async (erwartet) => {
@@ -91,7 +95,7 @@ export function useMaterialOrt(einsatzId: number) {
       await syncOrte([vorher, ziel]);
       return ergebnis;
     },
-    [einsatzId, syncOrte, konflikt, qc],
+    [einsatzId, syncOrte, qc],
   );
   /**
    * `menge` vom Posten abteilen und an `ziel` setzen, in EINEM Request (t1hvaqzu, design.md D1/D6):
