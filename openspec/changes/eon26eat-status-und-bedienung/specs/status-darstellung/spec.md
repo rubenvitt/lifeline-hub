@@ -2,12 +2,10 @@
 
 ### Requirement: Ein Zustand hat eine Form
 
-Jeder angezeigte Zustand eines Datensatzes (Status, Urteil wie „unterbesetzt“ oder „Soll
-erfüllt“, Lebenszyklus wie „storniert“ oder „entlassen“) SHALL in derselben Form erscheinen: eine
-getönte Fläche ohne Rahmen, mit Formzeichen und Wort in der Farbe seiner Statusrolle. Es MUST
-genau zwei Größen geben, eine für dichte Tabellen und Raster und eine für Kopf und Detail. Ein
-Zustand MUST NOT als farbiges Wort ohne Fläche, als umrandetes Etikett oder als rohes antd-`Tag`
-erscheinen. Die Sichtungskategorie bleibt als BBK-Feld davon ausgenommen.
+Jeder angezeigte Zustand eines Datensatzes (Status, Urteil, Lebenszyklus) SHALL als getönte
+Fläche ohne Rahmen erscheinen, mit Formzeichen und Wort in der Farbe seiner Statusrolle, in einer
+von genau zwei Größen. Er MUST NOT als farbiges Wort ohne Fläche oder als umrandetes Etikett
+erscheinen. Die Sichtungskategorie bleibt als BBK-Feld ausgenommen.
 
 #### Scenario: Derselbe FMS-Status an zwei Stellen
 - **WHEN** ein Fahrzeug auf S2 im Meldebild und in der Fahrzeugliste ohne Schreibrecht angezeigt
