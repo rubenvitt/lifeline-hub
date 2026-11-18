@@ -9,7 +9,9 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
-`check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
+`check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
+`swift test` in `ios/LifelineKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
+Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) als schneller lokaler
 Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
 - **Leichte PR-Prüfung** (LLH-1889/LLH-1896, ADR-0048; ersetzt die zwei Stufen von LLH-1662):
@@ -41,7 +43,7 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Gate-Skript (`check-all.sh`, `scripts/lib/`) oder den e2e-Unterbau (`frontend/e2e/*.ts` außer
     Specs), das betroffene Bündel ganz (`--nur rust|frontend|e2e`). Den Rest fängt „alpha rot“.
   - **Vor dem PR lokal:** `./scripts/check-all.sh --geaendert --ohne-e2e`. `scripts/bereiche.sh`
-    ordnet jede geänderte Datei den Suiten Rust, Frontend und e2e zu (**im Zweifel alles**; ein
+    ordnet jede geänderte Datei den Suiten Rust, Frontend, e2e und iOS zu (**im Zweifel alles**; ein
     Querbezug aus einem fremden Bereich braucht eine Regel dort, `bereiche.test.sh` sucht
     fehlende). `--auswahl` zeigt die Schritte nur an; ohne Argument läuft alles. Die CI wählt
     nicht mehr nach Bereichen.

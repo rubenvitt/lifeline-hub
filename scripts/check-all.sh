@@ -33,6 +33,8 @@ set -euo pipefail
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
+#   --nur ios        Swift-Kern der iOS-Hülle (`swift test`, LLH-1978); ohne Swift eine Lücke,
+#                    mit IOS_SWIFT_PFLICHT=1 (CI) rot
 #   --nur baut       nur kompilieren: Backend mit allen Zielen und Feature dev-seeds,
 #                    Frontend-Typprüfung (schneller lokaler Test, ob ein Stand übersetzt;
 #                    gehört nicht zum vollen Lauf, Schritt 3, 4, 15 bauen dasselbe mit Tests)
@@ -106,7 +108,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=17
+SCHRITTE=18
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -121,7 +123,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die siebzehn Schritte, je als Funktion ───────────────────────────────────────────
+# ── Die achtzehn Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -501,6 +503,26 @@ schritt_17() {
   $PNPM -C "$FE" typecheck
 }
 
+schritt_18() {
+  echo "==> [18/$SCHRITTE] Swift-Kern der iOS-Hülle gegen die gemeinsamen Fälle (LLH-1978)"
+  # `swift test` im Paket ios/LifelineKern: Adressprüfung, Deeplink und Linkregeln gegen
+  # src-tauri/faelle/ (dieselben Fälle prüft die Desktop-Hülle in Schritt 4), dazu Serverliste,
+  # Vertragsprüfung, Onboarding und Haptik. Läuft unter Linux; das App-Target baut nur der
+  # macOS-Lauf `ios-pruefung.yml`. Ohne Toolchain lokal eine Lücke, nie grün; die CI setzt
+  # IOS_SWIFT_PFLICHT=1, dort ist das Fehlen rot.
+  if ! command -v swift > /dev/null 2>&1; then
+    if [ "${IOS_SWIFT_PFLICHT:-0}" = 1 ]; then
+      echo "FEHLER: swift fehlt im PATH, IOS_SWIFT_PFLICHT=1 verlangt die Toolchain." >&2
+      return 1
+    fi
+    echo "    ÜBERSPRUNGEN: swift fehlt im PATH (Swift 6.1, https://www.swift.org/install/)." >&2
+    echo "    Die CI prüft den Swift-Kern mit IOS_SWIFT_PFLICHT=1." >&2
+    return "$UEBERSPRUNGEN_RC"
+  fi
+  cd "$ROOT/ios/LifelineKern"
+  swift test
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Suiten bekommen je einen eigenen Runner. Schritt 15 fährt
@@ -512,12 +534,13 @@ BUENDEL_e2e="7"
 # `baut` steht außerhalb von `alle` (Kopf, Bündel-Auswahl): Schritt 17 übersetzt nur, was 3, 4 und
 # 15 ohnehin übersetzen und testen.
 BUENDEL_baut="17"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16"
+BUENDEL_ios="18"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 18"
 
-# SELBSTPRÜFUNG: die vier Bündel ergeben zusammen genau die sechzehn Schritte von `alle`, jeden
+# SELBSTPRÜFUNG: die fünf Bündel ergeben zusammen genau die siebzehn Schritte von `alle`, jeden
 # einmal (`baut` zählt nicht mit) —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
-_summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e | sort -n | tr '\n' ' ')"
+_summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e $BUENDEL_ios | sort -n | tr '\n' ' ')"
 _soll="$(printf '%s\n' $BUENDEL_alle | sort -n | tr '\n' ' ')"
 if [ "$_summe" != "$_soll" ]; then
   echo "FEHLER: die Bündel decken nicht genau die Schritte von 'alle' ab." >&2
@@ -546,6 +569,7 @@ geaendert_auswahl() {
   lauf="$BUENDEL_schnell"
   case "$bereiche" in *rust=true*) lauf="$lauf $BUENDEL_rust" ;; esac
   case "$bereiche" in *frontend=true*) lauf="$lauf $BUENDEL_frontend" ;; esac
+  case "$bereiche" in *ios=true*) lauf="$lauf $BUENDEL_ios" ;; esac
   case "$bereiche" in
     *e2e=true*)
       lauf="$lauf $BUENDEL_e2e"
@@ -570,9 +594,10 @@ case "$NUR" in
   frontend) lauf="$BUENDEL_frontend" ;;
   e2e)      lauf="$BUENDEL_e2e" ;;
   baut)     lauf="$BUENDEL_baut" ;;
+  ios)      lauf="$BUENDEL_ios" ;;
   *)
     echo "FEHLER: unbekanntes Bündel '$NUR'." >&2
-    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e, baut" >&2
+    echo "        Erlaubt: alle (Vorgabe), schnell, rust, frontend, e2e, ios, baut" >&2
     exit 2
     ;;
 esac
