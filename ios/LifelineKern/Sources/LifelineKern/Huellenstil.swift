@@ -31,7 +31,8 @@ public enum Huellenstil {
 
 extension Testzustand {
     /// Seite des Testzustands `web`: lädt die App ohne Netz unter der Adresse des Beispielservers.
-    /// Lang genug zum Ziehen, mit Text für die lange Berührung und einem Eingabefeld.
+    /// Lang genug zum Ziehen, mit Text für die lange Berührung, einem Eingabefeld und einem Knopf,
+    /// der eine Rückfrage (`confirm`) auslöst (tasks.md 8.13).
     public static let beispielseite = """
         <!doctype html>
         <html lang="de"><head><meta charset="utf-8">
@@ -50,6 +51,9 @@ extension Testzustand {
         <p id="text">Lange Berührung auf diesem Text zeigt weder Lupe noch Textmenü.</p>
         <label>Eintrag <input id="eingabe" value="Eingaben bleiben auswählbar"></label>
         <p>Die Seite federt am Rand nicht nach und lädt beim Ziehen nicht neu.</p>
+        <button id="rueckfrage" onclick="document.getElementById('antwort').textContent = \
+        confirm('Eintrag wirklich löschen?') ? 'Bestätigt' : 'Abgelehnt'">Eintrag löschen</button>
+        <p id="antwort">Noch nicht gefragt</p>
         </main>
         </body></html>
         """
