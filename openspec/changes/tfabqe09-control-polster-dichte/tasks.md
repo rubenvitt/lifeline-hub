@@ -8,8 +8,8 @@
 
 ## 2. Prüfen
 
-- [ ] 2.1 Bilder in `kompakt` und `handschuh` von geöffneter Auswahlliste und Dropdown-Menü aufnehmen (Wegwerf-Spec im Bildlauf) und prüfen, dass `kompakt` unverändert ist und `handschuh` 24 px seitliches Polster zeigt
-- [ ] 2.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 2.1 Bilder in `kompakt` und `handschuh` von geöffneter Auswahlliste und Dropdown-Menü aufnehmen (Wegwerf-Spec im Bildlauf) und prüfen, dass `kompakt` unverändert ist und `handschuh` 24 px seitliches Polster zeigt
+- [x] 2.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
 
