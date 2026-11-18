@@ -1,6 +1,6 @@
 # iOS-Hülle (LLH-1978) — Regeln
 
-Gilt für `ios/`, zusätzlich zur `AGENTS.md` der Wurzel. Entscheidung: ADR-0066; Anforderungen in
+Gilt für `ios/`, zusätzlich zur `AGENTS.md` der Wurzel. Entscheidung: ADR-0067; Anforderungen in
 den Specs `ios-huelle`, `huellen-vertrag` und `ios-auslieferung`; Herleitung im `design.md` der
 Change `t39ltxxi-ios-huelle`.
 

@@ -94,7 +94,7 @@ Offline-Daten zweier Server; iOS-Sonderwege im Frontend, die nicht über die Ken
   keine eigene Versionsquelle.
 - `ITSAppUsesNonExemptEncryption = false`, `NSCameraUsageDescription` (QR-Code),
   `NSLocalNetworkUsageDescription` (`elw.local`), URL-Schema `lifeline`.
-- ADR-0066 „Die iOS-Hülle ist eine eigene Swift-App ohne Anwendungslogik, die die
+- ADR-0067 „Die iOS-Hülle ist eine eigene Swift-App ohne Anwendungslogik, die die
   Serveroberfläche lädt“ (eine ADR; der Vertrag steht in der Spec `huellen-vertrag`).
 
 ### D2 Onboarding und Serverliste (R, Form V)

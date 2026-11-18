@@ -56,7 +56,7 @@ Server-Versionen verträglich (Entscheidung Ruben, 18.11.2026, siehe `design.md`
 
 - **Neu:** `ios/` (Xcode-Projekt per XcodeGen, Swift-Paket `LifelineKern`, Init-Skript der
   Hülle), `src/routes/shell.rs`, `tests/shell.rs`, Workflows `ios-pruefung.yml` und
-  `ios.yml`, `ios/AGENTS.md`, ADR-0066, `docs/betrieb/ios-app.md`.
+  `ios.yml`, `ios/AGENTS.md`, ADR-0067, `docs/betrieb/ios-app.md`.
 - **Geändert:** `src/app.rs`, `src/routes/mod.rs`, `src/api_doc.rs` samt generierter Typen,
   `frontend/src/huelle/faehigkeiten.ts` und wenige Auslöser der Haptik,
   `frontend/src/pages/AppAnmeldungPage.tsx`, Texte des Zugangsprotokolls,

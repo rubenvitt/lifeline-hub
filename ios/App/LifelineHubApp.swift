@@ -3,7 +3,7 @@ import SwiftUI
 import UserNotifications
 
 /// Einstieg der iOS-Hülle (LLH-1978). Die Hülle lädt die Weboberfläche des gewählten Servers und
-/// trägt keine Anwendungslogik (ADR-0066, ios/AGENTS.md). Welche Seite sie zeigt, entscheidet die
+/// trägt keine Anwendungslogik (ADR-0067, ios/AGENTS.md). Welche Seite sie zeigt, entscheidet die
 /// Zustandsfunktion `Ablauf` des Kerns; `AppModell` führt deren Wirkungen aus.
 @main
 struct LifelineHubApp: App {

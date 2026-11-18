@@ -1,5 +1,5 @@
 ---
-id: ADR-0066
+id: ADR-0067
 titel: Die iOS-Hülle ist eine eigene Swift-App ohne Anwendungslogik, die die Serveroberfläche lädt
 status: akzeptiert
 datum: 2026-11-18
@@ -10,7 +10,7 @@ herleitung:
   - Zunder LLH-1978 (Brainstorming mit Ruben am 18.11.2026)
 ---
 
-# ADR-0066: Die iOS-Hülle ist eine eigene Swift-App ohne Anwendungslogik, die die Serveroberfläche lädt
+# ADR-0067: Die iOS-Hülle ist eine eigene Swift-App ohne Anwendungslogik, die die Serveroberfläche lädt
 
 ## Regeln
 

@@ -7,7 +7,7 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 ## 1. Vorarbeit Regeln
 
 - [x] 1.1 Abschnitte „Backend — Migrationsvergabe“ und „Backend — Tabellenumbau und `-- no-transaction`“ aus der Wurzel-`AGENTS.md` nach `migrations/AGENTS.md` verschieben (Verweis in `src/AGENTS.md`) (eigener `refactor`-Commit), Verweise per `git grep` nachziehen; belegt durch `wc -l AGENTS.md` < 190 und grünes `scripts/check-all.sh --nur schnell`
-- [x] 1.2 Freie ADR-Nummer gegen offene PRs prüfen und für ADR-0066 vormerken; belegt durch den Befund im Kommentar an LLH-1978
+- [x] 1.2 Freie ADR-Nummer gegen offene PRs prüfen und für ADR-0067 vormerken; belegt durch den Befund im Kommentar an LLH-1978
 
 ## 2. Server-Vertrag `GET /api/shell`
 
@@ -59,7 +59,7 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## 8. iOS-App
 
-- [ ] 8.1 `ios/project.yml` (XcodeGen), App-Target ab iOS 17.4, iPhone und iPad, Bundle-ID `dev.rubeen.lifeline.ios`, Info.plist-Schlüssel (`LifelineVersion`, `ITSAppUsesNonExemptEncryption`, Kamera, lokales Netz, Schema `lifeline`); `ios/AGENTS.md` angelegt und in der Wurzel-Tabelle; ADR-0066 im selben Commit; `ios-pruefung.yml` grün
+- [ ] 8.1 `ios/project.yml` (XcodeGen), App-Target ab iOS 17.4, iPhone und iPad, Bundle-ID `dev.rubeen.lifeline.ios`, Info.plist-Schlüssel (`LifelineVersion`, `ITSAppUsesNonExemptEncryption`, Kamera, lokales Netz, Schema `lifeline`); `ios/AGENTS.md` angelegt und in der Wurzel-Tabelle; ADR-0067 im selben Commit; `ios-pruefung.yml` grün
 - [x] 8.2 Versionsskript unter `scripts/` schreibt Marketing-Version, `LifelineVersion` und Build-Nummer (Zeitstempel) aus `[workspace.package]`; Selbsttest für Alpha-, Beta- und stabile Version grün
 - [ ] 8.3 App-Symbol aus der Bildmarke (1024 px, Kopf-Schwarz) und Startbildschirm; Simulator-Bild im Artefakt
 - [ ] 8.4 Webview-Host: Datenspeicher je Server, Init-Skript aus 4.1, Brücke nur Hauptframe und Origin des aktiven Servers (Test mit fremder Origin und nach Serverwechsel, Mutationsprobe)
