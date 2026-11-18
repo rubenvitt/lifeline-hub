@@ -19,11 +19,10 @@ Einsatztagebuch und ohne Anlagen.
 
 ## Abläufe
 
-### Einsatzbericht drucken
+### Den Einsatzbericht drucken
 
-1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht drucken“ wählen (am Handy unter
-   „Weitere“). Die Seite
-   „Einsatzbericht – Druckansicht“ öffnet sich.
+1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht – Druckansicht“ wählen (am Handy
+   unter „Weitere“). Die Druckansicht des Einsatzberichts öffnet sich.
 2. Unter „Blöcke“ abwählen, was nicht in den Bericht soll, und bei Bedarf eine der Anlagen
    dazunehmen.
 

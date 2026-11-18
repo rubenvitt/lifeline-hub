@@ -123,7 +123,8 @@ Für Einsatzleitung und Führungspersonal:
 
 2. Mit „Alle aufklappen“ und „Alle zuklappen“ die Tiefe wählen; ein Name führt zu seinem
    Datensatz.
-3. „Drucken / als PDF“ druckt das Organigramm. „In Lagebericht übernehmen“ legt einen
+3. „Drucken / als PDF“ im Kopf der Seite druckt das Organigramm, ganz aufgeklappt; auf schmalen
+   Bildschirmen steht es unter „Weitere“. „In Lagebericht übernehmen“ legt einen
    Lagebericht „Führungsorganisation …“ mit dem heutigen Stand an und öffnet ihn.
 
 ## Hintergrund

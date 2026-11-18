@@ -36,7 +36,8 @@ Einsatzleitung und Führungspersonal.
 
 ### Den Funkplan weitergeben
 
-1. Im Funkplan „Drucken / als PDF“ wählen, um ihn zu drucken.
+1. Im Funkplan im Kopf der Seite „Drucken / als PDF“ wählen, um ihn zu drucken; auf schmalen
+   Bildschirmen steht der Punkt unter „Weitere“.
 2. „In Lagebericht übernehmen“ legt einen Lagebericht „Funkplan …“ mit dem heutigen Stand an.
 3. „In Befehl übernehmen“ legt einen Befehl an, in dem der Funkplan unter „Führung und
    Kommunikation“ steht.

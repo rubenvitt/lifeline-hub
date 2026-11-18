@@ -143,7 +143,7 @@ vermisst → aktiv (aufgefunden)“, der Verbleib als Handlung („Tier T-… (H
 
 ### Druck und Export
 
-„Drucken / als PDF“ druckt die Liste in der gewählten Sicht und mit den Spezies aus dem Filter, „CSV exportieren“ gibt
+„Druckansicht“ öffnet die Liste in der gewählten Sicht und mit den Spezies aus dem Filter zum Drucken, „CSV exportieren“ gibt
 alle nicht stornierten Tiere als Tabelle aus.
 
 ### Rechte

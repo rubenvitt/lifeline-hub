@@ -104,11 +104,12 @@ Abgemeldete Personen tragen den Verbleib „entlassen“ und stehen nicht mehr i
 Personen „Ohne Haushalt“ lassen sich so einem Haushalt zuordnen. Dieselben Aktionen stehen auf der
 Seite der Person neben „Haushalt H-n“, ohne Haushalt dort nur „Haushalt ändern“.
 
-### Registrierliste drucken
+### Die Registrierliste drucken
 
 Für Stromausfall, Schichtübergabe und Essensausgabe gibt es die Registrierliste auf Papier.
 
-1. Unter „Registrierung“ „Registrierliste drucken“ wählen. Das geht auch ohne Schreibrecht und an
+1. Im Kopf von „Registrierung“ „Registrierliste – Druckansicht“ wählen (auf schmalen Bildschirmen
+   unter „Weitere“). Das geht auch ohne Schreibrecht und an
    einer geschlossenen Stelle.
 2. Die Druckansicht zeigt oben die Summen je Kostform mit „ohne Angabe“ und „gesamt“, darunter
    je Haushalt („H-1 · Bezugsperson · Zahl der Personen“) die hier registrierten Personen mit

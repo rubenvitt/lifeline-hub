@@ -1009,7 +1009,8 @@ anwendbar), „nicht geprüft" ist keins.
   melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht und
   Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
   `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
-  Kräfteübersicht, Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
+  Wortlaut und Platz jedes Druckeinstiegs: `src/druck/AGENTS.md`, „Wortlaut und Platz der
+  Druckeinstiege“ (LLH-1836).
   Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt

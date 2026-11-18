@@ -82,7 +82,8 @@ Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschir
    „Material“ mit Posten und Ausfall, Untereinheiten. Ohne Eingrenzung folgen darunter
    „Entlassen“ mit den entlassenen Personen und Fahrzeugen und „Aus dem Einsatz genommen“ mit dem
    herausgenommenen Material, jeder Eintrag mit Datum-Zeit-Gruppe.
-3. Für Papier „Drucken / als PDF“ wählen. Der Druck klappt den ganzen Baum auf und nennt im Kopf
+3. Für Papier im Kopf der Seite „Drucken / als PDF“ wählen (auf schmalen Bildschirmen unter
+   „Weitere“). Der Druck klappt den ganzen Baum auf und nennt im Kopf
    Stand, Umfang und die gewählte Auswahl.
 
 „In Lagebericht übernehmen“ steht nur Einsatzleitung und Führungspersonal zur Verfügung.

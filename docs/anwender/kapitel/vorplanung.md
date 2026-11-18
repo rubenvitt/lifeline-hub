@@ -89,13 +89,14 @@ Planung hat höchstens 50 Programmpunkte.
 
 ### Eine Planung drucken oder als Excel ausgeben
 
-1. Im Reiter „Plan“ „Drucken“ wählen. Die Druckansicht der Planung öffnet sich.
+1. Im Reiter „Plan“ oben im Kopf der Seite „Druckansicht“ wählen. Die Druckansicht der Planung
+   öffnet sich.
 2. Unter „Blätter“ „Je Posten“ für einen Aushang je Posten oder „Je Person“ für einen
    Schichtzettel je Person wählen, unter „Blatt“ einen einzelnen Posten oder eine Person, oder
    alle Blätter lassen.
 3. „Drucken / als PDF“ wählen. Jedes Blatt beginnt auf einer neuen Seite; der Druckkopf nennt
    die Planung.
-4. Für die Excel-Mappe im Reiter „Plan“ „Excel“ wählen. Die Datei heißt etwa
+4. Für die Excel-Mappe im Reiter „Plan“ oben „Excel“ wählen. Die Datei heißt etwa
    `schichtplan-stadtfest-2027-06-26.xlsx`, nach der Planung und dem Tag des Abrufs.
 
 Die Druckansicht ist ein fester Stand: Änderungen an der Planung holt „Neu laden“. „Zurück zur
