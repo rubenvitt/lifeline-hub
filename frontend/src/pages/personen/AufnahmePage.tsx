@@ -211,11 +211,16 @@ export default function AufnahmePage() {
           // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
           // Kommt die Antwort erst nach dem Einsatzwechsel, gilt sie hier als abgelehnt: sonst
           // leerte die Serie die Felder des neuen Einsatzes, und der Rückweg führte in den alten
-          // (LFH-1138). Ihre Quittung bleibt am alten Einsatz.
+          // (LFH-1138). Ihre Quittung bleibt am alten Einsatz. Das Ergebnis geht zurück: an ihm
+          // erkennt die Hülle „nur vorgemerkt“ und gibt `tap` statt `success` (Spec `huellen-vertrag`).
           onErfassen={async (werte) => {
             const ziel = einsatzId;
-            await anlegenMutation.mutateAsync({ einsatzId: ziel, daten: aufnahmeZuEingabe(werte) });
+            const ergebnis = await anlegenMutation.mutateAsync({
+              einsatzId: ziel,
+              daten: aufnahmeZuEingabe(werte),
+            });
             if (einsatzRef.current !== ziel) throw new Error('Einsatz gewechselt');
+            return ergebnis;
           }}
           // Erst die Post-Acceptance-Stufe darf den Sitzungswert ändern: ein Abbruch während des
           // POST besteht die Generation davor nicht.
