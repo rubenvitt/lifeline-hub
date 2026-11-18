@@ -19,8 +19,8 @@
 
 ## 4. Regeln und Abschluss
 
-- [ ] 4.1 `frontend/AGENTS.md` nachziehen (Hinweis-Kreuz am Kontext, Breitenboden der Brotkrume, Sortierauswahl ohne Kreuz) und Prettier über `frontend/` grün
-- [ ] 4.2 Design-System-Wächter prüfen; verlangt er es, `mise exec -- pnpm -C frontend design-system` laufen lassen und das Erzeugte mitcommitten
+- [x] 4.1 `frontend/AGENTS.md` nachziehen (Hinweis-Kreuz am Kontext, Breitenboden der Brotkrume, Sortierauswahl ohne Kreuz) und Prettier über `frontend/` grün
+- [x] 4.2 Design-System-Wächter prüfen; verlangt er es, `mise exec -- pnpm -C frontend design-system` laufen lassen und das Erzeugte mitcommitten
 - [ ] 4.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
 ## Workflow follow-up
