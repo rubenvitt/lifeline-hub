@@ -11,7 +11,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { vorlage as befehlVorlage } from '../befehle/vorlagen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
-import Druckkopf from '../components/druck/Druckkopf';
+import Druckkopf, { druckEinsatzName } from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import Bloecke from '../druck/einsatzbericht/Bloecke';
@@ -196,6 +196,7 @@ export default function EinsatzakteDruckPage() {
               <Vermerk text="keine Einträge" />
             ) : (
               <EtbDruckTabelle
+                laufzeile={`Einsatztagebuch · ${druckEinsatzName(einsatzStand)} · Stand ${zeitpunkt(roh.geladenAt)}`}
                 eintraege={roh.etb.daten.eintraege}
                 berichtigungen={roh.etb.daten.berichtigungen}
                 konventionen={konventionen}
