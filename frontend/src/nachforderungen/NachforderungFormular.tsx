@@ -1,4 +1,15 @@
-import { AutoComplete, Button, Col, Collapse, Form, Input, Row, Space, Typography } from 'antd';
+import {
+  AutoComplete,
+  Button,
+  Col,
+  Collapse,
+  Form,
+  Input,
+  Row,
+  Space,
+  Typography,
+  theme,
+} from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import type dayjs from 'dayjs';
 import {
@@ -202,6 +213,7 @@ export default function NachforderungFormular({
   /** Einsatzabschnitte für „Wohin“; leer ohne Freigabe des Moduls. */
   abschnitte?: readonly ZielAbschnitt[];
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const { zeitKurz } = useAnzeigeKonventionen();
   const [weitereOffen, setWeitereOffen] = useState(false);
@@ -365,7 +377,7 @@ export default function NachforderungFormular({
       {bezug && (
         // Der Bezug ist keine Eingabe: er steht fest, solange die Erfassung offen ist. Der Name ist
         // der Weg zurück auf die Stelle.
-        <Typography.Paragraph data-lfh="nachforderung-bezug" style={{ marginBottom: 12 }}>
+        <Typography.Paragraph data-lfh="nachforderung-bezug" style={{ marginBottom: token.margin }}>
           {bezug.name ? (
             <>
               Für Betreuungsstelle{' '}
@@ -384,7 +396,7 @@ export default function NachforderungFormular({
       )}
       {personBezug && (
         // Wie der Stellenbezug: keine Eingabe, und die Nummer ist der Weg zurück zur Person.
-        <Typography.Paragraph data-lfh="nachforderung-bezug" style={{ marginBottom: 12 }}>
+        <Typography.Paragraph data-lfh="nachforderung-bezug" style={{ marginBottom: token.margin }}>
           {personBezug.registrierNr != null ? (
             <>
               Für{' '}
@@ -410,14 +422,14 @@ export default function NachforderungFormular({
           )}
         </Typography.Paragraph>
       )}
-      <Space role="group" aria-label="Schnellwahl" wrap style={{ marginBottom: 16 }}>
+      <Space role="group" aria-label="Schnellwahl" wrap style={{ marginBottom: token.marginLG }}>
         {schnellwahl.map((art) => (
           <Button key={art} icon={<IconPlus />} onClick={() => waehle(art)}>
             {art}
           </Button>
         ))}
       </Space>
-      <Row gutter={16}>
+      <Row gutter={token.marginLG}>
         <Col xs={24} sm={10}>
           <Form.Item
             name="art"
@@ -459,7 +471,7 @@ export default function NachforderungFormular({
           Prüfung die Felder auch zugeklappt erreichen. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         activeKey={weitereOffen ? ['weitere'] : []}
         onChange={(k) => setWeitereOffen(k.includes('weitere'))}
         items={[
@@ -472,7 +484,7 @@ export default function NachforderungFormular({
                 <Form.Item name="bezeichnung" label="Details / Zweck">
                   <Input aria-label="Details / Zweck" maxLength={NACHFORDERUNG_BEZEICHNUNG_MAX} />
                 </Form.Item>
-                <Row gutter={16}>
+                <Row gutter={token.marginLG}>
                   <Col xs={24} sm={12}>
                     <Form.Item name="adressatKategorie" label="Adressat">
                       <Select<AdressatKategorie>
@@ -494,7 +506,7 @@ export default function NachforderungFormular({
                     </Form.Item>
                   </Col>
                 </Row>
-                <Row gutter={16}>
+                <Row gutter={token.marginLG}>
                   <Col xs={24} sm={12}>
                     <Form.Item name="prioritaet" label="Priorität">
                       <Select<NachforderungPrioritaet>

@@ -677,7 +677,7 @@ export default function EintreffenDialog({
               key: KLAPP_BEMERKUNG,
               forceRender: true,
               label: (
-                <Space size={4} wrap>
+                <Space size={token.marginXS} wrap>
                   <span>Bemerkung</span>
                   {bemerkung?.trim() && (
                     <Typography.Text type="secondary">· {kurz(bemerkung.trim())}</Typography.Text>
@@ -701,7 +701,7 @@ export default function EintreffenDialog({
               key: KLAPP_WEITERE,
               forceRender: true,
               label: (
-                <Space size={4} wrap>
+                <Space size={token.marginXS} wrap>
                   <span>Weiteres Fahrzeug</span>
                   {weitereNamen.length > 0 && (
                     <Typography.Text type="secondary">· {weitereNamen.join(', ')}</Typography.Text>

@@ -58,9 +58,16 @@ export default function MatrixPaneel({
     <DashboardPaneel {...basis}>
       <div
         className={MATRIX_KLASSE.wurzel}
-        style={{ padding: token.padding, display: 'flex', flexDirection: 'column', gap: 10 }}
+        style={{
+          padding: token.padding,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: token.margin,
+        }}
       >
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
+        <ul
+          style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: token.margin }}
+        >
           {zeilen.map((z) => (
             <li
               key={z.schluessel}
@@ -123,7 +130,7 @@ export default function MatrixPaneel({
           className={`${MATRIX_KLASSE.zeile} ${MATRIX_KLASSE.legende}`}
           style={{
             gap: token.paddingSM,
-            paddingTop: 6,
+            paddingTop: token.paddingSM,
             borderTop: `1px solid ${rollen.linie}`,
           }}
         >

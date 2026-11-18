@@ -452,7 +452,7 @@ export default function EinsatzkraftPage() {
   const einheitGesperrt = istSprungGesperrt('einheiten', freigaben);
 
   const titel: ReactNode = (
-    <Space size={8} wrap>
+    <Space size={token.marginSM} wrap>
       {ep.name}
       {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
       {ep.ist_demo && <DemoMarke />}

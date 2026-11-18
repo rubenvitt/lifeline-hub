@@ -38,7 +38,7 @@ import {
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
 import SchichtplanAnsicht from '../abloesung/schichtplan/SchichtplanAnsicht';
-import SchichtplanAusgabeKnoepfe from '../abloesung/schichtplan/ausgabe/SchichtplanAusgabeKnoepfe';
+import { useSchichtplanAusgabe } from '../abloesung/schichtplan/ausgabe/useSchichtplanAusgabe';
 import SchichtplanEinlesen from '../abloesung/schichtplan/SchichtplanEinlesen';
 import {
   AbloeserDialog,
@@ -743,6 +743,13 @@ export default function AbloesungPage() {
     },
   });
 
+  // Ausgabewege des Schichtplans im Seitenkopf, solange die Ansicht Schichtplan steht (LLH-1836).
+  const ausgabe = useSchichtplanAusgabe({
+    einsatzId,
+    einsatzBezeichnung: () => einsatzQuery.data?.bezeichnung ?? '',
+    personalFrei: freigabeVon('personal', freigabenQuery.data),
+  });
+
   if (einsatzQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
@@ -816,6 +823,11 @@ export default function AbloesungPage() {
       titel="Ablösung"
       meta={`${laufende.length} laufend · ${faellig} fällig${ohneZahl ? ` · ${ohneZahl} ohne Schicht` : ''}`}
       dataUpdatedAt={laufendQuery.dataUpdatedAt}
+      weitere={
+        wirksam === 'plan'
+          ? { name: 'Weitere Aktionen zum Schichtplan', eintraege: ausgabe.nebenwege }
+          : undefined
+      }
       breadcrumb={
         <Breadcrumb
           items={[
@@ -970,11 +982,8 @@ export default function AbloesungPage() {
           werkzeuge={
             <>
               {darfSchreiben && personalFrei ? <SchichtplanEinlesen einsatzId={einsatzId} /> : null}
-              <SchichtplanAusgabeKnoepfe
-                einsatzId={einsatzId}
-                einsatzBezeichnung={einsatz.bezeichnung}
-                personalFrei={freigabeVon('personal', freigabenQuery.data)}
-              />
+              {/* „Druckansicht“ und „Excel“ stehen im Seitenkopf (LLH-1836); ihr Fehler hier. */}
+              {ausgabe.fehler != null && <div style={{ flexBasis: '100%' }}>{ausgabe.fehler}</div>}
             </>
           }
         />

@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, Space, Spin, Typography } from 'antd';
+import { Alert, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
 import { useRef, useState } from 'react';
 import { koppeln } from '../api/geraete';
 import { ApiError, fehlerText } from '../api/client';
@@ -37,6 +37,7 @@ function codeAusFragment(): string {
 }
 
 export default function KoppelnPage({ navigiere = (a) => window.location.assign(a) }: Props) {
+  const { token } = theme.useToken();
   const { benutzer, geraet, laedt, logout } = useAuth();
   const [form] = Form.useForm<{ code: string }>();
   // Einmal beim ersten Rendern lesen; danach steht der Code nur noch im Feld.
@@ -86,11 +87,13 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
           <Alert
             type="info"
             showIcon
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: token.marginLG }}
             title={`Gekoppelt als ${geraet.bezeichnung}. Ein neuer Code ersetzt die Kopplung.`}
           />
         )}
-        {fehler && <Alert type="error" showIcon title={fehler} style={{ marginBottom: 16 }} />}
+        {fehler && (
+          <Alert type="error" showIcon title={fehler} style={{ marginBottom: token.marginLG }} />
+        )}
         <Form
           form={form}
           layout="vertical"

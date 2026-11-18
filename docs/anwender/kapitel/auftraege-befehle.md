@@ -127,7 +127,8 @@ sich aus ihr wieder ein Auftrag erteilen (siehe [Meldungen](meldungen.md)).
 
 ### Einen Auftrag drucken
 
-1. Den Auftrag wählen und im Auftrag unten „Druckansicht“ wählen. Die Druckansicht zeigt den
+1. Den Auftrag wählen und im Kopf des Auftrags „Druckansicht“ wählen; auf schmalen Bildschirmen
+   steht der Punkt unter dem Menü „Weitere“ des Auftrags. Die Druckansicht zeigt den
    Druckkopf und darunter das Blatt mit den Teilen „Auftrag“, „Quittung“ und „Bearbeitung“.
 2. „Drucken / als PDF“ wählen und im Druckdialog des Browsers drucken oder als PDF speichern.
 3. „Zurück zu Aufträge/Befehle“ führt zur Liste zurück; der Auftrag ist dann gewählt.

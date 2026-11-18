@@ -1,4 +1,4 @@
-import { Button, Flex, Popconfirm, Space, Typography } from 'antd';
+import { Button, Flex, Popconfirm, Space, Typography, theme } from 'antd';
 import { useMemo } from 'react';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -75,6 +75,7 @@ export default function EmpfaengerQuittung({
   error,
   stand,
 }: EmpfaengerQuittungProps) {
+  const { token } = theme.useToken();
   // Der Statuschip zeigt nur QUITTIERTE Empfänger; offene stehen in der Zeile „Quittung offen:".
   // Die Zeile hängt NICHT am Schreibrecht, nur ihr Knopf — sonst verlöre ein Beobachter den Namen
   // des offenen Empfängers.
@@ -100,12 +101,12 @@ export default function EmpfaengerQuittung({
 
   return (
     <>
-      <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
+      <Flex align="center" gap={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
         <Quittungsstand
           anzahl={stand?.anzahl ?? zeilen.length}
           quittiert={stand?.quittiert ?? zeilen.filter((e) => e.quittiertAt).length}
         />
-        <Space size={4} wrap>
+        <Space size={token.marginXS} wrap>
           {sichtbareQuittierte.map((e) => (
             <StatusChip key={e.id} ton="normal" wort={`${e.name} ✓`} />
           ))}
@@ -122,7 +123,7 @@ export default function EmpfaengerQuittung({
          reinen Statuszustand, die Bedienbarkeit hinge sonst allein an der Farbe. Wer für WEN
          quittiert, steht im zugänglichen Namen. */}
       {offene.length > 0 && (
-        <Flex align="center" gap={8} wrap style={{ marginBottom: 8 }}>
+        <Flex align="center" gap={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
           <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
             {offenLabel}
           </Text>
@@ -138,7 +139,7 @@ export default function EmpfaengerQuittung({
               </Button>
             );
             return (
-              <Space key={e.id} size={4}>
+              <Space key={e.id} size={token.marginXS}>
                 <Text style={{ fontSize: 13 }}>{e.name}</Text>
                 {canQuittieren &&
                   (canQuittierenFor?.(e.id) ?? true) &&
@@ -164,7 +165,7 @@ export default function EmpfaengerQuittung({
          „Rückwege und Fehler“). Außerhalb der Zeile, weil sie fehlt, sobald alle quittiert sind:
          gerade „bereits quittiert“ bliebe sonst ungesagt. */}
       {error && (
-        <div style={{ marginBottom: 8 }}>
+        <div style={{ marginBottom: token.marginSM }}>
           <ZeilenFehler fehler={error.fehler} fallback={error.fallback} />
         </div>
       )}

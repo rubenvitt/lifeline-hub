@@ -1,4 +1,4 @@
-import { Col, Collapse, Form, Input, Row, type FormInstance } from 'antd';
+import { Col, Collapse, Form, Input, Row, theme, type FormInstance } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
@@ -201,8 +201,9 @@ function SchemaRow({
   rechts: SchemaFeld;
   einsatzId?: number;
 }) {
+  const { token } = theme.useToken();
   return (
-    <Row gutter={16}>
+    <Row gutter={token.margin}>
       <Col xs={24} sm={12}>
         <SchemaFeldInput feld={links} einsatzId={einsatzId} />
       </Col>
@@ -283,6 +284,7 @@ export default function AuftragFormular({
     onSpeichern: (patch: AuftragPatch) => Promise<unknown>;
   };
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   // Richtung steuert die Sichtbarkeit der externen Adressat-Felder.
   const richtung = Form.useWatch('richtung', form);
@@ -369,7 +371,7 @@ export default function AuftragFormular({
     <>
       <SchemaRow links="lage" rechts="absicht" />
       <SchemaRow links="verbindung" rechts="sicherheit" />
-      <Row gutter={16}>
+      <Row gutter={token.margin}>
         <Col xs={24} sm={12}>
           <Form.Item name="richtung" label="Richtung">
             <Select<Richtung>
@@ -395,7 +397,7 @@ export default function AuftragFormular({
         </Col>
       </Row>
       {richtung === 'extern' && (
-        <Row gutter={16}>
+        <Row gutter={token.margin}>
           <Col xs={24} sm={12}>
             <Form.Item name="externKategorie" label="Externe Stelle">
               <Select<AdressatKategorie>
@@ -502,7 +504,7 @@ export default function AuftragFormular({
       >
         <TextArea aria-label="Auftrag / Was" rows={2} count={zeichenGrenze(AUFTRAG_TEXT_MAX)} />
       </Form.Item>
-      <Row gutter={16}>
+      <Row gutter={token.margin}>
         <Col xs={24} sm={12}>
           <Form.Item name="prioritaet" label="Priorität">
             <Select<AuftragPrioritaet>
@@ -523,7 +525,7 @@ export default function AuftragFormular({
       </Row>
       <Collapse
         ghost
-        style={{ marginInline: -8, marginBottom: 8 }}
+        style={{ marginInline: -token.paddingSM, marginBottom: token.marginSM }}
         activeKey={openKlappteile}
         onChange={(k) => setOpenKlappteile((Array.isArray(k) ? k : [k]) as Klappteil[])}
         items={[

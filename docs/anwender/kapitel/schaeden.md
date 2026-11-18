@@ -148,7 +148,7 @@ ausgeblendet sind, merkt sich das Gerät.
 
 ### Druck und Export
 
-„Drucken / als PDF“ druckt die Liste in der gewählten Sicht, „CSV exportieren“ gibt alle nicht
+„Druckansicht“ öffnet die Liste in der gewählten Sicht zum Drucken, „CSV exportieren“ gibt alle nicht
 stornierten Schäden als Tabelle aus, ohne Angaben zu Geschädigten. Beide nennen Gefahr und
 Schadensgrad in Worten.
 

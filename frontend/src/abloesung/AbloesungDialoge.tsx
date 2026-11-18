@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { Checkbox, Collapse, Form, Input, Typography, type FormInstance } from 'antd';
+import { Checkbox, Collapse, Form, Input, Typography, theme, type FormInstance } from 'antd';
 import { SegmentFeld } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
@@ -253,6 +253,7 @@ function useVorlageVorbelegung(
 /** Die Vorlage als Zeilen „Kommt: …“, „Bleibt: …“, „Geht: …“ (dazu „Fehlt: …“), einzeilig. */
 function VorlageZeilen({ vorlage }: { vorlage: AbloesungPlanVorlage }) {
   const { konventionen } = useAnzeigeKonventionen();
+  const { token } = theme.useToken();
   return (
     <div data-lfh="vollzug-plan-vorlage">
       <Typography.Paragraph type="secondary" data-lfh="vollzug-plan-wechsel">
@@ -264,7 +265,7 @@ function VorlageZeilen({ vorlage }: { vorlage: AbloesungPlanVorlage }) {
           data-lfh={`vollzug-plan-${z.wort.toLowerCase()}`}
           ellipsis={{ rows: 1, tooltip: false }}
           title={`${z.wort}: ${z.text}`}
-          style={{ marginBottom: 4 }}
+          style={{ marginBottom: token.marginXS }}
         >
           {z.wort}: {z.text}
         </Typography.Paragraph>
@@ -358,6 +359,7 @@ function BesatzungFelder({
   verteilung,
   pflicht,
 }: BesatzungFelderProps) {
+  const { token } = theme.useToken();
   const ids = (Form.useWatch('besatzung_ids', form) as number[] | undefined) ?? [];
   const werte = Form.useWatch('verteilung', form) as Verteilung | undefined;
   const name = new Map(personen.map((p) => [p.value, p.name]));
@@ -403,8 +405,8 @@ function BesatzungFelder({
               children: ids.map((id) => {
                 const person = name.get(id) ?? String(id);
                 return (
-                  <Form.Item key={id} label={person} style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                  <Form.Item key={id} label={person} style={{ marginBottom: token.marginSM }}>
+                    <div style={{ display: 'flex', gap: token.marginSM }}>
                       {verteilung.einheiten.length > 1 && (
                         <Form.Item name={['verteilung', String(id), 'einheit_id']} noStyle>
                           <Select

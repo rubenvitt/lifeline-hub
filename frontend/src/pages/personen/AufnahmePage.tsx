@@ -1,4 +1,4 @@
-import { Alert, Breadcrumb, Form } from 'antd';
+import { Alert, Breadcrumb, Form, theme } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -45,6 +45,7 @@ import { modulName } from '../../einsatz/modulRegistry';
  */
 export default function AufnahmePage() {
   const { id } = useParams();
+  const { token } = theme.useToken();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const navigate = useNavigate();
@@ -192,7 +193,12 @@ export default function AufnahmePage() {
     >
       {quittung?.einsatzId === einsatzId && (
         // Stehende Quittung statt Toast: an ihr wird die Registriernummer abgelesen.
-        <Alert style={{ marginBottom: 16 }} type="success" showIcon title={quittung.text} />
+        <Alert
+          style={{ marginBottom: token.marginLG }}
+          type="success"
+          showIcon
+          title={quittung.text}
+        />
       )}
 
       {darfSchreiben && (

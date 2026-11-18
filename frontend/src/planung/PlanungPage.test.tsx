@@ -352,6 +352,17 @@ describe('PlanungPage (LLH-1586)', () => {
     expect(bloecke[0]).toHaveAccessibleName(/UHS Bühne .*Bea Helfer, 1 offen/);
   });
 
+  it('Handy: „Druckansicht“ steht im Menü der Planung, kein zweiter Auslöser (LLH-1836)', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const ausloeser = await screen.findByRole('button', { name: 'Aktionen zu Stadtfest' });
+    expect(screen.queryByRole('link', { name: 'Druckansicht' })).toBeNull();
+    await waehleMenueEintrag(ausloeser, 'Druckansicht');
+    await waitFor(() =>
+      expect(screen.getByTestId('adresse')).toHaveTextContent('/planungen/5/druck'),
+    );
+  });
+
   it('Planung löschen fragt einmal nach und führt zur Liste', async () => {
     setup();
     server.use(http.delete('/api/planungen/5', () => new HttpResponse(null, { status: 204 })));
@@ -373,12 +384,16 @@ describe('PlanungPage (LLH-1586)', () => {
     );
     expect(await screen.findByText('Diese Planung gibt es nicht')).toBeInTheDocument();
   });
-  it('„Drucken“ führt zur Druckansicht, „Excel“ speichert die Mappe der Planung (LLH-1593)', async () => {
+  it('„Druckansicht“ im Seitenkopf führt zur Druckansicht, „Excel“ speichert die Mappe der Planung (LLH-1593, LLH-1836)', async () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     setup();
     server.use(http.get('/api/planungen/5/export', () => new HttpResponse('PK-planung')));
-    const drucken = await screen.findByRole('link', { name: 'Drucken' });
+    const drucken = await screen.findByRole('link', { name: 'Druckansicht' });
     expect(drucken).toHaveAttribute('href', '/planungen/5/druck');
+    // Im Kopf neben „In Einsatz übernehmen“, nicht in der Werkzeugzeile des Rasters.
+    expect(
+      screen.getByRole('button', { name: 'In Einsatz übernehmen' }).parentElement,
+    ).toContainElement(drucken);
     const excel = screen.getByRole('button', { name: 'Excel' });
     expect(excel).toBeEnabled();
     await userEvent.click(excel);

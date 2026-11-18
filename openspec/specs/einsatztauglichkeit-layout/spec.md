@@ -476,15 +476,15 @@ wenn die Seite keinen Nebenweg hat.
 
 #### Scenario: Betroffenenliste auf dem Handschirm
 - **WHEN** die Betroffenenliste bei 390 × 844 mit Schreibrecht geöffnet ist
-- **THEN** stehen im Seitenkopf ein Erfassungsknopf, „Vermisst melden“, der Knopf „Filter“ und der Auslöser „Weitere“, und weder „Drucken / als PDF“ noch „CSV exportieren“ steht als Knopf im Kopf
+- **THEN** stehen im Seitenkopf ein Erfassungsknopf, „Vermisst melden“, der Knopf „Filter“ und der Auslöser „Weitere“, und weder „Druckansicht“ noch „CSV exportieren“ steht als Knopf im Kopf
 
 #### Scenario: Nebenwege im Menü
 - **WHEN** auf dem Handschirm der Auslöser „Weitere“ der Betroffenenliste geöffnet wird
-- **THEN** enthält das Menü „Drucken / als PDF“ und „CSV exportieren“, und die Wahl löst denselben Weg aus wie der Knopf in `kompakt` ab `md`
+- **THEN** enthält das Menü „Druckansicht“ und „CSV exportieren“, und die Wahl löst denselben Weg aus wie der Knopf in `kompakt` ab `md`
 
 #### Scenario: Ab md unverändert erreichbar
 - **WHEN** die Betroffenenliste bei 1180 px Breite in `kompakt` geöffnet ist
-- **THEN** stehen „Drucken / als PDF“ und „CSV exportieren“ als Knöpfe im Kopf, und es gibt keinen Auslöser „Weitere“
+- **THEN** stehen „Druckansicht“ und „CSV exportieren“ als Knöpfe im Kopf, und es gibt keinen Auslöser „Weitere“
 
 #### Scenario: Stufe 48 und 72 am Tablet
 - **WHEN** die Betroffenenliste bei 1180 × 820 in `komfortabel` oder in `handschuh` geöffnet ist

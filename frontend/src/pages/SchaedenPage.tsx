@@ -43,6 +43,7 @@ import Datensicht, {
   type Kartenplan,
 } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { modulName } from '../einsatz/modulRegistry';
@@ -408,12 +409,7 @@ export default function SchaedenPage() {
       weitere={{
         name: 'Weitere Aktionen zu den Schäden',
         eintraege: [
-          {
-            key: 'druck',
-            label: 'Drucken / als PDF',
-            ziel: schaedenDruckPfad(einsatzId, { sicht }),
-            onWahl: () => navigate(schaedenDruckPfad(einsatzId, { sicht })),
-          },
+          druckansichtNebenweg({ ziel: schaedenDruckPfad(einsatzId, { sicht }), navigate }),
           {
             key: 'csv',
             label: 'CSV exportieren',
@@ -444,7 +440,7 @@ export default function SchaedenPage() {
         wert={sicht}
         onWechsel={wechsleSicht}
         optionen={SCHAEDEN_SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
-        style={{ marginBottom: 12 }}
+        style={{ marginBottom: token.margin }}
       />
 
       {listeGescheitert ? (

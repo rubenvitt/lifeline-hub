@@ -1,4 +1,15 @@
-import { App, Breadcrumb, Button, Form, Input, InputNumber, Space, Tag, Typography } from 'antd';
+import {
+  App,
+  Breadcrumb,
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Space,
+  Tag,
+  Typography,
+  theme,
+} from 'antd';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -213,6 +224,7 @@ export default function BetreuungsstelleDetailPage() {
 }
 
 function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }) {
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const { benutzer } = useAuth();
   const { message } = App.useApp();
@@ -683,7 +695,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   return (
     <EinsatzSeite
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>Betreuungsstelle {s.bezeichnung}</span>
           <Tag>{ART_LABEL[s.art]}</Tag>
           <StatusTag darstellung={betreuungsstelleStatus[s.status]} />
@@ -787,14 +799,17 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
             >
               {stammdaten}
               {speichernMut.error != null && (
-                <div style={{ marginTop: 16 }}>
+                <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
                   <SpeicherFehler
                     fehler={speichernMut.error}
                     titel="Betreuungsstelle konnte nicht gespeichert werden"
                   />
                 </div>
               )}
-              <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
+              <div
+                {...speicherLeiste}
+                style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+              >
                 {storniert ? (
                   // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
                   <Button onClick={() => setSitzung(null)}>Schließen</Button>

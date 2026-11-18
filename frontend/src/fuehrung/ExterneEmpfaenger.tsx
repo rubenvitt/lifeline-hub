@@ -1,4 +1,4 @@
-import { AutoComplete, Button, Col, Row, type FormRule } from 'antd';
+import { AutoComplete, Button, Col, Row, theme, type FormRule } from 'antd';
 import { VERTEILER_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import type { AdressatKategorie } from '../api/types';
 import { Select } from '../components/Select';
@@ -56,6 +56,7 @@ export function ExterneEmpfaenger({
   onChange?: (zeilen: ExternerEmpfaenger[]) => void;
   disabled?: boolean;
 }) {
+  const { token } = theme.useToken();
   const stellenOptionen = externeStellenOptions(useExterneStellen().data ?? []);
 
   const updateRow = (index: number, aenderung: Partial<ExternerEmpfaenger>) =>
@@ -69,7 +70,12 @@ export function ExterneEmpfaenger({
         const nummer = index + 1;
         const zuLang = istZuLang(zeile.bezeichnung, BEZEICHNUNG_MAX);
         return (
-          <Row key={index} gutter={[16, 8]} align="top" style={{ marginBottom: 8 }}>
+          <Row
+            key={index}
+            gutter={[token.marginLG, token.marginSM]}
+            align="top"
+            style={{ marginBottom: token.marginSM }}
+          >
             <Col xs={24} sm={9}>
               <Select<AdressatKategorie>
                 aria-label={`Kategorie externe Stelle ${nummer}`}

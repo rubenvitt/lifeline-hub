@@ -148,10 +148,11 @@ function Gruppe({
   quittiere: (id: number) => void;
   beiSprung: () => void;
 }) {
+  const { token } = theme.useToken();
   if (eintraege.length === 0) return null;
   return (
     <>
-      <Augenbraue als="h3" style={{ marginBlockStart: 8 }}>
+      <Augenbraue als="h3" style={{ marginBlockStart: token.marginSM }}>
         {name}
       </Augenbraue>
       <ul aria-label={name} style={{ margin: 0, padding: 0 }}>
@@ -293,7 +294,10 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
       )}
       {stummOffen && <StummListe />}
       {fehler && (
-        <div role="alert" style={{ color: token.colorWarningText, marginBlockStart: 4 }}>
+        <div
+          role="alert"
+          style={{ color: token.colorWarningText, marginBlockStart: token.marginXS }}
+        >
           Nicht gespeichert, bitte noch einmal.
         </div>
       )}

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { pdfAuszug } from './pdf-kern';
 import { ADMIN, ADMIN_PW, anmeldenAls } from './rollen-kern';
+import { waehleDruckweg } from './druckweg-kern';
 
 /**
  * Registrierliste drucken (LLH-1616, Change `iw8hjb93-registrierliste-drucken`, Spec
@@ -75,10 +76,11 @@ test('Registrierliste: Einstieg im Paneel, Gesundheitsangaben nur nach Wahl, Hau
 
   // Einstieg im Paneel „Registrierung“ der Detailseite.
   await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}`);
-  await page
-    .getByRole('region', { name: 'Registrierung', exact: true })
-    .getByRole('link', { name: 'Registrierliste drucken' })
-    .click();
+  await waehleDruckweg(page, {
+    name: 'Registrierliste – Druckansicht',
+    weitere: 'Weitere zur Registrierung',
+    in: page.getByRole('region', { name: 'Registrierung', exact: true }),
+  });
   await expect(page).toHaveURL(new RegExp(`/betreuung/${stelleId}/registrierliste/druck$`));
 
   const wurzel = page.locator('[data-lfh="druckwurzel"]');

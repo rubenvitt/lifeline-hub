@@ -110,7 +110,7 @@ export function UebungsBand({
   unbekannt?: boolean;
 }) {
   const aktiv = isUebung(einsatz);
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   // Die Quelle meldet sich nur bei einer klebenden Übung; sonst bleibt die Summe, wie sie war.
   const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(
     aktiv && klebend,
@@ -122,7 +122,7 @@ export function UebungsBand({
         data-lfh="uebung-unbekannt"
         style={{
           flexShrink: 0,
-          paddingBlock: 3,
+          paddingBlock: token.paddingXS,
           paddingInline: 'var(--lfh-seiten-polsterung)',
           textAlign: 'center',
           background: rollen.flaeche3,
@@ -148,7 +148,7 @@ export function UebungsBand({
         alignItems: 'center',
         justifyContent: 'center',
         gap: '0.75em',
-        paddingBlock: 3,
+        paddingBlock: token.paddingXS,
         paddingInline: 'var(--lfh-seiten-polsterung)',
         background: `repeating-linear-gradient(135deg, ${rollen.uebungFuellung} 0 12px, ${rollen.uebungSchraffur} 12px 24px)`,
         borderBlock: `1px solid ${rollen.uebungKante}`,

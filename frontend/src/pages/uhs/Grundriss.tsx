@@ -1349,7 +1349,7 @@ export default function Grundriss({
 }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   // Zeiger-Sensor mit 5-px-Aktivierungsdistanz (sonst löst jeder Klick einen Drag aus),
   // KeyboardSensor für Tastatur und Tests. `ZugPointerSensor` statt `PointerSensor`: sonst ging
   // der erste Klick nach einem Drag unter Last verloren, etwa aufs Platzmenü (LFH-519).
@@ -1821,7 +1821,7 @@ export default function Grundriss({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: token.margin,
         minHeight: 0,
         overflow: 'auto',
         height: '100%',
@@ -1867,8 +1867,8 @@ export default function Grundriss({
           flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 8,
-          gap: 8,
+          marginBottom: token.marginSM,
+          gap: token.marginSM,
           minWidth: 0,
         }}
       >
@@ -1917,7 +1917,7 @@ export default function Grundriss({
           Grundgröße (Raster im Backend), gestreckt höchstens das Doppelte, und keinen Platz für
           einen Satz. */}
       {platzGruende.length > 0 && (
-        <Flex vertical gap={4} style={{ marginBottom: 8 }}>
+        <Flex vertical gap={token.marginXS} style={{ marginBottom: token.marginSM }}>
           {platzGruende.map(({ pid, bezeichnung, grund }) => (
             <div key={pid} data-lfh="platz-fehler">
               {/* Der Platzname steht IN der Meldung: vorgelesen wird, wo abgelehnt wurde. */}
@@ -2009,7 +2009,10 @@ export default function Grundriss({
             {uhs.plaetze.length === 0 && (
               // Nur der Zustand (LFH-1078): der Weg steht direkt darüber im Kopf — geplant „Plätze
               // anlegen", im Betrieb hinter „Plätze bearbeiten" (LFH-58), kein zweiter Knopf hier.
-              <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
+              <Typography.Text
+                type="secondary"
+                style={{ padding: token.padding, display: 'block' }}
+              >
                 Keine Plätze
               </Typography.Text>
             )}
@@ -2090,7 +2093,7 @@ export default function Grundriss({
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 12,
+              gap: token.margin,
               height: '100%',
               minHeight: 0,
             }}
@@ -2355,6 +2358,7 @@ function NeuerPlatzKnopf({
   primaer?: boolean;
 }) {
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [open, setOpen] = useState(false);
   const [typ, setTyp] = useState<PlatzTyp>('bett');
   const [menge, setMenge] = useState(1);
@@ -2383,7 +2387,7 @@ function NeuerPlatzKnopf({
     );
   }
   return (
-    <Flex vertical gap={4} data-lfh="plaetze-anlegen">
+    <Flex vertical gap={token.marginXS} data-lfh="plaetze-anlegen">
       <Space align="center" wrap>
         <Select<PlatzTyp>
           value={typ}

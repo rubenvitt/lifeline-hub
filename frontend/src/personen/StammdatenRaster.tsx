@@ -1,4 +1,4 @@
-import { Typography } from 'antd';
+import { Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import { Datenfeld, Datenraster } from '../components/instrument';
 
@@ -20,6 +20,7 @@ function leer(wert: ReactNode): boolean {
  * gesetzten Angaben aus dem Bild.
  */
 export default function StammdatenRaster({ angaben }: { angaben: readonly StammdatenAngabe[] }) {
+  const { token } = theme.useToken();
   const gesetzt = angaben.filter((a) => !leer(a.wert));
   const ohne = angaben.filter((a) => leer(a.wert)).map((a) => a.label);
   return (
@@ -37,7 +38,7 @@ export default function StammdatenRaster({ angaben }: { angaben: readonly Stammd
         <Typography.Paragraph
           type="secondary"
           data-lfh="ohne-angabe"
-          style={{ marginTop: 8, marginBottom: 0 }}
+          style={{ marginTop: token.marginSM, marginBottom: 0 }}
         >
           Ohne Angabe: {ohne.join(', ')}
         </Typography.Paragraph>

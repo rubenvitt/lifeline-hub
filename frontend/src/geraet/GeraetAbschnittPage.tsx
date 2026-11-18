@@ -90,6 +90,7 @@ function EinheitZeile({
  * zugeschnitten; die Seite zeigt es nur.
  */
 export default function GeraetAbschnittPage() {
+  const { token } = useRollen();
   const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const abschnittId = geraet?.stelle_id ?? null;
@@ -131,7 +132,7 @@ export default function GeraetAbschnittPage() {
       ) : !abschnitt ? (
         <Alert type="warning" showIcon title="Abschnitt nicht mehr vorhanden" />
       ) : (
-        <Flex vertical gap={12}>
+        <Flex vertical gap={token.margin}>
           <Paneel titel="Abschnitt" koerperPolster>
             <AbschnittDaten
               abschnitt={abschnitt}

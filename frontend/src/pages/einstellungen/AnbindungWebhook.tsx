@@ -503,7 +503,9 @@ function LanSchalter({
       data-lfh="webhook-lan"
     >
       Ziel im lokalen Netz erlauben
-      <div style={{ color: rollen.achtungText, marginBlockStart: 4 }}>{LAN_WARNUNG}</div>
+      <div style={{ color: rollen.achtungText, marginBlockStart: 'var(--lfh-luft-1)' }}>
+        {LAN_WARNUNG}
+      </div>
     </Checkbox>
   );
 }

@@ -1,4 +1,4 @@
-import { Alert, Button, Space, Typography } from 'antd';
+import { Alert, Button, Space, Typography, theme } from 'antd';
 import { useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { appCodeAusstellen } from '../api/auth';
@@ -28,6 +28,7 @@ interface Props {
 
 export default function AppAnmeldungPage({ navigiere = (a) => window.location.assign(a) }: Props) {
   const { benutzer, logout } = useAuth();
+  const { token } = theme.useToken();
   const location = useLocation();
   const challenge = new URLSearchParams(location.search).get('challenge') ?? '';
   const [laeuft, setLaeuft] = useState(false);
@@ -80,10 +81,12 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
         <Alert
           type="warning"
           showIcon
-          style={{ marginBottom: 16 }}
+          style={{ marginBottom: token.marginLG }}
           title="Bestätige nur, wenn du gerade in der Lifeline-App auf „Im Browser anmelden“ gewählt hast."
         />
-        {fehler && <Alert type="error" showIcon title={fehler} style={{ marginBottom: 16 }} />}
+        {fehler && (
+          <Alert type="error" showIcon title={fehler} style={{ marginBottom: token.marginLG }} />
+        )}
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Button type="primary" size="large" block loading={laeuft} onClick={inDerAppAnmelden}>
             In der App anmelden

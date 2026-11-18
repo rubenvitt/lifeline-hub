@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Flex, Typography } from 'antd';
+import { Button, Flex, Typography, theme } from 'antd';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { IconKreuz, IconStandortZiel } from '../icons';
 import {
@@ -32,6 +32,7 @@ export default function StandortFeld({
   disabled?: boolean;
   sofort?: boolean;
 }) {
+  const { token } = theme.useToken();
   const { formatKoordinate, formatDistanz } = useAnzeigeKonventionen();
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export default function StandortFeld({
     );
   }
   return (
-    <Flex vertical gap={4}>
+    <Flex vertical gap={token.marginXS}>
       <Button
         icon={<IconStandortZiel size={18} />}
         loading={laeuft}

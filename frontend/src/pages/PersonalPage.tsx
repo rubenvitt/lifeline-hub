@@ -417,7 +417,7 @@ export default function PersonalPage() {
       // deshalb keinen Anker. `wrap`: eine Marke darf unter einen langen Namen rutschen, statt die
       // Fließspalte über ihr Maß zu drücken (LFH-975).
       render: (_, ep) => (
-        <Space wrap size={4}>
+        <Space wrap size={token.marginXS}>
           {ep.name}
           {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
           {ep.ist_demo && <DemoMarke />}

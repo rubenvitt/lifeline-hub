@@ -135,7 +135,7 @@ export function UntereinheitenSection({
           Untereinheit anlegen
         </Button>
       }
-      style={{ marginBlockStart: 16 }}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
     >
       {children.length === 0 ? (
         <PaneelZeile>Keine Untereinheiten</PaneelZeile>
@@ -187,7 +187,11 @@ export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
   );
 
   return (
-    <Paneel titel="Fahrzeuge" meta={vorlage.fahrzeuge.length} style={{ marginBlockStart: 16 }}>
+    <Paneel
+      titel="Fahrzeuge"
+      meta={vorlage.fahrzeuge.length}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
+    >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.fahrzeuge.length === 0 ? (
         <PaneelZeile>Keine Fahrzeuge</PaneelZeile>
@@ -302,7 +306,11 @@ export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionPro
   }));
 
   return (
-    <Paneel titel="Stammbesetzung" meta={vorlage.personal.length} style={{ marginBlockStart: 16 }}>
+    <Paneel
+      titel="Stammbesetzung"
+      meta={vorlage.personal.length}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
+    >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.personal.length === 0 ? (
         <PaneelZeile>Keine Stammbesetzung</PaneelZeile>
@@ -509,7 +517,11 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
   }));
 
   return (
-    <Paneel titel="Material" meta={vorlage.material.length} style={{ marginBlockStart: 16 }}>
+    <Paneel
+      titel="Material"
+      meta={vorlage.material.length}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
+    >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.material.length === 0 ? (
         <PaneelZeile>Kein Material</PaneelZeile>

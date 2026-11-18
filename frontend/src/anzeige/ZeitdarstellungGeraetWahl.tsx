@@ -1,4 +1,4 @@
-import { Typography } from 'antd';
+import { Typography, theme } from 'antd';
 import { Segmentleiste, type SegmentOption } from '../components/instrument';
 import type { Zeitdarstellung } from '../api/types';
 import { setzeZeitdarstellung, useZeitdarstellungGeraet } from './zeitDarstellungStore';
@@ -19,6 +19,7 @@ const OPTIONEN: readonly SegmentOption<Wahl>[] = [
  */
 export default function ZeitdarstellungGeraetWahl() {
   const geraet = useZeitdarstellungGeraet();
+  const { token } = theme.useToken();
   return (
     <section style={{ maxWidth: 480 }}>
       <Segmentleiste<Wahl>
@@ -27,7 +28,7 @@ export default function ZeitdarstellungGeraetWahl() {
         wert={geraet ?? 'vorgabe'}
         onWechsel={(w) => setzeZeitdarstellung(w === 'vorgabe' ? null : w)}
       />
-      <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+      <Typography.Paragraph type="secondary" style={{ marginTop: token.marginSM, marginBottom: 0 }}>
         Taktisch: 101430okt26, Datum und Uhrzeit: 10.10.26 14:30. „Vorgabe“ folgt der Einstellung
         von Einsatz und Organisation. Ausdrucke folgen immer ihr.
       </Typography.Paragraph>

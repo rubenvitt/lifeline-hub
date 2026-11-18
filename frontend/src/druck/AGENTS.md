@@ -19,14 +19,32 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
   `DRUCK_SPECS` der `playwright.config.ts`.
-- **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe sind `DruckKnopf`,
-  im Seitenkopf `useDruckNebenwege` (LFH-1079); beide über `useDrucken` (wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
+- **Druckkopf** `components/druck/Druckkopf.tsx` steht in der Wurzel. Druckknöpfe auf Druckseiten
+  sind `DruckKnopf`, im Seitenkopf `useDruckNebenwege` (LFH-1079); beide über `useDrucken` (wartet auf Organisation und Logo, höchstens `LOGO_FRIST_MS`; bereit = Daten da,
   nicht „letzter Abruf gelungen"). **Kein
   `window.print()` direkt**, nie aus dem Passiv-Effekt. `useDrucken` druckt über
   `components/druck/druckDialog.ts`: bleibt `beforeprint` aus (Safari stellt den Druck bei offenem
   Live-Strom zurück, LFH-1105), schließt es den Strom in derselben Aufgabe und öffnet ihn danach
   neu (`pausiereLiveStroeme`, Vollabgleich). `components/druck/useDruckModus.ts`
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
+- **Wortlaut und Platz der Druckeinstiege** (LLH-1836, Spec `druck-dokumente`, „Druckeinstiege
+  heißen nach ihrer Wirkung“, „Druckeinstiege stehen im Kopf“, „Module ohne eigenen Druck“;
+  Herleitung `openspec/changes/archive/2026-11-18-zqw0kax3-drucken-ein-name/design.md`):
+  - **Zwei Wörter nach Wirkung.** „Drucken / als PDF“ öffnet sofort den Druckdialog,
+    „Druckansicht“ öffnet eine eigene Druckseite; druckt diese ein anderes Dokument als die Seite des
+    Einstiegs, steht es davor („Einsatzbericht – Druckansicht“, „Registrierliste – Druckansicht“).
+    Die Wörter stehen nur in `components/druck/useDruckNebenwege.ts` (`DRUCKEN`, `DRUCKANSICHT`,
+    `druckansichtVon`, `druckansichtNebenweg`) und am `DruckKnopf`; Wächter
+    `druck/druckWortlaut.guard.test.ts`.
+  - **Zwei Plätze.** Was die ganze Seite druckt, ist ein Nebenweg im Seitenkopf (`weitere` der
+    `EinsatzSeite` bzw. `NebenwegeImKopf`), auch Meldebild, Funkplan, Kommunikationsplan,
+    Organigramm, Schichtplan und Planung; wer vorher aufklappen muss, gibt `useDruckNebenwege` ein
+    synchrones `vorDemDruck`. Was ein Objekt in der Seite druckt, steht über `NebenwegeImKopf` im
+    `aktion` seines `Paneel` (Auftrag, Registrierung). Nie in einer Werkzeugzeile im Inhalt oder am
+    Ende eines Paneels. Auf der Druckseite selbst ist `DruckKnopf` ihre Aktion.
+  - **Bewusst ohne eigenen Druck:** Einheiten und Fahrzeuge (stehen samt Besatzung im Druck des
+    Meldebilds), Meldungen (im ETB), die Liste der Lageberichte (jeder Lagebericht druckt sich auf
+    seiner Seite). Die Hilfe „Drucken und Export“ nennt diese Wege.
 - **Übung im Druck** (LLH-1725, Regel: `frontend/AGENTS.md`, Rahmen, „Übung“): der Druckkopf zeigt
   „ÜBUNG“, sobald sein `einsatz` (`DruckEinsatz`) die Einsatzart `uebung` trägt. Wer ihn aufruft,
   reicht `einsatzart` mit durch. `druck.css` setzt eine solche Wurzel auf die benannte Seite
@@ -118,8 +136,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Ergebnisobjekt (`useQuery` beobachtet nur, was die Seite liest).
 - **Auftragsdruck** (LLH-1171, Herleitung `openspec/changes/archive/2026-10-12-ianaw5k1-auftrag-drucken/design.md`):
   `/einsaetze/:id/auftraege/:auftragId/druck` (`pages/AuftragDruckPage.tsx`, Pfad
-  `auftragDruckPfad`), Einstieg nur als Sprung „Druckansicht“ im Detail eines Auftrags, auch
-  ohne Schreibrecht. Gedruckt wird nie aus dem Detailpaneel, wie der Befehl nur auf seiner
+  `auftragDruckPfad`), Einstieg nur als „Druckansicht“ im Kopf des Detailpaneels eines Auftrags,
+  auch ohne Schreibrecht. Gedruckt wird nie aus dem Detailpaneel, wie der Befehl nur auf seiner
   Vollseite. Abruf über den bestehenden Einzelabruf unter dem nicht-live Key `auftragDruck`
   (Schnappschuss, „Neu laden“). Die Feldfolge des Blatts steht im Schemakern (`druckFelder` in
   `auftraege/auftragsschemaKern.ts`, auf `READ_ORDER` gebaut), nie als eigene Liste; das Blatt
@@ -127,7 +145,9 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **Schichtplan** (LLH-1557, Spec `kraefte-schichtplan`, „Schichtplan drucken“):
   `/einsaetze/:id/abloesung/schichtplan/druck` (`pages/SchichtplanDruckPage.tsx`, Pfad
   `schichtplanDruckPfad`, Wahl in der Adresse: `sicht=person` und `auswahl` mit dem Schlüssel
-  von Posten oder Person), Einstieg „Drucken“ im Slot `werkzeuge` der Ansicht Schichtplan.
+  von Posten oder Person), Einstieg „Druckansicht“ neben „Excel“ im Seitenkopf, solange die Ansicht
+  Schichtplan steht (`abloesung/schichtplan/ausgabe/useSchichtplanAusgabe.tsx`; die Planung nimmt
+  `useAusgabeNebenwege` beim Reiter „Plan“).
   Nicht-live Key `schichtplanDruck`, `DRUCK_ABFRAGE`, `gcTime: 0`. Die Blätter
   (`abloesung/schichtplan/ausgabe/SchichtplanBlaetter.tsx`) lesen nur den Ausgabeplan
   (`ausgabePlan.ts`, aus dem Einsatz über `ausEinsatzPlan.ts` mit den Zeilen der Ansicht, damit
@@ -158,7 +178,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `/einsaetze/:id/betreuung/:stelleId/registrierliste/druck` (`pages/RegistrierlisteDruckPage.tsx`)
   und am Gerät `/geraet/:id/betreuung/registrierliste/druck`, beide über
   `betreuung/registrierung/RegistrierlisteDruckSeite.tsx` und `EinsatzPfade.registrierlisteDruck`;
-  Einstieg „Registrierliste drucken“ im Paneel „Registrierung“, auch ohne Schreibrecht. Geladen nur
+  Einstieg „Registrierliste – Druckansicht“ im Kopf des Paneels „Registrierung“, auch ohne
+  Schreibrecht. Geladen nur
   über `GET …/stellen/{sid}/registrierungen/druck`, das in EINER Transaktion (`write_retry!`) je Person einen
   Eintrag der eigenen Art `registrierliste` schreibt (nie listenweit, nie `druck`: das Protokoll
   trennt ihn vom Personenblatt) und erst nach dem Commit liefert. Eine Bezugsperson, die nicht auf
@@ -181,7 +202,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `e2e/gefahren-druck.spec.ts`.
 - **Einsatzbericht** (LFH-726, `pages/EinsatzberichtDruckPage.tsx`, `druck/einsatzbericht/`,
   `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md`): Route `einsatzdaten/bericht` (erbt die
-  nie gesperrten Einsatzdaten), Einstieg sekundär auf der Einsatzdaten-Seite und in der Palette.
+  nie gesperrten Einsatzdaten), Einstieg „Einsatzbericht – Druckansicht“ im Kopf der
+  Einsatzdaten-Seite und in der Palette.
   Vollständig oder gar nicht: `berichtFreigabe` entscheidet VOR dem Abruf (im Einsatz
   ausgeblendet → „nicht genutzt“, Rollensperre → Sackgasse mit den Modulen); ein 403 im Abruf ist
   „kein Zugriff“, nie ein leerer Bestand. Eine neue Quelle braucht ihre Zeile in `quellen.ts` mit

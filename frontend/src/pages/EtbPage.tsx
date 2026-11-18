@@ -101,6 +101,7 @@ import { useFunkprotokollLauf } from '../components/useFunkprotokollLauf';
 import { useViewport } from '../components/useViewport';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { useFokusInLeiste } from '../components/fokusInLeiste';
+import { DRUCKANSICHT } from '../components/druck/useDruckNebenwege';
 import { neueClientId } from '../offline/clientId';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
@@ -1025,7 +1026,7 @@ export default function EtbPage() {
 
   // Der Einsatzabschluss steht nicht hier, sondern auf den Einsatzdaten (LFH-960): Unumkehrbares
   // für den ganzen Einsatz gehört nicht in den Kopf einer Arbeitsseite.
-  const weitereEintraege: MenueEintrag<'druck'>[] = [{ key: 'druck', label: 'Drucken / als PDF' }];
+  const weitereEintraege: MenueEintrag<'druck'>[] = [{ key: 'druck', label: DRUCKANSICHT }];
 
   // Ab `md` steht der Typ in der Filterleiste über der Zeitachse (LLH-1065): der Kopf trägt, was
   // ÖFFNET, nicht was filtert. Unter `md` rollt er einzeilig im Kopf (LFH-955 D3).
@@ -1069,7 +1070,7 @@ export default function EtbPage() {
           navigate(etbDruckPfad(einsatzId, filter));
         }}
       >
-        Drucken / als PDF
+        {DRUCKANSICHT}
       </Button>
     </>
   );
@@ -1330,7 +1331,7 @@ export default function EtbPage() {
               style={{ marginTop: token.marginSM }}
               title={`${ausstehend.length === 1 ? '1 Eintrag' : `${ausstehend.length} Einträge`} offline vorgemerkt`}
               description={
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul style={{ margin: 0, paddingLeft: '1.2em' }}>
                   {ausstehend.map((a) => (
                     <li key={a.id}>{a.eintrag.inhalt}</li>
                   ))}
@@ -1345,7 +1346,7 @@ export default function EtbPage() {
               style={{ marginTop: token.marginSM }}
               title={`${abgelehnt.length === 1 ? '1 gepufferter Eintrag' : `${abgelehnt.length} gepufferte Einträge`} abgelehnt und NICHT gespeichert`}
               description={
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul style={{ margin: 0, paddingLeft: '1.2em' }}>
                   {abgelehnt.map((a) => (
                     <li key={a.id}>
                       {a.eintrag.inhalt} — {a.grund}

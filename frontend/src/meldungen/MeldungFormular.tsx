@@ -1,5 +1,5 @@
 import { IconBlitz, IconPapierflieger } from '../icons';
-import { Button, Col, Collapse, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { Button, Col, Collapse, Form, Input, InputNumber, Row, Space, Switch, theme } from 'antd';
 import type { TextAreaRef } from 'antd/es/input/TextArea';
 import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
@@ -198,6 +198,7 @@ export default function MeldungFormular({
    */
   dialog?: { offen: boolean; titel: string; onAbbrechen: () => void };
 }) {
+  const { token } = theme.useToken();
   const vorgaben = useMemo<MeldungFormWerte>(
     () => (artVorgabe ? { ...DEFAULTS, meldungsart: artVorgabe } : DEFAULTS),
     [artVorgabe],
@@ -357,7 +358,7 @@ export default function MeldungFormular({
     <>
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       {!artVorgabe && (
-        <Space style={{ marginBottom: 16 }} wrap>
+        <Space style={{ marginBottom: token.marginLG }} wrap>
           {/* Kein `danger` (LFH-962): der Knopf belegt nur Felder vor, und Rot bedient nichts. Die
             Dringlichkeit trägt das Prio-Etikett „Sofort". */}
           <Button icon={<IconBlitz />} onClick={sofortVorbelegen}>
@@ -385,7 +386,7 @@ export default function MeldungFormular({
           count={zeichenGrenze(ETB_INHALT_MAX)}
         />
       </Form.Item>
-      <Row gutter={16}>
+      <Row gutter={token.marginLG}>
         <Col
           {...(dialog ? EINSPALTIG : { xs: 24, sm: 12, lg: funktionsOptionen.length > 0 ? 8 : 12 })}
         >
@@ -432,7 +433,7 @@ export default function MeldungFormular({
           und Prüfung die Felder auch zugeklappt erreichen. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         activeKey={weitereOffen ? ['weitere'] : []}
         onChange={(k) => setWeitereOffen(k.includes('weitere'))}
         items={[
@@ -442,7 +443,7 @@ export default function MeldungFormular({
             label: ['Weitere Angaben', ...abweichungen].join(' · '),
             children: (
               <>
-                <Row gutter={16}>
+                <Row gutter={token.marginLG}>
                   {vonOptionen.length > 0 && (
                     <Col xs={24} sm={12}>
                       <Form.Item name="von" label="Von Einheit / Abschnitt">
@@ -497,7 +498,7 @@ export default function MeldungFormular({
                 )}
                 <Form.Item label="Bestätigung erforderlich (Sofortmeldung)">
                   {/* Flex statt `Space`: nur so trägt die Grundbreite des Fristfelds. */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: token.marginSM }}>
                     <Form.Item name="bestaetigung_pflicht" valuePropName="checked" noStyle>
                       <Switch aria-label="Bestätigung erforderlich" />
                     </Form.Item>

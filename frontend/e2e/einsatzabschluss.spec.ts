@@ -58,9 +58,7 @@ async function etbOhneAbschluss(page: Page, einsatzId: string, breite: number, w
     await expect(weitere, `${wo}: Menü „Weitere“ steht`).toBeVisible();
     await weitere.click();
     const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
-    await expect(menue.getByRole('menuitem'), `${wo}: Menü „Weitere“`).toHaveText([
-      'Drucken / als PDF',
-    ]);
+    await expect(menue.getByRole('menuitem'), `${wo}: Menü „Weitere“`).toHaveText(['Druckansicht']);
     await page.keyboard.press('Escape');
     await expect(menue).toHaveCount(0);
   }
@@ -184,13 +182,16 @@ test('Einsatzabschluss: fehlt für Führungspersonal auf allen Breiten', async (
       await page.getByRole('button', { name: 'Weitere Aktionen zu den Einsatzdaten' }).click();
       const menue = page.getByRole('menu');
       await expect(
-        menue.getByRole('menuitem', { name: 'Einsatzbericht drucken' }),
+        menue.getByRole('menuitem', { name: 'Einsatzbericht – Druckansicht' }),
         wo,
       ).toBeVisible();
       await expect(menue.getByRole('menuitem', { name: /Zugriff verwalten/ }), wo).toHaveCount(0);
       await page.keyboard.press('Escape');
     } else {
-      await expect(page.getByRole('link', { name: 'Einsatzbericht drucken' }), wo).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: 'Einsatzbericht – Druckansicht' }),
+        wo,
+      ).toBeVisible();
       await expect(page.getByRole('link', { name: /Zugriff verwalten/ }), wo).toHaveCount(0);
     }
     await expect(main.getByRole('heading', { name: 'Einsatzabschluss' }), wo).toHaveCount(0);

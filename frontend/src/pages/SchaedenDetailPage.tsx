@@ -397,7 +397,7 @@ export default function SchaedenDetailPage() {
         />
       }
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>
             Schaden <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
@@ -495,13 +495,16 @@ export default function SchaedenDetailPage() {
         >
           {detailAnsicht}
           {editFehler != null && (
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
               <SpeicherFehler fehler={editFehler} />
             </div>
           )}
           {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei langer
               Beschreibung scrollten die Knöpfe sonst aus dem Bild. */}
-          <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
+          <div
+            {...speicherLeiste}
+            style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+          >
             {storniert ? (
               // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
               <Button onClick={editSitzung.beende}>Schließen</Button>
@@ -525,7 +528,7 @@ export default function SchaedenDetailPage() {
       {/* Fotos und Dateien: unter dem Datenraster und außerhalb des Bearbeiten-<Form> — der
           Ablegen-Dialog trägt ein eigenes Formular, verschachtelt schickte es beim Absenden das
           äußere nativ ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
         <SchadenAnhaenge einsatzId={einsatzId} schaden={s} darfSchreiben={darfSchreiben} />
       </div>
 
@@ -600,7 +603,7 @@ export default function SchaedenDetailPage() {
       >
         Der Schaden verschwindet aus der Liste. Das Einsatztagebuch vermerkt das Stornieren.
         {stornoMutation.error != null && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
             <SpeicherFehler
               fehler={stornoMutation.error}
               titel="Nicht storniert"

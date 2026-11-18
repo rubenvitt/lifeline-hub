@@ -9,6 +9,7 @@ import {
   organigramm,
   seedeGross,
 } from './fuehrungsorganisation-kern';
+import { waehleDruckweg } from './druckweg-kern';
 
 /**
  * Druck der Führungsorganisation (LFH-626): was nur der Browser zeigt. Chromium, Firefox und
@@ -44,7 +45,7 @@ test('Druckpfad bei A4-Breite: alles offen, zwei Spalten, nichts ragt heraus', a
       window.dispatchEvent(new Event('beforeprint'));
     };
   });
-  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
+  await waehleDruckweg(page, { weitere: 'Weitere Aktionen zu den Einsatzabschnitten' });
   await page.emulateMedia({ media: 'print' });
 
   await expect(organigramm(page).getByRole('link', { name: 'Gruppe Deich' })).toHaveCount(1);

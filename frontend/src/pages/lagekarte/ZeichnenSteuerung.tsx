@@ -125,7 +125,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         minWidth: 'min(320px, 100%)',
       }}
     >
-      <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
         {/* Titel und Punktzähler teilen eine Zeile: jede Zeile mehr hebt den Fuß auf dem
             Handschirm über die Karte. */}
         <div

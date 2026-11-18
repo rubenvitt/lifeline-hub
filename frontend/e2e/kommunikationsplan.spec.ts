@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { waehleIn, waehleStehend } from './auswahl-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { waehleDruckweg } from './druckweg-kern';
 
 /**
  * Kommunikationsplan S6 (LFH-848): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein
@@ -221,7 +222,7 @@ test('Druckpfad bei A4-Breite: ohne Aktionen und Knöpfe, nichts ragt heraus', a
       window.dispatchEvent(new Event('beforeprint'));
     };
   });
-  await page.getByRole('button', { name: /Drucken/ }).click();
+  await waehleDruckweg(page, { weitere: 'Weitere Aktionen zum Kommunikationsplan' });
   await page.emulateMedia({ media: 'print' });
 
   await expect(tabelle(page).getByRole('columnheader', { name: 'Aktionen' })).toHaveCount(0);

@@ -57,7 +57,7 @@ export default function BearbeitenSteuerung(props: BearbeitenSteuerungProps) {
         minWidth: 'min(320px, 100%)',
       }}
     >
-      <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
         <div
           style={{
             display: 'flex',

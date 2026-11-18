@@ -78,7 +78,7 @@ export default function OfflineVorhandeneModal({
       destroyOnHidden
     >
       {vorhandeneQuery.isLoading ? (
-        <div style={{ textAlign: 'center', padding: 24 }}>
+        <div style={{ textAlign: 'center', padding: 'var(--lfh-luft-5)' }}>
           <Spin />
         </div>
       ) : (

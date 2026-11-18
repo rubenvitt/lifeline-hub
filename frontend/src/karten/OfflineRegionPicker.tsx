@@ -1,4 +1,4 @@
-import { App, Button, Modal, Spin, Typography } from 'antd';
+import { App, Button, Modal, Spin, Typography, theme } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -72,6 +72,7 @@ export default function OfflineRegionPicker({
   offen: boolean;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const { message } = App.useApp();
   // Regionen im „Bauen & laden"-Fluss: slug → name. Der Name wird mitgeführt, damit die
@@ -263,7 +264,7 @@ export default function OfflineRegionPicker({
       const phase = job ? BAU_PHASE_LABEL[job.status.status] : 'baut';
       return (
         <StatusTag
-          icon={<Spin size="small" style={{ marginInlineEnd: 4 }} />}
+          icon={<Spin size="small" style={{ marginInlineEnd: token.marginXS }} />}
           darstellung={{ ...kartenBauStatus.building, label: `Baut… ${phase}` }}
         />
       );
@@ -327,15 +328,15 @@ export default function OfflineRegionPicker({
       width={560}
     >
       {ladend ? (
-        <div style={{ textAlign: 'center', padding: 24 }}>
+        <div style={{ textAlign: 'center', padding: token.paddingXL }}>
           <Spin />
         </div>
       ) : leer ? (
         <Typography.Text type="secondary">Keine Regionen verfügbar</Typography.Text>
       ) : (
         Object.entries(gruppen).map(([gruppe, items]) => (
-          <div key={gruppe} style={{ marginBottom: 8 }}>
-            <Typography.Title level={5} style={{ marginBottom: 4 }}>
+          <div key={gruppe} style={{ marginBottom: token.marginSM }}>
+            <Typography.Title level={5} style={{ marginBottom: token.marginXS }}>
               {gruppe}
             </Typography.Title>
             <Liste

@@ -714,7 +714,7 @@ describe('Lange Einträge eingeklappt', () => {
       /\.etb-inhalt\[data-lfh='etb-inhalt'\] \.markdown \*\s*\{[^}]*margin-block:\s*0/,
     );
     // … und ein fester Abstand zwischen den Blöcken steht in beiden Zuständen.
-    expect(schirm).toMatch(/\.markdown > \* \+ \*\s*\{[^}]*margin-top:\s*4px/);
+    expect(schirm).toMatch(/\.markdown > \* \+ \*\s*\{[^}]*margin-top:\s*var\(--lfh-luft-1\)/);
     // Ohne Ersatzhöhe: sie schnitte die dritte Zeile an, sobald Abstände mitzählen.
     expect(css).not.toMatch(/max-height:\s*3lh/);
   });

@@ -494,7 +494,7 @@ export function VerlaufPaneel({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: token.marginXS,
                 fontSize: 11,
                 color: rollen.gedaempft,
               }}

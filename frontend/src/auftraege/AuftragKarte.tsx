@@ -1,4 +1,4 @@
-import { Collapse, Typography } from 'antd';
+import { Collapse, Typography, theme } from 'antd';
 import { memo } from 'react';
 import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/types';
 import KommKarte from '../kommunikation/KommKarte';
@@ -76,6 +76,7 @@ function AuftragKarte({
   fehlerGrund,
   quittierFehlerGrund,
 }: AuftragKarteProps) {
+  const { token } = theme.useToken();
   const { zeitpunkt } = useAnzeigeKonventionen();
   const hasSchema = gefuellteFelder(a, zeitpunkt).length > 0;
   // Kontextmenü aus denselben Daten wie Knöpfe und ⋮ der `AuftragHandlungen` (LLH-1598).
@@ -106,7 +107,10 @@ function AuftragKarte({
     >
       <AuftragKopf auftrag={a} einsatzId={einsatzId} />
 
-      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: 8 }}>
+      <Text
+        strong
+        style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: token.marginSM }}
+      >
         {a.auftrag_text}
       </Text>
 
@@ -126,7 +130,7 @@ function AuftragKarte({
       {hasSchema && (
         <Collapse
           ghost
-          style={{ marginInline: -8 }}
+          style={{ marginInline: -token.paddingSM }}
           items={[
             {
               key: 'details',

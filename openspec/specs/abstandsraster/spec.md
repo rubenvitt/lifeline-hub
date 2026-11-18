@@ -45,17 +45,13 @@ Ein Baustein oder eine Seite MUST einen Abstand aus dem Raster der aktiven Dicht
 - **WHEN** eine Seite, die einen Rasterabstand nutzt, in `komfortabel` steht
 - **THEN** misst dieser Abstand den Wert der Stufe in `komfortabel`, nicht den in `kompakt`
 
-### Requirement: Keine neuen Abstands-Literale
+### Requirement: Abstände ohne Literal
 
-Neuer Code MUST NOT einen Innen- oder Außenabstand oder eine Lücke als Zahl-Literal größer als 2 px setzen, weder im Stilobjekt noch als Abstandsangabe einer Layoutkomponente noch als px-Wert in handgeschriebenem CSS außerhalb der Rollenquelle. Bestehende Literale SHALL als Schuld je Datei geführt werden, die nur sinken darf.
+Code MUST NOT einen Innen- oder Außenabstand oder eine Lücke als Zahl-Literal größer als 2 px setzen, weder im Stilobjekt noch als Abstandsangabe einer Layoutkomponente noch als px-Wert in handgeschriebenem CSS außerhalb der Rollenquelle. Die Prüfung SHALL keine Altlast dulden: Jede Datei außerhalb der festen Ausnahmen ist ohne ein solches Literal.
 
-#### Scenario: Neues Literal
-- **WHEN** eine Datei ohne Schuld ein Abstands-Literal wie 8 oder `12px` bekommt
+#### Scenario: Literal in einer Datei
+- **WHEN** eine Datei außerhalb der festen Ausnahmen ein Abstands-Literal wie 8 oder `12px` bekommt
 - **THEN** schlägt die Prüfung fehl und nennt Datei, Zeile und Wert
-
-#### Scenario: Schuld sinkt
-- **WHEN** in einer verschuldeten Datei Literale auf das Raster umgestellt werden
-- **THEN** schlägt die Prüfung fehl, bis die geführte Schuld dieser Datei auf den neuen Stand gesenkt ist, und steigen darf sie nie
 
 #### Scenario: Feinsatz
 - **WHEN** ein Abstand 1 oder 2 px beträgt (Haarlinie, Symbolversatz) oder 0 ist
