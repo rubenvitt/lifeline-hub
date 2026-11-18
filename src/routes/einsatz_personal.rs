@@ -18,7 +18,7 @@ use crate::personal::{
 use crate::personal::{ADHOC_TEXT_MAX, BEMERKUNG_MAX, EINSATZFUNKTION_MAX};
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_enum, parse_flag,
-    pflicht_max, pruefe_koordinate, trimme,
+    pflicht_max, pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::staerke::StaerkePosition;
 use crate::zeitachse::repo as zeitachse_repo;
@@ -316,7 +316,34 @@ pub struct DispoPatchBody {
     pub funktion: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub traegerorganisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+    /// Änderung“): je Feld der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<DispoErwartet>,
 }
+
+/// Altwerte der Disposition, dreiwertig wie [`DispoPatchBody`]. Die Stärke-Position vergleicht
+/// den wirksamen Wert (Override, sonst der des Stamms): ihn zeigt die Oberfläche, und ihn hat sie
+/// beim Öffnen gesehen (wie die Soll-Stärke der Einheit, `src/AGENTS.md`). Der Status trägt
+/// keinen: ein Wechsel ist eine Handlung mit eigenem ETB-Eintrag.
+#[derive(Debug, Default, Deserialize)]
+pub struct DispoErwartet {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub staerke_position: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einsatzfunktion: Option<Option<String>>,
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub funktion: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub traegerorganisation: Option<Option<String>>,
+}
+
+/// Wirksame Stärke-Position einer Dispositionszeile als fester SQL-Ausdruck (Feld-CAS): der
+/// Override, sonst die Position der Stamm-Person; Spiegel von `disposition_repo::zu_anzeige`.
+const WIRKSAME_POSITION: &str = "COALESCE(staerke_position, (SELECT p.staerke_position \
+     FROM personal p WHERE p.id = einsatz_personal.personal_id))";
 
 /// PATCH /api/einsaetze/{id}/personal/{ep_id} — Status, Stärke-Position, Bemerkung,
 /// Einsatzfunktion und bei Ad-hoc-Personen Name, Qualifikation und Träger (LLH-1067).
@@ -358,6 +385,58 @@ pub async fn update(
     fn tri(w: &Option<Option<String>>) -> Option<Option<&str>> {
         w.as_ref().map(|o| o.as_deref())
     }
+
+    // Feld-CAS (LLH-1945): Altwert nur mit Änderung desselben Felds (422), nach allen 400; Formen
+    // wie der Patch (getrimmt, leer = ohne Angabe).
+    let erwartet = body.erwartet.unwrap_or_default();
+    crate::feld_cas::pruefe_felder(
+        &[
+            (
+                "staerke_position",
+                erwartet.staerke_position.is_some(),
+                body.staerke_position.is_some(),
+            ),
+            (
+                "bemerkung",
+                erwartet.bemerkung.is_some(),
+                bemerkung.is_some(),
+            ),
+            (
+                "einsatzfunktion",
+                erwartet.einsatzfunktion.is_some(),
+                einsatzfunktion.is_some(),
+            ),
+            ("name", erwartet.name.is_some(), name.is_some()),
+            ("funktion", erwartet.funktion.is_some(), funktion.is_some()),
+            (
+                "traegerorganisation",
+                erwartet.traegerorganisation.is_some(),
+                traeger.is_some(),
+            ),
+        ],
+        &[],
+    )?;
+    let erwartet_position = trimme_tri(erwartet.staerke_position);
+    let erwartet_bemerkung = trimme_tri(erwartet.bemerkung);
+    let erwartet_einsatzfunktion = trimme_tri(erwartet.einsatzfunktion);
+    let erwartet_name = erwartet.name.as_deref().map(str::trim);
+    let erwartet_funktion = trimme_tri(erwartet.funktion);
+    let erwartet_traeger = trimme_tri(erwartet.traegerorganisation);
+    let altwerte = {
+        use crate::feld_cas::ExpectedValue::Text;
+        fn text(v: &Option<Option<String>>) -> Option<crate::feld_cas::ExpectedValue<'_>> {
+            v.as_ref().map(|v| Text(v.as_deref()))
+        }
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        w.push(WIRKSAME_POSITION, text(&erwartet_position));
+        w.push("bemerkung", text(&erwartet_bemerkung));
+        w.push("einsatzfunktion", text(&erwartet_einsatzfunktion));
+        w.push("snap_name", erwartet_name.map(|n| Text(Some(n))));
+        w.push("snap_funktion", text(&erwartet_funktion));
+        w.push("snap_traegerorganisation", text(&erwartet_traeger));
+        w
+    };
+
     let patch = DispositionPatch {
         status_id: body.status_id,
         staerke_position: tri(&body.staerke_position),
@@ -376,7 +455,7 @@ pub async fn update(
     let jetzt = crate::zeit::jetzt();
     let (vorher, nachher, betroffen) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
-        disposition_repo::update_tx(conn, einsatz_id, ep_id, patch).await?;
+        disposition_repo::update_tx(conn, einsatz_id, ep_id, patch, &altwerte).await?;
         let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
         if vorher.status_id != nachher.status_id {
             // LFH-552: ein markierter Status schreibt die Zeitachse mit; ein Verstoß gegen die

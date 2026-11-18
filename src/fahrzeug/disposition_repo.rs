@@ -471,12 +471,14 @@ pub fn stamm_angaben_error() -> AppError {
 /// `status_id` per COALESCE. `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
 /// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört, `Conflict` an
 /// einem beendeten Fahrzeug (LLH-1079), `UnprocessableEntity` bei Ad-hoc-Angaben an einem
-/// Stamm-Fahrzeug; jede Ablehnung schreibt nichts, auch keinen Status.
+/// Stamm-Fahrzeug, `Veraltet` (409), wenn eine Spalte aus `erwartet` inzwischen einen anderen Wert
+/// trägt (Feld-CAS, LLH-1945); jede Ablehnung schreibt nichts, auch keinen Status.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     patch: FahrzeugPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<(), AppError> {
     // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
@@ -493,6 +495,8 @@ pub async fn update_tx(
             return Err(stamm_angaben_error());
         }
     }
+    // Feld-CAS (LLH-1945): nach 404, 409 (beendet) und 422 (Stamm-Fahrzeug), vor dem Schreiben.
+    crate::feld_cas::pruefe_zeile_tx(conn, "einsatz_fahrzeug", einsatz_id, ef_id, erwartet).await?;
     // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
     // still (Muster LLH-1067). Die `snap_*`-Spalten schreibt das UPDATE nur ohne Stammbezug, auch
     // wenn eine Route die Prüfung oben vergäße.
@@ -546,7 +550,14 @@ pub async fn update(
     patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(&mut conn, einsatz_id, ef_id, patch).await
+    update_tx(
+        &mut conn,
+        einsatz_id,
+        ef_id,
+        patch,
+        &crate::feld_cas::ExpectedValues::new(),
+    )
+    .await
 }
 
 /// Geo-/Symbol-Felder einer Disposition. `Some(None)` = NULL, `None` = unverändert.

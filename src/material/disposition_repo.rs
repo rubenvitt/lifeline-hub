@@ -483,12 +483,15 @@ pub fn stamm_angaben_error() -> AppError {
 /// Ad-hoc-Angaben an einem Stamm-Posten, beim Wechsel eines Stamm-Geräts mit Bestandsnummer zum
 /// Verbrauchsgut (LLH-1398) und wenn die Ergebniszeile gegen Art, Menge, Ausgabe oder
 /// Status verstößt ([`check_zeile`], LLH-1224); die Prüfung des Orts (404/409/422) läuft nur bei
-/// geändertem Ziel. Erst wird alles geprüft, dann geschrieben: jede Ablehnung schreibt nichts.
+/// geändertem Ziel; `Veraltet` (409), wenn eine Spalte aus `erwartet` inzwischen einen anderen
+/// Wert trägt (Feld-CAS, LLH-1945). Erst wird alles geprüft, dann geschrieben: jede Ablehnung
+/// schreibt nichts.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
     patch: MaterialPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<(), AppError> {
     // Herausgenommenes oder storniertes Material ändert sich nicht mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
@@ -543,6 +546,9 @@ pub async fn update_tx(
         patch.status.unwrap_or(status),
         patch.ausgegeben.is_some(),
     )?;
+    // Feld-CAS (LLH-1945): nach allen Prüfungen der Zeile und vor dem ersten Schreiben, also auch
+    // vor dem Ort, den `set_ort_tx` getrennt schreibt.
+    crate::feld_cas::pruefe_zeile_tx(conn, "einsatz_material", einsatz_id, em_id, erwartet).await?;
     // Der Ort zuletzt geprüft und vor der Zeile geschrieben: `set_ort_tx` prüft nur ein neues Ziel
     // (Lösen und ein unveränderter Wert gehen immer, auch an einer aufgelösten UHS) und schreibt
     // erst danach.
@@ -596,7 +602,14 @@ pub async fn update(
     patch: MaterialPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(&mut conn, einsatz_id, em_id, patch).await
+    update_tx(
+        &mut conn,
+        einsatz_id,
+        em_id,
+        patch,
+        &crate::feld_cas::ExpectedValues::new(),
+    )
+    .await
 }
 
 /// Teilt `menge` von einem Posten ab (LLH-1093, design.md D8): die Ausgangszeile wird um `menge`

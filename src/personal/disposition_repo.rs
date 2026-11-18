@@ -1,6 +1,7 @@
 use super::qualifikation_repo;
 use super::{status_repo, EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::error::AppError;
+use crate::feld_cas::ExpectedValues;
 use crate::katalog::{StatusKategorie, DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -436,12 +437,15 @@ pub fn stamm_angaben_error() -> AppError {
 
 /// Aktualisiert eine Dispositionszeile nach [`DispositionPatch`]. `NotFound`, falls die Zeile
 /// nicht zum Einsatz gehört, `Conflict` an einer beendeten Kraft (LLH-1079),
-/// `UnprocessableEntity` bei Ad-hoc-Angaben an einer Stamm-Person; dann schreibt sie nichts.
+/// `UnprocessableEntity` bei Ad-hoc-Angaben an einer Stamm-Person, `Veraltet` (409), wenn eine
+/// Spalte aus `erwartet` inzwischen einen anderen Wert trägt (Feld-CAS, LLH-1945); dann schreibt
+/// sie nichts. Ohne Altwert kein Vergleich.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
     patch: DispositionPatch<'_>,
+    erwartet: &ExpectedValues<'_>,
 ) -> Result<(), AppError> {
     require_aktiv_tx(conn, einsatz_id, ep_id).await?;
     if patch.has_adhoc_angaben() {
@@ -456,6 +460,8 @@ pub async fn update_tx(
             return Err(stamm_angaben_error());
         }
     }
+    // Feld-CAS (LLH-1945): nach 404, 409 (beendet) und 422 (Stamm-Person), vor dem Schreiben.
+    crate::feld_cas::pruefe_zeile_tx(conn, "einsatz_personal", einsatz_id, ep_id, erwartet).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
          SET status_id = COALESCE(?, status_id), \
@@ -497,7 +503,7 @@ pub async fn update(
     patch: DispositionPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(&mut conn, einsatz_id, ep_id, patch).await
+    update_tx(&mut conn, einsatz_id, ep_id, patch, &ExpectedValues::new()).await
 }
 
 // ── Lebenszustand (LLH-1079, Spec `kraefte-entlassung`) ──────────────────────────────────
@@ -2104,6 +2110,7 @@ mod tests {
                     status_id: Some(eingetroffen),
                     ..Default::default()
                 },
+                &ExpectedValues::new(),
             )
             .await
             .unwrap();
@@ -2322,6 +2329,7 @@ mod tests {
                     status_id: Some(eingetroffen),
                     ..Default::default()
                 },
+                &ExpectedValues::new(),
             )
             .await
             .unwrap();
