@@ -379,9 +379,24 @@ describe('teileZufluss', () => {
       ausstehend: [],
       abgelehnt: [],
     });
-    const { sichtbar, zurueckgehalten } = teileZufluss(mitZweitgeraet, stand, new Set(['hier']));
+    const { sichtbar, zurueckgehalten } = teileZufluss(mitZweitgeraet, stand, new Set(['hier']), 1);
     expect(zurueckgehalten).toBe(1);
     expect(sichtbar.map((z) => z.schluessel)).toEqual(['eintrag-2']);
+  });
+
+  /*
+   * Review LLH-1833: Ein Folgeeintrag, den der Server auf eine Handlung dieses Geräts hin schreibt
+   * („Auftrag aus ETB-Eintrag erteilen“, Freigaben), trägt keine client_id. Vom eigenen Konto
+   * steht er sofort wie bisher; ein fremder ohne Kennung bleibt zurück.
+   */
+  it('zeigt einen Folgeeintrag des eigenen Kontos ohne client_id sofort', () => {
+    const folge = baueZeilen({
+      eintraege: [e({ id: 3, lfd_nr: 3, erfasser_id: 42 }), e({ id: 2, lfd_nr: 2 })],
+      ausstehend: [],
+      abgelehnt: [],
+    });
+    expect(teileZufluss(folge, stand, new Set(), 42).zurueckgehalten).toBe(0);
+    expect(teileZufluss(folge, stand, new Set(), 7).zurueckgehalten).toBe(1);
   });
 
   it('lässt entfallene Einträge sofort fallen', () => {

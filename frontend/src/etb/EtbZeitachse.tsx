@@ -127,6 +127,8 @@ interface Props {
    * nicht — derselbe Benutzer auf einem anderen Gerät schreibt fremd (LLH-1833).
    */
   eigeneClientIds?: ReadonlySet<string>;
+  /** Die angemeldete Person: ihre Folgeeinträge ohne client_id gelten als hier geschrieben. */
+  eigeneBenutzerId?: number | null;
   /**
    * Steht die Seite am Ende (LLH-1149, `components/useFunkprotokollLauf.ts`)? Wer hochgerollt
    * hat, liest: dann hält die Zeitachse neue fremde Einträge zurück wie bei Fokus darin. Vorgabe
@@ -321,6 +323,7 @@ export default function EtbZeitachse({
   kopfKlebt = false,
   sprungMarke,
   eigeneClientIds,
+  eigeneBenutzerId,
   amEnde = true,
   onZumEnde,
   onGezeigt,
@@ -406,8 +409,8 @@ export default function EtbZeitachse({
   );
   const index = useMemo(() => berichtigungsindex(eintraege), [eintraege]);
   const { sichtbar, zurueckgehalten } = useMemo(
-    () => teileZufluss(zeilen, gefroren, eigeneClientIds),
-    [zeilen, gefroren, eigeneClientIds],
+    () => teileZufluss(zeilen, gefroren, eigeneClientIds, eigeneBenutzerId),
+    [zeilen, gefroren, eigeneClientIds, eigeneBenutzerId],
   );
   // Funkprotokoll-Ordnung (LLH-1149): erst nach dem Zufluss gekehrt, damit Einfrieren und
   // Wassermarke weiter auf der Serverordnung rechnen (`funkprotokollFolge`).

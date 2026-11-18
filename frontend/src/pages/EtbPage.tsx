@@ -1265,6 +1265,7 @@ export default function EtbPage() {
               kopfKlebt={kleben.klebt}
               sprungMarke={hervorhebung?.marke}
               eigeneClientIds={eigeneClientIds}
+              eigeneBenutzerId={benutzer?.id}
               amEnde={amEnde}
               onZumEnde={zumEnde}
               onGezeigt={setGezeigt}
