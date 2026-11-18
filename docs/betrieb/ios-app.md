@@ -137,6 +137,9 @@ im Browser ein, nicht in der App.
 - **Dateien vom eigenen Server** (Adressen unter `/api/` außer `/api/auth/`, CSV-Exporte) lädt
   die App und bietet sie im **Teilen-Blatt** an („In Dateien sichern“, AirDrop, Mail).
 - **Drucken** öffnet den Druckdialog von iOS (AirPrint).
+- **Rückfragen der Seite** (etwa „Tier löschen?“, ein Feldkonflikt) erscheinen als Dialog von iOS.
+  Der Titel nennt, wer fragt: die Adresse des Servers oder, bei einer fremden Seite wie dem
+  Anmeldedienst, deren Adresse.
 - **Meldungen und Zahl am App-Symbol:** Bei laufender App zeigt sie eine Benachrichtigung als
   Mitteilung des Systems und setzt die Zahl der ungelesenen Eingänge am Symbol. iOS fragt beim
   ersten Mal nach der Erlaubnis; ändern unter Einstellungen → Mitteilungen → „Lifeline“.
@@ -164,8 +167,6 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
   „Server nicht erreichbar“ statt der Oberfläche; einen Precache wie im Browser gibt es in der App
   nicht. Erst eine schon geladene Oberfläche arbeitet ohne Netz weiter. Der Start mit dem letzten
   Stand kommt nach einem Spike auf echtem Gerät als eigene Änderung.
-- **Dialoge der Seite:** `alert` und `confirm` der Weboberfläche zeigt die App noch nicht; ein
-  `confirm` gilt dort als abgelehnt.
 - **iPad:** Die Sitzungsliste unter Profil → „Anmeldungen“ nennt ein iPad als Mac, weil sich sein
   Webview so meldet.
 - **Nicht gemessen:** alles auf echten Geräten (Aufgabe 10.3 der Change): Onboarding mit
