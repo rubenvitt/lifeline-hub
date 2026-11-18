@@ -1,6 +1,6 @@
 import { theme } from 'antd';
 import type { ReactNode } from 'react';
-import Feldetikett from './instrument/Feldetikett';
+import { form } from '../theme/tokens';
 
 interface FeldLabelProps {
   /** Sichtbare Beschriftung — zugleich der Accessible Name des beschrifteten Feldes. */
@@ -25,9 +25,8 @@ interface FeldLabelProps {
  * dem Theme statt des dort hartkodierten `rgba(0,0,0,0.45)`, das im Dunkelmodus schwarz auf
  * dunklem Grund stand.
  *
- * Die Beschriftung ist ein `Feldetikett` (LLH-1776, Spec `schriftrollen`): gemischt geschrieben,
- * Stufe `klein`, Textstufe `gedaempft`. Vorher sprach sie die Metadaten-Stimme (gesperrte
- * Versalien); Versalien stehen seit 15.11.2026 nur noch in Köpfen.
+ * Die Beschriftung spricht die Metadaten-Stimme aus A0 (Signatur 5): gesperrte Versalien in
+ * `form.versalSperrung`, `token.fontSizeSM`, `token.colorTextSecondary`.
  *
  * **Ein Name, nicht zwei:** Wo `FeldLabel` steht, trägt das Feld KEIN `aria-label` mehr —
  * `aria-label` gewinnt gegen `<label>` und entkoppelte sonst den sichtbaren Text vom
@@ -37,13 +36,20 @@ export default function FeldLabel({ text, htmlFor, children }: FeldLabelProps) {
   const { token } = theme.useToken();
   return (
     <div>
-      <Feldetikett
-        als="label"
+      <label
         htmlFor={htmlFor}
-        style={{ display: 'block', marginBottom: token.marginXXS }}
+        style={{
+          display: 'block',
+          fontSize: token.fontSizeSM,
+          fontWeight: 600,
+          color: token.colorTextSecondary,
+          letterSpacing: form.versalSperrung,
+          textTransform: 'uppercase',
+          marginBottom: token.marginXXS,
+        }}
       >
         {text}
-      </Feldetikett>
+      </label>
       {children}
     </div>
   );

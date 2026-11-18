@@ -76,7 +76,7 @@ vi.mock('../api/meldungen', async () => {
     },
     ladeMeldung: async (id: number, mid: number) => {
       const m = (await liste(id)).find((x) => x.id === mid);
-      if (!m) throw new Error('404');
+      if (!m) throw new ApiError(404, 'Nicht gefunden');
       return m;
     },
     legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
@@ -341,6 +341,77 @@ describe('MeldungenPage', () => {
     antworte([]);
     expect(await screen.findByText('Keine Meldungen')).toBeInTheDocument();
     expect(screen.queryByText('Florian Nord 1')).not.toBeInTheDocument();
+  });
+
+  /**
+   * LLH-1823: Beim ersten Laden und bei einem gescheiterten Abruf ist die Lage unbekannt, nicht
+   * leer. „0 offen“, „Offen (0)“ und „Keine Meldungen“ wären eine falsche Aussage.
+   */
+  describe('Laden und Fehler ohne Bestand (LLH-1823)', () => {
+    const OHNE_PLATZHALTER = 'script, style, [data-lfh="meta-platzhalter"]';
+
+    it('zeigt beim ersten Laden das Skelett, keine Null und keinen Leerzustand', async () => {
+      listeMeldungen.mockImplementation(() => new Promise<Meldung[]>(() => {}));
+      renderPage();
+      expect(await screen.findByLabelText('Inhalt wird geladen')).toBeInTheDocument();
+      expect(screen.queryByText('Keine Meldungen')).not.toBeInTheDocument();
+      expect(screen.queryByText(/0 offen/, { ignore: OHNE_PLATZHALTER })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Offen' })).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /Offen \(0\)/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Abgeschlossen' })).toBeInTheDocument();
+    });
+
+    it('zeigt bei 500 den Abruffehler mit „Erneut abrufen“ und keine Null', async () => {
+      listeMeldungen.mockRejectedValue(new ApiError(500, 'Interner Fehler'));
+      renderPage();
+      expect(await screen.findByText('Meldungen konnten nicht geladen werden')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+      expect(screen.queryByText('Keine Meldungen')).not.toBeInTheDocument();
+      expect(screen.queryByText(/\b0 offen/, { ignore: OHNE_PLATZHALTER })).not.toBeInTheDocument();
+      expect(screen.getByText('— offen · — abgeschlossen')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Offen' })).toBeInTheDocument();
+
+      // Erneut abrufen holt die Liste; danach steht sie normal da.
+      listeMeldungen.mockResolvedValue([meldung()]);
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+      expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    });
+
+    // Review a12ms7g9 (F9): ein Kaltstart ohne Netz hält den Abruf an; das ist ein Abruffehler,
+    // kein endloses Laden.
+    it('zeigt ohne Netz und ohne Stand den Abruffehler mit „Erneut abrufen“ und „—“ im Kopf', async () => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client.setQueryDefaults(einsatzKeys.einsatz(1), { staleTime: Infinity });
+      client.setQueryData(einsatzKeys.einsatz(1), await ladeEinsatz(1));
+      setzeOnline(false);
+      renderPage(undefined, client);
+      expect(await screen.findByText('Meldungen konnten nicht geladen werden')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+      expect(screen.queryByLabelText('Inhalt wird geladen')).not.toBeInTheDocument();
+      expect(screen.getByText('— offen · — abgeschlossen')).toBeInTheDocument();
+    });
+
+    it('zeigt bei einem Fehler mit Bestand die Zeilen und den veralteten Stand', async () => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      renderPage(undefined, client);
+      await screen.findByText('Florian Nord 1');
+      listeMeldungen.mockRejectedValue(new ApiError(500, 'Interner Fehler'));
+      await act(() =>
+        client.refetchQueries({ queryKey: einsatzKeys.meldungenPhase(1, 'offen', 'alle') }),
+      );
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
+    });
+
+    it('zeigt im Normalfall Zahlen in Kopf und Segmenten wie bisher', async () => {
+      renderPage();
+      await screen.findByText('Florian Nord 1');
+      expect(screen.getByText('1 offen · 0 abgeschlossen')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Offen (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Abgeschlossen (0)' })).toBeInTheDocument();
+    });
   });
 
   /**
@@ -819,6 +890,20 @@ describe('MeldungenPage', () => {
     );
     // apply-then-clean: der Selektions-Param ist aus der URL geräumt.
     await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+  });
+
+  /** Spec `seiten-zustaende`, „Deeplink auf ein Objekt, das es nicht gibt“ (LLH-1827). */
+  it('?meldung=<id> ohne Meldung (404 des Einzelabrufs) zeigt den Hinweis, hebt nichts hervor und räumt die Adresse', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ id: 1, inhalt: 'Andere Meldung' })]);
+    const { container } = renderPage('/einsaetze/1/meldungen?meldung=99999');
+    expect(await screen.findByText('Meldung #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+    expect(container.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+    expect(screen.getByText('Andere Meldung')).toBeInTheDocument();
+
+    // Ein Klick auf eine Karte schließt den Hinweis.
+    await userEvent.click(screen.getByText('Andere Meldung'));
+    expect(screen.queryByText('Meldung #99999 gibt es nicht (mehr)')).not.toBeInTheDocument();
   });
 
   it('?meldung=<id> einer erledigten Meldung schaltet auf die Abgeschlossen-Ansicht', async () => {

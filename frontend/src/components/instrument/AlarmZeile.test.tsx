@@ -1,12 +1,10 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { schriftPx } from '../../theme/tokens';
 import { renderMitProviders } from '../../test/utils';
 import type { AlarmEintrag, WasBrennt } from '../../lage/wasBrennt';
 import AlarmZeile, { ALARMZEILE_SCHRIFT, alarmEintragHoehe } from './AlarmZeile';
 import { grossMass } from '../grossbild/grossMass';
-import { schriftGroesse } from './rollenwerte';
 
 const e = (art: AlarmEintrag['art'], rolle: AlarmEintrag['rolle'], text: string): AlarmEintrag => ({
   art,
@@ -45,13 +43,11 @@ describe('AlarmZeile (Spec lage-alarmzeile)', () => {
     for (const liste of [[], ACHT.slice(0, 1), ACHT]) {
       const { container, unmount } = renderMitProviders(<AlarmZeile daten={daten(liste)} />);
       hoehen.add(zeile(container).style.height);
-      expect(zeile(container).style.fontSize).toBe(ALARMZEILE_SCHRIFT.normal);
+      expect(zeile(container).style.fontSize).toBe(`${ALARMZEILE_SCHRIFT.normal}px`);
       unmount();
     }
     expect(hoehen.size).toBe(1);
-    // Stufe `titel`: 16 px in `kompakt`, darüber wachsend (Spec: mindestens 16 px).
-    expect(ALARMZEILE_SCHRIFT.normal).toBe(schriftGroesse('titel'));
-    expect(schriftPx('titel', 'kompakt')).toBeGreaterThanOrEqual(16);
+    expect(ALARMZEILE_SCHRIFT.normal).toBeGreaterThanOrEqual(16);
   });
 
   it('Treffläche folgt der Dichtestufe: Einträge in Steuerhöhe 30 / 48 / 72 px', () => {
@@ -171,14 +167,14 @@ describe('AlarmZeile (Spec lage-alarmzeile)', () => {
     expect(zeile(container).querySelector('[data-lfh="alarm-hinweis"]')).toHaveTextContent(
       'Stand unvollständig: Rückmeldungen nicht geladen',
     );
-    // Die Liste hinter „+n“ nennt den Stand auch, in der Größe der Zeile (Stufe `titel`, ≥ 16 px).
+    // Die Liste hinter „+n“ nennt den Stand auch, in mindestens 16 px.
     await userEvent.click(screen.getByRole('button', { name: 'Alle 3 zeigen' }));
     const liste = await screen.findByRole('list');
     expect(liste).toHaveTextContent('Stand unvollständig: Rückmeldungen nicht geladen');
     for (const e of within(liste).getAllByRole('listitem')) {
       const groesse =
         (e.firstElementChild as HTMLElement | null)?.style.fontSize || e.style.fontSize;
-      expect(groesse).toBe(ALARMZEILE_SCHRIFT.normal);
+      expect(parseFloat(groesse)).toBeGreaterThanOrEqual(16);
     }
   });
 });

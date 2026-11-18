@@ -267,6 +267,13 @@ describe('BefehlListe — Liste + Detailpaneel (Spec `auftraege-befehle`)', () =
     await waitFor(() => expect(screen.getByTestId('suche')).not.toHaveTextContent('befehl='));
   });
 
+  it('?befehl= mit unbekannter Kennung zeigt den Hinweis, wählt nichts und räumt den Parameter (LLH-1827)', async () => {
+    renderListe('/einsaetze/1/auftraege?befehl=99999&reiter=befehle');
+    expect(await screen.findByText('Befehl #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('suche')).not.toHaveTextContent('befehl='));
+    expect(document.querySelector('[aria-current="true"]')).toBeNull();
+  });
+
   /**
    * Rückweg aus der Vollseite (LLH-1530): Die Liste steht aus dem Cache sofort da, und StrictMode
    * lässt jeden Effekt der frisch eingehängten Liste ein zweites Mal laufen. Die Vorauswahl der

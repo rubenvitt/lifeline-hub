@@ -144,8 +144,8 @@ Unfallhilfsstelle, Position und Bemerkung zeigen. Jede Angabe MUST einzeln gespe
 
 ### Requirement: Ansicht ohne Person oder ohne Schreibrecht
 
-Eine ungültige ID MUST zur Personalliste führen. Eine unbekannte oder stornierte Person MUST die
-Ansicht als nicht (mehr) im Einsatz melden, mit einem Weg zur Personalliste. Ohne Schreibrecht
+Eine ungültige ID, eine unbekannte oder eine stornierte Person MUST die Ansicht als nicht (mehr)
+im Einsatz melden, mit einem Weg zur Personalliste, ohne stille Weiterleitung. Ohne Schreibrecht
 oder bei abgeschlossenem Einsatz MUST die Ansicht nur lesen und den Grund nennen.
 
 #### Scenario: Stornierte Person
@@ -155,6 +155,11 @@ oder bei abgeschlossenem Einsatz MUST die Ansicht nur lesen und den Grund nennen
 #### Scenario: Abgeschlossener Einsatz
 - **WHEN** die Ansicht in einem abgeschlossenen Einsatz geöffnet wird
 - **THEN** stehen alle Angaben als Text, und die Seite nennt den Grund „nur Ansicht“
+
+#### Scenario: Ungültige ID
+- **WHEN** die Ansicht mit einer Kennung aufgerufen wird, die keine Zahl ist
+- **THEN** bleibt die Adresse stehen, und die Seite meldet die Person als nicht (mehr) im Einsatz
+  mit dem Weg zur Personalliste
 
 ### Requirement: Angaben zur Person in der Ansicht
 

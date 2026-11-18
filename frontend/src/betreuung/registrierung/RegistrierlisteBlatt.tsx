@@ -2,6 +2,7 @@ import { theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { registrierNummer } from '../../anzeige/registrierNummer';
 import type { RegistrierListe, RegistriertePerson } from '../../api/types';
+import { monoStil } from '../../components/instrument';
 import {
   KOSTFORM_REIHE,
   KOSTFORM_WORT,
@@ -10,8 +11,6 @@ import {
   kostformBand,
   personName,
 } from './registrierKern';
-import { schriftStil, zahlStil } from '../../components/instrument/rollenwerte';
-
 import './registrierlisteDruck.css';
 
 export interface RegistrierlisteBlattProps {
@@ -53,17 +52,14 @@ export default function RegistrierlisteBlatt({
     textAlign: 'start',
   };
   const kopfzelle: CSSProperties = { ...zelle, borderBlockEnd: rand, fontWeight: 600 };
-  const mono: CSSProperties = { ...zahlStil('text'), whiteSpace: 'nowrap' };
+  const mono: CSSProperties = { ...monoStil(token.fontSize), whiteSpace: 'nowrap' };
   const spalten = hasUnvertraeglichkeiten ? 6 : 5;
 
   const personZeile = (p: RegistriertePerson) => (
     <tr key={p.id}>
       <td style={{ ...zelle, ...mono }}>{registrierNummer('R', p.registrier_nr)}</td>
       <td style={zelle}>{personName(p)}</td>
-      {/* „ca. 40 J.“ trägt Wörter: Textschrift mit gleich breiten Ziffern (LLH-1777). */}
-      <td style={{ ...zelle, ...schriftStil('text'), whiteSpace: 'nowrap' }}>
-        {alterText(p, heute)}
-      </td>
+      <td style={{ ...zelle, ...mono }}>{alterText(p, heute)}</td>
       <td style={zelle}>{p.kostform ? KOSTFORM_WORT[p.kostform] : 'ohne Angabe'}</td>
       {hasUnvertraeglichkeiten && <td style={zelle}>{p.unvertraeglichkeiten ?? ''}</td>}
       <td style={{ ...zelle, borderInline: rand, borderBlockEnd: rand }} />

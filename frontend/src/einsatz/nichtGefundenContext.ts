@@ -1,27 +1,42 @@
 import { createContext, useContext, useLayoutEffect, type MutableRefObject } from 'react';
+import { useLocation } from 'react-router';
 
 /**
- * Meldung der Auffangseite an den Einsatzrahmen (LLH-1729): „hier steht ‚Seite nicht gefunden‘“.
- * Der Rahmen merkt die Adresse dann nicht als letzten Ort (`letzterOrt.ts`), wie er auch ein
- * gesperrtes Modul nicht merkt; der Rückweg von Profil und Verwaltung führte sonst auf die
- * Fehlerseite.
+ * Meldung einer Seite an den Einsatzrahmen: „hier steht ‚gibt es nicht‘“. Das sind die Auffangseite
+ * einer unbekannten Adresse (LLH-1729) und jede Detailseite, deren Objekt es nicht (mehr) gibt
+ * (`SeitenNichtGefunden`, LLH-1827). Der Rahmen merkt die Adresse dann nicht als letzten Ort
+ * (`letzterOrt.ts`), wie er auch ein gesperrtes Modul nicht merkt; der Rückweg von Profil und
+ * Verwaltung führte sonst auf die Fehlerseite.
  *
- * Ein Ref statt eines Zustands: der Rahmen merkt im Effekt desselben Commits, in dem die Seite
- * erscheint. Die Seite setzt die Marke per `useLayoutEffect`, und alle Layout-Effekte laufen vor
- * den Effekten (`useEffect`) des Rahmens; ein Zustand käme erst einen Commit später an.
+ * `marke` ist ein Ref statt eines Zustands: der Rahmen merkt im Effekt desselben Commits, in dem die
+ * Seite erscheint. Die Seite setzt die Marke per `useLayoutEffect`, und alle Layout-Effekte laufen
+ * vor den Effekten (`useEffect`) des Rahmens; ein Zustand käme erst einen Commit später an.
+ *
+ * `revoke` deckt den späten Fall: eine Detailseite lädt erst und erfährt dann (404), dass es ihr
+ * Objekt nicht gibt. Bis dahin hat der Rahmen die Adresse schon gemerkt; er stellt dann den Ort
+ * davor wieder her, aber nur, wenn das Gemerkte genau diese Adresse ist.
  */
-const NichtGefundenContext = createContext<MutableRefObject<boolean> | null>(null);
+export interface NichtGefundenMarke {
+  marke: MutableRefObject<boolean>;
+  /** Nimmt das Merken von `pfad` (ohne Suche) zurück, falls der Rahmen ihn zuletzt gemerkt hat. */
+  revoke: (pfad: string) => void;
+}
+
+const NichtGefundenContext = createContext<NichtGefundenMarke | null>(null);
 
 export const NichtGefundenProvider = NichtGefundenContext.Provider;
 
 /** Setzt die Marke, solange die aufrufende Seite steht. Außerhalb des Rahmens wirkungslos. */
 export function useMarkNichtGefunden(): void {
-  const flag = useContext(NichtGefundenContext);
+  const kontext = useContext(NichtGefundenContext);
+  const { pathname } = useLocation();
   useLayoutEffect(() => {
-    if (!flag) return;
+    if (!kontext) return;
+    const flag = kontext.marke;
     flag.current = true;
+    kontext.revoke(pathname);
     return () => {
       flag.current = false;
     };
-  }, [flag]);
+  }, [kontext, pathname]);
 }

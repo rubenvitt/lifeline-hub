@@ -2,12 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import type { BetreuungUebersicht, Betreuungsstelle, ModulFreigaben } from '../api/types';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { richtwerteAntwort } from '../test/unterkunftRichtwerte';
 import { renderMitProviders, setzeOnline } from '../test/utils';
+import { erwarteNichtGefunden } from '../test/nichtGefunden';
 import UnterkunftPlanenPage, {
   ENTSPRICHT_KAPAZITAET,
   KEINE_PLAETZE,
@@ -95,15 +96,26 @@ function stelleBereit(a: Aufbau = {}) {
   return { patches, nachforderungen };
 }
 
-function rendern() {
+/** Zeigt die Adresse, auf der die Seite steht. */
+function Adresse() {
+  return <span data-testid="adresse">{useLocation().pathname}</span>;
+}
+
+function rendern(route = '/einsaetze/1/betreuung/8/unterkunft') {
   return renderMitProviders(
     <Routes>
+      <Route path="/einsaetze/:id/betreuung" element={<div>UEBERSICHT</div>} />
       <Route
         path="/einsaetze/:id/betreuung/:stelleId/unterkunft"
-        element={<UnterkunftPlanenPage />}
+        element={
+          <>
+            <Adresse />
+            <UnterkunftPlanenPage />
+          </>
+        }
       />
     </Routes>,
-    { route: '/einsaetze/1/betreuung/8/unterkunft' },
+    { route },
   );
 }
 
@@ -115,6 +127,25 @@ async function halleEintragen(laenge: string, breite: string) {
 
 describe('UnterkunftPlanenPage', () => {
   afterEach(() => setzeOnline(true));
+
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4): kein
+  // stilles `Navigate` mehr, die Adresse bleibt stehen.
+  it.each([
+    ['unbekannte oder stornierte', '/einsaetze/1/betreuung/77/unterkunft'],
+    ['unlesbare', '/einsaetze/1/betreuung/abc/unterkunft'],
+  ])('eine %s Stelle zeigt das Muster, die Adresse bleibt', async (_, pfad) => {
+    stelleBereit();
+    rendern(pfad);
+    expect(
+      await screen.findByText('Diese Betreuungsstelle gibt es nicht (mehr)'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('adresse')).toHaveTextContent(pfad);
+    await erwarteNichtGefunden({
+      titel: 'Diese Betreuungsstelle gibt es nicht (mehr)',
+      knopf: 'Zur Betreuung',
+      liste: 'UEBERSICHT',
+    });
+  });
 
   it('rechnet aus Räumen und übernimmt die Plätze als Kapazität der Stelle', async () => {
     const { patches } = stelleBereit();

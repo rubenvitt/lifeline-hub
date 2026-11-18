@@ -11,6 +11,7 @@ import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 
 /** Ziel des Sprungs „Auf Karte verorten“ (LLH-1123): zeigt den Auftrag aus der Adresse. */
 function KartenSonde() {
@@ -549,9 +550,27 @@ describe('TiereDetailPage — Fotos und Dateien', () => {
 });
 
 describe('TiereDetailPage — Robustheit', () => {
-  it('leitet bei ungültiger Tier-ID auf die Liste um', async () => {
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4).
+  it('zeigt bei ungültiger Tier-ID das Muster statt still auf die Liste umzuleiten', async () => {
     render(einsatzAktiv, tierBasis, [], '/einsaetze/1/tiere/abc');
-    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    await erwarteNichtGefunden({
+      titel: 'Dieses Tier gibt es nicht (mehr)',
+      knopf: 'Zu den Tieren',
+      liste: 'LISTE',
+    });
+  });
+
+  it('zeigt bei 404 „Dieses Tier gibt es nicht (mehr)“ mit dem Weg zu den Tieren', async () => {
+    render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () =>
+        HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
+      ),
+    ]);
+    await erwarteNichtGefunden({
+      titel: 'Dieses Tier gibt es nicht (mehr)',
+      knopf: 'Zu den Tieren',
+      liste: 'LISTE',
+    });
   });
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
@@ -562,6 +581,7 @@ describe('TiereDetailPage — Robustheit', () => {
     ]);
     expect(await screen.findByText('Tier konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Dieses Tier gibt es nicht (mehr)')).toBeNull();
   });
 });
 

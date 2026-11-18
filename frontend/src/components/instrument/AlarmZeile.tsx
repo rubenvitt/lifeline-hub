@@ -1,10 +1,10 @@
 import { Popover } from 'antd';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
-import { fernsicht, schrift } from '../../theme/tokens';
+import { schrift } from '../../theme/tokens';
 import { GROSS_BEZUG, grossMass } from '../grossbild/grossMass';
 import type { AlarmEintrag, WasBrennt } from '../../lage/wasBrennt';
-import { schriftGroesse, useRollen } from './rollenwerte';
+import { useRollen } from './rollenwerte';
 import { statusFlaeche } from './statusFlaeche';
 
 /**
@@ -29,12 +29,12 @@ import { statusFlaeche } from './statusFlaeche';
 export type AlarmGroesse = 'normal' | 'gross' | 'grossbild';
 
 /**
- * Schriftgröße der Zeile: Stufe `titel`, also mindestens 16 px (Spec) und mit der Dichte wachsend
- * (LLH-1774); am Monitor die Fernsicht-Skala, 28 px.
+ * Schriftgröße der Zeile: mindestens 16 px (Spec), am Monitor die Großbild-Stufe 28 px, im Großbild
+ * des Lagebilds 28 Bezugspixel über `grossMass`.
  */
 export const ALARMZEILE_SCHRIFT = {
-  normal: schriftGroesse('titel'),
-  gross: `${fernsicht.text}px`,
+  normal: 16,
+  gross: 28,
   grossbild: grossMass(GROSS_BEZUG.text),
 } as const;
 /**

@@ -90,9 +90,8 @@ import {
   Sammelbanner,
   WarnstufenHinweis,
   AlarmZeile,
+  monoStil,
   useRollen,
-  schriftGroesse,
-  schriftStil,
 } from '../../components/instrument';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import {
@@ -440,8 +439,7 @@ export default function LageDashboardPage() {
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: token.padding,
-                ...schriftStil('meta'),
-                fontSize: schriftGroesse('fein'),
+                ...monoStil(11),
                 color: rollen.schwach,
               }}
             >

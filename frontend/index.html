@@ -5,10 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0c0e11" />
-    <!-- Der Zoom ist frei (LLH-1774, Spec `schriftskala`; umgekehrt 15.11.2026 gegenüber
-         LLH-1328). Die Schrift wächst mit der Dichte, in `komfortabel` liegt ein Feld bei 16,1 px,
-         iOS zoomt beim Fokus also nicht. Wächter `theme/zoomFrei.guard.test.ts`. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Kein Zoom wie in einer App (LLH-1328, `frontend/AGENTS.md`, Bedien-Leitlinie): iOS zoomt
+         sonst beim Fokus in jedes Feld unter 16 px Schrift, und die Dichte-Stufen liegen darunter.
+         Größe trägt die Dichte, nicht der Browser-Zoom. Wächter `theme/keinZoom.guard.test.ts`. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>lifeline-hub</title>
     <!-- Theme synchron vor dem React-Mount setzen, sonst blitzt beim Laden das
          falsche Farbschema auf (FOUC). Logik gespiegelt aus ThemeModeProvider:
@@ -49,30 +52,6 @@
         } catch (e) {
           /* localStorage gesperrt o. Ä. – keine Abdunklung, der Provider übernimmt. */
         }
-      })();
-    </script>
-    <!-- Bediendichte synchron vor dem React-Mount setzen (LLH-1774): die Schriftgrößen rechnen in
-         CSS mit dem Faktor der Stufe (`--lfh-schrift-faktor` an `[data-dichte]`). Ohne das Merkmal
-         stünde das erste Bild in `kompakt`, antd schon in der Stufe, und Text spränge nach dem
-         Mount. Gespiegelt aus `theme/dichte.ts:startDichte` (Pin: `dichte.test.ts`). -->
-    <script>
-      (function () {
-        var d = 'kompakt';
-        try {
-          var dichten = ['kompakt', 'komfortabel', 'handschuh'];
-          d = localStorage.getItem('lifeline-hub.dichte');
-          if (dichten.indexOf(d) === -1) {
-            d = matchMedia('(pointer: coarse)').matches ? 'komfortabel' : 'kompakt';
-          }
-        } catch (e) {
-          /* localStorage gesperrt o. Ä. – wie `startDichte` ohne Wahl: die Zeigerart. */
-          try {
-            d = matchMedia('(pointer: coarse)').matches ? 'komfortabel' : 'kompakt';
-          } catch (f) {
-            d = 'kompakt';
-          }
-        }
-        document.documentElement.dataset.dichte = d;
       })();
     </script>
   </head>

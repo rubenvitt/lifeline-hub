@@ -2,7 +2,7 @@ import { Button } from 'antd';
 import type { CSSProperties, ReactNode } from 'react';
 import Paneel, { type PaneelUeberschrift } from './Paneel';
 import PaneelZustand, { PaneelLink, type PaneelDatenzustand } from './PaneelZustand';
-import { schriftGroesse, useRollen } from './rollenwerte';
+import { useRollen } from './rollenwerte';
 
 /**
  * DashboardPaneel — der Rahmen jedes Paneels einer Dashboard-Fläche (Regel „Dashboard-Baukasten“,
@@ -93,7 +93,7 @@ export default function DashboardPaneel({
         type="link"
         data-lfh="paneel-kopf-aktion"
         onClick={kopfAktion.onKlick}
-        style={{ paddingInline: token.paddingXS, fontSize: schriftGroesse('klein') }}
+        style={{ paddingInline: token.paddingXS, fontSize: 12 }}
       >
         {kopfAktion.label}
       </Button>
