@@ -1,0 +1,97 @@
+# iOS-App zu TestFlight (LLH-1978, Spec `ios-auslieferung`, „TestFlight erhält Beta- und stabile
+# Stände“): den Tag auschecken, das Projekt erzeugen, archivieren, automatisch signieren und hochladen.
+# Ablauf in `scripts/ios/testflight.sh` (auf einem Mac genauso), XcodeGen gepinnt in
+# `scripts/ios/xcodegen-installieren.sh`. Betrieb, Secrets und Übergaben: docs/betrieb/ios-app.md.
+#
+# Zwei Auslöser, kein PR und kein Push (ADR-0048; dieselbe Form wie deployment.yml):
+#
+# - `workflow_call` aus artefakte.yml (Job `ios`), NACH der Freigabe und nur für Tags der Kanäle
+#   `beta` und `main`. Der Job steht in keinem `needs` von `freigeben`: ein roter Upload oder eine
+#   hängende Verarbeitung bei Apple hält weder Release noch Deployment auf, es fehlt nur der
+#   TestFlight-Build dieses Tags (wie `desktop-alpha`).
+# - `workflow_dispatch` als Handstart, etwa für einen Beta-Tag nach einer Störung bei Apple.
+#
+# Alpha-Tags lädt das Skript nie hoch, auch nicht per Handstart. Signiert wird über den
+# App-Store-Connect-API-Schlüssel (APP_STORE_CONNECT_*); auf dem Runner liegt kein Zertifikat.
+# Runner und Xcode wie ios-pruefung.yml: Xcode 16.4 auf macos-15.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in pr.yml.
+name: iOS-App (TestFlight)
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Freigegebener Release-Tag der Kanäle beta oder main (vorbereiten in artefakte.yml)'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release-Tag, dessen App zu TestFlight soll, z. B. v1.0.0-beta.3 oder v1.0.0 (nie Alpha)'
+        required: true
+        type: string
+
+# Least privilege: der Lauf liest nur das Repository; hochgeladen wird zu Apple, nicht zu GitHub.
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: TestFlight
+    runs-on: macos-15
+    # Archiv plus Upload; die Verarbeitung bei Apple danach wartet der Lauf nicht ab.
+    timeout-minutes: 60
+    # Je Tag ein Upload zur Zeit; ein zweiter wartet (zwei Builds derselben Minute trügen dieselbe
+    # Build-Nummer, scripts/ios/version.sh).
+    concurrency:
+      group: ios-testflight-${{ inputs.tag }}
+      cancel-in-progress: false
+    env:
+      XCODE_APP: /Applications/Xcode_16.4.app
+    steps:
+      # Bei einem Handstart ist der Tag freie Eingabe: erst gegen das Muster prüfen, dann an
+      # `actions/checkout` geben. Den Kanal prüft danach das Skript.
+      - name: Tag prüfen
+        env:
+          ROH_TAG: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$ROH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "FEHLER: '$ROH_TAG' ist kein zulässiger Release-Tag (erwartet: vX.Y.Z[-vorab])." >&2
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - name: Xcode wählen
+        run: |
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "FEHLER: $XCODE_APP fehlt auf dem Runner. Vorhanden:" >&2
+            ls -d /Applications/Xcode*.app >&2
+            exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+      - name: XcodeGen (gepinnt)
+        run: ./scripts/ios/xcodegen-installieren.sh
+      - name: Archivieren, signieren, hochladen
+        env:
+          TAG: ${{ inputs.tag }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: ./scripts/ios/testflight.sh --tag "$TAG" --ausgabe "$RUNNER_TEMP/testflight"
+      # Zur Diagnose nur bei Rot: die Protokolle des Exports (ohne Schlüssel, der liegt nie in der
+      # Ausgabe).
+      - name: Export-Protokolle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-testflight-protokolle
+          path: |
+            ${{ runner.temp }}/testflight/export/*.log
+            ${{ runner.temp }}/testflight/export/*.plist
+            ${{ runner.temp }}/testflight/ExportOptions.plist
+          if-no-files-found: ignore
+          retention-days: 7

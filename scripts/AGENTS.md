@@ -66,6 +66,12 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     macOS-Runner nur an PRs, die `ios/`, `scripts/ios/` oder `src-tauri/faelle/` ändern, und ist
     kein Pflicht-Check. Ablauf in `scripts/ios/simulator-pruefung.sh`, XcodeGen nur über
     `scripts/ios/xcodegen-installieren.sh` (einzige Stelle der Version, mit Prüfsumme).
+  - **TestFlight** (LLH-1978): `ios.yml` lädt die iOS-App hoch, aufgerufen aus `artefakte.yml`
+    (Job `ios`, nach `freigeben`, nur Tags der Kanäle `beta` und `main`) oder per Handstart. Der
+    Job steht in keinem `needs` von `freigeben`: ein roter Upload hält das Release nicht auf.
+    Archiv, Signierung und Upload stehen in `scripts/ios/testflight.sh`, das Alpha-Tags und eine
+    vom Tag abweichende Workspace-Version selbst abweist (Selbsttest in Schritt 8). Betrieb und
+    Secrets: `docs/betrieb/ios-app.md`.
   - Folge: Testbrüche landen auf `alpha` und gehen über „alpha rot“ (Stau-Wächter, unten).
   - Herleitung: `openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md`,
     `openspec/changes/archive/2026-11-15-czjhc4qq-ci-pr-schlank/design.md`.
