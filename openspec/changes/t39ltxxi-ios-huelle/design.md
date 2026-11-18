@@ -1,236 +1,287 @@
-# iOS-App als native Hülle um die Weboberfläche des Servers
+# Design: iOS-App als native Hülle um die Weboberfläche des Servers
 
 Zunder: https://zunder.rubeen.dev/#/aufgabe/t39ltxxi3nvvqcoupqrae1do (LLH-1978)
-Brainstorming mit Ruben am 18.11.2026. Markiert ist, was Ruben entschieden hat **(R)** und was
-ein Vorschlag des Entwurfs ist **(V)**, den die Freigabe mit abdeckt.
 
-## Absicht
+Entstanden im Brainstorming mit Ruben am 18.11.2026 und berichtigt nach einer Vermessung des
+Repos und der iOS-Plattform (sechs Leser, Quellen in den Abschnitten). Markiert ist, was Ruben
+entschieden hat **(R)** und was ein Vorschlag des Entwurfs ist **(V)**, den die Freigabe mit
+abdeckt. Motivation: `proposal.md`, „Why“.
 
-Lifeline Hub soll auf iPhone und iPad als echte App laufen. Sie zeigt nur die Weboberfläche des
-Servers, mit dem sie verbunden ist, fühlt sich aber nativ an, gibt haptische Rückmeldung und
-startet auch dann, wenn der Server gerade nicht erreichbar ist. **(R)**
+## Context
 
-Warum eine Hülle und keine nachgebaute Oberfläche: Die Weboberfläche spricht die interne API,
-die keine Zusage hat (`src/AGENTS.md`). Eine nachgebaute Oberfläche bräuchte einen
-versionierten Vertrag für fast die ganze Fachlichkeit und müsste ihn über Jahre rückwärts
-tragen. Bei der Hülle liefert jeder Server seine passende Oberfläche selbst. So bleibt die App
-mit möglichst vielen Server-Versionen verträglich. **(R)**
+- Die Desktop-Hülle (`src-tauri/`, Variante A, LLH-612) lädt die https-Adresse des Servers in
+  einen Webview, meldet ihre Fähigkeiten über `window.__LIFELINE_HUELLE__` und bietet die
+  Anmeldung im Systembrowser (`POST /api/auth/app-code[/einloesen]`, Spec
+  `anmeldung-systembrowser`). Dieser Server-Weg ist plattformneutral; nur die
+  Bestätigungsseite `/app-anmeldung` und das Zugangsprotokoll sprechen von der „Mac-App“.
+- Die Weboberfläche spricht die interne API ohne Zusage (`src/AGENTS.md`). Die öffentliche
+  API v1 ist klein und für Fremdsysteme gedacht.
+- `GET /api/health` liefert anonym `version`. Die Workspace-Version ist `1.0.0-alpha.N`; es gibt
+  nur Alphas.
+- Ohne Netz liest das Frontend das Lagebild aus IndexedDB (LFH-723) und sammelt Einträge in
+  einer Schreib-Queue (LFH-705). Die Oberfläche selbst kommt heute aus dem Precache des
+  Service Workers.
+- `src/static_files.rs` liefert `assets/*` mit `public, max-age=31536000, immutable`, alles
+  andere (auch `index.html`) mit `no-cache` ohne ETag. Der Build erzeugt kein Vite-Manifest;
+  `App.tsx` hat zehn per `lazy()` geladene Routen.
+- `frontend/index.html` setzt **kein** `viewport-fit=cover`; nur zwei Stellen polstern Safe
+  Areas.
+- Im Linux-Container gibt es weder `swift` noch `xcodebuild`. `ubuntu-latest` bringt Swift mit,
+  macOS-Runner bringen Xcode.
 
-## Ziele
+**Plattformfakten (belegt):**
 
-- **Onboarding mit Pflicht-Server:** Beim ersten Start muss ein Server angegeben werden
-  (Eingabe, QR-Code oder Deeplink `lifeline://verbinden?server=`). **(R)**
-- **Mehrere Server:** hinzufügen, benennen, wechseln, entfernen. Der aktive Server ist sichtbar.
-  **(R)**
-- **Versionsverträglichkeit:** Eine App-Version läuft mit so vielen Server-Versionen wie möglich.
-  Über eine Major-Grenze darf es brechen, dann sagt die App das klar. **(R)**
-- **Offline:** „Online“ heißt, der Server ist erreichbar. Ohne Server startet die App mit der
-  zuletzt gespeicherten Oberfläche dieses Servers. Das Frontend zeigt den letzten Stand
-  (LFH-723) und sammelt Einträge (LFH-705) wie heute. **(R)**
-- **Natives Gefühl und Haptik.** **(R)**
-- **Verteilung über TestFlight.** **(R)**
+1. **Service Worker laufen im WKWebView einer App nicht** (Apple Frameworks Engineer, Developer
+   Forum 773539, Feb. 2025: „no supported way … service workers in iOS WKWebView“). Der Weg über
+   App-Bound Domains ist ebenfalls zu: höchstens 10 feste Domains, und er sperrt
+   Skript-Injektion und Message-Handler, also die Brücke. Precache, Web Push und der
+   Alarm-Klick über den Service Worker fallen in der Hülle aus.
+2. `WKWebsiteDataStore(forIdentifier:)` (ab iOS 17) trennt Cookies, IndexedDB, Local Storage und
+   Disk-Cache. `WKWebsiteDataStore.remove(forIdentifier:)` scheitert, solange ein Webview den
+   Speicher benutzt.
+3. `loadSimulatedRequest(_:responseHTML:)` bzw. `(_:response:responseData:)` (ab iOS 15) setzt
+   die URL des Requests als Basis und Origin; Unterressourcen laden normal über den
+   Datenspeicher, also auch aus dessen HTTP-Cache, solange der Eintrag frisch ist (WebKit
+   `NetworkCache.cpp`). Erfahrungsberichte für genau dieses Muster fehlen.
+4. Passkeys im eingebetteten WKWebView gibt es nur für Associated Domains (Apple, „Supporting
+   passkeys“). Frei eingetragene Server lassen sich nicht eintragen, also scheitert es wie auf
+   dem Mac.
+5. `ASWebAuthenticationSession` mit eigenem Schema geht; die Form
+   `ASWebAuthenticationSession.Callback.customScheme` gibt es ab iOS 17.4.
+6. Eine von Hand installierte Root-CA gilt nach dem Einschalten in den
+   Zertifikatsvertrauenseinstellungen für WKWebView und URLSession ohne eigenen Code.
+7. iOS hält eine App kurz nach dem Wechsel in den Hintergrund an; SSE läuft dann nicht weiter,
+   und der Web-Prozess kann beendet werden (`webViewWebContentProcessDidTerminate`).
+8. Haptik spielt nur auf iPhones; auf dem iPad nicht (HIG „Playing haptics“). Die HIG verlangt,
+   dass Haptik abschaltbar ist.
 
-## Nicht-Ziele
+## Goals / Non-Goals
 
-- Geräte untereinander ohne Server (P2P, Sync). **(R)**
-- Eigene Fachlogik oder nachgebaute Bildschirme in Swift. **(R)**
-- App Store, vorerst. Das kommt später als eigene Aufgabe, mit Prüfung nach Regel 4.2 und einem
-  Demo-Server für die Prüfung. **(R)**
-- Push über APNs. Das bräuchte APNs auf dem Server, also eine eigene Aufgabe. Bis dahin meldet
-  die App nur, solange sie im Vordergrund ist oder iOS sie kurz weiterlaufen lässt. **(V)**
-- Android. **(V)**
+**Goals (R):** Onboarding mit Pflicht-Server; mehrere Server; möglichst viele Server-Versionen,
+Bruch nur über die Vertragsgrenze; Start ohne Server mit dem letzten Stand (nach Spike);
+natives Gefühl und Haptik; Verteilung über TestFlight.
 
-## Anti-Ziele (wäre ein Fehlschlag, auch wenn es technisch läuft)
+**Non-Goals:** Geräte untereinander ohne Server (R). Eigene Fachlogik oder nachgebaute
+Bildschirme in Swift (R). App Store, vorerst (R). Push über APNs; im Hintergrund meldet die App
+nichts (V). Android (V). Nutzung von `/api/huelle` durch die Desktop-Hülle (V, später möglich).
 
-- Die App lenkt ohne Bestätigung auf einen anderen Server um. Dann könnte ein fremder Link die
-  Anmeldung abgreifen; dieselbe Regel gilt in der Desktop-Hülle.
-- Sitzungen oder Offline-Daten zweier Server vermischen sich.
-- Ein älterer Server bricht nur deshalb, weil die App neuer ist (innerhalb desselben Majors).
-- Die Oberfläche bekommt iOS-Sonderwege, die nicht über die Fähigkeits-Kennung der Hülle laufen.
+**Anti-Goals:** stilles Umlenken auf einen anderen Server; vermischte Sitzungen oder
+Offline-Daten zweier Server; iOS-Sonderwege im Frontend, die nicht über die Kennung laufen.
 
-## Ansätze
+## Decisions
 
-| Ansatz | Vorteil | Nachteil |
-| --- | --- | --- |
-| **A. Tauri-2-Hülle (`src-tauri/`) um ein iOS-Ziel erweitern** | ein Crate; Adressprüfung, Deeplink und Serverliste aus Rust wiederverwendet; Haptik als offizielles Plugin | Tauri-iOS ist jung, viel Desktop-Code (Fenster, Menü, Updater) gilt dort nicht; die nötige Feinsteuerung des WKWebView (Datenspeicher je Server, Ausliefern der gespeicherten Oberfläche) geht nur über Umwege |
-| **B. Eigene Swift-App (SwiftUI + WKWebView)** — **gewählt (R)** | volle Kontrolle über den Webview; Onboarding und Serverliste als echtes SwiftUI; erprobte TestFlight-Pipeline aus Vault Cockpit (VCP-89/90) | zweite Sprache; Adressprüfung und Linkregeln entstehen ein zweites Mal |
-| C. Komplett native App gegen eine stabile API | bestes Gefühl | doppelte Oberfläche, und eine API mit Zusage für fast alle Fachdaten fehlt; widerspricht dem Ziel der Versionsverträglichkeit — verworfen |
-| D. Capacitor | — | schon in der Roadmap (`docs/superpowers/specs/2026-06-18-native-apps-roadmap-design.md`) ausgeschlossen |
+### Ansatz (R)
 
-## Entwurf
+| Ansatz | Bewertung |
+| --- | --- |
+| A. Tauri-2-Hülle um ein iOS-Ziel erweitern | ein Crate, aber Tauri-iOS ist jung, und die nötige Feinsteuerung des WKWebView (Datenspeicher je Server, Ausliefern der gespeicherten Oberfläche) geht nur über Umwege |
+| **B. Eigene Swift-App (SwiftUI + WKWebView) — gewählt** | volle Kontrolle über den Webview, natives SwiftUI, erprobte TestFlight-Pipeline (Vault Cockpit); dafür zweite Sprache und doppelte Adress-/Linkregeln, die gemeinsame Testfälle zusammenhalten |
+| C. Native Oberfläche gegen eine stabile API | doppelte Oberfläche, und eine API mit Zusage für alle Fachdaten fehlt — verworfen |
+| D. Capacitor | in der Roadmap ausgeschlossen |
 
-### D1 Ort, Plattform, Kennung **(V)**
+### D1 Ort, Plattform, Kennung (V)
 
-- Code im Repo unter `ios/` (Xcode-Projekt, Swift Package für die testbare Logik). Verträge mit
-  dem Server ändern sich so im selben PR wie die App. Neue Bereichsdatei `ios/AGENTS.md`, Eintrag
-  in die Tabelle der Wurzel-`AGENTS.md`.
-- iPhone und iPad, **ab iOS 17** (nötig für `WKWebsiteDataStore(forIdentifier:)`, siehe D3).
-- Bundle-ID `dev.rubeen.lifeline.ios`, Team `H95J852PKP` (das Konto der macOS-Signierung,
-  LLH-614).
-- Version: `CFBundleShortVersionString` folgt der Workspace-Version (`[workspace.package]`) ohne
-  Vorab-Suffix, `CFBundleVersion` ist die Build-Nummer der CI. Damit gilt auch hier eine Quelle
-  (wie `src-tauri/AGENTS.md`, „Version: eine Quelle“).
-- Neue Architekturentscheidung (ADR) „iOS-Hülle als eigene Swift-App“ nach
-  `docs/architektur/AGENTS.md`.
+- Code unter `ios/`: Projekt per **XcodeGen** (`ios/project.yml`, keine `.xcodeproj` im Repo),
+  testbare Logik im Swift-Paket **`ios/LifelineKern`** (ohne UIKit/WebKit, läuft auch unter
+  Linux), App-Target `ios/App` mit SwiftUI und WebKit. Neue Bereichsdatei `ios/AGENTS.md`.
+- iPhone und iPad, **ab iOS 17.4** (Datenspeicher je Server ab 17, Callback-Form der
+  Anmeldesitzung ab 17.4; fast alle iOS-17-Geräte sind auf 17.4+).
+- Bundle-ID `dev.rubeen.lifeline.ios`, Team `H95J852PKP`.
+- Version: `CFBundleShortVersionString` = Workspace-Version ohne Vorab-Suffix (Apple lässt keins
+  zu), eigener Info.plist-Schlüssel `LifelineVersion` = volle Workspace-Version,
+  `CFBundleVersion` = Zeitstempel `JJJJMMTTHHMM` der CI (steigt immer, auch zwischen Beta und
+  stabil derselben Marketing-Version). Geschrieben von einem Skript aus `[workspace.package]`,
+  keine eigene Versionsquelle.
+- `ITSAppUsesNonExemptEncryption = false`, `NSCameraUsageDescription` (QR-Code),
+  `NSLocalNetworkUsageDescription` (`elw.local`), URL-Schema `lifeline`.
+- ADR-0065 „Die iOS-Hülle ist eine eigene Swift-App ohne Anwendungslogik, die die
+  Serveroberfläche lädt“ (eine ADR; der Vertrag steht in der Spec `huellen-vertrag`).
 
-### D2 Onboarding und Serverliste **(R, Form V)**
+### D2 Onboarding und Serverliste (R, Form V)
 
-- Ohne gespeicherten Server zeigt die App nur das Onboarding: Adresse eingeben, QR-Code scannen
-  (Kamera, Inhalt ist der Deeplink oder eine https-Adresse) oder per Deeplink vorbelegt.
-- Die Adressprüfung folgt `src-tauri/src/adresse.rs` Regel für Regel: nur `https`, Hostname
-  Pflicht, keine Zugangsdaten vor `@`, `https:///x` gilt als „ohne Host“. Dieselben Meldungstexte.
-  Getestet mit denselben Fällen wie dort.
-- Vor dem Speichern prüft die App den Server (D4). Ein Server außerhalb des unterstützten Majors
-  wird nicht gespeichert, die Meldung sagt, welche App-Version passt.
-- Serverliste (SwiftUI): Name (Vorgabe: Hostname, änderbar), Adresse, zuletzt verbunden,
-  Verträglichkeit. Wechseln, umbenennen, entfernen; der aktive Server lässt sich nicht entfernen,
-  ohne vorher zu wechseln. Erreichbar über einen dezenten nativen Knopf am Rand bzw. eine
-  Wischgeste, ohne die Weboberfläche zu verdecken.
-- Deeplink `lifeline://verbinden?server=…`: bekannter Server → wechseln nach Bestätigung, neuer
-  Server → Onboarding vorbelegt, gleicher Server → nichts (wie `src-tauri/src/deeplink.rs`,
-  `entscheide`).
+- Ohne gespeicherten Server nur das Onboarding: Adresse eingeben, QR-Code scannen
+  (`DataScannerViewController`; Inhalt Deeplink oder https-Adresse), oder per Deeplink
+  vorbelegt.
+- Ablauf: Adresse prüfen → `GET /api/huelle` → nur bei verträglichem Server speichern und laden.
+  Die Adressprüfung folgt `src-tauri/src/adresse.rs` Regel für Regel, mit denselben
+  Meldungstexten. Die Fälle stehen als JSON unter `src-tauri/faelle/` und werden von Rust und
+  Swift geprüft (Quelle bleibt die Desktop-Hülle).
+- Serverliste (SwiftUI-Sheet): Name (Vorgabe Hostname, änderbar), Adresse, zuletzt verbunden,
+  Zustand. Wechseln, umbenennen, entfernen; der aktive Server lässt sich erst nach einem Wechsel
+  entfernen. Zugang über einen kleinen nativen Knopf am Rand, der die Oberfläche nicht verdeckt.
+- Deeplink `lifeline://verbinden?server=…`: neuer Server → Onboarding vorbelegt, bekannter
+  anderer Server → Wechsel nach Bestätigung, aktiver Server → nichts (wie
+  `src-tauri/src/deeplink.rs`, gemeinsame Fälle).
 
-### D2a Server mit eigenem Zertifikat **(R, 18.11.2026)**
+### D2a Server mit eigenem Zertifikat (R)
 
-Die App prüft Zertifikate wie das System, ohne eigene Ausnahmen und ohne Pinning. Ein Server im
-Einsatz-LAN (`elw.local`, mkcert/interne CA) braucht auf dem Gerät das installierte und von Hand
-als vertrauenswürdig eingeschaltete CA-Profil, wie heute im Browser (LLH-31). Scheitert die
-Prüfung (Onboarding, Erreichbarkeit, Laden), zeigt die App eine native Seite „Zertifikat nicht
-vertrauenswürdig“ mit der Anleitung (Profil laden, Einstellungen → Allgemein → Info →
-Zertifikatsvertrauenseinstellungen) und unterscheidet das von „nicht erreichbar“.
+Prüfung wie das System, ohne Ausnahmen und ohne Pinning. Ein Server im Einsatz-LAN braucht auf
+dem Gerät das installierte und eingeschaltete CA-Profil (mkcert oder eigene CA, wie LLH-31). Bei
+einem Zertifikatsfehler (Onboarding, Prüfung, Laden — `NSURLErrorServerCertificate*` aus
+URLSession und aus `didFailProvisionalNavigation`) zeigt die App eine native Seite
+„Zertifikat nicht vertrauenswürdig“ mit Anleitung (Profil laden, Einstellungen → Allgemein →
+Info → Zertifikatsvertrauenseinstellungen), getrennt von „nicht erreichbar“. Das
+selbst signierte Rückfall-Zertifikat des Servers (`src/tls/mod.rs`) taugt dafür nicht; die
+Betriebsdoku setzt mkcert oder ein eigenes Zertifikat voraus.
 
-### D3 Ein Datenspeicher je Server **(V)**
+### D3 Ein Datenspeicher je Server (V)
 
-Jeder Server bekommt einen eigenen `WKWebsiteDataStore(forIdentifier:)` (UUID am Servereintrag).
-Cookies, IndexedDB (Offline-Lagebild, Schreib-Queue), Local Storage und HTTP-Cache bleiben
-getrennt. Entfernen eines Servers löscht seinen Datenspeicher (`removeDataStore`), nach einer
-Rückfrage, wenn die Schreib-Queue noch Einträge hat (soweit die Hülle das erkennen kann, sonst
-allgemeiner Hinweis).
+Jeder Servereintrag trägt eine UUID; die App lädt ihn in `WKWebsiteDataStore(forIdentifier:)`.
+Beim Wechsel wird der Webview mit dem neuen Speicher neu gebaut. Entfernen: erst den Webview
+des Speichers schließen, dann `remove(forIdentifier:)`, Fehler melden. Vorher eine Rückfrage mit
+dem allgemeinen Hinweis, dass noch nicht übertragene Einträge dieses Servers verloren gehen
+(die Hülle liest die Schreib-Queue nicht aus — keine zweite Kopplung an Frontend-Interna).
 
-### D4 Versionen und Fähigkeiten **(R: Ziel; V: Form)**
+### D4 Versionen und Vertrag (R: Ziel und Mindestversion; V: Form)
 
-Zwei Richtungen, keine reine Versionsnummer-Logik:
+- **Server → App:** `GET /api/huelle` liefert anonym `{ version, huelle_vertrag }`
+  (OpenAPI-Schema `HuelleInfo`, Typ-Codegen). `huelle_vertrag` ist eine ganze Zahl, anfangs `1`,
+  und steigt nur bei einem Bruch zwischen Hülle und Server; neue Felder kommen nur hinzu. Keine
+  Datenbank, also auch bei gestörter DB 200 — Erreichbarkeit prüft die App über das Laden, nicht
+  über diesen Endpunkt.
+- **Mindestversion (R):** die erste Server-Version mit `/api/huelle`. Ein 404 heißt „Server ist
+  zu alt für diese App“; die Seite nennt `version` aus `GET /api/health`.
+- **App prüft** bei jedem Start, Wechsel und Neuladen nach Rückkehr in den Vordergrund, nicht nur
+  im Onboarding. Kennt sie den Vertrag nicht, lädt sie die Oberfläche nicht und zeigt die
+  Richtung: Server-Vertrag größer → „App aktualisieren“, kleiner → „Server ist zu alt“. Ohne
+  Netz gilt der zuletzt bestätigte Vertrag dieses Servers.
+- **App → Seite:** Die Kennung `__LIFELINE_HUELLE__` bekommt `platform` (`'ios'`), `version`
+  (volle Workspace-Version) und `haptik(art)`. Die Desktop-Hüllen setzen `platform` und `version`
+  vorerst nicht; `platform` fehlt dort, und das Frontend fällt auf „Desktop-App“ zurück.
+  Feldnamen nach der Bezeichner-Sprache (Technik englisch, Fachwort `haptik` deutsch); als Grenzwert
+  danach fest. Gelesen wird die Kennung weiter nur in `frontend/src/huelle/faehigkeiten.ts`.
+- Das Init-Skript der iOS-Hülle liegt als reines JS unter `ios/App/Huelle/huelle.js`, damit
+  `frontend/src/test/huelle.ts` es per vitest ausführt wie die Tauri-Skripte (kein driftender
+  Stub). Message-Handler: `lifeline`.
 
-1. **Server → App:** neuer anonymer Endpunkt `GET /api/huelle` mit
-   `{ version, huelle_vertrag }`. `huelle_vertrag` ist eine ganze Zahl, die nur bei einem Bruch
-   zwischen Hülle und Server steigt (entspricht dem „Major“ aus Sicht der App). Neue Felder kommen
-   nur hinzu. Eine Fähigkeitsliste des Servers gibt es vorerst nicht: Ob eine Funktion der Hülle
-   genutzt wird, entscheidet allein das Frontend (D6); die App braucht keine Logik nach
-   Server-Fähigkeiten. *(Entscheidung des Entwurfs nach der Prüfung.)*
-   **Älterer Server ohne Endpunkt** (404): gilt als nicht verträglich. Mindestversion ist die
-   erste Server-Version mit `GET /api/huelle` **(R, 18.11.2026)**: Es gibt nur Alphas, ältere
-   haben teils weder die Anmeldung im Systembrowser noch Offline-Lagebild oder Schreib-Queue.
-   Die App liest dann `version` aus `GET /api/health` (anonym, gibt es schon) und nennt sie auf
-   der Seite „Server ist zu alt für diese App“.
-2. **App → Server:** wie bei der Desktop-Hülle über `window.__LIFELINE_HUELLE__`, ergänzt um
-   `plattform: 'ios'`, `version` und die neuen Funktionen (D6). Das Frontend liest die Kennung
-   weiter nur in `frontend/src/huelle/faehigkeiten.ts` und prüft jede Funktion einzeln. Ein
-   älteres Frontend kennt die neuen Felder nicht und ignoriert sie.
+### D5 Start ohne Server (R: Ziel; Mechanismus nach Spike)
 
-Die App trägt eine Liste der `huelle_vertrag`-Werte, die sie kann (anfangs `[1]`). Liegt der
-Server außerhalb, zeigt die App eine native Seite und lädt die Oberfläche nicht. Kein halbes
-Funktionieren. Die Seite nennt Version des Servers und der App und die Richtung: Server-Vertrag
-größer → „App aktualisieren“, kleiner → „Server ist zu alt für diese App“. Ein Feld „passende
-App-Version“ liefert der Server nicht. *(Entscheidung des Entwurfs.)*
+Der Precache des Service Workers trägt in der Hülle nicht (Fakt 1); die Hülle muss die Oberfläche
+selbst ausliefern. Anforderung: Ist der Server nicht erreichbar, lädt die App die zuletzt
+erfolgreich geladene Oberfläche **desselben** Servers unter dessen Origin, sodass Cookies,
+IndexedDB und die Offline-Logik des Frontends greifen; kommt der Server wieder, lädt sie neu.
 
-`__LIFELINE_HUELLE__.version` und die Anzeigen nennen die volle Workspace-Version
-(`1.0.0-alpha.195`); nur `CFBundleShortVersionString` ist ohne Suffix, weil Apple keins zulässt.
-*(Entscheidung des Entwurfs.)*
+Kandidaten in Vorzugsreihenfolge, gemessen in einem **Spike auf echtem Gerät** (Flugmodus,
+Kaltstart, Server weg und wieder da, Speicherdruck):
 
-### D5 Offline-Start **(R: Ziel; Mechanismus: Spike zuerst)**
+1. Gespeicherte `index.html` per `loadSimulatedRequest(_:responseHTML:)` unter der Server-URL;
+   die gehashten Assets kommen aus dem HTTP-Cache des Datenspeichers. Nach jedem Online-Laden
+   wärmt die Hülle den Cache mit allen Assets vor (auch nie geöffnete `lazy()`-Seiten); die Liste
+   kommt dann aus einem **neuen Feld von `/api/huelle`** (entschieden im Spike, additiv).
+2. Wie 1, aber die Hülle hält die Assets selbst in Application Support vor, falls iOS den
+   Disk-Cache räumt.
+3. Eigenes URL-Schema mit Vermittlung von Oberfläche und `/api` — nur nach neuer Entscheidung
+   durch Ruben (andere Origin, Cookie- und SSE-Weg in Swift, eigene Sicherheitsprüfung).
 
-Ein WKWebView in einer App bekommt Service Worker nur für höchstens 10 App-Bound Domains, die
-beim Bau feststehen. Für frei eingetragene Server fällt der Precache des PWA-Service-Workers
-also aus, und die Oberfläche startet ohne Netz nicht von selbst. Die Hülle muss das übernehmen.
+Der Spike hält den Rest nicht auf. Der erste TestFlight-Build läuft nur online und zeigt ohne
+Server die native Seite „nicht erreichbar“. Der Offline-Start kommt als **eigene Change** nach
+dem Spike; diese Change baut nur die Seite und die Erreichbarkeitsprüfung.
 
-Anforderung: Ist der Server nicht erreichbar, lädt die App die zuletzt erfolgreich geladene
-Oberfläche **desselben** Servers, unter dessen Origin, sodass Cookies, IndexedDB und die
-Offline-Logik des Frontends greifen. Kommt der Server wieder, lädt sie neu (Muster
-`src-tauri/src/erreichbar.rs`: neu laden erst, wenn der Server antwortet).
+### D6 Natives Gefühl und Haptik (R: Ziel; V: Form)
 
-Kandidaten, im Spike zu messen (Reihenfolge = Vorzug):
+- **Nativ in der Hülle, nicht im Frontend-CSS:** Webview in der Safe Area
+  (`contentInsetAdjustmentBehavior`, Hintergrund in Kopf-Schwarz), kein Nachfedern
+  (`scrollView.bounces = false`), kein Pull-to-Refresh, Lupe und Textmenü außerhalb von
+  Eingaben per eingespieltem Stil der Hülle. `viewport-fit=cover` bleibt aus — sonst rutschte im
+  Browser die Kopfleiste unter die Notch, und ältere Server hätten es ohnehin nicht.
+- Status-Seiten der Hülle (kein Server, nicht erreichbar, Zertifikat, nicht verträglich) sind
+  SwiftUI.
+- **Haptik:** `__LIFELINE_HUELLE__.haptik(art)` mit dem Vokabular
+  `'erfolg' | 'warnung' | 'fehler' | 'auswahl' | 'tippen'` →
+  `UINotificationFeedbackGenerator` (`.success/.warning/.error`),
+  `UISelectionFeedbackGenerator`, `UIImpactFeedbackGenerator(.light)`. Unbekannte Art: nichts.
+  Abschaltbar über einen Schalter in den Einstellungen der Hülle (Vorgabe an). Auf dem iPad
+  wirkungslos.
+- **Auslöser im Frontend** über `huelleHaptik(art)` in `faehigkeiten.ts` (feuern und vergessen,
+  wirft nie, ohne Hülle nichts):
+  - Erfassung vom Server angenommen → `erfolg`; ohne Netz nur vorgemerkt → `tippen` (kein
+    „gespeichert“-Gefühl); vom Server abgelehnt → `fehler`. Gilt für die gemeinsame
+    Erfassungs-Hülle und die ETB-Schnellerfassung.
+  - Eingehender Alarm der Stufe `alarm` (auch Unwetter) → `warnung`, nur beim ersten Eintreffen,
+    nicht beim Nachspielen, und nicht bei stummgeschaltetem Alarm.
+  - Wechsel in einem Segment → `auswahl` (zentral in der Segmentleiste, nicht im Aufrufer).
+  - Die übrigen rund 200 Erfolgsmeldungen bleiben ohne Haptik.
+- Native Meldung (`benachrichtigungZeigen`, `UNUserNotificationCenter`, Berechtigung beim ersten
+  Aufruf) und App-Badge (`setAppBadge`, `setBadgeCount`) mit denselben Kennungsfeldern wie die
+  Desktop-Hülle, wirksam nur bei laufender App.
+- **Brücke:** Der Message-Handler nimmt Aufrufe nur aus dem Hauptframe und nur von der Origin des
+  aktiven Servers an (`frameInfo.isMainFrame`, `securityOrigin`); nach einem Serverwechsel gilt
+  die neue Origin sofort.
+- Nach `webViewWebContentProcessDidTerminate` und bei Rückkehr in den Vordergrund nach einer
+  Pause lädt die Hülle neu, statt eine weiße Seite zu zeigen.
 
-1. `loadSimulatedRequest(_:response:responseHTML:)` (iOS 15+) mit gespeicherter `index.html`
-   unter der Server-URL; die gehashten Vite-Assets kommen aus dem HTTP-Cache des Datenspeichers
-   (sie sind unveränderlich gecacht). Offen: ob WebKit sie ohne Netz wirklich aus dem Cache
-   liefert, auch nach einem Neustart der App.
-2. Wie 1, aber die Hülle hält die Assets selbst vor (Liste aus dem Vite-Manifest) und füllt
-   Lücken über einen eigenen Weg. Nur, wenn 1 nicht trägt.
-3. Eigenes URL-Schema mit `WKURLSchemeHandler`, der Oberfläche und `/api` vermittelt. Ändert die
-   Origin und braucht einen Cookie- und SSE-Weg in Swift — nur als letzter Ausweg.
+### D7 Anmeldung (V)
 
-Ergebnis des Spikes: Entscheidungsprotokoll mit Belegen auf echtem Gerät (Flugmodus, Kaltstart,
-Server weg, Server wieder da), bevor der Mechanismus gebaut wird.
+`ASWebAuthenticationSession` mit Callback-Schema `lifeline` gegen den bestehenden Server-Weg,
+`verifier` bleibt in der App, Rücksprung nur aus der Sitzung; ein `lifeline://anmeldung` von
+außen bleibt wirkungslos. Eingelöst per `fetch` im Webview gegen denselben Server, gemeldet per
+Ereignis `lifeline:app-anmeldung` wie auf dem Mac. Die iOS-Hülle setzt `passkey: false` und
+`anmeldungImBrowser` (Fakt 4). Serverseitig ändert sich nur der Text der Bestätigungsseite und
+des Zugangsprotokolls („Lifeline-App“); das Audit bleibt `systembrowser`.
 
-Der Spike hält den Rest nicht auf: Der erste TestFlight-Build darf nur online laufen und zeigt
-ohne Server die native Seite „nicht erreichbar“; der Offline-Start folgt als eigener Schritt.
-Tragen weder 1 noch 2, entscheidet Ruben neu, bevor Kandidat 3 gebaut wird (Mehraufwand und eigene
-Sicherheitsprüfung). *(Entscheidung des Entwurfs nach der Prüfung.)*
+### D8 Links, Downloads, Drucken (V)
 
-### D6 Natives Gefühl und Haptik **(R: Ziel; V: Form)**
+Linkregeln aus `src-tauri/src/links.rs` (gemeinsame Fälle): eigene Origin bleibt im Webview,
+`target=_blank` und `window.open` der eigenen Origin laden im selben Webview
+(`createWebViewWith`), `/api/` außer `/api/auth/` → Download, fremde `http(s)`, `mailto`, `tel`
+→ System. Downloads über `WKDownload` (mit den Cookies des Datenspeichers, auch `blob:`) und
+danach das Teilen-Blatt. Drucken: das Init-Skript ersetzt `window.print` wie `druck.js` der
+Desktop-Hülle; die Hülle druckt über `UIPrintInteractionController` mit dem Druckformat des
+Webviews.
 
-- Kein Nachfedern am Seitenrand, keine Lupe und kein Textmenü außerhalb von Eingaben, sichere
-  Ränder (`viewport-fit=cover` liefert der Server schon oder bekommt es), Pull-to-Refresh nur,
-  wenn das Frontend es will (V: anfangs aus).
-- Status- und Fehlerseiten der Hülle (nicht erreichbar, nicht verträglich, kein Server) sind
-  SwiftUI, nicht HTML.
-- **Haptik:** `window.__LIFELINE_HUELLE__.haptik(art)` mit einem kleinen festen Vokabular
-  `'erfolg' | 'warnung' | 'fehler' | 'auswahl' | 'tippen'`, abgebildet auf
-  `UINotificationFeedbackGenerator` bzw. `UISelectionFeedbackGenerator` und
-  `UIImpactFeedbackGenerator`. Wann, entscheidet allein das Frontend über einen Helfer in
-  `frontend/src/huelle/faehigkeiten.ts` (ohne Hülle: nichts). Erste Stellen **(V)**: Quittung
-  eines gespeicherten Eintrags (`erfolg`), abgelehnte Speicherung (`fehler`), eingehender Alarm
-  (`warnung`), Umschalter und Auswahl in Segmenten (`auswahl`).
-- Native Meldung und App-Badge über dieselben Kennungsfelder wie die Desktop-Hülle
-  (`benachrichtigungZeigen`, `setAppBadge`), solange die App läuft.
-- Die Brücke (`WKScriptMessageHandler`) nimmt Aufrufe nur aus dem Hauptframe und nur von der
-  Origin des aktiven Servers an (wie `desktop-huelle`: „Die native Brücke gilt genau für die
-  konfigurierte Origin“).
+### D9 Prüfen und Verteilen (R: TestFlight; V: Form)
 
-### D7 Anmeldung **(V)**
+Nach ADR-0048 ein Auslöser je Workflow:
 
-Wie in der macOS-Hülle über `ASWebAuthenticationSession` und den bestehenden Server-Weg
-`POST /api/auth/app-code[/einloesen]` (PKCE, `verifier` bleibt in der App, Rücksprung
-`lifeline://anmeldung` nur aus der Sitzung). Damit gehen Passkeys für Lifeline und beim IdP;
-`passkey: false` gilt wie auf dem Mac. Serverseitig ändert sich nichts, wenn der Weg
-plattformneutral ist (zu prüfen: Audit-Kennung `systembrowser` reicht).
+- **`scripts/check-all.sh`, neuer Schritt „ios“** (Bündel `ios`, in `alle`): `swift test` des
+  Pakets `LifelineKern` und Prüfung der gemeinsamen Fälle. Ohne Swift lokal „OK mit Lücke“; in
+  der CI erzwingt `IOS_SWIFT_PFLICHT=1` die Toolchain. `scripts/bereiche.sh` kennt `ios/*` und
+  den Querbezug `src-tauri/faelle/*`.
+- **`suiten.yml`**: Job `ios` auf `ubuntu-latest` mit dem neuen Schritt (Kanal-Branches und PR
+  mit Label `voll`).
+- **`ios-pruefung.yml`** (`pull_request`, Pfadfilter `ios/**`, `src-tauri/faelle/**`): auf
+  `macos-latest` XcodeGen, Simulatorbau, Swift-Tests auf iOS, Simulator-Bilder als Artefakt (für
+  die Bilder der Änderung). Kein Pflicht-Check.
+- **`ios.yml`** (`workflow_call` aus `artefakte.yml` nach `freigeben`, nur Tags der Kanäle `beta`
+  und `main`; dazu `workflow_dispatch`): archivieren, signieren (automatisch per API-Schlüssel mit
+  Rolle App Manager), zu TestFlight hochladen. Ein roter Upload hält das Release nicht auf.
+- XcodeGen-Version an einer Stelle unter `scripts/` gepinnt, von beiden Workflows gelesen.
 
-### D8 Links, Downloads, Drucken **(V)**
+### D10 Regeln und Doku (V)
 
-Regeln aus `src-tauri/src/links.rs` übernommen: eigene Origin bleibt in der App (kein zweites
-Fenster auf dem iPhone; auf dem iPad optional später), `/api/` außer `/api/auth/` → Download
-über das Teilen-Blatt, fremde `http(s)`/`mailto`/`tel` → System. `blob:`-Downloads (CSV) gehen
-ebenfalls ans Teilen-Blatt. Drucken über `UIPrintInteractionController` mit dem Webview-Inhalt.
+- Die Wurzel-`AGENTS.md` hat 207 Zeilen (Grenze 200). Vor der neuen Tabellenzeile wandern die
+  zwei Abschnitte „Backend — Migrationsvergabe“ und „Backend — Tabellenumbau“ nach
+  `src/AGENTS.md` (eigener `refactor`-Commit, Verweise gegreppt).
+- Architektur-Wächter lernt das Teilprojekt `ios`; arc42 Kapitel 5 (Bausteine), 7 (Verteilung),
+  8 (Konzepte, Hüllen-Vertrag), 11 (Risiken) nachziehen.
+- `docs/betrieb/ios-app.md` (TestFlight, CA-Profil, Grenzen: kein Push im Hintergrund, kein
+  Passkey im Webview, Start ohne Netz noch nicht); Anwenderkapitel nur mit Ist-Stand.
 
-### D9 Bauen und Verteilen **(R: TestFlight; V: Form)**
+## Risks / Trade-offs
 
-- Eigener Workflow `ios.yml` auf einem macOS-Runner: bauen, Swift-Tests, bei Tag Upload zu
-  TestFlight (App-Store-Connect-API-Schlüssel als Secret, wie bei der Notarisierung). Die
-  Linux-Gates von `check-all.sh` bleiben unberührt; die Swift-Prüfung ist ein eigener Schritt,
-  der auf Linux sauber übersprungen wird (Mechanik nach `scripts/AGENTS.md`).
-- TestFlight zuerst intern, externe Gruppe nach Bedarf.
-- Hochgeladen wird per Handstart (`workflow_dispatch`) und an Tags der Kanäle `beta` und `main`,
-  nicht an jedem Alpha-Tag: Alphas kommen fast täglich, und der Rahmen der App ändert sich selten.
-  *(Entscheidung des Entwurfs.)*
-- **Übergaben an Ruben** (geht nicht im Linux-Container): Bundle-ID registrieren und App in App
-  Store Connect anlegen, Verteilungszertifikat und API-Schlüssel als Secrets, Spike und Abnahme
-  auf echtem iPhone/iPad. Swift-Code wird im Container geschrieben, gebaut und getestet aber nur
-  auf dem macOS-Runner oder Rubens Mac; ein „fertig“ ohne grünen macOS-Lauf gibt es nicht.
+- [Swift lässt sich im Container nicht bauen] → Kern unter Linux in der CI testbar, App-Teil
+  nur auf dem macOS-Runner; kein „fertig“ ohne grünen Lauf von `ios-pruefung.yml`.
+- [Foundation unter Linux parst URLs in Randfällen anders als auf iOS] → die gemeinsamen Fälle
+  laufen in beiden Umgebungen.
+- [Doppelte Regeln in Rust und Swift] → gemeinsame JSON-Fälle; eine Änderung macht beide Suiten
+  rot, `bereiche.sh` kennt den Querbezug.
+- [Kein Alarm bei geschlossener App] → ehrlich in Betriebs- und Anwenderdoku; APNs als eigene
+  Aufgabe.
+- [Ohne Netz startet der erste Build nicht] → native Seite „nicht erreichbar“; Offline-Start als
+  eigene Change nach dem Spike.
+- [iPad-WKWebView meldet sich als macOS] → Kennung trägt `platform: 'ios'`; die Sitzungsliste
+  bleibt kosmetisch ungenau (kein Server-Umbau dafür).
+- [API-Schlüssel der Notarisierung hat nur die Rolle Entwickler] → Übergabe an Ruben vor dem
+  ersten Upload.
+- [macOS-Minuten] → macOS nur im PR mit Pfadfilter und an Beta-/Stabil-Tags.
+- [ADR-Nummer kollidiert mit einem offenen PR] → vor dem Commit gegen offene PRs prüfen.
 
-## Was dem Bauenden überlassen bleibt
+## Migration Plan
 
-- Aufbau des Xcode-Projekts und der Module, Namen der Swift-Typen (Regel „Bezeichner-Sprache“
-  gilt auch dort).
-- Gestaltung von Onboarding und Serverliste im Rahmen der Gestaltungssprache
-  (`frontend/AGENTS.md`).
-- Mechanismus des Offline-Starts nach dem Spike-Ergebnis (D5).
-- Genaue Felder von `GET /api/huelle` über die genannten hinaus.
+Neu und additiv: Browser und Desktop-Hülle ändern sich nur in Texten. Rückweg: Workflows
+abschalten, App in TestFlight zurückziehen; `/api/huelle` bleibt harmlos stehen.
 
-## Reihenfolge **(V)**
+## Open Questions
 
-1. Spike Offline-Start (D5) auf Gerät, Wegwerf-Code.
-2. Serverseite: `GET /api/huelle`, Frontend-Helfer `haptik`, Kennungsfelder.
-3. App-Gerüst, Onboarding, Serverliste, Datenspeicher je Server, Versionsprüfung.
-4. Brücke (Haptik, Meldung, Badge), Anmeldung, Links und Downloads.
-5. Offline-Start nach Spike.
-6. CI und TestFlight, Doku (`docs/betrieb/`, Anwenderkapitel).
+- Mechanismus des Starts ohne Server (D5) — nach dem Spike, eigene Change; ändert diese Specs
+  nur additiv.
