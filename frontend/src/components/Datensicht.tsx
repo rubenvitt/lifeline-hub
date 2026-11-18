@@ -426,6 +426,8 @@ export type Kartenplan<T, K extends string> =
     };
 
 // ── Sortierung, Gruppierung, Baum, Zufluss ───────────────────────────────────────────
+/** Wert des Eintrags „wie geliefert“ der Sortierauswahl; ohne `:`, also nie `<spalte>:<richtung>`. */
+const WIE_GELIEFERT = 'wie-geliefert';
 /** `null` = Reihenfolge wie geliefert (Serverordnung unangetastet). */
 type Sortierung<K extends string> = { spalte: K; richtung: 'auf' | 'ab' } | null;
 /** Für Seiten, die die Sortierung kontrolliert führen (Servermodus). */
@@ -1830,22 +1832,25 @@ export default function Datensicht<T extends object, const K extends string>(
           }}
         />
       )}
-      {/* Sortierauswahl des Kartenzweigs (LLH-1086): die Karte hat keinen Kopf, der Pfeil fehlt. */}
+      {/* Sortierauswahl des Kartenzweigs (LLH-1086): die Karte hat keinen Kopf, der Pfeil fehlt.
+          „wie geliefert“ ist ein Eintrag, kein Löschkreuz (LLH-1798, Spec
+          `einsatztauglichkeit-layout`): das Kreuz war 12 × 12 px in jeder Stufe und der einzige
+          Weg zurück zur gelieferten Reihenfolge. */}
       {zeigtSortierung && (
         <Select
-          allowClear
           aria-label="Sortieren"
           prefix={
             <span aria-hidden="true" style={{ color: token.colorTextDescription }}>
               Sortieren:
             </span>
           }
-          placeholder="wie geliefert"
           value={
-            aktiveSortierung ? `${aktiveSortierung.spalte}:${aktiveSortierung.richtung}` : undefined
+            aktiveSortierung
+              ? `${aktiveSortierung.spalte}:${aktiveSortierung.richtung}`
+              : WIE_GELIEFERT
           }
-          onChange={(wert?: string) => {
-            if (!wert) {
+          onChange={(wert: string) => {
+            if (wert === WIE_GELIEFERT) {
               setzeSortierung(null);
               return;
             }
@@ -1855,7 +1860,7 @@ export default function Datensicht<T extends object, const K extends string>(
               richtung: wert.slice(trenner + 1) === 'ab' ? 'ab' : 'auf',
             });
           }}
-          options={sortierOptionen}
+          options={[{ value: WIE_GELIEFERT, label: 'wie geliefert' }, ...sortierOptionen]}
           // Neben der Suche in derselben Zeile (siehe dort); ein langer Wert kürzt mit Auslassung.
           style={{ flex: '1 1 160px', minWidth: 0, maxWidth: 280 }}
         />

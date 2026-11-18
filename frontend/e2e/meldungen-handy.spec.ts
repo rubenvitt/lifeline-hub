@@ -4,8 +4,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 /**
  * Meldungen am Handy (LFH-974, Spec `meldungen-handy`): bei 390×844 liegt der Wortlaut der ersten
  * Karte ganz im ersten Schirm, mit und ohne Schreibrecht. Unter `md` steht dafür eine Zeile statt
- * des Kennzahlenbands und „Filter" statt der Richtungs-Segmentleiste; ab `md` (1180, 1440) bleiben
- * Band und Segmentleiste.
+ * des Kennzahlenbands und „Filter" statt des Richtungsfelds; ab `md` (1180, 1440) bleiben
+ * Band und das Auswahlfeld „Richtung“ (LLH-1942, Spec `bedien-umschalten`).
  *
  * Gemessen mit `toBeInViewport({ ratio: 1 })` am Wortlaut, nie `toBeVisible()`: sichtbar wäre er
  * auch unter dem Falz.
@@ -67,11 +67,11 @@ async function oeffne(page: Page, einsatzId: string) {
 async function wortlautImErstenSchirm(page: Page) {
   const erste = page.locator('[data-meldung-id]').first();
   await expect(erste.getByText(WORTLAUT)).toBeInViewport({ ratio: 1 });
-  // Zeile statt Band, Knopf statt Segmentleiste.
+  // Zeile statt Band, Knopf statt Auswahlfeld.
   await expect(page.locator('[data-lfh="meldung-kennzahl-zeile"]')).toBeVisible();
   await expect(page.locator('[data-lfh="kennzahl-wert"]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Filter' })).toBeVisible();
-  await expect(page.getByRole('radiogroup', { name: 'Richtung' })).toHaveCount(0);
+  await expect(page.getByRole('combobox', { name: 'Richtung' })).toHaveCount(0);
 }
 
 test.describe('Meldungen am Handy (LFH-974)', () => {
@@ -104,14 +104,16 @@ test.describe('Meldungen am Handy (LFH-974)', () => {
   });
 
   for (const breite of [1180, 1440]) {
-    test(`${breite} px: Band und Segmentleiste bleiben`, async ({ page }) => {
+    test(`${breite} px: Band und Richtungsfeld bleiben`, async ({ page }) => {
       await page.setViewportSize({ width: 1366, height: 768 });
       await anmeldenAlsAdmin(page);
       const einsatzId = await einsatzMitMeldungen(page);
       await page.setViewportSize({ width: breite, height: 900 });
       await oeffne(page, einsatzId);
       await expect(page.locator('[data-lfh="kennzahl-wert"]')).toHaveCount(4);
-      await expect(page.getByRole('radiogroup', { name: 'Richtung' })).toBeVisible();
+      await expect(page.getByRole('combobox', { name: 'Richtung' })).toBeVisible();
+      // Eine Umschaltleiste je Ebene: nur „Ansicht“ ist eine Segmentleiste.
+      await expect(page.getByRole('radiogroup')).toHaveCount(1);
       await expect(page.locator('[data-lfh="meldung-kennzahl-zeile"]')).toHaveCount(0);
       await expect(page.getByRole('button', { name: /^Filter/ })).toHaveCount(0);
     });

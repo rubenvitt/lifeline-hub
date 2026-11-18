@@ -13,8 +13,8 @@ Einsatzabschnitt zuordnen. Ihre Ist-Stärke ergibt sich aus dem zugeordneten Per
 Soll-Stärke trägt die Führung ein.
 
 Das Modul zeigt die Gliederung aller Einheiten; jede Einheit hat eine eigene Seite mit den
-Paneelen „Kopfdaten“, „Fahrzeuge und Besatzung“, „Zeitachse“, „Material“, „Funk und
-Kommunikation“ und „Taktisches Zeichen“; für die Einsatzleitung „Gerät“ mit „Gerät koppeln“ für
+Paneelen „Fahrzeuge und Besatzung“, „Kopfdaten“, „Zeitachse“, „Material“, „Funk und
+Kommunikation“ und „Taktisches Zeichen“, oben eine Leiste mit Sprüngen zu diesen Paneelen; für die Einsatzleitung „Gerät“ mit „Gerät koppeln“ für
 das Handy der Einheit (siehe [Einheit am Gerät](geraet-einheit.md)), zuletzt „Einheit auflösen oder stornieren“. „Fahrzeuge und Besatzung“
 zeigt je Fahrzeug, wer darauf sitzt, und darunter, wer ohne Fahrzeug zur Einheit gehört. Jede
 Angabe wird an ihrem Wert geändert. Eine stehende Einheit wie ein Sanitätszug lässt sich in einem Zug aus ihrer
@@ -226,8 +226,8 @@ Für Einsatzleitung und Führungspersonal. Bucht ein Bereitstellungsraum eine Kr
 noch nicht kannte, entsteht eine Einheit mit „nicht übernommen“ (Kapitel
 [Bereitstellungsräume](bereitstellungsraeume.md)). Die Meldung dazu steht unter „Meldungen“.
 
-1. Die Einheit öffnen: in der Gliederung oder in der Kräfteübersicht. Unter dem Kopf steht das Paneel
-   „Übernahme“ mit „eingetroffen …“.
+1. Die Einheit öffnen: in der Gliederung oder in der Kräfteübersicht. Oben, vor „Fahrzeuge und
+   Besatzung“, steht das Paneel „Übernahme“ mit „eingetroffen …“.
 2. „Übernehmen“ wählen, bei Bedarf „Abschnitt“ und „Über-Einheit“ wählen und mit „Übernehmen“
    bestätigen. Die Bestätigung lautet „… übernommen“; „nicht übernommen“ und das Paneel
    verschwinden, die Einheit bleibt im Raum.

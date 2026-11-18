@@ -373,6 +373,84 @@ for (const { liste, api, daten, pfad } of [
 // ── Einheiten-Detailroute ───────────────────────────────────────────────────────────
 // Verwaltung → Führungsfunktionen (LFH-549): das Label ist eine Inline-Angabe, ihr Bearbeiten-Knopf
 // ist das Bedienziel jeder Zeile. Gemessen wird er als Admin (nur dort ist er ein Ziel).
+/**
+ * Wirksame Trefffläche eines Ziels (LLH-1798): wie weit trifft ein Tipp um die Mitte noch das Ziel
+ * oder eines seiner Kinder? Die Box allein täuscht, wo die Fläche bewusst aus dem Layout ragt
+ * (Hinweis-Kreuz, Kreuz des ETB-Entwurfstabs); sie träfe ein darüberliegendes Element.
+ */
+async function wirksameFlaeche(ziel: Locator): Promise<{ breite: number; hoehe: number }> {
+  return ziel.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const mx = r.left + r.width / 2;
+    const my = r.top + r.height / 2;
+    const trifft = (x: number, y: number) => {
+      const t = document.elementFromPoint(x, y);
+      return t != null && (t === el || el.contains(t));
+    };
+    const weit = (dx: number, dy: number) => {
+      let n = 0;
+      while (n < 120 && trifft(mx + dx * (n + 1), my + dy * (n + 1))) n += 1;
+      return n;
+    };
+    return { breite: weit(-1, 0) + weit(1, 0) + 1, hoehe: weit(0, -1) + weit(0, 1) + 1 };
+  });
+}
+
+// Spec `einsatztauglichkeit-layout`, „Schließen-Kreuz eines Hinweises“ und „Kurzer Link im
+// Ortspfad“ (LLH-1798). Der Hinweis: Deeplink auf einen Posten, den es nicht gibt. Höhenneutral
+// heißt: ohne den Boden des Kreuzes (Stil im Browser zurückgenommen) ist der Hinweis gleich hoch.
+test('Hinweis-Kreuz und kurzer Ortspfad-Link folgen der kleinen Steuerhöhe 24 / 48 / 72 px auf beiden Achsen (LLH-1798)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 Restziele ${Date.now()}`);
+  const gemessen: string[] = [];
+
+  for (const { dichte } of STAFFEL) {
+    const boden = BODEN_MENUE[dichte];
+
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/material?material=999999`, dichte);
+    const hinweis = page.locator('[data-lfh="deeplink-hinweis"]');
+    await expect(hinweis).toContainText('Posten #999999 gibt es nicht (mehr)');
+    const kreuz = hinweis.getByRole('button', { name: 'Hinweis schließen' });
+    const flaeche = await wirksameFlaeche(kreuz);
+    expect(
+      Math.min(flaeche.breite, flaeche.hoehe),
+      `Hinweis-Kreuz (${dichte}): wirksam ${flaeche.breite}×${flaeche.hoehe}, Soll ≥ ${boden}`,
+    ).toBeGreaterThanOrEqual(boden - 1);
+    const mitBoden = (await hinweis.boundingBox())!.height;
+    await kreuz.evaluate((el: HTMLElement) => {
+      el.style.minWidth = '0';
+      el.style.minHeight = '0';
+      el.style.marginBlock = '0';
+    });
+    const ohneBoden = (await hinweis.boundingBox())!.height;
+    expect(
+      Math.abs(mitBoden - ohneBoden),
+      `Hinweis (${dichte}) mit Boden ${mitBoden}px, ohne ${ohneBoden}px`,
+    ).toBeLessThanOrEqual(SUBPIXEL);
+
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/etb/druck`, dichte);
+    const etb = page
+      .locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad .ant-breadcrumb-item a:visible')
+      .filter({ hasText: /^ETB$/ });
+    await expect(etb).toHaveCount(1);
+    const kasten = (await etb.boundingBox())!;
+    expect(
+      kasten.width,
+      `Ortspfad-Link „ETB“ (${dichte}): ${kasten.width}px breit, Soll ≥ ${boden}`,
+    ).toBeGreaterThanOrEqual(boden - SUBPIXEL);
+    await expect(etb).toHaveCSS('font-size', PFAD_SCHRIFT);
+
+    gemessen.push(
+      `${dichte}: Kreuz ${flaeche.breite}×${flaeche.hoehe}, Hinweis ${mitBoden}/${ohneBoden}, „ETB“ ${kasten.width}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px', async ({ page }) => {
   await page.setViewportSize(FUEKW);
   await anmelden(page, { startseite: false });

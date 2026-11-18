@@ -316,12 +316,31 @@ describe('EinsatzSeite', () => {
    * den Token gegen sich selbst. Ob der Link die Höhe im Layout erreicht, misst Gate 3.
    */
   it('gibt dem Ortspfad den Boden der Stufe als Variable (30 / 48 / 72 px)', () => {
-    const tokenFuer = (s: keyof typeof dichten) => ({ controlHeight: dichten[s].zeilenhoehe });
+    const tokenFuer = (s: keyof typeof dichten) => ({
+      controlHeight: dichten[s].zeilenhoehe,
+      controlHeightSM: dichten[s].kleineZeilenhoehe,
+    });
     const ziel = (s: keyof typeof dichten) =>
       (ortspfadStil(tokenFuer(s)) as Record<string, unknown>)['--lfh-ortspfad-ziel'];
     expect(ziel('kompakt')).toBe('30px');
     expect(ziel('komfortabel')).toBe('48px');
     expect(ziel('handschuh')).toBe('72px');
+  });
+
+  /**
+   * LLH-1798: ein Pfad-Link ist mindestens so breit wie ein Knopf der Stufe (kleine Steuerhöhe),
+   * auch bei einem kurzen Wort wie „ETB“. Literale wie oben; die Breite im Layout misst Gate 3.
+   */
+  it('gibt dem Ortspfad die Mindestbreite der Stufe als Variable (24 / 48 / 72 px)', () => {
+    const tokenFuer = (s: keyof typeof dichten) => ({
+      controlHeight: dichten[s].zeilenhoehe,
+      controlHeightSM: dichten[s].kleineZeilenhoehe,
+    });
+    const breite = (s: keyof typeof dichten) =>
+      (ortspfadStil(tokenFuer(s)) as Record<string, unknown>)['--lfh-ortspfad-breite'];
+    expect(breite('kompakt')).toBe('24px');
+    expect(breite('komfortabel')).toBe('48px');
+    expect(breite('handschuh')).toBe('72px');
   });
 
   /**

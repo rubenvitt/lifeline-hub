@@ -28,8 +28,8 @@ Führungspersonal, solange der Einsatz läuft (siehe [Rechte im Einsatz](rechte-
 
    ![Meldungen mit Kennzahlen, den Ansichten „Offen“ und „Abgeschlossen“ und offenen Meldungskarten mit „Sichten“ und „Bearbeiter zuweisen“](../bilder/meldungen/meldungen-liste.png)
 
-2. Mit „Offen“ und „Abgeschlossen“ die Ansicht wählen, mit „Alle Richtungen“, „Intern“ und
-   „Extern“ die Richtung.
+2. Mit „Offen“ und „Abgeschlossen“ die Ansicht wählen, im Feld „Richtung“ „Alle Richtungen“,
+   „Intern“ oder „Extern“.
 3. An einer Karte die nächste Stufe wählen: „Sichten“, dann „Bearbeitung beginnen“, dann „Als
    erledigt melden“. Die Rückfrage „Meldung auf „Erledigt“ setzen?“ schließt die Meldung ab.
 4. Bei Bedarf unter „Bearbeiter zuweisen“ eine Person aus dem Einsatz eintragen.

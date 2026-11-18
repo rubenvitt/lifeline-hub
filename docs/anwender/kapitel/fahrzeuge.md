@@ -41,7 +41,8 @@ entlassen dürfen Einsatzleitung und Führungspersonal.
    Treffer und je Wert ein Knopf, etwa „Träger: ASB“, der genau diesen Filter entfernt; „Filter
    zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Ansicht, Filter und „Sortieren“
    hinter dem Knopf „Filter“ im Kopf der Seite; er nennt die Zahl gewählter Filter, etwa
-   „Filter (1)“. „Ad-hoc-Fahrzeug“ steht dort im Menü „Weitere Aktionen zu den Fahrzeugen“.
+   „Filter (1)“; „wie geliefert“ in „Sortieren“ stellt die Reihenfolge ohne Sortierung wieder
+   her. „Ad-hoc-Fahrzeug“ steht dort im Menü „Weitere Aktionen zu den Fahrzeugen“.
 
 ### Fahrzeuge aus dem Stamm disponieren
 

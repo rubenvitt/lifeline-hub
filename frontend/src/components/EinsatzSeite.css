@@ -32,6 +32,10 @@
   box-sizing: border-box;
   height: auto;
   min-height: var(--lfh-ortspfad-ziel);
+  /* Mindestbreite eines Knopfs der Stufe (LLH-1798, `--lfh-ortspfad-breite` aus `ortspfadStil`):
+     ein kurzes Wort wie „ETB“ bliebe sonst 32 px breit. Der Text steht mittig. */
+  min-width: var(--lfh-ortspfad-breite);
+  justify-content: center;
   border-block: max(0px, calc((var(--lfh-ortspfad-ziel) - 1lh) / 2)) solid transparent;
   background-clip: padding-box;
 }

@@ -134,9 +134,18 @@ export function seitenMetaStil(farben: Pick<Farbrollen, 'gedaempft'>): CSSProper
  * hat keine Dichte-Ausnahme (LFH-909, `frontend/AGENTS.md`, Handgebautes Bedienziel): antd setzt
  * den Link auf die Zeilenhöhe der 12-px-Schrift (20 px), die Trefffläche wächst über einen
  * durchsichtigen Rand, nicht über die Schrift.
+ *
+ * Dazu die Mindestbreite eines Knopfs der Stufe (`controlHeightSM`, wie `antdKnopf`, LLH-1798): ein
+ * kurzes Wort wie „ETB“ war sonst 32 px breit, auch in `handschuh`.
  */
-export function ortspfadStil(token: { controlHeight: number }): CSSProperties {
-  return { '--lfh-ortspfad-ziel': `${token.controlHeight}px` } as CSSProperties;
+export function ortspfadStil(token: {
+  controlHeight: number;
+  controlHeightSM: number;
+}): CSSProperties {
+  return {
+    '--lfh-ortspfad-ziel': `${token.controlHeight}px`,
+    '--lfh-ortspfad-breite': `${token.controlHeightSM}px`,
+  } as CSSProperties;
 }
 
 /**
