@@ -25,7 +25,12 @@ import {
 import { SPEZIES_META, TIER_STATUS, TIER_VERBLEIB, halterVorbelegung } from './tiere/tierHelfer';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
-import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -310,7 +315,10 @@ export default function TiereDetailPage() {
       </div>
     );
   }
-  if (einsatzQuery.isError || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1947): React Query setzt `error` auch, wenn nur ein
+  // Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher liegt. Dann
+  // bliebe sonst eine offene Bearbeitung nicht stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
@@ -319,7 +327,7 @@ export default function TiereDetailPage() {
   if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
   // Ein anderer Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den
   // neuen Versuch an.
-  if (detailQuery.isError || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <SeitenFehler
         text="Tier konnte nicht geladen werden"
@@ -329,6 +337,15 @@ export default function TiereDetailPage() {
     );
   }
   const t = detailQuery.data;
+  const veraltet = einsatzQuery.isError || detailQuery.isError;
+  const standVeraltet = veraltet && (
+    <SeitenStandVeraltet
+      onWiederholen={() => {
+        if (einsatzQuery.isError) void einsatzQuery.refetch();
+        if (detailQuery.isError) void detailQuery.refetch();
+      }}
+    />
+  );
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const kennung = tierRegistrierAnzeige(t.registrier_nr);
@@ -525,12 +542,15 @@ export default function TiereDetailPage() {
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        statusMutation.error != null && (
-          <SeitenHinweise
-            fehler={statusMutation.error}
-            fehlerTitel="Status nicht geändert"
-            fehlerFallback="Statuswechsel fehlgeschlagen"
-          />
+        (veraltet || statusMutation.error != null) && (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {standVeraltet}
+            <SeitenHinweise
+              fehler={statusMutation.error}
+              fehlerTitel="Status nicht geändert"
+              fehlerFallback="Statuswechsel fehlgeschlagen"
+            />
+          </Space>
         )
       }
     >

@@ -109,6 +109,21 @@ describe('buildMarker', () => {
     ]);
   });
 
+  it('aufgelöste UHS stehen weder auf der Karte noch in „Nicht verortet" (LLH-1948)', () => {
+    const { verortet, nichtVerortet } = buildMarker(
+      undefined,
+      [
+        uhs({ id: 5, lat: 50.1, lon: 8.1, status: 'aufgeloest' }),
+        uhs({ id: 6, status: 'aufgeloest' }),
+        uhs({ id: 7, bezeichnung: 'PA', status: 'geplant' }),
+      ],
+      [],
+      token,
+    );
+    expect(verortet).toEqual([]);
+    expect(nichtVerortet).toEqual([{ typ: 'uhs', id: 7, label: 'PA' }]);
+  });
+
   it('lässt den Einsatzort weg, wenn er keine Koordinate hat', () => {
     const einsatz = {
       einsatzort: null,

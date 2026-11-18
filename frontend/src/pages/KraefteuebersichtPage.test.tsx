@@ -1598,20 +1598,44 @@ describe('aktiveFilterChips', () => {
 
   it('führt jeden gesetzten Filter mit sprechendem Etikett, in fester Reihenfolge', () => {
     const chips = aktiveFilterChips(
-      { abschnittId: 10, traeger: 'FF Musterstadt', kategorie: 'verfuegbar', suche: '  HLF  ' },
+      {
+        abschnittId: 10,
+        traeger: 'FF Musterstadt',
+        kategorie: 'verfuegbar',
+        ohneAuftrag: true,
+        rueckmeldungFehlt: true,
+        suche: '  HLF  ',
+      },
       name,
     );
     expect(chips.map((c) => c.label)).toEqual([
       'Abschnitt: Abschnitt Nord',
       'Träger: FF Musterstadt',
       'Status: verfügbar',
+      'ohne Auftrag',
+      'Rückmeldung fehlt oder überfällig',
       'Suche: „HLF"',
     ]);
     expect(chips.map((c) => c.schluessel)).toEqual([
       'abschnittId',
       'traeger',
       'kategorie',
+      'ohneAuftrag',
+      'rueckmeldungFehlt',
       'suche',
+    ]);
+    expect(chips.every((c) => c.wirksam)).toBe(true);
+  });
+
+  it('sagt an einem Einheiten-Filter ohne lesbare Quelle, dass er gerade nicht wirkt (LLH-1792)', () => {
+    const chips = aktiveFilterChips(
+      { ...LEERER_FILTER, ohneAuftrag: true, rueckmeldungFehlt: true },
+      name,
+      { ohneAuftrag: false, rueckmeldungFehlt: true },
+    );
+    expect(chips.map((c) => [c.label, c.wirksam])).toEqual([
+      ['ohne Auftrag (wirkt gerade nicht)', false],
+      ['Rückmeldung fehlt oder überfällig', true],
     ]);
   });
 
@@ -2157,5 +2181,76 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
       expect(within(zeile(container, 'eh-20')!).getByText('Modul Aufträge gesperrt')).toBeVisible(),
     );
     expect(listeOffeneAuftraege).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Einheiten-Filter „ohne Auftrag“ und „Rückmeldung fehlt oder überfällig“ (LLH-1792, Spec
+ * `kraeftebaum`). `mitBaum`: Zug 20 mit Fahrzeug und Meier, Gruppe 21 darunter mit Schulz.
+ */
+describe('KraefteuebersichtPage — Einheiten-Filter (LLH-1792)', () => {
+  const kaestchen = async (name: string) => {
+    await oeffneFilter();
+    return screen.findByRole('checkbox', { name });
+  };
+  const leiste = () => document.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
+
+  it('„ohne Auftrag“ zeigt nur die Gruppe, der Zug bleibt als Rahmen, das Statusband folgt', async () => {
+    mitBaum();
+    vi.mocked(listeOffeneAuftraege).mockResolvedValue([AUFTRAG_A3]);
+    const { container } = setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('ohne Auftrag');
+    await waitFor(() => expect(box).toBeEnabled());
+    fireEvent.click(box);
+    expect(await screen.findByRole('button', { name: /^Filter \(1\)$/ })).toBeInTheDocument();
+    expect(within(leiste()).getByText('ohne Auftrag')).toBeInTheDocument();
+    expect(within(leiste()).getByText('1 von 2 Kräften · 0 von 1 Fahrzeugen')).toBeInTheDocument();
+    expect(zeile(container, 'eh-20')).not.toBeNull();
+    expect(zeile(container, 'eh-21')).not.toBeNull();
+    const band = screen.getByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(band).getByText('1 Einheit')).toBeInTheDocument());
+    expect(container.querySelector('[data-lfh="statusband-hinweis"]')).toBeNull();
+  });
+
+  it('„Rückmeldung fehlt oder überfällig“ trifft die nie zurückgemeldete Gruppe', async () => {
+    mitBaum();
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30)],
+    });
+    setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('Rückmeldung fehlt oder überfällig');
+    await waitFor(() => expect(box).toBeEnabled());
+    fireEvent.click(box);
+    expect(
+      await within(leiste()).findByText('Rückmeldung fehlt oder überfällig'),
+    ).toBeInTheDocument();
+    expect(within(leiste()).getByText('1 von 2 Kräften · 0 von 1 Fahrzeugen')).toBeInTheDocument();
+  });
+
+  it('ohne Freigabe der Aufträge ist „ohne Auftrag“ deaktiviert und nennt den Grund', async () => {
+    mitBaum();
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ auftraege: { zugriff: false } }),
+    );
+    setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('ohne Auftrag');
+    await waitFor(() => expect(box).toBeDisabled());
+    const feld = document.querySelector('[data-lfh="meldebild-filter"]') as HTMLElement;
+    expect(within(feld).getByText('Aufträge nicht freigegeben')).toBeInTheDocument();
+  });
+
+  it('scheitert der Abruf der Rückmeldungen, ist ihr Schalter deaktiviert und nennt den Grund', async () => {
+    mitBaum();
+    vi.mocked(holeRueckmeldungen).mockRejectedValue(new Error('500'));
+    setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('Rückmeldung fehlt oder überfällig');
+    await waitFor(() => expect(box).toBeDisabled());
+    const feld = document.querySelector('[data-lfh="meldebild-filter"]') as HTMLElement;
+    expect(within(feld).getByText('Rückmeldungen nicht abrufbar')).toBeInTheDocument();
   });
 });

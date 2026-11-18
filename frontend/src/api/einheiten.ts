@@ -55,16 +55,21 @@ export interface PositionPatch {
   tz_organisation?: string | null;
 }
 
-/** L‑2: Verortet eine Einheit auf der Lagekarte. */
+/**
+ * L‑2: Verortet eine Einheit auf der Lagekarte. `erwartet` = gespeicherter Stand zu Beginn der
+ * Handlung (Feld-CAS, LLH-1945; Koordinate nur als Paar): weicht er ab, antwortet der Server 409
+ * `veraltet`. Ohne `erwartet` schreibt er ohne Vergleich.
+ */
 export function verorteEinheit(
   einsatzId: number,
   einheitId: number,
   daten: PositionPatch,
+  erwartet?: PositionPatch,
 ): Promise<Einheit> {
   return apiSend<Einheit>(
     `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/position`,
     'PATCH',
-    daten,
+    erwartet ? { ...daten, erwartet } : daten,
   );
 }
 
@@ -86,12 +91,20 @@ export function patchEinheitZeichen(
   einsatzId: number,
   eid: number,
   patch: EinheitZeichenPatch,
+  /** Wert desselben Felds beim Öffnen (Feld-CAS, LLH-1945); ohne ihn kein Vergleich. */
+  erwartet?: string | null,
 ): Promise<Einheit> {
-  const body: PositionPatch =
+  const feld =
     'tz_fachaufgabe' in patch && patch.tz_fachaufgabe !== undefined
-      ? { tz_fachaufgabe: patch.tz_fachaufgabe }
-      : { tz_organisation: patch.tz_organisation ?? null };
-  return verorteEinheit(einsatzId, eid, body);
+      ? 'tz_fachaufgabe'
+      : 'tz_organisation';
+  const body: PositionPatch = { [feld]: patch[feld] ?? null };
+  return verorteEinheit(
+    einsatzId,
+    eid,
+    body,
+    erwartet === undefined ? undefined : { [feld]: erwartet },
+  );
 }
 
 export function bildeEinheit(einsatzId: number, daten: EinheitEingabe): Promise<Einheit> {

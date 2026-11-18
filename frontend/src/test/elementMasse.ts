@@ -1,5 +1,5 @@
 /**
- * Layout-Maße für jsdom: dort rechnet niemand Layout, `clientWidth`, `scrollWidth` und
+ * Layout-Maße für jsdom: dort rechnet niemand Layout, `clientWidth`, `clientHeight`, `scrollWidth` und
  * `scrollLeft` sind überall 0. Wer eine Entscheidung aus gemessenen Breiten prüft (etwa die
  * Drei-Spalten-Form des UHS-Grundrisses, LFH-970), setzt sie hier je Test-Marke (`data-testid`).
  * Alle übrigen Elemente behalten jsdoms Werte.
@@ -8,7 +8,7 @@
  * {@link setzeMasseZurueck} zurück.
  */
 
-type Mass = 'clientWidth' | 'offsetWidth' | 'scrollWidth' | 'scrollLeft';
+type Mass = 'clientWidth' | 'clientHeight' | 'offsetWidth' | 'scrollWidth' | 'scrollLeft';
 
 const werte = new Map<string, Partial<Record<Mass, number>>>();
 const installiert = new Map<Mass, PropertyDescriptor>();

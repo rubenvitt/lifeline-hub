@@ -929,6 +929,61 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     );
 }
 
+/// LLH-1948: Aufgelöstes ist wie Storniertes Lebenszyklus (409 mit Grund, nicht „veraltet“) —
+/// auch das blinde Überschreiben ohne Basisstand und die reine Verortung.
+#[tokio::test]
+async fn patch_auf_aufgeloester_uhs_ist_409() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 51"})),
+    )
+    .await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}/status"),
+        &cookie,
+        Some(&json!({"status": "aufgeloest"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for body in [
+        json!({"bezeichnung": "BHP 99"}),
+        json!({"lat": 51.9, "lon": 8.8}),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+            &cookie,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{v}");
+        assert!(v.get("grund").is_none(), "kein Sperrkonflikt: {v}");
+        assert_eq!(
+            v["error"], "Aufgelöste UHS kann nicht geändert werden",
+            "{v}"
+        );
+    }
+    let (_s, v) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(v["bezeichnung"], "BHP 51", "{v}");
+}
+
 #[tokio::test]
 async fn plaetze_bulk_legt_mehrere_mit_auto_namen_an() {
     let (app, _) = setup_mit_pool().await;

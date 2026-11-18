@@ -395,17 +395,37 @@ export interface Einfrierstand {
  * - **Ältere** (unter der Wassermarke): eine nachgeladene Seite, etwa für den Deeplink
  *   `?eintrag=`. Zurückgehalten meldete das Banner sie als „neu", und der Sprung fände seine
  *   Zeile nicht.
- * - **Eigene** (`erfasser_id` = angemeldete Person): der eben gesendete Eintrag wechselt den
- *   Schlüssel (`ausstehend-<queueId>` → `eintrag-<dbId>`); zurückgehalten wäre er in diesem
- *   Moment nirgends zu sehen.
+ * - **Auf diesem Gerät geschriebene** (`client_id` in `eigeneClientIds`): der eben gesendete
+ *   Eintrag wechselt den Schlüssel (`ausstehend-<queueId>` → `eintrag-<dbId>`); zurückgehalten
+ *   wäre er in diesem Moment nirgends zu sehen. Das Gerät zählt, nicht das Konto (LLH-1833):
+ *   derselbe Benutzer auf einem zweiten Gerät schreibt aus Sicht dieser Zeitachse fremd, sein
+ *   Eintrag wartet hinter dem Banner. Ein Folgeeintrag des Servers ohne Kennung zählt nach dem
+ *   Konto (`hierGeschrieben`).
  * - **Gepufferte**: sie sind die eigenen, noch nicht gesendeten.
  *
  * Entfallene fallen sofort weg. Die Reihenfolge bleibt die frische: neue Einträge kommen oben
  * an, die gezeigten behalten ihre relative Folge, also wandert unter dem Cursor nichts.
  */
+const KEINE_CLIENT_IDS: ReadonlySet<string> = new Set();
+
+/**
+ * Stammt der Eintrag von diesem Gerät? Mit client_id entscheidet sie allein (LLH-1833). Ohne
+ * Kennung ist er ein Folgeeintrag des Servers auf eine Handlung hin („Auftrag aus ETB-Eintrag
+ * erteilen“, Freigaben): vom eigenen Konto gilt er wie bisher als eigener.
+ */
+function hierGeschrieben(
+  e: EtbEintragAnzeige,
+  eigeneClientIds: ReadonlySet<string>,
+  eigeneBenutzerId: number | null | undefined,
+): boolean {
+  if (e.client_id != null) return eigeneClientIds.has(e.client_id);
+  return eigeneBenutzerId != null && e.erfasser_id === eigeneBenutzerId;
+}
+
 export function teileZufluss(
   zeilen: readonly EtbZeile[],
   gefroren: Einfrierstand | null,
+  eigeneClientIds: ReadonlySet<string> = KEINE_CLIENT_IDS,
   eigeneBenutzerId?: number | null,
 ): { sichtbar: EtbZeile[]; zurueckgehalten: number } {
   if (gefroren == null) return { sichtbar: [...zeilen], zurueckgehalten: 0 };
@@ -416,7 +436,7 @@ export function teileZufluss(
       z.art === 'eintrag' &&
       !gefroren.schluessel.has(z.schluessel) &&
       z.eintrag.lfd_nr > gefroren.wassermarke &&
-      (eigeneBenutzerId == null || z.eintrag.erfasser_id !== eigeneBenutzerId);
+      !hierGeschrieben(z.eintrag, eigeneClientIds, eigeneBenutzerId);
     if (zurueck) zurueckgehalten += 1;
     else sichtbar.push(z);
   }

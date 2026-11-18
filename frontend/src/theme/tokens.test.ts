@@ -1,7 +1,8 @@
 /**
  * Die Dichte-Staffel als Träger (A1 Festlegung 4): die drei Stufen erzeugen unterschiedliche
  * Tokens. Geprüft werden auch die Abstände: ein `antdToken`, das `padding*` weiter aus der
- * Modulkonstante läse, wäre sonst halb verdrahtet und trotzdem grün.
+ * Modulkonstante läse, wäre sonst halb verdrahtet und trotzdem grün. Dazu das seitliche
+ * Steuerelement-Polster (`controlPaddingHorizontal*`), das ebenfalls der Stufe folgt.
  */
 import { theme as antdTheme, type CheckboxProps, type RadioProps } from 'antd';
 import { describe, expect, it } from 'vitest';
@@ -10,6 +11,7 @@ import { seitenrinne } from './tokens';
 import { navDrawerBreite, navDrawerRand } from './tokens';
 import {
   antdAlgorithmus,
+  antdHinweis,
   antdKaestchen,
   antdKlappkopf,
   antdKomponenten,
@@ -124,6 +126,31 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
     const handschuh = tokenFuer('handschuh');
     expect(handschuh.paddingMD).toBeGreaterThan(kompakt.paddingMD as number);
     expect(handschuh.marginXL).toBeGreaterThan(kompakt.marginXL as number);
+  });
+
+  /**
+   * Das seitliche Steuerelement-Polster (Select-Option, Dropdown-Eintrag, Input SM/LG) folgt dem
+   * Raster: normal auf `md`, klein auf `sm` (Change `tfabqe09-control-polster-dichte`, D1). In
+   * `kompakt` sind das antds Vorgaben 12 und 8, dort ändert sich kein Pixel. Die Inhaltspolster
+   * `paddingContent*` (Knopf, Modal, Alert, Liste) bleiben bewusst bei antd (D2).
+   */
+  it('lässt das Steuerelement-Polster mit der Dichte wachsen, die Inhaltspolster nicht', () => {
+    for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const t = tokenFuer(dichte);
+      const r = dichten[dichte].abstand;
+      expect(t.controlPaddingHorizontal, dichte).toBe(r.md);
+      expect(t.controlPaddingHorizontalSM, dichte).toBe(r.sm);
+      expect(
+        Object.keys(t).filter((k) => k.startsWith('paddingContent')),
+        dichte,
+      ).toEqual([]);
+    }
+    const kompakt = tokenFuer('kompakt');
+    expect([kompakt.controlPaddingHorizontal, kompakt.controlPaddingHorizontalSM]).toEqual([12, 8]);
+    const handschuh = tokenFuer('handschuh');
+    expect([handschuh.controlPaddingHorizontal, handschuh.controlPaddingHorizontalSM]).toEqual([
+      24, 16,
+    ]);
   });
 
   it('erzeugt für jede Stufe einen anderen Token-Satz (Spec §2.1)', () => {
@@ -314,6 +341,32 @@ describe('Klappkopf folgt der Staffel (LFH-653)', () => {
       expect((kopf as { header?: unknown }).header, d).toEqual({
         minHeight: SOLL[d],
         alignItems: 'center',
+      });
+    }
+  });
+});
+
+/**
+ * Schließen-Kreuz eines Hinweises (LLH-1798, Spec `einsatztauglichkeit-layout`): antd zeichnet es in
+ * jeder Stufe 12 × 14 px groß. Unbeschriftetes Ziel, also die kleine Steuerhöhe auf BEIDEN Achsen,
+ * 24 / 48 / 72. Höhenneutral: der negative Rand nimmt den Zuwachs über die Kreuzgröße (`1em`, antd
+ * setzt Schrift und Zeilenhöhe des Knopfs auf `fontSizeIcon`) aus dem Layout. Literale, nicht die
+ * Quelle.
+ */
+describe('Schließen-Kreuz eines Hinweises folgt der Staffel (LLH-1798)', () => {
+  const SOLL: Record<Dichte, number> = { kompakt: 24, komfortabel: 48, handschuh: 72 };
+
+  it('setzt den Boden der GEWÄHLTEN Stufe auf beiden Achsen, mittig und höhenneutral', () => {
+    for (const d of Object.keys(SOLL) as Dichte[]) {
+      const stile = antdHinweis(d).styles;
+      expect(typeof stile, d).toBe('object');
+      expect((stile as { close?: unknown }).close, d).toEqual({
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: SOLL[d],
+        minHeight: SOLL[d],
+        marginBlock: `calc((1em - ${SOLL[d]}px) / 2)`,
       });
     }
   });

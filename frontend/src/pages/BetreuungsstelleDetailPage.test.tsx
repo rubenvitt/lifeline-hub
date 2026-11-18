@@ -7,6 +7,7 @@ import { http, HttpResponse } from 'msw';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 import BetreuungsstelleDetailPage from './BetreuungsstelleDetailPage';
 import { AuthProvider } from '../auth/AuthContext';
+import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BetreuungUebersicht, Betreuungsstelle, Person } from '../api/types';
 import { queueLeerenFuerTests } from '../offline/queue';
@@ -240,15 +241,102 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     expect(screen.queryByRole('button', { name: 'Belegung melden' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
-      expect(api.aendereStelle).toHaveBeenCalledWith(1, 8, {
-        kapazitaet_personen: 200,
-        leitung: null,
-      }),
+      expect(api.aendereStelle).toHaveBeenCalledWith(
+        1,
+        8,
+        { kapazitaet_personen: 200, leitung: null },
+        // Feld-CAS (LLH-1945): je geänderte Angabe ihr Wert beim Öffnen.
+        { kapazitaet_personen: 150, leitung: 'Frau Schulz' },
+      ),
     );
     expect(
       await screen.findByText('Betreuungsstelle Turnhalle Ost gespeichert'),
     ).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByLabelText('Kapazität (Personen)')).toBeNull());
+  });
+
+  // Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+  // Änderung“): hat ein anderer eine der geänderten Angaben inzwischen geändert, fragt die Seite;
+  // „Meine Änderung übernehmen“ schreibt ohne Altwert, „Verwerfen und neu laden“ schreibt nichts.
+  it('Kapazität aus altem Stand: Rückfrage „Zwischenzeitlich geändert“, übernehmen ohne Altwert', async () => {
+    api.aendereStelle
+      .mockRejectedValueOnce(new ApiError(409, 'Das Feld wurde zwischenzeitlich geändert.'))
+      .mockResolvedValueOnce({ ...TURNHALLE, kapazitaet_personen: 200 });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    // Inzwischen hat ein anderer Arbeitsplatz die Kapazität auf 180 gesetzt.
+    api.ladeBetreuung.mockResolvedValue({
+      ...MIT_DATEN,
+      stellen: [{ ...TURNHALLE, kapazitaet_personen: 180 }, STADION],
+    });
+    const kapazitaet = await screen.findByLabelText('Kapazität (Personen)');
+    await userEvent.clear(kapazitaet);
+    await userEvent.type(kapazitaet, '200');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent(/Kapazität inzwischen: „180“/);
+    // Solange die Rückfrage klärt, steht kein Grund am Formular.
+    expect(screen.queryByText('Betreuungsstelle konnte nicht gespeichert werden')).toBeNull();
+    expect(api.aendereStelle).toHaveBeenNthCalledWith(
+      1,
+      1,
+      8,
+      { kapazitaet_personen: 200 },
+      { kapazitaet_personen: 150 },
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await waitFor(() => expect(api.aendereStelle).toHaveBeenCalledTimes(2));
+    expect(api.aendereStelle).toHaveBeenNthCalledWith(
+      2,
+      1,
+      8,
+      { kapazitaet_personen: 200 },
+      undefined,
+    );
+    expect(
+      await screen.findByText('Betreuungsstelle Turnhalle Ost gespeichert'),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByLabelText('Kapazität (Personen)')).toBeNull());
+  });
+
+  it('Leitung aus altem Stand: „Verwerfen und neu laden“ schreibt nichts und zeigt den frischen Stand', async () => {
+    api.aendereStelle.mockRejectedValue(
+      new ApiError(409, 'Das Feld wurde zwischenzeitlich geändert.'),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    api.ladeBetreuung.mockResolvedValue({
+      ...MIT_DATEN,
+      stellen: [{ ...TURNHALLE, leitung: 'Herr Meyer' }, STADION],
+    });
+    const leitung = await screen.findByLabelText('Leitung');
+    await userEvent.clear(leitung);
+    await userEvent.type(leitung, 'Frau Kern');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/Leitung inzwischen: „Herr Meyer“/);
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    // Die Sitzung endet ohne Meldung, die Ansicht zeigt den frischen Stand; kein zweiter PATCH.
+    expect(await screen.findByText('Herr Meyer')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Leitung')).toBeNull();
+    expect(screen.queryByText('Betreuungsstelle Turnhalle Ost gespeichert')).toBeNull();
+    expect(screen.queryByText('Betreuungsstelle konnte nicht gespeichert werden')).toBeNull();
+    expect(api.aendereStelle).toHaveBeenCalledTimes(1);
+  });
+
+  it('409 ohne fremde Änderung an der Angabe: kein Dialog, der Grund steht am Formular', async () => {
+    api.aendereStelle.mockRejectedValue(new ApiError(409, 'Einsatz ist abgeschlossen'));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(await screen.findByLabelText('Notiz'), 'Eingang Süd');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByText('Betreuungsstelle konnte nicht gespeichert werden'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // Die Sitzung bleibt offen.
+    expect(screen.getByLabelText('Notiz')).toHaveValue('Eingang Süd');
   });
 
   it('LLH-1582: Bezeichnung, Standort und Notiz über der Grenze stehen am Feld und senden nicht', async () => {
@@ -304,11 +392,13 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Am Sportplatz 5,/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
-      expect(api.aendereStelle).toHaveBeenCalledWith(1, 8, {
-        standort: 'Am Sportplatz 5',
-        lat: 52.3,
-        lon: 9.7,
-      }),
+      expect(api.aendereStelle).toHaveBeenCalledWith(
+        1,
+        8,
+        { standort: 'Am Sportplatz 5', lat: 52.3, lon: 9.7 },
+        // Die Koordinate ist ein Paar: beide Altwerte, auch wenn sie leer waren.
+        { standort: 'Am Sportplatz 3', lat: null, lon: null },
+      ),
     );
   });
 
@@ -330,7 +420,12 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     await userEvent.type(standort, 'a');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
-      expect(api.aendereStelle).toHaveBeenCalledWith(1, 8, { standort: 'Am Sportplatz 3a' }),
+      expect(api.aendereStelle).toHaveBeenCalledWith(
+        1,
+        8,
+        { standort: 'Am Sportplatz 3a' },
+        { standort: 'Am Sportplatz 3' },
+      ),
     );
   });
 
@@ -508,7 +603,12 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     await waehle('Belegungsart', 'namentlich geführt');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
-      expect(api.aendereStelle).toHaveBeenCalledWith(1, 8, { belegungsart: 'namentlich' }),
+      expect(api.aendereStelle).toHaveBeenCalledWith(
+        1,
+        8,
+        { belegungsart: 'namentlich' },
+        { belegungsart: 'gezaehlt' },
+      ),
     );
   });
 

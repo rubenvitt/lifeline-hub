@@ -206,6 +206,12 @@ pub struct EtbEintragAnzeige {
     /// (LLH-1104 D1/D6). Fehlt ohne Kopplung.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nachforderung_id: Option<i64>,
+    /// Die Kennung, die das erfassende Gerät beim Senden vergab (Idempotenz der Warteschlange,
+    /// LFH-261). Das Gerät erkennt daran seine eigenen Einträge: die Zeitachse lässt hochgerollt
+    /// nur sie sofort durch, Einträge desselben Kontos von einem anderen Gerät warten hinter dem
+    /// Sammelbanner (LLH-1833). Fehlt bei Einträgen ohne Kennung (Systemeinträge, ältere).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
     /// Aufträge, die AUS diesem Eintrag erteilt wurden (LFH-636) — die Vorwärtsrichtung zu
     /// `auftrag.quell_etb_eintrag_id` (LFH-112), nicht zu verwechseln mit `auftrag_id` oben
     /// (Eintrag wurde VON einem Auftrag erzeugt). Aufsteigend nach `lfd_nr`, leer statt

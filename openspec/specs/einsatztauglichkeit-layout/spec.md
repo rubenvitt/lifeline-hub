@@ -53,10 +53,19 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
   trägt, auch im Kopf der Verwaltungsseiten (etwa „Fahrzeuge“ bzw. „Personal“ über der
   Fahrzeug- und der Personal-Detailseite der Stammdaten). Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um Fläche über und
   unter dem Text, nicht über die Schrift. Der Ortspfad MUST den Seitenkopf in `kompakt` am
-  Fükw-Schirm nicht über seine 44 px heben.
+  Fükw-Schirm nicht über seine 44 px heben. Jeder Link im Ortspfad MUST zudem mindestens so breit
+  sein wie ein Knopf der Stufe (`controlHeightSM`: 24 / 48 / 72 px), auch bei einem kurzen Wort
+  wie „ETB“.
+- Hinweise: das Schließen-Kreuz jedes schließbaren Hinweises (Hinweisfläche über dem Inhalt einer
+  Seite, eines Paneels oder einer Leiste). Es ist ein unbeschriftetes Ziel und MUST die kleine
+  Steuerhöhe (24 / 48 / 72 px) auf beiden Achsen erreichen; der Hinweis MUST dadurch nicht höher
+  werden als ohne diesen Boden.
 
 Nicht Teil dieser Zusicherung sind Kennungs-Links in Tabellenzellen, beschriftete Checkboxen
-und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Ziel).
+und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Ziel). Gibt es zum
+Löschkreuz keinen anderen Weg zurück zum leeren Zustand, gilt die Ausnahme nicht: Die
+Sortierauswahl der Kartenansicht einer Liste MUST die gelieferte Reihenfolge („wie geliefert“) als
+eigenen Eintrag der Auswahl führen und trägt kein Löschkreuz.
 
 #### Scenario: Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und die Seite neu geladen wurde
@@ -90,6 +99,20 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 #### Scenario: Liste und Detail der Aufträge im Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und auf dem Handschirm ein offener Auftrag mit offenem Empfänger aufgeklappt ist
 - **THEN** misst das Auswahlziel jeder Karte und jeder Knopf des Detailpaneels („Quittieren“, „Bearbeitung beginnen“, „Vollzug melden“) mindestens 72 px in der Höhe
+
+#### Scenario: Schließen-Kreuz eines Hinweises
+- **WHEN** ein schließbarer Hinweis steht (etwa „Posten #… gibt es nicht (mehr)“ nach einem Deeplink auf einen unbekannten Posten) und die Dichtestufe `kompakt`, `komfortabel` bzw. `handschuh` gewählt ist
+- **THEN** trifft ein Tipp das Kreuz „Hinweis schließen“ auf einer Fläche von mindestens 24 × 24, 48 × 48 bzw. 72 × 72 px
+- **AND** ist der Hinweis so hoch wie ohne diesen Boden
+
+#### Scenario: Kurzer Link im Ortspfad
+- **WHEN** eine Seite mit dem Link „ETB“ im Ortspfad (Druckansicht des ETB) in `kompakt` bzw. `handschuh` steht
+- **THEN** ist dieser Link mindestens 24 bzw. 72 px breit, und seine Schrift ist 12 px groß
+
+#### Scenario: Sortierung zurücksetzen am Handschirm
+- **WHEN** eine Liste in der Kartenansicht auf dem Handschirm nach einer Spalte sortiert ist
+- **THEN** führt die Sortierauswahl den Eintrag „wie geliefert“, und seine Wahl stellt die gelieferte Reihenfolge wieder her
+- **AND** trägt die Sortierauswahl kein Löschkreuz
 
 ### Requirement: Abstand zwischen klickbaren Kennzahlen
 

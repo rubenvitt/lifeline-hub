@@ -1500,10 +1500,10 @@ function BoardMitKarte() {
  * `nvhnqynd-konflikt-und-aenderungsvermerk`).
  */
 describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () => {
-  function casServer(geladen: Record<string, unknown>) {
+  function casServer(geladen: Record<string, unknown>, pfad = '/api/einsaetze/1/einheiten/10') {
     const anfragen: Record<string, unknown>[] = [];
     let stand = { ...geladen };
-    const handler = http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
+    const handler = http.patch(pfad, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       anfragen.push(body);
       const erwartet = (body.erwartet ?? {}) as Record<string, unknown>;
@@ -1544,6 +1544,30 @@ describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () =>
     await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
     await waitFor(() => expect(cas.anfragen).toHaveLength(2));
     expect(cas.anfragen[1]).toEqual({ bemerkung: 'Halle 2' });
+  });
+
+  it('Zeichen (LLH-1945): Altwert beim Öffnen geht mit; verworfen bleibt das fremde Zeichen', async () => {
+    const cas = casServer(
+      { ...einheiten[0], tz_organisation: null },
+      '/api/einsaetze/1/einheiten/10/position',
+    );
+    zeige(cas.liste, cas.handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Organisation eintragen' }));
+    cas.fremdAendern({ tz_organisation: 'feuerwehr' });
+    await userEvent.click(screen.getByRole('combobox', { name: 'Organisation' }));
+    await userEvent.click(await screen.findByTitle('THW'));
+    await userEvent.click(screen.getByRole('button', { name: 'Organisation speichern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Organisation inzwischen: „Feuerwehr“');
+    expect(cas.anfragen[0]).toEqual({
+      tz_organisation: 'thw',
+      erwartet: { tz_organisation: null },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Organisation speichern' })).toBeNull(),
+    );
+    expect(cas.anfragen).toHaveLength(1);
   });
 
   it('Vermerk an der Zeile und der jüngste im Paneelkopf', async () => {

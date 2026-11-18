@@ -80,8 +80,10 @@ export interface LiveVerbindungOptionen {
    * Läuft nur beim ersten `open`. Beim Wechsel zwischen Einsatz- und Org-Strom (LFH-734) kann
    * ein Org-Ereignis zwischen beiden Verbindungen verloren gehen; der neue Strom gleicht deshalb
    * gleich zu Beginn die Org-Keys ab (`openspec/changes/archive/2026-10-01-lfh-734-org-live-ereignis/design.md`, D4).
+   * `nachFehlversuch`: vor diesem `open` scheiterte schon ein Versuch, es lag also Zeit dazwischen
+   * (LLH-1839, `merkeOrgStand`).
    */
-  beimErstenOpen?: () => void;
+  beimErstenOpen?: (nachFehlversuch: boolean) => void;
   /**
    * Nach einem CLOSED-Fehler bei gültiger Sitzung: ist das Ziel endgültig weg (LFH-732, etwa ein
    * gelöschter Einsatz)? Dann kein Reconnect, Status `idle` statt `lost` und `beiEndzustand`.
@@ -110,6 +112,9 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     window.dispatchEvent(new CustomEvent('lfh:live-status', { detail: { status } }));
 
   let ersterOpen = true;
+  // Scheiterte vor dem ersten `open` ein Versuch, lag Zeit dazwischen (Backoff bis 30 s): Was die
+  // Seite inzwischen geladen hat, kann Ereignisse verpasst haben (LLH-1839).
+  let fehlversuchVorOpen = false;
   let abgebrochen = false;
   let backoffStufe = 0;
   let backoffTimer: ReturnType<typeof setTimeout> | null = null;
@@ -229,7 +234,7 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
       backoffStufe = 0;
       if (ersterOpen) {
         ersterOpen = false;
-        opt.beimErstenOpen?.();
+        opt.beimErstenOpen?.(fehlversuchVorOpen);
       } else if (quelleWarOffen && (!opt.positionsEreignis || positionBekannt)) {
         (opt.beiNachlieferung ?? opt.beiWiederaufbau)();
       } else {
@@ -239,6 +244,7 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     };
     quelle.onerror = () => {
       stopWatchdog();
+      if (ersterOpen) fehlversuchVorOpen = true;
       if (quelle.readyState === EventSource.CONNECTING) {
         // Browser reconnectet selbst; sichtbar erst, wenn es länger dauert. Weitere Fehlversuche
         // verlängern die Frist nicht.

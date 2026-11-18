@@ -28,7 +28,8 @@ import {
   schienenLinieY,
 } from './fernmeldeskizzeLayout';
 import FernmeldeskizzeBild from './FernmeldeskizzeBild';
-import type { SkizzenAktionen } from './skizzenAktionen';
+import { HandlungVerfallen, type SkizzenAktionen } from './skizzenAktionen';
+import { OFFEN_LASSEN } from '../components/InlineAngabe';
 import { STRICH_HERVORGEHOBEN, schaetzeTextbreite } from './skizzenZeichen';
 import { eingepasst } from './skizze/ansicht';
 import { ZURUECK_DECKKRAFT } from './skizze/SkizzenElemente';
@@ -137,7 +138,7 @@ function aktionenAttrappe() {
     aendereBereich: vi.fn(),
     entferneBereich: vi.fn(),
     setzeSchriftfeld: vi.fn(),
-    setzeRufname: vi.fn(async () => {}),
+    setzeRufname: vi.fn(async (): Promise<string | null> => null),
   } satisfies SkizzenAktionen;
   return a;
 }
@@ -320,8 +321,33 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
     await user.clear(feld);
     await user.type(feld, 'Florian Musterstadt 1/1{Enter}');
     await waitFor(() =>
-      expect(aktionen!.setzeRufname).toHaveBeenCalledWith('eh-10', 'Florian Musterstadt 1/1'),
+      // Der Wert beim Öffnen geht als Altwert mit (Feld-CAS, LLH-1945).
+      expect(aktionen!.setzeRufname).toHaveBeenCalledWith(
+        'eh-10',
+        'Florian Musterstadt 1/1',
+        'Florian 1/1',
+      ),
     );
+  });
+
+  // Feld-CAS (LLH-1945): Escape in der Rückfrage „Zwischenzeitlich geändert“ lässt die Eingabe
+  // offen; nichts ist gescheitert, nichts steht am Element, nichts liegt auf dem Rückgängig-Stapel.
+  it('Rufname: verfällt die Handlung in der Rückfrage, bleibt die Eingabe offen', async () => {
+    const user = userEvent.setup();
+    const aktionen = aktionenAttrappe();
+    vi.mocked(aktionen.setzeRufname).mockRejectedValueOnce(new HandlungVerfallen(OFFEN_LASSEN));
+    bild(netz(), aktionen);
+    await user.click(element('eh-10')!);
+    await user.click(within(paneel()).getByRole('button', { name: 'Rufname bearbeiten' }));
+    const feld = within(paneel()).getByRole('textbox', { name: 'Rufname' });
+    await user.clear(feld);
+    await user.type(feld, 'Florian Musterstadt 1/1{Enter}');
+    await waitFor(() => expect(aktionen.setzeRufname).toHaveBeenCalledTimes(1));
+    expect(within(paneel()).getByRole('textbox', { name: 'Rufname' })).toHaveValue(
+      'Florian Musterstadt 1/1',
+    );
+    expect(within(paneel()).queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Rückgängig/ })).toBeDisabled();
   });
 
   it('Geplante Datenverbindung: glatt, gestrichelt, mit Zeichen für Daten und dem Wort „geplant“', () => {

@@ -1664,7 +1664,44 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     );
     await waehle('Ort zu Wolldecke', 'UHS Turnhalle');
     await userEvent.click(screen.getByRole('button', { name: 'Ort zu Wolldecke speichern' }));
-    await waitFor(() => expect(aufrufe).toEqual([{ uhs_id: 7 }]));
+    await waitFor(() =>
+      expect(aufrufe).toEqual([
+        {
+          uhs_id: 7,
+          erwartet: {
+            ort: { einheit_id: 1, einsatz_fahrzeug_id: null, uhs_id: null, br_id: null },
+          },
+        },
+      ]),
+    );
+  });
+
+  it('Ort mit überholtem Stand: Rückfrage nennt den aktuellen Ort beim Namen, „Verwerfen“ schreibt nichts (LLH-1945)', async () => {
+    const aufrufe: unknown[] = [];
+    let stand = { ...em, einheit_id: 1 as number | null };
+    server.use(
+      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+        aufrufe.push(await request.json());
+        return HttpResponse.json({ error: 'veraltet', grund: 'veraltet' }, { status: 409 });
+      }),
+    );
+    render(einsatzAktiv, [stand]);
+    await screen.findByText('Wolldecke');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ort zu Wolldecke bearbeiten' }),
+    );
+    // Ein anderer Arbeitsplatz hängt den Posten inzwischen an Staffel B.
+    stand = { ...stand, einheit_id: 2 };
+    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([stand])));
+    await waehle('Ort zu Wolldecke', 'UHS Turnhalle');
+    await userEvent.click(screen.getByRole('button', { name: 'Ort zu Wolldecke speichern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Ort inzwischen: „Staffel B“');
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    expect(aufrufe).toHaveLength(1);
+    expect(
+      await screen.findByRole('button', { name: 'Ort zu Wolldecke bearbeiten' }),
+    ).toHaveTextContent('Staffel B');
   });
 
   it('Ort: „ohne Ort“ löst über das Feld des bisherigen Orts', async () => {
@@ -1682,7 +1719,16 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     );
     await waehle('Ort zu Wolldecke', 'ohne Ort');
     await userEvent.click(screen.getByRole('button', { name: 'Ort zu Wolldecke speichern' }));
-    await waitFor(() => expect(aufrufe).toEqual([{ einsatz_fahrzeug_id: null }]));
+    await waitFor(() =>
+      expect(aufrufe).toEqual([
+        {
+          einsatz_fahrzeug_id: null,
+          erwartet: {
+            ort: { einheit_id: null, einsatz_fahrzeug_id: 4, uhs_id: null, br_id: null },
+          },
+        },
+      ]),
+    );
   });
 
   it('Ort: ohne Zugriff auf Einheiten steht „zugeordnet“; die Angabe bleibt bedienbar, ohne Einheiten', async () => {

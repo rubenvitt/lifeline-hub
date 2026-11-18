@@ -771,6 +771,36 @@ async fn erfassung_mit_client_id_ist_idempotent() {
 }
 
 #[tokio::test]
+async fn eintrag_traegt_seine_client_id_in_antwort_und_liste() {
+    // LLH-1833: Das Gerät erkennt seine eigenen Einträge an der client_id, nicht am Konto —
+    // derselbe Benutzer auf einem zweiten Gerät schreibt fremd. Ohne client_id fehlt das Feld.
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let mit = r#"{"von":"ELW 1","an":"ELW 2","typ":"meldung","inhalt":"Vom Gerät","client_id":"geraet-a-1"}"#;
+    let ohne = r#"{"von":"ELW 1","an":"ELW 2","typ":"meldung","inhalt":"Ohne Kennung"}"#;
+
+    let (status, antwort) = eintrag_erfassen(&app, &admin, einsatz, mit).await;
+    assert_eq!(status, StatusCode::CREATED, "{antwort:?}");
+    assert_eq!(antwort["client_id"], "geraet-a-1");
+    let (status, antwort) = eintrag_erfassen(&app, &admin, einsatz, ohne).await;
+    assert_eq!(status, StatusCode::CREATED, "{antwort:?}");
+    assert!(antwort.get("client_id").is_none(), "{antwort:?}");
+
+    let (_, liste) = etb_abrufen(&app, &admin, einsatz, "").await;
+    let liste = liste.as_array().unwrap();
+    let von = |inhalt: &str| {
+        liste
+            .iter()
+            .find(|e| e["inhalt"] == inhalt)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(von("Vom Gerät")["client_id"], "geraet-a-1");
+    assert!(von("Ohne Kennung").get("client_id").is_none());
+}
+
+#[tokio::test]
 async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

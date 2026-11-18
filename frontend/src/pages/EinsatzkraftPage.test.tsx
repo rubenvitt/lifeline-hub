@@ -292,7 +292,11 @@ describe('EinsatzkraftPage – Einteilung (3.2)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Position bearbeiten' }));
     await waehle('Position', 'Führer');
     await userEvent.click(screen.getByRole('button', { name: 'Position speichern' }));
-    await waitFor(() => expect(bodies).toEqual([{ staerke_position: 'fuehrer' }]));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { staerke_position: 'fuehrer', erwartet: { staerke_position: 'unterfuehrer' } },
+      ]),
+    );
     expect(await screen.findByText('Gespeichert: Position')).toBeInTheDocument();
   });
 
@@ -379,6 +383,73 @@ describe('EinsatzkraftPage – Einteilung (3.2)', () => {
   });
 });
 
+describe('EinsatzkraftPage – zwischenzeitlich geändert (LLH-1945)', () => {
+  /** PATCH mit Altwert: 409, solange `erwartet` nicht zum Serverstand passt. */
+  function mitFeldCas() {
+    server.use(
+      http.patch('/api/einsaetze/7/personal/:ep', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        const erwartet = body.erwartet as Record<string, unknown> | undefined;
+        const stand = serverState.aktiv[0] as unknown as Record<string, unknown>;
+        if (erwartet && Object.entries(erwartet).some(([k, v]) => (stand[k] ?? null) !== v)) {
+          return HttpResponse.json({ error: 'veraltet', grund: 'veraltet' }, { status: 409 });
+        }
+        const felder = { ...body };
+        delete felder.erwartet;
+        serverState.aktiv = [{ ...serverState.aktiv[0], ...felder }];
+        return HttpResponse.json(serverState.aktiv[0]);
+      }),
+    );
+  }
+
+  it('Bemerkung: Rückfrage mit dem aktuellen Wert, „Meine Änderung übernehmen“ ohne Altwert und mit Toast', async () => {
+    renderAnsicht('/einsaetze/7/personal/10', { aktiv: [kraft({ bemerkung: 'Tor 3' })] });
+    mitFeldCas();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bemerkung bearbeiten' }));
+    serverState.aktiv = [kraft({ bemerkung: 'Tor 5' })];
+    const feld = screen.getByRole('textbox', { name: 'Bemerkung' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Halle 2');
+    await userEvent.click(screen.getByRole('button', { name: 'Bemerkung speichern' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' });
+    expect(dialog).toHaveTextContent('Bemerkung inzwischen: „Tor 5“');
+    expect(bodies).toEqual([{ bemerkung: 'Halle 2', erwartet: { bemerkung: 'Tor 3' } }]);
+    expect(screen.queryByText('Gespeichert: Bemerkung')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    expect(await screen.findByText('Gespeichert: Bemerkung')).toBeInTheDocument();
+    expect(bodies[1]).toEqual({ bemerkung: 'Halle 2' });
+  });
+
+  it('Einsatzfunktion: „Verwerfen und neu laden“ schreibt nichts und meldet nichts als gespeichert', async () => {
+    renderAnsicht();
+    mitFeldCas();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Funktion zu Lena Beispiel bearbeiten' }),
+    );
+    serverState.aktiv = [kraft({ einsatzfunktion: 'Melder' })];
+    const feld = screen.getByRole('combobox', { name: 'Funktion zu Lena Beispiel' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Gruppenführer');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Funktion zu Lena Beispiel speichern' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' });
+    expect(dialog).toHaveTextContent('Einsatzfunktion inzwischen: „Melder“');
+    expect(bodies).toEqual([
+      { einsatzfunktion: 'Gruppenführer', erwartet: { einsatzfunktion: 'Sprechfunker' } },
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Funktion zu Lena Beispiel bearbeiten' }),
+      ).toHaveTextContent('Melder'),
+    );
+    expect(bodies).toHaveLength(1);
+    expect(screen.queryByText('Gespeichert: Einsatzfunktion')).toBeNull();
+  });
+});
+
 describe('EinsatzkraftPage – Person (3.3)', () => {
   const adhoc = () => kraft({ ist_adhoc: true, personal_id: null, name: 'Maier' });
 
@@ -388,7 +459,7 @@ describe('EinsatzkraftPage – Person (3.3)', () => {
     const feld = screen.getByRole('textbox', { name: 'Name' });
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Meier{Enter}');
-    await waitFor(() => expect(bodies).toEqual([{ name: 'Meier' }]));
+    await waitFor(() => expect(bodies).toEqual([{ name: 'Meier', erwartet: { name: 'Maier' } }]));
   });
 
   it('sendet einen leeren Namen nicht und lässt den alten mit Hinweis stehen', async () => {

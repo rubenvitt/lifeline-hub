@@ -1444,6 +1444,32 @@ pub async fn stelle_aendern_tx(
     startwert: i64,
     eingabe: &StelleAenderung,
 ) -> Result<Geschrieben, AppError> {
+    let ohne_altwert = crate::feld_cas::ExpectedValues::new();
+    update_stelle_mit_altwert_tx(
+        conn,
+        einsatz_id,
+        id,
+        benutzer_id,
+        startwert,
+        eingabe,
+        &ohne_altwert,
+    )
+    .await
+}
+
+/// [`stelle_aendern_tx`] mit Feld-CAS (LLH-1945): trägt eine erwartete Spalte inzwischen einen
+/// anderen Wert, ist der Altwert überholt (409 `veraltet`) und nichts wird geschrieben, auch kein
+/// ETB-Eintrag. Verglichen wird in DIESER Transaktion nach 404, 409 (storniert) und den Feld- und
+/// Zusammenhangsprüfungen, vor dem Leerlauf-Riegel und dem ersten Schreiben.
+pub async fn update_stelle_mit_altwert_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    startwert: i64,
+    eingabe: &StelleAenderung,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
+) -> Result<Geschrieben, AppError> {
     let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
     stelle_lebt(&roh)?;
 
@@ -1504,6 +1530,7 @@ pub async fn stelle_aendern_tx(
     let verortung_neu = lat != roh.lat || lon != roh.lon;
     let belegungsart = eingabe.belegungsart.unwrap_or(roh.belegungsart);
     let belegungsart_neu = belegungsart != roh.belegungsart;
+    crate::feld_cas::check_zeile_tx(conn, "betreuungsstelle", einsatz_id, id, erwartet).await?;
     if stammdaten.leer() && !status_neu && !verortung_neu && !belegungsart_neu {
         return Ok(Geschrieben {
             id,

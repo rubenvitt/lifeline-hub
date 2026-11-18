@@ -76,6 +76,24 @@ function verbinde(listeners: readonly (readonly [string, EventListener])[] = [])
   return { schliessen, beiWiederaufbau, beimErstenOpen };
 }
 
+describe('Erst-Open nach Fehlversuch (LLH-1839)', () => {
+  it('meldet dem Erst-Open, ob vorher ein Versuch scheiterte', () => {
+    const { schliessen, beimErstenOpen } = verbinde();
+    FakeEventSource.instanzen[0].oeffne();
+    expect(beimErstenOpen).toHaveBeenCalledWith(false);
+    schliessen();
+  });
+
+  it('nach einem gescheiterten Versuch vor dem ersten open heißt es: es lag Zeit dazwischen', () => {
+    const { schliessen, beimErstenOpen } = verbinde();
+    const quelle = FakeEventSource.instanzen[0];
+    quelle.fehler(FakeEventSource.CONNECTING);
+    quelle.oeffne();
+    expect(beimErstenOpen).toHaveBeenCalledWith(true);
+    schliessen();
+  });
+});
+
 describe('pausiereLiveStroeme (LFH-1105)', () => {
   it('liefert null, wenn kein Strom offen ist', () => {
     expect(pausiereLiveStroeme()).toBeNull();

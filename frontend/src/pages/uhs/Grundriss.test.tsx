@@ -2771,3 +2771,94 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
     });
   });
 });
+
+describe('Grundriss – Kacheln wachsen mit der Fläche (LLH-1940)', () => {
+  /** Sicht der Bildlauffläche; gemessen wird im Callback-Ref vor dem ersten Zeichnen. */
+  const sicht = (breite: number, hoehe: number) =>
+    setzeMasse('grundriss-flaeche-scroll', { clientWidth: breite, clientHeight: hoehe });
+
+  it('streckt Lage und Größe einer Karte in einer leeren Fläche auf das Doppelte', async () => {
+    sicht(1300, 700);
+    renderGrundriss(uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10 })] }), []);
+    expect(await screen.findByTestId('platz-karte')).toHaveStyle({
+      left: '20px',
+      top: '20px',
+      width: `${2 * PLATZ_KARTE_BREITE}px`,
+      height: `${2 * PLATZ_KARTE_HOEHE}px`,
+    });
+  });
+
+  it('bleibt in Grundgröße, solange die Sicht nicht gemessen ist', async () => {
+    renderGrundriss(uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10 })] }), []);
+    expect(await screen.findByTestId('platz-karte')).toHaveStyle({
+      width: `${PLATZ_KARTE_BREITE}px`,
+      height: `${PLATZ_KARTE_HOEHE}px`,
+    });
+  });
+
+  it('streckt den Plan im selben Maß, die Karte deckt dieselbe Stelle', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/uhs/1/plan/bild', () =>
+        HttpResponse.json(null, { headers: { 'Content-Type': 'image/png' } }),
+      ),
+    );
+    const erzeugen = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:plan');
+    onTestFinished(() => erzeugen.mockRestore());
+    // Inhalt: Plan 30 + 1200 breit, 40 + 600 hoch → 1230 × 640; Sicht 1845 × 960 → genau 1,5.
+    sicht(1845, 960);
+    renderGrundriss(
+      uhsDetail({
+        status: 'aktiv',
+        plaetze: [platz({ id: 10 })],
+        plan: {
+          uhs_id: 1,
+          mime: 'image/png',
+          sha256: 'ab12',
+          bild_breite: 800,
+          bild_hoehe: 400,
+          x: 30,
+          y: 40,
+          breite: 1200,
+          helligkeit: 60,
+          kontrast: 120,
+          nacht_umkehren: true,
+          hinterlegt_at: 'x',
+          geaendert_at: 'x',
+        },
+      }),
+      [],
+    );
+    expect(await screen.findByTestId('uhs-plan')).toHaveStyle({
+      left: '45px',
+      top: '60px',
+      width: '1800px',
+      height: '900px',
+    });
+    expect(screen.getByTestId('platz-karte')).toHaveStyle({
+      left: '15px',
+      top: '15px',
+      width: `${1.5 * PLATZ_KARTE_BREITE}px`,
+    });
+  });
+
+  it('rechnet einen Zug auf das Raster zurück: 200 px bei Faktor 2 sind 100 Einheiten', async () => {
+    const koerper: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/uhs/1/plaetze/10', async ({ request }) => {
+        koerper.push(await request.json());
+        return HttpResponse.json(platz({ id: 10, pos_x: 110 }));
+      }),
+    );
+    sicht(1300, 700);
+    renderGrundriss(uhsDetail({ status: 'geplant', plaetze: [platz({ id: 10 })] }), []);
+    await screen.findByTestId('platz-karte');
+    act(() =>
+      zug.ende!({
+        active: { id: 'platz-10', data: { current: { kind: 'platz', platzId: 10 } } },
+        over: null,
+        delta: { x: 200, y: 31 },
+      } as unknown as DragEndEvent),
+    );
+    await waitFor(() => expect(koerper).toEqual([{ pos_x: 110, pos_y: 26 }]));
+  });
+});

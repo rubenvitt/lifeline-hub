@@ -193,8 +193,15 @@ export interface MaterialOrtAngabeProps {
   ort: MaterialOrtRef | null;
   kontext: MaterialOrtKontext;
   darfSchreiben: boolean;
-  /** Ort setzen, wechseln oder lösen (`useMaterialOrt().setOrt`); lehnt bei Ablehnung ab. */
-  onSpeichern: (ziel: MaterialOrtRef | null) => Promise<unknown>;
+  /**
+   * Ort setzen, wechseln oder lösen (`useMaterialOrt().setOrt`); lehnt bei Ablehnung ab.
+   * `kontext.beimOeffnen` ist der Ort beim Öffnen (`null` = ohne Ort), Altwert des Feld-CAS
+   * (LLH-1945); `undefined`, wenn der Auswahlwert unlesbar war (dann ohne Vergleich).
+   */
+  onSpeichern: (
+    ziel: MaterialOrtRef | null,
+    kontext: { beimOeffnen: MaterialOrtRef | null | undefined },
+  ) => Promise<unknown>;
 }
 
 export default function MaterialOrtAngabe({
@@ -228,9 +235,11 @@ export default function MaterialOrtAngabe({
           anzeige={name}
           leer={() => false}
           darfSchreiben
-          onSpeichern={(neu) => {
+          onSpeichern={(neu, { beimOeffnen }) => {
             const ziel = parseOrtValue(neu);
-            return ziel === undefined ? Promise.resolve() : onSpeichern(ziel);
+            return ziel === undefined
+              ? Promise.resolve()
+              : onSpeichern(ziel, { beimOeffnen: parseOrtValue(beimOeffnen) });
           }}
           eingabe={({ feld, value, onChange, popup }) => (
             <Select<string>

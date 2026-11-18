@@ -1931,6 +1931,34 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
     expect(abrufe).toBe(1);
   });
 
+  it('fragt ohne Modulrecht Abschnitte und Einheiten nicht ab (kein 403, LLH-1839)', async () => {
+    const abgefragt: string[] = [];
+    const { client } = setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({
+            einsatzabschnitte: { zugriff: false },
+            einheiten: { zugriff: false },
+          }),
+        ),
+      ),
+      http.get('/api/einsaetze/7/abschnitte', () => {
+        abgefragt.push('abschnitte');
+        return HttpResponse.json([]);
+      }),
+      http.get('/api/einsaetze/7/einheiten', () => {
+        abgefragt.push('einheiten');
+        return HttpResponse.json([]);
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(7))?.status).toBe('success'),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(abgefragt).toEqual([]);
+  });
+
   it('fragt ohne Modulrecht `dokumente` keine Dokumente ab und zeigt keinen Verweis', async () => {
     let abgefragt = false;
     const { client } = setup('/einsaetze/7/etb', [
