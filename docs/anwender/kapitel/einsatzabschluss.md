@@ -21,11 +21,10 @@ Tabellen.
 
 ## Abläufe
 
-### Einsatzbericht drucken
+### Den Einsatzbericht drucken
 
-1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht drucken“ wählen (am Handy unter
-   „Weitere“). Die Seite
-   „Einsatzbericht – Druckansicht“ öffnet sich.
+1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht – Druckansicht“ wählen (am Handy
+   unter „Weitere“). Die Druckansicht des Einsatzberichts öffnet sich.
 2. Unter „Blöcke“ abwählen, was nicht in den Bericht soll, und bei Bedarf eine der Anlagen
    dazunehmen.
 
@@ -48,7 +47,7 @@ holt den aktuellen Stand, „Zurück zu den Einsatzdaten“ verlässt die Drucka
 
 ### Einsatzakte sichern
 
-1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzakte“ wählen (am Handy unter „Weitere“).
+1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzakte – Druckansicht“ wählen (am Handy unter „Weitere“).
    Die Seite „Einsatzakte – Druckansicht“ öffnet sich und lädt alle Kapitel.
 2. „Drucken / als PDF“ wählen und im Druckdialog des Browsers als PDF speichern oder drucken.
 3. „Anhänge und Tabellen (ZIP)“ wählen. Der Browser lädt eine Datei

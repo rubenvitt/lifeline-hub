@@ -419,7 +419,9 @@ describe('FunkplanPage — Übernahme in den Lagebericht', () => {
     setup();
     await screen.findByText('Florian 1/42-1');
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /Drucken/ })).toBeInTheDocument();
+    // Drucken steht im Seitenkopf (LLH-1836).
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
   });
 });
 

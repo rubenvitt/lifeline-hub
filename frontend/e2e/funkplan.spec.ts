@@ -27,6 +27,7 @@ import {
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { doppelteSchluesselVerbieten } from './react-schluessel-kern';
+import { waehleDruckweg } from './druckweg-kern';
 
 /**
  * Funkplan S6 (LFH-548): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein Layout,
@@ -199,7 +200,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
         window.dispatchEvent(new Event('beforeprint'));
       };
     });
-    await page.getByRole('button', { name: /Drucken/ }).click();
+    await waehleDruckweg(page, { weitere: 'Weitere Aktionen zum Fernmeldewesen' });
     await page.emulateMedia({ media: 'print' });
     await expect(tabelle(page).getByText(TELEFON)).toHaveCount(1);
     const druck = await baumLage(page, '.funkplan-print-root');
@@ -302,7 +303,7 @@ test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck m
       window.dispatchEvent(new Event('beforeprint'));
     };
   });
-  await page.getByRole('button', { name: /Drucken/ }).click();
+  await waehleDruckweg(page, { weitere: 'Weitere Aktionen zum Fernmeldewesen' });
   await page.emulateMedia({ media: 'print' });
   await expect(tabelle(page).locator('tr[data-row-key="fs"]')).toContainText(FS_TELEFON);
   await page.emulateMedia({ media: null });

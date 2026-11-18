@@ -173,15 +173,15 @@ describe('AuftragDetail (Spec `auftraege-befehle`)', () => {
     expect(grund.compareDocumentPosition(knopf) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('der Sprung „Druckansicht“ steht ohne Schreibrecht und auch am aufgehobenen Auftrag (LLH-1171)', () => {
+  it('„Druckansicht“ steht im Kopf des Paneels, ohne Schreibrecht und auch am aufgehobenen Auftrag (LLH-1171, LLH-1836)', () => {
     renderDetail({
       auftrag: auftrag({ bearbeitungsstatus: 'aufgehoben' }),
       darfSchreiben: false,
     });
-    expect(screen.getByRole('link', { name: /Druckansicht/ })).toHaveAttribute(
-      'href',
-      '/einsaetze/5/auftraege/31/druck',
-    );
+    const link = screen.getByRole('link', { name: 'Druckansicht' });
+    expect(link).toHaveAttribute('href', '/einsaetze/5/auftraege/31/druck');
+    expect(link.closest('[data-lfh="paneel-kopf-rechts"]')).not.toBeNull();
+    expect(screen.getAllByRole('link', { name: /Druckansicht/ })).toHaveLength(1);
   });
 
   it('entfallen sagt das Detail, dass der Auftrag nicht mehr in der Ansicht steht', () => {

@@ -289,7 +289,9 @@ unverändert bleiben. Das Einlesen MUST NOT löschen. Dieselbe Datei ein zweites
 
 ### Requirement: Schichtplan drucken
 Die Ablösung SHALL den Schichtplan eines Einsatzes als Druckansicht ausgeben, wahlweise je
-Posten (Aushang) oder je Person (Zettel), für alle Blätter oder ein einzelnes. Jedes Blatt MUST
+Posten (Aushang) oder je Person (Zettel), für alle Blätter oder ein einzelnes. Der Einstieg MUST
+„Druckansicht“ heißen und, solange die Ansicht Schichtplan gewählt ist, neben „Excel“ im Seitenkopf
+stehen. Jedes Blatt MUST
 auf einer neuen A4-Seite beginnen und den Druckkopf tragen. Der Aushang MUST je Schicht Zeit,
 eingeteilte Personen mit Qualifikationen und offene Plätze als Wort zeigen, aber keine
 Prüfbefunde. Der Zettel MUST je Schicht Zeit, Posten mit Abschnitt und die übrigen Eingeteilten
@@ -299,7 +301,7 @@ sein. Eine Tabellenzeile MUST in Chromium, Firefox und WebKit nicht über eine S
 geschnitten werden.
 
 #### Scenario: Aushang an der UHS
-- **WHEN** jemand in der Ansicht Schichtplan „Drucken“ wählt, „Je Posten“ und die UHS Marktplatz
+- **WHEN** jemand in der Ansicht Schichtplan im Seitenkopf „Druckansicht“ wählt, „Je Posten“ und die UHS Marktplatz
 - **THEN** zeigt die Druckansicht ein Blatt UHS Marktplatz mit den Schichten nach Beginn, den
   Eingeteilten und „1 offen“ an der Schicht mit fehlender Person
 

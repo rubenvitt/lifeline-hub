@@ -1,7 +1,10 @@
-import { Alert, Flex, Typography } from 'antd';
+import { Alert, Typography } from 'antd';
 import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/types';
 import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
 import { DetailSprung } from '../components/ListeDetail';
+import { NebenwegeImKopf } from '../components/EinsatzSeite';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
+import { useNavigate } from 'react-router';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
 import type { LatLon } from '../anzeige/koordinaten';
@@ -103,8 +106,8 @@ function AuftragZiel({ einsatzId, punkt }: { einsatzId: number; punkt: LatLon })
  * Detail eines Einzelauftrags im Muster „Liste + Detailpaneel“ (Spec `auftraege-befehle`,
  * „Handlungen eines Auftrags im Detail“, „Lesefassung eines Auftrags im Detail“; design.md D3/D4).
  * Die Handlungen stehen direkt unter dem Text, damit sie auf dem Handschirm ohne Scrollen
- * erreichbar sind; Empfänger, Schema (mit dem verorteten Ziel) und Verlauf folgen, am Ende der
- * Sprung zur Druckansicht.
+ * erreichbar sind; Empfänger, Schema (mit dem verorteten Ziel) und Verlauf folgen. „Druckansicht“
+ * steht im Kopf des Paneels.
  */
 export default function AuftragDetail({
   auftrag: a,
@@ -125,6 +128,7 @@ export default function AuftragDetail({
 }: AuftragDetailProps) {
   const { token, rollen } = useRollen();
   const { zeitpunkt } = useAnzeigeKonventionen();
+  const navigate = useNavigate();
   const kennung = auftragKennung(a);
   const hasSchema = gefuellteFelder(a, zeitpunkt).length > 0;
   const verlauf = auftragVerlauf(a);
@@ -141,6 +145,15 @@ export default function AuftragDetail({
         <>
           erteilt <ZeitAnzeige wert={a.erteilt_at} />
         </>
+      }
+      // Gedruckt wird auf der eigenen Druckansicht, wie der Befehl auf seiner Vollseite (LLH-1171,
+      // Change `ianaw5k1-auftrag-drucken` D1); lesend, also ohne Schreibrecht und in jeder Phase.
+      // Der Einstieg steht im Kopf des Objekts (LLH-1836, `druck/AGENTS.md`, „Wortlaut und Platz“).
+      aktion={
+        <NebenwegeImKopf
+          name={`Weitere zum Auftrag${kennung ? ` ${kennung}` : ''}`}
+          eintraege={[druckansichtNebenweg({ ziel: auftragDruckPfad(einsatzId, a.id), navigate })]}
+        />
       }
       koerperPolster
     >
@@ -222,11 +235,6 @@ export default function AuftragDetail({
           </DetailSprung>
         )}
       </div>
-      {/* Gedruckt wird auf der eigenen Druckansicht, wie der Befehl auf seiner Vollseite (LLH-1171,
-         Change `ianaw5k1-auftrag-drucken` D1); lesend, also ohne Schreibrecht und in jeder Phase. */}
-      <Flex style={abschnitt}>
-        <DetailSprung ziel={auftragDruckPfad(einsatzId, a.id)}>Druckansicht</DetailSprung>
-      </Flex>
     </Paneel>
   );
 }

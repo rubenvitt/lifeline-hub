@@ -19,6 +19,7 @@ import Datensicht, {
   spaltenFuer,
   type Kartenplan,
 } from '../components/Datensicht';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import FormularEingehaengt from '../components/FormularEingehaengt';
@@ -430,12 +431,7 @@ export default function TierePage() {
       weitere={{
         name: 'Weitere Aktionen zu den Tieren',
         eintraege: [
-          {
-            key: 'druck',
-            label: 'Drucken / als PDF',
-            ziel: druckPfad,
-            onWahl: () => navigate(druckPfad),
-          },
+          druckansichtNebenweg({ ziel: druckPfad, navigate }),
           {
             key: 'csv',
             label: 'CSV exportieren',

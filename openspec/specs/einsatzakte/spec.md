@@ -9,14 +9,14 @@ Sichert das ganze Einsatzgeschehen eines Einsatzes in einem Zug: als ein Druckst
 
 ### Requirement: Einstieg und eigene Adresse
 
-Die Seite Einsatzdaten SHALL neben „Einsatzbericht drucken“ eine Aktion „Einsatzakte“ anbieten,
+Die Seite Einsatzdaten SHALL neben „Einsatzbericht – Druckansicht“ eine Aktion „Einsatzakte – Druckansicht“ anbieten,
 die eine eigene Druckansicht der Akte öffnet. Die Druckansicht SHALL eine eigene, teilbare
 Adresse je Einsatz haben und SHALL über die Sprungpalette erreichbar sein. Gedruckt und als PDF
 gespeichert wird über den Druckdialog des Browsers; der Server MUST NOT ein PDF erzeugen.
 
 #### Scenario: Aus den Einsatzdaten öffnen
 
-- **WHEN** eine Person auf der Seite Einsatzdaten „Einsatzakte“ wählt
+- **WHEN** eine Person auf der Seite Einsatzdaten „Einsatzakte – Druckansicht“ wählt
 - **THEN** öffnet sich die Druckansicht der Einsatzakte dieses Einsatzes
 - **AND** ein Neuladen der Adresse zeigt wieder die Akte desselben Einsatzes
 
