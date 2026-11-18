@@ -20310,6 +20310,24 @@
           }
         }
       },
+      "StornoStand": {
+        "type": "object",
+        "description": "Storno-Stand eines Datensatzes für eine offene Detailseite (LLH-1832, Spec `storno-sperre`):\nnur ob und wann storniert, und von wem (Anzeigename, `None` bei Altbestand). Trägt keine\nFachangaben, damit die Abfrage protokollfrei und live abrufbar bleibt.",
+        "properties": {
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "SystemRolle": {
         "type": "string",
         "description": "System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.",

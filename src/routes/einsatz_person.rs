@@ -231,6 +231,22 @@ pub async fn liste(
     Ok(Json(liste))
 }
 
+/// GET /api/einsaetze/{id}/personen/{pid}/stand — Storno-Stand der Person für ihre offene
+/// Detailseite (LLH-1832, Spec `storno-sperre`). NICHT auditiert: die Detailseite ruft ihn bei
+/// jedem `person`-Ereignis ab, das Detail selbst bleibt protokolliert und nicht live. Dieselben
+/// Schranken wie das Detail (Stellenbindung, fremder Einsatz 404); eine stornierte Person ist
+/// hier 200 mit `storniert_at`.
+pub async fn stand(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<crate::storno::StornoStand>, AppError> {
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    Ok(Json(
+        repo::stand(&state.pool, ctx.einsatz.id, person_id).await?,
+    ))
+}
+
 /// GET /api/einsaetze/{id}/personen/{pid}/zeile — genau die Zeile, die die Liste dieser Sitzung
 /// zeigen würde, für den Zeilenabgleich des Live-Feeds (LLH-1682, Spec `live-abgleich`). NICHT
 /// auditiert wie die Liste: jeder Tab ruft sie bei jedem `person`-Ereignis ab, das Detail

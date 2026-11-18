@@ -762,6 +762,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/betreuung/stellen/{sid}/stornieren",
             post(routes::betreuung::stelle_stornieren),
         )
+        // Storno-Stand für die offene Detailseite (LLH-1832).
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/stand",
+            get(routes::betreuung::stelle_stand),
+        )
         .route(
             "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
             get(routes::betreuung::belegung_verlauf).post(routes::betreuung::belegung_melden),
@@ -1255,6 +1260,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen/{pid}/zeile",
             get(routes::einsatz_person::zeile),
+        )
+        // Storno-Stand für die offene Detailseite, ohne Zugriffsprotokoll (LLH-1832).
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/stand",
+            get(routes::einsatz_person::stand),
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}",

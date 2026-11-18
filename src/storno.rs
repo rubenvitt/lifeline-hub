@@ -1,7 +1,18 @@
 //! Soft-Delete (Storno) einer Zeile unter ihrem Elternobjekt.
 
 use crate::error::AppError;
+use serde::Serialize;
 use sqlx::SqliteConnection;
+use utoipa::ToSchema;
+
+/// Storno-Stand eines Datensatzes für eine offene Detailseite (LLH-1832, Spec `storno-sperre`):
+/// nur ob und wann storniert, und von wem (Anzeigename, `None` bei Altbestand). Trägt keine
+/// Fachangaben, damit die Abfrage protokollfrei und live abrufbar bleibt.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct StornoStand {
+    pub storniert_at: Option<String>,
+    pub storniert_von_name: Option<String>,
+}
 
 /// Welche Nachweisspalten der Storno neben `storniert_at` mitschreibt.
 #[derive(Debug, Clone, Copy)]

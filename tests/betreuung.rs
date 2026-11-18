@@ -287,6 +287,55 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     assert!(st["storniert_at"].is_string());
     let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
     assert_eq!(u["stellen"].as_array().unwrap().len(), 0);
+
+    // … der Stand nennt Wann und Wer (LLH-1832, Spec `storno-sperre`)
+    let (s, stand) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/stellen/{sid}/stand", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{stand:?}");
+    assert!(stand["storniert_at"].is_string(), "{stand:?}");
+    assert!(stand["storniert_von_name"].is_string(), "{stand:?}");
+}
+
+/// Der Stand einer Stelle (LLH-1832): unbekannt oder fremder Einsatz 404, ohne Modul 403.
+#[tokio::test]
+async fn stand_einer_stelle_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Halle").await;
+    let (s, stand) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/stellen/{sid}/stand", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{stand:?}");
+    assert!(stand["storniert_at"].is_null(), "{stand:?}");
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    for pfad_stand in [
+        format!("{}/stellen/{sid}/stand", pfad(anderer)),
+        format!("{}/stellen/999999/stand", pfad(e)),
+    ] {
+        let (s, _) = anfrage(&app, "GET", &pfad_stand, &admin, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{pfad_stand}");
+    }
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let pfad_stand = format!("{}/stellen/{sid}/stand", pfad(e));
+    let (s, _) = anfrage(&app, "GET", &pfad_stand, &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: sichtbar liest sie");
+    override_setzen(&app, &admin, e, "betreuung", false, None).await;
+    let (s, _) = anfrage(&app, "GET", &pfad_stand, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
 /// Ein PATCH ohne neuen Wert schreibt kein ETB und verteilt nichts live (Leerlauf-Riegel,

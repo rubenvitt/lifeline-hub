@@ -16,14 +16,14 @@
 
 ## 2. Backend: Stand-Abfragen
 
-- [ ] 2.1 `GET …/personen/{pid}/stand` → `StornoStand` (D3): dieselben Schranken wie das Detail,
+- [x] 2.1 `GET …/personen/{pid}/stand` → `StornoStand` (D3): dieselben Schranken wie das Detail,
   kein Audit, eine stornierte Person ist 200. Route in die Geräte-Routenliste wie `…/zeile`.
   Tests:
   - keine neue Zeile in `person_zugriff_audit`;
   - fremder Einsatz 404;
   - Gerät einer fremden Stelle 404;
   - storniert 200 mit Name.
-- [ ] 2.2 `GET …/betreuung/stellen/{sid}/stand` → `StornoStand` (D3). Tests:
+- [x] 2.2 `GET …/betreuung/stellen/{sid}/stand` → `StornoStand` (D3). Tests:
   - stornierte Stelle 200 mit Name;
   - unbekannte oder fremde Stelle 404;
   - ohne Modulrecht 403.

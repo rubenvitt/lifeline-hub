@@ -8151,6 +8151,15 @@ export interface components {
             vorlage_id?: number | null;
         };
         /**
+         * @description Storno-Stand eines Datensatzes für eine offene Detailseite (LLH-1832, Spec `storno-sperre`):
+         *     nur ob und wann storniert, und von wem (Anzeigename, `None` bei Altbestand). Trägt keine
+         *     Fachangaben, damit die Abfrage protokollfrei und live abrufbar bleibt.
+         */
+        StornoStand: {
+            storniert_at?: string | null;
+            storniert_von_name?: string | null;
+        };
+        /**
          * @description System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
          * @enum {string}
          */

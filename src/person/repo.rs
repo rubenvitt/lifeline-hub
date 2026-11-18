@@ -729,6 +729,24 @@ pub async fn storniere(
     .await
 }
 
+/// Storno-Stand einer Person (LLH-1832): fremder Einsatz oder unbekannt → `NotFound`.
+pub async fn stand(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<crate::storno::StornoStand, AppError> {
+    sqlx::query_as::<_, crate::storno::StornoStand>(
+        "SELECT p.storniert_at, b.anzeigename AS storniert_von_name \
+         FROM einsatz_person p LEFT JOIN benutzer b ON b.id = p.storniert_von \
+         WHERE p.id = ? AND p.einsatz_id = ?",
+    )
+    .bind(person_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 /// [`storniere`] in einer laufenden Transaktion (LLH-1612: samt Nachführen der Belegung).
 pub async fn storniere_tx(
     conn: &mut SqliteConnection,
