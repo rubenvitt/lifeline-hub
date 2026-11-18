@@ -16561,6 +16561,21 @@
               "null"
             ]
           },
+          "storniert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355 und ungelöscht."
+          },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“."
+          },
           "transport_art": {
             "oneOf": [
               {
@@ -18882,6 +18897,13 @@
             ],
             "format": "int64"
           },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `storniert_von` (LLH-1832), für das Banner „Storniert von … um …“."
+          },
           "typ": {
             "$ref": "#/components/schemas/SchadenTyp"
           },
@@ -20511,6 +20533,21 @@
               "string",
               "null"
             ]
+          },
+          "storniert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355."
+          },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“."
           }
         }
       },

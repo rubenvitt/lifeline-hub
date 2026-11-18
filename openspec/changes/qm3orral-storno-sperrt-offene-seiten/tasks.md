@@ -2,14 +2,14 @@
 
 ## 1. Backend: Nachweis, wer storniert
 
-- [ ] 1.1 Migration (nächste freie Nummer, `scripts/check-migrationen.sh` grün):
+- [x] 1.1 Migration (nächste freie Nummer, `scripts/check-migrationen.sh` grün):
   `storniert_von INTEGER REFERENCES benutzer(id)` an `einsatz_person` und `einsatz_tier` (D1).
   Die Schwärzungs-Registry bekommt für beide Tabellen `retain("storniert_von", G_FK)`. Prüfen:
   Registry- und Spiegel-Tests grün.
-- [ ] 1.2 `src/person/repo.rs` und `src/tier/repo.rs` stornieren mit
+- [x] 1.2 `src/person/repo.rs` und `src/tier/repo.rs` stornieren mit
   `Vermerk::GeaendertUndStorniert`. Test je Repo: nach dem Storno ist `storniert_von` der
   stornierende Benutzer, wie im Schaden-Test.
-- [ ] 1.3 DTO-Feld `storniert_von_name` (Join `benutzer.anzeigename`) an `PersonAnzeige`, am
+- [x] 1.3 DTO-Feld `storniert_von_name` (Join `benutzer.anzeigename`) an `PersonAnzeige`, am
   Tier-DTO und am Schaden-DTO (D2). `scripts/check-typ-codegen.sh` laufen lassen und beide
   erzeugten Dateien mitnehmen. Test: das Detail einer stornierten Person, eines Tiers und eines
   Schadens trägt den Namen; ein Altbestand ohne `storniert_von` liefert `null`.
