@@ -40,11 +40,11 @@
 
 ## 4. Frontend: Personen-Detail
 
-- [ ] 4.1 `einsatzKeys.personStand` mit Loader `loadPersonStand`. Live über
+- [x] 4.1 `einsatzKeys.personStand` mit Loader `loadPersonStand`. Live über
   `EINSATZ_STREAM_ZIELE.person` und den Präfix in `EINSATZ_STREAM_EVENTS.person` (D4). Prüfen:
   `queryKeys.guard.test.ts` grün; Test, dass ein `person`-Ereignis mit `person_id` den Stand
   dieser Person und nicht das Detail abgleicht.
-- [ ] 4.2 `PersonenDetailPage`:
+- [x] 4.2 `PersonenDetailPage`:
   - Stand abfragen, `gesperrt` ableiten;
   - Banner zeigen, Kopfaktionen, Patientenkopf, Personendaten, Notiz, Anhänge und Bezüge sperren;
   - `refetchOnWindowFocus: false` am Detail.

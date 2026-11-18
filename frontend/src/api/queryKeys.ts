@@ -99,6 +99,8 @@ export const EINSATZ_KEYS = {
   // `einheit`, `personal`, `fahrzeug` oder `abloesung` ohnehin sendet.
   kraefteZeitachse: 'einsatz-kraefte-zeitachse',
   betreuung: 'einsatz-betreuung',
+  // Storno-Stand einer Betreuungsstelle, wenn sie aus der Übersicht fällt (LLH-1832).
+  betreuungsstelleStand: 'einsatz-betreuungsstelle-stand',
   // Registrierliste einer Betreuungsstelle (LLH-1612): eigener Prefix, damit sie NICHT mit der
   // Betreuung auf die Platte geht (Namen, Geburtsdaten, Unverträglichkeiten). Live über
   // `betreuung` (Registrieren, Abmelden) und `person` (Kostform, Verbleib, Storno).
@@ -169,6 +171,8 @@ export const EINSATZ_KEYS = {
   // unveränderte Bild bei jedem Ereignis neu.
   uhsPlanBild: 'einsatz-uhs-plan-bild',
   person: 'einsatz-person',
+  // Storno-Stand der offenen Detailseite (LLH-1832): protokollfrei und live, das Detail nicht.
+  personStand: 'einsatz-person-stand',
   personAudit: 'einsatz-person-audit',
   // Zugriffe auf die ganze Personenliste (LFH-916): eigener Prefix, unter `personen` zöge ihn
   // jedes `person`-Ereignis per Präfix mit.
@@ -239,7 +243,13 @@ export const EINSATZ_STREAM_EVENTS = {
   ],
   // Ablegen und Entfernen einer Datei verteilen `schaden`; die Anhangliste der Detailseite hängt
   // deshalb mit daran. Gezielt (Zeile, Anhangliste) ordnet {@link EINSATZ_STREAM_ZIELE} zu.
-  schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenMarker, EINSATZ_KEYS.schadenAnhaenge],
+  // Das Detail ist live (LLH-1832, Storno-Sperre); sein Abruf schreibt kein Protokoll.
+  schaden: [
+    EINSATZ_KEYS.schaeden,
+    EINSATZ_KEYS.schadenMarker,
+    EINSATZ_KEYS.schadenAnhaenge,
+    EINSATZ_KEYS.schaden,
+  ],
   // Der Status einer Einheit ist aus ihren Fahrzeugen abgeleitet.
   // Ein markierter Fahrzeugstatus schreibt die Zeitachse seiner Einheit (LFH-552).
   fahrzeug: [
@@ -255,7 +265,8 @@ export const EINSATZ_STREAM_EVENTS = {
   // Das UHS-Detail trägt das dort verortete Material (LFH-892).
   material: [EINSATZ_KEYS.material, EINSATZ_KEYS.uhsDetail],
   // Ablegen und Entfernen einer Tier-Datei verteilen `tier` (LFH-758).
-  tier: [EINSATZ_KEYS.tiere, EINSATZ_KEYS.tierAnhaenge],
+  // Das Detail ist live (LLH-1832, Storno-Sperre); sein Abruf schreibt kein Protokoll.
+  tier: [EINSATZ_KEYS.tiere, EINSATZ_KEYS.tierAnhaenge, EINSATZ_KEYS.tier],
   // Der Lagemonitor zeigt die Gefahrenzonen aus seinem Lagebild (LLH-1153).
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete, EINSATZ_KEYS.lagemonitor],
   freies_zeichen: [EINSATZ_KEYS.freieZeichen],
@@ -315,7 +326,8 @@ export const EINSATZ_STREAM_EVENTS = {
   // die Zahl.
   // Ablegen und Entfernen einer Datei an einer Person verteilen `person` (LFH-757); die
   // Anhangliste hängt mit daran. Das Detail (`person`) bleibt NICHT live: jeder Abruf schreibt
-  // eine Audit-Zeile, die Liste der Anhänge schreibt keine.
+  // eine Audit-Zeile, die Liste der Anhänge schreibt keine. Live ist stattdessen sein Stand
+  // (`personStand`, LLH-1832), der protokollfrei sagt, ob die Person storniert ist.
   person: [
     EINSATZ_KEYS.personen,
     EINSATZ_KEYS.personenAuswahl,
@@ -325,6 +337,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.personenTransportmittel,
     // Registrierliste (LLH-1612): Kostform, Verbleib oder Storno einer Person ändert sie.
     EINSATZ_KEYS.registrierliste,
+    EINSATZ_KEYS.personStand,
   ],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
@@ -401,7 +414,12 @@ export const EINSATZ_STREAM_EVENTS = {
   // Empfängerliste trägt die Betreuungsstellen, und ein Storno löst den Bezug von Ausgaben.
   // Registrieren und Abmelden (LLH-1612) senden `betreuung` mit der Stelle: die Registrierliste
   // hängt mit daran.
-  betreuung: [EINSATZ_KEYS.betreuung, EINSATZ_KEYS.verpflegung, EINSATZ_KEYS.registrierliste],
+  betreuung: [
+    EINSATZ_KEYS.betreuung,
+    EINSATZ_KEYS.verpflegung,
+    EINSATZ_KEYS.registrierliste,
+    EINSATZ_KEYS.betreuungsstelleStand,
+  ],
   // Bezirke und ihre Standreihen (LLH-1034), wie `betreuung`. Die Kennzahl „Evakuiert“ und der
   // Modulzähler lesen dieselbe Übersicht.
   evakuierung: [EINSATZ_KEYS.evakuierung],
@@ -500,6 +518,7 @@ export const EINSATZ_STREAM_ZIELE: Partial<
     if (p.anhang === true) return [key(einsatzKeys.schadenAnhaenge(e, sid))];
     return [
       { art: 'zeile', ziel: 'schaeden', id: sid },
+      key(einsatzKeys.schaden(e, sid)),
       key(einsatzKeys.schaedenGeschaedigtAlle(e)),
       key(einsatzKeys.schaedenKennzahlenAlle(e)),
     ];
@@ -511,6 +530,7 @@ export const EINSATZ_STREAM_ZIELE: Partial<
     if (pid === null) return null;
     return [
       { art: 'zeile', ziel: 'personen', id: pid },
+      key(einsatzKeys.personStand(e, pid)),
       key(einsatzKeys.modulZaehler(e)),
       key(einsatzKeys.betreuung(e)),
       key(einsatzKeys.personAnhaenge(e, pid)),
@@ -529,8 +549,9 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   `einsatz` ist seit LFH-555 live, die Mitglieder sind es seit i6k6mzed (`mitglieder`).
  * - `mitgliedAuswahl` (LFH-1141): die eigene Aufnahme oder Entfernung invalidiert sie, eine neu
  *   angelegte Person erscheint beim nächsten Abruf.
- * - `person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
- *   Listen-Prefix-Match nicht erreicht.
+ * - `person`/`personAudit`: jeder Abruf schreibt eine Zeile ins Zugriffsprotokoll; die offene
+ *   Detailseite gleicht stattdessen `personStand` ab (LLH-1832). Tier- und Schadendetail sind seit
+ *   LLH-1832 live.
  * - `modulOverrides`: das Backend kennt kein LiveEvent dafür (`LiveEvent::ALLE`); ein Override
  *   eines anderen Nutzers propagiert nicht live.
  * - `modulVorgaben` (LLH-1183): Org-Vorgaben ohne LiveEvent wie `orgModulEinstellungen`; die
@@ -606,8 +627,6 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.anhangHeicVorschau,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
-  EINSATZ_KEYS.tier,
-  EINSATZ_KEYS.schaden,
   EINSATZ_KEYS.lageSnapshotDokument,
   EINSATZ_KEYS.pegel,
   EINSATZ_KEYS.wetter,
@@ -725,6 +744,8 @@ export const einsatzKeys = {
   // personId nullbar: der Person-Detail-Drawer rendert ohne Auswahl (enabled-Guard).
   person: (einsatzId: number, personId: number | null) =>
     [EINSATZ_KEYS.person, einsatzId, personId] as const,
+  personStand: (einsatzId: number, personId: number) =>
+    [EINSATZ_KEYS.personStand, einsatzId, personId] as const,
   personAudit: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAudit, einsatzId, personId] as const,
   personenListenzugriffe: (einsatzId: number) =>
@@ -900,6 +921,8 @@ export const einsatzKeys = {
   // Zonenkennung), ohne Stichtag der feste Platzhalter 'jetzt'. Nie „jetzt“ als Zeitstempel: der
   // wäre bei jedem Rendern ein neues Cache-Fach samt Abruf.
   betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
+  betreuungsstelleStand: (einsatzId: number, stelleId: number) =>
+    [EINSATZ_KEYS.betreuungsstelleStand, einsatzId, stelleId] as const,
   betreuungKopfzahl: (einsatzId: number, zeitpunkt?: string) =>
     [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt ?? 'jetzt'] as const,
   /** Belegungsreihe einer Stelle, Sub-Key unter dem Betreuungs-Prefix: das `betreuung`-Ereignis
