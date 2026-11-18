@@ -25,6 +25,8 @@ interface GrossKennzahlProps {
   /** Kurz hinter der Zahl, in Textgröße („h“, „m“). */
   einheit?: string;
   notiz?: ReactNode;
+  /** Zugängliche Beschreibung der Notiz (Schreibweise der Stärke, LLH-1750), kein Tooltip. */
+  notizBeschreibung?: string;
   ton?: GrossTon;
   zustand?: GrossZustand;
   groesse?: 'zahl' | 'zahlKlein';
@@ -45,6 +47,7 @@ export default function GrossKennzahl({
   wert,
   einheit,
   notiz,
+  notizBeschreibung,
   ton = 'neutral',
   zustand = 'daten',
   groesse = 'zahl',
@@ -117,6 +120,7 @@ export default function GrossKennzahl({
       {notizText != null && notizText !== '' && (
         <span
           title={zustand === 'daten' && typeof notizText === 'string' ? notizText : undefined}
+          aria-description={zustand === 'daten' ? notizBeschreibung : undefined}
           style={{
             fontSize: grossMass(GROSS_BEZUG.text),
             lineHeight: 1.2,

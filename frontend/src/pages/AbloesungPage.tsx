@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { IconStift } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -46,7 +47,7 @@ import {
   VollzugDialog,
   type EinheitAuswahl,
 } from '../abloesung/AbloesungDialoge';
-import { formatDauer } from '../abloesung/dauer';
+
 import { verbleibRaeume } from '../abloesung/verbleib';
 import { folgtPlan } from '../abloesung/lautPlan';
 import { planungWarnungText } from '../abloesung/planungWarnung';
@@ -1053,7 +1054,7 @@ export default function AbloesungPage() {
                     // Rangfolge wie im Server: Abschnitt vor Einsatz (LLH-1122).
                     const vorgabe =
                       v != null
-                        ? abschnittVorgabe(formatDauer(v))
+                        ? abschnittVorgabe(dauer(v))
                         : einsatzVorgabeKurz != null
                           ? einsatzVorgabe(einsatzVorgabeKurz)
                           : undefined;
@@ -1092,7 +1093,7 @@ export default function AbloesungPage() {
                       <Text strong>{v.abschnitt_name}</Text>{' '}
                       <Text type="secondary">
                         {v.rhythmus_minuten != null
-                          ? `Rhythmus ${formatDauer(v.rhythmus_minuten)}`
+                          ? `Rhythmus ${dauer(v.rhythmus_minuten)}`
                           : 'keine Vorgabe'}
                         {v.laufende_schichten > 0 ? ` · ${v.laufende_schichten} laufend` : ''}
                       </Text>
@@ -1130,7 +1131,7 @@ export default function AbloesungPage() {
                     <Text strong>{einsatzModell.bezeichnung}</Text>{' '}
                     <Text type="secondary">
                       {formatRegel(einsatzModell, konventionen)} · Vorwarnung{' '}
-                      {formatDauer(einsatzModell.vorwarnung_minuten)}
+                      {dauer(einsatzModell.vorwarnung_minuten)}
                       {einsatzVorgabeQuery.data && einsatzVorgabeQuery.data.laufende_schichten > 0
                         ? ` · ${einsatzVorgabeQuery.data.laufende_schichten} laufend`
                         : ''}

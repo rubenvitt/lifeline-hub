@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Collapse, Form, Input } from 'antd';
 import { useState } from 'react';
 import {
@@ -11,7 +12,7 @@ import type { SchichtmodellTyp, SchichtmodellWerteBody } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { Segmentleiste } from '../components/instrument';
 import { mitVorgabe } from '../components/vorgabeText';
-import { dauerRegel, formatDauer, uhrzeitenRegel } from './dauer';
+import { dauerRegel, uhrzeitenRegel } from './dauer';
 import {
   buildWerteBody,
   PLANUNGSVORLAUF_VORGABE_MINUTEN,
@@ -31,7 +32,7 @@ import {
  * stehen im Klappteil; dessen Kopf nennt beide wirksamen Werte, auch die Vorgabe, und er geht
  * bei einem Prüffehler darin selbst auf (Ausnahme nach LFH-974, `meldungen/MeldungFormular.tsx`).
  *
- * Dauern als Text („8 h“, „7:30 h“, `abloesung/dauer.ts`), Wechselzeiten taktisch („0600 1800“).
+ * Dauern als Text („8 h“, „7 h 30 min“, `anzeige/dauer.ts`), Wechselzeiten taktisch („0600 1800“).
  * Ein leeres Vorlauf-Feld schickt nichts: der Server nimmt dann seine Vorgabe, die der
  * Platzhalter nennt. Vorbelegt wird über `initialValues`; der Aufrufer montiert den Dialog je Ziel
  * frisch.
@@ -182,7 +183,7 @@ export default function SchichtmodellModal({
                   ]}
                 >
                   <Input
-                    placeholder={mitVorgabe(formatDauer(VORWARNUNG_VORGABE_MINUTEN))}
+                    placeholder={mitVorgabe(dauer(VORWARNUNG_VORGABE_MINUTEN))}
                     autoComplete="off"
                   />
                 </Form.Item>
@@ -194,7 +195,7 @@ export default function SchichtmodellModal({
                   ]}
                 >
                   <Input
-                    placeholder={mitVorgabe(formatDauer(PLANUNGSVORLAUF_VORGABE_MINUTEN))}
+                    placeholder={mitVorgabe(dauer(PLANUNGSVORLAUF_VORGABE_MINUTEN))}
                     autoComplete="off"
                   />
                 </Form.Item>

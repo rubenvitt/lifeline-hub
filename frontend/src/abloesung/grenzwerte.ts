@@ -1,6 +1,7 @@
+import { dauer } from '../anzeige/dauer';
 import type { SchichtplanGrenzwerte, SchichtplanGrenzwerteBody } from '../api/types';
 import { mitVorgabe } from '../components/vorgabeText';
-import { dauerFeldText, dauerMinuten, formatDauer } from './dauer';
+import { dauerFeldText, dauerMinuten } from './dauer';
 
 /**
  * Grenzwerte des Einsatzes, also Höchstdienst und Mindestruhe (LLH-1603, Change
@@ -21,7 +22,7 @@ export const MIN_RUHE_VORGABE_MINUTEN = 480;
 
 /** „12 h (Vorgabe)“ · „10 h“ · „0 min“. */
 export function grenzwertText(minuten: number, eigen: boolean): string {
-  const text = formatDauer(minuten);
+  const text = dauer(minuten);
   return eigen ? text : mitVorgabe(text);
 }
 

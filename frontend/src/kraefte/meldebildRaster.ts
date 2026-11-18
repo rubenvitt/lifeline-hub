@@ -1,3 +1,4 @@
+import { relativ } from '../anzeige/dauer';
 import type {
   Auftrag,
   Einheit,
@@ -21,7 +22,6 @@ import {
   rueckmeldungZustand,
   type RueckmeldungZustand,
 } from '../meldungen/rueckmeldung';
-import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
 import { fahrzeugStatusRolle, statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
 import { isAufgebraucht, materialDarstellung, mengeText } from './materialPosten';
@@ -697,13 +697,13 @@ export function grundWort(g: ToenungsGrund): string {
     case 'ausfall_material':
       return `${g.anzahl} Ausfall Material`;
     case 'rueckmeldung_ueberfaellig': {
-      // In der ersten Minute „< 1 min“ wie bei Fristen („in < 1 min“), nie „0 min“.
-      const seit = g.seitMin == null ? null : g.seitMin < 1 ? '< 1 min' : dauerText(g.seitMin);
+      // In der ersten Minute „seit < 1 min“ wie bei Fristen („in < 1 min“), nie „0 min“.
+      const seit = g.seitMin == null ? null : relativ(g.seitMin, 'seit');
       if ((g.einheiten ?? 1) > 1) {
         const kopf = `${g.einheiten} Einh. Rückm. überfällig`;
-        return seit ? `${kopf}, längste seit ${seit}` : kopf;
+        return seit ? `${kopf}, längste ${seit}` : kopf;
       }
-      return seit ? `Rückm. überfällig seit ${seit}` : 'Rückm. überfällig';
+      return seit ? `Rückm. überfällig ${seit}` : 'Rückm. überfällig';
     }
     case 'rueckmeldung_keine':
       return (g.einheiten ?? 1) > 1 ? `${g.einheiten} Einh. ohne Rückm.` : 'keine Rückm.';

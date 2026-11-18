@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import dayjs from 'dayjs';
 import type {
   Personal,
@@ -19,7 +20,7 @@ import type {
   SchichtplanPostenEingabe,
 } from '../api/types';
 import { alsZeitpunkt, effektiveZone } from '../anzeige/zeitEingabe';
-import { formatDauer } from '../abloesung/dauer';
+
 import {
   STUNDE_MS,
   type RasterBlock,
@@ -154,8 +155,7 @@ export function qualiVorgaben(
 export function laengenVorgaben(posten: readonly PlanungPosten[]): Map<string, string> {
   const m = new Map<string, string>();
   for (const p of posten)
-    if (p.schichtlaenge_minuten != null)
-      m.set(zeileVon(p.id), formatDauer(p.schichtlaenge_minuten));
+    if (p.schichtlaenge_minuten != null) m.set(zeileVon(p.id), dauer(p.schichtlaenge_minuten));
   return m;
 }
 

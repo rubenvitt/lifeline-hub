@@ -1,7 +1,7 @@
 import { Form, Input, InputNumber, type TableColumnsType } from 'antd';
 import { monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
-import { staerkeSumme } from '../anzeige/staerke';
+import { STAERKE_SCHREIBWEISE, staerkeSumme } from '../anzeige/staerke';
 import { aktualisiereTyp, deaktiviereTyp, legeTypAn, listeEinheitTypen } from '../api/einheitTypen';
 import type { EinheitTyp, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -31,12 +31,12 @@ const spalten: TableColumnsType<EinheitTyp> = [
     sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
   },
   {
-    title: 'Soll-Stärke (F/UF/M//Σ)',
+    title: `Soll-Stärke (${STAERKE_SCHREIBWEISE})`,
     key: 'soll',
     // Nach der Gesamtstärke (Σ); ohne Soll hinten (LLH-1096).
     sorter: nachZahl((t: EinheitTyp) => staerkeSumme(t.soll)),
-    // Mono an der AUFRUFSTELLE, nicht im Primitiv: `StaerkeAnzeige` rendert bewusst ein
-    // Fragment, damit zusammengesetzte Textzeilen nicht in mehrere Textknoten zerfallen.
+    // Mono an der AUFRUFSTELLE, nicht im Primitiv: `StaerkeAnzeige` rendert ein schlichtes `span`
+    // ohne Stil (nur die Beschreibung), damit zusammengesetzte Zeilen wie Text fließen.
     // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
     render: (_, t) => (
       <>

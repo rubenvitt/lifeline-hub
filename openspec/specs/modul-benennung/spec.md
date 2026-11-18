@@ -21,8 +21,8 @@ das Modul im h1 nennen und den Reiter darunter, nicht umgekehrt.
 #### Scenario: Lagebild
 
 - **WHEN** eine Person das Lagebild öffnet
-- **THEN** heißen Menüeintrag und h1 „Lagebild“, und die Uhrzeit des Lagebilds steht neben dem
-  Titel, nicht in ihm
+- **THEN** heißen Menüeintrag und h1 „Lagebild“, und neben dem Titel steht der Datenstand, keine
+  Uhrzeit (Spec `zeitdarstellung`, „Uhr im Kopf in der Darstellung“)
 
 #### Scenario: Betroffene
 
@@ -69,7 +69,7 @@ Modulname bleiben.
 #### Scenario: Lange Beschreibung im Modulpanel
 
 - **WHEN** eine Person bei 1440 px die Kategorie Führung öffnet
-- **THEN** steht unter „Überblick“ „Kennzahlen, Fristen, Entscheidungen“ vollständig, und keine
+- **THEN** steht unter „Überblick“ „Fristen, Vorgänge, Entscheidungen“ vollständig, und keine
   Beschreibung der Kategorie endet mit Auslassung
 
 #### Scenario: Handy

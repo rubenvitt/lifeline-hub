@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Space, Switch, theme, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,7 +16,7 @@ const ABSTAENDE = [1, 3, 6, 12, 24, 168];
 
 /** „6 h“ bzw. „7 Tage“. */
 export function abstandText(stunden: number): string {
-  return stunden === 168 ? '7 Tage' : `${stunden} h`;
+  return stunden === 168 ? '7 Tage' : dauer(stunden * 60);
 }
 
 /**

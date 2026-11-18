@@ -9,8 +9,8 @@ quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/component
 
 Der Überblick ist die Startseite eines Einsatzes im Bereich „Führung“. Er fasst auf einer Seite
 zusammen, was zu tun ist: was gerade brennt, bei einem neuen Einsatz die Startliste „Einsatz
-starten“, den Führungsstand, den Stand der Einsatzabschnitte, die offenen Vorgänge, die
-Entscheidungen der letzten Stunde und die nächsten Fristen. Was los ist (Betroffene, Kräfte,
+starten“, die nächsten Fristen, die offenen Vorgänge, den Stand der Einsatzabschnitte und die
+Entscheidungen der letzten Stunde. Was los ist (Betroffene, Kräfte,
 Gefahren, Einsatzdauer), zeigt das [Lagebild](lagebild.md). Der Überblick rechnet nur aus Daten, die in den Modulen schon erfasst
 sind; erfasst wird in den Modulen selbst.
 
@@ -27,9 +27,15 @@ sind; erfasst wird in den Modulen selbst.
    und überfällige Aufträge, danach in Gelb dringende Meldungen, fällige Erinnerungen und
    überfällige Nachforderungen. Ein Eintrag führt in sein Modul; passt nicht alles in die Zeile,
    zeigt „+n“ die ganze Liste. Ist nichts davon da, steht dort „Nichts brennt“.
-4. Im Führungsstand die drei Zahlen lesen: „Offene Aufträge“, „Meldungen offen“ und die Zahl der
-   „Einsatzabschnitte“.
-5. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
+4. Darunter „Nächste Marken“ lesen: die anstehenden Fristen aus Aufträgen, Erinnerungen,
+   Lagebesprechung, Ablösungen, Pegel, Unwetter und Programm, das Überfällige zuerst.
+
+   ![Überblick mit der Zeile „Was brennt“, den nächsten Marken, offenen Vorgängen, Einsatzabschnitten und Entscheidungen der letzten Stunde](../bilder/ueberblick/ueberblick.png)
+
+5. Daneben (am Handy darunter) „Offene Vorgänge“ lesen: Meldungen, Aufträge, Nachforderungen,
+   Erinnerungen und Ablösungen, je mit ihrer Zahl und den drei dringendsten. Die Zahlen sind
+   dieselben wie in den Modulen.
+6. Darunter im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
    „kritisch“), den festen Auftrag, bei Aufträgen an den Abschnitt die Zahl der erledigten, die
    letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „nicht verfügbar“ mit
    Zahl und Balken) lesen. Was im Abschnitt brennt, steht als rotes Etikett direkt neben dem
@@ -37,14 +43,8 @@ sind; erfasst wird in den Modulen selbst.
    mehreren Einheiten „3 Einh. Rückm. überfällig, längste seit 47 min“), „keine Rückm.“, „1
    Ausfall“ und „1 Ausfall Material“. Der Lagezustand bleibt dabei, wie die Führung ihn beurteilt
    hat; ein „planmäßig“ mit rotem Etikett daneben heißt: die Beurteilung ist zu prüfen.
-
-   ![Überblick mit der Zeile „Was brennt“, dem Führungsstand, Einsatzabschnitten, offenen Vorgängen, nächsten Marken und Entscheidungen der letzten Stunde](../bilder/ueberblick/ueberblick.png)
-
-6. Daneben „Offene Vorgänge“ lesen: Meldungen, Aufträge, Nachforderungen, Erinnerungen und
-   Ablösungen, je mit ihrer Zahl und den drei dringendsten. Darunter stehen „Nächste Marken“ und
-   „Entscheidungen der letzten Stunde“. Was zuerst fällig ist, steht oben.
-7. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
-   Entscheidungen. Jedes Paneel führt so über den Verweis oben rechts in sein Modul.
+7. Daneben im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch
+   zeigt alle Entscheidungen. Jedes Paneel führt so über den Verweis oben rechts in sein Modul.
 
 ### Einen neuen Einsatz arbeitsfähig machen
 
@@ -100,10 +100,9 @@ Für die Einsatzleitung und das Führungspersonal:
   Seitenkopf, nur ab „mittel“, und daneben, falls es welche gibt, wie viele Gebiete
   „unbestätigt“ sind (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort auch sein
   Stand (Kapitel [Wetter und Pegel](wetter-pegel.md)).
-- **Meldungen offen** nennt dieselbe Zahl wie das Modul „Meldungen“, darunter die neuen; ist eine
-  Bestätigung überfällig, steht die Zahl in Rot.
-- **Offene Aufträge** nennt dieselbe Zahl wie das Modul „Aufträge/Befehle“ und dazu, wie viele
-  über ihrer Frist sind.
+- **Aufträge und Meldungen** stehen mit ihrer Zahl im Paneel „Offene Vorgänge“ (unten), die Zahl
+  der Abschnitte und Einheiten im Kopf des Paneels „Einsatzabschnitte“. Eine eigene Zahlenleiste
+  hat der Überblick nicht; Zahlen zur Lage zeigt das [Lagebild](lagebild.md).
 - **Entscheidungen der letzten Stunde:** Gab es in der letzten Stunde keine, heißt das Paneel
   „Letzte Entscheidungen“ und zeigt die jüngsten fünf mit dem Hinweis „keine in der letzten
   Stunde“. Eine berichtigte Entscheidung trägt wie im Einsatztagebuch die Marke „berichtigt“ und

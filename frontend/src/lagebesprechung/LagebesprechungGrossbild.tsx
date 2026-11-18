@@ -1,6 +1,6 @@
 import { useUhr } from '../abloesung/useUhr';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { useAnzeigeKonventionen, useUhrDarstellung } from '../anzeige/AnzeigeKonventionenContext';
 import type { AbrufZustand } from '../api/abrufZustand';
 import { ABSCHNITT_OFFLINE } from '../components/instrument/ListenPaneel';
 import { NICHT_FREIGEGEBEN } from '../pages/lage-dashboard/fuehrungsZahlen';
@@ -16,7 +16,9 @@ import {
 } from '../components/grossbild';
 import { useRollen } from '../components/instrument';
 import { modulName } from '../einsatz/modulRegistry';
-import { lagebildZeit, standText } from '../pages/lage-dashboard/lagebild';
+import { datenstandText } from '../components/Datenstand';
+import { formatiereUhr } from '../anzeige/zeitDarstellung';
+import { useOhneVerbindung } from '../offline/verbindung';
 import { lagebesprechungZustand } from './lagebesprechungZustand';
 import type { Vorbereitung } from './useVorbereitung';
 
@@ -73,14 +75,16 @@ export default function LagebesprechungGrossbild({
         ? ABSCHNITT_OFFLINE
         : null;
   const { konventionen: konv } = useAnzeigeKonventionen();
-  // 5-s-Takt wie im Lagebild: „Stand vor n s“ läuft mit, ohne jede Sekunde zu rendern.
+  const uhrArt = useUhrDarstellung();
+  const ohneNetz = useOhneVerbindung();
+  // 5-s-Takt: Uhr und Alter des Stands laufen mit, ohne jede Sekunde zu rendern.
   const jetzt = useUhr(5_000);
   const termin = stand?.naechste_lagebesprechung_at;
   const darstellung = lagebesprechungZustand(termin, jetzt);
   const { zeilen, standMs } = vorbereitung;
-  // Uhrzeit und Alter des Stands wie im Lagebild: ohne Live-Kanal sieht man an der Wand, dass die
-  // Zahlen alt werden (Spec „Dieselben Zahlen wie die Seite“: den Datenstand mit Alter nennen).
-  const meta = `${lagebildZeit(jetzt.valueOf(), konv)} · ${standText(standMs, jetzt.valueOf(), konv)}`;
+  // Uhr und Stand mit Alter wie im Großbild des Lagebilds (LLH-1750): ohne Live-Kanal sieht man an
+  // der Wand, dass die Zahlen alt werden (Spec „Dieselben Zahlen wie die Seite“).
+  const meta = `${formatiereUhr(jetzt.valueOf(), uhrArt)} · ${datenstandText(standMs, jetzt.valueOf(), { alter: true, offline: ohneNetz, konv })}`;
   const jeSpalte = Math.ceil(zeilen.length / SPALTEN);
   const spalten = Array.from({ length: SPALTEN }, (_, i) =>
     zeilen.slice(i * jeSpalte, (i + 1) * jeSpalte),

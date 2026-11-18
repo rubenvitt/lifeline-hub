@@ -50,7 +50,9 @@ describe('EinheitTypenTab', () => {
     render(nichtAdmin);
     await screen.findByText('Zug');
     for (const zahl of ['1/3/18//22', '40']) {
-      const knoten = screen.getByText(zahl);
+      // Die Stärke steht in ihrem eigenen `span` (Beschreibung, LLH-1750); die Schrift setzt die Zelle.
+      const text = screen.getByText(zahl);
+      const knoten = text.dataset.lfh === 'staerke' ? text.parentElement! : text;
       expect(knoten.style.fontFamily).toContain('JetBrains Mono');
       expect(knoten.style.fontVariantNumeric).toBe('tabular-nums');
     }

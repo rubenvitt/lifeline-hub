@@ -28,7 +28,7 @@ describe('grenzwertText (LLH-1603)', () => {
   it('kennzeichnet die Vorgabe und lässt einen eigenen Wert ohne Zusatz', () => {
     expect(grenzwertText(720, false)).toBe('12 h (Vorgabe)');
     expect(grenzwertText(600, true)).toBe('10 h');
-    expect(grenzwertText(450, true)).toBe('7:30 h');
+    expect(grenzwertText(450, true)).toBe('7 h 30 min');
   });
 
   it('zeigt eine Mindestruhe von 0 als „0 min“, nie leer', () => {
@@ -57,7 +57,7 @@ describe('grenzwerteFormWerte (LLH-1603)', () => {
   });
 
   it('belegt eigene Werte in Dauerform vor', () => {
-    expect(grenzwerteFormWerte(eigene)).toEqual({ max_dienst: '10 h', min_ruhe: '7:30 h' });
+    expect(grenzwerteFormWerte(eigene)).toEqual({ max_dienst: '10 h', min_ruhe: '7 h 30 min' });
   });
 });
 

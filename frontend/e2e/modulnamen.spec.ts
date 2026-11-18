@@ -140,10 +140,11 @@ test('1440 px: die Beschreibungen der Führung stehen ohne Auslassung im Modulpa
   await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
   const panel = page.locator('#modul-panel');
   await expect(panel).toBeVisible();
-  // Vorbedingung: die Zeile aus der Meldung steht da (einzeilig: „Kennzahlen, Fristen, Entschei…“).
+  // Vorbedingung: die Beschreibung des Überblicks steht da (die Meldung zeigte sie einzeilig
+  // abgeschnitten, „Kennzahlen, Fristen, Entschei…“; seit LLH-1748 trägt er keine Kennzahl mehr).
   await expect(
     panel.getByRole('link', { name: 'Überblick' }).locator('[data-lfh="modul-beschreibung"]'),
-  ).toHaveText('Kennzahlen, Fristen, Entscheidungen');
+  ).toHaveText('Fristen, Vorgänge, Entscheidungen');
   const abgeschnitten = await panel
     .locator('[data-lfh="modul-beschreibung"]')
     .evaluateAll((alle) =>

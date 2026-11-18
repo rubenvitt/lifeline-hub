@@ -142,7 +142,7 @@ zeigen. Der erste Wert MUST die angetroffenen Personen mit `versorgung: "unterwe
 zweite die angetroffenen Personen ohne Verbleib und ohne Unfallhilfsstelle, der dritte die
 angetroffenen Personen mit `versorgung: "abgeschlossen"`. Die Patientenzahl (Notiz der Kennzahl
 „Betroffene“) MUST nur Nicht-Abgeschlossene zählen und, wenn es Abgeschlossene gibt, „· n
-abgeschlossen“ anfügen. Die Notiz der Kennzahl „Verbleib offen“ MUST „n unterwegs“ lauten. Die Kennzahl „Vermisste“ SHALL als Notiz „n seit über 4 h“ tragen, wenn mindestens eine
+abgeschlossen“ anfügen. Die Notiz der Kennzahl „Verbleib offen“ MUST „wohin nicht erfasst · n unterwegs“ lauten, ohne Unterwegs nur „wohin nicht erfasst“. Die Kennzahl „Vermisste“ SHALL als Notiz „n seit über 4 h“ tragen, wenn mindestens eine
 vermisste Person seit mehr als vier Stunden vermisst wird. Die Notiz MUST mit der Zeit
 fortschreiben, ohne dass neue Daten eintreffen.
 
@@ -157,6 +157,10 @@ fortschreiben, ohne dass neue Daten eintreffen.
 #### Scenario: Vermisste seit über 4 h
 - **WHEN** drei Personen vermisst werden, zwei davon seit mehr als vier Stunden
 - **THEN** zeigt die Kennzahl „Vermisste“ den Wert 3 mit der Notiz „2 seit über 4 h“
+
+#### Scenario: Verbleib offen erklärt sich
+- **WHEN** zwei angetroffene Personen ohne Verbleib und eine im Eigentransport erfasst sind
+- **THEN** zeigt die Kennzahl „Verbleib offen“ den Wert 2 mit der Notiz „wohin nicht erfasst · 1 unterwegs“
 
 ### Requirement: Kartenansicht der Betroffenen
 Die Betroffenen-Seite SHALL neben „Zeilen“ und „Sichtungsraster“ eine Ansicht „Karte“ bieten.

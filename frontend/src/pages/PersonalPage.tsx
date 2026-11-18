@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Breadcrumb, Button, Space, Tag, theme } from 'antd';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useParams } from 'react-router';
@@ -24,13 +25,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { einsatzkraftPfad, kraefteuebersichtPfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import DauerMitEinstufung from '../kraefte/DauerMitEinstufung';
-import {
-  dauerText,
-  kraftDauern,
-  stufeEin,
-  type Einstufung,
-  type KraftDauern,
-} from '../kraefte/zeitachse';
+import { kraftDauern, stufeEin, type Einstufung, type KraftDauern } from '../kraefte/zeitachse';
 import { ladeZeitachseGrenzwerte, listePersonalPerioden } from '../api/kraefteZeitachse';
 import { abrufZustand } from '../api/abrufZustand';
 import { useUhr } from '../abloesung/useUhr';
@@ -371,7 +366,7 @@ export default function PersonalPage() {
   const dauerZelle = (minuten: number | null | undefined) =>
     periodenBereit ? (
       <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
-        {minuten == null ? '—' : dauerText(minuten)}
+        {minuten == null ? '—' : dauer(minuten)}
       </span>
     ) : null;
 

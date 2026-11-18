@@ -255,9 +255,9 @@ describe('AbloesungPage (LFH-635)', () => {
     );
     renderPage();
     const [einsatzKarte, abschnittKarte] = await screen.findAllByRole('article');
-    // Dauer als „7:30 h“, nie „7.5“ oder „7 h 30 min“ (LLH-1122).
+    // Dauer als „7 h 30 min“, nie „7.5“ oder „7:30 h“ (LLH-1122, LLH-1750).
     expect(einsatzKarte.querySelector('[data-lfh="abloesung-rhythmus"]')).toHaveTextContent(
-      /^Rhythmus 7:30 h \(Vorgabe Einsatz\)$/,
+      /^Rhythmus 7 h 30 min \(Vorgabe Einsatz\)$/,
     );
     // Die Abschnittsvorgabe bleibt kurz: den Abschnitt nennt die Zeile darüber (LFH-708).
     expect(abschnittKarte.querySelector('[data-lfh="abloesung-rhythmus"]')).toHaveTextContent(
@@ -367,7 +367,7 @@ describe('AbloesungPage (LFH-635)', () => {
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
     // Der eigene Wert steht als Dauer im Feld, nie „7.5“.
-    expect(feld).toHaveValue('7:30 h');
+    expect(feld).toHaveValue('7 h 30 min');
     expect(feld).toHaveAttribute('placeholder', 'Wechsel 0600/1800 (Vorgabe Einsatz)');
     expect(feld).not.toBeRequired();
     await userEvent.clear(feld);

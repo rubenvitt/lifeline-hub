@@ -32,7 +32,7 @@ describe('DauerMitEinstufung', () => {
       />,
     );
     const zelle = document.querySelector('[data-lfh="im-einsatz"]') as HTMLElement;
-    expect(zelle.textContent).toBe('7 h 40, seit Alarmierung 06:10');
+    expect(zelle.textContent).toBe('7 h 40 min, seit Alarmierung 06:10');
     expect(zelle.title).toBe('seit Alarmierung 06:10');
     expect(document.querySelector('[data-lfh="dauer-einstufung"]')).toBeNull();
   });
@@ -60,9 +60,9 @@ describe('DauerMitEinstufung', () => {
     );
     const zelle = document.querySelector('[data-lfh="im-einsatz"]') as HTMLElement;
     const text =
-      'Im Dienst seit 08:00: 14 h 30, Höchstwert 12 h · Ruhe davor 2 h 00, Mindestruhe 8 h';
+      'Im Dienst seit 08:00: 14 h 30 min, Höchstwert 12 h · Ruhe davor 2 h, Mindestruhe 8 h';
     expect(zelle.title).toBe(`seit Alarmierung 16:00 · ${text}`);
-    expect(zelle.textContent).toBe(`6 h 30 zu lang, seit Alarmierung 16:00. ${text}`);
+    expect(zelle.textContent).toBe(`6 h 30 min zu lang, seit Alarmierung 16:00. ${text}`);
   });
 
   it('„Ruhe zu kurz“ ohne Zusatz', () => {
@@ -81,7 +81,7 @@ describe('DauerMitEinstufung', () => {
     );
     expect(screen.getByText('Ruhe zu kurz')).toBeTruthy();
     expect(
-      screen.getByTitle(/^Ruhe davor 2 h 00, Mindestruhe 8 h · Im Dienst seit 08:00/),
+      screen.getByTitle(/^Ruhe davor 2 h, Mindestruhe 8 h · Im Dienst seit 08:00/),
     ).toBeTruthy();
   });
 
@@ -100,6 +100,6 @@ describe('DauerMitEinstufung', () => {
       />,
     );
     expect(screen.queryByText('zu lang')).toBeNull();
-    expect(screen.getByText('12 h 20')).toBeTruthy();
+    expect(screen.getByText('12 h 20 min')).toBeTruthy();
   });
 });

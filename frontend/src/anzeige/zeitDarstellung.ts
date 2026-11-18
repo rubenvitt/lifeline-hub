@@ -171,6 +171,17 @@ export function tagUndUhrzeit(wert: Zeitwert, konv: AnzeigeKonventionen): string
   return zeitMitTag(d, darstellung(konv));
 }
 
+/**
+ * Die Uhr im Kopf, im Lagemonitor und im Großbild (LLH-1750, Spec `zeitdarstellung`, „Uhr im Kopf
+ * in der Darstellung“, Entscheidung E5): die GERÄTEZEIT in der Rolle „Uhrzeit“ der wirksamen
+ * Darstellung, `1731` bzw. `17:31`. Die Zone bleibt die des Geräts: eine Uhr, die je Route die Zone
+ * wechselt, wäre schlimmer als eine, die vom Einsatz abweicht. Die Darstellung liefert
+ * `useUhrDarstellung()`.
+ */
+export function formatiereUhr(ms: number, art: Zeitdarstellung): string {
+  return nurUhrzeit(dayjs(ms), art);
+}
+
 /** Rolle „Uhrzeit“, nur wo der Tag aus dem Zusammenhang feststeht: `1430` bzw. `14:30`. */
 export function uhrzeit(wert: Zeitwert, konv: AnzeigeKonventionen): string {
   const d = wanduhr(wert, konv);

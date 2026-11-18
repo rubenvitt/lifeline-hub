@@ -1,3 +1,4 @@
+import { dauer } from '../../anzeige/dauer';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { listePersonen } from '../../api/einsatzPerson';
@@ -10,7 +11,6 @@ import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { SICHTUNGSBILD_REIHE, type SichtungsbildSchluessel } from '../../personen/personenBilanz';
 import { sichtung } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
-import { wartezeitText } from './dringlichkeit';
 import { uhsLage } from './uhsLage';
 
 interface UhsLagezeileProps {
@@ -75,9 +75,7 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
       ? `${lage.plaetze.inAufbereitung} in Aufbereitung`
       : `${lage.plaetze.belegt} belegt`;
   const warteZusatz =
-    lage.laengsteWarteMin != null
-      ? `längste ${wartezeitText(lage.laengsteWarteMin)}`
-      : 'niemand wartet';
+    lage.laengsteWarteMin != null ? `längste ${dauer(lage.laengsteWarteMin)}` : 'niemand wartet';
 
   if (form === 'zeile') {
     // Ohne Daten keine Zahl: über einem Ladefehler stünden sonst Nullen, die niemand erhoben hat.

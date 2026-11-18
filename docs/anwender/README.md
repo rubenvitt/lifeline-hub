@@ -25,6 +25,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Einstieg | [Profil und Sicherheit](kapitel/profil-sicherheit.md) | Alle |
 | Einstieg | [Neuigkeiten](kapitel/neuigkeiten.md) | Alle |
 | Einstieg | [Rückmeldung geben](kapitel/rueckmeldung.md) | Alle |
+| Einstieg | [Zeiten und Kürzel](kapitel/zeiten-und-kuerzel.md) | Alle |
 | Führung | [Überblick](kapitel/ueberblick.md) | Führung |
 | Führung | [Einsatztagebuch](kapitel/einsatztagebuch.md) | Alle, Führung |
 | Führung | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |

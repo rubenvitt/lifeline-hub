@@ -1,3 +1,4 @@
+import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Einheit, Staerke } from '../api/types';
@@ -70,7 +71,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
                 {e.funkrufname}
               </Datenfeld>
             )}
-            <Datenfeld label="Ist-Stärke (F/UF/M//Σ)" mono>
+            <Datenfeld label={`Ist-Stärke (${STAERKE_SCHREIBWEISE})`} mono>
               <StaerkeAnzeige wert={e.ist} />
             </Datenfeld>
             {!gleicheStaerke(e.ist, e.ist_kumuliert) && (
@@ -79,7 +80,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
               </Datenfeld>
             )}
             {e.soll && (
-              <Datenfeld label="Soll-Stärke (F/UF/M//Σ)" mono>
+              <Datenfeld label={`Soll-Stärke (${STAERKE_SCHREIBWEISE})`} mono>
                 <StaerkeAnzeige wert={e.soll} />
               </Datenfeld>
             )}

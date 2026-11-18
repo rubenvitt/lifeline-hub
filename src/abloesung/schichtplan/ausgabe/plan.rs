@@ -313,19 +313,6 @@ pub fn zeitpunkt_text(t: DateTime<Utc>, zone: Tz) -> String {
     t.with_timezone(&zone).format("%d.%m.%Y %H:%M").to_string()
 }
 
-/// Wie `formatDauer` im Frontend: „45 min“, „8 h“, „7:30 h“.
-pub fn dauer_text(minuten: i64) -> String {
-    if minuten < 60 {
-        return format!("{minuten} min");
-    }
-    let (h, m) = (minuten / 60, minuten % 60);
-    if m == 0 {
-        format!("{h} h")
-    } else {
-        format!("{h}:{m:02} h")
-    }
-}
-
 /// Das Wort eines Befunds wie in der Ansicht (`schichtplanZeilen.ts`, `BEFUND_WORT`).
 pub fn befund_wort(art: PlanBefundArt) -> &'static str {
     match art {
@@ -377,7 +364,10 @@ fn befund_text(
                 .unwrap_or_else(|| "Qualifikation".into())
         ),
         PlanBefundArt::Dienst => {
-            format!("{} im Dienst", dauer_text(b.dauer_minuten.unwrap_or(0)))
+            format!(
+                "{} im Dienst",
+                crate::zeitdarstellung::dauer_text(b.dauer_minuten.unwrap_or(0))
+            )
         }
         PlanBefundArt::Doppelt => match b.anderer_block_id.and_then(andere) {
             Some(o) => format!("auch in {o}"),
@@ -1018,9 +1008,9 @@ pub(crate) mod tests {
             bis_text(t("2026-08-15 20:00:00"), t("2026-08-15 23:00:00"), BERLIN),
             "16.08.2026 01:00"
         );
-        assert_eq!(dauer_text(45), "45 min");
-        assert_eq!(dauer_text(480), "8 h");
-        assert_eq!(dauer_text(810), "13:30 h");
+        assert_eq!(crate::zeitdarstellung::dauer_text(45), "45 min");
+        assert_eq!(crate::zeitdarstellung::dauer_text(480), "8 h");
+        assert_eq!(crate::zeitdarstellung::dauer_text(810), "13 h 30 min");
         assert_eq!(namensfolge(" Öztürk"), "ozturk");
     }
 }

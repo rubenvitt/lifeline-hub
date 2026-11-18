@@ -472,7 +472,7 @@ hat.
 
 #### Scenario: Längster zulässiger Rhythmus bleibt einzeilig
 - **WHEN** eine Schicht einen Rhythmus von 167 h 59 min als Vorgabe des Einsatzes trägt und die Karte auf 390 px Breite in der Dichte `komfortabel` oder `handschuh` steht
-- **THEN** steht die Zeile „Rhythmus 167:59 h (Vorgabe Einsatz)“ einzeilig, der Wert „Rhythmus 167:59 h“ ganz sichtbar und der ganze Text im Titel
+- **THEN** steht die Zeile „Rhythmus 167 h 59 min (Vorgabe Einsatz)“ einzeilig, der Wert „Rhythmus 167 h 59 min“ ganz sichtbar und der ganze Text im Titel
 
 ### Requirement: Schichtmodelle in der Verwaltung
 
@@ -524,7 +524,7 @@ Ohne Freigabe des Moduls Ablösung MUST der Reiter das sagen, statt die Vorgabe 
 
 ### Requirement: Dauern und Einsatzvorgabe auf der Seite Ablösung
 
-Dauern SHALL als „8 h“, „7:30 h“ oder „45 min“ erscheinen und so vorbelegt werden, nie mit
+Dauern SHALL als „8 h“, „7 h 30 min“ oder „45 min“ erscheinen (Spec `zeitdarstellung`, „Eine Form für Dauern“) und so vorbelegt werden, nie mit
 Dezimalpunkt; Wechselzeiten taktisch („0600/1800“). Die Seite Ablösung MUST die Vorgabe des
 Einsatzes zeigen und sie in „Schicht beginnen“ und „Rhythmus ändern“ als letzte Stufe der
 Rangfolge nennen: ohne Vorgabe des Abschnitts als Platzhalter, und das Rhythmusfeld darf leer
@@ -536,11 +536,11 @@ bleiben. Die Einstufung im Client MUST mit `vorwarnung_minuten` der Schicht rech
 
 #### Scenario: Dauer statt Dezimalzahl
 - **WHEN** eine Schicht einen eigenen Rhythmus von 450 min hat und jemand „Rhythmus ändern“ öffnet
-- **THEN** steht im Feld „7:30 h“
+- **THEN** steht im Feld „7 h 30 min“
 
 #### Scenario: Eingabe einer Dauer
-- **WHEN** jemand „8“, „7:30“, „7,5“ oder „90 min“ einträgt
-- **THEN** gelten 480, 450, 450 bzw. 90 Minuten, und Unlesbares lehnt das Feld ab, ohne zu senden
+- **WHEN** jemand „8“, „7:30“, „7 h 30 min“, „7,5“ oder „90 min“ einträgt
+- **THEN** gelten 480, 450, 450, 450 bzw. 90 Minuten, und Unlesbares lehnt das Feld ab, ohne zu senden
 
 #### Scenario: Vorwarnung aus der Schicht
 - **WHEN** eine laufende Schicht in 50 min fällig ist und `vorwarnung_minuten: 60` meldet

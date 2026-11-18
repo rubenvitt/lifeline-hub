@@ -13,8 +13,8 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
-import { staerkeText } from '../../anzeige/staerke';
-import { monoStil, StatusChip, useRollen } from '../../components/instrument';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
+import { monoStil, schriftStil, StatusChip, useRollen } from '../../components/instrument';
 import StatusTag from '../../components/StatusTag';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
@@ -362,7 +362,12 @@ function KnotenInhalt({
           <span style={{ overflowWrap: 'anywhere' }}>
             {knoten.leitung ?? 'Leitung nicht besetzt'}
           </span>
-          <span style={{ ...meta, color: rollen.text }}>{staerkeText(knoten.staerke)}</span>
+          <span
+            style={{ ...meta, color: rollen.text }}
+            title={knoten.staerke ? STAERKE_AUSGESCHRIEBEN : undefined}
+          >
+            {staerkeText(knoten.staerke)}
+          </span>
           {knoten.art === 'einheit' && knoten.abgestelltAus && (
             <span style={{ overflowWrap: 'anywhere' }}>aus {knoten.abgestelltAus}</span>
           )}
@@ -524,6 +529,19 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
             Commit aus. */}
         <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
       </Space>
+      {/* Die Schreibweise der Stärke einmal über den Knoten, auch im Druck (LLH-1750, Spec
+          `lage-verdichtung`, „Die Stärke nennt ihre Schreibweise“). */}
+      <div
+        data-lfh="org-legende"
+        title={STAERKE_AUSGESCHRIEBEN}
+        style={{
+          ...schriftStil('meta'),
+          color: token.colorTextSecondary,
+          marginBlockEnd: token.marginXS,
+        }}
+      >
+        Stärke {STAERKE_SCHREIBWEISE}
+      </div>
       {uebernehmen.error != null && (
         <div className="organigramm-no-print" style={{ marginBlockEnd: token.margin }}>
           <SpeicherFehler

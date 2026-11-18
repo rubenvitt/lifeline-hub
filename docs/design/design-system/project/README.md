@@ -35,7 +35,7 @@ die Karten deckungsgleich.
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
 | Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
-| Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts` („Zeitdarstellung“)                                                                                                 | `Zeitdarstellung`                  |
+| Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts`, Dauer `anzeige/dauer.ts` („Zeitdarstellung“, „Uhr, Dauer und Datenstand“)                                          | `Zeitdarstellung`                  |
 | Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
 | Taktisches Zeichen                                                                              | `EinsatzZeichen`                                                                                                                                 | `TaktischeZeichen`                 |
 | Verletzungen am Körper                                                                          | `Koerperschema`                                                                                                                                  | `Koerperschema`                    |
@@ -277,10 +277,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Keine erfundenen Daten:** was ohne Datenquelle ist, wird weggelassen,
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
   Evakuiert, Pegel auf Platz 1, Rückmeldung, ETB-Zählung.
-- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, Aufträge,
-  Meldungen, Abschnitte, offene Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los
-  ist (Betroffene, Kräfte, Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine
-  Kennzahl steht auf genau einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Die
+- **Rollen der Übersichten**: der Überblick sagt, was zu tun ist (Startliste eines neuen Einsatzes, nächste
+  Marken, offene Vorgänge samt Aufträgen und Meldungen, Abschnitte, Entscheidungen; ohne
+  Kennzahlenband), das Lagebild, was los ist (Betroffene, Kräfte, Vermisste, Gefahren,
+  Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Zahl steht auf genau einer der beiden Seiten;
+  nur die Alarmzeile steht auf beiden. Die
   Startliste zeigt Haken, keine Zahl. Beide verweisen im Seitenkopf aufeinander..
 
 ## Farbachsen
@@ -620,6 +621,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+- **Kürzel sind eingeführt oder erklärt**: Die Oberfläche zeigt ein
+  Kürzel nur, wenn es in `anzeige/kuerzel.ts` (`EINGEFUEHRTE_KUERZEL`) steht oder auf derselben
+  Fläche sichtbar erklärt wird; sonst wird es ausgeschrieben („Unterabschnitte“, nicht „UA“). Ein
+  neues Kürzel kommt in die Liste und in die Tabelle des Kapitels `zeiten-und-kuerzel.md`
+  (`anzeige/kuerzel.test.ts` hält beide gleich). Kurzbezeichnungen der Organisation („EA 1.1“) sind
+  Daten und bleiben. **Die Stärke** schreibt nur `anzeige/staerke.ts` (`staerkeText`, Wert
+  „1/2/5//8“); jede Fläche mit Stärke nennt `STAERKE_SCHREIBWEISE` („F/UF/M//Σ“) einmal sichtbar
+  (Spaltenkopf, Feldetikett, Legende), der Wert trägt `STAERKE_AUSGESCHRIEBEN` als `title`
+  (`StaerkeAnzeige`, `Kennzahl notizBeschreibung`). „Ges“, „Gesamt“ und eine Stärke ohne Summe gibt
+  es nicht (Wächter `anzeige/staerke.guard.test.ts`).
 
 ## Begriffe
 
@@ -649,7 +660,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Organisation vor Vorgabe (`wirksameZeitdarstellung`), die Gerätewahl liegt in
   `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
   **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
-  sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
+  sie unter `useDruckModus` weg. Kein
   `.format('…')` und kein `formatiere(…, '…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/`
   (Maschinenformate ab `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts`,
   Schuldmenge `OFFEN` leer. Titelvorschlag und Startinhalt eines Lagevortrags werden
@@ -658,5 +669,4 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `datum`/`kalendertag` (Tag ohne Uhrzeit, `10okt26` bzw. `10.10.26`), `uhrzeitOhneDatum`
   (Wanduhrzeit `HH:MM` ohne Tag: Verpflegungsplan, Wechselzeiten), `tagUndUhrzeit` (Anfang eines
   Zeitraums), `leereUhrzeit` (Lücke in Ziffernbreite); „heute“ einer Nebenzeit (Nachtrag, Übergabe,
-  Zeitraumende) über das `jetzt` von `zeitKurz`. Der Datenstand rechnet in Gerätezeit
-  (`components/Datenstand.tsx`), die Uhr des Lagemonitors nimmt `formatiereUhr` der Kopfleiste.
+  Zeitraumende) über das `jetzt` von `zeitKurz`.

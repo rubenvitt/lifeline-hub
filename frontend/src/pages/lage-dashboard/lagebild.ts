@@ -23,8 +23,9 @@ import type {
   Uhs,
   Warnstufe,
 } from '../../api/types';
+import { dauer, minutenZwischen } from '../../anzeige/dauer';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../../anzeige/format';
-import { staerkeText } from '../../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
 import { baueKraeftebild } from '../../kraefte/kraeftebild';
 import { LAGEBERICHT_STATUS } from '../../kommunikation/phase';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
@@ -189,6 +190,8 @@ interface Kennzahl {
   wert: string;
   einheit?: string;
   notiz: string;
+  /** Erklärt ein Kürzel der Notiz, etwa die Schreibweise der Stärke (LLH-1750). */
+  notizBeschreibung?: string;
   ton: KennzahlTon;
   /** Modul-Route für `einsatzModulPfad` (die Seite baut den Pfad über `routing/deeplinks`). */
   route: string;
@@ -246,15 +249,15 @@ export function wireAlsEpoche(wire: string): number {
 }
 
 /**
- * Einsatzdauer als `H:MM` (Stunden laufen über 24 weiter: „26:05"), bis `jetzt` bzw. zum Abschluss.
- * Ein Beginn in der Zukunft oder ein unlesbarer Wert ergibt `—:——`. Rein.
+ * Einsatzdauer in der Form der Dauer (LLH-1750, Spec `zeitdarstellung`, „Eine Form für Dauern“):
+ * „5 h 01 min“, ab 24 h „2 d 14 h“, bis `jetzt` bzw. zum Abschluss. Ein Beginn in der Zukunft oder
+ * ein unlesbarer Wert ergibt „—“. Rein.
  */
 export function einsatzdauer(beginn: string, jetzt: number, ende?: string | null): string {
   const von = wireAlsEpoche(beginn);
   const bis = ende ? wireAlsEpoche(ende) : jetzt;
-  if (!Number.isFinite(von) || !Number.isFinite(bis) || bis < von) return '—:——';
-  const minuten = Math.floor((bis - von) / 60_000);
-  return `${Math.floor(minuten / 60)}:${String(minuten % 60).padStart(2, '0')}`;
+  if (!Number.isFinite(von) || !Number.isFinite(bis) || bis < von) return '—';
+  return dauer(minutenZwischen(von, bis), { tage: true });
 }
 
 /**
@@ -265,46 +268,14 @@ export function einsatzdauerKennzahl(
   einsatz: Pick<EinsatzAnzeige, 'begonnen_at'> & { abgeschlossen_at?: string | null },
   jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): { wert: string; einheit: 'h'; notiz: string } {
+): { wert: string; notiz: string } {
   const abgeschlossen = einsatz.abgeschlossen_at ?? null;
   return {
     wert: einsatzdauer(einsatz.begonnen_at, jetzt, abgeschlossen),
-    einheit: 'h',
     notiz: abgeschlossen
       ? `beendet ${zeitKurz(abgeschlossen, konv, jetzt)}`
       : `seit ${zeitKurz(einsatz.begonnen_at, konv, jetzt)}`,
   };
-}
-
-/**
- * Zeit des Lagebilds im Seitenkopf: „jetzt“ in der Rolle „kurz“ (LLH-1061), also `1422` bzw.
- * `14:22` — der Kopf ist eng (`e2e/lagebild-cls-schmal.spec.ts`), und „jetzt“ ist immer heute.
- * In der Anzeigezone. Rein.
- */
-export function lagebildZeit(
-  jetzt: number,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): string {
-  return zeitKurz(new Date(jetzt).toISOString(), konv, jetzt);
-}
-
-/**
- * Alter des Datenstands als Mono-Meta („Stand vor 40 s"). `0`/ungültig heißt „noch nichts
- * abgerufen". Über einer Stunde steht die Uhrzeit — „vor 184 min" liest niemand. Rein.
- *
- * Bewusst nicht `anzeige/abstand.ts:formatVor` (LLH-1327): eine andere Größe mit Präfix „Stand“,
- * Sekunden unter einer Minute und ab einer Stunde die Uhrzeit statt „vor 3 h 4 min“.
- */
-export function standText(
-  datenstand: number,
-  jetzt: number,
-  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): string {
-  if (!Number.isFinite(datenstand) || datenstand <= 0) return 'Stand wird abgerufen';
-  const sekunden = Math.max(0, Math.round((jetzt - datenstand) / 1000));
-  if (sekunden < 60) return `Stand vor ${sekunden} s`;
-  if (sekunden < 3600) return `Stand vor ${Math.floor(sekunden / 60)} min`;
-  return `Stand ${zeitKurz(new Date(datenstand).toISOString(), konv, jetzt)}`;
 }
 
 /** Schwelle der Notiz „n seit über 4 h" an „Vermisste" — gesetzt im Neuentwurf S3, keine Norm. */
@@ -557,10 +528,14 @@ export function baueLagebild(
     },
     'Verbleib offen': {
       // Angetroffene ohne Verbleib — dieselbe Zählung wie „Unterwegs / offen / abgeschlossen“ im
-      // Sichtungspaneel (LLH-1332).
+      // Sichtungspaneel (LLH-1332). Die Notiz sagt, was offen ist (LLH-1750, Spec
+      // `betroffene-lagedaten`).
       etikett: 'Verbleib offen',
       wert: String(versorgung.offen),
-      notiz: `${versorgung.unterwegs} unterwegs`,
+      notiz:
+        versorgung.unterwegs > 0
+          ? `wohin nicht erfasst · ${versorgung.unterwegs} unterwegs`
+          : 'wohin nicht erfasst',
       ton: versorgung.offen > 0 ? 'achtung' : 'neutral',
       route: 'personen',
     },
@@ -578,10 +553,11 @@ export function baueLagebild(
     },
     Kräfte: {
       // Die Gesamtstärke führt; F/UF/M//Σ steht in der Notiz, damit die BOS-Schreibweise erhalten
-      // bleibt.
+      // bleibt, mit dem Wort „Stärke“ und ausgeschrieben als Beschreibung (LLH-1750).
       etikett: 'Kräfte',
       wert: String(kraefte.staerke.gesamt),
-      notiz: `${r.einheiten.length} Einheiten · ${staerkeText(kraefte.staerke)}`,
+      notiz: `${r.einheiten.length} Einheiten · Stärke ${staerkeText(kraefte.staerke)}`,
+      notizBeschreibung: `Stärke ${STAERKE_SCHREIBWEISE}: ${STAERKE_AUSGESCHRIEBEN}`,
       ton: 'neutral',
       route: 'kraefteuebersicht',
     },

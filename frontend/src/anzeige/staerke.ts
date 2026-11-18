@@ -66,6 +66,16 @@ export function summiereStaerke(
 }
 
 /**
+ * Die Schreibweise der Stärke als Etikett (LLH-1750, Spec `lage-verdichtung`, „Die Stärke nennt
+ * ihre Schreibweise“): jede Fläche mit einer Stärke nennt sie einmal sichtbar (Spaltenkopf,
+ * Feldetikett, Legende). Andere Namen der Summe („Ges“, „Gesamt“) gibt es nicht.
+ */
+export const STAERKE_SCHREIBWEISE = 'F/UF/M//Σ';
+
+/** Die ausgeschriebene Schreibweise: zugängliche Beschreibung jedes Werts und Tooltip. */
+export const STAERKE_AUSGESCHRIEBEN = 'Führer / Unterführer / Mannschaft // Summe';
+
+/**
  * Stärke in BOS-Schreibweise `F/UF/M//Σ` (Doppelstrich vor der Gesamtstärke), „—" ohne Angabe.
  * Die EINE Formatierung (LFH-550): das Meldebild (`kraefte/kraeftebild.ts`) formatiert hierüber.
  */

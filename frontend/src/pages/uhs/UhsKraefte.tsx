@@ -13,7 +13,7 @@ import { PERSONAL_ADHOC_TEXT_MAX } from '../../api/eingabegrenzen';
 import { POSITION_LABELS, POSITION_OPTIONEN } from '../../api/personal';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { StaerkePosition, UhsDetail, UhsKraft } from '../../api/types';
-import { staerkeText } from '../../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
 import { ErfassungsModal } from '../../components/Erfassung';
 import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
 import { Select } from '../../components/Select';
@@ -305,8 +305,10 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           />
         )}
       <Datenraster beschriftung="Stärke der UHS" spalten={2}>
-        <Datenfeld label="Stärke" mono>
-          <span data-testid="uhs-staerke">{staerkeText(uhs.staerke)}</span>
+        <Datenfeld label={`Stärke (${STAERKE_SCHREIBWEISE})`} mono>
+          <span data-testid="uhs-staerke" title={STAERKE_AUSGESCHRIEBEN}>
+            {staerkeText(uhs.staerke)}
+          </span>
         </Datenfeld>
         <Datenfeld label="Qualifikationen">
           {qualifikationen.length === 0 ? (

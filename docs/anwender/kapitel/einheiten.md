@@ -82,7 +82,7 @@ Für Einsatzleitung und Führungspersonal:
    wird mit Strg+Enter oder „Speichern“. Name und Funkrufname dürfen höchstens 200 Zeichen lang
    sein, die Bemerkung höchstens 2 000; eine längere Bemerkung nennt das Feld „zu lang“ und
    speichert sie nicht.
-4. Unter „Soll-Stärke (F/UF/M)“ Führer, Unterführer und Mannschaft zusammen eintragen. Unter „Ist
+4. Unter „Soll-Stärke (F/UF/M//Σ)“ Führer, Unterführer und Mannschaft zusammen eintragen. Unter „Ist
    (F/UF/M//Σ)“ steht die Ist-Stärke, mit unterstellten Einheiten auch die kumulierte, und
    daneben „unterbesetzt“ oder „Soll erfüllt“.
 5. Unter „Qualifikationssoll“ mit „Qualifikation fordern“ festlegen, welche Qualifikationen die

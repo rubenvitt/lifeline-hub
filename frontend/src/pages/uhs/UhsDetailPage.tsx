@@ -43,7 +43,7 @@ import UhsLagezeile from './UhsLagezeile';
 import BewegungenTab from './BewegungenTab';
 import UhsAnhaenge from './UhsAnhaenge';
 import UhsKraefte from './UhsKraefte';
-import { staerkeText } from '../../anzeige/staerke';
+import { STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
 import { qualiSollText } from '../../kraefte/qualiSoll';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -275,7 +275,7 @@ function UhsDetailInhalt() {
   const metaText = [
     uhsTyp[uhs.typ].label,
     uhs.standort ?? 'ohne Standort',
-    `Stärke ${staerkeText(uhs.staerke)}`,
+    `Stärke ${STAERKE_SCHREIBWEISE} ${staerkeText(uhs.staerke)}`,
   ].join(' · ');
   // Die Materialzahl im Wortlaut des Bausteins („3 Posten · 1 Ausfall“, eine Heimat je Zahl,
   // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät), ohne Freigabe

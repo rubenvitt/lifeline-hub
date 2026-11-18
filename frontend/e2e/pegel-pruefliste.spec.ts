@@ -887,11 +887,14 @@ for (const [route, text] of [
         [`**/api/einsaetze/${einsatzId}/pegel`, pegelListe(10)],
       ]);
       await page.goto(`/einsaetze/${einsatzId}/${route}`);
-      // Der Überblick trägt seit LLH-1743 das Band „Führungsstand“, das Lagebild „Lage in Zahlen“.
-      const band = page.getByRole('group', {
-        name: route === 'ueberblick' ? 'Führungsstand' : 'Lage in Zahlen',
-      });
-      await expect(band.locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
+      // Das Lagebild trägt das Band „Lage in Zahlen“, der Überblick seit LLH-1748 keins: dort
+      // gilt die Seite als aufgebaut, sobald die offenen Vorgänge ihre Zahlen zeigen.
+      const band = page.getByRole('group', { name: 'Lage in Zahlen' });
+      await expect(
+        route === 'ueberblick'
+          ? page.locator('[data-lfh="offene-vorgaenge"] [data-lfh="abschnitt-zahl"]').first()
+          : band.locator('a[data-lfh="kennzahl"]').first(),
+      ).toBeVisible();
       await wartenBisRuhig(page);
       const marke = await pegel.freigeben();
       // Im Überblick steht der Pegel seit LLH-1140 im Seitenkopf (die Warnstufe hat dort keinen

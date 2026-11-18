@@ -4,7 +4,7 @@
 zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
 `components/instrument/`.
 Kopf: `EinsatzSeite` mit Datenstand und `WarnstufenHinweis` (nur bei Ton achtung/alarm; die
-Warnstufe ist keine Kennzahl). Darunter, vor jedem Band, auf Überblick, Lagebild und Lagemonitor
+Warnstufe ist keine Kennzahl). Darunter, vor Band und Paneelen, auf Überblick, Lagebild und Lagemonitor
 die **Alarmzeile „Was brennt“** (`AlarmZeile`): Einträge,
 Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
 am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
@@ -13,12 +13,15 @@ Seite baut eine zweite Sammlung. Im Großbild des Lagebilds steht sie in der Gr�
 (Maße über `grossMass`, ohne Sprünge), mit den Daten der Seite; das Großbild der
 Lagebesprechung trägt keine. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**: eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
 Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
-ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über dem
-Band steht, warten sie, Band und Paneelreihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
+ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über den
+Paneelreihen steht, warten sie und die Reihen beim ersten Aufbau gemeinsam auf ihre Quellen; die
 Alarmzeile nicht. Später hängt eine erstmals ladende Quelle nichts aus, und ein gescheiterter
 Neuabruf zählt mit den zuletzt geladenen Daten (Review LLH-1815).
-Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds, der
-Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
+Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band „Lage in Zahlen“ des Lagebilds). Der
+Überblick hat keins: seine erste
+Paneelreihe trägt „Nächste Marken“ und „Offene Vorgänge“, die zweite „Einsatzabschnitte“ und
+die Entscheidungen, damit Fristen über der Falz und am Handy zuerst stehen. Beim ersten Aufbau
+warten die Reihen auf die Quellen der Gliederung und der Marken, sonst rückt alles darunter.
 Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
 `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
 (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine

@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { formatVor } from '../../anzeige/abstand';
+import { vorText } from '../../anzeige/dauer';
 import { spiegelGrund } from '../../components/nurAnsicht';
 import type {
   AbgelehnterAntragAnzeige,
@@ -62,7 +62,7 @@ export function spiegelStand(
   if (s.beendet) return { text: 'Abgleich beendet', gestoert: false };
   const letzter = s.letzter_abgleich_at;
   if (!letzter) return { text: 'noch kein Abgleich', gestoert: aktiv };
-  const vor = formatVor(letzter, jetzt);
+  const vor = vorText(letzter, jetzt);
   const alt = jetzt - dayjs.utc(letzter).valueOf() > KEINE_VERBINDUNG_AB_MS;
   if (aktiv && alt) {
     return { text: `keine Verbindung seit ${vor.replace(/^vor /, '')}`, gestoert: true };

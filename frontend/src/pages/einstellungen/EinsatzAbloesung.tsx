@@ -1,3 +1,4 @@
+import { dauer } from '../../anzeige/dauer';
 import { App, Button, Flex, Typography } from 'antd';
 import { useId, useState } from 'react';
 import { useParams } from 'react-router';
@@ -7,7 +8,7 @@ import { ladeModulFreigaben } from '../../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { fetchSchichtmodelle, werteBodyOf } from '../../api/schichtmodelle';
 import type { AbloesungEinsatzVorgabe, EinsatzSchichtmodellBody } from '../../api/types';
-import { formatDauer } from '../../abloesung/dauer';
+
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import SchichtmodellModal from '../../abloesung/SchichtmodellModal';
 import { formatRegel } from '../../abloesung/schichtmodellText';
@@ -174,10 +175,10 @@ export default function EinsatzAbloesung() {
             <Datenfeld label="Bezeichnung">{modell.bezeichnung}</Datenfeld>
             <Datenfeld label="Regel">{formatRegel(modell, konventionen)}</Datenfeld>
             <Datenfeld label="Vorwarnung" mono>
-              {formatDauer(modell.vorwarnung_minuten)}
+              {dauer(modell.vorwarnung_minuten)}
             </Datenfeld>
             <Datenfeld label="Planungsvorlauf" mono>
-              {formatDauer(modell.planungsvorlauf_minuten)}
+              {dauer(modell.planungsvorlauf_minuten)}
             </Datenfeld>
             <Datenfeld label="Laufende Schichten" mono>
               {vorgabeQ.data.laufende_schichten}
@@ -185,7 +186,7 @@ export default function EinsatzAbloesung() {
           </Datenraster>
         ) : (
           <Text type="secondary" style={{ display: 'block', padding: token.paddingSM }}>
-            {`Keine Vorgabe · Vorwarnung ${formatDauer(vorgabeQ.data.vorwarnung_minuten)}`}
+            {`Keine Vorgabe · Vorwarnung ${dauer(vorgabeQ.data.vorwarnung_minuten)}`}
           </Text>
         )}
 

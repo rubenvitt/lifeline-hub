@@ -16,6 +16,8 @@ export interface KennzahlAnzeige {
   wert: string | number;
   einheit?: string;
   notiz: string;
+  /** Erklärt ein Kürzel der Notiz (Stärke, LLH-1750). */
+  notizBeschreibung?: string;
   ton: KennzahlTon;
   zustand: KennzahlZustand;
   /** Nur die Seite springt; das Großbild liest es nicht. */
@@ -48,6 +50,7 @@ export function bandKennzahl(k: BandKennzahl, z: Quellzustand, ziel?: string): K
     wert: k.wert,
     einheit: k.einheit,
     notiz: k.notiz,
+    notizBeschreibung: k.notizBeschreibung,
     ton: k.ton,
     zustand: alsKennzahlZustand(z),
     ziel,

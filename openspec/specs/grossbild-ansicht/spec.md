@@ -106,13 +106,14 @@ ladende oder gescheiterte als solche, nie als 0.
 ### Requirement: Inhalt des Großbilds im Lagebild
 
 Das Großbild des Lagebilds SHALL zeigen: ganz oben die Alarmzeile „Was brennt“ mit denselben
-Einträgen in derselben Folge wie auf der Seite, die Uhrzeit des Lagebilds und den Datenstand, die
-sechs Kennzahlen der Reihe des Einsatzes, die Gefahrenmatrix verdichtet je Gefahrentyp (in der
-Reihe „Sanitätsdienst“ statt dessen den Verlauf), die Sichtungsverteilung und den Stand
-(Lagebericht, UHS aktiv). Die Alarmzeile MUST ohne Sprünge stehen; was nicht in die Breite passt,
-steht als „+n“ ohne Liste. Die Kennzahlen „Aufträge offen“ und „Meldungen offen“ MUST NOT im
-Großbild des Lagebilds stehen; ihre Heimat ist der Überblick (`lage-alarmzeile`, Seitenrollen),
-ihr Überfällig-Signal trägt die Alarmzeile. Die jüngsten ETB-Einträge MUST NOT im Großbild
+Einträgen in derselben Folge wie auf der Seite, die Uhr in der Form der Uhr im Kopf und den
+Datenstand mit Alter (Spec `zeitdarstellung`), die sechs Kennzahlen der Reihe des Einsatzes, die
+Gefahrenmatrix verdichtet je Gefahrentyp (in der Reihe „Sanitätsdienst“ statt dessen den Verlauf),
+die Sichtungsverteilung und den Stand (Lagebericht, UHS aktiv). Die Alarmzeile MUST ohne Sprünge
+stehen; was nicht in die Breite passt, steht als „+n“ ohne Liste. Die Kennzahlen „Aufträge offen“
+und „Meldungen offen“ MUST NOT im Großbild des Lagebilds stehen; ihre Heimat ist der Überblick
+(`lage-alarmzeile`, Seitenrollen), ihr Überfällig-Signal trägt die Alarmzeile. Die jüngsten
+ETB-Einträge MUST NOT im Großbild
 stehen. Töne der Kennzahlen (Alarm, Achtung) MUST dieselben sein wie auf der Seite.
 
 #### Scenario: Vermisste Person
@@ -143,6 +144,11 @@ stehen. Töne der Kennzahlen (Alarm, Achtung) MUST dieselben sein wie auf der Se
 - **WHEN** das Großbild des Lagebilds in einem Fenster von 1280 × 720 läuft
 - **THEN** ist der Text der Alarmzeile zwei Drittel so groß wie bei 1920 × 1080, und die Fläche
   braucht keinen Bildlauf
+
+#### Scenario: Uhr und Stand im Großbild
+
+- **WHEN** das Großbild des Lagebilds um 17:33 in taktischer Darstellung läuft und der letzte Stand von 17:31 stammt
+- **THEN** steht dort die Uhr „1733“ und „Stand 1731 · vor 2 min“
 
 ### Requirement: Inhalt des Großbilds in der Lagebesprechung
 

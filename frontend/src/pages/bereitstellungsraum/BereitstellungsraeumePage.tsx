@@ -1,3 +1,4 @@
+import { dauer } from '../../anzeige/dauer';
 import { Breadcrumb, Button } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -28,7 +29,6 @@ import { useListenGedaechtnis, type GedaechtnisSpalte } from '../../components/l
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { useUhr } from '../../abloesung/useUhr';
-import { dauerText } from '../../kraefte/zeitachse';
 import { wartezeitMinuten } from './brBelegungKern';
 import BrAnlegenModal from './BrAnlegenModal';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -232,7 +232,7 @@ export default function BereitstellungsraeumePage() {
       sorter: (a, b) => wartezeitSortWert(a, jetzt) - wartezeitSortWert(b, jetzt),
       render: (_: unknown, br) => {
         const seit = br.belegung.laengste_seit_at;
-        return seit ? dauerText(wartezeitMinuten(seit, jetzt)) : '—';
+        return seit ? dauer(wartezeitMinuten(seit, jetzt)) : '—';
       },
     },
   ];

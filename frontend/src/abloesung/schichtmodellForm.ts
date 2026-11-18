@@ -1,17 +1,12 @@
+import { dauer } from '../anzeige/dauer';
 import type { SchichtmodellTyp, SchichtmodellWerteBody } from '../api/types';
 import { mitVorgabe } from '../components/vorgabeText';
-import {
-  dauerFeldText,
-  dauerMinuten,
-  formatDauer,
-  parseUhrzeiten,
-  uhrzeitenFeldText,
-} from './dauer';
+import { dauerFeldText, dauerMinuten, parseUhrzeiten, uhrzeitenFeldText } from './dauer';
 import type { RegelFelder } from './schichtmodellText';
 
 /**
  * Formular eines Schichtmodells (LLH-1122), rein: Vorbelegung aus einem Modell und der Body an
- * den Server. Dauern stehen als Text im Feld („7:30 h“), Wechselzeiten taktisch („0600/1800“).
+ * den Server. Dauern stehen als Text im Feld („7 h 30 min“), Wechselzeiten taktisch („0600/1800“).
  * Genutzt in den Stammdaten und für eigene Werte am Einsatz (`abloesung/SchichtmodellModal.tsx`).
  */
 
@@ -50,13 +45,11 @@ export function toFormWerte(m: SchichtmodellVorlage | null): SchichtmodellFormWe
     wechselzeiten: m.typ === 'wechselzeiten' ? uhrzeitenFeldText(m.wechselzeiten ?? []) : undefined,
     mindestdauer: m.typ === 'wechselzeiten' ? dauerFeldText(m.mindestdauer_minuten) : undefined,
     vorwarnung:
-      m.vorwarnung_minuten === VORWARNUNG_VORGABE_MINUTEN
-        ? undefined
-        : formatDauer(m.vorwarnung_minuten),
+      m.vorwarnung_minuten === VORWARNUNG_VORGABE_MINUTEN ? undefined : dauer(m.vorwarnung_minuten),
     planungsvorlauf:
       m.planungsvorlauf_minuten === PLANUNGSVORLAUF_VORGABE_MINUTEN
         ? undefined
-        : formatDauer(m.planungsvorlauf_minuten),
+        : dauer(m.planungsvorlauf_minuten),
   };
 }
 
@@ -87,7 +80,7 @@ export function vorlaufKopf(
   const vorwarnung = dauerMinuten(w.vorwarnung);
   const vorlauf = dauerMinuten(w.planungsvorlauf);
   const teil = (wert: number | null, vorgabe: number) =>
-    wert == null ? mitVorgabe(formatDauer(vorgabe)) : formatDauer(wert);
+    wert == null ? mitVorgabe(dauer(vorgabe)) : dauer(wert);
   return `Vorwarnung ${teil(vorwarnung, VORWARNUNG_VORGABE_MINUTEN)} · Planungsvorlauf ${teil(
     vorlauf,
     PLANUNGSVORLAUF_VORGABE_MINUTEN,

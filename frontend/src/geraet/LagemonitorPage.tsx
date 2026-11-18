@@ -1,3 +1,6 @@
+import { useOhneVerbindung } from '../offline/verbindung';
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
+import { relativ } from '../anzeige/dauer';
 import {
   useCallback,
   useEffect,
@@ -8,10 +11,9 @@ import {
   type ReactNode,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { formatVor } from '../anzeige/abstand';
-import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatiereDatenstand } from '../components/Datenstand';
-import { formatiereUhr } from '../components/Kopfleiste';
+import { useAnzeigeKonventionen, useUhrDarstellung } from '../anzeige/AnzeigeKonventionenContext';
+import { datenstandText } from '../components/Datenstand';
+import { formatiereUhr } from '../anzeige/zeitDarstellung';
 import { useAuth } from '../auth/AuthContext';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeLagemonitor } from '../api/lagemonitor';
@@ -43,7 +45,6 @@ import { belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { anstehendeProgrammpunkte } from '../programmpunkt/programmpunkt';
 import { countsKraefteAnUhs } from '../pages/lage-dashboard/lageVerdichtung';
 
@@ -173,6 +174,7 @@ function Zahl({
   farbe,
   zeilen = 1,
   hervorgehoben,
+  beschreibung,
 }: {
   wert: number | string;
   bezeichnung: string;
@@ -187,6 +189,8 @@ function Zahl({
    * reicht per `box-shadow` über den Rand, damit nichts verrutscht.
    */
   hervorgehoben?: boolean;
+  /** Zugängliche Beschreibung des Werts, etwa die ausgeschriebene Stärke (LLH-1750). */
+  beschreibung?: string;
 }) {
   const { rollen } = useRollen();
   return (
@@ -205,6 +209,7 @@ function Zahl({
       }}
     >
       <span
+        aria-description={beschreibung}
         style={{
           fontFamily: schrift.zahl,
           fontVariantNumeric: 'tabular-nums',
@@ -350,9 +355,11 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
         <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
           <Zahl wert={k.personal} bezeichnung="Personal" />
           <Zahl wert={k.einheiten} bezeichnung="Einheiten" />
+          {/* Mit Summe aus der einen Formatierung (LLH-1750, Spec `lage-verdichtung`). */}
           <Zahl
-            wert={`${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}`}
-            bezeichnung="Stärke F/UF/M"
+            wert={staerkeText(s)}
+            bezeichnung={`Stärke ${STAERKE_SCHREIBWEISE}`}
+            beschreibung={STAERKE_AUSGESCHRIEBEN}
           />
         </div>
       </Kachel>
@@ -563,6 +570,8 @@ function Statusleiste({
 }) {
   const { rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
+  const uhrArt = useUhrDarstellung();
+  const ohneNetz = useOhneVerbindung();
   const verbindung = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus);
   const druck = useRef<number | undefined>(undefined);
   const loslassen = () => window.clearTimeout(druck.current);
@@ -619,11 +628,13 @@ function Statusleiste({
         }}
       >
         {standMs > 0
-          ? `${veraltet ? 'Veraltet · ' : ''}Stand ${formatiereDatenstand(standMs, konventionen)} · ${formatVor(standMs, jetzt)}`
+          ? `${veraltet ? 'Veraltet · ' : ''}${datenstandText(standMs, jetzt, { alter: true, offline: ohneNetz, konv: konventionen })}`
           : 'Kein Stand'}
       </span>
-      {/* Die Uhr ist eine Wanduhr wie im Kopf (Entscheidung E2, LLH-1045): dieselbe Stelle. */}
-      <span style={{ fontFamily: schrift.zahl }}>{formatiereUhr(jetzt)}</span>
+      {/* Dieselbe Uhr wie im Kopf (LLH-1750, E5): Gerätezeit in der Zeitdarstellung. */}
+      <span data-lfh="monitor-uhr" style={{ fontFamily: schrift.zahl }}>
+        {formatiereUhr(jetzt, uhrArt)}
+      </span>
     </footer>
   );
 }
@@ -642,7 +653,7 @@ const ABLAUF_SICHTBAR = 3;
 /** „in 1 h 05 min“, unter einer Minute „in < 1 min“ (dieselben Wörter wie im Überblick). */
 function abstandText(zeitpunktAt: string, jetztMs: number): string {
   const minuten = Math.floor((dayjs.utc(zeitpunktAt).valueOf() - jetztMs) / 60_000);
-  return minuten <= 0 ? 'in < 1 min' : `in ${dauerText(minuten)}`;
+  return relativ(minuten, 'in');
 }
 
 /**

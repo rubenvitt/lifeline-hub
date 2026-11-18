@@ -10,6 +10,7 @@
  * (`dayjs.utc`), nie über `dayjs(s)` — das läse Ortszeit und verschöbe das 60-Minuten-Fenster still
  * um den Zonenversatz.
  */
+import { relativ } from '../../anzeige/dauer';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type {
@@ -50,10 +51,7 @@ import {
 import { type ToenungsGrund } from '../../kraefte/meldebildRaster';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { ausfallJeEinheit, OHNE_EINHEIT } from '../../lage/ausfallJeEinheit';
-import {
-  dauerText,
-  lagebesprechungUeberfaellig,
-} from '../../lagebesprechung/lagebesprechungZustand';
+import { lagebesprechungUeberfaellig } from '../../lagebesprechung/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
 import { ERINNERUNG_FAELLIG, erinnerungZustand } from '../../erinnerung/erinnerungZustand';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
@@ -143,40 +141,6 @@ export function warnstufeNotiz(
       : `${anzahlAktiv} Gefahrengebiete mit Warnstufe`;
   const offen = nichtBeurteilt > 0 ? `${nichtBeurteilt} ${UNBESTAETIGT}` : null;
   return [gebiete, offen, pegelNotiz].filter(Boolean).join(' · ');
-}
-
-interface AuftraegeKennzahl {
-  offen: number;
-  /** Davon schon angenommen (`in_arbeit`). */
-  inArbeit: number;
-  ueberfaellig: number;
-  ton: KennzahlTon;
-}
-
-/**
- * Die Kennzahl „Offene Aufträge" aus dem Modulzähler des Servers (LFH-550): dieselbe Zahl wie im
- * Modulpanel und im Führungsstand des Lage-Dashboards. Hier wird nichts gezählt, nur benannt.
- */
-export function auftraegeKennzahl(z: {
-  offen: number;
-  in_arbeit: number;
-  ueberfaellig: number;
-}): AuftraegeKennzahl {
-  return {
-    offen: z.offen,
-    inArbeit: z.in_arbeit,
-    ueberfaellig: z.ueberfaellig,
-    ton: z.ueberfaellig > 0 ? 'alarm' : 'neutral',
-  };
-}
-
-/** Wie viele Abschnittsnamen die Notiz trägt, bevor sie zählt statt aufzählt. */
-const NAMEN_MAX = 4;
-
-export function abschnittNamen(abschnitte: Einsatzabschnitt[]): string {
-  const namen = sortiereAbschnitte(abschnitte).map((a) => a.name);
-  if (namen.length <= NAMEN_MAX) return namen.join(', ');
-  return `${namen.slice(0, NAMEN_MAX).join(', ')} +${namen.length - NAMEN_MAX}`;
 }
 
 function sortiereAbschnitte(abschnitte: Einsatzabschnitt[]): Einsatzabschnitt[] {
@@ -588,7 +552,7 @@ export function markenBewertung(
 
 /** „in 23 min“, unter einer Minute „in < 1 min“. */
 function abstandText(minuten: number): string {
-  return minuten <= 0 ? 'in < 1 min' : `in ${dauerText(minuten)}`;
+  return relativ(minuten, 'in');
 }
 
 /** „HANN. MÜNDEN (WESER)" — Station mit Gewässer, ohne Gewässer nur die Station. Rein. */

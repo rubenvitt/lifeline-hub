@@ -389,7 +389,7 @@ describe('EinheitDetailPage · die Route selbst', () => {
   it('trägt das Stärke-Etikett in BOS-Fachsprache', async () => {
     server.use(...handlers());
     rendere();
-    expect(await screen.findByText('Soll-Stärke (F/UF/M)')).toBeInTheDocument();
+    expect(await screen.findByText('Soll-Stärke (F/UF/M//Σ)')).toBeInTheDocument();
     // Keine Eingaberegel als Satz: die Summe zeigt `StaerkeEingabe` live (LFH-1078).
     expect(screen.queryByText(/alle drei Werte/)).not.toBeInTheDocument();
   });
