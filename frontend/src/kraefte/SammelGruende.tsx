@@ -22,7 +22,7 @@ export function GruendeListe({ gruende, name, onAbwaehlen }: GruendeListeProps) 
   if (gruende.size === 0) return null;
   return (
     <div>
-      <ul aria-label="Nicht disponiert" style={{ margin: 0, paddingInlineStart: 18 }}>
+      <ul aria-label="Nicht disponiert" style={{ margin: 0, paddingInlineStart: '1.2em' }}>
         {[...gruende].map(([id, grund]) => (
           <li key={id}>
             <Typography.Text type="danger">
@@ -60,7 +60,7 @@ export function gruendeTagRender(
           e.preventDefault();
           e.stopPropagation();
         }}
-        style={{ marginInlineEnd: 4 }}
+        style={{ marginInlineEnd: 'var(--lfh-luft-1)' }}
       >
         {grund ? (
           <Typography.Text type="danger">

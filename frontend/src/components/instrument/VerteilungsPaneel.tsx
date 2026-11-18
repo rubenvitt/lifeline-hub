@@ -110,7 +110,7 @@ export function Verteilungsliste({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
+                gap: token.marginXS,
                 ...monoStil(mass.wort),
                 letterSpacing: '0.06em',
                 color: inZeile ? rollen.gedaempft : rollen.text,

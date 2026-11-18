@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { Collapse, Form, Input } from 'antd';
+import { Collapse, Form, Input, theme } from 'antd';
 import { useState } from 'react';
 import {
   ABLOESUNG_RHYTHMUS_MAX_MINUTEN,
@@ -85,6 +85,7 @@ export default function SchichtmodellModal({
 }: SchichtmodellModalProps) {
   const [form] = Form.useForm<SchichtmodellFormWerte>();
   const start = toFormWerte(vorlage);
+  const { token } = theme.useToken();
   const typ = Form.useWatch('typ', form) ?? start.typ;
   const vorwarnung = Form.useWatch('vorwarnung', form);
   const planungsvorlauf = Form.useWatch('planungsvorlauf', form);
@@ -164,7 +165,7 @@ export default function SchichtmodellModal({
       )}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         activeKey={vorlaufOffen ? ['vorlauf'] : []}
         onChange={(keys) => setVorlaufOffen(keys.includes('vorlauf'))}
         items={[

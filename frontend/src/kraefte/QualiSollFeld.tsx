@@ -1,4 +1,4 @@
-import { Button, InputNumber, Space } from 'antd';
+import { Button, InputNumber, Space, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { QUALI_SOLL_ANZAHL_MAX, QUALI_SOLL_MAX } from '../api/eingabegrenzen';
 import { listeQualifikationen } from '../api/qualifikationen';
@@ -50,6 +50,7 @@ export default function QualiSollFeld({
   id?: string;
   'aria-label'?: string;
 }) {
+  const { token } = theme.useToken();
   const katalog = useQuery({
     queryKey: globalKeys.qualifikationen(),
     queryFn: listeQualifikationen,
@@ -72,7 +73,12 @@ export default function QualiSollFeld({
           value.filter((_, i) => i !== index).map((z) => z.qualifikation_id),
         );
         return (
-          <Space key={index} align="start" style={{ display: 'flex', marginBottom: 8 }} wrap>
+          <Space
+            key={index}
+            align="start"
+            style={{ display: 'flex', marginBottom: token.marginSM }}
+            wrap
+          >
             <Select<number>
               aria-label={`Qualifikation ${nummer}`}
               placeholder="Qualifikation"

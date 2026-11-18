@@ -574,7 +574,7 @@ export default function SchichtplanRaster({
                           zIndex: 3,
                           ...monoStil(11),
                           color: rollen.text,
-                          paddingInline: 4,
+                          paddingInline: token.paddingXS,
                           whiteSpace: 'nowrap',
                           overflow: 'visible',
                           display: 'flex',

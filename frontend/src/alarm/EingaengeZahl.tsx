@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import type { ReactNode } from 'react';
 import { rahmenFarben, schrift } from '../theme/tokens';
 import { eingaengeZahlText } from './eingaenge';
@@ -14,6 +15,7 @@ import { eingaengeZahlText } from './eingaenge';
  * Unterkante liegt knapp über der Oberkante des Zeichens, so trifft auch eine breite „99+“ kein Wort.
  */
 export default function EingaengeZahl({ zahl, children }: { zahl: number; children: ReactNode }) {
+  const { token } = theme.useToken();
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
       {children}
@@ -28,7 +30,7 @@ export default function EingaengeZahl({ zahl, children }: { zahl: number; childr
             transform: 'translateX(-50%)',
             minWidth: 16,
             height: 16,
-            paddingInline: 3,
+            paddingInline: token.paddingXS,
             borderRadius: 8,
             background: rahmenFarben.text,
             color: rahmenFarben.grund,

@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, Space, Typography } from 'antd';
+import { Collapse, Form, Input, Space, Typography, theme } from 'antd';
 import { FAHRZEUG_ADHOC_TEXT_MAX } from '../api/eingabegrenzen';
 import type { AdhocEingabe } from '../api/einsatzFahrzeuge';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
@@ -52,6 +52,7 @@ export default function AdhocFahrzeugFelder({
   weitereOffen,
   onWeitereOffen,
 }: AdhocFahrzeugFelderProps) {
+  const { token } = theme.useToken();
   const form = Form.useFormInstance<AdhocEingabe>();
   const werte = Form.useWatch([], form) as Partial<AdhocEingabe> | undefined;
   const sichtbar = felder.filter((f) => !weitere.includes(f));
@@ -84,7 +85,7 @@ export default function AdhocFahrzeugFelder({
             {
               key: WEITERE_ANGABEN,
               label: (
-                <Space size={4} wrap>
+                <Space size={token.marginXS} wrap>
                   <span>Weitere Angaben</span>
                   {gesetzt.length > 0 && (
                     <Typography.Text type="secondary" data-lfh="weitere-angaben-werte">

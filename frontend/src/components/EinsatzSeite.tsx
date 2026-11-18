@@ -213,7 +213,7 @@ export function Ortspfad({
 export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | undefined }) {
   // Rollen aus dem antd-Theme (wie jeder Baustein): in der App derselbe Modus wie
   // `useThemeMode`, in den Vorschauen des Design Systems das Thema der Karte.
-  const { rollen: farben } = useRollen();
+  const { token, rollen: farben } = useRollen();
   if (!einsatz || einsatz.status === 'aktiv') return null;
   return (
     <span
@@ -221,7 +221,7 @@ export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | unde
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
+        gap: token.marginSM,
         fontSize: 12,
         color: farben.gedaempft,
         whiteSpace: 'nowrap',

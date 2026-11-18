@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Flex, Form, Popconfirm, Spin, Typography } from 'antd';
+import { Alert, Button, Checkbox, Flex, Form, Popconfirm, Spin, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -70,9 +70,10 @@ function kommtZusatz(p: SchichtplanWechselPerson): string {
 }
 
 function Namen({ titel, personen, lfh }: { titel: string; personen: string[]; lfh: string }) {
+  const { token } = theme.useToken();
   if (personen.length === 0) return null;
   return (
-    <div data-lfh={lfh} style={{ marginBottom: 12 }}>
+    <div data-lfh={lfh} style={{ marginBottom: token.margin }}>
       <Typography.Text type="secondary" style={{ display: 'block' }}>
         {titel}
       </Typography.Text>
@@ -88,6 +89,7 @@ export default function SchichtplanWechselDialog({
 }: SchichtplanWechselDialogProps) {
   const qc = useQueryClient();
   const { konventionen } = useAnzeigeKonventionen();
+  const { token } = theme.useToken();
   const [form] = Form.useForm<WechselWerte>();
   const vorlageQuery = useQuery({
     queryKey: einsatzKeys.schichtplanWechsel(einsatzId, blockId),
@@ -166,7 +168,10 @@ export default function SchichtplanWechselDialog({
       {vorlage && (
         <div data-lfh="schichtplan-wechsel">
           {art && (
-            <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+            <Typography.Text
+              type="secondary"
+              style={{ display: 'block', marginBottom: token.margin }}
+            >
               {zeit(vorlage.zeitpunkt)}
             </Typography.Text>
           )}
@@ -174,7 +179,7 @@ export default function SchichtplanWechselDialog({
             <Alert
               type="warning"
               showIcon
-              style={{ marginBottom: 12 }}
+              style={{ marginBottom: token.margin }}
               title={vorlage.gesperrt}
               data-lfh="schichtplan-wechsel-gesperrt"
             />
@@ -184,7 +189,7 @@ export default function SchichtplanWechselDialog({
               {kommen.length > 0 && (
                 <Form.Item<WechselWerte> name="kommen" label="Kommt">
                   <Checkbox.Group
-                    style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
                     options={kommen.map((k) => ({
                       value: k.schluessel,
                       label: `${k.person.name}${kommtZusatz(k.person)}`,
@@ -195,7 +200,7 @@ export default function SchichtplanWechselDialog({
               {vorlage.gehen.length > 0 && (
                 <Form.Item<WechselWerte> name="gehen" label="Geht">
                   <Checkbox.Group
-                    style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
                     options={vorlage.gehen.flatMap((p) =>
                       p.einsatz_personal_id != null
                         ? [{ value: p.einsatz_personal_id, label: p.name }]
@@ -242,12 +247,12 @@ export default function SchichtplanWechselDialog({
             </>
           )}
           {vorlage.wechsel.length > 0 && (
-            <div data-lfh="schichtplan-wechsel-vollzogen" style={{ marginTop: 8 }}>
+            <div data-lfh="schichtplan-wechsel-vollzogen" style={{ marginTop: token.marginSM }}>
               <Typography.Text type="secondary" style={{ display: 'block' }}>
                 Vollzogen
               </Typography.Text>
               {vorlage.wechsel.map((w) => (
-                <Flex key={w.id} align="center" justify="space-between" gap={8} wrap>
+                <Flex key={w.id} align="center" justify="space-between" gap={token.marginSM} wrap>
                   <Typography.Text>
                     {ART_WORT[w.art]} · {zeit(w.vollzogen_at)}
                   </Typography.Text>
