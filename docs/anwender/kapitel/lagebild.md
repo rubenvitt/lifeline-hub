@@ -39,11 +39,13 @@ Modul, in dem sie erfasst wird.
 ### Neue ETB-Einträge im Lagebild anzeigen
 
 1. Im Lagebild bleiben, während neue Einträge eingehen. Das Paneel „Jüngste ETB-Einträge“ schiebt
-   sie nicht zwischen die gelesenen Zeilen, sondern kündigt sie oben an („… neue Einträge“).
+   sie nicht zwischen die gelesenen Zeilen, sondern kündigt sie im Paneelkopf an („2 neu“, an der
+   Stelle von „live“).
 
-   ![Paneel „Jüngste ETB-Einträge“ mit dem Hinweis „2 neue Einträge“ und dem Knopf „anzeigen“](../bilder/lagebild/etb-eintraege-neu.png)
+   ![Paneel „Jüngste ETB-Einträge“ mit dem Knopf „2 neu“ im Kopf neben „ETB“](../bilder/lagebild/etb-eintraege-neu.png)
 
-2. „anzeigen“ wählen: Die neuen Einträge stehen oben im Paneel, der Hinweis verschwindet.
+2. „2 neu“ wählen: Die neuen Einträge stehen oben im Paneel, der Knopf verschwindet, und im Kopf
+   steht wieder „live“.
 
 ### Das Lagebild im Großbild zeigen
 
