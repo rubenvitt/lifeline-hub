@@ -224,6 +224,11 @@ final class Navigationsbegleiter: NSObject, WKNavigationDelegate, WKUIDelegate {
         melde(webView, .navigationFehlgeschlagen(URLError.Code(rawValue: fehler.code), url: url))
     }
 
+    /// Zurück auf einer Seite des Servers nimmt `Ablauf` den Hinweis „Zur Oberfläche“ weg.
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        melde(webView, .seiteGeladen(url: webView.url))
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         melde(webView, .webProzessBeendet)
     }

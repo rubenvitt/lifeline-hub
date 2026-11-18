@@ -72,6 +72,9 @@ final class Anmelder: NSObject, ASWebAuthenticationPresentationContextProviding 
             Laufend(sitzung: sitzung, verifier: verifier, server: server, webView: webView))
     }
 
+    /// Läuft gerade „Im Browser anmelden“? Dann gehört eine fremde Seite zur Anmeldung.
+    var isLaufend: Bool { lauf.isLaufend }
+
     /// Bricht eine laufende Sitzung ab; deren Abschluss findet danach keine Sitzung mehr.
     func abbrechen() {
         lauf.nimm()?.sitzung.cancel()

@@ -27,6 +27,8 @@ final class AppModell {
     var entfernenFehler: String?
     /// Server, dessen Datenspeicher gerade gelöscht wird; zu ihm wechselt die App nicht.
     private(set) var inEntfernung: UUID?
+    /// Hinweis „Zur Oberfläche“ über dem Webview (`Ablauf`: fremde Seite nach der Rückkehr).
+    private(set) var zeigtZurOberflaeche = false
 
     let appVersion: AppVersion?
     let testzustand: Testzustand?
@@ -87,10 +89,22 @@ final class AppModell {
         seite = schritt.seite
         if case .web = seite {} else { closeWebView() }
         if case .status(_, .nichtErreichbar) = seite {} else { wiederholung?.cancel() }
+        if case .web = seite {} else { zeigtZurOberflaeche = false }
         for effekt in schritt.effects { perform(effekt) }
     }
 
     private func perform(_ effekt: Ablauf.Effect) {
+        // Nur Anzeige: gilt auch im Testzustand, der sonst weder Netz noch Ablage anfasst.
+        switch effekt {
+        case .showZurOberflaeche:
+            zeigtZurOberflaeche = true
+            return
+        case .hideZurOberflaeche:
+            zeigtZurOberflaeche = false
+            return
+        default:
+            break
+        }
         guard testzustand == nil else { return }
         switch effekt {
         case .check(let eintrag):
@@ -125,6 +139,8 @@ final class AppModell {
                 guard !Task.isCancelled else { return }
                 send(.wiederholen)
             }
+        case .showZurOberflaeche, .hideZurOberflaeche:
+            break
         }
     }
 
@@ -146,8 +162,27 @@ final class AppModell {
         guard rueckkehr.melde(gemeldet), testzustand == nil else { return }
         Task {
             let antwortet = (await webView?.isResponsive()) ?? false
-            send(.vordergrund(seiteAntwortet: antwortet))
+            send(
+                .vordergrund(
+                    seiteAntwortet: antwortet, adresse: webView?.url,
+                    anmeldungLaeuft: anmelder.isLaufend))
         }
+    }
+
+    // MARK: Zur Oberfläche
+
+    /// Bietet die Serverliste „Zur Oberfläche“ an? Entscheidet `Ablauf`.
+    var bietetZurOberflaeche: Bool { Ablauf.bietetZurOberflaeche(seite) }
+
+    /// „Zur Oberfläche“ oder ein Tipp auf den aktiven Server: Startadresse des aktiven Servers.
+    func zurOberflaeche() {
+        zeigtServerliste = false
+        send(.zurOberflaeche)
+    }
+
+    /// Der Hinweis über dem Webview ist weggetippt; die fremde Seite bleibt.
+    func verwerfeZurOberflaeche() {
+        zeigtZurOberflaeche = false
     }
 
     // MARK: Serverliste
@@ -290,13 +325,17 @@ final class AppModell {
             seite = .status(elw, .nichtVertraeglich(.zuAlt, serverVersion: "1.0.0-alpha.200"))
         case .zuNeu:
             seite = .status(elw, .nichtVertraeglich(.zuNeu, serverVersion: "2.0.0"))
-        case .web:
+        case .web, .fremdeSeite:
             let webView = Webviewfabrik.make(
                 fuer: elw, skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
                 empfang: empfang, navigation: navigation)
-            webView.loadHTMLString(Testzustand.beispielseite, baseURL: elw.adresse.url)
+            let fremd = testzustand == .fremdeSeite
+            webView.loadHTMLString(
+                Testzustand.beispielseite,
+                baseURL: fremd ? URL(string: "https://idp.example/") : elw.adresse.url)
             self.webView = webView
             seite = .web(elw, vertrag: 1)
+            zeigtZurOberflaeche = fremd
         }
     }
 }

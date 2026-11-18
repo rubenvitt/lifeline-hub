@@ -56,7 +56,24 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(element(app, "serverliste").waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["ELW 1"].exists)
         XCTAssertTrue(app.staticTexts["Lager"].exists)
+        XCTAssertTrue(app.buttons["zur-oberflaeche"].exists, "kein Weg zur Oberfläche")
         attachScreenshot(named: "serverliste")
+    }
+
+    /// Fremde Seite im Hauptframe (etwa ohne Rücklink nach dem Identitätsanbieter): der Hinweis
+    /// bietet den Weg zurück, ohne die Seite wegzunehmen; „Zur Oberfläche“ nimmt ihn weg (das
+    /// Neuladen selbst prüft `AblaufTests`, im Testzustand lädt die App nichts).
+    @MainActor
+    func testEineFremdeSeiteBietetDenWegZurOberflaeche() {
+        let app = launch("fremde-seite")
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15))
+        let hinweis = element(app, "hinweis-fremde-seite")
+        XCTAssertTrue(hinweis.waitForExistence(timeout: 10))
+        let knopf = app.buttons["hinweis-zur-oberflaeche"]
+        XCTAssertTrue(knopf.exists)
+        attachScreenshot(named: "fremde-seite")
+        knopf.tap()
+        XCTAssertTrue(hinweis.waitForNonExistence(timeout: 5))
     }
 
     /// tasks.md 8.11: Entfernen nur für einen nicht aktiven Server, erst nach der Rückfrage mit dem

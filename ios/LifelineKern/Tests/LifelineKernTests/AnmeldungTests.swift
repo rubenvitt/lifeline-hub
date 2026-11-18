@@ -157,4 +157,19 @@ final class AnmeldungTests: XCTestCase {
         XCTAssertEqual(lauf.beende(neu), "neu")
         XCTAssertNil(lauf.beende(neu))
     }
+
+    /// Ob eine Sitzung läuft, fragt der Ablauf bei der Rückkehr in den Vordergrund.
+    func testLaufendGiltVomMerkenBisZumEnde() {
+        var lauf = Anmeldelauf<String>()
+        XCTAssertFalse(lauf.isLaufend)
+        let generation = lauf.naechste()
+        XCTAssertFalse(lauf.isLaufend)
+        lauf.merke(generation, "a")
+        XCTAssertTrue(lauf.isLaufend)
+        _ = lauf.beende(generation)
+        XCTAssertFalse(lauf.isLaufend)
+        lauf.merke(lauf.naechste(), "b")
+        _ = lauf.nimm()
+        XCTAssertFalse(lauf.isLaufend)
+    }
 }

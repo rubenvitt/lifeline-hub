@@ -3,7 +3,9 @@ import SwiftUI
 
 /// Serverliste als Blatt (Spec `ios-huelle`, „Mehrere Server lassen sich verwalten“): Name,
 /// Adresse, zuletzt verbunden; wechseln, umbenennen, hinzufügen und entfernen (nicht den aktiven,
-/// nach einer Rückfrage mit dem Hinweis auf nicht übertragene Einträge).
+/// nach einer Rückfrage mit dem Hinweis auf nicht übertragene Einträge). „Zur Oberfläche“ und ein
+/// Tipp auf den aktiven Server laden dessen Startadresse neu, der Weg zurück von einer fremden
+/// Seite im Webview (`Ablauf`, `.zurOberflaeche`).
 struct ServerlisteView: View {
     @Environment(AppModell.self) private var modell
     @State private var umbenennen: ServerEintrag?
@@ -14,6 +16,16 @@ struct ServerlisteView: View {
     var body: some View {
         NavigationStack {
             List {
+                if modell.bietetZurOberflaeche {
+                    Section {
+                        Button("Zur Oberfläche", systemImage: "arrow.uturn.backward") {
+                            modell.zurOberflaeche()
+                        }
+                        .accessibilityIdentifier("zur-oberflaeche")
+                    } footer: {
+                        Text("Lädt die Startseite von „\(modell.liste.aktiv?.name ?? "")“ neu.")
+                    }
+                }
                 Section {
                     ForEach(modell.liste.eintraege) { eintrag in
                         zeile(eintrag)
@@ -87,7 +99,7 @@ struct ServerlisteView: View {
     private func zeile(_ eintrag: ServerEintrag) -> some View {
         let istAktiv = eintrag.id == modell.liste.aktiv?.id
         return Button {
-            if !istAktiv { modell.wechseln(eintrag) }
+            if istAktiv { modell.zurOberflaeche() } else { modell.wechseln(eintrag) }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: istAktiv ? "checkmark.circle.fill" : "circle")

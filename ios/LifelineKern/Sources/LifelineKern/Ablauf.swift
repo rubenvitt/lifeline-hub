@@ -61,7 +61,14 @@ public enum Ablauf {
         /// Das Onboarding hat den Server geprüft und gespeichert.
         case verbunden(ServerEintrag, ShellInfo)
         /// Rückkehr in den Vordergrund; die App hat vorher gefragt, ob die Seite noch antwortet.
-        case vordergrund(seiteAntwortet: Bool)
+        /// `adresse` ist die Adresse des Webviews, `anmeldungLaeuft` gilt, solange „Im Browser
+        /// anmelden“ eine Sitzung offen hat.
+        case vordergrund(seiteAntwortet: Bool, adresse: URL?, anmeldungLaeuft: Bool)
+        /// „Zur Oberfläche“ in der Serverliste oder im Hinweis, oder ein Tipp auf den aktiven
+        /// Server: zurück zur Startadresse des aktiven Servers.
+        case zurOberflaeche
+        /// Der Webview hat eine neue Seite übernommen (`didCommit`).
+        case seiteGeladen(url: URL?)
         /// Ergebnis von `check`; `healthVersion` nur für einen Server ohne Vertrag.
         case ergebnis(Vertragsergebnis, healthVersion: String?, fuer: UUID)
         /// Zeitgeber der Seite „nicht erreichbar“.
@@ -81,6 +88,10 @@ public enum Ablauf {
         case markVerbunden(UUID, vertrag: Int)
         /// Nach `wiederholIntervall` `wiederholen` melden.
         case scheduleRetry
+        /// Hinweis „Zur Oberfläche“ über dem Webview zeigen: er steht auf einer fremden Seite.
+        case showZurOberflaeche
+        /// Den Hinweis wieder wegnehmen.
+        case hideZurOberflaeche
     }
 
     public struct Step: Equatable, Sendable {
@@ -102,15 +113,30 @@ public enum Ablauf {
         case (_, .verbunden(let eintrag, let info)):
             return loaded(eintrag, info)
 
-        case (.web(let eintrag, _), .vordergrund(seiteAntwortet: true)):
-            // Erst prüfen, ob der Server inzwischen einen anderen Vertrag spricht.
+        case (.web(let eintrag, _), .vordergrund(seiteAntwortet: true, let adresse, let anmeldungLaeuft)):
+            // Erst prüfen, ob der Server inzwischen einen anderen Vertrag spricht. Eine fremde
+            // Seite bleibt stehen (sie kann der Identitätsanbieter sein), aber ohne laufende
+            // Anmeldung bietet die App den Weg zurück an.
+            if let adresse, !anmeldungLaeuft, !Linkregeln.belongsToServer(eintrag.adresse.url, seite: adresse) {
+                return Step(seite, [.check(eintrag), .showZurOberflaeche])
+            }
             return Step(seite, [.check(eintrag)])
-        case (.web(let eintrag, _), .vordergrund(seiteAntwortet: false)):
+        case (.web(let eintrag, _), .vordergrund(seiteAntwortet: false, _, _)):
             return Step(.pruefung(eintrag), [.check(eintrag)])
         case (.status(let eintrag, _), .vordergrund):
             return Step(seite, [.check(eintrag)])
         case (.status(let eintrag, .nichtErreichbar), .wiederholen):
             return Step(seite, [.check(eintrag)])
+
+        case (.web(let eintrag, _), .zurOberflaeche):
+            // Ein neuer Webview mit dem Datenspeicher des Servers: Startadresse, ohne die
+            // Geschichte der fremden Seite.
+            return Step(seite, [.hideZurOberflaeche, .load(eintrag)])
+        case (.status(let eintrag, _), .zurOberflaeche):
+            return Step(.pruefung(eintrag), [.check(eintrag)])
+        case (.web(let eintrag, _), .seiteGeladen(let url?))
+        where Linkregeln.belongsToServer(eintrag.adresse.url, seite: url):
+            return Step(seite, [.hideZurOberflaeche])
 
         case (_, .ergebnis(let ergebnis, let healthVersion, let id)):
             guard let eintrag = seite.eintrag, eintrag.id == id else { return Step(seite) }
@@ -127,6 +153,15 @@ public enum Ablauf {
             return Step(seite, [.reload])
         default:
             return Step(seite)
+        }
+    }
+
+    /// Bietet die Serverliste „Zur Oberfläche“ an? Nur mit einem Server, dessen Oberfläche geladen
+    /// ist oder auf einer Status-Seite wartet.
+    public static func bietetZurOberflaeche(_ seite: Seite) -> Bool {
+        switch seite {
+        case .web, .status: true
+        case .onboarding, .pruefung: false
         }
     }
 

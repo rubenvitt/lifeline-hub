@@ -37,12 +37,22 @@ final class LinkTests: XCTestCase {
         let web = try await lade("<p>ETB</p>")
         _ = try await web.evaluateJavaScript(
             "window.open('https://elw.local:8443/einsaetze/1/etb', '_blank'); 0")
-        await warte(sekunden: 15) { !self.gemeldet.isEmpty }
-        guard case .navigationFehlgeschlagen(_, let url)? = gemeldet.first else {
+        await warte(sekunden: 15) { !self.fehlschlaege.isEmpty }
+        guard let url = fehlschlaege.first else {
             return XCTFail("keine Navigation im selben Webview: \(gemeldet)")
         }
         XCTAssertEqual(url?.path, "/einsaetze/1/etb")
         XCTAssertEqual(geoeffnet, [])
+    }
+
+    /// Jede übernommene Seite geht als `seiteGeladen` an den Ablauf; zurück auf der Origin des
+    /// Servers nimmt er den Hinweis „Zur Oberfläche“ weg.
+    func testEineGeladeneSeiteWirdGemeldet() async throws {
+        _ = try await lade("<p>Lage</p>")
+        guard case .seiteGeladen(let url)? = gemeldet.first else {
+            return XCTFail("keine geladene Seite gemeldet: \(gemeldet)")
+        }
+        XCTAssertEqual(url, elw.url)
     }
 
     /// CSV-Export aus einem `blob:`: WKDownload legt die Datei ab, das Teilen-Blatt bekommt sie.
@@ -84,6 +94,14 @@ final class LinkTests: XCTestCase {
             ((try? await web.evaluateJavaScript("document.getElementById('bereit') ? 1 : 0")) as? Int) == 1
         }
         return web
+    }
+
+    /// Adressen der gemeldeten Ladefehler, in Reihenfolge.
+    private var fehlschlaege: [URL?] {
+        gemeldet.compactMap { event -> URL?? in
+            guard case .navigationFehlgeschlagen(_, let url) = event else { return nil }
+            return .some(url)
+        }
     }
 
     private func warte(sekunden: Double = 5, bis bedingung: () async -> Bool) async {

@@ -25,6 +25,7 @@ final class HuellenhilfenTests: XCTestCase {
     func testTestzustandKommtAusDenStartargumenten() {
         XCTAssertEqual(Testzustand(argumente: ["App", "-LifelineTestzustand", "zu-neu"]), .zuNeu)
         XCTAssertEqual(Testzustand(argumente: ["App", "-LifelineTestzustand", "onboarding"]), .onboarding)
+        XCTAssertEqual(Testzustand(argumente: ["App", "-LifelineTestzustand", "fremde-seite"]), .fremdeSeite)
         XCTAssertNil(Testzustand(argumente: ["App"]))
         XCTAssertNil(Testzustand(argumente: ["App", "-LifelineTestzustand"]))
         XCTAssertNil(Testzustand(argumente: ["App", "-LifelineTestzustand", "kaputt"]))
@@ -35,7 +36,7 @@ final class HuellenhilfenTests: XCTestCase {
             Set(Testzustand.allCases.map(\.rawValue)),
             [
                 "onboarding", "serverliste", "einstellungen", "zertifikat", "nicht-erreichbar", "zu-alt",
-                "zu-neu", "web",
+                "zu-neu", "web", "fremde-seite",
             ])
     }
 

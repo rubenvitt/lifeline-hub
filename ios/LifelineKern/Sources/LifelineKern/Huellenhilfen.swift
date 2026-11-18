@@ -40,6 +40,8 @@ public enum Testzustand: String, CaseIterable, Sendable {
     case zuNeu = "zu-neu"
     /// Der Webview mit `beispielseite` unter der Adresse des Beispielservers (natives Gefühl).
     case web
+    /// Der Webview auf einer fremden Seite mit dem Hinweis „Zur Oberfläche“.
+    case fremdeSeite = "fremde-seite"
 
     public static let argument = "-LifelineTestzustand"
 

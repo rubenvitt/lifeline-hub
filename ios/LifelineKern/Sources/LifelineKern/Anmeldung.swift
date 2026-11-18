@@ -202,6 +202,9 @@ public struct Anmeldelauf<Wert> {
 
     public init() {}
 
+    /// Läuft gerade eine Sitzung (gemerkt und noch nicht beendet)?
+    public var isLaufend: Bool { laufend != nil }
+
     /// Nächste Generation, bevor die Sitzung gebaut wird (ihr Handler braucht sie).
     public mutating func naechste() -> UInt64 {
         generation += 1

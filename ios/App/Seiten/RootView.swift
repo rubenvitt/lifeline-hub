@@ -68,6 +68,10 @@ struct RootView: View {
                 WebviewHost(webView: webView)
                     .id(ObjectIdentifier(webView))
                     .overlay(alignment: .leading) { Randknopf() }
+                    .overlay(alignment: .top) {
+                        if modell.zeigtZurOberflaeche { ZurOberflaecheHinweis() }
+                    }
+                    .animation(.easeOut(duration: 0.2), value: modell.zeigtZurOberflaeche)
             }
         case .status(let eintrag, let status):
             StatusView(eintrag: modell.aktuell(eintrag), status: status)
@@ -95,5 +99,48 @@ struct Randknopf: View {
         .opacity(0.8)
         .accessibilityLabel("Serverliste")
         .accessibilityIdentifier("serverliste-knopf")
+    }
+}
+
+/// Hinweis über dem Webview, wenn er nach der Rückkehr auf einer fremden Seite steht (`Ablauf`,
+/// `.showZurOberflaeche`). Kein Zwang: die Seite bleibt, bis die Person „Zur Oberfläche“ wählt.
+struct ZurOberflaecheHinweis: View {
+    @Environment(AppModell.self) private var modell
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "globe")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text("Fremde Seite")
+                .font(.subheadline)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Button("Zur Oberfläche") { modell.zurOberflaeche() }
+                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .accessibilityIdentifier("hinweis-zur-oberflaeche")
+            Button {
+                modell.verwerfeZurOberflaeche()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.semibold))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("Hinweis schließen")
+            .accessibilityIdentifier("hinweis-schliessen")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: Capsule())
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("hinweis-fremde-seite")
     }
 }
