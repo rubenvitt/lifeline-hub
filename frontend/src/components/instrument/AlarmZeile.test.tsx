@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import type { AlarmEintrag, WasBrennt } from '../../lage/wasBrennt';
 import AlarmZeile, { ALARMZEILE_SCHRIFT, alarmEintragHoehe } from './AlarmZeile';
+import { grossMass } from '../grossbild/grossMass';
 
 const e = (art: AlarmEintrag['art'], rolle: AlarmEintrag['rolle'], text: string): AlarmEintrag => ({
   art,
@@ -114,6 +115,39 @@ describe('AlarmZeile (Spec lage-alarmzeile)', () => {
     // Sichtbar „+n“ außerhalb der Messreihe: 400 px fassen „+n“ (100 + 12) und zwei Einträge.
     expect(sichtbare(container)).toHaveLength(2);
     expect(zeile(container).querySelector('[data-lfh="alarm-mehr"]')).toHaveTextContent('+6');
+  });
+
+  it('grossbild (Großbild des Lagebilds): wächst mit grossMass, ohne Links und ohne Knopf', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400);
+    // Der Abstand ist eine CSS-Länge und wird gemessen: hier 8 px wie bei 1920 × 1080.
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.dataset.mess === 'abstand' ? 8 : 100;
+    });
+    const { container } = renderMitProviders(
+      <AlarmZeile daten={daten(ACHT)} groesse="grossbild" ziel={() => '/x'} />,
+    );
+    expect(ALARMZEILE_SCHRIFT.grossbild).toBe(grossMass(28));
+    expect(zeile(container).style.fontSize).toBe(grossMass(28));
+    // Zeile 56 + 2 · 8 Bezugspixel (design.md D2), in jeder Lage gleich.
+    expect(zeile(container).style.height).toBe(grossMass(72));
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+    const plus = zeile(container).querySelector<HTMLElement>('[data-lfh="alarm-mehr"]')!;
+    expect(plus.tagName).toBe('SPAN');
+    // Gemessen wird in Pixeln wie bei `gross`: 400 px fassen „+n“ (100 + 8) und zwei Einträge.
+    expect(sichtbare(container)).toHaveLength(2);
+    expect(plus).toHaveTextContent('+6');
+  });
+
+  it('normal und gross behalten ihre Maße', () => {
+    const { container: n, unmount } = renderMitProviders(<AlarmZeile daten={daten(ACHT)} />);
+    expect(zeile(n).style.height).toMatch(/^\d+px$/);
+    unmount();
+    const { container: g } = renderMitProviders(<AlarmZeile daten={daten(ACHT)} groesse="gross" />);
+    expect(zeile(g).style.height).toBe('52px');
+    expect(zeile(g).style.fontSize).toBe('28px');
   });
 
   it('unvollständiger Stand neben Einträgen: der Hinweis behält seinen Platz (Review)', async () => {

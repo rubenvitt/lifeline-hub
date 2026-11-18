@@ -1,8 +1,10 @@
 /**
  * Die Quellen der Alarmzeile aus der Antwort des Lagemonitors (LLH-1743, design.md D5): dieselben
  * Eingaben wie im Browser (`useWasBrennt`), nur vom Server verdichtet. So zeigen Monitor,
- * Überblick und Lagebild dieselbe Folge und denselben Wortlaut. Den Ausfall trägt der Monitor
- * nicht (D6): die Quelle fehlt (`null`), statt als unvollständig zu gelten.
+ * Überblick und Lagebild dieselbe Folge und denselben Wortlaut. Den Ausfall zählt der Server nach
+ * der Regel des Meldebilds (`einsatz::ausfall`, LLH-1929), in der Folge der Einheitenliste wie
+ * `einheitenMitAusfall`. Fehlt das Feld (älterer Server), fehlt die Quelle (`null`), statt als
+ * unvollständig zu gelten.
  */
 import type { LagemonitorAnzeige } from '../api/types';
 import type { WasBrenntQuellen } from './wasBrennt';
@@ -55,6 +57,8 @@ export function alarmAusMonitor(
         seitMin: r.seit_min,
       })),
     },
-    ausfall: null,
+    ausfall: Array.isArray(a.ausfall)
+      ? { zustand: 'daten', wert: a.ausfall.map((name) => ({ id: null, name })) }
+      : null,
   };
 }
