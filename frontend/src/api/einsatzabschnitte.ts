@@ -98,21 +98,26 @@ export function loeseAbschnittAuf(einsatzId: number, aid: number): Promise<void>
 
 /** L‑2: Fläche (GeoJSON-String) und Verortungs-Metadaten eines Abschnitts.
  *  `null` löscht explizit, undefined = unverändert. */
-interface FlaechePatch {
+export interface FlaechePatch {
   flaeche_geojson?: string | null;
   tz_fachaufgabe?: string | null;
   tz_organisation?: string | null;
 }
 
-/** L‑2: Zeichnet/aktualisiert die taktische Fläche eines Abschnitts. */
+/**
+ * L‑2: Zeichnet/aktualisiert die taktische Fläche eines Abschnitts. `erwartet` = gespeicherter
+ * Stand zu Beginn der Handlung (Feld-CAS, LLH-1945): weicht er ab, antwortet der Server 409
+ * `veraltet`; ohne `erwartet` schreibt er ohne Vergleich.
+ */
 export function zeichneAbschnitt(
   einsatzId: number,
   aid: number,
   daten: FlaechePatch,
+  erwartet?: FlaechePatch,
 ): Promise<Einsatzabschnitt> {
   return apiSend<Einsatzabschnitt>(
     `/api/einsaetze/${einsatzId}/abschnitte/${aid}/flaeche`,
     'PATCH',
-    daten,
+    erwartet ? { ...daten, erwartet } : daten,
   );
 }

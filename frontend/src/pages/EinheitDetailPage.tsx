@@ -63,7 +63,11 @@ import { qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
 import { staerkeText } from '../anzeige/staerke';
 import { vollstaendig } from '../kraefte/QualiSollFeld';
 import EinheitFunk from './einheit/EinheitFunk';
-import EinheitZeichenPaneel from './einheit/EinheitZeichenPaneel';
+import EinheitZeichenPaneel, {
+  labelOf,
+  type EinheitZeichenHandler,
+} from './einheit/EinheitZeichenPaneel';
+import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from './lagekarte/taktischesZeichen';
 import EinheitAufgeloestAnsicht from './einheit/EinheitAufgeloestAnsicht';
 import EinheitAufloesen from './einheit/EinheitAufloesen';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
@@ -385,8 +389,8 @@ function EinheitAnsicht({
   });
   // Das Zeichen geht über den Lageweg, ohne Tagebuch-Eintrag (D4).
   const patchZeichen = useMutation({
-    mutationFn: (v: { etikett: string; patch: EinheitZeichenPatch }) =>
-      patchEinheitZeichen(einsatzId, einheitId, v.patch),
+    mutationFn: (v: { etikett: string; patch: EinheitZeichenPatch; erwartet?: string | null }) =>
+      patchEinheitZeichen(einsatzId, einheitId, v.patch, v.erwartet),
     onSuccess: (neu, v) => {
       setInCache(neu);
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
@@ -468,6 +472,32 @@ function EinheitAnsicht({
       text: ausschnittText,
       leer: ausschnittLeer,
     });
+  /*
+   * Das Zeichen mit demselben Ablauf (LLH-1945): der Wert beim Öffnen der Zeile geht als `erwartet`
+   * mit, ein 409 fragt mit dem frisch geladenen Zeichen.
+   */
+  const onPatchZeichen: EinheitZeichenHandler = (etikett, p, alt) => {
+    const feld = 'tz_fachaufgabe' in p ? 'tz_fachaufgabe' : 'tz_organisation';
+    const optionen = feld === 'tz_fachaufgabe' ? FACHAUFGABE_OPTIONS : ORGANISATION_OPTIONS;
+    return konflikt({
+      etikett,
+      erwartet: alt,
+      speichern: async (erwartet) => {
+        await patchZeichen.mutateAsync({ etikett, patch: p, erwartet });
+      },
+      ladeFrisch: async () => {
+        const liste = await qc.fetchQuery({
+          queryKey: einsatzKeys.einheiten(einsatzId),
+          queryFn: () => listeEinheiten(einsatzId),
+          staleTime: 0,
+        });
+        return liste.find((x) => x.id === einheitId);
+      },
+      aktuell: (frisch) => frisch && { wert: frisch[feld] ?? null },
+      text: (w) => labelOf(optionen, w) ?? '',
+      leer: (w) => w == null,
+    });
+  };
 
   /**
    * „Als Einheitsführer“ im Menü einer Person: derselbe Weg wie die Kopfzeile (D1). Ohne Öffnen ist
@@ -646,7 +676,7 @@ function EinheitAnsicht({
             einheit={aktuell}
             canEdit={rechte.canEditEinheit}
             orgDefault={orgDefault}
-            onPatchZeichen={(etikett, p) => patchZeichen.mutateAsync({ etikett, patch: p })}
+            onPatchZeichen={onPatchZeichen}
           />
         </Sprungziel>
 

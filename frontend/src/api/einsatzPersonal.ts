@@ -143,15 +143,19 @@ export function listeFuehrungskraefte(einsatzId: number): Promise<Fuehrungskraft
   return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/karte/fuehrungskraefte`);
 }
 
-/** L‑2: Verortet eine Führungskraft (Einsatzpersonal) auf der Lagekarte. */
+/**
+ * L‑2: Verortet eine Führungskraft (Einsatzpersonal) auf der Lagekarte; `erwartet` wie
+ * `verorteEinheit`.
+ */
 export function verortePerson(
   einsatzId: number,
   epId: number,
   daten: PositionPatch,
+  erwartet?: PositionPatch,
 ): Promise<FuehrungskraftKarte> {
   return apiSend<FuehrungskraftKarte>(
     `/api/einsaetze/${einsatzId}/personal/${epId}/position`,
     'PATCH',
-    daten,
+    erwartet ? { ...daten, erwartet } : daten,
   );
 }

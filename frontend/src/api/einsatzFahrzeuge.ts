@@ -123,16 +123,17 @@ export function reaktiviereDisposition(einsatzId: number, efId: number): Promise
   );
 }
 
-/** L‑2: Verortet ein Einsatzfahrzeug auf der Lagekarte. */
+/** L‑2: Verortet ein Einsatzfahrzeug auf der Lagekarte; `erwartet` wie `verorteEinheit`. */
 export function verorteFahrzeug(
   einsatzId: number,
   efId: number,
   daten: PositionPatch,
+  erwartet?: PositionPatch,
 ): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(
     `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/position`,
     'PATCH',
-    daten,
+    erwartet ? { ...daten, erwartet } : daten,
   );
 }
 
