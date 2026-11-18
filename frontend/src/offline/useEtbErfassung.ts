@@ -50,6 +50,22 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
     scope: string;
     werte: AbgelehnterEintrag[];
   }>({ scope: scopeKey, werte: [] });
+  /*
+   * Die client_ids, die DIESES Gerät vergab (LLH-1833): selbst vergeben beim Erfassen, aus der
+   * gerätweiten Warteschlange gelesen oder von hier aus ihr gesendet. Was ein anderer Tab
+   * schreibt und selbst sendet, ohne dass dieser Tab es in der Warteschlange sah, zählt als fremd
+   * und steht hinter dem Banner — es fehlte hier vorher auch nicht als vorgemerkte Zeile. Die Zeitachse lässt
+   * hochgerollt nur diese Einträge sofort durch; derselbe Benutzer auf einem anderen Gerät
+   * schreibt fremd. Die Menge wächst nur: ein gesendeter Eintrag verlässt die Warteschlange, bleibt
+   * aber der eigene. Kennungen sind zufällig, ein Wechsel von Einsatz oder Person stört nicht.
+   */
+  const [eigeneClientIds, setEigeneClientIds] = useState<ReadonlySet<string>>(() => new Set());
+  const rememberClientIds = useCallback((ids: readonly (string | null | undefined)[]) => {
+    setEigeneClientIds((vorher) => {
+      const neu = ids.filter((id): id is string => id != null && !vorher.has(id));
+      return neu.length === 0 ? vorher : new Set([...vorher, ...neu]);
+    });
+  }, []);
   const aktiverScope = useRef({ key: scopeKey, generation: 0 });
   if (aktiverScope.current.key !== scopeKey) {
     aktiverScope.current = {
@@ -77,9 +93,11 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       montiert.current &&
       aktiverScope.current.key === scopeKey &&
       aktiverScope.current.generation === generation
-    )
+    ) {
+      rememberClientIds(geladen.map((a) => a.eintrag.client_id));
       setAusstehendStand({ scope: scopeKey, werte: geladen });
-  }, [benutzerId, einsatzId, scopeKey]);
+    }
+  }, [benutzerId, einsatzId, scopeKey, rememberClientIds]);
 
   const ladeAbgelehnt = useCallback(async () => {
     const generation = aktiverScope.current.generation;
@@ -123,6 +141,8 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       // Erst innerhalb des Locks lesen: ein wartender Tab darf nicht mit einem
       // veralteten Snapshot weiterarbeiten.
       const liste = await queueLaden(benutzerId, einsatzId);
+      // Vor dem Senden: die Live-Meldung kann vor `ladeAusstehend` eintreffen (Review LLH-1833).
+      rememberClientIds(liste.map((a) => a.eintrag.client_id));
       let transientOffen = false;
       for (const a of liste) {
         if (!darfFortsetzen()) break;
@@ -184,7 +204,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         flushtGerade.current = false;
       }
     }
-  }, [benutzerId, einsatzId, qc, ladeAusstehend, ladeAbgelehnt, scopeKey]);
+  }, [benutzerId, einsatzId, qc, ladeAusstehend, ladeAbgelehnt, scopeKey, rememberClientIds]);
 
   useEffect(() => {
     flushRef.current = flush;
@@ -218,6 +238,8 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         client_id: eintrag.client_id ?? neueClientId(),
       };
       if (benutzerId == null) throw new Error('Nicht angemeldet');
+      // Vor dem Senden: die Live-Meldung des eigenen Eintrags kann vor der Antwort eintreffen.
+      rememberClientIds([mitId.client_id]);
       try {
         const angenommen: EtbEintragAnzeige | AntragAngenommen = await erfasseEtb(
           einsatzId,
@@ -245,7 +267,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         }
       }
     },
-    [benutzerId, einsatzId, qc, ladeAusstehend],
+    [benutzerId, einsatzId, qc, ladeAusstehend, rememberClientIds],
   );
 
   // Einen persistent abgelegten abgelehnten Eintrag bewusst verwerfen (Dismiss-UX).
@@ -264,5 +286,6 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
     flush,
     abgelehnt: abgelehntStand.scope === scopeKey ? abgelehntStand.werte : KEINE_ABGELEHNTEN,
     abgelehntVerwerfen,
+    eigeneClientIds,
   };
 }

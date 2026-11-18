@@ -29,10 +29,16 @@ import { Status } from '../../components/instrument/Status';
 
 /**
  * Speichert EINE Angabe des Abschnitts (LFH-1208): `etikett` nennt sie in der Erfolgsmeldung, der
- * Patch trägt genau einen Schlüssel. Erfüllt erst, wenn der neue Stand im Cache steht; lehnt bei
- * Ablehnung ab, dann zeigt die Zeile den Grund.
+ * Patch trägt genau einen Schlüssel. `alt` = der Wert der Zeile beim Öffnen in Patch-Form; er geht
+ * als `erwartet` mit (Feld-CAS, LLH-1945). Erfüllt erst, wenn der neue Stand im Cache steht (oder
+ * mit `OFFEN_LASSEN`/`VERWORFEN` aus der Rückfrage); lehnt bei Ablehnung ab, dann zeigt die Zeile
+ * den Grund.
  */
-export type AbschnittPatchHandler = (etikett: string, patch: AbschnittPatch) => Promise<unknown>;
+export type AbschnittPatchHandler = (
+  etikett: string,
+  patch: AbschnittPatch,
+  alt?: Partial<AbschnittPatch>,
+) => Promise<unknown>;
 
 interface AbschnittDetailProps {
   abschnitt: Einsatzabschnitt;
@@ -106,7 +112,9 @@ export default function AbschnittDetail({
       gleich={isSameText}
       darfSchreiben={darfSchreiben}
       mehrzeilig={mehrzeilig}
-      onSpeichern={(w) => onPatch(etikett, { [feld]: leerZuNull(w) })}
+      onSpeichern={(w, { beimOeffnen }) =>
+        onPatch(etikett, { [feld]: leerZuNull(w) }, { [feld]: leerZuNull(beimOeffnen) })
+      }
       eingabe={({ feld: f, value, onChange }) =>
         mehrzeilig ? (
           <Input.TextArea
@@ -139,7 +147,9 @@ export default function AbschnittDetail({
           gleich={isSameText}
           darfSchreiben={darfSchreiben}
           pflicht
-          onSpeichern={(w) => onPatch('Name', { name: w.trim() })}
+          onSpeichern={(w, { beimOeffnen }) =>
+            onPatch('Name', { name: w.trim() }, { name: beimOeffnen.trim() })
+          }
           eingabe={({ feld, value, onChange }) => (
             <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
           )}
@@ -153,12 +163,16 @@ export default function AbschnittDetail({
           leer={isEmptyText}
           gleich={isSameText}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(w) => {
+          onSpeichern={(w, { beimOeffnen }) => {
             const conflict = findKurzbezeichnungConflict(abschnitte, w, a.id);
             // Dieselbe Ablehnung, die der Index des Servers mit 409 gäbe — nur ohne Anfrage.
             if (conflict)
               return Promise.reject(new ApiError(409, kurzbezeichnungVergeben(conflict)));
-            return onPatch('Kurzbezeichnung', { kurzbezeichnung: leerZuNull(w) });
+            return onPatch(
+              'Kurzbezeichnung',
+              { kurzbezeichnung: leerZuNull(w) },
+              { kurzbezeichnung: leerZuNull(beimOeffnen) },
+            );
           }}
           eingabe={({ feld, value, onChange }) => (
             <Input
@@ -180,7 +194,9 @@ export default function AbschnittDetail({
           anzeige={a.leiter_name}
           leer={(w) => w == null}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(w) => onPatch('Abschnittsleiter', { leiter_id: w })}
+          onSpeichern={(w, { beimOeffnen }) =>
+            onPatch('Abschnittsleiter', { leiter_id: w }, { leiter_id: beimOeffnen })
+          }
           eingabe={({ feld, popup, value, onChange }) => (
             <Select<number>
               {...feld}
@@ -226,8 +242,12 @@ export default function AbschnittDetail({
           etikett="Telefon und weitere Verbindungen"
           verbindungen={a.verbindungen}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(liste) =>
-            onPatch('Telefon und weitere Verbindungen', { verbindungen: liste })
+          onSpeichern={(liste, alt) =>
+            onPatch(
+              'Telefon und weitere Verbindungen',
+              { verbindungen: liste },
+              { verbindungen: alt },
+            )
           }
         />
       </Datenfeld>

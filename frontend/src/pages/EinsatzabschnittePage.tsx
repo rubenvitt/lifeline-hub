@@ -7,6 +7,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -50,6 +51,12 @@ import {
 } from '../components/SprechgruppenAngabe';
 import AbschnittDetail, { type AbschnittPatchHandler } from './einsatzabschnitte/AbschnittDetail';
 import AbschnittAnlegenModal from './einsatzabschnitte/AbschnittAnlegenModal';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import { ausschnitt, ausschnittLeer, ausschnittText } from '../components/feldVermerk';
+import {
+  alsEingabe as alsVerbindungsEingabe,
+  bereinigeVerbindungen,
+} from '../components/verbindungen';
 import { abrufZustand } from '../api/abrufZustand';
 import {
   einheitenPfad,
@@ -91,6 +98,30 @@ import {
 import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { Marke } from '../components/instrument/Marke';
+
+/**
+ * Der Abschnitt in der Wire-Form des PATCH (LLH-1945): Altwert und Vergleichswert des Feld-CAS
+ * nach einem 409; Verbindungen ohne Kennung, wie die Zeile sie schickt.
+ */
+function abschnittWire(a: Einsatzabschnitt): Record<string, unknown> {
+  return {
+    name: a.name,
+    kurzbezeichnung: a.kurzbezeichnung ?? null,
+    leiter_id: a.leiter_id ?? null,
+    ueber_abschnitt_id: a.ueber_abschnitt_id ?? null,
+    bemerkung: a.bemerkung ?? null,
+    rufname: a.rufname ?? null,
+    abschnittsauftrag: a.abschnittsauftrag ?? null,
+    verbindungen: bereinigeVerbindungen(alsVerbindungsEingabe(a.verbindungen)),
+  };
+}
+
+/** Der aktuelle Wert lesbar für die Rückfrage: Namen statt Kennungen, Verbindungen als Werte. */
+function abschnittAnzeige(a: Einsatzabschnitt, patch: AbschnittPatch): string | undefined {
+  if ('leiter_id' in patch) return a.leiter_name ?? undefined;
+  if ('verbindungen' in patch) return a.verbindungen.map((v) => v.wert).join(', ');
+  return undefined;
+}
 
 /**
  * Zwei Ansichten derselben Daten (LFH-626): die Gliederung bearbeitet, das Organigramm liest,
@@ -171,6 +202,14 @@ export default function EinsatzabschnittePage() {
    * Umhang), träfe die Bestätigung sonst einen anderen.
    */
   const [verschiebenFuer, setVerschiebenFuer] = useState<number | null>(null);
+  /**
+   * Altwert (Feld-CAS, LLH-1945) für Zug und Dialog: der gespeicherte Ort zu Beginn der Handlung
+   * (`frontend/AGENTS.md`, Bedien-Leitlinie Punkt 4), festgehalten beim Greifen bzw. Öffnen. Der
+   * Zwischenspeicher lädt währenddessen weiter; läse das Loslassen ihn erst dann, passte der
+   * Vergleich auf einen fremden Umhang und überschriebe ihn still.
+   */
+  const zugVonRef = useRef<number | null>(null);
+  const verschiebenVonRef = useRef<number | null>(null);
   const [aufloesenFuer, setAufloesenFuer] = useState<{ id: number; name: string } | null>(null);
   /** Gründe abgelehnter Umhänge, je Ort (LFH-1077): Baum, Dialog, Seitenhinweis. */
   const [dragFehler, setDragFehler] = useState<unknown>(null);
@@ -301,8 +340,16 @@ export default function EinsatzabschnittePage() {
   // überschreibt keine Zeile, was ein anderer Arbeitsplatz inzwischen geändert hat. Der Fehler
   // geht an die Zeile (`mutateAsync` lehnt ab), deshalb kein `onError`-Toast.
   const patch = useMutation({
-    mutationFn: ({ aid, patch: p }: { aid: number; etikett: string; patch: AbschnittPatch }) =>
-      patcheAbschnitt(einsatzId, aid, p),
+    mutationFn: ({
+      aid,
+      patch: p,
+      erwartet,
+    }: {
+      aid: number;
+      etikett: string;
+      patch: AbschnittPatch;
+      erwartet?: Partial<AbschnittPatch>;
+    }) => patcheAbschnitt(einsatzId, aid, p, erwartet),
     onSuccess: (aktualisiert, { etikett }) => {
       // Erst in den Cache, dann erfüllen: die Zeile zeigt den neuen Wert in derselben Runde, in der
       // sie die Eingabe schließt (Muster Einsatzdaten).
@@ -313,10 +360,40 @@ export default function EinsatzabschnittePage() {
       message.success(`${etikett} gespeichert`);
     },
   });
+  /*
+   * Feld-CAS mit dem einen Konfliktablauf (LLH-1945, `components/useFeldKonflikt`): die Schlüssel
+   * des Patches gehen mit ihrem Wert beim Öffnen als `erwartet` mit; nach einem 409 vergleicht die
+   * Seite mit der Wire-Form des frisch geladenen Abschnitts.
+   */
+  const konflikt = useFeldKonflikt();
+  const loadAbschnittFrisch = async (aid: number) => {
+    const liste = await qc.fetchQuery({
+      queryKey: einsatzKeys.abschnitte(einsatzId),
+      queryFn: () => listeAbschnitte(einsatzId),
+      staleTime: 0,
+    });
+    return liste.find((a) => a.id === aid);
+  };
   const patchHandler =
     (aid: number): AbschnittPatchHandler =>
-    (etikett, p) =>
-      patch.mutateAsync({ aid, etikett, patch: p });
+    (etikett, p, alt) =>
+      konflikt({
+        etikett,
+        erwartet: alt ? ausschnitt(alt, p) : undefined,
+        speichern: async (erwartet) => {
+          await patch.mutateAsync({ aid, etikett, patch: p, erwartet });
+        },
+        ladeFrisch: () => loadAbschnittFrisch(aid),
+        // Ein inzwischen aufgelöster Abschnitt fehlt in der Liste: dann kein Feldkonflikt, der
+        // Grund des Servers steht an der Angabe.
+        aktuell: (frisch) =>
+          frisch && {
+            wert: ausschnitt(abschnittWire(frisch), p),
+            anzeige: abschnittAnzeige(frisch, p),
+          },
+        text: ausschnittText,
+        leer: ausschnittLeer,
+      });
   /*
    * Sprechgruppen über die Einzelwege (LLH-1456, D1/D5): erst lösen, dann zuordnen, eine Anfrage
    * nach der anderen; die erste Ablehnung hält an und steht an der Zeile. Die Wege antworten ohne
@@ -380,19 +457,79 @@ export default function EinsatzabschnittePage() {
    * gleichzeitige Umbenennung. Der Rückweg ist serverseitig derselbe PATCH, deshalb Rückgängig im
    * Toast statt Rückfrage (LFH-343). Der Zwischenspeicher zieht sofort nach, und die Schleuse
    * übernimmt das Ergebnis: die eigene Handlung wartet nicht hinter dem Banner.
+   *
+   * Feld-CAS (LLH-1945): `von` ist der gespeicherte Wert zu Beginn der Handlung (beim Rückgängig der
+   * zuletzt gesetzte) und geht als `erwartet` mit. Hat ein anderer Arbeitsplatz inzwischen umgehängt,
+   * fragt `useFeldKonflikt`; „Verwerfen und neu laden“ und Escape lassen die Handlung verfallen, die
+   * Gliederung zeigt den frischen Stand, nichts wird als verschoben gemeldet.
    */
   const verschieben = useMutation({
-    mutationFn: async (v: Verschiebung): Promise<void> => {
-      if (v.art === 'abschnitt')
-        await patcheAbschnitt(v.einsatzId, v.id, { ueber_abschnitt_id: v.nach });
-      else await patcheEinheit(v.einsatzId, v.id, { abschnitt_id: v.nach });
+    mutationFn: async (v: Verschiebung): Promise<'verschoben' | 'verfallen'> => {
+      const ergebnis =
+        v.art === 'abschnitt'
+          ? await konflikt({
+              etikett: `Über-Abschnitt von „${v.name}“`,
+              erwartet: { ueber_abschnitt_id: v.von },
+              speichern: async (erwartet) => {
+                await patcheAbschnitt(v.einsatzId, v.id, { ueber_abschnitt_id: v.nach }, erwartet);
+              },
+              ladeFrisch: () =>
+                qc.fetchQuery({
+                  queryKey: einsatzKeys.abschnitte(v.einsatzId),
+                  queryFn: () => listeAbschnitte(v.einsatzId),
+                  staleTime: 0,
+                }),
+              aktuell: (liste) => {
+                const a = liste.find((x) => x.id === v.id);
+                if (!a) return undefined;
+                const ueber = a.ueber_abschnitt_id ?? null;
+                return {
+                  wert: { ueber_abschnitt_id: ueber },
+                  anzeige: liste.find((x) => x.id === ueber)?.name,
+                };
+              },
+              text: (w) => String(w.ueber_abschnitt_id),
+              leer: (w) => w.ueber_abschnitt_id == null,
+            })
+          : await konflikt({
+              etikett: `Abschnitt von „${v.name}“`,
+              erwartet: { abschnitt_id: v.von },
+              speichern: async (erwartet) => {
+                await patcheEinheit(v.einsatzId, v.id, { abschnitt_id: v.nach }, erwartet);
+              },
+              ladeFrisch: async () =>
+                (
+                  await qc.fetchQuery({
+                    queryKey: einsatzKeys.einheiten(v.einsatzId),
+                    queryFn: () => listeEinheiten(v.einsatzId),
+                    staleTime: 0,
+                  })
+                ).find((x) => x.id === v.id),
+              aktuell: (e) =>
+                e && {
+                  wert: { abschnitt_id: e.abschnitt_id ?? null },
+                  anzeige: e.abschnitt_name ?? undefined,
+                },
+              text: (w) => String(w.abschnitt_id),
+              leer: (w) => w.abschnitt_id == null,
+            });
+      return ergebnis === undefined ? 'verschoben' : 'verfallen';
     },
     // Jede Quelle räumt nur ihren eigenen Grund: ein Rückgängig aus dem Toast nimmt dem offenen
     // Dialog seinen nicht.
     onMutate: (v) => setzeFehler(v.quelle, null),
-    onSuccess: (_antwort, v) => {
+    onSuccess: (ergebnis, v) => {
       // Nach einem Einsatzwechsel gehört die Antwort nicht mehr zu dieser Ansicht.
       if (v.einsatzId !== einsatzRef.current) return;
+      if (ergebnis === 'verfallen') {
+        // Der frische Stand liegt schon im Cache (`ladeFrisch`); die Gliederung übernimmt ihn,
+        // statt ihn hinter dem Banner warten zu lassen.
+        const frisch = qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(v.einsatzId));
+        if (v.art === 'abschnitt' && frisch) zufluss.uebernehmen(buildGliederungKnoten(frisch));
+        invalidate();
+        if (v.quelle === 'menue') setVerschiebenFuer(null);
+        return;
+      }
       if (v.art === 'abschnitt') {
         const neu = (
           qc.getQueryData<Einsatzabschnitt[]>(einsatzKeys.abschnitte(v.einsatzId)) ?? []
@@ -432,23 +569,32 @@ export default function EinsatzabschnittePage() {
     },
   });
 
-  function handleDragStart() {
+  function handleDragStart(e: DragStartEvent) {
     setDragFehler(null);
     zufluss.holdDrag(true);
+    // Der Rückweg kommt aus dem gespeicherten Wert, nicht aus dem Griff: der Griff einer Einheit
+    // trägt den wirksamen Abschnitt nur für die Sperre (LLH-1744), ein geerbter ist `null`.
+    const drag = e.active.data.current as DragDaten | undefined;
+    zugVonRef.current = !drag
+      ? null
+      : drag.art === 'abschnitt'
+        ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
+        : (einheitenQuery.data?.find((x) => x.id === drag.id)?.abschnitt_id ?? null);
+  }
+
+  function handleDragCancel() {
+    zufluss.holdDrag(false);
+    zugVonRef.current = null;
   }
 
   function handleDragEnd(e: DragEndEvent) {
     zufluss.holdDrag(false);
+    const von = zugVonRef.current;
+    zugVonRef.current = null;
     const drag = e.active.data.current as DragDaten | undefined;
     const ziel = e.over?.data.current as DropDaten | undefined;
     // Gesperrte Ziele sind `disabled` und melden sich nie als `over`.
     if (!drag || !ziel) return;
-    // Der Rückweg kommt aus dem gespeicherten Wert, nicht aus dem Griff: der Griff einer Einheit
-    // trägt den wirksamen Abschnitt nur für die Sperre (LLH-1744), ein geerbter ist `null`.
-    const von =
-      drag.art === 'abschnitt'
-        ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
-        : (einheitenQuery.data?.find((x) => x.id === drag.id)?.abschnitt_id ?? null);
     verschieben.mutate({
       einsatzId,
       art: drag.art,
@@ -480,6 +626,7 @@ export default function EinsatzabschnittePage() {
 
   function openVerschieben(aid: number) {
     setDialogFehler(null);
+    verschiebenVonRef.current = abschnitte.find((a) => a.id === aid)?.ueber_abschnitt_id ?? null;
     setVerschiebenFuer(aid);
   }
 
@@ -717,7 +864,7 @@ export default function EinsatzabschnittePage() {
           }}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => zufluss.holdDrag(false)}
+          onDragCancel={handleDragCancel}
         >
           <div
             data-testid="abschnitte-rahmen"
@@ -926,7 +1073,7 @@ export default function EinsatzabschnittePage() {
             art: 'abschnitt',
             id: verschiebenAbschnitt.id,
             name: verschiebenAbschnitt.name,
-            von: verschiebenAbschnitt.ueber_abschnitt_id ?? null,
+            von: verschiebenVonRef.current,
             nach,
             quelle: 'menue',
           });

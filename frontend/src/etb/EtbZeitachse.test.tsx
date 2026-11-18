@@ -834,18 +834,20 @@ describe('EtbZeitachse – Sammelbanner', () => {
 
   /*
    * Der eigene gepufferte Eintrag geht raus — `ausstehend-<queueId>` verschwindet,
-   * `eintrag-<dbId>` kommt mit neuem Schlüssel. Zurückgehalten wäre er nirgends zu sehen.
+   * `eintrag-<dbId>` kommt mit neuem Schlüssel. Zurückgehalten wäre er nirgends zu sehen. Erkannt
+   * an der client_id, die dieses Gerät vergab (LLH-1833).
    */
-  it('zeigt den eigenen gerade gesendeten Eintrag sofort, auch eingefroren', () => {
+  it('zeigt den auf diesem Gerät gerade gesendeten Eintrag sofort, auch eingefroren', () => {
+    const hier = new Set(['geraet-hier']);
     const { neu: setze } = renderZeitachse({
       zeilen: baueZeilen({ eintraege: [alt], ausstehend: [ausstehend()], abgelehnt: [] }),
       onWiedervorlage: vi.fn(),
-      eigeneBenutzerId: 42,
+      eigeneClientIds: hier,
     });
     act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
     setze(
       zeilenAus([
-        eintrag({ id: 2, lfd_nr: 2, inhalt: 'Noch nicht gesendet', erfasser_id: 42 }),
+        eintrag({ id: 2, lfd_nr: 2, inhalt: 'Noch nicht gesendet', client_id: 'geraet-hier' }),
         alt,
       ]),
     );
@@ -857,11 +859,29 @@ describe('EtbZeitachse – Sammelbanner', () => {
     const { neu: setze } = renderZeitachse({
       zeilen: zeilenAus([alt]),
       onWiedervorlage: vi.fn(),
-      eigeneBenutzerId: 42,
+      eigeneClientIds: new Set(['geraet-hier']),
     });
     act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
     setze(zeilenAus([eintrag({ id: 2, lfd_nr: 2, inhalt: 'Fremd', erfasser_id: 7 }), alt]));
     expect(screen.queryByText('Fremd')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('1 neuer Eintrag');
+  });
+
+  // LLH-1833: dasselbe Konto auf einem zweiten Gerät schreibt aus Sicht dieser Zeitachse fremd.
+  it('meldet den NEUEN Eintrag desselben Kontos von einem anderen Gerät im Banner', () => {
+    const { neu: setze } = renderZeitachse({
+      zeilen: zeilenAus([alt]),
+      onWiedervorlage: vi.fn(),
+      eigeneClientIds: new Set(['geraet-hier']),
+    });
+    act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
+    setze(
+      zeilenAus([
+        eintrag({ id: 2, lfd_nr: 2, inhalt: 'Zweitgerät', erfasser_id: 1, client_id: 'geraet-b' }),
+        alt,
+      ]),
+    );
+    expect(screen.queryByText('Zweitgerät')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('1 neuer Eintrag');
   });
 
@@ -933,7 +953,7 @@ describe('EtbZeitachse – gezeigte Ränder für den Bildlauf (LLH-1149)', () =>
     const { neu: rerender } = renderZeitachse({
       eintraege: [alt],
       onGezeigt,
-      eigeneBenutzerId: 1,
+      eigeneClientIds: new Set(['hier']),
       onWiedervorlage: vi.fn(),
     });
     expect(onGezeigt).toHaveBeenLastCalledWith({ juengste: '|eintrag-1', aelteste: 'eintrag-1' });

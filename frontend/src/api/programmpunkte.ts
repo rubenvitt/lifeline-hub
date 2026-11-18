@@ -19,12 +19,22 @@ export function legeProgrammpunktAn(
   return apiSend<Programmpunkt>(`/api/einsaetze/${einsatzId}/programmpunkte`, 'POST', daten);
 }
 
+/**
+ * Ändert Bezeichnung und/oder Zeitpunkt. `erwartet` trägt je geänderter Angabe ihren Wert beim
+ * Öffnen (Feld-CAS, LLH-1945): hat sie ein anderer inzwischen geändert, antwortet der Server 409
+ * `veraltet`; ohne `erwartet` schreibt er ohne Vergleich.
+ */
 export function aendereProgrammpunkt(
   einsatzId: number,
   id: number,
   daten: Partial<ProgrammpunktEingabe>,
+  erwartet?: Partial<ProgrammpunktEingabe>,
 ): Promise<Programmpunkt> {
-  return apiSend<Programmpunkt>(`/api/einsaetze/${einsatzId}/programmpunkte/${id}`, 'PATCH', daten);
+  return apiSend<Programmpunkt>(
+    `/api/einsaetze/${einsatzId}/programmpunkte/${id}`,
+    'PATCH',
+    erwartet ? { ...daten, erwartet } : daten,
+  );
 }
 
 export function loescheProgrammpunkt(einsatzId: number, id: number): Promise<void> {

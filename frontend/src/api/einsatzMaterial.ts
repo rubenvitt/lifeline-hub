@@ -101,19 +101,33 @@ export interface MaterialPatch extends MaterialOrtPatch {
 }
 
 /**
+ * Altwerte einer Einzelangabe des Postens (Feld-CAS, LLH-1945): `null` = leer. Der Ort ist EINE
+ * Angabe und geht mit allen vier Spalten, auch wenn der Patch nur das neue Ziel nennt.
+ */
+export type MaterialErwartet = Pick<
+  MaterialPatch,
+  'bezeichnung' | 'kategorie' | 'bestandsnummer' | 'traegerorganisation'
+> & {
+  bemerkung?: string | null;
+  ort?: { [K in keyof MaterialOrtPatch]-?: number | null };
+};
+
+/**
  * Ändert einen Posten. Das Rückgängig nach dem Lösen vom Ort schickt `nurWennFrei` (LLH-1924):
- * liegt der Posten inzwischen an einem anderen Ort, 409 statt Umsetzen.
+ * liegt der Posten inzwischen an einem anderen Ort, 409 statt Umsetzen. `erwartet` trägt die Werte
+ * beim Öffnen (Feld-CAS, LLH-1945): hat ein anderer eine dieser Angaben inzwischen geändert,
+ * antwortet der Server 409 `veraltet`; ohne schreibt er ohne Vergleich.
  */
 export function updateDisposition(
   einsatzId: number,
   emId: number,
   felder: MaterialPatch,
-  optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
+  optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'> & { erwartet?: MaterialErwartet },
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
     `/api/einsaetze/${einsatzId}/material/${emId}${zuruecknahmeQuery(optionen)}`,
     'PATCH',
-    felder,
+    optionen?.erwartet ? { ...felder, erwartet: optionen.erwartet } : felder,
   );
 }
 

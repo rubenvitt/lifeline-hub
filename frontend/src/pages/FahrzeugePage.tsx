@@ -1,6 +1,7 @@
 import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Typography, theme } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
+import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
@@ -630,12 +631,25 @@ function FahrzeugeInhalt() {
     onFehler: (e, v) => zeilen.melde(v.efId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
+  // Der Grund einer Ablehnung kommt aus `saveBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
-    mutationFn: (v: { efId: number; bemerkung: string }) =>
-      updateDisposition(einsatzId, v.efId, { bemerkung: v.bemerkung }),
+    mutationFn: (v: { efId: number; bemerkung: string; erwartet?: string | null }) =>
+      updateDisposition(
+        einsatzId,
+        v.efId,
+        { bemerkung: v.bemerkung },
+        v.erwartet === undefined ? undefined : { bemerkung: v.erwartet },
+      ),
     onMutate: (v) => zeilen.beginne(v.efId),
     onSuccess: invalidate,
-    onError: (e, v) => zeilen.melde(v.efId, e, 'Bemerkung nicht gespeichert'),
+  });
+  const saveBemerkung = useBemerkungMitAltwert({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    laden: () => listeEinsatzFahrzeuge(einsatzId),
+    speichern: (efId, bemerkung, erwartet) =>
+      bemerkungMutation.mutateAsync({ efId, bemerkung, erwartet }),
+    melde: (efId, e) => zeilen.melde(efId, e, 'Bemerkung nicht gespeichert'),
   });
   /** Entlassen löst die Einheit; deren Mitglieder und Status nicht erst mit dem Live-Ereignis. */
   function invalidateNachEntlassen() {
@@ -1183,7 +1197,7 @@ function FahrzeugeInhalt() {
           kennung={ef.funkrufname}
           darfSchreiben={darfSchreiben}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val) => bemerkungMutation.mutateAsync({ efId: ef.id, bemerkung: val })}
+          onSpeichern={(val, { beimOeffnen }) => saveBemerkung(ef.id, val, beimOeffnen)}
         />
       ),
     },

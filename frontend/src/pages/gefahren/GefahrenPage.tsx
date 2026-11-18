@@ -31,6 +31,7 @@ import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import EinsatzSeite, { type SeitenNebenwege } from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
 import { InlineAngabe } from '../../components/InlineAngabe';
+import { useFeldKonflikt } from '../../components/useFeldKonflikt';
 import { GEFAHR_GEBIET_LABEL_MAX } from '../../api/eingabegrenzen';
 import { KennungsLink } from '../../components/kennungsLink';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
@@ -165,9 +166,34 @@ export default function GefahrenPage() {
   const beurteilenFehler =
     beurteilen.isError && beurteilen.variables === gewaehlt ? beurteilen.error : null;
   const umbenennen = useMutation({
-    mutationFn: (label: string) => benenneGefahrengebiet(einsatzId, gewaehlt as number, label),
+    mutationFn: (v: { label: string; erwartet?: { label: string | null } }) =>
+      benenneGefahrengebiet(einsatzId, gewaehlt as number, v.label, v.erwartet),
     onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
   });
+  /*
+   * Feld-CAS der Bezeichnung (LLH-1945, `components/useFeldKonflikt`): die Bezeichnung beim Öffnen
+   * geht als Altwert mit; nach einem 409 fragt die Seite mit dem frisch geladenen Stand.
+   */
+  const konflikt = useFeldKonflikt();
+  const saveBezeichnung = (gebietId: number, neu: string, beimOeffnen: string) =>
+    konflikt({
+      etikett: 'Bezeichnung',
+      erwartet: { label: beimOeffnen.trim() === '' ? null : beimOeffnen.trim() },
+      speichern: async (erwartet) => {
+        await umbenennen.mutateAsync({ label: neu, erwartet });
+      },
+      ladeFrisch: async () => {
+        const liste = await qc.fetchQuery({
+          queryKey: einsatzKeys.gefahrengebiete(einsatzId),
+          queryFn: () => ladeGefahrengebiete(einsatzId),
+          staleTime: 0,
+        });
+        return liste.find((g) => g.id === gebietId);
+      },
+      aktuell: (frisch) => frisch && { wert: { label: frisch.label?.trim() || null } },
+      text: (w) => w.label ?? '',
+      leer: (w) => w.label == null,
+    });
 
   if (einsatzQuery.isLoading)
     return (
@@ -382,7 +408,9 @@ export default function GefahrenPage() {
                       Umbenennen
                     </Button>
                   )}
-                  onSpeichern={(w) => umbenennen.mutateAsync(w.trim())}
+                  onSpeichern={(w, { beimOeffnen }) =>
+                    saveBezeichnung(aktuell.id, w.trim(), beimOeffnen)
+                  }
                 />
               </div>
               {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an.

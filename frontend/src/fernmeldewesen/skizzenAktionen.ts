@@ -12,6 +12,8 @@ import type {
   Verbindungsstatus,
   Verkehrsart,
 } from '../api/types';
+import type { OFFEN_LASSEN } from '../components/InlineAngabe';
+import type { VERWORFEN } from '../components/useFeldKonflikt';
 
 /**
  * Die Schreibwege der Fernmeldeskizze (LFH-893) als eine Schnittstelle zwischen Zeichenfläche
@@ -96,6 +98,30 @@ export interface SkizzenAktionen {
   /** Tri-State: fehlend = unverändert, `null` = leeren. */
   setzeSchriftfeld(felder: Partial<Schriftfeld>): Promise<Schriftfeld>;
 
-  /** Rufname im Datensatz der Stelle (Abschnitt, Einheit, Führungsstelle). */
-  setzeRufname(stelle: string, rufname: string | null): Promise<void>;
+  /**
+   * Rufname im Datensatz der Stelle (Abschnitt, Einheit, Führungsstelle) mit Feld-CAS (LLH-1945):
+   * `erwartet` ist der Rufname zu Beginn der Handlung, wie die Stelle ihn zeigte. Erfüllt mit dem
+   * gespeicherten Rufnamen vor dem Schreiben (Wert der Gegenhandlung). Hat ein anderer Arbeitsplatz
+   * ihn inzwischen geändert, fragt „Zwischenzeitlich geändert“; „Verwerfen“, Escape und Schließen
+   * werfen {@link HandlungVerfallen}.
+   */
+  setzeRufname(
+    stelle: string,
+    rufname: string | null,
+    erwartet: string | null,
+  ): Promise<string | null>;
+}
+
+/**
+ * Eine Handlung ist nach der Rückfrage „Zwischenzeitlich geändert“ verfallen (LLH-1945): nichts ist
+ * geschrieben, der frische Stand liegt im Cache. `ergebnis` sagt, ob die Eingabe offen bleibt
+ * (`OFFEN_LASSEN`) oder schließt (`VERWORFEN`); ein Rückgängig-Schritt scheitert damit.
+ */
+export class HandlungVerfallen extends Error {
+  readonly ergebnis: typeof OFFEN_LASSEN | typeof VERWORFEN;
+  constructor(ergebnis: typeof OFFEN_LASSEN | typeof VERWORFEN) {
+    super('Zwischenzeitlich geändert');
+    this.name = 'HandlungVerfallen';
+    this.ergebnis = ergebnis;
+  }
 }

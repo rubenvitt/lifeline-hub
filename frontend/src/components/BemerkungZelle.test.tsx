@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { dichten } from '../theme/tokens';
 import { BemerkungZelle, BEMERKUNG_HINZUFUEGEN, wertKnopfStil } from './BemerkungZelle';
+import { OFFEN_LASSEN } from './InlineAngabe';
 
 /**
  * Verhalten der Bemerkungszelle (LFH-369 · B5i).
@@ -74,7 +75,7 @@ describe('BemerkungZelle', () => {
     await userEvent.type(feld, 'Tank leer');
     druecke(feld, ENTER);
 
-    expect(onSpeichern).toHaveBeenCalledWith('Tank leer');
+    expect(onSpeichern).toHaveBeenCalledWith('Tank leer', { beimOeffnen: null });
     // Nach dem Übernehmen ist das Feld wieder zu — der Aufrufer liefert den neuen Wert nach.
     expect(screen.queryByRole('textbox')).toBeNull();
   });
@@ -107,7 +108,7 @@ describe('BemerkungZelle', () => {
     await userEvent.type(screen.getByRole('textbox'), 'Knie');
     expect(screen.queryByText(/ \/ 10/)).toBeNull();
     druecke(screen.getByRole('textbox'), ENTER);
-    expect(onSpeichern).toHaveBeenCalledExactlyOnceWith('Knie');
+    expect(onSpeichern).toHaveBeenCalledExactlyOnceWith('Knie', { beimOeffnen: null });
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
@@ -130,7 +131,7 @@ describe('BemerkungZelle', () => {
     await userEvent.type(feld, 'Tank leer');
     druecke(feld, ENTER);
 
-    expect(onSpeichern).toHaveBeenCalledWith('Tank leer');
+    expect(onSpeichern).toHaveBeenCalledWith('Tank leer', { beimOeffnen: null });
     expect(screen.getByRole('textbox')).toHaveValue('Tank leer');
     fireEvent.blur(screen.getByRole('textbox'));
     expect(onSpeichern).toHaveBeenCalledTimes(1);
@@ -157,7 +158,7 @@ describe('BemerkungZelle', () => {
 
     await act(async () => druecke(screen.getByRole('textbox'), ENTER));
     expect(onSpeichern).toHaveBeenCalledTimes(2);
-    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt');
+    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt', { beimOeffnen: null });
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
@@ -184,12 +185,12 @@ describe('BemerkungZelle', () => {
 
     await act(async () => druecke(screen.getByRole('textbox'), ENTER));
     expect(onSpeichern).toHaveBeenCalledTimes(2);
-    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt');
+    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt', { beimOeffnen: null });
 
     await userEvent.type(screen.getByRole('textbox'), '!');
     await act(async () => fireEvent.blur(screen.getByRole('textbox')));
     expect(onSpeichern).toHaveBeenCalledTimes(3);
-    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt!');
+    expect(onSpeichern).toHaveBeenLastCalledWith('Achse defekt!', { beimOeffnen: null });
   });
 
   it('solange gesendet wird, ist das Feld gesperrt und als beschäftigt markiert (LFH-1077)', async () => {
@@ -235,7 +236,7 @@ describe('BemerkungZelle', () => {
     await userEvent.type(feld, 'Achse defekt');
     fireEvent.blur(feld);
 
-    expect(onSpeichern).toHaveBeenCalledWith('Achse defekt');
+    expect(onSpeichern).toHaveBeenCalledWith('Achse defekt', { beimOeffnen: null });
   });
 
   it('gefüllter Wert: der Wert selbst ist der Knopf, benannt als Aufforderung, beschrieben durch den Wert (LFH-650)', async () => {
@@ -448,6 +449,34 @@ describe('BemerkungZelle', () => {
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }).style.color).toBe(
       'rgb(17, 69, 119)',
     );
+  });
+
+  it('reicht den Wert beim Öffnen weiter, auch wenn er sich bei offenem Feld ändert (LLH-1945)', async () => {
+    const onSpeichern = vi.fn();
+    const { rerender } = renderMitProviders(
+      <BemerkungZelle wert="Tor 3" darfSchreiben onSpeichern={onSpeichern} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bemerkung bearbeiten' }));
+    // Ein anderer Arbeitsplatz ändert die Bemerkung, das Live-Ereignis kommt bei offenem Feld.
+    rerender(<BemerkungZelle wert="Tor 5" darfSchreiben onSpeichern={onSpeichern} />);
+    const feld = screen.getByRole('textbox');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Halle 2');
+    druecke(feld, ENTER);
+    expect(onSpeichern).toHaveBeenCalledWith('Halle 2', { beimOeffnen: 'Tor 3' });
+  });
+
+  it('`OFFEN_LASSEN` als Antwort hält das Feld mit dem Entwurf offen (LLH-1945)', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(OFFEN_LASSEN);
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={onSpeichern} />);
+    await userEvent.click(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'Achse defekt');
+    await act(async () => druecke(feld, ENTER));
+    expect(screen.getByRole('textbox')).toHaveValue('Achse defekt');
+    // Verlassen schickt den Entwurf nicht noch einmal, Enter schon.
+    await act(async () => fireEvent.blur(screen.getByRole('textbox')));
+    expect(onSpeichern).toHaveBeenCalledTimes(1);
   });
 });
 

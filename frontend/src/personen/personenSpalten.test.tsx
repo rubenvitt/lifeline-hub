@@ -317,7 +317,43 @@ describe('Zustand-Spalte (LFH-613)', () => {
     await userEvent.type(feld, 'gehfähig, unterkühlt');
     fireEvent.blur(feld);
     await waitFor(() => expect(koerper).toHaveLength(1));
-    expect(koerper[0]).toEqual({ zustand: 'gehfähig, unterkühlt' });
+    // Feld-CAS (LLH-1945): der Wert beim Öffnen der Zelle geht als Altwert mit, leer = `null`.
+    expect(koerper[0]).toEqual({ zustand: 'gehfähig, unterkühlt', erwartet: { zustand: null } });
+  });
+
+  // Entscheidung 18.11.2026 (LLH-1945): auch das Kurzfeld prüft auf zwischenzeitliche Änderung.
+  it('veralteter Zustand: Rückfrage mit dem aktuellen Wert, „Meine Änderung übernehmen“ ohne Altwert', async () => {
+    const koerper: Record<string, unknown>[] = [];
+    let stand: Person = { ...basis, zustand: 'gehfähig' };
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        koerper.push(body);
+        const erwartet = body.erwartet as { zustand: string | null } | undefined;
+        if (erwartet && erwartet.zustand !== stand.zustand) {
+          return HttpResponse.json({ error: 'zwischenzeitlich geändert' }, { status: 409 });
+        }
+        stand = { ...stand, zustand: body.zustand as string };
+        return HttpResponse.json(stand);
+      }),
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+    );
+    renderMitProviders(<>{zelle(mitSchreibrecht, stand)}</>);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 bearbeiten' }),
+    );
+    stand = { ...stand, zustand: 'bewusstlos' };
+    const feld = screen.getByRole('textbox');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'unterkühlt');
+    fireEvent.blur(feld);
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent(/Zustand \/ Verdacht inzwischen: „bewusstlos“/);
+    expect(koerper[0]).toEqual({ zustand: 'unterkühlt', erwartet: { zustand: 'gehfähig' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await waitFor(() => expect(koerper).toHaveLength(2));
+    expect(koerper[1]).toEqual({ zustand: 'unterkühlt' });
   });
 
   it('zeigt während des Speicherns den GETIPPTEN Wert mit Ladeanzeige, nicht wieder den Platzhalter (LFH-650)', async () => {
@@ -408,6 +444,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
           ? HttpResponse.json({ error: 'Datenbank gesperrt' }, { status: 409 })
           : HttpResponse.json({ ...basis, zustand: 'gehfähig' }),
       ),
+      // Der 409 lädt die Person frisch: der Zustand steht noch wie beim Öffnen, also kein
+      // Feldkonflikt — der Grund steht an der Zelle.
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(basis)),
     );
     const { container } = renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
     await userEvent.click(
@@ -506,7 +545,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
     await new Promise((r) => setTimeout(r, 30));
     expect(koerper).toEqual([]);
     fireEvent.blur(screen.getByRole('textbox'));
-    await waitFor(() => expect(koerper).toEqual([{ zustand: 'gehfähig' }]));
+    await waitFor(() =>
+      expect(koerper).toEqual([{ zustand: 'gehfähig', erwartet: { zustand: null } }]),
+    );
   });
 
   it('bleibt ohne Schreibrecht reine Anzeige — Wert oder „—", kein Knopf', () => {

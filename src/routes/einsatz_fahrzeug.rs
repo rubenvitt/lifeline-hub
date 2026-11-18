@@ -23,7 +23,7 @@ use crate::kraefte_disposition;
 use crate::live::LiveEvent;
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
-    pruefe_koordinate,
+    pruefe_koordinate, trimme_tri,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -294,6 +294,26 @@ pub struct DispoPatchBody {
     pub traegerorganisation: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub opta: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+    /// Änderung“): je Feld der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<DispoErwartet>,
+}
+
+/// Altwerte der Disposition, dreiwertig wie [`DispoPatchBody`]. Der Status trägt keinen: ein
+/// Wechsel ist eine Handlung mit eigenem ETB-Eintrag.
+#[derive(Debug, Default, Deserialize)]
+pub struct DispoErwartet {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+    pub funkrufname: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub fahrzeugtyp: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kennzeichen: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub traegerorganisation: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub opta: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id} — Status, Bemerkung und bei Ad-hoc-Fahrzeugen
@@ -333,6 +353,65 @@ pub async fn update(
     fn tri(w: &Option<Option<String>>) -> Option<Option<&str>> {
         w.as_ref().map(|o| o.as_deref())
     }
+
+    // Feld-CAS (LLH-1945): Altwert nur mit Änderung desselben Felds (422), nach allen 400; Formen
+    // wie der Patch (getrimmt, leer = ohne Angabe).
+    let erwartet = body.erwartet.unwrap_or_default();
+    crate::feld_cas::pruefe_felder(
+        &[
+            (
+                "bemerkung",
+                erwartet.bemerkung.is_some(),
+                bemerkung.is_some(),
+            ),
+            (
+                "funkrufname",
+                erwartet.funkrufname.is_some(),
+                funkrufname.is_some(),
+            ),
+            (
+                "fahrzeugtyp",
+                erwartet.fahrzeugtyp.is_some(),
+                fahrzeugtyp.is_some(),
+            ),
+            (
+                "kennzeichen",
+                erwartet.kennzeichen.is_some(),
+                kennzeichen.is_some(),
+            ),
+            (
+                "traegerorganisation",
+                erwartet.traegerorganisation.is_some(),
+                traeger.is_some(),
+            ),
+            ("opta", erwartet.opta.is_some(), opta.is_some()),
+        ],
+        &[],
+    )?;
+    let erwartet_bemerkung = trimme_tri(erwartet.bemerkung);
+    let erwartet_funkrufname = erwartet.funkrufname.as_deref().map(str::trim);
+    let erwartet_typ = trimme_tri(erwartet.fahrzeugtyp);
+    let erwartet_kennzeichen = trimme_tri(erwartet.kennzeichen);
+    let erwartet_traeger = trimme_tri(erwartet.traegerorganisation);
+    let erwartet_opta = trimme_tri(erwartet.opta);
+    let altwerte = {
+        use crate::feld_cas::ExpectedValue::Text;
+        fn text(v: &Option<Option<String>>) -> Option<crate::feld_cas::ExpectedValue<'_>> {
+            v.as_ref().map(|v| Text(v.as_deref()))
+        }
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        w.push("bemerkung", text(&erwartet_bemerkung));
+        w.push(
+            "snap_funkrufname",
+            erwartet_funkrufname.map(|n| Text(Some(n))),
+        );
+        w.push("snap_fahrzeugtyp", text(&erwartet_typ));
+        w.push("snap_kennzeichen", text(&erwartet_kennzeichen));
+        w.push("snap_traegerorganisation", text(&erwartet_traeger));
+        w.push("snap_opta", text(&erwartet_opta));
+        w
+    };
+
     let patch = FahrzeugPatch {
         status_id: body.status_id,
         gesetzt_von: Some(ctx.benutzer.id),
@@ -354,7 +433,7 @@ pub async fn update(
         crate::write_retry!(&state.pool, |conn| {
             let mut etb_ids = Vec::new();
             let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-            disposition_repo::update_tx(conn, einsatz_id, ef_id, patch).await?;
+            disposition_repo::update_tx(conn, einsatz_id, ef_id, patch, &altwerte).await?;
             let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
             let mut beruehrt = crate::zeitachse::repo::Beruehrt::default();
             if vorher.status_id != nachher.status_id {
@@ -947,6 +1026,8 @@ pub struct PositionBody {
     pub tz_fachaufgabe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_organisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945): je Feld der Wert zu Beginn der Handlung; fehlt = kein Vergleich.
+    pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
 /// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id}/position — reine Lage-Pflege, KEIN ETB.
@@ -957,6 +1038,13 @@ pub async fn position(
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let erwartet = body.erwartet.unwrap_or_default();
+    let altwerte = erwartet.altwerte(&[
+        ("lat", body.lat.is_some()),
+        ("lon", body.lon.is_some()),
+        ("tz_fachaufgabe", body.tz_fachaufgabe.is_some()),
+        ("tz_organisation", body.tz_organisation.is_some()),
+    ])?;
     // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
     let vorher: (Option<f64>, Option<f64>) =
         sqlx::query_as("SELECT lat, lon FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?")
@@ -980,6 +1068,7 @@ pub async fn position(
             tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
         },
         ctx.einsatz.ist_aktiv(),
+        &altwerte,
     )
     .await?;
     sse_fahrzeug(&state, einsatz_id, ef_id);

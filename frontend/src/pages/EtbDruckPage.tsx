@@ -9,7 +9,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
-import Druckkopf from '../components/druck/Druckkopf';
+import Druckkopf, { druckEinsatzName } from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { ladeEtbVollstaendig } from '../etb/druckAbruf';
 import { auswahlZeilen } from '../etb/druckAuswahl';
@@ -18,11 +18,24 @@ import { etbFilterPfad, parseEtbDruckFilter } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import { modulName } from '../einsatz/modulRegistry';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import type { AnzeigeKonventionen } from '../anzeige/format';
 
 /** „1 200 Einträge" — Tausender mit geschütztem Leerzeichen, Einzahl bei genau einem. */
 function umfang(anzahl: number): string {
   const zahl = String(anzahl).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return `${zahl} ${anzahl === 1 ? 'Eintrag' : 'Einträge'}`;
+}
+
+/**
+ * Der Stand des Schnappschusses, „181400nov26 · bis Nr. 220“: im Druckkopf und in der Laufzeile
+ * jeder Seite derselbe Text.
+ */
+function standText(
+  stand: { geladenAt: string; hoechsteLfdNr: number | null },
+  konventionen: AnzeigeKonventionen,
+): string {
+  const zeit = zeitpunkt(stand.geladenAt, konventionen);
+  return stand.hoechsteLfdNr != null ? `${zeit} · bis Nr. ${stand.hoechsteLfdNr}` : zeit;
 }
 
 /**
@@ -176,13 +189,7 @@ export default function EtbDruckPage() {
             zeilen={[
               { etikett: 'Auswahl', wert: auswahl.join(' · ') },
               { etikett: 'Umfang', wert: umfang(stand.eintraege.length) },
-              {
-                etikett: 'Stand',
-                wert:
-                  stand.hoechsteLfdNr != null
-                    ? `${zeitpunkt(stand.geladenAt, konventionen)} · bis Nr. ${stand.hoechsteLfdNr}`
-                    : zeitpunkt(stand.geladenAt, konventionen),
-              },
+              { etikett: 'Stand', wert: standText(stand, konventionen) },
             ]}
           />
           {stand.eintraege.length === 0 ? (
@@ -191,6 +198,8 @@ export default function EtbDruckPage() {
             </Typography.Paragraph>
           ) : (
             <EtbDruckTabelle
+              // Einsatz und Stand auf jeder Seite, die ihren Tabellenkopf wiederholt (LLH-1837).
+              laufzeile={`Einsatztagebuch · ${druckEinsatzName(einsatz)} · Stand ${standText(stand, konventionen)}`}
               eintraege={stand.eintraege}
               berichtigungen={stand.berichtigungen}
               konventionen={konventionen}

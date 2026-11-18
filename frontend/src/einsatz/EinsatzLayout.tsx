@@ -27,6 +27,7 @@ import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
+import ModulWechselGerippe from './ModulWechselGerippe';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
@@ -794,7 +795,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                       darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
                     />
                   ) : (
-                    <Outlet />
+                    // Modulwechsel zeigt sofort Kopf und Gerippe (LLH-1838, Spec
+                    // `seiten-zustaende`): nach Wächter und Sperre, damit beide Vorrang behalten.
+                    <ModulWechselGerippe modul={aktuellesModul}>
+                      <Outlet />
+                    </ModulWechselGerippe>
                   )}
                 </NichtGefundenProvider>
               </ImEinsatzRahmenProvider>

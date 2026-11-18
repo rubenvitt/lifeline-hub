@@ -3,9 +3,10 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, Einheit, ExterneStelle, Fahrzeug } from '../api/types';
 import { AuthProvider } from '../auth/AuthContext';
-import { adminFixture, benutzerFixture } from '../test/fixtures';
+import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -16,6 +17,7 @@ import {
   ladeZuletzt,
   merkeZuletzt,
   useExterneStellenQuelle,
+  useFunkrufnamenEinsatz,
   useZuletztQuelle,
   ZULETZT_MAX,
   zuletztRaeumen,
@@ -171,5 +173,67 @@ describe('useExterneStellenQuelle', () => {
     });
     await waitFor(() => expect(result.current.eintraege).toHaveLength(1));
     expect(result.current.uebernahme).toBeUndefined();
+  });
+});
+
+describe('useFunkrufnamenEinsatz', () => {
+  function wrapper(client = neuerQueryClient()) {
+    return ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  }
+
+  it('fragt Fahrzeuge und Einheiten nur mit Modulrecht ab (kein 403, LLH-1839)', async () => {
+    const abgefragt: string[] = [];
+    let freigabenGeladen = false;
+    server.use(
+      http.get('/api/einsaetze/4/modul-freigaben', () => {
+        freigabenGeladen = true;
+        return HttpResponse.json(
+          freigabenFixture({ fahrzeuge: { zugriff: false }, einheiten: { zugriff: false } }),
+        );
+      }),
+      http.get('/api/einsaetze/4/fahrzeuge', () => {
+        abgefragt.push('fahrzeuge');
+        return HttpResponse.json([]);
+      }),
+      http.get('/api/einsaetze/4/einheiten', () => {
+        abgefragt.push('einheiten');
+        return HttpResponse.json([]);
+      }),
+    );
+    renderHook(() => useFunkrufnamenEinsatz(4), { wrapper: wrapper() });
+    await waitFor(() => expect(freigabenGeladen).toBe(true));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(abgefragt).toEqual([]);
+  });
+
+  it('zeigt nach Entzug des Modulrechts keine Namen aus dem Cache mehr', async () => {
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.einheiten(4), [{ id: 1, name: 'Florian 3' } as Einheit]);
+    server.use(
+      http.get('/api/einsaetze/4/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({ fahrzeuge: { zugriff: false }, einheiten: { zugriff: false } }),
+        ),
+      ),
+    );
+    const { result } = renderHook(() => useFunkrufnamenEinsatz(4), { wrapper: wrapper(client) });
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(4))?.status).toBe('success'),
+    );
+    expect(result.current).toEqual([]);
+  });
+
+  it('schlägt mit Modulrecht Funkrufnamen aus Fahrzeugen und Einheiten vor', async () => {
+    server.use(
+      http.get('/api/einsaetze/4/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/4/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/4/einheiten', () =>
+        HttpResponse.json([{ id: 1, name: 'Florian 3' } as Einheit]),
+      ),
+    );
+    const { result } = renderHook(() => useFunkrufnamenEinsatz(4), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.map((v) => v.wert)).toEqual(['Florian 3']));
   });
 });

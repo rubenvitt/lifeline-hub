@@ -474,12 +474,14 @@ pub fn stamm_angaben_error() -> AppError {
 /// `status_id` per COALESCE. `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
 /// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört, `Conflict` an
 /// einem beendeten Fahrzeug (LLH-1079), `UnprocessableEntity` bei Ad-hoc-Angaben an einem
-/// Stamm-Fahrzeug; jede Ablehnung schreibt nichts, auch keinen Status.
+/// Stamm-Fahrzeug, `Veraltet` (409), wenn eine Spalte aus `erwartet` inzwischen einen anderen Wert
+/// trägt (Feld-CAS, LLH-1945); jede Ablehnung schreibt nichts, auch keinen Status.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     patch: FahrzeugPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<(), AppError> {
     // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
@@ -496,6 +498,8 @@ pub async fn update_tx(
             return Err(stamm_angaben_error());
         }
     }
+    // Feld-CAS (LLH-1945): nach 404, 409 (beendet) und 422 (Stamm-Fahrzeug), vor dem Schreiben.
+    crate::feld_cas::check_zeile_tx(conn, "einsatz_fahrzeug", einsatz_id, ef_id, erwartet).await?;
     // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
     // still (Muster LLH-1067). Die `snap_*`-Spalten schreibt das UPDATE nur ohne Stammbezug, auch
     // wenn eine Route die Prüfung oben vergäße.
@@ -569,7 +573,14 @@ pub async fn update(
     patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(&mut conn, einsatz_id, ef_id, patch).await
+    update_tx(
+        &mut conn,
+        einsatz_id,
+        ef_id,
+        patch,
+        &crate::feld_cas::ExpectedValues::new(),
+    )
+    .await
 }
 
 /// Geo-/Symbol-Felder einer Disposition. `Some(None)` = NULL, `None` = unverändert.
@@ -590,32 +601,41 @@ pub async fn update_position(
     ef_id: i64,
     daten: PositionPatch<'_>,
     einsatz_aktiv: bool,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<EinsatzFahrzeugAnzeige, AppError> {
     // Ein beendetes Fahrzeug steht auf keiner Karte mehr (409, LLH-1079).
     require_aktiv_tx(&mut *pool.acquire().await?, einsatz_id, ef_id).await?;
-    let betroffen = sqlx::query(
+    // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
+    let sql = format!(
         "UPDATE einsatz_fahrzeug SET \
-            lat = CASE WHEN ? THEN ? ELSE lat END, \
-            lon = CASE WHEN ? THEN ? ELSE lon END, \
-            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.lat.is_some())
-    .bind(daten.lat.flatten())
-    .bind(daten.lon.is_some())
-    .bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some())
-    .bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some())
-    .bind(daten.tz_organisation.flatten())
-    .bind(ef_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+            lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
+            lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+         WHERE id = ?9 AND einsatz_id = ?10{}",
+        erwartet.sql_suffix(11)
+    );
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.lat.is_some())
+        .bind(daten.lat.flatten())
+        .bind(daten.lon.is_some())
+        .bind(daten.lon.flatten())
+        .bind(daten.tz_fachaufgabe.is_some())
+        .bind(daten.tz_fachaufgabe.flatten())
+        .bind(daten.tz_organisation.is_some())
+        .bind(daten.tz_organisation.flatten())
+        .bind(ef_id)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        return Err(crate::feld_cas::ohne_treffer(
+            pool,
+            "einsatz_fahrzeug",
+            einsatz_id,
+            ef_id,
+            erwartet,
+        )
+        .await);
     }
     let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE ef.id = ? AND ef.einsatz_id = ?"
@@ -1407,6 +1427,7 @@ mod tests {
                 tz_organisation: Some(Some("feuerwehr")),
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1421,6 +1442,7 @@ mod tests {
                 tz_organisation: None,
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1817,9 +1839,16 @@ mod tests {
             AppError::Conflict(_)
         ));
         assert!(matches!(
-            update_position(&pool, einsatz, ef, PositionPatch::default(), true)
-                .await
-                .unwrap_err(),
+            update_position(
+                &pool,
+                einsatz,
+                ef,
+                PositionPatch::default(),
+                true,
+                &Default::default()
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
     }

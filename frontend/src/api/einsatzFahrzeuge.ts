@@ -62,18 +62,21 @@ export interface AngabenPatch {
 export type DispositionPatch = AngabenPatch & { status_id?: number; bemerkung?: string | null };
 
 /**
- * Die Antwort ist das Fahrzeug; bei einem echten Statuswechsel trägt sie zusätzlich den Beleg
+ * Ändert eine Disposition. `erwartet` trägt die Werte beim Öffnen (Feld-CAS, LLH-1945): hat ein
+ * anderer eine dieser Angaben inzwischen geändert, antwortet der Server 409 `veraltet`. Die Antwort
+ * ist das Fahrzeug; bei einem echten Statuswechsel trägt sie zusätzlich den Beleg
  * `status_ruecknahme` für „Rückgängig“ (LLH-1781, {@link nimmStatuswechselZurueck}).
  */
 export function updateDisposition(
   einsatzId: number,
   efId: number,
   felder: DispositionPatch,
+  erwartet?: Partial<Omit<DispositionPatch, 'status_id'>>,
 ): Promise<FahrzeugPatchAntwort> {
   return apiSend<FahrzeugPatchAntwort>(
     `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`,
     'PATCH',
-    felder,
+    erwartet ? { ...felder, erwartet } : felder,
   );
 }
 
@@ -141,16 +144,17 @@ export function reaktiviereDisposition(einsatzId: number, efId: number): Promise
   );
 }
 
-/** L‑2: Verortet ein Einsatzfahrzeug auf der Lagekarte. */
+/** L‑2: Verortet ein Einsatzfahrzeug auf der Lagekarte; `erwartet` wie `verorteEinheit`. */
 export function verorteFahrzeug(
   einsatzId: number,
   efId: number,
   daten: PositionPatch,
+  erwartet?: PositionPatch,
 ): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(
     `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/position`,
     'PATCH',
-    daten,
+    erwartet ? { ...daten, erwartet } : daten,
   );
 }
 
