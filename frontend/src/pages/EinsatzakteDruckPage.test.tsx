@@ -49,7 +49,7 @@ function quellen(freigaben = freigabenFixture()) {
   const json = (pfad: string, antwort: () => unknown) =>
     http.get(`/api/einsaetze/${E}${pfad}`, () => {
       zaehle(pfad);
-      return HttpResponse.json(antwort());
+      return HttpResponse.json(antwort() as never);
     });
   const mitBeendeten = (
     pfad: string,
