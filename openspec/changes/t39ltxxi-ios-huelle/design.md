@@ -90,6 +90,15 @@ mit möglichst vielen Server-Versionen verträglich. **(R)**
   Server → Onboarding vorbelegt, gleicher Server → nichts (wie `src-tauri/src/deeplink.rs`,
   `entscheide`).
 
+### D2a Server mit eigenem Zertifikat **(R, 18.11.2026)**
+
+Die App prüft Zertifikate wie das System, ohne eigene Ausnahmen und ohne Pinning. Ein Server im
+Einsatz-LAN (`elw.local`, mkcert/interne CA) braucht auf dem Gerät das installierte und von Hand
+als vertrauenswürdig eingeschaltete CA-Profil, wie heute im Browser (LLH-31). Scheitert die
+Prüfung (Onboarding, Erreichbarkeit, Laden), zeigt die App eine native Seite „Zertifikat nicht
+vertrauenswürdig“ mit der Anleitung (Profil laden, Einstellungen → Allgemein → Info →
+Zertifikatsvertrauenseinstellungen) und unterscheidet das von „nicht erreichbar“.
+
 ### D3 Ein Datenspeicher je Server **(V)**
 
 Jeder Server bekommt einen eigenen `WKWebsiteDataStore(forIdentifier:)` (UUID am Servereintrag).
@@ -108,9 +117,11 @@ Zwei Richtungen, keine reine Versionsnummer-Logik:
    nur hinzu. Eine Fähigkeitsliste des Servers gibt es vorerst nicht: Ob eine Funktion der Hülle
    genutzt wird, entscheidet allein das Frontend (D6); die App braucht keine Logik nach
    Server-Fähigkeiten. *(Entscheidung des Entwurfs nach der Prüfung.)*
-   **Älterer Server ohne Endpunkt** (404): Die App liest `version` aus `GET /api/health` (gibt es
-   schon, anonym). Major 1 → `huelle_vertrag` 1 mit leerer Fähigkeitsliste; die App läuft dann
-   mit der Grundfunktion.
+   **Älterer Server ohne Endpunkt** (404): gilt als nicht verträglich. Mindestversion ist die
+   erste Server-Version mit `GET /api/huelle` **(R, 18.11.2026)**: Es gibt nur Alphas, ältere
+   haben teils weder die Anmeldung im Systembrowser noch Offline-Lagebild oder Schreib-Queue.
+   Die App liest dann `version` aus `GET /api/health` (anonym, gibt es schon) und nennt sie auf
+   der Seite „Server ist zu alt für diese App“.
 2. **App → Server:** wie bei der Desktop-Hülle über `window.__LIFELINE_HUELLE__`, ergänzt um
    `plattform: 'ios'`, `version` und die neuen Funktionen (D6). Das Frontend liest die Kennung
    weiter nur in `frontend/src/huelle/faehigkeiten.ts` und prüft jede Funktion einzeln. Ein
