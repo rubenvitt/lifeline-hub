@@ -195,14 +195,26 @@ export async function pushAusschalten(benutzerId: number): Promise<PushZustand> 
   return 'aus';
 }
 
+function gleicheArten(a: readonly string[], b: readonly string[]): boolean {
+  const menge = new Set(a);
+  return menge.size === new Set(b).size && b.every((art) => menge.has(art));
+}
+
 /**
  * Nach jeder bestätigten Anmeldung: Hat diese Person Push auf diesem Browser gewählt, meldet die
  * neue Sitzung das Abo wieder an (das alte fiel mit der alten Sitzung). Ebenso nach jedem
  * Umschalten von „Stumm auf diesem Gerät“ (LLH-1482), damit der Server die neue Liste kennt;
  * ohne Netz bleibt er bis zur nächsten Anmeldung beim alten Stand. Fragt nie nach der
  * Erlaubnis und wirft nie.
+ *
+ * `nurBeiBedarf` (Seitenstart, LLH-1839): Kennt der Server das Abo dieser Sitzung schon mit
+ * derselben Wahl, bleibt es stehen; ein Neuladen kostet so nur den Abruf des Stands. Nicht nach
+ * einem Umschalten: dort kann der gelesene Stand eine noch laufende Anmeldung nicht kennen.
  */
-export async function pushAbgleichen(benutzerId: number): Promise<void> {
+export async function pushAbgleichen(
+  benutzerId: number,
+  { nurBeiBedarf = false }: { nurBeiBedarf?: boolean } = {},
+): Promise<void> {
   try {
     const merker = moeglich() ? sicherLesen(pushMerker(benutzerId)) : null;
     if (merker == null) return;
@@ -210,7 +222,16 @@ export async function pushAbgleichen(benutzerId: number): Promise<void> {
     const stand = await ladeWebPushStand();
     // Am gekoppelten ELW lehnt der Server jedes Abo ab; das alte ruht bis zum Entkoppeln.
     if (stand.ueber_hub) return;
-    await anmelden(await abonnieren(stand.schluessel), merker === MERKER_MIT_INHALT);
+    const inhalt = merker === MERKER_MIT_INHALT;
+    if (
+      nurBeiBedarf &&
+      stand.angemeldet &&
+      stand.inhalt === inhalt &&
+      gleicheArten(stand.stumm, stummeArten())
+    ) {
+      return;
+    }
+    await anmelden(await abonnieren(stand.schluessel), inhalt);
   } catch {
     // Ohne Schalter am Server, offline oder ohne Worker: die App meldet weiter im Tab.
   }
