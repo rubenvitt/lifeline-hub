@@ -15,7 +15,7 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::http::{header, HeaderMap, HeaderValue};
 use axum::response::IntoResponse;
-use chrono::Local;
+use chrono::Utc;
 use std::collections::HashMap;
 
 /// Welche Module die Akte dieser Person aufnimmt: jedes Modul der Akte muss lesbar sein (sonst
@@ -250,8 +250,8 @@ async fn blockierend<T: Send + 'static>(
 }
 
 /// `Einsatzakte_<Einsatznummer>_<JJJJ-MM-TT>_Anlagen.zip`. Ohne interne Einsatznummer die
-/// Kennung. Das Datum in der Zeit des Servers, wie der Name der Sicherung (ADR-0012 regelt den
-/// Wire, nicht Dateinamen).
+/// Kennung. Das Datum in UTC (ADR-0012: keine Ortszeit des Servers); um Mitternacht kann es vom
+/// Kalendertag der Anzeigezone abweichen, die Datei trägt keinen Zeitpunkt, der zählt.
 fn zip_dateiname(einsatz: &crate::einsatz::Einsatz) -> String {
     let nummer = einsatz
         .einsatznummer_intern
@@ -262,7 +262,7 @@ fn zip_dateiname(einsatz: &crate::einsatz::Einsatz) -> String {
         .unwrap_or_else(|| einsatz.id.to_string());
     format!(
         "Einsatzakte_{nummer}_{}_Anlagen.zip",
-        Local::now().format("%Y-%m-%d")
+        Utc::now().format("%Y-%m-%d")
     )
 }
 
