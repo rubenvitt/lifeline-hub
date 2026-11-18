@@ -91,7 +91,7 @@ export default function OnlineQuellenVerwaltung() {
        * mit fixierter erster Spalte wählt rc-table `table-layout: auto`, und dort ist eine
        * Spaltenbreite nur ein Wunsch (im Browser gemessen: trotz `<col width="280">` ungekürzt;
        * antds `.ant-table-cell-ellipsis` senkt den Platzbedarf nicht). `maxWidth` bindet — und eine
-       * zusätzliche `width` wäre ein Verstoß gegen `components/feldbreiten.guard.test.ts`.
+       * zusätzliche `width` wäre ein Verstoß gegen `components/feld.guard.test.ts`.
        */
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 280 } }),

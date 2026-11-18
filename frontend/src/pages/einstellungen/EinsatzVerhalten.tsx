@@ -150,7 +150,7 @@ export default function EinsatzVerhalten() {
                   label={`Startwert ${nk.label}`}
                   name={`${nk.key}_nummer_start`}
                   // `flex: 0 1 160px` statt `width: 160`: eine feste Pixelbreite ragte am schmalen
-                  // Schirm über den Rand (`feldbreiten.guard.test.ts`).
+                  // Schirm über den Rand (`components/feld.guard.test.ts`).
                   style={{ flex: '0 1 160px' }}
                 >
                   <InputNumber

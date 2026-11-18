@@ -100,7 +100,7 @@ Obergrenze im Pilot), `mittel` 320, `voll` ohne Obergrenze; Konstante `FELDBREIT
   `abstandsraster`: zählt `fontSize: <Zahl>` in TS/TSX und `font-size: <Zahl>px` in CSS je Datei;
   neue Literale rot, Schuld sinkt nur. Ausnahmen wie beim Abstandsraster plus `theme/`. Die
   Scan-Hilfen (Kommentare entfernen, Dateien sammeln, Schuld vergleichen) teilt er mit dem
-  Abstandsraster-Wächter über ein gemeinsames Modul `theme/ratsche.ts`, statt sie zu kopieren.
+  Abstandsraster-Wächter über ein gemeinsames Modul `test/ratsche.ts`, statt sie zu kopieren.
 *Verworfen:* Wächter nur auf `Feld`-Pflicht ohne Breitenprüfung (ein `Input style={{width}}`
 außerhalb von Form.Item entginge ihm).
 

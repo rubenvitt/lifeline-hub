@@ -32,13 +32,13 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
 
 ## 3. Wächter
 
-- [ ] 3.1 Gemeinsame Scan-Hilfen aus `theme/abstandsraster.guard.test.ts` nach `theme/ratsche.ts`
-  ziehen (Kommentare entfernen, Dateien sammeln, Schuld vergleichen); Abstandsraster-Wächter
+- [x] 3.1 Gemeinsame Scan-Hilfen aus `theme/abstandsraster.guard.test.ts` nach `test/ratsche.ts`
+  ziehen (neben `test/ohneKommentare.ts`, weil es `node:fs` braucht und der Scan `test/` auslässt) (Kommentare entfernen, Dateien sammeln, Schuld vergleichen); Abstandsraster-Wächter
   unverändert grün
-- [ ] 3.2 `theme/schriftgroesse.guard.test.ts` + `schriftgroesse.schuld.ts`: Selbsttests (neues
+- [x] 3.2 `theme/schriftgroesse.guard.test.ts` + `schriftgroesse.schuld.ts`: Selbsttests (neues
   Literal rot mit Datei/Zeile/Wert, Schuld sinkt nur, Ausnahmen, CSS-px) und Bestandsprüfung;
   Schuld aus dem Stand vor dem Pilot erzeugt
-- [ ] 3.3 `components/feld.guard.test.ts` ersetzt `components/feldbreiten.guard.test.ts`:
+- [x] 3.3 `components/feld.guard.test.ts` ersetzt `components/feldbreiten.guard.test.ts`:
   Selbsttests (Zahl-, String- und Konstantenbreite an Eingabefeldern rot, `<Form.Item` im
   Verwaltungsteil rot, Tabellenspalte und Fortschrittsbalken frei); zunächst mit Liste der noch
   nicht umgestellten Pilotdateien, die in Gruppe 4 auf leer sinkt
@@ -66,7 +66,10 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
   Karte `Eingabefeld` zeigt `Feld`; `pnpm design-system` erzeugt
   `docs/design/design-system/project/`, `designSystem.test.ts` und `designSystem.guard.test.ts`
   grün
-- [ ] 5.3 Folgeaufgaben je übrigem Bereich (Umstellung auf die Bausteine) und für Mono-Stufe sowie
+- [ ] 5.3 ADR „Text, Abstand und Feldbreite kommen aus benannten Stufen“ nach
+  `docs/architektur/entscheidungen/VORLAGE.md` mit nächster freier Nummer auf `alpha`, `gilt_fuer`
+  auf Bausteine, Wächter und Schuld; Prüfblock grün (`scripts/check-all.sh` ADR-Schritt)
+- [ ] 5.4 Folgeaufgaben je übrigem Bereich (Umstellung auf die Bausteine) und für Mono-Stufe sowie
   Knopfreihe per `zunder-task-anlegen` angelegt, Kennungen in der PR-Beschreibung
 
 ## 6. Prüfung
