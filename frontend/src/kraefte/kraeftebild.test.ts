@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import Markdown from '../components/Markdown';
 import {
@@ -8,6 +8,7 @@ import {
   rendereMeldebildMarkdown,
   verdichte,
   OHNE_ABSCHNITT_KEY,
+  type FilterWerte,
 } from './kraeftebild';
 import { personalBand } from './meldebildRaster';
 import type {
@@ -774,4 +775,70 @@ it('eine Untereinheit einer aufgelösten Über-Einheit bleibt sichtbar und zähl
   expect(nach(2).personal.map((x) => x.id)).toEqual([2]);
   expect(nach(1).einheiten.map((e) => e.id)).toEqual([10]);
   expect(nach(1).personal.map((x) => x.id)).toEqual([1]);
+});
+
+// ── Einheiten-Filter (LLH-1792, design.md D1, D3) ────────────────────────────
+
+describe('filtereKraefte mit Treffermenge der Einheiten', () => {
+  const OHNE: FilterWerte = { traeger: null, abschnittId: null, kategorie: null, suche: '' };
+  const abschnitte = [ab(1), ab(2)];
+  // Zug 10 mit Gruppe 11 darunter (ohne eigenen Abschnitt), Gruppe 12 vom Zug in Abschnitt 2
+  // abgestellt, Einheit 20 für sich.
+  const einheiten = [eh(10, 1), eh(11, null, 10), eh(12, 2, 10), eh(20, 1)];
+  const personal = [
+    p(1, 10, 'mannschaft'),
+    p(2, 11, 'mannschaft'),
+    p(3, 12, 'mannschaft'),
+    p(4, 20, 'mannschaft'),
+    p(5, null, 'mannschaft'),
+  ];
+  const fahrzeuge = [fz(1, 10), fz(2, 20), fz(3, null)];
+  const material = [mat(1, 10, 'einsatzbereit'), mat(2, 20, 'einsatzbereit')];
+  const roh = { abschnitte, einheiten, personal, fahrzeuge, material };
+
+  it('ohne Treffermenge bleibt alles wie bisher', () => {
+    expect(filtereKraefte(roh, OHNE, null)).toEqual(filtereKraefte(roh, OHNE));
+  });
+
+  it('nur Treffer mit ihren Mitteln; Mittel ohne Einheit fallen weg', () => {
+    const ge = filtereKraefte(roh, OHNE, new Set([20]));
+    expect(ge.einheiten.map((e) => e.id)).toEqual([20]);
+    expect(ge.personal.map((x) => x.id)).toEqual([4]);
+    expect(ge.fahrzeuge.map((x) => x.id)).toEqual([2]);
+    expect(ge.material.map((x) => x.id)).toEqual([2]);
+  });
+
+  it('die Obereinheit eines Treffers bleibt als Rahmen, ohne eigene Mittel', () => {
+    const ge = filtereKraefte(roh, OHNE, new Set([11]));
+    expect(ge.einheiten.map((e) => e.id)).toEqual([10, 11]);
+    expect(ge.personal.map((x) => x.id)).toEqual([2]);
+    expect(ge.fahrzeuge).toEqual([]);
+    expect(ge.material).toEqual([]);
+  });
+
+  it('eine abgestellte Untereinheit holt ihre Obereinheit nicht als Rahmen', () => {
+    const ge = filtereKraefte(roh, OHNE, new Set([12]));
+    expect(ge.einheiten.map((e) => e.id)).toEqual([12]);
+  });
+
+  it('die übrigen Filter gelten weiter', () => {
+    const ge = filtereKraefte(roh, { ...OHNE, abschnittId: 2 }, new Set([11, 12, 20]));
+    expect(ge.einheiten.map((e) => e.id)).toEqual([12]);
+    expect(ge.personal.map((x) => x.id)).toEqual([3]);
+  });
+
+  it('der Lagebericht-Text nennt nur die Auswahl', () => {
+    const ge = filtereKraefte(roh, OHNE, new Set([20]));
+    const bild = baueKraeftebild(
+      ge.abschnitte,
+      ge.einheiten,
+      ge.personal,
+      ge.fahrzeuge,
+      ge.material,
+    );
+    const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+    expect(md).toContain('E20');
+    expect(md).not.toContain('E10');
+    expect(md).not.toContain('P5');
+  });
 });

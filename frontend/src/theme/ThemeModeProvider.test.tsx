@@ -9,8 +9,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button, Checkbox, Collapse, Popconfirm, Radio, Switch, theme } from 'antd';
-import { ThemeModeProvider, useDichte, useThemeMode } from './ThemeModeProvider';
+import { Alert, Button, Checkbox, Collapse, Popconfirm, Radio, Switch, theme } from 'antd';
+import { ThemeModeProvider, ThemeModusFest, useDichte, useThemeMode } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { sendeZeigerAenderung, setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
 
@@ -235,6 +235,28 @@ describe('Nachtbetrieb als Vorgabe (Neuentwurf „Instrumententafel", 21.09.2026
  * Geprüft wird die VERDRAHTUNG im Provider, nicht `antdKnopf()` allein; die Werte stehen als
  * Literale da.
  */
+describe('Bediendichte — Schließen-Kreuz eines Hinweises (LLH-1798)', () => {
+  const BODEN = { kompakt: '24px', komfortabel: '48px', handschuh: '72px' } as const;
+
+  for (const s of STUFEN) {
+    it(`Stufe ${s}: das Kreuz „Hinweis schließen“ ist auf beiden Achsen mindestens ${BODEN[s]}`, () => {
+      localStorage.setItem(SPEICHER_SCHLUESSEL, s);
+      render(
+        <ThemeModeProvider>
+          <Alert
+            type="info"
+            title="Posten #7 gibt es nicht (mehr)"
+            closable={{ 'aria-label': 'Hinweis schließen' }}
+          />
+        </ThemeModeProvider>,
+      );
+      const kreuz = screen.getByRole('button', { name: 'Hinweis schließen' });
+      expect(kreuz.style.minWidth).toBe(BODEN[s]);
+      expect(kreuz.style.minHeight).toBe(BODEN[s]);
+    });
+  }
+});
+
 describe('Bediendichte — die kurze Achse beschrifteter Knöpfe (LFH-381)', () => {
   const BODEN = { kompakt: '24px', komfortabel: '48px', handschuh: '72px' } as const;
 
@@ -489,5 +511,31 @@ describe('Gesperrter Browserspeicher (LFH-942)', () => {
       length: 0,
     });
     pruefeOhneSpeicher();
+  });
+});
+
+/**
+ * Fester Modus für das Design System (d78gipem D5): jeder Abschnitt einer Karte (Nacht, Tag)
+ * braucht seinen eigenen Modus, sonst lesen Bausteine mit `useModusFarben` im Tag-Abschnitt die
+ * Nacht-Rollen. Kein Speicher, keine Medienabfrage.
+ */
+describe('ThemeModusFest', () => {
+  function Sonde() {
+    const { modus, effektiv, dichte } = useThemeMode();
+    return <span data-testid="sonde">{`${modus} ${effektiv} ${dichte}`}</span>;
+  }
+
+  it('liefert den gesetzten Modus und die Dichte, unabhängig vom Speicher', () => {
+    window.localStorage.setItem('lifeline-hub.theme', 'dark');
+    try {
+      render(
+        <ThemeModusFest effektiv="light" dichte="kompakt">
+          <Sonde />
+        </ThemeModusFest>,
+      );
+      expect(screen.getByTestId('sonde')).toHaveTextContent('light light kompakt');
+    } finally {
+      window.localStorage.removeItem('lifeline-hub.theme');
+    }
   });
 });
