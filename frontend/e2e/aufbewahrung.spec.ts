@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { DatabaseSync } from 'node:sqlite';
-import { kontrast, randKontrast } from './kontrast-kern';
+import { kontrast } from './kontrast-kern';
 import { kontoAnlegen } from './konto-anlegen';
 import { anmeldenPerApi } from './anmelde-kern';
 
@@ -21,7 +21,6 @@ import { anmeldenPerApi } from './anmelde-kern';
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const TEXT = { light: 7, dark: 5 } as const;
-const RAND = 3;
 
 function datenbank(): string {
   const lauf = process.env.LIFELINE_E2E_LAUF;
@@ -299,20 +298,8 @@ test.describe('Aufbewahrung (LFH-23)', () => {
           messwerte[zustand] = text;
           expect(text.verhaeltnis, `${zustand} Text ${modus}`).toBeGreaterThanOrEqual(TEXT[modus]);
         }).toPass({ timeout: 10_000 });
-        // Der Rand trägt die Rolle (WCAG 1.4.11) — gegen die eigene Tönung UND die Zeile.
-        if (
-          zustand === 'faellig' ||
-          zustand === 'vorgemerkt' ||
-          zustand === 'schwaerzung_ausstehend' ||
-          zustand === 'schwaerzung_beantragt'
-        ) {
-          const rand = await randKontrast(etikett);
-          messwerte[`${zustand}-rand`] = rand;
-          expect(
-            Math.min(rand.gegenInnen, rand.gegenAussen),
-            `${zustand} Rand ${modus}`,
-          ).toBeGreaterThanOrEqual(RAND);
-        }
+        // Kein Randmaß mehr: `Status` ist randlos (LLH-1779, Spec `status-darstellung`); die
+        // Rolle trägt neben der Fläche das Formzeichen, Rahmen heißt bedienbar (LLH-1780).
       }
       await testInfo.attach(`kontrast-${modus}.json`, {
         body: JSON.stringify(messwerte, null, 2),
