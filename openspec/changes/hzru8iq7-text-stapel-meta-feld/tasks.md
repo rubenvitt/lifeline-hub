@@ -69,7 +69,7 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
 - [x] 5.3 ADR „Text, Abstand und Feldbreite kommen aus benannten Stufen“ nach
   `docs/architektur/entscheidungen/VORLAGE.md` mit nächster freier Nummer auf `alpha`, `gilt_fuer`
   auf Bausteine, Wächter und Schuld; Prüfblock grün (`scripts/check-all.sh` ADR-Schritt)
-- [ ] 5.4 Folgeaufgaben je übrigem Bereich (Umstellung auf die Bausteine) und für Mono-Stufe sowie
+- [x] 5.4 Folgeaufgaben je übrigem Bereich (Umstellung auf die Bausteine) und für Mono-Stufe sowie
   Knopfreihe per `zunder-task-anlegen` angelegt, Kennungen in der PR-Beschreibung
 
 ## 6. Prüfung
