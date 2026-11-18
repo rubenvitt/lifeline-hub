@@ -1,3 +1,138 @@
+## [1.0.0-alpha.195](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.194...v1.0.0-alpha.195) (2026-11-18)
+
+### Wichtige Änderungen
+
+- **Gleichzeitiges Bearbeiten:** Kopfdaten des Einsatzes, Einheiten, Führungsstellen, Unfallhilfsstellen und Bereitstellungsräume prüfen beim Speichern, ob ein Feld inzwischen von jemand anderem geändert wurde. Der Server lehnt einen solchen Konflikt als „veraltet“ ab. Die Oberfläche zeigt dann einen Änderungsvermerk, statt die fremde Änderung still zu überschreiben. Schreibende Fremdsysteme müssen den Stand mitschicken, auf dem ihre Änderung beruht.
+- **Einsatzabschluss neu geregelt:** Ein Dialog listet vor dem Abschluss die offenen Punkte auf. Er nennt dabei nur Inhalte aus Modulen, die die Person lesen darf. Zur Bestätigung wird der Einsatzname eingetippt. Der Abschluss schreibt „Einsatz abgeschlossen“ ins ETB und beendet Gerätekopplungen und Freigaben, auch am Spiegel. Binnen 24 Stunden lässt sich der Einsatz wieder öffnen. Dabei wird eine begonnene Nachbereitung zurückgenommen.
+- **Kopplung und Archiv:** Eine Direktkopplung vor Ort macht eine Instanz nicht mehr zum Hub und sperrt keine Anbindungen. Fremdsysteme einer Organisation sperrt nur noch eine Standardkopplung.
+- **Live-Verbindung:** Eine stumme Live-Leitung wird jetzt an fehlenden Lebenszeichen erkannt.
+
+### Lage und Übersichten
+
+- **Alarmzeile „Was brennt“:** Sie steht oben im Überblick, im Lagebild, im Großbild des Lagebilds und auf dem Lagemonitor. Der Lagemonitor nennt den Ausfall je Einheit, gezählt vom Server. Ein gescheiterter Abruf erscheint als „Stand unvollständig“.
+- **Überblick:**
+  - Das Kennzahlenband entfällt. Die nächsten Fristen stehen in der ersten Reihe, und im Menü heißt der Überblick „Fristen, Vorgänge, Entscheidungen“.
+  - Neu ist die Startliste „Einsatz starten“. Sie führt direkt zu Einsatzort, eigener Führungsstelle und zum Anlegen eines Abschnitts.
+  - Sofort- und Dringendmeldungen stehen zuoberst. Abschnittskarten nennen überfällige Rückmeldungen und Ausfälle.
+- **Lagebild:**
+  - Es hat ein Großbild für den Beamer.
+  - Aufträge und Meldungen sind aus dem Lagebild herausgenommen.
+  - Ohne Netz steht „offline“ statt „live“, und Sichtungskategorie IV heißt „abwartend“.
+  - Der Hinweis auf neue ETB-Einträge sitzt im Paneelkopf.
+- **Lagemonitor:**
+  - Gefahrenzonen tragen Bezeichnung, Warnstufe und Bestätigung.
+  - Eine Überbelegung wird als Alarm gezeigt.
+  - Kartenmarken weichen dem Einsatzort und einander aus.
+  - Lange Gebietsnamen brechen um, statt gekürzt zu werden.
+- **Lagebesprechung:** Sie hat ebenfalls ein Großbild, und die Vorbereitung passt darin ohne Bildlauf.
+- **Organigramm:** Jeder Knoten zeigt seinen Lagezustand. Eine fehlende Leitung wird einmal in einer festen Sammelzeile oben gemeldet.
+- **Gefahren und Wetter:** Statt „nicht beurteilt“ steht „unbestätigt“, Stufe und Zusatz stehen in einem Etikett. Fehlt der Einsatzort, erklärt die Wetterseite das einmal.
+
+### Übungen
+
+- Eine Übung ist überall deutlich gekennzeichnet:
+  - im Einsatzrahmen mit Band und Marke, in jeder Breite;
+  - im Tab-Titel mit „ÜBUNG ·“;
+  - in Einsatzliste, Einsatzwechsler, Sprungpalette und Planungsübernahme;
+  - im externen Lagebild, in der Gerätehülle und auf dem Lagemonitor.
+- Gedruckte Blätter tragen „ÜBUNG“ im Kopf und am Rand. Das Schriftfeld der Fernmeldeskizze beginnt mit „ÜBUNG ·“.
+
+### Einsatztagebuch
+
+- Eine unlesbare Zeitangabe hält das Senden an und markiert die Angabe.
+- HEIC-Fotos lassen sich über das Zeilenmenü in der Großansicht öffnen. Ohne Netz meldet die Großansicht das, statt endlos umzuwandeln. Ein neuer Versuch und Abbrechen sind möglich.
+- Das „/“-Menü rollt die gewählte Zeile mit und wird nie höher als der verfügbare Platz.
+- Die Filterleiste bleibt bei schmalen Fenstern einzeilig.
+- Das ETB steht in der Navigation unter „Führung“, „Entscheidungen“ direkt darunter.
+
+### Lagekarte
+
+- Die Knöpfe tragen ein Wort. Bei Bedienung per Touch ist die Leiste zunächst zugeklappt.
+- Gibt es noch keinen gespeicherten Stand, steht nur der Knopf „Stand sichern“ da.
+- Die Messkarte passt im Handschuh-Modus auch auf schmale Handys.
+- Einheiten werden dem Abschnitt zugezählt, in dem sie stehen.
+
+### Kräfte und Mittel
+
+- **Stärke:**
+  - Ein Abschnitt zählt, wer in ihm steht. Das gilt auch für abgestellte Einheiten und Untereinheiten mit geerbtem Abschnitt.
+  - Die Stärke wird überall gleich geschrieben und bricht nicht mehr mitten im Kürzel um.
+  - Kräfte an Unfallhilfsstellen zählen nur bei aktiven Stellen.
+- **Kräfteübersicht** (bisher „Meldebild“): „Kräfte“ zählt Köpfe, Fahrzeuge werden gesondert gezählt. Gründe der Einfärbung erscheinen als Etiketten mit Dauer. Die Auswahlzahl erscheint nur bei gesetztem Filter.
+- **Rückgängig, wo es geht:** Zurücknehmen lassen sich:
+  - Entlassungen von Fahrzeugen und Personen;
+  - die Herausnahme von Material, das wieder an seinen Ort kommt;
+  - „Aus Einheit lösen“ und das Austragen.
+
+  Rückgängig wird nur angeboten, solange das Objekt nicht anderweitig gebunden ist. Entlassene Fahrzeuge erscheinen nicht mehr auf der Karte.
+- **Beenden und Lösen:** Auflösen und Stornieren sind an Bereitstellungsräumen, Unfallhilfsstellen und Einheiten gleich gebündelt. „Lösen“ liegt neutral im ⋮-Menü.
+- **Unfallhilfsstellen und Bereitstellungsräume:**
+  - Sie werden im Dialog angelegt.
+  - Ihre Angaben lassen sich direkt in der Ansicht bearbeiten.
+  - Die Kennzahlen der Unfallhilfsstellen sind eindeutig benannt, und die Seite läuft am Handy nicht mehr quer über.
+- **Tabellen:**
+  - Die Aktionsspalte ist rechts fixiert.
+  - Zellen werden in einer schwebenden Bearbeitung direkt an der Zelle geändert.
+  - Spaltenköpfe stehen sauber über ihren Spalten.
+  - Der Spaltenschalter zeigt einen Zähler erst nach eigener Auswahl.
+- **Personal, Fahrzeuge, Einheiten:** Die Qualifikation wird als Wert angezeigt und per Stift bearbeitet. Unter dem Funkrufnamen steht der Fahrzeugtyp. Einheiten erscheinen am Handy als Karten.
+- **Verpflegung:** Sammlung und „Buchen“ stehen in der klebenden Leiste neben „+1“.
+
+### Betroffene und Betreuung
+
+- In der Navigation gibt es die Kategorie „Betroffene & Schäden“.
+- Rückgängig nach dem Schließen einer Betreuungsstelle setzt den vorherigen Status wieder.
+- Der Sperrgrund einer Registrierung steht neben dem Knopf.
+- Die Sichtungsauswahl ist farblich überarbeitet.
+
+### Meldungen und Kommunikation
+
+- Lagemeldungen werden in einem einspaltigen Erfassungsdialog erfasst.
+- Wird eine Chatnachricht als Meldung oder Lage heraufgestuft, legt das die Meldung im Eingang an.
+- Die Meldungsliste zeigt beim Laden kein „0 offen“ mehr. Bei einem Kaltstart ohne Netz erscheint eine Fehlermeldung statt eines endlosen Ladebilds.
+- Das Alter der ältesten Sofortmeldung zählt ab dem Sofortalarm.
+- Alarme erscheinen in einer eigenen Alarmzone statt als Toast-Stapel. Ausblenden quittiert einen Alarm nicht.
+- Eine verweigerte Benachrichtigungserlaubnis wird auch ohne Service Worker gemeldet.
+- Die Fernmeldeskizze behält den Verband wie der Funkplan.
+
+### Bedienung und Navigation
+
+- **Kopfleiste:**
+  - Sie bleibt in jeder Breite stehen, am Handy einzeilig mit Uhr.
+  - Der Einsatzname hat Vorrang vor der Suche.
+  - Ruhezustände erscheinen nur als Symbol, ein Wort steht nur bei einer Störung.
+- **Rahmen:**
+  - Modulpanel und Seitenkopf bleiben beim Rollen stehen.
+  - Die Rail führt ins zuletzt besuchte Modul.
+  - Module lassen sich per Link in einem neuen Tab öffnen.
+  - Sprungmarken stehen als eingerückte Unteransicht.
+- **Einsatzwechsel:** Der Wechsel behält das aktuelle Modul, auch aus der Sprungpalette. Die Nebenzeile nennt Einsatzart oder Beginn.
+- **Sprungpalette:**
+  - Neue Schnellaktionen: Meldung, Lagemeldung, Auftrag, Nachforderung und Fahrzeugstatus.
+  - Die Schnellaktionen sind nach der eigenen Nutzung geordnet.
+  - Treffer kommen über Wortanfang und Teilwort.
+- **Benutzermenü:** „Abmelden“ steht am Menüende und fragt nach. Das Profil hat einen Reiter „Anzeige“. Die Hilfe führt mit „Zurück zu <Einsatz>“ zurück und öffnet am breiten Schirm in einem neuen Tab.
+- **Nicht vorhandene Seiten und Objekte:** Sie werden einheitlich behandelt. Eine unbekannte Adresse bleibt im Einsatz und meldet „Seite nicht gefunden“. Links auf gelöschte Objekte bekommen eine Hinweisleiste. Fehler fängt jeder Rahmen einzeln ab.
+- **Zugänglichkeit und Darstellung:**
+  - Jeder Rahmen hat den Sprunglink „Zum Inhalt springen“.
+  - Dauern, Uhrzeiten und Datenstände haben eine einheitliche Form, Kürzel werden eingeführt oder erklärt.
+  - Statt Tabs und Knopfgruppen gibt es eine Segmentleiste.
+  - Die Abstände folgen einem einheitlichen Raster.
+  - Gelb wird sparsamer eingesetzt, und die Ortsmarke ist jetzt blau.
+  - Meldungswörter und Links erreichen im Tagbetrieb ein Kontrastverhältnis von 7 : 1.
+- **Druck:** Aus dem Nachtbetrieb wird im hellen Farbschema gedruckt.
+
+### Gekoppelte Geräte
+
+- Die Restzeit einer Kopplung wird ohne Doppelungen angezeigt.
+- Fehlt der Einsatzkopf, erscheint „Einsatzart nicht geladen“ statt einer leeren Ansicht.
+- Die Einheitenliste folgt dem tatsächlich wirksamen Abschnitt und zeigt die eigene Stärke.
+
+### Betrieb und Installation
+
+- Abstürze im Browser und in der Gerätehülle werden an den Server gemeldet.
+- Die Einsatznummer eines Spiegels ist begrenzt. Freie Nummern an der Grenze werden ohne Überlauf neu vergeben.
+
 ## [1.0.0-alpha.194](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.193...v1.0.0-alpha.194) (2026-11-15)
 
 ### Wichtige Änderungen
