@@ -1,5 +1,5 @@
 // src/etb/BausteinPlatzhalterModal.tsx
-import { Button, Form, Input, Modal, Space } from 'antd';
+import { Button, Form, Input, Modal, Space, theme } from 'antd';
 import { useEffect } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
@@ -21,6 +21,7 @@ export default function BausteinPlatzhalterModal({
   onEinsetzen,
   onAbbrechenAll,
 }: Props) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<Record<string, string>>();
   // `{datum}`/`{uhrzeit}` in der Anzeigezone (LFH-692) und der wirksamen Darstellung (LLH-1061).
   const { konventionen } = useAnzeigeKonventionen();
@@ -64,7 +65,7 @@ export default function BausteinPlatzhalterModal({
       <Form<Record<string, string>> form={form} layout="vertical" onFinish={anwenden}>
         <Space orientation="vertical" style={{ width: '100%' }}>
           {offenePlatzhalter.map((name, index) => (
-            <Form.Item key={name} name={name} label={name} style={{ marginBottom: 8 }}>
+            <Form.Item key={name} name={name} label={name} style={{ marginBottom: token.marginSM }}>
               <Input aria-label={name} autoFocus={index === 0} />
             </Form.Item>
           ))}

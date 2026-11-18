@@ -100,7 +100,7 @@ export default function NachrichtEingabe({
   };
 
   return (
-    <div style={{ marginTop: 12 }}>
+    <div style={{ marginTop: token.margin }}>
       <SpeicherFehler fehler={fehler} {...sendeFehlerKopf(fehler)} />
       <Space.Compact style={{ width: '100%' }}>
         <Mentions
@@ -163,7 +163,7 @@ export default function NachrichtEingabe({
         beforeUpload={() => false}
         fileList={dateien}
         onChange={({ fileList }) => setDateien(fileList)}
-        style={{ marginTop: 8 }}
+        style={{ marginTop: token.marginSM }}
       >
         <Button type="text" icon={<IconBueroklammer />}>
           Anhang

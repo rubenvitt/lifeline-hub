@@ -62,7 +62,7 @@ export default function EinsatzSwitcher({
       const neben = einsatzNebenzeile(e, konventionen);
       // Eine Übung trägt die Übungsmarke vor dem Namen (LLH-1725, Spec `uebungsmarke`).
       const name = isUebung(e) ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginSM }}>
           <UebungsMarke einsatz={e} />
           <span>{e.bezeichnung}</span>
         </span>
@@ -112,7 +112,7 @@ export default function EinsatzSwitcher({
           minWidth: token.controlHeight,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
+          gap: token.marginXS,
         }}
       >
         <span

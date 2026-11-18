@@ -11,6 +11,7 @@ import {
   Spin,
   Tag,
   Typography,
+  theme,
 } from 'antd';
 import type { FormRule } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -165,6 +166,7 @@ function halterAnzeige(t: Tier): ReactNode {
 }
 
 export default function TiereDetailPage() {
+  const { token } = theme.useToken();
   const { id, tierId: tierIdParam } = useParams();
   const einsatzId = Number(id);
   const tierId = Number(tierIdParam);
@@ -518,7 +520,7 @@ export default function TiereDetailPage() {
         />
       }
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>
             Tier <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
@@ -609,13 +611,16 @@ export default function TiereDetailPage() {
           >
             {detailAnsicht}
             {editFehler != null && (
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
                 <SpeicherFehler fehler={editFehler} />
               </div>
             )}
             {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
                 Feldern scrollten die Knöpfe sonst aus dem Bild. */}
-            <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
+            <div
+              {...speicherLeiste}
+              style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+            >
               {storniert ? (
                 // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
                 <Button onClick={editSitzung.beende}>Schließen</Button>
@@ -720,7 +725,7 @@ export default function TiereDetailPage() {
       >
         Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
         {stornoMutation.error != null && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
             <SpeicherFehler
               fehler={stornoMutation.error}
               titel="Nicht storniert"

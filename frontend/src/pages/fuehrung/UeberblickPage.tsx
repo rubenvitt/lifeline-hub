@@ -1145,7 +1145,7 @@ function abschnittGliederung(
         {(lage || zeile.unterLage || gruende.length > 0) && (
           <span
             data-lfh="abschnitt-zustand"
-            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}
+            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginSM }}
           >
             {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
             {/* Ein schlechter beurteilter Unterabschnitt bekommt dieselbe Form wie der eigene
@@ -1188,7 +1188,7 @@ function abschnittGliederung(
         {zeile.rueckmeldungBekannt && (
           <span
             data-lfh="abschnitt-rueckmeldung"
-            style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}
+            style={{ display: 'flex', alignItems: 'baseline', gap: token.margin, minWidth: 0 }}
           >
             {rueck ? (
               <>

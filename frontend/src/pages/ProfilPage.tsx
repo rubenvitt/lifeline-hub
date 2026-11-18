@@ -262,14 +262,19 @@ export default function ProfilPage() {
                   Passkey
                 </Augenbraue>
                 {fehler && (
-                  <Alert type="error" title={fehler} showIcon style={{ marginBottom: 12 }} />
+                  <Alert
+                    type="error"
+                    title={fehler}
+                    showIcon
+                    style={{ marginBottom: token.margin }}
+                  />
                 )}
                 {erfolg && (
                   <Alert
                     type="success"
                     title="Passkey registriert"
                     showIcon
-                    style={{ marginBottom: 12 }}
+                    style={{ marginBottom: token.margin }}
                   />
                 )}
                 <Button onClick={passkeyRegistrieren} loading={laedt}>
@@ -290,22 +295,22 @@ export default function ProfilPage() {
                   <Alert
                     type="warning"
                     showIcon
-                    style={{ marginBottom: 16 }}
+                    style={{ marginBottom: token.marginLG }}
                     // `title` statt des in antd 6 abgelösten `message`.
                     title="Wiederherstellungscodes jetzt sichern"
                     description={
                       <div>
-                        <Typography.Paragraph style={{ marginBottom: 8 }}>
+                        <Typography.Paragraph style={{ marginBottom: token.marginSM }}>
                           Nur jetzt sichtbar. Einziger Zugang bei Geräteverlust; jeder Code gilt
                           einmal.
                         </Typography.Paragraph>
                         <pre
                           style={{
                             background: rollen.flaeche2,
-                            padding: 12,
+                            padding: token.padding,
                             borderRadius: 0,
                             ...monoStil(13),
-                            marginBottom: 8,
+                            marginBottom: token.marginSM,
                             whiteSpace: 'pre-wrap',
                           }}
                         >
@@ -329,7 +334,12 @@ export default function ProfilPage() {
                 )}
 
                 {totpFehler && (
-                  <Alert type="error" title={totpFehler} showIcon style={{ marginBottom: 12 }} />
+                  <Alert
+                    type="error"
+                    title={totpFehler}
+                    showIcon
+                    style={{ marginBottom: token.margin }}
+                  />
                 )}
 
                 {totpAktiv ? (
@@ -338,7 +348,7 @@ export default function ProfilPage() {
                       type="success"
                       title="Zweiter Faktor aktiv"
                       showIcon
-                      style={{ marginBottom: 8 }}
+                      style={{ marginBottom: token.marginSM }}
                     />
                     <Typography.Paragraph type="secondary">
                       Abschalten kann nur ein Administrator.

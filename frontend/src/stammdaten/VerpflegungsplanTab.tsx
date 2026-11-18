@@ -125,7 +125,10 @@ function VerpflegungsplanInhalt() {
             {uhrzeitOhneDatum(m.beginn, konventionen)}–{uhrzeitOhneDatum(m.ende, konventionen)}
           </span>
           {m.folgetag && (
-            <Typography.Text type="secondary" style={{ ...monoStil(12), marginInlineStart: 6 }}>
+            <Typography.Text
+              type="secondary"
+              style={{ ...monoStil(12), marginInlineStart: 'var(--lfh-luft-2)' }}
+            >
               +1 Tag
             </Typography.Text>
           )}

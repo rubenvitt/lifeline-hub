@@ -529,7 +529,7 @@ export default function ModulPanel({ titel, einsatz, kleben = true, ...liste }: 
               padding: `${token.paddingSM}px ${token.padding}px`,
               display: 'flex',
               flexDirection: 'column',
-              gap: 6,
+              gap: token.marginSM,
             }}
           >
             <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>

@@ -28,12 +28,19 @@ export default function WetterKopfMarke({ warnung, ziel }: { warnung: KopfWarnun
           display: 'inline-flex',
           flexWrap: 'wrap',
           alignItems: 'center',
-          columnGap: 6,
+          columnGap: token.marginSM,
           minHeight: token.controlHeight,
           color: rollen.text,
         }}
       >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: farbe }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: token.marginXS,
+            color: farbe,
+          }}
+        >
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
             <IconWarndreieck size={14} />
           </span>

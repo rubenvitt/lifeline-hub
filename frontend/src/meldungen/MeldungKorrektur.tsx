@@ -1,4 +1,4 @@
-import { Alert, Button, Col, Form, Input, Row, Space } from 'antd';
+import { Alert, Button, Col, Form, Input, Row, Space, theme } from 'antd';
 import { useState } from 'react';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import type {
@@ -79,6 +79,7 @@ export default function MeldungKorrektur({
   onSpeichern,
   onFertig,
 }: Props) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<KorrekturWerte>();
   const [sendet, setSendet] = useState(false);
   const meldungsart = Form.useWatch('meldungsart', form) ?? meldung.meldungsart;
@@ -120,9 +121,9 @@ export default function MeldungKorrektur({
         }
       }}
       aria-label={`Meldung #${meldung.lfd_nr} korrigieren`}
-      style={{ marginTop: 8 }}
+      style={{ marginTop: token.marginSM }}
     >
-      <Row gutter={16}>
+      <Row gutter={token.marginLG}>
         <Col xs={24} sm={12}>
           <Form.Item name="meldungsart" label="Meldungsart">
             <Select<Meldungsart> aria-label="Meldungsart" options={MELDUNGSART_OPTIONEN} />
@@ -177,7 +178,7 @@ export default function MeldungKorrektur({
           type="warning"
           showIcon
           title="Speichern löst den Sofortalarm aus, wenn die Meldung noch keinen hatte."
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: token.margin }}
         />
       )}
       <Space style={{ justifyContent: 'flex-end', width: '100%' }}>

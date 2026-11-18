@@ -251,7 +251,7 @@ export default function GefahrenPage() {
      * Schreibrecht zeichnet die Karte nicht; dann steht kein Knopf, der es verspräche.
      */
     return seite(
-      <div style={{ marginTop: 64, textAlign: 'center' }}>
+      <div style={{ marginTop: flaeche.zustandOben, textAlign: 'center' }}>
         <SeitenLeer
           titel="Noch keine Gefahrengebiete"
           aktion={
@@ -453,12 +453,12 @@ export default function GefahrenPage() {
           />
         )}
         {!darfSchreiben && (
-          <div className="gefahren-no-print" style={{ marginBottom: 12 }}>
+          <div className="gefahren-no-print" style={{ marginBottom: token.margin }}>
             <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
           </div>
         )}
         {setzen.isError && (
-          <div data-fehler className="gefahren-no-print" style={{ marginBottom: 12 }}>
+          <div data-fehler className="gefahren-no-print" style={{ marginBottom: token.margin }}>
             <SpeicherFehler fehler={setzen.error} titel="Bewertung nicht gespeichert" />
           </div>
         )}

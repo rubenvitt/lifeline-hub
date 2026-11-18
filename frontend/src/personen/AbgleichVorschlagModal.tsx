@@ -76,7 +76,10 @@ export default function AbgleichVorschlagModal({
         disabled={gefundene.length === 0}
       />
       {gefundene.length === 0 && (
-        <Typography.Paragraph type="secondary" style={{ marginBlockStart: 8, marginBlockEnd: 0 }}>
+        <Typography.Paragraph
+          type="secondary"
+          style={{ marginBlockStart: token.marginSM, marginBlockEnd: 0 }}
+        >
           Keine gefundenen Personen
         </Typography.Paragraph>
       )}

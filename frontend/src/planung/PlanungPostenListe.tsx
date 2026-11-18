@@ -103,7 +103,7 @@ export default function PlanungPostenListe({
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
       render: (_, p) => (
-        <Space size={4} wrap>
+        <Space size={token.marginXS} wrap>
           <span style={{ overflowWrap: 'anywhere' }}>{p.bezeichnung}</span>
           {p.nicht_verfuegbar && <StatusChip ton="achtung" wort="nicht verfügbar" />}
         </Space>

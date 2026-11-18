@@ -64,7 +64,9 @@ describe('Seitenrinne — die Verdrahtung (LFH-329 · B1)', () => {
     const block = lies(INDEX_CSS).match(/\.etb-erfassung-sticky\s*\{([^}]*)\}/);
     expect(block).not.toBeNull();
     expect(block![1]).toMatch(/margin:\s*0 calc\(-1 \* var\(--lfh-seiten-polsterung\)\)/);
-    expect(block![1]).toMatch(/padding:\s*12px var\(--lfh-seiten-polsterung\) 14px/);
+    expect(block![1]).toMatch(
+      /padding:\s*var\(--lfh-luft-3\) var\(--lfh-seiten-polsterung\) var\(--lfh-luft-4\)/,
+    );
   });
 
   it('index.css nennt das alte Maß nirgends mehr — auch nicht in Prosa', () => {

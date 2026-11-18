@@ -1,4 +1,4 @@
-import { Form, Typography } from 'antd';
+import { Form, Typography, theme } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { ladeVersorgendeEinheiten, savePersonEinheit } from '../api/einsatzPerson';
@@ -67,6 +67,7 @@ export default function VersorgtVon({
   bedienbar: boolean;
   onGeschrieben?: () => void;
 }) {
+  const { token } = theme.useToken();
   const geraet = useAuthOptional()?.geraet ?? null;
   const ohneVerbindung = useOhneVerbindung();
   const schreibt = bedienbar && geraet == null;
@@ -117,7 +118,14 @@ export default function VersorgtVon({
     ) : null;
 
   return (
-    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+    <span
+      style={{
+        display: 'inline-flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: token.marginSM,
+      }}
+    >
       {schreibt ? (
         <InlineAngabe<number | null>
           etikett="Versorgende Einheit"

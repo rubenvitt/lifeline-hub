@@ -380,7 +380,7 @@ export default function OfflineKartenVerwaltung() {
   return (
     <>
       {istAdmin && (
-        <Space style={{ marginBottom: 12 }}>
+        <Space style={{ marginBottom: 'var(--lfh-luft-3)' }}>
           {/* Ein Weg für den Regelfall: bauen (falls nötig) + laden hinter einem Button. */}
           <Button type="primary" onClick={() => setPickerOffen(true)}>
             Region aufs Gerät bringen

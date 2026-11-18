@@ -1,4 +1,4 @@
-import { Button } from 'antd';
+import { Button, theme } from 'antd';
 import { useCallback, useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { schriftStil, useRollen } from '../components/instrument/rollenwerte';
 import { RAHMEN_EBENE, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
@@ -223,6 +223,7 @@ function Zeile({
   mitWort?: boolean;
   mitFokus: (handlung: () => void) => () => void;
 }) {
+  const { token } = theme.useToken();
   return (
     <div data-lfh="alarm-eintrag" data-schluessel={eintrag.schluessel} style={stil}>
       {mitWort && <Wort stufe={eintrag.stufe === 'alarm' ? 'alarm' : 'hinweis'} rollen={rollen} />}
@@ -233,7 +234,7 @@ function Zeile({
             fontFamily: schrift.zahl,
             fontVariantNumeric: 'tabular-nums',
             fontWeight: 700,
-            paddingInline: 5,
+            paddingInline: token.paddingXS,
             background: zaehler.alarm ? rollen.alarm : rollen.bedien,
             color: rollen.aufBedien,
           }}
@@ -249,7 +250,14 @@ function Zeile({
           {eintrag.beschreibung}
         </span>
       )}
-      <span style={{ display: 'inline-flex', gap: 8, marginInlineStart: 'auto', flexShrink: 0 }}>
+      <span
+        style={{
+          display: 'inline-flex',
+          gap: token.marginSM,
+          marginInlineStart: 'auto',
+          flexShrink: 0,
+        }}
+      >
         <Button type="primary" onClick={eintrag.oeffnen}>
           Öffnen
         </Button>

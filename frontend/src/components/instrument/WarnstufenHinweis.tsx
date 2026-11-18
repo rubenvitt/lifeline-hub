@@ -17,7 +17,7 @@ export default function WarnstufenHinweis({
   ton: 'achtung' | 'alarm';
   children: ReactNode;
 }) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   return (
     <span
       data-lfh="warnstufe-hinweis"
@@ -25,7 +25,7 @@ export default function WarnstufenHinweis({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
+        gap: token.marginXS,
         color: ton === 'alarm' ? rollen.alarmText : rollen.achtungText,
       }}
     >

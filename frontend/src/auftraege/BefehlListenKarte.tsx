@@ -33,7 +33,7 @@ function BefehlListenKarte({
   hervorgehoben: boolean;
   auswahl: AuswahlZielProps;
 }) {
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   const status = BEFEHL_STATUS[b.status];
   const verteiler = b.verteiler ?? [];
   return (
@@ -51,7 +51,7 @@ function BefehlListenKarte({
       }
       nr={`v${b.version}`}
     >
-      <Space size={6} wrap style={{ marginBottom: 6 }}>
+      <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
         <StatusBadge phase={status.phase} label={status.label} />
         <Text type="secondary" style={{ fontSize: 12 }}>
           {befehlSchemaLabel(b.vorlage)}
@@ -62,7 +62,11 @@ function BefehlListenKarte({
           {b.titel}
         </Text>
       </AuswahlZiel>
-      <Flex gap={8} wrap style={{ marginTop: 4, ...monoStil(11), color: rollen.gedaempft }}>
+      <Flex
+        gap={token.marginSM}
+        wrap
+        style={{ marginTop: token.marginXS, ...monoStil(11), color: rollen.gedaempft }}
+      >
         <span>{b.ersteller_name}</span>
         {b.status === 'freigegeben' && b.freigegeben_at && (
           <span>
@@ -72,7 +76,7 @@ function BefehlListenKarte({
         )}
       </Flex>
       {verteiler.length > 0 && (
-        <Flex align="baseline" gap={8} wrap style={{ marginTop: 4 }}>
+        <Flex align="baseline" gap={token.marginSM} wrap style={{ marginTop: token.marginXS }}>
           {b.status === 'freigegeben' && (
             <Quittungsstand
               anzahl={verteiler.length}

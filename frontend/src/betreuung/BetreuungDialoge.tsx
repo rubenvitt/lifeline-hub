@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal } from 'antd';
+import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, theme } from 'antd';
 import { Typography } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
@@ -428,10 +428,11 @@ function gebietNachAnlegen(
  * `id`, `value`/`onChange` und die ARIA-Zustände (Pflicht, Fehler, Meldung) hinein.
  */
 function RadiusFeld(props: ComponentProps<typeof RadiusEingabe>) {
+  const { token } = theme.useToken();
   return (
     <div
       data-lfh="bezirk-radius"
-      style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
+      style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginSM }}
     >
       <RadiusEingabe {...props} />
     </div>
@@ -772,6 +773,7 @@ export function StelleSchliessenDialog({
   /** Meldet Belegung 0 (ohne Zeitpunkt = jetzt). */
   onLeermeldung: () => Promise<unknown>;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<StelleSchliessenWerte>();
   const geleertGegen = useRef<number | null>(null);
   const belegt = stelle.belegung?.belegt ?? 0;
@@ -806,7 +808,7 @@ export function StelleSchliessenDialog({
           <Alert
             type="info"
             showIcon
-            style={{ marginBottom: 12 }}
+            style={{ marginBottom: token.margin }}
             title={`Die Stelle ist mit ${personenZahl(belegt)} Personen belegt.`}
           />
           <Form.Item

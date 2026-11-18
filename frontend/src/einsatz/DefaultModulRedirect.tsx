@@ -55,7 +55,8 @@ function StandardModulWeiche({
   });
   // Bis alles geladen ist: kurzer Spinner statt Fehl-Redirect — sonst würde er erst auf den
   // Fallback und dann auf den Override bzw. das Modul springen (Doppel-Navigation).
-  if (einstellungen.isLoading || freigaben.isLoading) return <Spin style={{ margin: 24 }} />;
+  if (einstellungen.isLoading || freigaben.isLoading)
+    return <Spin style={{ margin: 'var(--lfh-luft-5)' }} />;
   const modul = modulRegistry.find((m) => m.key === modulHinweis);
   // Gesperrt, ausgeblendet, nicht fertig oder Freigaben unbekannt: still das bisherige Ziel.
   if (modul && istModulFreigegeben(modul, freigaben.data)) {

@@ -177,9 +177,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. antds Steuerelement-Polster
   (`controlPaddingHorizontal`/`…SM`) stehen auf `md`/`sm`; die Inhaltspolster (`paddingContent*`:
   Knopf, Modal, Alert, Liste) bleiben bewusst antds feste Werte. Ein festes Kompakt-Raster gibt es nicht.
-  Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
-  `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
-  `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
+  Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und `gutter`
+  verbietet `theme/abstandsraster.guard.test.ts` ohne Schuldliste. Wo kein `token` zur
+  Hand ist (Stil auf Modulebene, `tagRender`), nimmst du `var(--lfh-luft-*)`; ein Wert, der kein
+  Layoutabstand ist (Kartenrand bei `fitBounds`), steht als benannte Konstante. Feste Ausnahmen
   (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter. Elemente
   reiht `Stapel abstand="…"` (Stufe, nie Zahl) statt `Space direction="vertical"` oder eines
   Flex-`div` mit `gap`.

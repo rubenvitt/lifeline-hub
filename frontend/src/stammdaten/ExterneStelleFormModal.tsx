@@ -153,7 +153,7 @@ export default function ExterneStelleFormModal({
       <Collapse
         key={stelle?.id ?? 'neu'}
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: 'calc(-1 * var(--lfh-luft-2))' }}
         defaultActiveKey={stelle?.rufnummer || stelle?.funkrufname ? ['kontakt'] : []}
         items={[
           {

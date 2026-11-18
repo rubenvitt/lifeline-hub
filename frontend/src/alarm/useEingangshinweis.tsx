@@ -299,7 +299,12 @@ export function useEingangshinweis(
         <div
           key={e.benachrichtigungId}
           data-eingang-meldung={e.bezug === 'meldung' ? e.bezugId : undefined}
-          style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBlockStart: 4 }}
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 'var(--lfh-luft-2)',
+            marginBlockStart: 'var(--lfh-luft-1)',
+          }}
         >
           <span style={{ flex: 1, minWidth: 0 }}>
             {einzeln ? null : (
@@ -332,7 +337,7 @@ export function useEingangshinweis(
         <>
           {zeilen.slice(0, EINGANG_ZEILEN).map(zeile)}
           {weitere > 0 ? (
-            <div style={{ marginBlockStart: 4 }}>
+            <div style={{ marginBlockStart: 'var(--lfh-luft-1)' }}>
               {weitere === 1 ? '+ 1 weitere' : `+ ${weitere} weitere`}
             </div>
           ) : null}

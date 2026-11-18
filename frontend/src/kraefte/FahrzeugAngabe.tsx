@@ -1,4 +1,4 @@
-import { Space, Tag } from 'antd';
+import { Space, Tag, theme } from 'antd';
 import type { Einheit, EinsatzFahrzeug } from '../api/types';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { Select } from '../components/Select';
@@ -36,6 +36,7 @@ export default function FahrzeugAngabe({
   darfSchreiben,
   onSpeichern,
 }: FahrzeugAngabeProps) {
+  const { token } = theme.useToken();
   const aktuell = wert != null ? fahrzeuge.find((f) => f.id === wert) : undefined;
   const fremd = aktuell ? isFremdesFahrzeug(aktuell, { einheit_id: einheitId }) : false;
   const eigeneEinheit = einheitId != null ? einheiten.find((e) => e.id === einheitId) : undefined;
@@ -46,7 +47,7 @@ export default function FahrzeugAngabe({
       kennung={kennung}
       wert={wert}
       anzeige={
-        <Space size={4} wrap>
+        <Space size={token.marginXS} wrap>
           <span style={monoStil(13)}>{aktuell?.funkrufname ?? 'nicht geladen'}</span>
           {fremd && <Tag>andere Einheit</Tag>}
         </Space>

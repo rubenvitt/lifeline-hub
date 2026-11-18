@@ -208,7 +208,10 @@ export default function LagebildExternPage() {
       <header style={{ display: 'grid', gap: token.marginXXS }}>
         <Typography.Title level={1} style={{ margin: 0, fontSize: 24 }} data-lfh="extern-titel">
           {isUebung(e) && (
-            <UebungsMarke einsatz={e} style={{ marginInlineEnd: 8, verticalAlign: 'middle' }} />
+            <UebungsMarke
+              einsatz={e}
+              style={{ marginInlineEnd: token.marginSM, verticalAlign: 'middle' }}
+            />
           )}
           {e.bezeichnung}
         </Typography.Title>
@@ -217,7 +220,10 @@ export default function LagebildExternPage() {
             .filter(Boolean)
             .join(' · ')}
         </span>
-        <span data-lfh="extern-stand" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <span
+          data-lfh="extern-stand"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}
+        >
           <span>Stand {zeit(daten.stand_at)}</span>
           {abfrage.isError && <span style={{ color: rollen.achtungText }}>· keine Verbindung</span>}
           {abgleich && (

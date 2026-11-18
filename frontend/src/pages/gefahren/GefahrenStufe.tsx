@@ -20,7 +20,7 @@ export default function GefahrenStufe({ stufe }: { stufe: Warnstufe }) {
         display: 'inline-flex',
         alignItems: 'baseline',
         gap: token.marginXXS,
-        padding: `0 ${token.paddingXS}px 3px`,
+        padding: `0 ${token.paddingXS}px ${token.paddingXS}px`,
         whiteSpace: 'nowrap',
         ...zellFlaechenStil(stufe, token),
       }}

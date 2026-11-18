@@ -228,6 +228,7 @@ describe('IconRail · Dichte', () => {
   const tokenFuer = (s: keyof typeof dichten) => ({
     controlHeight: dichten[s].zeilenhoehe,
     paddingXS: dichten[s].abstand.xs,
+    marginXS: dichten[s].abstand.xs,
   });
   const hoehe = (s: keyof typeof dichten) => railZielStil(tokenFuer(s), { aktiv: false }).minHeight;
 

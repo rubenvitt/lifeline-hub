@@ -20,6 +20,7 @@ import type { BezirkFlaechen } from './bezirkFlaechen';
 
 /** Höhe des Ausschnitts in Pixeln. */
 const HOEHE = 240;
+const KARTENRAND_PX = 24; // Rand des Kartenausschnitts, kein Layoutabstand (Abstandsraster)
 
 /**
  * Kleiner Kartenausschnitt der Flächen eines Evakuierungsbezirks (LLH-1076, design.md D5):
@@ -95,7 +96,7 @@ export default function BezirkKartenbild({
           [ausschnitt.west, ausschnitt.sued],
           [ausschnitt.ost, ausschnitt.nord],
         ],
-        { padding: 24, maxZoom: PUNKT_ZOOM + 2, animate: false },
+        { padding: KARTENRAND_PX, maxZoom: PUNKT_ZOOM + 2, animate: false },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Schlüssel statt Objektidentität

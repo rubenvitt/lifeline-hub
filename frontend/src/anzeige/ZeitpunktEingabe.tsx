@@ -503,6 +503,7 @@ export function ZeitraumEingabe({
   className,
   ...rest
 }: ZeitraumEingabeProps) {
+  const { token } = theme.useToken();
   const [von, bis] = value ?? [null, null];
   const endeRef = useRef<InputRef | null>(null);
   // Halbe Tupel bleiben stehen, damit das andere Ende beim Tippen nicht verloren geht; die
@@ -512,7 +513,7 @@ export function ZeitraumEingabe({
     <div
       id={id ? `${id}-zeitraum` : undefined}
       className={className}
-      style={{ display: 'flex', flexWrap: 'wrap', gap: 8, ...style }}
+      style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginSM, ...style }}
     >
       <div style={{ flex: '1 1 14ch', minWidth: 0 }}>
         <ZeitpunktEingabe

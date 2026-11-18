@@ -1,4 +1,4 @@
-import { Button, Form, Input, InputNumber, Space, type FormRule } from 'antd';
+import { Button, Form, Input, InputNumber, Space, type FormRule, theme } from 'antd';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
@@ -85,6 +85,7 @@ export default function BezirkStammdaten({
   /** Sitzung beenden (Abbrechen, Erfolg, nichts zu speichern). */
   onBeenden: () => void;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<BezirkWerte>();
   const bearbeiten = beimOeffnen != null;
   const speicherLeiste = useSpeicherLeiste({ hasAbbrechen: true });
@@ -222,11 +223,11 @@ export default function BezirkStammdaten({
         >
           {raster}
           {fehler != null && (
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: token.marginLG }}>
               <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht gespeichert werden" />
             </div>
           )}
-          <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
+          <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: token.marginLG }}>
             <Button type="primary" htmlType="submit" loading={laeuft}>
               Speichern
             </Button>

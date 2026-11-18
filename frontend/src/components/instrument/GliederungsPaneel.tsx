@@ -112,7 +112,12 @@ export default function GliederungsPaneel({
               </span>
               <span
                 className={GLIEDERUNG_KLASSE.zahl}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-end',
+                  gap: token.marginSM,
+                }}
               >
                 {z.zahl}
               </span>

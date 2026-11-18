@@ -171,7 +171,7 @@ export default function EvakuierungsbezirkPage() {
   return (
     <EinsatzSeite
       titel={
-        <Space wrap size={8}>
+        <Space wrap size={token.marginSM}>
           <span>{`Bezirk ${bezirk.bezeichnung}`}</span>
           <StatusTag darstellung={raeumungszustand[bezirk.raeumung]} />
         </Space>

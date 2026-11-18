@@ -496,7 +496,7 @@ export default function PersonenDetailPage() {
             </Typography.Text>
             <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
               {person.abgleiche.map((a) => (
-                <li key={a.id} style={{ padding: '4px 0' }}>
+                <li key={a.id} style={{ padding: `${token.paddingXS}px 0` }}>
                   <StatusTag darstellung={abgleichStatus[a.status]} />
                   <Typography.Text>
                     {registrierNummer(
@@ -509,7 +509,7 @@ export default function PersonenDetailPage() {
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
                     /* `size="middle"`: „Verwerfen" ist `danger` und stünde sonst bündig neben
                        „Bestätigen". */
-                    <Space size="middle" style={{ marginLeft: 12 }}>
+                    <Space size="middle" style={{ marginLeft: token.margin }}>
                       <Button
                         type="primary"
                         disabled={!darfEinsatzLeiten(einsatz)}
