@@ -1,4 +1,5 @@
 import { Checkbox, Collapse, Form, Input } from 'antd';
+import { Feld } from '../components/instrument';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -122,22 +123,18 @@ export default function ExterneStelleFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. ILS Musterkreis" maxLength={EXTERNE_STELLE_BEZEICHNUNG_MAX} />
-      </Form.Item>
-      <Form.Item
-        label="Art"
-        name="art"
-        rules={[{ required: true, message: 'Art ist erforderlich' }]}
-      >
+      </Feld>
+      <Feld label="Art" name="art" rules={[{ required: true, message: 'Art ist erforderlich' }]}>
         <Select<ExterneStelleArt> aria-label="Art" options={ART_OPTIONEN} />
-      </Form.Item>
+      </Feld>
       {art === 'leitstelle' && (
-        <Form.Item
+        <Feld
           name="zustaendig"
           valuePropName="checked"
           extra={
@@ -147,7 +144,7 @@ export default function ExterneStelleFormModal({
           }
         >
           <Checkbox disabled={zustaendigVomHub}>Zuständige Leitstelle</Checkbox>
-        </Form.Item>
+        </Feld>
       )}
       {/* Feldbudget (LFH-19): Bezeichnung und Art offen (bei Leitstelle dazu die Markierung),
          Rufnummer und Funkrufname zugeklappt. Trägt die Stelle schon eines davon, steht der
@@ -164,15 +161,15 @@ export default function ExterneStelleFormModal({
             label: 'Rufnummer und Funkrufname',
             children: (
               <>
-                <Form.Item label="Rufnummer" name="rufnummer">
+                <Feld label="Rufnummer" name="rufnummer">
                   <Input maxLength={EXTERNE_STELLE_KURZ_MAX} />
-                </Form.Item>
-                <Form.Item label="Funkrufname" name="funkrufname">
+                </Feld>
+                <Feld label="Funkrufname" name="funkrufname">
                   <Input
                     placeholder="z. B. Leitstelle Musterkreis"
                     maxLength={EXTERNE_STELLE_KURZ_MAX}
                   />
-                </Form.Item>
+                </Feld>
               </>
             ),
           },

@@ -8,7 +8,7 @@ import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
 import { modulRegistry, modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
-import { Formularpaneel } from '../../components/instrument';
+import { Feld, Formularpaneel } from '../../components/instrument';
 import {
   EINHEITEN_OPTIONEN,
   KOORDINATEN_OPTIONEN,
@@ -107,25 +107,25 @@ export default function EinsatzAllgemein() {
         disabled={!daten.darfBearbeiten}
       >
         <Formularpaneel titel="Einstieg">
-          <Form.Item label="Einstiegsmodul" name="standard_modul">
+          <Feld label="Einstiegsmodul" name="standard_modul">
             <Select
               allowClear
               placeholder={mitVorgabe(einstiegVorgabe)}
               options={standardModulOptionen}
             />
-          </Form.Item>
+          </Feld>
         </Formularpaneel>
 
         <Formularpaneel titel="Anzeige-Konventionen">
-          <Form.Item label="Zeitzone" name="zeitzone" extra={orgHinweisWert(orgDefaults?.zeitzone)}>
+          <Feld label="Zeitzone" name="zeitzone" extra={orgHinweisWert(orgDefaults?.zeitzone)}>
             <AutoComplete
               allowClear
               options={ZEITZONEN_OPTIONEN}
               placeholder={platzhalterVorgabe(orgDefaults?.zeitzone, 'Gerätezeit')}
               showSearch={teilwortSuche}
             />
-          </Form.Item>
-          <Form.Item
+          </Feld>
+          <Feld
             label="Zeitdarstellung"
             name="zeitdarstellung"
             extra={orgHinweisSelect(orgDefaults?.zeitdarstellung, ZEITDARSTELLUNG_OPTIONEN)}
@@ -139,8 +139,8 @@ export default function EinsatzAllgemein() {
               )}
               options={ZEITDARSTELLUNG_OPTIONEN}
             />
-          </Form.Item>
-          <Form.Item
+          </Feld>
+          <Feld
             label="Einheiten"
             name="einheiten"
             extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
@@ -154,8 +154,8 @@ export default function EinsatzAllgemein() {
               )}
               options={EINHEITEN_OPTIONEN}
             />
-          </Form.Item>
-          <Form.Item
+          </Feld>
+          <Feld
             label="Koordinatenformat"
             name="koordinatenformat"
             extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
@@ -169,7 +169,7 @@ export default function EinsatzAllgemein() {
               )}
               options={KOORDINATEN_OPTIONEN}
             />
-          </Form.Item>
+          </Feld>
         </Formularpaneel>
 
         <div {...speicherLeiste}>

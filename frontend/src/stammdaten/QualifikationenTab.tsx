@@ -1,7 +1,7 @@
-import { Form, Input, InputNumber, type TableColumnsType } from 'antd';
+import { Input, InputNumber, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import { useQuery } from '@tanstack/react-query';
-import { monoStil } from '../components/instrument';
+import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import {
   aktualisiereQualifikation,
@@ -67,20 +67,20 @@ const aktualisiere = (id: number, werte: FormWerte) =>
 /** Die Auswahl „Schließt ein“ lässt den Eintrag selbst und jeden Kreis weg. */
 const felder = (bearbeite: Qualifikation | null, katalog: readonly Qualifikation[]) => (
   <>
-    <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
       <Input />
-    </Form.Item>
-    <Form.Item label="Sortierung" name="sortier">
-      <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-    </Form.Item>
-    <Form.Item label="Schließt ein" name="schliesst_ein_id">
+    </Feld>
+    <Feld label="Sortierung" name="sortier" breite="kurz">
+      <InputNumber min={0} />
+    </Feld>
+    <Feld label="Schließt ein" name="schliesst_ein_id">
       <Select<number | null>
         allowClear
         options={einschlussKandidaten(einschluesseAus(katalog), katalog, bearbeite?.id ?? null).map(
           (q) => ({ value: q.id, label: q.label }),
         )}
       />
-    </Form.Item>
+    </Feld>
   </>
 );
 

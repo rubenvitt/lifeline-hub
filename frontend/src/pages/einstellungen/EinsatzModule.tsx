@@ -1,7 +1,7 @@
-import { App, Button, Typography, theme } from 'antd';
+import { App, Button } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
-import { Formularpaneel } from '../../components/instrument';
+import { Formularpaneel, Textstufe } from '../../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
@@ -64,7 +64,6 @@ export default function EinsatzModule() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token } = theme.useToken();
   const daten = useEinstellungenDaten(einsatzId);
 
   const overridesQuery = useQuery({
@@ -153,9 +152,9 @@ export default function EinsatzModule() {
     return (
       <>
         {hinweis && (
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             {ORG_AUSGEBLENDET}
-          </Typography.Text>
+          </Textstufe>
         )}
         {eigen && (
           <Button

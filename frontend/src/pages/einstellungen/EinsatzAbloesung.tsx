@@ -204,19 +204,21 @@ export default function EinsatzAbloesung() {
               Schichtmodell der Organisation
             </label>
             <Flex wrap gap={token.marginSM}>
-              <Select<number>
-                id={auswahlId}
-                style={{ flex: '1 1 16rem', minWidth: 0 }}
-                placeholder="Schichtmodell wählen"
-                value={auswahl ?? undefined}
-                onChange={(v) => setAuswahl(v)}
-                allowClear
-                onClear={() => setAuswahl(null)}
-                loading={modelleQ.isLoading}
-                disabled={laeuft}
-                notFoundContent="Keine Schichtmodelle in den Stammdaten"
-                options={optionen}
-              />
+              {/* Die Hülle wächst in der Reihe, das Raster streckt die Auswahl auf ihre Breite. */}
+              <div style={{ flex: '1 1 16rem', minWidth: 0, display: 'grid' }}>
+                <Select<number>
+                  id={auswahlId}
+                  placeholder="Schichtmodell wählen"
+                  value={auswahl ?? undefined}
+                  onChange={(v) => setAuswahl(v)}
+                  allowClear
+                  onClear={() => setAuswahl(null)}
+                  loading={modelleQ.isLoading}
+                  disabled={laeuft}
+                  notFoundContent="Keine Schichtmodelle in den Stammdaten"
+                  options={optionen}
+                />
+              </div>
               <Button
                 type="primary"
                 disabled={laeuft || auswahl == null}

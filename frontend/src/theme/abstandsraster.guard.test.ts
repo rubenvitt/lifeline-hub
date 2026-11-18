@@ -1,7 +1,14 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ohneKommentare } from '../test/ohneKommentare';
+import {
+  DICHTE_AUSNAHMEN,
+  DRUCKDATEI,
+  liesBaum,
+  quellwurzel,
+  ratschenBefunde,
+  zeileVon,
+  type Fund,
+} from '../test/ratsche';
 import { SCHULD } from './abstandsraster.schuld';
 
 /**
@@ -34,36 +41,13 @@ import { SCHULD } from './abstandsraster.schuld';
  *    (`DRUCKDATEI`, am Dateinamen erkannt).
  */
 
-const SRC = (() => {
-  for (const kandidat of ['src', 'frontend/src']) {
-    const pfad = resolve(process.cwd(), kandidat);
-    if (existsSync(join(pfad, 'theme', 'rollen.css'))) return pfad;
-  }
-  throw new Error(`Abstandsraster-Wächter findet frontend/src nicht (cwd: ${process.cwd()})`);
-})();
+const SRC = quellwurzel('Abstandsraster-Wächter');
 
 /** Die eine Quelle der Abstände in CSS. */
 const ROLLENQUELLE = 'theme/rollen.css';
 
-/**
- * Flächen, deren Abstände bewusst nicht der Bediendichte folgen (Spec, „Feste Ausnahmen mit
- * Grund“). Präfix eines Pfads relativ zu `src/` → Grund.
- */
-export const AUSNAHMEN: Readonly<Record<string, string>> = {
-  'geraet/Lagemonitor': 'Großbild: Betrachtungsabstand statt Bedienhand',
-  'geraet/lagemonitor': 'Großbild: Betrachtungsabstand statt Bedienhand',
-  'hilfe/Hilfe.css': 'Prosa der Hilfe: Lesetypografie, keine Bedienziele',
-  'pages/LoginPage': 'Anmeldeseite: eigene Bühne vor der Dichtewahl',
-  'druck/': 'Druck: Papiermaß, keine Bildschirmdichte',
-};
-
-/**
- * Druckansichten außerhalb von `druck/` (`pages/befehlPrint.css`, `pages/EtbDruckPage.tsx`,
- * `personen/PersonDruckBlatt.tsx` …): dieselbe Ausnahme wie `druck/`, erkannt am Dateinamen. Nur
- * Druck-CSS und Druckseiten; Bausteine am Bildschirm (`components/druck/DruckKnopf.tsx`) zählen.
- */
-const DRUCKDATEI =
-  /(?:[Pp]rint|[Dd]ruck)\.css$|(?:DruckPage|DruckSeite|DruckBlatt|DruckInhalt|DruckTabelle)\.tsx$/;
+/** Flächen, die bewusst nicht der Bediendichte folgen (Spec, „Feste Ausnahmen mit Grund“). */
+export const AUSNAHMEN = DICHTE_AUSNAHMEN;
 
 /** Feinsatz (Haarlinie, Symbolversatz) zählt nicht. */
 const FEINSATZ = 2;
@@ -80,10 +64,7 @@ const JSX_GUTTER = /\bgutter=\{\s*(\[[^\]]*\]|-?\d+(?:\.\d+)?)\s*\}/g;
 const CSS_DEKL =
   /(?:^|[\s;{])(?:padding|margin)(?:-[a-z-]+)?\s*:\s*([^;}]*)|(?:^|[\s;{])(?:gap|row-gap|column-gap)\s*:\s*([^;}]*)/g;
 
-export interface Fund {
-  zeile: number;
-  wert: number;
-}
+export type { Fund };
 
 function zaehlt(wert: number): boolean {
   return Math.abs(wert) > FEINSATZ;
@@ -91,13 +72,6 @@ function zaehlt(wert: number): boolean {
 
 function zahlenIn(text: string): number[] {
   return [...text.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
-}
-
-/** Zeile (1-basiert) eines Index im verbundenen Text. */
-function zeileVon(text: string, index: number): number {
-  let zeile = 1;
-  for (let i = 0; i < index; i += 1) if (text.charCodeAt(i) === 10) zeile += 1;
-  return zeile;
 }
 
 /** Alle Abstands-Literale einer Datei (`.css` oder TS/TSX) außerhalb von Kommentaren. */
@@ -153,50 +127,17 @@ export function befunde(
   schuld: Readonly<Record<string, number>>,
   ausnahmen: Readonly<Record<string, string>> = AUSNAHMEN,
 ): string[] {
-  const meldungen: string[] = [];
-  for (const [pfad, inhalt] of Object.entries(dateien)) {
-    if (ausgenommen(pfad, ausnahmen)) continue;
-    const funde = abstandsliterale(pfad, inhalt);
-    const erlaubt = schuld[pfad] ?? 0;
-    if (funde.length > erlaubt) {
-      const liste = funde.map((f) => `  ${pfad}:${f.zeile}  ${f.wert}`).join('\n');
-      meldungen.push(
-        `${pfad}: ${funde.length} Abstands-Literale, Schuld ${erlaubt} — neues Literal? ` +
-          `Abstand aus dem Raster nehmen (token.padding*/margin*, var(--lfh-luft-*)):\n${liste}`,
-      );
-    } else if (funde.length < erlaubt) {
-      meldungen.push(
-        `${pfad}: Schuld senken — ${funde.length} statt ${erlaubt} Literale; in ` +
-          `abstandsraster.schuld.ts auf ${funde.length} setzen${funde.length === 0 ? ' (Eintrag streichen)' : ''}`,
-      );
-    }
-  }
-  for (const pfad of Object.keys(schuld)) {
-    if (!(pfad in dateien)) meldungen.push(`${pfad}: Datei fehlt — Schuld-Eintrag streichen`);
-    else if (ausgenommen(pfad, ausnahmen)) {
-      meldungen.push(`${pfad}: ist Ausnahme — Schuld-Eintrag streichen`);
-    }
-    if (schuld[pfad] <= 0) meldungen.push(`${pfad}: Schuld 0 — Eintrag streichen`);
-  }
-  return meldungen;
-}
-
-function liesBaum(verzeichnis: string, praefix = ''): Record<string, string> {
-  const treffer: Record<string, string> = {};
-  for (const eintrag of readdirSync(verzeichnis, { withFileTypes: true })) {
-    const pfad = join(verzeichnis, eintrag.name);
-    const rel = praefix ? `${praefix}/${eintrag.name}` : eintrag.name;
-    if (eintrag.isDirectory()) {
-      if (rel !== 'test') Object.assign(treffer, liesBaum(pfad, rel));
-    } else if (
-      /\.(tsx?|css)$/.test(eintrag.name) &&
-      !/\.test\.tsx?$/.test(eintrag.name) &&
-      !eintrag.name.endsWith('.d.ts')
-    ) {
-      treffer[rel] = readFileSync(pfad, 'utf8');
-    }
-  }
-  return treffer;
+  return ratschenBefunde(
+    {
+      funde: abstandsliterale,
+      ausgenommen: (pfad) => ausgenommen(pfad, ausnahmen),
+      was: 'Abstands-Literale',
+      hinweis: 'Abstand aus dem Raster nehmen (token.padding*/margin*, var(--lfh-luft-*))',
+      schuldDatei: 'abstandsraster.schuld.ts',
+    },
+    dateien,
+    schuld,
+  );
 }
 
 const dateien = liesBaum(SRC);

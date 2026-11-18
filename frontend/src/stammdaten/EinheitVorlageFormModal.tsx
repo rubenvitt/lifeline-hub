@@ -1,4 +1,5 @@
 import { Form, Input } from 'antd';
+import { Feld } from '../components/instrument';
 import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Select } from '../components/Select';
@@ -86,24 +87,24 @@ export default function EinheitVorlageFormModal({
       }}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. Sanitätszug Musterstadt" maxLength={EINHEIT_VORLAGE_NAME_MAX} />
-      </Form.Item>
-      <Form.Item label="Typ" name="typ_id" rules={[{ required: true, message: 'Typ wählen' }]}>
+      </Feld>
+      <Feld label="Typ" name="typ_id" rules={[{ required: true, message: 'Typ wählen' }]}>
         <Select<number> aria-label="Typ" options={typOptions} loading={typenQuery.isLoading} />
-      </Form.Item>
-      <Form.Item label="Unter" name="ueber_vorlage_id">
+      </Feld>
+      <Feld label="Unter" name="ueber_vorlage_id">
         <Select<number>
           aria-label="Unter"
           allowClear
           placeholder="keine (eigene Einheit)"
           options={ueberOptions}
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

@@ -7,7 +7,7 @@ import { globalKeys } from '../api/queryKeys';
 import { fetchSchichtmodelle } from '../api/schichtmodelle';
 import type { EinsatzVorlage } from '../api/types';
 import AdminPage from '../components/AdminPage';
-import { monoStil } from '../components/instrument';
+import { Stapel, monoStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -75,13 +75,13 @@ export default function EinsatzVorlagenTab() {
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       sorter: nachText((v: EinsatzVorlage) => v.bezeichnung),
       render: (text: string, v) => (
-        <Space size={[8, 4]} wrap>
+        <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{text}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('einsatz_vorlage', v.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {
