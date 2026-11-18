@@ -169,7 +169,8 @@ Die App MUST Links nach den Regeln der Desktop-Hülle behandeln: eigene Origin i
 `target=_blank` und `window.open`; `/api/` außer `/api/auth/` als Download; fremde `http(s)`,
 `mailto` und `tel` im System. Downloads, auch aus `blob:`-Adressen, MUST mit der Sitzung des
 Servers geladen und über das Teilen-Blatt angeboten werden. `window.print()` MUST den
-System-Druckdialog mit dem Inhalt des Webviews öffnen.
+System-Druckdialog mit dem Inhalt des Webviews öffnen. Steht der Webview auf einer fremden Seite,
+MUST die App einen Weg zurück zur Oberfläche des aktiven Servers anbieten.
 
 #### Scenario: CSV-Export
 - **WHEN** jemand einen CSV-Export auslöst
@@ -182,6 +183,10 @@ System-Druckdialog mit dem Inhalt des Webviews öffnen.
 #### Scenario: Drucken
 - **WHEN** jemand im ETB auf „Drucken“ tippt
 - **THEN** erscheint der Druckdialog von iOS
+
+#### Scenario: Zurück von einer fremden Seite
+- **WHEN** der Webview nach einem abgebrochenen Ausflug zum Identitätsanbieter auf einer fremden Seite steht
+- **THEN** bietet die App „Zur Oberfläche“ an und lädt damit die Startadresse des aktiven Servers neu
 
 ### Requirement: Die Oberfläche fühlt sich nativ an
 Der Webview MUST innerhalb der sicheren Ränder liegen, MUST am Rand nicht nachfedern und MUST kein
