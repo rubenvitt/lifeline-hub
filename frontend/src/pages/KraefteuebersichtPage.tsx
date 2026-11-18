@@ -11,7 +11,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Fragment, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   auftraegePfad,
@@ -331,8 +331,21 @@ function rasterSpalten(
       ),
     },
     {
-      // Die Schreibweise steht im Spaltenkopf (LLH-1750, Spec `lage-verdichtung`).
-      title: `Stärke ${STAERKE_SCHREIBWEISE}`,
+      // Die Schreibweise steht im Spaltenkopf (LLH-1750, Spec `lage-verdichtung`). In der schmalen
+      // Spalte des Druckblatts bricht sie nur vor der Summe („F/UF/M“ · „//Σ“), nicht an jedem
+      // Strich (`e2e/meldebild-druck.spec.ts`, „kein Kopf bricht im Wort“). Ganz unteilbar
+      // verbreiterte sie die Spalte, und 40 Kräfte brauchten eine Seite mehr.
+      title: (
+        <>
+          Stärke{' '}
+          {STAERKE_SCHREIBWEISE.split(/(?=\/\/)/).map((teil, i) => (
+            <Fragment key={teil}>
+              {i > 0 && <wbr />}
+              <span style={{ whiteSpace: 'nowrap' }}>{teil}</span>
+            </Fragment>
+          ))}
+        </>
+      ),
       key: 'staerke',
       width: 100,
       // Einheit: kumulierte Stärke (D2). Fahrzeug: die Besatzung Ist/Soll statt einer Stärke

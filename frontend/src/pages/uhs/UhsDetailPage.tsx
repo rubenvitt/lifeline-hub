@@ -5,7 +5,7 @@ import { sprungGesperrtText } from '../../components/Sprung';
 import { Alert, App, Breadcrumb, Button, Flex, Modal, Space, Spin } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useState } from 'react';
+import { Fragment, useEffect, useId, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -272,36 +272,45 @@ function UhsDetailInhalt() {
   // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
   // nur seine Beschriftung aus `uhsTyp`. Die Notiz ist Freitext und bleibt Beschreibungszeile.
   // Die Stärke steht im Kopf jeder Ansicht (LFH-1045), die Kräfte dazu im Reiter.
-  const metaText = [
+  const metaTeile = [
     uhsTyp[uhs.typ].label,
     uhs.standort ?? 'ohne Standort',
     `Stärke ${STAERKE_SCHREIBWEISE} ${staerkeText(uhs.staerke)}`,
-  ].join(' · ');
+  ];
   // Die Materialzahl im Wortlaut des Bausteins („3 Posten · 1 Ausfall“, eine Heimat je Zahl,
   // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät), ohne Freigabe
   // Material oder ohne Posten steht keine Zahl (wie am BR und an der Einheit, LLH-1400); in den
   // Bereich führt dann die Bereichsleiste.
   const showMaterialzahl =
     bereichListe.includes('material') && materialFrei && uhs.material.length > 0;
-  // Die Meta bricht im Kopf nicht um (`seitenMetaStil`); vor der Zahl darf sie es, sonst liefe
-  // der Kopf bei 390 px über den Rand. Die Teile selbst bleiben ganz.
-  const meta = showMaterialzahl ? (
+  // Die Meta bricht im Kopf nicht um (`seitenMetaStil`); zwischen ihren Teilen darf sie es, sonst
+  // liefe der Kopf bei 390 px über den Rand (seit der Schreibweise „F/UF/M//Σ“, LLH-1750, schon
+  // ohne Materialzahl). Die Teile selbst bleiben ganz.
+  const meta = (
     <span style={{ whiteSpace: 'normal' }}>
-      <span style={{ whiteSpace: 'nowrap' }}>{metaText} ·</span>{' '}
+      {metaTeile.map((teil, i) => (
+        <Fragment key={`${i}-${teil}`}>
+          <span style={{ whiteSpace: 'nowrap' }}>
+            {teil}
+            {i < metaTeile.length - 1 || showMaterialzahl ? ' ·' : ''}
+          </span>
+          {i < metaTeile.length - 1 || showMaterialzahl ? ' ' : null}
+        </Fragment>
+      ))}
       {/* Ersetzen wie die Bereichsleiste: „Zurück“ verlässt die Seite, statt den Bereich
           zurückzunehmen. */}
-      <KennungsLink
-        to={{ search: uhsBereichSuche('material') }}
-        replace
-        // Wie die Bereichsleiste über den Merker: ein Wechsel nur des Suchteils fragt der Router
-        // nicht nach. Die Adresse bleibt für „In neuem Tab öffnen“.
-        onClick={(e) => handleLinkKlick(e, () => waehleBereich('material'))}
-      >
-        {materialKopfzahl(uhs.material)}
-      </KennungsLink>
+      {showMaterialzahl && (
+        <KennungsLink
+          to={{ search: uhsBereichSuche('material') }}
+          replace
+          // Wie die Bereichsleiste über den Merker: ein Wechsel nur des Suchteils fragt der Router
+          // nicht nach. Die Adresse bleibt für „In neuem Tab öffnen“.
+          onClick={(e) => handleLinkKlick(e, () => waehleBereich('material'))}
+        >
+          {materialKopfzahl(uhs.material)}
+        </KennungsLink>
+      )}
     </span>
-  ) : (
-    metaText
   );
   const hasMehrereBereiche = bereichListe.length > 1;
   const showLagezeile = !geraet && abBreite('md');
