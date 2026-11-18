@@ -49,6 +49,19 @@ Jede Zahl MUST aus derselben Heimat kommen wie an ihrer Stelle im Modul.
 - **WHEN** ein Abschnitt den Lagezustand „planmäßig“ trägt und eine Rückmeldung darin überfällig ist
 - **THEN** nennt die Zeile die Rückmeldung, aber keinen kritischen Abschnitt
 
+### Requirement: Einheiten mit Ausfall in der Folge der Einheitenliste
+Die Alarmzeile SHALL die Einheiten mit Ausfall auf Überblick, Lagebild und Lagemonitor in der Folge
+der Einheitenliste nennen: nach der Sortierung, dann nach der Anlage, „Ohne Einheit“ zuletzt. Die
+Baumfolge des Meldebilds MUST dafür nicht gelten.
+
+#### Scenario: Ausfall in der Folge der Einheitenliste
+- **WHEN** die Einheitenliste Sanitätszug vor Logistiktrupp führt und beide sowie Mittel ohne Einheit einen Ausfall haben
+- **THEN** zeigt die Zeile „Ausfall: Sanitätszug, Logistiktrupp +1“, und die volle Liste endet mit „Ohne Einheit“
+
+#### Scenario: Untereinheit vor ihrer Obereinheit
+- **WHEN** die Betreuungsgruppe dem Sanitätszug unterstellt ist, in der Einheitenliste aber vor ihm steht, und beide einen Ausfall haben
+- **THEN** zeigt die Zeile „Ausfall: Betreuungsgruppe, Sanitätszug“
+
 ### Requirement: Quellen in der Achtungsrolle
 Die Alarmzeile SHALL in der Achtungsrolle zeigen: offene dringende Meldungen, fällige
 Erinnerungen und überfällige Nachforderungen. Abschnitte im Lagezustand „angespannt“ MUST NOT in

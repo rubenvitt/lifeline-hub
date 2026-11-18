@@ -23,14 +23,16 @@ import {
 } from '../pages/lagekarte/kartenLayer';
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
 import { rollenFarbe } from '../theme/statusFarben';
+import { GROSS_BEZUG } from '../components/grossbild/grossMass';
 import { baueMonitorFlaechen, belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 import { placeMarken, type Box, type MarkenEingabe } from './lagemonitorMarken';
 
 /**
- * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`,
- * wie `GROSS.text` in `LagemonitorPage.tsx`; nicht von dort importiert, die Seite bindet diese Datei).
+ * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`),
+ * aus der Großbild-Skala (`components/grossbild/grossMass.ts`); die Kartenbibliothek nimmt eine
+ * Zahl, keine CSS-Länge.
  */
-const GROSS_TEXT = 28;
+const GROSS_TEXT = GROSS_BEZUG.text;
 
 /**
  * Ein Punkt, den die Karte zeigen muss: der Einsatzort, jede verortete UHS und jeder Stützpunkt

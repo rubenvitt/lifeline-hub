@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { grossMass } from '../../components/grossbild';
 import LagebildGrossbild, { GEFAHREN_HOECHSTENS } from './LagebildGrossbild';
+import type { AlarmZeilenDaten } from '../../lage/useWasBrennt';
 import type { KennzahlAnzeige } from './kennzahlAnzeige';
 import type { GefahrenZeile, SichtungsZeile } from './lageVerdichtung';
 import type { Verlauf } from './verlauf';
@@ -40,6 +41,22 @@ const SICHTUNG: SichtungsZeile[] = [
 
 const LEERER_VERLAUF: Verlauf = { stunden: [], imFenster: 0, spitze: null };
 
+type AlarmEintrag = AlarmZeilenDaten['eintraege'][number];
+
+const brennt = (art: AlarmEintrag['art'], text: string): AlarmEintrag => ({
+  art,
+  rolle: 'alarm',
+  text,
+  voll: text,
+  bezug: [7],
+});
+
+const ALARM = {
+  stand: 'vollstaendig' as const,
+  fehlend: [],
+  eintraege: [brennt('vermisst', '1 vermisst'), brennt('auftrag', '1 Auftrag überfällig')],
+};
+
 function renderGrossbild(mehr: Partial<Parameters<typeof LagebildGrossbild>[0]> = {}) {
   return render(
     <LagebildGrossbild
@@ -56,6 +73,7 @@ function renderGrossbild(mehr: Partial<Parameters<typeof LagebildGrossbild>[0]> 
       verlauf={{ zustand: 'daten', verlauf: LEERER_VERLAUF }}
       sichtung={{ zustand: 'daten', zeilen: SICHTUNG, erfasst: 248, ohneSichtung: 2 }}
       fuehrung={FUEHRUNG}
+      alarm={ALARM}
       onVerlassen={() => undefined}
       {...mehr}
     />,
@@ -67,6 +85,19 @@ function kennzahl(titel: string): HTMLElement {
 }
 
 describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des Großbilds im Lagebild“)', () => {
+  it('zeigt die Alarmzeile der Seite als erstes Element, vor dem Band und ohne Sprung (LLH-1931)', () => {
+    renderGrossbild();
+    const zeile = screen.getByRole('status', { name: 'Was brennt' });
+    expect(zeile).toHaveAttribute('data-stand', 'vollstaendig');
+    const eintraege = [...zeile.querySelectorAll('[data-lfh="alarm-eintrag"]')];
+    expect(eintraege.map((e) => e.textContent)).toEqual(['1 vermisst', '1 Auftrag überfällig']);
+    expect(eintraege.map((e) => e.getAttribute('data-ton'))).toEqual(['alarm', 'alarm']);
+    expect(zeile.style.fontSize).toBe(grossMass(28));
+    expect(within(zeile).queryByRole('link')).toBeNull();
+    const band = screen.getByRole('group', { name: 'Lage in Zahlen' });
+    expect(zeile.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('zeigt Titel, Uhrzeit und Datenstand', () => {
     renderGrossbild();
     expect(screen.getByRole('dialog', { name: 'Lagebild' })).toBeInTheDocument();
@@ -129,13 +160,7 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
     const block = screen.getByRole('region', { name: 'Gefahren' });
     const zeilen = within(block).getAllByRole('listitem');
     expect(zeilen).toHaveLength(GEFAHREN_HOECHSTENS);
-    expect(zeilen.map((z) => z.textContent)).toEqual([
-      'Bakut',
-      'Dhoch',
-      'Cmittel',
-      'Aniedrig',
-      'Eniedrig',
-    ]);
+    expect(zeilen.map((z) => z.textContent)).toEqual(['Bakut', 'Dhoch', 'Cmittel', 'Aniedrig']);
     expect(block).toHaveTextContent(`+ ${viele.length - GEFAHREN_HOECHSTENS} weitere`);
     expect(block).toHaveTextContent('3 Gebiete unbestätigt');
     // Ein langer Hinweis endet nach zwei Zeilen mit „…“, der ganze Text bleibt im `title`.
@@ -153,6 +178,17 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
       .getAllByRole('listitem')
       .map((z) => z.textContent);
     expect(zeilen).toEqual(['SK I4', 'SK II11', 'SK III63', 'SK IV0', 'ohne Sichtung2']);
+  });
+
+  it('stellt die üblichen fünf Sichtungszeilen in zwei Spaltenpaare, vier in eins (LLH-1931, D3)', () => {
+    const liste = () => screen.getByRole('list', { name: 'Sichtung je Kategorie' });
+    const { unmount } = renderGrossbild();
+    expect(liste().style.gridTemplateColumns).toMatch(/^repeat\(2,/);
+    unmount();
+    renderGrossbild({
+      sichtung: { zustand: 'daten', zeilen: SICHTUNG, erfasst: 78, ohneSichtung: 0 },
+    });
+    expect(liste().style.gridTemplateColumns).toMatch(/^repeat\(1,/);
   });
 
   it('zeigt in der Reihe „Sanitätsdienst“ den Verlauf statt der Gefahren', () => {
@@ -180,8 +216,9 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
       within(block)
         .getAllByRole('listitem')
         .map((z) => z.textContent),
-      // Vier Stunden, jüngste zuerst: fünf ragten samt „Spitze“ über die Höhe (Review vor dem PR).
-    ).toEqual(['14 Uhr · laufend2', '13 Uhr3', '12 Uhr1', '11 Uhr4']);
+      // Drei Stunden, jüngste zuerst: seit der Alarmzeile ragten vier samt „Spitze“ über die Höhe
+      // (LLH-1931, design.md D3).
+    ).toEqual(['14 Uhr · laufend2', '13 Uhr3', '12 Uhr1']);
     expect(block).toHaveTextContent('Spitze 13 Uhr · 3');
   });
 

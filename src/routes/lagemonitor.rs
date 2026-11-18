@@ -190,8 +190,8 @@ pub struct LagemonitorRueckmeldung {
 /// Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
 /// Personenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die
 /// überfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten
-/// und Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall trägt der Block
-/// nicht (D6: die Regel lebt im Browser, Folgeaufgabe).
+/// und Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall zählt
+/// `einsatz::ausfall` nach der Regel des Meldebilds (LLH-1929).
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LagemonitorAlarm {
     /// Offene, unbestätigte Sofortmeldungen (`meldungen.sofort_offen` des Modulzählers).
@@ -208,6 +208,9 @@ pub struct LagemonitorAlarm {
     pub rueckmeldung_ueberfaellig: Vec<LagemonitorRueckmeldung>,
     /// Bezeichnungen der Abschnitte im Lagezustand „kritisch“, in der Folge der Gliederung.
     pub abschnitte_kritisch: Vec<String>,
+    /// Bezeichnungen der Einheiten mit Ausfall (LLH-1929, `einsatz::ausfall`), in der Folge der
+    /// Einheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie.
+    pub ausfall: Vec<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -331,6 +334,7 @@ pub async fn alarm(
         nachforderungen_ueberfaellig: nachforderungen.ueberfaellig,
         rueckmeldung_ueberfaellig,
         abschnitte_kritisch,
+        ausfall: crate::einsatz::ausfall::load_einheiten_mit_ausfall(pool, einsatz_id).await?,
     })
 }
 

@@ -32,12 +32,22 @@ describe('StromPaneel', () => {
     expect(screen.queryByRole('button', { name: 'anzeigen' })).toBeNull();
   });
 
-  it('Neues kommt als Sammelbanner über der Liste, „anzeigen“ gibt den Fokus an die Liste', async () => {
+  it('Neues kommt als Sammelbanner, „anzeigen“ gibt den Fokus an die Liste', async () => {
     const { onAnzeigen } = rendere(3);
     expect(screen.getByText('3 neue Einträge')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'anzeigen' }));
+    await userEvent.click(screen.getByRole('button', { name: '3 neu anzeigen' }));
     expect(onAnzeigen).toHaveBeenCalledOnce();
     expect(screen.getByRole('list', { name: 'Jüngste Einträge' })).toHaveFocus();
+  });
+
+  // LLH-1934: als Überlagerung über der Liste verdeckte er die halbe oberste Zeile.
+  it('der Banner steht als Kurzform im Paneelkopf, nicht über der Liste', () => {
+    rendere(3);
+    const banner = screen.getByRole('status');
+    const kopf = screen.getByRole('heading', { name: 'Jüngste ETB-Einträge' }).parentElement!;
+    expect(kopf).toContainElement(banner);
+    expect(kopf).not.toContainElement(screen.getByRole('list', { name: 'Jüngste Einträge' }));
+    expect(banner.querySelector('[data-lfh="sammelbanner-kurz"]')).toHaveTextContent('3 neu');
   });
 
   it('Leer und Fehler zeigen keine Liste', () => {

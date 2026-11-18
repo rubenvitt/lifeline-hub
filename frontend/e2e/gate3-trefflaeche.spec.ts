@@ -4552,9 +4552,11 @@ test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Werkzeugmenü, Kartengrun
       3,
     );
 
-    // Zeitachse (LFH-899): die Auswahl „Stand“ hält die Höhe, die Symbolknöpfe die kurze Achse.
+    // Zeitachse (LFH-899): die Auswahl „Stand“ hält die Höhe, die Knöpfe die kurze Achse
+    // („Stand sichern“ trägt seit LLH-1936 ein Wort, die kurze Achse ist dann seine Höhe).
     const band = page.locator('[data-lfh="zeitachse"]');
-    // Erst messen, wenn die Stände geladen sind — sonst steht nur „Stand sichern" im Band.
+    // Erst messen, wenn die Stände geladen sind — ohne Stand steht statt des Bands nur der Knopf
+    // „Stand sichern“ (LLH-1936).
     await expect(band.getByRole('combobox', { name: 'Stand' })).toBeVisible();
     // Gemessen wird der Kasten der Auswahl, nicht ihr inneres Suchfeld.
     const beschriftet = band.locator('.ant-select');

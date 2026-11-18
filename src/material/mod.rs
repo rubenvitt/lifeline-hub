@@ -127,6 +127,38 @@ impl MaterialStatus {
     }
 }
 
+impl MaterialStatus {
+    /// Ausfall nach der Rolle im Vertrag `materialStatus` (`frontend/src/theme/statusFarben.ts`):
+    /// Alarm oder Achtung, also defekt, verbraucht, Desinfektion nötig (LLH-1093, LLH-1929). Der
+    /// Browser zählt über `kraefte/materialVerdichtungKern.ts`; das Fixture `regeln.json`, Abschnitt
+    /// `ausfall`, bindet beide Seiten.
+    pub fn is_ausfall(self) -> bool {
+        match self {
+            MaterialStatus::Einsatzbereit | MaterialStatus::ImEinsatz => false,
+            MaterialStatus::Defekt
+            | MaterialStatus::Verbraucht
+            | MaterialStatus::DesinfektionNoetig => true,
+        }
+    }
+}
+
+/// Aufgebraucht: ein Verbrauchsgut, das ganz ausgegeben ist (LLH-1224, design.md D4; im Browser
+/// `isAufgebraucht` in `kraefte/materialPosten.ts`).
+pub fn is_aufgebraucht(art: MaterialArt, menge: i64, ausgegeben: i64) -> bool {
+    art == MaterialArt::Verbrauchsgut && ausgegeben >= menge
+}
+
+/// Ausfall eines Postens: sein Status hat die Rolle Alarm oder Achtung, oder er ist aufgebraucht
+/// (gleich welcher Status, LLH-1224 D15).
+pub fn is_material_ausfall(
+    status: MaterialStatus,
+    art: MaterialArt,
+    menge: i64,
+    ausgegeben: i64,
+) -> bool {
+    status.is_ausfall() || is_aufgebraucht(art, menge, ausgegeben)
+}
+
 impl MaterialArt {
     /// Anzeigewort im ETB („Art Gerät → Verbrauchsgut“).
     pub fn label(self) -> &'static str {
@@ -284,6 +316,26 @@ pub const GERAET_JE_STUECK: &str = "Ein Gerät steht je Stück im Einsatz";
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ausfall_sind_die_status_mit_rolle_alarm_oder_achtung_und_aufgebraucht() {
+        use MaterialArt::{Geraet as G, Verbrauchsgut as V};
+        use MaterialStatus::*;
+        // Rollen wie `materialStatus` in `frontend/src/theme/statusFarben.ts` (LLH-1929).
+        assert!(!Einsatzbereit.is_ausfall());
+        assert!(!ImEinsatz.is_ausfall());
+        assert!(Defekt.is_ausfall());
+        assert!(Verbraucht.is_ausfall());
+        assert!(DesinfektionNoetig.is_ausfall());
+        // Aufgebraucht: nur ein Verbrauchsgut, das ganz ausgegeben ist (LLH-1224 D4).
+        assert!(is_aufgebraucht(V, 5, 5));
+        assert!(is_aufgebraucht(V, 5, 6));
+        assert!(!is_aufgebraucht(V, 5, 4));
+        assert!(!is_aufgebraucht(G, 1, 1));
+        assert!(is_material_ausfall(Einsatzbereit, V, 5, 5));
+        assert!(!is_material_ausfall(ImEinsatz, V, 5, 3));
+        assert!(is_material_ausfall(Defekt, G, 1, 0));
+    }
 
     fn grund(r: Result<(), crate::error::AppError>) -> String {
         match r {

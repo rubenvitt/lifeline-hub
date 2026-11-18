@@ -1585,7 +1585,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'AlarmZeile',
-    title: 'AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)',
+    title: 'AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig, Großbild)',
     group: 'Rückmeldung',
     height: 390,
     source: 'components/instrument/AlarmZeile.tsx',
@@ -1626,6 +1626,32 @@ export const PREVIEWS: readonly PreviewSpec[] = [
           <AlarmZeile
             daten={{ stand: 'unvollstaendig', fehlend: ['Rückmeldungen'], eintraege: [] }}
           />
+          {/* Größe `grossbild` (LLH-1931): Maße über `grossMass`, hier mit festgesetzter Einheit. */}
+          <div style={{ '--lfh-gross-einheit': '0.375px' } as CSSProperties}>
+            <AlarmZeile
+              groesse="grossbild"
+              daten={{
+                stand: 'vollstaendig',
+                fehlend: [],
+                eintraege: [
+                  {
+                    art: 'vermisst',
+                    rolle: 'alarm',
+                    text: '1 vermisst',
+                    voll: '1 vermisst',
+                    bezug: [],
+                  },
+                  {
+                    art: 'auftrag',
+                    rolle: 'alarm',
+                    text: '1 Auftrag überfällig',
+                    voll: '1 Auftrag überfällig',
+                    bezug: [],
+                  },
+                ],
+              }}
+            />
+          </div>
         </div>
       </MemoryRouter>
     ),

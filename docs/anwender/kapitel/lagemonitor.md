@@ -2,7 +2,7 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/einsatz/ausfall.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
 ---
 
 ## Überblick
@@ -38,9 +38,10 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
 1. Die Zeile „Was brennt“ über der Lagekarte nennt dasselbe wie im Überblick und im Lagebild,
    in derselben Folge (Kapitel [Überblick](ueberblick.md)): offene Sofortmeldungen,
    überfällige Bestätigungen, Vermisste, kritische Abschnitte mit Namen, Einheiten mit
-   überfälliger Rückmeldung mit Namen und überfällige Aufträge in Rot, dringende Meldungen,
-   fällige Erinnerungen und überfällige Nachforderungen in Gelb. Den Ausfall nennt der Monitor
-   nicht. Was nicht in die Zeile passt, steht als „+…“.
+   überfälliger Rückmeldung mit Namen, Einheiten mit Ausfall und überfällige Aufträge in Rot,
+   dringende Meldungen, fällige Erinnerungen und überfällige Nachforderungen in Gelb. Die
+   Einheiten stehen in der Reihenfolge der Einheitenliste, Personennamen nennt der Monitor nie.
+   Was nicht in die Zeile passt, steht als „+…“.
 2. „Betroffene“ zählt gesamt, Patienten und vermisst, darunter die Sichtungskategorien SK I bis
    SK IV und „ungesichtet“. Patienten und Sichtungskategorien zählen nur, wer noch in Versorgung
    oder unterwegs ist; übergebene, entlassene und abgeschlossene Patienten zählen nur in

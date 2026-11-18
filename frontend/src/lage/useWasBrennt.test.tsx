@@ -159,6 +159,29 @@ describe('useWasBrennt (LLH-1743)', () => {
     expect(result.current.eintraege.map((e) => e.text)).toContain('Ausfall: Logistiktrupp');
   });
 
+  it('Ausfall in der Folge der Einheitenliste, nicht in der Baumfolge (LLH-1929)', async () => {
+    handler();
+    server.use(
+      http.get(`${BASIS}/einheiten`, () =>
+        HttpResponse.json([
+          { ...einheit(20, 'Sanitätszug'), sortier: 2 },
+          { ...einheit(21, 'Betreuungsgruppe'), ueber_einheit_id: 20, sortier: 1 },
+        ]),
+      ),
+      http.get(`${BASIS}/fahrzeuge`, () =>
+        HttpResponse.json([
+          { id: 1, funkrufname: 'Florian 1', einheit_id: 20, status_kategorie: 'nicht_verfuegbar' },
+          { id: 2, funkrufname: 'Florian 2', einheit_id: 21, status_kategorie: 'nicht_verfuegbar' },
+        ]),
+      ),
+    );
+    const { result } = renderHook(() => useWasBrennt(1, JETZT), { wrapper });
+    await waitFor(() => expect(result.current.stand).toBe('vollstaendig'));
+    const ausfall = result.current.eintraege.find((e) => e.art === 'ausfall');
+    expect(ausfall?.text).toBe('Ausfall: Betreuungsgruppe, Sanitätszug');
+    expect(ausfall?.bezug).toEqual([21, 20]);
+  });
+
   it('gesperrte Einheiten: kein Ausfall, kein unvollständiger Stand', async () => {
     handler();
     server.use(
