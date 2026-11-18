@@ -13,7 +13,7 @@ https://zunder.rubeen.dev/#/aufgabe/t3q2y33zhnvqykd2of5j4oh8
 
 ## 2. Filter in `filtereKraefte`
 
-- [x] 2.1 `FilterWerte` um `ohneAuftrag` und `rueckmeldungFehlt` erweitern, `filtereKraefte` nimmt
+- [x] 2.1 `filtereKraefte` nimmt
   die Treffermenge: Treffer mit Mitteln, Obereinheiten als Rahmen ohne eigene Mittel, „Ohne
   Einheit“ fällt weg (D3). Nachweis: Fälle in `kraeftebild.test.ts` grün (Treffer, Rahmen-
   Obereinheit, Mittel ohne Einheit, ohne Treffermenge unverändert).
@@ -22,10 +22,10 @@ https://zunder.rubeen.dev/#/aufgabe/t3q2y33zhnvqykd2of5j4oh8
 
 ## 3. Meldebild-Seite
 
-- [ ] 3.1 `LEERER_FILTER`, `aktiveFilterChips` (Marken „ohne Auftrag“, „Rückmeldung fehlt oder
+- [x] 3.1 `MeldebildFilter` (D2), `LEERER_FILTER`, `aktiveFilterChips` (Marken „ohne Auftrag“, „Rückmeldung fehlt oder
   überfällig“, Zusatz „wirkt gerade nicht“ nach D4), `filterZahl`. Nachweis: Unit-Tests der
   exportierten Funktionen in `KraefteuebersichtPage.test.tsx` grün.
-- [ ] 3.2 Zwei Checkboxen im Popover mit deaktiviertem Zustand samt Grund (D6); `gefiltertRoh` mit
+- [x] 3.2 Zwei Checkboxen im Popover mit deaktiviertem Zustand samt Grund (D6); `gefiltertRoh` mit
   Treffermenge und `jetzt` nur bei wirksamem Rückmeldungs-Filter (D5); Statusband zählt nur Treffer,
   Vermerk entfällt (D7); Auswahlzeile zählt Treffer. Nachweis: Seitentests grün für Szenarien
   „Einheiten ohne Auftrag“, „Untereinheit trifft“, „Aufträge nicht lesbar“, „Rückmeldungen fallen

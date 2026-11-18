@@ -781,14 +781,17 @@ export function toenungsGruende(
  * Die Kachel „keine Rückmeldung": Einheiten, von denen NIE eine Rückmeldung kam; überfällige
  * zählen nicht (das zeigt ihre Zeile). Gezählt über die GEFILTERTEN Zeilen wie die übrigen
  * Bandzellen, rekursiv samt Untereinheiten (D12). Bei 0 entfällt die Kachel — eine rote Null meldete das Gegenteil.
+ * `nur`: die Treffer eines Einheiten-Filters (LLH-1792); Rahmen-Obereinheiten zählen nicht.
  */
 export function keineRueckmeldungZelle(
   zeilen: readonly RasterZeile[],
   daten: Rueckmeldungen,
+  nur: ReadonlySet<number> | null = null,
 ): BandZelle | null {
   const ids = einheitZeilen(zeilen)
     .filter(istEchteEinheit)
-    .map((z) => z.einheitId);
+    .map((z) => z.einheitId)
+    .filter((id) => !nur || nur.has(id));
   const anzahl = ohneRueckmeldung(ids, daten);
   if (anzahl === 0) return null;
   return {

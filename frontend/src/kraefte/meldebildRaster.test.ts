@@ -1095,3 +1095,12 @@ describe('einheitenTreffer', () => {
     ).toEqual([2, 3]);
   });
 });
+
+describe('keineRueckmeldungZelle mit Einheiten-Filter (LLH-1792)', () => {
+  it('zählt nur die Treffer, nicht die Rahmen-Obereinheit', () => {
+    const raster = baueMeldebildRaster(eingabe({ einheiten: [eh(1, null), eh(2, null, 1)] }));
+    const daten: Rueckmeldungen = { frist_min: 60, einheiten: [], abschnitte: [] };
+    expect(keineRueckmeldungZelle(raster, daten)?.wert).toBe(2);
+    expect(keineRueckmeldungZelle(raster, daten, new Set([2]))?.wert).toBe(1);
+  });
+});

@@ -36,10 +36,12 @@ beschränkt Einheiten und Mittel darauf. Alternative: das fertige Raster nachtr�
 Verworfen, weil dann Statusband, Verdichtung und Lagebericht eigene Wege bräuchten und die
 Kumulierung der Stärke über den Baum nicht mehr stimmte.
 
-**D2 Die Schalter stehen in `FilterWerte`** (`ohneAuftrag: boolean`, `rueckmeldungFehlt: boolean`),
-`LEERER_FILTER` setzt beide `false`. So greifen Marken (`aktiveFilterChips`), Einzel-Entfernen,
-„Filter zurücksetzen“, der Einsatzwechsel und `gefiltert` (Zulauf aus, Auswahl im Druckkopf)
-ohne eigenen Zustand. `filterZahl` zählt sie mit.
+**D2 Die Schalter stehen im Filterzustand der Seite** (`MeldebildFilter` erweitert `FilterWerte`
+um `ohneAuftrag` und `rueckmeldungFehlt`), `LEERER_FILTER` setzt beide `false`. So greifen Marken
+(`aktiveFilterChips`), Einzel-Entfernen, „Filter zurücksetzen“ und der Einsatzwechsel ohne eigenen
+Zustand; `filterZahl` zählt sie mit. `FilterWerte` selbst bleibt ohne die Schalter, weil
+`filtereKraefte` sie nicht liest, sondern die Treffermenge aus D1 bekommt. „Gefiltert“ (Zulauf aus,
+Auswahl im Druckkopf, Lagebericht ohne Entlassene) gilt nur bei einer wirksamen Marke (D4).
 
 **D3 Obereinheit als Rahmen.** Trifft eine Untereinheit, nicht aber ihre Obereinheit, bleibt die
 Obereinheit in `einheiten` (sonst rückte die Gruppe als eigene Wurzel heraus und verlöre ihren
