@@ -8,6 +8,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * - LESBAR AUS DER ENTFERNUNG: bei 1920 × 1080 jede führende Zahl ≥ 72 px, jeder Text ≥ 28 px.
  * - MITWACHSEN OHNE BILDLAUF: bei 1920 × 1080 und 1280 × 720 rollt nichts, und kein Block schneidet
  *   seinen Inhalt unten ab.
+ * - ALARMZEILE (LLH-1931): das Großbild des Lagebilds trägt „Was brennt“ der Seite oben, in Alarmrolle
+ *   und im Großbild-Maß; das Großbild der Lagebesprechung trägt keine.
  * - AUSSTIEG, zwei Wege getrennt: das Lagebild läuft im Element-Vollbild, und dessen Ende (wie Esc im
  *   Vollbild, das der Browser selbst nimmt) beendet das Großbild; in der Lagebesprechung beendet die
  *   Taste Esc es über den Tastenhörer der Hülle.
@@ -22,7 +24,8 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 /**
  * Drei Betroffene, eine davon vermisst, und ein überfälliger Auftrag: genug, damit Band, Sichtung
  * und die Vorbereitung der Lagebesprechung Werte tragen. Den Alarmton im Großbild des Lagebilds
- * trägt seit LLH-1743 die Kennzahl „Vermisste“ (Aufträge zeigt nur der Überblick).
+ * tragen die Kennzahl „Vermisste“ und die Alarmzeile („1 vermisst“, „1 Auftrag überfällig“); die
+ * Kennzahl „Aufträge offen“ zeigt nur der Überblick (LLH-1743).
  */
 async function seed(page: Page): Promise<string> {
   const einsatzId = String(
@@ -121,6 +124,23 @@ for (const fenster of [
       // Zweiter Kanal neben der Farbe: die Kante (Innenschatten), 6 px bei 1920.
       expect(await vermisste.evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/inset/);
 
+      // Alarmzeile der Seite ganz oben, ohne Sprung (LLH-1931).
+      const alarm = flaeche.getByRole('status', { name: 'Was brennt' });
+      for (const [art, text] of [
+        ['vermisst', '1 vermisst'],
+        ['auftrag', '1 Auftrag überfällig'],
+      ]) {
+        const eintrag = alarm.locator(`[data-lfh="alarm-eintrag"][data-art="${art}"]`);
+        await expect(eintrag).toHaveText(text);
+        await expect(eintrag).toHaveAttribute('data-ton', 'alarm');
+      }
+      await expect(alarm.getByRole('link')).toHaveCount(0);
+      const [alarmUnten, bandOben] = await Promise.all([
+        alarm.evaluate((el) => el.getBoundingClientRect().bottom),
+        band.evaluate((el) => el.getBoundingClientRect().top),
+      ]);
+      expect(alarmUnten).toBeLessThanOrEqual(bandOben);
+
       expect(await smallestFontSize(flaeche)).toBeGreaterThanOrEqual(28 * anteil - 0.5);
       expect(await smallestNumberSize(flaeche)).toBeGreaterThanOrEqual(72 * anteil - 0.5);
       expect(await findOverflow(flaeche)).toEqual([]);
@@ -143,6 +163,8 @@ for (const fenster of [
       const vorbereitung = flaeche.getByRole('region', { name: 'Vorbereitung' });
       await expect(vorbereitung).toContainText('Aufträge offen');
       await expect(vorbereitung).not.toContainText('Quelle');
+      // Die Seite Lagebesprechung trägt keine Alarmzeile, ihr Großbild auch nicht (LLH-1931).
+      await expect(flaeche.locator('[data-lfh="alarm-zeile"]')).toHaveCount(0);
 
       expect(await smallestFontSize(flaeche)).toBeGreaterThanOrEqual(28 * anteil - 0.5);
       expect(await smallestNumberSize(flaeche)).toBeGreaterThanOrEqual(72 * anteil - 0.5);
