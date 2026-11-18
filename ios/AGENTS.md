@@ -30,7 +30,12 @@ Change `t39ltxxi-ios-huelle`.
   `ios-pruefung.yml`. Ohne grünen Lauf dort ist App-Code nicht fertig.
 - **Bildschirmbilder:** jede native Seite bekommt ein Bild in
   `ios/AppUITests/ScreenshotTests.swift`; der Lauf lädt sie als Artefakt hoch (Bilder der
-  Änderung für den PR).
+  Änderung für den PR). Erreicht wird die Seite über das Startargument `-LifelineTestzustand`
+  (`LifelineKern.Testzustand`, je Seite ein Wert); in diesem Zustand fragt die App kein Netz und
+  speichert nichts.
+- **Seite und Wirkung aus dem Kern:** welche Seite die App zeigt, entscheiden `Ablauf` und
+  `Onboarding`, was die Brücke tut, `Brueckenausfuehrung`; `ios/App/AppModell.swift` führt nur
+  deren Wirkungen aus. Eine neue Entscheidung kommt mit Test in den Kern, nicht in eine Ansicht.
 - **Marke:** App-Symbol (`ios/App/Assets.xcassets/AppIcon.appiconset`) und Startfarbe
   `Kopfschwarz` kommen aus der Bildmarke (Spec `app-marke`); neu erzeugt mit
   `scripts/ios/erzeuge-symbol.sh` (auch aus `scripts/marke/erzeuge-symbole.sh` gerufen), geprüft in
