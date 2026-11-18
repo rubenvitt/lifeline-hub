@@ -122,6 +122,10 @@
   --lfh-luft-3: 12px;
   --lfh-luft-4: 16px;
   --lfh-luft-5: 24px;
+  /* Obergrenzen eines Eingabefelds (`FELDBREITE` in tokens.ts, Spec `feldbreiten`). */
+  --lfh-feld-kurz: 120px;
+  --lfh-feld-schmal: 200px;
+  --lfh-feld-mittel: 320px;
   --lfh-zeilenhoehe: 30px;
   --lfh-schriftgroesse: 13.5px;
 
@@ -186,6 +190,8 @@
   --lfh-typo-ueberschrift-sperrung: -0.02em;
   --lfh-typo-seitentitel-groesse: 14px;
   --lfh-typo-seitentitel-gewicht: 600;
+  --lfh-typo-kartentitel-groesse: 15px;
+  --lfh-typo-kartentitel-gewicht: 600;
   --lfh-typo-text-groesse: 14px;
   --lfh-typo-text-gewicht: 400;
   --lfh-typo-text-klein-groesse: 12px;

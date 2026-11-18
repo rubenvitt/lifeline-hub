@@ -465,7 +465,7 @@ describe('OnlineQuellenVerwaltung', () => {
  * `scroll={{ x: 'max-content' }}` mit fixierter erster Spalte, dafür wählt rc-table
  * `table-layout: auto`, und dort ist eine Spaltenbreite nur ein Wunsch (im Browser gemessen:
  * trotz `<col width="280">` blieb eine lange URL ungekürzt). `max-width` an der Zelle bindet
- * dagegen — und ist die Form, die `components/feldbreiten.guard.test.ts` verlangt.
+ * dagegen — und ist die Form, die `components/feld.guard.test.ts` verlangt.
  *
  * Drei getrennte Aussagen: Klasse (Kürzung konfiguriert), Kappung (greift) und Titel (voller
  * Wert erreichbar). Pixel misst keine — jsdom rechnet kein Layout.

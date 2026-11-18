@@ -1,7 +1,7 @@
-import { Flex, Switch, Typography, theme } from 'antd';
+import { Switch, Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
-import { Formularpaneel } from '../../components/instrument';
+import { Formularpaneel, Stapel } from '../../components/instrument';
 import { NUR_LEITUNG_FUEHRUNG } from '../../components/nurAnsicht';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
@@ -42,7 +42,6 @@ export default function EinsatzKennzahlen() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
-  const { token } = theme.useToken();
   const daten = useEinstellungenDaten(einsatzId);
 
   // Kein `onError`-Toast: der Fehler steht über dem Paneel.
@@ -74,8 +73,8 @@ export default function EinsatzKennzahlen() {
         rechteText={daten.rechteGrund(NUR_LEITUNG_FUEHRUNG)}
       />
       <Formularpaneel titel="Lage in Zahlen">
-        <Flex vertical gap={token.marginXS}>
-          <Flex align="center" gap={token.marginSM}>
+        <Stapel abstand="xs">
+          <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
             <Switch
               id={feldId}
               aria-label="Nachforderungen offen auf Platz 3"
@@ -85,7 +84,7 @@ export default function EinsatzKennzahlen() {
               onChange={(an) => waehlen.mutate(umgeschaltet(gewaehlt, 'nachforderungen', an))}
             />
             <label htmlFor={feldId}>Nachforderungen offen auf Platz 3</label>
-          </Flex>
+          </Stapel>
           {/* Zustand, keine Bedienung (`frontend/AGENTS.md`, „Texte: zeigen statt erklären“): die
               Wahl ist gespeichert, wirkt aber gerade nicht. Erklärt wird im Kapitel
               `docs/anwender/kapitel/einsatz-einstellungen.md`. */}
@@ -101,7 +100,7 @@ export default function EinsatzKennzahlen() {
               </Typography.Text>
             )
           )}
-          <Flex align="center" gap={token.marginSM}>
+          <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
             <Switch
               id={sanFeldId}
               aria-label="Reihe Sanitätsdienst"
@@ -111,8 +110,8 @@ export default function EinsatzKennzahlen() {
               onChange={(an) => waehlen.mutate(umgeschaltet(gewaehlt, 'sanitaetsdienst', an))}
             />
             <label htmlFor={sanFeldId}>Reihe Sanitätsdienst</label>
-          </Flex>
-        </Flex>
+          </Stapel>
+        </Stapel>
       </Formularpaneel>
     </>
   );

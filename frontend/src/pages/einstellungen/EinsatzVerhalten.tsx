@@ -21,7 +21,7 @@ import {
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
-import { Formularpaneel } from '../../components/instrument';
+import { Feld, Formularpaneel, Stapel } from '../../components/instrument';
 import { mitVorgabe } from '../../components/vorgabeText';
 
 /** Tristate-Optionen für automatische ETB-Einträge (leer = erbt Org, true = An, false = Aus).
@@ -126,45 +126,42 @@ export default function EinsatzVerhalten() {
             ).map((nk) => (
               // Präfix und Startwert eines Kreises bleiben ein Rasterfeld, sonst stünden sie in
               // verschiedenen Spalten.
-              <div
-                key={nk.key}
-                style={{ display: 'flex', gap: token.margin, alignItems: 'flex-start' }}
-              >
-                <Form.Item
-                  label={`Präfix ${nk.label}`}
-                  name={`${nk.key}_nummer_praefix`}
-                  style={{ flex: 1 }}
-                  extra={
-                    nk.eingefroren
-                      ? 'Erste Nummer bereits vergeben — nicht mehr änderbar'
-                      : orgHinweisWert(nk.orgPraefix)
-                  }
-                >
-                  <Input
-                    maxLength={8}
-                    placeholder={`z. B. ${nk.beispiel}`}
-                    disabled={nk.eingefroren}
-                  />
-                </Form.Item>
-                <Form.Item
-                  label={`Startwert ${nk.label}`}
-                  name={`${nk.key}_nummer_start`}
-                  // `flex: 0 1 160px` statt `width: 160`: eine feste Pixelbreite ragte am schmalen
-                  // Schirm über den Rand (`feldbreiten.guard.test.ts`).
-                  style={{ flex: '0 1 160px' }}
-                >
-                  <InputNumber
-                    min={1}
-                    max={999999}
-                    style={{ width: '100%' }}
-                    placeholder={mitVorgabe('1')}
-                    disabled={nk.eingefroren}
-                  />
-                </Form.Item>
-              </div>
+              <Stapel key={nk.key} richtung="zeile" abstand="md" ausrichten="start">
+                <Stapel wachsen>
+                  <Feld
+                    label={`Präfix ${nk.label}`}
+                    name={`${nk.key}_nummer_praefix`}
+                    extra={
+                      nk.eingefroren
+                        ? 'Erste Nummer bereits vergeben — nicht mehr änderbar'
+                        : orgHinweisWert(nk.orgPraefix)
+                    }
+                  >
+                    <Input
+                      maxLength={8}
+                      placeholder={`z. B. ${nk.beispiel}`}
+                      disabled={nk.eingefroren}
+                    />
+                  </Feld>
+                </Stapel>
+                {/* `flex: 0 1 160px` statt `width: 160`: eine feste Pixelbreite ragte am schmalen
+                    Schirm über den Rand (`components/feld.guard.test.ts`). `Feld` nimmt keinen
+                    Stil, darum trägt die Hülle die Spur. */}
+                <div style={{ flex: '0 1 160px', minWidth: 0 }}>
+                  <Feld label={`Startwert ${nk.label}`} name={`${nk.key}_nummer_start`}>
+                    <InputNumber
+                      min={1}
+                      max={999999}
+                      placeholder={mitVorgabe('1')}
+                      disabled={nk.eingefroren}
+                    />
+                  </Feld>
+                </div>
+              </Stapel>
             ))}
 
-            <Form.Item
+            <Feld
+              breite="schmal"
               label="Bestätigungsfrist Meldungen (Minuten)"
               name="meldung_bestaetigung_frist_min"
               extra={orgHinweisWert(orgDefaults?.meldung_bestaetigung_frist_min, 'Min.')}
@@ -172,11 +169,11 @@ export default function EinsatzVerhalten() {
               <InputNumber
                 min={1}
                 max={10080}
-                style={{ width: '100%', maxWidth: 200 }}
                 placeholder={platzhalterVorgabe(orgDefaults?.meldung_bestaetigung_frist_min, '5')}
               />
-            </Form.Item>
-            <Form.Item
+            </Feld>
+            <Feld
+              breite="schmal"
               label="Quittierfrist Aufträge (Minuten)"
               name="auftrag_quittierung_frist_min"
               extra={orgHinweisWert(orgDefaults?.auftrag_quittierung_frist_min, 'Min.')}
@@ -184,14 +181,14 @@ export default function EinsatzVerhalten() {
               <InputNumber
                 min={1}
                 max={10080}
-                style={{ width: '100%', maxWidth: 200 }}
                 placeholder={platzhalterVorgabe(
                   orgDefaults?.auftrag_quittierung_frist_min,
                   'keine Frist',
                 )}
               />
-            </Form.Item>
-            <Form.Item
+            </Feld>
+            <Feld
+              breite="schmal"
               label="Rückmeldefrist Einheiten (Minuten)"
               name="rueckmeldung_frist_min"
               extra={orgHinweisWert(orgDefaults?.rueckmeldung_frist_min, 'Min.')}
@@ -199,11 +196,11 @@ export default function EinsatzVerhalten() {
               <InputNumber
                 min={1}
                 max={10080}
-                style={{ width: '100%', maxWidth: 200 }}
                 placeholder={platzhalterVorgabe(orgDefaults?.rueckmeldung_frist_min, '60')}
               />
-            </Form.Item>
-            <Form.Item
+            </Feld>
+            <Feld
+              breite="schmal"
               label="Automatische ETB-Einträge"
               name="auto_etb_eintraege"
               extra={orgHinweisAutoEtb(orgDefaults?.auto_etb_eintraege)}
@@ -219,9 +216,8 @@ export default function EinsatzVerhalten() {
                   'An',
                 )}
                 options={AUTO_ETB_OPTIONEN}
-                style={{ width: '100%', maxWidth: 200 }}
               />
-            </Form.Item>
+            </Feld>
           </div>
         </Formularpaneel>
 

@@ -32,6 +32,9 @@ die Karten deckungsgleich.
 | Navigation im Einsatz (Kategorien und Module)                                                   | `IconRail`/`ModulPanel` ab `lg`, darunter Navigations-Drawer („UI-Form-Leitlinie“)                                                               | `Navigation`                       |
 | **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
+| Nebenangaben eines Datensatzes in einer Zeile                                                   | `MetaZeile`                                                                                                                                      | `MetaZeile`                        |
+| Text in einer Größe und Farbe                                                                   | `Textstufe` (Stufe der `schriftskala`, Ton)                                                                                                      | `Text`                             |
+| Elemente mit Abstand reihen                                                                     | `Stapel` (Rasterstufe)                                                                                                                           | `Stapel`                           |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
 | Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
@@ -52,7 +55,7 @@ die Karten deckungsgleich.
 | **Eingabe**                                                                                     |                                                                                                                                                  |                                    |
 | Eine Handlung auslösen                                                                          | antd `Button`, Farben aus `antdKnopf` („Farbe und Zeichen“, „Rot bedient nichts“)                                                                | `Knopf`                            |
 | Frei oder gesperrt mit Grund                                                                    | Sperrzeichen aus `index.css` („Gesperrt trägt die Sperre ohne Farbe“)                                                                            | `Gesperrt`                         |
-| Ein Feld mit Beschriftung und Fehlerzeile                                                       | antd `Input`/`Select` in `Form.Item`, ohne `Form.Item` `FeldFehler`                                                                              | `Eingabefeld`                      |
+| Ein Feld mit Beschriftung und Fehlerzeile                                                       | `Feld` mit `breite` (Hülle um `Form.Item`), ohne Formular `FeldFehler`                                                                           | `Eingabefeld`                      |
 | Zeitpunkt eingeben                                                                              | `ZeitpunktEingabe`                                                                                                                               | `Zeiteingabe`                      |
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
@@ -86,6 +89,9 @@ die Karten deckungsgleich.
 - **Navigation im Einsatz (Rail und Modulpanel)** (`components/Navigation/`, Gruppe Rahmen)
 - **Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)** (`components/Dashboard/`, Gruppe Flächen)
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
+- **Textstufe (Stufen der Schriftskala und Töne)** (`components/Text/`, Gruppe Flächen)
+- **Stapel (Abstand als Rasterstufe, senkrecht und als Zeile)** (`components/Stapel/`, Gruppe Flächen)
+- **MetaZeile (Nebenangaben eines Datensatzes)** (`components/MetaZeile/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
 - **Klappbares Kennzahlenband** (`components/KlappBand/`, Gruppe Daten)
@@ -102,7 +108,7 @@ die Karten deckungsgleich.
 - **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
 - **BearbeitbaresPaneel (offen und gesperrt)** (`components/BearbeitbaresPaneel/`, Gruppe Formular)
 - **Knopf (primär, Standard, Text, Gefahr, gesperrt, mit Symbol)** (`components/Knopf/`, Gruppe Eingabe)
-- **Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)** (`components/Eingabefeld/`, Gruppe Eingabe)
+- **Eingabefeld (Feld mit Breitenstufe, Pflicht mit Fehlerzeile, FeldFehler)** (`components/Eingabefeld/`, Gruppe Eingabe)
 - **Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)** (`components/Formularlayout/`, Gruppe Eingabe)
 - **Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)** (`components/Dialog/`, Gruppe Eingabe)
 - **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
@@ -159,7 +165,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
-  30/48/72 gilt, nicht die Entwurfsskizze.
+  30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
+  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nicht. Die
+  Stufen wachsen nicht mit der Dichte. Neue `fontSize`-Zahlen
+  verbietet `theme/schriftgroesse.guard.test.ts`; die Altlast steht in `schriftgroesse.schuld.ts`
+  und sinkt wie beim Abstandsraster.
 - **Abstandsraster**: Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
@@ -170,7 +180,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
   `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
   `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
-  (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter.
+  (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter. Elemente
+  reiht `Stapel abstand="…"` (Stufe, nie Zahl) statt `Space direction="vertical"` oder eines
+  Flex-`div` mit `gap`.
 - **Orientierung**: den Tab-Titel setzen nur die Rahmen über
   `components/useDokumentTitel.ts`, aus dem Modulnamen der Registry („Seite · Einsatz ·
   lifeline-hub“); keine Seite setzt `document.title`. Der Einsatzstatus steht nie im h1, sondern

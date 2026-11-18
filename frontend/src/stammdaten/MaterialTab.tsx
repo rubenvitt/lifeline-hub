@@ -1,7 +1,7 @@
-import { Button, Space } from 'antd';
+import { Button } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
-import { monoStil } from '../components/instrument';
+import { Stapel, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -87,14 +87,14 @@ export default function MaterialTab() {
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
       // LFH-733: die Marke steht neben der Bezeichnung; `dataIndex` hält den Suchkorpus beim Rohwert.
       render: (_, m) => (
-        <Space size={4} wrap>
+        <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
           {m.ist_demo && <DemoMarke />}
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('material', m.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {

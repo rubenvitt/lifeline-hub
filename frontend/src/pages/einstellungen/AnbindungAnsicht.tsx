@@ -10,6 +10,7 @@ import {
   Datenfeld,
   Datenraster,
   Paneel,
+  Stapel,
   StatusChip,
   monoStil,
   useRollen,
@@ -186,13 +187,15 @@ export default function AnbindungAnsicht() {
       breit: true,
       anzeige: <RechteText scopes={zugang.scopes} />,
       eingabe: (
-        <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
-          {SCOPES.map((s) => (
-            <Checkbox key={s} value={s}>
-              {SCOPE_TEXT[s]}{' '}
-              <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
-            </Checkbox>
-          ))}
+        <Checkbox.Group>
+          <Stapel abstand="xxs">
+            {SCOPES.map((s) => (
+              <Checkbox key={s} value={s}>
+                {SCOPE_TEXT[s]}{' '}
+                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+              </Checkbox>
+            ))}
+          </Stapel>
         </Checkbox.Group>
       ),
       regeln: [{ required: true, type: 'array', min: 1, message: 'Mindestens ein Recht wählen' }],
@@ -259,7 +262,7 @@ export default function AnbindungAnsicht() {
           />
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <BearbeitbaresPaneel<ZugangWerte, AnbindungPatch>
           key={zugang.id}
           titel="Zugang"
@@ -331,7 +334,7 @@ export default function AnbindungAnsicht() {
           }
           onNeuLaden={() => void listeQ.refetch()}
         />
-      </div>
+      </Stapel>
 
       <WiderrufDialog
         zugang={widerrufFuer}

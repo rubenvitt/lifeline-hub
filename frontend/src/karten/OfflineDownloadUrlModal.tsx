@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { starteOfflineDownload } from '../api/offlineKarten';
 import { invalidiereKarte } from './invalidiereKarte';
+import { Feld } from '../components/instrument';
 
 interface FormWerte {
   name: string;
@@ -79,14 +80,14 @@ export default function OfflineDownloadUrlModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. Deutschland (eigener Extrakt)" />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="URL (.mbtiles)"
         name="url"
         rules={[
@@ -100,14 +101,14 @@ export default function OfflineDownloadUrlModal({
         ]}
       >
         <Input placeholder="https://…/de.mbtiles" />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Attribution / Lizenz"
         name="lizenz"
         rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
       >
         <Input.TextArea rows={2} placeholder="© OpenStreetMap contributors (ODbL)" />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }
