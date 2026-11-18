@@ -174,11 +174,12 @@ describe('Registrieren gesperrt', () => {
   });
 });
 
-describe('Registrierliste drucken (LLH-1616)', () => {
-  it('führt auf die Druckansicht der Stelle, auch ohne Schreibrecht', async () => {
+describe('Registrierliste – Druckansicht (LLH-1616, LLH-1836)', () => {
+  it('steht im Kopf des Paneels und führt auf die Druckansicht der Stelle, auch ohne Schreibrecht', async () => {
     rendere({ darfSchreiben: false });
-    const link = await screen.findByRole('link', { name: 'Registrierliste drucken' });
+    const link = await screen.findByRole('link', { name: 'Registrierliste – Druckansicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/betreuung/8/registrierliste/druck');
+    expect(link.closest('[data-lfh="paneel-kopf-rechts"]')).not.toBeNull();
   });
 
   it('fehlt ohne Personenrecht', async () => {
@@ -187,7 +188,7 @@ describe('Registrierliste drucken (LLH-1616)', () => {
       <RegistrierungPaneel einsatzId={7} stelle={TURNHALLE} personenFrei={false} darfSchreiben />,
     );
     await screen.findByText(/Registrierung ·/);
-    expect(screen.queryByRole('link', { name: 'Registrierliste drucken' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Registrierliste/ })).toBeNull();
   });
 });
 

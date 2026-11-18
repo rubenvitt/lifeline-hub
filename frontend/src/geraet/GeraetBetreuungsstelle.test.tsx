@@ -321,8 +321,8 @@ describe('Betreuungsstelle — Registrierung (LLH-1612)', () => {
   });
 });
 
-describe('Betreuungsstelle — Registrierliste drucken (LLH-1616)', () => {
-  it('„Registrierliste drucken“ öffnet die Druckansicht der eigenen Stelle', async () => {
+describe('Betreuungsstelle — Registrierliste – Druckansicht (LLH-1616)', () => {
+  it('„Registrierliste – Druckansicht“ öffnet die Druckansicht der eigenen Stelle', async () => {
     bereit();
     const abrufe: string[] = [];
     server.use(
@@ -349,7 +349,9 @@ describe('Betreuungsstelle — Registrierliste drucken (LLH-1616)', () => {
     );
     const router = renderApp('/geraet/7/betreuung');
     await userEvent.click(await screen.findByRole('tab', { name: 'Registrierung' }));
-    await userEvent.click(await screen.findByRole('link', { name: 'Registrierliste drucken' }));
+    await userEvent.click(
+      await screen.findByRole('link', { name: 'Registrierliste – Druckansicht' }),
+    );
     await waitFor(() => expect(pfad(router)).toBe('/geraet/7/betreuung/registrierliste/druck'));
     expect(await screen.findByRole('table', { name: 'Registrierte Personen' })).toHaveTextContent(
       'Muster, Max',

@@ -77,7 +77,7 @@ test('Registrierliste: Einstieg im Paneel, Gesundheitsangaben nur nach Wahl, Hau
   await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}`);
   await page
     .getByRole('region', { name: 'Registrierung', exact: true })
-    .getByRole('link', { name: 'Registrierliste drucken' })
+    .getByRole('link', { name: 'Registrierliste – Druckansicht' })
     .click();
   await expect(page).toHaveURL(new RegExp(`/betreuung/${stelleId}/registrierliste/druck$`));
 
