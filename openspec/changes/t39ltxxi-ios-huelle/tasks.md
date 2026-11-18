@@ -11,51 +11,51 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## 2. Server-Vertrag `GET /api/shell`
 
-- [ ] 2.1 Roter Integrationstest `tests/shell.rs`: anonym 200, `version` gleich `/api/health`, `shell_contract` ganze Zahl ≥ 1 (Pflichtfelder per `contains_key`, keine feste Feldzahl), erreichbar mit Gerätesitzung, 200 auch bei gestörter DB
-- [ ] 2.2 `src/routes/shell.rs` (`load_shell`, `SHELL_CONTRACT = 1` mit Doc-Kommentar zur Bruchregel, DTO `ShellInfo`), Route in `src/app.rs`, Modul in `src/routes/mod.rs`; Test aus 2.1 grün
-- [ ] 2.3 `ShellInfo` in `src/api_doc.rs` aufnehmen, `scripts/check-typ-codegen.sh` laufen lassen, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten; Gate grün
-- [ ] 2.4 Mutationsprobe: `shell_contract` testweise auf 0 bzw. Route hinter `CurrentUser` → Test rot; Ergebnis im Kommentar
+- [x] 2.1 Roter Integrationstest `tests/shell.rs`: anonym 200, `version` gleich `/api/health`, `shell_contract` ganze Zahl ≥ 1 (Pflichtfelder per `contains_key`, keine feste Feldzahl), erreichbar mit Gerätesitzung, 200 auch bei gestörter DB
+- [x] 2.2 `src/routes/shell.rs` (`load_shell`, `SHELL_CONTRACT = 1` mit Doc-Kommentar zur Bruchregel, DTO `ShellInfo`), Route in `src/app.rs`, Modul in `src/routes/mod.rs`; Test aus 2.1 grün
+- [x] 2.3 `ShellInfo` in `src/api_doc.rs` aufnehmen, `scripts/check-typ-codegen.sh` laufen lassen, `frontend/src/api/openapi.json` und `types.generated.ts` mitcommitten; Gate grün
+- [x] 2.4 Mutationsprobe: `shell_contract` testweise auf 0 bzw. Route hinter `CurrentUser` → Test rot; Ergebnis im Kommentar
 
 ## 3. Plattformneutrale Texte (Lifeline-App)
 
-- [ ] 3.1 `frontend/src/pages/AppAnmeldungPage.tsx` und Test: „In der Lifeline-App anmelden als …“ und neutrale Fehler-/Untertitel; vitest grün, `git grep -n 'Mac-App' frontend/src` zeigt nur noch begründete Stellen
-- [ ] 3.2 Klartext des Anmeldewegs `systembrowser` im Zugangsprotokoll auf „Lifeline-App“ samt Test; vitest grün
-- [ ] 3.3 Anwenderkapitel, die die Mac-App bei der Anmeldung im Browser nennen, auf „Lifeline-App“ (Mitänderungsregel `docs/anwender/AGENTS.md`); Wächter der Anwenderdoku grün
+- [x] 3.1 `frontend/src/pages/AppAnmeldungPage.tsx` und Test: „In der Lifeline-App anmelden als …“ und neutrale Fehler-/Untertitel; vitest grün, `git grep -n 'Mac-App' frontend/src` zeigt nur noch begründete Stellen
+- [x] 3.2 Klartext des Anmeldewegs `systembrowser` im Zugangsprotokoll auf „Lifeline-App“ samt Test; vitest grün
+- [x] 3.3 Anwenderkapitel, die die Mac-App bei der Anmeldung im Browser nennen, auf „Lifeline-App“ (Mitänderungsregel `docs/anwender/AGENTS.md`); Wächter der Anwenderdoku grün
 
 ## 4. Frontend: Kennung und Haptik
 
-- [ ] 4.1 Init-Skript der iOS-Hülle `ios/App/Huelle/huelle.js` (reines JS: Kennung mit `platform`, `version`, `passkey: false`, `anmeldungImBrowser`, `haptics`, `benachrichtigungZeigen`, `setAppBadge`, Ersatz für `window.print`, Message-Handler `lifeline`) und Testhelfer in `frontend/src/test/huelle.ts`, der es wie die Tauri-Skripte ausführt; Test „Kennung vollständig“ grün
-- [ ] 4.2 `frontend/src/huelle/faehigkeiten.ts`: `huellePlatform()`, `huelleVersion()`, `huelleHaptics(kind)` (feuern und vergessen, wirft nie, ohne Hülle nichts); Tests für Browser, Desktop-Hülle ohne Felder, iOS-Hülle, werfende Brücke
-- [ ] 4.3 Rückmeldung (`rueckmeldung/adresse.ts`) nennt bei `platform: 'ios'` die iOS-App, sonst wie bisher; bestehende Tests unverändert grün, neuer Fall grün
-- [ ] 4.4 Haptik in der gemeinsamen Erfassung und der ETB-Schnellerfassung: angenommen → `success`, vorgemerkt → `tap`, abgelehnt → `error`, je genau einmal; Tests je Fall, Mutationsprobe (Aufruf entfernt → rot)
-- [ ] 4.5 Haptik beim neu eingehenden Alarm der Stufe `alarm` (`warning`), nicht beim Nachspielen, nicht bei Stummschaltung; Tests
-- [ ] 4.6 Haptik in der Segmentleiste (`selection`, einmal je Wechsel, zentral); Test
-- [ ] 4.7 Test: Push-Schalter fehlt bei `platform: 'ios'`; Test: Start ohne `navigator.serviceWorker` (Registrierung, Alarm, Web Push) bleibt still und meldet keinen Client-Fehler
-- [ ] 4.8 Kapitel der Anwenderdoku zur Haptik nur, wenn ein bestehendes Kapitel die Rückmeldung beim Speichern beschreibt; sonst Begründung im Kommentar
+- [x] 4.1 Init-Skript der iOS-Hülle `ios/App/Huelle/huelle.js` (reines JS: Kennung mit `platform`, `version`, `passkey: false`, `anmeldungImBrowser`, `haptics`, `benachrichtigungZeigen`, `setAppBadge`, Ersatz für `window.print`, Message-Handler `lifeline`) und Testhelfer in `frontend/src/test/huelle.ts`, der es wie die Tauri-Skripte ausführt; Test „Kennung vollständig“ grün
+- [x] 4.2 `frontend/src/huelle/faehigkeiten.ts`: `huellePlatform()`, `huelleVersion()`, `huelleHaptics(kind)` (feuern und vergessen, wirft nie, ohne Hülle nichts); Tests für Browser, Desktop-Hülle ohne Felder, iOS-Hülle, werfende Brücke
+- [x] 4.3 Rückmeldung (`rueckmeldung/adresse.ts`) nennt bei `platform: 'ios'` die iOS-App, sonst wie bisher; bestehende Tests unverändert grün, neuer Fall grün
+- [x] 4.4 Haptik in der gemeinsamen Erfassung und der ETB-Schnellerfassung: angenommen → `success`, vorgemerkt → `tap`, abgelehnt → `error`, je genau einmal; Tests je Fall, Mutationsprobe (Aufruf entfernt → rot)
+- [x] 4.5 Haptik beim neu eingehenden Alarm der Stufe `alarm` (`warning`), nicht beim Nachspielen, nicht bei Stummschaltung; Tests
+- [x] 4.6 Haptik in der Segmentleiste (`selection`, einmal je Wechsel, zentral); Test
+- [x] 4.7 Test: Push-Schalter fehlt bei `platform: 'ios'`; Test: Start ohne `navigator.serviceWorker` (Registrierung, Alarm, Web Push) bleibt still und meldet keinen Client-Fehler
+- [ ] 4.8 Haptik in den Anwenderkapiteln, die die Rückmeldung beim Speichern und den Alarm beschreiben (einsatztagebuch, einsatz-oberflaeche), erst mit dem ersten TestFlight-Build nach 10.2 (Anwenderdoku nur Ist-Stand); Wächter grün
 
 ## 5. Gemeinsame Fälle der Hüllen
 
-- [ ] 5.1 Fälle von `adresse.rs`, `deeplink.rs` (`deute`, `entscheide`) und `links.rs` als JSON unter `src-tauri/faelle/` auslagern; die Rust-Tests lesen sie (`cargo test -p lifeline-desktop` grün, Mutationsprobe an einem Fall rot)
-- [ ] 5.2 `src-tauri/AGENTS.md`: Fälle sind die gemeinsame Quelle beider Hüllen; Prettier/Gates grün
+- [x] 5.1 Fälle von `adresse.rs`, `deeplink.rs` (`deute`, `entscheide`) und `links.rs` als JSON unter `src-tauri/faelle/` auslagern; die Rust-Tests lesen sie (`cargo test -p lifeline-desktop` grün, Mutationsprobe an einem Fall rot)
+- [x] 5.2 `src-tauri/AGENTS.md`: Fälle sind die gemeinsame Quelle beider Hüllen; Prettier/Gates grün
 
 ## 6. Gate und CI für iOS
 
-- [ ] 6.1 Swift-Paket `ios/LifelineKern` als Gerüst (Package.swift, leeres Modul, ein Platzhaltertest), Swift-Version gepinnt
-- [ ] 6.2 Schritt `ios` in `scripts/check-all.sh` (Bündel `ios`, in `alle`): `swift test` in `ios/LifelineKern`; ohne Toolchain „OK mit Lücke“, mit `IOS_SWIFT_PFLICHT=1` rot; Selbsttest des Skripts nach `scripts/AGENTS.md` grün
-- [ ] 6.3 `scripts/bereiche.sh` kennt `ios/*` und den Querbezug `src-tauri/faelle/*` (Desktop- und iOS-Prüfung); Selbsttest grün
+- [x] 6.1 Swift-Paket `ios/LifelineKern` als Gerüst (Package.swift, leeres Modul, ein Platzhaltertest), Swift-Version gepinnt
+- [x] 6.2 Schritt `ios` in `scripts/check-all.sh` (Bündel `ios`, in `alle`): `swift test` in `ios/LifelineKern`; ohne Toolchain „OK mit Lücke“, mit `IOS_SWIFT_PFLICHT=1` rot; Selbsttest des Skripts nach `scripts/AGENTS.md` grün
+- [x] 6.3 `scripts/bereiche.sh` kennt `ios/*` und den Querbezug `src-tauri/faelle/*` (Desktop- und iOS-Prüfung); Selbsttest grün
 - [ ] 6.4 `suiten.yml`: Job `ios` auf `ubuntu-latest` mit `IOS_SWIFT_PFLICHT=1`; Lauf mit Label `voll` grün
 - [ ] 6.5 XcodeGen-Version unter `scripts/` pinnen (eine Stelle); `ios-pruefung.yml` (`pull_request`, Pfadfilter `ios/**`, `src-tauri/faelle/**`, `macos-latest`): Projekt erzeugen, Simulatorbau, Swift-Tests auf iOS, Simulator-Bilder als Artefakt; erster Lauf grün
 - [ ] 6.6 Architektur-Wächter kennt das Teilprojekt `ios`, Kapitel 5 der arc42 nennt es; `check-architektur.sh` grün
 
 ## 7. Swift-Kern `LifelineKern`
 
-- [ ] 7.1 Adressprüfung gegen die gemeinsamen Fälle (gleiche Meldungstexte); Linux-Job grün
-- [ ] 7.2 Deeplink deuten und entscheiden (vorbelegen, bestätigen, nichts) gegen die gemeinsamen Fälle; grün
-- [ ] 7.3 Linkregeln (Webview, Download, System) gegen die gemeinsamen Fälle; grün
-- [ ] 7.4 Serverliste (Codable: UUID, Name, Adresse, zuletzt verbunden, zuletzt bestätigter Vertrag): hinzufügen, umbenennen, wechseln, entfernen nur nicht-aktiv, Vorgabename Hostname; grün
-- [ ] 7.5 Vertragsprüfung: `ShellInfo` lesen, bekannte Verträge `[1]`, Richtung bei unbekanntem Vertrag, 404 → zu alt, ohne Netz letzter bestätigter Vertrag; grün
-- [ ] 7.6 Onboarding-Ablauf als Zustandsfunktion (Adresse → Prüfung → speichern nur bei verträglich) und Fehlerklassen (Zertifikat, nicht erreichbar, zu alt, zu neu) aus URL-Fehlercodes; grün
-- [ ] 7.7 Haptik-Abbildung Art → Rückmeldungsart (unbekannt → nichts, Schalter aus → nichts); grün
+- [x] 7.1 Adressprüfung gegen die gemeinsamen Fälle (gleiche Meldungstexte); Linux-Job grün
+- [x] 7.2 Deeplink deuten und entscheiden (vorbelegen, bestätigen, nichts) gegen die gemeinsamen Fälle; grün
+- [x] 7.3 Linkregeln (Webview, Download, System) gegen die gemeinsamen Fälle; grün
+- [x] 7.4 Serverliste (Codable: UUID, Name, Adresse, zuletzt verbunden, zuletzt bestätigter Vertrag): hinzufügen, umbenennen, wechseln, entfernen nur nicht-aktiv, Vorgabename Hostname; grün
+- [x] 7.5 Vertragsprüfung: `ShellInfo` lesen, bekannte Verträge `[1]`, Richtung bei unbekanntem Vertrag, 404 → zu alt, ohne Netz letzter bestätigter Vertrag; grün
+- [x] 7.6 Onboarding-Ablauf als Zustandsfunktion (Adresse → Prüfung → speichern nur bei verträglich) und Fehlerklassen (Zertifikat, nicht erreichbar, zu alt, zu neu) aus URL-Fehlercodes; grün
+- [x] 7.7 Haptik-Abbildung Art → Rückmeldungsart (unbekannt → nichts, Schalter aus → nichts); grün
 
 ## 8. iOS-App
 
