@@ -21,7 +21,8 @@ Handler (`JsonBody`, LFH-1074).
 - **409 hat zwei Quellen:** CAS (Zeilen-CAS `basis_geaendert_at` in `schaden/repo.rs`,
   `tier/repo.rs`, `verpflegung/repo.rs` für Zeitfenster; Feld-CAS `erwartet` über den Baustein
   `src/feld_cas.rs` in `person/repo.rs`, am Einsatzkopf, an der Einheit und an der eigenen
-  Führungsstelle (LLH-1831); Rückfrage „Zwischenzeitlich geändert“ mit „Meine Änderung
+  Führungsstelle (LLH-1831), an Abschnitt, Gefahrengebiet, Programmpunkt, Dispositionen,
+  Betreuungsstelle und den Positionswegen der Lage (LLH-1945); Rückfrage „Zwischenzeitlich geändert“ mit „Meine Änderung
   übernehmen“) und Lebenszyklus (kein Dialog). Das Frontend trennt nur
   heuristisch (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
   `SchaedenDetailPage.tsx`/`TiereDetailPage.tsx`) — ein neuer 409 in einer
@@ -41,6 +42,12 @@ Handler (`JsonBody`, LFH-1074).
   Typs). Jeder dieser Schreibwege setzt den **Änderungsvermerk** je geänderter Angabe in
   `einsatz_feld_vermerk` (LLH-1834, `einsatz::feld_vermerk`), auch ohne `erwartet`; kein
   ETB-Eintrag daraus. Eine neue Angabe an diesen Wegen kommt in die feste Feldliste des Vermerks.
+- **Feld-CAS ohne Änderungsvermerk** (LLH-1945): Abschnitt, Gefahrengebiet, Programmpunkt, die
+  Dispositionen von Personal, Fahrzeug und Material, die Betreuungsstelle sowie `…/position` und
+  `…/flaeche` nehmen `erwartet` in derselben Form (Prüfung `feld_cas::pruefe_felder`, Vergleich in
+  der Schreibtransaktion über `pruefe_zeile_tx` oder als Suffix des einen UPDATE, 0 Zeilen über
+  `ohne_treffer` zu 409 `Veraltet` oder 404). Die Stärke-Position vergleicht den wirksamen Wert,
+  der Material-Ort ist eine Gruppe aller vier Spalten. Kein Eintrag in `einsatz_feld_vermerk`.
 - **Personendaten nutzen Feld-CAS** (LLH-1103, design.md D1 der Change
   `f8218h1i-personendaten-feldweise`): der PATCH `…/personen/{pid}` trägt in `erwartet` je
   geändertem Feld den Wert beim Öffnen (`null` = leer, Koordinate nur als Paar), und
