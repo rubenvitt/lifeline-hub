@@ -58,6 +58,16 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO || rc=$?
 
 if [ -d "$ERGEBNIS" ]; then
+  if [ "$rc" != 0 ]; then
+    # Das Protokoll von `xcodebuild` nennt fehlgeschlagene Tests nicht mit Grund; ohne diese
+    # Liste hilft nur das herunterzuladende Ergebnisbündel. Scheitert die Ausgabe, bleibt rc.
+    echo "==> Fehlgeschlagene Tests (xcresulttool get test-results tests)"
+    xcrun xcresulttool get test-results tests --path "$ERGEBNIS" --format json 2> /dev/null \
+      | jq -r '.. | objects | select(.result? == "Failed" and .nodeType? == "Test Case")
+          | "FEHLGESCHLAGEN: \(.nodeIdentifier // .name)",
+            (.children[]? | select(.nodeType? == "Failure Message") | "  \(.name)")' \
+      || echo "(Liste nicht lesbar; siehe Artefakt ios-xcresult)"
+  fi
   # `export attachments` gibt es ab Xcode 16.3; die Namen stehen in manifest.json.
   xcrun xcresulttool export attachments --path "$ERGEBNIS" --output-path "$AUSGABE/roh"
   # Nur echte Bilder, mit Namen, die `actions/upload-artifact` annimmt (bilder-ablegen.sh).
