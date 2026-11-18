@@ -193,7 +193,7 @@ export default function OfflineKartenVerwaltung() {
           <div>
             <div>{name}</div>
             {(stand || seit || k.update_verfuegbar) && (
-              <Space size={6} wrap style={{ marginTop: 2 }}>
+              <Space size={token.marginSM} wrap style={{ marginTop: 2 }}>
                 {stand && (
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                     Stand {stand}
@@ -249,7 +249,7 @@ export default function OfflineKartenVerwaltung() {
         // Vor dem Download (Neubau, Veröffentlichung) ein Etikett mit Ladekreis.
         if (akt?.phase && akt.phase !== 'laedt' && s !== 'laedt' && k.geladen == null) {
           return (
-            <Space size={8} wrap>
+            <Space size={token.marginSM} wrap>
               <StatusTag
                 icon={<IconLadekreis drehen />}
                 darstellung={{ ...offlineKarteStatus.laedt, label: PHASE_ETIKETT[akt.phase] }}
@@ -263,7 +263,7 @@ export default function OfflineKartenVerwaltung() {
         const laeuft = s === 'laedt' || k.geladen != null || akt?.phase === 'laedt';
         if (!laeuft) {
           return (
-            <Space size={8} wrap>
+            <Space size={token.marginSM} wrap>
               <StatusTag darstellung={offlineKarteStatus[s]} />
               {fehler}
             </Space>
@@ -275,7 +275,7 @@ export default function OfflineKartenVerwaltung() {
         // In-Place-Reload einer 'bereit'-Zeile: „aktualisiert" (Karte bleibt aktiv), sonst „lädt".
         const label = s === 'laedt' ? 'lädt' : 'aktualisiert';
         return (
-          <Space size={8}>
+          <Space size={token.marginSM}>
             <StatusTag
               icon={<IconLadekreis drehen />}
               darstellung={{ ...offlineKarteStatus.laedt, label }}
@@ -391,7 +391,7 @@ export default function OfflineKartenVerwaltung() {
   return (
     <>
       {istAdmin && (
-        <Space style={{ marginBottom: 12 }}>
+        <Space style={{ marginBottom: token.margin }}>
           {/* Ein Weg für den Regelfall: bauen (falls nötig) + laden hinter einem Button. */}
           <Button type="primary" onClick={() => setPickerOffen(true)}>
             Region aufs Gerät bringen
@@ -419,7 +419,7 @@ export default function OfflineKartenVerwaltung() {
         <AutoAktualisierungZeile status={statusQuery.data} istAdmin={istAdmin} />
       )}
       {istAdmin && bauVerfuegbar && aktiveBauten.length > 0 && (
-        <Space size={6} wrap style={{ marginBottom: 12 }}>
+        <Space size={token.marginSM} wrap style={{ marginBottom: token.margin }}>
           {aktiveBauten.map((j) => (
             <StatusTag
               key={j.id}

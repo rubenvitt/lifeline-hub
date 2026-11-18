@@ -1,4 +1,4 @@
-import { Space, Tag, Typography } from 'antd';
+import { Space, Tag, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import { zahlText } from '../../anzeige/zahl';
 import {
@@ -35,8 +35,9 @@ export function ruhtAufAnnahme(schluessel: readonly string[], richtwerte: Richtw
 }
 
 function Etikett({ text, annahme }: { text: string; annahme: boolean }) {
+  const { token } = theme.useToken();
   return (
-    <Space size={6} wrap>
+    <Space size={token.marginSM} wrap>
       <span>{text}</span>
       {annahme && (
         <Tag variant="filled" data-lfh="annahme">

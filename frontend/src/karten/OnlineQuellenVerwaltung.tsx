@@ -179,7 +179,7 @@ export default function OnlineQuellenVerwaltung() {
   return (
     <>
       {istAdmin && (
-        <Space style={{ marginBottom: 12 }}>
+        <Space style={{ marginBottom: token.margin }}>
           <Button
             type="primary"
             onClick={() => {

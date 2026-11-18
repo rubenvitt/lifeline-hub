@@ -1,4 +1,4 @@
-import { App, Button, Input, Modal, Spin, Tag, Typography } from 'antd';
+import { App, Button, Input, Modal, Spin, Tag, Typography, theme } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ export default function OfflineVorhandeneModal({
   offen: boolean;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const { message } = App.useApp();
   // Editierbare Namen je Datei (Default aus dem Dateinamen abgeleitet).
@@ -77,7 +78,7 @@ export default function OfflineVorhandeneModal({
       destroyOnHidden
     >
       {vorhandeneQuery.isLoading ? (
-        <div style={{ textAlign: 'center', padding: 24 }}>
+        <div style={{ textAlign: 'center', padding: token.paddingXL }}>
           <Spin />
         </div>
       ) : (

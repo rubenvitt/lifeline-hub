@@ -44,8 +44,9 @@ function neuerRaum(): Raum {
 const zahl = (v: number | null) => (v == null || !Number.isFinite(v) ? 0 : v);
 
 function Zeile({ label, children }: { label: ReactNode; children: ReactNode }) {
+  const { token } = useRollen();
   return (
-    <label style={{ display: 'grid', gap: 4 }}>
+    <label style={{ display: 'grid', gap: token.marginXS }}>
       <Typography.Text type="secondary">{label}</Typography.Text>
       {children}
     </label>

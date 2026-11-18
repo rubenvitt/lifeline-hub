@@ -1,6 +1,6 @@
 import { IconLautsprecher } from '../icons';
 import { useState } from 'react';
-import { Button, Popover, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
+import { Button, Popover, Segmented, Space, Tag, Tooltip, Typography, theme } from 'antd';
 import { buchstabiere, type Buchstabiertafel } from './buchstabieren';
 
 /**
@@ -25,6 +25,7 @@ export default function BuchstabierHilfe({
   /** Gesperrt wie das Feld daneben (ETB: während des Sendens). */
   disabled?: boolean;
 }) {
+  const { token } = theme.useToken();
   const name = zu ? `Buchstabierhilfe zu ${zu}` : 'Buchstabierhilfe';
   const [tafel, setTafel] = useState<Buchstabiertafel>('din5009');
   /**
@@ -47,11 +48,11 @@ export default function BuchstabierHilfe({
           { value: 'nato', label: 'NATO' },
         ]}
       />
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: token.marginSM }}>
         {text.trim() === '' ? (
           <Typography.Text type="secondary">Text im Feld eingeben …</Typography.Text>
         ) : (
-          <Space wrap size={[4, 4]}>
+          <Space wrap size={[token.marginXS, token.marginXS]}>
             {zeichen.map((z, i) =>
               z.wort ? (
                 <Tag key={i} style={{ margin: 0 }}>

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Alert, Button, Space, Spin } from 'antd';
+import { Alert, Button, Space, Spin, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { IconKachelraster } from '../icons';
@@ -59,6 +59,7 @@ function PlaetzeBereich({ einsatzId, uhs }: { einsatzId: number; uhs: UhsDetail 
  * selbst bleibt der eigene Bereich.
  */
 export default function GeraetStellePage() {
+  const { token } = theme.useToken();
   const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const uhsId = geraet?.uhs_id ?? null;
@@ -96,7 +97,7 @@ export default function GeraetStellePage() {
             wert={bereich}
             onWechsel={setBereich}
             optionen={BEREICHE.map((b) => ({ wert: b, label: BEREICH_NAME[b], steuert: feld }))}
-            style={{ marginBottom: 12 }}
+            style={{ marginBottom: token.margin }}
           />
           <div role="tabpanel" id={feld} aria-label={BEREICH_NAME[bereich]}>
             {bereich === 'plaetze' ? (

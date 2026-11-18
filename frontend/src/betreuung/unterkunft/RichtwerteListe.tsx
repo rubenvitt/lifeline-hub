@@ -158,7 +158,7 @@ function RichtwertZeile({
 
   return (
     <div style={zeile} data-schluessel={b.schluessel}>
-      <Space size={6} wrap>
+      <Space size={token.marginSM} wrap>
         <Typography.Text>{b.bezeichnung}</Typography.Text>
         {b.herkunft === 'annahme' && <Tag variant="filled">Annahme</Tag>}
       </Space>
@@ -177,7 +177,7 @@ function RichtwertZeile({
           {vomHub && <VomHubGesperrt />}
         </div>
       )}
-      <Space size={6} wrap>
+      <Space size={token.marginSM} wrap>
         <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
           {HERKUNFT_LABEL[herkunft]}
           {herkunft !== 'basis' && ` · ${mitVorgabe(richtwertText(b.wert, b.einheit))}`}

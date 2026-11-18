@@ -244,7 +244,9 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
         position: 'absolute',
         zIndex: 10,
         minWidth: 240,
-        ...(richtung === 'oben' ? { bottom: '100%', marginBottom: 4 } : { marginTop: 4 }),
+        ...(richtung === 'oben'
+          ? { bottom: '100%', marginBottom: token.marginXS }
+          : { marginTop: token.marginXS }),
         background: token.colorBgElevated,
         color: token.colorText,
         border: `1px solid ${token.colorBorderSecondary}`,

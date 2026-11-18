@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, Switch } from 'antd';
+import { Collapse, Form, Input, InputNumber, Switch, theme } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -55,6 +55,7 @@ export default function OnlineQuelleFormModal({
   naechsteSortier: number;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
   const typ = Form.useWatch('typ', form) ?? 'vektor';
@@ -157,7 +158,7 @@ export default function OnlineQuelleFormModal({
          Gegenmittel steht am `onErfassen` oben. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         items={[
           {
             key: 'weitere',

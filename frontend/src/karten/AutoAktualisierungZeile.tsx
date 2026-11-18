@@ -61,11 +61,11 @@ export default function AutoAktualisierungZeile({
   }
 
   return (
-    <div data-testid="auto-aktualisierung" style={{ marginBottom: 12 }}>
-      <Space wrap size={12}>
+    <div data-testid="auto-aktualisierung" style={{ marginBottom: token.margin }}>
+      <Space wrap size={token.margin}>
         {istAdmin ? (
           <>
-            <Space size={8}>
+            <Space size={token.marginSM}>
               <Switch
                 aria-label="Automatisch aktualisieren"
                 checked={status.automatisch}

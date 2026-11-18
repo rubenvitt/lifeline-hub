@@ -1,4 +1,4 @@
-import { Alert, App, Button, Modal, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Modal, Spin, Tag, Typography, theme } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -29,6 +29,7 @@ export default function AusKatalogModal({
   naechsteSortier: number;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const { message } = App.useApp();
 
@@ -85,7 +86,7 @@ export default function AusKatalogModal({
       destroyOnHidden
     >
       {katalogQuery.isLoading ? (
-        <div style={{ textAlign: 'center', padding: 24 }}>
+        <div style={{ textAlign: 'center', padding: token.paddingXL }}>
           <Spin />
         </div>
       ) : (
@@ -126,7 +127,7 @@ export default function AusKatalogModal({
                           type="warning"
                           showIcon
                           title={eintrag.hinweis}
-                          style={{ marginTop: 8 }}
+                          style={{ marginTop: token.marginSM }}
                         />
                       )}
                       {grund && (
