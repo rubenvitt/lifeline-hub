@@ -19,7 +19,8 @@ Ausführung, nicht beim Anzeigen eines Ziels.
 
 #### Scenario: Kennzahl auf dem Überblick
 
-- **WHEN** eine Person auf Führung · Überblick die Kennzahl „Offene Aufträge" anklickt
+- **WHEN** eine Person auf Führung · Überblick im Paneel „Offene Vorgänge“ den Sprung „alle“ des
+  Abschnitts „Aufträge“ anklickt
 - **THEN** steht „Aufträge/Befehle" danach als jüngster Eintrag in „Zuletzt besucht"
 
 #### Scenario: Knopf auf dem Überblick

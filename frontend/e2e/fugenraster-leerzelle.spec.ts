@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { einsatzdatenPfad, lagebesprechungPfad, ueberblickPfad } from '../src/routing/deeplinks';
+import { einsatzModulPfad, einsatzdatenPfad, lagebesprechungPfad } from '../src/routing/deeplinks';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -150,19 +150,18 @@ async function vorbereiten(page: Page, rolleName: (typeof ROLLEN)[number]): Prom
 }
 
 for (const rolleName of ROLLEN) {
-  test(`Überblick 390 px (${rolleName}): drei Plätze ohne Restspur, Fuge 1 px`, async ({
+  // Seit LLH-1748 trägt der Überblick kein Band; das Band des Lagebilds hält die Regel.
+  test(`Lagebild 390 px (${rolleName}): sechs Plätze ohne Restspur, Fuge 1 px`, async ({
     page,
   }) => {
     const id = await vorbereiten(page, rolleName);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(ueberblickPfad(id));
-    // Seit LLH-1743 der Führungsstand mit drei Handlungszahlen in einer Reihe.
-    const band = page.getByRole('group', { name: 'Führungsstand' });
-    await expect(band.getByText('Einsatzabschnitte', { exact: true })).toBeVisible();
+    await page.goto(einsatzModulPfad(id, 'lage-dashboard'));
+    const band = page.getByRole('group', { name: 'Lage in Zahlen' });
+    await expect(band.getByText('Einsatzdauer', { exact: true })).toBeVisible();
     await expect(band.locator('[aria-busy="true"]')).toHaveCount(0);
     const v = await pruefeRaster(page, band, false);
-    expect(v.spalten).toBe(3);
-    expect(v.rest, 'drei Plätze füllen eine Reihe ganz').toBeNull();
+    expect(v.rest, 'sechs Plätze füllen ihre Reihen ganz').toBeNull();
   });
 
   for (const breite of [820, 1180]) {

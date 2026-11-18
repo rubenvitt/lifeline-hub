@@ -177,7 +177,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKacheln,
     route: 'ueberblick',
     status: 'fertig',
-    beschreibung: 'Kennzahlen, Fristen, Entscheidungen',
+    beschreibung: 'Fristen, Vorgänge, Entscheidungen',
   },
   // ETB als Führungsmittel direkt hinter dem Überblick (y3zh5ymv D10; bis dahin unter Erfassung).
   {

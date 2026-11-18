@@ -137,5 +137,5 @@ Ladephase erscheinen wie die übrigen Paneele des Überblicks, damit nichts nach
 
 - **WHEN** eine Person auf dem Überblick live Schreibrecht bekommt und die Lagefeststellungen zum
   ersten Mal geladen werden
-- **THEN** bleiben Führungsstand und Paneelreihen dabei stehen, und die Startliste erscheint erst
-  mit ihren Quellen
+- **THEN** bleiben die Paneelreihen dabei stehen, und die Startliste erscheint erst mit ihren
+  Quellen

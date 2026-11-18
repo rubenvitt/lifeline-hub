@@ -354,9 +354,15 @@ function rendern() {
   );
 }
 
-const band = () => screen.getByRole('group', { name: 'Führungsstand' });
-/** Das Band erst nach dem Einsatz-Abruf — der Körper wartet auf ihn (LFH-629). */
-const bandDa = () => screen.findByRole('group', { name: 'Führungsstand' });
+/**
+ * Der Körper erst nach dem Einsatz-Abruf (LFH-629); sein erstes Element ist die Alarmzeile. Ein
+ * Band trägt der Überblick seit LLH-1748 nicht mehr.
+ */
+const koerperDa = () => screen.findByRole('status', { name: 'Was brennt' });
+const keinBand = () => screen.queryByRole('group', { name: 'Führungsstand' });
+/** `b` steht im Dokument nach `a`. */
+const folgt = (a: Node, b: Node) =>
+  (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 const paneel = (name: string | RegExp) => screen.getByRole('region', { name });
 /** Die Warnstufe steht im Seitenkopf wie im Lagebild (LLH-1140), nicht mehr im Band. */
 const kopfLage = () => document.querySelector<HTMLElement>('[data-lfh="ueberblick-lage-kopf"]');
@@ -398,29 +404,36 @@ describe('UeberblickPage', () => {
     expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/lageberichte');
   });
 
-  it('Führungsstand: drei Handlungszahlen, jede ein Link ins Fachmodul (LLH-1743)', async () => {
+  it('kein Band: Reihe 1 Nächste Marken | Offene Vorgänge, Reihe 2 Einsatzabschnitte | Entscheidungen (LLH-1748)', async () => {
     stelleBereit(volleDaten);
     rendern();
-    await waitFor(() => expect(within(band()).getByText('2 neu')).toBeInTheDocument());
-    const links = within(band()).getAllByRole('link');
-    // Seitenrollen (Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt die Lage“):
+    await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent('4'));
+    // Die Zahlen des früheren Bands stehen in den Paneelen (Spec `lage-verdichtung`, „Überblick
+    // führt, Lagebild zeigt die Lage“): keine Kennzahl, kein Band.
+    expect(keinBand()).toBeNull();
+    expect(document.querySelector('[data-lfh="kennzahl"]')).toBeNull();
+    expect(abschnittZahl('Aufträge')).toHaveTextContent('2');
+    expect(abschnitt('Aufträge')).toHaveTextContent('1 überfällig');
+    const marken = paneel('Nächste Marken');
+    const abschnitte = await waitFor(() => paneel('Einsatzabschnitte'));
+    const entscheidungen = paneel(/Entscheidungen/);
+    expect(marken.closest('[data-lfh="ueberblick-paneele"]')).not.toBeNull();
+    expect(vorgaenge().closest('[data-lfh="ueberblick-paneele"]')).not.toBeNull();
+    expect(abschnitte.closest('[data-lfh="ueberblick-paneele-gliederung"]')).not.toBeNull();
+    expect(entscheidungen.closest('[data-lfh="ueberblick-paneele-gliederung"]')).not.toBeNull();
+    // Gestapelt (unter `lg`) gilt die Folge des Dokuments: Fristen zuerst.
+    expect(folgt(marken, vorgaenge())).toBe(true);
+    expect(folgt(vorgaenge(), abschnitte)).toBe(true);
+    expect(folgt(abschnitte, entscheidungen)).toBe(true);
+    // Die Zahl der Abschnitte steht im Kopf ihres Paneels.
+    expect(abschnitte).toHaveTextContent('1 Abschnitt');
     // Betroffene, Kräfte und Einsatzdauer haben ihre Heimat im Lagebild.
-    expect(links.map((l) => l.getAttribute('href'))).toEqual([
-      '/einsaetze/1/auftraege',
-      '/einsaetze/1/meldungen',
-      '/einsaetze/1/einsatzabschnitte',
-    ]);
-    const b = within(band());
-    expect(b.getByText('davon 1 ü.')).toBeInTheDocument();
-    // „Meldungen offen“ aus dem Modulzähler (LFH-550).
-    expect(links[1]).toHaveTextContent('4');
-    expect(await b.findByText('Abschnitt Nord')).toBeInTheDocument();
-    for (const weg of ['Betroffene', 'Kräfte im Einsatz', 'Einsatzdauer', 'Warnstufe']) {
-      expect(b.queryByText(weg)).toBeNull();
+    for (const weg of ['Betroffene', 'Kräfte im Einsatz', 'Einsatzdauer']) {
+      expect(screen.queryByText(weg)).toBeNull();
     }
   });
 
-  it('Alarmzeile „Was brennt“ steht vor dem Band (LLH-1743)', async () => {
+  it('Alarmzeile „Was brennt“ steht vor den Paneelreihen (LLH-1743)', async () => {
     stelleBereit({
       ...volleDaten,
       personen: [...volleDaten.personen, { ...person(9, vor(30)), status: 'vermisst' }],
@@ -434,8 +447,8 @@ describe('UeberblickPage', () => {
       'href',
       '/einsaetze/1/personen?filter=vermisst',
     );
-    // Zuerst die Zeile, dann das Band.
-    expect(zeile.compareDocumentPosition(band()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Zuerst die Zeile, dann die Fristen (LLH-1748).
+    expect(folgt(zeile, await waitFor(() => paneel('Nächste Marken')))).toBe(true);
   });
 
   it('Seitenkopf springt ins Lagebild (LLH-1743)', async () => {
@@ -445,7 +458,7 @@ describe('UeberblickPage', () => {
     expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/lage-dashboard');
   });
 
-  it('Meldungen offen: überfällige Bestätigung färbt die Kennzahl alarm', async () => {
+  it('Offene Vorgänge · Meldungen: die überfällige Bestätigung steht in der Notiz, die Zahl aus dem Zähler', async () => {
     stelleBereit({
       ...volleDaten,
       zaehler: {
@@ -461,9 +474,8 @@ describe('UeberblickPage', () => {
       },
     });
     rendern();
-    const meldungen = await within(await bandDa()).findByRole('link', { name: /Meldungen offen/ });
-    await waitFor(() => expect(meldungen).toHaveAttribute('data-ton', 'alarm'));
-    expect(meldungen).toHaveTextContent('1 neu · 1 Bestätigung überfällig');
+    await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent('3'));
+    expect(abschnitt('Meldungen')).toHaveTextContent('1 Bestätigung überfällig');
   });
 
   it('Warnstufe im Seitenkopf: Wort und Ton, die offenen Gebiete daneben (LLH-1140)', async () => {
@@ -484,7 +496,7 @@ describe('UeberblickPage', () => {
   it('ohne Gefahrengebiet kein Warnstufen-Hinweis im Kopf', async () => {
     stelleBereit({ ...volleDaten, gefahren: [] });
     rendern();
-    await waitFor(() => expect(within(band()).getByText('2 neu')).toBeInTheDocument());
+    await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent('4'));
     expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
   });
 
@@ -1454,7 +1466,6 @@ describe('UeberblickPage', () => {
     expect(
       await screen.findByText('Noch keine Abschnitte und keine Kräfte erfasst.'),
     ).toBeInTheDocument();
-    expect(within(band()).getByText('noch keine angelegt')).toBeInTheDocument();
     // Ohne Gefahrengebiet kein Warnstufen-Hinweis im Kopf.
     expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Eintrag erfassen' }));
@@ -1544,14 +1555,10 @@ describe('UeberblickPage', () => {
     expect(within(p).getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(within(p).queryByText('keine')).toBeNull();
     expect(abschnittZahl('Aufträge')).toHaveTextContent('—');
-    const auftragsZahl = within(band()).getByRole('link', { name: /Offene Aufträge/ });
-    expect(auftragsZahl).toHaveTextContent('?');
-    // Die Abschnittszahl hängt an ihrer eigenen Quelle und bleibt lesbar.
-    await waitFor(() =>
-      expect(within(band()).getByRole('link', { name: /Einsatzabschnitte/ })).toHaveTextContent(
-        'Abschnitt Nord',
-      ),
-    );
+    // Die Abschnitte hängen an ihren eigenen Quellen und bleiben lesbar.
+    expect(
+      await within(paneel('Einsatzabschnitte')).findByRole('link', { name: /Abschnitt Nord/ }),
+    ).toBeInTheDocument();
     // Die Alarmzeile sagt nicht „Nichts brennt“, denn der Zähler fehlt.
     const zeile = screen.getByRole('status', { name: 'Was brennt' });
     expect(zeile).toHaveAttribute('data-stand', 'unvollstaendig');
@@ -1576,31 +1583,30 @@ describe('UeberblickPage', () => {
     expect(within(p).getByRole('link', { name: /Abschnitt Nord/ })).toHaveTextContent('1/0/1//2');
   });
 
-  it('Ladezustand: Kennzahlen und Paneele zeigen „wird abgerufen", keine Null', async () => {
+  it('Ladezustand: die Paneele zeigen „wird abgerufen", keine Null', async () => {
     const haengt = async () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
+    // Die Meldungsliste hält die Reihen nicht auf (anders als die Quellen der Marken, LLH-1748).
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/personen', haengt),
-      http.get('/api/einsaetze/1/auftraege', haengt),
+      http.get('/api/einsaetze/1/meldungen', haengt),
     ]);
     rendern();
-    await bandDa();
+    await koerperDa();
     // Die Alarmzeile lädt mit den Personen und behauptet keine Ruhe (Spec `lage-alarmzeile`).
     const zeile = screen.getByRole('status', { name: 'Was brennt' });
     await waitFor(() => expect(zeile).toHaveTextContent('1 Auftrag überfällig'));
     expect(zeile).toHaveAttribute('data-stand', 'laedt');
     expect(zeile).not.toHaveTextContent('Nichts brennt');
-    // Die Paneelreihen kommen erst mit den Quellen der Gliederung (LLH-1481).
-    const p = await waitFor(() => abschnitt('Aufträge'));
+    // Die Paneelreihen kommen erst mit den Quellen der Gliederung (LLH-1481) und der Marken.
+    const p = await waitFor(() => abschnitt('Meldungen'));
     expect(within(p).getByText('wird abgerufen').closest('[aria-busy="true"]')).not.toBeNull();
     // Eine unabhängige Quelle lädt trotzdem durch.
-    await waitFor(() =>
-      expect(within(band()).getByRole('link', { name: /Einsatzabschnitte/ })).toHaveTextContent(
-        'Abschnitt Nord',
-      ),
-    );
+    expect(
+      await within(paneel('Einsatzabschnitte')).findByRole('link', { name: /Abschnitt Nord/ }),
+    ).toBeInTheDocument();
   });
 
   /*
@@ -1615,12 +1621,12 @@ describe('UeberblickPage', () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
-    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/auftraege', haengt)]);
+    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/nachforderungen', haengt)]);
     rendern();
-    await bandDa();
-    // Der Aufträge-Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
-    const auftraege = await waitFor(() => abschnitt('Aufträge'));
-    expect(within(auftraege).getByText('wird abgerufen')).toBeInTheDocument();
+    await koerperDa();
+    // Ein Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
+    const nachforderungen = await waitFor(() => abschnitt('Nachforderungen'));
+    expect(within(nachforderungen).getByText('wird abgerufen')).toBeInTheDocument();
     expect(vorgaenge().querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
     // Die Gliederung ist da: leer mit Ausweg, kein Ladezustand.
     expect(
@@ -1631,11 +1637,11 @@ describe('UeberblickPage', () => {
   /*
    * LLH-1481: wie viele Zeilen „Einsatzabschnitte“ bekommt, sagt keine Zahl vorher; mit einer
    * Ladezeile wuchs das Paneel um jede Zeile und schob alles darunter. Die Paneelreihen erscheinen
-   * deshalb erst mit allen Quellen der Gliederung, das Kennzahlenband steht schon. Ein Fehler hält
+   * deshalb erst mit allen Quellen der Gliederung, die Alarmzeile steht schon. Ein Fehler hält
    * nichts auf. Die Seiten-CLS misst `e2e/ueberblick-vorgaenge-cls.spec.ts`.
    */
   describe('Paneelreihen warten auf die Quellen der Gliederung (LLH-1481)', () => {
-    // Ohne Startliste (LLH-1815): steht sie über dem Band, wartet der ganze Körper auf Abschnitte,
+    // Ohne Startliste (LLH-1815): steht sie über den Reihen, wartet der ganze Körper auf Abschnitte,
     // Einheiten und Personal (Fall „langsame Lage-Abfrage“ unten). Hier geht es nur um die Reihen.
     beforeEach(() => {
       localStorage.clear();
@@ -1645,8 +1651,17 @@ describe('UeberblickPage', () => {
     });
     afterEach(() => localStorage.clear());
 
-    for (const quelle of ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material']) {
-      it(`${quelle} lädt: Band steht, keine Paneelreihe; mit der Antwort die Zeilen`, async () => {
+    // Seit LLH-1748 auch die Quellen der Marken: „Nächste Marken“ steht in Reihe 1 zuoberst.
+    for (const quelle of [
+      'abschnitte',
+      'einheiten',
+      'personal',
+      'fahrzeuge',
+      'material',
+      'auftraege',
+      'erinnerungen',
+    ]) {
+      it(`${quelle} lädt: Alarmzeile steht, keine Paneelreihe; mit der Antwort die Zeilen`, async () => {
         let loslassen!: () => void;
         const tor = new Promise<void>((f) => (loslassen = f));
         const daten = volleDaten[quelle as keyof typeof volleDaten];
@@ -1657,9 +1672,9 @@ describe('UeberblickPage', () => {
           }),
         ]);
         rendern();
-        await bandDa();
-        // Unabhängige Quellen laden durch, die Paneelreihen bleiben weg.
-        await waitFor(() => expect(band()).toHaveTextContent('2 neu'));
+        const zeile = await koerperDa();
+        // Unabhängige Quellen laden durch (der Modulzähler), die Paneelreihen bleiben weg.
+        await waitFor(() => expect(zeile).toHaveTextContent('1 Auftrag überfällig'));
         expect(screen.queryByRole('region', { name: 'Einsatzabschnitte' })).toBeNull();
         expect(screen.queryByRole('region', { name: 'Offene Vorgänge' })).toBeNull();
         expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
@@ -1687,7 +1702,9 @@ describe('UeberblickPage', () => {
    * LLH-1430: laden die Listen der „Offenen Vorgänge“, hält jeder Abschnitt so viele Zeilen, wie
    * der Modulzähler Einträge erwarten lässt (höchstens drei). Erinnerungen kennen nur die fälligen,
    * Ablösungen keinen Serverzähler; „meine Stelle“ zählt der Zähler nicht. Die Seiten-CLS misst
-   * `e2e/ueberblick-vorgaenge-cls.spec.ts`.
+   * `e2e/ueberblick-vorgaenge-cls.spec.ts`. Aufträge, Erinnerungen und Ablösungen speisen seit
+   * LLH-1748 auch die Marken in Reihe 1; ihre Listen halten die Reihen beim ersten Aufbau ganz auf
+   * (`markenLaedt`). Sichtbar laden hier deshalb nur Meldungen und Nachforderungen.
    */
   describe('Offene Vorgänge · Ladezustand hält den Platz der erwarteten Einträge (LLH-1430)', () => {
     const haengt = async () => {
@@ -1720,10 +1737,7 @@ describe('UeberblickPage', () => {
         },
         [
           http.get('/api/einsaetze/1/meldungen', haengt),
-          http.get('/api/einsaetze/1/auftraege', haengt),
           http.get('/api/einsaetze/1/nachforderungen', haengt),
-          http.get('/api/einsaetze/1/erinnerungen', haengt),
-          http.get('/api/einsaetze/1/abloesungen', haengt),
         ],
       );
     const platzhalter = (name: string) =>
@@ -1734,21 +1748,12 @@ describe('UeberblickPage', () => {
       rendern();
       await waitFor(() => vorgaenge());
       // Der Zähler steht, die Listen laden noch.
-      await waitFor(() => expect(abschnittZahl('Aufträge')).toHaveTextContent(/^2$/));
-      for (const name of [
-        'Meldungen',
-        'Aufträge',
-        'Nachforderungen',
-        'Erinnerungen',
-        'Ablösungen',
-      ]) {
+      await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent(/^5$/));
+      for (const name of ['Meldungen', 'Nachforderungen']) {
         expect(abschnitt(name).querySelector('[aria-busy="true"]')).not.toBeNull();
       }
       expect(platzhalter('Meldungen')).toBe(3);
-      expect(platzhalter('Aufträge')).toBe(2);
       expect(platzhalter('Nachforderungen')).toBe(0);
-      expect(platzhalter('Erinnerungen')).toBe(1);
-      expect(platzhalter('Ablösungen')).toBe(0);
       expect(within(abschnitt('Nachforderungen')).getByText('wird abgerufen')).toBeInTheDocument();
     });
 
@@ -1761,14 +1766,13 @@ describe('UeberblickPage', () => {
         { route: '/einsaetze/1/ueberblick?vorgaenge=meine' },
       );
       await waitFor(() => vorgaenge());
-      await waitFor(() => expect(abschnittZahl('Aufträge')).toHaveTextContent(/^2/));
-      for (const name of ['Meldungen', 'Aufträge', 'Erinnerungen']) {
-        expect(platzhalter(name)).toBe(0);
-      }
+      await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent(/^5/));
+      expect(abschnitt('Meldungen').querySelector('[aria-busy="true"]')).not.toBeNull();
+      expect(platzhalter('Meldungen')).toBe(0);
     });
   });
 
-  it('Körper erst mit dem Einsatz: davor weder Band noch Paneele noch Rechtehinweis (LFH-629)', async () => {
+  it('Körper erst mit dem Einsatz: davor weder Alarmzeile noch Paneele noch Rechtehinweis (LFH-629)', async () => {
     let freigeben!: () => void;
     const tor = new Promise<void>((f) => (freigeben = f));
     stelleBereit(leereDaten, [
@@ -1783,12 +1787,12 @@ describe('UeberblickPage', () => {
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="seiten-inhalt"]')).toBeEmptyDOMElement(),
     );
-    expect(screen.queryByRole('group', { name: 'Führungsstand' })).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Was brennt' })).toBeNull();
     expect(screen.queryByText('nur Einsatzleitung und Führungspersonal')).toBeNull();
     act(() => freigeben());
     // Mit dem Einsatz kommen Hinweis und Körper im selben Zug.
     expect(await screen.findByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
-    expect(await bandDa()).toBeInTheDocument();
+    expect(await koerperDa()).toBeInTheDocument();
   });
 
   it('Körper erst mit dem Modulzähler: die Platzhalter der Vorgänge kennen ihre Zahl (LLH-1430)', async () => {
@@ -1819,7 +1823,7 @@ describe('UeberblickPage', () => {
     );
     expect(document.querySelector('[data-lfh="seiten-inhalt"]')).toBeEmptyDOMElement();
     act(() => freigeben());
-    expect(await bandDa()).toBeInTheDocument();
+    expect(await koerperDa()).toBeInTheDocument();
   });
 
   it('ein gescheiterter Modulzähler hält den Körper nicht auf', async () => {
@@ -1829,7 +1833,7 @@ describe('UeberblickPage', () => {
       ),
     ]);
     rendern();
-    expect(await bandDa()).toBeInTheDocument();
+    expect(await koerperDa()).toBeInTheDocument();
     expect(await screen.findByRole('region', { name: 'Offene Vorgänge' })).toBeInTheDocument();
   });
 
@@ -1871,12 +1875,12 @@ describe('UeberblickPage', () => {
       server.use(meHandler(ICH));
     });
 
-    it('die Kennzahl „Offene Aufträge" merkt die Aufträge', async () => {
+    it('der Sprung „alle Aufträge“ in „Offene Vorgänge“ merkt die Aufträge (LLH-1748)', async () => {
       stelleBereit(volleDaten);
       rendern();
-      await waitFor(() => expect(within(band()).getByText('2 neu')).toBeInTheDocument());
+      await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent('4'));
       expect(gemerkt()).toEqual([]);
-      await userEvent.click(within(band()).getAllByRole('link')[0]);
+      await userEvent.click(within(vorgaenge()).getByRole('link', { name: 'alle Aufträge' }));
       expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/auftraege');
       expect(gemerkt()).toEqual(['auftraege']);
     });
@@ -1984,9 +1988,13 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     return aufrufe;
   }
 
-  /** Die Zelle einer Kennzahl im Band — mit oder ohne Link. */
-  const zelle = (titel: string) =>
-    within(band()).getByText(titel).closest('[data-lfh="kennzahl"]') as HTMLElement;
+  /** Die Abschnittszeile „Abschnitt Nord“: steht sie, liefen die freien Quellen der Gliederung. */
+  const nordDa = async () =>
+    expect(
+      await within(await waitFor(() => paneel('Einsatzabschnitte'))).findByRole('link', {
+        name: /Abschnitt Nord/,
+      }),
+    ).toBeInTheDocument();
 
   it('Modul Einheiten gesperrt: keine Anfrage an die Zeitachse, kein Sprung „ohne Schicht“ (LLH-1312)', async () => {
     const aufrufe = mitFreigaben({ einheiten: { zugriff: false } });
@@ -2007,7 +2015,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     });
     rendern();
     // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
-    await waitFor(() => expect(zelle('Einsatzabschnitte')).toHaveTextContent('Abschnitt Nord'));
+    await nordDa();
     await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
     expect(aufrufe['/api/einsaetze/1/personen']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
@@ -2061,12 +2069,11 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       },
     });
     rendern();
-    await waitFor(() => expect(zelle('Offene Aufträge')).toHaveTextContent('2'));
-    const meldungen = zelle('Meldungen offen');
-    expect(meldungen).toHaveTextContent('—');
+    await waitFor(() => expect(abschnittZahl('Aufträge')).toHaveTextContent('2'));
+    const meldungen = abschnitt('Meldungen');
+    expect(abschnittZahl('Meldungen')).toHaveTextContent(/^—$/);
     expect(meldungen).toHaveTextContent('nicht freigegeben');
-    expect(meldungen).not.toHaveTextContent('0');
-    expect(meldungen.closest('a')).toBeNull();
+    expect(within(meldungen).queryByRole('link')).toBeNull();
   });
 
   it('gesperrtes Modul mit Altstand im Cache: keine Daten aus dem Cache', async () => {
@@ -2080,7 +2087,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       </Routes>,
       { route: '/einsaetze/1/ueberblick', client },
     );
-    await waitFor(() => expect(zelle('Einsatzabschnitte')).toHaveTextContent('Abschnitt Nord'));
+    await nordDa();
     // Die Alarmzeile liest den Altstand nicht: kein „vermisst“ aus dem Cache.
     const alarm = screen.getByRole('status', { name: 'Was brennt' });
     await waitFor(() => expect(alarm).toHaveAttribute('data-stand', 'vollstaendig'));
@@ -2242,8 +2249,13 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
       }),
     ]);
   }
-  const zelle = (titel: string) =>
-    within(band()).getByText(titel).closest('[data-lfh="kennzahl"]') as HTMLElement;
+  /** Die Abschnittszeile „Abschnitt Nord“: steht sie, liefen die freien Quellen der Gliederung. */
+  const nordDa = async () =>
+    expect(
+      await within(await waitFor(() => paneel('Einsatzabschnitte'))).findByRole('link', {
+        name: /Abschnitt Nord/,
+      }),
+    ).toBeInTheDocument();
 
   it('gesperrtes ETB und Lageberichte: beide Kopfaktionen gesperrt mit „Keine Berechtigung“', async () => {
     mitFreigaben({ etb: { zugriff: false }, lageberichte: { zugriff: false } });
@@ -2259,9 +2271,9 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
   it('freie Ziele: beide Kopfaktionen bedienbar, ohne Sperrgrund', async () => {
     mitFreigaben({});
     rendern();
-    await bandDa();
+    await koerperDa();
     const lagebericht = screen.getByRole('button', { name: /Lagebericht/ });
-    await waitFor(() => expect(zelle('Einsatzabschnitte')).toHaveTextContent('Abschnitt Nord'));
+    await nordDa();
     expect(lagebericht).toBeEnabled();
     expect(lagebericht).not.toHaveAttribute('title');
     expect(screen.getByRole('button', { name: /Eintrag/ })).toBeEnabled();
@@ -2270,7 +2282,7 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
   it('Freigaben laden noch: die Kopfaktionen bleiben bedienbar (kein Aufblitzen)', async () => {
     mitFreigaben('haengt');
     rendern();
-    await bandDa();
+    await koerperDa();
     expect(screen.getByRole('button', { name: /Lagebericht/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Eintrag/ })).toBeEnabled();
   });
@@ -2379,7 +2391,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     server.use(meHandler(benutzerFixture({ id: 9 })));
   });
 
-  it('leerer Einsatz: fünf offene Punkte unter der Alarmzeile, vor dem Führungsstand, ohne Zahl', async () => {
+  it('leerer Einsatz: fünf offene Punkte unter der Alarmzeile, vor den Paneelreihen, ohne Zahl', async () => {
     stelleBereit(leer);
     rendern();
     const p = await screen.findByRole('region', { name: 'Einsatz starten' });
@@ -2391,12 +2403,11 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
       ['kraefte', 'offen'],
       ['lage', 'offen'],
     ]);
-    // Reihenfolge: Alarmzeile → Startliste → Führungsstand → Paneelreihen.
+    // Reihenfolge: Alarmzeile → Startliste → Paneelreihen (seit LLH-1748 ohne Band).
     const alarm = screen.getByRole('status', { name: 'Was brennt' });
-    const folgt = (a: Node, b: Node) =>
-      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
     expect(folgt(alarm, p)).toBe(true);
-    expect(folgt(p, band())).toBe(true);
+    expect(folgt(p, document.querySelector('[data-lfh="ueberblick-paneele"]')!)).toBe(true);
+    expect(keinBand()).toBeNull();
     expect(p.closest('[data-lfh="ueberblick-startliste"]')).not.toBeNull();
     // Haken statt Kennzahl (Spec `lage-verdichtung`).
     expect(p.textContent).not.toMatch(/\d/);
@@ -2550,7 +2561,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   /*
    * Review LLH-1815 (Befunde 6, 10): ein gescheiterter Neuabruf behält in TanStack v5 seine Daten.
    * Die zuletzt geladenen gelten weiter; „unbekannt“ heißt nur: nie geladen. Sonst holte ein 502
-   * die schon verschwundene Reihe zurück, und Band und Paneelreihen rutschten nach unten.
+   * die schon verschwundene Reihe zurück, und die Paneelreihen rutschten nach unten.
    */
   it('alles erledigt, dann scheitert ein Neuabruf: die Startliste bleibt weg', async () => {
     // Kräfte nur über eine Einheit: fällt die Einheitenliste aus, trägt das Personal nichts.
@@ -2603,10 +2614,10 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   /*
    * Review LLH-1815 (Befund 8): die gemeinsame Ladeschranke gilt nur beim ersten Aufbau. Bekommt
-   * eine lesende Person live Schreibrecht, lädt die Lagefeststellung zum ersten Mal; Band und
+   * eine lesende Person live Schreibrecht, lädt die Lagefeststellung zum ersten Mal; die
    * Paneelreihen bleiben dabei eingehängt, und die Startliste erscheint erst mit ihren Quellen.
    */
-  it('Schreibrecht kommt live dazu: Band und Paneelreihen bleiben stehen, solange die Lage lädt', async () => {
+  it('Schreibrecht kommt live dazu: die Paneelreihen bleiben stehen, solange die Lage lädt', async () => {
     let loslassen!: () => void;
     const tor = new Promise<void>((f) => (loslassen = f));
     const lage = { n: 0 };
@@ -2617,7 +2628,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     ]);
     const { client } = rendern();
     await waitFor(() => paneel('Einsatzabschnitte'));
-    const bandVorher = band();
+    const zweiteReiheVorher = document.querySelector('[data-lfh="ueberblick-paneele-gliederung"]')!;
+    expect(zweiteReiheVorher).not.toBeNull();
     const reihenVorher = document.querySelector('[data-lfh="ueberblick-paneele"]')!;
     expect(reihenVorher).not.toBeNull();
     expect(startliste()).toBeNull();
@@ -2633,14 +2645,14 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     );
     await act(() => client.refetchQueries({ queryKey: einsatzKeys.einsatz(1) }));
     await waitFor(() => expect(lage.n).toBe(1));
-    expect(bandVorher.isConnected).toBe(true);
+    expect(zweiteReiheVorher.isConnected).toBe(true);
     expect(reihenVorher.isConnected).toBe(true);
     // Kein „nicht geladen“ dazwischen: die Liste steht erst mit ihren Quellen.
     expect(startliste()).toBeNull();
 
     loslassen();
     await screen.findByRole('region', { name: 'Einsatz starten' });
-    expect(bandVorher.isConnected).toBe(true);
+    expect(zweiteReiheVorher.isConnected).toBe(true);
     expect(reihenVorher.isConnected).toBe(true);
   });
 
@@ -2658,8 +2670,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   });
 
   /*
-   * Ladeschranke (Spec „Kein Layoutsprung durch die Startliste“): die Reihe steht über dem
-   * Führungsstand, also warten Band, Startliste und Paneelreihen gemeinsam auf ihre Quellen. Die
+   * Ladeschranke (Spec „Kein Layoutsprung durch die Startliste“): die Reihe steht über den
+   * Paneelreihen, also warten Startliste und Paneelreihen gemeinsam auf ihre Quellen. Die
    * Alarmzeile darüber hat eine feste Höhe und steht sofort.
    */
   it('langsame Lage-Abfrage: Startliste und Paneelreihen erscheinen zusammen', async () => {
@@ -2680,11 +2692,10 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     expect(screen.getByRole('status', { name: 'Was brennt' })).toBeInTheDocument();
     expect(startliste()).toBeNull();
     expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Führungsstand' })).toBeNull();
     loslassen();
     await screen.findByRole('region', { name: 'Einsatz starten' });
     expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).not.toBeNull();
-    expect(band()).toBeInTheDocument();
+    expect(keinBand()).toBeNull();
   });
 
   it('ausgeblendet ist die Liste weg und bleibt es nach dem Neuladen; die Lage wird nicht mehr gefragt', async () => {
