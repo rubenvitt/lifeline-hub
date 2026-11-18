@@ -1,4 +1,4 @@
-import { Modal, Typography } from 'antd';
+import { Modal, Typography, theme } from 'antd';
 import { useEffect, useRef } from 'react';
 import type { Speicherung } from '../components/Erfassung';
 import type { ChatNachricht, NeuerAuftrag } from '../api/types';
@@ -36,6 +36,7 @@ export default function HeraufstufenAuftragModal({
   onAnlegen,
   speicherung,
 }: Props) {
+  const { token } = theme.useToken();
   const sperrt = speicherung?.isPending === true;
   // Ein schließender Dialog bleibt bis zum Ende seiner Animation eingehängt; ein schnelles
   // Wiederöffnen hängt das Formular nicht neu ein. Deshalb räumt jeder Wechsel von `offen`.
@@ -70,7 +71,7 @@ export default function HeraufstufenAuftragModal({
           nachricht && (
             // Read-only Wortlaut der Quellnachricht: der vorbelegte Auftragstext wird beim Formulieren
             // überschrieben.
-            <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            <Typography.Paragraph type="secondary" style={{ marginBottom: token.margin }}>
               <Typography.Text strong>{nachricht.autor_name}:</Typography.Text> {nachricht.inhalt}
             </Typography.Paragraph>
           )

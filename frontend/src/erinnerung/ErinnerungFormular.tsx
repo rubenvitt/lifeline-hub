@@ -1,4 +1,4 @@
-import { Col, Input, InputNumber, Form, Row } from 'antd';
+import { Col, Input, InputNumber, Form, Row, theme } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { serverJetzt } from '../offline/serveruhr';
@@ -60,6 +60,7 @@ export default function ErinnerungFormular({
   einsatzId,
   speicherung,
 }: Props) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const funktionen = useFunktionsVorschlaege(einsatzId);
 
@@ -110,7 +111,7 @@ export default function ErinnerungFormular({
       <Form.Item name="beschreibung" label="Beschreibung (optional)">
         <TextArea aria-label="Beschreibung" rows={2} />
       </Form.Item>
-      <Row gutter={16}>
+      <Row gutter={token.marginLG}>
         <Col xs={24} sm={12}>
           <Form.Item
             name="faellig"
