@@ -123,7 +123,8 @@ test('Browser-Zurück: Bleiben behält die Fassung, Verwerfen führt den zweiten
 
 /**
  * Rückweg auf den Reiter Befehle (LFH-972): Der Reiter steht in der Adresse, Brotkrume,
- * Browser-Zurück und die Weiterleitung bei ungültiger Kennung landen auf „Befehle", nicht auf der
+ * Browser-Zurück und der Rückweg aus „gibt es nicht (mehr)“ (Spec `seiten-zustaende`) landen auf
+ * „Befehle", nicht auf der
  * Vorgabe „Aufträge". Auch als Beobachter (`e2e/AGENTS.md`, nicht-privilegiert): ohne Schreibrecht
  * fehlt die Anlegen-Aktion, und die Befehlsliste muss trotzdem erreichbar bleiben.
  */
@@ -164,7 +165,12 @@ for (const rolle of ['admin', 'beobachter'] as const) {
     await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
     await expect(karte).toBeVisible();
 
+    // Eine ungültige Kennung leitet nicht still um (Spec `seiten-zustaende`, LLH-1812): die Seite
+    // bleibt, sagt es und führt mit genau einem Knopf auf den Reiter Befehle zurück.
     await page.goto(`${liste}/befehle/kein-befehl`);
+    await expect(page).toHaveURL(`${liste}/befehle/kein-befehl`);
+    await expect(page.getByText('Diesen Befehl gibt es nicht (mehr)')).toBeVisible();
+    await page.getByRole('button', { name: 'Zur Befehlsliste' }).click();
     await expect(page).toHaveURL(befehle);
     await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
   });
