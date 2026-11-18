@@ -46,7 +46,7 @@ export default function AbschnittsText({
             id={anker?.(a.schluessel)}
             // Sprungziel mit Fokus („In der Lesefassung zeigen“, LLH-1601): nur mit Anker.
             tabIndex={anker ? -1 : undefined}
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: token.marginLG }}
           >
             {text.trim() ? (
               <Markdown variante="dokument" unterEbene={abschnittEbene} titel={titel}>

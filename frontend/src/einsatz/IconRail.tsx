@@ -51,7 +51,7 @@ const MARKE_BREITE = 2;
  * Etikett beim Aktivieren verschöbe.
  */
 export function railZielStil(
-  token: { controlHeight: number; paddingXS: number },
+  token: { controlHeight: number; paddingXS: number; marginXS: number },
   zustand: { aktiv: boolean },
 ): CSSProperties {
   return {
@@ -68,7 +68,7 @@ export function railZielStil(
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: token.marginXS,
     // Nachtrollen, nicht Modus-Token: die Rail ist in BEIDEN Modi dunkel. Inaktiv heißt nicht
     // gesperrt: das Etikett ist bedienbarer Text und hält die Tag-Schwelle (LFH-434).
     background: zustand.aktiv ? rahmenFarben.aktiv : 'transparent',

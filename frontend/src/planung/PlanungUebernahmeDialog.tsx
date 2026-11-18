@@ -279,7 +279,13 @@ export default function PlanungUebernahmeDialog({
                       value: e.id,
                       title: text,
                       label: isUebung(e) ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: token.marginSM,
+                          }}
+                        >
                           <UebungsMarke einsatz={e} />
                           {text}
                         </span>

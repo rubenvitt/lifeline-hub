@@ -1,4 +1,4 @@
-import { AutoComplete, Form, Input, type FormInstance } from 'antd';
+import { AutoComplete, Form, Input, theme, type FormInstance } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { ladeTransportmittel } from '../api/einsatzPerson';
@@ -36,6 +36,7 @@ export default function RettungsmittelFeld({
    */
   fokus?: boolean;
 }) {
+  const { token } = theme.useToken();
   const auswahl = useQuery({
     queryKey: einsatzKeys.personenTransportmittel(einsatzId),
     queryFn: () => ladeTransportmittel(einsatzId),
@@ -48,7 +49,7 @@ export default function RettungsmittelFeld({
     <>
       <Form.Item
         label={
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginSM }}>
             Rettungsmittel
             <StatusTag darstellung={transportDurch[durch]} />
           </span>
