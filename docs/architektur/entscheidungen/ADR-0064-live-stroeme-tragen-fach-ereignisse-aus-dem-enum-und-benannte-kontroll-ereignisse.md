@@ -1,5 +1,5 @@
 ---
-id: ADR-0063
+id: ADR-0064
 titel: Live-Ströme tragen Fach-Ereignisse aus dem Enum und benannte Kontroll-Ereignisse
 status: vorgeschlagen
 datum: 2026-11-17
@@ -17,7 +17,7 @@ herleitung:
   - openspec/changes/archive/2026-10-06-lfh-922-live-neuladeflut/design.md
 ---
 
-# ADR-0063: Live-Ströme tragen Fach-Ereignisse aus dem Enum und benannte Kontroll-Ereignisse
+# ADR-0064: Live-Ströme tragen Fach-Ereignisse aus dem Enum und benannte Kontroll-Ereignisse
 
 ## Regeln
 
@@ -71,4 +71,4 @@ Kontroll-Ereignissen.
 Fach-Ereignisse bleiben im Enum-Kontrakt mit Filter je Modul. Kontroll-Ereignisse liegen an
 einer Stelle und sind ohne Enum-Variante erlaubt; wer eins hinzufügt, legt die Konstante dort an
 und hört es nur in `liveVerbindung.ts`. Mit der Annahme bekommt ADR-0003 `status: ersetzt` und
-`ersetzt_durch: ADR-0063`.
+`ersetzt_durch: ADR-0064`.
