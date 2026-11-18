@@ -125,7 +125,12 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
     await userEvent.click(document.body);
     expect(onSpeichern).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: `${NAME} speichern` }));
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith({ art: 'uhs', id: 7 }));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith(
+        { art: 'uhs', id: 7 },
+        { beimOeffnen: { art: 'einheit', id: 1 } },
+      ),
+    );
   });
 
   it('Enter sendet; „ohne Ort“ löst', async () => {
@@ -133,7 +138,11 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
     await userEvent.click(screen.getByRole('button', { name: `${NAME} bearbeiten` }));
     await waehle(NAME, 'ohne Ort');
     fireEvent.submit(screen.getByRole('combobox', { name: NAME }).closest('form')!);
-    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith(null));
+    await waitFor(() =>
+      expect(onSpeichern).toHaveBeenCalledWith(null, {
+        beimOeffnen: { art: 'bereitstellungsraum', id: 6 },
+      }),
+    );
   });
 
   it('bietet je Ortsart eine Gruppe; ohne Leserecht auf ein Modul fehlt seine', async () => {

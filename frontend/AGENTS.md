@@ -474,7 +474,11 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    `useFeldKonflikt` lädt beim 409 neu und fragt nur, wenn die Angabe sich wirklich geändert hat.
    Ein fremder Wert im offenen Feld steht dort als Hinweis, die Eingabe bleibt. Wo der Server einen
    Änderungsvermerk liefert (`vermerke`), steht er leise an der Zeile (`VermerkZeile`) und der
-   jüngste im Paneelkopf (`PaneelVermerk`). Noch ohne Feld-CAS: die Schreibwege in LLH-1945.
+   jüngste im Paneelkopf (`PaneelVermerk`). **Wege ohne offenes Feld** (Platzieren, Fläche, Zeichen
+   wählen, Umhängen per Ziehen, Skizze; LLH-1945) schicken den Stand zu Beginn der Handlung als
+   `erwartet` und zeigen beim 409 denselben Dialog; „Übernehmen“ schreibt ohne Altwert,
+   „Verwerfen“ und Escape lassen die Handlung verfallen. Ohne Altwert bleiben Knöpfe und Dialoge,
+   die einen festen oder errechneten Wert setzen (Status, Lagezustand, „Kapazität übernehmen“).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.

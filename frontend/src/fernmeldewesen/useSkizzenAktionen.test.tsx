@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { App } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { ApiError } from '../api/client';
@@ -13,7 +15,7 @@ import {
   setzeSkizzenLage,
   verwerfeSkizzenLage,
 } from '../api/fernmeldeskizze';
-import { patcheAbschnitt } from '../api/einsatzabschnitte';
+import { listeAbschnitte, patcheAbschnitt } from '../api/einsatzabschnitte';
 import { patcheEinheit } from '../api/einheiten';
 import { patcheFuehrungsstelle } from '../api/einsaetze';
 import {
@@ -30,6 +32,8 @@ import type {
 } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 import { skizzenRechte, useSkizzenAktionen } from './useSkizzenAktionen';
+import { HandlungVerfallen } from './skizzenAktionen';
+import { VERWORFEN } from '../components/useFeldKonflikt';
 
 vi.mock('../api/fernmeldeskizze', () => ({
   ladeFernmeldeskizze: vi.fn(),
@@ -49,9 +53,12 @@ vi.mock('../api/fernmeldeskizze', () => ({
   ordneSprechgruppeZu: vi.fn(),
   loeseSprechgruppe: vi.fn(),
 }));
-vi.mock('../api/einsatzabschnitte', () => ({ patcheAbschnitt: vi.fn() }));
-vi.mock('../api/einheiten', () => ({ patcheEinheit: vi.fn() }));
-vi.mock('../api/einsaetze', () => ({ patcheFuehrungsstelle: vi.fn() }));
+vi.mock('../api/einsatzabschnitte', () => ({ patcheAbschnitt: vi.fn(), listeAbschnitte: vi.fn() }));
+vi.mock('../api/einheiten', () => ({ patcheEinheit: vi.fn(), listeEinheiten: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({
+  patcheFuehrungsstelle: vi.fn(),
+  ladeFuehrungsstelle: vi.fn(),
+}));
 vi.mock('../api/kommunikationsplan', () => ({
   legeKommunikationsStelleEinzelnAn: vi.fn(),
   entferneKommunikationsStelle: vi.fn(),
@@ -83,7 +90,10 @@ let qc: QueryClient;
 
 function setup(darfSchreiben = true) {
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      {/* Die Rückfrage „Zwischenzeitlich geändert“ braucht den App-Kontext (LLH-1945). */}
+      <App>{children}</App>
+    </QueryClientProvider>
   );
   return renderHook(() => useSkizzenAktionen(7, darfSchreiben), { wrapper }).result;
 }
@@ -242,21 +252,77 @@ describe('useSkizzenAktionen — Datensatz der Stelle', () => {
     const fs = { rufname: 'Florian Kreis 1', sprechgruppen: [] } as unknown as Fuehrungsstelle;
     vi.mocked(patcheFuehrungsstelle).mockResolvedValue(fs);
     const a = setup().current!;
-    await a.setzeRufname('ab-3', 'EA N');
-    expect(patcheAbschnitt).toHaveBeenCalledWith(7, 3, { rufname: 'EA N' });
+    // Der Rufname zu Beginn der Handlung geht als Altwert mit (Feld-CAS, LLH-1945).
+    await a.setzeRufname('ab-3', 'EA N', null);
+    expect(patcheAbschnitt).toHaveBeenCalledWith(7, 3, { rufname: 'EA N' }, { rufname: null });
     expect(invalidiert(ABSCHNITTE_KEY)).toBe(true);
-    await a.setzeRufname('eh-10', null);
-    expect(patcheEinheit).toHaveBeenCalledWith(7, 10, { funkrufname: null });
+    await a.setzeRufname('eh-10', null, 'Florian 1');
+    expect(patcheEinheit).toHaveBeenCalledWith(
+      7,
+      10,
+      { funkrufname: null },
+      { funkrufname: 'Florian 1' },
+    );
     expect(invalidiert(EINHEITEN_KEY)).toBe(true);
     // Kein Schreibweg für Kommunikationsmittel mehr (LLH-1134): Funk und Telefon getrennt.
     expect(a).not.toHaveProperty('setzeKommunikationsmittel');
-    await a.setzeRufname('fs', 'Florian Kreis 1');
-    expect(patcheFuehrungsstelle).toHaveBeenCalledWith(7, { rufname: 'Florian Kreis 1' });
+    await a.setzeRufname('fs', 'Florian Kreis 1', null);
+    expect(patcheFuehrungsstelle).toHaveBeenCalledWith(
+      7,
+      { rufname: 'Florian Kreis 1' },
+      { rufname: null },
+    );
     expect(qc.getQueryData(FS_KEY)).toEqual(fs);
   });
 
+  it('die angezeigte Kurzbezeichnung eines Abschnitts ohne Rufnamen ist kein Altwert', async () => {
+    vi.mocked(patcheAbschnitt).mockResolvedValue({} as never);
+    qc.setQueryData(ABSCHNITTE_KEY, [{ id: 3, rufname: null, kurzbezeichnung: 'EA-N' }]);
+    const vorher = await setup().current!.setzeRufname('ab-3', 'Florian 1', 'EA-N');
+    expect(patcheAbschnitt).toHaveBeenCalledWith(7, 3, { rufname: 'Florian 1' }, { rufname: null });
+    // Rückgängig stellt den gespeicherten Wert wieder her, nicht die Kurzbezeichnung.
+    expect(vorher).toBeNull();
+  });
+
+  it('409 mit fremdem Rufnamen: „Verwerfen und neu laden“ lässt die Handlung verfallen', async () => {
+    vi.mocked(patcheAbschnitt).mockRejectedValue(
+      new ApiError(409, 'Das Feld wurde zwischenzeitlich geändert.'),
+    );
+    vi.mocked(listeAbschnitte).mockResolvedValue([
+      { id: 3, rufname: 'Florian Fremd', kurzbezeichnung: null },
+    ] as never);
+    // Sofort abgefangen: die Ablehnung kommt erst nach dem Klick in der Rückfrage.
+    const ausgang = setup()
+      .current!.setzeRufname('ab-3', 'Florian 1', null)
+      .then(
+        () => 'gespeichert',
+        (e: unknown) => e,
+      );
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Rufname inzwischen: „Florian Fremd“');
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    const e = await ausgang;
+    expect(e).toBeInstanceOf(HandlungVerfallen);
+    expect(e).toMatchObject({ ergebnis: VERWORFEN });
+    expect(patcheAbschnitt).toHaveBeenCalledTimes(1);
+  });
+
+  it('409 mit fremdem Rufnamen: „Meine Änderung übernehmen“ schreibt ohne Altwert', async () => {
+    vi.mocked(patcheAbschnitt)
+      .mockRejectedValueOnce(new ApiError(409, 'Das Feld wurde zwischenzeitlich geändert.'))
+      .mockResolvedValueOnce({} as never);
+    vi.mocked(listeAbschnitte).mockResolvedValue([
+      { id: 3, rufname: 'Florian Fremd', kurzbezeichnung: null },
+    ] as never);
+    const versuch = setup().current!.setzeRufname('ab-3', 'Florian 1', null);
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await expect(versuch).resolves.toBeNull();
+    expect(patcheAbschnitt).toHaveBeenLastCalledWith(7, 3, { rufname: 'Florian 1' }, undefined);
+  });
+
   it('kennt keinen Rufnamen an einer externen Stelle', async () => {
-    await expect(setup().current!.setzeRufname('ks-5', 'x')).rejects.toThrow();
+    await expect(setup().current!.setzeRufname('ks-5', 'x', null)).rejects.toThrow();
   });
 
   it('legt eine externe Stelle an und gibt GENAU die vom Server genannte zurück, auch bei leerem Plan-Cache (Review S4)', async () => {

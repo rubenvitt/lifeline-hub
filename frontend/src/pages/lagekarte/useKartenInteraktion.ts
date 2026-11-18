@@ -1,9 +1,9 @@
 import { useCallback, useReducer, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { patcheEinsatz } from '../../api/einsaetze';
+import { patcheEinsatz, type KopfdatenPatch } from '../../api/einsaetze';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
 import { aktualisiereSchaden } from '../../api/einsatzSchaden';
-import { verorteEinheit } from '../../api/einheiten';
+import { verorteEinheit, type PositionPatch } from '../../api/einheiten';
 import { verorteFahrzeug } from '../../api/einsatzFahrzeuge';
 import { verortePerson } from '../../api/einsatzPersonal';
 import { aktualisierePerson } from '../../api/einsatzPerson';
@@ -11,7 +11,7 @@ import { aendereStelle } from '../../api/betreuung';
 import { aktualisiereBr } from '../../api/einsatzBereitstellungsraum';
 import { aktualisiereTier } from '../../api/einsatzTier';
 import { aendereBezirk } from '../../api/evakuierung';
-import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
+import { zeichneAbschnitt, type FlaechePatch } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
 import {
   legeFreiesZeichenAn,
@@ -20,7 +20,26 @@ import {
   verschiebeFreiesZeichen,
 } from '../../api/freieZeichen';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { LageZone, ZoneTyp, FreiesZeichenPatch, FreiesZeichenUpdate } from '../../api/types';
+import type {
+  BetreuungsstellePatch,
+  LageZone,
+  ZoneTyp,
+  FreiesZeichenPatch,
+  FreiesZeichenUpdate,
+} from '../../api/types';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import { formatKoordinate } from '../../anzeige/format';
+import { useFeldKonflikt } from '../../components/useFeldKonflikt';
+import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from './taktischesZeichen';
+import {
+  istLageTyp,
+  loadLageStand,
+  lageAusschnitt,
+  lageStandImCache,
+  type LageFeld,
+  type LageTyp,
+  type LageWerte,
+} from './lageStand';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
 import {
@@ -127,14 +146,24 @@ type KartenModus =
    * (`?platzieren=…`, LLH-1125); `null` beim Start in der Karte selbst („Nicht verortet“,
    * Einsatzort). Nur ein Auftrag endet in der Rückmeldung „verortet“.
    */
-  | { art: 'platzieren'; ziel: PlatzierZiel; auftrag: { zurueck: boolean } | null }
+  | {
+      art: 'platzieren';
+      ziel: PlatzierZiel;
+      auftrag: { zurueck: boolean } | null;
+      /**
+       * Gespeicherter Stand des Ziels zu Beginn (LLH-1945), Altwert des Feld-CAS; `undefined`, wenn
+       * der Cache ihn beim Start nicht kannte.
+       */
+      beginn: LageWerte | undefined;
+    }
   /**
    * Nach erfolgreichem Verorten eines Auftrags (LLH-1125): die Rückmeldung steht, bis jemand „Auf der Karte
    * bleiben“ wählt oder einen anderen Modus beginnt. Kein exklusiver Modus — die Karte ist wieder
    * frei bedienbar.
    */
   | { art: 'verortet'; ziel: VerortetZiel }
-  | { art: 'abschnitt'; id: number }
+  /** `beginn`: Fläche und Zeichen des Abschnitts beim Start (LLH-1945), wie bei `platzieren`. */
+  | { art: 'abschnitt'; id: number; beginn: LageWerte | undefined }
   /** `kreis`: der laufende Kreis (nur bei `entwurf.modus === 'kreis'` von Belang). */
   | {
       art: 'zone';
@@ -160,13 +189,18 @@ type KartenModus =
   | { art: 'messen'; form: MessForm };
 
 type ModusAktion =
-  | { t: 'platzieren'; ziel: PlatzierZiel; auftrag?: { zurueck: boolean } }
+  | {
+      t: 'platzieren';
+      ziel: PlatzierZiel;
+      auftrag?: { zurueck: boolean };
+      beginn: LageWerte | undefined;
+    }
   /**
    * Erfolg des Verortens: aus einem Auftrag die Rückmeldung, sonst Modusende wie bisher (LFH-765);
    * läuft kein Platzier-Modus mehr, No-op.
    */
   | { t: 'verortet'; ziel: PlatzierZiel }
-  | { t: 'abschnitt'; id: number }
+  | { t: 'abschnitt'; id: number; beginn: LageWerte | undefined }
   | { t: 'zone'; entwurf: ZoneEntwurf }
   | { t: 'bild'; id: number }
   | { t: 'zeichen'; spec: FreiesZeichenUpdate }
@@ -212,7 +246,7 @@ type KartenSelektion =
 function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
   switch (a.t) {
     case 'platzieren':
-      return { art: 'platzieren', ziel: a.ziel, auftrag: a.auftrag ?? null };
+      return { art: 'platzieren', ziel: a.ziel, auftrag: a.auftrag ?? null, beginn: a.beginn };
     case 'verortet':
       // Die Herkunft kommt aus dem Modus, der verortet hat; ein inzwischen begonnener anderer Modus
       // bleibt stehen (wie `beenden` mit `arten`).
@@ -221,7 +255,7 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
         ? { art: 'verortet', ziel: { ...a.ziel, zurueck: state.auftrag.zurueck } }
         : { art: 'idle' };
     case 'abschnitt':
-      return { art: 'abschnitt', id: a.id };
+      return { art: 'abschnitt', id: a.id, beginn: a.beginn };
     case 'bild':
       return { art: 'bild', id: a.id };
     case 'zeichen':
@@ -332,6 +366,86 @@ export function useKartenInteraktion({
   warnung,
 }: KartenInteraktionArgs) {
   const qc = useQueryClient();
+  const konflikt = useFeldKonflikt();
+  const { konventionen } = useAnzeigeKonventionen();
+
+  /** Stand des Ziels im Cache, falls es ein Lageweg mit Feld-CAS ist (LLH-1945). */
+  const standImCache = useCallback(
+    (typ: string, id: number) =>
+      istLageTyp(typ) ? lageStandImCache(qc, einsatzId, typ, id) : undefined,
+    [qc, einsatzId],
+  );
+
+  /** Schickt eine Lageangabe über den Weg ihres Typs, mit oder ohne Altwert. */
+  function sendLage(
+    typ: LageTyp,
+    id: number,
+    patch: LageWerte,
+    erwartet: LageWerte | undefined,
+  ): Promise<unknown> {
+    switch (typ) {
+      case 'einheit':
+        return verorteEinheit(einsatzId, id, patch as PositionPatch, erwartet as PositionPatch);
+      case 'fahrzeug':
+        return verorteFahrzeug(einsatzId, id, patch as PositionPatch, erwartet as PositionPatch);
+      case 'fuehrung':
+        return verortePerson(einsatzId, id, patch as PositionPatch, erwartet as PositionPatch);
+      case 'abschnitt':
+        return zeichneAbschnitt(einsatzId, id, patch as FlaechePatch, erwartet as FlaechePatch);
+      case 'betreuungsstelle':
+        return aendereStelle(
+          einsatzId,
+          id,
+          patch as BetreuungsstellePatch,
+          erwartet as BetreuungsstellePatch,
+        );
+      case 'einsatzort':
+        // Nur das Koordinatenpaar: ein Kopf aus dem Cache überschriebe die gleichzeitige Änderung
+        // einer anderen Person (Leitstellen-Nr., Stichwort …).
+        return patcheEinsatz(einsatzId, patch as KopfdatenPatch, erwartet as KopfdatenPatch);
+    }
+  }
+
+  /** Lesbarer Wert einer Lageangabe für die Rückfrage „Zwischenzeitlich geändert“. */
+  function lageText(w: LageWerte): string {
+    const lat = w.lat ?? w.einsatzort_lat;
+    const lon = w.lon ?? w.einsatzort_lon;
+    if (typeof lat === 'number' && typeof lon === 'number') {
+      return formatKoordinate(lat, lon, konventionen);
+    }
+    if (w.flaeche_geojson != null) return 'neu gezeichnet';
+    const optionen = w.tz_fachaufgabe != null ? FACHAUFGABE_OPTIONS : ORGANISATION_OPTIONS;
+    const wert = w.tz_fachaufgabe ?? w.tz_organisation;
+    return optionen.find((o) => o.value === wert)?.label ?? String(wert ?? '');
+  }
+
+  /**
+   * Schreibt eine Lageangabe ohne offenes Feld (Platzieren, Fläche, Zeichen) mit dem Stand zu Beginn
+   * der Handlung als Altwert (Feld-CAS, LLH-1945). Ein 409 fragt über `useFeldKonflikt`: „Meine
+   * Änderung übernehmen“ schreibt ohne Altwert; „Verwerfen und neu laden“ und Escape lassen die
+   * Handlung verfallen (`false`), der frische Stand liegt dann schon im Cache. `true` = gespeichert.
+   */
+  async function saveLage(
+    typ: LageTyp,
+    id: number,
+    patch: LageWerte,
+    beginn: LageWerte | undefined,
+    etikett: string,
+  ): Promise<boolean> {
+    const felder = Object.keys(patch) as LageFeld[];
+    const ergebnis = await konflikt<LageWerte, LageWerte | undefined>({
+      etikett,
+      erwartet: beginn ? lageAusschnitt(beginn, felder) : undefined,
+      speichern: async (erwartet) => {
+        await sendLage(typ, id, patch, erwartet);
+      },
+      ladeFrisch: () => loadLageStand(qc, einsatzId, typ, id),
+      aktuell: (frisch) => frisch && { wert: lageAusschnitt(frisch, felder) },
+      text: lageText,
+      leer: (w) => Object.values(w).every((v) => v == null),
+    });
+    return ergebnis === undefined;
+  }
 
   const [modus, dispatch] = useReducer(modusReducer, { art: 'idle' } as KartenModus);
   /**
@@ -458,16 +572,26 @@ export function useKartenInteraktion({
   const verortenMutation = useMutation({
     mutationFn: async (p: { lat: number | null; lon: number | null }) => {
       if (!platzierungZiel) return;
+      const lauf = modusRef.current;
+      if (istLageTyp(platzierungZiel.typ)) {
+        // Feld-CAS (LLH-1945): Altwert ist der Stand beim Start des Platzierens; kannte der Cache
+        // ihn da noch nicht (Auftrag von außen), der beim Klick.
+        const typ = platzierungZiel.typ;
+        const beginn =
+          (lauf.art === 'platzieren' ? lauf.beginn : undefined) ??
+          lageStandImCache(qc, einsatzId, typ, platzierungZiel.id);
+        const patch: LageWerte =
+          typ === 'einsatzort'
+            ? { einsatzort_lat: p.lat, einsatzort_lon: p.lon }
+            : { lat: p.lat, lon: p.lon };
+        const etikett = typ === 'einsatzort' ? 'Einsatzort' : 'Ort auf der Karte';
+        const gespeichert = await saveLage(typ, platzierungZiel.id, patch, beginn, etikett);
+        return { ziel: platzierungZiel, punkt: p, verfallen: !gespeichert };
+      }
       if (platzierungZiel.typ === 'uhs') {
         await aktualisiereUhs(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'schaden') {
         await aktualisiereSchaden(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'einheit') {
-        await verorteEinheit(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'fahrzeug') {
-        await verorteFahrzeug(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'fuehrung') {
-        await verortePerson(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'person') {
         // Betroffene: nur die zwei Koordinatenfelder — `patchBody` liest vorhandene Keys, jeder
         // weitere wäre ein „leeren". `verortePerson` oben ist das Personal.
@@ -475,10 +599,6 @@ export function useKartenInteraktion({
           antreff_lat: p.lat,
           antreff_lon: p.lon,
         });
-      } else if (platzierungZiel.typ === 'betreuungsstelle') {
-        // Betreuungsstelle: nur das Koordinatenpaar; der PATCH ist tri-state, ein fehlender
-        // Schlüssel bleibt unverändert.
-        await aendereStelle(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'bereitstellungsraum') {
         // Bereitstellungsraum (LLH-1107): nur das Paar, wie bei der Betreuungsstelle. Der Server
         // schreibt dafür keinen ETB-Eintrag, verteilt aber live.
@@ -497,17 +617,25 @@ export function useKartenInteraktion({
           sammelstelle_lat: p.lat,
           sammelstelle_lon: p.lon,
         });
-      } else if (platzierungZiel.typ === 'einsatzort') {
-        // Einsatzort: nur das Koordinatenpaar. Ein Kopf aus dem Cache überschriebe die
-        // gleichzeitige Änderung einer anderen Person (Leitstellen-Nr., Stichwort …).
-        await patcheEinsatz(einsatzId, { einsatzort_lat: p.lat, einsatzort_lon: p.lon });
       }
-      // Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, wem der PATCH galt, unabhängig
-      // vom inzwischen laufenden Modus.
-      return { ziel: platzierungZiel, punkt: p };
+      // Einheit, Fahrzeug, Personal, Betreuungsstelle und Einsatzort laufen oben über
+      // `saveLage`. Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, wem der PATCH
+      // galt, unabhängig vom inzwischen laufenden Modus.
+      return { ziel: platzierungZiel, punkt: p, verfallen: false };
     },
     onSuccess: (ergebnis) => {
       const ziel = ergebnis?.ziel;
+      if (ergebnis?.verfallen) {
+        // Verworfen oder offen gelassen (LLH-1945): die Handlung verfällt, nichts gilt als
+        // verortet. Die Karte zeigt den frischen Stand, der Platzier-Modus endet.
+        qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
+        dispatch({ t: 'beenden', arten: ['platzieren'] });
+        return;
+      }
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
@@ -787,42 +915,35 @@ export function useKartenInteraktion({
     }
   }
 
-  /** Symbol-Override eines taktischen Markers; quittiert erst nach Erfolg. */
+  /**
+   * Symbol-Override eines taktischen Markers; quittiert erst nach Erfolg. Der Altwert ist das
+   * gespeicherte Zeichen im Cache bei der Wahl (Feld-CAS, LLH-1945); ein 409 fragt über
+   * `useFeldKonflikt`, verworfen oder offen gelassen bleibt das frische Zeichen ohne Quittung.
+   */
   function aendereSymbol(
     marker: KarteMarker,
     patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
   ) {
-    let vorgang: { aufruf: Promise<unknown>; fach: readonly unknown[] } | null = null;
-    if (marker.typ === 'einheit') {
-      vorgang = {
-        aufruf: verorteEinheit(einsatzId, marker.id, patch),
-        fach: einsatzKeys.einheiten(einsatzId),
-      };
-    } else if (marker.typ === 'fahrzeug') {
-      vorgang = {
-        aufruf: verorteFahrzeug(einsatzId, marker.id, patch),
-        fach: einsatzKeys.fahrzeuge(einsatzId),
-      };
-    } else if (marker.typ === 'fuehrung') {
-      vorgang = {
-        aufruf: verortePerson(einsatzId, marker.id, patch),
-        fach: einsatzKeys.fuehrungskraefte(einsatzId),
-      };
-    } else if (marker.typ === 'abschnitt') {
-      vorgang = {
-        aufruf: zeichneAbschnitt(einsatzId, marker.id, patch),
-        fach: einsatzKeys.abschnitte(einsatzId),
-      };
+    const typ = marker.typ;
+    if (typ !== 'einheit' && typ !== 'fahrzeug' && typ !== 'fuehrung' && typ !== 'abschnitt') {
+      return;
     }
-    if (!vorgang) return;
+    const fach =
+      typ === 'einheit'
+        ? einsatzKeys.einheiten(einsatzId)
+        : typ === 'fahrzeug'
+          ? einsatzKeys.fahrzeuge(einsatzId)
+          : typ === 'fuehrung'
+            ? einsatzKeys.fuehrungskraefte(einsatzId)
+            : einsatzKeys.abschnitte(einsatzId);
     const melde = beginneHandlung(
       `objekt:${marker.schluessel}`,
       `Symbol nicht gespeichert · ${marker.label}`,
     );
-    const { aufruf, fach } = vorgang;
-    aufruf
-      .then(() => {
-        erfolg('Symbol gespeichert');
+    const etikett = `${'tz_fachaufgabe' in patch ? 'Fachaufgabe' : 'Organisation'} von „${marker.label}“`;
+    saveLage(typ, marker.id, patch, lageStandImCache(qc, einsatzId, typ, marker.id), etikett)
+      .then((gespeichert) => {
+        if (gespeichert) erfolg('Symbol gespeichert');
         return qc.invalidateQueries({ queryKey: fach });
       })
       .catch(melde);
@@ -1050,14 +1171,15 @@ export function useKartenInteraktion({
    * `useCallback`, weil der Handler in den Deps eines Effekts von `LagekartePage` steht
    * (Platzier-Deeplink `?platzieren=<typ>:<id>`). Ohne stabile Identität lief der Effekt bei jedem
    * Render neu, und weil er selbst rendert und die URL räumt, drehte er sich mit noch veraltetem
-   * `searchParams` im Kreis. `dispatch` und `setAuswahl` sind stabil, die leeren Deps vollständig.
+   * `searchParams` im Kreis. `dispatch` und `setAuswahl` sind stabil, `standImCache` wechselt nur
+   * mit dem Einsatz.
    */
   const onPlatzierenStart = useCallback(
     (z: { typ: PlatzierenPunktTyp; id: number }) => {
-      dispatch({ t: 'platzieren', ziel: z });
+      dispatch({ t: 'platzieren', ziel: z, beginn: standImCache(z.typ, z.id) });
       setAuswahl(null);
     },
-    [setAuswahl],
+    [setAuswahl, standImCache],
   );
   /**
    * Verortungsauftrag von außen (`?platzieren=…[&zurueck=1]`, LLH-1125): wie `onPlatzierenStart`,
@@ -1069,11 +1191,12 @@ export function useKartenInteraktion({
         t: 'platzieren',
         ziel: { typ: auftrag.typ, id: auftrag.id },
         auftrag: { zurueck: auftrag.zurueck },
+        beginn: standImCache(auftrag.typ, auftrag.id),
       });
       setVerortungsTyp(auftrag.typ);
       setAuswahl(null);
     },
-    [setAuswahl],
+    [setAuswahl, standImCache],
   );
   /** „Auf der Karte bleiben“: schließt nur die Rückmeldung; Auswahl und Ebenen-Vorrang bleiben. */
   const onVerortetSchliessen = useCallback(
@@ -1090,7 +1213,7 @@ export function useKartenInteraktion({
     dispatch({ t: 'beenden', arten: ['platzieren'] });
   };
   const onAbschnittZeichnenStart = (id: number) => {
-    dispatch({ t: 'abschnitt', id });
+    dispatch({ t: 'abschnitt', id, beginn: standImCache('abschnitt', id) });
     setAuswahl(null);
   };
   /**
@@ -1183,7 +1306,11 @@ export function useKartenInteraktion({
     if (darfSchreiben) verorten(lat, lon);
   };
   const onEinsatzortPlatzieren = () => {
-    dispatch({ t: 'platzieren', ziel: { typ: 'einsatzort', id: 0 } });
+    dispatch({
+      t: 'platzieren',
+      ziel: { typ: 'einsatzort', id: 0 },
+      beginn: standImCache('einsatzort', 0),
+    });
     setAuswahl(null);
   };
   // Freies-Zeichen-Platzieren starten/abbrechen.
@@ -1236,9 +1363,20 @@ export function useKartenInteraktion({
       `objekt:abschnitt-${zeichneAbschnittId}`,
       'Fläche nicht gespeichert',
     );
-    zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
-      .then(() => {
-        erfolg('Fläche gespeichert');
+    // Feld-CAS (LLH-1945): Altwert ist die Fläche beim Start des Zeichnens.
+    const lauf = modusRef.current;
+    const beginn =
+      (lauf.art === 'abschnitt' ? lauf.beginn : undefined) ??
+      lageStandImCache(qc, einsatzId, 'abschnitt', zeichneAbschnittId!);
+    saveLage(
+      'abschnitt',
+      zeichneAbschnittId!,
+      { flaeche_geojson: JSON.stringify(poly) },
+      beginn,
+      'Fläche des Abschnitts',
+    )
+      .then((gespeichert) => {
+        if (gespeichert) erfolg('Fläche gespeichert');
         return qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });
       })
       .catch(melde)

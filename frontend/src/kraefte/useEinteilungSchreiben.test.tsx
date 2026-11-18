@@ -77,4 +77,15 @@ describe('useEinteilungSchreiben (LLH-1060, D3)', () => {
     const s = hook();
     await expect(s.einheit(9)(12, null)).rejects.toThrow(/entlassen/);
   });
+
+  it('bleibt über ein neues Rendern dasselbe Objekt', () => {
+    const client = neuerQueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result, rerender } = renderHook(() => useEinteilungSchreiben(1), { wrapper });
+    const vorher = result.current;
+    rerender();
+    expect(result.current).toBe(vorher);
+  });
 });

@@ -858,7 +858,9 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(kopf).getByRole('button', { name: 'PAT-Nummer eintragen' }));
     const feld = within(kopf).getByRole('textbox', { name: 'PAT-Nummer' });
     await userEvent.type(feld, 'A-4711{Enter}');
-    await waitFor(() => expect(gepatcht).toEqual([{ pat_nummer: 'A-4711' }]));
+    await waitFor(() =>
+      expect(gepatcht).toEqual([{ pat_nummer: 'A-4711', erwartet: { pat_nummer: null } }]),
+    );
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
   });
 
@@ -877,7 +879,9 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(kopf).getByRole('combobox', { name: 'Kontamination' }));
     await userEvent.click(await screen.findByTitle('kontaminiert'));
     await userEvent.click(within(kopf).getByRole('button', { name: 'Kontamination speichern' }));
-    await waitFor(() => expect(gepatcht).toEqual([{ kontamination: true }]));
+    await waitFor(() =>
+      expect(gepatcht).toEqual([{ kontamination: true, erwartet: { kontamination: null } }]),
+    );
   });
 
   it('sperrt PAT-Nummer und Kontamination ohne Netz mit Grund', () => {
@@ -1525,7 +1529,9 @@ describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
     });
     expect(patches).toEqual([]);
     fireEvent.blur(within(zelle).getByRole('textbox'));
-    await waitFor(() => expect(patches).toEqual([{ zustand: 'Atemnot' }]));
+    await waitFor(() =>
+      expect(patches).toEqual([{ zustand: 'Atemnot', erwartet: { zustand: null } }]),
+    );
   });
 
   it('mit Netz bleibt er schreibbar, ohne Grund', () => {

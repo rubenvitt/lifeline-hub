@@ -369,3 +369,106 @@ async fn lage_der_oeffentlichen_api_traegt_kein_programm() {
     assert!(!text.contains("Feuerwerk"), "{text}");
     assert!(!text.contains("\"programm\""), "{text}");
 }
+
+// ---------- LLH-1945: Feld-CAS an Bezeichnung und Zeitpunkt ----------
+
+/// Bezeichnung mit Altwert (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf
+/// zwischenzeitliche Änderung“): stimmt er, wird geschrieben; hat ein anderer die Bezeichnung
+/// inzwischen geändert, ist es 409 `veraltet` und nichts wird überschrieben. Ohne `erwartet` wie
+/// bisher ohne Vergleich.
+#[tokio::test]
+async fn bezeichnung_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let id = angelegt(&app, &admin, einsatz, "Einlass", "2026-09-13 16:00").await;
+    let punkt = format!("{}/{id}", pfad(einsatz));
+
+    let body = json!({"bezeichnung": "Öffnung", "erwartet": {"bezeichnung": "Einlass"}});
+    let (s, v) = anfrage_json(&app, "PATCH", &punkt, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bezeichnung"], "Öffnung");
+
+    let body = json!({"bezeichnung": "Start", "erwartet": {"bezeichnung": "Einlass"}});
+    let (s, v) = anfrage_json(&app, "PATCH", &punkt, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["grund"], "veraltet", "{v}");
+    assert_eq!(
+        liste(&app, &admin, einsatz).await[0]["bezeichnung"],
+        "Öffnung"
+    );
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &punkt,
+        &admin,
+        Some(&json!({"bezeichnung": "Start"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["bezeichnung"], "Start");
+}
+
+/// Zeitpunkt mit Altwert: in Formular- wie Wire-Form verglichen; ein inzwischen geänderter
+/// Zeitpunkt ist 409, eine Änderung der Bezeichnung dazwischen löst keinen Konflikt aus.
+#[tokio::test]
+async fn zeitpunkt_mit_altwert_und_andere_angabe_dazwischen_ohne_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let id = angelegt(&app, &admin, einsatz, "Einlass", "2026-09-13 16:00").await;
+    let punkt = format!("{}/{id}", pfad(einsatz));
+
+    // Ein anderer ändert die Bezeichnung.
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &punkt,
+        &admin,
+        Some(&json!({"bezeichnung": "Öffnung"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let body = json!({"zeitpunkt_at": "2026-09-13 17:00", "erwartet": {"zeitpunkt_at": "2026-09-13 16:00:00"}});
+    let (s, v) = anfrage_json(&app, "PATCH", &punkt, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["zeitpunkt_at"], "2026-09-13 17:00:00");
+    assert_eq!(v["bezeichnung"], "Öffnung");
+
+    let body = json!({"zeitpunkt_at": "2026-09-13 18:00", "erwartet": {"zeitpunkt_at": "2026-09-13T16:00"}});
+    let (s, v) = anfrage_json(&app, "PATCH", &punkt, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["grund"], "veraltet", "{v}");
+    assert_eq!(
+        liste(&app, &admin, einsatz).await[0]["zeitpunkt_at"],
+        "2026-09-13 17:00:00"
+    );
+}
+
+/// Ein Altwert ohne Änderung derselben Angabe ist 422; ein fremder Punkt bleibt 404, auch mit
+/// Altwert.
+#[tokio::test]
+async fn altwert_ohne_aenderung_ist_422_und_fremd_bleibt_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let id = angelegt(&app, &admin, einsatz, "Einlass", "2026-09-13 16:00").await;
+    let punkt = format!("{}/{id}", pfad(einsatz));
+    let body = json!({"zeitpunkt_at": "2026-09-13 17:00", "erwartet": {"bezeichnung": "Einlass"}});
+    let (s, v) = anfrage_json(&app, "PATCH", &punkt, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    let b = einsatz_anlegen(&app, &admin).await;
+    let body = json!({"bezeichnung": "X", "erwartet": {"bezeichnung": "Einlass"}});
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{}/{id}", pfad(b)),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}

@@ -292,6 +292,35 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     expect(toasts()).toBe(0);
   });
 
+  it('Bemerkung mit Altwert: ein 409 ohne fremde Änderung steht als Grund an der Zeile (LLH-1945)', async () => {
+    const koerper: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/7/fahrzeuge/10', async ({ request }) => {
+        koerper.push(await request.json());
+        return HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 });
+      }),
+    );
+    const { container } = render();
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
+    await userEvent.click(
+      within(zeile(container, 10)).getByRole('button', {
+        name: 'Bemerkung zu Florian 1 hinzufügen',
+      }),
+    );
+    const feld = within(zeile(container, 10)).getByRole('textbox');
+    await userEvent.type(feld, 'Tank leer');
+    fireEvent.keyDown(feld, { keyCode: 13 });
+    fireEvent.keyUp(feld, { keyCode: 13 });
+    // Der Stand ist noch der beim Öffnen (leer): kein Feldkonflikt, keine Rückfrage.
+    expect(await within(zeile(container, 10)).findByRole('alert')).toHaveTextContent(
+      'Einsatz ist abgeschlossen',
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(koerper).toEqual([{ bemerkung: 'Tank leer', erwartet: { bemerkung: null } }]);
+  });
+
   it('Bemerkung: über 2 000 Zeichen geht kein PATCH hinaus, der Zähler sagt „zu lang“ (LLH-1073)', async () => {
     setzeViewportBreite(1600);
     let patches = 0;
