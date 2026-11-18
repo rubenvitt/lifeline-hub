@@ -54,7 +54,7 @@ test('Beobachter öffnet die Druckansicht aus dem Detail; am Handy bleibt das Bl
   await expect(detail).toContainText('Wasserversorgung von Hydrant H12 aufbauen');
   // Vorbedingung: wirklich ohne Schreibrecht, sonst belegte der Fall nichts.
   await expect(detail.getByRole('button', { name: 'Vollzug melden' })).toHaveCount(0);
-  await detail.getByRole('link', { name: /Druckansicht/ }).click();
+  await detail.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/auftraege/${auftragId}/druck$`));
   await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled();
   const wurzel = page.locator('[data-lfh="druckwurzel"]');

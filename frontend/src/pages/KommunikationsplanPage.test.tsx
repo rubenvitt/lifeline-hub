@@ -398,7 +398,9 @@ describe('KommunikationsplanPage — Anzeige', () => {
     setup();
     await screen.findByText('Polizei PI Nord');
     expect(screen.queryByRole('button', { name: /Lagebericht/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /Drucken/ })).toBeInTheDocument();
+    // Drucken steht im Seitenkopf (LLH-1836).
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
   });
 
   it('nennt im Druckkopf die Dokumentart', async () => {

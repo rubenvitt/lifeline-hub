@@ -10,7 +10,7 @@ nachvollziehbar wie ihr Export.
 
 ### Requirement: Einstieg mit dem aktiven Filter
 
-Jede der Listen Personen, Tiere und Schäden SHALL eine Aktion „Drucken / als PDF“ anbieten, die
+Jede der Listen Personen, Tiere und Schäden SHALL eine Aktion „Druckansicht“ anbieten, die
 eine eigene Druckansicht öffnet. Die Druckansicht SHALL eine eigene, teilbare Adresse haben, die
 den Seitenfilter der Liste trägt. Die Aktion SHALL den gerade aktiven Seitenfilter unverändert
 mitnehmen: bei Personen den Status und den Schalter „nur offene Felder“, bei Tieren die
@@ -20,7 +20,7 @@ Adresse MUST verworfen werden und darf nicht als Auswahl im Kopf erscheinen.
 #### Scenario: Aus der gefilterten Tierliste drucken
 
 - **WHEN** eine Person in der Tierliste die Sicht „Vermisst“ und die Spezies „Hund“ wählt und
-  „Drucken / als PDF“ wählt
+  „Druckansicht“ wählt
 - **THEN** öffnet sich die Druckansicht mit genau dieser Auswahl
 - **AND** ein Neuladen der Druckansicht behält die Auswahl
 

@@ -1000,7 +1000,7 @@ describe('SchaedenPage — Einstieg in den Druck (LFH-727)', () => {
       expect(k).not.toBeNull();
       return k!;
     });
-    return within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
+    return within(kopf).findByRole('link', { name: 'Druckansicht' });
   }
 
   it('nimmt die Vorgabe-Sicht „offen“ ausdrücklich mit und folgt einem Wechsel', async () => {

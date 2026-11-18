@@ -42,6 +42,7 @@ import { listeUhs, aenderePersonBelegung, nimmUhsAustrittZurueck } from '../api/
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzKeys } from '../api/queryKeys';
 import { STATUS_META } from '../personen/personMeta';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
@@ -823,12 +824,7 @@ export default function PersonenDetailPage() {
           ? {
               name: `Weitere Wege zu Person ${registrierAnzeige(p.registrier_nr)}`,
               eintraege: [
-                {
-                  key: 'druck',
-                  label: 'Druckansicht',
-                  ziel: personDruckPfad(einsatzId, p.id),
-                  onWahl: () => navigate(personDruckPfad(einsatzId, p.id)),
-                },
+                druckansichtNebenweg({ ziel: personDruckPfad(einsatzId, p.id), navigate }),
               ],
             }
           : undefined

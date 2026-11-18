@@ -59,7 +59,7 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
   // ── Personen: Einstieg aus der gefilterten Liste.
   await page.goto(`/einsaetze/${einsatzId}/personen?filter=betroffen`);
   await expect(page.getByText('Albers')).toBeVisible();
-  await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/personen/druck\\?filter=betroffen$`));
   await expect(drucken).toBeEnabled({ timeout: 30_000 });
   await expect(kopf).toContainText('Betroffenenliste');
@@ -103,7 +103,7 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
   // ── Tiere: die Vorgabe-Sicht „aktiv" reist ausdrücklich mit.
   await page.goto(`/einsaetze/${einsatzId}/tiere`);
   await expect(page.getByText('Rex')).toBeVisible();
-  await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/tiere/druck\\?sicht=aktiv$`));
   await expect(drucken).toBeEnabled({ timeout: 30_000 });
   // Das Wort der Liste („Offen“), der Wert in der Adresse bleibt `aktiv`.
@@ -113,7 +113,7 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
   // ── Schäden: Vorgabe-Sicht „offen".
   await page.goto(`/einsaetze/${einsatzId}/schaeden`);
   await expect(page.getByText('Deich')).toBeVisible();
-  await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/schaeden/druck\\?sicht=offen$`));
   await expect(drucken).toBeEnabled({ timeout: 30_000 });
   await expect(kopf).toContainText('Schadensliste');

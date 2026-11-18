@@ -1,12 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { listePersonal } from '../api/personal';
 import {
   updatePlanungBlock,
   erzeugePlanungSchichten,
   createPlanungBlock,
-  loadPlanungMappe,
   deletePlanungBlock,
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
@@ -15,14 +14,11 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { datum, tagUndUhrzeit } from '../anzeige/zeitDarstellung';
 import { Segmentleiste } from '../components/instrument';
 import { Select } from '../components/Select';
-import { AusgabeKnoepfe } from '../abloesung/schichtplan/ausgabe/SchichtplanAusgabeKnoepfe';
-import { mappeDateiname } from '../abloesung/schichtplan/ausgabe/mappeDateiname';
 import SchichtplanEditor, {
   type SchichtplanEditorAdapter,
 } from '../abloesung/schichtplan/SchichtplanEditor';
 import { alsRasterBlock } from '../abloesung/schichtplan/schichtplanZeilen';
 import { useUhr } from '../abloesung/useUhr';
-import { planungDruckPfad } from '../routing/deeplinks';
 import {
   blockAendernBody,
   blockBody,
@@ -63,8 +59,11 @@ const TAGE_ALS_SEGMENTE = 3;
 export default function PlanungSchichtplan({
   planung,
   readOnly = false,
+  ausgabeFehler,
 }: {
   planung: Planung;
+  /** Fehler des Excel-Abrufs; „Druckansicht“ und „Excel“ stehen im Seitenkopf (LLH-1836). */
+  ausgabeFehler?: ReactNode;
   /** Übernommen (LLH-1587): Raster und Blöcke nur zum Ansehen, ohne Anlegen und Ziehen. */
   readOnly?: boolean;
 }) {
@@ -146,17 +145,9 @@ export default function PlanungSchichtplan({
     isErzeugenDisabled: planung.posten.length === 0,
     beschriftung: 'Planung',
     fehlerTitel: 'Planung nicht geändert',
-    // Ausgabe wie im Einsatz (LLH-1593): Aushang und Zettel, Excel-Mappe. Wer die Planung lesen
-    // darf, sieht auch das Personal; „Excel“ ist deshalb nie gesperrt.
-    tools: (
-      <AusgabeKnoepfe
-        druckPfad={planungDruckPfad(planungId)}
-        schluessel={`planung-${planungId}`}
-        ladeMappe={() => loadPlanungMappe(planungId)}
-        dateiname={() => mappeDateiname(planung.kopf.bezeichnung, `planung-${planungId}`)}
-        personalFrei
-      />
-    ),
+    // Ausgabe wie im Einsatz (LLH-1593) steht im Seitenkopf der Planung (LLH-1836); hier nur ihr
+    // Fehler.
+    tools: ausgabeFehler != null ? <div style={{ flexBasis: '100%' }}>{ausgabeFehler}</div> : null,
     // Die Liste fürs Handy nennt den Tag: eine Planung reicht über mehrere.
     liste: { formatZeit: (ms) => tagUndUhrzeit(dayjs(ms), konventionen), alleBloecke: true },
     api: {

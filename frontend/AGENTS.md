@@ -1052,8 +1052,9 @@ anwendbar), „nicht geprüft" ist keins.
   melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht und
   Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
   `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
-  Das Meldebild (Kräfteübersicht) trägt Drucken und „In Lagebericht übernehmen“ als Nebenwege
-  (LLH-1786); Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
+  Das Meldebild (Kräfteübersicht) trägt „In Lagebericht übernehmen“ als Nebenweg (LLH-1786).
+  Wortlaut und Platz jedes Druckeinstiegs: `src/druck/AGENTS.md`, „Wortlaut und Platz der
+  Druckeinstiege“ (LLH-1836).
   Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`,
   Stufen 48 / 72: `openspec/changes/archive/2026-11-18-z137bgm5-seitenkopf-einzeilig/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
