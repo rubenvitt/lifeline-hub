@@ -88,7 +88,7 @@
     (`docs/architektur/AGENTS.md`, Mitänderungsregel).
 
   Prüfen: Doku-Wächter grün.
-- [ ] 7.3 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün. Dazu Bilder der Änderung
+- [x] 7.3 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün. Dazu Bilder der Änderung
   (Personendetail vorher und nachher, Tier, Schaden, Betreuungsstelle) für PR und Meldung.
 
 ## Workflow follow-up
