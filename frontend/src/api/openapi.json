@@ -1692,7 +1692,7 @@
       },
       "AppCode": {
         "type": "object",
-        "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.",
+        "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS).",
         "required": [
           "code"
         ],

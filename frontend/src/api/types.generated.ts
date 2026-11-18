@@ -699,7 +699,7 @@ export interface components {
          * @enum {string}
          */
         AntragZielArt: "einsatz" | "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
-        /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App. */
+        /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS). */
         AppCode: {
             code: string;
         };

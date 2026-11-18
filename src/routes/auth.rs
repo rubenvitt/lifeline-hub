@@ -2123,7 +2123,7 @@ pub struct AppCodeAnfrage {
     pub challenge: String,
 }
 
-/// Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.
+/// Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS).
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AppCode {
     pub code: String,
