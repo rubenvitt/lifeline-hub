@@ -35,7 +35,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Index `design-system.json` gibt es nur im Artifact: zuletzt und einzeln senden, unmittelbar
     vorher lesen, alle Schlüssel und `createdOnFiles` behalten, nur `lastChange` setzen (`via`
     „Claude Code aus lifeline-hub <Commit>“). Ohne claude.ai-Anmeldung vermerkt er das als
-    Kommentar an der Aufgabe.
+    Kommentar an der Aufgabe. Das Artifact gehört allein Ruben (mit zwei Unterkonten): Neu
+    veröffentlichen ist ohne Rückfrage freigegeben, auch das Entfernen von Dateien, die auf
+    `alpha` fehlen (Ruben, 18.11.2026).
 
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
