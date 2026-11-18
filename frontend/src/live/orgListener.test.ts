@@ -78,6 +78,20 @@ describe('merkeOrgStand (Erst-Open-Abgleich, LLH-1839)', () => {
     expect(vorgemerkt).toContainEqual(['einsaetze']);
   });
 
+  it('gleicht ab, was vorher Daten hatte, auch wenn ein Neuabruf vor dem open fertig wurde', async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(['einsaetze'], []);
+    vi.advanceTimersByTime(50);
+    const { sammler, vorgemerkt } = sammlerMitProtokoll();
+    const abgleich = merkeOrgStand(qc);
+    vi.advanceTimersByTime(10);
+    // Die neue Seite lädt im selben Zug neu; der Abruf liest vor dem Wechsel der Ströme.
+    await qc.fetchQuery({ queryKey: ['einsaetze'], queryFn: async () => [], staleTime: 0 });
+    vi.advanceTimersByTime(50);
+    abgleich(sammler);
+    expect(vorgemerkt).toContainEqual(['einsaetze']);
+  });
+
   it('merkt einen Org-Key nur einmal vor, auch wenn mehrere Fächer unter ihm veraltet sind', () => {
     const qc = new QueryClient();
     qc.setQueryData(['personal', 'alle'], []);

@@ -112,6 +112,23 @@ describe('useOrgLiveStream (LFH-734)', () => {
     expect(spy).not.toHaveBeenCalledWith(...abgleich(['einsaetze']));
   });
 
+  it('gleicht beim ersten open nach einem Fehlversuch alle Org-Keys ab (LLH-1839)', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    mount(true, client);
+    vi.advanceTimersByTime(50);
+    client.setQueryData(['einsaetze'], []);
+    const quelle = FakeEventSource.instanzen[0];
+    quelle.readyState = FakeEventSource.CONNECTING;
+    quelle.onerror?.();
+    quelle.readyState = FakeEventSource.OPEN;
+    quelle.emit('open');
+    vi.advanceTimersByTime(LIVE_SAMMELFENSTER_MS);
+    expect(spy).toHaveBeenCalledWith(...abgleich(['einsaetze']));
+  });
+
   it('gleicht auch beim Neuaufbau durch den Browser die Org-Keys ab (kein Nachlieferweg)', () => {
     vi.useFakeTimers();
     vi.stubGlobal('EventSource', FakeEventSource);

@@ -176,7 +176,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734). Und nur die mit einem Stand
     // von vor dem Verbindungsaufbau, damit ein Kaltaufruf nichts doppelt lädt (LLH-1839).
     const orgAbgleich = () => invalidiereOrgLiveKeys(sammler);
-    const verbinde = (beimErstenOpen: () => void) => {
+    const verbinde = (beimErstenOpen: (nachFehlversuch: boolean) => void) => {
       schliessen = oeffneLiveVerbindung({
         url: `/api/einsaetze/${einsatzId}/live`,
         listeners,
@@ -194,7 +194,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       });
     };
     const erstAbgleich = merkeOrgStand(qc);
-    verbinde(() => erstAbgleich(sammler));
+    verbinde((nachFehlversuch) => (nachFehlversuch ? orgAbgleich() : erstAbgleich(sammler)));
     const abmelden = meldeEinsatzStrom();
     return () => {
       wartenBeenden?.();

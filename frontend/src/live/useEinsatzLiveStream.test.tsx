@@ -664,8 +664,6 @@ describe('useEinsatzLiveStream', () => {
     // zwischen beiden Verbindungen verloren gehen.
     expect(keys).toContainEqual(['einsaetze']);
     expect(keys).toContainEqual(['fahrzeuge']);
-    // … und nur die mit altem Stand: was beim Kaltaufruf frisch lud, bleibt (LLH-1839).
-    expect(keys).not.toContainEqual(['etb-bausteine']);
     window.removeEventListener('lfh:live-status', onStatus);
   });
 

@@ -40,8 +40,9 @@ export function useOrgLiveStream(angemeldet: boolean): void {
       url: '/api/live',
       listeners: [...orgListener(sammler), ...benachrichtigungListener(true), ['lagged', abgleich]],
       beiWiederaufbau: abgleich,
-      beimErstenOpen: () => {
-        erstAbgleich(sammler);
+      beimErstenOpen: (nachFehlversuch) => {
+        if (nachFehlversuch) invalidiereOrgLiveKeys(sammler);
+        else erstAbgleich(sammler);
         meldeNachreichen();
       },
     });
