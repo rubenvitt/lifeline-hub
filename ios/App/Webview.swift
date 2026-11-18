@@ -1,6 +1,7 @@
 import Foundation
 import LifelineKern
 import SwiftUI
+import UIKit
 import WebKit
 import os
 
@@ -26,6 +27,7 @@ enum Webviewfabrik {
         konfiguration.userContentController = inhalt
         let webView = WKWebView(frame: .zero, configuration: konfiguration)
         webView.navigationDelegate = navigation
+        webView.uiDelegate = navigation as? WKUIDelegate
         #if DEBUG
             webView.isInspectable = true
         #endif
@@ -47,6 +49,7 @@ enum Webviewfabrik {
     static func close(_ webView: WKWebView) {
         webView.stopLoading()
         webView.navigationDelegate = nil
+        webView.uiDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(
             forName: Bruecke.handlerName)
     }
@@ -104,13 +107,81 @@ final class Brueckenempfang: NSObject, WKScriptMessageHandler {
     }
 }
 
-/// Meldet Ladefehler und das Ende des Web-Prozesses an das Modell (Entwurf D6; tasks.md 8.6).
+/// Begleitet die Navigation des Webviews: Linkregeln, neue Fenster, Downloads (Entwurf D8; Spec
+/// `ios-huelle`, „Links, Downloads und Druck laufen nicht ins Leere“), dazu Ladefehler und das Ende
+/// des Web-Prozesses an das Modell (Entwurf D6). Was geschieht, entscheidet `Linkweiche` im Kern.
 @MainActor
-final class Navigationsbegleiter: NSObject, WKNavigationDelegate {
+final class Navigationsbegleiter: NSObject, WKNavigationDelegate, WKUIDelegate {
+    private let aktiverServer: @MainActor () -> ServerAdresse?
+    private let oeffne: @MainActor (URL) -> Void
+    private let downloads: Downloads
     private let melde: @MainActor (WKWebView, Ablauf.Event) -> Void
 
-    init(melde: @escaping @MainActor (WKWebView, Ablauf.Event) -> Void) {
+    init(
+        aktiverServer: @escaping @MainActor () -> ServerAdresse?,
+        oeffne: @escaping @MainActor (URL) -> Void = { UIApplication.shared.open($0) },
+        downloads: Downloads = Downloads(),
+        melde: @escaping @MainActor (WKWebView, Ablauf.Event) -> Void
+    ) {
+        self.aktiverServer = aktiverServer
+        self.oeffne = oeffne
+        self.downloads = downloads
         self.melde = melde
+    }
+
+    private func entscheide(
+        _ aktion: WKNavigationAction, in webView: WKWebView, neuesFenster: Bool
+    ) -> Linkweiche.Entscheidung {
+        guard let ziel = aktion.request.url else { return neuesFenster ? .abbrechen : .erlauben }
+        return Linkweiche.navigation(
+            server: aktiverServer()?.url, ziel: ziel,
+            isMainFrame: aktion.targetFrame?.isMainFrame ?? true,
+            neuesFenster: neuesFenster || aktion.targetFrame == nil,
+            shouldPerformDownload: aktion.shouldPerformDownload, seite: webView.url)
+    }
+
+    // MARK: Navigation
+
+    func webView(
+        _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+    ) {
+        switch entscheide(navigationAction, in: webView, neuesFenster: false) {
+        case .erlauben:
+            decisionHandler(.allow)
+        case .abbrechen:
+            decisionHandler(.cancel)
+        case .download:
+            decisionHandler(.download)
+        case .imWebviewLaden(let url):
+            decisionHandler(.cancel)
+            webView.load(URLRequest(url: url))
+        case .system(let url):
+            decisionHandler(.cancel)
+            oeffne(url)
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void
+    ) {
+        let entscheidung = Linkweiche.antwort(
+            canShowMIMEType: navigationResponse.canShowMIMEType,
+            isForMainFrame: navigationResponse.isForMainFrame)
+        decisionHandler(entscheidung == .download ? .download : .allow)
+    }
+
+    func webView(
+        _ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload
+    ) {
+        download.delegate = downloads
+    }
+
+    func webView(
+        _ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload
+    ) {
+        download.delegate = downloads
     }
 
     func webView(
@@ -126,6 +197,96 @@ final class Navigationsbegleiter: NSObject, WKNavigationDelegate {
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         melde(webView, .webProzessBeendet)
+    }
+
+    // MARK: Neue Fenster
+
+    /// `target=_blank` und `window.open`: ein zweiter Webview entsteht nie. Die eigene Origin lädt
+    /// im selben Webview, eine Dateiroute wird heruntergeladen, Fremdes öffnet das System.
+    func webView(
+        _ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        switch entscheide(navigationAction, in: webView, neuesFenster: true) {
+        case .imWebviewLaden(let url):
+            webView.load(URLRequest(url: url))
+        case .download:
+            let downloads = self.downloads
+            webView.startDownload(using: navigationAction.request) { download in
+                download.delegate = downloads
+            }
+        case .system(let url):
+            oeffne(url)
+        case .erlauben, .abbrechen:
+            break
+        }
+        return nil
+    }
+}
+
+/// Lädt Dateien mit `WKDownload` (mit den Cookies des Datenspeichers, auch aus `blob:`) in ein
+/// eigenes Verzeichnis unter dem temporären Verzeichnis und bietet sie im Teilen-Blatt an.
+@MainActor
+final class Downloads: NSObject, WKDownloadDelegate {
+    static let basis = FileManager.default.temporaryDirectory.appendingPathComponent(
+        "Downloads", isDirectory: true)
+
+    private var ziele: [ObjectIdentifier: URL] = [:]
+    private let zeige: @MainActor (URL, WKWebView?) -> Void
+    private let protokoll = Logger(subsystem: "dev.rubeen.lifeline.ios", category: "download")
+
+    init(zeige: @escaping @MainActor (URL, WKWebView?) -> Void = Teilen.zeige) {
+        self.zeige = zeige
+    }
+
+    func download(
+        _ download: WKDownload, decideDestinationUsing response: URLResponse,
+        suggestedFilename: String,
+        completionHandler: @escaping @MainActor @Sendable (URL?) -> Void
+    ) {
+        let ziel = Downloadablage.ziel(basis: Self.basis, vorschlag: suggestedFilename, kennung: UUID())
+        do {
+            try FileManager.default.createDirectory(
+                at: ziel.deletingLastPathComponent(), withIntermediateDirectories: true)
+        } catch {
+            protokoll.error("Download-Verzeichnis nicht angelegt: \(error.localizedDescription)")
+            completionHandler(nil)
+            return
+        }
+        ziele[ObjectIdentifier(download)] = ziel
+        completionHandler(ziel)
+    }
+
+    func downloadDidFinish(_ download: WKDownload) {
+        guard let ziel = ziele.removeValue(forKey: ObjectIdentifier(download)) else { return }
+        zeige(ziel, download.webView)
+    }
+
+    func download(_ download: WKDownload, didFailWithError error: any Error, resumeData: Data?) {
+        protokoll.error("Download gescheitert: \(error.localizedDescription)")
+        if let ziel = ziele.removeValue(forKey: ObjectIdentifier(download)) {
+            try? FileManager.default.removeItem(at: ziel.deletingLastPathComponent())
+        }
+    }
+}
+
+/// Das Teilen-Blatt für eine geladene Datei; danach räumt es die Datei weg.
+enum Teilen {
+    @MainActor
+    static func zeige(_ datei: URL, von webView: WKWebView?) {
+        guard let webView, var oben = webView.window?.rootViewController else { return }
+        while let gezeigt = oben.presentedViewController { oben = gezeigt }
+        let blatt = UIActivityViewController(activityItems: [datei], applicationActivities: nil)
+        // Nur Dateioperationen: der Rückruf braucht keinen Hauptthread.
+        blatt.completionWithItemsHandler = { @Sendable _, _, _, _ in
+            try? FileManager.default.removeItem(at: datei.deletingLastPathComponent())
+        }
+        if let popover = blatt.popoverPresentationController {
+            popover.sourceView = webView
+            popover.sourceRect = CGRect(x: webView.bounds.midX, y: webView.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
+        oben.present(blatt, animated: true)
     }
 }
 

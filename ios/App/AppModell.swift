@@ -60,7 +60,8 @@ final class AppModell {
         dienste = Systemdienste(webView: { [weak self] in self?.webView }, anmelder: anmelder)
         empfang = Brueckenempfang(
             dienste: dienste, aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
-        navigation = Navigationsbegleiter { [weak self] webView, event in
+        navigation = Navigationsbegleiter(aktiverServer: { [weak self] in self?.liste.aktiv?.adresse }) {
+            [weak self] webView, event in
             // Meldungen eines schon verworfenen Webviews zählen nicht.
             guard let self, webView === self.webView else { return }
             self.send(event)

@@ -116,7 +116,7 @@ final class WebviewTests: XCTestCase {
 
     func testEinUnerreichbarerServerMeldetSeineFehlerklasse() async throws {
         var gemeldet: [Ablauf.Event] = []
-        let begleiter = Navigationsbegleiter { _, event in gemeldet.append(event) }
+        let begleiter = Navigationsbegleiter(aktiverServer: { nil }) { _, event in gemeldet.append(event) }
         let ziel = try ServerAdresse.parse("https://127.0.0.1:9")
         let web = Webviewfabrik.make(
             fuer: eintrag(ziel), skript: "",
