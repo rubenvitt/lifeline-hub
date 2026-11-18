@@ -11,6 +11,7 @@ import type {
 } from '../api/types';
 import { kraefteText, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
 import {
+  abgestelltVon,
   abschnittDerEinheit,
   besatzungText,
   detachAbgestellte,
@@ -430,12 +431,49 @@ export interface FilterWerte {
   suche: string;
 }
 
-export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
+/**
+ * Obereinheiten, unter denen ein Treffer im Baum hängt: die Kette über `ueber_einheit_id` bis zur
+ * ersten abgestellten Einheit (die löst sich und wird Wurzel, LLH-1744). Sie bleiben als Rahmen
+ * ohne eigene Mittel (Change `t3q2y33z-meldebild-schnellfilter`, design.md D3).
+ */
+function rahmenFuer(einheiten: readonly Einheit[], treffer: ReadonlySet<number>): Set<number> {
+  const nachId = new Map(einheiten.map((e) => [e.id, e]));
+  const abgestellt = abgestelltVon(einheiten);
+  const rahmen = new Set<number>();
+  for (const id of treffer) {
+    let cur = nachId.get(id);
+    while (cur && cur.ueber_einheit_id != null && !abgestellt(cur)) {
+      const eltern = nachId.get(cur.ueber_einheit_id);
+      if (!eltern || rahmen.has(eltern.id) || treffer.has(eltern.id)) break;
+      rahmen.add(eltern.id);
+      cur = eltern;
+    }
+  }
+  return rahmen;
+}
+
+/**
+ * Filtert die Kräfte des Meldebilds. `einheitTreffer` ist die Menge der Einheiten aus den Schaltern
+ * „ohne Auftrag“ und „Rückmeldung fehlt oder überfällig“ (`einheitenTreffer`, LLH-1792); `null`
+ * heißt kein Einheiten-Filter. Mit Treffermenge bleiben nur die Treffer mit ihren Mitteln, ihre
+ * Obereinheiten als Rahmen ohne eigene Mittel, und Mittel ohne Einheit fallen weg.
+ */
+export function filtereKraefte(
+  alles: Rohdaten,
+  f: FilterWerte,
+  einheitTreffer: ReadonlySet<number> | null = null,
+): Rohdaten {
   // Zuerst nur aktive Kräfte (LLH-1079): Meldebild, Statusband und Kumulierung zählen keine
   // Entlassenen, und eine Untereinheit einer aufgelösten Über-Einheit ist ihre eigene oberste.
+  const aktive = filterAktive(alles.einheiten);
+  const rahmen = einheitTreffer ? rahmenFuer(aktive, einheitTreffer) : new Set<number>();
+  const mittelEinheitOk = (einheit_id: number | null | undefined) =>
+    !einheitTreffer || (einheit_id != null && einheitTreffer.has(einheit_id));
   const roh: Rohdaten = {
     ...alles,
-    einheiten: filterAktive(alles.einheiten),
+    einheiten: einheitTreffer
+      ? aktive.filter((e) => einheitTreffer.has(e.id) || rahmen.has(e.id))
+      : aktive,
     personal: filterAktive(alles.personal),
   };
   const s = f.suche.trim().toLowerCase();
@@ -450,7 +488,8 @@ export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
     f.abschnittId == null || wirksamerAbschnitt.get(e.id)?.id === f.abschnittId;
   const erlaubteEinheiten = new Set(roh.einheiten.filter(einheitErlaubt).map((e) => e.id));
   const abschnittOk = (einheit_id: number | null | undefined) =>
-    f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id));
+    mittelEinheitOk(einheit_id) &&
+    (f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id)));
   const traegerOk = (traeger: string | null | undefined) => !f.traeger || traeger === f.traeger;
   const fahrzeugEinheit = new Map(roh.fahrzeuge.map((x) => [x.id, x.einheit_id ?? null]));
   const einheitDesOrts = (em: EinsatzMaterial): number | null => {

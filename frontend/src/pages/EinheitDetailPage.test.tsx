@@ -290,8 +290,8 @@ async function waehleImMenue(name: string, eintrag: string) {
 }
 
 const PANEELE = [
-  'Kopfdaten',
   'Fahrzeuge und Besatzung',
+  'Kopfdaten',
   'Zeitachse',
   'Material',
   'Funk',
@@ -337,7 +337,8 @@ describe('EinheitDetailPage · die Route selbst', () => {
     expect(feld).toHaveAttribute('maxLength', String(EINHEIT_NAME_MAX));
   });
 
-  it('die Paneele stehen in der Folge aus D2', async () => {
+  // LLH-1797: Fahrzeuge und Besatzung vor den Kopfdaten (Übernahme, wenn offen, bleibt darüber).
+  it('die Paneele stehen in der Folge aus D2, Besatzung vor den Kopfdaten (LLH-1797)', async () => {
     server.use(...handlers());
     rendere();
     await screen.findByRole('region', { name: 'Einheit auflösen oder stornieren' });
@@ -346,6 +347,36 @@ describe('EinheitDetailPage · die Route selbst', () => {
       .map((r) => r.querySelector('h2')?.textContent ?? '')
       .filter((t) => PANEELE.includes(t));
     expect(titel).toEqual(PANEELE);
+  });
+
+  it('die Gliederung springt zu jedem Paneel und setzt den Fokus dorthin (LLH-1797)', async () => {
+    const gerollt: Element[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      gerollt.push(this);
+    };
+    try {
+      server.use(...handlers());
+      rendere();
+      const gliederung = await screen.findByRole('navigation', { name: 'Gliederung' });
+      const spruenge = within(gliederung)
+        .getAllByRole('button')
+        .map((b) => b.textContent);
+      expect(spruenge).toEqual([
+        'Fahrzeuge und Besatzung',
+        'Kopfdaten',
+        'Zeitachse',
+        'Material',
+        'Funk',
+        'Taktisches Zeichen',
+      ]);
+      await userEvent.click(within(gliederung).getByRole('button', { name: 'Material' }));
+      const ziel = document.activeElement as HTMLElement;
+      expect(ziel).toContainElement(screen.getByRole('region', { name: 'Material' }));
+      expect(gerollt).toEqual([ziel]);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
   });
 
   it('eine unbekannte Einheiten-Kennung meldet das und führt zurück, statt einen Ausfall zu behaupten', async () => {
@@ -1469,10 +1500,10 @@ function BoardMitKarte() {
  * `nvhnqynd-konflikt-und-aenderungsvermerk`).
  */
 describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () => {
-  function casServer(geladen: Record<string, unknown>) {
+  function casServer(geladen: Record<string, unknown>, pfad = '/api/einsaetze/1/einheiten/10') {
     const anfragen: Record<string, unknown>[] = [];
     let stand = { ...geladen };
-    const handler = http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
+    const handler = http.patch(pfad, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       anfragen.push(body);
       const erwartet = (body.erwartet ?? {}) as Record<string, unknown>;
@@ -1513,6 +1544,30 @@ describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () =>
     await userEvent.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
     await waitFor(() => expect(cas.anfragen).toHaveLength(2));
     expect(cas.anfragen[1]).toEqual({ bemerkung: 'Halle 2' });
+  });
+
+  it('Zeichen (LLH-1945): Altwert beim Öffnen geht mit; verworfen bleibt das fremde Zeichen', async () => {
+    const cas = casServer(
+      { ...einheiten[0], tz_organisation: null },
+      '/api/einsaetze/1/einheiten/10/position',
+    );
+    zeige(cas.liste, cas.handler);
+    await userEvent.click(await screen.findByRole('button', { name: 'Organisation eintragen' }));
+    cas.fremdAendern({ tz_organisation: 'feuerwehr' });
+    await userEvent.click(screen.getByRole('combobox', { name: 'Organisation' }));
+    await userEvent.click(await screen.findByTitle('THW'));
+    await userEvent.click(screen.getByRole('button', { name: 'Organisation speichern' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Organisation inzwischen: „Feuerwehr“');
+    expect(cas.anfragen[0]).toEqual({
+      tz_organisation: 'thw',
+      erwartet: { tz_organisation: null },
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Organisation speichern' })).toBeNull(),
+    );
+    expect(cas.anfragen).toHaveLength(1);
   });
 
   it('Vermerk an der Zeile und der jüngste im Paneelkopf', async () => {

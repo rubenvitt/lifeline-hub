@@ -4,6 +4,9 @@ import { antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
 import {
   DREI_SPALTEN_SOCKEL,
   dreiSpaltenPassen,
+  EINPASS_MAX,
+  einpassFaktor,
+  grundrissInhalt,
   markenZielStil,
   seitlicherUeberlauf,
 } from './grundrissLayout';
@@ -98,5 +101,63 @@ describe('markenZielStil — Trefffläche der Personenmarke in Listen (LFH-970)'
     const stil = markenZielStil(token('kompakt'));
     expect(stil.flex).toBe('1 1 auto');
     expect(stil.minWidth).toBe(0);
+  });
+});
+
+describe('grundrissInhalt — Hülle aus Plätzen und Plan in Grundmaßen (LLH-1940)', () => {
+  it('reicht einen Rasterschritt hinter die letzte Karte', () => {
+    // Vier Plätze in einer Reihe, wie `raster_position` sie vergibt: x = 10, 170, 330, 490.
+    const plaetze = [10, 170, 330, 490].map((x) => ({ pos_x: x, pos_y: 10 }));
+    expect(grundrissInhalt(plaetze, null)).toEqual({ breite: 650, hoehe: 150 });
+  });
+
+  it('zählt den Plan mit, wenn er über die Plätze hinausragt', () => {
+    const plaetze = [{ pos_x: 10, pos_y: 10 }];
+    expect(grundrissInhalt(plaetze, { x: 0, y: 20, breite: 900, hoehe: 400 })).toEqual({
+      breite: 900,
+      hoehe: 420,
+    });
+  });
+
+  it('setzt einen Platz ohne Lage dorthin, wo die Karte ihn zeichnet (10, 10)', () => {
+    expect(grundrissInhalt([{ pos_x: null, pos_y: null }], null)).toEqual({
+      breite: 170,
+      hoehe: 150,
+    });
+  });
+
+  it('ist ohne Plätze und Plan leer — die Mindestfläche zählt nicht zum Inhalt', () => {
+    expect(grundrissInhalt([], null)).toEqual({ breite: 0, hoehe: 0 });
+  });
+});
+
+describe('einpassFaktor — Streckung der Fläche (LLH-1940)', () => {
+  it('deckelt bei 2', () => {
+    expect(EINPASS_MAX).toBe(2);
+    expect(
+      einpassFaktor({ sichtBreite: 2000, sichtHoehe: 1000, inhaltBreite: 650, inhaltHoehe: 150 }),
+    ).toBe(2);
+  });
+
+  it('bleibt bei 1, wenn der Inhalt nicht passt', () => {
+    expect(
+      einpassFaktor({ sichtBreite: 600, sichtHoehe: 1000, inhaltBreite: 650, inhaltHoehe: 150 }),
+    ).toBe(1);
+  });
+
+  it('nimmt die engere Achse und rundet ab, damit nichts überläuft', () => {
+    // 1124 / 650 = 1,729…, 552 / 290 = 1,903… → die Breite entscheidet, abgerundet 1,72.
+    expect(
+      einpassFaktor({ sichtBreite: 1124, sichtHoehe: 552, inhaltBreite: 650, inhaltHoehe: 290 }),
+    ).toBe(1.72);
+  });
+
+  it('gibt 1 bei unbekannter Sicht oder leerem Inhalt', () => {
+    expect(
+      einpassFaktor({ sichtBreite: 0, sichtHoehe: 0, inhaltBreite: 650, inhaltHoehe: 150 }),
+    ).toBe(1);
+    expect(
+      einpassFaktor({ sichtBreite: 1000, sichtHoehe: 800, inhaltBreite: 0, inhaltHoehe: 0 }),
+    ).toBe(1);
   });
 });

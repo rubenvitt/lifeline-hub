@@ -83,7 +83,9 @@ hat.
 
 2. Die Fläche zeigt jeden Platz mit seiner Verfügbarkeit („frei“, „belegt“, „in Aufbereitung“,
    „defekt“, „gesperrt“) und dem Patienten darauf. Jede Patientenmarke trägt vorn die Sichtung
-   als Farbfeld mit Kategorie, etwa „SK I“; „—“ heißt ungesichtet.
+   als Farbfeld mit Kategorie, etwa „SK I“; „—“ heißt ungesichtet. Ist die Fläche größer als der
+   Grundriss, wachsen Plätze, Abstände und Plan gemeinsam mit, bis auf das Doppelte; die
+   gespeicherte Lage der Plätze bleibt dabei gleich.
 3. „Wartebereich“ zeigt, wer in der Stelle auf einen Platz wartet („Wartebereich (Eingang)“), und
    wer noch keiner Stelle zugeordnet ist („Noch nicht aufgenommen“). Jede Person steht in zwei
    Zeilen: oben Sichtung, Registriernummer und Name, darunter „wartet … min“ bzw. „erfasst vor …

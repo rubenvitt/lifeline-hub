@@ -151,8 +151,9 @@ Für die Einsatzleitung:
   gespeichert hat. Wer eine Zeile verlässt, ohne zu speichern, behält den alten Wert.
 - Hat eine andere Person **dieselbe** Angabe seit dem Öffnen geändert, speichert die App nicht
   still darüber, sondern fragt nach (Ablauf „Eine Angabe ändern“). Das gilt für die Kopfdaten,
-  den Einsatzort und die eigene Führungsstelle, auch für den Einsatzleiter: zwei gleichzeitige
-  Übergaben ergeben nur einen Eintrag im Einsatztagebuch.
+  den Einsatzort, Zeitpunkt und Bezeichnung eines Programmpunkts und die eigene Führungsstelle,
+  auch für den Einsatzleiter: zwei gleichzeitige Übergaben ergeben nur einen Eintrag im
+  Einsatztagebuch.
 - Unter jeder geänderten Angabe steht leise, wer sie zuletzt geändert hat und wann („Geändert von
   …“), im Kopf jedes Paneels die jüngste Änderung („Zuletzt geändert von …“). Eine Angabe, die seit
   dem Anlegen niemand geändert hat, trägt keinen Vermerk.

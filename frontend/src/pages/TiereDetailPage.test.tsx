@@ -141,6 +141,33 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(screen.getByText('Weide')).toBeInTheDocument();
   });
 
+  // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
+  it.each(['/tiere/10', ''] as const)(
+    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite und offene Eingabe bleiben, Hinweis zeigt den alten Stand',
+    async (unterpfad) => {
+      const { client } = render(einsatzAktiv, tierBasis);
+      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      const feld = screen.getByRole('textbox', { name: 'Notiz' });
+      await userEvent.clear(feld);
+      await userEvent.type(feld, 'Halsband rot');
+
+      server.use(
+        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Notiz' })).toHaveValue('Halsband rot');
+      expect(screen.queryByText('Tier konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
+
   it('Einsatzleitung kann bearbeiten und speichern (ohne Halter → beide null)', async () => {
     // Edit-Modus öffnen, das vorbefüllte Formular direkt speichern und den PATCH prüfen.
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } | null = null;

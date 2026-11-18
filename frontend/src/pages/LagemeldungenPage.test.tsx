@@ -9,6 +9,7 @@ import type { LageMeldung } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { setzeOnline } from '../test/utils';
 import { freigabenFixture } from '../test/fixtures';
+import { waehle } from '../test/auswahlListe';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 // `useAuthOptional`: die Marke „berichtigt“ fragt, ob ein Gerät angemeldet ist (LLH-1382).
@@ -216,13 +217,13 @@ describe('LagemeldungenPage', () => {
     ]);
     renderPage();
     await screen.findByText('Ohne Ort');
-    const ort = screen.getByRole('radiogroup', { name: 'Ort' });
-    await userEvent.click(within(ort).getByRole('radio', { name: 'Mit Koordinaten' }));
+    // Keine Segmentleiste: „Ort“ und „Herkunft“ schränken nur ein (Spec `bedien-umschalten`, LLH-1942).
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+    await waehle('Ort', 'Mit Koordinaten');
     expect(screen.queryByText('Ohne Ort')).toBeNull();
     expect(screen.getByText('Mit Ort')).toBeInTheDocument();
-    expect(within(ort).getByRole('radio', { name: 'Mit Koordinaten' })).toHaveAttribute(
-      'aria-checked',
-      'true',
+    expect(screen.getByRole('combobox', { name: 'Ort' }).closest('.ant-select')).toHaveTextContent(
+      'Mit Koordinaten',
     );
   });
 
@@ -725,12 +726,11 @@ describe('LagemeldungenPage', () => {
       renderPage();
       await screen.findByText('Vom Tablet');
       expect(screen.getByText('2 Lagemeldungen')).toBeInTheDocument();
-      const herkunft = screen.getByRole('radiogroup', { name: 'Herkunft' });
-      await userEvent.click(within(herkunft).getByRole('radio', { name: 'Übernommen' }));
+      await waehle('Herkunft', 'Übernommen');
       expect(screen.queryByText('Vom Tablet')).toBeNull();
       expect(screen.getByText('Übernommen', { selector: 'li *' })).toBeInTheDocument();
       expect(screen.getByText('1 von 2 Lagemeldungen')).toBeInTheDocument();
-      await userEvent.click(within(herkunft).getByRole('radio', { name: 'Gerät' }));
+      await waehle('Herkunft', 'Gerät');
       expect(screen.getByText('Vom Tablet')).toBeInTheDocument();
     });
   });
@@ -791,8 +791,7 @@ describe('LagemeldungenPage', () => {
       await screen.findByText('Jüngste');
       await userEvent.click(screen.getByRole('button', { name: 'Alle als gesehen markieren' }));
       expect(markLageMeldungenGesehen).toHaveBeenLastCalledWith(1, [4, 9]);
-      const ort = screen.getByRole('radiogroup', { name: 'Ort' });
-      await userEvent.click(within(ort).getByRole('radio', { name: 'Mit Koordinaten' }));
+      await waehle('Ort', 'Mit Koordinaten');
       await userEvent.click(screen.getByRole('button', { name: 'Alle als gesehen markieren' }));
       expect(markLageMeldungenGesehen).toHaveBeenLastCalledWith(1, [9]);
     });
