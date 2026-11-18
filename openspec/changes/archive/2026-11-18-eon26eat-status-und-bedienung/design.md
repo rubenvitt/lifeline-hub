@@ -147,7 +147,7 @@ Kopf (gemessen 450 px). Deshalb die dritte Spalte; zwei Spalten reichen in jedem
 ### D8 — Rücknahme im Server
 
 **Der Server hält den Vorzustand selbst.** Bei jedem echten Wechsel schreibt `update_tx` vier
-Spalten an `einsatz_fahrzeug` (Migration 0355): `status_gesetzt_von` (wer), `status_vorher_id` und
+Spalten an `einsatz_fahrzeug` (Migration 0356): `status_gesetzt_von` (wer), `status_vorher_id` und
 `status_vorher_seit` (was davor galt) und, nach dem Zeitachsen-Schreiben, `status_ereignis_id`
 (das Ereignis dieses Wechsels; `einheit_ereignis` gibt dafür seine id zurück). Einträge in
 `einsatz/schwaerzung_registry.rs`; der Spiegel braucht nichts (ADD COLUMN).
