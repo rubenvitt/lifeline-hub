@@ -38,9 +38,11 @@
 
 /* Links in der BEDIENFARBE, nicht im Akzent (Neuentwurf, 21.09.2026): `--lfh-marke` liegt
    nachts bei 2,57 : 1 auf dem Grund und ist rot — ein Link ist ein Bedienziel, und Rot
-   bedient nichts. Der Akzent bleibt der dekorativen Zitatkante vorbehalten. */
+   bedient nichts. Der Akzent bleibt der dekorativen Zitatkante vorbehalten. Als Text trägt der
+   Link die Textrolle `bedien-text` wie antds Linkfarbe (LFH-652): `bedien` lag am Tag auf `grund`
+   (seit LLH-1720 `#e6e7e9`, Druckvorschau des ETB) bei 6,91 : 1. */
 .markdown a {
-  color: var(--lfh-bedien);
+  color: var(--lfh-bedien-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
