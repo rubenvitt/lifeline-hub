@@ -30,7 +30,7 @@ https://zunder.rubeen.dev/#/aufgabe/t3q2y33zhnvqykd2of5j4oh8
   Vermerk entfällt (D7); Auswahlzeile zählt Treffer. Nachweis: Seitentests grün für Szenarien
   „Einheiten ohne Auftrag“, „Untereinheit trifft“, „Aufträge nicht lesbar“, „Rückmeldungen fallen
   aus“.
-- [ ] 3.3 Anwenderdoku `docs/anwender/kapitel/meldebild.md`, Abschnitt Filtern: beide Schalter,
+- [x] 3.3 Anwenderdoku `docs/anwender/kapitel/meldebild.md`, Abschnitt Filtern: beide Schalter,
   Rahmen-Obereinheit, deaktivierter Zustand. Nachweis: Wächter der Anwenderdoku im Gate grün.
 
 ## 4. Abschluss
