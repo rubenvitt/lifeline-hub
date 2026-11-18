@@ -36,5 +36,5 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 
 - [x] 4.1 Verweise nachziehen: Regel „Großbild“ in `lagebesprechung/AGENTS.md` (keine Alarmzeile)
   und Liste der Bausteine in `frontend/AGENTS.md` (`AlarmZeile` auch im Großbild des Lagebilds).
-- [ ] 4.2 `./scripts/check-all.sh --geaendert --ohne-e2e` und das e2e `grossbild.spec.ts` lokal
+- [x] 4.2 `./scripts/check-all.sh --geaendert --ohne-e2e` und das e2e `grossbild.spec.ts` lokal
   grün; Bilder der Änderung (1920 × 1080 und 1280 × 720) für PR und Meldung.
