@@ -81,13 +81,14 @@ dasselbe Wort „unbestätigt“ stehen, nie „nicht beurteilt“.
 ### Requirement: Lagebild und Überblick nennen nicht beurteilte Gebiete
 Das Paneel „Gefahren“ im Lagebild SHALL je gesetzter Gefahr (Stufe über „keine“ oder mit
 Erläuterung) die höchste Stufe zeigen und in seinem Fuß die unbestätigten Gebiete nennen: bis zwei
-mit Namen („<Gebiet>: unbestätigt“), mehr als zwei als Zahl („<n> Gebiete unbestätigt“). Die
-Kennzahl „Warnstufe“ im Überblick SHALL in ihrer Notiz die Zahl unbestätigter Gebiete nennen
-(„<n> unbestätigt“), wenn sie größer als null ist.
+mit Namen („<Gebiet>: unbestätigt“), mehr als zwei als Zahl („<n> Gebiete unbestätigt“). Der
+Seitenkopf des Überblicks SHALL neben dem Hinweis auf die Warnstufe die Zahl unbestätigter
+Gebiete nennen („<n> unbestätigt“), wenn sie größer als null ist, auch wenn kein Hinweis auf die
+Warnstufe steht.
 
 #### Scenario: Ein Gebiet nicht beurteilt
 - **WHEN** ein Einsatz zwei Gefahrengebiete hat und nur eines bestätigt ist
-- **THEN** nennt der Fuß des Paneels „Gefahren“ das andere Gebiet mit „: unbestätigt“, und die Notiz der Kennzahl „Warnstufe“ nennt „1 unbestätigt“
+- **THEN** nennt der Fuß des Paneels „Gefahren“ das andere Gebiet mit „: unbestätigt“, und der Seitenkopf des Überblicks nennt „1 unbestätigt“
 
 #### Scenario: Drei Gebiete offen
 - **WHEN** drei Gefahrengebiete unbestätigt sind

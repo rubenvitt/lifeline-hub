@@ -5,6 +5,7 @@ import deDE from 'antd/locale/de_DE';
 import {
   antdKaestchen,
   antdKlappkopf,
+  antdHinweis,
   antdKnopf,
   antdOptionsknopf,
   antdThema,
@@ -166,6 +167,7 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
   const klappkopf = useMemo(() => antdKlappkopf(dichte), [dichte]);
   const kaestchen = useMemo(() => antdKaestchen(dichte), [dichte]);
   const optionsknopf = useMemo(() => antdOptionsknopf(dichte), [dichte]);
+  const hinweis = useMemo(() => antdHinweis(dichte), [dichte]);
 
   const wert = useMemo<ThemeModeWert>(
     () => ({
@@ -209,6 +211,9 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
         checkbox={kaestchen}
         // Boden des beschrifteten Optionsknopfs (LFH-1048): gebaut wie das Kästchen-Label.
         radio={optionsknopf}
+        // Boden des Schließen-Kreuzes jedes Hinweises (LLH-1798): antd zeichnet es in jeder Stufe
+        // 12 × 14 px, ohne Komponenten-Token für seine Größe.
+        alert={hinweis}
         // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
         // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine
         // Steuerhöhe mit, sonst rechnete antd sie unter den Boden aus A1 Gate 3. Nachts hält
@@ -223,24 +228,48 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Ein fester Modus ohne Speicher, Medienabfrage und Umschalten, für die Vorschauen des Design
+ * Systems (d78gipem D5): dort stehen Nacht und Tag untereinander, jeder Abschnitt braucht seinen
+ * eigenen Modus. Ohne ihn lesen Bausteine mit `useModusFarben` im Tag-Abschnitt die Nacht-Rollen
+ * der Vorgabe. Den antd-Provider setzt der Aufrufer selbst; die App nimmt {@link ThemeModeProvider}.
+ */
+export function ThemeModusFest({
+  effektiv,
+  dichte,
+  children,
+}: {
+  effektiv: EffektivesTheme;
+  dichte: Dichte;
+  children: ReactNode;
+}) {
+  const wert = useMemo<ThemeModeWert>(
+    () => ({ ...THEME_MODE_VORGABE, modus: effektiv, effektiv, dichte }),
+    [effektiv, dichte],
+  );
+  return <ThemeModeContext.Provider value={wert}>{children}</ThemeModeContext.Provider>;
+}
+
+/** Der Wert außerhalb jedes Providers: Nacht, wie die App startet, und nichts schaltet. */
+const THEME_MODE_VORGABE: ThemeModeWert = {
+  modus: MODUS_DEFAULT,
+  effektiv: 'dark',
+  setModus: () => {},
+  dichte: DICHTE_DEFAULT,
+  setDichte: () => {},
+  helligkeit: HELLIGKEIT_DEFAULT,
+  setHelligkeit: () => {},
+  helligkeitWirksam: HELLIGKEIT_DEFAULT,
+  warnungAktiv: false,
+  meldeWarnung: () => {},
+};
+
+/**
  * Liefert den aktuellen Theme-Modus. Außerhalb des Providers (z. B. in isolierten Tests) wird
  * die Vorgabe `dark` zurückgegeben statt zu werfen, dieselbe, mit der die App startet.
  */
 export function useThemeMode(): ThemeModeWert {
   const wert = useContext(ThemeModeContext);
-  if (wert) return wert;
-  return {
-    modus: MODUS_DEFAULT,
-    effektiv: 'dark',
-    setModus: () => {},
-    dichte: DICHTE_DEFAULT,
-    setDichte: () => {},
-    helligkeit: HELLIGKEIT_DEFAULT,
-    setHelligkeit: () => {},
-    helligkeitWirksam: HELLIGKEIT_DEFAULT,
-    warnungAktiv: false,
-    meldeWarnung: () => {},
-  };
+  return wert ?? THEME_MODE_VORGABE;
 }
 
 /**
