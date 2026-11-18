@@ -22,16 +22,41 @@ enum Webviewfabrik {
             WKUserScript(source: skript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         // Der Controller hält seinen Handler stark; die Weiche bricht den Kreis zum Modell.
         inhalt.add(SchwacherEmpfang(empfang), name: Bruecke.handlerName)
+        // Natives Gefühl (D6): keine Lupe und kein Textmenü außerhalb von Eingaben.
+        inhalt.addUserScript(
+            WKUserScript(
+                source: Huellenstil.skript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let konfiguration = WKWebViewConfiguration()
         konfiguration.websiteDataStore = WKWebsiteDataStore(forIdentifier: eintrag.id)
         konfiguration.userContentController = inhalt
         let webView = WKWebView(frame: .zero, configuration: konfiguration)
+        fuehlNativ(webView)
         webView.navigationDelegate = navigation
         webView.uiDelegate = navigation as? WKUIDelegate
         #if DEBUG
             webView.isInspectable = true
         #endif
         return webView
+    }
+
+    /// Natives Gefühl (Entwurf D6; Spec `ios-huelle`, „Die Oberfläche fühlt sich nativ an“): der
+    /// Webview liegt in der Safe Area (`WebviewHost` ignoriert sie nicht), also rechnet die
+    /// Scroll-Ansicht keine Ränder mehr hinzu; kein Nachfedern, kein Ziehen zum Neuladen, keine
+    /// Linkvorschau. Hintergrund in Kopf-Schwarz, damit vor dem ersten Bild nichts weiß aufblitzt.
+    static func fuehlNativ(_ webView: WKWebView) {
+        let kopfschwarz = UIColor(named: "Kopfschwarz") ?? .black
+        webView.isOpaque = false
+        webView.backgroundColor = kopfschwarz
+        webView.underPageBackgroundColor = kopfschwarz
+        webView.allowsLinkPreview = false
+        webView.allowsBackForwardNavigationGestures = false
+        let scroll = webView.scrollView
+        scroll.backgroundColor = kopfschwarz
+        scroll.contentInsetAdjustmentBehavior = .never
+        scroll.bounces = false
+        scroll.alwaysBounceVertical = false
+        scroll.alwaysBounceHorizontal = false
+        scroll.refreshControl = nil
     }
 
     /// Das Init-Skript aus den Ressourcen der App mit eingesetzter Version.

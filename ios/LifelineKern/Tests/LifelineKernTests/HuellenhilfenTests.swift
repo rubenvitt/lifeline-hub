@@ -33,7 +33,10 @@ final class HuellenhilfenTests: XCTestCase {
     func testJedeNativeSeiteHatEinenTestzustand() {
         XCTAssertEqual(
             Set(Testzustand.allCases.map(\.rawValue)),
-            ["onboarding", "serverliste", "einstellungen", "zertifikat", "nicht-erreichbar", "zu-alt", "zu-neu"])
+            [
+                "onboarding", "serverliste", "einstellungen", "zertifikat", "nicht-erreichbar", "zu-alt",
+                "zu-neu", "web",
+            ])
     }
 
     // MARK: QR-Code

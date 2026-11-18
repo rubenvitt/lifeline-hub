@@ -35,9 +35,38 @@ final class WebviewTests: XCTestCase {
             fuer: eintrag(elw), skript: skript,
             empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }), navigation: nil)
         let skripte = web.configuration.userContentController.userScripts
-        XCTAssertEqual(skripte.count, 1)
-        XCTAssertEqual(skripte.first?.injectionTime, .atDocumentStart)
-        XCTAssertEqual(skripte.first?.isForMainFrameOnly, true)
+        XCTAssertEqual(skripte.map(\.source), [skript, Huellenstil.skript])
+        XCTAssertTrue(skripte.allSatisfy { $0.injectionTime == .atDocumentStart })
+        XCTAssertTrue(skripte.allSatisfy(\.isForMainFrameOnly))
+    }
+
+    /// tasks.md 8.10: kein Nachfedern, kein Pull-to-Refresh, keine Linkvorschau, Ränder nur über
+    /// die Safe Area der Ansicht.
+    func testDerWebviewFuehltSichNativAn() {
+        let web = Webviewfabrik.make(
+            fuer: eintrag(elw), skript: "",
+            empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }), navigation: nil)
+        XCTAssertFalse(web.scrollView.bounces)
+        XCTAssertFalse(web.scrollView.alwaysBounceVertical)
+        XCTAssertNil(web.scrollView.refreshControl)
+        XCTAssertEqual(web.scrollView.contentInsetAdjustmentBehavior, .never)
+        XCTAssertFalse(web.allowsLinkPreview)
+        XCTAssertFalse(web.isOpaque)
+        XCTAssertEqual(web.underPageBackgroundColor, UIColor(named: "Kopfschwarz"))
+    }
+
+    func testDerStilDerHuelleSperrtDieAuswahlNurAusserhalbVonEingaben() async throws {
+        let (web, _, _) = try await lade(basis: elw.url, aktiv: elw, html: """
+            <p id="text">Text</p><input id="eingabe" value="x">
+            """)
+        let stil = { (id: String) async throws -> String? in
+            try await web.evaluateJavaScript(
+                "getComputedStyle(document.getElementById('\(id)')).webkitUserSelect") as? String
+        }
+        let text = try await stil("text")
+        let eingabe = try await stil("eingabe")
+        XCTAssertEqual(text, "none")
+        XCTAssertEqual(eingabe, "text")
     }
 
     // MARK: Brücke im echten Webview

@@ -38,6 +38,8 @@ public enum Testzustand: String, CaseIterable, Sendable {
     case nichtErreichbar = "nicht-erreichbar"
     case zuAlt = "zu-alt"
     case zuNeu = "zu-neu"
+    /// Der Webview mit `beispielseite` unter der Adresse des Beispielservers (natives Gefühl).
+    case web
 
     public static let argument = "-LifelineTestzustand"
 

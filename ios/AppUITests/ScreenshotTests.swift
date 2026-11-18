@@ -124,6 +124,34 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(element(app, "status-nicht-erreichbar").waitForExistence(timeout: 5))
     }
 
+    /// Natives Gefühl (tasks.md 8.10; Spec `ios-huelle`, „Die Oberfläche fühlt sich nativ an“):
+    /// Webview in der Safe Area, kein Nachfedern und kein Neuladen beim Ziehen, keine Lupe und kein
+    /// Textmenü bei langer Berührung außerhalb von Eingaben. Die Seite ist
+    /// `Testzustand.beispielseite`, geladen ohne Netz.
+    @MainActor
+    func testDieWebansichtFuehltSichNativAn() {
+        let app = launch("web")
+        let web = app.webViews.firstMatch
+        XCTAssertTrue(web.waitForExistence(timeout: 15))
+        let text = web.staticTexts["Lange Berührung auf diesem Text zeigt weder Lupe noch Textmenü."]
+        XCTAssertTrue(text.waitForExistence(timeout: 10))
+        // Safe Area: der Webview beginnt unter der Statusleiste, nicht am oberen Bildschirmrand.
+        XCTAssertGreaterThan(web.frame.minY, 0)
+        attachScreenshot(named: "web")
+
+        let vorher = text.frame
+        web.swipeDown(velocity: .fast)
+        XCTAssertEqual(text.frame.minY, vorher.minY, accuracy: 1, "die Seite federt nach")
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "Ziehen lädt neu")
+
+        text.press(forDuration: 1.5)
+        XCTAssertFalse(app.menuItems.firstMatch.waitForExistence(timeout: 2), "Textmenü erscheint")
+        for befehl in ["Copy", "Kopieren", "Look Up", "Nachschlagen"] {
+            XCTAssertFalse(app.buttons[befehl].exists, befehl)
+        }
+        attachScreenshot(named: "web-lange-beruehrung")
+    }
+
     @MainActor
     private func launch(_ testzustand: String) -> XCUIApplication {
         let app = XCUIApplication()

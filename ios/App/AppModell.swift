@@ -44,10 +44,9 @@ final class AppModell {
     ) {
         appVersion = AppVersion(info: info)
         testzustand = Testzustand(argumente: argumente)
-        if let testzustand {
+        if testzustand != nil {
             ablage = nil
             liste = Self.beispielliste()
-            zeige(testzustand)
         } else {
             let ablage = Serverablage(
                 verzeichnis: URL.applicationSupportDirectory.appendingPathComponent("Lifeline"))
@@ -66,6 +65,8 @@ final class AppModell {
             guard let self, webView === self.webView else { return }
             self.send(event)
         }
+        // Erst jetzt: der Testzustand `web` braucht Brücke und Begleiter.
+        if let testzustand { zeige(testzustand) }
     }
 
     // MARK: Ablauf
@@ -264,6 +265,13 @@ final class AppModell {
             seite = .status(elw, .nichtVertraeglich(.zuAlt, serverVersion: "1.0.0-alpha.200"))
         case .zuNeu:
             seite = .status(elw, .nichtVertraeglich(.zuNeu, serverVersion: "2.0.0"))
+        case .web:
+            let webView = Webviewfabrik.make(
+                fuer: elw, skript: Webviewfabrik.initskript(version: appVersion?.fullVersion),
+                empfang: empfang, navigation: navigation)
+            webView.loadHTMLString(Testzustand.beispielseite, baseURL: elw.adresse.url)
+            self.webView = webView
+            seite = .web(elw, vertrag: 1)
         }
     }
 }
