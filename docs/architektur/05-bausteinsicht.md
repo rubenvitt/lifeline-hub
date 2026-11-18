@@ -421,7 +421,7 @@ das Laden des Servers; `kanal.rs` und `update.rs` Update-Kanal und Updater. Die 
 
 ### `ios`
 
-Die iOS-Hülle (LLH-1978, ADR-0067), Regeln in [ios/AGENTS.md](../../ios/AGENTS.md). `ios/LifelineKern` ist ein Swift-Paket
+Die iOS-Hülle (LLH-1978, ADR-0068), Regeln in [ios/AGENTS.md](../../ios/AGENTS.md). `ios/LifelineKern` ist ein Swift-Paket
 ohne UIKit und WebKit (`ios/LifelineKern/Package.swift`): Adressprüfung (`Adresse.swift`),
 Deeplink (`Deeplink.swift`), Linkregeln (`Linkregeln.swift`), Serverliste (`Serverliste.swift`),
 Vertragsprüfung gegen `GET /api/shell` (`Vertrag.swift`), Onboarding (`Onboarding.swift`) und

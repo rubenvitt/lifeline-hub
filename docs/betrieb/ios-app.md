@@ -1,7 +1,7 @@
 # Betrieb: iOS-App (iPhone, iPad)
 
 Die iOS-App „Lifeline“ ist eine **Hülle** um die Webanwendung (LLH-1978,
-[ADR-0067](../architektur/entscheidungen/ADR-0067-die-ios-huelle-ist-eine-eigene-swift-app-ohne-anwendungslogik-die-die-serveroberflaeche-laedt.md)).
+[ADR-0068](../architektur/entscheidungen/ADR-0068-die-ios-huelle-ist-eine-eigene-swift-app-ohne-anwendungslogik-die-die-serveroberflaeche-laedt.md)).
 Sie lädt die https-Adresse des Einsatzservers in einen Webview, wie die
 [Desktop-App](desktop-app.md). Anwendung, Daten und Anmeldung liegen auf dem Server. Die Hülle
 bringt das Onboarding, eine Serverliste mit einem eigenen Datenspeicher je Server, native
