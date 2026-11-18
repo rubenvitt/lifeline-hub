@@ -31,8 +31,9 @@ pub const BREITE_MIN: i64 = 100;
 pub const BREITE_MAX: i64 = 5_000;
 pub const VERSATZ_MAX: i64 = 10_000;
 
-/// Kartengröße einer Platzkarte (`Grundriss.tsx`, `PLATZ_KARTE_BREITE`/`_HOEHE`) — der Rahmen,
-/// den die Startlage überdecken muss.
+/// Grundgröße einer Platzkarte (`Grundriss.tsx`, `PLATZ_KARTE_BREITE`/`_HOEHE`) — der Rahmen,
+/// den die Startlage überdecken muss. Der Client streckt Karten und Plan gemeinsam (LLH-1940);
+/// hier zählen die Maße des Rasters.
 pub const KARTE_BREITE: i64 = 140;
 pub const KARTE_HOEHE: i64 = 116;
 

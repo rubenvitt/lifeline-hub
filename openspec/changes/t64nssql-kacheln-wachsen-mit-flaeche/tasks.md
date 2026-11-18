@@ -4,7 +4,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/t64nssql5sboyz6yh03bdptn
 
 ## 1. Einpassfaktor rechnen
 
-- [ ] 1.1 `einpassFaktor` und `grundrissInhalt` (Hülle aus Plätzen und Plan in Grundmaßen) in
+- [x] 1.1 `einpassFaktor` und `grundrissInhalt` (Hülle aus Plätzen und Plan in Grundmaßen) in
   `frontend/src/pages/uhs/grundrissLayout.ts` per TDD anlegen (design.md D1); Tests in
   `grundrissLayout.test.ts` für: leere Fläche → 2, volle Fläche → 1, dazwischen abgerundet auf
   zwei Stellen, Maß 0 oder kein Platz → 1, Plan erweitert die Hülle, Mindestfläche 700 × 420
@@ -13,18 +13,18 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/t64nssql5sboyz6yh03bdptn
 
 ## 2. Grundriss streckt
 
-- [ ] 2.1 `flaecheMessen` misst zusätzlich `clientWidth`/`clientHeight` des Bildlauf-Containers;
+- [x] 2.1 `flaecheMessen` misst zusätzlich `clientWidth`/`clientHeight` des Bildlauf-Containers;
   der Grundriss bildet daraus `s` und hält ihn während eines Zugs fest (D2, D4). Nachweis:
   Vitest-Test in `Grundriss.test.tsx` mit gestubbtem `ResizeObserver`/`clientWidth`, der eine
   doppelt so große Karte und Position erwartet, rot → grün.
-- [ ] 2.2 `PlatzKarte` und `PlanEbene` bekommen `s`: `left`/`top`, Breite und Höhe der Karte, Lage,
+- [x] 2.2 `PlatzKarte` und `PlanEbene` bekommen `s`: `left`/`top`, Breite und Höhe der Karte, Lage,
   Breite und Höhe des Plans und die Innenfläche werden gestreckt, Rand, Polster und Inhalt nicht
   (D3). Nachweis: Test aus 2.1 und ein Test für die Planlage grün; bestehende Grundriss-Tests
   bleiben grün.
-- [ ] 2.3 `onDragEnd` rechnet die Zugstrecke mit `1/s` gerundet zurück (D4). Nachweis: Test, der
+- [x] 2.3 `onDragEnd` rechnet die Zugstrecke mit `1/s` gerundet zurück (D4). Nachweis: Test, der
   bei `s = 2` einen Tastatur- oder gestubbten Zug um 200 px auslöst und `pos_x + 100` an
   `aktualisierePlatz` erwartet, rot → grün.
-- [ ] 2.4 Kommentare an `PLATZ_KARTE_*`, am Hinweis „feste 140 × 116 px“ über der Fläche und in
+- [x] 2.4 Kommentare an `PLATZ_KARTE_*`, am Hinweis „feste 140 × 116 px“ über der Fläche und in
   `src/uhs/plan.rs` (`KARTE_BREITE`/`_HOEHE`) auf „Grundgröße“ nachziehen (D6). Nachweis:
   `grep -n "feste 140" frontend/src/pages/uhs/Grundriss.tsx` leer.
 
