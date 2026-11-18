@@ -9,9 +9,11 @@ import WebKit
 @MainActor
 final class Systemdienste: Huellendienste {
     private let webView: @MainActor () -> WKWebView?
+    private let anmelder: Anmelder
 
-    init(webView: @escaping @MainActor () -> WKWebView?) {
+    init(webView: @escaping @MainActor () -> WKWebView?, anmelder: Anmelder) {
         self.webView = webView
+        self.anmelder = anmelder
     }
 
     var isHaptikEnabled: Bool {
@@ -69,6 +71,8 @@ final class Systemdienste: Huellendienste {
         }
         return try ergebnis.get()
     }
+
+    func startAnmeldung() throws { try anmelder.start() }
 }
 
 struct Druckfehler: LocalizedError {

@@ -31,6 +31,7 @@ final class AppModell {
     @ObservationIgnored private var wiederholung: Task<Void, Never>?
     @ObservationIgnored private var rueckkehr = Rueckkehr()
     @ObservationIgnored private var gestartet = false
+    @ObservationIgnored private var anmelder: Anmelder!
     @ObservationIgnored private var dienste: Systemdienste!
     @ObservationIgnored private var empfang: Brueckenempfang!
     @ObservationIgnored private var navigation: Navigationsbegleiter!
@@ -53,7 +54,10 @@ final class AppModell {
             self.ablage = ablage
             liste = ablage.loadOrRecover()
         }
-        dienste = Systemdienste(webView: { [weak self] in self?.webView })
+        anmelder = Anmelder(
+            webView: { [weak self] in self?.webView },
+            aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
+        dienste = Systemdienste(webView: { [weak self] in self?.webView }, anmelder: anmelder)
         empfang = Brueckenempfang(
             dienste: dienste, aktiverServer: { [weak self] in self?.liste.aktiv?.adresse })
         navigation = Navigationsbegleiter { [weak self] webView, event in
@@ -209,6 +213,9 @@ final class AppModell {
 
     // MARK: Deeplink
 
+    /// Links von außen (`onOpenURL`). Nur `lifeline://verbinden` wirkt; ein
+    /// `lifeline://anmeldung?code=…` von außen bleibt wirkungslos, den Rücksprung der Anmeldung
+    /// nimmt nur die laufende Sitzung an (`Anmelder`).
     func open(_ url: URL) {
         guard let adresse = Deeplink.parse(url.absoluteString) else { return }
         switch Deeplink.decide(

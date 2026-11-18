@@ -113,6 +113,9 @@ public protocol Huellendienste: AnyObject, Sendable {
     func setBadge(_ count: Int) async throws
     /// Öffnet den Druckdialog; `true`, wenn gedruckt wurde.
     func print() async throws -> Bool
+    /// Startet „Im Browser anmelden“ (`ASWebAuthenticationSession`, Entwurf D7); wirft, wenn die
+    /// Sitzung nicht beginnt. Das Ergebnis meldet die App später als `Anmeldung.ereignis`.
+    func startAnmeldung() throws
 }
 
 /// Führt einen angenommenen Befehl aus (Spec `ios-huelle`, „Haptik nur auf Wunsch der Seite und
@@ -121,8 +124,6 @@ public protocol Huellendienste: AnyObject, Sendable {
 public enum Brueckenausfuehrung {
     public static let meldungenAus =
         "Meldungen sind für Lifeline ausgeschaltet (Einstellungen → Mitteilungen → Lifeline)."
-    public static let anmeldungFehlt =
-        "Die Anmeldung im Browser ist in dieser Version der App noch nicht möglich."
 
     /// `nil` für `haptics` (ohne Antwort), sonst die Antwort an die Seite.
     public static func run(_ befehl: Brueckenbefehl, dienste: Huellendienste) async
@@ -148,7 +149,10 @@ public enum Brueckenausfuehrung {
         case .print(let id):
             return await antwort(id) { .bool(try await dienste.print()) }
         case .signInWithBrowser(let id):
-            return Brueckenantwort(id: id, fehler: anmeldungFehlt, wert: .null)
+            return await antwort(id) {
+                try dienste.startAnmeldung()
+                return .null
+            }
         case .ungueltig(let id, let grund):
             return Brueckenantwort(id: id, fehler: grund, wert: .null)
         }

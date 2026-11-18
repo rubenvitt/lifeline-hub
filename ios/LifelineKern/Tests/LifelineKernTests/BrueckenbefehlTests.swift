@@ -162,13 +162,23 @@ final class BrueckenbefehlTests: XCTestCase {
     }
 
     @MainActor
-    func testUngueltigeUndNochNichtUnterstuetzteBefehleWerdenAbgelehnt() async {
+    func testUngueltigeBefehleWerdenAbgelehnt() async {
         let dienste = Dienste()
         let a = await Brueckenausfuehrung.run(.ungueltig(id: 4, grund: "x"), dienste: dienste)
         XCTAssertEqual(a, Brueckenantwort(id: 4, fehler: "x", wert: .null))
-        let b = await Brueckenausfuehrung.run(.signInWithBrowser(id: 5), dienste: dienste)
-        XCTAssertEqual(b?.id, 5)
-        XCTAssertNotNil(b?.fehler)
+    }
+
+    /// Die Antwort sagt nur, ob die Sitzung begonnen hat; das Ergebnis kommt später als Ereignis
+    /// `lifeline:app-anmeldung` (wie in der Desktop-Hülle).
+    @MainActor
+    func testDieAnmeldungImBrowserStartetDieSitzung() async {
+        let dienste = Dienste()
+        let a = await Brueckenausfuehrung.run(.signInWithBrowser(id: 5), dienste: dienste)
+        XCTAssertEqual(a, Brueckenantwort(id: 5, fehler: nil, wert: .null))
+        XCTAssertEqual(dienste.anmeldungen, 1)
+        dienste.wirft = true
+        let b = await Brueckenausfuehrung.run(.signInWithBrowser(id: 6), dienste: dienste)
+        XCTAssertEqual(b, Brueckenantwort(id: 6, fehler: "kaputt", wert: .null))
     }
 }
 
@@ -188,6 +198,7 @@ private final class Dienste: Huellendienste {
     var meldungen: [(String, String?)] = []
     var badges: [Int] = []
     var drucke = 0
+    var anmeldungen = 0
 
     func play(_ feedback: Haptik.Feedback) { gespielt.append(feedback) }
 
@@ -212,5 +223,10 @@ private final class Dienste: Huellendienste {
         if wirft { throw Kaputt() }
         drucke += 1
         return gedruckt
+    }
+
+    func startAnmeldung() throws {
+        if wirft { throw Kaputt() }
+        anmeldungen += 1
     }
 }

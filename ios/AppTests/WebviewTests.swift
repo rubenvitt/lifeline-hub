@@ -94,6 +94,14 @@ final class WebviewTests: XCTestCase {
         XCTAssertEqual(dienste.drucke, 1)
     }
 
+    func testDieAnmeldungImBrowserGehtUeberDieBruecke() async throws {
+        let (web, dienste, _) = try await lade(basis: URL(string: "https://elw.local:8443/login")!, aktiv: elw, html: "<p>Anmelden</p>")
+        _ = try await web.evaluateJavaScript(
+            "window.__LIFELINE_HUELLE__.anmeldungImBrowser().then(() => { document.title = 'gestartet'; }); 0")
+        await warte { await self.titel(web) == "gestartet" }
+        XCTAssertEqual(dienste.anmeldungen, 1)
+    }
+
     func testEineMeldungFragtBeimErstenMalNachDerBerechtigung() async throws {
         let (web, dienste, _) = try await lade(basis: elw.url, aktiv: elw, html: "<p>Alarm</p>")
         dienste.freigabe = .offen
@@ -196,4 +204,6 @@ final class Attrappe: Huellendienste {
         drucke += 1
         return true
     }
+    var anmeldungen = 0
+    func startAnmeldung() throws { anmeldungen += 1 }
 }
