@@ -479,7 +479,7 @@ describe('Nächste Marken', () => {
     expect(r.marken.map((m) => [m.art, m.text, m.ton, m.wort])).toEqual([
       ['unwetter', 'Extremes Unwetter: Extremes Gewitter', 'achtung', 'in 20 min'],
       ['auftrag', 'Frist', 'neutral', 'in 45 min'],
-      ['unwetter', 'Unwetterwarnung: Orkanböen', 'neutral', 'in 2 h 00 min'],
+      ['unwetter', 'Unwetterwarnung: Orkanböen', 'neutral', 'in 2 h'],
     ]);
     expect(r.marken.some((m) => m.ton === 'alarm')).toBe(false);
   });

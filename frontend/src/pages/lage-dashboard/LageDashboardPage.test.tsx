@@ -383,7 +383,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     // Der eine Angetroffene hat keinen Verbleib: offene Arbeit, Achtung.
     const verbleib = kennzahl('Verbleib offen');
     expect(verbleib.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('1');
-    expect(verbleib).toHaveTextContent('0 unterwegs');
+    expect(verbleib).toHaveTextContent('wohin nicht erfasst');
     expect(verbleib.getAttribute('data-ton')).toBe('achtung');
     expect(verbleib).toHaveAttribute('href', '/einsaetze/1/personen');
   });
@@ -512,7 +512,11 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     mockEndpunkte({});
     render();
     await kennzahlGeladen('Kräfte');
-    expect(kennzahl('Kräfte')).toHaveTextContent('0 Einheiten · 0/0/0//0');
+    expect(kennzahl('Kräfte')).toHaveTextContent('0 Einheiten · Stärke 0/0/0//0');
+    // Die Schreibweise ausgeschrieben, als zugängliche Beschreibung der Notiz (LLH-1750).
+    expect(
+      kennzahl('Kräfte').querySelector('[data-lfh="kennzahl-notiz"]')!.getAttribute('title'),
+    ).toContain('Führer / Unterführer / Mannschaft // Summe');
   });
 
   it('gesperrtes Meldebild: „Kräfte" zeigt die Stärke ohne Link (LFH-888)', async () => {
@@ -539,8 +543,10 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     render();
     await kennzahlGeladen('Einsatzdauer');
     const dauer = kennzahl('Einsatzdauer');
-    expect(dauer.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toMatch(/^\d+:\d{2}$/);
-    expect(dauer).toHaveTextContent('h');
+    expect(dauer.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toMatch(
+      /^(\d+ min|\d+ h( \d{2} min)?|\d+ d( \d{2} h)?)$/,
+    );
+    expect(dauer).not.toHaveTextContent(/\d:\d/);
     expect(dauer).toHaveTextContent(/seit /);
   });
 
@@ -1014,18 +1020,16 @@ describe('LageDashboardPage — Kennzahlenband', () => {
 });
 
 describe('LageDashboardPage — Seitenkopf', () => {
-  it('trägt den Menünamen als Titel, die Uhrzeit daneben und den Datenstand als Meta (LFH-965)', async () => {
+  it('trägt den Menünamen als Titel und daneben den Datenstand, keine Uhr (LFH-965, LLH-1750)', async () => {
     mockEndpunkte({});
     render();
     await kennzahlGeladen('Betroffene');
     expect(screen.getByRole('heading', { level: 1, name: 'Lagebild' })).toBeInTheDocument();
-    // „jetzt“ in der Rolle „kurz“ (LLH-1061): heute nur die Uhrzeit, `1422`.
-    expect(document.querySelector('.lfh-seitenkopf__meta')?.textContent).toMatch(
-      /(^|\D)\d{4}(\D|$)/,
-    );
+    // Der Stand in der Rolle „kurz“ (heute nur die Uhrzeit), ohne Alter, solange er jünger als
+    // eine Minute ist; daneben keine zweite Uhr (Spec `zeitdarstellung`, `modul-benennung`).
     await waitFor(() =>
-      expect(document.querySelector('[data-lfh="datenstand"]')?.textContent).toMatch(
-        /^Stand vor \d+ s$/,
+      expect(document.querySelector('.lfh-seitenkopf__meta')?.textContent).toMatch(
+        /^Stand \d{4}( · vor 1 min)?( · offline)?$/,
       ),
     );
   });
@@ -1456,9 +1460,40 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     expect(within(box).queryByText('Deichbruch km 4')).toBeNull();
     expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(2);
 
-    await userEvent.click(within(box).getByRole('button', { name: 'anzeigen' }));
+    await userEvent.click(within(box).getByRole('button', { name: '1 neu anzeigen' }));
     expect(within(box).getByText('Deichbruch km 4')).toBeInTheDocument();
     expect(within(box).queryByText('1 neuer Eintrag')).toBeNull();
+  });
+
+  /*
+   * LLH-1934: der Banner steht im Paneelkopf an der Stelle des Verbindungsworts. Bei offener
+   * Leitung weicht „live“ (der Banner belegt sie ja); eine Störung bleibt daneben sichtbar.
+   */
+  it('der Banner ersetzt „live“ im Kopf, eine abgerissene Leitung bleibt daneben stehen', async () => {
+    setzeLiveStatusFuerTest('open');
+    const daten: Daten = { etb: [etb(1)] };
+    mockEndpunkte(daten);
+    // Ohne Antwort hielte die Seite den Server für unerreichbar und sagte „offline“ statt „live“.
+    server.use(
+      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+        HttpResponse.json({ abschnitte: [], einheiten: [], frist_min: 60 }),
+      ),
+      http.get('/api/einsaetze/1/schaeden/marker', () => HttpResponse.json([])),
+    );
+    const { client } = render();
+    const box = paneel('Jüngste ETB-Einträge');
+    const live = () => box.querySelector('[data-lfh="strom-live"]');
+    await waitFor(() => expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(1));
+    expect(live()?.textContent).toBe('live');
+
+    daten.etb = [etb(1), etb(2)];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(1) }));
+    expect(await within(box).findByText('1 neuer Eintrag')).toBeInTheDocument();
+    expect(live()).toBeNull();
+
+    act(() => setzeLiveStatusFuerTest('lost'));
+    await waitFor(() => expect(live()?.textContent).toBe('Verbindung unterbrochen'));
+    expect(within(box).getByText('1 neuer Eintrag')).toBeInTheDocument();
   });
 
   /*

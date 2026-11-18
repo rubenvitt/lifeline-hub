@@ -72,6 +72,21 @@ pub async fn setup_mit_pool_und_live() -> (axum::Router, sqlx::SqlitePool, LiveH
     (router, pool, live)
 }
 
+/// Wie [`setup_mit_pool_und_live`], mit eigenen Grenzen der Live-Ströme (etwa einem Takt des
+/// Lebenszeichens in Millisekunden, LLH-1935).
+pub async fn setup_mit_stromgrenzen(
+    grenzen: lifeline_hub::live::strom::StromGrenzen,
+) -> (axum::Router, sqlx::SqlitePool, LiveHub) {
+    let pool = db::test_pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    pool_merken(&pool);
+    let live = LiveHub::mit_stromgrenzen(grenzen);
+    let router = build_router(test_state(&pool, &live));
+    (router, pool, live)
+}
+
 /// Wie [`setup_mit_pool`], mit abweichendem `AppState` (eigenes `karten_dir`,
 /// Fachebenen-Attrappe, karten-service).
 pub async fn setup_mit_state(
@@ -639,6 +654,22 @@ pub async fn sse_anfang_lesen(body: Body, stille_ms: u64) -> String {
             gelesen.push_str(&String::from_utf8_lossy(daten));
         }
     }
+    gelesen
+}
+
+/// Liest einen OFFENEN SSE-Strom genau `dauer` lang. Anders als [`sse_anfang_lesen`] endet das
+/// Lesen auch, wenn der Strom nie still wird (Lebenszeichen im Millisekunden-Takt, LLH-1935).
+pub async fn sse_lesen_fuer(body: &mut Body, dauer: Duration) -> String {
+    use http_body_util::BodyExt;
+    let mut gelesen = String::new();
+    let _ = tokio::time::timeout(dauer, async {
+        while let Some(Ok(frame)) = std::pin::Pin::new(&mut *body).frame().await {
+            if let Some(daten) = frame.data_ref() {
+                gelesen.push_str(&String::from_utf8_lossy(daten));
+            }
+        }
+    })
+    .await;
     gelesen
 }
 

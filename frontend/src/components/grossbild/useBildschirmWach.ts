@@ -3,13 +3,10 @@ import { useEffect, useState } from 'react';
 export type WachZustand = 'aus' | 'an' | 'nicht-unterstuetzt';
 
 /**
- * Bildschirm-Wachhalten für das Großbild (LLH-1747, Spec `grossbild-ansicht`, „Einstieg“):
- * angefordert, solange `aktiv` gilt, und bei jeder Rückkehr in den Vordergrund neu, denn der
- * Browser gibt die Sperre beim Verstecken des Tabs frei.
- *
- * Inhaltsgleich mit `useBildschirmWach` in `geraet/LagemonitorPage.tsx`. Ein Import von dort zöge
- * die Monitorseite samt Kartenbibliothek in jede Seite mit Großbild; die Doppelung räumt die
- * Folgeaufgabe „Lagemonitor auf Großbild-Bausteine“ ab (design.md D2).
+ * Bildschirm-Wachhalten für Großbild und Lagemonitor (LLH-1747, Spec `grossbild-ansicht`,
+ * „Einstieg“; Spec `lagemonitor`, „Bildschirm bleibt an“): angefordert, solange `aktiv` gilt, und
+ * bei jeder Rückkehr in den Vordergrund neu, denn der Browser gibt die Sperre beim Verstecken des
+ * Tabs frei. Ohne `navigator.wakeLock` bleibt der Zustand `nicht-unterstuetzt`.
  */
 export function useBildschirmWach(aktiv: boolean): WachZustand {
   const unterstuetzt = typeof navigator !== 'undefined' && 'wakeLock' in navigator;

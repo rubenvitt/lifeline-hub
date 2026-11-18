@@ -1,3 +1,6 @@
+import { wireAlsEpoche } from '../pages/lage-dashboard/lagebild';
+import { datenstandText } from '../components/Datenstand';
+import { useOhneVerbindung } from '../offline/verbindung';
 import { useNavigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from 'antd';
@@ -12,7 +15,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { useVorbereitung } from './useVorbereitung';
 import { vorbereitungMarkdown } from './vorbereitung';
-import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 interface Props {
   einsatzId: number;
@@ -42,6 +45,7 @@ export default function VorbereitungPaneel({
 }: Props) {
   const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
+  const ohneNetz = useOhneVerbindung();
   const navigate = useNavigate();
   const { zeilen, standWire, laedt } = useVorbereitung({
     einsatzId,
@@ -73,7 +77,12 @@ export default function VorbereitungPaneel({
   return (
     <Paneel
       titel="Vorbereitung"
-      meta={standWire ? `Stand ${zeitKurz(standWire, konv)}` : undefined}
+      // Eine Form für den Datenstand (LLH-1750, Spec `zeitdarstellung`).
+      meta={
+        standWire
+          ? datenstandText(wireAlsEpoche(standWire), Date.now(), { offline: ohneNetz, konv })
+          : undefined
+      }
       style={{ marginBottom: token.margin }}
       fuss={
         darfUebernehmen || uebernehmen.error != null ? (

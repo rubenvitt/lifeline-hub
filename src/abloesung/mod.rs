@@ -362,12 +362,7 @@ pub fn einstufung(faellig_at: &str, jetzt: &str, vorwarnung_minuten: i64) -> Ein
 
 /// Rhythmus als Text für ETB-Einträge: „6 h", „6 h 30 min", „45 min".
 pub fn rhythmus_text(minuten: i64) -> String {
-    let (h, m) = (minuten / 60, minuten % 60);
-    match (h, m) {
-        (0, m) => format!("{m} min"),
-        (h, 0) => format!("{h} h"),
-        (h, m) => format!("{h} h {m} min"),
-    }
+    crate::zeitdarstellung::dauer_text(minuten)
 }
 
 /// Öffentliche Darstellung einer Schicht.
@@ -773,6 +768,7 @@ mod tests {
         assert_eq!(rhythmus_text(360), "6 h");
         assert_eq!(rhythmus_text(390), "6 h 30 min");
         assert_eq!(rhythmus_text(45), "45 min");
+        assert_eq!(rhythmus_text(365), "6 h 05 min");
     }
 
     /// Knoten-Modell: der nächste Vorfahr mit Schicht trägt, eine eigene Schicht übersteuert

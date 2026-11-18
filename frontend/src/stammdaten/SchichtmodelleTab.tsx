@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { App, Button, Modal, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -12,7 +13,7 @@ import {
   updateSchichtmodell,
 } from '../api/schichtmodelle';
 import type { Schichtmodell, SchichtmodellWerteBody } from '../api/types';
-import { formatDauer } from '../abloesung/dauer';
+
 import SchichtmodellModal from '../abloesung/SchichtmodellModal';
 import { formatRegel } from '../abloesung/schichtmodellText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -220,14 +221,14 @@ function SchichtmodelleInhalt() {
       key: 'vorwarnung',
       abBreite: 'md',
       sorter: nachZahl((m: Schichtmodell) => m.vorwarnung_minuten),
-      render: (_, m) => <span style={monoStil(12)}>{formatDauer(m.vorwarnung_minuten)}</span>,
+      render: (_, m) => <span style={monoStil(12)}>{dauer(m.vorwarnung_minuten)}</span>,
     },
     {
       title: 'Planungsvorlauf',
       key: 'planungsvorlauf',
       abBreite: 'lg',
       sorter: nachZahl((m: Schichtmodell) => m.planungsvorlauf_minuten),
-      render: (_, m) => <span style={monoStil(12)}>{formatDauer(m.planungsvorlauf_minuten)}</span>,
+      render: (_, m) => <span style={monoStil(12)}>{dauer(m.planungsvorlauf_minuten)}</span>,
     },
     ...(istAdmin
       ? [

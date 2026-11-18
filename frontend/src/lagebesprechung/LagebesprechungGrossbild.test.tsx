@@ -90,9 +90,10 @@ describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => 
   it('zeigt alle Zeilen der Vorbereitung in ihrer Reihenfolge, ohne Quelle', () => {
     renderGrossbild();
     const block = screen.getByRole('region', { name: 'Vorbereitung' });
-    // Uhrzeit und Alter des Stands stehen im Kopf, wie im Lagebild.
+    // Uhr und Stand stehen im Kopf, wie im Großbild des Lagebilds (LLH-1750). Der Stand liegt
+    // Sekunden zurück; fällt ein Minutenwechsel dazwischen, zählt die Uhr schon „vor 1 min“.
     expect(document.querySelector('[data-lfh="grossbild-meta"]')).toHaveTextContent(
-      /· Stand vor 1\d s$/,
+      /^\d{4} · Stand \d{4}( · vor 1 min)?$/,
     );
     const titel = within(block)
       .getAllByRole('listitem')

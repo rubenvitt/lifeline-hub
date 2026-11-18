@@ -2,9 +2,9 @@
  * Großbild-Skala (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entfernung“; design.md D3 in
  * `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`).
  *
- * Die Bezugsgrößen sind die des Lagemonitors bei 1920 × 1080 (`geraet/LagemonitorPage.tsx`,
- * `GROSS`): Zahl 96, Zahl klein 72, Titel 32, Text 28. Bis der Lagemonitor auf diese Bausteine
- * umzieht (Folgeaufgabe nach LLH-1746), stehen die Werte dort ein zweites Mal.
+ * Die Schriftgrößen gelten bei 1920 × 1080: Zahl 96, Zahl klein 72, Titel 32, Text 28. Sie stehen
+ * nur hier; der Lagemonitor nimmt sie über diese Skala, fest auf ein Pixel je Bezugspixel
+ * (LLH-1930), seine Kartenkachel liest `GROSS_BEZUG.text` als Zahl.
  *
  * `grossMass(px)` macht daraus eine CSS-Länge, die mit dem Fenster geht: bei 1920 × 1080 genau
  * `px`, auf einem Beamer mit 1280 × 720 zwei Drittel, auf 4K das Doppelte. Die knappere Achse

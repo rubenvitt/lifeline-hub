@@ -161,7 +161,7 @@ describe('schichtplanZeilen (LLH-1554)', () => {
       expect(lueckeText(block({ offene_plaetze: 2 }), namen)).toBe('2 Plätze offen');
       expect(lueckeText(block(), namen)).toBeNull();
       expect(befundText({ art: 'dienst', dauer_minuten: 750 }, namen, 'Anna')).toBe(
-        'Anna: 12:30 h im Dienst',
+        'Anna: 12 h 30 min im Dienst',
       );
       expect(befundText({ art: 'dienst', dauer_minuten: 45 }, namen)).toBe('45 min im Dienst');
       expect(befundText({ art: 'quali', qualifikation_id: 3, fehlen: 1 }, namen)).toBe(

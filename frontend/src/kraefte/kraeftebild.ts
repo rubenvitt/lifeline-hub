@@ -9,7 +9,7 @@ import type {
   StaerkePosition,
   MaterialStatus,
 } from '../api/types';
-import { kraefteText, staerkeText } from '../anzeige/staerke';
+import { kraefteText, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
 import {
   abschnittDerEinheit,
   besatzungText,
@@ -519,7 +519,7 @@ export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
 
 // ── Formatierung ──────────────────────────────────────────────────────────────
 
-// „F/UF/M//Ges" kommt aus der EINEN Formatierung `anzeige/staerke.ts:staerkeText` (LFH-550).
+// „F/UF/M//Σ“ kommt aus der EINEN Formatierung `anzeige/staerke.ts:staerkeText` (LFH-550).
 
 // ── Markdown-Renderer ─────────────────────────────────────────────────────────
 
@@ -543,7 +543,7 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
     // Abschnitte tragen keinen Einzug — die Tiefe steckt in der Heading-Hierarchie (## / ###).
     const prefix = tiefe === 0 ? '##' : '###';
     zeilen.push(`${prefix} ${zeile.bezeichnung}`);
-    zeilen.push(`Stärke (F/UF/M//Ges): ${staerkeText(zeile.staerke)}`);
+    zeilen.push(`Stärke (${STAERKE_SCHREIBWEISE}): ${staerkeText(zeile.staerke)}`);
   } else if (zeile.art === 'einheit') {
     zeilen.push(
       `${einzug}- **${zeile.bezeichnung}**${klammer} — Stärke: ${staerkeText(zeile.staerke)}`,
@@ -629,9 +629,9 @@ export function rendereMeldebildMarkdown(
   zeilen.push('');
   // Als Liste: Markdown kennt keinen harten Umbruch, Zeilen ohne Leerzeile liefen in der Anzeige
   // zu einem Absatz zusammen (LFH-1153).
-  zeilen.push(`- **Gesamtstärke (F/UF/M//Ges):** ${staerkeText(v.staerke)}`);
+  zeilen.push(`- **Gesamtstärke (${STAERKE_SCHREIBWEISE}):** ${staerkeText(v.staerke)}`);
   zeilen.push(
-    `- **Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, n.v.: ${v.fahrzeugStatus.nicht_verfuegbar})`,
+    `- **Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, nicht verfügbar: ${v.fahrzeugStatus.nicht_verfuegbar})`,
   );
   let material = `- **Material (Positionen):** ${v.anzahlMaterialPositionen}`;
   if (v.anzahlMaterialPositionen > 0) {

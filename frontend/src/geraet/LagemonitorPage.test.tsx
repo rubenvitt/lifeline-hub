@@ -21,6 +21,7 @@ import {
 import { monitorAusschnitt } from './LagemonitorKarte';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
+import { GROSS_BEZUG, grossMass } from '../components/grossbild';
 
 // Ob der Monitor einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -117,6 +118,16 @@ function renderApp(route: string) {
   return router;
 }
 
+/**
+ * Pixel einer Großbild-Länge am Monitor: dort setzt die Wurzel `--lfh-gross-einheit: 1px`, also
+ * zählt der Faktor aus `grossMass(px)`.
+ */
+function monitorPx(fontSize: string): number {
+  const m = /^calc\(var\(--lfh-gross-einheit, [^)]*\)\) \* ([\d.]+)\)$/.exec(fontSize);
+  if (!m) throw new Error(`keine Großbild-Länge: ${fontSize}`);
+  return Number(m[1]);
+}
+
 const wakeRequest = vi.fn();
 
 function mitWakeLock() {
@@ -181,7 +192,7 @@ describe('Lagemonitor — Großbild', () => {
     expect(within(betroffene).getByText('12')).toBeInTheDocument();
     expect(within(betroffene).getByText('vermisst')).toBeInTheDocument();
     const kraefte = screen.getByRole('region', { name: 'Kräfte' });
-    expect(within(kraefte).getByText('2/6/30')).toBeInTheDocument();
+    expect(within(kraefte).getByText('2/6/30//38')).toBeInTheDocument();
     // Kräfte an den UHS nur als Zahl (LFH-1045).
     expect(within(kraefte).getByText('4 an UHS')).toBeInTheDocument();
     const belegung = screen.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
@@ -280,9 +291,25 @@ describe('Lagemonitor — Großbild', () => {
     expect(zahlen.length).toBeGreaterThan(5);
     for (const z of zahlen) {
       const [zahl, text] = z.children as unknown as HTMLElement[];
-      expect(parseInt(zahl.style.fontSize, 10)).toBeGreaterThanOrEqual(72);
-      expect(parseInt(text.style.fontSize, 10)).toBeGreaterThanOrEqual(28);
+      expect(monitorPx(zahl.style.fontSize)).toBeGreaterThanOrEqual(72);
+      expect(monitorPx(text.style.fontSize)).toBeGreaterThanOrEqual(28);
     }
+  });
+
+  it('Größen aus der Großbild-Skala, fest auf 1 px je Bezugspixel (LLH-1930)', async () => {
+    bereit();
+    renderApp('/geraet/7/monitor');
+    const kachel = await screen.findByRole('region', { name: 'Betroffene' });
+    // Der Monitor wächst nicht mit dem Fenster: seine Abstände stehen in Pixeln.
+    const wurzel = document.querySelector<HTMLElement>('.lagemonitor');
+    expect(wurzel?.style.getPropertyValue('--lfh-gross-einheit')).toBe('1px');
+    expect(within(kachel).getByRole('heading', { name: 'Betroffene' }).style.fontSize).toBe(
+      grossMass(GROSS_BEZUG.titel),
+    );
+    const [zahl, text] = kachel.querySelector('[data-lfh="monitor-zahl"]')!
+      .children as unknown as HTMLElement[];
+    expect(zahl.style.fontSize).toBe(grossMass(GROSS_BEZUG.zahl));
+    expect(text.style.fontSize).toBe(grossMass(GROSS_BEZUG.text));
   });
 
   it('ein Monitor hat keine UHS-Seiten, ein Tablet kein Großbild', async () => {
@@ -337,7 +364,7 @@ describe('Lagemonitor — Aktualität und Gerätemenü', () => {
     expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 min/);
   });
 
-  it('nennt einen Stand über einer Stunde in Stunden und Minuten (anzeige/abstand.ts)', async () => {
+  it('nennt einen Stand über einer Stunde in Stunden und Minuten (anzeige/dauer.ts)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
     bereit();
     renderApp('/geraet/7/monitor');
@@ -349,7 +376,7 @@ describe('Lagemonitor — Aktualität und Gerätemenü', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
-    expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 h 4 min$/);
+    expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 h 04 min$/);
   });
 
   it('kurzes Tippen öffnet kein Menü, 3 s Drücken schon, nach 30 s ohne Eingabe zu', async () => {
@@ -663,7 +690,7 @@ describe('Lagemonitor — Ablauf der Veranstaltung (LLH-1570)', () => {
       // Uhrzeit in der Anzeigezone (Europe/Berlin), dann Bezeichnung und Abstand.
       expect.stringMatching(/^12:?20Beginnin 20 min$/),
       expect.stringMatching(/Feuerwerkin 1 h 05 min$/),
-      expect.stringMatching(/Endein 2 h 00 min$/),
+      expect.stringMatching(/Endein 2 h$/),
     ]);
     expect(within(ablauf).queryByText(/überfällig/)).toBeNull();
     // Meldungen teilen sich die Zeile mit dem Ablauf.

@@ -21,6 +21,16 @@ const RECONNECT_STREUUNG = 0.5;
  */
 export const WIEDERAUFBAU_SCHONFRIST_MS = 8000;
 
+/**
+ * Lebenszeichen des Servers (LLH-1935): Einsatz- und Org-Strom senden es alle 15 s
+ * (`HEARTBEAT_INTERVAL` in `src/live/strom.rs`). Trifft nach dem `open` einer Verbindung so lange
+ * KEIN Ereignis ein (drei verpasste Schläge), gilt die Leitung als stumm, etwa ein halboffenes
+ * TCP im Funkloch, das der Browser nicht bemerkt: `connecting` sofort, Neuaufbau mit Vollabgleich
+ * (`openspec/changes/archive/2026-11-17-l39v43md-sse-herzschlag/design.md`, D3).
+ */
+export const HEARTBEAT_EVENT = 'heartbeat';
+export const HEARTBEAT_TIMEOUT_MS = 45_000;
+
 /** Je offener Verbindung ihr Zugang für {@link pausiereLiveStroeme} (LFH-1105). */
 const pausierbare = new Set<() => (() => void) | null>();
 
@@ -91,6 +101,9 @@ export interface LiveVerbindungOptionen {
  *   `lost`, Auth proben, dann Login-Flow (401) oder manueller Reconnect per Backoff.
  * - Beim Aufräumen meldet sie `idle`: die Betriebszeile bleibt global gemountet, und ohne `idle`
  *   stünde ein früheres `lost` nach dem Verlassen des Stroms weiter da.
+ * - Ab dem `open` wacht {@link HEARTBEAT_TIMEOUT_MS} über die Leitung (LLH-1935): jedes Ereignis
+ *   der Quelle setzt die Wache zurück, Stille baut neu auf. Vor dem ersten `open` wacht sie nicht,
+ *   ein Kaltstart bleibt `idle`; nach `onerror` übernimmt der Neuaufbau des Browsers.
  */
 export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
   const meldeStatus = (status: LiveVerbindungsStatus) =>
@@ -101,11 +114,20 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
   let backoffStufe = 0;
   let backoffTimer: ReturnType<typeof setTimeout> | null = null;
   let schonfristTimer: ReturnType<typeof setTimeout> | null = null;
+  let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  // Abläufe der Wache in Folge, deren Quelle seit dem `open` kein einziges Ereignis lieferte
+  // (design.md D6): ab dem zweiten wartet der Neuaufbau gestaffelt.
+  let silentStreak = 0;
   let aktuelle: EventSource | null = null;
 
   const schonfristBeenden = () => {
     if (schonfristTimer) clearTimeout(schonfristTimer);
     schonfristTimer = null;
+  };
+
+  const stopWatchdog = () => {
+    if (watchdogTimer) clearTimeout(watchdogTimer);
+    watchdogTimer = null;
   };
 
   const probeUndReconnect = async (tote: EventSource) => {
@@ -157,10 +179,52 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     const positionErhalten = () => {
       positionBekannt = true;
     };
+    // Die Wache: eine stumme Leitung wird geschlossen und neu aufgebaut. Die neue Quelle hat keine
+    // `Last-Event-ID`, ihr `open` gleicht deshalb voll ab (`beiWiederaufbau`).
+    let delivered = false;
+    const startWatchdog = () => {
+      stopWatchdog();
+      watchdogTimer = setTimeout(() => {
+        watchdogTimer = null;
+        if (abgebrochen || aktuelle !== quelle) return;
+        schonfristBeenden();
+        meldeStatus('connecting');
+        aktuelle = null;
+        trenne(quelle);
+        // Ein Weg, der öffnet, aber nie liefert (puffernder Proxy), soll nicht alle 45 s voll
+        // abgleichen: ab dem zweiten stummen Ablauf in Folge gestaffelt warten (design.md D6).
+        silentStreak = delivered ? 0 : silentStreak + 1;
+        if (silentStreak < 2) {
+          verbinde();
+          return;
+        }
+        const basis =
+          RECONNECT_BACKOFF_MS[Math.min(silentStreak - 2, RECONNECT_BACKOFF_MS.length - 1)];
+        backoffTimer = setTimeout(
+          () => {
+            if (!abgebrochen) verbinde();
+          },
+          Math.round(basis * (1 + Math.random() * RECONNECT_STREUUNG)),
+        );
+      }, HEARTBEAT_TIMEOUT_MS);
+    };
+    // Jedes Ereignis zählt als Lebenszeichen, nicht nur `heartbeat`. Eine Wache läuft nur, solange
+    // die Quelle offen ist; eine getrennte Quelle meldet nichts mehr, ihre Lauscher bleiben hängen.
+    const resetWatchdog = () => {
+      if (aktuelle !== quelle) return;
+      delivered = true;
+      if (watchdogTimer) startWatchdog();
+    };
+    new Set([
+      HEARTBEAT_EVENT,
+      ...(opt.positionsEreignis ? [opt.positionsEreignis] : []),
+      ...opt.listeners.map(([event]) => event),
+    ]).forEach((event) => quelle.addEventListener(event, resetWatchdog));
     if (opt.positionsEreignis) quelle.addEventListener(opt.positionsEreignis, positionErhalten);
     opt.listeners.forEach(([event, handler]) => quelle.addEventListener(event, handler));
     quelle.onopen = () => {
       schonfristBeenden();
+      startWatchdog();
       meldeStatus('open');
       backoffStufe = 0;
       if (ersterOpen) {
@@ -174,6 +238,7 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
       quelleWarOffen = true;
     };
     quelle.onerror = () => {
+      stopWatchdog();
       if (quelle.readyState === EventSource.CONNECTING) {
         // Browser reconnectet selbst; sichtbar erst, wenn es länger dauert. Weitere Fehlversuche
         // verlängern die Frist nicht.
@@ -217,6 +282,7 @@ export function oeffneLiveVerbindung(opt: LiveVerbindungOptionen): () => void {
     pausierbare.delete(pausieren);
     if (backoffTimer) clearTimeout(backoffTimer);
     schonfristBeenden();
+    stopWatchdog();
     if (aktuelle) trenne(aktuelle);
     meldeStatus('idle');
   };

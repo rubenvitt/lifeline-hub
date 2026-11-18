@@ -349,8 +349,8 @@ test.describe('fremde Rhythmusänderung', () => {
 
 /**
  * Die Rhythmuszeile ist die Zeile, die eine fremde Änderung von Wert oder Quelle berührt. Sie
- * bleibt deshalb für jeden zulässigen Rhythmus einzeilig (LFH-708): 167:59 h als Vorgabe des
- * Einsatzes ist der breiteste Text (LLH-1122: Dauer „h:mm“, Quelle „Vorgabe Einsatz“; die
+ * bleibt deshalb für jeden zulässigen Rhythmus einzeilig (LFH-708): 167 h 59 min als Vorgabe des
+ * Einsatzes ist der breiteste Text (LLH-1750: Dauer „167 h 59 min“, Quelle „Vorgabe Einsatz“; die
  * Abschnittsvorgabe heißt nur „Vorgabe“). Gemessen wird dort, wo am wenigsten Platz ist, auf
  * 390 px in `komfortabel` (252 px Inhalt) und `handschuh` (226 px Inhalt).
  */
@@ -397,7 +397,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
 
     await ladeInDichte(page, `/einsaetze/${einsatzId}/abloesung`, dichte);
     const zeile = page.locator('[data-lfh="abloesung-rhythmus"]');
-    await expect(zeile).toHaveText('Rhythmus 167:59 h (Vorgabe Einsatz)');
+    await expect(zeile).toHaveText('Rhythmus 167 h 59 min (Vorgabe Einsatz)');
     await schriftenGeladen(page);
 
     const mass = await zeile.evaluate((el) => ({
@@ -417,6 +417,6 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
       };
     });
     expect(kanten.wertRechts).toBeLessThanOrEqual(kanten.zeileRechts + SUBPIXEL);
-    await expect(zeile).toHaveAttribute('title', 'Rhythmus 167:59 h (Vorgabe Einsatz)');
+    await expect(zeile).toHaveAttribute('title', 'Rhythmus 167 h 59 min (Vorgabe Einsatz)');
   });
 }

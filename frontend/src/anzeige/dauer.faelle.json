@@ -1,0 +1,24 @@
+{
+  "_zweck": "Gemeinsame Fälle der Dauerform für Frontend (anzeige/dauer.test.ts) und Server (src/zeitdarstellung.rs). Spec zeitdarstellung, „Eine Form für Dauern“ (LLH-1750). „tage“: nur Einsatzdauer und relative Angaben; der Server schreibt nur Längen ohne Tage.",
+  "faelle": [
+    { "minuten": 0, "text": "0 min" },
+    { "minuten": 1, "text": "1 min" },
+    { "minuten": 45, "text": "45 min" },
+    { "minuten": 59, "text": "59 min" },
+    { "minuten": 60, "text": "1 h" },
+    { "minuten": 61, "text": "1 h 01 min" },
+    { "minuten": 90, "text": "1 h 30 min" },
+    { "minuten": 301, "text": "5 h 01 min" },
+    { "minuten": 450, "text": "7 h 30 min" },
+    { "minuten": 480, "text": "8 h" },
+    { "minuten": 810, "text": "13 h 30 min" },
+    { "minuten": 1440, "text": "24 h" },
+    { "minuten": 1565, "text": "26 h 05 min" },
+    { "minuten": 10079, "text": "167 h 59 min" },
+    { "minuten": 1440, "tage": true, "text": "1 d" },
+    { "minuten": 1565, "tage": true, "text": "1 d 02 h" },
+    { "minuten": 3740, "tage": true, "text": "2 d 14 h" },
+    { "minuten": 2880, "tage": true, "text": "2 d" },
+    { "minuten": 1439, "tage": true, "text": "23 h 59 min" }
+  ]
+}

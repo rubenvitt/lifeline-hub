@@ -6,21 +6,25 @@ import { STAFFEL, haeltStufe, ladeInDichte } from './trefflaeche-kern';
  * LFH-900 — der Sammelbanner im Paneel „Jüngste ETB-Einträge“ (im Code „Meldungsstrom“) des
  * Lage-Dashboards kostet keine Höhe (Prüfliste Kriterium 12, „kein Sprung unter dem Cursor“;
  * Bedien-Leitlinie: der Banner soll einen Sprung verhindern, nicht selbst einen auslösen).
+ * LLH-1934 — und er verdeckt keine Zeile.
  *
  * Vor dem Fix stand der Banner im Fluss über der Liste: trifft ein ETB-Eintrag live ein, wurde das
  * Paneel um die Bannerhöhe höher (gemessen 38 / 60 / 88 px je Dichte), die Paneelreihe wuchs mit, und das Band
  * „Führungsstand“ darunter rutschte nach unten (gemessen bei 1440 × 900: Unterkante der Reihe
- * y = 349 → 383). Jetzt liegt er als Überlagerung über dem Listenkopf.
+ * y = 349 → 383). Danach lag er als Überlagerung über dem Listenkopf und verdeckte die halbe oberste
+ * Zeile; seit LLH-1934 steht er als Kurzform „↓ 1 neu“ im Paneelkopf an der Stelle von „live“.
  *
  * Gemessen wird in DOKUMENT-Koordinaten (`top + scrollY`): auf 390 px steht der Meldungsstrom
  * unter dem Falz, und das Scrollen zum Banner verschöbe jede Viewport-Koordinate.
  *  - die oberste gezeigte Zeile des Stroms bleibt, wo sie war — sie läge sonst unter dem Cursor;
  *  - das Band „Führungsstand“ bleibt, wo es war — der Sprung aus dem Ticket;
- *  - der Banner bleibt im Paneel, und nach „anzeigen“ steht der Fokus auf der Liste.
+ *  - der Banner bleibt im Paneel und endet über der obersten Zeile, statt sie zu verdecken;
+ *  - nach „anzeigen“ steht der Fokus auf der Liste.
  *
  * DICHTE: alle drei Stufen. Der Banner ist in `handschuh` am höchsten (Knopf 72 px), und der
- * Knopf „anzeigen“ hält die Trefffläche der Stufe; geklickt wird er, nicht nur gesehen
- * (`e2e/AGENTS.md`, LFH-355).
+ * Knopf „1 neu anzeigen“ hält die Trefffläche der Stufe; geklickt wird er, nicht nur gesehen
+ * (`e2e/AGENTS.md`, LFH-355). Im Kopf steht daneben „ETB ↗“ in derselben Knopfhöhe, deshalb wächst
+ * der Kopf nicht.
  *
  * ROLLEN (LFH-435): kein Durchgang als Beobachter. Das Inventar führt das Lage-Dashboard als nicht
  * rollenabhängig; der Banner hat keinen Rollenzweig.
@@ -39,8 +43,8 @@ const BREITEN = [
  * neuen Eintrag direkt, ohne Banner (`meldungsstrom.ts`, `wassermarkeNachziehen`).
  *
  * Dazu der knappste Fall: EIN Eintrag in `handschuh`. Die Zeile (≈ 70 px) ist dort niedriger als
- * der Banner (88 px); ohne Mindesthöhe der Liste ragte er über das Paneel und auf 390 px über die
- * Links des Bands „Führungsstand“.
+ * der frühere Überlagerungsbanner (88 px); der ragte ohne Mindesthöhe der Liste über das Paneel
+ * und auf 390 px über die Links des Bands „Führungsstand“.
  */
 const FAELLE = [
   ...BREITEN.flatMap((viewport) => STAFFEL.map((stufe) => ({ viewport, ...stufe, vorher: 3 }))),
@@ -99,20 +103,24 @@ for (const { viewport, dichte, soll, vorher: anzahl } of FAELLE) {
 
     const danach = { zeile: await oben(ersteZeile), band: await oben(fuehrungsstand) };
     const ueberstand = (await unten(banner)) - (await unten(strom(page)));
+    const ueberdeckung = (await unten(banner)) - danach.zeile;
     test.info().annotations.push({
       type: 'messwert',
       description:
         `${viewport.width} px, ${dichte}, ${anzahl}: oberste Zeile y ${davor.zeile} → ` +
         `${danach.zeile}, Führungsstand y ${davor.band} → ${danach.band}, ` +
-        `Banner-Unterkante ${ueberstand} px über der Paneelunterkante`,
+        `Banner-Unterkante ${ueberstand} px über der Paneelunterkante, ` +
+        `${ueberdeckung} px über der Oberkante der obersten Zeile`,
     });
     expect.soft(danach.zeile, 'oberste Zeile des Stroms nach dem Banner').toBe(davor.zeile);
     expect.soft(danach.band, 'Band „Führungsstand“ nach dem Banner').toBe(davor.band);
     // Die Überlagerung bleibt im Paneel: sie verdeckt nichts außerhalb des Meldungsstroms.
     expect.soft(ueberstand, 'Banner ragt über das Paneel hinaus').toBeLessThanOrEqual(0);
+    // LLH-1934: der Banner endet über der obersten Zeile, er verdeckt sie nicht.
+    expect.soft(ueberdeckung, 'Banner verdeckt die oberste Zeile').toBeLessThanOrEqual(0);
 
     // Bedienbar: Trefffläche der Stufe, und der Klick gibt den Eintrag frei.
-    const anzeigen = banner.getByRole('button', { name: 'anzeigen' });
+    const anzeigen = banner.getByRole('button', { name: '1 neu anzeigen' });
     await anzeigen.scrollIntoViewIfNeeded();
     await expect(anzeigen).toBeInViewport();
     await haeltStufe(anzeigen, soll, `„anzeigen“ in ${dichte}`);

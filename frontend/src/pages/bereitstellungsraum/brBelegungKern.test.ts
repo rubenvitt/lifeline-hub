@@ -30,7 +30,7 @@ describe('„seit …“ als Text', () => {
   });
 
   it('ab einer Stunde in Stunden und Minuten', () => {
-    expect(seitText('1050', 220)).toBe('seit 1050 · 3 h 40');
+    expect(seitText('1050', 220)).toBe('seit 1050 · 3 h 40 min');
   });
 });
 

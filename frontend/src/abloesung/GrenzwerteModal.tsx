@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Form, Input } from 'antd';
 import { useState } from 'react';
 import {
@@ -8,7 +9,7 @@ import {
 import type { SchichtplanGrenzwerte, SchichtplanGrenzwerteBody } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { mitVorgabe } from '../components/vorgabeText';
-import { dauerRegel, formatDauer } from './dauer';
+import { dauerRegel } from './dauer';
 import {
   grenzwerteBody,
   grenzwerteFormWerte,
@@ -75,17 +76,14 @@ export default function GrenzwerteModal({
           }),
         ]}
       >
-        <Input
-          placeholder={mitVorgabe(formatDauer(MAX_DIENST_VORGABE_MINUTEN))}
-          autoComplete="off"
-        />
+        <Input placeholder={mitVorgabe(dauer(MAX_DIENST_VORGABE_MINUTEN))} autoComplete="off" />
       </Form.Item>
       <Form.Item<GrenzwerteFormWerte>
         label="Mindestruhe"
         name="min_ruhe"
         rules={[dauerRegel({ pflicht: false, min: 0, max: SCHICHTPLAN_MIN_RUHE_MAX_MINUTEN })]}
       >
-        <Input placeholder={mitVorgabe(formatDauer(MIN_RUHE_VORGABE_MINUTEN))} autoComplete="off" />
+        <Input placeholder={mitVorgabe(dauer(MIN_RUHE_VORGABE_MINUTEN))} autoComplete="off" />
       </Form.Item>
     </ErfassungsModal>
   );

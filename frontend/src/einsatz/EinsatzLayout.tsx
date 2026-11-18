@@ -673,7 +673,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           <SyncAnzeige liveErwartet kompakt={!mittel} />
           {/* Am Handy ist die Uhr die letzte Zelle; Suche und Benutzermenü stehen dort in der
               Navigation (LLH-1728, D3), sonst bliebe der Kopf zweizeilig. */}
-          <Uhr zelle={zellToken} trenner={mittel ? 'ende' : 'keiner'} />
+          {/* Die Uhr folgt der Darstellung des Einsatzes, wenn das Gerät nichts wählt (LLH-1750). */}
+          <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+            <Uhr zelle={zellToken} trenner={mittel ? 'ende' : 'keiner'} />
+          </EinsatzAnzeigeProvider>
           {mittel && !breit && (
             <div style={kopfZelleStil(zellToken)}>
               <CommandPaletteTrigger />

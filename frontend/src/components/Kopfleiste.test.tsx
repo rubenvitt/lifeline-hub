@@ -1,5 +1,11 @@
-import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { formatiereUhr } from '../anzeige/zeitDarstellung';
+import {
+  setzeZeitdarstellung,
+  zeitdarstellungVergessenFuerTests,
+} from '../anzeige/zeitDarstellungStore';
 import { LINIE_PFAD } from '../marke/bildmarkeGeometrie';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import {
@@ -9,7 +15,6 @@ import {
   Markenzelle,
   SYNC_DARSTELLUNG,
   syncZeigtWort,
-  formatiereUhr,
   kopfZelleStil,
   railBreite,
   syncZustand,
@@ -127,8 +132,10 @@ describe('Kopfleiste · Stile', () => {
     }
   });
 
-  it('formatiert die Uhr als HH:MM', () => {
-    expect(formatiereUhr(new Date(2026, 8, 21, 7, 5).getTime())).toBe('07:05');
+  it('formatiert die Uhr in der Zeitdarstellung, in Gerätezeit (LLH-1750)', () => {
+    const ms = new Date(2026, 8, 21, 7, 5).getTime();
+    expect(formatiereUhr(ms, 'taktisch')).toBe('0705');
+    expect(formatiereUhr(ms, 'datum_uhrzeit')).toBe('07:05');
   });
 });
 
@@ -217,6 +224,36 @@ describe('Handy-Kopf (LLH-1728)', () => {
     );
     const zelle = container.querySelector<HTMLElement>('[data-lfh="kopf-marke"]')!;
     expect(zelle.style.minHeight).toBe('72px');
+  });
+
+  it('die Uhr zeigt taktisch und folgt ohne Neuladen der Gerätewahl (LLH-1750)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 17, 17, 31));
+    try {
+      zeitdarstellungVergessenFuerTests();
+      const { container } = render(<Uhr />);
+      const uhr = () => container.querySelector('[data-lfh="kopf-uhr"] time')!;
+      expect(uhr()).toHaveTextContent(/^1731$/);
+      act(() => setzeZeitdarstellung('datum_uhrzeit'));
+      expect(uhr()).toHaveTextContent(/^17:31$/);
+      act(() => setzeZeitdarstellung(null));
+      expect(uhr()).toHaveTextContent(/^1731$/);
+    } finally {
+      zeitdarstellungVergessenFuerTests();
+      vi.useRealTimers();
+    }
+  });
+
+  it('die Uhr folgt der Darstellung des Einsatzes, wenn das Gerät nichts wählt', () => {
+    zeitdarstellungVergessenFuerTests();
+    const { container } = render(
+      <AnzeigeKonventionenProvider konventionen={{ zeitdarstellung: 'datum_uhrzeit' }}>
+        <Uhr />
+      </AnzeigeKonventionenProvider>,
+    );
+    expect(container.querySelector('[data-lfh="kopf-uhr"] time')!.textContent).toMatch(
+      /^\d{2}:\d{2}$/,
+    );
   });
 
   it('die Uhr nimmt die Zellpolsterung des Handy-Kopfs', () => {

@@ -175,7 +175,7 @@ test('Zettel je Person: Pause als Zeile, Stunden ohne Pause, Telefon beim Helfer
   const anna = blaetter.nth(0);
   await expect(anna.getByRole('heading')).toHaveText('Schichtzettel – Anna Aushang');
   // 15 UHS-Schichten zu 30 min + 2 h Streife; die halbe Stunde Pause zählt nicht.
-  await expect(anna.getByText('16 Schichten, 9:30 h')).toBeVisible();
+  await expect(anna.getByText('16 Schichten, 9 h 30 min')).toBeVisible();
   await expect(anna.getByRole('cell', { name: 'Pause', exact: true })).toBeVisible();
   const cora = blaetter.nth(1);
   await expect(cora.getByText('0151 2345678')).toBeVisible();

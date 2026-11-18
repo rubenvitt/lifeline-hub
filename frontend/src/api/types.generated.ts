@@ -5291,14 +5291,19 @@ export interface components {
          * @description Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
          *     Personenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die
          *     überfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten
-         *     und Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall trägt der Block
-         *     nicht (D6: die Regel lebt im Browser, Folgeaufgabe).
+         *     und Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall zählt
+         *     `einsatz::ausfall` nach der Regel des Meldebilds (LLH-1929).
          */
         LagemonitorAlarm: {
             /** @description Bezeichnungen der Abschnitte im Lagezustand „kritisch“, in der Folge der Gliederung. */
             abschnitte_kritisch: string[];
             /** Format: int64 */
             auftraege_ueberfaellig: number;
+            /**
+             * @description Bezeichnungen der Einheiten mit Ausfall (LLH-1929, `einsatz::ausfall`), in der Folge der
+             *     Einheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie.
+             */
+            ausfall: string[];
             /** Format: int64 */
             bestaetigung_ueberfaellig: number;
             /** Format: int64 */

@@ -21,8 +21,8 @@ das Modul im h1 nennen und den Reiter darunter, nicht umgekehrt.
 #### Scenario: Lagebild
 
 - **WHEN** eine Person das Lagebild öffnet
-- **THEN** heißen Menüeintrag und h1 „Lagebild“, und die Uhrzeit des Lagebilds steht neben dem
-  Titel, nicht in ihm
+- **THEN** heißen Menüeintrag und h1 „Lagebild“, und neben dem Titel steht der Datenstand, keine
+  Uhrzeit (Spec `zeitdarstellung`, „Uhr im Kopf in der Darstellung“)
 
 #### Scenario: Betroffene
 

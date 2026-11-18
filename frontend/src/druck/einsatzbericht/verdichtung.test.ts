@@ -117,7 +117,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     const a = block(b, 'zeiten').abschnitte[0];
     expect(wert(a, 'Beginn')).toBe('290130mrz26');
     expect(wert(a, 'Ende')).toBe('läuft');
-    expect(wert(a, 'Dauer')).toBe('01:30 h (bis Stand)');
+    expect(wert(a, 'Dauer')).toBe('1 h 30 min (bis Stand)');
     expect(b.stand).toBe('290400mrz26');
   });
 
@@ -131,7 +131,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
     expect(b.vorlaeufig).toBe(false);
     const a = block(b, 'zeiten').abschnitte[0];
     expect(wert(a, 'Ende')).toBe('290310mrz26');
-    expect(wert(a, 'Dauer')).toBe('00:40 h');
+    expect(wert(a, 'Dauer')).toBe('40 min');
   });
 
   // Spec `einsatzbericht`, „Führungsfunktionen aus der Mitgliedschaft“ (i6k6mzed, D7).
@@ -190,7 +190,7 @@ describe('3.2 Kräfte', () => {
     expect(wert(a, 'Einheiten')).toBe('1');
     expect(wert(a, 'Personen')).toBe('2');
     // 60 min (abgeschlossen) + 60 min (offen bis Stand 02:00 UTC).
-    expect(wert(a, 'Helferstunden')).toBe('2 h 00');
+    expect(wert(a, 'Helferstunden')).toBe('2 h');
     expect(vermerke(a)).toContain('Zeitachse für 2 von 3 Personen erfasst');
   });
 
@@ -209,7 +209,7 @@ describe('3.2 Kräfte', () => {
     expect(wert(abschnitt(b, 'kraefte', 'Stärke zum Druckzeitpunkt'), 'Stärke')).toBe('1/2/9//12');
     const a = abschnitt(b, 'kraefte', 'Insgesamt eingesetzt');
     expect(wert(a, 'Personen')).toBe('3');
-    expect(wert(a, 'Helferstunden')).toBe('2 h 30');
+    expect(wert(a, 'Helferstunden')).toBe('2 h 30 min');
     expect(vermerke(a)).toContain('Zeitachse für 3 von 5 Personen erfasst');
   });
 
@@ -667,7 +667,7 @@ describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
     expect(tabelle(anlage(roh))).toEqual({
       art: 'tabelle',
       kopf: ['Einheit', 'Beginn', 'Ende', 'Einsatzzeit'],
-      zeilen: [['Zug 1 (Florian 1/1)', '010800jun26', 'läuft', '6 h 32']],
+      zeilen: [['Zug 1 (Florian 1/1)', '010800jun26', 'läuft', '6 h 32 min']],
     });
   });
 
@@ -694,7 +694,7 @@ describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
     );
     expect(tabelle(anlage(roh)).zeilen).toEqual([
       ['Gruppe 1', '010830jun26', '010910jun26', '40 min'],
-      ['Zug 1', '010900jun26', '011130jun26', '1 h 30'],
+      ['Zug 1', '010900jun26', '011130jun26', '1 h 30 min'],
     ]);
   });
 
@@ -719,9 +719,7 @@ describe('Anlage Einheiten mit Einsatzzeiten (LFH-902, design.md D5)', () => {
       },
       STAND_SOMMER,
     );
-    expect(tabelle(anlage(roh)).zeilen).toEqual([
-      ['Zug 1', '010800jun26', 'nicht erfasst', '4 h 00'],
-    ]);
+    expect(tabelle(anlage(roh)).zeilen).toEqual([['Zug 1', '010800jun26', 'nicht erfasst', '4 h']]);
   });
 
   it('Einheiten im Einsatz ausgeblendet: Vermerk', () => {
@@ -815,8 +813,8 @@ describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
     expect(t.kopf).toEqual(['Name', 'Funktion', 'Einheit', 'Beginn', 'Ende', 'Einsatzzeit']);
     expect(t.zeilen).toEqual([
       ['Bert Bauer', 'Truppführerin', 'Bereitschaft', '—', '—', 'keine Zeitachse'],
-      ['Anna Abel', '—', 'Zug 1', '010800jun26', '010900jun26', '1 h 00'],
-      ['Zora Zander', 'Truppführerin', 'Zug 1', '010800jun26', 'läuft', '6 h 32'],
+      ['Anna Abel', '—', 'Zug 1', '010800jun26', '010900jun26', '1 h'],
+      ['Zora Zander', 'Truppführerin', 'Zug 1', '010800jun26', 'läuft', '6 h 32 min'],
       ['Frei Kraft', 'Truppführerin', '—', '—', '—', 'keine Zeitachse'],
     ]);
   });
@@ -864,7 +862,7 @@ describe('Anlage Personal je Kopf (LFH-902, design.md D5)', () => {
     const b = verdichteEinsatzbericht(roh(), konv, auswahl);
     const imKraefteblock = wert(abschnitt(b, 'kraefte', 'Insgesamt eingesetzt'), 'Helferstunden');
     expect(wert(anlage(b), 'Helferstunden')).toBe(imKraefteblock);
-    expect(imKraefteblock).toBe('7 h 32');
+    expect(imKraefteblock).toBe('7 h 32 min');
   });
 
   it('enthält nur Name, Funktion, Einheit und Zeiten, keine weiteren Felder der Kraft', () => {

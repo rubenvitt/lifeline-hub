@@ -34,6 +34,20 @@ pub const MONATE_DTG: [&str; 12] = [
     "jan", "feb", "mrz", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "dez",
 ];
 
+/// Eine Dauer in der Form des Clients (LLH-1750, Spec `zeitdarstellung`, „Eine Form für Dauern“):
+/// „45 min“, „8 h“, „13 h 30 min“, nie mit Doppelpunkt; Stunden laufen über 24 weiter, denn der
+/// Server schreibt nur Längen (Rhythmus, Grenzwerte, Dienstzeit im Schichtplan). Gegenstück:
+/// `frontend/src/anzeige/dauer.ts:dauer`, gehalten über `dauer.faelle.json`. Negativ gilt als 0.
+pub fn dauer_text(minuten: i64) -> String {
+    let minuten = minuten.max(0);
+    let (h, m) = (minuten / 60, minuten % 60);
+    match (h, m) {
+        (0, m) => format!("{m} min"),
+        (h, 0) => format!("{h} h"),
+        (h, m) => format!("{h} h {m:02} min"),
+    }
+}
+
 /// Wirksame Darstellung: Einsatz vor Organisation vor Vorgabe. Ein leerer oder unbekannter Wert
 /// zählt als nicht gesetzt.
 pub fn wirksame_darstellung(einsatz: Option<&str>, org: Option<&str>) -> Zeitdarstellung {
@@ -170,6 +184,30 @@ impl Zeitstil {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Spec `zeitdarstellung`, „Eine Form für Dauern“ (LLH-1750): dieselben Fälle wie der Kern im
+    /// Client (`frontend/src/anzeige/dauer.faelle.json`). Der Server schreibt nur Längen, ohne Tage.
+    #[test]
+    fn dauer_text_wie_der_client() {
+        let faelle: serde_json::Value =
+            serde_json::from_str(include_str!("../frontend/src/anzeige/dauer.faelle.json"))
+                .unwrap();
+        let mut geprueft = 0;
+        for fall in faelle["faelle"].as_array().unwrap() {
+            if fall.get("tage").and_then(|t| t.as_bool()) == Some(true) {
+                continue;
+            }
+            let minuten = fall["minuten"].as_i64().unwrap();
+            assert_eq!(
+                dauer_text(minuten),
+                fall["text"].as_str().unwrap(),
+                "{minuten} min"
+            );
+            geprueft += 1;
+        }
+        assert!(geprueft >= 10, "zu wenige gemeinsame Fälle: {geprueft}");
+        assert_eq!(dauer_text(-5), "0 min");
+    }
 
     const TAKTISCH: Zeitstil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::Taktisch);
     const DATUM: Zeitstil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::DatumUhrzeit);

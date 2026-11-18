@@ -8,8 +8,14 @@
  * (`lage/ausfallJeEinheit.ts`). Am Lagemonitor kommen dieselben Eingaben vom Server
  * (`lage/alarmAusMonitor.ts`); Folge und Wortlaut sind deshalb überall gleich.
  */
+import { dauer } from '../anzeige/dauer';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+
+/** Wartezeit wie „längste“ an der UHS (LLH-1750): ohne Tage, in der ersten Minute „< 1 min“. */
+function wartezeit(minuten: number): string {
+  return minuten < 1 ? '< 1 min' : dauer(minuten);
+}
 
 dayjs.extend(utc);
 
@@ -71,7 +77,8 @@ export interface WasBrenntQuellen {
   kritisch: QuellStand<Benannt[]>;
   /** Einheiten mit überfälliger Rückmeldung (schon geurteilt), Minuten seit der Fälligkeit. */
   rueckmeldung: QuellStand<(Benannt & { seitMin: number })[]>;
-  /** Einheiten mit Ausfall; `null`, wo es die Quelle nicht gibt (Lagemonitor, D6). */
+  /** Einheiten mit Ausfall; `null`, wo es die Quelle nicht gibt (Lagemonitor an einem Server vor
+   *  LLH-1929). */
   ausfall: QuellStand<Benannt[]> | null;
 }
 
@@ -146,7 +153,7 @@ export function wasBrennt(q: WasBrenntQuellen, jetzt: Dayjs): WasBrennt {
     if (m.sofort_offen > 0) {
       const seit = minutenSeit(m.sofort_aelteste_at, jetzt);
       const zahl = mehrzahl(m.sofort_offen, 'Sofortmeldung', 'Sofortmeldungen');
-      setze('sofort', seit != null ? `${zahl} · älteste ${seit} min` : zahl);
+      setze('sofort', seit != null ? `${zahl} · älteste ${wartezeit(seit)}` : zahl);
     }
     if (m.bestaetigung_ueberfaellig > 0) {
       setze(
@@ -173,7 +180,7 @@ export function wasBrennt(q: WasBrenntQuellen, jetzt: Dayjs): WasBrennt {
       (a, b) => b.seitMin - a.seitMin || a.name.localeCompare(b.name, 'de'),
     );
     const namen = folge.map((e) => e.name);
-    const laengste = ` · längste ${folge[0].seitMin} min`;
+    const laengste = ` · längste ${wartezeit(folge[0].seitMin)}`;
     setze(
       'rueckmeldung',
       `Rückmeldung überfällig: ${namenKurz(namen)}${laengste}`,

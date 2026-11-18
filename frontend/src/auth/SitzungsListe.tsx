@@ -1,3 +1,4 @@
+import { relativ } from '../anzeige/dauer';
 import { Button, Flex, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { PaneelZustand, StatusChip, monoStil, useRollen } from '../components/instrument';
@@ -22,16 +23,17 @@ function alsMs(utc: string): number {
 /**
  * „gerade eben“, „vor 12 min“, „vor 3 h“; ab einem Tag `null` (dann steht der Zeitpunkt).
  *
- * Bewusst nicht `anzeige/abstand.ts:formatVor` (LLH-1327): unter 5 min „gerade eben“ nach dem
- * Server-Takt, „vor n h“ ohne Minuten (der Takt macht sie ungenau) und ab einem Tag kein Text.
+ * Eigene Schwellen, Form aus `anzeige/dauer.ts` (LLH-1327, LLH-1750): unter 5 min „gerade eben“
+ * nach dem Server-Takt, „vor n h“ ohne Minuten (der Takt macht sie ungenau) und ab einem Tag
+ * kein Text.
  * Die 5-min-Schwelle beschreibt die Anwenderhilfe (`docs/anwender/kapitel/benutzer.md`,
  * `profil-sicherheit.md`).
  */
 export function zuletztText(utc: string, jetztMs: number): string | null {
   const alter = jetztMs - alsMs(utc);
   if (alter < GERADE_EBEN_MS) return 'gerade eben';
-  if (alter < 60 * 60_000) return `vor ${Math.floor(alter / 60_000)} min`;
-  if (alter < 24 * 60 * 60_000) return `vor ${Math.floor(alter / (60 * 60_000))} h`;
+  if (alter < 60 * 60_000) return relativ(Math.floor(alter / 60_000), 'vor');
+  if (alter < 24 * 60 * 60_000) return relativ(Math.floor(alter / (60 * 60_000)) * 60, 'vor');
   return null;
 }
 

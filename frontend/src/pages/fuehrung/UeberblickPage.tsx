@@ -1,3 +1,4 @@
+import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { IconBericht, IconPlus } from '../../icons';
 import { useWasBrennt } from '../../lage/useWasBrennt';
 import { alarmZiel } from '../../lage/alarmZiel';
@@ -1136,7 +1137,10 @@ function abschnittGliederung(
           {/* Was gezählt wird, steht dran (LFH-973): hier der ganze Teilbaum, im Abschnittsbaum
               nur die direkt zugeordneten. */}
           {anzahlWort(zeile.einheiten, 'Einheit', 'Einheiten')}
-          {zeile.unterabschnitte > 0 && ` inkl. UA · ${zeile.unterabschnitte} UA`}
+          {/* Ausgeschrieben statt „UA“ (LLH-1750, Spec `bedien-wortlaut`, „Kürzel sind eingeführt
+              oder erklärt“). */}
+          {zeile.unterabschnitte > 0 &&
+            ` inkl. Unterabschnitte · ${anzahlWort(zeile.unterabschnitte, 'Unterabschnitt', 'Unterabschnitte')}`}
         </span>
         {(lage || zeile.unterLage || gruende.length > 0) && (
           <span
@@ -1145,13 +1149,13 @@ function abschnittGliederung(
           >
             {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
             {/* Ein schlechter beurteilter Unterabschnitt bekommt dieselbe Form wie der eigene
-                Zustand (Rollenrand + Wort), sonst stünde „UA kritisch“ leiser da als ein grünes
+                Zustand (Rollenrand + Wort), sonst stünde „Unterabschnitt kritisch“ leiser da als ein grünes
                 „planmäßig“. */}
             {zeile.unterLage && (
               <StatusTag
                 darstellung={{
                   ...abschnittLagezustand[zeile.unterLage],
-                  label: `UA ${abschnittLagezustand[zeile.unterLage].label}`,
+                  label: `Unterabschnitt ${abschnittLagezustand[zeile.unterLage].label}`,
                 }}
                 darstellungsart="rand"
               />
@@ -1216,8 +1220,10 @@ function abschnittGliederung(
     ),
     zahl: (
       <>
-        <span style={monoStil(15)}>{zeile.staerkeText}</span>
-        <Augenbraue>F/UF/M//Ges</Augenbraue>
+        <span style={monoStil(15)} title={STAERKE_AUSGESCHRIEBEN}>
+          {zeile.staerkeText}
+        </span>
+        <Augenbraue>{STAERKE_SCHREIBWEISE}</Augenbraue>
         {/* Einheiten je Status als Verteilung: Wort, Zahl, Balken (Dashboard-Baukasten). Kein
             `aria-label` an der Liste: im Link bildet sich der Name aus dem Inhalt. */}
         <Verteilungsliste kennung="abschnitt-status" dichte="zeile" zeilen={status} />

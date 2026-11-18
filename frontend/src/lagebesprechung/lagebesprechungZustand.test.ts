@@ -2,7 +2,6 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import {
-  dauerText,
   lagebesprechungUeberfaellig,
   lagebesprechungZustand,
   terminZeitpunkt,
@@ -12,19 +11,6 @@ dayjs.extend(utc);
 
 /** Wire-Form eines absoluten Zeitpunkts — so, wie das Backend ihn schickt (UTC ohne Zone). */
 const wire = (iso: string) => dayjs(iso).utc().format('YYYY-MM-DD HH:mm:ss');
-
-describe('dauerText', () => {
-  it.each([
-    [0, '0 min'],
-    [23, '23 min'],
-    [59, '59 min'],
-    [60, '1 h 00 min'],
-    [70, '1 h 10 min'],
-    [125, '2 h 05 min'],
-  ])('%i Minuten → „%s"', (minuten, text) => {
-    expect(dauerText(minuten)).toBe(text);
-  });
-});
 
 describe('lagebesprechungZustand', () => {
   const jetzt = dayjs('2026-09-13T10:00:00Z');
@@ -151,19 +137,19 @@ describe('lagebesprechungZustand an den Sommerzeitgrenzen', () => {
     // 00:30Z = 01:30 MEZ, 01:30Z = 03:30 MESZ — auf der Wanduhr 2 h, tatsächlich 1 h.
     expect(
       lagebesprechungZustand(wire('2026-03-29T01:30:00Z'), dayjs('2026-03-29T00:30:00Z')).label,
-    ).toBe('in 1 h 00 min');
+    ).toBe('in 1 h');
     expect(
       lagebesprechungZustand(wire('2026-03-29T00:30:00Z'), dayjs('2026-03-29T01:30:00Z')).label,
-    ).toBe('seit 1 h 00 min überfällig');
+    ).toBe('seit 1 h überfällig');
   });
 
   it('Oktober: rechnet in echten Minuten, nicht in Wanduhrzeit', () => {
     // 00:30Z = 02:30 MESZ, 01:30Z = 02:30 MEZ — auf der Wanduhr 0 h, tatsächlich 1 h.
     expect(
       lagebesprechungZustand(wire('2026-10-25T01:30:00Z'), dayjs('2026-10-25T00:30:00Z')).label,
-    ).toBe('in 1 h 00 min');
+    ).toBe('in 1 h');
     expect(
       lagebesprechungZustand(wire('2026-10-25T00:30:00Z'), dayjs('2026-10-25T01:30:00Z')).label,
-    ).toBe('seit 1 h 00 min überfällig');
+    ).toBe('seit 1 h überfällig');
   });
 });

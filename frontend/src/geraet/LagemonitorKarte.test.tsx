@@ -24,6 +24,10 @@ const karte = vi.hoisted(() => ({
   /** Die Elemente der Marken, wie maplibre sie bekäme (LLH-1746). */
   elemente: [] as HTMLElement[],
   optionen: null as null | Record<string, unknown>,
+  /** Versatz je Markenelement, wie `setOffset` ihn bekam (LLH-1933). */
+  versatz: new Map<HTMLElement, [number, number]>(),
+  /** Ort je Markenelement, wie `setLngLat` ihn bekam. */
+  orte: new Map<HTMLElement, [number, number]>(),
 }));
 
 vi.mock('maplibre-gl', () => {
@@ -40,14 +44,32 @@ vi.mock('maplibre-gl', () => {
       if (karte.wurf) throw karte.wurf();
       karte.gebaut += 1;
       karte.optionen = optionen;
-      return spion();
+      const karteSpion = spion();
+      // Bildschirmraum für die Platzierung der Marken (LLH-1933): eine Kachel von 1600 × 1400 px,
+      // 100 000 px je Grad um 13,4° O / 52,53° N.
+      karteSpion.getContainer = () => ({ clientWidth: 1600, clientHeight: 1400 });
+      karteSpion.project = ([lon, lat]: [number, number]) => ({
+        x: (lon - 13.4) * 100_000,
+        y: (52.53 - lat) * 100_000,
+      });
+      return karteSpion;
     }
   }
   class Marker {
     constructor(optionen?: { element?: HTMLElement }) {
       karte.marker += 1;
-      if (optionen?.element) karte.elemente.push(optionen.element);
-      return spion();
+      const el = optionen?.element;
+      if (el) karte.elemente.push(el);
+      const markerSpion = spion();
+      markerSpion.setLngLat = (ort: [number, number]) => {
+        if (el) karte.orte.set(el, ort);
+        return markerSpion;
+      };
+      markerSpion.setOffset = (v: [number, number]) => {
+        if (el) karte.versatz.set(el, v);
+        return markerSpion;
+      };
+      return markerSpion;
     }
   }
   return { Map, Marker };
@@ -86,6 +108,8 @@ beforeEach(() => {
   karte.marker = 0;
   karte.elemente = [];
   karte.optionen = null;
+  karte.versatz = new Map();
+  karte.orte = new Map();
   server.use(
     http.get('/api/karte/config', () =>
       HttpResponse.json({
@@ -314,5 +338,128 @@ describe('LagemonitorKarte Marken (LLH-1746)', () => {
     expect(zelt.style.borderColor).toBe(schule.style.borderColor);
     expect(zelt).toHaveTextContent('Zelt · 2');
     expect(zelt.dataset.ueberbelegt).toBe('nein');
+  });
+});
+
+describe('LagemonitorKarte Platzierung der Marken (LLH-1933)', () => {
+  /** Quadrat um den Einsatzort, Schwerpunkt genau auf ihm (13,405° O / 52,52° N). */
+  const UM_EINSATZORT = JSON.stringify({
+    type: 'Polygon',
+    coordinates: [
+      [
+        [13.4, 52.515],
+        [13.41, 52.515],
+        [13.41, 52.525],
+        [13.4, 52.525],
+        [13.4, 52.515],
+      ],
+    ],
+  });
+  const EINSATZORT = { lat: 52.52, lon: 13.405 };
+  const marke = (lfh: string) => karte.elemente.filter((e) => e.dataset.lfh === lfh);
+  const einsatzortMarke = () =>
+    karte.elemente.find((e) => e.getAttribute('aria-label') === 'Einsatzort')!;
+
+  /** Maße der Marken wie im Browser (jsdom misst nicht): Punkt 36 px, Text 400 × 40 px. */
+  function mass(el: HTMLElement, achse: 'breite' | 'hoehe'): number {
+    if (el.getAttribute('aria-label') === 'Einsatzort') return 36;
+    if (el.dataset.lfh?.startsWith('monitor-')) return achse === 'breite' ? 400 : 40;
+    return 0;
+  }
+
+  /** Rahmen einer Marke in Pixeln der Kachel: ihr Ort nach `project`, verschoben um ihren Versatz. */
+  function rahmen(el: HTMLElement) {
+    const [lon, lat] = karte.orte.get(el)!;
+    const [dx, dy] = karte.versatz.get(el) ?? [0, 0];
+    const x = (lon - 13.4) * 100_000 + dx;
+    const y = (52.53 - lat) * 100_000 + dy;
+    const b = mass(el, 'breite');
+    const h = mass(el, 'hoehe');
+    return { links: x - b / 2, oben: y - h / 2, rechts: x + b / 2, unten: y + h / 2 };
+  }
+
+  function ueberlappen(a: HTMLElement, b: HTMLElement) {
+    const ra = rahmen(a);
+    const rb = rahmen(b);
+    return ra.links < rb.rechts && rb.links < ra.rechts && ra.oben < rb.unten && rb.oben < ra.unten;
+  }
+
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return mass(this, 'breite');
+    });
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return mass(this, 'hoehe');
+    });
+    return () => vi.restoreAllMocks();
+  });
+
+  it('liegt der Schwerpunkt eines Gefahrengebiets auf dem Einsatzort, bleibt der Punkt sichtbar', async () => {
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={EINSATZORT}
+        uhs={[]}
+        zonen={[
+          {
+            id: 1,
+            typ: 'gefahrengebiet',
+            geometrie: UM_EINSATZORT,
+            gebiet: { bezeichnung: 'Überflutung Unterstadt', warnstufe: 'hoch', bestaetigt: false },
+          },
+        ]}
+      />,
+    );
+    await waitFor(() => expect(karte.versatz.size).toBe(1));
+    const [zone] = marke('monitor-zone');
+    // Die Marke steht am Schwerpunkt verankert, also auf dem Einsatzort …
+    const [lon, lat] = karte.orte.get(zone)!;
+    expect(lon).toBeCloseTo(13.405, 6);
+    expect(lat).toBeCloseTo(52.52, 6);
+    // … und weicht aus, sodass sie den Punkt nicht deckt.
+    expect(ueberlappen(zone, einsatzortMarke())).toBe(false);
+    // Der Punkt liegt über allen Marken: auch wenn es eng wird, deckt ihn keine zu.
+    expect(Number(einsatzortMarke().style.zIndex)).toBeGreaterThan(0);
+  });
+
+  it('die UHS behält ihren Platz, Abschnitts- und Zonenmarke weichen aus', async () => {
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={{ lat: 52.525, lon: 13.41 }}
+        uhs={[
+          {
+            id: 1,
+            bezeichnung: 'Turnhalle Musterstadt',
+            typ: 'behandlungsplatz',
+            status: 'aktiv',
+            lat: 52.52,
+            lon: 13.405,
+            belegt: 8,
+            plaetze: 5,
+            kraefte: 0,
+          },
+        ]}
+        zonen={[{ id: 2, typ: 'absperrbereich', geometrie: UM_EINSATZORT }]}
+        abschnitte={[
+          {
+            id: 3,
+            bezeichnung: 'Einsatzabschnitt 1',
+            kurzbezeichnung: 'EA 1',
+            flaeche_geojson: UM_EINSATZORT,
+          },
+        ]}
+      />,
+    );
+    await waitFor(() => expect(karte.versatz.size).toBe(3));
+    const [uhs] = marke('monitor-uhs-marke');
+    const [abschnitt] = marke('monitor-abschnitt');
+    const [zone] = marke('monitor-zone');
+    expect(karte.versatz.get(uhs)).toEqual([0, 0]);
+    expect(ueberlappen(uhs, abschnitt)).toBe(false);
+    expect(ueberlappen(uhs, zone)).toBe(false);
+    expect(ueberlappen(abschnitt, zone)).toBe(false);
   });
 });

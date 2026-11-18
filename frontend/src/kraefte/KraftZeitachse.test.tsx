@@ -118,7 +118,7 @@ describe('KraftZeitachse (LFH-552)', () => {
       expect(z).not.toBeNull();
       return z!;
     });
-    expect(zeile).toHaveTextContent(/Im Einsatz \d+ h \d\d/);
+    expect(zeile).toHaveTextContent(/Im Einsatz (\d+ min|\d+ h( \d\d min)?)/);
     expect(zeile).toHaveTextContent(/seit Alarmierung/);
     expect(zeile).toHaveTextContent(/gesamt/);
   });

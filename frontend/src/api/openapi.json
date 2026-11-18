@@ -13243,7 +13243,7 @@
       },
       "LagemonitorAlarm": {
         "type": "object",
-        "description": "Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne\nPersonenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die\nüberfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten\nund Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall trägt der Block\nnicht (D6: die Regel lebt im Browser, Folgeaufgabe).",
+        "description": "Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne\nPersonenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die\nüberfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten\nund Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall zählt\n`einsatz::ausfall` nach der Regel des Meldebilds (LLH-1929).",
         "required": [
           "sofort_offen",
           "dringend_offen",
@@ -13252,7 +13252,8 @@
           "erinnerungen_faellig",
           "nachforderungen_ueberfaellig",
           "rueckmeldung_ueberfaellig",
-          "abschnitte_kritisch"
+          "abschnitte_kritisch",
+          "ausfall"
         ],
         "properties": {
           "abschnitte_kritisch": {
@@ -13265,6 +13266,13 @@
           "auftraege_ueberfaellig": {
             "type": "integer",
             "format": "int64"
+          },
+          "ausfall": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Bezeichnungen der Einheiten mit Ausfall (LLH-1929, `einsatz::ausfall`), in der Folge der\nEinheitenliste, „Ohne Einheit“ zuletzt. Leer ohne Ausfall; Namen von Personen nie."
           },
           "bestaetigung_ueberfaellig": {
             "type": "integer",

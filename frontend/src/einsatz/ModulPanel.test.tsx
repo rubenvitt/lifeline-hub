@@ -418,7 +418,7 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
       />,
     );
     expect(screen.getByText('Einsatzdauer')).toBeInTheDocument();
-    expect(screen.getByText('06:41 h')).toBeInTheDocument();
+    expect(screen.getByText('6 h 41 min')).toBeInTheDocument();
   });
 
   it('lässt den Fuß ohne Einsatz weg, statt eine Dauer zu erfinden', () => {

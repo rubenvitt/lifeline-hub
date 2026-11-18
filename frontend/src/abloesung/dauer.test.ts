@@ -1,27 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  formatDauer,
-  formatUhrzeiten,
-  parseDauer,
-  parseUhrzeiten,
-  uhrzeitenFeldText,
-} from './dauer';
-
-describe('formatDauer (LLH-1122)', () => {
-  it('schreibt ganze Stunden als „8 h“, nie mit Dezimalpunkt', () => {
-    expect(formatDauer(480)).toBe('8 h');
-    expect(formatDauer(720)).toBe('12 h');
-    expect(formatDauer(480)).not.toContain('.');
-  });
-  it('schreibt angebrochene Stunden als „7:30 h“ mit zweistelligen Minuten', () => {
-    expect(formatDauer(450)).toBe('7:30 h');
-    expect(formatDauer(365)).toBe('6:05 h');
-  });
-  it('schreibt unter einer Stunde Minuten', () => {
-    expect(formatDauer(45)).toBe('45 min');
-    expect(formatDauer(0)).toBe('0 min');
-  });
-});
+import { dauer } from '../anzeige/dauer';
+import { formatUhrzeiten, parseDauer, parseUhrzeiten, uhrzeitenFeldText } from './dauer';
 
 describe('parseDauer (LLH-1122)', () => {
   it('liest leer als leer', () => {
@@ -39,17 +18,33 @@ describe('parseDauer (LLH-1122)', () => {
     expect(parseDauer('45 min')).toEqual({ art: 'minuten', minuten: 45 });
     expect(parseDauer('90min')).toEqual({ art: 'minuten', minuten: 90 });
   });
-  it('nimmt das Dezimalkomma als Stunden (7,5 = 7:30 h)', () => {
+  it('liest die Anzeigeform „7 h 30 min“ und „7 h 30“ (LLH-1750)', () => {
+    expect(parseDauer('7 h 30 min')).toEqual({ art: 'minuten', minuten: 450 });
+    expect(parseDauer('7 h 30')).toEqual({ art: 'minuten', minuten: 450 });
+    expect(parseDauer('167 h 59 min')).toEqual({ art: 'minuten', minuten: 10_079 });
+    expect(parseDauer('6h05min')).toEqual({ art: 'minuten', minuten: 365 });
+  });
+  it('nimmt das Dezimalkomma als Stunden (7,5 = 7 h 30 min)', () => {
     expect(parseDauer('7,5')).toEqual({ art: 'minuten', minuten: 450 });
     expect(parseDauer('7.5 h')).toEqual({ art: 'minuten', minuten: 450 });
   });
   it('liest jede eigene Anzeige zurück', () => {
     for (const m of [0, 1, 30, 45, 60, 90, 450, 480, 720, 1440, 10_080]) {
-      expect(parseDauer(formatDauer(m))).toEqual({ art: 'minuten', minuten: m });
+      expect(parseDauer(dauer(m))).toEqual({ art: 'minuten', minuten: m });
     }
   });
   it('lehnt Unlesbares ab, statt zu raten', () => {
-    for (const t of ['acht', '7:75', '7:5', '-1', '1:30:00', 'h', '8 Tage', '7,555']) {
+    for (const t of [
+      'acht',
+      '7:75',
+      '7:5',
+      '-1',
+      '1:30:00',
+      'h',
+      '8 Tage',
+      '7,555',
+      '7 h 75 min',
+    ]) {
       expect(parseDauer(t), t).toEqual({ art: 'ungueltig' });
     }
   });

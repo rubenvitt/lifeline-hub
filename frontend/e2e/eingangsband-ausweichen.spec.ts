@@ -487,6 +487,12 @@ test('Eingangsband rückt auf der Lagekarte über die Bänder des Kartenfußes, 
   });
   expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
+  // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur ein Knopf (LLH-1936), und das
+  // Band reichte nicht unter die Meldung.
+  const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+    data: { bezeichnung: 'Stand vor Ort' },
+  });
+  expect(stand.ok(), `POST lage-snapshots: ${stand.status()}`).toBe(true);
   const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zweiter Schirm');
   await mitgliedEintragen(page, String(einsatzId), konto.id, 'fuehrungspersonal');
 

@@ -17,7 +17,7 @@ import {
 } from '../offline/useVorgemerkteSchreibaktionen';
 import type { PersonDetail } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { formatVor } from '../anzeige/abstand';
+import { vorText } from '../anzeige/dauer';
 import { ErfassungsFormular } from '../components/Erfassung';
 import {
   Datenfeld,
@@ -255,7 +255,7 @@ export default function Patientenkopf({
               {person.aktuelle_sichtung_at && (
                 <Typography.Text type="secondary" data-lfh="sichtung-zeit">
                   gesichtet <ZeitAnzeige wert={person.aktuelle_sichtung_at} rolle="kurz" /> ·{' '}
-                  {formatVor(person.aktuelle_sichtung_at, jetzt)}
+                  {vorText(person.aktuelle_sichtung_at, jetzt)}
                   {letzteSichtung?.bestaetigt_name &&
                     ` · bestätigt: ${letzteSichtung.bestaetigt_name}`}
                 </Typography.Text>

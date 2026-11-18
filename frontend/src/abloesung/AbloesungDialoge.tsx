@@ -1,3 +1,4 @@
+import { dauer } from '../anzeige/dauer';
 import { Checkbox, Collapse, Form, Input, Typography, type FormInstance } from 'antd';
 import { SegmentFeld } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
@@ -34,7 +35,7 @@ import {
   type VerteilungZiele,
 } from './besatzung';
 import { verbleibBody, verbleibOptionen, type VerbleibRaum, type VerbleibWert } from './verbleib';
-import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
+import { dauerFeldText, dauerMinuten, dauerRegel } from './dauer';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import {
   folgtPlan,
@@ -48,7 +49,7 @@ import {
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog
  * (der Vollzug: Art, Ablöser bzw. neue Besatzung, Zeitpunkt; „Abschnitt übergeben“ als Option zu
  * den Ablösern; bei der ganzen Einheit dazu „Danach“ mit Vorgabe, LLH-1308 design.md D1).
- * Der Rhythmus wird als DAUER erfasst und angezeigt („8 h“, „7:30 h“, nie „8.0“, LLH-1122,
+ * Der Rhythmus wird als DAUER erfasst und angezeigt („8 h“, „7 h 30 min“, nie „8.0“, LLH-1122,
  * `abloesung/dauer.ts`) und als Minuten gesendet — die Lage spricht in „6-Stunden-Rhythmus",
  * nicht in 360 Minuten. Zeiten stehen in der Anzeigezone (`ZeitpunktEingabe`, LFH-692).
  *
@@ -196,7 +197,7 @@ export function SchichtBeginnenDialog({
         ? rhythmusField(undefined, false)
         : rhythmusField(
             vorgabe != null
-              ? abschnittVorgabe(formatDauer(vorgabe))
+              ? abschnittVorgabe(dauer(vorgabe))
               : einsatzVorgabeText != null
                 ? einsatzVorgabe(einsatzVorgabeText)
                 : undefined,

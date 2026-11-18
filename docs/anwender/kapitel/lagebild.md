@@ -18,8 +18,8 @@ Modul, in dem sie erfasst wird.
 
 ### Das Lagebild lesen
 
-1. Im Bereich „Lage“ „Lagebild“ öffnen. Im Seitenkopf stehen Datum und Uhrzeit, rechts das Alter
-   des Datenstands („Stand vor … s“), sobald eine erhöhte Warnstufe gilt, der Hinweis
+1. Im Bereich „Lage“ „Lagebild“ öffnen. Neben dem Titel steht der Datenstand („Stand 1430“, ab
+   einer Minute mit Alter „Stand 1430 · vor 2 min“); rechts steht, sobald eine erhöhte Warnstufe gilt, der Hinweis
    „Warnstufe …“ und, sobald für den Einsatzort eine Wetterwarnung gilt oder angekündigt ist, ihre
    Marke, etwa „Markantes Wetter Dauerregen bis 21:00 ↗“. Die Marke öffnet „Wetter & Pegel“.
 2. Die Zeile „Was brennt“ lesen: dieselbe wie im Überblick, mit offenen Sofortmeldungen ab
@@ -39,19 +39,22 @@ Modul, in dem sie erfasst wird.
 ### Neue ETB-Einträge im Lagebild anzeigen
 
 1. Im Lagebild bleiben, während neue Einträge eingehen. Das Paneel „Jüngste ETB-Einträge“ schiebt
-   sie nicht zwischen die gelesenen Zeilen, sondern kündigt sie oben an („… neue Einträge“).
+   sie nicht zwischen die gelesenen Zeilen, sondern kündigt sie im Paneelkopf an („2 neu“, an der
+   Stelle von „live“).
 
-   ![Paneel „Jüngste ETB-Einträge“ mit dem Hinweis „2 neue Einträge“ und dem Knopf „anzeigen“](../bilder/lagebild/etb-eintraege-neu.png)
+   ![Paneel „Jüngste ETB-Einträge“ mit dem Knopf „2 neu“ im Kopf neben „ETB“](../bilder/lagebild/etb-eintraege-neu.png)
 
-2. „anzeigen“ wählen: Die neuen Einträge stehen oben im Paneel, der Hinweis verschwindet.
+2. „2 neu“ wählen: Die neuen Einträge stehen oben im Paneel, der Knopf verschwindet, und im Kopf
+   steht wieder „live“.
 
 ### Das Lagebild im Großbild zeigen
 
 Für einen Beamer oder Wandbildschirm im Führungsraum, ab Tablet-Breite:
 
 1. Im Seitenkopf des Lagebilds „Großbild“ wählen. Das Lagebild füllt den Bildschirm ohne Kopfleiste
-   und Navigation: die sechs Kennzahlen groß, darunter die Gefahren je Typ (in der Reihe
-   Sanitätsdienst der Verlauf), die Sichtung und der Stand mit Lagebericht und UHS.
+   und Navigation: ganz oben die Zeile „Was brennt“, darunter die sechs Kennzahlen groß, dann die
+   Gefahren je Typ (in der Reihe Sanitätsdienst der Verlauf), die Sichtung und der Stand mit
+   Lagebericht und UHS.
 2. Hat der Browser das Vollbild abgelehnt, steht oben „Vollbild“; es holt das Vollbild nach.
 3. Zum Verlassen „Großbild verlassen“ wählen oder Esc drücken. Das Lagebild steht wieder an
    derselben Stelle.
@@ -63,11 +66,11 @@ Für einen Beamer oder Wandbildschirm im Führungsraum, ab Tablet-Breite:
 Das Großbild ist nur zum Ansehen: Nichts darin führt in ein Modul oder ändert etwas. Die Zahlen
 kommen aus derselben Zusammenstellung wie die Seite und laufen live mit. Bei 1920 × 1080 sind die
 Zahlen so groß wie am Lagemonitor, auf einem kleineren oder größeren Bildschirm wächst alles im
-selben Verhältnis mit, ohne Bildlauf. Die jüngsten ETB-Einträge und die Zeile „Was brennt“ stehen
-nicht im Großbild. Gehen
-Alarme oder Hinweise ein, nennt das Großbild nur ihre Zahl („1 Alarm offen“), ohne Titel;
+selben Verhältnis mit, ohne Bildlauf. Die Zeile „Was brennt“ zeigt dieselben Einträge wie auf der
+Seite, nur ohne Sprünge; was nicht in die Breite passt, steht als „+2“ ohne Liste. Die jüngsten
+ETB-Einträge stehen nicht im Großbild. Gehen Alarme oder Hinweise ein, nennt das Großbild nur ihre Zahl („1 Alarm offen“), ohne Titel;
 bearbeitet werden sie nach dem Verlassen in der Alarmzone. Ist das Netz weg oder die Live-Verbindung
-getrennt, steht das oben („Ohne Netz“, „Verbindung getrennt“), und die Uhrzeit mit dem Alter des Stands zeigt, wie alt die Zahlen sind.
+getrennt, steht das oben („Ohne Netz“, „Verbindung getrennt“), und Uhr und Stand mit Alter zeigen, wie alt die Zahlen sind.
 Tastenkürzel der App, etwa die Suche, wirken im Großbild nicht. Bei einer Übung trägt es die
 Übungsmarke. Nach einem Neuladen steht die normale Seite da, das Großbild wird nicht gemerkt.
 
@@ -128,7 +131,8 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   „Unterwegs / offen / abgeschlossen“: unterwegs im Eigentransport, ohne Verbleib, abgeschlossen
   (übergeben, entlassen, Notunterkunft, Verbleib des Leichnams). Abgeschlossene zählen in keiner
   Sichtungskategorie; die Kennzahl „Betroffene“ nennt sie hinter den Patienten („3 Patienten · 2
-  abgeschlossen“), „Verbleib offen“ nennt, wie viele unterwegs sind.
+  abgeschlossen“), „Verbleib offen“ zählt die Angetroffenen, bei denen noch nicht erfasst ist, wohin sie gegangen
+  sind („wohin nicht erfasst“), und nennt, wie viele unterwegs sind.
 - **Jüngste ETB-Einträge:** die jüngsten Einträge des Einsatztagebuchs aller Typen, nicht nur
   Meldungen. Rechts im Kopf steht der Zustand der Leitung: „live“, „Verbindung wird aufgebaut“
   oder „Verbindung unterbrochen“, ohne Netz oder Server „offline“. Ein berichtigter Eintrag trägt wie im Einsatztagebuch die Marke

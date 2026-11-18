@@ -9,7 +9,9 @@ die **Alarmzeile „Was brennt“** (`AlarmZeile`): Einträge,
 Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
 am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
 Quellen, Sprungziele aus `lage/alarmZiel.ts`. Sie zeigt Zustände, die Alarmzone Ereignisse; keine
-Seite baut eine zweite Sammlung. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**: eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
+Seite baut eine zweite Sammlung. Im Großbild des Lagebilds steht sie in der Größe `grossbild`
+(Maße über `grossMass`, ohne Sprünge), mit den Daten der Seite; das Großbild der
+Lagebesprechung trägt keine. Nur im Überblick folgt ihr die Reihe **„Einsatz starten“**: eine eigene `PaneelReihe` mit genau einem `ListenPaneel`,
 Punkte nur aus `pages/fuehrung/startliste.ts`, nur mit Schreibrecht am aktiven Einsatz; sie fehlt
 ganz, sobald kein Punkt offen ist oder sie in diesem Browser ausgeblendet ist. Weil sie über den
 Paneelreihen steht, warten sie und die Reihen beim ersten Aufbau gemeinsam auf ihre Quellen; die

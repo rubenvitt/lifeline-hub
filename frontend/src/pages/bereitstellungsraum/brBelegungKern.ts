@@ -1,7 +1,7 @@
+import { dauer } from '../../anzeige/dauer';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { BrVerlaufEintrag } from '../../api/types';
-import { dauerText } from '../../kraefte/zeitachse';
 
 dayjs.extend(utc);
 
@@ -27,7 +27,7 @@ export function wartezeitMinuten(seitAt: string, jetzt: Dayjs): number {
 
 /** „seit 1342 · 48 min“: die Uhrzeit kommt formatiert (taktisch, Anzeigezone) herein. */
 export function seitText(uhrzeit: string, minuten: number): string {
-  return `seit ${uhrzeit} · ${dauerText(minuten)}`;
+  return `seit ${uhrzeit} · ${dauer(minuten)}`;
 }
 
 /**

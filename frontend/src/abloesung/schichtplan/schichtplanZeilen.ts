@@ -1,3 +1,4 @@
+import { dauer } from '../../anzeige/dauer';
 import type {
   AbloesungVorgabe,
   Einheit,
@@ -15,7 +16,7 @@ import type {
 import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import { qualiSollEingabe } from '../../kraefte/qualiSoll';
 import { abschnittDerEinheit } from '../../kraefte/kraeftebaumKern';
-import { formatDauer } from '../dauer';
+
 import type { Ampel, RasterBlock, RasterZeile } from './raster';
 
 /**
@@ -185,7 +186,7 @@ export function befundText(
     case 'quali':
       return `${vorn}${befund.fehlen ?? 1} × ${qualiNamen.get(befund.qualifikation_id ?? -1) ?? 'Qualifikation'} fehlt`;
     case 'dienst':
-      return `${vorn}${formatDauer(befund.dauer_minuten ?? 0)} im Dienst`;
+      return `${vorn}${dauer(befund.dauer_minuten ?? 0)} im Dienst`;
     default:
       return `${vorn}${befundWort(befund.art)}`;
   }

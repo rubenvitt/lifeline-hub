@@ -8821,7 +8821,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
             "sofort_offen": 0, "dringend_offen": 0, "bestaetigung_ueberfaellig": 0,
             "auftraege_ueberfaellig": 0, "erinnerungen_faellig": 0,
             "nachforderungen_ueberfaellig": 0,
-            "rueckmeldung_ueberfaellig": [], "abschnitte_kritisch": []
+            "rueckmeldung_ueberfaellig": [], "abschnitte_kritisch": [], "ausfall": []
         }),
         "{v}"
     );
@@ -8969,6 +8969,53 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
     let _ = &pool;
 }
 
+/// Delta-Spec `lagemonitor`, „Alarmzeile ohne Personenbezug“, Szenario „Ausfall auf dem Monitor“
+/// (LLH-1929): der Block `alarm` nennt die Einheit mit Ausfall, nicht die Person.
+#[tokio::test]
+async fn lagemonitor_alarm_nennt_ausfall_ohne_personennamen() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let mut einheiten = Vec::new();
+    for name in ["Sanitätszug", "Logistiktrupp"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/einheiten"),
+            &admin,
+            Some(&json!({ "name": name })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        einheiten.push(v["id"].as_i64().unwrap());
+    }
+    let krank: i64 = sqlx::query_scalar(
+        "INSERT INTO personal_status (org_id, label, kategorie) \
+         SELECT org_id, 'krank', 'nicht_verfuegbar' FROM einsatz WHERE id = ? RETURNING id",
+    )
+    .bind(einsatz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id, status_id) \
+         VALUES (?, 'Anna Muster', ?, ?)",
+    )
+    .bind(einsatz)
+    .bind(einheiten[1])
+    .bind(krank)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/lagemonitor"), &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["alarm"]["ausfall"], json!(["Logistiktrupp"]), "{v}");
+    assert!(!v.to_string().contains("Anna Muster"), "{v}");
+}
+
 /// Delta-Spec `lagemonitor`, „Sofortmeldungen erreichen den Monitor sofort“ (LLH-1743, D7): der
 /// Live-Kanal des Monitors trägt `sofortmeldung` als Signal ohne Inhalt, aber kein `meldung`.
 #[tokio::test]
@@ -8997,6 +9044,24 @@ async fn lagemonitor_bekommt_sofortmeldung_im_live_kanal_ohne_inhalt() {
     assert!(!gelesen.contains("event: meldung\n"), "{gelesen}");
     assert!(!gelesen.contains("meldung_id"), "{gelesen}");
     assert!(!gelesen.contains("Verborgen"), "{gelesen}");
+}
+
+/// Spec `live-abgleich`, „Gerät ohne Modulrechte“ (LLH-1935): der Lagemonitor bekommt das
+/// Lebenszeichen wie jede andere Verbindung, obwohl sein Strom nach Ansicht gefiltert ist.
+#[tokio::test]
+async fn lagemonitor_bekommt_das_lebenszeichen() {
+    let (app, _pool, _live) =
+        common::setup_mit_stromgrenzen(lifeline_hub::live::strom::StromGrenzen {
+            heartbeat: Duration::from_millis(50),
+            ..Default::default()
+        })
+        .await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let mut body = live_geraet(&app, &monitor, einsatz).await;
+    let gelesen = common::sse_lesen_fuer(&mut body, Duration::from_millis(300)).await;
+    assert!(gelesen.contains("event: heartbeat\ndata: {}"), "{gelesen}");
 }
 
 // ---------- Rücknahme am Gerät (LLH-1924, Review) ----------
