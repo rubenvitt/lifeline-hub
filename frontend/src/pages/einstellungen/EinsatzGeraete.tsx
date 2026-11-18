@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'react-router';
 import type { Dayjs } from 'dayjs';
 import { QRCodeSVG } from 'qrcode.react';
 import { IconKreuz, IconPlus, IconSchluessel, IconUhr } from '../../icons';
-import { Formularpaneel, monoStil, useRollen } from '../../components/instrument';
+import { Feld, Formularpaneel, MetaZeile, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -363,21 +363,36 @@ export default function EinsatzGeraete() {
                 <ListenEintragMeta
                   title={<span data-lfh="geraet-titel">{k.anzeigename}</span>}
                   description={
-                    <span style={{ color: rollen.gedaempft }} data-lfh="geraet-zustand">
-                      {[
-                        ANSICHT_LABEL[k.ansicht],
-                        STATUS_WORT[k.status],
-                        k.status === 'widerrufen'
-                          ? `von ${k.widerrufen_von_name ?? '—'} um ${zeitKurz(k.widerrufen_at, konv)}`
-                          : `bis ${zeitKurz(k.laeuft_ab_at, konv)}`,
-                        k.letzter_zugriff_at
-                          ? `zuletzt ${zeitKurz(k.letzter_zugriff_at, konv)}`
-                          : null,
-                        `angelegt von ${k.erstellt_von_name}`,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
+                    <div data-lfh="geraet-zustand">
+                      <MetaZeile>
+                        <MetaZeile.Teil>{ANSICHT_LABEL[k.ansicht]}</MetaZeile.Teil>
+                        <MetaZeile.Teil>{STATUS_WORT[k.status]}</MetaZeile.Teil>
+                        <MetaZeile.Teil>
+                          {k.status === 'widerrufen' ? (
+                            <>
+                              {`von ${k.widerrufen_von_name ?? '—'} um `}
+                              <MetaZeile.Zahl>{zeitKurz(k.widerrufen_at, konv)}</MetaZeile.Zahl>
+                            </>
+                          ) : (
+                            <>
+                              {'bis '}
+                              <MetaZeile.Zahl>{zeitKurz(k.laeuft_ab_at, konv)}</MetaZeile.Zahl>
+                            </>
+                          )}
+                        </MetaZeile.Teil>
+                        <MetaZeile.Teil>
+                          {k.letzter_zugriff_at ? (
+                            <>
+                              {'zuletzt '}
+                              <MetaZeile.Zahl>
+                                {zeitKurz(k.letzter_zugriff_at, konv)}
+                              </MetaZeile.Zahl>
+                            </>
+                          ) : null}
+                        </MetaZeile.Teil>
+                        <MetaZeile.Teil>{`angelegt von ${k.erstellt_von_name}`}</MetaZeile.Teil>
+                      </MetaZeile>
+                    </div>
                   }
                 />
               </ListenEintrag>
@@ -411,7 +426,7 @@ export default function EinsatzGeraete() {
         }}
       >
         <FormularEingehaengt onWechsel={anlegenFormular.melde} />
-        <Form.Item
+        <Feld
           label="Ansicht"
           name="ansicht"
           rules={[{ required: true, message: 'Ansicht wählen' }]}
@@ -424,9 +439,9 @@ export default function EinsatzGeraete() {
               label: ANSICHT_LABEL[ansicht],
             }))}
           />
-        </Form.Item>
+        </Feld>
         {stellenFeld && (
-          <Form.Item
+          <Feld
             // Je Art ein eigenes Feld: ein Wechsel der Ansicht verwirft die gewählte Stelle.
             key={stellenFeld.art}
             preserve={false}
@@ -451,9 +466,9 @@ export default function EinsatzGeraete() {
               }
               notFoundContent={STELLENART_FELD[stellenFeld.art].leer}
             />
-          </Form.Item>
+          </Feld>
         )}
-        <Form.Item
+        <Feld
           label="Gerätebezeichnung"
           name="bezeichnung"
           rules={[
@@ -462,7 +477,7 @@ export default function EinsatzGeraete() {
           ]}
         >
           <Input placeholder="Tablet 1" maxLength={60} />
-        </Form.Item>
+        </Feld>
         {sperre && (
           <Alert
             type="warning"
@@ -490,7 +505,7 @@ export default function EinsatzGeraete() {
         onFertig={() => setVerlaengernFuer(null)}
         onAbbrechen={() => setVerlaengernFuer(null)}
       >
-        <Form.Item
+        <Feld
           label="Neues Ende"
           name="ende"
           rules={[
@@ -503,7 +518,7 @@ export default function EinsatzGeraete() {
           ]}
         >
           <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={verlaengern.error} titel="Nicht verlängert" />
       </ErfassungsModal>
 

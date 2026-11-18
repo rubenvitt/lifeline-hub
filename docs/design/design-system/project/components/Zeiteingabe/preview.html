@@ -157,6 +157,9 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
   --lfh-luft-3: 12px;
   --lfh-luft-4: 16px;
   --lfh-luft-5: 24px;
+  --lfh-feld-kurz: 120px;
+  --lfh-feld-schmal: 200px;
+  --lfh-feld-mittel: 320px;
   --lfh-zeilenhoehe: 30px;
   --lfh-schriftgroesse: 13.5px;
   --lfh-seiten-polsterung: 12px;
@@ -181,6 +184,8 @@ a{color:var(--ant-color-link);text-decoration:var(--ant-link-decoration);backgro
   --lfh-typo-ueberschrift-sperrung: -0.02em;
   --lfh-typo-seitentitel-groesse: 14px;
   --lfh-typo-seitentitel-gewicht: 600;
+  --lfh-typo-kartentitel-groesse: 15px;
+  --lfh-typo-kartentitel-gewicht: 600;
   --lfh-typo-text-groesse: 14px;
   --lfh-typo-text-gewicht: 400;
   --lfh-typo-text-klein-groesse: 12px;
@@ -774,6 +779,14 @@ main:has([data-lfh='ausgabe-kurzzeile']) {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+}
+.lfh-formfeld .ant-input-number,
+.lfh-formfeld .ant-picker,
+.lfh-formfeld .ant-select {
+  width: 100%;
+}
+.lfh-formfeld .ant-form-item-control-input {
+  max-width: var(--lfh-feldgrenze, none);
 }
 .lfh-zeit-blatt.ant-popover {
   position: fixed !important;

@@ -1,4 +1,4 @@
-import { Alert, App, Button, Modal, Spin, Tag, Typography, theme } from 'antd';
+import { Alert, App, Button, Modal, Spin, Tag } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -12,6 +12,7 @@ import {
 } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import { globalKeys } from '../api/queryKeys';
+import { Textstufe } from '../components/instrument';
 
 /**
  * Server-autoritativer Vorschlagskatalog: je Eintrag „Hinzufügen" = POST. Bereits (per URL)
@@ -29,7 +30,6 @@ export default function AusKatalogModal({
   naechsteSortier: number;
   onClose: () => void;
 }) {
-  const { token } = theme.useToken();
   const qc = useQueryClient();
   const { message } = App.useApp();
 
@@ -86,7 +86,7 @@ export default function AusKatalogModal({
       destroyOnHidden
     >
       {katalogQuery.isLoading ? (
-        <div style={{ textAlign: 'center', padding: token.paddingXL }}>
+        <div style={{ textAlign: 'center', padding: 'var(--lfh-luft-5)' }}>
           <Spin />
         </div>
       ) : (
@@ -119,15 +119,15 @@ export default function AusKatalogModal({
                   }
                   description={
                     <>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      <Textstufe stufe="textKlein" ton="gedaempft">
                         {eintrag.url}
-                      </Typography.Text>
+                      </Textstufe>
                       {eintrag.hinweis && (
                         <Alert
                           type="warning"
                           showIcon
                           title={eintrag.hinweis}
-                          style={{ marginTop: token.marginSM }}
+                          style={{ marginTop: 'var(--lfh-luft-2)' }}
                         />
                       )}
                       {grund && (

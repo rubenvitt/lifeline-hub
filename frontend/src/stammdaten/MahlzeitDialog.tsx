@@ -1,4 +1,5 @@
-import { Flex, Form, Input, type InputProps } from 'antd';
+import { Form, Input, type InputProps } from 'antd';
+import { Feld, Stapel } from '../components/instrument';
 import type { RuleObject } from 'antd/es/form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { parseUhrzeit, taktischeUhrzeitAus } from '../anzeige/uhrzeit';
@@ -143,7 +144,7 @@ export default function MahlzeitDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<FormWerte>
+      <Feld<FormWerte>
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
@@ -155,45 +156,47 @@ export default function MahlzeitDialog({
           placeholder="z. B. Frühstück"
           count={zeichenGrenze(VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX)}
         />
-      </Form.Item>
-      <Flex gap="middle" wrap>
-        <Form.Item<FormWerte>
-          name="beginn"
-          label="Beginn"
-          style={{ flex: '1 1 120px' }}
-          rules={[
-            { required: true, whitespace: true, message: 'Bitte Beginn angeben' },
-            uhrzeitRegel,
-          ]}
-        >
-          <UhrzeitFeld />
-        </Form.Item>
-        <Form.Item<FormWerte>
-          name="ende"
-          label="Ende"
-          style={{ flex: '1 1 120px' }}
-          dependencies={['beginn']}
-          extra={isFolgetag(beginn, ende) ? 'Ende am Folgetag' : undefined}
-          rules={[
-            { required: true, whitespace: true, message: 'Bitte Ende angeben' },
-            uhrzeitRegel,
-            ({ getFieldValue }) => ({
-              validator: (_, wert: unknown) => {
-                const b = parseUhrzeit(String(getFieldValue('beginn') ?? ''));
-                const e = typeof wert === 'string' ? parseUhrzeit(wert) : null;
-                return b != null && b === e
-                  ? Promise.reject(new Error(ENDE_GLEICH_BEGINN))
-                  : Promise.resolve();
-              },
-            }),
-          ]}
-        >
-          <UhrzeitFeld />
-        </Form.Item>
-      </Flex>
-      <Form.Item<FormWerte> name="verpflegungsart" label="Art" style={{ marginBottom: 0 }}>
+      </Feld>
+      <Stapel richtung="zeile" umbruch abstand="md">
+        <div style={{ flex: '1 1 120px' }}>
+          <Feld<FormWerte>
+            name="beginn"
+            label="Beginn"
+            rules={[
+              { required: true, whitespace: true, message: 'Bitte Beginn angeben' },
+              uhrzeitRegel,
+            ]}
+          >
+            <UhrzeitFeld />
+          </Feld>
+        </div>
+        <div style={{ flex: '1 1 120px' }}>
+          <Feld<FormWerte>
+            name="ende"
+            label="Ende"
+            dependencies={['beginn']}
+            extra={isFolgetag(beginn, ende) ? 'Ende am Folgetag' : undefined}
+            rules={[
+              { required: true, whitespace: true, message: 'Bitte Ende angeben' },
+              uhrzeitRegel,
+              ({ getFieldValue }) => ({
+                validator: (_, wert: unknown) => {
+                  const b = parseUhrzeit(String(getFieldValue('beginn') ?? ''));
+                  const e = typeof wert === 'string' ? parseUhrzeit(wert) : null;
+                  return b != null && b === e
+                    ? Promise.reject(new Error(ENDE_GLEICH_BEGINN))
+                    : Promise.resolve();
+                },
+              }),
+            ]}
+          >
+            <UhrzeitFeld />
+          </Feld>
+        </div>
+      </Stapel>
+      <Feld<FormWerte> name="verpflegungsart" label="Art">
         <Select allowClear placeholder="ohne Angabe" options={ART_OPTIONEN} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

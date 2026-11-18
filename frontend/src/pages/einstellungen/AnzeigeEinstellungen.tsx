@@ -25,7 +25,7 @@ import {
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
-import { Formularpaneel } from '../../components/instrument';
+import { Feld, Formularpaneel } from '../../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../../instanz/herkunft';
 import { teilwortSuche } from '../../components/teilwortSuche';
 
@@ -115,46 +115,42 @@ export default function AnzeigeEinstellungen() {
         disabled={!darf}
       >
         <Formularpaneel titel="Darstellung">
-          <Form.Item label="Zeitzone" name="zeitzone">
+          <Feld label="Zeitzone" name="zeitzone">
             <AutoComplete
               allowClear
               options={ZEITZONEN_OPTIONEN}
               placeholder={mitVorgabe('Gerätezeit')}
               showSearch={teilwortSuche}
             />
-          </Form.Item>
-          <Form.Item label="Zeitdarstellung" name="zeitdarstellung">
+          </Feld>
+          <Feld label="Zeitdarstellung" name="zeitdarstellung">
             <Select
               allowClear
               placeholder={mitVorgabe(ZEITDARSTELLUNG_VORGABE)}
               options={ZEITDARSTELLUNG_OPTIONEN}
             />
-          </Form.Item>
-          <Form.Item label="Einheiten" name="einheiten">
+          </Feld>
+          <Feld label="Einheiten" name="einheiten">
             <Select allowClear placeholder={mitVorgabe('Metrisch')} options={EINHEITEN_OPTIONEN} />
-          </Form.Item>
-          <Form.Item label="Koordinatenformat" name="koordinatenformat">
+          </Feld>
+          <Feld label="Koordinatenformat" name="koordinatenformat">
             <Select
               allowClear
               placeholder={mitVorgabe('WGS84 dezimal')}
               options={KOORDINATEN_OPTIONEN}
             />
-          </Form.Item>
+          </Feld>
         </Formularpaneel>
         <Formularpaneel titel="Ort-Vorschau">
-          <Form.Item
+          <Feld
             label="Geocoder-URL"
             name="geocoder_url"
             // Datenschutz-Hinweis sichtbar am Feld, nicht im Tooltip (Touch, LFH-1078). Was leer
             // gilt, nennt der Platzhalter.
             extra="Die Einsatz-Koordinate wird an diesen Dienst gesendet."
           >
-            <Input
-              placeholder={mitVorgabe('https://nominatim.openstreetmap.org')}
-              allowClear
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
+            <Input placeholder={mitVorgabe('https://nominatim.openstreetmap.org')} allowClear />
+          </Feld>
         </Formularpaneel>
         <div {...speicherLeiste}>
           <Button

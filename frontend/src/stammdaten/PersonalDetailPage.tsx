@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Col, Form, Input, Row, Space, theme } from 'antd';
+import { App, AutoComplete, Button, Col, Form, Input, Row, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,7 +26,7 @@ import { parseRouteId } from '../routing/deeplinks';
 import type { Personal, StaerkePosition } from '../api/types';
 import { personalListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import { Formularpaneel } from '../components/instrument';
+import { Feld, Formularpaneel, Stapel } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
 
@@ -141,10 +141,10 @@ export default function PersonalDetailPage() {
         pfad={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
         breite="schmal"
         titel={
-          <Space size={token.marginSM}>
+          <Stapel richtung="zeile" abstand="sm" ausrichten="mitte" als="span">
             {person.name}
             {person.ist_demo && <DemoMarke />}
-          </Space>
+          </Stapel>
         }
         hinweis={
           <SeitenHinweise
@@ -185,7 +185,7 @@ export default function PersonalDetailPage() {
           <Formularpaneel titel="Identität" dataUpdatedAt={personalQuery.dataUpdatedAt}>
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
-                <Form.Item
+                <Feld
                   label="Name"
                   name="name"
                   rules={[
@@ -193,22 +193,22 @@ export default function PersonalDetailPage() {
                   ]}
                 >
                   <Input />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Personalnummer" name="personalnummer">
+                <Feld label="Personalnummer" name="personalnummer">
                   <Input />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Trägerorganisation" name="traegerorganisation">
+                <Feld label="Trägerorganisation" name="traegerorganisation">
                   <AutoComplete
                     options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. DRK Musterstadt"
                     showSearch={teilwortSuche}
                   />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
@@ -216,18 +216,18 @@ export default function PersonalDetailPage() {
           <Formularpaneel titel="Kontakt & Konto">
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
-                <Form.Item label="Telefon" name="telefon">
+                <Feld label="Telefon" name="telefon">
                   <Input />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
+                <Feld label="Benutzer-Konto (optional)" name="benutzer_id">
                   <Select
                     allowClear
                     options={benutzerOptionen}
                     placeholder="kein Konto verknüpft"
                   />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
@@ -235,27 +235,27 @@ export default function PersonalDetailPage() {
           <Formularpaneel titel="Einsatzrolle">
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
-                <Form.Item label="Stärke-Position" name="staerke_position">
+                <Feld label="Stärke-Position" name="staerke_position">
                   <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Qualifikationen" name="qualifikation_ids">
+                <Feld label="Qualifikationen" name="qualifikation_ids">
                   <Select
                     mode="multiple"
                     allowClear
                     options={qualOptionen}
                     placeholder="Qualifikationen wählen"
                   />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
 
           <Formularpaneel titel="Freitext">
-            <Form.Item label="Bemerkung" name="bemerkung">
+            <Feld label="Bemerkung" name="bemerkung">
               <Input.TextArea rows={3} />
-            </Form.Item>
+            </Feld>
           </Formularpaneel>
 
           <div {...speicherLeiste}>

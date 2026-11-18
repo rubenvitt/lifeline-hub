@@ -3,7 +3,7 @@ import { Alert, App, Button, Form, Input, Modal, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconHaken, IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
-import { Paneel, monoStil, useRollen } from '../../components/instrument';
+import { Feld, monoStil, Paneel, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -234,7 +234,7 @@ export default function ArchivSchluessel() {
         onFertig={() => setEintragenOffen(false)}
         onAbbrechen={() => setEintragenOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Bezeichnung"
           name="bezeichnung"
           rules={[
@@ -246,14 +246,14 @@ export default function ArchivSchluessel() {
           ]}
         >
           <Input placeholder="Tresor Kreisverband" maxLength={ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Öffentlicher Schlüssel"
           name="schluessel"
           rules={[{ required: true, whitespace: true, message: 'Schlüssel angeben' }]}
         >
           <Input placeholder="age1…" spellCheck={false} autoComplete="off" style={monoStil(14)} />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <ErfassungsModal<ProbeWerte>
@@ -281,9 +281,10 @@ export default function ArchivSchluessel() {
             </KopierbarerText>
           </div>
         )}
-        <Form.Item
+        <Feld
           label="Code"
           name="code"
+          breite="schmal"
           rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
         >
           <Input
@@ -291,9 +292,9 @@ export default function ArchivSchluessel() {
             autoComplete="off"
             maxLength={8}
             placeholder="8 Ziffern"
-            style={{ ...monoStil(14), maxWidth: 200 }}
+            style={monoStil(14)}
           />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <Modal

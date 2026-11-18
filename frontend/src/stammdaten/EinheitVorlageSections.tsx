@@ -1,8 +1,15 @@
 import { Button, InputNumber, Space, Typography, theme } from 'antd';
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DemoMarke from '../components/DemoMarke';
-import { Paneel, PaneelZeile, StatusChip, monoStil } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  Paneel,
+  PaneelZeile,
+  Stapel,
+  StatusChip,
+  monoStil,
+} from '../components/instrument';
 import { KennungsLink } from '../components/kennungsLink';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -49,7 +56,8 @@ interface SectionProps {
 }
 
 /** Breite der Auswahlfelder in einer Zeile. */
-const SELECT_STYLE = { minWidth: 180 };
+/** Hülle einer Auswahl in einer Listenzeile: Mindestbreite als Feldstufe (Spec `feldbreiten`). */
+const AUSWAHL_HUELLE: CSSProperties = { display: 'grid', minWidth: 'var(--lfh-feld-schmal)' };
 
 /**
  * Eine Zeile: links Kennung und Marken, rechts Bedienung; bricht schmal um. Die Abstände folgen
@@ -68,9 +76,11 @@ function Row({ children, actions }: { children: ReactNode; actions?: ReactNode }
         rowGap: token.marginSM,
       }}
     >
-      <Space size={token.marginSM} wrap style={{ flex: '1 1 240px', minWidth: 0 }}>
-        {children}
-      </Space>
+      <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+        <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
+          {children}
+        </Stapel>
+      </div>
       {actions != null && (
         <Space size="middle" wrap>
           {actions}
@@ -114,7 +124,6 @@ export function UntereinheitenSection({
   isAdmin,
   onCreated,
 }: SectionProps & { onCreated: (v: EinheitVorlage) => void }) {
-  const { token } = theme.useToken();
   const [modalOpen, setModalOpen] = useState(false);
   const children = vorlagen.filter((v) => v.ueber_vorlage_id === vorlage.id);
   return (
@@ -126,7 +135,7 @@ export function UntereinheitenSection({
           Untereinheit anlegen
         </Button>
       }
-      style={{ marginBlockStart: token.marginLG }}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
     >
       {children.length === 0 ? (
         <PaneelZeile>Keine Untereinheiten</PaneelZeile>
@@ -154,7 +163,6 @@ export function UntereinheitenSection({
 // ── Fahrzeuge ────────────────────────────────────────────────────────────────────────────────
 
 export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
-  const { token } = theme.useToken();
   const qc = useQueryClient();
   const names = useNames(vorlagen);
   const [selected, setSelected] = useState<number | undefined>();
@@ -182,7 +190,7 @@ export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
     <Paneel
       titel="Fahrzeuge"
       meta={vorlage.fahrzeuge.length}
-      style={{ marginBlockStart: token.marginLG }}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
     >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.fahrzeuge.length === 0 ? (
@@ -230,18 +238,20 @@ export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
             </Button>
           }
         >
-          <Select<number>
-            aria-label="Fahrzeug wählen"
-            placeholder="Fahrzeug wählen"
-            style={SELECT_STYLE}
-            value={selected}
-            onChange={setSelected}
-            loading={fahrzeugeQuery.isLoading}
-            options={demoGroupedOptions(
-              candidates,
-              (f) => `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
-            )}
-          />
+          {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+          <div style={AUSWAHL_HUELLE}>
+            <Select<number>
+              aria-label="Fahrzeug wählen"
+              placeholder="Fahrzeug wählen"
+              value={selected}
+              onChange={setSelected}
+              loading={fahrzeugeQuery.isLoading}
+              options={demoGroupedOptions(
+                candidates,
+                (f) => `${f.funkrufname}${f.fahrzeugtyp ? ` (${f.fahrzeugtyp})` : ''}`,
+              )}
+            />
+          </div>
         </Row>
       )}
     </Paneel>
@@ -267,7 +277,6 @@ function toInput(
 }
 
 export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
-  const { token } = theme.useToken();
   const qc = useQueryClient();
   const names = useNames(vorlagen);
   const [selected, setSelected] = useState<number | undefined>();
@@ -300,7 +309,7 @@ export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionPro
     <Paneel
       titel="Stammbesetzung"
       meta={vorlage.personal.length}
-      style={{ marginBlockStart: token.marginLG }}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
     >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.personal.length === 0 ? (
@@ -315,27 +324,31 @@ export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionPro
               key={p.personal_id}
               actions={
                 <>
-                  <Select<StaerkePosition>
-                    aria-label={`Position ${p.name}`}
-                    allowClear
-                    disabled={!isAdmin || replace.isPending}
-                    style={SELECT_STYLE}
-                    // Leer gilt die Position aus dem Personalstamm.
-                    placeholder={stamm ? mitVorgabe(POSITION_LABELS[stamm]) : 'Position'}
-                    value={p.staerke_position ?? undefined}
-                    options={POSITION_OPTIONEN}
-                    onChange={(value) => update({ staerke_position: value ?? null })}
-                  />
-                  <Select<number>
-                    aria-label={`Fahrzeug ${p.name}`}
-                    allowClear
-                    disabled={!isAdmin || replace.isPending || fahrzeugOptions.length === 0}
-                    style={SELECT_STYLE}
-                    placeholder="kein Fahrzeug"
-                    value={p.fahrzeug_id ?? undefined}
-                    options={fahrzeugOptions}
-                    onChange={(value) => update({ fahrzeug_id: value ?? null })}
-                  />
+                  {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+                  <div style={AUSWAHL_HUELLE}>
+                    <Select<StaerkePosition>
+                      aria-label={`Position ${p.name}`}
+                      allowClear
+                      disabled={!isAdmin || replace.isPending}
+                      // Leer gilt die Position aus dem Personalstamm.
+                      placeholder={stamm ? mitVorgabe(POSITION_LABELS[stamm]) : 'Position'}
+                      value={p.staerke_position ?? undefined}
+                      options={POSITION_OPTIONEN}
+                      onChange={(value) => update({ staerke_position: value ?? null })}
+                    />
+                  </div>
+                  {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+                  <div style={AUSWAHL_HUELLE}>
+                    <Select<number>
+                      aria-label={`Fahrzeug ${p.name}`}
+                      allowClear
+                      disabled={!isAdmin || replace.isPending || fahrzeugOptions.length === 0}
+                      placeholder="kein Fahrzeug"
+                      value={p.fahrzeug_id ?? undefined}
+                      options={fahrzeugOptions}
+                      onChange={(value) => update({ fahrzeug_id: value ?? null })}
+                    />
+                  </div>
                   {isAdmin && (
                     <Button
                       danger
@@ -373,15 +386,17 @@ export function StammbesetzungSection({ vorlage, vorlagen, isAdmin }: SectionPro
             </Button>
           }
         >
-          <Select<number>
-            aria-label="Person wählen"
-            placeholder="Person wählen"
-            style={SELECT_STYLE}
-            value={selected}
-            onChange={setSelected}
-            loading={personalQuery.isLoading}
-            options={demoGroupedOptions(candidates, (p) => p.name)}
-          />
+          {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+          <div style={AUSWAHL_HUELLE}>
+            <Select<number>
+              aria-label="Person wählen"
+              placeholder="Person wählen"
+              value={selected}
+              onChange={setSelected}
+              loading={personalQuery.isLoading}
+              options={demoGroupedOptions(candidates, (p) => p.name)}
+            />
+          </div>
         </Row>
       )}
     </Paneel>
@@ -455,23 +470,23 @@ function MengeFeld({
     onCommit(wert);
   };
   return (
-    <InputNumber
-      aria-label={`Menge ${bezeichnung}`}
-      min={1}
-      max={max}
-      precision={0}
-      disabled={disabled}
-      style={{ width: '100%', maxWidth: 120 }}
-      value={wert}
-      onChange={setWert}
-      onBlur={commit}
-      onPressEnter={commit}
-    />
+    <div className={FELD_KLASSE} style={{ width: '100%', maxWidth: 'var(--lfh-feld-kurz)' }}>
+      <InputNumber
+        aria-label={`Menge ${bezeichnung}`}
+        min={1}
+        max={max}
+        precision={0}
+        disabled={disabled}
+        value={wert}
+        onChange={setWert}
+        onBlur={commit}
+        onPressEnter={commit}
+      />
+    </div>
   );
 }
 
 export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
-  const { token } = theme.useToken();
   const qc = useQueryClient();
   const [selected, setSelected] = useState<number | undefined>();
   const materialQuery = useQuery({
@@ -505,7 +520,7 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
     <Paneel
       titel="Material"
       meta={vorlage.material.length}
-      style={{ marginBlockStart: token.marginLG }}
+      style={{ marginBlockStart: 'var(--lfh-luft-4)' }}
     >
       <SpeicherFehler fehler={replace.error} />
       {vorlage.material.length === 0 ? (
@@ -526,16 +541,18 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
                     disabled={!isAdmin || replace.isPending || isStueck(m)}
                     onCommit={(menge) => update({ menge })}
                   />
-                  <Select<number>
-                    aria-label={`Ort ${m.bezeichnung}`}
-                    allowClear
-                    disabled={!isAdmin || replace.isPending || fahrzeugOptions.length === 0}
-                    style={SELECT_STYLE}
-                    placeholder="an der Einheit"
-                    value={m.fahrzeug_id ?? undefined}
-                    options={fahrzeugOptions}
-                    onChange={(value) => update({ fahrzeug_id: value ?? null })}
-                  />
+                  {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+                  <div style={AUSWAHL_HUELLE}>
+                    <Select<number>
+                      aria-label={`Ort ${m.bezeichnung}`}
+                      allowClear
+                      disabled={!isAdmin || replace.isPending || fahrzeugOptions.length === 0}
+                      placeholder="an der Einheit"
+                      value={m.fahrzeug_id ?? undefined}
+                      options={fahrzeugOptions}
+                      onChange={(value) => update({ fahrzeug_id: value ?? null })}
+                    />
+                  </div>
                   {isAdmin && (
                     <Button
                       danger
@@ -578,18 +595,20 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
             </Button>
           }
         >
-          <Select<number>
-            aria-label="Material wählen"
-            placeholder="Material wählen"
-            style={SELECT_STYLE}
-            value={selected}
-            onChange={setSelected}
-            loading={materialQuery.isLoading}
-            options={demoGroupedOptions(
-              candidates,
-              (m) => `${m.bezeichnung}${m.bestandsnummer ? ` (${m.bestandsnummer})` : ''}`,
-            )}
-          />
+          {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+          <div style={AUSWAHL_HUELLE}>
+            <Select<number>
+              aria-label="Material wählen"
+              placeholder="Material wählen"
+              value={selected}
+              onChange={setSelected}
+              loading={materialQuery.isLoading}
+              options={demoGroupedOptions(
+                candidates,
+                (m) => `${m.bezeichnung}${m.bestandsnummer ? ` (${m.bestandsnummer})` : ''}`,
+              )}
+            />
+          </div>
         </Row>
       )}
     </Paneel>

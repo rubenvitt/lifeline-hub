@@ -278,3 +278,16 @@ main:has([data-lfh='ausgabe-kurzzeile']) {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+
+/* Feld (Spec `feldbreiten`, LLH-1810): Zahlen-, Datums- und Auswahlfelder füllen wie `Input` die
+   Breite bis zur Obergrenze des Felds; antd setzt sie sonst auf ihre Eigenbreite. Dieselbe Klasse
+   trägt die Hülle eines Felds ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`). */
+.lfh-formfeld .ant-input-number,
+.lfh-formfeld .ant-picker,
+.lfh-formfeld .ant-select {
+  width: 100%;
+}
+/* Die Obergrenze (`breite`) gilt der Steuerzeile, nicht der Beschriftung darüber. */
+.lfh-formfeld .ant-form-item-control-input {
+  max-width: var(--lfh-feldgrenze, none);
+}

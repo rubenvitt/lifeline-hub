@@ -1,4 +1,5 @@
-import { Alert, Form } from 'antd';
+import { Alert } from 'antd';
+import { Feld } from '../components/instrument';
 import type { ZeitachseMarke } from '../api/types';
 import { Select } from '../components/Select';
 import { MARKE_WORT } from '../kraefte/zeitachse';
@@ -33,13 +34,13 @@ export const markeSpalte = {
  * (LFH-1078).
  */
 export const markeFeld = (
-  <Form.Item label="Zeitachsen-Ereignis" name="zeitachse_marke">
+  <Feld label="Zeitachsen-Ereignis" name="zeitachse_marke">
     <Select
       allowClear
       placeholder="keine"
       options={MARKEN.map((m) => ({ value: m, label: MARKE_WORT[m] }))}
     />
-  </Form.Item>
+  </Feld>
 );
 
 /**

@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { Space, Switch, theme, Typography } from 'antd';
+import { Switch, theme, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,6 +10,7 @@ import {
 import { globalKeys } from '../api/queryKeys';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { MetaZeile, Stapel } from '../components/instrument';
 
 /** Auswahl des Prüfabstands (Stunden); der Server nimmt 1…168. */
 const ABSTAENDE = [1, 3, 6, 12, 24, 168];
@@ -47,25 +48,38 @@ export default function AutoAktualisierungZeile({
     ? ABSTAENDE
     : [...ABSTAENDE, status.intervall_stunden].sort((a, b) => a - b);
 
-  const zeiten: string[] = [];
+  // Wort und Zeit getrennt: die Zeit steht in Mono (Spec `schriftstufen`, Metazeile).
+  const zeiten: { schluessel: string; wort: string; zeit?: string }[] = [];
   if (status.letzte_pruefung_at) {
-    zeiten.push(`zuletzt geprüft ${zeitpunkt(status.letzte_pruefung_at)}`);
+    zeiten.push({
+      schluessel: 'letzte',
+      wort: 'zuletzt geprüft',
+      zeit: zeitpunkt(status.letzte_pruefung_at),
+    });
   }
   if (status.automatisch && status.naechste_pruefung_at) {
-    zeiten.push(`nächste Prüfung ${zeitpunkt(status.naechste_pruefung_at)}`);
+    zeiten.push({
+      schluessel: 'naechste',
+      wort: 'nächste Prüfung',
+      zeit: zeitpunkt(status.naechste_pruefung_at),
+    });
   }
   if (status.bau_dienst === 'unerreichbar') {
-    zeiten.push('Kartenbau-Dienst nicht erreichbar');
+    zeiten.push({ schluessel: 'bau', wort: 'Kartenbau-Dienst nicht erreichbar' });
   } else if (status.bau_dienst === 'erreichbar' && status.naechster_bau_at) {
-    zeiten.push(`nächster Kartenbau ${zeitpunkt(status.naechster_bau_at)}`);
+    zeiten.push({
+      schluessel: 'bau',
+      wort: 'nächster Kartenbau',
+      zeit: zeitpunkt(status.naechster_bau_at),
+    });
   }
 
   return (
-    <div data-testid="auto-aktualisierung" style={{ marginBottom: token.margin }}>
-      <Space wrap size={token.margin}>
+    <div data-testid="auto-aktualisierung" style={{ marginBottom: 'var(--lfh-luft-3)' }}>
+      <Stapel richtung="zeile" umbruch abstand="md" ausrichten="mitte">
         {istAdmin ? (
           <>
-            <Space size={token.marginSM}>
+            <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
               <Switch
                 aria-label="Automatisch aktualisieren"
                 checked={status.automatisch}
@@ -78,17 +92,19 @@ export default function AutoAktualisierungZeile({
                 }
               />
               <Typography.Text>Automatisch aktualisieren</Typography.Text>
-            </Space>
-            <Select
-              aria-label="Prüfabstand"
-              value={status.intervall_stunden}
-              disabled={speichern.isPending}
-              style={{ minWidth: 130 }}
-              options={abstaende.map((h) => ({ value: h, label: `alle ${abstandText(h)}` }))}
-              onChange={(h: number) =>
-                speichern.mutate({ automatisch: status.automatisch, intervall_stunden: h })
-              }
-            />
+            </Stapel>
+            {/* Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite. */}
+            <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-kurz)' }}>
+              <Select
+                aria-label="Prüfabstand"
+                value={status.intervall_stunden}
+                disabled={speichern.isPending}
+                options={abstaende.map((h) => ({ value: h, label: `alle ${abstandText(h)}` }))}
+                onChange={(h: number) =>
+                  speichern.mutate({ automatisch: status.automatisch, intervall_stunden: h })
+                }
+              />
+            </div>
           </>
         ) : (
           <Typography.Text>
@@ -97,10 +113,20 @@ export default function AutoAktualisierungZeile({
               : 'Automatisch aktualisieren: aus'}
           </Typography.Text>
         )}
-        {zeiten.length > 0 && (
-          <Typography.Text type="secondary">{zeiten.join(' · ')}</Typography.Text>
-        )}
-      </Space>
+        <MetaZeile>
+          {zeiten.map((z) => (
+            <MetaZeile.Teil key={z.schluessel}>
+              {z.wort}
+              {z.zeit && (
+                <>
+                  {' '}
+                  <MetaZeile.Zahl>{z.zeit}</MetaZeile.Zahl>
+                </>
+              )}
+            </MetaZeile.Teil>
+          ))}
+        </MetaZeile>
+      </Stapel>
       {speichern.error != null && (
         <div style={{ marginTop: token.marginXS }}>
           <SpeicherFehler fehler={speichern.error} titel="Einstellung nicht gespeichert" />

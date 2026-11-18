@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { App, Button, Modal, Space, theme } from 'antd';
+import { App, Button, Modal } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -19,7 +19,7 @@ import { formatRegel } from '../abloesung/schichtmodellText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Stapel, StatusChip, monoStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -73,7 +73,6 @@ export default function SchichtmodelleTab() {
 }
 
 function SchichtmodelleInhalt() {
-  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const { konventionen } = useAnzeigeKonventionen();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -194,7 +193,7 @@ function SchichtmodelleInhalt() {
       sorter: nachText((m: Schichtmodell) => m.bezeichnung),
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (_: string, m) => (
-        <Space size={[token.marginSM, token.marginXS]} wrap>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{m.bezeichnung}</span>
           {m.ist_vorgabe && <StatusChip ton="normal" wort="Vorgabe der Organisation" />}
           {m.ist_demo && <DemoMarke />}
@@ -202,7 +201,7 @@ function SchichtmodelleInhalt() {
             herkunft={herkunft.herkunft('schichtmodell', m.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {

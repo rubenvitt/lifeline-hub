@@ -1,16 +1,4 @@
-import {
-  App,
-  AutoComplete,
-  Button,
-  Col,
-  Form,
-  Input,
-  InputNumber,
-  Row,
-  Space,
-  Switch,
-  theme,
-} from 'antd';
+import { App, AutoComplete, Button, Col, Form, Input, InputNumber, Row, Switch, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -37,7 +25,7 @@ import { parseRouteId } from '../routing/deeplinks';
 import type { Fahrzeug, Staerke } from '../api/types';
 import { fahrzeugListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import { Formularpaneel } from '../components/instrument';
+import { Feld, Formularpaneel, Stapel } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
 
@@ -161,10 +149,10 @@ export default function FahrzeugDetailPage() {
         ]}
         breite="schmal"
         titel={
-          <Space size={token.marginSM}>
+          <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
             <span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>
             {fahrzeug.ist_demo && <DemoMarke />}
-          </Space>
+          </Stapel>
         }
         hinweis={
           <SeitenHinweise
@@ -207,7 +195,7 @@ export default function FahrzeugDetailPage() {
           <Formularpaneel titel="Identität" dataUpdatedAt={fahrzeugeQuery.dataUpdatedAt}>
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
-                <Form.Item
+                <Feld
                   label="Funkrufname"
                   name="funkrufname"
                   rules={[
@@ -219,47 +207,47 @@ export default function FahrzeugDetailPage() {
                   ]}
                 >
                   <Input />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
+                <Feld label="Fahrzeugtyp" name="fahrzeugtyp">
                   <AutoComplete
                     options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. LF 20, RTW"
                     showSearch={teilwortSuche}
                   />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Trägerorganisation" name="traegerorganisation">
+                <Feld label="Trägerorganisation" name="traegerorganisation">
                   <AutoComplete
                     options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. Feuerwehr Musterstadt"
                     showSearch={teilwortSuche}
                   />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Kennzeichen" name="kennzeichen">
+                <Feld label="Kennzeichen" name="kennzeichen">
                   <Input />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="OPTA" name="opta">
+                <Feld label="OPTA" name="opta">
                   <Input />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Standort" name="standort">
+                <Feld label="Standort" name="standort">
                   <AutoComplete
                     options={vorschlaege.standort.map((t) => ({ value: t }))}
                     allowClear
                     placeholder="z. B. Wache Mitte"
                     showSearch={teilwortSuche}
                   />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
@@ -267,14 +255,14 @@ export default function FahrzeugDetailPage() {
           <Formularpaneel titel="Funk & Sonderrechte">
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
-                <Form.Item label="FMS-ISSI" name="fms_issi">
+                <Feld label="FMS-ISSI" name="fms_issi">
                   <Input />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
+                <Feld label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
                   <Switch />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
@@ -282,26 +270,26 @@ export default function FahrzeugDetailPage() {
           <Formularpaneel titel="Kapazität">
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
-                <Form.Item label="Tragenkapazität" name="tragenkapazitaet">
-                  <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
-                </Form.Item>
+                <Feld label="Tragenkapazität" name="tragenkapazitaet" breite="schmal">
+                  <InputNumber min={0} />
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                {/* EIN `Form.Item` für das ganze F/UF/M-Trio — nicht drei. Das Backend prüft die Stärke gegen
+                {/* EIN `Feld` für das ganze F/UF/M-Trio — nicht drei. Das Backend prüft die Stärke gegen
                    den EFFEKTIVZUSTAND (Mehrspalten-CHECK „alle drei oder keiner"); verteilt und teilweise
                    gesendet entstünde eine Kombination, die der CHECK ablehnt. Die Regel setzt
                    `StaerkeEingabe` selbst durch (leere Felder zählen als 0), kein Satz am Label. */}
-                <Form.Item label="Soll-Stärke" name="staerke">
+                <Feld label="Soll-Stärke" name="staerke">
                   <StaerkeEingabe />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
 
           <Formularpaneel titel="Freitext">
-            <Form.Item label="Bemerkung" name="bemerkung">
+            <Feld label="Bemerkung" name="bemerkung">
               <Input.TextArea rows={3} />
-            </Form.Item>
+            </Feld>
           </Formularpaneel>
 
           {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf `htmlType="submit"`, und

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Pilot Fahrzeug vorher und nachher</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;box-sizing:border-box;padding:32px;background:#08090b;color:#e8ebee;font-family:'LFH Archivo',system-ui,sans-serif;font-size:14px;line-height:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;overflow:hidden">
+
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2 style="margin:0;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#9199a2">Vorher · Inline-Stile</h2>
+    <section style="background:#151719;border:1px solid #22262b;padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:15px;font-weight:600">RTW 1/83-1</span>
+        <span style="font-size:13px;color:#9fa7b0">HH-RK 1083 – Wache Nord – geändert 17.11. 14:32</span>
+      </div>
+      <form style="display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label for="v-funk">Funkrufname</label>
+          <input id="v-funk" value="RK 1/83-1" style="height:30px;box-sizing:border-box;width:280px;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;border-radius:0">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label for="v-sitz">Sitzplätze</label>
+          <input id="v-sitz" value="4" style="height:30px;box-sizing:border-box;width:100%;max-width:120px;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;border-radius:0">
+          <span style="font-size:13px;color:#9fa7b0">Ohne Fahrerin oder Fahrer.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label for="v-bem">Bemerkung</label>
+          <input id="v-bem" value="" style="height:30px;box-sizing:border-box;width:420px;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;border-radius:0">
+        </div>
+      </form>
+    </section>
+    <ul style="margin:0;padding-left:18px;font-size:12px;color:#9fa7b0;display:flex;flex-direction:column;gap:4px">
+      <li>Kartentitel 15, Meta 13 in Fließschrift, Trenner von Hand („–“), Kennzeichen nicht mono.</li>
+      <li>Feste Breiten 280 und 420 px: am Handy ragt das Feld über den Rand (heute fängt das <code style="font-family:'LFH Mono',monospace">feldbreiten.guard</code>).</li>
+      <li>Abstände 2/14/18 px frei erfunden, außerhalb des Rasters.</li>
+    </ul>
+    <pre style="margin:0;background:#151719;border:1px solid #22262b;padding:12px;font-family:'LFH Mono',monospace;font-size:11px;line-height:16px;color:#c6ccd2;white-space:pre-wrap">&lt;Text strong style={{ fontSize: 15 }}&gt;{f.name}&lt;/Text&gt;
+&lt;Text type="secondary" style={{ fontSize: 13 }}&gt;
+  {f.kennzeichen} – {f.wache} – geändert {zeit}
+&lt;/Text&gt;
+&lt;Form.Item name="funkrufname" label="Funkrufname"&gt;
+  &lt;Input style={{ width: 280 }} /&gt;
+&lt;/Form.Item&gt;</pre>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <h2 style="margin:0;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8ec2f0">Nachher · Bausteine</h2>
+    <section style="background:#151719;border:1px solid #22262b;padding:16px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:15px;font-weight:600">RTW 1/83-1</span>
+        <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:12px;color:#9199a2">
+          <span style="font-family:'LFH Mono',monospace;font-size:11px">HH-RK 1083</span><span aria-hidden="true">·</span><span>Wache Nord</span><span aria-hidden="true">·</span><span>geändert <span style="font-family:'LFH Mono',monospace;font-size:11px">17.11. 14:32</span></span>
+        </div>
+      </div>
+      <form style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:4px;max-width:320px">
+          <label for="n-funk">Funkrufname</label>
+          <input id="n-funk" value="RK 1/83-1" style="height:30px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;font-family:'LFH Mono',monospace;border-radius:0">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;max-width:120px">
+          <label for="n-sitz">Sitzplätze</label>
+          <input id="n-sitz" value="4" style="height:30px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;font-family:'LFH Mono',monospace;border-radius:0">
+          <span style="font-size:12px;color:#9fa7b0">Ohne Fahrerin oder Fahrer.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label for="n-bem">Bemerkung</label>
+          <input id="n-bem" value="" style="height:30px;box-sizing:border-box;width:100%;background:#151719;border:1px solid #6c747d;color:#e8ebee;padding:0 8px;font:inherit;border-radius:0">
+        </div>
+      </form>
+    </section>
+    <ul style="margin:0;padding-left:18px;font-size:12px;color:#9fa7b0;display:flex;flex-direction:column;gap:4px">
+      <li>Titel <code style="font-family:'LFH Mono',monospace">kartentitel</code>, Meta-Zeile 12/schwach, Kennzeichen und Zeit mono, Trenner „·“ vom Baustein.</li>
+      <li>Felder fluid bis zur Stufe: mittel 320, kurz 120, voll. Kein Wächter mehr nötig, weil keine Pixelbreite übergeben werden kann.</li>
+      <li>Abstände md · lg aus dem Raster; in komfortabel wachsen sie mit.</li>
+    </ul>
+    <pre style="margin:0;background:#151719;border:1px solid #22262b;padding:12px;font-family:'LFH Mono',monospace;font-size:11px;line-height:16px;color:#c6ccd2;white-space:pre-wrap">&lt;Stapel abstand="xs"&gt;
+  &lt;Textstufe stufe="kartentitel"&gt;{f.name}&lt;/Textstufe&gt;
+  &lt;MetaZeile&gt;
+    &lt;MetaZeile.Teil mono&gt;{f.kennzeichen}&lt;/MetaZeile.Teil&gt;
+    &lt;MetaZeile.Teil&gt;{f.wache}&lt;/MetaZeile.Teil&gt;
+  &lt;/MetaZeile&gt;
+&lt;/Stapel&gt;
+&lt;Feld name="funkrufname" label="Funkrufname" breite="mittel"&gt;
+  &lt;Input /&gt;
+&lt;/Feld&gt;</pre>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

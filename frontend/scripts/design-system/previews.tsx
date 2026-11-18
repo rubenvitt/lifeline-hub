@@ -46,6 +46,7 @@ import {
   Datenfeld,
   DatenfeldEingabe,
   Datenraster,
+  Feld,
   FeldFehler,
   Formularpaneel,
   GliederungsPaneel,
@@ -56,15 +57,18 @@ import {
   ListenPaneel,
   listenZeileStil,
   MatrixPaneel,
+  MetaZeile,
   Paneel,
   PaneelZeile,
   PaneelZustand,
   Sammelbanner,
   SegmentFeld,
   Segmentleiste,
+  Stapel,
   StatusChip,
   StatusZelle,
   StromPaneel,
+  Textstufe,
   UebungsBand,
   UebungsMarke,
   VerteilungsPaneel,
@@ -1133,16 +1137,16 @@ function EingabefeldBeispiel() {
           eingetroffen: dayjs(ZEIT_LAGE),
         }}
       >
-        <Form.Item label="Einheit (Funkrufname)" name="einheit">
+        <Feld label="Einheit (Funkrufname)" name="einheit" breite="mittel">
           <Input />
-        </Form.Item>
-        <Form.Item label="Einsatzabschnitt" name="abschnitt">
+        </Feld>
+        <Feld label="Einsatzabschnitt" name="abschnitt" breite="mittel">
           <Select options={ABSCHNITTE} />
-        </Form.Item>
-        <Form.Item label="Eingetroffen" name="eingetroffen">
+        </Feld>
+        <Feld label="Eingetroffen" name="eingetroffen">
           <ZeitpunktEingabe art="ereignis" />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Auftrag"
           name="auftrag"
           required
@@ -1150,7 +1154,7 @@ function EingabefeldBeispiel() {
           help="Auftrag ist Pflicht"
         >
           <Input />
-        </Form.Item>
+        </Feld>
       </Form>
       <div className="ds-feld">
         <label htmlFor={feldId}>Einsatzort</label>
@@ -1506,6 +1510,93 @@ export const PREVIEWS: readonly PreviewSpec[] = [
           <FeldFehler id="ds-ort-fehler">Ort ist Pflicht</FeldFehler>
         </div>
       </Form>
+    ),
+  },
+  {
+    name: 'Text',
+    title: 'Textstufe (Stufen der Schriftskala und Töne)',
+    group: 'Flächen',
+    height: 555,
+    source: 'components/instrument/Textstufe.tsx',
+    content: () => (
+      <Stapel abstand="sm">
+        <Textstufe stufe="seitentitel" als="h2">
+          Fahrzeuge
+        </Textstufe>
+        <Textstufe stufe="kartentitel" als="h3">
+          RTW 1/83-1
+        </Textstufe>
+        <Textstufe>Fahrzeug steht ab 06:00 wieder bereit.</Textstufe>
+        <Textstufe ton="text2">Besatzung: zwei Notfallsanitäter</Textstufe>
+        <Textstufe stufe="textKlein" ton="gedaempft">
+          Hinweis unter einem Feld
+        </Textstufe>
+        <Textstufe stufe="textKlein" ton="alarm">
+          Funkrufname ist schon vergeben
+        </Textstufe>
+        <Textstufe stufe="meta" ton="schwach">
+          14:32 · Nr. 0412
+        </Textstufe>
+        <Textstufe stufe="augenbraue" ton="schwach">
+          Augenbraue
+        </Textstufe>
+      </Stapel>
+    ),
+  },
+  {
+    name: 'Stapel',
+    title: 'Stapel (Abstand als Rasterstufe, senkrecht und als Zeile)',
+    group: 'Flächen',
+    height: 890,
+    source: 'components/instrument/Stapel.tsx',
+    content: () => {
+      const kachel: CSSProperties = { height: 20, background: 'var(--lfh-flaeche-3)' };
+      return (
+        <Stapel abstand="lg">
+          {(['xs', 'sm', 'md', 'lg'] as const).map((stufe) => (
+            <Stapel key={stufe} abstand="xs">
+              <Textstufe stufe="meta" ton="schwach">
+                abstand=&quot;{stufe}&quot;
+              </Textstufe>
+              <Stapel abstand={stufe}>
+                <div style={kachel} />
+                <div style={kachel} />
+              </Stapel>
+            </Stapel>
+          ))}
+          <Stapel richtung="zeile" abstand="sm" umbruch>
+            <Button>Übernehmen</Button>
+            <Button>Verwerfen</Button>
+          </Stapel>
+        </Stapel>
+      );
+    },
+  },
+  {
+    name: 'MetaZeile',
+    title: 'MetaZeile (Nebenangaben eines Datensatzes)',
+    group: 'Daten',
+    height: 335,
+    source: 'components/instrument/MetaZeile.tsx',
+    content: () => (
+      <Stapel abstand="md">
+        <Stapel abstand="xs">
+          <Textstufe stufe="kartentitel">RTW 1/83-1</Textstufe>
+          <MetaZeile>
+            <MetaZeile.Teil mono>HH-RK 1083</MetaZeile.Teil>
+            <MetaZeile.Teil>Wache Nord</MetaZeile.Teil>
+            <MetaZeile.Teil mono>17.11. 14:32</MetaZeile.Teil>
+          </MetaZeile>
+        </Stapel>
+        <Stapel abstand="xs">
+          <Textstufe stufe="kartentitel">Leitstelle Nord</Textstufe>
+          <MetaZeile>
+            <MetaZeile.Teil>Leitstelle</MetaZeile.Teil>
+            <MetaZeile.Teil mono>040 4285-0</MetaZeile.Teil>
+            <MetaZeile.Teil ton="alarm">nicht erreichbar</MetaZeile.Teil>
+          </MetaZeile>
+        </Stapel>
+      </Stapel>
     ),
   },
   {
@@ -1938,10 +2029,11 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'Eingabefeld',
-    title: 'Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)',
+    title: 'Eingabefeld (Feld mit Breitenstufe, Pflicht mit Fehlerzeile, FeldFehler)',
     group: 'Eingabe',
     height: 903,
-    source: 'components/instrument/FeldFehler.tsx',
+    source: 'components/instrument/Feld.tsx',
+    moreDoc: 'components/instrument/FeldFehler.tsx',
     styles: ['anzeige/ZeitpunktEingabe.css'],
     content: () => <EingabefeldBeispiel />,
     interact: beendeBewegung,

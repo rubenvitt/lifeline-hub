@@ -1,11 +1,11 @@
 import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { Button, Space, theme } from 'antd';
+import { Button } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Stapel, StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -35,7 +35,6 @@ const INDENT_PX = 20;
  * Typ, Unterstellung und Fahrzeuge. Gepflegt wird auf der Detailseite, angelegt im Dialog.
  */
 export default function EinheitVorlagenTab() {
-  const { token } = theme.useToken();
   const herkunft = useStammdatenHerkunft();
   const { benutzer } = useAuth();
   const isAdmin = benutzer?.system_rolle === 'admin';
@@ -66,24 +65,21 @@ export default function EinheitVorlagenTab() {
       // Für die Suche: die Zeile trägt den Namen nur verschachtelt.
       dataIndex: ['vorlage', 'name'],
       render: (_, { vorlage, depth }) => (
-        <Space
-          size={token.marginXS}
-          wrap
-          data-tiefe={depth}
-          style={{ paddingInlineStart: depth * INDENT_PX }}
-        >
-          <KennungsLink
-            to={einheitVorlageDetailPath(vorlage.id)}
-            style={{ overflowWrap: 'anywhere' }}
-          >
-            {vorlage.name}
-          </KennungsLink>
-          {vorlage.ist_demo && <DemoMarke />}
-          <HerkunftAbzeichen
-            herkunft={herkunft.herkunft('einheit_vorlage', vorlage.id)}
-            quelle={herkunft.quelle}
-          />
-        </Space>
+        <div data-tiefe={depth} style={{ paddingInlineStart: depth * INDENT_PX }}>
+          <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
+            <KennungsLink
+              to={einheitVorlageDetailPath(vorlage.id)}
+              style={{ overflowWrap: 'anywhere' }}
+            >
+              {vorlage.name}
+            </KennungsLink>
+            {vorlage.ist_demo && <DemoMarke />}
+            <HerkunftAbzeichen
+              herkunft={herkunft.herkunft('einheit_vorlage', vorlage.id)}
+              quelle={herkunft.quelle}
+            />
+          </Stapel>
+        </div>
       ),
     },
     { title: 'Typ', key: 'typ', dataIndex: ['vorlage', 'typ_label'] },
@@ -102,13 +98,13 @@ export default function EinheitVorlagenTab() {
         vorlage.fahrzeuge.length === 0 ? (
           '—'
         ) : (
-          <Space size={[token.marginSM, 0]} wrap>
+          <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             {vorlage.fahrzeuge.map((f) => (
               <span key={f.fahrzeug_id} style={monoStil(12)}>
                 {f.funkrufname}
               </span>
             ))}
-          </Space>
+          </Stapel>
         ),
     },
     {

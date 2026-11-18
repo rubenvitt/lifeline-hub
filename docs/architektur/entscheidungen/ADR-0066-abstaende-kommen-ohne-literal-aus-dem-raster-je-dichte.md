@@ -1,5 +1,5 @@
 ---
-id: ADR-0065
+id: ADR-0066
 titel: Abstände kommen ohne Literal aus dem Raster je Dichte
 status: akzeptiert
 datum: 2026-11-18
@@ -15,7 +15,7 @@ herleitung:
   - Zunder LLH-1937 (Wächter bleibt als Nulltoleranz, abgestimmt mit Ruben am 18.11.2026)
 ---
 
-# ADR-0065: Abstände kommen ohne Literal aus dem Raster je Dichte
+# ADR-0066: Abstände kommen ohne Literal aus dem Raster je Dichte
 
 ## Regeln
 

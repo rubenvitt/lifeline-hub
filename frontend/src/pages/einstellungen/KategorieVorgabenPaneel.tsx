@@ -1,5 +1,5 @@
 import { Form, Input, InputNumber, Typography } from 'antd';
-import { Formularpaneel } from '../../components/instrument';
+import { Feld, Formularpaneel } from '../../components/instrument';
 import { KATEGORIE_TEXT, KATEGORIEN, PERSONENSTAMM_TEXT } from '../../aufbewahrung/kategorieText';
 import { mitVorgabe } from '../../components/vorgabeText';
 import type { FormWerteEinsatz } from './orgEinstellungenForm';
@@ -32,7 +32,8 @@ export default function KategorieVorgabenPaneel() {
         const laengerAlsEinsatz = dauer != null && einsatzDauer != null && dauer > einsatzDauer;
         return (
           <div key={k}>
-            <Form.Item
+            <Feld
+              breite="schmal"
               label={`Dauer ${text.bezeichnung} (Tage)`}
               name={['kategorien', k, 'dauer_tage']}
               extra={
@@ -48,14 +49,9 @@ export default function KategorieVorgabenPaneel() {
                 </>
               }
             >
-              <InputNumber
-                min={0}
-                max={3650}
-                style={{ width: '100%', maxWidth: 200 }}
-                placeholder={mitVorgabe('Einsatz-Frist')}
-              />
-            </Form.Item>
-            <Form.Item
+              <InputNumber min={0} max={3650} placeholder={mitVorgabe('Einsatz-Frist')} />
+            </Feld>
+            <Feld
               label={`Rechtsgrundlage ${text.bezeichnung}`}
               name={['kategorien', k, 'rechtsgrundlage']}
               dependencies={[['kategorien', k, 'dauer_tage']]}
@@ -70,7 +66,7 @@ export default function KategorieVorgabenPaneel() {
               ]}
             >
               <Input placeholder="z. B. Paragraf und Gesetz" />
-            </Form.Item>
+            </Feld>
           </div>
         );
       })}

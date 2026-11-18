@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
-import { augenbraueStil, useRollen } from '../components/instrument';
+import { augenbraueStil, Feld, useRollen } from '../components/instrument';
 import { aktualisiereEinsatzVorlage, legeEinsatzVorlageAn } from '../api/einsatzVorlagen';
 import { EINSATZ_VORLAGE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import { globalKeys } from '../api/queryKeys';
@@ -43,7 +43,7 @@ function ModulHaekchen({
   const { token } = theme.useToken();
   const { rollen } = useRollen();
   return (
-    // Die Hülle trägt die `id` des Form.Item (Ziel des Etiketts) und benennt die Gruppe.
+    // Die Hülle trägt die `id` des `Feld` (Ziel des Etiketts) und benennt die Gruppe.
     <div id={id} role="group" aria-label="Sichtbare Module">
       <Checkbox.Group
         value={value}
@@ -161,13 +161,13 @@ export default function EinsatzVorlageFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. Großbrand" maxLength={EINSATZ_VORLAGE_BEZEICHNUNG_MAX} />
-      </Form.Item>
+      </Feld>
       <div
         data-lfh="vorlage-vorbelegung"
         style={{
@@ -176,32 +176,28 @@ export default function EinsatzVorlageFormModal({
           columnGap: token.marginSM,
         }}
       >
-        <Form.Item label="Einsatzart" name="einsatzart">
+        <Feld label="Einsatzart" name="einsatzart">
           <Select<Einsatzart>
             aria-label="Einsatzart"
             allowClear
             placeholder="keine"
             options={EINSATZART_OPTIONEN}
           />
-        </Form.Item>
+        </Feld>
         {/* Immer registriert, nur ohne Modelle verborgen: solange die Liste lädt oder fehlt,
             behält der Vollersatz so den gespeicherten Wert, statt ihn still auf `null` zu setzen. */}
-        <Form.Item
-          label="Schichtmodell"
-          name="schichtmodell_id"
-          hidden={schichtmodelle.length === 0}
-        >
+        <Feld label="Schichtmodell" name="schichtmodell_id" hidden={schichtmodelle.length === 0}>
           <Select<number>
             aria-label="Schichtmodell"
             allowClear
             placeholder={orgVorgabe ? mitVorgabe(orgVorgabe.bezeichnung) : 'keins'}
             options={schichtmodelle.map((m) => ({ value: m.id, label: m.bezeichnung }))}
           />
-        </Form.Item>
+        </Feld>
       </div>
-      <Form.Item label="Sichtbare Module" name="sichtbar">
+      <Feld label="Sichtbare Module" name="sichtbar">
         <ModulHaekchen />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

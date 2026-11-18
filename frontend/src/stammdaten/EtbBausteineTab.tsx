@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
-import { monoStil } from '../components/instrument';
+import { Stapel, monoStil } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
@@ -69,7 +69,7 @@ export default function EtbBausteineTab() {
       render: (label: string, b: EtbBaustein) => (
         <>
           {/* Die Marke trägt die Testabfrage: der `textContent` der Zelle enthält Label UND Inhalt. */}
-          <Space size={[token.marginSM, token.marginXS]} wrap>
+          <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             <div data-lfh="baustein-label" style={{ fontWeight: token.fontWeightStrong }}>
               {label}
             </div>
@@ -77,7 +77,7 @@ export default function EtbBausteineTab() {
               herkunft={herkunft.herkunft('etb_baustein', b.id)}
               quelle={herkunft.quelle}
             />
-          </Space>
+          </Stapel>
           <Typography.Text
             type="secondary"
             ellipsis={{ tooltip: b.inhalt }}

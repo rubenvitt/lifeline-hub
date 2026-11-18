@@ -1,7 +1,7 @@
-import { Button, Space, theme } from 'antd';
+import { Button } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
-import { monoStil } from '../components/instrument';
+import { Stapel, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -37,7 +37,6 @@ import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
 
 export default function FahrzeugeTab() {
-  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const herkunft = useStammdatenHerkunft();
   const istAdmin = benutzer?.system_rolle === 'admin';
@@ -101,7 +100,7 @@ export default function FahrzeugeTab() {
        * gleichzeitig feuern könnten.
        */
       render: (_, f) => (
-        <Space size={token.marginXS} wrap>
+        <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           <KennungsLink
             to={fahrzeugDetailPfad(f.id)}
             style={{ ...monoStil(13), overflowWrap: 'anywhere' }}
@@ -113,7 +112,7 @@ export default function FahrzeugeTab() {
             herkunft={herkunft.herkunft('fahrzeug', f.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {

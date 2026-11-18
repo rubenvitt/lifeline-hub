@@ -1,5 +1,6 @@
-import { Button, Popconfirm, Space, theme } from 'antd';
+import { Button, Popconfirm } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { Stapel } from '../components/instrument';
 import SchnellAnlegen from '../components/SchnellAnlegen';
 import { SeitenHinweise, ZeilenFehler } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
@@ -27,7 +28,6 @@ import { auswahlWert, vorlageAusWert, vorlagenOptionen } from './einsatzVorlageM
 const OHNE_VORLAGE = 'ohne';
 
 export default function StichworteTab() {
-  const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
@@ -140,13 +140,13 @@ export default function StichworteTab() {
        */
       sorter: (a, b) => a.text.localeCompare(b.text, 'de', { numeric: true }),
       render: (text: string, v) => (
-        <Space size={[token.marginSM, token.marginXS]} wrap>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="mitte">
           <span>{text}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('stichwort_vorschlag', v.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {
@@ -172,17 +172,19 @@ export default function StichworteTab() {
             {/* „keine“ ist ein Eintrag, kein Leeren: so bleibt die Auswahl immer kontrolliert
                (antd liest `value={undefined}` als unkontrolliert), und ein abgelehnter Wechsel
                springt mit dem Serverstand zurück. */}
-            <Select<number>
-              aria-label={`Vorlage zu ${v.text}`}
-              value={auswahlWert(v.vorlage_id)}
-              options={vorlagenAuswahl}
-              loading={vorlagenQuery.isLoading}
-              disabled={istVomHub(v)}
-              style={{ width: '100%', minWidth: 180 }}
-              onChange={(wert) =>
-                vorlageMutation.mutate({ id: v.id, vorlageId: vorlageAusWert(wert) })
-              }
-            />
+            {/* Das Raster streckt die Auswahl auf die Spaltenbreite, mindestens aber `schmal`. */}
+            <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+              <Select<number>
+                aria-label={`Vorlage zu ${v.text}`}
+                value={auswahlWert(v.vorlage_id)}
+                options={vorlagenAuswahl}
+                loading={vorlagenQuery.isLoading}
+                disabled={istVomHub(v)}
+                onChange={(wert) =>
+                  vorlageMutation.mutate({ id: v.id, vorlageId: vorlageAusWert(wert) })
+                }
+              />
+            </div>
             {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
           </>
         );
