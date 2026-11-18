@@ -634,19 +634,39 @@ mod tests {
             .unwrap();
 
         // Setzen.
-        let g = gebiet_umbenennen(&pool, eid, gid, Some(Some("Süd")))
-            .await
-            .unwrap();
+        let g = gebiet_umbenennen(
+            &pool,
+            eid,
+            gid,
+            Some(Some("Süd")),
+            &crate::feld_cas::ExpectedValues::new(),
+        )
+        .await
+        .unwrap();
         assert_eq!(g.label.as_deref(), Some("Süd"));
 
         // Absent → Label bleibt stehen.
-        let g = gebiet_umbenennen(&pool, eid, gid, None).await.unwrap();
+        let g = gebiet_umbenennen(
+            &pool,
+            eid,
+            gid,
+            None,
+            &crate::feld_cas::ExpectedValues::new(),
+        )
+        .await
+        .unwrap();
         assert_eq!(g.label.as_deref(), Some("Süd"), "absent fasst nichts an");
 
         // Leerwunsch → Label wird NULL.
-        let g = gebiet_umbenennen(&pool, eid, gid, Some(None))
-            .await
-            .unwrap();
+        let g = gebiet_umbenennen(
+            &pool,
+            eid,
+            gid,
+            Some(None),
+            &crate::feld_cas::ExpectedValues::new(),
+        )
+        .await
+        .unwrap();
         assert_eq!(g.label, None, "Some(None) leert die Spalte");
     }
 
@@ -661,9 +681,15 @@ mod tests {
         .await
         .unwrap();
         assert!(matches!(
-            gebiet_umbenennen(&pool, fremd, gid, Some(Some("X")))
-                .await
-                .unwrap_err(),
+            gebiet_umbenennen(
+                &pool,
+                fremd,
+                gid,
+                Some(Some("X")),
+                &crate::feld_cas::ExpectedValues::new()
+            )
+            .await
+            .unwrap_err(),
             AppError::NotFound
         ));
     }

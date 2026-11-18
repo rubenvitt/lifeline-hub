@@ -720,6 +720,29 @@ pub async fn aufloesen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<()
 mod tests {
     use super::*;
 
+    /// Teil-Patch ohne Altwert mit Prüfung, Schreiben und frischer Anzeige (der Weg der Route vor
+    /// LLH-1945, für die Tests hier).
+    async fn update(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        id: i64,
+        patch: AbschnittPatch<'_>,
+    ) -> Result<EinsatzabschnittAnzeige, AppError> {
+        pruefe_patch(pool, einsatz_id, id, &patch).await?;
+        let mut conn = pool.acquire().await?;
+        update_tx(
+            &mut conn,
+            einsatz_id,
+            id,
+            &patch,
+            &crate::feld_cas::ExpectedValues::new(),
+        )
+        .await?;
+        // Der Test-Pool hat eine Verbindung: erst zurückgeben, dann lesen.
+        drop(conn);
+        load(pool, einsatz_id, id).await
+    }
+
     /// Org(1) + Einsatz; liefert einsatz_id.
     async fn setup(pool: &SqlitePool) -> i64 {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
