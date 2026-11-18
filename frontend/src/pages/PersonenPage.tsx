@@ -23,6 +23,7 @@ import {
 import { einsatzKeys } from '../api/queryKeys';
 import { listeUhs } from '../api/einsatzUhs';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { useViewport } from '../components/useViewport';
 import { Segmentleiste, useRollen } from '../components/instrument';
@@ -1044,12 +1045,7 @@ export default function PersonenPage() {
                 },
               ]
             : []),
-          {
-            key: 'druck',
-            label: 'Drucken / als PDF',
-            ziel: druckPfad,
-            onWahl: () => navigate(druckPfad),
-          },
+          druckansichtNebenweg({ ziel: druckPfad, navigate }),
           {
             key: 'csv',
             label: 'CSV exportieren',

@@ -976,7 +976,7 @@ describe('EinsatzdatenPage — Alarmzeit in der Anzeigezone (LFH-692)', () => {
 /**
  * ── Einstieg in den Einsatzbericht (LFH-726) ──
  *
- * „Einsatzbericht drucken" öffnet die Druckansicht und sendet nichts ab: Kopf-Slot, sekundär, als
+ * „Einsatzbericht – Druckansicht" öffnet die Druckansicht und sendet nichts ab: Kopf-Slot, sekundär, als
  * Link mit Knopfgestalt. Auch für Beobachter und abgeschlossene Einsätze — der Bericht prüft die
  * Rechte je Quelle selbst.
  */
@@ -992,7 +992,7 @@ describe('EinsatzdatenPage — Einstieg in den Einsatzbericht (LFH-726)', () => 
   it('verlinkt sekundär auf die Druckansicht; höchstens eine Primäraktion bleibt', async () => {
     setup();
     const k = await kopf();
-    const link = await within(k).findByRole('link', { name: 'Einsatzbericht drucken' });
+    const link = await within(k).findByRole('link', { name: 'Einsatzbericht – Druckansicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/einsatzdaten/bericht');
     expect(link).not.toHaveClass('ant-btn-primary');
     expect(k.querySelectorAll('.ant-btn-primary').length).toBeLessThanOrEqual(1);
@@ -1004,7 +1004,9 @@ describe('EinsatzdatenPage — Einstieg in den Einsatzbericht (LFH-726)', () => 
       benutzer: { ...admin, system_rolle: 'keiner' },
     });
     const k = await kopf();
-    expect(await within(k).findByRole('link', { name: 'Einsatzbericht drucken' })).toBeVisible();
+    expect(
+      await within(k).findByRole('link', { name: 'Einsatzbericht – Druckansicht' }),
+    ).toBeVisible();
   });
 });
 
@@ -1029,13 +1031,13 @@ describe('EinsatzdatenPage — Nebenweg „Zugriff verwalten“ (LFH-1170)', () 
     ['Beobachter', 'beobachter' as const],
   ])('fehlt für %s', async (_fall, meine_rolle) => {
     setup({ einsatz: { meine_rolle }, benutzer: { ...admin, system_rolle: 'keiner' } });
-    await screen.findByRole('link', { name: 'Einsatzbericht drucken' });
+    await screen.findByRole('link', { name: 'Einsatzbericht – Druckansicht' });
     expect(screen.queryByRole('link', { name: /Zugriff verwalten/ })).toBeNull();
   });
 
   it('fehlt am abgeschlossenen Einsatz', async () => {
     setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
-    await screen.findByRole('link', { name: 'Einsatzbericht drucken' });
+    await screen.findByRole('link', { name: 'Einsatzbericht – Druckansicht' });
     expect(screen.queryByRole('link', { name: /Zugriff verwalten/ })).toBeNull();
   });
 });

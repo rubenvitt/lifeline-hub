@@ -128,7 +128,7 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   // als `system=aus` mit (Review S7).
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/etb?system=an`);
-  await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb/druck$`));
   const drucken = page.getByRole('button', { name: 'Drucken / als PDF' });
   await expect(drucken).toBeEnabled({ timeout: 60_000 });
@@ -214,7 +214,7 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   // ── Gefilterter Druck: nur Meldungen; die Berichtigung liegt außerhalb der Auswahl. Die Seite
   // blendet Systemeinträge in der Vorgabe aus und gibt das als `system=aus` mit (Review S7).
   await page.goto(`/einsaetze/${einsatzId}/etb?typ=meldung`);
-  await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/etb/druck\\?typ=meldung&system=aus$`));
   await expect(drucken).toBeEnabled({ timeout: 60_000 });
   await expect(kopf).toContainText('Typ: Meldung');

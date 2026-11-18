@@ -2,8 +2,40 @@ import { useState } from 'react';
 import type { Nebenweg } from '../EinsatzSeite';
 import { useDrucken } from './useDrucken';
 
-/** Wortlaut wie am `DruckKnopf`. */
+/**
+ * Wortlaut der Druckeinstiege nach ihrer Wirkung (LLH-1836, `druck/AGENTS.md`, „Wortlaut und
+ * Platz“): `DRUCKEN` öffnet sofort den Druckdialog (wie am `DruckKnopf`), `DRUCKANSICHT` öffnet eine
+ * eigene Druckseite. Kein Druckeinstieg trägt einen anderen Namen.
+ */
 export const DRUCKEN = 'Drucken / als PDF';
+export const DRUCKANSICHT = 'Druckansicht';
+
+/** Druckseite eines anderen Dokuments als der Seite des Einstiegs: „Einsatzbericht – Druckansicht“. */
+export function druckansichtVon(dokument: string): string {
+  return `${dokument} – ${DRUCKANSICHT}`;
+}
+
+/**
+ * Der Einstieg in eine Druckseite als `Nebenweg` (Seitenkopf oder Objektkopf über
+ * `NebenwegeImKopf`): ab `md` ein Link in Knopfgestalt, Strg/⌘+Klick öffnet einen Tab.
+ */
+export function druckansichtNebenweg({
+  ziel,
+  navigate,
+  dokument,
+}: {
+  ziel: string;
+  navigate: (ziel: string) => void;
+  /** Nur, wenn die Druckseite ein anderes Dokument druckt als die Seite des Einstiegs. */
+  dokument?: string;
+}): Nebenweg {
+  return {
+    key: 'druck',
+    label: dokument ? druckansichtVon(dokument) : DRUCKANSICHT,
+    ziel,
+    onWahl: () => navigate(ziel),
+  };
+}
 
 /**
  * „Drucken / als PDF“ als Nebenweg des Seitenkopfs (LFH-1079) für Seiten, die sich selbst drucken
@@ -17,10 +49,15 @@ export const DRUCKEN = 'Drucken / als PDF';
  * `vorbereiten` (Lageplan, LLH-1051): baut das Druckstück erst auf Wahl, etwa das Bild der Karte.
  * Der Druck folgt, wenn es `true` meldet; bis dahin läuft der Eintrag. Meldet es `false`, hat der
  * Aufrufer den Grund schon an seinen Ort gegeben.
+ *
+ * `vorDemDruck` (Meldebild, Funkplan, Organigramm, LLH-1836): läuft synchron im selben Zug vor dem
+ * Druck wie `DruckKnopf.vorbereiten`, etwa um alles aufzuklappen; `useDrucken` öffnet den Dialog
+ * erst nach dem Commit.
  */
 export function useDruckNebenwege({
   vorbereiten,
-}: { vorbereiten?: () => Promise<boolean> } = {}): Nebenweg[] {
+  vorDemDruck,
+}: { vorbereiten?: () => Promise<boolean>; vorDemDruck?: () => void } = {}): Nebenweg[] {
   const { drucken, zustand, wiederholen } = useDrucken();
   const [bereitetVor, setBereitetVor] = useState(false);
   if (zustand === 'fehler') {
@@ -34,7 +71,17 @@ export function useDruckNebenwege({
       { key: 'organisation-laden', label: 'Organisation erneut laden', onWahl: wiederholen },
     ];
   }
-  if (!vorbereiten) return [{ key: 'druck', label: DRUCKEN, onWahl: drucken }];
+  if (!vorbereiten)
+    return [
+      {
+        key: 'druck',
+        label: DRUCKEN,
+        onWahl: () => {
+          vorDemDruck?.();
+          drucken();
+        },
+      },
+    ];
   return [
     {
       key: 'druck',

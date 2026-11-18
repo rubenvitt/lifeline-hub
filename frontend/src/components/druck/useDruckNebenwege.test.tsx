@@ -6,7 +6,12 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite, setzeViewportZurueck } from '../../test/viewport';
 import EinsatzSeite from '../EinsatzSeite';
-import { useDruckNebenwege } from './useDruckNebenwege';
+import {
+  DRUCKANSICHT,
+  druckansichtNebenweg,
+  druckansichtVon,
+  useDruckNebenwege,
+} from './useDruckNebenwege';
 
 /**
  * Drucken als Nebenweg (LFH-1079): derselbe Weg wie `DruckKnopf` (Dialog erst mit geladener
@@ -122,5 +127,56 @@ describe('useDruckNebenwege mit Vorbereitung', () => {
     await waitFor(() => expect(vorbereiten).toHaveBeenCalledTimes(2));
     await new Promise((r) => setTimeout(r, 20));
     expect(drucke).not.toHaveBeenCalled();
+  });
+});
+
+describe('useDruckNebenwege mit synchronem Vorbereiten (LLH-1836)', () => {
+  it('läuft im selben Zug vor dem Druckdialog, ohne Ladezustand', async () => {
+    setzeViewportBreite(1180);
+    const folge: string[] = [];
+    drucke.mockImplementation(() => folge.push('druck'));
+    function Seite() {
+      return (
+        <EinsatzSeite
+          titel="Meldebild"
+          weitere={{
+            name: NAME,
+            eintraege: useDruckNebenwege({ vorDemDruck: () => folge.push('aufklappen') }),
+          }}
+        >
+          <div>Inhalt</div>
+        </EinsatzSeite>
+      );
+    }
+    renderMitProviders(<Seite />);
+    await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+    await waitFor(() => expect(folge).toEqual(['aufklappen', 'druck']));
+  });
+});
+
+describe('druckansichtNebenweg (LLH-1836)', () => {
+  it('heißt „Druckansicht“ und öffnet die Druckseite', async () => {
+    setzeViewportBreite(1180);
+    const navigate = vi.fn();
+    renderMitProviders(
+      <EinsatzSeite
+        titel="Liste"
+        weitere={{ name: NAME, eintraege: [druckansichtNebenweg({ ziel: '/x/druck', navigate })] }}
+      >
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    const knopf = screen.getByRole('link', { name: DRUCKANSICHT });
+    expect(knopf).toHaveAttribute('href', '/x/druck');
+    await userEvent.click(knopf);
+    expect(navigate).toHaveBeenCalledWith('/x/druck');
+    expect(drucke).not.toHaveBeenCalled();
+  });
+
+  it('nennt ein anderes Dokument vor „Druckansicht“', () => {
+    expect(druckansichtVon('Einsatzbericht')).toBe('Einsatzbericht – Druckansicht');
+    expect(
+      druckansichtNebenweg({ ziel: '/b', navigate: () => {}, dokument: 'Einsatzbericht' }),
+    ).toMatchObject({ key: 'druck', label: 'Einsatzbericht – Druckansicht', ziel: '/b' });
   });
 });

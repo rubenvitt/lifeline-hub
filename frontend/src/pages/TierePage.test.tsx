@@ -1191,7 +1191,7 @@ describe('TierePage — Einstieg in den Druck (LFH-727)', () => {
       expect(k).not.toBeNull();
       return k!;
     });
-    return within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
+    return within(kopf).findByRole('link', { name: 'Druckansicht' });
   }
 
   it('nimmt die Vorgabe-Sicht „aktiv“ ausdrücklich mit', async () => {
@@ -1233,7 +1233,7 @@ describe('TierePage — Einstieg in den Druck (LFH-727)', () => {
       'ant-btn-primary',
     );
     expect(within(kopf).getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
-    expect(within(kopf).queryByText('Drucken / als PDF')).not.toBeInTheDocument();
+    expect(within(kopf).queryByText('Druckansicht')).not.toBeInTheDocument();
     expect(within(kopf).queryByText('CSV exportieren')).not.toBeInTheDocument();
     await userEvent.click(
       within(kopf).getByRole('button', { name: 'Weitere Aktionen zu den Tieren' }),
@@ -1245,7 +1245,7 @@ describe('TierePage — Einstieg in den Druck (LFH-727)', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' }));
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Druckansicht' }));
     expect(await screen.findByText('DRUCK-SEITE')).toBeInTheDocument();
   });
 });

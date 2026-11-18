@@ -43,11 +43,11 @@ describe('EinsatzSeite — Nebenwege ab md', () => {
     const druck = vi.fn();
     const csv = vi.fn();
     const { container } = zeige([
-      { key: 'druck', label: 'Drucken / als PDF', onWahl: druck, ziel: '/einsaetze/1/druck' },
+      { key: 'druck', label: 'Druckansicht', onWahl: druck, ziel: '/einsaetze/1/druck' },
       { key: 'csv', label: 'CSV exportieren', onWahl: csv },
     ]);
     const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
-    const druckKnopf = within(kopf).getByRole('link', { name: 'Drucken / als PDF' });
+    const druckKnopf = within(kopf).getByRole('link', { name: 'Druckansicht' });
     // Link mit Knopfgestalt: Strg/⌘+Klick öffnet einen Tab, das Ziel steht als Adresse da.
     expect(druckKnopf).toHaveAttribute('href', '/einsaetze/1/druck');
     await userEvent.click(within(kopf).getByRole('button', { name: 'CSV exportieren' }));
@@ -66,20 +66,20 @@ describe('EinsatzSeite — Nebenwege unter md', () => {
     const druck = vi.fn();
     const csv = vi.fn();
     const { container } = zeige([
-      { key: 'druck', label: 'Drucken / als PDF', onWahl: druck, ziel: '/einsaetze/1/druck' },
+      { key: 'druck', label: 'Druckansicht', onWahl: druck, ziel: '/einsaetze/1/druck' },
       { key: 'csv', label: 'CSV exportieren', onWahl: csv },
     ]);
     const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
     // Die Erfassung bleibt sichtbar, die Nebenwege nicht.
     expect(within(kopf).getByRole('button', { name: 'Betroffene erfassen' })).toBeInTheDocument();
-    expect(within(kopf).queryByText('Drucken / als PDF')).not.toBeInTheDocument();
+    expect(within(kopf).queryByText('Druckansicht')).not.toBeInTheDocument();
     expect(within(kopf).queryByText('CSV exportieren')).not.toBeInTheDocument();
 
     const ausloeser = within(kopf).getByRole('button', { name: NAME });
     await userEvent.click(ausloeser);
     await waitFor(() => expect(offenesMenue()).not.toBeNull());
     const menue = offenesMenue();
-    expect(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: 'Druckansicht' })).toBeInTheDocument();
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'CSV exportieren' }));
     expect(csv).toHaveBeenCalledTimes(1);
     expect(druck).not.toHaveBeenCalled();

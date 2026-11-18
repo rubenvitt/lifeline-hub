@@ -1126,7 +1126,7 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
     const k = kontext();
     const b = baueBefehle(k).find((x) => x.id === 'sprung:einsatzbericht');
     expect(b).toBeDefined();
-    expect(b!.label).toBe('Einsatzbericht drucken');
+    expect(b!.label).toBe('Einsatzbericht – Druckansicht');
     expect(b!.gruppe).toBe('module');
     b!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einsatzdaten/bericht');

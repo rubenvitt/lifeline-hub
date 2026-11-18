@@ -5,8 +5,8 @@ Wortlaut bzw. Platz, dann die Änderung. Pfade relativ zu `frontend/`.
 
 ## 1. Wortlaut als Baustein (D1, D2)
 
-- [ ] 1.1 `src/components/druck/useDruckNebenwege.ts`: `DRUCKANSICHT`, `druckansichtVon(dokument)` und `druckansichtNebenweg({ ziel, navigate, dokument? })` ergänzen; belegt durch neue Fälle in `useDruckNebenwege.test.tsx` (Label, `ziel`, `key: 'druck'`).
-- [ ] 1.2 `useDruckNebenwege({ vorDemDruck })`: synchron vor `drucken()` im selben Zug, ohne `laeuft`; belegt durch einen Test, der die Reihenfolge Aufklappen → Druckdialog prüft.
+- [x] 1.1 `src/components/druck/useDruckNebenwege.ts`: `DRUCKANSICHT`, `druckansichtVon(dokument)` und `druckansichtNebenweg({ ziel, navigate, dokument? })` ergänzen; belegt durch neue Fälle in `useDruckNebenwege.test.tsx` (Label, `ziel`, `key: 'druck'`).
+- [x] 1.2 `useDruckNebenwege({ vorDemDruck })`: synchron vor `drucken()` im selben Zug, ohne `laeuft`; belegt durch einen Test, der die Reihenfolge Aufklappen → Druckdialog prüft.
 - [ ] 1.3 Formtest `src/druck/druckWortlaut.guard.test.ts`: schlägt an bei „Einsatzbericht drucken“, „Registrierliste drucken“ und einem Druckeinstieg „Drucken“ ohne Zusatz außerhalb von Tests; erst rot gegen den Bestand, nach Gruppe 2–4 grün.
 
 ## 2. Seiten mit eigener Druckseite heißen „Druckansicht“

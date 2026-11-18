@@ -22,6 +22,7 @@ import {
   modulZielRoute,
   type KategorieKey,
 } from '../einsatz/modulRegistry';
+import { druckansichtVon } from '../components/druck/useDruckNebenwege';
 import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
 import { sprungmarken, sprungVoraussetzungGesperrt, sprungZiel } from '../einsatz/sprungmarken';
 import {
@@ -500,7 +501,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       befehle.push({
         id: 'sprung:einsatzbericht',
         gruppe: 'module',
-        label: 'Einsatzbericht drucken',
+        label: druckansichtVon('Einsatzbericht'),
         kontext: kategorieKontext('fuehrung'),
         icon: IconDokument,
         schlagworte: ['einsatzbericht', 'abschlussbericht', 'nachbereitung', 'pdf', 'drucken'],
