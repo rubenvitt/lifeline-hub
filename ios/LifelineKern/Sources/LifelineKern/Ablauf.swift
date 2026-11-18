@@ -44,7 +44,8 @@ public enum Ablauf {
         case web(ServerEintrag, vertrag: Int)
         case status(ServerEintrag, Statusseite)
 
-        var eintrag: ServerEintrag? {
+        /// Der Server der Seite; `nil` im Onboarding.
+        public var eintrag: ServerEintrag? {
             switch self {
             case .onboarding: nil
             case .pruefung(let e), .web(let e, _), .status(let e, _): e

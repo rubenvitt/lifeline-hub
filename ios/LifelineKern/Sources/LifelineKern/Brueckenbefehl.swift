@@ -102,7 +102,7 @@ public enum Meldungsfreigabe: Equatable, Sendable {
 /// Die Systemdienste, die die Brücke braucht; die App setzt sie mit UIKit und UserNotifications
 /// um, die Tests mit einer Attrappe.
 @MainActor
-public protocol Huellendienste: AnyObject {
+public protocol Huellendienste: AnyObject, Sendable {
     /// Schalter „Haptik“ in den Einstellungen der Hülle (Vorgabe an).
     var isHaptikEnabled: Bool { get }
     func play(_ feedback: Haptik.Feedback)
