@@ -2,7 +2,7 @@
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
 reihenfolge: 170
-quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/etbDruckTabelle.css, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css]
+quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/etbDruckTabelle.css, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css, frontend/src/pages/EinsatzakteDruckPage.tsx]
 ---
 
 ## Überblick
@@ -23,10 +23,12 @@ Gedruckt werden können unter anderem:
 - der Ausschnitt der Lagekarte als Lageplan ([Lagekarte, Zeichnen und Messen](lagekarte.md)),
 - die Bewertung eines Gefahrengebiets mit ihren Erläuterungen ([Gefahren](gefahren.md)),
 - der Einsatzbericht („Einsatzbericht drucken“ in den Einsatzdaten),
+- die Einsatzakte, das ganze Einsatzgeschehen in einem Druckstück („Einsatzakte“ in den
+  Einsatzdaten, siehe [Einsatz abschließen und Einsatzbericht](einsatzabschluss.md)),
 - die Hilfe.
 
 Als Datei exportieren lassen sich die Listen der Betroffenen und der Tiere mit „CSV
-exportieren“.
+exportieren“. Alle Anhänge und Tabellen eines Einsatzes zusammen liefert die Einsatzakte als ZIP.
 
 ## Abläufe
 
