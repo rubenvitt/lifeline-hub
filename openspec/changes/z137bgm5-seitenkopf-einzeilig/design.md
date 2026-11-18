@@ -54,12 +54,20 @@ als der von `kompakt` ist (48 / 72). Gelesen wird der Token (`useRollen().token`
 
 ### D2 Stärke als Meta im Seitenkopf
 
-`Verdichtungszeile` bekommt eine Form für den Kopf (`form="meta"`): Mono, ohne eigene Zeile und
-ohne `marginBlockEnd`, Sprung „Meldebild“ als Bedienziel der Stufe wie bisher. Die drei Seiten
-geben sie in `meta` der `EinsatzSeite` und setzen `metaPlatzhalter` in der Form der Zeile mit `0`
-(LLH-1463), weil die Zeile beim Laden still bleibt. Unter `md` bricht die Meta-Gruppe ohnehin in
-ihre eigene Zeile (`lfh-seitenkopf__meta`). Auf Fahrzeuge schaltet die Seite den Gruppenzähler der
-`Datensicht` ab (neue Prop, Vorgabe bleibt an); die Gruppenköpfe der Tabelle zählen weiter.
+`Verdichtungszeile` bekommt eine Form für den Kopf (`form="meta"`): ihre Glieder stehen per
+`display: contents` direkt in der Meta-Gruppe der `EinsatzSeite` und teilen sich die Zeilen mit
+Zahl und Datenstand; der Sprung „Meldebild“ hält die Steuerhöhe ohne senkrechte Polsterung
+(sonst wäre der Kopf in `kompakt` 46 statt 44 px hoch). Die Seiten geben sie über einen neuen
+Slot `metaZusatz` der `EinsatzSeite` hinein (keine Mono-Schrift wie `meta`). Beim Laden steht
+derselbe Gliedersatz mit Nullen unsichtbar und stumm da (LLH-1463), die Seitenzahl bekommt
+`metaPlatzhalter`. Auf Fahrzeuge entfällt „Fahrzeuge n“ in der Stärke (`fahrzeugzahl={false}`,
+der Kopf nennt „n Fahrzeuge“) und der Gruppenzähler der `Datensicht` (`gruppen.zaehler: false`);
+die Gruppenköpfe der Tabelle zählen weiter.
+
+Damit die längere Meta die Aktionen nicht unter den Titel schiebt, gibt ab `md` der Titelblock
+nach (`flex: 1 1 0%`, Mindestbreite 20rem, `EinsatzSeite.css`): die Meta bricht im Titelblock um,
+die Aktionen bleiben in der Titelzeile. Die Titelzeile hält dabei die Höhe einer Zeile der Stufe
+(`--lfh-titelzeile`), damit der Titel auf allen Kräfteseiten auf derselben Höhe steht.
 
 - *Verworfen: Stärke in die Werkzeugzeile der `Datensicht`.* Die Zeile gehört der Tabelle; die
   Stärke rollte mit und stünde nicht neben dem Titel, wo die Spec `kraeftebaum` („Stärke im

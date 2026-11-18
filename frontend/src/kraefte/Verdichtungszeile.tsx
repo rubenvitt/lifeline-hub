@@ -22,7 +22,22 @@ import { verdichte } from './kraeftebild';
  * `Space`-Zeile ist; `flex` risse ihn auf volle Breite. Rein und exportiert, damit über zwei
  * Dichtestufen ohne Rendern prüfbar.
  */
-export function verdichtungsLinkStil(token: { controlHeight: number; paddingSM: number }) {
+export function verdichtungsLinkStil(
+  token: { controlHeight: number; paddingSM: number },
+  form: VerdichtungForm = 'zeile',
+) {
+  if (form === 'meta') {
+    // Im Seitenkopf (LLH-1786): Boden ist die Steuerhöhe selbst, der Rand liegt im Kasten. Mit
+    // Polsterung oben und unten wäre der Link in `kompakt` 46 statt 30 px hoch, und der Kopf der
+    // Kräfteseiten stünde höher als der von Material (`e2e/kraefte-seitenkopf.spec.ts`).
+    return {
+      display: 'inline-flex',
+      alignItems: 'center',
+      boxSizing: 'border-box',
+      minHeight: token.controlHeight,
+      padding: `0 ${token.paddingSM}px`,
+    } as const;
+  }
   return {
     display: 'inline-flex',
     alignItems: 'center',
@@ -70,12 +85,23 @@ export function verdichtungsTextfarbe(
 
 const KATEGORIEN = ['verfuegbar', 'gebunden', 'nicht_verfuegbar'] as const;
 
+/**
+ * Wo die Zeile steht: `zeile` als eigene Zeile über einer Liste, `meta` im Seitenkopf neben dem
+ * Titel (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D2; Fahrzeuge, Personal, Einheiten).
+ */
+export type VerdichtungForm = 'zeile' | 'meta';
+
 export default function Verdichtungszeile({
   einsatzId,
   pfad,
+  form = 'zeile',
+  fahrzeugzahl = true,
 }: {
   einsatzId: number;
   pfad: string;
+  form?: VerdichtungForm;
+  /** `false` auf der Fahrzeugseite: ihr Kopf nennt die Zahl schon („3 Fahrzeuge“, LLH-1786). */
+  fahrzeugzahl?: boolean;
 }) {
   const { token, rollen } = useRollen();
   // Kein Link in ein gesperrtes Meldebild (LFH-888, design.md D4); die Zahlen bleiben.
@@ -100,33 +126,37 @@ export default function Verdichtungszeile({
   // Eine gesperrte Liste wartet auf nichts: sie fehlt bewusst (LLH-1462).
   const personalDa = personalFrei === false || personalQuery.data !== undefined;
   const fahrzeugeDa = fahrzeugeFrei === false || fahrzeugeQuery.data !== undefined;
-  if (!personalDa || !fahrzeugeDa) return null;
+  const laedt = !personalDa || !fahrzeugeDa;
+  // Als eigene Zeile still beim Laden; im Kopf hält ein stummer Platzhalter in derselben Form
+  // (dieselben Glieder, Zahlen als `0`) Breite und Umbruch der Meta-Gruppe (LLH-1463).
+  if (laedt && form === 'zeile') return null;
   if (personalFrei === false && fahrzeugeFrei === false) return null;
 
-  const v = verdichte(personalQuery.data ?? [], fahrzeugeQuery.data ?? [], []);
+  const v = verdichte(
+    laedt ? [] : (personalQuery.data ?? []),
+    laedt ? [] : (fahrzeugeQuery.data ?? []),
+    [],
+  );
   const sperre =
     personalFrei === false
       ? MODUL_PERSONAL_GESPERRT
       : fahrzeugeFrei === false
         ? MODUL_FAHRZEUGE_GESPERRT
         : null;
-  return (
-    <Space
-      wrap
-      align="center"
-      data-lfh="verdichtungszeile"
-      style={{ marginBlockEnd: token.margin }}
-    >
+  const glieder = (
+    <>
       {/* Die Schreibweise steht dabei (LLH-1750, Spec `lage-verdichtung`). */}
       <span style={{ color: token.colorTextSecondary }}>Stärke {STAERKE_SCHREIBWEISE}</span>
       {/* Ohne Personal ist die Stärke unbekannt: „—“, nie „0/0/0//0“ (keine erfundenen Daten). */}
-      <strong title={personalFrei === false ? undefined : STAERKE_AUSGESCHRIEBEN}>
+      <strong title={personalFrei === false || laedt ? undefined : STAERKE_AUSGESCHRIEBEN}>
         {personalFrei === false ? '—' : staerkeText(v.staerke)}
       </strong>
       {fahrzeugeFrei !== false && (
         <>
           <span aria-hidden>·</span>
-          <span style={{ color: token.colorTextSecondary }}>Fahrzeuge {v.anzahlFahrzeuge}</span>
+          {fahrzeugzahl && (
+            <span style={{ color: token.colorTextSecondary }}>Fahrzeuge {v.anzahlFahrzeuge}</span>
+          )}
           {/* Zahl vor Wort, dieselben Wörter wie der Zählerstreifen der Tabelle darunter
               (LFH-973, `statusKategorie`): „verfügbar“ statt „frei“, „nicht verfügbar“
               ausgeschrieben. */}
@@ -149,11 +179,43 @@ export default function Verdichtungszeile({
         </>
       )}
       {/* Der Linktext ist der Name des Moduls (`modulName`); die Route bleibt `kraefteuebersicht`. */}
-      {!meldebildGesperrt && (
-        <Link to={pfad} style={verdichtungsLinkStil(token)}>
-          {modulName('kraefteuebersicht')}
-        </Link>
-      )}
+      {!meldebildGesperrt &&
+        (laedt ? (
+          // Im Platzhalter kein Link: er wäre unsichtbar, aber fokussierbar.
+          <span style={verdichtungsLinkStil(token, form)}>{modulName('kraefteuebersicht')}</span>
+        ) : (
+          <Link to={pfad} style={verdichtungsLinkStil(token, form)}>
+            {modulName('kraefteuebersicht')}
+          </Link>
+        ))}
+    </>
+  );
+  if (form === 'meta') {
+    // Im Kopf: die Glieder sind Glieder der Meta-Gruppe der `EinsatzSeite` (`display: contents`),
+    // damit sie sich die Zeilen mit Zahl und Datenstand teilen, statt als ein Block eine eigene
+    // Zeile zu nehmen. Die Gruppe bricht um, die Glieder nicht im Wort. Kein Abstand nach unten.
+    return laedt ? (
+      <span
+        data-lfh="verdichtung-platzhalter"
+        aria-hidden="true"
+        style={{ display: 'contents', visibility: 'hidden' }}
+      >
+        {glieder}
+      </span>
+    ) : (
+      <span data-lfh="verdichtung-meta" style={{ display: 'contents' }}>
+        {glieder}
+      </span>
+    );
+  }
+  return (
+    <Space
+      wrap
+      align="center"
+      data-lfh="verdichtungszeile"
+      style={{ marginBlockEnd: token.margin }}
+    >
+      {glieder}
     </Space>
   );
 }

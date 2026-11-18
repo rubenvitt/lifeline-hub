@@ -202,10 +202,13 @@ describe('PersonalPage', () => {
    * Der Weg zum Meldebild von der Pflegefläche. Geprüft wird das `href`: ein Inline-Pfad neben dem
    * Builder wäre sonst nicht zu unterscheiden.
    */
-  it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
-    render(einsatz());
+  it('trägt Stärke und Meldebild-Link im Seitenkopf, keine Stärkezeile über der Tabelle', async () => {
+    const { container } = render(einsatz());
     const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
+    // LLH-1786: die Stärke ist Meta des Kopfs (Change `z137bgm5-seitenkopf-einzeilig` D2).
+    expect(link.closest('[data-lfh="seitenkopf"]')).not.toBeNull();
+    expect(container.querySelector('[data-lfh="verdichtungszeile"]')).toBeNull();
   });
 
   it('zeigt disponiertes Personal mit Funktion und Position', async () => {

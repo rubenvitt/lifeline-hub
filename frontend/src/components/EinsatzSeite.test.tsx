@@ -244,6 +244,33 @@ describe('EinsatzSeite', () => {
     expect(screen.getByText('12 Tiere')).toBeVisible();
   });
 
+  it('stellt den Meta-Zusatz (Stärke, LLH-1786) in die Meta-Gruppe, hinter die Meta', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite
+        titel="Fahrzeuge"
+        meta="3 Fahrzeuge"
+        metaZusatz={<span data-testid="staerke">Stärke 0/1/2//3</span>}
+      >
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    const gruppe = container.querySelector<HTMLElement>('.lfh-seitenkopf__meta')!;
+    const zusatz = screen.getByTestId('staerke');
+    expect(gruppe.contains(zusatz)).toBe(true);
+    // Folge Meta → Zusatz, und der Zusatz steht nicht in der Mono-Meta selbst.
+    expect(gruppe.textContent).toMatch(/^3 Fahrzeuge.*Stärke/);
+    expect(screen.getByText('3 Fahrzeuge').contains(zusatz)).toBe(false);
+  });
+
+  it('rendert die Meta-Gruppe auch, wenn nur der Meta-Zusatz steht', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="Einheiten" metaZusatz={<span>Stärke</span>}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(container.querySelector('.lfh-seitenkopf__meta')).toHaveTextContent('Stärke');
+  });
+
   it('rendert ohne Meta und ohne Datenstand keine leere Gruppe', () => {
     const { container } = renderMitProviders(
       <EinsatzSeite titel="Liste">
@@ -318,7 +345,19 @@ describe('EinsatzSeite', () => {
       const stil = titelblockStil(tokenFuer(stufe));
       expect(stil.alignSelf, stufe).toBe('flex-start');
       expect(stil.minHeight, stufe).toBe(boden);
+      // Die Titelzeile selbst hält dieselbe Höhe (LLH-1786): bricht die Meta unter den Titel, steht
+      // der Titel weiter mittig in SEINER Zeile, statt mit dem Block nach oben zu rutschen.
+      expect((stil as Record<string, unknown>)['--lfh-titelzeile'], stufe).toBe(`${boden}px`);
+      expect(stil.alignContent, stufe).toBeUndefined();
     }
+  });
+
+  it('hält ab md die Titelzeile auf ihrer Höhe und stapelt die Zeilen oben (Quelltext-Pin)', () => {
+    const abMd = seiteCss.slice(seiteCss.lastIndexOf('@media (min-width: 768px)'));
+    expect(abMd).toMatch(/\.lfh-seitenkopf__titelblock\s*\{[^}]*align-content:\s*flex-start/);
+    expect(abMd).toMatch(
+      /\.lfh-seitenkopf__titelblock > h1\s*\{[^}]*min-height:\s*var\(--lfh-titelzeile/,
+    );
   });
 
   it('setzt den Boden am Wrapper des Ortspfads', () => {

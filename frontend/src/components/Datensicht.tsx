@@ -452,7 +452,14 @@ interface Gruppierung<T> {
  * über der Sicht (Seitentitel = 1, Paneel = 2, …). Getrennt von {@link Gruppierung}, weil
  * `effektiveDaten` nur die Achse liest.
  */
-type SichtGruppierung<T> = Gruppierung<T> & { unterEbene: UnterEbene };
+type SichtGruppierung<T> = Gruppierung<T> & {
+  unterEbene: UnterEbene;
+  /**
+   * `false`: kein Zählerstreifen in der Werkzeugzeile, weil die Seite dieselbe Aufteilung schon im
+   * Kopf trägt (Fahrzeuge, Stärke als Meta, LLH-1786). Die Gruppenköpfe zählen weiter.
+   */
+  zaehler?: false;
+};
 
 /**
  * Feldname, unter dem `T` Kinder DESSELBEN Typs trägt — sonst `never`. `-?` allein genügt
@@ -1702,7 +1709,7 @@ export default function Datensicht<T extends object, const K extends string>(
         : filterSpalten.filter((spalte) => !spalte.filter!.ohneKartenfeld);
   const zeigtSuche = suche != null && baum == null;
   const zeigtSortierung = !alsTabelle && sortierOptionen.length > 0;
-  const zeigtZaehler = gruppenZaehler.length > 0 && alsTabelle;
+  const zeigtZaehler = gruppenZaehler.length > 0 && alsTabelle && gruppen?.zaehler !== false;
   /**
    * Schwebender Sammelbanner (LLH-1479): steht der Spaltenschalter bei der Seite und trüge die Zeile
    * sonst nur den Banner, hielte sie im Meldebild fast immer eine leere Standzeile (~40 px) als

@@ -609,6 +609,16 @@ export default function PersonalPage() {
   return (
     <EinsatzSeite
       meta={epQuery.isSuccess ? `${eps.length} Kräfte` : undefined}
+      metaPlatzhalter="0 Kräfte"
+      // Die Stärke steht als Meta im Kopf, nicht als eigene Zeile über der Liste (LLH-1786, Change
+      // `z137bgm5-seitenkopf-einzeilig` D2); sie hält ihre Breite beim Laden selbst.
+      metaZusatz={
+        <Verdichtungszeile
+          einsatzId={einsatzId}
+          pfad={kraefteuebersichtPfad(einsatzId)}
+          form="meta"
+        />
+      }
       dataUpdatedAt={gemeinsamerDatenstand(
         epQuery.dataUpdatedAt,
         einheitenQuery.dataUpdatedAt,
@@ -669,7 +679,6 @@ export default function PersonalPage() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
           <DeeplinkHinweis lage={deeplinkHinweis} sache="Einsatzkraft" />
-          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {/* `zufluss` bleibt `sammelbanner`: Einheitswechsel, Status und Position sind Bedienziele
               der Zeile. Wechselt eine Person unter Fokus oder Zeiger die Einheit, hält die
               Schleuse Platz und Folge, bis beide die Sicht verlassen (D6). */}

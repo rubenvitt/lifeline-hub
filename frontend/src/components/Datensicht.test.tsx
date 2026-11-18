@@ -1089,6 +1089,21 @@ describe('Datensicht · Kartenzweig', () => {
     expect(screen.getByText('2 Feuerwehr')).toBeInTheDocument();
   });
 
+  it('ohne Zählerstreifen, wenn die Seite die Aufteilung schon im Kopf trägt (LLH-1786)', () => {
+    setzeViewportBreite(1366);
+    const { container } = rendere({
+      form: 'tabelle',
+      gruppen: {
+        schluessel: (f) => f.traeger ?? 'ohne',
+        etikett: (w) => (w === 'FW' ? 'Feuerwehr' : 'Hilfsorganisation'),
+        reihenfolge: ['FW', 'DRK'],
+        unterEbene: 1,
+        zaehler: false,
+      },
+    });
+    expect(container.querySelector('[data-lfh="datensicht-gruppenzaehler"]')).toBeNull();
+  });
+
   it('Gruppen erscheinen im Kartenzweig als Köpfe mit Zähler', () => {
     setzeViewportBreite(390);
     rendere({

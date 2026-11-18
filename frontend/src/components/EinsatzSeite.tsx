@@ -85,21 +85,22 @@ export function titelblockStil(token: {
   paddingXS: number;
   marginXS: number;
 }): CSSProperties {
+  const zeile = Math.max(
+    token.controlHeight,
+    SEITENKOPF_HOEHE - 2 * token.paddingXS - SEITENKOPF_LINIE,
+  );
   return {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    // Mehrzeilig (Ortspfad, Titel, Meta unter `md`) stehen die Zeilen beisammen in der Mitte,
-    // statt sich über den Boden zu verteilen.
-    alignContent: 'center',
+    // Wie die Zeilen stehen, sagt `EinsatzSeite.css`: unter `md` mittig beisammen (Ortspfad, Titel,
+    // Meta), ab `md` oben gestapelt, die Titelzeile so hoch wie `--lfh-titelzeile` (LLH-1786).
     alignSelf: 'flex-start',
-    minHeight: Math.max(
-      token.controlHeight,
-      SEITENKOPF_HOEHE - 2 * token.paddingXS - SEITENKOPF_LINIE,
-    ),
+    minHeight: zeile,
     columnGap: token.marginXS * 3,
     rowGap: 2,
     minWidth: 0,
+    ['--lfh-titelzeile' as string]: `${zeile}px`,
   };
 }
 
@@ -378,6 +379,12 @@ interface EinsatzSeiteProps {
    */
   metaPlatzhalter?: string;
   /**
+   * Zusatz in der Meta-Gruppe hinter der Meta, in eigener Schrift (keine Mono): die Stärke der
+   * Kräfteseiten (LLH-1786, `kraefte/Verdichtungszeile` in der Form `meta`). Er hält seine Breite
+   * beim Laden selbst; unter `md` bricht er mit der Gruppe in ihre eigene Zeile.
+   */
+  metaZusatz?: ReactNode;
+  /**
    * Rechter Header-Slot — **genau eine Primäraktion**, der Rest sekundär.
    *
    * Der Slot wird AUSSERHALB jedes `<Form>` gerendert. Ein Speichern-Button hier darf KEIN
@@ -491,6 +498,7 @@ export default function EinsatzSeite({
   ortspfadAbMd = false,
   meta,
   metaPlatzhalter,
+  metaZusatz,
   aktionen,
   weitere,
   neueZeile,
@@ -604,7 +612,7 @@ export default function EinsatzSeite({
           {/* Meta und Datenstand sind EINE Gruppe mit eigener Zeile unter `md` (`EinsatzSeite.css`,
               LFH-373): in der Titelzeile schöbe eine spät eintreffende Meta alles darunter nach unten.
               Per CSS, nicht per `useViewport`, dessen erstes Bild bewusst breit ist. */}
-          {(meta || metaPlatzhalter || dataUpdatedAt !== undefined) && (
+          {(meta || metaPlatzhalter || metaZusatz || dataUpdatedAt !== undefined) && (
             <span
               className="lfh-seitenkopf__meta"
               style={{
@@ -635,6 +643,7 @@ export default function EinsatzSeite({
                   </span>
                 )
               )}
+              {metaZusatz}
               {/* Führt die Seite einen Datenstand (auch `0` vor dem ersten Abruf), hält der Kopf seinen
                   Platz frei, in jeder Breite (LLH-1463) — sonst bräche er beim Eintreffen um. Der
                   `key` macht aus Platzhalter und Stand zwei Knoten: kommt die Meta mit den Daten,

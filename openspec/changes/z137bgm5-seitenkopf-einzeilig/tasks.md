@@ -16,10 +16,10 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 2. Stärke im Seitenkopf (D2)
 
-- [ ] 2.1 `kraefte/Verdichtungszeile.tsx`: Form `meta` (Mono, ohne eigene Zeile, Sprung „Meldebild“ in Stufenhöhe) und exportierter Platzhaltertext; Unit-Tests „Meta-Form ohne Zeilenabstand“, „Platzhalter in der Form der Zeile“ rot→grün
-- [ ] 2.2 `components/Datensicht.tsx`: Prop zum Abschalten des Gruppenzählers (Vorgabe an); Unit-Test rot→grün
-- [ ] 2.3 `pages/FahrzeugePage.tsx`, `pages/PersonalPage.tsx`, `pages/EinheitenPage.tsx`: Stärke in `meta` samt `metaPlatzhalter`, keine Zeile über der Liste; Fahrzeuge ohne Gruppenzähler. Seitentests „Stärke im Seitenkopf“, „Aufteilung nur einmal“ rot→grün
-- [ ] 2.4 e2e: `kraefte-seitenkopf.spec.ts` (Titel auf gleicher Höhe) und `rahmen-cls-dichte.spec.ts` grün; neu „Fahrzeuge ohne Doppel“ in `kraefte-seitenkopf.spec.ts` grün
+- [x] 2.1 `kraefte/Verdichtungszeile.tsx`: Form `meta` (Glieder in der Meta-Gruppe, Sprung „Meldebild“ in Stufenhöhe ohne senkrechte Polsterung, `fahrzeugzahl`) und Platzhalter in derselben Form; Unit-Tests „Meta-Form ohne Zeilenabstand“, „Platzhalter in der Form der Zeile“, „Link auf der Steuerhöhe“, „ohne Fahrzeugzahl“ rot→grün
+- [x] 2.2 `components/Datensicht.tsx`: `gruppen.zaehler: false` schaltet den Gruppenzähler ab (Vorgabe an); Unit-Test rot→grün
+- [x] 2.3 `components/EinsatzSeite.tsx` Slot `metaZusatz` (Test rot→grün, Mutationsprobe); `pages/FahrzeugePage.tsx`, `pages/PersonalPage.tsx`, `pages/EinheitenPage.tsx`: Stärke in `metaZusatz`, Zahl mit `metaPlatzhalter`, keine Zeile über der Liste; Fahrzeuge ohne Gruppenzähler. Seitentests „Stärke im Seitenkopf“, „Aufteilung genau einmal“ rot→grün
+- [x] 2.4 Titelblock gibt ab `md` nach, Titelzeile hält `--lfh-titelzeile` (`EinsatzSeite.css`, Tests rot→grün); e2e `kraefte-seitenkopf`, `rahmen-cls-dichte`, `kraefte-schmal`, `einsatzauswahl-cls` grün. „Fahrzeuge ohne Doppel“ ist Logik einer Seite und steht in Vitest (`e2e/AGENTS.md`)
 
 ## 3. Klappbare Kennzahlen (D3)
 

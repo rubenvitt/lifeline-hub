@@ -316,6 +316,16 @@ export default function EinheitenPage() {
       }
       titel={modulName('einheiten')}
       meta={einheitenQuery.isSuccess ? `${einheiten.length} Einheiten` : undefined}
+      metaPlatzhalter="0 Einheiten"
+      // Die Stärke steht als Meta im Kopf, nicht als eigene Zeile über der Liste (LLH-1786, Change
+      // `z137bgm5-seitenkopf-einzeilig` D2); sie hält ihre Breite beim Laden selbst.
+      metaZusatz={
+        <Verdichtungszeile
+          einsatzId={einsatzId}
+          pfad={kraefteuebersichtPfad(einsatzId)}
+          form="meta"
+        />
+      }
       dataUpdatedAt={einheitenQuery.dataUpdatedAt}
       aktionen={
         darfSchreiben && (
@@ -329,7 +339,6 @@ export default function EinheitenPage() {
         darfSchreiben ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
     >
-      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
       <DeeplinkHinweis lage={deeplinkHinweis} sache="Einheit" />
 
       {/* Drei Zustände, nicht zwei: `einheiten.length === 0` ist auch während des Ladens und im

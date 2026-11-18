@@ -1202,6 +1202,17 @@ function FahrzeugeInhalt() {
     <EinsatzSeite
       dataUpdatedAt={gemeinsamerDatenstand(efQuery.dataUpdatedAt, personalQuery.dataUpdatedAt)}
       meta={efQuery.isSuccess ? `${efs.length} Fahrzeuge` : undefined}
+      metaPlatzhalter="0 Fahrzeuge"
+      // Die Stärke steht als Meta im Kopf, nicht als eigene Zeile über der Liste (LLH-1786, Change
+      // `z137bgm5-seitenkopf-einzeilig` D2); sie hält ihre Breite beim Laden selbst.
+      metaZusatz={
+        <Verdichtungszeile
+          einsatzId={einsatzId}
+          pfad={kraefteuebersichtPfad(einsatzId)}
+          form="meta"
+          fahrzeugzahl={false}
+        />
+      }
       titel={modulName('fahrzeuge')}
       breadcrumb={
         <Breadcrumb
@@ -1299,7 +1310,6 @@ function FahrzeugeInhalt() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
           <DeeplinkHinweis lage={deeplinkHinweis} sache="Fahrzeug" />
-          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {ansicht === 'tableau' ? (
             <FmsTableau
               fahrzeuge={efs}
@@ -1342,6 +1352,8 @@ function FahrzeugeInhalt() {
               spaltenAusVoreinstellung={['bemerkung']}
               zeilenFehler={(f) => zeilen.grund(f.id)}
               gruppen={{
+                // Die Aufteilung steht schon als Meta im Kopf (LLH-1786): kein zweiter Streifen.
+                zaehler: false,
                 schluessel: (ef) => kategorieVon(ef.status_kategorie),
                 etikett: kategorieEtikett,
                 reihenfolge: KATEGORIE_REIHENFOLGE,
