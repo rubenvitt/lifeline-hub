@@ -5,7 +5,7 @@ import { meHandler, server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../../api/queryKeys';
-import Druckkopf from './Druckkopf';
+import Druckkopf, { druckEinsatzName } from './Druckkopf';
 import { adminFixture } from '../../test/fixtures';
 
 /**
@@ -29,6 +29,24 @@ afterEach(() => {
 function kopf(): HTMLElement {
   return document.querySelector('[data-lfh="druckkopf"]') as HTMLElement;
 }
+
+describe('druckEinsatzName', () => {
+  it('setzt die interne Nummer in Klammern hinter die Bezeichnung', () => {
+    expect(druckEinsatzName({ bezeichnung: 'Hochwasser', einsatznummer_intern: ' E-7 ' })).toBe(
+      'Hochwasser (E-7)',
+    );
+  });
+
+  it('lässt fehlende oder leere Nummern ohne Klammer', () => {
+    expect(druckEinsatzName({ bezeichnung: 'Hochwasser' })).toBe('Hochwasser');
+    expect(druckEinsatzName({ bezeichnung: 'Hochwasser', einsatznummer_intern: null })).toBe(
+      'Hochwasser',
+    );
+    expect(druckEinsatzName({ bezeichnung: 'Hochwasser', einsatznummer_intern: '  ' })).toBe(
+      'Hochwasser',
+    );
+  });
+});
 
 describe('Druckkopf', () => {
   it('nennt Organisation, Dokument als h1, Einsatz mit Nummer, Zeilen und druckende Person', async () => {
