@@ -26,7 +26,7 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
   Umbruch erlaubt; Prüfung des zugänglichen Namens ohne „·“
 - [x] 2.4 `components/instrument/Feld.tsx` mit `Feld.test.tsx`: in einer `<Form>` gebunden,
   Pflichtfehler wie Form.Item, `maxWidth` je Breite, `voll` ohne Grenze, `InputNumber` füllt die
-  Breite (Klasse `lfh-feld` in `index.css`), `noStyle`/`dependencies` werden durchgereicht,
+  Breite (Klasse `lfh-formfeld` in `index.css` (`lfh-feld` ist der Werteblock in `theme/sprache.css`)), `noStyle`/`dependencies` werden durchgereicht,
   `@ts-expect-error` für `style`
 - [x] 2.5 Export der vier Bausteine über `components/instrument/index.ts`; `pnpm tsc -b` grün
 
@@ -59,14 +59,14 @@ Code). Befehle laufen in `frontend/` mit `mise exec -- pnpm …`.
 
 ## 5. Regeltext und Design System
 
-- [ ] 5.1 `frontend/AGENTS.md`: Skala um `kartentitel`, Bausteine-Liste um `Textstufe`, `Stapel`,
+- [x] 5.1 `frontend/AGENTS.md`: Skala um `kartentitel`, Bausteine-Liste um `Textstufe`, `Stapel`,
   `MetaZeile`, `Feld`; Bausteinwahl um Zeilen für Text, Stapel und Metazeile, Feld-Zeile auf
   `Feld`; Regeltext, den die Bausteine tragen, gekürzt; Prettier grün
-- [ ] 5.2 Karten `Text`, `Stapel`, `MetaZeile` in `frontend/scripts/design-system/previews.tsx`,
+- [x] 5.2 Karten `Text`, `Stapel`, `MetaZeile` in `frontend/scripts/design-system/previews.tsx`,
   Karte `Eingabefeld` zeigt `Feld`; `pnpm design-system` erzeugt
   `docs/design/design-system/project/`, `designSystem.test.ts` und `designSystem.guard.test.ts`
   grün
-- [ ] 5.3 ADR „Text, Abstand und Feldbreite kommen aus benannten Stufen“ nach
+- [x] 5.3 ADR „Text, Abstand und Feldbreite kommen aus benannten Stufen“ nach
   `docs/architektur/entscheidungen/VORLAGE.md` mit nächster freier Nummer auf `alpha`, `gilt_fuer`
   auf Bausteine, Wächter und Schuld; Prüfblock grün (`scripts/check-all.sh` ADR-Schritt)
 - [ ] 5.4 Folgeaufgaben je übrigem Bereich (Umstellung auf die Bausteine) und für Mono-Stufe sowie

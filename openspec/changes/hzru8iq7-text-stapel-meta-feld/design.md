@@ -82,7 +82,7 @@ schlecht prüfen.
 `<Feld name label breite="mittel" …FormItemProps>` reicht alle Form.Item-Props außer `style`
 durch und setzt `style={{ maxWidth: FELDBREITE[breite] }}` auf das Form.Item. antds Steuerelemente
 sind in einem Form.Item schon 100 % breit (`Input`, `Select`); für `InputNumber`, `DatePicker`
-und `TimePicker`, die das nicht sind, setzt `Feld` per Klasse `lfh-feld` in `index.css`
+und `TimePicker`, die das nicht sind, setzt `Feld` per Klasse `lfh-formfeld` in `index.css` (`lfh-feld` ist der Werteblock in `theme/sprache.css`)
 `width: 100%` auf das Steuerelement. Breiten: `kurz` 120 (Zahlen, Kürzel), `schmal` 200 (häufigste
 Obergrenze im Pilot), `mittel` 320, `voll` ohne Obergrenze; Konstante `FELDBREITE` in
 `theme/tokens.ts`, gespiegelt als `--lfh-feld-*` (Gate wie Rollen). Gegenüber dem Gespräch kam

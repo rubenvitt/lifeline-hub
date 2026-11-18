@@ -13,7 +13,7 @@ import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
  * Wächter `components/feld.guard.test.ts`.
  */
 
-export const FELD_KLASSE = 'lfh-feld';
+export const FELD_KLASSE = 'lfh-formfeld';
 
 export interface FeldProps extends Omit<FormItemProps, 'style'> {
   /** Obergrenze der Breite; Vorgabe `voll` (ganze Zeile). */

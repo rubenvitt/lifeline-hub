@@ -281,7 +281,7 @@ main:has([data-lfh='ausgabe-kurzzeile']) {
 
 /* Feld (Spec `feldbreiten`, LLH-1810): Zahlen- und Datumsfelder füllen wie `Input` und `Select` die
    Breite bis zur Obergrenze des Felds; antd setzt sie sonst auf ihre Eigenbreite. */
-.lfh-feld .ant-input-number,
-.lfh-feld .ant-picker {
+.lfh-formfeld .ant-input-number,
+.lfh-formfeld .ant-picker {
   width: 100%;
 }
