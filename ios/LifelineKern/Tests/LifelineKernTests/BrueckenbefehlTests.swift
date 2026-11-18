@@ -143,6 +143,45 @@ final class BrueckenbefehlTests: XCTestCase {
         XCTAssertEqual(b?.fehler, nil)
     }
 
+    /// Ohne vorherige Meldung fragt das erste Badge nach der Berechtigung, wie eine Meldung.
+    @MainActor
+    func testDasErsteBadgeFragtNachDerBerechtigung() async {
+        let dienste = Dienste()
+        dienste.freigabe = .offen
+        dienste.erteilt = true
+        let antwort = await Brueckenausfuehrung.run(.setAppBadge(id: 1, count: 4), dienste: dienste)
+        XCTAssertEqual(dienste.anfragen, 1)
+        XCTAssertEqual(dienste.badges, [4])
+        XCTAssertEqual(antwort, Brueckenantwort(id: 1, fehler: nil, wert: .null))
+    }
+
+    @MainActor
+    func testOhneBerechtigungSetztDieHuelleKeinBadge() async {
+        for (freigabe, erteilt) in [(Meldungsfreigabe.verweigert, false), (.offen, false)] {
+            let dienste = Dienste()
+            dienste.freigabe = freigabe
+            dienste.erteilt = erteilt
+            let antwort = await Brueckenausfuehrung.run(.setAppBadge(id: 2, count: 1), dienste: dienste)
+            XCTAssertEqual(dienste.badges, [], "\(freigabe)")
+            XCTAssertEqual(antwort, Brueckenantwort(id: 2, fehler: Brueckenausfuehrung.meldungenAus, wert: .null))
+        }
+    }
+
+    /// Wegnehmen fragt nie: ohne Berechtigung gibt es keine Zahl am Symbol, und eine Rückfrage beim
+    /// Laden der Seite hätte keinen Anlass, den die Person versteht.
+    @MainActor
+    func testNullFragtNieUndGelingtOhneBerechtigungOhneWirkung() async {
+        for freigabe in [Meldungsfreigabe.offen, .verweigert] {
+            let dienste = Dienste()
+            dienste.freigabe = freigabe
+            dienste.erteilt = true
+            let antwort = await Brueckenausfuehrung.run(.setAppBadge(id: 3, count: 0), dienste: dienste)
+            XCTAssertEqual(dienste.anfragen, 0, "\(freigabe)")
+            XCTAssertEqual(dienste.badges, [], "\(freigabe)")
+            XCTAssertEqual(antwort, Brueckenantwort(id: 3, fehler: nil, wert: .null))
+        }
+    }
+
     @MainActor
     func testEinFehlerDesSystemsGehtAlsAblehnungAnDieSeite() async {
         let dienste = Dienste()

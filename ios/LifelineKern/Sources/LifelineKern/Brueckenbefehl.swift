@@ -143,6 +143,14 @@ public enum Brueckenausfuehrung {
             }
         case .setAppBadge(let id, let count):
             return await antwort(id) {
+                // Die Zahl am Symbol braucht dieselbe Berechtigung wie eine Meldung. Wegnehmen fragt
+                // nie: ohne Berechtigung steht keine Zahl da, und eine Rückfrage beim Laden der
+                // Seite hätte keinen Anlass, den die Person versteht.
+                if count == 0 {
+                    guard await dienste.loadMeldungsfreigabe() == .erlaubt else { return .null }
+                } else if await !isMeldungErlaubt(dienste) {
+                    throw Abgelehnt(meldungenAus)
+                }
                 try await dienste.setBadge(count)
                 return .null
             }
