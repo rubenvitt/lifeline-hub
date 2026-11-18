@@ -21,7 +21,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/s4u2yl0p5icigp4lx42mgu4e
 
 ## 4. Gesamtprüfung
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün und die Druck-Specs `etb-druck` in Chromium, Firefox, WebKit grün
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün und die Druck-Specs `etb-druck` in Chromium, Firefox, WebKit grün
 
 ## Workflow follow-up
 
