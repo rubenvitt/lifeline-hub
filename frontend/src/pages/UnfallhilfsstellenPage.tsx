@@ -11,7 +11,6 @@ import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenModal from './uhs/UhsAnlegenModal';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
-import StatusTag from '../components/StatusTag';
 import {
   SeitenFehler,
   SeitenLeer,
@@ -23,6 +22,7 @@ import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
+import { Status } from '../components/instrument/Status';
 
 const TYP_FILTER = (Object.keys(uhsTyp) as UhsTyp[]).map((t) => ({
   text: uhsTyp[t].label,
@@ -108,7 +108,7 @@ export default function UnfallhilfsstellenPage() {
       sorter: (a, b) => STATUS_FOLGE.indexOf(a.status) - STATUS_FOLGE.indexOf(b.status),
       filters: STATUS_FILTER,
       onFilter: (wert, u) => u.status === wert,
-      render: (s: UhsStatus) => <StatusTag darstellung={uhsStatus[s]} />,
+      render: (s: UhsStatus) => <Status darstellung={uhsStatus[s]} />,
     },
     {
       key: 'standort',

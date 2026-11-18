@@ -571,10 +571,10 @@ describe('SchaedenDetailPage — Kopfaktionen (LLH-1105)', () => {
     expect(
       screen.queryByRole('button', { name: 'Weitere Aktionen zu Schaden S-001' }),
     ).not.toBeInTheDocument();
-    const marke = within(titel).getByText('storniert').closest('[data-lfh="status-chip"]');
+    const marke = within(titel).getByText('storniert').closest('[data-lfh="status"]');
     expect(marke).toHaveAttribute('data-ton', 'neutral');
-    // Kein farbloser antd-`Tag` mehr daneben: die Zustandsmarke ist das neutrale Muster.
-    expect([...titel.querySelectorAll('.ant-tag')].map((t) => t.textContent)).not.toContain(
+    // Keine Kennzeichnung daneben: „storniert“ ist ein Zustand, keine Marke (LLH-1779).
+    expect([...titel.querySelectorAll('[data-marke]')].map((t) => t.textContent)).not.toContain(
       'storniert',
     );
   });

@@ -31,11 +31,16 @@ export function schliesseRueckgaengig(api: MessageInstance) {
   api.destroy(SCHLUESSEL);
 }
 
-export function zeigeRueckgaengig(api: MessageInstance, text: string, aufRueckgaengig: () => void) {
+export function zeigeRueckgaengig(
+  api: MessageInstance,
+  text: string,
+  aufRueckgaengig: () => void,
+  schluessel: string = SCHLUESSEL,
+) {
   // Lokal statt State: der Toast lebt außerhalb des React-Baums des Auslösers.
   let verbraucht = false;
   api.open({
-    key: SCHLUESSEL,
+    key: schluessel,
     type: 'success',
     duration: DAUER_S,
     content: (
@@ -48,7 +53,7 @@ export function zeigeRueckgaengig(api: MessageInstance, text: string, aufRueckga
             if (verbraucht) return;
             verbraucht = true;
             aufRueckgaengig();
-            api.destroy(SCHLUESSEL);
+            api.destroy(schluessel);
           }}
         >
           Rückgängig
@@ -56,4 +61,27 @@ export function zeigeRueckgaengig(api: MessageInstance, text: string, aufRueckga
       </Space>
     ),
   });
+}
+
+/**
+ * Quittung nach einem Statuswechsel eines Fahrzeugs (LLH-1781, Spec `fahrzeugstatus-quittung`,
+ * Change `eon26eat-status-und-bedienung`, D10): „85-1: S2 → S3 · Rückgängig“. Eigener Schlüssel
+ * je Fahrzeug: zwei schnelle Wechsel an zwei Fahrzeugen überschreiben sich nicht, ein zweiter
+ * Wechsel am selben Fahrzeug ersetzt den ersten. antds `message` nimmt keinen Fokus, die Hand
+ * bleibt also an der Zeile oder Kachel.
+ */
+export function zeigeStatusQuittung(
+  api: MessageInstance,
+  q: { efId: number; rufname: string; vorher: string; neu: string },
+  aufRueckgaengig: () => void,
+) {
+  zeigeRueckgaengig(api, statusQuittungText(q), aufRueckgaengig, statusQuittungSchluessel(q.efId));
+}
+
+export function statusQuittungText(q: { rufname: string; vorher: string; neu: string }): string {
+  return `${q.rufname}: ${q.vorher} → ${q.neu}`;
+}
+
+export function statusQuittungSchluessel(efId: number): string {
+  return `lfh-status-quittung-${efId}`;
 }

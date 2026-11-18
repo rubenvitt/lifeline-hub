@@ -10,7 +10,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
-import { Feld, monoStil, Stapel, StatusChip } from '../components/instrument';
+import { Status, monoStil, Feld, Stapel } from '../components/instrument';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
@@ -391,10 +391,12 @@ export default function BenutzerPage() {
         // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage (Blau
         // hieße Bedienung).
         <Stapel richtung="zeile" umbruch abstand="xxs" ausrichten="mitte">
-          {b.system_rolle === 'admin' && <StatusChip ton="neutral" wort="Admin" />}
-          {b.org_rolle === 'fuehrungskraft' && <StatusChip ton="neutral" wort="Führungskraft" />}
+          {b.system_rolle === 'admin' && <Status groesse="klein" ton="neutral" wort="Admin" />}
+          {b.org_rolle === 'fuehrungskraft' && (
+            <Status groesse="klein" ton="neutral" wort="Führungskraft" />
+          )}
           {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && (
-            <StatusChip ton="neutral" wort="Benutzer" />
+            <Status groesse="klein" ton="neutral" wort="Benutzer" />
           )}
         </Stapel>
       ),
@@ -415,9 +417,9 @@ export default function BenutzerPage() {
       onFilter: (wert, b) => b.aktiv === wert,
       render: (_, b) =>
         b.aktiv ? (
-          <StatusChip ton="normal" wort="aktiv" />
+          <Status groesse="klein" ton="normal" wort="aktiv" />
         ) : (
-          <StatusChip ton="neutral" wort="deaktiviert" />
+          <Status groesse="klein" ton="neutral" wort="deaktiviert" />
         ),
     },
     {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Tag, Typography, theme } from 'antd';
+import { Alert, Button, Typography, theme } from 'antd';
 import { EINTRAEGE } from 'virtual:neuigkeiten';
 import type { ChangelogEintrag, Kanal } from '../../scripts/changelog-zerlegen.mjs';
 import AdminPage from '../components/AdminPage';
@@ -14,6 +14,7 @@ import {
   VORSCHAU_GRENZE,
   type KanalFilter,
 } from './neuigkeiten';
+import { Marke } from '../components/instrument/Marke';
 
 const KANAL_TITEL: Record<Kanal, string> = { alpha: 'Alpha', beta: 'Beta', stabil: 'Stabil' };
 
@@ -125,7 +126,7 @@ function EintragAnzeige({ eintrag }: { eintrag: ChangelogEintrag }) {
         <Typography.Title level={2} style={{ margin: 0, fontSize: 18 }}>
           <span style={{ fontFamily: 'monospace' }}>{eintrag.version}</span>
         </Typography.Title>
-        <Tag>{KANAL_TITEL[eintrag.kanal]}</Tag>
+        <Marke>{KANAL_TITEL[eintrag.kanal]}</Marke>
         {eintrag.datum && (
           <Typography.Text type="secondary">{datumAnzeige(eintrag.datum)}</Typography.Text>
         )}

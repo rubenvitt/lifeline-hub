@@ -1,6 +1,5 @@
 import { Button, Space } from 'antd';
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import StatusTag from '../components/StatusTag';
 import type { KatalogSpalte } from '../components/KatalogTabelle';
 import { nachZahl } from '../components/katalogVergleich';
 import type { WeitereAktionen } from '../components/Datensicht';
@@ -8,6 +7,7 @@ import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import type { Dienststatus } from '../api/types';
 import { VomHubGesperrt } from '../instanz/herkunft';
 import { dienststatus } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
 
 interface DienststatusVariablen {
   id: number;
@@ -136,7 +136,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
     onFilter: (wert, t) => t.dienststatus === String(wert),
     // In der Folge des Vertrags (in Dienst vor außer Dienst), nicht nach dem Wort (LLH-1096).
     sorter: nachZahl((t: T) => DIENSTSTATUS_REIHENFOLGE.indexOf(t.dienststatus)),
-    render: (_, t) => <StatusTag darstellung={dienststatus[t.dienststatus]} />,
+    render: (_, t) => <Status darstellung={dienststatus[t.dienststatus]} />,
   };
   if (!istAdmin) return [status];
   return [

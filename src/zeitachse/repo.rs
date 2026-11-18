@@ -770,8 +770,9 @@ pub async fn aus_personalstatus_id_tx(
 /// Ein Fahrzeug hat auf `status_id` gewechselt. Wirkt nur über seine Einheit: Alarmierung und
 /// Eintreffen mit dem ersten Fahrzeug (die offene Periode trägt die Art dann schon, das zweite
 /// wird ausgelassen), die Entlassung erst, wenn danach ALLE Fahrzeuge der Einheit einen Status
-/// mit dieser Marke tragen. Ohne Einheit: nichts. Liefert die berührten Personen, wenn an der
-/// Einheit etwas geschrieben wurde.
+/// mit dieser Marke tragen. Ohne Einheit: nichts. Liefert Einheit, Ereignis (für die Rücknahme
+/// eines Statuswechsels, LLH-1781) und die berührten Personen, wenn an der Einheit etwas
+/// geschrieben wurde.
 pub async fn aus_fahrzeugstatus_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -779,7 +780,7 @@ pub async fn aus_fahrzeugstatus_tx(
     ef_id: i64,
     status_id: i64,
     jetzt: &str,
-) -> Result<Option<(i64, Beruehrt)>, AppError> {
+) -> Result<Option<(i64, i64, Beruehrt)>, AppError> {
     let Some(marke) = marke_tx(conn, "fahrzeug_status", status_id).await? else {
         return Ok(None);
     };
@@ -819,7 +820,7 @@ pub async fn aus_einheit_handstatus_tx(
     einheit_id: i64,
     status_id: i64,
     jetzt: &str,
-) -> Result<Option<(i64, Beruehrt)>, AppError> {
+) -> Result<Option<(i64, i64, Beruehrt)>, AppError> {
     let Some(marke) = marke_tx(conn, "fahrzeug_status", status_id).await? else {
         return Ok(None);
     };
@@ -833,7 +834,7 @@ async fn einheit_ereignis(
     einheit_id: i64,
     marke: ZeitachseMarke,
     jetzt: &str,
-) -> Result<Option<(i64, Beruehrt)>, AppError> {
+) -> Result<Option<(i64, i64, Beruehrt)>, AppError> {
     let (r, beruehrt) = schreibe_tx(
         conn,
         einsatz_id,
@@ -848,7 +849,7 @@ async fn einheit_ereignis(
     )
     .await?;
     Ok(match r {
-        Schreibergebnis::Geschrieben(_) => Some((einheit_id, beruehrt)),
+        Schreibergebnis::Geschrieben(id) => Some((einheit_id, id, beruehrt)),
         Schreibergebnis::Ausgelassen(_) => None,
     })
 }

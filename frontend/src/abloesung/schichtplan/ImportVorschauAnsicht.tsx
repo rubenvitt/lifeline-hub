@@ -1,4 +1,4 @@
-import { Alert, Flex, Tag, Typography } from 'antd';
+import { Alert, Flex, Typography } from 'antd';
 import type {
   SchichtplanEntscheidungenEingabe,
   SchichtplanImportMeldung,
@@ -14,6 +14,7 @@ import type {
 } from '../../api/types';
 import { Select } from '../../components/Select';
 import { useRollen } from '../../components/instrument';
+import { Marke } from '../../components/instrument/Marke';
 
 /**
  * Vorschau einer Übernahme in den Schichtplan (LLH-1556, design.md D10): Zählung, Fehler, Posten
@@ -112,7 +113,7 @@ function personLabel(z: SchichtplanImportPersonZiel): string {
 }
 
 function Treffer({ treffer }: { treffer: SchichtplanImportTreffer }) {
-  return <Tag data-lfh={`einlesen-treffer-${treffer}`}>{TREFFER[treffer]}</Tag>;
+  return <Marke data-lfh={`einlesen-treffer-${treffer}`}>{TREFFER[treffer]}</Marke>;
 }
 
 function PostenZeile({
@@ -164,9 +165,9 @@ function PostenZeile({
           <Typography.Text type="secondary"> · {posten.abschnitt}</Typography.Text>
         )}
         {posten.abschnitt_neu && (
-          <Tag data-lfh="einlesen-abschnitt-neu" style={{ marginInlineStart: token.marginXS }}>
+          <Marke data-lfh="einlesen-abschnitt-neu" style={{ marginInlineStart: token.marginXS }}>
             neu
-          </Tag>
+          </Marke>
         )}
       </span>
       <Treffer treffer={posten.treffer} />
@@ -275,7 +276,7 @@ export function ImportVorschauAnsicht({
     <Flex vertical gap={token.margin} data-lfh="einlesen-vorschau">
       <Flex gap={token.marginXS} wrap data-lfh="einlesen-zaehlung">
         {zaehlungMarken(vorschau.zaehlung).map((m) => (
-          <Tag key={m}>{m}</Tag>
+          <Marke key={m}>{m}</Marke>
         ))}
       </Flex>
       <Meldungen meldungen={vorschau.meldungen} stufe="fehler" />
@@ -284,7 +285,7 @@ export function ImportVorschauAnsicht({
           <Typography.Title level={5}>Neue Abschnitte</Typography.Title>
           <Flex gap={token.marginXS} wrap>
             {vorschau.abschnitte_neu.map((name) => (
-              <Tag key={name}>{name}</Tag>
+              <Marke key={name}>{name}</Marke>
             ))}
           </Flex>
         </section>

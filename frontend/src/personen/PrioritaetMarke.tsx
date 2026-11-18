@@ -1,5 +1,5 @@
-import { Tag } from 'antd';
 import type { TransportPrioritaet } from '../api/types';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Transportpriorität als neutrale Marke mit Wort (LLH-1325, design.md D10): ein `Tag` ohne Farbe,
@@ -14,7 +14,7 @@ export default function PrioritaetMarke({
   if (prioritaet == null) return null;
   return (
     <span data-lfh="transport-prioritaet" title={`Transportpriorität ${prioritaet}`}>
-      <Tag style={{ marginInlineEnd: 0 }}>{prioritaet}</Tag>
+      <Marke style={{ marginInlineEnd: 0 }}>{prioritaet}</Marke>
     </span>
   );
 }

@@ -71,8 +71,10 @@ describe('FahrzeugAngabe (LLH-1060)', () => {
     angabe({ wert: 6, darfSchreiben: false });
     expect(screen.getByText('46-1')).toBeVisible();
     const marke = screen.getByText('andere Einheit');
-    expect(marke.closest('.ant-tag')).not.toBeNull();
-    expect(marke.closest('.ant-tag')!.className).not.toMatch(/ant-tag-(red|blue|green|orange)/);
+    expect(marke.closest('[data-lfh="status"], [data-marke]')).not.toBeNull();
+    expect(marke.closest('[data-lfh="status"], [data-marke]')!.className).not.toMatch(
+      /ant-tag-(red|blue|green|orange)/,
+    );
   });
 
   it('ohne Marke auf einem Fahrzeug der eigenen Einheit oder ohne Einheit', () => {

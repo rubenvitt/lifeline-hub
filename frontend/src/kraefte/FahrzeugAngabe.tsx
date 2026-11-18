@@ -1,9 +1,10 @@
-import { Space, Tag, theme } from 'antd';
+import { Space, theme } from 'antd';
 import type { Einheit, EinsatzFahrzeug } from '../api/types';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { Select } from '../components/Select';
 import { monoStil } from '../components/instrument';
 import { buildFahrzeugOptions, isFremdesFahrzeug } from './einteilungKern';
+import { Marke } from '../components/instrument/Marke';
 
 export interface FahrzeugAngabeProps {
   /** Zeilenkennung für die zugänglichen Namen in einer Liste („Fahrzeug zu Anna“). */
@@ -49,7 +50,7 @@ export default function FahrzeugAngabe({
       anzeige={
         <Space size={token.marginXS} wrap>
           <span style={monoStil(13)}>{aktuell?.funkrufname ?? 'nicht geladen'}</span>
-          {fremd && <Tag>andere Einheit</Tag>}
+          {fremd && <Marke>andere Einheit</Marke>}
         </Space>
       }
       leer={(w) => w == null}

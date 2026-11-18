@@ -254,7 +254,7 @@ describe('Webhook einer Anbindung (LLH-1656)', () => {
       datenRouter: true,
     });
     await screen.findByText('Einsatzbuch');
-    const chip = document.querySelector('[data-lfh="anbindung-webhook"] [data-lfh="status-chip"]')!;
+    const chip = document.querySelector('[data-lfh="anbindung-webhook"] [data-lfh="status"]')!;
     expect(chip.textContent).toContain('Webhook angehalten');
     expect(chip.getAttribute('data-ton')).toBe('achtung');
   });

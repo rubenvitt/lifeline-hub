@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Statusmenü und Quittung</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1280px; height: 900px; background: #08090b; color: #e8ebee; font-family: Archivo, sans-serif; padding: 40px; box-sizing: border-box; display: flex; gap: 48px;">
+
+<div style="display: flex; flex-direction: column; gap: 16px; width: 420px;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #9fa7b0;">Kompakt · Menü mit Rufname als Kopf</span>
+<button type="button" aria-label="Status von 85-1 ändern" style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; background: #0d1a0a; color: #7ddc4a; border: 1px solid #52c41a; font-family: Archivo, sans-serif; font-size: 14px;"><span aria-hidden="true">●</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">S2</span><span>einsatzbereit</span><span aria-hidden="true" style="margin-left: 4px;">▾</span></button>
+<div role="menu" aria-label="Status von 85-1" style="background: #1f2123; border: 1px solid #2e343a; padding: 4px 0; display: flex; flex-direction: column; width: 260px;">
+<div style="padding: 6px 12px 8px; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; color: #e8ebee; border-bottom: 1px solid #22262b;">85-1</div>
+<sc-for list="{{eintraege}}" as="e" hint-placeholder-count="10">
+<div role="menuitem" style="{{e.stil}}"><span aria-hidden="true" style="{{e.punkt}}"></span><span style="font-family: 'JetBrains Mono', monospace; width: 22px;">{{e.code}}</span><span>{{e.wort}}</span></div>
+</sc-for>
+</div>
+<span style="font-size: 11px; color: #9fa7b0;">Liegt immer ganz im Fenster: kippt nach oben, sonst rollt es innerhalb.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #9fa7b0;">Handschuh · 1366 × 520 · zweispaltig, S9 und S0 sichtbar</span>
+<div role="menu" aria-label="Status von 85-1" style="background: #1f2123; border: 1px solid #2e343a; padding: 4px; width: 600px;">
+<div style="padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 500; color: #e8ebee; border-bottom: 1px solid #22262b;">85-1</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0;">
+<sc-for list="{{eintraegeGross}}" as="e" hint-placeholder-count="10">
+<div role="menuitem" style="{{e.stil}}"><span aria-hidden="true" style="{{e.punkt}}"></span><span style="font-family: 'JetBrains Mono', monospace; width: 28px;">{{e.code}}</span><span>{{e.wort}}</span></div>
+</sc-for>
+</div>
+</div>
+
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #9fa7b0; margin-top: 24px;">Quittung nach dem Wechsel (6 s, eigener Schlüssel je Fahrzeug)</span>
+<div role="status" style="align-self: flex-start; display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #1f2123; border: 1px solid #2e343a; box-shadow: 0 6px 16px rgba(0,0,0,0.4);">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #e8ebee;">85-1: S2 → S3</span>
+<button type="button" style="height: 30px; padding: 0 12px; background: transparent; color: #8ec2f0; border: 1px solid #4d94d6; font-family: Archivo, sans-serif; font-size: 14px;">Rückgängig</button>
+</div>
+<div role="status" style="align-self: flex-start; display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #1c1705; border: 1px solid #e8cc3a;">
+<span style="font-size: 14px; color: #e8cc3a;">85-1: Nicht mehr zurückzunehmen, inzwischen geändert.</span>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const werte = [
+      ['S1', 'frei Funk', '#4d94d6'], ['S2', 'einsatzbereit Wache', '#52c41a'], ['S3', 'Einsatz übernommen', '#9199a2'],
+      ['S4', 'am Einsatzort', '#9199a2'], ['S5', 'Sprechwunsch', '#e8cc3a'], ['S6', 'außer Dienst', '#ff6b6b'],
+      ['S7', 'Patient aufgenommen', '#9199a2'], ['S8', 'am Zielort', '#9199a2'], ['S9', 'Fremdanmeldung', '#9199a2'], ['S0', 'dringender Sprechwunsch', '#e8cc3a'],
+    ];
+    const zeile = (h, fs, gewaehlt) => `display:flex;align-items:center;gap:10px;height:${h}px;padding:0 12px;font-size:${fs}px;color:#e8ebee;${gewaehlt ? 'background:#08172b;' : ''}`;
+    const punkt = (c) => `display:inline-block;width:8px;height:8px;background:${c}`;
+    return {
+      eintraege: werte.map(([code, wort, c]) => ({ code, wort, stil: zeile(30, 14, code === 'S2'), punkt: punkt(c) })),
+      eintraegeGross: werte.map(([code, wort, c]) => ({ code, wort, stil: zeile(72, 16, code === 'S2'), punkt: punkt(c) })),
+    };
+  }
+}
+</script>
+</body>
+</html>

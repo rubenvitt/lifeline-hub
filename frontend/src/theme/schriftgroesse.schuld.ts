@@ -39,7 +39,6 @@ export const SCHULD: Readonly<Record<string, number>> = {
   'components/instrument/MatrixPaneel.tsx': 1,
   'components/instrument/PaneelZustand.tsx': 5,
   'components/instrument/Sammelbanner.tsx': 1,
-  'components/instrument/Status.tsx': 1,
   'components/instrument/VerteilungsPaneel.tsx': 1,
   'components/instrument/Zeitachseneintrag.tsx': 1,
   'einsatz/AlarmZentrale.tsx': 3,

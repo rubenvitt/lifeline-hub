@@ -1,6 +1,6 @@
 import { Button, Flex, Popconfirm, Space, Typography, theme } from 'antd';
 import { useMemo } from 'react';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Status, monoStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
@@ -108,7 +108,7 @@ export default function EmpfaengerQuittung({
         />
         <Space size={token.marginXS} wrap>
           {sichtbareQuittierte.map((e) => (
-            <StatusChip key={e.id} ton="normal" wort={`${e.name} ✓`} />
+            <Status groesse="klein" key={e.id} ton="normal" wort={`${e.name} ✓`} />
           ))}
           {/* „+n" zählt nur verborgene QUITTIERTE — das ✓ sagt es ohne Farbe (WCAG 1.4.1). */}
           {restQuittierte > 0 && (

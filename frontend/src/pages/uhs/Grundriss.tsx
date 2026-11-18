@@ -66,7 +66,6 @@ import { ladePlanBild, type UhsPlan } from '../../api/uhsPlan';
 import UhsPlanPaneel from './UhsPlanPaneel';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
-import StatusTag from '../../components/StatusTag';
 import PrioritaetMarke from '../../personen/PrioritaetMarke';
 import SichtungsTag from '../../components/SichtungsTag';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
@@ -80,7 +79,7 @@ import {
   Augenbraue,
   Paneel,
   Segmentleiste,
-  StatusChip,
+  Status,
   monoStil,
   useRollen,
 } from '../../components/instrument';
@@ -414,7 +413,8 @@ function RettungsmittelMarke({ person }: { person: Person }) {
   if (!marke) return null;
   return (
     <span data-lfh="rettungsmittel-marke">
-      <StatusChip
+      <Status
+        groesse="klein"
         ton={person.rettungsmittel?.status === 'eingetroffen' ? 'normal' : 'achtung'}
         wort={marke}
       />
@@ -766,7 +766,7 @@ function PlatzKarte({
         id={`${beschreibungsId}-status`}
         style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}
       >
-        {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
+        {zeigeVerfTag && <Status darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
         {/* Vorgemerkt statt „belegt“: beides fasst die Zeile nicht, belegt zeigen schon Fläche
             und Personenmarke. */}
         {belegtVon && verbleibVorgemerkt ? (
@@ -776,7 +776,7 @@ function PlatzKarte({
           // schon Fläche und Personenmarke.
           <RettungsmittelMarke person={belegtVon} />
         ) : (
-          belegtVon && <StatusChip ton="bedien" wort="belegt" />
+          belegtVon && <Status groesse="klein" ton="bedien" wort="belegt" />
         )}
       </div>
       {/* Belegung: feste Höhe, auch wenn leer. Die belegte Person ist ziehbar (→ Wartebereich
@@ -1156,7 +1156,7 @@ function UnterwegsSpalte({
                 <PrioritaetMarke prioritaet={p.transport_prioritaet} />
                 {seit && <Wartezeit seit={seit} vorwort="seit" />}
                 {minuten != null && minuten >= UEBERGABE_OFFEN_AB_MIN && (
-                  <StatusTag darstellung={uebergabeOffen} />
+                  <Status darstellung={uebergabeOffen} />
                 )}
                 {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
               </div>

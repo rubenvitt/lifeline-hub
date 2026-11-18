@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>FMS-Tableau</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1280px; height: 760px; background: #08090b; color: #e8ebee; font-family: Archivo, sans-serif; padding: 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
+<sc-for list="{{abschnitte}}" as="a" hint-placeholder-count="2">
+<section style="display: flex; flex-direction: column; gap: 8px;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #9fa7b0;">{{a.name}}</span>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px;">
+<sc-for list="{{a.kacheln}}" as="k" hint-placeholder-count="4">
+<div style="background: #08090b; border: 1px solid #22262b; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 500; letter-spacing: -0.02em;">{{k.ruf}}</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #9199a2;">seit {{k.seit}}</span>
+</div>
+<span style="font-size: 12px; color: #9fa7b0;">{{k.typ}} · {{k.einheit}}</span>
+<button type="button" aria-label="Status von {{k.ruf}} ändern" style="{{k.block}}">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 40px; font-weight: 500; letter-spacing: -0.02em; line-height: 1;">{{k.ziffer}}</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px;"><span aria-hidden="true">{{k.zeichen}}</span>{{k.wort}}<span aria-hidden="true" style="margin-left: auto;">▾</span></span>
+</button>
+</div>
+</sc-for>
+</div>
+</section>
+</sc-for>
+<span style="font-size: 11px; color: #9fa7b0;">Mindestbreite 240 px, auto-fill: eine einzelne Kachel bleibt eine Spalte breit. Ohne Schreibrecht derselbe Block ohne Rahmen und Pfeil.</span>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ton = {
+      normal: ['#0d1a0a', '#7ddc4a', '#52c41a', '●'], neutral: ['#27292b', '#c6ccd2', '#9199a2', ''],
+      achtung: ['#1c1705', '#e8cc3a', '#e8cc3a', '▮'], alarm: ['#1c0a0d', '#ff6b6b', '#ff6b6b', '▲'],
+    };
+    const k = (ruf, typ, einheit, seit, ziffer, wort, t) => {
+      const f = ton[t];
+      return { ruf, typ, einheit, seit, ziffer, wort, zeichen: f[3],
+        block: `display:flex;flex-direction:column;align-items:stretch;gap:6px;min-height:88px;padding:10px 12px;background:${f[0]};color:${f[1]};border:1px solid ${f[2]};text-align:left;font-family:Archivo,sans-serif;cursor:pointer;box-sizing:border-box` };
+    };
+    return {
+      abschnitte: [
+        { name: 'Abschnitt Nord', kacheln: [
+          k('85-1', 'RTW', 'Zug 1', '10:15', '2', 'einsatzbereit Wache', 'normal'),
+          k('85-2', 'KTW', 'Zug 1', '10:31', '3', 'Einsatz übernommen', 'neutral'),
+          k('83-1', 'NEF', 'Zug 1', '10:38', '5', 'Sprechwunsch', 'achtung'),
+          k('86-1', 'GW-San', 'Zug 2', '09:52', '4', 'am Einsatzort', 'neutral'),
+          k('87-1', 'ELW 1', 'Führung', '08:40', '6', 'außer Dienst', 'alarm'),
+        ] },
+        { name: 'Bereitstellungsraum', kacheln: [
+          k('85-3', 'RTW', '—', '10:02', '2', 'einsatzbereit Wache', 'normal'),
+        ] },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

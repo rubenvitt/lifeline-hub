@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Space, Tag, Typography } from 'antd';
+import { App, Breadcrumb, Button, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router';
@@ -23,6 +23,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { betreuungPfad, betreuungsstellePfad, parseRouteId } from '../routing/deeplinks';
+import { Marke } from '../components/instrument/Marke';
 
 type Ansicht = 'rechner' | 'richtwerte';
 
@@ -189,7 +190,7 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
       titel={
         <Space wrap size={token.marginSM}>
           <span>Unterkunft planen</span>
-          {quelle === 'basis' && <Tag>Basiswerte</Tag>}
+          {quelle === 'basis' && <Marke>Basiswerte</Marke>}
         </Space>
       }
       meta={

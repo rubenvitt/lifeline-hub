@@ -1,5 +1,5 @@
 import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { App, Breadcrumb, Button, Modal, Space, Tag, Tree, type TreeDataNode } from 'antd';
+import { App, Breadcrumb, Button, Modal, Space, Tree, type TreeDataNode } from 'antd';
 import {
   DndContext,
   DragOverlay,
@@ -98,6 +98,7 @@ import {
 } from './einsatzabschnitte/GliederungDrag';
 import VerschiebenDialog from './einsatzabschnitte/VerschiebenDialog';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Der Abschnitt in der Wire-Form des PATCH (LLH-1945): Altwert und Vergleichswert des Feld-CAS
@@ -742,7 +743,7 @@ export default function EinsatzabschnittePage() {
                 />
               )}
               <span>{e.name}</span>
-              {e.typ_label && <Tag>{e.typ_label}</Tag>}
+              {e.typ_label && <Marke>{e.typ_label}</Marke>}
               <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
                 eigene <StaerkeAnzeige wert={e.ist} />
               </span>

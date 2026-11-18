@@ -1,7 +1,7 @@
 import { relativ } from '../anzeige/dauer';
 import { Button, Flex, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { PaneelZustand, StatusChip, monoStil, useRollen } from '../components/instrument';
+import { PaneelZustand, Status, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -114,7 +114,7 @@ export default function SitzungsListe({
               <Flex vertical gap={2}>
                 <Space size="small" wrap>
                   <span style={{ fontWeight: 600 }}>{geraet}</span>
-                  {s.aktuell && <StatusChip ton="normal" wort="dieses Gerät" />}
+                  {s.aktuell && <Status groesse="klein" ton="normal" wort="dieses Gerät" />}
                 </Space>
                 <span style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
                   angemeldet{' '}

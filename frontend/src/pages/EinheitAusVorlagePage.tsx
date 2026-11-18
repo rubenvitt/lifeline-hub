@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Checkbox, Form, Input, Tag, Typography } from 'antd';
+import { App, Breadcrumb, Button, Checkbox, Form, Input, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -62,6 +62,7 @@ import {
   kraefteuebersichtPfad,
   parseRouteId,
 } from '../routing/deeplinks';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Einheit aus Vorlage bilden (LLH-1049, Spec `einheit-vorlagen`, „Seite zum Bilden aus der
@@ -552,7 +553,7 @@ function PersonZeile({
       // vor dem Wechsel am Wert.
       marke={
         person.zustand === 'gebunden' && person.einheitsfuehrer ? (
-          <Tag style={{ marginInlineEnd: 0 }}>Einheitsführer</Tag>
+          <Marke style={{ marginInlineEnd: 0 }}>Einheitsführer</Marke>
         ) : undefined
       }
       beschriftung={

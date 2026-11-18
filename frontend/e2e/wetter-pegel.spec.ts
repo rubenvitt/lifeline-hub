@@ -304,7 +304,7 @@ for (const modus of ['light', 'dark'] as const) {
     const boden = modus === 'light' ? 7 : 5;
     for (const stufe of ['maessig', 'schwer']) {
       const chip = page
-        .locator(`[data-lfh="wetter-warnung"][data-stufe="${stufe}"] [data-lfh="status-chip"] span`)
+        .locator(`[data-lfh="wetter-warnung"][data-stufe="${stufe}"] [data-lfh="status"]`)
         .last();
       await pruefe(chip, boden, `${modus} ${stufe}`);
     }

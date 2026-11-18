@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Status, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -105,7 +105,7 @@ export function AuftragKopf({
           unbearbeitet={!!status.unbearbeitet}
           ton={status.ton}
         />
-        {a.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
+        {a.richtung === 'extern' && <Status groesse="klein" ton="neutral" wort="Extern" />}
         {mitEtbSprung && a.quell_etb_eintrag_id != null && einsatzId != null && (
           <KennungsLink to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>
             ↗ ETB-Eintrag

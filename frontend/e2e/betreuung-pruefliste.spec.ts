@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { pruefeFokusVerdeckung } from './fokus-kern';
-import { kontrast, randKontrast } from './kontrast-kern';
+import { kontrast } from './kontrast-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 import { ladeInDichte } from './trefflaeche-kern';
 
@@ -41,7 +41,6 @@ import { ladeInDichte } from './trefflaeche-kern';
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-const ZUSTAND = 3;
 /**
  * Text in gesperrten Knöpfen zählt nur gegen den Gesperrt-Boden (Spec `textstufen-kontrast`,
  * Muster `verpflegung-kontrast.spec.ts`): etwa „Ort suchen“ am leeren Ortsfeld (LLH-1121).
@@ -254,10 +253,10 @@ for (const modus of ['light', 'dark'] as const) {
 
     const messwerte: Record<string, unknown>[] = [];
 
-    /** Etikett: Wort, Rolle, Text gegen die eigene Tönung, Rand gegen außen und innen. */
+    /** Etikett: Wort, Rolle, Text gegen die eigene Tönung (randlos, LLH-1780). */
     const pruefeEtikett = async (etikett: Locator, wo: string, wort: string, rolle: string) => {
       await expect(etikett).toHaveText(wort);
-      await expect(etikett).toHaveAttribute('data-rolle', rolle);
+      await expect(etikett).toHaveAttribute('data-ton', rolle);
       const m = await kontrast(etikett);
       messwerte.push({ modus, wo, art: 'etikett', wortlaut: wort, rolle, ...m });
       expect
@@ -266,23 +265,14 @@ for (const modus of ['light', 'dark'] as const) {
           `${modus}, ${wo}: Etikett „${wort}" ${m.verhaeltnis.toFixed(2)} : 1 (Soll ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`,
         )
         .toBeGreaterThanOrEqual(TEXT[modus]);
-      const rand = await randKontrast(etikett, 'top');
-      messwerte.push({ modus, wo, art: 'etikettrand', wortlaut: wort, rolle, ...rand });
-      if (rolle === 'neutral') return;
-      const kontext = `${modus}, ${wo}: Rand „${wort}" ${JSON.stringify(rand)}`;
-      expect
-        .soft(rand.gegenAussen, `${kontext} gegen Fläche darum`)
-        .toBeGreaterThanOrEqual(ZUSTAND);
-      expect
-        .soft(rand.gegenInnen, `${kontext} gegen eigene Tönung`)
-        .toBeGreaterThanOrEqual(ZUSTAND);
+      // Randlos (LLH-1780, „Rahmen heißt bedienbar“): Wort und Tönung tragen den Zustand.
     };
 
     // (1) Status- und Auslastungsetiketten der Stellentabelle — „fast voll", „voll" und
     // „überbelegt" sind kritisch.
     for (const a of AUSLASTUNG) {
       const zeile = stellenZeile(page, stellen[a.stelle]);
-      const etiketten = zeile.locator('.ant-tag');
+      const etiketten = zeile.locator(':is([data-lfh="status"],[data-marke])');
       await expect(etiketten).toHaveCount(2);
       // Nach Wort, nicht nach Position: die Spaltenfolge richtet sich nach der Zielfrage
       // (LFH-967, Belegung vor Status) und ist kein Gegenstand dieser Messung.
@@ -303,7 +293,9 @@ for (const modus of ['light', 'dark'] as const) {
       ['Sporthalle West', 'vorbereitet'],
       ['Schule Nord', 'geschlossen'],
     ] as const) {
-      const etikett = stellenZeile(page, stellen[stelle]).locator('.ant-tag');
+      const etikett = stellenZeile(page, stellen[stelle]).locator(
+        ':is([data-lfh="status"],[data-marke])',
+      );
       await expect(etikett).toHaveCount(1);
       await pruefeEtikett(etikett, `Stelle ${stelle}`, wort, 'neutral');
     }
@@ -386,7 +378,9 @@ for (const modus of ['light', 'dark'] as const) {
 
     // (3) Räumungs-Etiketten der Bezirkstabelle — „angeordnet" und „läuft" sind kritisch.
     for (const b of BEZIRKE) {
-      const etikett = bezirkZeile(page, bezirke[b.name]).locator('.ant-tag');
+      const etikett = bezirkZeile(page, bezirke[b.name]).locator(
+        ':is([data-lfh="status"],[data-marke])',
+      );
       await expect(etikett).toHaveCount(1);
       await pruefeEtikett(etikett, `Bezirk ${b.name}`, b.wort, b.rolle);
     }

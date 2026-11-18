@@ -206,9 +206,7 @@ describe('MeldungenPage', () => {
     expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
     expect(screen.getByText('Deich instabil')).toBeInTheDocument();
     // Status-Chip „Neu" der Meldung (eindeutig über den Chip; „Neu" steht auch im Gruppenkopf).
-    expect(
-      screen.getByText('Neu', { selector: '[data-lfh="status-chip"] span' }),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Neu', { selector: '[data-lfh="status"]' })).toBeInTheDocument();
   });
 
   it('erfasst eine Meldung mit Mindestfeldern (Absender, Inhalt, Meldeweg)', async () => {

@@ -1,7 +1,7 @@
 import { Alert, Flex, theme, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import { fehlerText as apiFehlerText } from '../api/client';
-import { StatusChip } from './instrument/Status';
+import { Status } from './instrument/Status';
 
 /**
  * Persistenter Speicher-Fehler und Rechte-Hinweis „Nur Ansicht · Grund“ (LFH-345 · C10, LFH-1078).
@@ -69,7 +69,7 @@ export function RechteHinweis({ text, sichtbar, marke = 'Nur Ansicht' }: RechteH
   if (!sichtbar) return null;
   return (
     <Flex role="status" align="center" wrap gap={token.marginXS} data-lfh="rechte-hinweis">
-      <StatusChip ton="neutral" wort={marke} />{' '}
+      <Status groesse="klein" ton="neutral" wort={marke} />{' '}
       <Typography.Text type="secondary">{text}</Typography.Text>
     </Flex>
   );

@@ -10,11 +10,11 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import StatusTag from '../components/StatusTag';
 import { Datenfeld, Datenraster, monoStil } from '../components/instrument';
 import { aufbewahrungZustand } from '../theme/statusFarben';
 import { fristAusEingabe, istFristverkuerzung } from './fristModell';
 import { KATEGORIE_TEXT, vorgabeSatz } from './kategorieText';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Aufbewahrung je Datenkategorie (LFH-749, Spec `aufbewahrung-kategorien` und
@@ -60,7 +60,7 @@ export function KategorieWert({
   return (
     <Flex vertical gap={token.marginXXS}>
       <Flex gap={token.marginXS} wrap align="center">
-        {eintrag.zustand && <StatusTag darstellung={aufbewahrungZustand[eintrag.zustand]} />}
+        {eintrag.zustand && <Status darstellung={aufbewahrungZustand[eintrag.zustand]} />}
         {aktiv ? (
           <span>{vorgabeSatz(eintrag.dauer_tage_vorgabe)}</span>
         ) : eintrag.geschwaerzt_at ? (

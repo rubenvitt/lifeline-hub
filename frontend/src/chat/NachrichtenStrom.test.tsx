@@ -544,7 +544,7 @@ describe('NachrichtenStrom', () => {
       />,
     );
     // antd Tag-Close ist ein Icon ohne Accessible-Name → über die antd-Klasse greifen.
-    const close = container.querySelector('.ant-tag-close-icon') as HTMLElement;
+    const close = container.querySelector('button') as HTMLElement;
     expect(close).not.toBeNull();
     await userEvent.click(close);
     expect(onBezugLoeschen).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));

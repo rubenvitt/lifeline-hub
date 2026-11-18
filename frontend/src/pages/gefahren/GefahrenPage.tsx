@@ -21,7 +21,6 @@ import { deeplinkStand, useQueryParamSelektion } from '../../routing/useQueryPar
 import { DeeplinkHinweis } from '../../components/DeeplinkHinweis';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
-import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import GefahrenBeurteilung from './GefahrenBeurteilung';
 import { beurteilungText, istBeurteilt } from './beurteilung';
@@ -42,6 +41,7 @@ import { useDruckNebenwege } from '../../components/druck/useDruckNebenwege';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import './gefahrenPrint.css';
 import { flaeche } from '../../theme/tokens';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Trefflächenboden der Gebietszeile. Sie ist ein handgebautes Bedienziel (`ListenEintrag` legt
@@ -316,10 +316,10 @@ export default function GefahrenPage() {
               {/* `wrap`: in der 240-px-Spalte bricht die Zeile zwischen den Angaben um, nicht in
                   einem Wort. */}
               <Space wrap>
-                {/* Etikett über `StatusTag`, nicht `color`-Prop: für einen Nicht-Preset rechnet
+                {/* Etikett über `Status`, nicht `color`-Prop: für einen Nicht-Preset rechnet
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 {/* Stufe und Vorläufigkeit in EINEM Etikett: „hoch · unbestätigt“ (LLH-1745). */}
-                <StatusTag darstellung={gebietEtikett(g)} />
+                <Status darstellung={gebietEtikett(g)} />
                 <span>{gefahrengebietName(g.label, g.id)}</span>
                 {/* Was im Gebiet los ist (LLH-1102): „3 Gefahren · hoch“; unbestätigt trägt es das
                     Etikett der Stufe (LLH-1745) — hier wählt man, was zu tun ist. Die Zonenzahl steht am Sprung zur

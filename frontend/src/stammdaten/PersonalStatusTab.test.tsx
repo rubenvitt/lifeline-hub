@@ -60,7 +60,7 @@ describe('PersonalStatusTab', () => {
   });
 
   // Farbcode und Sortierung stehen Mono mit `tabular-nums`, das Label nicht. Die Kategorie ist
-  // bereits Fläche (`StatusTag`-Vorgabe).
+  // bereits Fläche (`Status`-Vorgabe).
   it('setzt Farbcode und Sortierung in die Zahlenschrift, das Label nicht', async () => {
     render(admin, [{ ...status[0], farbe: '#22aa55' }, status[1]]);
     await screen.findByText('dienstbereit');

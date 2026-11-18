@@ -8,7 +8,7 @@ import type { VerpflegungVorlage, Verpflegungsart } from '../api/types';
 import { listVerpflegungVorlagen, updateVerpflegungVorlage } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
-import { Stapel, StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil, Stapel } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -157,9 +157,9 @@ function VerpflegungsplanInhalt() {
       onFilter: (wert, m) => m.aktiv === wert,
       render: (_, m) =>
         m.aktiv ? (
-          <StatusChip ton="normal" wort="Aktiv" />
+          <Status groesse="klein" ton="normal" wort="Aktiv" />
         ) : (
-          <StatusChip ton="neutral" wort="Inaktiv" />
+          <Status groesse="klein" ton="neutral" wort="Inaktiv" />
         ),
     },
     ...(istAdmin

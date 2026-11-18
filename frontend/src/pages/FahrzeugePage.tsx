@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Typography, theme } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
@@ -79,7 +79,6 @@ import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
 import { useViewport } from '../components/useViewport';
 import FilterKnopf from '../components/FilterKnopf';
-import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
 import FahrzeugeDisponierenModal from '../kraefte/FahrzeugeDisponierenModal';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
@@ -96,6 +95,7 @@ import {
   katalogStatusWechsel,
   useOptimistischesZeilenUpdate,
 } from '../kraefte/useOptimistischesZeilenUpdate';
+import { useFahrzeugStatusQuittung } from '../kraefte/useFahrzeugStatusQuittung';
 import { modulName } from '../einsatz/modulRegistry';
 import {
   abschnittDerEinheit,
@@ -114,9 +114,11 @@ import { listEinsatzMaterial } from '../api/einsatzMaterial';
 import { besatzungKandidaten, besatzungVorschlag } from '../kraefte/besatzungVorschlag';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 /**
- * Besatzung als Urteil (`StatusTag` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
+ * Besatzung als Urteil (`Status` über die Karte `besatzungsUrteil`) plus beschriftete Stärke:
  * „Ist 1/0/0//1 · Soll 0/1/8//9". Rot steht nur bei echter Unterbesetzung; das Wort ist der
  * zweite Kanal, nicht die Farbe.
  */
@@ -126,7 +128,7 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
   const urteil = besatzungsUrteilVon(crew.length, ist, soll);
   return (
     <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
-      <StatusTag darstellung={besatzungsUrteil[urteil]} />
+      <Status darstellung={besatzungsUrteil[urteil]} />
       <span style={monoStil(12)}>
         {urteil !== 'nicht_erfasst' && (
           <>
@@ -280,9 +282,9 @@ function BesatzungsBlock({
                     <span style={{ gridArea: '1 / 1', ...nurPlatz }}>
                       {angabe && <Typography.Text type="secondary">{angabe}</Typography.Text>}
                       {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
-                        <Tag style={{ margin: 0, marginInlineStart: angabe ? 8 : 0 }}>
+                        <Marke style={{ margin: 0, marginInlineStart: angabe ? 8 : 0 }}>
                           andere Einheit
-                        </Tag>
+                        </Marke>
                       )}
                     </span>
                     {geloest && darfSchreiben && (
@@ -613,16 +615,26 @@ function FahrzeugeInhalt() {
     mutationFn: (daten: AdhocEingabe) => disponiereAdhoc(einsatzId, daten),
     onSuccess: invalidate,
   });
+  const quittiereStatus = useFahrzeugStatusQuittung(einsatzId, statusQuery.data);
   const statusMutation = useOptimistischesZeilenUpdate<
     EinsatzFahrzeug,
     { efId: number; statusId: number }
   >({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    mutationFn: (v) => updateDisposition(einsatzId, v.efId, { status_id: v.statusId }),
+    // Den Beleg merken, die Zeile ohne ihn in den Cache (Review vor dem PR): kein späterer
+    // Leser findet einen veralteten Beleg an der Zeile.
+    mutationFn: async (v) => {
+      const { status_ruecknahme, ...fahrzeug } = await updateDisposition(einsatzId, v.efId, {
+        status_id: v.statusId,
+      });
+      if (status_ruecknahme) quittiereStatus({ ...fahrzeug, status_ruecknahme });
+      return fahrzeug;
+    },
     zeilenId: (v) => v.efId,
     ...katalogStatusWechsel<EinsatzFahrzeug>(statusQuery.data),
     // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
-    // das ohne Stream (offline, Proxy) nie käme.
+    // das ohne Stream (offline, Proxy) nie käme. Danach die Quittung mit Rückweg (LLH-1781), auch
+    // nach einer Zifferntaste im Tableau: beide nehmen diese Mutation.
     onErfolg: () => void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
     onBeginn: (v) => zeilen.beginne(v.efId),
     onFehler: (e, v) => zeilen.melde(v.efId, e, 'Status nicht geändert'),
@@ -941,6 +953,8 @@ function FahrzeugeInhalt() {
       aktuell: laeuft ? statusMutation.variables?.statusId : ef.status_id,
       farbe: ef.status_farbe,
       kennung: ef.funkrufname,
+      // Der Rufname als Kopf des Menüs (LLH-1781).
+      titel: ef.funkrufname,
       laeuft,
       // Sichtbar gesperrt, solange irgendwo eine Statusmutation läuft — der Riegel in `onWaehlen`
       // wirkt ohnehin, aber ein Auslöser, der klickbar aussieht und nichts tut, ist schlechter als
@@ -1044,7 +1058,7 @@ function FahrzeugeInhalt() {
             <Space wrap>
               {/* Funkrufname in Mono. */}
               <span style={monoStil(13)}>{ef.funkrufname}</span>
-              {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
+              {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
               {ef.ist_demo && <DemoMarke />}
             </Space>
           }

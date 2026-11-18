@@ -12,7 +12,6 @@ import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
-import StatusTag from '../components/StatusTag';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { istAdmin } from '../einsatz/schreibrecht';
 import { aufbewahrungZustand } from '../theme/statusFarben';
@@ -20,6 +19,7 @@ import { standVerworfen } from './archivAbruf';
 import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
 import { ArchivEingespieltErgebnis, ArchivEinspielenDialog } from './ArchivEinspielen';
 import { IconHochladen } from '../icons';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Aufbewahrungsübersicht der Verwaltung — `/admin/aufbewahrung`, nur System-Admin (sonst
@@ -103,7 +103,7 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
       werte: ZUSTAENDE.map((z) => ({ text: aufbewahrungZustand[z].label, value: z })),
       trifft: (e, wert) => e.zustand === wert,
     },
-    render: (_, e) => <StatusTag darstellung={aufbewahrungZustand[e.zustand]} />,
+    render: (_, e) => <Status darstellung={aufbewahrungZustand[e.zustand]} />,
   },
   {
     key: 'bezeichnung',

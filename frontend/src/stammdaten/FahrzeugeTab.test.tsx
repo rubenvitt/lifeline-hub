@@ -78,8 +78,14 @@ describe('FahrzeugeTab', () => {
     await screen.findByText('Florian 1');
     const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
     const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
-    expect(within(erste).getByText('in Dienst')).toHaveAttribute('data-rolle', 'normal');
-    expect(within(zweite).getByText('außer Dienst')).toHaveAttribute('data-rolle', 'neutral');
+    expect(within(erste).getByText('in Dienst').closest('[data-lfh="status"]')).toHaveAttribute(
+      'data-ton',
+      'normal',
+    );
+    expect(within(zweite).getByText('außer Dienst').closest('[data-lfh="status"]')).toHaveAttribute(
+      'data-ton',
+      'neutral',
+    );
   });
 
   it('Admin sieht „Fahrzeug anlegen" und Aktionen', async () => {

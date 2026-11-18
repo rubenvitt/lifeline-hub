@@ -612,7 +612,7 @@ describe('KraefteuebersichtPage — Raster', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    const chip = mittel.querySelector('[data-lfh="status-chip"]') as HTMLElement;
+    const chip = mittel.querySelector('[data-lfh="status"]') as HTMLElement;
     expect(chip).toHaveTextContent('S4');
     expect(chip).toHaveTextContent('Am Einsatzort');
   });
@@ -685,7 +685,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     const grund = (key: string) =>
       zeile(container, key)!.querySelector('[data-lfh="meldebild-toenungsgrund"]');
     const etiketten = (key: string) =>
-      Array.from(grund(key)?.querySelectorAll('[data-lfh="status-chip"]') ?? []).map((c) => [
+      Array.from(grund(key)?.querySelectorAll('[data-lfh="status"]') ?? []).map((c) => [
         c.textContent,
         c.getAttribute('data-ton'),
       ]);
@@ -703,7 +703,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     const { container } = setup();
     await screen.findByText('1. Zug');
     const e = zeile(container, 'eh-20')!;
-    const chip = e.querySelector('[data-lfh="status-chip"]') as HTMLElement;
+    const chip = e.querySelector('[data-lfh="status"]') as HTMLElement;
     expect(chip).toHaveTextContent('S4');
     expect(chip).toHaveTextContent('Am Einsatzort');
     // Mit Fahrzeug führen die Fahrzeuge — kein Handstatus-Auslöser.
@@ -921,7 +921,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(c).toHaveAttribute('data-rolle', 'alarm');
     expect(zeile(container, 'eh-20')).toHaveClass('meldebild-problemzeile');
     const etikett = zeile(container, 'eh-20')!.querySelector(
-      '[data-lfh="meldebild-toenungsgrund"] [data-lfh="status-chip"]',
+      '[data-lfh="meldebild-toenungsgrund"] [data-lfh="status"]',
     );
     expect(etikett).toHaveAttribute('data-ton', 'alarm');
     expect(etikett?.textContent).toMatch(/^Rückm\. überfällig seit \d+ min$/);
@@ -1595,7 +1595,7 @@ describe('KraefteuebersichtPage — Filterwahrheit', () => {
       document.querySelector<HTMLElement>('[data-lfh="meldebild-werkzeuge"]')!,
     );
     const marke = await werkzeuge.findByText('Abschnitt: Abschnitt Nord');
-    fireEvent.click(marke.closest('.ant-tag')!.querySelector('.ant-tag-close-icon')!);
+    fireEvent.click(marke.closest('[data-lfh="status"], [data-marke]')!.querySelector('button')!);
     await waitFor(() => expect(screen.queryByText('Abschnitt: Abschnitt Nord')).toBeNull());
     expect(screen.queryByText(/von \d+ Kräften/)).toBeNull();
   });

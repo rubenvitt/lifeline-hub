@@ -22,10 +22,10 @@ import SprechgruppenAngabe, {
   type SprechgruppenHandler,
 } from '../../components/SprechgruppenAngabe';
 import { VerbindungenAngabe } from '../../components/VerbindungenFeld';
-import StatusTag from '../../components/StatusTag';
 import { abschnittLagezustand, rollenFarbe } from '../../theme/statusFarben';
 import type { AbschnittStaerken } from './abschnittStaerke';
 import { findKurzbezeichnungConflict, kurzbezeichnungVergeben } from './kurzbezeichnung';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Speichert EINE Angabe des Abschnitts (LFH-1208): `etikett` nennt sie in der Erfolgsmeldung, der
@@ -295,7 +295,7 @@ function LagezustandSelect({
   if (!darfSchreiben) {
     // Fehlende Beurteilung als Wort, nicht als leere Zelle (LFH-608).
     return value ? (
-      <StatusTag darstellung={abschnittLagezustand[value]} darstellungsart="rand" />
+      <Status darstellung={abschnittLagezustand[value]} />
     ) : (
       <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
     );

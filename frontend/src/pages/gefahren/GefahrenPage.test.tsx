@@ -205,9 +205,9 @@ describe('GefahrenPage', () => {
     // rechnet den Hex-Wert in `rgb(...)` um und trägt ihn als Textfarbe — geprüft wird deshalb die
     // Abwesenheit des umgerechneten Werts. Den neuen Wert positiv zu pinnen prüfte nur antds
     // Vorgaben (nacktes `ConfigProvider` in `test/utils.tsx`).
-    expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain(
-      'rgb(255, 163, 158)',
-    );
+    expect(
+      tag.closest('[data-lfh="status"], [data-marke]')!.getAttribute('style') ?? '',
+    ).not.toContain('rgb(255, 163, 158)');
   });
 
   it('bietet „Auf Karte zeigen" mit Reverse-Deeplink auf die Lagekarte (LFH-155)', async () => {

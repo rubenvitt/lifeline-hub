@@ -1,6 +1,8 @@
 import type {
   EinsatzFahrzeug,
   EntlassungAntwort,
+  FahrzeugPatchAntwort,
+  StatusRuecknahmeBeleg,
   EntlassungRuecknahmeAntwort,
   EntlassungVorzustand,
 } from './types';
@@ -61,18 +63,37 @@ export type DispositionPatch = AngabenPatch & { status_id?: number; bemerkung?: 
 
 /**
  * Ändert eine Disposition. `erwartet` trägt die Werte beim Öffnen (Feld-CAS, LLH-1945): hat ein
- * anderer eine dieser Angaben inzwischen geändert, antwortet der Server 409 `veraltet`.
+ * anderer eine dieser Angaben inzwischen geändert, antwortet der Server 409 `veraltet`. Die Antwort
+ * ist das Fahrzeug; bei einem echten Statuswechsel trägt sie zusätzlich den Beleg
+ * `status_ruecknahme` für „Rückgängig“ (LLH-1781, {@link nimmStatuswechselZurueck}).
  */
 export function updateDisposition(
   einsatzId: number,
   efId: number,
   felder: DispositionPatch,
   erwartet?: Partial<Omit<DispositionPatch, 'status_id'>>,
-): Promise<EinsatzFahrzeug> {
-  return apiSend<EinsatzFahrzeug>(
+): Promise<FahrzeugPatchAntwort> {
+  return apiSend<FahrzeugPatchAntwort>(
     `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`,
     'PATCH',
     erwartet ? { ...felder, erwartet } : felder,
+  );
+}
+
+/**
+ * „Rückgängig“ nach einem Statuswechsel (LLH-1781, Spec `fahrzeugstatus-quittung`): Status und
+ * „seit“ von davor, das Zeitachsen-Ereignis gestrichen. Nur direkt danach und nur für die Person,
+ * die gewechselt hat; inzwischen geändert → 409 `veraltet`, sonst 409 mit Grund.
+ */
+export function nimmStatuswechselZurueck(
+  einsatzId: number,
+  efId: number,
+  beleg: StatusRuecknahmeBeleg,
+): Promise<EinsatzFahrzeug> {
+  return apiSend<EinsatzFahrzeug>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/status/zuruecknehmen`,
+    'POST',
+    beleg,
   );
 }
 

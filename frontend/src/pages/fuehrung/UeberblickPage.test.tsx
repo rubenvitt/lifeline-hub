@@ -638,9 +638,12 @@ describe('UeberblickPage', () => {
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
     const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
     const etikett = await waitFor(() => {
-      const el = zeile.querySelector<HTMLElement>(
-        '[data-lfh="abschnitt-zustand"] [data-lfh="status-chip"]',
-      );
+      // Der Lagezustand ist ebenfalls ein `Status` (LLH-1779): das Etikett nach dem Wort.
+      const el = [
+        ...zeile.querySelectorAll<HTMLElement>(
+          '[data-lfh="abschnitt-zustand"] [data-lfh="status"]',
+        ),
+      ].find((s) => /^Rückm\./.test(s.textContent ?? ''));
       expect(el).not.toBeNull();
       return el!;
     });

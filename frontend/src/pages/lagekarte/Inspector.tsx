@@ -17,13 +17,7 @@ import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import {
-  Augenbraue,
-  StatusChip,
-  monoStil,
-  tonVonRolle,
-  useRollen,
-} from '../../components/instrument';
+import { Augenbraue, Status, monoStil, tonVonRolle, useRollen } from '../../components/instrument';
 import {
   LEERE_ROHDATEN,
   auswahlRaster,
@@ -137,7 +131,7 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
       <Augenbraue als="dt">{feld.label}</Augenbraue>
       <dd style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
         {ton ? (
-          <StatusChip ton={ton} wort={feld.wert} />
+          <Status groesse="klein" ton={ton} wort={feld.wert} />
         ) : (
           <span
             style={

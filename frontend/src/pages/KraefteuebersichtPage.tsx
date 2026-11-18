@@ -6,7 +6,7 @@ import {
   KEINE_BERECHTIGUNG,
   modulName,
 } from '../einsatz/modulRegistry';
-import { Breadcrumb, Button, Checkbox, Input, Popover, Space, Tag, theme } from 'antd';
+import { Breadcrumb, Button, Checkbox, Input, Popover, Space, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
@@ -107,7 +107,7 @@ import {
   toHerausgenommenesMaterial,
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { KlappBand, StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
+import { Status, StatusZelle, monoStil, useRollen, KlappBand } from '../components/instrument';
 import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -120,6 +120,7 @@ import {
 } from '../components/nurAnsicht';
 import { funktionText } from '../kraefte/einsatzfunktionKern';
 import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
@@ -547,7 +548,7 @@ function StatusSpalte({
       style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXXS }}
     >
       {gruende.map((g) => (
-        <StatusChip key={g.art} ton="alarm" wort={grundWort(g)} />
+        <Status groesse="klein" key={g.art} ton="alarm" wort={grundWort(g)} />
       ))}
     </span>
   );
@@ -557,7 +558,8 @@ function StatusSpalte({
     const verteilung = 'verteilung' in z.status ? z.status.verteilung : null;
     status = (
       <>
-        <StatusChip
+        <Status
+          groesse="klein"
           ton={z.status.ton}
           code={z.status.code ?? undefined}
           wort={z.status.wort}
@@ -1648,15 +1650,15 @@ export default function KraefteuebersichtPage() {
             </span>
           )}
           {chips.map((chip) => (
-            <Tag
+            <Marke
               key={chip.schluessel}
-              closable
-              onClose={() =>
+              onEntfernen={() =>
                 setFilter((f) => ({ ...f, [chip.schluessel]: LEERER_FILTER[chip.schluessel] }))
               }
+              entfernenLabel={`Filter ${chip.label} entfernen`}
             >
               {chip.label}
-            </Tag>
+            </Marke>
           ))}
           {gefiltert && (
             <Button type="link" onClick={() => setFilter(LEERER_FILTER)}>

@@ -1,4 +1,4 @@
-import { Space, Tag, Typography } from 'antd';
+import { Space, Typography } from 'antd';
 import { useEffect, useState, type CSSProperties } from 'react';
 import type { RichtwertEbenen, RichtwertHerkunft, UnterkunftRichtwerte } from '../../api/types';
 import { DezimalFeld } from '../../components/DezimalFeld';
@@ -8,6 +8,7 @@ import { mitVorgabe, orgVorgabe } from '../../components/vorgabeText';
 import { HerkunftAbzeichen, VomHubGesperrt, type Herkunft } from '../../instanz/herkunft';
 import { menge } from './ErgebnisAnzeige';
 import { RICHTWERTE_BASIS, type RichtwertBasis, type RichtwertGruppe } from './richtwerte';
+import { Marke } from '../../components/instrument/Marke';
 
 export const GRUPPE_TITEL: Record<RichtwertGruppe, string> = {
   schlafen: 'Schlafen',
@@ -160,7 +161,7 @@ function RichtwertZeile({
     <div style={zeile} data-schluessel={b.schluessel}>
       <Space size={token.marginSM} wrap>
         <Typography.Text>{b.bezeichnung}</Typography.Text>
-        {b.herkunft === 'annahme' && <Tag variant="filled">Annahme</Tag>}
+        {b.herkunft === 'annahme' && <Marke>Annahme</Marke>}
       </Space>
       {ebene === 'anzeige' ? (
         <Typography.Text style={{ fontVariantNumeric: 'tabular-nums' }}>

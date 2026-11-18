@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Space, Tag } from 'antd';
-import StatusTag from '../../components/StatusTag';
+import { Space } from 'antd';
 import { monoStil, useRollen } from '../../components/instrument';
 import { ladeSchaden, schadenRegistrierAnzeige } from '../../api/einsatzSchaden';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -8,6 +7,7 @@ import { FRISCH_MS } from '../../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../../command-palette/VorschauZustand';
 import SchadenDaten from './SchadenDaten';
 import { STATUS_META } from './schadenHelfer';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Lese-Vorschau eines Schadens in der Sprungpalette. Quelle ist der Einzelabruf im Fach
@@ -29,8 +29,8 @@ export default function SchadenVorschau({ einsatzId, id }: { einsatzId: number; 
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Space wrap size={token.marginSM}>
             <span style={monoStil(14, 500)}>{schadenRegistrierAnzeige(s.registrier_nr)}</span>
-            <StatusTag darstellung={STATUS_META[s.status]} />
-            {s.storniert_at && <Tag color="default">storniert</Tag>}
+            <Status darstellung={STATUS_META[s.status]} />
+            {s.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
           </Space>
           <SchadenDaten schaden={s} einsatzId={einsatzId} ortZeile={false} spalten={2} />
         </Space>

@@ -1,6 +1,6 @@
-import { Tag } from 'antd';
-import StatusTag from '../components/StatusTag';
 import { uebernahmeOffen } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Kennzeichen einer unangemeldet eingetroffenen Einheit, die die Führung noch nicht übernommen
@@ -11,7 +11,7 @@ import { uebernahmeOffen } from '../theme/statusFarben';
 export default function NichtUebernommenMarke() {
   return (
     <span data-lfh="nicht-uebernommen">
-      <StatusTag darstellung={uebernahmeOffen} />
+      <Status darstellung={uebernahmeOffen} />
     </span>
   );
 }
@@ -21,5 +21,5 @@ export default function NichtUebernommenMarke() {
  * Belegungszeile des Raums.
  */
 export function UnangemeldetMarke() {
-  return <Tag data-lfh="unangemeldet">unangemeldet</Tag>;
+  return <Marke data-lfh="unangemeldet">unangemeldet</Marke>;
 }

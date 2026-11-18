@@ -13,7 +13,7 @@ import {
 import { ERINNERUNG_HANDLUNG, ERINNERUNG_STATUS, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
@@ -146,12 +146,14 @@ export default function ErinnerungKarte({
             {e.titel}
           </Text>
           {istAbg && <StatusBadge phase={status.phase} label={status.label} />}
-          {faellig && <StatusChip ton="alarm" wort="fällig" />}
+          {faellig && <Status groesse="klein" ton="alarm" wort="fällig" />}
           {e.intervall_minuten && (
-            <StatusChip ton="neutral" wort={`alle ${e.intervall_minuten} Min`} />
+            <Status groesse="klein" ton="neutral" wort={`alle ${e.intervall_minuten} Min`} />
           )}
-          {e.quelle === 'auto_frist' && <StatusChip ton="achtung" wort="automatisch" />}
-          {e.vollzug_status === 'vollzogen' && <StatusChip ton="normal" wort="Vollzogen" />}
+          {e.quelle === 'auto_frist' && <Status groesse="klein" ton="achtung" wort="automatisch" />}
+          {e.vollzug_status === 'vollzogen' && (
+            <Status groesse="klein" ton="normal" wort="Vollzogen" />
+          )}
           <BezugLink e={e} einsatzId={einsatzId} />
         </Space>
         <Space size={token.margin} wrap>

@@ -1,4 +1,4 @@
-import { Alert, App, Button, Modal, Spin, Tag } from 'antd';
+import { Alert, App, Button, Modal, Spin } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -12,6 +12,7 @@ import {
 } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
 import { globalKeys } from '../api/queryKeys';
+import { Marke } from '../components/instrument/Marke';
 import { Textstufe } from '../components/instrument';
 
 /**
@@ -114,7 +115,7 @@ export default function AusKatalogModal({
                 <ListenEintragMeta
                   title={
                     <span>
-                      {eintrag.name} <Tag>{eintrag.typ}</Tag>
+                      {eintrag.name} <Marke>{eintrag.typ}</Marke>
                     </span>
                   }
                   description={

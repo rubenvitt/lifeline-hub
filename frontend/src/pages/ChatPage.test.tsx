@@ -1124,8 +1124,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
       http.delete('/api/einsaetze/7/chat/nachrichten/6/bezug', () => HttpResponse.json(eigene2)),
     );
     await screen.findByText('Zweite Lage');
-    const schliessen = (text: string) =>
-      zeile(text).querySelector('.ant-tag-close-icon') as HTMLElement;
+    const schliessen = (text: string) => zeile(text).querySelector('button') as HTMLElement;
     await userEvent.click(schliessen('Erste Lage'));
     await userEvent.click(schliessen('Zweite Lage'));
     await screen.findByText('Bezug entfernt');
@@ -1164,7 +1163,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
       ),
     );
     await screen.findByText('Erste Lage');
-    await userEvent.click(zeile('Erste Lage').querySelector('.ant-tag-close-icon') as HTMLElement);
+    await userEvent.click(zeile('Erste Lage').querySelector('button') as HTMLElement);
     // Erst wechseln, wenn die Anfrage des vorigen Einsatzes beim Server liegt.
     await waitFor(() => expect(lehneAb).not.toBeNull());
     await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz B' }));

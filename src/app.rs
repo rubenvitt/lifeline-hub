@@ -1077,6 +1077,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen/zuruecknehmen",
             post(routes::einsatz_fahrzeug::zuruecknehmen),
         )
+        // LLH-1781: „Rückgängig“ nach einem Statuswechsel.
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/status/zuruecknehmen",
+            post(routes::einsatz_fahrzeug::status_zuruecknehmen),
+        )
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/stornieren",
             post(routes::einsatz_fahrzeug::stornieren),

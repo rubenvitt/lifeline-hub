@@ -495,7 +495,7 @@ describe('EinheitenPage', () => {
       const oben = await zeileVon('1. Zug');
       const unten = await zeileVon('Gruppe Deich');
       const marke = within(unten).getByText('unterbesetzt');
-      expect(marke.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'achtung');
+      expect(marke.closest('[data-lfh="status"]')).toHaveAttribute('data-ton', 'achtung');
       expect(within(oben).queryByText('unterbesetzt')).toBeNull();
       expect(screen.queryByText('Soll erfüllt')).toBeNull();
     });

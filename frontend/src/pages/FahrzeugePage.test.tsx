@@ -593,7 +593,9 @@ describe('FahrzeugePage', () => {
     // Kein Ist-Wert, der wie eine Unterschreitung aussähe; das Soll bleibt als Auskunft.
     expect(urteil).not.toHaveTextContent('Ist');
     expect(urteil).toHaveTextContent('Soll 0/1/8//9');
-    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
+    expect(urteil.querySelector('[data-lfh="status"], [data-marke]')?.className).not.toMatch(
+      /ant-tag-(blue|green|red)\b/,
+    );
   });
 
   it('zählt Besatzung ohne Stärke-Position als Mannschaft (BOS-Σ ist Kopfzahl)', async () => {
@@ -644,7 +646,9 @@ describe('FahrzeugePage', () => {
     expect(urteil).toHaveAttribute('data-urteil', 'kein_soll');
     expect(urteil).toHaveTextContent('Ist 1/0/0//1');
     expect(urteil).not.toHaveTextContent('Soll 0');
-    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
+    expect(urteil.querySelector('[data-lfh="status"], [data-marke]')?.className).not.toMatch(
+      /ant-tag-(blue|green|red)\b/,
+    );
   });
 
   it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker nach dem Aufklappen', async () => {
@@ -2032,6 +2036,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     optionen: { adresseSteht?: boolean; daneben?: ReactNode } = {},
   ) {
     const patches: unknown[] = [];
+    const ruecknahmen: unknown[] = [];
     // Der Serverstand wandert mit dem PATCH — sonst holte der Refetch nach `onSettled` den alten
     // Status zurück.
     let stand: Record<string, unknown> = {
@@ -2050,11 +2055,30 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       http.patch('/api/einsaetze/7/fahrzeuge/10', async ({ request }) => {
         const body = await request.json();
         patches.push(body);
+        const vorher = stand;
         stand = {
           ...stand,
           status_id: 3,
           status_label: 'vor_ort',
           status_seit: '2026-05-26 09:30:00',
+        };
+        // Beleg für „Rückgängig“ (LLH-1781).
+        return HttpResponse.json({
+          ...stand,
+          status_ruecknahme: {
+            vorher_status_id: vorher.status_id,
+            status_id: 3,
+            status_seit: '2026-05-26 09:30:00',
+          },
+        });
+      }),
+      http.post('/api/einsaetze/7/fahrzeuge/10/status/zuruecknehmen', async ({ request }) => {
+        ruecknahmen.push(await request.json());
+        stand = {
+          ...stand,
+          status_id: 2,
+          status_label: 'disponiert',
+          status_seit: '2026-05-26 09:10:00',
         };
         return HttpResponse.json(stand);
       }),
@@ -2079,7 +2103,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       </>,
       { route, datenRouter: true },
     );
-    return { patches };
+    return { patches, ruecknahmen };
   }
 
   /**
@@ -2178,8 +2202,33 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     act(() => knopf.focus());
     fireEvent.keyDown(knopf, { key: '4' });
     await waitFor(() => expect(patches).toEqual([{ status_id: 3 }]));
-    // Serverstand übernommen: der Chip zeigt S4, „seit" die Zeit aus der Antwort.
-    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+    // Serverstand übernommen: der Statusblock zeigt die Ziffer 4.
+    await waitFor(() => expect(within(knopf).getByText('4')).toBeInTheDocument());
+  });
+
+  it('nach dem Wechsel per Ziffer quittiert ein Hinweis mit Rückgängig, der Fokus bleibt (LLH-1781)', async () => {
+    const { ruecknahmen } = renderTableau();
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    const knopf = await within(tableau).findByRole('button', {
+      name: 'Status von Florian 1 ändern',
+    });
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: '4' });
+    expect(await screen.findByText('Florian 1: S3 → S4')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.activeElement?.closest('[data-lfh="fms-kachel"]')).not.toBeNull(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(ruecknahmen).toEqual([
+        {
+          vorher_status_id: 2,
+          status_id: 3,
+          status_seit: '2026-05-26 09:30:00',
+        },
+      ]),
+    );
+    await waitFor(() => expect(within(knopf).getByText('3')).toBeInTheDocument());
   });
 
   it('bleibt ohne Einheiten (Modul gesperrt) bedienbar und sagt, warum ungegliedert', async () => {
@@ -2223,7 +2272,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     act(() => knopf.focus());
     fireEvent.keyDown(knopf, { key: '4' });
     await waitFor(() => expect(abrufe).toBeGreaterThanOrEqual(2));
-    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+    await waitFor(() => expect(within(tableau).getByText('4')).toBeInTheDocument());
     expect(within(tableau).getByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
     expect(within(tableau).queryByText(/Einheiten nicht abrufbar/)).toBeNull();
   });
@@ -2253,7 +2302,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     // Vorher fiel das Tableau für die Dauer des Abrufs aufs Skelett, und der Hinweis verschwand.
     // Frisch gesucht: ein ausgehängtes Tableau fände `within(tableau)` noch.
     const jetzt = () => screen.getByRole('region', { name: 'FMS-Tableau' });
-    await waitFor(() => expect(within(jetzt()).getByText('S4')).toBeInTheDocument());
+    await waitFor(() => expect(within(jetzt()).getByText('4')).toBeInTheDocument());
     expect(within(jetzt()).getByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
     expect(within(jetzt()).getByRole('heading', { name: 'Alle Fahrzeuge' })).toBeInTheDocument();
   });

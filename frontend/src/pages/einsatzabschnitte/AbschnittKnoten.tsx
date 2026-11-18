@@ -1,9 +1,8 @@
 import { IconPerson, IconTelefon } from '../../icons';
 import { Space, theme } from 'antd';
-import { StatusChip, monoStil } from '../../components/instrument';
+import { Status, monoStil } from '../../components/instrument';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
-import StatusTag from '../../components/StatusTag';
 import { telefonVerbindungen } from '../../components/verbindungen';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 
@@ -23,7 +22,7 @@ interface Props {
  * sichtbarem Wort (WCAG 1.4.1, „Rot bedient nichts" in `frontend/AGENTS.md`): ein reiner
  * Farbpunkt für die Führung las sich in Gelb wie der Lagezustand „angespannt" (LFH-962). Deshalb
  * zeigt ein besetzter Abschnitt nur den Leiternamen, ein unbesetzter den Chip „ohne Leiter", und
- * der Lagezustand steht in derselben Form wie im Überblick (`StatusTag` am Rand, leer = nicht
+ * der Lagezustand steht in derselben Form wie im Überblick (`Status` am Rand, leer = nicht
  * beurteilt). Icons in `aria-hidden`-Hülle, weil antd-Icons `role="img"` mit englischem Namen
  * mitbringen.
  */
@@ -34,7 +33,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
   return (
     <Space size={token.marginXXS} wrap>
       <span>{abschnitt.name}</span>
-      {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
+      {lage && <Status darstellung={lage} />}
       {/* Zahlen in Mono, kein farbiges Etikett: Blau ist die Bedienrolle. */}
       <span style={{ ...monoStil(12), color: token.colorText }}>
         <StaerkeAnzeige wert={staerke} />
@@ -44,7 +43,7 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
             zählt „inkl. UA“. */}
         {anzahlEinheiten === 1 ? '1 Einheit' : `${anzahlEinheiten} Einheiten`} direkt
       </span>
-      {!besetzt && <StatusChip ton="achtung" wort="ohne Leiter" />}
+      {!besetzt && <Status groesse="klein" ton="achtung" wort="ohne Leiter" />}
       {abschnitt.leiter_name && (
         <span style={{ color: token.colorTextSecondary }}>
           <span aria-hidden="true">

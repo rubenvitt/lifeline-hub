@@ -1,4 +1,4 @@
-import { Button, Modal, Popover, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { Button, Modal, Popover, Space, Tooltip, Typography, theme } from 'antd';
 import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
 import { useKontextMenue } from '../components/useKontextMenue';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -10,13 +10,14 @@ import { isBildMime, originalPfad } from '../api/anhangFassung';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { aktionsNamen } from './aktionsNamen';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 import { formatGroesse } from '../karten/formatGroesse';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import type { Speicherung } from '../components/Erfassung';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Restweg zum unteren Rand, der noch als „der Lesende steht unten" gilt.
@@ -314,14 +315,16 @@ export default function NachrichtenStrom({
                     {n.bearbeitet_at && (
                       <Tooltip title={`bearbeitet am ${zeitpunkt(n.bearbeitet_at)}`}>
                         <span style={{ display: 'inline-flex' }}>
-                          <StatusChip ton="neutral" wort="bearbeitet" />
+                          <Status groesse="klein" ton="neutral" wort="bearbeitet" />
                         </span>
                       </Tooltip>
                     )}
                     {/* Heraufstufung ist eine aktive Beziehung → Ton `bedien`. */}
-                    {heraufgestuft && <StatusChip ton="bedien" wort="heraufgestuft zu ETB" />}
+                    {heraufgestuft && (
+                      <Status groesse="klein" ton="bedien" wort="heraufgestuft zu ETB" />
+                    )}
                     {heraufgestuftZuAuftrag && (
-                      <StatusChip ton="bedien" wort="heraufgestuft zu Auftrag" />
+                      <Status groesse="klein" ton="bedien" wort="heraufgestuft zu Auftrag" />
                     )}
                     {!geloescht &&
                       hatBezug &&
@@ -332,12 +335,13 @@ export default function NachrichtenStrom({
                         const label = bezugLabel(typ, zielId);
                         const info = bezugInfo?.(typ, zielId) ?? null;
                         return (
-                          <Tag
-                            closable={darfSchreiben && onBezugLoeschen !== undefined}
-                            onClose={(e) => {
-                              e.preventDefault();
-                              onBezugLoeschen?.(n);
-                            }}
+                          <Marke
+                            onEntfernen={
+                              darfSchreiben && onBezugLoeschen !== undefined
+                                ? () => onBezugLoeschen(n)
+                                : undefined
+                            }
+                            entfernenLabel={`Bezug ${label} entfernen`}
                           >
                             {info ? (
                               <Popover
@@ -360,7 +364,7 @@ export default function NachrichtenStrom({
                             ) : (
                               label
                             )}
-                          </Tag>
+                          </Marke>
                         );
                       })()}
                   </Space>
