@@ -1,17 +1,17 @@
 ## MODIFIED Requirements
 
 ### Requirement: Kartengröße und Layout sind dichteunabhängig
-Die Platzkarte SHALL in jeder Dichtestufe dieselbe Größe haben. Ihre Grundgröße passt in das
-Platzraster des Servers: Sie bleibt schmaler als der Spaltenabstand und niedriger als der
+Die Platzkarte SHALL in jeder Dichtestufe dieselbe Grundgröße haben, die in das Platzraster
+des Servers passt: Sie bleibt schmaler als der Spaltenabstand und niedriger als der
 Zeilenabstand. Der Grundriss SHALL Positionen, Karten und Plan gemeinsam mit einem Faktor
 zwischen 1 und 2 strecken, so weit die sichtbare Fläche es ohne Bildlauf zulässt; passt der
-Inhalt nicht, gilt der Faktor 1. Gespeicherte Positionen von Plätzen MUST beim Wechsel der
-Dichtestufe und der Fenstergröße unverändert gelten. Weder Server noch Client dürfen sie
-umrechnen oder migrieren.
+Inhalt nicht, gilt der Faktor 1. Der Faktor folgt nur der Fläche, nicht der Dichtestufe.
+Gespeicherte Positionen von Plätzen MUST beim Wechsel der Dichtestufe und der Fenstergröße
+unverändert gelten. Weder Server noch Client dürfen sie umrechnen oder migrieren.
 
 #### Scenario: Wechsel auf Handschuh
 - **WHEN** ein Grundriss mit zehn im Raster angelegten Plätzen in der Stufe „Handschuh“ geöffnet wird
-- **THEN** stehen die Karten an denselben Positionen und in derselben Größe wie in „kompakt“ und überlappen einander nicht
+- **THEN** stehen die Karten in derselben Anordnung wie in „kompakt“, mit demselben Faktor gestreckt, soweit die freie Fläche gleich groß ist, und überlappen einander nicht
 
 #### Scenario: Verschobenes Layout
 - **WHEN** Plätze im Bearbeiten-Modus verschoben und gespeichert wurden und danach die Dichtestufe wechselt

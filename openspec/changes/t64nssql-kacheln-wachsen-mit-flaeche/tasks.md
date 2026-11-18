@@ -30,16 +30,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/t64nssql5sboyz6yh03bdptn
 
 ## 3. Im Browser belegen
 
-- [ ] 3.1 e2e in `frontend/e2e/uhs-grundriss-layout.spec.ts`: Grundriss mit wenigen Plätzen bei
+- [x] 3.1 e2e in `frontend/e2e/uhs-grundriss-layout.spec.ts`: Grundriss mit wenigen Plätzen bei
   1920 × 1080 → Karten breiter als 140 px und nicht angeschnitten; Dichtestufe „Handschuh“ →
   dieselbe Kartengröße und Position wie „kompakt“; Zug im Bearbeiten-Modus landet an der
   losgelassenen Stelle. Nachweis: die Spec läuft lokal grün.
-- [ ] 3.2 Bestehende Suiten zu Grundriss und Plan (`uhs-grundriss-*.spec.ts`, `uhs-plan.spec.ts`,
+- [x] 3.2 Bestehende Suiten zu Grundriss und Plan (`uhs-grundriss-*.spec.ts`, `uhs-plan.spec.ts`,
   `geraet-uhs-*.spec.ts`) lokal fahren. Nachweis: grün oder Abweichung mit Grund in der PR-Beschreibung.
 
 ## 4. Doku
 
-- [ ] 4.1 `docs/anwender/kapitel/unfallhilfsstellen.md`: ein Satz, dass die Plätze mit der freien
+- [x] 4.1 `docs/anwender/kapitel/unfallhilfsstellen.md`: ein Satz, dass die Plätze mit der freien
   Fläche bis auf das Doppelte wachsen und gespeicherte Positionen dabei gleich bleiben; Bilder
   des Kapitels neu erzeugen (`pnpm doku:bilder e2e/doku-bilder/unfallhilfsstellen.bilder.ts`).
   Nachweis: `mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` grün.

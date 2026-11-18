@@ -88,6 +88,18 @@ Kommentare an den Konstanten und am Fehlerhinweis über der Fläche („feste 14
 nachgezogen. `src/uhs/plan.rs` nennt die Konstanten als Grundmaß; dort ändert sich nur der
 Kommentarverweis, falls er „fest“ behauptet.
 
+### D7 Die Stufe wirkt nur über die Fläche (Nachtrag 18.11.2026)
+
+In „Handschuh“ sind Kopf und Werkzeugzeile höher, die Sicht der Fläche also kleiner, und der
+Faktor fällt kleiner aus (gemessen bei 1440 × 900: 2 in „kompakt“, 1,74 in „Handschuh“). Abgestimmt
+mit dem Menschen: Die Größe folgt der Fläche; die Stufe selbst streckt nichts. Bei gleicher freier
+Fläche sind die Karten in jeder Stufe gleich groß. Ältere e2e-Prüfungen auf feste 140 × 116 px
+oder ≤ 120 px Höhe prüfen stattdessen Seitenverhältnis und Rasterabstand im gestreckten Maß.
+
+*Verworfen:* den Faktor aus einer dichteunabhängigen Fläche rechnen (Rahmen ohne Kopf, feste
+Reserve). Gleiche Größe, aber in „Handschuh“ liefe die Fläche eher in den Bildlauf, und die
+Reserve wäre eine zweite Wahrheit neben dem Layout.
+
 ## Risks / Trade-offs
 
 - [Kachel springt nach einem Zug, der die Hülle verändert] → Bewusst so abgestimmt; während des

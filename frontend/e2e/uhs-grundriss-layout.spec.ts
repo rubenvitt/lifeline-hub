@@ -279,12 +279,14 @@ async function wenigeBetten(page: Page): Promise<Aufbau & { uhsPfad: string }> {
 
 async function kartenLagen(page: Page) {
   await expect(page.locator('[data-testid="platz-karte"]')).toHaveCount(3);
-  return page.locator('[data-testid="platz-karte"]').evaluateAll((karten) =>
-    karten.map((k) => {
+  // Lage in der Fläche, nicht auf der Seite: Kopf und Werkzeugzeile sind je Dichte verschieden hoch.
+  return page.getByTestId('grundriss-flaeche-scroll').evaluate((flaeche) => {
+    const f = flaeche.getBoundingClientRect();
+    return [...flaeche.querySelectorAll<HTMLElement>('[data-testid="platz-karte"]')].map((k) => {
       const b = k.getBoundingClientRect();
-      return { x: Math.round(b.x), y: Math.round(b.y), w: b.width, h: b.height };
-    }),
-  );
+      return { x: Math.round(b.x - f.x), y: Math.round(b.y - f.y), w: b.width, h: b.height };
+    });
+  });
 }
 
 test('Großbild mit drei Betten: die Karten wachsen, liegen ganz in der Fläche, ohne Bildlauf', async ({
@@ -307,6 +309,8 @@ test('Großbild mit drei Betten: die Karten wachsen, liegen ganz in der Fläche,
   expect(masse, 'kein Bildlauf in der gestreckten Fläche').toEqual({ breit: 0, hoch: 0 });
 });
 
+// Bei 1920 px entscheidet die Breite der Fläche über den Faktor, und die ist in beiden Stufen
+// gleich; die Stufe selbst streckt nichts (design.md D7).
 test('Dichtestufe „Handschuh“: dieselbe Kartengröße und Lage wie in „kompakt“', async ({
   page,
 }) => {
