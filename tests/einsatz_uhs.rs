@@ -968,7 +968,10 @@ async fn patch_auf_aufgeloester_uhs_ist_409() {
         .await;
         assert_eq!(s, StatusCode::CONFLICT, "{v}");
         assert!(v.get("grund").is_none(), "kein Sperrkonflikt: {v}");
-        assert_eq!(v["error"], "Aufgelöste UHS kann nicht geändert werden", "{v}");
+        assert_eq!(
+            v["error"], "Aufgelöste UHS kann nicht geändert werden",
+            "{v}"
+        );
     }
     let (_s, v) = anfrage_json(
         &app,

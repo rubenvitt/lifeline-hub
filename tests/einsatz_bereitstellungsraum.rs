@@ -4236,14 +4236,23 @@ async fn patch_aufgeloester_raum_409() {
     )
     .await;
     assert!(s.is_success(), "auflösen: {s} {v}");
-    for body in [json!({"notiz": "zu spät"}), json!({"lat": 51.9, "lon": 8.8})] {
+    for body in [
+        json!({"notiz": "zu spät"}),
+        json!({"lat": 51.9, "lon": 8.8}),
+    ] {
         let (s, v) = patch_br(&app, &cookie, eid, br, body).await;
         assert_eq!(s, StatusCode::CONFLICT, "{v}");
         assert!(v.get("grund").is_none(), "kein Sperrkonflikt: {v}");
-        assert_eq!(v["error"], "Aufgelöster BR kann nicht geändert werden", "{v}");
+        assert_eq!(
+            v["error"], "Aufgelöster BR kann nicht geändert werden",
+            "{v}"
+        );
     }
     let detail = fetch_json(&app, &cookie, &br_pfad(eid, br)).await;
-    assert!(detail.get("notiz").is_none() || detail["notiz"].is_null(), "{detail}");
+    assert!(
+        detail.get("notiz").is_none() || detail["notiz"].is_null(),
+        "{detail}"
+    );
 }
 
 /// Anlegen mit Standort und Koordinate trägt beide.

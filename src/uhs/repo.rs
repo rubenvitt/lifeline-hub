@@ -533,7 +533,9 @@ mod tests {
             AppError::Conflict(m) if m == "Stornierte UHS kann nicht geändert werden"
         ));
         assert!(matches!(
-            aktualisiere(&pool, e, 999_999, b, None, notiz()).await.unwrap_err(),
+            aktualisiere(&pool, e, 999_999, b, None, notiz())
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
