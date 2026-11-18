@@ -38,10 +38,14 @@ targets:
         excludes:
           - "Huelle/**"
           - "Info.plist"
+          - "PrivacyInfo.xcprivacy"
           - "Version.xcconfig"
       # Das Init-Skript ist reines JS (Vitest führt es aus, frontend/src/test/huelle.ts); die
       # App liest es als Ressource und spielt es als WKUserScript ein.
       - path: App/Huelle/huelle.js
+        buildPhase: resources
+      # Privacy-Manifest (Required-Reason-APIs) liegt an der Wurzel des App-Bündels.
+      - path: App/PrivacyInfo.xcprivacy
         buildPhase: resources
     dependencies:
       - package: LifelineKern

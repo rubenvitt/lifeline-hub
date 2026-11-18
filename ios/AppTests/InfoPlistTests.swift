@@ -53,6 +53,25 @@ final class InfoPlistTests: XCTestCase {
         XCTAssertEqual(alpha, 1)
     }
 
+    /// App Store: Required-Reason-APIs stehen mit Grund im Privacy-Manifest; die Hülle verfolgt
+    /// niemanden und erhebt selbst keine Daten.
+    func testDasPrivacyManifestLiegtImBuendel() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "PrivacyInfo", withExtension: "xcprivacy"))
+        let daten = try Data(contentsOf: url)
+        let manifest = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: daten, format: nil) as? [String: Any])
+        XCTAssertEqual(manifest["NSPrivacyTracking"] as? Bool, false)
+        XCTAssertEqual((manifest["NSPrivacyTrackingDomains"] as? [String])?.count, 0)
+        XCTAssertEqual((manifest["NSPrivacyCollectedDataTypes"] as? [Any])?.count, 0)
+        let apis = manifest["NSPrivacyAccessedAPITypes"] as? [[String: Any]] ?? []
+        let gruende = Dictionary(
+            uniqueKeysWithValues: apis.compactMap { eintrag -> (String, [String])? in
+                guard let typ = eintrag["NSPrivacyAccessedAPIType"] as? String else { return nil }
+                return (typ, eintrag["NSPrivacyAccessedAPITypeReasons"] as? [String] ?? [])
+            })
+        XCTAssertEqual(gruende, ["NSPrivacyAccessedAPICategoryUserDefaults": ["CA92.1"]])
+    }
+
     func testDasInitSkriptLiegtAlsRessourceInDerApp() throws {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "huelle", withExtension: "js"))
         let skript = try String(contentsOf: url, encoding: .utf8)
