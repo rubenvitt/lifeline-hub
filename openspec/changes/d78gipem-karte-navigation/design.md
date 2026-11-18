@@ -61,6 +61,17 @@ Rail ist in beiden Modi dunkel; Nacht und Tag wie jede Karte.
 `IconRail`/`ModulPanel` (ab `lg`; darunter Navigations-Drawer, „UI-Form-Leitlinie“) → Karte
 `Navigation`. Der Abdeckungswächter in `designSystem.test.ts` hält Zeile und Karte deckungsgleich.
 
+**D5: Fester Theme-Modus je Abschnitt der Karte** (beim Umsetzen gefunden). Das Modulpanel liest
+seine Flächen über `useModusFarben` aus dem Theme-Modus der App (`useThemeMode`), nicht aus dem
+antd-Token. Der Generator hat keinen `ThemeModeProvider`, die Vorgabe außerhalb ist Nacht: im
+Tag-Abschnitt stand das Panel dunkel. `ThemeModeProvider.tsx` exportiert deshalb
+`ThemeModusFest` (fester Modus und Dichte, kein Speicher, keine Medienabfrage), und
+`ThemaAbschnitt` in `previews.tsx` legt ihn um jeden Abschnitt. Die übrigen Karten ändern sich
+dadurch nicht (Lauf ohne Diff außerhalb von `Navigation`).
+
+Verworfen: `useModusFarben` auf das antd-Token umstellen (wie `useRollen`). Das wirkte auf 14
+Stellen der App und änderte die Vorgabe außerhalb eines Providers in Tests von Nacht auf Tag.
+
 ## Risks / Trade-offs
 
 - [Ein Schalter, den nur die Karte setzt] → Er ist klein, hat eine Vorgabe ohne Wirkung auf die App
