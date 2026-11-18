@@ -247,3 +247,113 @@ for (const rolle of ['admin', 'beobachter'] as const) {
     );
   });
 }
+
+/**
+ * Kacheln wachsen mit der Fläche (LLH-1940, Spec `uhs-grundriss`, „Kartengröße und Layout sind
+ * dichteunabhängig“): drei Betten in einer Reihe lassen bei 1920 × 1080 viel Fläche frei, der
+ * Grundriss streckt Lage und Größe bis aufs Doppelte. Die Dichtestufe ändert daran nichts, und ein
+ * Zug landet dort, wo er losgelassen wurde, obwohl der Server in Grundmaßen speichert.
+ *
+ * Mutationsprobe: `einpassFaktor` auf 1 festnageln → die Karte bleibt 140 px breit, der erste Test
+ * wird rot; die Rückrechnung in `onDragEnd` entfernen → der Server speichert die doppelte Strecke,
+ * der Zug-Test wird rot.
+ */
+async function wenigeBetten(page: Page): Promise<Aufbau & { uhsPfad: string }> {
+  const stempel = Date.now();
+  const einsatz = await seede(page, '/api/einsaetze', {
+    bezeichnung: `E2E UHS Wachsen ${stempel}`,
+  });
+  const E = `/api/einsaetze/${einsatz.id}`;
+  const uhs = await seede(page, `${E}/uhs`, {
+    typ: 'behandlungsplatz',
+    bezeichnung: `BHP Wachsen ${stempel}`,
+  });
+  await seede(page, `${E}/uhs/${uhs.id}/plaetze/bulk`, { typ: 'bett', menge: 3 });
+  await seede(page, `${E}/uhs/${uhs.id}/status`, { status: 'aktiv' });
+  return {
+    einsatzId: String(einsatz.id),
+    pfad: `/einsaetze/${einsatz.id}/unfallhilfsstellen/${uhs.id}`,
+    uhsPfad: `${E}/uhs/${uhs.id}`,
+  };
+}
+
+async function kartenLagen(page: Page) {
+  await expect(page.locator('[data-testid="platz-karte"]')).toHaveCount(3);
+  return page.locator('[data-testid="platz-karte"]').evaluateAll((karten) =>
+    karten.map((k) => {
+      const b = k.getBoundingClientRect();
+      return { x: Math.round(b.x), y: Math.round(b.y), w: b.width, h: b.height };
+    }),
+  );
+}
+
+test('Großbild mit drei Betten: die Karten wachsen, liegen ganz in der Fläche, ohne Bildlauf', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await anmelden(page);
+  const { pfad } = await wenigeBetten(page);
+  await page.goto(pfad);
+  const [erste] = await kartenLagen(page);
+  expect(erste.w, 'gestreckte Kartenbreite').toBeGreaterThan(140);
+  expect(erste.w, 'höchstens das Doppelte').toBeLessThanOrEqual(280);
+  expect(erste.h / erste.w, 'Seitenverhältnis bleibt').toBeCloseTo(116 / 140, 2);
+  expect(await angeschnitteneKarten(page), 'angeschnittene Platzkarten').toEqual([]);
+  const scroll = page.getByTestId('grundriss-flaeche-scroll');
+  const masse = await scroll.evaluate((el) => ({
+    breit: el.scrollWidth - el.clientWidth,
+    hoch: el.scrollHeight - el.clientHeight,
+  }));
+  expect(masse, 'kein Bildlauf in der gestreckten Fläche').toEqual({ breit: 0, hoch: 0 });
+});
+
+test('Dichtestufe „Handschuh“: dieselbe Kartengröße und Lage wie in „kompakt“', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await anmelden(page);
+  const { pfad } = await wenigeBetten(page);
+  await page.goto(pfad);
+  await stelleDichte(page, 'kompakt');
+  const kompakt = await kartenLagen(page);
+  await stelleDichte(page, 'handschuh');
+  expect(await kartenLagen(page)).toEqual(kompakt);
+});
+
+test('Zug in der gestreckten Fläche: der Server speichert die Strecke in Grundmaßen', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await anmelden(page);
+  const { pfad, uhsPfad } = await wenigeBetten(page);
+  await page.goto(pfad);
+  const startY = await page.request
+    .get(uhsPfad)
+    .then((a) => a.json())
+    .then(
+      (u: { plaetze: { bezeichnung: string; pos_y: number }[] }) =>
+        u.plaetze.find((p) => p.bezeichnung === 'Bett 1')!.pos_y,
+    );
+
+  // Erst in den Bearbeiten-Modus, dann messen: die Werkzeugzeile darf die Sicht verändern.
+  await page.getByRole('button', { name: 'Plätze bearbeiten' }).click();
+  await expect(page.getByRole('button', { name: 'Bearbeiten beenden' })).toBeVisible();
+  const [vorher] = await kartenLagen(page);
+  const faktor = vorher.w / 140;
+  expect(faktor, 'Vorbedingung: die Fläche ist gestreckt').toBeGreaterThan(1);
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Bett 1' });
+  const box = (await karte.boundingBox())!;
+  const patch = page.waitForRequest(
+    (r) => r.method() === 'PATCH' && /\/uhs\/\d+\/plaetze\/\d+$/.test(r.url()),
+  );
+  // Nach unten: in der Reihe stünde der Platz auf seinem Nachbarn.
+  const cx = box.x + box.width / 2;
+  const cy = box.y + 14;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx, cy + 120, { steps: 12 });
+  await page.mouse.up();
+
+  const body = JSON.parse((await patch).postData() ?? '{}') as { pos_y: number };
+  expect(body.pos_y, 'Strecke durch den Faktor').toBe(startY + Math.round(120 / faktor));
+});
