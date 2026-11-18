@@ -33,6 +33,7 @@ die Karten deckungsgleich.
 | **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
+| Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
 | Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
@@ -87,6 +88,7 @@ die Karten deckungsgleich.
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
+- **Klappbares Kennzahlenband** (`components/KlappBand/`, Gruppe Daten)
 - **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
 - **Großbild: Zeilen** (`components/GrossZeile/`, Gruppe Großbild)
 - **Segmentleiste (Filter, Umbruch, als Formularfeld)** (`components/Segmentleiste/`, Gruppe Bedienung)

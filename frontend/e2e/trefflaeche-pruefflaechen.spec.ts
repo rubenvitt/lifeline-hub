@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { weitereAusloeser, weitereEintrag } from './nebenweg-kern';
 import {
   FUEKW,
   HANDSCHIRM,
@@ -82,6 +83,7 @@ interface Flaeche {
 }
 
 const inMain = (page: Page) => page.locator('main');
+const EINSATZDATEN_WEITERE = 'Weitere Aktionen zu den Einsatzdaten';
 /**
  * Ein beschriftetes Kästchen (LFH-907): gemessen wird das LABEL, das Box und Text umschließt und
  * als Ganzes klickt; die Box allein ist `controlInteractiveSize` groß.
@@ -90,9 +92,30 @@ const kaestchen = (text: string) => (page: Page) =>
   inMain(page).locator('label.ant-checkbox-wrapper').filter({ hasText: text });
 const knopf = (name: string | RegExp) => (page: Page) =>
   inMain(page).getByRole('button', { name, exact: typeof name === 'string' });
-/** Ein Nebenweg des Seitenkopfs mit Ziel ist ab `md` ein Link in Knopfgestalt (LFH-963). */
-const nebenweg = (name: RegExp) => (page: Page) =>
-  page.locator('[data-lfh="seitenkopf-aktionen"]').getByRole('link', { name });
+/**
+ * Ein Nebenweg des Seitenkopfs: in `kompakt` ab `md` ein Knopf (mit Ziel ein Link in Knopfgestalt,
+ * LFH-963), in `handschuh` ein Eintrag im Menü „Weitere“ (LLH-1786), das {@link weitereAufklappen}
+ * vorher öffnet. Gemessen wird, was steht.
+ */
+const nebenweg = (name: string | RegExp) => (page: Page) => {
+  const kopf = page.locator('[data-lfh="seitenkopf-aktionen"]');
+  const exact = typeof name === 'string';
+  return kopf
+    .getByRole('link', { name, exact })
+    .or(kopf.getByRole('button', { name, exact }))
+    .or(weitereEintrag(page, name));
+};
+/** `vorbereiten` einer Fläche mit Nebenwegen: öffnet „Weitere“, wo die Stufe sie bündelt. */
+const weitereAufklappen = (ausloeser: string) => async (page: Page) => {
+  const knopf = weitereAusloeser(page, ausloeser);
+  if ((await knopf.count()) === 0) return;
+  await knopf.click();
+  // Erst messen, wenn das Menü ausgezoomt ist (antd skaliert es beim Öffnen).
+  await ruhigeHoehe(
+    page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
+    `Menü ${ausloeser}`,
+  );
+};
 /** Kopfknopf der eingeklappten Spalte „Abgelehnt“ im Nachforderungen-Board. */
 const abgelehntSpalte = {
   sorte: 'Board Abgelehnt',
@@ -745,6 +768,7 @@ function einstellungenFlaechen(einsatzId: string): Flaeche[] {
       // LFH-1170: ein Bearbeitungsweg (Zeilen), die Nebenwege im Kopf statt „Bearbeiten“.
       pfad: `${R}/einsatzdaten`,
       anker: knopf('Bezeichnung bearbeiten'),
+      vorbereiten: weitereAufklappen(EINSATZDATEN_WEITERE),
       ziele: [
         {
           sorte: 'Einsatzdaten Zeilen',
@@ -815,7 +839,10 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
     },
     {
       pfad: `${R}/einsatzdaten`,
-      anker: nebenweg(/^Einsatzbericht drucken/),
+      // In `handschuh` steht der Nebenweg im Menü: Anker ist dann der Auslöser (LLH-1786).
+      anker: (page) =>
+        nebenweg(/^Einsatzbericht drucken/)(page).or(weitereAusloeser(page, EINSATZDATEN_WEITERE)),
+      vorbereiten: weitereAufklappen(EINSATZDATEN_WEITERE),
       hinweis: /nur Einsatzleitung, Führungspersonal oder Org-Admin$/,
       fehlt: knopf('Bezeichnung bearbeiten'),
       ziele: [
@@ -1182,7 +1209,10 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen 
       // Schreibrecht zeigen das Formular); es bleibt die Druckaktion.
       anker: (page) => inMain(page).getByText('Zeitstand:'),
       fehlt: knopf('Freigeben'),
-      ziele: [{ sorte: 'Lagebericht Drucken', ziele: knopf('Drucken / als PDF'), mindestens: 1 }],
+      vorbereiten: weitereAufklappen('Weitere Aktionen zum Lagebericht'),
+      ziele: [
+        { sorte: 'Lagebericht Drucken', ziele: nebenweg('Drucken / als PDF'), mindestens: 1 },
+      ],
     },
     {
       pfad: `${R}/lageberichte`,

@@ -5,7 +5,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep zeiten-und-kuerzel`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   staerke.png  frontend/src/kraefte/Verdichtungszeile.tsx (in pages/EinheitenPage.tsx),
+ *   staerke.png  frontend/src/kraefte/Verdichtungszeile.tsx (Form `meta` im Kopf von pages/EinheitenPage.tsx),
  *                frontend/src/anzeige/staerke.ts
  */
 
@@ -17,7 +17,8 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     const demo = await demoEinsatz(page);
     await page.goto(`/einsaetze/${demo.id}/einheiten`);
-    const zeile = page.locator('[data-lfh="verdichtungszeile"]');
+    // Die Stärke steht seit LLH-1786 als Meta im Seitenkopf; fotografiert wird die Meta-Gruppe.
+    const zeile = page.locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__meta');
     await expect(zeile).toContainText('Stärke F/UF/M//Σ');
     await expect(zeile.locator('strong')).toHaveText(/^\d+\/\d+\/\d+\/\/\d+$/);
     await fotografiere(zeile, KAPITEL, 'staerke');

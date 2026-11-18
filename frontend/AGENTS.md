@@ -380,6 +380,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
+| Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
 | Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
@@ -1026,16 +1027,20 @@ anwendbar), „nicht geprüft" ist keins.
 - **Ein Anker in der Zeile bedient den Klick allein** (Riegel `closest('a')` in `Datensicht`);
   mit `titel.ziel` erzeugt das `render` keinen Anker.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET**; Speichern gehört ins `<form>`.
-- **Nebenwege im Kopf gehen über `weitere` der `EinsatzSeite`** (LFH-963, Spec
-  `einsatztauglichkeit-layout`, Entscheidung 8): Drucken, CSV, Listenzugriffe und ähnliche
-  Öffnen-Wege stehen ab `md` als sekundäre Knöpfe, unter `md` hinter EINEM Auslöser „Weitere“
-  (`MenueAusloeser`, Name nennt die Seite). In `aktionen` bleibt nur, was am Handy sichtbar sein
+- **Nebenwege im Kopf gehen über `weitere` der `EinsatzSeite`** (LFH-963, LLH-1786, Spec
+  `einsatztauglichkeit-layout`, „Der Seitenkopf bündelt Nebenwege unter md und ab Stufe 48“):
+  Drucken, CSV, Listenzugriffe und ähnliche Öffnen-Wege stehen in `kompakt` ab `md` als sekundäre
+  Knöpfe, unter `md` und in den Stufen 48 / 72 in jeder Breite hinter EINEM Auslöser „Weitere“
+  (`MenueAusloeser`, Name nennt die Seite; Weiche `nebenwegeImMenue`, Seiten mit eigenem Kopf
+  `useNebenwegeImMenue`). e2e wählt einen Nebenweg über `e2e/nebenweg-kern.ts`. In `aktionen` bleibt nur, was am Handy sichtbar sein
   muss: Segmentleiste und genau eine Erfassung, auf Betroffenen- und Tiere-Liste dazu „Vermisst
   melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht und
   Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
   `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
-  Kräfteübersicht, Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
-  Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`.
+  Das Meldebild (Kräfteübersicht) trägt Drucken und „In Lagebericht übernehmen“ als Nebenwege
+  (LLH-1786); Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
+  Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`,
+  Stufen 48 / 72: `openspec/changes/archive/2026-11-18-z137bgm5-seitenkopf-einzeilig/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt
   (`/admin/stammdaten/{fahrzeuge,personal}/:id`), sonst Einzel-GET; Admin-Pfade in
