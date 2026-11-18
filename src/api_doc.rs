@@ -38,6 +38,7 @@ use utoipa::OpenApi;
         crate::routes::benutzer::Einmalpasswort,
         crate::auth::session::SitzungAnzeige,
         crate::routes::sitzung::SitzungenBeendet,
+        crate::routes::shell::ShellInfo,
         crate::auth::OrgRolle,
         crate::auth::SystemRolle,
         crate::auth::provider::AuthProviderAnzeige,

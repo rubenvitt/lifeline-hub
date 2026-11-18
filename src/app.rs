@@ -135,6 +135,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
 
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
+        .route("/api/shell", get(routes::shell::load_shell))
         .route("/api/backup", get(routes::backup::download))
         .route(
             "/api/system/datentraeger",

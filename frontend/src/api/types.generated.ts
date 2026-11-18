@@ -7761,6 +7761,16 @@ export interface components {
          * @enum {string}
          */
         Scope: "lage:read" | "einsaetze:read" | "events:read" | "alarmmeldungen:write" | "positionen:write" | "rechner:use";
+        /** @description Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`). */
+        ShellInfo: {
+            /**
+             * Format: int32
+             * @description Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).
+             */
+            shell_contract: number;
+            /** @description Laufende Anwendungsversion, dieselbe wie in `GET /api/health`. */
+            version: string;
+        };
         /** @description Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`). */
         SichtungAnzeige: {
             /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
