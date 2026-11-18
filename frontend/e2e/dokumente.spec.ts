@@ -1,7 +1,7 @@
 import { expect, test, type FileChooser, type Locator, type Page } from '@playwright/test';
 import { kopfFilterWaehlen } from './kopffilter-kern';
 import { waehleIn } from './auswahl-kern';
-import { pruefeFokusVerdeckung } from './fokus-kern';
+import { ohneDevtoolsKnopf, pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 import { MINI_JPEG } from './bildFixture';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
@@ -821,6 +821,9 @@ test('Fokus nie verdeckt: Tab-Durchlauf durch die Liste unter der stehenden Kopf
 }, testInfo) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1366, height: 600 });
+  // Der Devtools-Knopf unten rechts lag über „bearbeiten“ der letzten sichtbaren Zeile; im Betrieb
+  // gibt es ihn nicht.
+  await ohneDevtoolsKnopf(page);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Ablage Fokus ${Date.now()}`);
   for (let i = 1; i <= 20; i += 1) {

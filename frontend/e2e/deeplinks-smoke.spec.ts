@@ -23,13 +23,17 @@ async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
 }
 
-test('ungültige Detail-ID leitet im Browser auf die Modul-Liste um (NaN-Guard)', async ({
+test('ungültige Detail-ID: die Seite bleibt und sagt, dass es die Person nicht gibt (NaN-Guard)', async ({
   page,
 }) => {
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
   await page.goto(`/einsaetze/${eid}/personen/abc`);
-  // <Navigate replace> → Personen-Liste (ohne /:personId)
+  // Spec `seiten-zustaende` (LLH-1812): keine stille Weiterleitung, sondern „gibt es nicht (mehr)“
+  // mit genau einem Knopf zur Liste; der führt zurück.
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${eid}/personen/abc$`));
+  await expect(page.getByText('Diese Person gibt es nicht (mehr)')).toBeVisible();
+  await page.getByRole('button', { name: 'Zu den Betroffenen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${eid}/personen$`));
 });
 

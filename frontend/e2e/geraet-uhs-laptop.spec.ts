@@ -160,7 +160,8 @@ test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', asy
 
     // Die Einsatzleitung sieht dieselbe Stärke im Seitenkopf.
     await page.reload();
-    await expect(page.getByText(/Stärke 1\/0\/1\/\/2/)).toBeVisible();
+    // Mit der Schreibweise vor dem Wert (LLH-1750, Spec `lage-verdichtung`).
+    await expect(page.getByText(/Stärke F\/UF\/M\/\/Σ 1\/0\/1\/\/2/)).toBeVisible();
   } finally {
     await kontext.close();
   }

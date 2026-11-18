@@ -339,7 +339,11 @@ describe('UhsDetailPage — Materialzahl im Kopf (LLH-1133)', () => {
 
     // Positiver Anker zuerst: die Meta steht, nur die Zahl fehlt.
     await screen.findByText('GRUNDRISS');
-    await within(kopf()).findByText(/Patientenablage · Halle 1/);
+    // Die Teile der Meta stehen je für sich (umbrechen darf sie nur zwischen ihnen); ohne Zahl
+    // steht die Stärke zuletzt.
+    await waitFor(() =>
+      expect(kopf()).toHaveTextContent(/Patientenablage · Halle 1 · Stärke F\/UF\/M\/\/Σ/),
+    );
     await waitFor(() => expect(vi.mocked(ladeModulFreigaben)).toHaveBeenCalled());
     // Die Freigaben sind da (Gegenprobe am Kopf: „Patient aufnehmen“ ist frei), die Zahl fehlt.
     expect(await screen.findByRole('button', { name: 'Patient aufnehmen' })).toBeEnabled();
@@ -357,7 +361,11 @@ describe('UhsDetailPage — Materialzahl im Kopf (LLH-1133)', () => {
 
     // Positiver Anker zuerst: die Meta steht, nur die Zahl fehlt.
     await screen.findByText('GRUNDRISS');
-    await within(kopf()).findByText(/Patientenablage · Halle 1/);
+    // Die Teile der Meta stehen je für sich (umbrechen darf sie nur zwischen ihnen); ohne Zahl
+    // steht die Stärke zuletzt.
+    await waitFor(() =>
+      expect(kopf()).toHaveTextContent(/Patientenablage · Halle 1 · Stärke F\/UF\/M\/\/Σ/),
+    );
     await waitFor(() => expect(vi.mocked(ladeModulFreigaben)).toHaveBeenCalled());
     // Die Freigaben sind da (Gegenprobe am Kopf: „Patient aufnehmen“ ist frei), die Zahl fehlt.
     expect(await screen.findByRole('button', { name: 'Patient aufnehmen' })).toBeEnabled();

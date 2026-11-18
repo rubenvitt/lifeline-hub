@@ -509,8 +509,14 @@ export const etbTypFarbenDunkel: Record<EtbTypTon, EtbTypFarbe> = {
   system: { kante: farbenDunkel.schwach, wort: farbenDunkel.gedaempft },
 };
 
+/**
+ * Am Tag steht das Typwort auch auf `grund` (Zeitachse, Druckvorschau). Seit den vier
+ * Flächenstufen (LLH-1720) ist `grund` = `kopf` = `#e6e7e9`; `meldung` ist deshalb eine Spur
+ * dunkler als zuvor (`#0a47a6` lag dort bei 6,89, `#0a449d` hält 7,29). Gerechnet in
+ * `statusFarben.test.ts`, gemessen in `e2e/hellmodus-kontrast.spec.ts`.
+ */
 export const etbTypFarbenHell: Record<EtbTypTon, EtbTypFarbe> = {
-  meldung: { kante: '#1677ff', wort: '#0a47a6' },
+  meldung: { kante: '#1677ff', wort: '#0a449d' },
   anordnung: { kante: '#b35600', wort: '#7a3700' },
   entscheidung: { kante: '#722ed1', wort: '#5b1fae' },
   lage: { kante: '#0e8c90', wort: '#005357' },

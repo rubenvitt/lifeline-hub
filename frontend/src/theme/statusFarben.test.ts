@@ -733,6 +733,20 @@ describe('ETB-Typfarben als Kante + Typwort (Neuentwurf, 21.09.2026)', () => {
     }
   });
 
+  it('hält das Typwort am Tag ≥ 7 : 1 auf jeder Fläche, auf der die Zeitachse steht', () => {
+    // `grund` ist seit den vier Flächenstufen (LLH-1720) die dunkelste Tagesfläche unter der
+    // Zeitachse; der alte Meldungston `#0a47a6` lag dort bei 6,89.
+    expect(kontrast('#0a47a6', farbenHell.grund)).toBeLessThan(7);
+    for (const t of TYPEN) {
+      for (const grund of ['grund', 'paneel', 'flaeche'] as const) {
+        expect(
+          kontrast(etbTypFarbenHell[t].wort, farbenHell[grund]),
+          `${t} auf ${grund}`,
+        ).toBeGreaterThanOrEqual(7);
+      }
+    }
+  });
+
   it('lässt den Wortlaut beim Vertrag — die Typfarbe trägt keinen zweiten Kanal selbst', () => {
     for (const t of TYPEN) expect(sf.etbTyp[t].label.trim()).not.toBe('');
   });

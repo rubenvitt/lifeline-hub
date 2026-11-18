@@ -26,6 +26,18 @@ async function senden<T = { id: number }>(page: Page, pfad: string, data: unknow
   return (await antwort.json()) as T;
 }
 
+/**
+ * Die Brotkrume „Betroffene“ im Inhalt. Nicht seitenweit nach dem Namen suchen: der Modul-Link im
+ * Panel heißt ebenso, bis der Modulzähler nachkommt („Betroffene, 1 betroffene Person“), und wäre
+ * vorher ein zweiter Treffer.
+ */
+function brotkrumeBetroffene(page: Page) {
+  return page
+    .getByRole('main')
+    .getByRole('navigation')
+    .getByRole('link', { name: 'Betroffene', exact: true });
+}
+
 /** Einsatz über die API — diese Specs prüfen nicht das Anlegen. */
 async function einsatzPerApi(page: Page, name: string): Promise<number> {
   return (await senden(page, '/api/einsaetze', { bezeichnung: name })).id;
@@ -84,7 +96,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   );
 
   // Zurück zur Liste über den Breadcrumb.
-  await page.getByRole('link', { name: 'Betroffene', exact: true }).click();
+  await brotkrumeBetroffene(page).click();
   await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 });
 
@@ -129,14 +141,14 @@ test('Personendaten: leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlas
   // Rückfrage beim Verlassen mit offenem, geändertem Feld.
   await ohne.getByRole('button', { name: 'Vorname eintragen' }).click();
   await daten.getByRole('textbox', { name: 'Vorname' }).fill('Mül');
-  await page.getByRole('link', { name: 'Betroffene', exact: true }).click();
+  await brotkrumeBetroffene(page).click();
   const rueckfrage = page.getByRole('dialog', { name: 'Ungespeicherte Änderungen' });
   await expect(rueckfrage).toBeVisible();
   await rueckfrage.getByRole('button', { name: 'Bleiben' }).click();
   await expect(daten.getByRole('textbox', { name: 'Vorname' })).toHaveValue('Mül');
   await expect(page).toHaveURL(new RegExp(`/personen/${person.id}$`));
 
-  await page.getByRole('link', { name: 'Betroffene', exact: true }).click();
+  await brotkrumeBetroffene(page).click();
   await rueckfrage.getByRole('button', { name: 'Verwerfen' }).click();
   await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 });
