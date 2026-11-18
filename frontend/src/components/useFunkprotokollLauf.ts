@@ -142,7 +142,7 @@ export function useFunkprotokollLauf({
   const anker = useRef<Anker | null>(null);
   const gestartet = useRef(false);
   /** Öffnungsphase: vom Startlauf bis zur ersten Eingabe bleibt die Seite am Ende (Punkt 4). */
-  const oeffnet = useRef(false);
+  const isOpening = useRef(false);
 
   const merke = useCallback(() => {
     const jetzt = istAmEnde(endeRef.current);
@@ -189,28 +189,30 @@ export function useFunkprotokollLauf({
    * gemessen, nie mitgezogen: was über der Lesestelle aufgeht („mehr“), schiebt sie nicht weg.
    */
   useEffect(() => {
-    const ziele = [wurzel.current, ende?.spalte.current].filter(
+    const targets = [wurzel.current, ende?.spalte.current].filter(
       (el): el is HTMLElement => el != null,
     );
-    if (!bereit || ziele.length === 0 || typeof ResizeObserver === 'undefined') return;
-    const beobachter = new ResizeObserver(() => {
-      if (oeffnet.current && amEndeRef.current) zumEnde();
+    if (!bereit || targets.length === 0 || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (isOpening.current && amEndeRef.current) zumEnde();
       else merke();
     });
-    for (const el of ziele) beobachter.observe(el);
-    return () => beobachter.disconnect();
+    for (const el of targets) observer.observe(el);
+    return () => observer.disconnect();
     // Die Ränder in den Abhängigkeiten: hängt die Liste erst nach `bereit` ein (Skelett), findet
     // der nächste Lauf sie. Ein neues `observe` meldet sich einmal, das misst nur nach.
   }, [bereit, juengste, aelteste, wurzel, ende?.spalte, merke, zumEnde]);
 
   useEffect(() => {
-    const eingabe = () => {
-      oeffnet.current = false;
+    const handleInput = () => {
+      isOpening.current = false;
     };
-    const arten = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
-    for (const a of arten) window.addEventListener(a, eingabe, { capture: true, passive: true });
+    const eventTypes = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
+    for (const t of eventTypes) {
+      window.addEventListener(t, handleInput, { capture: true, passive: true });
+    }
     return () => {
-      for (const a of arten) window.removeEventListener(a, eingabe, { capture: true });
+      for (const t of eventTypes) window.removeEventListener(t, handleInput, { capture: true });
     };
   }, []);
 
@@ -234,7 +236,7 @@ export function useFunkprotokollLauf({
       // beim Auslegen kennt (`content-visibility: auto` schätzt sie vorher).
       gestartet.current = true;
       if (!ohneStartlauf) {
-        oeffnet.current = true;
+        isOpening.current = true;
         zumEnde();
         rahmen = requestAnimationFrame(() => {
           if (amEndeRef.current) rolleAnsEnde(endeRef.current);
