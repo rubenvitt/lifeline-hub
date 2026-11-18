@@ -1,6 +1,6 @@
 # 5. Bausteinsicht
 
-Stand: 17.11.2026 (Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
+Stand: 18.11.2026 (iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
 
 Dieses Kapitel nennt jeden Baustein des Repos mit einem Satz Zweck und seinen Schnittstellen.
 Der Wächter `scripts/check-architektur.sh` verlangt, dass jedes Modul unter `src/`, jedes
@@ -17,6 +17,7 @@ flowchart LR
   nutzer([Browser / PWA])
   website["website<br/>(Astro, statisch)"]
   tauri["src-tauri<br/>(Desktop-Hülle)"]
+  ios["ios<br/>(iOS-Hülle)"]
   subgraph bin["Binary lifeline-hub"]
     hub["lifeline-hub<br/>(axum + SQLite)"]
     fe["frontend<br/>(eingebettet aus frontend/dist)"]
@@ -29,6 +30,8 @@ flowchart LR
   s3[(S3-Speicher)]
   nutzer -- "HTTPS: Seiten, /api, SSE" --> hub
   tauri -- "Webview lädt Server-Adresse" --> hub
+  ios -- "Webview lädt Server-Adresse,<br/>GET /api/shell" --> hub
+  ios -.-|gemeinsame Fälle| tauri
   hub -- "liefert aus" --> fe
   hub -- "HTTP + Bearer-Token<br/>(Region-Bau)" --> ks
   ks -- "make tiles" --> kb
@@ -45,6 +48,7 @@ flowchart LR
 | Backend `lifeline-hub` | Ein Binary: REST-API unter `/api`, Live-Kanal per SSE, SQLite-Datenbank, Hintergrund-Scheduler (u. a. Erinnerung, Purge, Sicherung) und Auslieferung des Frontends | HTTP(S), `GET /api/einsaetze/{id}/live` und `GET /api/live` (`src/routes/live.rs`), CLI-Subkommandos `backup`/`restore` (`src/config.rs`) | `src/`, Start `src/main.rs` |
 | `frontend` | React-19/antd-6-Oberfläche als PWA (`frontend/package.json`); Stabsoberfläche und Gerätehülle | ruft `/api` über `frontend/src/api/client.ts`, Live über `EventSource` (`frontend/src/live/liveVerbindung.ts`) | `frontend/src/` |
 | Desktop-Hülle `src-tauri` | Tauri-2-Crate `lifeline-desktop`, lädt die https-Adresse des Servers, keine Anwendungslogik | Commands nach `src-tauri/build.rs`, Deeplink `lifeline://verbinden`, `POST /api/auth/app-code[/einloesen]` | `src-tauri/` ([AGENTS.md](../../src-tauri/AGENTS.md)) |
+| iOS-Hülle `ios` | Eigene Swift-App für iPhone und iPad (SwiftUI + WKWebView), lädt die Oberfläche des gewählten Servers, keine Anwendungslogik; testbare Logik im Swift-Paket `ios/LifelineKern`, App-Target unter `ios/App` | `GET /api/shell` (`src/routes/shell.rs`), Brücke `lifeline` mit Init-Skript `ios/App/Huelle/huelle.js`, Deeplink `lifeline://verbinden`, gemeinsame Fälle `src-tauri/faelle/` | `ios/` |
 | `karten-service` | Zentraler Dienst, der Offline-Kartenregionen baut und in S3 ablegt | `/regions`, `/builds`, `/builds/{id}`, `/zeitplan`, `/healthz` (`karten-service/src/api.rs`) | `karten-service/` |
 | `karten-build` | Bau-zeitiges Erzeugen der Shortbread-MBTiles mit Planetiler, nie zur Laufzeit der App | `make tiles AREA=…`, `make validate` (`karten-build/README.md`) | `karten-build/` |
 | `crates/karten-katalog` | Geteilte Wire-Typen des Offline-Kartenkatalogs und der Bau-Jobs | Lib-Crate, Feature `schema` für den Typ-Codegen (`crates/karten-katalog/Cargo.toml`) | `crates/karten-katalog/src/lib.rs` |
@@ -322,7 +326,7 @@ flowchart TB
 | `frontend/src/anzeige` | Anzeige-Konventionen: Zeit, Koordinaten, Stärke, Ortsfelder, Zeitpunkteingabe | `src/zeit.rs`, `src/staerke.rs` |
 | `frontend/src/assets` | Schriftdateien (`fonts/`) | — |
 | `frontend/src/marke` | Bildmarke „Lebenslinie“ und PWA-Manifest | — |
-| `frontend/src/huelle` | Einzige Stelle, die die Kennung der Desktop-Hülle liest | `src-tauri` |
+| `frontend/src/huelle` | Einzige Stelle, die die Kennung der Hüllen liest (`__LIFELINE_HUELLE__`) | `src-tauri`, `ios` |
 | `frontend/src/heic` | HEIC-Vorschau im Browser per `libheif-js` (LGPL, `heic/LIESMICH.md`) | WASM aus `src/static_files.rs` |
 | `frontend/src/command-palette` | Sprungpalette mit Befehlen, Datensätzen, Adress- und Koordinatensprung ([AGENTS.md](../../frontend/src/command-palette/AGENTS.md)) | `src/benutzer_einstellungen` |
 | `frontend/src/druck` | Druckmechanik und Listendruck ([AGENTS.md](../../frontend/src/druck/AGENTS.md)) | Listenrouten der Fachmodule |
@@ -413,6 +417,17 @@ Anmeldung im Systembrowser; `links.rs` und `erreichbar.rs` neue Fenster, Links u
 das Laden des Servers; `kanal.rs` und `update.rs` Update-Kanal und Updater. Die Init-Skripte
 (`faehigkeiten.js`, `benachrichtigung.js`, `druck.js`) liegen daneben, die Rechte unter
 `src-tauri/capabilities/`.
+
+### `ios`
+
+Die iOS-Hülle (LLH-1978, Change `t39ltxxi-ios-huelle`). `ios/LifelineKern` ist ein Swift-Paket
+ohne UIKit und WebKit (`ios/LifelineKern/Package.swift`): Adressprüfung (`Adresse.swift`),
+Deeplink (`Deeplink.swift`), Linkregeln (`Linkregeln.swift`), Serverliste (`Serverliste.swift`),
+Vertragsprüfung gegen `GET /api/shell` (`Vertrag.swift`), Onboarding (`Onboarding.swift`) und
+Haptik-Abbildung (`Haptik.swift`). Seine Suite liest die gemeinsamen Fälle der Desktop-Hülle aus
+`src-tauri/faelle/` und läuft auch unter Linux (Schritt 18 von `scripts/check-all.sh`). `ios/App`
+trägt das App-Target; das Init-Skript `ios/App/Huelle/huelle.js` meldet der Seite die Kennung
+`__LIFELINE_HUELLE__` und beschreibt das Wire-Format der Brücke in seinem Kopf.
 
 ### `karten-service`
 

@@ -5,9 +5,10 @@
 # Rot ist:
 #   - ein fehlendes oder doppeltes arc42-Kapitel `docs/architektur/NN-*.md` (01 bis 12);
 #   - ein Modul unter `src/` (Verzeichnis oder `*.rs`), ein Verzeichnis unter `frontend/src/`,
-#     ein Crate unter `crates/` oder ein Teilprojekt (`src-tauri`, `karten-service`,
-#     `karten-build`, `website`), das Kapitel 5 nicht als Pfad nennt — die Bausteinsicht
-#     veraltet sonst still, sobald jemand ein Modul anlegt;
+#     ein Crate unter `crates/`, ein Teilprojekt (`src-tauri`, `karten-service`,
+#     `karten-build`, `website`, `ios`) oder ein Teil der iOS-Hülle (`ios/<teil>`, LLH-1978),
+#     das Kapitel 5 nicht als Pfad nennt — die Bausteinsicht veraltet sonst still, sobald
+#     jemand ein Modul anlegt;
 #   - eine ADR (`entscheidungen/ADR-*.md`) mit falschem Kopf (Pflichtschlüssel, `id` passend
 #     zum Dateinamen und eindeutig, bekannter `status`, `ersetzt_durch` bei `ersetzt`), ohne
 #     Pflichtabschnitte, ohne MUST-/SHOULD-Regel, ohne Prüfung, über 80 Zeilen, oder mit einem
@@ -52,13 +53,15 @@ done
 kap5="$(find "$DOKU" -maxdepth 1 -name '05-*.md' | head -1)"
 if [ -n "$kap5" ]; then
   # Erwartete Pfade: Module direkt unter src/, Verzeichnisse direkt unter frontend/src/,
-  # Crates, Teilprojekte.
+  # Crates, Teilprojekte, Teile der iOS-Hülle (Swift-Paket und App-Target).
   erwartet="$(printf '%s\n' "$dateien" | awk -F/ '
     $1 == "src" && NF == 2 && $2 ~ /\.rs$/ { print "src/" $2 }
     $1 == "src" && NF > 2 { print "src/" $2 }
     $1 == "frontend" && $2 == "src" && NF > 3 { print "frontend/src/" $3 }
     $1 == "crates" && NF > 2 { print "crates/" $2 }
     ($1 == "src-tauri" || $1 == "karten-service" || $1 == "karten-build" || $1 == "website") && NF > 1 { print $1 }
+    $1 == "ios" && NF > 1 { print "ios" }
+    $1 == "ios" && NF > 2 { print "ios/" $2 }
   ' | sort -u)"
   while IFS= read -r pfad; do
     [ -n "$pfad" ] || continue
