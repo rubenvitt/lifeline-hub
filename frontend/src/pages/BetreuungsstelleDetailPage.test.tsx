@@ -819,6 +819,8 @@ describe('BetreuungsstelleDetailPage — Storno-Sperre (LLH-1832, Spec storno-sp
     expect(screen.queryByRole('button', { name: 'Belegung melden' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
     expect(screen.queryByText('Unterkunft planen')).toBeNull();
+    // Der Grund am gesperrten „Registrieren“ ist der Storno, nicht ein fehlendes Recht.
+    expect(screen.getByText('Stelle storniert')).toBeInTheDocument();
     expect(screen.queryByText('Diese Betreuungsstelle gibt es nicht (mehr)')).toBeNull();
     expect(api.loadBetreuungsstelleStand).toHaveBeenCalledWith(1, 8);
   });

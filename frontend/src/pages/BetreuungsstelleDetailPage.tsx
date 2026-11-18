@@ -652,7 +652,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           stelle={s}
           personenFrei={personenFrei}
           darfSchreiben={darfErfassen}
-          rechteGrund={einsatzRechteGrund(einsatz)}
+          rechteGrund={storniert ? 'Stelle storniert' : einsatzRechteGrund(einsatz)}
         />
 
         <Paneel
