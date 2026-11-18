@@ -24,9 +24,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/t64nssql5sboyz6yh03bdptn
 - [x] 2.3 `onDragEnd` rechnet die Zugstrecke mit `1/s` gerundet zurück (D4). Nachweis: Test, der
   bei `s = 2` einen Tastatur- oder gestubbten Zug um 200 px auslöst und `pos_x + 100` an
   `aktualisierePlatz` erwartet, rot → grün.
-- [x] 2.4 Kommentare an `PLATZ_KARTE_*`, am Hinweis „feste 140 × 116 px“ über der Fläche und in
-  `src/uhs/plan.rs` (`KARTE_BREITE`/`_HOEHE`) auf „Grundgröße“ nachziehen (D6). Nachweis:
-  `grep -n "feste 140" frontend/src/pages/uhs/Grundriss.tsx` leer.
+- [x] 2.4 Kommentare an `PLATZ_KARTE_*` und am Hinweis „feste 140 × 116 px“ über der Fläche auf
+  „Grundgröße“ nachziehen (D6); `src/uhs/plan.rs` behauptet keine feste Anzeige und bleibt.
+  Nachweis: `grep -n "feste 140" frontend/src/pages/uhs/Grundriss.tsx` leer.
 
 ## 3. Im Browser belegen
 
