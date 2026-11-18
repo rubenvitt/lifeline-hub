@@ -106,7 +106,7 @@ export const ANMELDEWEG_TEXT: Record<Anmeldeweg, string> = {
   dev: 'Entwicklung',
   totp: 'Zweiter Faktor',
   geraetecode: 'Gerätecode',
-  systembrowser: 'Mac-App',
+  systembrowser: 'Lifeline-App',
   unbekannt: '—',
 };
 
