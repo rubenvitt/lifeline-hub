@@ -1,4 +1,4 @@
-import { Alert, Flex, Typography } from 'antd';
+import { Alert, Typography } from 'antd';
 import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/types';
 import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
 import { DetailSprung } from '../components/ListeDetail';
