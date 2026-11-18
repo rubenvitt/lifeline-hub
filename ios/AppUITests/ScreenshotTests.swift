@@ -59,6 +59,32 @@ final class ScreenshotTests: XCTestCase {
         attachScreenshot(named: "serverliste")
     }
 
+    /// tasks.md 8.11: Entfernen nur für einen nicht aktiven Server, erst nach der Rückfrage mit dem
+    /// Hinweis auf nicht übertragene Einträge.
+    @MainActor
+    func testServerEntfernenFragtVorher() {
+        let app = launch("serverliste")
+        XCTAssertTrue(element(app, "serverliste").waitForExistence(timeout: 15))
+        app.staticTexts["ELW 1"].swipeLeft()
+        XCTAssertFalse(app.buttons["Entfernen"].waitForExistence(timeout: 2), "aktiver Server entfernbar")
+        app.staticTexts["ELW 1"].swipeRight()
+
+        app.staticTexts["Lager"].swipeLeft()
+        let entfernen = app.buttons["Entfernen"]
+        XCTAssertTrue(entfernen.waitForExistence(timeout: 5))
+        entfernen.tap()
+        let bestaetigen = app.buttons["entfernen-bestaetigen"]
+        XCTAssertTrue(bestaetigen.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'noch nicht übertragen'"))
+                .firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Lager"].exists, "vor der Bestätigung schon entfernt")
+        attachScreenshot(named: "server-entfernen")
+        bestaetigen.tap()
+        XCTAssertTrue(app.staticTexts["Lager"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["ELW 1"].exists)
+    }
+
     @MainActor
     func testEinstellungen() {
         let app = launch("einstellungen")

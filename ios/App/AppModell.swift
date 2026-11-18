@@ -23,6 +23,10 @@ final class AppModell {
     var zeigtEinstellungen = false
     /// Ein Deeplink nennt einen gespeicherten, nicht aktiven Server: wechseln erst nach Rückfrage.
     var wechselRueckfrage: ServerEintrag?
+    /// Meldung, wenn sich ein Server nicht entfernen ließ.
+    var entfernenFehler: String?
+    /// Server, dessen Datenspeicher gerade gelöscht wird; zu ihm wechselt die App nicht.
+    private(set) var inEntfernung: UUID?
 
     let appVersion: AppVersion?
     let testzustand: Testzustand?
@@ -150,6 +154,7 @@ final class AppModell {
 
     func wechseln(_ eintrag: ServerEintrag) {
         wechselRueckfrage = nil
+        guard eintrag.id != inEntfernung else { return }
         zeigtServerliste = false
         do {
             try liste.activate(eintrag.id)
@@ -170,6 +175,26 @@ final class AppModell {
     func rename(_ eintrag: ServerEintrag, to name: String) {
         try? liste.rename(eintrag.id, to: name)
         save()
+    }
+
+    /// Bietet die Liste „Entfernen“ an? Nicht für den aktiven Server.
+    func isEntfernbar(_ eintrag: ServerEintrag) -> Bool {
+        inEntfernung == nil && Serverentfernung.isEntfernbar(eintrag.id, in: liste)
+    }
+
+    /// Nach der Rückfrage: Reihenfolge und Fehler entscheidet `Serverentfernung` im Kern.
+    func entfernen(_ eintrag: ServerEintrag) {
+        guard inEntfernung == nil else { return }
+        inEntfernung = eintrag.id
+        Task {
+            defer { inEntfernung = nil }
+            do {
+                try await Serverentfernung.run(eintrag.id, dienste: self)
+            } catch {
+                protokoll.error("Server nicht entfernt: \(error.localizedDescription)")
+                entfernenFehler = error.localizedDescription
+            }
+        }
     }
 
     /// Der aktuelle Stand eines Eintrags (Name nach Umbenennen, zuletzt verbunden).
@@ -273,5 +298,26 @@ final class AppModell {
             self.webView = webView
             seite = .web(elw, vertrag: 1)
         }
+    }
+}
+
+/// Entfernen eines Servers (Entwurf D3; tasks.md 8.11).
+extension AppModell: Entfernungsdienste {
+    var serverliste: Serverliste { liste }
+
+    func closeWebView(datenspeicher id: UUID) {
+        guard webView?.configuration.websiteDataStore.identifier == id else { return }
+        closeWebView()
+    }
+
+    /// Im Testzustand bleibt jeder Datenspeicher, wie er ist.
+    func removeDatenspeicher(_ id: UUID) async throws {
+        guard testzustand == nil else { return }
+        try await Datenspeicher.remove(id)
+    }
+
+    func removeEintrag(_ id: UUID) throws(Serverliste.ListError) {
+        try liste.remove(id)
+        save()
     }
 }

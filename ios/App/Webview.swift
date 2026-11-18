@@ -357,3 +357,27 @@ extension WKWebView {
         }
     }
 }
+
+/// Datenspeicher je Server (Entwurf D3). Die Rückrufe von WebKit kommen auf dem Hauptthread; die
+/// Hüllen machen sie `async`, ohne sich auf einen erzeugten async-Namen zu verlassen.
+@MainActor
+enum Datenspeicher {
+    /// `WKWebsiteDataStore.remove(forIdentifier:)`; scheitert, solange ein Webview ihn benutzt.
+    static func remove(_ id: UUID) async throws {
+        try await withCheckedThrowingContinuation { (fortsetzung: CheckedContinuation<Void, any Error>) in
+            WKWebsiteDataStore.remove(forIdentifier: id) { fehler in
+                if let fehler {
+                    fortsetzung.resume(throwing: fehler)
+                } else {
+                    fortsetzung.resume()
+                }
+            }
+        }
+    }
+
+    static func fetchIdentifiers() async -> [UUID] {
+        await withCheckedContinuation { fortsetzung in
+            WKWebsiteDataStore.fetchAllDataStoreIdentifiers { fortsetzung.resume(returning: $0) }
+        }
+    }
+}

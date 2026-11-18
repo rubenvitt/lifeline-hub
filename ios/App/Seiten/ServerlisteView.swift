@@ -2,13 +2,14 @@ import LifelineKern
 import SwiftUI
 
 /// Serverliste als Blatt (Spec `ios-huelle`, „Mehrere Server lassen sich verwalten“): Name,
-/// Adresse, zuletzt verbunden; wechseln, umbenennen, hinzufügen. Entfernen kommt mit tasks.md
-/// 8.11 (Rückfrage, Datenspeicher löschen).
+/// Adresse, zuletzt verbunden; wechseln, umbenennen, hinzufügen und entfernen (nicht den aktiven,
+/// nach einer Rückfrage mit dem Hinweis auf nicht übertragene Einträge).
 struct ServerlisteView: View {
     @Environment(AppModell.self) private var modell
     @State private var umbenennen: ServerEintrag?
     @State private var neuerName = ""
     @State private var zeigtHinzufuegen = false
+    @State private var entfernen: ServerEintrag?
 
     var body: some View {
         NavigationStack {
@@ -58,6 +59,28 @@ struct ServerlisteView: View {
             } message: { _ in
                 Text("Ein leerer Name zeigt den Hostnamen.")
             }
+            .confirmationDialog(
+                entfernen.map(Serverentfernung.rueckfrageTitel) ?? "",
+                isPresented: Binding(get: { entfernen != nil }, set: { if !$0 { entfernen = nil } }),
+                titleVisibility: .visible,
+                presenting: entfernen
+            ) { eintrag in
+                Button("Server entfernen", role: .destructive) { modell.entfernen(eintrag) }
+                    .accessibilityIdentifier("entfernen-bestaetigen")
+                Button("Abbrechen", role: .cancel) {}
+            } message: { _ in
+                Text(Serverentfernung.hinweis)
+            }
+            .alert(
+                "Server nicht entfernt",
+                isPresented: Binding(
+                    get: { modell.entfernenFehler != nil },
+                    set: { if !$0 { modell.entfernenFehler = nil } })
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(modell.entfernenFehler ?? "")
+            }
         }
     }
 
@@ -83,6 +106,11 @@ struct ServerlisteView: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(istAktiv ? .isSelected : [])
         .swipeActions(edge: .trailing) {
+            // Kein `role: .destructive`: der Eintrag verschwindet erst nach der Rückfrage.
+            if modell.isEntfernbar(eintrag) {
+                Button("Entfernen") { entfernen = eintrag }
+                    .tint(.red)
+            }
             Button("Umbenennen") {
                 neuerName = eintrag.name
                 umbenennen = eintrag
@@ -94,7 +122,11 @@ struct ServerlisteView: View {
                 neuerName = eintrag.name
                 umbenennen = eintrag
             }
+            if modell.isEntfernbar(eintrag) {
+                Button("Entfernen", systemImage: "trash", role: .destructive) { entfernen = eintrag }
+            }
         }
+        .disabled(eintrag.id == modell.inEntfernung)
     }
 
     private func zuletzt(_ eintrag: ServerEintrag) -> String {
