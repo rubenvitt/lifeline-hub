@@ -159,7 +159,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
     im selben Modul und nicht beim ersten Aufruf. Eine Seite baut kein eigenes Vorab-Gerippe für
     den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
-    Ladetext. Herleitung: `openspec/changes/q71gt8zq-modulwechsel-gerippe/design.md`.
+    Ladetext. Herleitung: `openspec/changes/archive/2026-11-18-q71gt8zq-modulwechsel-gerippe/design.md`.
   - **Zwei Höhen** (zjt7c073 D2, `components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
     (`useRahmenOben`) dazu der klebende Seitenkopf. Die Kopfhöhe nehmen nur, was neben dem Inhalt

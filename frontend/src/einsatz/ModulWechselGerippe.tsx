@@ -9,7 +9,7 @@ import { modulName, type ModulEintrag } from './modulRegistry';
 /**
  * Modulwechsel zeigt sofort Kopf und Gerippe (LLH-1838, Spec `seiten-zustaende`, Regel:
  * `frontend/AGENTS.md`, „Rahmen“, „Modulwechsel“). Herleitung:
- * `openspec/changes/q71gt8zq-modulwechsel-gerippe/design.md` (D1, D2).
+ * `openspec/changes/archive/2026-11-18-q71gt8zq-modulwechsel-gerippe/design.md` (D1, D2).
  *
  * Der Router zeichnet jede Navigation in `startTransition`; React hält dabei das alte Bild, bis
  * die neue Seite fertig ist. Diese Hülle um das `<Outlet />` des Einsatzrahmens merkt sich, für

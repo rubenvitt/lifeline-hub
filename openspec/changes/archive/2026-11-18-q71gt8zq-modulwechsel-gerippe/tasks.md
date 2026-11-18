@@ -15,7 +15,7 @@
 - [x] 3.1 Regel in `frontend/AGENTS.md`, Abschnitt „Rahmen“: Modulwechsel zeigt Kopf und Gerippe, eine Stelle im Rahmen, keine Seite baut ein eigenes Vorab-Gerippe für den Wechsel, Verweis auf die Spec `seiten-zustaende`. Beleg: Prettier grün.
 - [x] 3.2 Gegenmessung am Produktions-Build mit der Messung aus LLH-1838: Der Seitenkopf des Zielmoduls steht für Betroffene, Personal und Fahrzeuge im ersten Bild (≤ 50 ms), die Seite danach wie bisher. Ergebnis als Kommentar an LLH-1838.
 - [x] 3.3 Bilder: Wechsel Überblick → Personal, das Gerippe-Bild und die fertige Seite, für PR und Meldung.
-- [ ] 3.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] 3.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
 
 ## Workflow follow-up
 
