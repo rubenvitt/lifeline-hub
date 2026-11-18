@@ -36,6 +36,7 @@ import PlanungSchichtplan from './PlanungSchichtplan';
 import { useAusgabeNebenwege } from '../abloesung/schichtplan/ausgabe/useSchichtplanAusgabe';
 import { mappeDateiname } from '../abloesung/schichtplan/ausgabe/mappeDateiname';
 import { NebenwegeImKopf } from '../components/EinsatzSeite';
+import { useViewport } from '../components/useViewport';
 import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
 
 /** Name der Reiterfläche je Reiter, ohne die Zahl im Wortlaut des Reiters. */
@@ -67,6 +68,7 @@ export default function PlanungPage() {
   const [loeschenOffen, setLoeschenOffen] = useState(false);
   const [isUebernahmeOpen, setUebernahmeOpen] = useState(false);
   const reiterflaecheId = useId();
+  const { istSchmal } = useViewport();
 
   const query = useQuery({
     queryKey: globalKeys.planung(planungId ?? 0),
@@ -131,6 +133,8 @@ export default function PlanungPage() {
   // Übernommen (LLH-1587): nur noch lesen und löschen.
   const uebernahme = planung.kopf.uebernahme;
   const readOnly = uebernahme != null;
+  // Ausgabewege nur beim Reiter „Plan“ (LLH-1836).
+  const ausgabeWege = reiter === 'plan' ? ausgabe.nebenwege : [];
   const reiterInhalt: Record<PlanungReiter, ReactNode> = {
     plan: (
       <PlanungSchichtplan planung={planung} readOnly={readOnly} ausgabeFehler={ausgabe.fehler} />
@@ -161,10 +165,11 @@ export default function PlanungPage() {
       pfad={pfad}
       aktionen={
         <Flex gap={token.marginSM} align="center">
-          {reiter === 'plan' && (
+          {/* Ab `md` als Knöpfe; schmal im Menü der Planung, kein zweiter Auslöser (LLH-1836). */}
+          {!istSchmal && (
             <NebenwegeImKopf
-              name={`Weitere Aktionen zu ${planung.kopf.bezeichnung}`}
-              eintraege={ausgabe.nebenwege}
+              name={`Aktionen zu ${planung.kopf.bezeichnung}`}
+              eintraege={ausgabeWege}
             />
           )}
           {!readOnly && (
@@ -172,11 +177,28 @@ export default function PlanungPage() {
               In Einsatz übernehmen
             </Button>
           )}
-          <MenueAusloeser<'loeschen'>
-            eintraege={[{ key: 'loeschen', label: 'Planung löschen', gefahr: true }]}
+          <MenueAusloeser<string>
+            eintraege={[
+              ...(istSchmal
+                ? ausgabeWege.map((w) =>
+                    w.laeuft
+                      ? { key: w.key, label: `${w.label} (läuft …)`, gesperrt: true as const }
+                      : {
+                          key: w.key,
+                          label: w.label,
+                          ...(w.gesperrt ? { gesperrt: w.gesperrt } : {}),
+                        },
+                  )
+                : []),
+              { key: 'loeschen', label: 'Planung löschen', gefahr: true },
+            ]}
             zugaenglicherName={`Aktionen zu ${planung.kopf.bezeichnung}`}
             laeuft={loeschenMut.isPending}
-            onWahl={() => {
+            onWahl={(key) => {
+              if (key !== 'loeschen') {
+                ausgabeWege.find((w) => w.key === key)?.onWahl();
+                return;
+              }
               loeschenMut.reset();
               setLoeschenOffen(true);
             }}

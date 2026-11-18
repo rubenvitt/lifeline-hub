@@ -352,6 +352,17 @@ describe('PlanungPage (LLH-1586)', () => {
     expect(bloecke[0]).toHaveAccessibleName(/UHS Bühne .*Bea Helfer, 1 offen/);
   });
 
+  it('Handy: „Druckansicht“ steht im Menü der Planung, kein zweiter Auslöser (LLH-1836)', async () => {
+    setzeViewportBreite(390);
+    setup();
+    const ausloeser = await screen.findByRole('button', { name: 'Aktionen zu Stadtfest' });
+    expect(screen.queryByRole('link', { name: 'Druckansicht' })).toBeNull();
+    await waehleMenueEintrag(ausloeser, 'Druckansicht');
+    await waitFor(() =>
+      expect(screen.getByTestId('adresse')).toHaveTextContent('/planungen/5/druck'),
+    );
+  });
+
   it('Planung löschen fragt einmal nach und führt zur Liste', async () => {
     setup();
     server.use(http.delete('/api/planungen/5', () => new HttpResponse(null, { status: 204 })));

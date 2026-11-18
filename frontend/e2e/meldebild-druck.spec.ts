@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { SUBPIXEL, anmelden, einsatzAnlegen, seedeKraefte } from './meldebild-kern';
 import { pdfAuszug } from './pdf-kern';
+import { waehleDruckweg } from './druckweg-kern';
 
 /**
  * Druck des Meldebilds: die Nachweise, die NUR im Browser gehen (jsdom rechnet kein Layout und
@@ -198,7 +199,7 @@ test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf �
       w.gedruckt += 1;
     };
   });
-  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
+  await waehleDruckweg(page, { weitere: 'Weitere Aktionen zum Meldebild' });
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { gedruckt: number }).gedruckt))
     .toBe(1);
@@ -396,7 +397,7 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
       window.dispatchEvent(new Event('beforeprint'));
     };
   });
-  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
+  await waehleDruckweg(page, { weitere: 'Weitere Aktionen zum Meldebild' });
   // Kräfte, „Ohne Einheit“, die Einheit, ihre Materialgruppe und der Posten.
   await expect(zeilen, '„vorbereiten“ klappt alle Kräfte auf').toHaveCount(KRAEFTE_LESBAR + 4);
   await page.emulateMedia({ media: 'print' });
