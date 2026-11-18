@@ -12,6 +12,8 @@ import {
   type Ref,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import { huelleHaptics } from '../huelle/faehigkeiten';
+import type { OfflineSchreibErgebnis } from '../offline/schreiben';
 import { FOKUSABSTAND_ERFASSUNG, useFokusabstandUnten } from './fokusabstandUnten';
 import { SpeicherFehler } from './SpeicherHinweis';
 import { useViewport } from './useViewport';
@@ -138,6 +140,14 @@ export const SERIEN_KUERZEL_KLASSE = 'lfh-serien-kuerzel';
 export interface ErfassungsFormularSteuerung {
   /** Bricht über denselben Reset-Pfad wie Knopf und Tastatur-Registry ab. */
   abbrechen: () => void;
+}
+
+/**
+ * Nur vorgemerkt statt angenommen? Die offline-fähigen Erfassungen geben ihr
+ * {@link OfflineSchreibErgebnis} über `mutateAsync` durch; jede andere Antwort gilt als angenommen.
+ */
+function istVorgemerkt(ergebnis: unknown): boolean {
+  return (ergebnis as Partial<OfflineSchreibErgebnis<unknown>> | null)?.zustand === 'vorgemerkt';
 }
 
 interface ErfassungsFormularProps<T> {
@@ -346,11 +356,17 @@ export function ErfassungsFormular<T extends object>({
       let serverErfolg = false;
       try {
         try {
-          await (aktion === undefined ? onErfassen(werte) : onErfassen(werte, aktion));
+          const ergebnis = await (aktion === undefined
+            ? onErfassen(werte)
+            : onErfassen(werte, aktion));
           serverErfolg = true;
+          // Haptik der Hülle (Spec `huellen-vertrag`): angenommen `success`, ohne Netz nur
+          // vorgemerkt `tap` — kein „gespeichert“-Gefühl für etwas, das der Server nicht kennt.
+          huelleHaptics(istVorgemerkt(ergebnis) ? 'tap' : 'success');
         } catch {
           // Abgelehnt: nichts leeren, nichts schliessen. Den Fehler meldet die
           // Mutation des Aufrufers; hier bleibt der Wortlaut stehen.
+          huelleHaptics('error');
         }
         if (!serverErfolg || abbruchGenerationRef.current !== abbruchGeneration) return;
 
