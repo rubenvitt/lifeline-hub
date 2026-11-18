@@ -96,6 +96,7 @@ import {
   SeitenStandVeraltet,
 } from '../../src/components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../../src/components/SpeicherHinweis';
+import { StornoBanner } from '../../src/components/StornoBanner';
 import { EINSATZ_ABGESCHLOSSEN, MODUL_PERSONAL_GESPERRT } from '../../src/components/nurAnsicht';
 import EinsatzSeite from '../../src/components/EinsatzSeite';
 import { ApiError, NetzFehler } from '../../src/api/client';
@@ -1268,11 +1269,15 @@ function ZustaendeBeispiel() {
 /**
  * Hinweise einer Fläche: fehlendes Recht als eine Zeile, die Warnstufe im Seitenkopf und `Alert`
  * auf den Statusflächen (bedien, normal, achtung, alarm). Achtung und Alarm sind die echten
- * Hinweise der App: veralteter Stand und Speicherfehler ohne Netz.
+ * Hinweise der App: veralteter Stand und Speicherfehler ohne Netz. Das Storno-Banner sperrt eine
+ * offene Detailseite, deren Datensatz storniert wurde (LLH-1832).
  */
 function HinweisBeispiel() {
   return (
     <div className="ds-stapel">
+      <StornoBanner
+        stand={{ storniert_at: '2026-10-09 12:32:00', storniert_von_name: 'Anna Beispiel' }}
+      />
       <RechteHinweis sichtbar text={EINSATZ_ABGESCHLOSSEN} />
       <RechteHinweis sichtbar marke="Ohne Besatzung" text={MODUL_PERSONAL_GESPERRT} />
       <div className="ds-reihe">
@@ -1679,7 +1684,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Hinweis',
     title: 'Hinweis: Rechte, Warnstufe und Alert auf der Statusfläche',
     group: 'Rückmeldung',
-    height: 820,
+    height: 880,
     source: 'components/SpeicherHinweis.tsx',
     moreDoc: 'components/instrument/WarnstufenHinweis.tsx',
     styles: ['icons/icons.css'],

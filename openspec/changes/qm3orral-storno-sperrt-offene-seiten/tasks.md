@@ -30,14 +30,13 @@
 
 ## 3. Frontend: Banner und Sperre
 
-- [ ] 3.1 `components/StornoBanner.tsx` (D7): Text mit Name bzw. ohne Name, mit Datum außerhalb
+- [x] 3.1 `components/StornoBanner.tsx` (D7): Text mit Name bzw. ohne Name, mit Datum außerhalb
   von heute, `role="status"`, Farben aus dem Statusvertrag. Unit-Test der drei Wortlaute.
-- [ ] 3.2 `gesperrt` an `InlineAngabe` und `BearbeitbaresPaneel` (D8):
-  - offenes Feld wird `readOnly`, der Text bleibt;
-  - Speichern weg, „Schließen“ statt „Abbrechen“;
-  - der Merker `offeneBearbeitung` gibt frei, ohne nachzufragen.
-
-  Tests an beiden Bausteinen.
+- [x] 3.2 Schreibschutz an `InlineAngabe` (D8): fällt `darfSchreiben` bei offenem, geändertem
+  Entwurf weg, bleibt das Feld `readOnly` mit dem Text stehen, „Speichern“ verschwindet,
+  „Schließen“ verwirft ohne Rückfrage, und der Merker `offeneBearbeitung` gibt frei. Eine
+  unveränderte Bearbeitung schließt. Test in `InlineAngabe.test.tsx`. `BearbeitbaresPaneel` steht
+  auf keiner der vier Seiten; die Bearbeiten-Formulare von Tier und Schaden folgen in 5.2.
 
 ## 4. Frontend: Personen-Detail
 

@@ -148,11 +148,18 @@ mehrdeutig, und der Abruf schriebe trotzdem eine Protokollzeile).
 
 ### D8 — Offene Eingabe: schreibgeschützt statt geschlossen
 
-- `InlineAngabe` und `BearbeitbaresPaneel` bekommen `gesperrt`:
+- `InlineAngabe` regelt das selbst: Fällt `darfSchreiben` weg, während ein geänderter Entwurf
+  offen ist, gilt Schreibschutz.
   - Das Eingabeelement wird `readOnly` und der Text bleibt markierbar.
   - „Speichern“ verschwindet, „Abbrechen“ heißt „Schließen“.
-  - Der Merker `offeneBearbeitung` gibt die Sperre frei, ohne nachzufragen.
-- Die Notizzeile im Patientenkopf verhält sich ebenso.
+  - Der Entwurf zählt nicht mehr als Änderung, also gibt der Merker `offeneBearbeitung` die
+    Sperre frei, ohne nachzufragen.
+  - Eine unveränderte Bearbeitung schließt.
+- Damit gilt die Regel überall, wo eine Seite `darfSchreiben && !storniert_at` übergibt, ohne
+  eigene Verdrahtung.
+- Die Bearbeiten-Formulare von Tier und Schaden (`useEditSitzung`, eigenes `<Form>`) und die
+  Notizzeile im Patientenkopf verhalten sich ebenso.
+- `BearbeitbaresPaneel` steht auf keiner der vier Seiten und bleibt unverändert.
 - Ein schon laufender Speicherversuch, der danach mit 409 endet, zeigt keinen Konfliktdialog.
   Das Banner sagt genug, der Grund am Feld entfällt.
 

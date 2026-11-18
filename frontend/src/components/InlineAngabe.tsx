@@ -76,6 +76,9 @@ import { vermerkKurz } from './feldVermerk';
  *   Sperre geschlossen, ausgehängt). Mit `onOeffnen` hält der Aufrufer ein offenes Feld an seinem
  *   Ort, auch wenn ein neuer Stand es woanders einordnete (Spec `personendaten-bearbeiten`,
  *   „Eine offene Bearbeitung zur Zeit“).
+ * - Fällt `darfSchreiben` bei offenem, geändertem Entwurf weg (Datensatz storniert, LLH-1832,
+ *   Spec `storno-sperre`), bleibt der Entwurf schreibgeschützt (`feld.readOnly`) stehen, nur mit
+ *   „Schließen“; eine unveränderte Bearbeitung schließt.
  * - Erfüllt `onSpeichern` mit {@link OFFEN_LASSEN}, bleibt die Eingabe mit dem Entwurf offen, ohne
  *   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
  *
@@ -127,6 +130,8 @@ export interface InlineEingabe<T> {
     autoFocus: true;
     'aria-invalid'?: true;
     'aria-describedby'?: string;
+    /** Gesetzt, wenn das Schreibrecht bei offenem Entwurf wegfiel (LLH-1832): nur noch lesen. */
+    readOnly?: true;
   };
   value: T;
   onChange: (wert: T) => void;
@@ -340,7 +345,16 @@ export function InlineAngabe<T>({
   /** Der Grund steht hier (Text) oder an anderer Stelle (Kennung seines Elements). */
   const sperrText = typeof sperre === 'string' ? sperre : undefined;
   const sperrBeschreibung = typeof sperre === 'object' ? sperre.beschreibungId : sperrId;
-  const geaendert = darfSchreiben && bearbeitet && angefasst && !gleich(entwurf, wert);
+  /** Der Entwurf weicht vom Stand ab, unabhängig vom Schreibrecht. */
+  const entwurfGeaendert = bearbeitet && angefasst && !gleich(entwurf, wert);
+  const geaendert = darfSchreiben && entwurfGeaendert;
+  /**
+   * Das Schreibrecht fiel bei offener Bearbeitung weg, etwa weil der Datensatz storniert wurde
+   * (LLH-1832, Spec `storno-sperre`): der Entwurf bleibt schreibgeschützt stehen, damit sein Text
+   * nicht still verloren geht, und lässt sich nur noch schließen. Er zählt nicht mehr als
+   * Änderung (`geaendert`), der Merker der Seite gibt ihn frei.
+   */
+  const schreibschutz = !darfSchreiben && bearbeitet;
   const fremdGeaendert = !ohneFremdHinweis && bearbeitet && !gleich(wert, beimOeffnen);
   const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
 
@@ -402,7 +416,7 @@ export function InlineAngabe<T>({
   // Die Sperre schließt eine offene Bearbeitung ohne Änderung (Zustand beim Rendern angepasst,
   // nicht per Effekt: sonst stünde einen Frame lang ein bedienbares Feld unter der Sperre). Ein
   // Entwurf bleibt stehen.
-  if (isGesperrt && bearbeitet && !geaendert) {
+  if ((isGesperrt || !darfSchreiben) && bearbeitet && !entwurfGeaendert) {
     setBearbeitet(false);
     setFehler(null);
   }
@@ -464,7 +478,7 @@ export function InlineAngabe<T>({
     );
   });
 
-  if (!darfSchreiben) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
+  if (!darfSchreiben && !bearbeitet) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
 
   function oeffnen() {
     if (isGesperrt) return;
@@ -508,7 +522,7 @@ export function InlineAngabe<T>({
   schliessenRef.current = schliessen;
 
   async function abschicken() {
-    if (sendetRef.current || isGesperrt) return;
+    if (sendetRef.current || isGesperrt || !darfSchreiben) return;
     const entwurf = entwurfRef.current;
     if (pflicht && leer(entwurf)) {
       setPflichtHinweis(true);
@@ -634,9 +648,11 @@ export function InlineAngabe<T>({
           'aria-label': name,
           autoFocus: true,
           ...(pruefGrund ? { 'aria-invalid': true, 'aria-describedby': pruefId } : {}),
+          ...(schreibschutz ? { readOnly: true } : {}),
         },
         value: entwurf,
         onChange: (neu) => {
+          if (schreibschutz) return;
           setAngefasst(true);
           setEntwurf(neu);
         },
@@ -657,23 +673,31 @@ export function InlineAngabe<T>({
       {sperrHinweis}
       {/* Abstand der Dialogfüße (frontend/AGENTS.md, „Rot steht nicht bündig neben Neutralem“). */}
       <Space wrap size="middle">
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={sendet}
-          disabled={isGesperrt}
-          aria-label={`${name} speichern`}
-          aria-describedby={isGesperrt ? sperrBeschreibung : undefined}
-        >
-          Speichern
-        </Button>
-        <Button
-          disabled={sendet}
-          aria-label={`Bearbeitung von ${name} abbrechen`}
-          onClick={schliessen}
-        >
-          Abbrechen
-        </Button>
+        {schreibschutz ? (
+          <Button aria-label={`Entwurf von ${name} schließen`} onClick={schliessen}>
+            Schließen
+          </Button>
+        ) : (
+          <>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={sendet}
+              disabled={isGesperrt}
+              aria-label={`${name} speichern`}
+              aria-describedby={isGesperrt ? sperrBeschreibung : undefined}
+            >
+              Speichern
+            </Button>
+            <Button
+              disabled={sendet}
+              aria-label={`Bearbeitung von ${name} abbrechen`}
+              onClick={schliessen}
+            >
+              Abbrechen
+            </Button>
+          </>
+        )}
       </Space>
     </form>
   );

@@ -185,6 +185,37 @@ describe('InlineAngabe · Bearbeitung', () => {
   });
 });
 
+describe('InlineAngabe · Schreibrecht fällt weg (LLH-1832, Spec storno-sperre)', () => {
+  it('ein geänderter Entwurf bleibt schreibgeschützt lesbar, ohne Speichern', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), ' neu');
+
+    rerender(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} darfSchreiben={false} />);
+
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    expect(feld).toHaveValue('ILS-1 neu');
+    expect(feld).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: /speichern/ })).toBeNull();
+    fireEvent.submit(feld.closest('form')!);
+    expect(onSpeichern).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Entwurf von Leitstellen-Nr. schließen' }));
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByText('ILS-1')).toBeInTheDocument();
+  });
+
+  it('eine unveränderte Bearbeitung schließt', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    rerender(<TextAngabe wert="ILS-1" darfSchreiben={false} />);
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+});
+
 describe('InlineAngabe · Riegel', () => {
   it('unveränderter Wert sendet nicht und kehrt in die Anzeige zurück', async () => {
     const onSpeichern = vi.fn().mockResolvedValue(undefined);
