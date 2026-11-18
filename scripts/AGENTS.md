@@ -29,7 +29,7 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Liste und Ruleset zusammen.
   - **Im PR** läuft `schnell` aus `pr.yml`. Ein fremdes Label startet an einem PR ohne `voll` nur die Schnellprüfungen neu, in
     eigener Gruppe, ohne einen laufenden Lauf abzubrechen; an einem PR mit `voll` startet es alle
-    Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend- und e2e-Suite laufen im PR nur mit dem **Label `voll`**, dann ganz
+    Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend-, e2e-Suite und der Swift-Kern (`ios`) laufen im PR nur mit dem **Label `voll`**, dann ganz
     und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label
     `e2e` bedeutet nichts mehr.
   - **Wann `voll`** (LLH-1898, ADR-0050), selten und nur, wenn mindestens eines zutrifft:
@@ -49,7 +49,7 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     nicht mehr nach Bereichen.
   - **Auf `alpha`, `beta`, `main`** laufen bei jedem Push alle Suiten. Ein neuer Push bricht die
     **Testjobs** des laufenden Laufs ab (Concurrency je Job: `rust`, `frontend` je Anteil, `e2e`,
-    `berichte`), der jüngste Lauf deckt alle früheren mit ab. Der **Release** hat eine eigene
+    `ios`, `berichte`), der jüngste Lauf deckt alle früheren mit ab. Der **Release** hat eine eigene
     Gruppe ohne Abbruch: ein laufender Release endet nie mittendrin (Tag ohne Release), und ein
     Lauf mit abgebrochenen oder roten Tests released nicht (`needs`). Nie
     `cancel-in-progress` für den ganzen Workflow auf einem Kanal-Branch. **Neu starten nur den

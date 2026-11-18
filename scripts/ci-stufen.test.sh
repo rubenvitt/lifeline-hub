@@ -158,8 +158,8 @@ pruefe "env in ci.yml und pr.yml gleich" \
 pruefe "keine Auswahl nach Bereichen in der CI" fehlt "$(cat "$CI" "$PR" "$SUITEN" "$E2E")" "ci-auswahl.sh"
 
 echo "==> ci-stufen: suiten.yml"
-pruefe "suiten.yml: Jobs rust, frontend, e2e, berichte" gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e berichte"
-for id in rust frontend e2e; do
+pruefe "suiten.yml: Jobs rust, frontend, e2e, ios, berichte" gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e ios berichte"
+for id in rust frontend e2e ios; do
   pruefe "$id: kein if (der Aufrufer entscheidet)" test -z "$(job_if "$SUITEN" "$id")"
 done
 pruefe "berichte nur ohne Abbruch" gleich "$(job_if "$SUITEN" berichte)" "\${{ !cancelled() }}"
@@ -172,6 +172,12 @@ pruefe "frontend: Gruppe je Anteil und Branch mit Abbruch" \
   gleich "$(job_gruppe "$SUITEN" frontend)" "ci-frontend-\${{ matrix.shard }}-$JE_BRANCH|true"
 pruefe "e2e: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" e2e)" "ci-e2e-$JE_BRANCH|true"
 pruefe "berichte: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" berichte)" "ci-berichte-$JE_BRANCH|true"
+pruefe "ios: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" ios)" "ci-ios-$JE_BRANCH|true"
+# Der Swift-Kern der iOS-Hülle (LLH-1978): in der CI ist eine fehlende Toolchain rot, nie eine
+# Lücke, und die Swift-Version ist dieselbe wie lokal.
+pruefe "ios: Swift-Kern über check-all.sh" enthaelt "$(job "$SUITEN" ios)" "run: ./scripts/check-all.sh --nur ios"
+pruefe "ios: Toolchain Pflicht" enthaelt "$(job "$SUITEN" ios)" 'IOS_SWIFT_PFLICHT: "1"'
+pruefe "ios: Swift gepinnt" enthaelt "$(job "$SUITEN" ios)" 'swift-version: "6.1.2"'
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
 pruefe "suiten.yml kennt das Label voll nicht (der Aufrufer entscheidet)" fehlt "$(code_ohne_kommentar "$SUITEN")" "'voll'"
 for datei in "$CI" "$PR"; do

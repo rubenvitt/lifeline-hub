@@ -1,4 +1,5 @@
-# Suiten (LLH-1896): Rust-, Frontend- und e2e-Suite samt Bericht, als wiederverwendbarer Workflow.
+# Suiten (LLH-1896): Rust-, Frontend- und e2e-Suite samt Bericht, dazu der Swift-Kern der iOS-Hülle
+# (LLH-1978), als wiederverwendbarer Workflow.
 #
 # WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: `ci.yml` ruft ihn bei jedem Push auf einen Kanal-Branch
 # (der Release wartet darauf), `pr.yml` nur an einem PR mit dem Label `voll` (ohne Pflicht).
@@ -9,7 +10,7 @@
 # darf deshalb nicht hier stehen: die Schnellprüfungen stehen in `ci.yml` und `pr.yml` selbst.
 #
 # ABBRUCH AUF KANAL-BRANCHES (LLH-1889): Ein neuer Push bricht die Testjobs des laufenden Laufs
-# ab, über Concurrency AUF JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `berichte`). Im
+# ab, über Concurrency AUF JOB-EBENE (`rust`, `frontend` je Anteil, `e2e`, `ios`, `berichte`). Im
 # aufgerufenen Workflow ist `github.event_name` der des Aufrufers: bei Push eine Gruppe je Branch,
 # im PR je Lauf (dort bricht der PR-Workflow als Ganzes ab). Der Release in `ci.yml` hat eine
 # eigene Gruppe und bricht nie ab.
@@ -149,6 +150,28 @@ jobs:
     permissions:
       contents: read
       checks: read
+
+  # ── Swift-Kern der iOS-Hülle (LLH-1978) ────────────────────────────────────────────
+  # `swift test` in ios/LifelineKern über Schritt 18 von check-all.sh, unter Linux. Das App-Target
+  # baut nur `ios-pruefung.yml` auf einem macOS-Runner. IOS_SWIFT_PFLICHT=1 macht eine fehlende
+  # Toolchain rot statt zur Lücke. Swift in derselben Version wie lokal (Werkzeugversion 6.1 in
+  # ios/LifelineKern/Package.swift); setup-swift prüft die Signatur des Pakets von swift.org.
+  ios:
+    name: iOS-Kern
+    concurrency:
+      group: ci-ios-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
+        with:
+          swift-version: "6.1.2"
+      - name: Swift-Kern
+        env:
+          IOS_SWIFT_PFLICHT: "1"
+        run: ./scripts/check-all.sh --nur ios
 
   # ── Ein Bericht aus den Vitest-Teilläufen ───────────────────────────────────────────
   # Die Merge-Werkzeuge scheitern nur bei NULL Blobs, ein gestorbener Shard ergäbe sonst einen
