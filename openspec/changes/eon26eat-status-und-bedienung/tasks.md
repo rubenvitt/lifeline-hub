@@ -6,7 +6,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`, im Backend zu `src/`. Entsche
 
 ## 1. Entwurf (D11)
 
-- [ ] 1.1 Entwurf im Artifact-Typ „Design“ auf Grundlage des Design Systems „Lifeline Hub“: `Status` (klein, normal), `Marke` (mit und ohne Entfernen), Statusknopf (drei Dichten), Statusmenü mit Kopf (Handschuh zweispaltig), Tableau-Kachel (gross, mit und ohne Schreibrecht), Nacht und Tag; Ablage unter `docs/design/2026-11-18-status-baustein/`. Nachweis: Dateien liegen dort, Abweichungen von D1–D9 sind vorgelegt oder es gibt keine
+- [x] 1.1 Entwurf im Artifact-Typ „Design“ auf Grundlage des Design Systems „Lifeline Hub“: `Status` (klein, normal), `Marke` (mit und ohne Entfernen), Statusknopf (drei Dichten), Statusmenü mit Kopf (Handschuh zweispaltig), Tableau-Kachel (gross, mit und ohne Schreibrecht), Nacht und Tag; Ablage unter `docs/design/2026-11-18-status-baustein/`. Nachweis: Dateien liegen dort, Abweichungen von D1–D9 sind vorgelegt oder es gibt keine
 
 ## 2. l8zlpr35 (LLH-1779): Baustein `Status` und `Marke`
 

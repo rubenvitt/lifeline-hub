@@ -1,8 +1,11 @@
-import { Button, Dropdown, theme } from 'antd';
+import { Dropdown, theme } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
-import StatusTag from './StatusTag';
+import { Status } from './instrument/Status';
+import { StatusBlock, StatusKnopf, type StatusVariante } from './instrument/StatusKnopf';
+import { monoStil } from './instrument/rollenwerte';
+import { useDichte } from '../theme/ThemeModeProvider';
 import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
 
 /**
@@ -24,15 +27,23 @@ import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
  * widerspräche LFH-19. `Datensicht.tsx` sichert genau EINE Primäraktion zu, auf den Kräfteseiten
  * „Entfernen".
  *
- * ── WARUM EIN `Button` ─────────────────────────────────────────────────────────────────
+ * ── RAHMEN HEISST BEDIENBAR (LLH-1780) ─────────────────────────────────────────────────
  *
- * Ein antd-`Button` erbt seine Höhe vom `ConfigProvider`; ein handgebautes Ziel schuldete die
- * zwei Angaben aus LFH-365. `type="text"` hält die Fläche unaufdringlich.
+ * Mit Schreibrecht ist der Auslöser ein `StatusKnopf`: getönte Fläche, Rahmen in der Kante der
+ * Rolle, Pfeil ▾, 14 px, ein antd-`Button` mit der Dichtehöhe (LFH-365), also sichtbar so hoch
+ * wie antippbar. Ohne Schreibrecht steht der randlose `Status` (Spec `status-darstellung`).
+ *
+ * ── MENÜ: KOPF UND LAGE (LLH-1781, Change `eon26eat-status-und-bedienung`, D7) ─────────
+ *
+ * `titel` setzt einen Kopf über die Einträge (Fahrzeuge: der Rufname). Beim Öffnen misst das
+ * Primitiv den Platz über und unter dem Auslöser, öffnet zur größeren Seite und begrenzt die
+ * Höhe auf diesen Platz; was nicht passt, rollt im Menü. Im Handschuh-Betrieb stehen die
+ * Einträge zweispaltig, sobald eine Spalte nicht ins Fenster passt.
  *
  * ── FARBE ──────────────────────────────────────────────────────────────────────────────
  *
- * Das AUSLÖSER-Etikett ist ein `StatusTag` und trägt für ROLLENfarben die getönte Fläche (Werte
- * und Kontrast in `instrument/statusFlaeche.ts`). Eine MANDANTENFARBE bleibt Punkt, nie Fläche:
+ * Der Status trägt für ROLLENfarben die getönte Fläche (Werte und Kontrast in
+ * `instrument/statusFlaeche.ts`). Eine MANDANTENFARBE bleibt Punkt, nie Fläche:
  * `status_farbe` ist bei Fahrzeug und Personal ungeprüfter Freitext (`theme/statusFarben.ts`),
  * Kontrast auf großer Fläche wäre nicht zugesichert. Die Menüzeilen bleiben ungefärbt, der Punkt
  * ist quadratisch (Radius 0). antds Vollflächen-`color` scheidet aus (erzwungen weißer Text).
@@ -75,7 +86,7 @@ export interface StatusOption<W> {
    * zulässig für Kataloge außerhalb des A2-Vertrags.
    */
   darstellung?: StatusDarstellung;
-  /** Mandantenfarbe für den Punkt — überschreibt die Rollenfarbe (siehe `StatusTag`). */
+  /** Mandantenfarbe für den Punkt — überschreibt die Rollenfarbe (siehe `Status`). */
   farbe?: string | null;
 }
 
@@ -102,7 +113,7 @@ interface StatusWahlProps<W> {
   darstellung: StatusDarstellung | null;
   /**
    * Mandantengepflegte Zusatzfarbe des aktuellen Status: ein dekorativer Punkt neben dem Wortlaut
-   * (siehe `StatusTag`).
+   * (siehe `Status`).
    */
   farbe?: string | null;
   /**
@@ -131,12 +142,12 @@ interface StatusWahlProps<W> {
   gesperrt?: boolean;
   /** Ohne Schreibrecht wird ein reines Etikett gerendert, KEIN Auslöser. */
   darfSchreiben: boolean;
-  /**
-   * Eigene Anzeige des aktuellen Stands statt des `StatusTag` — im FMS-Tableau (LFH-642) der
-   * `StatusChip` mit S-Code und Wort. Gilt für Auslöser UND Lesezweig. Das Wort als zweiter Kanal
-   * (WCAG 1.4.1) liegt dann beim Aufrufer.
-   */
-  etikett?: ReactNode;
+  /** Code vor dem Wort (FMS „S2“); in der Variante `gross` die große Ziffer. */
+  code?: ReactNode;
+  /** `gross`: der Statusblock einer Kachel im FMS-Tableau (LLH-1782). */
+  variante?: StatusVariante;
+  /** Kopf über den Menüeinträgen, nicht wählbar — bei Fahrzeugen der Rufname (LLH-1781). */
+  titel?: string;
   /** Tasten, die am Auslöser direkt einen Status setzen (`aria-keyshortcuts`), etwa „0 1 2“. */
   tastenkuerzel?: string;
 }
@@ -154,10 +165,13 @@ export default function StatusWahl<W extends string | number>({
   laeuft = false,
   gesperrt = false,
   darfSchreiben,
-  etikett: eigenesEtikett,
+  code,
+  variante = 'normal',
+  titel,
   tastenkuerzel,
 }: StatusWahlProps<W>): ReactElement {
   const { token } = theme.useToken();
+  const { dichte } = useDichte();
 
   // Kontrolliert geöffnet, damit die Palette das Menü öffnen kann (Muster: „Spalten“, LFH-391).
   const [offen, setOffen] = useState(false);
@@ -188,18 +202,45 @@ export default function StatusWahl<W extends string | number>({
     nurMitFokus: true,
   });
 
-  const etikett =
-    eigenesEtikett != null ? (
-      eigenesEtikett
-    ) : darstellung ? (
-      <StatusTag darstellung={darstellung} farbe={farbe} />
-    ) : (
-      <span>{OHNE_STATUS}</span>
-    );
+  // Lage des Menüs: beim Öffnen gemessen, damit es ganz im Fenster liegt (D7).
+  const knopf = useRef<HTMLButtonElement | null>(null);
+  const [lage, setLage] = useState<{ unten: boolean; maxHoehe: number; zweispaltig: boolean }>({
+    unten: true,
+    maxHoehe: 0,
+    zweispaltig: false,
+  });
+  const setzeOffen = useCallback(
+    (neu: boolean) => {
+      if (neu)
+        setLage(menueLage(knopf.current, optionen.length, token.controlHeight, dichte, titel));
+      setOffen(neu);
+    },
+    [optionen.length, token.controlHeight, dichte, titel],
+  );
+  const verbindeKnopf = useCallback(
+    (el: HTMLButtonElement | null) => {
+      knopf.current = el;
+      merkeZeile(el);
+    },
+    [merkeZeile],
+  );
+  // Öffnet die Palette das Menü, misst es dieselbe Lage.
+  useEffect(() => {
+    if (offen)
+      setLage(menueLage(knopf.current, optionen.length, token.controlHeight, dichte, titel));
+  }, [offen, optionen.length, token.controlHeight, dichte, titel]);
 
   // Ohne Schreibrecht KEIN Auslöser, auch kein gesperrter: ein deaktivierter Knopf verspräche
   // eine Fähigkeit, die es hier nicht gibt.
-  if (!darfSchreiben) return <>{etikett}</>;
+  if (!darfSchreiben) {
+    if (variante === 'gross')
+      return <StatusBlock darstellung={darstellung} code={code} farbe={farbe} />;
+    return darstellung ? (
+      <Status darstellung={darstellung} farbe={farbe} code={code} trenner={code != null} />
+    ) : (
+      <span>{OHNE_STATUS}</span>
+    );
+  }
 
   const eintraege = optionen.map((o) => ({
     key: String(o.wert),
@@ -230,7 +271,38 @@ export default function StatusWahl<W extends string | number>({
       trigger={['click']}
       open={offen}
       // Die Menüwahl schließt über denselben Weg (antd meldet `false` mit `source: 'menu'`).
-      onOpenChange={setOffen}
+      onOpenChange={setzeOffen}
+      placement={lage.unten ? 'bottomLeft' : 'topLeft'}
+      popupRender={(menue) => (
+        <div
+          data-lfh="status-menue"
+          data-zweispaltig={lage.zweispaltig || undefined}
+          className={lage.zweispaltig ? 'lfh-statusmenue--zweispaltig' : undefined}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: lage.maxHoehe > 0 ? lage.maxHoehe : undefined,
+            background: token.colorBgElevated,
+            boxShadow: token.boxShadowSecondary,
+          }}
+        >
+          {titel && (
+            <div
+              data-lfh="status-menue-kopf"
+              style={{
+                ...monoStil(dichte === 'handschuh' ? 18 : 14, 500),
+                paddingBlock: token.paddingXS,
+                paddingInline: token.paddingSM,
+                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                color: token.colorText,
+              }}
+            >
+              {titel}
+            </div>
+          )}
+          <div style={{ overflowY: 'auto', minHeight: 0 }}>{menue}</div>
+        </div>
+      )}
       menu={{
         items: eintraege,
         selectable: true,
@@ -246,17 +318,45 @@ export default function StatusWahl<W extends string | number>({
       }}
       autoFocus
     >
-      <Button
-        ref={merkeZeile}
-        type="text"
+      <StatusKnopf
+        ref={verbindeKnopf}
+        darstellung={darstellung}
+        farbe={farbe}
+        code={code}
+        variante={variante}
         aria-label={`Status von ${kennung} ändern`}
         aria-keyshortcuts={tastenkuerzel || undefined}
         loading={laeuft}
         disabled={laeuft || gesperrt}
-        style={{ paddingInline: token.paddingXXS }}
-      >
-        {etikett}
-      </Button>
+      />
     </Dropdown>
   );
+}
+
+/** Abstand des Menüs zum Fensterrand und zum Auslöser. */
+const RAND = 8;
+
+/**
+ * Lage des Menüs (D7), rein: nach unten, wenn es dort passt oder unten mehr Platz ist, sonst
+ * nach oben; Höhe auf den Platz der gewählten Seite begrenzt. Im Handschuh-Betrieb zweispaltig,
+ * sobald eine Spalte nicht ins Fenster passt.
+ */
+export function menueLage(
+  ausloeser: HTMLElement | null,
+  eintraege: number,
+  zeilenhoehe: number,
+  dichte: string,
+  titel: string | undefined,
+  fensterhoehe: number = typeof window === 'undefined' ? 0 : window.innerHeight,
+): { unten: boolean; maxHoehe: number; zweispaltig: boolean } {
+  const kopf = titel ? zeilenhoehe : 0;
+  const einspaltig = eintraege * zeilenhoehe + kopf + RAND;
+  const zweispaltig = dichte === 'handschuh' && einspaltig > fensterhoehe - 2 * RAND;
+  const benoetigt = zweispaltig ? Math.ceil(eintraege / 2) * zeilenhoehe + kopf + RAND : einspaltig;
+  if (!ausloeser || fensterhoehe <= 0) return { unten: true, maxHoehe: 0, zweispaltig };
+  const r = ausloeser.getBoundingClientRect();
+  const unten = Math.max(0, fensterhoehe - r.bottom - 2 * RAND);
+  const oben = Math.max(0, r.top - 2 * RAND);
+  const nachUnten = unten >= benoetigt || unten >= oben;
+  return { unten: nachUnten, maxHoehe: Math.floor(nachUnten ? unten : oben), zweispaltig };
 }

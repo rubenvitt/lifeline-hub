@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Status, Marke, Statusknopf</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1280px; height: 900px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); font-family: Archivo, sans-serif;">
+<sc-for list="{{themes}}" as="t" hint-placeholder-count="2">
+<div style="{{t.rootStyle}}">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<span style="{{t.braue}}">{{t.name}}</span>
+<span style="{{t.titel}}">Zustand · Marke · bedienbar</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="{{t.braue}}">Status · klein (20 px, 11 px) — Tabellen, Raster</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+<sc-for list="{{t.toene}}" as="s" hint-placeholder-count="5">
+<span style="{{s.klein}}"><span aria-hidden="true">{{s.zeichen}}</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">{{s.code}}</span><span>{{s.wort}}</span></span>
+</sc-for>
+</div>
+<span style="{{t.braue}}">Status · normal (24 px, 12 px) — Kopf, Detail</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+<sc-for list="{{t.toene}}" as="s" hint-placeholder-count="5">
+<span style="{{s.normal}}"><span aria-hidden="true">{{s.zeichen}}</span><span>{{s.urteil}}</span></span>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="{{t.braue}}">Marke — Kennzeichnung ohne Zustand, randlos, neutral</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+<span style="{{t.marke}}">ad-hoc</span>
+<span style="{{t.marke}}">Einheitsführer</span>
+<span style="{{t.marke}}">RTW</span>
+<span style="{{t.marke}}">Demo</span>
+<span style="{{t.markeBedien}}">Suche: „85“<button type="button" aria-label="Suche: „85“ entfernen" style="{{t.markeX}}">✕</button></span>
+</div>
+<span style="{{t.hinweis}}">Entfernbar (Filter) = bedienbar → Rahmen und ✕ in Dichtehöhe.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="{{t.braue}}">Statusknopf — Rahmen in der Rollenkante, Pfeil, 14 px, sichtbar so hoch wie antippbar</span>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+<sc-for list="{{t.knoepfe}}" as="k" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<button type="button" aria-label="Status von 85-1 ändern" style="{{k.stil}}"><span aria-hidden="true">●</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">S2</span><span>einsatzbereit Wache</span><span aria-hidden="true" style="margin-left: 4px;">▾</span></button>
+<span style="{{t.hinweis}}">{{k.dichte}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="{{t.braue}}">Zeile der Fahrzeugliste — mit und ohne Schreibrecht</span>
+<div style="{{t.zeile}}">
+<span style="{{t.ruf}}">85-1</span>
+<span style="{{t.marke}}">ad-hoc</span>
+<span style="flex-grow: 1;"></span>
+<span style="{{t.urteilKlein}}"><span aria-hidden="true">▮</span><span>unterbesetzt</span></span>
+<button type="button" aria-label="Status von 85-1 ändern" style="{{t.knopfKompakt}}"><span aria-hidden="true">●</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">S2</span><span>einsatzbereit</span><span aria-hidden="true" style="margin-left: 4px;">▾</span></button>
+</div>
+<div style="{{t.zeile}}">
+<span style="{{t.ruf}}">85-2</span>
+<span style="flex-grow: 1;"></span>
+<span style="{{t.neutralNormal}}"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">S3</span><span>Einsatz übernommen</span></span>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = {
+      nacht: { name: 'NACHT', grund: '#08090b', flaeche: '#151719', flaeche2: '#1f2123', linie: '#22262b', linieStark: '#2e343a', text: '#e8ebee', ged: '#9fa7b0',
+        normal: ['#0d1a0a', '#7ddc4a', '#52c41a'], neutral: ['#27292b', '#c6ccd2', '#9199a2'], achtung: ['#1c1705', '#e8cc3a', '#e8cc3a'], alarm: ['#1c0a0d', '#ff6b6b', '#ff6b6b'], bedien: ['#0d1620', '#8ec2f0', '#4d94d6'] },
+      tag: { name: 'TAG', grund: '#e6e7e9', flaeche: '#ffffff', flaeche2: '#f2f3f5', linie: '#d4d8dd', linieStark: '#b9bfc6', text: '#111418', ged: '#323941',
+        normal: ['#e3f1e8', '#155234', '#1c6640'], neutral: ['#dbdcde', '#272d34', '#3d454e'], achtung: ['#f7efd5', '#604200', '#7a5200'], alarm: ['#f9e3e3', '#88140d', '#b02318'], bedien: ['#e4edf7', '#114577', '#154e84'] },
+    };
+    const chip = (f, h, fs) => `display:inline-flex;align-items:center;gap:6px;height:${h}px;padding:0 8px;background:${f[0]};color:${f[1]};font-size:${fs}px;line-height:1;box-sizing:border-box;white-space:nowrap`;
+    const knopf = (f, h, fs) => `display:inline-flex;align-items:center;gap:6px;height:${h}px;padding:0 12px;background:${f[0]};color:${f[1]};border:1px solid ${f[2]};border-radius:0;font-family:Archivo,sans-serif;font-size:${fs}px;cursor:pointer;box-sizing:border-box;white-space:nowrap`;
+    const themes = ['nacht', 'tag'].map((id) => {
+      const p = P[id];
+      const toene = [
+        { t: 'normal', zeichen: '●', code: 'S2', wort: 'einsatzbereit', urteil: 'Soll erfüllt' },
+        { t: 'neutral', zeichen: '', code: 'S3', wort: 'übernommen', urteil: 'im Einsatz' },
+        { t: 'achtung', zeichen: '▮', code: 'S5', wort: 'Sprechwunsch', urteil: 'ohne Leiter' },
+        { t: 'alarm', zeichen: '▲', code: 'S6', wort: 'außer Dienst', urteil: 'unterbesetzt' },
+        { t: 'bedien', zeichen: '', code: 'S1', wort: 'frei Funk', urteil: 'in Planung' },
+      ].map((s) => ({ ...s, klein: chip(p[s.t], 20, 11), normal: chip(p[s.t], 24, 12) }));
+      return {
+        name: p.name,
+        rootStyle: `background:${p.grund};color:${p.text};padding:40px;display:flex;flex-direction:column;gap:28px;box-sizing:border-box`,
+        braue: `font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:${p.ged}`,
+        titel: `font-size:22px;font-weight:600;color:${p.text}`,
+        hinweis: `font-size:11px;color:${p.ged}`,
+        toene,
+        marke: `display:inline-flex;align-items:center;height:20px;padding:0 8px;background:${p.flaeche2};color:${p.ged};font-size:11px;font-weight:500;letter-spacing:0.04em;box-sizing:border-box`,
+        markeBedien: `display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 0 0 8px;background:${p.flaeche2};color:${p.text};border:1px solid ${p.linieStark};font-size:12px;box-sizing:border-box`,
+        markeX: `height:28px;width:28px;border:0;background:transparent;color:${p.ged};cursor:pointer;font-size:12px`,
+        knoepfe: [
+          { dichte: 'kompakt · 30 px', stil: knopf(p.normal, 30, 14) },
+          { dichte: 'komfortabel · 48 px', stil: knopf(p.normal, 48, 14) },
+          { dichte: 'Handschuh · 72 px', stil: knopf(p.normal, 72, 16) },
+        ],
+        zeile: `display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;background:${p.flaeche};border-bottom:1px solid ${p.linie}`,
+        ruf: `font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:${p.text}`,
+        urteilKlein: chip(p.alarm, 20, 11),
+        neutralNormal: chip(p.neutral, 24, 12),
+        knopfKompakt: knopf(p.normal, 30, 14),
+      };
+    });
+    return { themes };
+  }
+}
+</script>
+</body>
+</html>

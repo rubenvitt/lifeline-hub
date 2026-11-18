@@ -509,3 +509,11 @@
     inset -2px 0 0 0 var(--lfh-steuer-rahmen),
     inset -10px 0 8px -8px var(--lfh-steuer-rahmen);
 }
+
+/* Statusmenü im Handschuh-Betrieb (LLH-1781, Change `eon26eat-status-und-bedienung`, D7):
+   passt eine Spalte nicht ins Fenster, stehen die Einträge zweispaltig. Die Klasse setzt
+   `components/StatusWahl.tsx`. */
+.lfh-statusmenue--zweispaltig .ant-dropdown-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}

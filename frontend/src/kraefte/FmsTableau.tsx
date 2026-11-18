@@ -14,7 +14,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StatusWahl, { type StatusBedienung } from '../components/StatusWahl';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { Paneel, Sammelbanner, StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Sammelbanner, monoStil, useRollen } from '../components/instrument';
 import { kategorieDarstellung, type StatusDarstellung } from '../theme/statusFarben';
 import {
   baueFmsTableau,
@@ -84,13 +84,23 @@ function darstellungVon(
   return { ...kategorieDarstellung(ef.status_kategorie, anker), label: ef.status_label };
 }
 
-/** Kachelraster — rein. `min(100%, …)` hält die Spalte am 390-px-Schirm. */
-function kachelRasterStil(token: { marginXS: number }): CSSProperties {
+/**
+ * Kachelraster — rein. Mindestens 240 px je Kachel (LLH-1782, Spec `fms-tableau`); `auto-fill`
+ * hält leere Spuren, eine einzelne Kachel wird also nicht fensterbreit. `min(100%, …)` hält die
+ * Spalte am 390-px-Schirm.
+ */
+export function kachelRasterStil(token: { marginXS: number }): CSSProperties {
   return {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 208px), 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 240px), 1fr))',
     gap: token.marginXS,
   };
+}
+
+/** Die große Ziffer im Statusblock: „S4“ → „4“; ohne Anker bleibt der Block ohne Ziffer. */
+export function grosseZiffer(code: string | null): string | null {
+  const m = code?.match(/^S(\d)$/);
+  return m ? m[1] : code;
 }
 
 export default function FmsTableau({
@@ -256,6 +266,19 @@ export default function FmsTableau({
               const bedienung = bedienungVon(ef);
               const grund = zeilenFehler?.(ef) ?? null;
               const status = fahrzeugStatus(ef, katalogNach);
+              // Wort aus dem Katalog, Ton aus der Statusrolle (Welle 1, Spec `statusrollen`).
+              const katalogDarstellung = darstellungVon(ef, katalogNach);
+              const darstellung: StatusDarstellung | null = katalogDarstellung
+                ? { ...katalogDarstellung, label: status.wort }
+                : null;
+              // Typ und Einheit, ausgelassen was fehlt (Spec `fms-tableau`).
+              const zusatz =
+                [
+                  ef.fahrzeugtyp?.trim() || null,
+                  einheiten !== null ? (einheit ?? OHNE_EINHEIT_TITEL) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || null;
               const seit = bedienung.laeuft
                 ? '…'
                 : ef.status_seit
@@ -288,7 +311,13 @@ export default function FmsTableau({
                     }}
                   >
                     <span
-                      style={{ ...monoStil(13), ...abgeschnitten, minWidth: 0 }}
+                      data-lfh="fms-rufname"
+                      style={{
+                        ...monoStil(22, 500),
+                        letterSpacing: '-0.02em',
+                        ...abgeschnitten,
+                        minWidth: 0,
+                      }}
                       title={ef.funkrufname}
                     >
                       {ef.funkrufname}
@@ -297,24 +326,28 @@ export default function FmsTableau({
                       seit {seit}
                     </span>
                   </div>
-                  <StatusWahl
-                    {...bedienung}
-                    optionen={optionen}
-                    onWaehlen={(w) => waehle(ef, bedienung, Number(w))}
-                    darstellung={darstellungVon(ef, katalogNach)}
-                    etikett={
-                      <StatusChip ton={status.ton} code={status.code} wort={status.wort} trenner />
-                    }
-                    darfSchreiben={darfSchreiben}
-                    tastenkuerzel={ziffernKuerzel}
-                  />
-                  {einheiten !== null && (
+                  {zusatz && (
                     <span
+                      data-lfh="fms-zusatz"
                       style={{ fontSize: 12, ...gedaempft, ...abgeschnitten, maxWidth: '100%' }}
+                      title={zusatz}
                     >
-                      {einheit ?? OHNE_EINHEIT_TITEL}
+                      {zusatz}
                     </span>
                   )}
+                  <div style={{ alignSelf: 'stretch' }}>
+                    <StatusWahl
+                      {...bedienung}
+                      optionen={optionen}
+                      onWaehlen={(w) => waehle(ef, bedienung, Number(w))}
+                      darstellung={darstellung}
+                      code={grosseZiffer(status.code)}
+                      variante="gross"
+                      titel={ef.funkrufname}
+                      darfSchreiben={darfSchreiben}
+                      tastenkuerzel={ziffernKuerzel}
+                    />
+                  </div>
                   {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
                 </div>
               );

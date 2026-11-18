@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EinsatzFahrzeug, Einheit, FahrzeugStatus } from '../api/types';
 import type { StatusBedienung } from '../components/StatusWahl';
 import { renderMitProviders } from '../test/utils';
-import FmsTableau, { type FmsTableauProps } from './FmsTableau';
+import FmsTableau, { grosseZiffer, kachelRasterStil, type FmsTableauProps } from './FmsTableau';
 
 const KATALOG: FahrzeugStatus[] = [
   {
@@ -111,12 +111,33 @@ describe('FmsTableau (LFH-642)', () => {
     expect(screen.getByRole('heading', { name: 'ohne Einheit' })).toBeInTheDocument();
 
     const kachel = ausloeser('Florian 1').closest<HTMLElement>('[data-lfh="fms-kachel"]')!;
-    expect(within(kachel).getByText('Florian 1')).toBeInTheDocument();
-    // Code und Wort getrennt — der Chip trägt BEIDE Kanäle, der Präfix „3 – " fällt weg.
-    expect(within(kachel).getByText('S3')).toBeInTheDocument();
+    // Rufname groß (22 px Mono), Ziffer als großer Statusblock (40 px), Wort ohne Präfix „3 – “.
+    expect(within(kachel).getByText('Florian 1')).toHaveStyle({ fontSize: '22px' });
+    expect(within(ausloeser('Florian 1')).getByText('3')).toHaveStyle({ fontSize: '40px' });
     expect(within(kachel).getByText('Einsatz übernommen')).toBeInTheDocument();
     expect(within(kachel).getByText(/^seit \d{4}/)).toBeInTheDocument();
     expect(within(kachel).getByText('Zug 1')).toBeInTheDocument();
+  });
+
+  it('zeigt Fahrzeugtyp und Einheit in einer Zeile, lässt Fehlendes aus (LLH-1782)', () => {
+    zeige({
+      fahrzeuge: [
+        fzg(10, 'Florian 1', { fahrzeugtyp: 'RTW' }),
+        fzg(11, 'MTW', { fahrzeugtyp: null, einheit_id: null }),
+      ],
+    });
+    const k1 = ausloeser('Florian 1').closest<HTMLElement>('[data-lfh="fms-kachel"]')!;
+    expect(within(k1).getByText('RTW · Zug 1')).toBeInTheDocument();
+    const k2 = ausloeser('MTW').closest<HTMLElement>('[data-lfh="fms-kachel"]')!;
+    expect(k2.querySelector('[data-lfh="fms-zusatz"]')?.textContent).not.toMatch(/·/);
+  });
+
+  it('Kacheln mindestens 240 px, eine einzelne wird nicht fensterbreit (auto-fill)', () => {
+    expect(kachelRasterStil({ marginXS: 8 }).gridTemplateColumns).toBe(
+      'repeat(auto-fill, minmax(min(100%, 240px), 1fr))',
+    );
+    expect(grosseZiffer('S4')).toBe('4');
+    expect(grosseZiffer(null)).toBeNull();
   });
 
   it('erklärt den Tastenweg nicht in einem Satz — der S-Code im Menü ist die Ziffer (LFH-1078)', async () => {
@@ -129,9 +150,9 @@ describe('FmsTableau (LFH-642)', () => {
     expect(within(menue).getByText(/^S4 · /)).toBeInTheDocument();
     unmount();
     zeige({ darfSchreiben: false });
-    // Ohne Schreibrecht kein Auslöser — nur das Etikett.
+    // Ohne Schreibrecht kein Auslöser — nur der Statusblock ohne Rahmen.
     expect(screen.queryByRole('button', { name: /Status von/ })).toBeNull();
-    expect(screen.getByText('S3')).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-lfh="status-block"]').length).toBeGreaterThan(0);
   });
 
   describe('Ziffern', () => {

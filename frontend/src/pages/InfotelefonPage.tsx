@@ -570,7 +570,6 @@ export default function InfotelefonPage() {
                         if (s !== a.status && !statusMutation.isPending)
                           statusMutation.mutate({ id: a.id, status: s });
                       }}
-                      etikett={<StatusTag darstellung={infotelefonStatus[a.status]} />}
                     />
                   }
                 >

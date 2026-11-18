@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import StatusWahl, { type StatusOption } from './StatusWahl';
+import StatusWahl, { menueLage, type StatusOption } from './StatusWahl';
 import type { StatusDarstellung } from '../theme/statusFarben';
 
 /** Zweiter Kanal ist Pflicht — die Darstellungen werden hier von Hand gebaut, damit die
@@ -93,21 +93,29 @@ describe('StatusWahl', () => {
     expect(ausloeser.textContent).not.toMatch(/Florian 44\/1/);
   });
 
-  it('zeigt den Status als getönte Fläche mit Rand (Neuentwurf), die Menüzeilen bleiben ungefärbt', async () => {
+  it('mit Schreibrecht ist der Status ein Knopf: Fläche, Rahmen in der Rollenkante, Pfeil (LLH-1780)', async () => {
     aufbauen();
-    const etikett = screen.getByText('1 – Frei auf Funk').closest('.ant-tag') as HTMLElement;
-    // Entscheidung 2 des Neuentwurfs: Rollenfarbe als Fläche. Werte und Kontrastrechnung in
-    // `instrument/statusFlaeche.ts`; hier nur die Form — Fläche, Rand und Text getrennt.
-    expect(etikett.dataset.darstellung).toBe('flaeche');
-    expect(etikett.style.backgroundColor).not.toBe('transparent');
-    expect(etikett.style.borderColor).not.toBe(etikett.style.backgroundColor);
-    expect(etikett.style.color).not.toBe(etikett.style.backgroundColor);
+    const knopf = screen.getByRole('button', { name: `Status von ${KENNUNG} ändern` });
+    expect(knopf).toHaveAttribute('data-lfh', 'status-knopf');
+    expect(knopf.style.borderStyle).toBe('solid');
+    expect(knopf.style.borderColor).not.toBe(knopf.style.backgroundColor);
+    expect(knopf.style.fontSize).toBe('14px');
+    expect(knopf.querySelector('[data-lfh="status-pfeil"]')).toHaveTextContent('▾');
 
     // Auch im Menü: der Farbpunkt steht NEBEN dem Text, die Zeile bleibt ungefärbt.
     const menue = await oeffneMenue();
     const eintrag = within(menue).getByRole('menuitem', { name: /Nicht einsatzbereit/ });
     expect(eintrag.style.background).toBeFalsy();
     expect(eintrag.textContent).toMatch(/Nicht einsatzbereit/);
+  });
+
+  it('ohne Schreibrecht steht der randlose Status, ohne Pfeil (Rahmen heißt bedienbar)', () => {
+    aufbauen({ darfSchreiben: false });
+    const status = screen
+      .getByText('1 – Frei auf Funk')
+      .closest<HTMLElement>('[data-lfh="status"]')!;
+    expect(status.style.border).toBe('');
+    expect(document.querySelector('[data-lfh="status-pfeil"]')).toBeNull();
   });
 
   it('macht den Farbpunkt für Screenreader unsichtbar — er wiederholte nur das Etikett', async () => {
@@ -142,15 +150,31 @@ describe('StatusWahl', () => {
     expect(onWaehlen).toHaveBeenCalledWith(1);
   });
 
-  describe('eigenes Etikett (LFH-642)', () => {
-    const chip = <span data-testid="chip">S4 · Am Einsatzort</span>;
-
-    it('trägt am Auslöser das übergebene Etikett statt des StatusTag', () => {
+  describe('Menü: Kopf und Lage (LLH-1781)', () => {
+    it('mit `titel` steht der Rufname als Kopf über den Einträgen, nicht wählbar', async () => {
       renderMitProviders(
         <StatusWahl
           darstellung={gebunden}
-          etikett={chip}
           aktuell={4}
+          optionen={OPTIONEN}
+          kennung={KENNUNG}
+          titel="85-1"
+          onWaehlen={vi.fn()}
+          darfSchreiben
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: `Status von ${KENNUNG} ändern` }));
+      const kopf = await screen.findByText('85-1');
+      expect(kopf).toHaveAttribute('data-lfh', 'status-menue-kopf');
+      expect(kopf.closest('[role="menuitem"]')).toBeNull();
+    });
+
+    it('`gross`: der Statusblock trägt die große Ziffer, ohne Schreibrecht ohne Rahmen', () => {
+      const { unmount } = renderMitProviders(
+        <StatusWahl
+          darstellung={gebunden}
+          code="4"
+          variante="gross"
           optionen={OPTIONEN}
           kennung={KENNUNG}
           onWaehlen={vi.fn()}
@@ -158,23 +182,59 @@ describe('StatusWahl', () => {
         />,
       );
       const knopf = screen.getByRole('button', { name: `Status von ${KENNUNG} ändern` });
-      expect(within(knopf).getByTestId('chip')).toBeInTheDocument();
-      expect(knopf.querySelector('.ant-tag')).toBeNull();
-    });
-
-    it('zeigt es auch im Lesezweig ohne Schreibrecht', () => {
+      expect(knopf).toHaveAttribute('data-variante', 'gross');
+      expect(within(knopf).getByText('4')).toHaveStyle({ fontSize: '40px' });
+      unmount();
       renderMitProviders(
         <StatusWahl
           darstellung={gebunden}
-          etikett={chip}
+          code="4"
+          variante="gross"
           optionen={OPTIONEN}
           kennung={KENNUNG}
           onWaehlen={vi.fn()}
           darfSchreiben={false}
         />,
       );
-      expect(screen.getByTestId('chip')).toBeInTheDocument();
-      expect(screen.queryByRole('button')).toBeNull();
+      const block = document.querySelector<HTMLElement>('[data-lfh="status-block"]')!;
+      expect(block.style.border).toBe('');
+      expect(within(block).getByText('4')).toHaveStyle({ fontSize: '40px' });
+    });
+  });
+
+  describe('menueLage (D7)', () => {
+    const ausloeser = (top: number, bottom: number) =>
+      ({ getBoundingClientRect: () => ({ top, bottom }) }) as unknown as HTMLElement;
+
+    it('öffnet nach unten, wenn es dort passt', () => {
+      expect(menueLage(ausloeser(100, 130), 10, 30, 'kompakt', '85-1', 900)).toEqual({
+        unten: true,
+        maxHoehe: 754,
+        zweispaltig: false,
+      });
+    });
+
+    it('kippt nach oben, wenn unten der Platz fehlt und oben mehr ist', () => {
+      const l = menueLage(ausloeser(700, 730), 10, 30, 'kompakt', '85-1', 768);
+      expect(l.unten).toBe(false);
+      expect(l.maxHoehe).toBe(684);
+    });
+
+    it('bleibt unten mit begrenzter Höhe, wenn unten mehr Platz ist als oben', () => {
+      const l = menueLage(ausloeser(40, 70), 10, 48, 'komfortabel', undefined, 500);
+      expect(l).toEqual({ unten: true, maxHoehe: 414, zweispaltig: false });
+    });
+
+    it('Handschuh: zweispaltig, sobald eine Spalte nicht ins Fenster passt', () => {
+      expect(menueLage(ausloeser(100, 172), 10, 72, 'handschuh', '85-1', 520).zweispaltig).toBe(
+        true,
+      );
+      expect(menueLage(ausloeser(100, 172), 4, 72, 'handschuh', '85-1', 520).zweispaltig).toBe(
+        false,
+      );
+      expect(menueLage(ausloeser(100, 130), 10, 30, 'kompakt', '85-1', 200).zweispaltig).toBe(
+        false,
+      );
     });
   });
 });
