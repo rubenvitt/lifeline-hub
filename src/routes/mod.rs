@@ -90,6 +90,7 @@ pub mod programmpunkt;
 pub mod qualifikation;
 pub mod schaden_anhang;
 pub mod schichtmodell;
+pub mod shell;
 pub mod sitzung;
 pub mod sprechgruppe;
 pub mod stichwort;
