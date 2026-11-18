@@ -30,8 +30,11 @@ function wort(k: SichtungsbildSchluessel): string {
 
 export default function Sichtungszeile({
   alle,
+  ohneAbstand = false,
 }: {
   alle: readonly Pick<Person, 'aktuelle_sichtung' | 'versorgung'>[];
+  /** Ohne eigenen Abstand nach unten, wenn eine Zeile drumherum ihn hält (LLH-1786). */
+  ohneAbstand?: boolean;
 }) {
   const { token, rollen } = useRollen();
   // Abgeschlossene zählen nicht (LLH-1332): die Zeile ist die Lage der Versorgung.
@@ -44,7 +47,7 @@ export default function Sichtungszeile({
       style={{
         listStyle: 'none',
         margin: 0,
-        marginBottom: token.marginSM,
+        marginBottom: ohneAbstand ? 0 : token.marginSM,
         padding: 0,
         display: 'flex',
         flexWrap: 'wrap',

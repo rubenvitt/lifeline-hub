@@ -27,6 +27,20 @@ class StummerKanal {
   close() {}
 }
 
+/**
+ * Reiter „Vermisst“ wählen; unter `md` steht er hinter dem Knopf „Filter“ (LLH-1786, D5).
+ */
+async function waehleVermisst() {
+  // Erst warten, bis die Seite steht: Reiter (ab md) oder Filterknopf (unter md).
+  const filter = await waitFor(() => {
+    const knopf = screen.queryByRole('button', { name: /^Filter/, expanded: false });
+    if (!knopf && !screen.queryByRole('tab', { name: 'Vermisst' })) throw new Error('lädt');
+    return knopf;
+  });
+  if (filter) await userEvent.click(filter);
+  await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+}
+
 beforeEach(async () => {
   offlineQuittungsKanalZuruecksetzenFuerTests();
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -178,7 +192,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
   }
 
   async function zeigeVermisste() {
-    await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+    await waehleVermisst();
     await screen.findByText('R-003');
   }
 
@@ -387,7 +401,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
     it('der Dialog aus A steht in B nicht, auch nicht mit seiner Ablehnung', async () => {
       setzeViewportBreite(390);
       const lauf = renderMitWechsel(() => abgelehnt('Abgleich besteht schon', 409));
-      await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+      await waehleVermisst();
       const karte = (await screen.findByText('R-002')).closest<HTMLElement>(
         '[data-lfh="datensicht-karte"]',
       )!;
@@ -444,7 +458,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
     async function schlageVorImDialog() {
       setzeViewportBreite(390);
       render([vermisstA, gefunden]);
-      await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+      await waehleVermisst();
       await userEvent.click(await screen.findByRole('button', { name: /Abgleich vorschlagen/ }));
       const dialog = await offenerDialog();
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Gefundene Person' }));

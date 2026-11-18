@@ -77,7 +77,7 @@ import {
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../kraefte/fmsTableauKern';
-import Statusband, { type StatusbandZustand } from '../kraefte/Statusband';
+import Statusband, { statusbandKurzform, type StatusbandZustand } from '../kraefte/Statusband';
 import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
 import {
   besatzungZeilen,
@@ -96,9 +96,9 @@ import { kategorieDarstellung, statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/SpaltenSchalter';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
-import EinsatzSeite from '../components/EinsatzSeite';
+import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import {
@@ -107,7 +107,7 @@ import {
   toHerausgenommenesMaterial,
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
+import { KlappBand, StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -1196,6 +1196,15 @@ export default function KraefteuebersichtPage() {
   // nur so bleibt sie einzeilig, und sein Fokus hält die Zeilenschleuse nicht.
   const spaltenSchalter = useSpaltenSchalterZustand<(typeof spalten)[number]['key']>();
 
+  // Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel): `useDrucken` löst den
+  // Dialog nach dem Commit aus.
+  const druckNebenwege = useDruckNebenwege({
+    vorbereiten: async () => {
+      setGewaehlteStufe('alles');
+      setExpandedKeys(schluesselBisStufe(raster, 'alles'));
+      return true;
+    },
+  });
   const uebernehmen = useMutation({
     mutationFn: async () => {
       // Stand in der Anzeigezone: die DTG landet als Text im Lagebericht (LFH-692).
@@ -1451,6 +1460,46 @@ export default function KraefteuebersichtPage() {
     gefiltert,
   });
 
+  /**
+   * Nebenwege des Kopfs (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D4): Drucken und die
+   * Übernahme in den Lagebericht standen in der Werkzeugzeile über dem Baum; jetzt folgen sie der
+   * Regel aller Seiten (`frontend/AGENTS.md`, „Nebenwege im Kopf“). Der Grund einer Sperre steht
+   * im sichtbaren Namen (LFH-1079), ein `title` erscheint auf Touch nie. Ein Bericht ohne eine der
+   * Listen meldete eine Lage, die niemand geprüft hat (LLH-1462).
+   */
+  // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel, das
+  // Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts). Steht auch in der
+  // Kurzform des eingeklappten Bands (LLH-1786).
+  // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel, das
+  // Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts). Ein wirksamer
+  // Einheiten-Filter (LLH-1792) trifft auch das Einheitenband: dann kein Vermerk (design.md D7).
+  const einheitenFilterHinweis =
+    !treffer && (filter.traeger || filter.kategorie || filter.suche.trim())
+      ? filter.abschnittId != null
+        ? 'nur nach Abschnitt gefiltert'
+        : 'ungefiltert'
+      : null;
+  const lageberichtSperre = lageberichtGesperrt ? KEINE_BERECHTIGUNG : berichtGesperrt;
+  const nebenwege: Nebenweg[] = [
+    ...(darfSchreiben
+      ? [
+          {
+            key: 'lagebericht',
+            label:
+              lageberichtSperre != null
+                ? `In Lagebericht übernehmen (${lageberichtSperre})`
+                : berichtQuellenDa
+                  ? 'In Lagebericht übernehmen'
+                  : 'In Lagebericht übernehmen (Listen laden …)',
+            laeuft: uebernehmen.isPending,
+            ...(lageberichtSperre != null || !berichtQuellenDa ? { gesperrt: true as const } : {}),
+            onWahl: () => uebernehmen.mutate(),
+          },
+        ]
+      : []),
+    ...druckNebenwege,
+  ];
+
   return (
     // `kraefte-print-root` bleibt die äußere Hülle: `kraefteuebersichtPrint.css` hängt daran, und
     // `EinsatzSeite` nimmt kein `className`.
@@ -1469,6 +1518,7 @@ export default function KraefteuebersichtPage() {
         meta={metaLaedt ? undefined : meta}
         metaPlatzhalter={metaPlatzhalter}
         dataUpdatedAt={datenstand}
+        weitere={{ name: 'Weitere Aktionen zum Meldebild', eintraege: nebenwege }}
         aktionen={
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
@@ -1530,37 +1580,40 @@ export default function KraefteuebersichtPage() {
         />
 
         <div style={{ marginBlock: token.marginLG }}>
-          <Statusband
-            einheiten={band.einheiten}
-            // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel,
-            // das Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts).
-            // Ein wirksamer Einheiten-Filter (LLH-1792) trifft auch das Einheitenband: dann kein
-            // Vermerk (design.md D7).
-            einheitenHinweis={
-              !treffer && (filter.traeger || filter.kategorie || filter.suche.trim())
-                ? filter.abschnittId != null
-                  ? 'nur nach Abschnitt gefiltert'
-                  : 'ungefiltert'
-                : null
+          {/* Einklappbar (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D3): in 48 / 72 nahm das
+              Band die halbe Höhe vor der ersten Zeile. Eingeklappt bleibt die Kurzform. */}
+          <KlappBand
+            seite="meldebild"
+            titel="Status in Zahlen"
+            kurzform={
+              statusbandKurzform(band, {
+                einheiten: bandZustand(frei.einheiten),
+                personal: bandZustand(frei.personal),
+              }) + (einheitenFilterHinweis ? ` (${einheitenFilterHinweis})` : '')
             }
-            personal={band.personal}
-            rueckmeldung={band.rueckmeldung}
-            // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
-            // Lagebericht): gefiltert entfällt er.
-            zulauf={gefiltert ? null : zulauf}
-            zulaufZiel={nachforderungenPfad(einsatzId)}
-            // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
-            rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
-            einheitenZustand={bandZustand(frei.einheiten)}
-            personalZustand={bandZustand(frei.personal)}
-            onNeuladen={() => {
-              // Nur freie Listen: `refetch` liefe trotz `enabled: false` in den 403.
-              if (freigabenGescheitert) freigabenWiederholen();
-              if (frei.personal === true) void personalQuery.refetch();
-              if (frei.fahrzeuge === true) void fahrzeugeQuery.refetch();
-              if (frei.einheiten === true) void einheitenQuery.refetch();
-            }}
-          />
+          >
+            <Statusband
+              einheiten={band.einheiten}
+              einheitenHinweis={einheitenFilterHinweis}
+              personal={band.personal}
+              rueckmeldung={band.rueckmeldung}
+              // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
+              // Lagebericht): gefiltert entfällt er.
+              zulauf={gefiltert ? null : zulauf}
+              zulaufZiel={nachforderungenPfad(einsatzId)}
+              // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
+              rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
+              einheitenZustand={bandZustand(frei.einheiten)}
+              personalZustand={bandZustand(frei.personal)}
+              onNeuladen={() => {
+                // Nur freie Listen: `refetch` liefe trotz `enabled: false` in den 403.
+                if (freigabenGescheitert) freigabenWiederholen();
+                if (frei.personal === true) void personalQuery.refetch();
+                if (frei.fahrzeuge === true) void fahrzeugeQuery.refetch();
+                if (frei.einheiten === true) void einheitenQuery.refetch();
+              }}
+            />
+          </KlappBand>
         </div>
 
         <div className="kraefte-no-print">
@@ -1705,27 +1758,6 @@ export default function KraefteuebersichtPage() {
             bezeichnung={modulName('kraefteuebersicht')}
             spalten={spalten}
             {...spaltenSchalter}
-          />
-          {darfSchreiben && (
-            <Button
-              loading={uebernehmen.isPending}
-              // Ein Bericht ohne eine der Listen meldete eine Lage, die niemand geprüft hat
-              // (LLH-1462): gesperrt, der Grund steht sichtbar in derselben Zeile.
-              disabled={lageberichtGesperrt || berichtGesperrt != null || !berichtQuellenDa}
-              title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : (berichtGesperrt ?? undefined)}
-              aria-describedby={berichtGesperrt != null && mittelGesperrt ? sperreId : undefined}
-              onClick={() => uebernehmen.mutate()}
-            >
-              In Lagebericht übernehmen
-            </Button>
-          )}
-          {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel) — `useDrucken`
-              löst den Dialog nach dem Commit aus. */}
-          <DruckKnopf
-            vorbereiten={() => {
-              setGewaehlteStufe('alles');
-              setExpandedKeys(schluesselBisStufe(raster, 'alles'));
-            }}
           />
         </div>
         {uebernehmen.error != null && (

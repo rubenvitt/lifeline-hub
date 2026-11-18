@@ -2,7 +2,7 @@
 titel: Kräfteübersicht und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 200
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs, src/abloesung/kopplung.rs]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs, src/abloesung/kopplung.rs, frontend/src/components/instrument/KlappBand.tsx]
 ---
 
 ## Überblick
@@ -26,7 +26,7 @@ setzen Status, tragen nach und streichen.
 1. Unter „Kräfte & Mittel“ die „Kräfteübersicht“ öffnen. Der Kopf nennt die Zahl der Einheiten und die
    Stärke; die Spalte heißt „Stärke F/UF/M//Σ“ (Führer/Unterführer/Mannschaft//Summe, Kapitel
    [Zeiten und Kürzel](zeiten-und-kuerzel.md)).
-2. Im Statusband unter „Einheiten nach FMS-Status“ je Status Code, Wort und Zahl lesen, etwa
+2. Im Statusband („Status in Zahlen“) unter „Einheiten nach FMS-Status“ je Status Code, Wort und Zahl lesen, etwa
    „S3 Anfahrt 2“; der Balken darunter zeigt den Anteil, die Summe steht oben rechts. Daneben
    gliedert „Personal nach Status“ das Personal nach Kategorie. „Rückmeldung“ mit dem Wort „keine
    Rückmeldung“ erscheint nur, wenn sich eine Einheit noch nie zurückgemeldet hat, zählt diese
@@ -34,6 +34,8 @@ setzen Status, tragen nach und streichen.
    angefordert, zugesagt oder unterwegs ist: die Zahl nennt, was zugesagt oder unterwegs ist,
    darunter steht je Art, wann es eintreffen soll, etwa „+2 RTW, Eintreffen 15:30 · +1 GW-San
    unterwegs, Eintreffen 16:10 · 1 NEF angefordert“. Ein Klick darauf öffnet die Nachforderungen.
+   Ein Tipp auf „Status in Zahlen“ klappt das Band zu einer Zeile ein, etwa „12 Einheiten · 48
+   Kräfte · 2 ohne Rückmeldung“, und der Baum rückt nach oben; das Gerät merkt sich die Wahl.
 3. Im Raster je Einheit „Status“, „Rückmeldung“ (Uhrzeit der letzten), „Auftrag“ (der jüngste
    offene, als Verweis), „Stärke“, „Abschnitt“, „Seit“ und „Im Einsatz“ lesen. Eine getönte Zeile
    nennt in der Spalte „Status“ ihren Grund als rotes Etikett, etwa „1 Ausfall“, „1 Ausfall
@@ -88,13 +90,14 @@ Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschir
 ### Die Kräfteübersicht in den Lagebericht übernehmen oder drucken
 
 1. Die Kräfteübersicht wie gewünscht eingrenzen.
-2. „In Lagebericht übernehmen“ wählen. Die App legt aus der Auswahl einen Lagebericht
+2. Im Kopf der Seite „In Lagebericht übernehmen“ wählen; auf dem Handy und in der Bediendichte
+   „Komfortabel“ oder „Handschuh“ steht der Punkt im Menü „Weitere Aktionen zum Meldebild“. Die App legt aus der Auswahl einen Lagebericht
    „Kräfteübersicht“ mit Datum-Zeit-Gruppe an und öffnet ihn. Er ist nach Abschnitten gegliedert,
    darin wie die Kräfteübersicht: Einheit, Fahrzeuge mit Besatzung und „Beladung“, „Ohne Fahrzeug“,
    „Material“ mit Posten und Ausfall, Untereinheiten. Ohne Eingrenzung folgen darunter
    „Entlassen“ mit den entlassenen Personen und Fahrzeugen und „Aus dem Einsatz genommen“ mit dem
    herausgenommenen Material, jeder Eintrag mit Datum-Zeit-Gruppe.
-3. Für Papier „Drucken / als PDF“ wählen. Der Druck klappt den ganzen Baum auf und nennt im Kopf
+3. Für Papier „Drucken / als PDF“ wählen, an derselben Stelle. Der Druck klappt den ganzen Baum auf und nennt im Kopf
    Stand, Umfang und die gewählte Auswahl.
 
 „In Lagebericht übernehmen“ steht nur Einsatzleitung und Führungspersonal zur Verfügung.

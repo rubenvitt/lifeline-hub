@@ -51,6 +51,7 @@ import {
   GliederungsPaneel,
   Kennzahl,
   Kennzahlenband,
+  KlappBand,
   ListenAbschnitt,
   ListenPaneel,
   listenZeileStil,
@@ -1549,6 +1550,28 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         <Kennzahl titel="Aufträge überfällig" wert={2} ton="achtung" notiz="älteste 18 min" />
         <Kennzahl titel="Meldungen offen" wert={5} ton="alarm" notiz="Bestätigung überfällig" />
       </Kennzahlenband>
+    ),
+  },
+  {
+    name: 'KlappBand',
+    title: 'Klappbares Kennzahlenband',
+    group: 'Daten',
+    height: 320,
+    source: 'components/instrument/KlappBand.tsx',
+    content: () => (
+      <div style={{ display: 'grid', gap: 12 }}>
+        <KlappBand
+          seite="design-system-offen"
+          titel="Unterbringung in Zahlen"
+          kurzform="12 in Betreuung · 18 frei · 1 voll"
+        >
+          <Kennzahlenband spalten={3} beschriftung="Unterbringung in Zahlen">
+            <Kennzahl titel="In Betreuung" wert={12} groesse="klein" />
+            <Kennzahl titel="Frei" wert={18} groesse="klein" />
+            <Kennzahl titel="Voll/überbelegt" wert={1} ton="alarm" groesse="klein" />
+          </Kennzahlenband>
+        </KlappBand>
+      </div>
     ),
   },
   // Großbild (LLH-1747): die Vorschau hat kein ganzes Fenster, deshalb setzt sie die Einheit auf
