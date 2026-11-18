@@ -54,7 +54,7 @@ folgt auf „Anmelden“ (und gegebenenfalls den Code) noch ein Schritt:
 1. In der Mac-App „Im Browser anmelden (Passkey, SSO)“ wählen. Der Browser des Systems öffnet
    sich.
 2. Im Browser auf einem der angebotenen Wege anmelden.
-3. Die Seite „In der Mac-App anmelden als …“ nennt die Person und ihr Konto. Stimmt beides, „In
+3. Die Seite „In der Lifeline-App anmelden als …“ nennt die Person und ihr Konto. Stimmt beides, „In
    der App anmelden“ wählen, sonst „Mit anderem Konto“.
 
 ### Abmelden
