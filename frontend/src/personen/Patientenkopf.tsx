@@ -550,12 +550,15 @@ export default function Patientenkopf({
           onSchliessen={close('massnahme')}
         />
       )}
-      {erfassbar && (
+      {/* Storniert, während eine Notiz in Arbeit war (LLH-1832): die Zeile bleibt mit ihrem Text
+          schreibgeschützt stehen, ohne „Notiz anlegen“; leer verschwindet sie. */}
+      {(erfassbar || (modus === 'bedienen' && person.storniert_at != null)) && (
         <NotizZeile
           einsatzId={einsatzId}
           person={person}
           vorgemerkt={vorgemerkteNotizen}
           onGeschrieben={onGeschrieben}
+          gesperrt={!erfassbar}
         />
       )}
     </section>
@@ -841,15 +844,19 @@ function NotizZeile({
   person,
   vorgemerkt,
   onGeschrieben,
+  gesperrt = false,
 }: {
   einsatzId: number;
   person: PersonDetail;
   /** Ohne Netz vorgemerkte Notizen dieser Person (LLH-1138): die Zeile quittiert sie. */
   vorgemerkt: readonly VorgemerkterPersonEintrag[];
   onGeschrieben?: () => void;
+  /** Die Person wurde storniert (LLH-1832): Text nur noch lesen, nichts mehr anlegen. */
+  gesperrt?: boolean;
 }) {
   const { token, rollen } = useRollen();
   const [form] = Form.useForm<{ text: string }>();
+  const entwurf = Form.useWatch('text', form);
   const save = useSavePersonEintrag();
   const personId = person.id;
   const mutation = useMutation({
@@ -861,8 +868,18 @@ function NotizZeile({
       if (ergebnis.zustand === 'gesendet') onGeschrieben?.();
     },
   });
+  // Gesperrt ohne Entwurf gibt es nichts zu retten; die Zeile bleibt dann ganz weg. Die Form
+  // bleibt dafür eingehängt (`hidden`), sonst verlöre `useWatch` ihre Instanz.
+  const leerGesperrt = gesperrt && !(entwurf ?? '').trim();
   return (
-    <Form form={form} onFinish={(v) => mutation.mutate(v)} data-lfh="notiz-zeile">
+    <Form
+      form={form}
+      onFinish={(v) => {
+        if (!gesperrt) mutation.mutate(v);
+      }}
+      data-lfh="notiz-zeile"
+      hidden={leerGesperrt}
+    >
       <Schnellerfassungszeile
         praefix="Notiz"
         hinweiszeile={<span id={`notiz-folge-${personId}`}>nicht änderbar · nicht im ETB</span>}
@@ -883,12 +900,15 @@ function NotizZeile({
               aria-describedby={`notiz-folge-${personId}`}
               placeholder="Verlaufsnotiz"
               disabled={mutation.isPending}
+              readOnly={gesperrt}
               count={zeichenGrenze(VERLAUFSNOTIZ_MAX)}
             />
           </Form.Item>
-          <Button type="primary" htmlType="submit" loading={mutation.isPending}>
-            Notiz anlegen
-          </Button>
+          {!gesperrt && (
+            <Button type="primary" htmlType="submit" loading={mutation.isPending}>
+              Notiz anlegen
+            </Button>
+          )}
         </Flex>
       </Schnellerfassungszeile>
       {vorgemerkt.some((v) => v.antrag == null) && (

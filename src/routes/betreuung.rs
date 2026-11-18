@@ -180,6 +180,21 @@ pub async fn belegung_verlauf(
     ))
 }
 
+/// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/stand — Storno-Stand einer Stelle für ihre
+/// offene Detailseite (LLH-1832, Spec `storno-sperre`). Die Übersicht lässt stornierte Stellen
+/// weg; fällt eine gesehene Stelle heraus, fragt die Seite hier nach Wann und Wer. Unbekannt oder
+/// fremder Einsatz 404, Stellenbindung wie bei den übrigen Stellenrouten.
+pub async fn stelle_stand(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Betreuung>,
+    PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
+) -> Result<Json<crate::storno::StornoStand>, AppError> {
+    stelle::fordere_stelle(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle, sid)?;
+    Ok(Json(
+        repo::stelle_stand(&state.pool, ctx.einsatz.id, sid).await?,
+    ))
+}
+
 async fn stelle_meldung(
     state: &AppState,
     einsatz_id: i64,

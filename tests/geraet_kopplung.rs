@@ -8747,6 +8747,40 @@ async fn tablet_ruft_zeile_nur_fuer_personen_der_eigenen_uhs_ab() {
     assert_eq!(antwort["grund"], "nicht_in_liste", "{antwort}");
 }
 
+/// Der Stand einer Person (LLH-1832) gilt am Tablet wie das Detail: die eigene UHS ja, eine
+/// Person, die es nicht sähe, ist 404.
+#[tokio::test]
+async fn tablet_ruft_stand_nur_fuer_personen_der_eigenen_uhs_ab() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let eigene = person_in(&app, &admin, einsatz, Some(nord)).await["id"]
+        .as_i64()
+        .unwrap();
+    let fremde = person_in(&app, &admin, einsatz, Some(sued)).await["id"]
+        .as_i64()
+        .unwrap();
+    let (s, stand) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{eigene}/stand"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{stand}");
+    assert!(stand["storniert_at"].is_null(), "{stand}");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{fremde}/stand"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
 /// Am Einheitengerät trägt die Zeile wie die Liste keine Personalien; eine Person einer anderen
 /// Einheit ist 404 (LLH-1580 K5).
 #[tokio::test]

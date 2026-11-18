@@ -112,6 +112,7 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
 | `src/einsatz` | Einsatz-Lebenszyklus, Rollen, Modulsichtbarkeit, Einstellungen, Zugriffs-Extractor, Nummernvergabe, Purge-Scheduler, Schwärzung und Archiv nach der Nachbereitung (`archiv.rs`) | Routen `/api/einsaetze`, `…/{id}/modul-zaehler`, `…/{id}/lagekennzahl-wahl`; Live `einsatz` |
+| `src/einsatzakte` | Einsatzakte (LLH-1835): ZIP mit allen Anhängen (bereinigt), den Tabellen von Betroffenen, Tieren und Schäden und einem Inhaltsverzeichnis; Sammeln über die Linker, Bausperre je Einsatz und Server. Das Druckstück der Akte baut der Browser | `GET …/{id}/einsatzakte/anlagen.zip`; nutzt `routes::support::anhang_fuer_akte`, `routes::backup::chunk_stream` |
 | `src/einsatz_vorlage` | Org-Katalog „Einsatz-Vorlagen“: Modulsatz, der beim Anlegen Module ausblendet | `/api/einsatz-vorlagen`; nutzt `einsatz::repo::anlegen_tx` |
 | `src/einsatzabschnitt` | Abschnittsbaum mit Leiter, Fläche und Sprechgruppen; schreibt System-ETB beim Anlegen | `…/{id}/abschnitte`; Live `abschnitt` |
 | `src/etb` | Einsatztagebuch: Eintragstypen, Einfügen als einzige Stelle, Lesemarke, Zähler | `…/{id}/etb`; Live `etb` |

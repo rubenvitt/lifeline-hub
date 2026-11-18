@@ -33,6 +33,10 @@ bereiche_von() {
     # LLH-1750); der Kern im Frontend liest sie ebenso.
     frontend/src/anzeige/dauer.faelle.json)
       echo "rust frontend e2e" ;;
+    # Rust vergleicht die Module der Einsatzakte mit dem Client (`include_str!` in
+    # src/routes/einsatzakte.rs, Test `akte_module_wie_im_client`, LLH-1835).
+    frontend/src/druck/einsatzakte/quellen.ts)
+      echo "rust frontend e2e" ;;
     # Testvektoren des Maschinenzugangs (LLH-1652): Server- und Client-Tests (Rust) und der
     # Vitest des TypeScript-Clients lesen sie; die e2e-Suite nutzt den Client selbst.
     # Vor `docs/api/*`: die erste passende Regel gilt.

@@ -1147,6 +1147,26 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
   });
 });
 
+describe('baueBefehle — Einsatzakte (LLH-1835)', () => {
+  it('springt im Einsatz auf die Druckansicht der Akte und ist über „Akte“ findbar', () => {
+    const k = kontext();
+    const b = baueBefehle(k).find((x) => x.id === 'sprung:einsatzakte');
+    expect(b).toBeDefined();
+    expect(b!.label).toBe('Einsatzakte');
+    b!.ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einsatzdaten/akte');
+    expect(ordneTreffer(filtereBefehle(baueBefehle(k), 'akte'), 'akte')[0]?.id).toBe(
+      'sprung:einsatzakte',
+    );
+  });
+
+  it('fehlt ohne Einsatz-Kontext', () => {
+    expect(
+      baueBefehle(kontext({ einsatzId: null })).some((x) => x.id === 'sprung:einsatzakte'),
+    ).toBe(false);
+  });
+});
+
 describe('baueBefehle — Ansichten (LLH-1127)', () => {
   // LLH-1180: die Ansichten des Fernmeldewesens hängen an dessen Freigabe.
   const FERNMELDEWESEN = ['fernmeldeskizze', 'kommunikationsplan'];

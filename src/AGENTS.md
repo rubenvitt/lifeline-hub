@@ -296,6 +296,17 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `BEREINIGUNG_VERSION` (steht im ETag `"<sha256>.b<n>"`).
 - Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
   beim Download mit 422.
+- **ZIP der Einsatzakte (LLH-1835)** (Spec `einsatzakte`, `GET …/einsatzakte/anlagen.zip`,
+  `routes/einsatzakte.rs`, `einsatzakte/`): liest die Bytes über `support::anhang_fuer_akte`,
+  immer bereinigt; unbereinigbar, am Spiegel noch nicht geholt oder entfernt steht als „nicht
+  enthalten“ im `inhalt.csv` statt das ZIP zu kippen. Gate: jedes Modul aus `AKTE_MODULE` lesbar
+  (403), ausgeblendet fällt weg; die Liste spiegelt `frontend/src/druck/einsatzakte/quellen.ts`
+  (Test `akte_module_wie_im_client`). Protokoll in EINER Transaktion vor dem Bau (`export` der
+  Personentabelle, `anhang` je Personen-Anhang, `anhang_zugriff_audit` je UHS-Anhang). Ein neuer
+  Linker in `MODUL_LINKER` gehört in `einsatzakte::sammeln` (mit Protokoll, falls seine Route
+  eins schreibt). Gebaut wird in `tokio::spawn` (vom Request entkoppelt) in eine Temp-Datei
+  neben der DB, ein Bau je Einsatz und höchstens `MAX_BAUTEN` je Server (`BauSperre`, 409/503),
+  gestreamt über `routes::backup::chunk_stream`.
 - **Kartenhintergrundbilder (LLH-1635)** sind keine Anhänge, laufen beim Download aber durch
   dieselbe Bereinigung (`karte_hintergrundbild::bereinigt`; ETag `"<sha256>.b<n>"`,
   `BEREINIGT_CACHE_CONTROL`). Gespeichert bleibt das Original, einen Original-Abruf gibt es

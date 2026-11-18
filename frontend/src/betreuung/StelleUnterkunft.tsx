@@ -13,10 +13,13 @@ export default function StelleUnterkunft({
   einsatzId,
   stelleId,
   kapazitaet,
+  planbar = true,
 }: {
   einsatzId: number;
   stelleId: number;
   kapazitaet: number | null;
+  /** `false` an einer stornierten Stelle (LLH-1832): kein Sprung in den Rechner. */
+  planbar?: boolean;
 }) {
   const navigate = useNavigate();
   return (
@@ -24,10 +27,12 @@ export default function StelleUnterkunft({
       titel="Unterkunft"
       koerperPolster
       aktion={
-        <PaneelLink
-          label="Unterkunft planen"
-          onKlick={() => navigate(unterkunftPlanenPfad(einsatzId, stelleId))}
-        />
+        planbar ? (
+          <PaneelLink
+            label="Unterkunft planen"
+            onKlick={() => navigate(unterkunftPlanenPfad(einsatzId, stelleId))}
+          />
+        ) : undefined
       }
     >
       {kapazitaet != null ? (

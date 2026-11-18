@@ -415,6 +415,25 @@ pub async fn stelle_laden(
     .try_into()
 }
 
+/// Storno-Stand einer Stelle (LLH-1832): Wann und Wer, auch für eine stornierte. `NotFound`,
+/// wenn sie nicht zum Einsatz gehört.
+pub async fn stelle_stand(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<crate::storno::StornoStand, AppError> {
+    sqlx::query_as::<_, crate::storno::StornoStand>(
+        "SELECT s.storniert_at, b.anzeigename AS storniert_von_name \
+         FROM betreuungsstelle s LEFT JOIN benutzer b ON b.id = s.storniert_von_id \
+         WHERE s.einsatz_id = ? AND s.id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 /// Kopfzahl „in Betreuung“ zum Stichtag `zeitpunkt_at` (UTC, `YYYY-MM-DD HH:MM:SS`): je nicht
 /// stornierter Stelle die aktuelle Meldung mit Zeitpunkt ≤ Stichtag. Stellen ohne solche
 /// Meldung stehen ohne Anzahl in der Liste und gehen nicht in die Summe ein. Ein unlesbarer
