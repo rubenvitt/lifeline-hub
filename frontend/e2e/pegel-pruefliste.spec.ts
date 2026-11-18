@@ -887,12 +887,13 @@ for (const [route, text] of [
         [`**/api/einsaetze/${einsatzId}/pegel`, pegelListe(10)],
       ]);
       await page.goto(`/einsaetze/${einsatzId}/${route}`);
-      // Das Lagebild trägt das Band „Lage in Zahlen“, der Überblick seit LLH-1748 keins: dort
-      // gilt die Seite als aufgebaut, sobald die offenen Vorgänge ihre Zahlen zeigen.
+      // Das Lagebild trägt das Band „Lage in Zahlen“, der Überblick seit LLH-1748 keins. Dort
+      // warten die Paneelreihen auf die Quellen der Marken, den Pegel eingeschlossen
+      // (`markenLaedt`); als aufgebaut gilt die Seite, sobald die Alarmzeile über ihnen steht.
       const band = page.getByRole('group', { name: 'Lage in Zahlen' });
       await expect(
         route === 'ueberblick'
-          ? page.locator('[data-lfh="offene-vorgaenge"] [data-lfh="abschnitt-zahl"]').first()
+          ? page.getByRole('status', { name: 'Was brennt' })
           : band.locator('a[data-lfh="kennzahl"]').first(),
       ).toBeVisible();
       await wartenBisRuhig(page);
