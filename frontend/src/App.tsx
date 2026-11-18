@@ -56,6 +56,7 @@ import PersonDruckPage from './pages/PersonDruckPage';
 import TiereDruckPage from './pages/TiereDruckPage';
 import SchaedenDruckPage from './pages/SchaedenDruckPage';
 import EinsatzberichtDruckPage from './pages/EinsatzberichtDruckPage';
+import EinsatzakteDruckPage from './pages/EinsatzakteDruckPage';
 import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
 import AuftraegePage from './pages/AuftraegePage';
@@ -526,6 +527,7 @@ export const appRouten = createRoutesFromElements(
             {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder
               gesperrt sind; die Rechte prüft der Bericht je Quelle selbst. */}
             <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
+            <Route path="einsatzdaten/akte" element={<EinsatzakteDruckPage />} />
             {/* Kommunikationsplan S6 (LFH-848): Unterroute des Moduls Fernmeldewesen (LLH-1180). */}
             <Route path="fernmeldewesen/kommunikationsplan" element={<KommunikationsplanPage />} />
             {/* Ausgabeansicht eines Zeitfensters (LLH-1032): Unterroute des Moduls Verpflegung,

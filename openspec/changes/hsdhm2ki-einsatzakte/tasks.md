@@ -16,15 +16,15 @@
 
 ## 3. Frontend: Bausteine herauslösen
 
-- [ ] 3.1 `freigabeDerQuelle` aus `druck/einsatzbericht/quellen.ts` exportieren; Lesefassung des Lageberichts und Befehls samt `DokumentAnlagen` als Baustein ohne Seitenrahmen nutzbar machen, Einzelseiten unverändert; Nachweis: bestehende Vitest-Tests und `dokument-anlage-druck`-Spec grün
-- [ ] 3.2 `druck/einsatzakte/quellen.ts` mit `akteFreigabe` (Bericht voll + etb, personen, auftraege, lageberichte); Nachweis: Vitest gesperrt / nicht genutzt / abrufen, Module nur aus der Registry
-- [ ] 3.3 `druck/einsatzakte/abruf.ts`: paralleler Schnappschuss aller Kapitel, nur freigegebene Befehle/Lageberichte, Zustände bereit / kein-zugriff / fehler; Query-Key `einsatzKeys.einsatzakteDruck` nicht live; Nachweis: Vitest mit Testdaten, Query-Key-Guard grün
-- [ ] 3.4 `druck/einsatzakte/AuftragsListe.tsx` über `DruckTabelle`, aufsteigend nach Nummer, aufgehobene bleiben; Nachweis: Vitest
+- [x] 3.1 `freigabeDerQuelle` aus `druck/einsatzbericht/quellen.ts` exportieren; Lesefassung des Lageberichts und Befehls samt `DokumentAnlagen` als Baustein ohne Seitenrahmen nutzbar machen, Einzelseiten unverändert; Nachweis: bestehende Vitest-Tests und `dokument-anlage-druck`-Spec grün
+- [x] 3.2 `druck/einsatzakte/quellen.ts` mit `akteFreigabe` (Bericht voll + etb, personen, auftraege, lageberichte); Nachweis: Vitest gesperrt / nicht genutzt / abrufen, Module nur aus der Registry
+- [x] 3.3 `druck/einsatzakte/abruf.ts`: paralleler Schnappschuss aller Kapitel, nur freigegebene Befehle/Lageberichte, Zustände bereit / kein-zugriff / fehler; Query-Key `einsatzKeys.einsatzakteDruck` nicht live; Nachweis: Vitest mit Testdaten, Query-Key-Guard grün
+- [x] 3.4 `druck/einsatzakte/AuftragsListe.tsx` über `DruckTabelle`, aufsteigend nach Nummer, aufgehobene bleiben; Nachweis: Vitest
 
 ## 4. Frontend: Seite und Einstiege
 
-- [ ] 4.1 `pages/EinsatzakteDruckPage.tsx` unter `einsatzdaten/akte`: Sackgasse bei Sperre, Kapitel als `druck-kapitel` mit eigenem `Druckkopf` (Stand, Vorläufig), „keine Einträge“/„nicht genutzt“, `DruckKnopf` erst bei `bereit`, „Neu laden“, ZIP-Knopf als Download-Link; Nachweis: Vitest der Seite
-- [ ] 4.2 Pfad `einsatzaktePfad` in `routing/deeplinks.ts`, Route in `App.tsx`, Aktion auf der Einsatzdaten-Seite, Eintrag in der Sprungpalette; Nachweis: Vitest Deeplinks/Palette
+- [x] 4.1 `pages/EinsatzakteDruckPage.tsx` unter `einsatzdaten/akte`: Sackgasse bei Sperre, Kapitel als `druck-kapitel` mit eigenem `Druckkopf` (Stand, Vorläufig), „keine Einträge“/„nicht genutzt“, `DruckKnopf` erst bei `bereit`, „Neu laden“, ZIP-Knopf als Download-Link; Nachweis: Vitest der Seite
+- [x] 4.2 Pfad `einsatzaktePfad` in `routing/deeplinks.ts`, Route in `App.tsx`, Aktion auf der Einsatzdaten-Seite, Eintrag in der Sprungpalette; Nachweis: Vitest Deeplinks/Palette
 - [ ] 4.3 e2e `e2e/einsatzakte-druck.spec.ts` in `DRUCK_SPECS`: Kapitelreihenfolge, Seitenumbruch je Kapitel, PDF in Chromium (`pdf-kern.ts`), ZIP-Download liefert `application/zip`; Nachweis: Lauf in drei Engines grün
 
 ## 5. Doku und Abschluss

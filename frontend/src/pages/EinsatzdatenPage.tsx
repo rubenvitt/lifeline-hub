@@ -26,6 +26,7 @@ import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { sucheOrtImEinsatz } from '../api/ortSuche';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
+  einsatzaktePfad,
   einsatzberichtPfad,
   einsatzEinstellungenPfad,
   lagekartePfad,
@@ -1473,6 +1474,7 @@ export default function EinsatzdatenPage() {
   // Der Einsatzbericht auch für Beobachter (die Rechte prüft der Bericht je Quelle), der Sprung zum
   // Zugriff nur für die, die ihn dort bedienen.
   const berichtZiel = einsatzberichtPfad(einsatzId);
+  const akteZiel = einsatzaktePfad(einsatzId);
   const zugriffZiel = einsatzEinstellungenPfad(einsatzId, 'zugriff');
   const nebenwege: Nebenweg[] = [
     {
@@ -1480,6 +1482,13 @@ export default function EinsatzdatenPage() {
       label: 'Einsatzbericht drucken',
       ziel: berichtZiel,
       onWahl: () => navigate(berichtZiel),
+    },
+    // Die ganze Akte (LLH-1835): Bericht, ETB, Betroffene, Aufträge, Befehle, Lageberichte.
+    {
+      key: 'einsatzakte',
+      label: 'Einsatzakte',
+      ziel: akteZiel,
+      onWahl: () => navigate(akteZiel),
     },
     ...(darfLeiten
       ? [
