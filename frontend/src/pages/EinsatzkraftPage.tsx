@@ -1,6 +1,6 @@
 import { dauer } from '../anzeige/dauer';
 import { Alert, App, Breadcrumb, Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { Fragment, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -41,8 +41,8 @@ import {
   SpeicherFehler,
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
-import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import { Datenfeld, Datenraster, Paneel, useRollen, schriftStil } from '../components/instrument';
+import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
+import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
@@ -73,7 +73,6 @@ import {
 } from '../routing/deeplinks';
 import { personalDetailPfad } from '../stammdaten/stammdatenDetail';
 import { statusKategorie } from '../theme/statusFarben';
-
 import './EinsatzkraftPage.css';
 
 dayjs.extend(utc);
@@ -292,7 +291,15 @@ export default function EinsatzkraftPage() {
     onError: (e) => orte.melde('aus', e, 'Nicht erneut disponiert'),
   });
 
-  if (!idGueltig) return <Navigate to={personalPfad(einsatzId)} replace />;
+  // Gibt es nicht (mehr), eine ungültige Kennung in der Adresse eingeschlossen (LLH-1827): das
+  // Muster statt einer stillen Weiterleitung, die Adresse bleibt.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Nicht (mehr) im Einsatz"
+      rueckweg={{ label: 'Zur Personalliste', pfad: personalPfad(einsatzId) }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   // Die Perioden tragen die Einsatzdauer im Kopf: kämen sie nach dem ersten Bild, wüchse die
   // Meta in der Titelzeile, und alles darunter rückte (CLS 0,22 bei 1280 px, LLH-1060).
   if (einsatzQuery.isLoading || epQuery.isLoading || periodenQuery.isLoading) {
@@ -311,7 +318,9 @@ export default function EinsatzkraftPage() {
   const aktiv = epQuery.data?.find((x) => x.id === epId);
   const entlassen = aktiv ? undefined : entlasseneQuery.data?.find((x) => x.id === epId);
   if (!aktiv && !entlassen) {
-    if (epQuery.isError) {
+    // Ein Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den neuen
+    // Versuch an: ohne beide Listen steht nicht fest, dass es die Kraft nicht (mehr) gibt.
+    if (epQuery.isError || !epQuery.data) {
       return (
         <SeitenFehler
           text="Disponiertes Personal konnte nicht geladen werden"
@@ -321,13 +330,17 @@ export default function EinsatzkraftPage() {
       );
     }
     if (entlasseneQuery.isLoading) return <SeitenSkeleton />;
+    if (entlasseneQuery.isError || !entlasseneQuery.data) {
+      return (
+        <SeitenFehler
+          text="Entlassenes Personal konnte nicht geladen werden"
+          ursache={entlasseneQuery.error}
+          onWiederholen={() => void entlasseneQuery.refetch()}
+        />
+      );
+    }
     // Unbekannt oder storniert: kein Abruf scheiterte, die Person steht in keiner Liste.
-    return (
-      <SeitenLeer
-        titel="Nicht (mehr) im Einsatz"
-        aktion={{ label: 'Zur Personalliste', pfad: personalPfad(einsatzId) }}
-      />
-    );
+    return nichtGefunden;
   }
   const ep = (aktiv ?? entlassen)!;
   const isEntlassen = !aktiv;
@@ -443,7 +456,7 @@ export default function EinsatzkraftPage() {
       // Nur die Dauer bleibt immer beisammen.
       meta={
         metaTeile.length > 0 ? (
-          <span className="lfh-personenkopf-meta" style={schriftStil('meta')}>
+          <span className="lfh-personenkopf-meta" style={monoStil(12)}>
             {metaTeile.map((teil, i) => (
               <Fragment key={i}>
                 {i > 0 && ' · '}
@@ -692,10 +705,7 @@ export default function EinsatzkraftPage() {
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
-                  entlassen{' '}
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {zeitKurz(ep.beendet_at)}
-                  </span>
+                  entlassen <span style={monoStil(13)}>{zeitKurz(ep.beendet_at)}</span>
                 </span>
                 {imEinsatzSchreiben && (
                   <Button

@@ -2,7 +2,7 @@ import { Button, Space } from 'antd';
 import { useNavigate } from 'react-router';
 import { IconSchloss } from '../icons';
 import Paneel from '../components/instrument/Paneel';
-import { schriftStil, useRollen, schriftGroesse } from '../components/instrument/rollenwerte';
+import { schriftStil, useRollen } from '../components/instrument/rollenwerte';
 import type { PlatzhalterRueckweg } from '../components/Platzhalter';
 import { flaeche } from '../theme/tokens';
 import { KEINE_BERECHTIGUNG, type ModulEintrag } from './modulRegistry';
@@ -63,14 +63,7 @@ export default function ModulGesperrt({ modul, ausgeblendet, rueckweg, freigaben
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
           {/* Eine Sperrzeile (LFH-1078, Spec `modul-freigabe`): Modul und Grund stehen schon in h1 und
              Paneeltitel. Wo die Freigaben liegen, zeigt der Knopf statt eines Satzes. */}
-          <p
-            style={{
-              margin: 0,
-              fontSize: schriftGroesse('text'),
-              lineHeight: 1.5,
-              color: rollen.text2,
-            }}
-          >
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
             {ausgeblendet ? 'In diesem Einsatz ausgeblendet' : 'Für deine Rolle nicht freigegeben'}
           </p>
           {(rueckweg || freigabenPfad) && (

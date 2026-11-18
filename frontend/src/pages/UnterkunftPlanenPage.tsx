@@ -1,7 +1,7 @@
 import { App, Breadcrumb, Button, Space, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { aendereStelle, ladeBetreuung } from '../api/betreuung';
 import { ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
@@ -16,6 +16,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { KEINE_BERECHTIGUNG, istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -68,7 +69,8 @@ export default function UnterkunftPlanenPage() {
   const { id, stelleId: stelleParam } = useParams();
   const einsatzId = Number(id);
   const stelleId = parseRouteId(stelleParam);
-  if (stelleId == null) return <Navigate replace to={betreuungPfad(einsatzId)} />;
+  // Eine Stelle, die es nicht (mehr) gibt, zeigt das Muster, die Adresse bleibt (LLH-1827).
+  if (stelleId == null) return <StelleNichtGefunden einsatzId={einsatzId} />;
   return <Inhalt einsatzId={einsatzId} stelleId={stelleId} />;
 }
 
@@ -116,7 +118,7 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
     );
   }
   const stelle = betreuungQuery.data?.stellen.find((s) => s.id === stelleId);
-  if (betreuungQuery.data && !stelle) return <Navigate replace to={betreuungPfad(einsatzId)} />;
+  if (betreuungQuery.data && !stelle) return <StelleNichtGefunden einsatzId={einsatzId} />;
   if (!stelle) {
     return (
       <SeitenFehler

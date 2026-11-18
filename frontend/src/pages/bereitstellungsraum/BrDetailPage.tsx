@@ -2,7 +2,7 @@ import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { dauer } from '../../anzeige/dauer';
 import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
@@ -42,15 +42,19 @@ import KraefteOhneBrSidebar, {
 } from './KraefteOhneBrSidebar';
 import BeendenAbschnitt from '../../components/BeendenAbschnitt';
 import EinsatzSeite from '../../components/EinsatzSeite';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+} from '../../components/SeitenZustand';
 import SektionHeader from '../../components/SektionHeader';
 import {
   Kennzahl,
   Kennzahlenband,
+  monoStil,
   Sammelbanner,
   sammelbannerKurz,
-  schriftStil,
   useRollen,
-  zahlStil,
 } from '../../components/instrument';
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
@@ -442,10 +446,15 @@ export default function BrDetailPage() {
     setVerlegenZiel(null);
   }, [brId, statusReset, leereZeilen]);
 
-  // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
-  if (!idGueltig) {
-    return <Navigate to={listenPfad} replace />;
-  }
+  // Gibt es nicht (mehr): ungültige Kennung in der Adresse oder 404 (LLH-1827,
+  // `SeitenNichtGefunden`), ohne stille Weiterleitung. Nach allen Hooks.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diesen Bereitstellungsraum gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zu den Bereitstellungsräumen', pfad: listenPfad }}
+    />
+  );
+  if (!idGueltig) return nichtGefunden;
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: flaechenMass.zustandOben }}>
@@ -456,8 +465,15 @@ export default function BrDetailPage() {
   if (einsatzQuery.error || !einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
+  if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
   if (detailQuery.error || !detailQuery.data) {
-    return <Alert type="error" title="Bereitstellungsraum konnte nicht geladen werden" showIcon />;
+    return (
+      <SeitenFehler
+        text="Bereitstellungsraum konnte nicht geladen werden"
+        ursache={detailQuery.error}
+        onWiederholen={() => void detailQuery.refetch()}
+      />
+    );
   }
 
   const einsatz = einsatzQuery.data;
@@ -532,7 +548,7 @@ export default function BrDetailPage() {
   /** „seit 1342 · 48 min“ an einer Zeile; ohne „seit“ keine Zeitangabe (keine Schätzung). */
   const seitAngabe = (seitAt: string | null | undefined) =>
     seitAt ? (
-      <span data-lfh="br-seit" style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+      <span data-lfh="br-seit" style={{ ...monoStil(12), color: rollen.gedaempft }}>
         {seitText(zeitKurz(seitAt), wartezeitMinuten(seitAt, jetzt))}
       </span>
     ) : null;
@@ -684,13 +700,13 @@ export default function BrDetailPage() {
         e.unangemeldet && <UnangemeldetMarke />
       )}
       {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
-      <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+      <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
         <StaerkeAnzeige
           wert={staerkeDerEinheitImRaum(e.id, einheitIdsImRaum, einheitenQuery.data)}
         />
       </span>
       {e.fahrzeuge.length > 0 && (
-        <span data-lfh="br-einheit-fahrzeuge" data-schrift="kennung" style={zahlStil('klein')}>
+        <span data-lfh="br-einheit-fahrzeuge" style={monoStil(12)}>
           {funkrufnamen(e.fahrzeuge)}
         </span>
       )}
@@ -698,9 +714,7 @@ export default function BrDetailPage() {
   );
   const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
     <>
-      <span data-schrift="kennung" style={zahlStil('text')}>
-        {f.funkrufname}
-      </span>
+      <span style={monoStil(13)}>{f.funkrufname}</span>
       {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
     </>
   );
@@ -918,7 +932,7 @@ export default function BrDetailPage() {
                         <div data-lfh="br-abruf">
                           <Space wrap size={token.marginXS}>
                             <StatusTag darstellung={brAbgerufen} />
-                            <span style={schriftStil('meta')}>
+                            <span style={monoStil(12)}>
                               {abrufAngabe(zeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
                             </span>
                           </Space>
@@ -986,7 +1000,7 @@ export default function BrDetailPage() {
                       <Space wrap>
                         <span>{v.aktion.name}</span>
                         {v.aktion.daten.unangemeldet && <UnangemeldetMarke />}
-                        <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
+                        <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
                           {v.antrag ? 'beantragt' : 'vorgemerkt'}{' '}
                           {zeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
                         </span>

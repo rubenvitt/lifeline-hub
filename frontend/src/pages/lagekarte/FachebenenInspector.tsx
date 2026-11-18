@@ -41,7 +41,6 @@ import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 import FachebeneStand from './FachebeneStand';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
-import { schriftGroesse } from '../../components/instrument/rollenwerte';
 
 interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
@@ -179,7 +178,7 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
           style={{
             marginTop: token.marginSM,
             marginBottom: hinweis ? token.marginSM : 0,
-            fontSize: schriftGroesse('text'),
+            fontSize: 13,
           }}
         >
           {beschreibung}
@@ -187,11 +186,11 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
       )}
       {hinweis && (
         <>
-          <Typography.Text strong style={{ fontSize: schriftGroesse('klein') }}>
+          <Typography.Text strong style={{ fontSize: 12 }}>
             Handlungsempfehlung
           </Typography.Text>
           <Typography.Paragraph
-            style={{ marginTop: token.marginXS, marginBottom: 0, fontSize: schriftGroesse('text') }}
+            style={{ marginTop: token.marginXS, marginBottom: 0, fontSize: 13 }}
           >
             {hinweis}
           </Typography.Paragraph>
@@ -547,10 +546,7 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
   const [fehler, setFehler] = useState(false);
   if (fehler) {
     return (
-      <Typography.Paragraph
-        type="secondary"
-        style={{ fontSize: schriftGroesse('klein'), marginBottom: token.marginSM }}
-      >
+      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: token.marginSM }}>
         Standbild nicht abrufbar
       </Typography.Paragraph>
     );
@@ -690,7 +686,7 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           style={{
             marginTop: token.marginSM,
             marginBottom: 0,
-            fontSize: schriftGroesse('text'),
+            fontSize: 13,
             whiteSpace: 'pre-line',
           }}
         >

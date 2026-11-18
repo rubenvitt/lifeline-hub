@@ -10,8 +10,7 @@ import {
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung, PlanungPosten } from '../api/types';
-
-import { StatusChip, useRollen, zahlStil } from '../components/instrument';
+import { monoStil, StatusChip, useRollen } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -127,7 +126,7 @@ export default function PlanungPostenListe({
       title: 'Schichtlänge',
       key: 'schichtlaenge',
       render: (_, p) => (
-        <span style={zahlStil('klein')}>
+        <span style={monoStil(12)}>
           {p.schichtlaenge_minuten != null ? dauer(p.schichtlaenge_minuten) : '—'}
         </span>
       ),
@@ -139,7 +138,7 @@ export default function PlanungPostenListe({
         const quali = qualiSollText(p.quali_soll);
         return (
           <>
-            <span style={zahlStil('klein')}>{p.soll_anzahl ?? '—'}</span>
+            <span style={monoStil(12)}>{p.soll_anzahl ?? '—'}</span>
             {quali ? ` · ${quali}` : null}
           </>
         );

@@ -81,6 +81,18 @@ describe('ListeDetail — Anordnung und Wahl (Spec `liste-detail`)', () => {
     );
   });
 
+  it('ohne Vorauswahl bleibt ab lg nichts gewählt, bis von Hand gewählt wird (LLH-1827)', () => {
+    rendere(<Harness eintraege={[A, B, C]} vorauswahl={false} />);
+    expect(detail()).toBeNull();
+    expect(
+      screen
+        .getAllByRole('button', { name: /^Objekt / })
+        .filter((b) => b.getAttribute('aria-current') === 'true'),
+    ).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Objekt 2: Bravo' }));
+    expect(detail()).toHaveTextContent('Detail Bravo');
+  });
+
   it('ab lg meldet genau ein Auswahlziel den Zustand „aktuell“', () => {
     rendere(<Harness eintraege={[A, B, C]} />);
     const aktuelle = screen

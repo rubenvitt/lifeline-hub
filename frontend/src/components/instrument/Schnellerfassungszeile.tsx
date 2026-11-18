@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Farbrollen } from '../../theme/tokens';
-import { useRollen, zahlStil, schriftStil } from './rollenwerte';
-
+import { monoStil, useRollen } from './rollenwerte';
 import '../../theme/sprache.css';
 
 /**
@@ -55,7 +54,7 @@ export function zellenStile(
     : {};
   return {
     praefix: {
-      ...zahlStil('text'),
+      ...monoStil(14),
       display: 'flex',
       alignItems: 'center',
       flex: gestapelt ? '1 1 auto' : '0 0 auto',
@@ -67,7 +66,7 @@ export function zellenStile(
       ? { flex: '1 1 100%', minWidth: 0, display: 'flex', alignItems: 'center' }
       : { flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center' },
     hinweis: {
-      ...schriftStil('meta'),
+      ...monoStil(11),
       display: 'flex',
       alignItems: 'center',
       flex: '0 0 auto',
@@ -164,7 +163,7 @@ export default function Schnellerfassungszeile({
       >
         {gestapelt && feldZelle}
         {praefix != null && (
-          <span data-lfh="schnellerfassung-praefix" data-schrift="kennung" style={zellen.praefix}>
+          <span data-lfh="schnellerfassung-praefix" style={zellen.praefix}>
             {praefix}
           </span>
         )}
@@ -174,7 +173,7 @@ export default function Schnellerfassungszeile({
       {hinweiszeile != null && (
         <div
           style={{
-            ...schriftStil('meta'),
+            ...monoStil(11),
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',

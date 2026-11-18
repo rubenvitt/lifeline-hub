@@ -1,7 +1,7 @@
 import { dauer } from '../anzeige/dauer';
 import type { CSSProperties } from 'react';
 import type { SchichtplanGrenzwerte } from '../api/types';
-import { schriftStil, useRollen } from '../components/instrument';
+import { monoStil, useRollen } from '../components/instrument';
 import { EINSTUFUNG_WORT, einstufungText, type Einstufung } from './zeitachse';
 
 /** Nur für Screenreader: sehend steht die Beschreibung im `title`. */
@@ -45,7 +45,7 @@ export default function DauerMitEinstufung({
     einstufung && grenzwerte ? einstufungText(einstufung, grenzwerte, zeit) : null;
   const titel = [zusatz, begruendung].filter((t): t is string => !!t).join(' · ') || undefined;
   return (
-    <span data-lfh={lfh} title={titel} style={{ ...schriftStil('meta'), whiteSpace: 'nowrap' }}>
+    <span data-lfh={lfh} title={titel} style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
       {dauer(minuten)}
       {begruendung && einstufung && (
         <>

@@ -79,6 +79,8 @@ async fn bemerkung_mit_veraltetem_stand_ist_409() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    // Sperrkonflikt ausgezeichnet (src/AGENTS.md, Statuscode-Konvention, LLH-1920).
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
     assert_eq!(
         einheit(&app, &admin, einsatz, eid).await["bemerkung"],
         "Tor 5"

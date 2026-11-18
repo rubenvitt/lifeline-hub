@@ -5,8 +5,8 @@ import { listePersonen } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Sichtungskategorie, UhsDetail } from '../../api/types';
 import SichtungsTag from '../../components/SichtungsTag';
-import { Kennzahl, Kennzahlenband, type Segment, zahlStil } from '../../components/instrument';
-import { useRollen } from '../../components/instrument/rollenwerte';
+import { Kennzahl, Kennzahlenband, type Segment } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument/rollenwerte';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { SICHTUNGSBILD_REIHE, type SichtungsbildSchluessel } from '../../personen/personenBilanz';
 import { sichtung } from '../../theme/statusFarben';
@@ -164,7 +164,7 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
                 <span style={{ color: rollen.schwach }}>{p.titel}</span>{' '}
               </>
             )}
-            <b style={{ ...zahlStil('titel', 500) }}>{zahl(p.wert)}</b>
+            <b style={{ ...monoStil(16, 500) }}>{zahl(p.wert)}</b>
             {p.nach != null && (
               <>
                 {' '}

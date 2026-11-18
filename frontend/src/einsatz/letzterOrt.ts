@@ -10,7 +10,7 @@
  * JE BENUTZER und MIT FRIST einer Schicht, aus demselben Grund wie `zuletztModule.ts`: am geteilten
  * Fükw-Rechner führte der Rückweg sonst in den Einsatz der vorigen Schicht.
  */
-import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
+import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
 import { einsatzPfad } from '../routing/deeplinks';
 
 /** Lebensdauer ab dem letzten Besuch: eine Schichtlänge, wie `ZULETZT_FRIST_MS`. */
@@ -37,9 +37,37 @@ export function merkeLetztenOrt(benutzerId: number, ort: LetzterOrt, jetzt = Dat
   sicherSchreiben(schluessel(benutzerId), JSON.stringify({ ...ort, at: jetzt }));
 }
 
-/** Der gemerkte Ort, oder `null` (nichts gemerkt, abgelaufen, fremder Inhalt). */
-export function leseLetztenOrt(benutzerId: number, jetzt = Date.now()): LetzterOrt | null {
-  const roh = sicherLesen(schluessel(benutzerId));
+/** Der rohe Speicherstand samt Zeitpunkt, `null` ohne Eintrag; nur für `restoreLetztenOrt`. */
+export type LetzterOrtSnapshot = string | null;
+
+/** Hält den Speicherstand fest, bevor der Rahmen eine neue Adresse merkt. */
+export function snapshotLetztenOrt(benutzerId: number): LetzterOrtSnapshot {
+  return sicherLesen(schluessel(benutzerId));
+}
+
+/**
+ * Nimmt das Merken von `eigen` zurück: schreibt den Stand davor unverändert zurück, samt seinem
+ * Zeitpunkt (ein neuer verlängerte die Frist eines fast abgelaufenen Orts), und entfernt den
+ * Eintrag, wenn davor keiner da war. Für den Rahmen, wenn eine Seite erst nach dem Laden meldet,
+ * dass es ihr Objekt nicht (mehr) gibt (LLH-1827, `nichtGefundenContext.ts`): ihre Adresse hatte
+ * er bei der Ankunft schon gemerkt.
+ *
+ * Nur, solange im Speicher noch genau `eigen` steht: hat ein anderer Tab inzwischen einen Ort
+ * gemerkt, ist der neuer als der Stand davor und bleibt.
+ */
+export function restoreLetztenOrt(
+  benutzerId: number,
+  eigen: LetzterOrt,
+  vorher: LetzterOrtSnapshot,
+): void {
+  const steht = parseLetztenOrt(sicherLesen(schluessel(benutzerId)));
+  if (steht == null || steht.einsatzId !== eigen.einsatzId || steht.pfad !== eigen.pfad) return;
+  if (vorher == null) sicherEntfernen(schluessel(benutzerId));
+  else sicherSchreiben(schluessel(benutzerId), vorher);
+}
+
+/** Liest einen Speicherstand, ohne Frist und ohne Prüfung des Einsatzes. */
+function parseLetztenOrt(roh: string | null): (LetzterOrt & { at: number }) | null {
   if (!roh) return null;
   try {
     const wert: unknown = JSON.parse(roh);
@@ -48,10 +76,16 @@ export function leseLetztenOrt(benutzerId: number, jetzt = Date.now()): LetzterO
     if (typeof einsatzId !== 'number' || typeof pfad !== 'string' || typeof at !== 'number') {
       return null;
     }
-    if (jetzt - at > LETZTER_ORT_FRIST_MS) return null;
-    const ort = { einsatzId, pfad };
-    return gehoertZumEinsatz(ort) ? ort : null;
+    return { einsatzId, pfad, at };
   } catch {
     return null;
   }
+}
+
+/** Der gemerkte Ort, oder `null` (nichts gemerkt, abgelaufen, fremder Inhalt). */
+export function leseLetztenOrt(benutzerId: number, jetzt = Date.now()): LetzterOrt | null {
+  const wert = parseLetztenOrt(sicherLesen(schluessel(benutzerId)));
+  if (wert == null || jetzt - wert.at > LETZTER_ORT_FRIST_MS) return null;
+  const ort = { einsatzId: wert.einsatzId, pfad: wert.pfad };
+  return gehoertZumEinsatz(ort) ? ort : null;
 }

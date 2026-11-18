@@ -26,7 +26,7 @@ import { useDokumentTitel } from './useDokumentTitel';
 import { ebene1Seite } from './ebene1Seite';
 import { planungenPfad } from '../routing/deeplinks';
 import { Ebene1OrtProvider, type Ebene1OrtWert } from './Ebene1OrtKontext';
-import { schriftGroesse } from './instrument/rollenwerte';
+import { sprungzielInhalt } from './SprungZumInhalt';
 
 const { Header, Content } = Layout;
 
@@ -81,7 +81,7 @@ function GlobalLink({
           // freie Link (`gedaempft`). Die Tag-Schwelle gilt für bedienbaren Text, nicht für
           // Gesperrtes (LFH-434); deshalb steht das Schloss daneben.
           color: rahmenFarben.gesperrt,
-          fontSize: schriftGroesse('klein'),
+          fontSize: 12,
           cursor: 'not-allowed',
           display: 'inline-flex',
           alignItems: 'center',
@@ -174,7 +174,7 @@ export default function AppLayout() {
   // Nachtrolle, weil die Leiste in beiden Modi dunkel ist.
   const linkStil: CSSProperties = {
     color: rahmenFarben.gedaempft,
-    fontSize: schriftGroesse('klein'),
+    fontSize: 12,
     display: 'inline-flex',
     alignItems: 'center',
     flexShrink: 0,
@@ -270,7 +270,8 @@ export default function AppLayout() {
       {/* Alarmzone (LLH-1735): Org-Hinweise direkt unter dem Kopf, in jeder Breite; der Org-Rahmen
          hat keine Leiste am Handschirm (design.md D5). */}
       <AlarmZone />
-      <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
+      {/* Ziel des Sprunglinks zum Inhalt (nufmon70 D2); die Verwaltung schachtelt ihres hinein. */}
+      <Content {...sprungzielInhalt} style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
         <Ebene1OrtProvider value={ebene1Ort}>
           <Outlet />
         </Ebene1OrtProvider>

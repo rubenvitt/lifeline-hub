@@ -1,6 +1,6 @@
 import { Button, Modal } from 'antd';
 import KopierbarerText from '../../components/KopierbarerText';
-import { useRollen, zahlStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
@@ -15,10 +15,7 @@ export function RechteText({ scopes }: { scopes: readonly string[] }) {
       {scopes.map((s, i) => (
         <span key={s}>
           {i > 0 && ' · '}
-          {scopeText(s)}{' '}
-          <span data-schrift="kennung" style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>
-            {s}
-          </span>
+          {scopeText(s)} <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
         </span>
       ))}
     </span>
@@ -59,7 +56,7 @@ export function CodeDialog({
           style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
         >
           <KopierbarerText text={code.code} bezeichnung="Code">
-            <span data-lfh="anbindung-code-text" style={zahlStil('wert', 500)}>
+            <span data-lfh="anbindung-code-text" style={monoStil(22, 500)}>
               {code.code}
             </span>
           </KopierbarerText>
@@ -67,12 +64,7 @@ export function CodeDialog({
             gilt bis {zeitKurz(code.laeuft_ab_at, konv)}, einmal einlösbar · nur jetzt sichtbar
           </span>
           <KopierbarerText text={kommando} bezeichnung="Kommando">
-            <span
-              data-schrift="kennung"
-              style={{ ...zahlStil('klein', 500), wordBreak: 'break-all' }}
-            >
-              {kommando}
-            </span>
+            <span style={{ ...monoStil(12, 500), wordBreak: 'break-all' }}>{kommando}</span>
           </KopierbarerText>
           <span style={{ color: rollen.gedaempft }}>
             Nach dem Einlösen steht der Fingerabdruck des Fremdsystems am Zugang. Das Kommando zeigt

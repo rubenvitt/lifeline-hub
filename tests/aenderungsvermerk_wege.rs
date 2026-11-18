@@ -300,3 +300,48 @@ async fn zuordnen_und_freigeben_vermerken_den_fuehrer() {
         Some(l.bert_id)
     );
 }
+
+#[tokio::test]
+async fn ruecknahme_der_entlassung_vermerkt_fuehrer_und_einsatzleiter() {
+    let l = lage().await;
+    let (eid, ep) = einheit_mit_fuehrer(&l, "1. Zug", "Anna").await;
+    let fs = format!("/api/einsaetze/{}/fuehrungsstelle", l.einsatz);
+    senden(
+        &l.app,
+        &l.admin,
+        "PATCH",
+        &fs,
+        Some(json!({"einsatzleiter": {"art": "personal", "personal_id": ep}})),
+    )
+    .await;
+    // Die Rücknahme darf nur, wer entlassen hat.
+    let pfad = format!("/api/einsaetze/{}/personal/{ep}/entlassen", l.einsatz);
+    let (s, entlassen) = anfrage_json(&l.app, "POST", &pfad, &l.bert, None).await;
+    assert!(s.is_success(), "{s} {entlassen}");
+    // Die Vermerke des Entlassens räumen: so belegt nur die Rücknahme einen neuen.
+    sqlx::query("DELETE FROM einsatz_feld_vermerk WHERE einsatz_id = ?")
+        .bind(l.einsatz)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+
+    let (s, v) = anfrage_json(
+        &l.app,
+        "POST",
+        &format!("{pfad}/zuruecknehmen"),
+        &l.bert,
+        Some(&entlassen["vorzustand"]),
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    assert_eq!(v["ausgelassen"], json!([]), "{v}");
+
+    assert_eq!(
+        vermerk_einheit(&l.pool, eid, "fuehrer_id").await,
+        Some(l.bert_id)
+    );
+    assert_eq!(
+        vermerk_fuehrungsstelle(&l.pool, l.einsatz, "einsatzleiter").await,
+        Some(l.bert_id)
+    );
+}

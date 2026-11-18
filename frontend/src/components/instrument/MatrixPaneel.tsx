@@ -2,8 +2,7 @@ import type { ReactNode } from 'react';
 import DashboardPaneel, { type DashboardPaneelBasis } from './DashboardPaneel';
 import type { KennzahlTon } from './Kennzahl';
 import { MATRIX_KLASSE } from './matrixGeometrie';
-import { useRollen, schriftGroesse, zahlStil, schriftStil } from './rollenwerte';
-
+import { monoStil, useRollen } from './rollenwerte';
 import './matrixPaneel.css';
 
 /**
@@ -76,7 +75,7 @@ export default function MatrixPaneel({
                   „niedrig“ knapp, dort deckte es das Wort. */}
               <span
                 style={{
-                  fontSize: schriftGroesse('klein'),
+                  fontSize: 12,
                   color: rollen.text2,
                   hyphens: 'auto',
                   overflowWrap: 'break-word',
@@ -102,7 +101,7 @@ export default function MatrixPaneel({
               </span>
               <span
                 style={{
-                  ...zahlStil('fein'),
+                  ...monoStil(11),
                   textAlign: 'end',
                   color:
                     z.ton === 'alarm'
@@ -129,10 +128,7 @@ export default function MatrixPaneel({
           }}
         >
           <span className={MATRIX_KLASSE.fueller} />
-          <span
-            className={MATRIX_KLASSE.stufen}
-            style={{ ...schriftStil('meta'), color: rollen.schwach }}
-          >
+          <span className={MATRIX_KLASSE.stufen} style={{ ...monoStil(10), color: rollen.schwach }}>
             {stufen.map((l) => (
               <span
                 key={l}

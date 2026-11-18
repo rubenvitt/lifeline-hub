@@ -19,7 +19,7 @@ import { formatRegel } from '../abloesung/schichtmodellText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { StatusChip, zahlStil } from '../components/instrument';
+import { StatusChip, monoStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -221,14 +221,14 @@ function SchichtmodelleInhalt() {
       key: 'vorwarnung',
       abBreite: 'md',
       sorter: nachZahl((m: Schichtmodell) => m.vorwarnung_minuten),
-      render: (_, m) => <span style={zahlStil('klein')}>{dauer(m.vorwarnung_minuten)}</span>,
+      render: (_, m) => <span style={monoStil(12)}>{dauer(m.vorwarnung_minuten)}</span>,
     },
     {
       title: 'Planungsvorlauf',
       key: 'planungsvorlauf',
       abBreite: 'lg',
       sorter: nachZahl((m: Schichtmodell) => m.planungsvorlauf_minuten),
-      render: (_, m) => <span style={zahlStil('klein')}>{dauer(m.planungsvorlauf_minuten)}</span>,
+      render: (_, m) => <span style={monoStil(12)}>{dauer(m.planungsvorlauf_minuten)}</span>,
     },
     ...(istAdmin
       ? [

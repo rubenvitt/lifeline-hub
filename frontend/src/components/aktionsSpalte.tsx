@@ -1,5 +1,5 @@
 import { Button, Space } from 'antd';
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import { dichten, type Dichte } from '../theme/tokens';
 import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
 import { menueSpaltenBreite } from './menueSpalte';
@@ -65,6 +65,13 @@ export function aktionsSpaltenBreite({
   return Math.ceil(menue + knopf + FUGE);
 }
 
+/**
+ * Meldet `AktionsInhalt`, dass er in der fixierten Kennung unter `md` steht (`Datensicht`
+ * setzt ihn dort). Ab `md` hat die Reihe ihre eigene, breit genug gerechnete Spalte und bleibt
+ * nebeneinander.
+ */
+export const KennungAktionKontext = createContext(false);
+
 /** Der Inhalt einer Aktionszelle; derselbe in der Spalte und in der Kennung unter `md`. */
 export function AktionsInhalt<T>({
   zeile,
@@ -75,6 +82,7 @@ export function AktionsInhalt<T>({
   aktion?: SpaltenAktion<T>;
   weitere?: SpaltenWeitere<T>;
 }): ReactNode {
+  const inKennung = useContext(KennungAktionKontext);
   const sichtbar = aktion != null && (aktion.sichtbar?.(zeile) ?? true);
   const knopf = !aktion ? null : !sichtbar ? (
     (aktion.ersatz?.(zeile) ?? null)
@@ -98,11 +106,25 @@ export function AktionsInhalt<T>({
       />
     ) : null;
   if (!knopf && !menue) return null;
-  return (
-    <Space size="middle" wrap={false}>
+  const reihe = (
+    <Space size="middle" wrap={inKennung}>
       {knopf}
       {menue}
     </Space>
+  );
+  if (!inKennung) return reihe;
+  // In der Kennung bemisst die Reihe die Spalte nicht mit: `min-content` meldet der Tabelle nur
+  // das breiteste Teil, `minWidth: 100%` füllt danach die Zelle. So setzt der Name die Breite, und
+  // ⋮ bricht nur um, wenn der Platz fehlt (Betreuungsstellen auf 390 px,
+  // `e2e/betreuung-stellen-schmal.spec.ts`). Ohne Knopf und ⋮ kein leerer Kasten: er brächte in
+  // der Kennung eine Fuge mit.
+  return (
+    <div
+      data-lfh="datensicht-kennung-aktionsreihe"
+      style={{ width: 'min-content', minWidth: '100%' }}
+    >
+      {reihe}
+    </div>
   );
 }
 

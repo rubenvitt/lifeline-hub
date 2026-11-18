@@ -109,7 +109,9 @@ for (const dichte of DICHTEN) {
       await anmelden(page);
     });
 
-    test('Name an der Zeile ändern: genau `name` geht hinaus', async ({ page }) => {
+    test('Name an der Zeile ändern: genau `name` geht hinaus, mit dem Wert beim Öffnen', async ({
+      page,
+    }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Name ${dichte} ${Date.now()}`);
       const einheitId = await createEinheit(page, einsatzId, '1. Zug');
       await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten/${einheitId}`, dichte);
@@ -131,7 +133,8 @@ for (const dichte of DICHTEN) {
       expect(bodies).toEqual([
         {
           pfad: `/api/einsaetze/${einsatzId}/einheiten/${einheitId}`,
-          body: { name: '1. Zug Nord' },
+          // Feldvergleich (LLH-1831): der Wert beim Öffnen geht als `erwartet` mit.
+          body: { name: '1. Zug Nord', erwartet: { name: '1. Zug' } },
         },
       ]);
     });

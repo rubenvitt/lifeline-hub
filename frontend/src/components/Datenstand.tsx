@@ -5,7 +5,6 @@ import { useOhneVerbindung } from '../offline/verbindung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { leereUhrzeit, zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
-import { schriftGroesse } from './instrument/rollenwerte';
 import { minutenZwischen, relativ } from '../anzeige/dauer';
 import { useMinutenTakt } from './useMinutenTakt';
 
@@ -103,13 +102,12 @@ export function gemeinsamerDatenstand(...zeitstempel: Array<number | undefined>)
 }
 
 /**
- * Kompakte, wiederverwendbare Datenfrische-Anzeige für Seiten- und Sektionsköpfe, als Meta
- * (`schriftskala.meta`, Stufe `klein`): „Stand 14:32“ trägt ein Wort, steht also in der Textschrift
- * mit gleich breiten Ziffern (LLH-1777, Mono-Grenze).
+ * Kompakte, wiederverwendbare Datenfrische-Anzeige für Seiten- und Sektionsköpfe, als Mono-Meta
+ * (`schriftskala.meta`, 11 px): eine Uhrzeit ist eine Zahl.
  */
 const STIL = {
   fontFamily: schrift[schriftskala.meta.familie],
-  fontSize: schriftGroesse('klein'),
+  fontSize: schriftskala.meta.groesse,
   fontVariantNumeric: 'tabular-nums',
   whiteSpace: 'nowrap',
 } as const;

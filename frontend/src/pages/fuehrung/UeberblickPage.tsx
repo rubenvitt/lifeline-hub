@@ -19,8 +19,8 @@ import {
 import { darfBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
+  Augenbraue,
   DashboardFlaeche,
-  Feldetikett,
   GliederungsPaneel,
   Kennzahl,
   Kennzahlenband,
@@ -34,14 +34,13 @@ import {
   AlarmZeile,
   Zeitachseneintrag,
   listenZeileStil,
+  monoStil,
+  schriftStil,
   useRollen,
   type DashboardZustand,
   type Gliederungszeile,
   type KennzahlZustand,
   type Verteilungszeile,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
 } from '../../components/instrument';
 import { anteil } from '../../components/instrument/Aufgliederung';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -943,7 +942,7 @@ export default function UeberblickPage() {
                             <span
                               style={{
                                 ...schriftStil('meta'),
-                                fontSize: schriftGroesse('fein'),
+                                fontSize: 11,
                                 color: rollen.schwach,
                               }}
                             >
@@ -1007,9 +1006,7 @@ export default function UeberblickPage() {
                         fuss={
                           // Im Leerzustand steht der Hinweis im Leertext.
                           zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
-                            <span
-                              style={{ fontSize: schriftGroesse('klein'), color: rollen.gedaempft }}
-                            >
+                            <span style={{ fontSize: 12, color: rollen.gedaempft }}>
                               {markenHinweis}
                             </span>
                           ) : undefined
@@ -1038,13 +1035,13 @@ export default function UeberblickPage() {
                                 minWidth: 52,
                               }}
                             >
-                              <span style={{ ...zahlStil('text'), color: markenFarbe(m) }}>
+                              <span style={{ ...monoStil(14), color: markenFarbe(m) }}>
                                 {kurz(m.zeit)}
                               </span>
                               <span
                                 style={{
                                   ...schriftStil('meta'),
-                                  fontSize: schriftGroesse('fein'),
+                                  fontSize: 11,
                                   color: markenFarbe(m),
                                 }}
                               >
@@ -1055,7 +1052,7 @@ export default function UeberblickPage() {
                               style={{
                                 flex: '1 1 auto',
                                 minWidth: 0,
-                                fontSize: schriftGroesse('klein'),
+                                fontSize: 12,
                                 lineHeight: 1.4,
                                 color: rollen.gedaempft,
                                 overflowWrap: 'anywhere',
@@ -1124,7 +1121,7 @@ export default function UeberblickPage() {
                                     data-lfh="entscheidung-folge"
                                     style={{
                                       ...schriftStil('meta'),
-                                      fontSize: schriftGroesse('fein'),
+                                      fontSize: 11,
                                       letterSpacing: '0.06em',
                                       color: rollen.bedien,
                                     }}
@@ -1222,29 +1219,11 @@ function abschnittGliederung(
     kante: lage ? { farbe: rollenFarbe(lage.rolle, token), rolle: lage.rolle } : null,
     kopf: (
       <>
-        <span
-          style={{ fontSize: schriftGroesse('text'), fontWeight: 500, overflowWrap: 'anywhere' }}
-        >
+        <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
         </span>
-        {leitung && (
-          <span
-            style={{
-              ...schriftStil('meta'),
-              fontSize: schriftGroesse('fein'),
-              color: rollen.schwach,
-            }}
-          >
-            {leitung}
-          </span>
-        )}
-        <span
-          style={{
-            ...schriftStil('meta'),
-            fontSize: schriftGroesse('fein'),
-            color: rollen.gedaempft,
-          }}
-        >
+        {leitung && <span style={{ ...monoStil(11), color: rollen.schwach }}>{leitung}</span>}
+        <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {/* Was gezählt wird, steht dran (LFH-973): hier der ganze Teilbaum, im Abschnittsbaum
               nur die direkt zugeordneten. */}
           {anzahlWort(zeile.einheiten, 'Einheit', 'Einheiten')}
@@ -1286,30 +1265,14 @@ function abschnittGliederung(
           <span>
             {juengster.auftrag_text}
             {weitere.length > 0 && (
-              <span
-                style={{
-                  ...schriftStil('meta'),
-                  fontSize: schriftGroesse('fein'),
-                  color: rollen.schwach,
-                }}
-              >
+              <span style={{ ...monoStil(10), color: rollen.schwach }}>
                 {' '}
                 · +{weitere.length} weitere offen
               </span>
             )}
           </span>
         ) : null}
-        {unterzeile && (
-          <span
-            style={{
-              ...schriftStil('meta'),
-              fontSize: schriftGroesse('fein'),
-              color: rollen.schwach,
-            }}
-          >
-            {unterzeile}
-          </span>
-        )}
+        {unterzeile && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unterzeile}</span>}
         {/* Nur wenn die Rückmeldungen feststehen, sonst gar nichts. Der verborgene Vorsatz gibt
             der Zeit im Linknamen ihre Bedeutung. */}
         {zeile.rueckmeldungBekannt && (
@@ -1319,14 +1282,7 @@ function abschnittGliederung(
           >
             {rueck ? (
               <>
-                <span
-                  style={{
-                    ...schriftStil('meta'),
-                    fontSize: schriftGroesse('fein'),
-                    color: rollen.schwach,
-                    flex: '0 0 auto',
-                  }}
-                >
+                <span style={{ ...monoStil(10), color: rollen.schwach, flex: '0 0 auto' }}>
                   <span style={NUR_VORLESER}>Letzte Rückmeldung:</span> {zeit(rueck.ereigniszeit)}
                 </span>
                 {/* Leerzeichen zwischen den Flex-Kindern: unsichtbar, trennt aber im Linknamen
@@ -1334,7 +1290,7 @@ function abschnittGliederung(
                 <span
                   title={rueck.inhalt}
                   style={{
-                    fontSize: schriftGroesse('fein'),
+                    fontSize: 11,
                     color: rollen.schwach,
                     minWidth: 0,
                     overflow: 'hidden',
@@ -1346,9 +1302,7 @@ function abschnittGliederung(
                 </span>
               </>
             ) : (
-              <span style={{ fontSize: schriftGroesse('fein'), color: rollen.schwach }}>
-                noch keine Rückmeldung
-              </span>
+              <span style={{ fontSize: 11, color: rollen.schwach }}>noch keine Rückmeldung</span>
             )}
           </span>
         )}
@@ -1356,21 +1310,15 @@ function abschnittGliederung(
     ),
     zahl: (
       <>
-        <span style={zahlStil('text')} title={STAERKE_AUSGESCHRIEBEN}>
+        <span style={monoStil(15)} title={STAERKE_AUSGESCHRIEBEN}>
           {zeile.staerkeText}
         </span>
-        <Feldetikett>{STAERKE_SCHREIBWEISE}</Feldetikett>
+        <Augenbraue>{STAERKE_SCHREIBWEISE}</Augenbraue>
         {/* Einheiten je Status als Verteilung: Wort, Zahl, Balken (Dashboard-Baukasten). Kein
             `aria-label` an der Liste: im Link bildet sich der Name aus dem Inhalt. */}
         <Verteilungsliste kennung="abschnitt-status" dichte="zeile" zeilen={status} />
         {verteilung.ohne > 0 && (
-          <span
-            style={{
-              ...schriftStil('meta'),
-              fontSize: schriftGroesse('fein'),
-              color: rollen.schwach,
-            }}
-          >
+          <span style={{ ...monoStil(10), color: rollen.schwach }}>
             +{verteilung.ohne} ohne Status
           </span>
         )}

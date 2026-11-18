@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { StatusChip, schriftStil, zahlStil } from '../components/instrument';
+import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -98,7 +98,7 @@ export default function EinheitVorlagenTab() {
         ) : (
           <Space size={[8, 0]} wrap>
             {vorlage.fahrzeuge.map((f) => (
-              <span key={f.fahrzeug_id} data-schrift="kennung" style={zahlStil('klein')}>
+              <span key={f.fahrzeug_id} style={monoStil(12)}>
                 {f.funkrufname}
               </span>
             ))}
@@ -113,11 +113,7 @@ export default function EinheitVorlagenTab() {
         const quali = qualiSollTextVon(vorlage);
         return (
           <>
-            {/* Geerbt trägt das Soll „(Vorgabe)“, ein Wort: dann Textschrift (LLH-1777). */}
-            <span
-              style={vorlage.soll && !vorlage.soll_eigen ? schriftStil('meta') : zahlStil('klein')}
-              title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}
-            >
+            <span style={monoStil(12)} title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}>
               {sollText(vorlage)}
             </span>
             {quali ? ` · ${quali}` : null}

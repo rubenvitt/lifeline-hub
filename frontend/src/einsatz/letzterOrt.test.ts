@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { LETZTER_ORT_FRIST_MS, leseLetztenOrt, merkeLetztenOrt } from './letzterOrt';
+import {
+  LETZTER_ORT_FRIST_MS,
+  leseLetztenOrt,
+  merkeLetztenOrt,
+  restoreLetztenOrt,
+  snapshotLetztenOrt,
+} from './letzterOrt';
 
 const A = 3;
 const B = 4;
@@ -50,5 +56,40 @@ describe('letzterOrt', () => {
     expect(leseLetztenOrt(A, 2)).toBeNull();
     merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/6/etb' }, 1);
     expect(leseLetztenOrt(A, 2)).toBeNull();
+  });
+
+  // Eine Detailseite erfährt erst nach dem Laden, dass es ihr Objekt nicht gibt (LLH-1827): der
+  // Rahmen stellt dann den Stand davor wieder her, unverändert samt Zeitpunkt.
+  it('stellt einen früheren Ort samt seiner Frist wieder her', () => {
+    merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/5/ueberblick' }, 0);
+    const vorher = snapshotLetztenOrt(A);
+    const eigen = { einsatzId: 5, pfad: '/einsaetze/5/personen/999' };
+    merkeLetztenOrt(A, eigen, LETZTER_ORT_FRIST_MS - 1000);
+    restoreLetztenOrt(A, eigen, vorher);
+    expect(leseLetztenOrt(A, LETZTER_ORT_FRIST_MS)).toEqual({
+      einsatzId: 5,
+      pfad: '/einsaetze/5/ueberblick',
+    });
+    // Das Zurücknehmen verlängert die Frist nicht: der Ort verfällt wie vor dem Besuch.
+    expect(leseLetztenOrt(A, LETZTER_ORT_FRIST_MS + 1)).toBeNull();
+  });
+
+  it('vergisst den Ort, wenn davor keiner gemerkt war', () => {
+    const vorher = snapshotLetztenOrt(A);
+    const eigen = { einsatzId: 5, pfad: '/einsaetze/5/personen/999' };
+    merkeLetztenOrt(A, eigen, 1000);
+    restoreLetztenOrt(A, eigen, vorher);
+    expect(localStorage.getItem(`lfh:nav:letzter-ort:${A}`)).toBeNull();
+  });
+
+  it('lässt einen Ort stehen, den inzwischen ein anderer Tab gemerkt hat', () => {
+    merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/5/ueberblick' }, 1000);
+    const vorher = snapshotLetztenOrt(A);
+    const eigen = { einsatzId: 5, pfad: '/einsaetze/5/personen/999' };
+    merkeLetztenOrt(A, eigen, 2000);
+    // Ein zweiter Tab kommt zwischen Ankunft und 404 an einer anderen Stelle an.
+    merkeLetztenOrt(A, { einsatzId: 5, pfad: '/einsaetze/5/etb' }, 3000);
+    restoreLetztenOrt(A, eigen, vorher);
+    expect(leseLetztenOrt(A, 4000)).toEqual({ einsatzId: 5, pfad: '/einsaetze/5/etb' });
   });
 });

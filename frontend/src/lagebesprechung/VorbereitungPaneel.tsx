@@ -8,7 +8,7 @@ import type { AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
 import type { EinsatzAnzeige, LagebesprechungStand, ModulFreigaben } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Paneel, PaneelZeile, useRollen, schriftStil } from '../components/instrument';
+import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -135,8 +135,7 @@ export default function VorbereitungPaneel({
             <span
               data-teil="wert"
               style={{
-                ...schriftStil('text'),
-                fontWeight: 500,
+                ...monoStil(token.fontSize, 500),
                 overflowWrap: 'anywhere',
               }}
             >

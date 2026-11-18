@@ -81,10 +81,8 @@ import {
   Paneel,
   Segmentleiste,
   StatusChip,
+  monoStil,
   useRollen,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
 } from '../../components/instrument';
 import {
   rollenFarbe,
@@ -382,7 +380,7 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
             : { minWidth: 0, overflowWrap: 'anywhere' }
         }
       >
-        <span style={{ ...zahlStil('klein'), whiteSpace: 'nowrap' }}>{nr}</span>
+        <span style={{ ...monoStil(token.fontSizeSM), whiteSpace: 'nowrap' }}>{nr}</span>
         {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
         {` · ${person.name || 'unbekannt'}`}
       </span>
@@ -439,7 +437,7 @@ function Wartezeit({ seit, vorwort }: { seit: string; vorwort?: string }) {
       style={{ flex: 'none', fontSize: token.fontSizeSM, color: rollen.text2 }}
     >
       {vorwort && `${vorwort} `}
-      <span style={zahlStil('klein')}>{dauer(minuten)}</span>
+      <span style={monoStil(token.fontSizeSM)}>{dauer(minuten)}</span>
     </span>
   );
 }
@@ -748,7 +746,7 @@ function PlatzKarte({
           WebkitLineClamp: 2,
           overflow: 'hidden',
           lineHeight: '15px',
-          fontSize: schriftGroesse('text'),
+          fontSize: 13,
           maxHeight: 30,
           // Silbengrenzen statt Wortbruch ohne Trennstrich (LLH-1793).
           ...WORTUMBRUCH_STIL,
@@ -1117,8 +1115,7 @@ function UnterwegsSpalte({
               <Button
                 type="link"
                 style={{
-                  // „R-007 · Name“ trägt einen Namen: Textschrift (LLH-1777).
-                  ...schriftStil('textKlein'),
+                  ...monoStil(12),
                   paddingInline: 0,
                   justifyContent: 'flex-start',
                   maxWidth: '100%',
@@ -2228,7 +2225,9 @@ function KandidatenWahl({
                   style={{ minWidth: 0, whiteSpace: 'normal', ...WORTUMBRUCH_STIL }}
                 >
                   <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
-                  <span style={zahlStil('klein')}>{registrierAnzeige(p.registrier_nr)}</span>
+                  <span style={monoStil(token.fontSizeSM)}>
+                    {registrierAnzeige(p.registrier_nr)}
+                  </span>
                   {` · ${p.name || 'unbekannt'}`}
                 </span>
                 {(seit || p.zustand) && (

@@ -51,8 +51,7 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
   „Lagemeldungen“.
 - Seitenkopf: jeder Link im Ortspfad (Brotkrume) jeder Seite, die den gemeinsamen Seitenkopf
   trägt, auch im Kopf der Verwaltungsseiten (etwa „Fahrzeuge“ bzw. „Personal“ über der
-  Fahrzeug- und der Personal-Detailseite der Stammdaten). Seine Schrift MUST dabei in der Stufe `klein` der Schriftskala stehen (12 px in `kompakt`,
-  mit der Dichte wachsend); die Trefffläche wächst darüber hinaus um Fläche über und
+  Fahrzeug- und der Personal-Detailseite der Stammdaten). Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um Fläche über und
   unter dem Text, nicht über die Schrift. Der Ortspfad MUST den Seitenkopf in `kompakt` am
   Fükw-Schirm nicht über seine 44 px heben.
 
@@ -78,7 +77,7 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 
 #### Scenario: Brotkrume im Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und eine Seite mit zwei Links im Ortspfad (etwa „Einsätze“ und das Modul über der Druckansicht einer Liste) am Fükw-Schirm und auf dem Handschirm steht
-- **THEN** misst jeder Link im Ortspfad mindestens 72 px in der Höhe, und seine Schrift ist 15 px groß (12 px × 1,25)
+- **THEN** misst jeder Link im Ortspfad mindestens 72 px in der Höhe, und seine Schrift ist 12 px groß
 
 #### Scenario: Brotkrume in kompakt
 - **WHEN** dieselbe Seite in `kompakt` am Fükw-Schirm steht
@@ -86,7 +85,7 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 
 #### Scenario: Brotkrume der Stammdaten-Detailseiten
 - **WHEN** die Fahrzeug- oder die Personal-Detailseite der Stammdaten am Fükw-Schirm und auf dem Handschirm steht
-- **THEN** misst der Link „Fahrzeuge“ bzw. „Personal“ im Ortspfad in `handschuh` mindestens 72 px und in `kompakt` mindestens 30 px in der Höhe, und seine Schrift ist in `kompakt` 12 px und in `handschuh` 15 px groß
+- **THEN** misst der Link „Fahrzeuge“ bzw. „Personal“ im Ortspfad in `handschuh` mindestens 72 px und in `kompakt` mindestens 30 px in der Höhe, und seine Schrift ist in jeder Stufe 12 px groß
 
 #### Scenario: Liste und Detail der Aufträge im Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und auf dem Handschirm ein offener Auftrag mit offenem Empfänger aufgeklappt ist
@@ -675,3 +674,34 @@ aufgeklappt stehen. Folge und kumulierte Stärken MUST denen der Tabelle gleiche
 #### Scenario: Ab md Tabelle
 - **WHEN** dieselbe Liste bei 1024 × 768 geöffnet wird
 - **THEN** steht sie als Tabelle mit stehender Kopfzeile
+
+### Requirement: Ein Sprunglink führt zum Inhalt
+
+Jede Seite im Rahmen (Einsatz, Ebene 1, Verwaltung, Planungen) und die Hilfe MUST als ersten
+Tab-Halt einen Link „Zum Inhalt springen“ haben, vor Betriebszeile, Kopf und Navigation. Er MUST
+den Fokus an den Anfang des Seiteninhalts setzen, in der Verwaltung neben das Menü. Ohne Fokus
+MUST er unsichtbar sein; mit Fokus MUST er sichtbar sein, ohne den Rahmen zu verschieben, und
+MUST NOT verdeckt sein. Die Adresse MUST dabei unverändert bleiben.
+
+#### Scenario: Erster Halt im Überblick
+- **WHEN** der Überblick eines Einsatzes geladen ist und einmal Tab gedrückt wird
+- **THEN** hat der Link „Zum Inhalt springen“ den Fokus und ist sichtbar
+- **AND** kein Element des Rahmens hat sich verschoben
+
+#### Scenario: Sprung in den Inhalt
+- **WHEN** auf dem Link Enter gedrückt und danach einmal Tab gedrückt wird
+- **THEN** liegt der Fokus auf dem ersten Bedienelement im Seiteninhalt, nicht in Kopf, Rail
+  oder Modulpanel
+- **AND** die Adresse ist unverändert
+
+#### Scenario: Verwaltung
+- **WHEN** in der Verwaltung der Link benutzt und danach Tab gedrückt wird
+- **THEN** liegt der Fokus im Inhalt neben dem Verwaltungsmenü, nicht im Menü
+
+#### Scenario: Störung der Verbindung
+- **WHEN** die Betriebszeile eine Störung mit Knöpfen zeigt und die Seite neu geladen ist
+- **THEN** ist der erste Tab-Halt trotzdem der Link „Zum Inhalt springen“
+
+#### Scenario: Ohne Fokus
+- **WHEN** der Link keinen Fokus hat
+- **THEN** ist er nicht zu sehen und nimmt keinen Platz im Rahmen ein

@@ -22,7 +22,7 @@ import { useEditSitzung, type CasBasis, type MitGeaendertAt } from '../useEditSi
 import Datenraster, { Datenfeld } from './Datenraster';
 import DatenfeldEingabe from './DatenfeldEingabe';
 import Paneel, { paneelZeileStil, type PaneelUeberschrift } from './Paneel';
-import { useRollen, schriftGroesse } from './rollenwerte';
+import { useRollen } from './rollenwerte';
 
 /**
  * BearbeitbaresPaneel — „Bearbeiten in der Ansicht“ (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten
@@ -431,11 +431,7 @@ function Innen<W extends object, P = Partial<W>>({
         <div
           id={grundId}
           data-lfh="paneel-sperrgrund"
-          style={{
-            ...paneelZeileStil(rollen, token),
-            color: rollen.gedaempft,
-            fontSize: schriftGroesse('text'),
-          }}
+          style={{ ...paneelZeileStil(rollen, token), color: rollen.gedaempft, fontSize: 13 }}
         >
           {sperrGrund}
         </div>

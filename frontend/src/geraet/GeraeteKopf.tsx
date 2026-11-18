@@ -20,11 +20,10 @@ import { datenstandText, formatiereDatenstand } from '../components/Datenstand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
-import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import { GeraeteMenue } from './GeraeteMenue';
 import { useStellenName } from './stellenName';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
-import { schriftStil } from '../components/instrument/rollenwerte';
 
 dayjs.extend(utc);
 
@@ -123,7 +122,9 @@ function KopplungsEnde({
       <span
         aria-hidden="true"
         style={{
-          ...schriftStil('meta'),
+          fontFamily: schrift.zahl,
+          fontSize: 12,
+          fontVariantNumeric: 'tabular-nums',
           whiteSpace: 'nowrap',
           color: bald ? farbe : rahmenFarben.text,
           fontWeight: bald ? 600 : 400,
@@ -195,7 +196,9 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
             role="img"
             style={{
               ...kopfZelleStil(zellToken),
-              ...schriftStil('meta'),
+              fontFamily: schrift.zahl,
+              fontSize: 12,
+              fontVariantNumeric: 'tabular-nums',
               whiteSpace: 'nowrap',
               color: farbenDunkel.achtung,
             }}

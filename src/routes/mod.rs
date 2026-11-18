@@ -16,6 +16,7 @@ pub mod benutzer_einstellungen;
 pub mod betreuung;
 pub mod betreuung_registrierung;
 pub mod chat;
+pub mod client_fehler;
 pub mod demo_daten;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;

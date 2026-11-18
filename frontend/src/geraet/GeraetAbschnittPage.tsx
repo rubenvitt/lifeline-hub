@@ -10,7 +10,7 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import StatusTag from '../components/StatusTag';
-import { Paneel, schriftStil, useRollen, zahlStil } from '../components/instrument';
+import { Paneel, monoStil, useRollen } from '../components/instrument';
 import { abschnittDerEinheit } from '../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../kraefte/meldebildRaster';
 import AbschnittDaten from '../pages/einsatzabschnitte/AbschnittDaten';
@@ -61,10 +61,7 @@ function EinheitZeile({
         <span>
           <strong>{e.name}</strong>
           {e.funkrufname && (
-            <span data-schrift="kennung" style={{ ...zahlStil('text'), color: rollen.gedaempft }}>
-              {' '}
-              · {e.funkrufname}
-            </span>
+            <span style={{ ...monoStil(13), color: rollen.gedaempft }}> · {e.funkrufname}</span>
           )}
           {abschnittName && <span style={{ color: rollen.gedaempft }}> · {abschnittName}</span>}
           {ueber && <span style={{ color: rollen.gedaempft }}> · über {ueber}</span>}
@@ -78,9 +75,8 @@ function EinheitZeile({
         />
       </Flex>
       {/* Eigene Stärke wie „Zugeordnete Einheiten“ der Abschnittsseite (LLH-1744): die Zeilen
-          ergeben die Stärke im Kopf, eine Untereinheit zählt nicht zusätzlich bei ihrem Zug.
-          Mit dem Wort „eigene“ ganz in der Textschrift, gleich breite Ziffern (LLH-1777). */}
-      <span style={schriftStil('text')}>
+          ergeben die Stärke im Kopf, eine Untereinheit zählt nicht zusätzlich bei ihrem Zug. */}
+      <span style={monoStil(13)}>
         eigene <StaerkeAnzeige wert={e.ist} />
       </span>
     </li>

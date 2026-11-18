@@ -20,6 +20,7 @@ import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { listePersonen } from '../../api/einsatzPerson';
 import type { Person } from '../../api/types';
 import { ApiError } from '../../api/client';
+import { erwarteNichtGefunden } from '../../test/nichtGefunden';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 
@@ -149,9 +150,35 @@ function renderBei(route: string) {
 }
 
 describe('UhsDetailPage — Deeplink-Robustheit (LFH-25)', () => {
-  it('leitet bei ungültiger UHS-ID auf die Liste um', async () => {
+  const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
+  const muster = {
+    titel: 'Diese Unfallhilfsstelle gibt es nicht (mehr)',
+    knopf: 'Zu den Unfallhilfsstellen',
+    liste: 'UHS-LISTE',
+  };
+
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4).
+  it('zeigt bei ungültiger UHS-ID das Muster, die Adresse bleibt', async () => {
     renderBei('/einsaetze/1/unfallhilfsstellen/abc');
-    expect(await screen.findByText('UHS-LISTE')).toBeInTheDocument();
+    expect(await screen.findByText(muster.titel)).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/abc');
+    await erwarteNichtGefunden(muster);
+  });
+
+  it('zeigt bei 404 das Muster mit dem Weg zur Liste der Unfallhilfsstellen', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockRejectedValue(new ApiError(404, 'Nicht gefunden'));
+    renderBei('/einsaetze/1/unfallhilfsstellen/99');
+    await erwarteNichtGefunden(muster);
+  });
+
+  it('behält bei 500 den Abruffehler mit „Erneut abrufen“', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeUhs).mockRejectedValue(new ApiError(500, 'kaputt'));
+    renderBei('/einsaetze/1/unfallhilfsstellen/99');
+    expect(await screen.findByText('UHS konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText(muster.titel)).toBeNull();
   });
 });
 

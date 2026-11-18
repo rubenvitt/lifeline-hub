@@ -44,6 +44,10 @@ Dienstes, auch Backup-, Purge- und DB-Fehler.
   WARN-Zeile je Minute. Die erste kommt sofort, die nächste trägt `anzahl` (Ereignisse seit der
   letzten Zeile) und `seit_s`. Ebbt die Last ab, steht der Rest der Zählung erst in der Zeile
   des nächsten Ereignisses.
+- **Absturz im Browser:** fängt die Oberfläche einen Fehler beim Zeichnen einer Seite, meldet sie
+  ihn an `POST /api/client-fehler` (`src/routes/client_fehler.rs`). Im Log steht höchstens eine
+  WARN-Zeile je Minute („Absturz im Client gemeldet“) mit Routenmuster ohne Kennungen, Version,
+  Meldung, Stack-Anfang, `anzahl` und `seit_s`; Benutzer und Organisation stehen nicht darin.
 - **503 ist kein ERROR mehr:** der `TraceLayer` schreibt einen 503 als WARN-Sammelzeile; jeder
   andere 5xx bleibt eine ERROR-Zeile („response failed“).
 - **Nicht blockierend:** ein eigener Thread schreibt das Log auf stdout. Staut journald, fallen

@@ -19,10 +19,8 @@ import {
   StromPaneel,
   VerteilungsPaneel,
   Zeitachseneintrag,
+  monoStil,
   useRollen,
-  schriftGroesse,
-  schriftStil,
-  zahlStil,
 } from '../../components/instrument';
 import type { LiveVerbindungsStatus } from '../../live/liveVerbindung';
 import {
@@ -84,10 +82,7 @@ export function GefahrenmatrixPaneel({
       sprung={{ label: 'Gefahren', onKlick: onGefahren }}
       fuss={
         (zustand === 'daten' || zustand === 'leer') && !gesperrt && beurteilung ? (
-          <span
-            data-lfh="gefahren-beurteilung"
-            style={{ fontSize: schriftGroesse('fein'), color: rollen.achtungText }}
-          >
+          <span data-lfh="gefahren-beurteilung" style={{ fontSize: 11, color: rollen.achtungText }}>
             {beurteilung}
           </span>
         ) : undefined
@@ -117,11 +112,7 @@ export function GefahrenmatrixPaneel({
           <div
             aria-hidden="true"
             data-lfh="gefahrenlegende-erlaeuterung"
-            style={{
-              ...schriftStil('meta'),
-              fontSize: schriftGroesse('fein'),
-              color: rollen.schwach,
-            }}
+            style={{ ...monoStil(10), color: rollen.schwach }}
           >
             <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
           </div>
@@ -170,19 +161,17 @@ export function SichtungsPaneel({
               data-lfh="ohne-sichtung"
               style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
             >
-              <span style={{ fontSize: schriftGroesse('fein'), color: rollen.schwach }}>
-                Ohne Sichtung
-              </span>
-              <span style={{ ...zahlStil('klein'), color: rollen.text2 }}>{ohneSichtung}</span>
+              <span style={{ fontSize: 11, color: rollen.schwach }}>Ohne Sichtung</span>
+              <span style={{ ...monoStil(12), color: rollen.text2 }}>{ohneSichtung}</span>
             </span>
             <span
               data-lfh="transport-bilanz"
               style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
             >
-              <span style={{ fontSize: schriftGroesse('fein'), color: rollen.schwach }}>
+              <span style={{ fontSize: 11, color: rollen.schwach }}>
                 Unterwegs / offen / abgeschlossen
               </span>
-              <span style={{ ...zahlStil('klein'), color: rollen.text2 }}>
+              <span style={{ ...monoStil(12), color: rollen.text2 }}>
                 {versorgung.unterwegs} / {versorgung.offen} / {versorgung.abgeschlossen}
               </span>
             </span>
@@ -336,7 +325,7 @@ export function MeldungsstromPaneel({
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              fontSize: schriftGroesse('klein'),
+              fontSize: 12,
               lineHeight: 1.4,
             }}
             title={e.inhalt}
@@ -391,8 +380,8 @@ export function VerlaufPaneel({
             data-lfh="verlauf-spitze"
             style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
           >
-            <span style={{ fontSize: schriftGroesse('fein'), color: rollen.schwach }}>Spitze</span>
-            <span style={{ ...schriftStil('meta'), color: rollen.text2 }}>
+            <span style={{ fontSize: 11, color: rollen.schwach }}>Spitze</span>
+            <span style={{ ...monoStil(12), color: rollen.text2 }}>
               {verlauf.spitze.stunde} Uhr · {verlauf.spitze.gesamt}
             </span>
           </span>
@@ -453,7 +442,7 @@ export function VerlaufPaneel({
                       <span
                         aria-hidden="true"
                         style={{
-                          ...zahlStil('fein'),
+                          ...monoStil(10),
                           color: rollen.text2,
                           textAlign: 'center',
                           lineHeight: 1.2,
@@ -467,7 +456,7 @@ export function VerlaufPaneel({
                 <div
                   aria-hidden="true"
                   style={{
-                    ...zahlStil('fein'),
+                    ...monoStil(10),
                     textAlign: 'center',
                     borderTop: `1px solid ${rollen.linieStark}`,
                     paddingTop: 2,
@@ -499,7 +488,7 @@ export function VerlaufPaneel({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
-                fontSize: schriftGroesse('fein'),
+                fontSize: 11,
                 color: rollen.gedaempft,
               }}
             >

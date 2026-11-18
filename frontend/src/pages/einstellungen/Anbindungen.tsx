@@ -5,7 +5,7 @@ import type { Dayjs } from 'dayjs';
 import { Link, useNavigate } from 'react-router';
 import { IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
-import { Paneel, StatusChip, useRollen, zahlStil } from '../../components/instrument';
+import { Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -250,8 +250,7 @@ export default function Anbindungen() {
                             <span>
                               {z.fingerabdruck ? (
                                 <>
-                                  Schlüssel{' '}
-                                  <span style={zahlStil('klein', 500)}>{z.fingerabdruck}</span>
+                                  Schlüssel <span style={monoStil(12, 500)}>{z.fingerabdruck}</span>
                                 </>
                               ) : widerrufenAm ? (
                                 'ohne Schlüssel'
@@ -261,7 +260,7 @@ export default function Anbindungen() {
                               {z.fingerabdruck_neu && (
                                 <>
                                   {' · neuer Schlüssel '}
-                                  <span style={zahlStil('klein', 500)}>{z.fingerabdruck_neu}</span>
+                                  <span style={monoStil(12, 500)}>{z.fingerabdruck_neu}</span>
                                   {', gilt ab der ersten Anfrage damit'}
                                 </>
                               )}
@@ -343,12 +342,7 @@ export default function Anbindungen() {
             {SCOPES.map((s) => (
               <Checkbox key={s} value={s}>
                 {SCOPE_TEXT[s]}{' '}
-                <span
-                  data-schrift="kennung"
-                  style={{ ...zahlStil('fein', 500), color: rollen.schwach }}
-                >
-                  {s}
-                </span>
+                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
               </Checkbox>
             ))}
           </Checkbox.Group>
