@@ -46,7 +46,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/t64nssql5sboyz6yh03bdptn
 
 ## 5. Gate
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
 
 ## Workflow follow-up
 
