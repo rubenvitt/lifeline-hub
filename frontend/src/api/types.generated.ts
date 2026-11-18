@@ -8078,14 +8078,10 @@ export interface components {
         /**
          * @description Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,
          *     Change `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,
-         *     wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+         *     wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er
+         *     trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */
         StatusRuecknahmeBeleg: {
-            /**
-             * Format: int64
-             * @description Zeitachsen-Ereignis der Einheit, das der Wechsel geschrieben hat.
-             */
-            ereignis_id?: number | null;
             /**
              * Format: int64
              * @description Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht.
@@ -8093,11 +8089,10 @@ export interface components {
             status_id: number;
             /** @description „Status seit“ des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt. */
             status_seit: string;
-            /** @description „Status seit“ vor dem Wechsel. */
-            vorher_seit?: string | null;
             /**
              * Format: int64
-             * @description Status vor dem Wechsel; `null`, wenn keiner gesetzt war.
+             * @description Status vor dem Wechsel, nur für die Quittung („S2 → S3“); die Rücknahme nimmt den Wert,
+             *     den der Server beim Wechsel festgehalten hat.
              */
             vorher_status_id?: number | null;
         };

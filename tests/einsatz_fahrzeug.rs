@@ -2161,8 +2161,14 @@ async fn statuswechsel_zuruecknehmen_stellt_status_und_seit_her_und_streicht_das
     let beleg = wechsel["status_ruecknahme"].clone();
     assert_eq!(beleg["vorher_status_id"], s2);
     assert_eq!(beleg["status_id"], s4);
-    assert!(beleg["ereignis_id"].is_i64(), "{beleg}");
-    let vorher_seit = beleg["vorher_seit"].clone();
+    // Der Beleg trägt nur Prüfwerte; was zurückkommt, hält der Server selbst fest (D8).
+    assert!(beleg.get("ereignis_id").is_none(), "{beleg}");
+    let vorher_seit: String =
+        sqlx::query_scalar("SELECT status_vorher_seit FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(
         einheit_ereignisse(&pool, einheit).await,
         vec![("eintreffen".into(), false)]
@@ -2302,9 +2308,12 @@ async fn rueckname_scheitert_an_der_zeitachse_und_aendert_nichts() {
         .await
         .unwrap();
     // Die Entlassung der Einheit von Hand, damit der Status S4 bleibt.
-    let ereignis = wechsel["status_ruecknahme"]["ereignis_id"]
-        .as_i64()
-        .unwrap();
+    let ereignis: i64 =
+        sqlx::query_scalar("SELECT status_ereignis_id FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let admin_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
         .fetch_one(&pool)
         .await
@@ -2342,4 +2351,29 @@ async fn rueckname_ohne_schreibrecht_ist_403() {
     let (s, _) =
         status_zuruecknehmen(&app, &erika, einsatz, ef, &wechsel["status_ruecknahme"]).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// Review vor dem PR: Werte im Beleg außer den Prüfwerten zählen nicht. Ein erfundener Vorzustand
+/// und ein fremdes Ereignis ändern nichts an dem, was zurückkommt.
+#[tokio::test]
+async fn rueckname_glaubt_dem_beleg_keinen_vorzustand() {
+    let (app, pool, admin, einsatz, ef, einheit, s2, _s4, wechsel) = statuswechsel_welt().await;
+    let vorher_seit: String =
+        sqlx::query_scalar("SELECT status_vorher_seit FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let mut beleg = wechsel["status_ruecknahme"].clone();
+    beleg["vorher_status_id"] = serde_json::json!(null);
+    beleg["vorher_seit"] = serde_json::json!("1970-01-01 00:00:00");
+    beleg["ereignis_id"] = serde_json::json!(999_999);
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status_id"], s2);
+    assert_eq!(json["status_seit"], vorher_seit);
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), true)]
+    );
 }

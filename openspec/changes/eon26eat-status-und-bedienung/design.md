@@ -140,28 +140,29 @@ Höhenbegrenzung; antd kippt nur, wenn das Menü auf einer Seite passt.
 
 ### D8 — Rücknahme im Server
 
-**Beleg im Wechsel.** Die Antwort des Status-PATCH bekommt ein Feld `status_ruecknahme` (nur wenn
-der Status sich geändert hat): `vorher_status_id`, `vorher_seit`, `status_seit` (neu),
-`ereignis_id` (Zeitachse, optional). Dafür gibt `einheit_ereignis` die Ereignis-id zurück, statt
-sie zu verwerfen.
+**Der Server hält den Vorzustand selbst.** Bei jedem echten Wechsel schreibt `update_tx` vier
+Spalten an `einsatz_fahrzeug` (Migration 0355): `status_gesetzt_von` (wer), `status_vorher_id` und
+`status_vorher_seit` (was davor galt) und, nach dem Zeitachsen-Schreiben, `status_ereignis_id`
+(das Ereignis dieses Wechsels; `einheit_ereignis` gibt dafür seine id zurück). Einträge in
+`einsatz/schwaerzung_registry.rs`; der Spiegel braucht nichts (ADD COLUMN).
 
-**Wer gewechselt hat.** Neue Spalte `einsatz_fahrzeug.status_gesetzt_von` (Migration mit der
-nächsten freien Nummer, heute 0355), gesetzt in `update_tx` bei jedem echten Wechsel; Eintrag in
-`einsatz/schwaerzung_registry.rs`. Der Spiegel braucht nichts (ADD COLUMN, Trigger hängen nicht
-an Spalten).
+**Beleg im Wechsel.** Die Antwort des Status-PATCH bekommt `status_ruecknahme` (nur bei einem
+echten Wechsel): `status_id` und `status_seit` als Prüfwerte, dazu `vorher_status_id` nur für den
+Wortlaut der Quittung. Die Rücknahme glaubt dem Beleg nichts außer den Prüfwerten.
 
 **Route.** `POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/status/zuruecknehmen`, Body = Beleg,
-`EinsatzSchreibzugriff<Fahrzeuge>`. In einer Transaktion: aktueller `status_id` und
-`status_seit` gleich dem Beleg, `status_gesetzt_von` gleich der Person, höchstens zehn Minuten
-seit `status_seit`, `vorher_status_id` gehört zur Org, `vorher_seit` liegt vor `status_seit`;
-sonst `AppError::Veraltet` (409). Dann Status und `seit` zurück, `status_gesetzt_von` auf NULL,
-das Ereignis per `streiche_tx` mit Grund „Rücknahme“ (scheitert es an der Ordnung, rollt alles
-zurück und die Antwort ist 409), ETB-Eintrag, Live-Meldungen wie der Wechsel. Keine
-Benachrichtigung, und eine gesendete „wieder verfügbar“ bleibt.
+`EinsatzSchreibzugriff<Fahrzeuge>`. In einer Transaktion: aktueller `status_id` und `status_seit`
+gleich dem Beleg, sonst `AppError::Veraltet` (409 `veraltet`, CAS nach `src/AGENTS.md`);
+`status_gesetzt_von` gleich der Person und höchstens zehn Minuten seit `status_seit`, sonst 409
+mit Grund. Dann das gemerkte Ereignis per `streiche_tx` mit dem Grund „Statuswechsel
+zurückgenommen“ (scheitert es an der Ordnung, rollt alles zurück, 409; ein inzwischen schon
+gestrichenes bleibt, wie es ist), Status und „seit“ aus den gemerkten Spalten, die vier Spalten
+geleert, ETB-Eintrag, Live-Meldungen wie der Wechsel. Keine Benachrichtigung, und eine
+gesendete „wieder verfügbar“ bleibt.
 
-*Verworfen:* Vorzustand und Person nur vom Client, ohne Spalte. Dann prüfte der Server „dieselbe
-Person“ nicht wirklich; der ETB-Autor als Ersatz wäre über Zeitstempel zu suchen, und
-`status_seit` (SQL) und Zeitachse (Rust) liegen bis zu einer Sekunde auseinander.
+*Geändert nach dem Review vor dem PR (18.11.2026):* Zuerst kamen Vorzustand und Ereignis vom
+Client, wie bei „Entlassung zurücknehmen“. Damit hätte jemand innerhalb der zehn Minuten ein
+beliebiges eigenes Ereignis der Einheit streichen oder ein erfundenes „seit“ setzen können.
 
 *Verworfen:* eine Statushistorie als Tabelle. Mehr als die Rücknahme braucht, und sie müsste in
 den Spiegel.
@@ -205,12 +206,12 @@ Maße oben sind der Ausgangspunkt; weicht der Entwurf in einer Entscheidung ab, 
   Attribute `data-lfh="status"` und `data-lfh="marke"` mit `data-ton`; die Tests ziehen mit.
 - [Rücknahme scheitert an der Ablösungskopplung (422 aus `streiche_tx`)] → ganze Rücknahme als
   409, Hinweis im Wortlaut; Status bleibt neu, nichts halb geschrieben.
-- [Mehrere Fahrzeuge einer Einheit] → nur das Ereignis aus dem Beleg wird gestrichen, und nur,
-  wenn es zur Einheit dieses Fahrzeugs und zur Quelle `status` gehört.
+- [Mehrere Fahrzeuge einer Einheit] → nur das Ereignis, das der Server beim Wechsel dieses
+  Fahrzeugs gemerkt hat, wird gestrichen.
 - [Menüänderung trifft alle elf Abnehmer] → Kopf nur auf Wunsch; Höhenbegrenzung und Kippen sind
   für alle eine Verbesserung, e2e für Tablet und Handschuh.
 
 ## Migration Plan
 
-Eine Migration (ADD COLUMN, nullable), rückwärts harmlos: Ältere Server ignorieren die Spalte.
-Ein Rollback des Codes lässt die Spalte stehen.
+Eine Migration (vier ADD COLUMN, nullable), rückwärts harmlos: Ältere Server ignorieren die
+Spalten. Ein Rollback des Codes lässt sie stehen.

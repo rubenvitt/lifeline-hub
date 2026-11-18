@@ -42,7 +42,8 @@ Ort des Wechsels nehmen.
 ### Requirement: Statuswechsel zurücknehmen
 
 „Rückgängig“ SHALL in einer Transaktion den Status und „Status seit“ von davor herstellen und das
-Zeitachsen-Ereignis des Wechsels samt Kopien mit dem Grund „Rücknahme“ streichen. Sie MUST einen
+Zeitachsen-Ereignis des Wechsels samt Kopien mit dem Grund „Statuswechsel zurückgenommen“ streichen;
+was wiederhergestellt wird, MUST der Server beim Wechsel selbst festgehalten haben. Sie MUST einen
 ETB-Eintrag „Fahrzeug «X»: Statuswechsel «A» → «B» zurückgenommen“ schreiben und dieselben
 Live-Meldungen senden wie der Wechsel. Eine gesendete Benachrichtigung bleibt bestehen.
 
@@ -51,6 +52,11 @@ Live-Meldungen senden wie der Wechsel. Eine gesendete Benachrichtigung bleibt be
   gewählt wird
 - **THEN** steht es auf S2 seit 10:15, das Zeitachsen-Ereignis „S3“ ist gestrichen, und das ETB
   nennt die Rücknahme
+
+#### Scenario: Erfundener Vorzustand im Beleg
+- **WHEN** die Rücknahme einen anderen Vorzustand oder ein fremdes Zeitachsen-Ereignis mitschickt
+- **THEN** stellt das System trotzdem genau den Status und „seit“ von vor dem Wechsel her und
+  streicht nur das Ereignis dieses Wechsels
 
 #### Scenario: Zeitachse lässt sich nicht streichen
 - **WHEN** das Streichen des Ereignisses die Ordnung der Zeitachse bräche

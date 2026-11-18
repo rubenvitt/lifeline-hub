@@ -611,16 +611,21 @@ function FahrzeugeInhalt() {
     { efId: number; statusId: number }
   >({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    mutationFn: (v) => updateDisposition(einsatzId, v.efId, { status_id: v.statusId }),
+    // Den Beleg merken, die Zeile ohne ihn in den Cache (Review vor dem PR): kein späterer
+    // Leser findet einen veralteten Beleg an der Zeile.
+    mutationFn: async (v) => {
+      const { status_ruecknahme, ...fahrzeug } = await updateDisposition(einsatzId, v.efId, {
+        status_id: v.statusId,
+      });
+      if (status_ruecknahme) quittiereStatus({ ...fahrzeug, status_ruecknahme });
+      return fahrzeug;
+    },
     zeilenId: (v) => v.efId,
     ...katalogStatusWechsel<EinsatzFahrzeug>(statusQuery.data),
     // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet — nicht auf das Live-Ereignis warten,
     // das ohne Stream (offline, Proxy) nie käme. Danach die Quittung mit Rückweg (LLH-1781), auch
     // nach einer Zifferntaste im Tableau: beide nehmen diese Mutation.
-    onErfolg: (antwort) => {
-      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-      quittiereStatus(antwort);
-    },
+    onErfolg: () => void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
     onBeginn: (v) => zeilen.beginne(v.efId),
     onFehler: (e, v) => zeilen.melde(v.efId, e, 'Status nicht geändert'),
     onSettled: invalidate,

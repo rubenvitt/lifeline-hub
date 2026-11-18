@@ -345,13 +345,12 @@ pub async fn update(
     // auf den alten Status ETB, Zeitachse und Ereignis. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (vorher, nachher, beruehrt, traegt_fuehrungsstelle, ereignis_id) =
+    let (vorher, nachher, beruehrt, traegt_fuehrungsstelle) =
         crate::write_retry!(&state.pool, |conn| {
             let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
             disposition_repo::update_tx(conn, einsatz_id, ef_id, patch).await?;
             let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
             let mut beruehrt = crate::zeitachse::repo::Beruehrt::default();
-            let mut ereignis_id = None;
             if vorher.status_id != nachher.status_id {
                 // LFH-552: ein markierter Status wirkt über die Einheit des Fahrzeugs auf deren
                 // Zeitachse (erstes Fahrzeug bzw. alle für die Entlassung) und per Fan-out auf die
@@ -368,7 +367,9 @@ pub async fn update(
                     .await?
                     {
                         beruehrt = b;
-                        ereignis_id = Some(id);
+                        // Für „Rückgängig“: der Server merkt sich das Ereignis (D8).
+                        disposition_repo::merke_status_ereignis_tx(conn, einsatz_id, ef_id, id)
+                            .await?;
                     }
                 }
                 crate::etb::system_audit_tx(
@@ -393,13 +394,7 @@ pub async fn update(
                 traegt_fuehrungsstelle =
                     crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
             }
-            Ok((
-                vorher,
-                nachher,
-                beruehrt,
-                traegt_fuehrungsstelle,
-                ereignis_id,
-            ))
+            Ok((vorher, nachher, beruehrt, traegt_fuehrungsstelle))
         })?;
     let has_status_changed = vorher.status_id != nachher.status_id;
     let has_angaben_changed = vorher.funkrufname != nachher.funkrufname
@@ -455,10 +450,8 @@ pub async fn update(
     let status_ruecknahme = match (has_status_changed, nachher.status_id, &nachher.status_seit) {
         (true, Some(status_id), Some(status_seit)) => Some(StatusRuecknahmeBeleg {
             vorher_status_id: vorher.status_id,
-            vorher_seit: vorher.status_seit.clone(),
             status_id,
             status_seit: status_seit.clone(),
-            ereignis_id,
         }),
         _ => None,
     };
@@ -487,7 +480,6 @@ pub async fn status_zuruecknehmen(
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let ergebnis = disposition_repo::status_zuruecknehmen_tx(
             conn,
-            ctx.einsatz.org_id,
             einsatz_id,
             ef_id,
             ctx.benutzer.id,

@@ -2049,10 +2049,8 @@ describe('FahrzeugePage — FMS-Tableau', () => {
           ...stand,
           status_ruecknahme: {
             vorher_status_id: vorher.status_id,
-            vorher_seit: vorher.status_seit,
             status_id: 3,
             status_seit: '2026-05-26 09:30:00',
-            ereignis_id: 77,
           },
         });
       }),
@@ -2175,10 +2173,8 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       expect(ruecknahmen).toEqual([
         {
           vorher_status_id: 2,
-          vorher_seit: '2026-05-26 09:10:00',
           status_id: 3,
           status_seit: '2026-05-26 09:30:00',
-          ereignis_id: 77,
         },
       ]),
     );

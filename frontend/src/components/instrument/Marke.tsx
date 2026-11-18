@@ -71,7 +71,8 @@ export function Marke({
         <Button
           type="text"
           aria-label={
-            entfernenLabel ?? `${typeof children === 'string' ? children : ''} entfernen`.trim()
+            entfernenLabel ??
+            (typeof children === 'string' ? `${children} entfernen` : 'Eintrag entfernen')
           }
           onClick={onEntfernen}
           onMouseDown={(e) => e.preventDefault()}

@@ -27,7 +27,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`, im Backend zu `src/`. Entsche
 
 ## 4. cfv89pp5 (LLH-1781): Statuswechsel mit Quittung
 
-- [ ] 4.1 Migration `status_gesetzt_von` (nächste freie Nummer nach `scripts/check-migrationen.sh`), Eintrag in `einsatz/schwaerzung_registry.rs`; `update_tx` setzt die Spalte bei echtem Wechsel; Test in `fahrzeug/disposition_repo.rs` rot→grün; `migrationsnummern_sind_eindeutig` grün
+- [ ] 4.1 Migration `status_gesetzt_von`, `status_vorher_id`, `status_vorher_seit`, `status_ereignis_id` (nächste freie Nummer nach `scripts/check-migrationen.sh`), Eintrag in `einsatz/schwaerzung_registry.rs`; `update_tx` setzt die Spalte bei echtem Wechsel; Test in `fahrzeug/disposition_repo.rs` rot→grün; `migrationsnummern_sind_eindeutig` grün
 - [ ] 4.2 `einheit_ereignis`/`aus_fahrzeugstatus_tx` geben die Ereignis-id zurück; PATCH-Antwort mit `status_ruecknahme` (D8); `scripts/check-typ-codegen.sh`, beide erzeugten Dateien mitcommitten; Integrationstest: Wechsel liefert Beleg, kein Wechsel liefert keinen
 - [ ] 4.3 Route `POST …/fahrzeuge/{ef_id}/status/zuruecknehmen` nach D8; Integrationstests je Szenario der Spec `fahrzeugstatus-quittung` (Rückgängig mit „seit“ von davor und gestrichenem Ereignis samt Kopien, ETB-Text, inzwischen gewechselt → 409, andere Person → 409, elf Minuten → 409, Streichen scheitert → 409 und nichts geändert, ohne Schreibrecht → 403) rot→grün
 - [ ] 4.4 `api/einsatzFahrzeuge.ts`: `nimmStatuswechselZurueck`; `zeigeStatusQuittung` in `kommunikation/rueckgaengig.tsx` (D10) mit Tests (Text, Schlüssel je Fahrzeug, 409-Wortlaut)

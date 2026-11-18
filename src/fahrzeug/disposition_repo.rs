@@ -505,6 +505,12 @@ pub async fn update_tx(
                                 THEN datetime('now') ELSE status_seit END, \
              status_gesetzt_von = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
                                        THEN ? ELSE status_gesetzt_von END, \
+             status_vorher_id = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
+                                     THEN status_id ELSE status_vorher_id END, \
+             status_vorher_seit = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
+                                       THEN status_seit ELSE status_vorher_seit END, \
+             status_ereignis_id = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
+                                       THEN NULL ELSE status_ereignis_id END, \
              status_id = COALESCE(?, status_id), \
              bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
              snap_funkrufname = CASE WHEN fahrzeug_id IS NULL \
@@ -521,9 +527,18 @@ pub async fn update_tx(
     )
     .bind(patch.status_id)
     .bind(patch.status_id)
+    // status_gesetzt_von
     .bind(patch.status_id)
     .bind(patch.status_id)
     .bind(patch.gesetzt_von)
+    // status_vorher_id, status_vorher_seit, status_ereignis_id
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    // status_id
     .bind(patch.status_id)
     .bind(patch.bemerkung.is_some())
     .bind(patch.bemerkung.flatten())
@@ -2796,17 +2811,37 @@ pub struct StatusRuecknahme {
     pub beruehrt: crate::zeitachse::repo::Beruehrt,
 }
 
+/// Merkt das Zeitachsen-Ereignis, das ein Statuswechsel geschrieben hat (LLH-1781, design.md D8),
+/// in der Transaktion des Wechsels.
+pub async fn merke_status_ereignis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    ereignis_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET status_ereignis_id = ? WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ereignis_id)
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Nimmt einen Statuswechsel zurück (LLH-1781, Spec `fahrzeugstatus-quittung`, Change
 /// `eon26eat-status-und-bedienung`, design.md D8), in der Transaktion des Aufrufers.
 ///
-/// Riegel: das Fahrzeug ist aktiv, steht noch auf `beleg.status_id` seit `beleg.status_seit`,
+/// Was wiederhergestellt wird (Status und „seit“ davor, das Ereignis des Wechsels), hält der
+/// Server selbst fest; vom Client zählen nur `status_id` und `status_seit` als Prüfwerte.
+/// Riegel: das Fahrzeug ist aktiv und steht noch auf diesem Wechsel (sonst `Veraltet`),
 /// `benutzer_id` hat gewechselt, und höchstens [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`]
-/// sind vergangen; der Status davor gehört zur Org und liegt zeitlich davor. Sonst `Conflict`,
-/// bevor etwas geschrieben ist. Das Ereignis des Wechsels wird gestrichen; bräche das die Ordnung
-/// der Zeitachse, ist es ebenfalls `Conflict`, und der Aufrufer rollt alles zurück.
+/// sind vergangen (sonst `Conflict`). Bräche das Streichen die Ordnung der Zeitachse, ist es
+/// ebenfalls `Conflict`, und der Aufrufer rollt alles zurück. Ein inzwischen schon gestrichenes
+/// Ereignis bleibt, wie es ist.
 pub async fn status_zuruecknehmen_tx(
     conn: &mut SqliteConnection,
-    org_id: i64,
     einsatz_id: i64,
     ef_id: i64,
     benutzer_id: i64,
@@ -2814,91 +2849,80 @@ pub async fn status_zuruecknehmen_tx(
     beleg: &crate::fahrzeug::StatusRuecknahmeBeleg,
 ) -> Result<StatusRuecknahme, AppError> {
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
-    let zeile: Option<(Option<i64>, Option<String>, Option<i64>, Option<i64>)> = sqlx::query_as(
-        "SELECT status_id, status_seit, status_gesetzt_von, einheit_id FROM einsatz_fahrzeug \
-         WHERE id = ? AND einsatz_id = ?",
+    type Zeile = (
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+    );
+    let zeile: Option<Zeile> = sqlx::query_as(
+        "SELECT status_id, status_seit, status_gesetzt_von, status_vorher_id, \
+                status_vorher_seit, status_ereignis_id, einheit_id \
+         FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
     )
     .bind(ef_id)
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    let (status_id, status_seit, gesetzt_von, einheit_id) = zeile.ok_or(AppError::NotFound)?;
+    let (status_id, status_seit, gesetzt_von, vorher_id, vorher_seit, ereignis, einheit_id) =
+        zeile.ok_or(AppError::NotFound)?;
     // Inzwischen anders gesetzt: ein CAS-Konflikt (`src/AGENTS.md`, Statuscode-Konvention).
     if status_id != Some(beleg.status_id)
         || status_seit.as_deref() != Some(beleg.status_seit.as_str())
     {
         return Err(AppError::Veraltet);
     }
-    let im_riegel = gesetzt_von == Some(benutzer_id)
-        && crate::entlassung::is_in_ruecknahme_frist(&beleg.status_seit, jetzt)
-        && beleg
-            .vorher_seit
-            .as_deref()
-            .is_none_or(|v| v <= beleg.status_seit.as_str());
-    if !im_riegel {
+    if gesetzt_von != Some(benutzer_id)
+        || !crate::entlassung::is_in_ruecknahme_frist(&beleg.status_seit, jetzt)
+    {
         return Err(status_ruecknahme_conflict());
-    }
-    if let Some(vorher) = beleg.vorher_status_id {
-        // Vom Client: nur ein Status der eigenen Org (wie beim Setzen).
-        let in_org: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM fahrzeug_status WHERE id = ? AND org_id = ?)",
-        )
-        .bind(vorher)
-        .bind(org_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        if !in_org {
-            return Err(AppError::Validation("Unbekannter Status".into()));
-        }
     }
 
     let mut ergebnis = StatusRuecknahme {
         einheit_id,
         ..Default::default()
     };
-    if let (Some(ereignis), Some(eid)) = (beleg.ereignis_id, einheit_id) {
-        // Nur ein Ereignis dieser Einheit aus einem Statuswechsel, nicht vor dem Wechsel:
-        // bei mehreren Fahrzeugen einer Einheit streicht jedes nur sein eigenes.
-        let passt: bool = sqlx::query_scalar(
+    if let (Some(ereignis), Some(eid)) = (ereignis, einheit_id) {
+        let offen: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse \
-             WHERE id = ? AND einsatz_id = ? AND einheit_id = ? AND quelle = 'status' \
-               AND erfasst_von = ? AND gestrichen_at IS NULL)",
+             WHERE id = ? AND einsatz_id = ? AND einheit_id = ? AND gestrichen_at IS NULL)",
         )
         .bind(ereignis)
         .bind(einsatz_id)
         .bind(eid)
-        .bind(benutzer_id)
         .fetch_one(&mut *conn)
         .await?;
-        if !passt {
-            return Err(status_ruecknahme_conflict());
+        if offen {
+            let g = crate::zeitachse::repo::streiche_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                crate::zeitachse::repo::Kraft::Einheit(eid),
+                ereignis,
+                GRUND_STATUS_RUECKNAHME,
+                false,
+            )
+            .await
+            .map_err(|e| match e {
+                AppError::UnprocessableEntity(m) | AppError::Conflict(m) => AppError::Conflict(
+                    format!("Der Statuswechsel lässt sich nicht zurücknehmen: {m}"),
+                ),
+                andere => andere,
+            })?;
+            ergebnis.beruehrt = g.beruehrt;
         }
-        let g = crate::zeitachse::repo::streiche_tx(
-            conn,
-            einsatz_id,
-            benutzer_id,
-            crate::zeitachse::repo::Kraft::Einheit(eid),
-            ereignis,
-            GRUND_STATUS_RUECKNAHME,
-            false,
-        )
-        .await
-        .map_err(|e| match e {
-            AppError::UnprocessableEntity(m) | AppError::Conflict(m) => AppError::Conflict(
-                format!("Der Statuswechsel lässt sich nicht zurücknehmen: {m}"),
-            ),
-            AppError::NotFound => status_ruecknahme_conflict(),
-            andere => andere,
-        })?;
-        ergebnis.beruehrt = g.beruehrt;
     }
 
     let r = sqlx::query(
-        "UPDATE einsatz_fahrzeug SET status_id = ?, status_seit = ?, status_gesetzt_von = NULL \
+        "UPDATE einsatz_fahrzeug SET status_id = ?, status_seit = ?, status_gesetzt_von = NULL, \
+                status_vorher_id = NULL, status_vorher_seit = NULL, status_ereignis_id = NULL \
          WHERE id = ? AND einsatz_id = ? AND status_id = ? AND status_seit = ?",
     )
-    .bind(beleg.vorher_status_id)
-    .bind(beleg.vorher_seit.as_deref())
+    .bind(vorher_id)
+    .bind(vorher_seit.as_deref())
     .bind(ef_id)
     .bind(einsatz_id)
     .bind(beleg.status_id)

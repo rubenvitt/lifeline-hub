@@ -314,6 +314,8 @@ export default function StatusWahl<W extends string | number>({
             ]
           : eintraege,
         className: lage.zweispaltig ? 'lfh-statusmenue--zweispaltig' : undefined,
+        // Der Kopf ist auch der zugängliche Name des Menüs (Review vor dem PR).
+        ...(titel ? { 'aria-label': `Status von ${titel}` } : {}),
         style: {
           maxHeight: lage.maxHoehe > 0 ? lage.maxHoehe : undefined,
           overflowY: 'auto',
