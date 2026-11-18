@@ -67,7 +67,8 @@ Die Gerippe-Seite rendert `EinsatzSeite` mit `titel={modulName(key)}` und als In
 `SeitenSkeleton` mit `verzoegert`. Den Kopf zeichnet dieselbe Komponente wie bei der echten
 Seite, also springt er nicht an eine andere Stelle. Meta und Aktionen kommen erst mit der Seite
 (D4). `verzoegert` setzt die Klasse `lfh-skelett--verzoegert`: Die Balken stehen zuerst mit
-`opacity: 0` da und werden nach 120 ms per CSS-Animation (`animation-delay`) sichtbar. Ihr Platz
+`visibility: hidden` da und werden nach 120 ms per CSS-Animation (`animation-delay`) sichtbar
+(`visibility` statt `opacity`, damit der Puls der Balken unberührt bleibt). Ihr Platz
 ist von Anfang an reserviert, also springt nichts. Ein Modul, das schneller gezeichnet ist, zeigt
 nie Balken. `aria-busy` steht sofort, damit ein Screenreader „Inhalt wird geladen“ hört.
 
@@ -82,11 +83,14 @@ ohne diesen Kopf. Das ist ein bewusster kurzer Wechsel, abgestimmt am 18.11.2026
 „vereinheitlichen“. Lädt der Code beim Wechsel, folgen Rahmen-Gerippe (D1) und Suspense-Fallback
 mit demselben Bild aufeinander, und man sieht keinen Unterschied.
 
-### D4: Was bewusst nicht im Gerippe steht
+### D4: Ortspfad ja, Meta und Aktionen nein
 
-Kein Ortspfad mit Daten, keine Meta, keine Aktionen. Diese hängen an den Daten der Seite, und ein
-Platzhalter dafür hieße, die Seite doppelt zu bauen. `EinsatzSeite` hält den Datenstand schon
-ohne Inhalt in seiner Breite (LLH-1463).
+Im Einsatzrahmen trägt die Gerippe-Seite den Ortspfad der Modulseiten („Einsätze › Einsatz ›
+Modul“). Den Einsatz kennt der Rahmen schon (`useEinsatzRahmen`). Ohne den Ortspfad sprang der
+Titel beim Ablösen um die Breite des Pfads nach rechts. Das zeigte die Bildaufnahme vom
+18.11.2026, also wurde der Ortspfad bei der Umsetzung ergänzt. Meta und Aktionen fehlen weiter.
+Sie hängen an den Daten der Seite, und ein Platzhalter dafür hieße, die Seite doppelt zu bauen.
+`EinsatzSeite` hält den Datenstand schon ohne Inhalt in seiner Breite (LLH-1463).
 
 ## Risks / Trade-offs
 

@@ -2,7 +2,9 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, Outlet, Route, Routes, useLocation } from 'react-router';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { EinsatzAnzeige } from '../api/types';
 import { renderMitProviders } from '../test/utils';
+import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import { modulAusPfad } from './modulRegistry';
 import ModulWechselGerippe, { ModulGerippeSeite } from './ModulWechselGerippe';
 
@@ -125,5 +127,18 @@ describe('ModulGerippeSeite', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Fahrzeuge' })).toBeInTheDocument();
     expect(container.querySelector('.lfh-skelett--verzoegert')).not.toBeNull();
     expect(screen.queryByText(/wird geladen…/)).not.toBeInTheDocument();
+  });
+
+  it('trägt im Einsatzrahmen denselben Ortspfad wie die Modulseiten, damit der Titel nicht springt', () => {
+    renderMitProviders(
+      <EinsatzRahmenProvider
+        value={{ id: 5, bezeichnung: 'Starkregen Musterstadt', status: 'aktiv' } as EinsatzAnzeige}
+      >
+        <ModulGerippeSeite modulKey="personal" />
+      </EinsatzRahmenProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Einsätze' })).toHaveAttribute('href', '/einsaetze');
+    expect(screen.getByText('Starkregen Musterstadt')).toBeInTheDocument();
   });
 });

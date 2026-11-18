@@ -1,6 +1,9 @@
+import { Breadcrumb } from 'antd';
 import { startTransition, useEffect, useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenSkeleton } from '../components/SeitenZustand';
+import { useEinsatzRahmen } from './EinsatzRahmenKontext';
 import { modulName, type ModulEintrag } from './modulRegistry';
 
 /**
@@ -39,13 +42,30 @@ export default function ModulWechselGerippe({
 
 /**
  * Die Gerippe-Seite eines Moduls: derselbe Seitenkopf wie die echte Seite, mit dem Modulnamen als
- * `h1`, darunter das verzögerte Gerippe (D2). Meta, Aktionen und Ortspfad kommen erst mit der
- * Seite (D4). Auch Suspense-Fallback der nachgeladenen Module (Lagekarte, Kräfteübersicht, D3).
+ * `h1` und im Einsatzrahmen dem Ortspfad der Modulseiten („Einsätze › Einsatz › Modul“, den
+ * Einsatz kennt der Rahmen schon), damit der Titel beim Ablösen nicht springt. Darunter das
+ * verzögerte Gerippe (D2). Meta und Aktionen kommen erst mit der Seite (D4). Auch
+ * Suspense-Fallback der nachgeladenen Module (Lagekarte, Kräfteübersicht, D3).
  */
 export function ModulGerippeSeite({ modulKey }: { modulKey: string }) {
+  const einsatz = useEinsatzRahmen();
+  const name = modulName(modulKey);
   return (
     <div data-testid="modul-gerippe">
-      <EinsatzSeite titel={modulName(modulKey)}>
+      <EinsatzSeite
+        titel={name}
+        breadcrumb={
+          einsatz && (
+            <Breadcrumb
+              items={[
+                { title: <Link to="/einsaetze">Einsätze</Link> },
+                { title: einsatz.bezeichnung },
+                { title: name },
+              ]}
+            />
+          )
+        }
+      >
         <SeitenSkeleton verzoegert />
       </EinsatzSeite>
     </div>
