@@ -14,8 +14,8 @@ zur Schuld-Datei gelten nicht mehr.
 - Die Entscheidung steht in genau einer gültigen ADR; Spec, AGENTS.md und Kapitel 11 stimmen.
 
 **Non-Goals:**
-- Die bekannten Grenzen des Wächters schließen (Werte aus Variablen, `var(--lfh-luft-*)` in TSX,
-  `calc`). Sie bleiben Vertrag und stehen in Kapitel 11.
+- Die bekannten Grenzen des Wächters schließen (Werte aus Variablen und Rechnungen). Sie bleiben
+  Vertrag und stehen in Kapitel 11.
 - Neue Ausnahmen oder Rasterwerte.
 
 ## Decisions
@@ -40,7 +40,7 @@ Schuld- oder Ausnahmeliste für Abstands-Literale außer `AUSNAHMEN` im Wächter
 ist auf `alpha` frei; vor dem Push `scripts/adr-fuer.sh --alle` und offene PRs prüfen.
 
 **D4: Kapitel 11, neuer Eintrag.** Nach dem Muster von R20: Schuld leer, Grenzen des Wächters
-(Variablen und Rechnungen, CSS-Variablen in TSX-Strings, `<Space size>` nach einer Pfeilfunktion),
+(Variablen und Rechnungen, `<Space size>` nach einer Pfeilfunktion, benannte Nicht-Layout-Werte),
 Auswirkung (ein Literal über diesen Weg folgt der Dichte nicht), Beleg Wächter + ADR-0065.
 
 ## Risks / Trade-offs

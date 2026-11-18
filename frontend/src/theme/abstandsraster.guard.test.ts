@@ -2,11 +2,10 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ohneKommentare } from '../test/ohneKommentare';
-import { SCHULD } from './abstandsraster.schuld';
 
 /**
- * Abstandsraster (Spec `abstandsraster`, Change `m113c8ln-abstandsraster`, design.md D4): **kein
- * neues Abstands-Literal.** Innen- und Außenabstände und Lücken kommen aus dem Raster der aktiven
+ * Abstandsraster (Spec `abstandsraster`, „Abstände ohne Literal“; ADR-0065): **kein
+ * Abstands-Literal.** Innen- und Außenabstände und Lücken kommen aus dem Raster der aktiven
  * Dichte: in TSX über die antd-Tokens (`token.paddingSM`, `token.margin` …), in CSS über
  * `var(--lfh-luft-0…5)` aus `theme/rollen.css`.
  *
@@ -17,11 +16,9 @@ import { SCHULD } from './abstandsraster.schuld';
  * - CSS: `padding*`, `margin*`, `gap`, `row-gap`, `column-gap` mit einem px-Wert, außer in
  *   `theme/rollen.css`.
  *
- * ── SCHULD (`abstandsraster.schuld.ts`) ──
- * Die Zahl der Literale je Datei beim Einführen. Mehr Funde als die Schuld sind rot (neues
- * Literal). WENIGER auch: wer abbaut, senkt die Zahl im selben Commit, so kann die Liste nie still
- * wieder wachsen. Bei 0 fällt der Eintrag. Ist die Liste leer, fällt dieser Wächter mit ihr
- * (Abbaubedingung, ADR zum Abstandsraster).
+ * Nulltoleranz: Die Altlast ist abgebaut (LLH-1937), eine Schuld je Datei gibt es nicht mehr.
+ * Jedes Literal außerhalb der Ausnahmen ist rot. Werte ohne Stufe entscheidet man einzeln: nächste
+ * Stufe, Feinsatz (≤ 2 px) oder ein benannter Nicht-Layout-Wert (Kartenrand).
  *
  * ── BEKANNTE GRENZEN (Teil des Vertrags) ──
  * 1. Feinsatz bis 2 px (Haarlinie, Symbolversatz) und 0 sind frei.
@@ -150,33 +147,18 @@ function ausgenommen(pfad: string, ausnahmen: Readonly<Record<string, string>>):
  */
 export function befunde(
   dateien: Readonly<Record<string, string>>,
-  schuld: Readonly<Record<string, number>>,
   ausnahmen: Readonly<Record<string, string>> = AUSNAHMEN,
 ): string[] {
   const meldungen: string[] = [];
   for (const [pfad, inhalt] of Object.entries(dateien)) {
     if (ausgenommen(pfad, ausnahmen)) continue;
     const funde = abstandsliterale(pfad, inhalt);
-    const erlaubt = schuld[pfad] ?? 0;
-    if (funde.length > erlaubt) {
-      const liste = funde.map((f) => `  ${pfad}:${f.zeile}  ${f.wert}`).join('\n');
-      meldungen.push(
-        `${pfad}: ${funde.length} Abstands-Literale, Schuld ${erlaubt} — neues Literal? ` +
-          `Abstand aus dem Raster nehmen (token.padding*/margin*, var(--lfh-luft-*)):\n${liste}`,
-      );
-    } else if (funde.length < erlaubt) {
-      meldungen.push(
-        `${pfad}: Schuld senken — ${funde.length} statt ${erlaubt} Literale; in ` +
-          `abstandsraster.schuld.ts auf ${funde.length} setzen${funde.length === 0 ? ' (Eintrag streichen)' : ''}`,
-      );
-    }
-  }
-  for (const pfad of Object.keys(schuld)) {
-    if (!(pfad in dateien)) meldungen.push(`${pfad}: Datei fehlt — Schuld-Eintrag streichen`);
-    else if (ausgenommen(pfad, ausnahmen)) {
-      meldungen.push(`${pfad}: ist Ausnahme — Schuld-Eintrag streichen`);
-    }
-    if (schuld[pfad] <= 0) meldungen.push(`${pfad}: Schuld 0 — Eintrag streichen`);
+    if (funde.length === 0) continue;
+    const liste = funde.map((f) => `  ${pfad}:${f.zeile}  ${f.wert}`).join('\n');
+    meldungen.push(
+      `${pfad}: ${funde.length} Abstands-Literal(e) — Abstand aus dem Raster nehmen ` +
+        `(token.padding*/margin*, var(--lfh-luft-*)):\n${liste}`,
+    );
   }
   return meldungen;
 }
@@ -202,8 +184,8 @@ function liesBaum(verzeichnis: string, praefix = ''): Record<string, string> {
 const dateien = liesBaum(SRC);
 
 describe('Abstandsraster: kein neues Abstands-Literal (Spec `abstandsraster`)', () => {
-  it('kein Literal über der Schuld, und die Schuld ist auf dem Stand', () => {
-    const meldungen = befunde(dateien, SCHULD);
+  it('kein Abstands-Literal außerhalb der Ausnahmen', () => {
+    const meldungen = befunde(dateien);
     expect(meldungen, meldungen.join('\n')).toEqual([]);
   });
 
@@ -265,22 +247,11 @@ describe('Abstandsraster: kein neues Abstands-Literal (Spec `abstandsraster`)', 
       expect(abstandsliterale('a.css', '/* padding: 8px */')).toEqual([]);
     });
 
-    it('eine neue Datei mit Literal ist rot', () => {
-      const meldung = befunde({ 'neu.tsx': 'const a = { padding: 8 };' }, {}, {});
+    it('eine Datei mit Literal ist rot, eine ohne grün', () => {
+      const meldung = befunde({ 'neu.tsx': 'const a = { padding: 8 };' }, {});
       expect(meldung).toHaveLength(1);
       expect(meldung[0]).toContain('neu.tsx:1  8');
-    });
-
-    it('Schuld überschritten ist rot, Schuld getroffen ist grün', () => {
-      const datei = { 'alt.tsx': 'const a = { padding: 8, margin: 12 };' };
-      expect(befunde(datei, { 'alt.tsx': 1 }, {})).toHaveLength(1);
-      expect(befunde(datei, { 'alt.tsx': 2 }, {})).toEqual([]);
-    });
-
-    it('Schuld unterschritten ist rot — die Liste zählt mit', () => {
-      const datei = { 'alt.tsx': 'const a = { padding: 8 };' };
-      expect(befunde(datei, { 'alt.tsx': 2 }, {})[0]).toContain('Schuld senken');
-      expect(befunde({ 'alt.tsx': '' }, { 'alt.tsx': 1 }, {})[0]).toContain('Eintrag streichen');
+      expect(befunde({ 'gut.tsx': 'const a = { padding: token.paddingSM };' }, {})).toEqual([]);
     });
 
     it('meldet gap als String-Prop', () => {
@@ -291,30 +262,20 @@ describe('Abstandsraster: kein neues Abstands-Literal (Spec `abstandsraster`)', 
     it('nimmt Druckansichten auch außerhalb von druck/ aus', () => {
       const css = '@media print { .x { padding: 6px; } }';
       expect(
-        befunde(
-          { 'pages/befehlPrint.css': css, 'pages/EtbDruckPage.tsx': 'const a = { padding: 8 };' },
-          {},
-        ),
+        befunde({
+          'pages/befehlPrint.css': css,
+          'pages/EtbDruckPage.tsx': 'const a = { padding: 8 };',
+        }),
       ).toEqual([]);
-      expect(befunde({ 'pages/befehl.css': css }, {})).toHaveLength(1);
-      expect(befunde({ 'components/druck/DruckKnopf.tsx': '<Space size={12}>' }, {})).toHaveLength(
-        1,
-      );
+      expect(befunde({ 'pages/befehl.css': css })).toHaveLength(1);
+      expect(befunde({ 'components/druck/DruckKnopf.tsx': '<Space size={12}>' })).toHaveLength(1);
     });
 
-    it('nimmt Rollenquelle und Ausnahmen aus, ein Schuldeintrag dort ist rot', () => {
+    it('nimmt Rollenquelle und Ausnahmen aus', () => {
       const css = '.a { padding: 8px; }';
-      expect(befunde({ [ROLLENQUELLE]: css }, {}, {})).toEqual([]);
-      expect(befunde({ 'druck/x.css': css }, {}, { 'druck/': 'Papier' })).toEqual([]);
-      expect(befunde({ 'druck/x.css': css }, { 'druck/x.css': 1 }, { 'druck/': 'Papier' })).toEqual(
-        ['druck/x.css: ist Ausnahme — Schuld-Eintrag streichen'],
-      );
-    });
-
-    it('ein Schuldeintrag ohne Datei ist rot', () => {
-      expect(befunde({}, { 'weg.tsx': 3 }, {})).toEqual([
-        'weg.tsx: Datei fehlt — Schuld-Eintrag streichen',
-      ]);
+      expect(befunde({ [ROLLENQUELLE]: css }, {})).toEqual([]);
+      expect(befunde({ 'druck/x.css': css }, { 'druck/': 'Papier' })).toEqual([]);
+      expect(befunde({ 'x.css': css }, { 'druck/': 'Papier' })).toHaveLength(1);
     });
   });
 });

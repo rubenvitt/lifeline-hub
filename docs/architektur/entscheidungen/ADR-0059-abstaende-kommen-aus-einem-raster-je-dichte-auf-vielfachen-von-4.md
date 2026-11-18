@@ -1,7 +1,8 @@
 ---
 id: ADR-0059
 titel: Abstände kommen aus einem Raster je Dichte auf Vielfachen von 4
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0065
 datum: 2026-11-16
 gilt_fuer:
   - frontend/src/theme/tokens.ts

@@ -656,12 +656,12 @@ mark.lfh-fundstelle {
   bottom: 0;
   z-index: 20;
   margin: 0 calc(-1 * var(--lfh-seiten-polsterung)) calc(-1 * var(--lfh-seiten-polsterung));
-  padding: 12px var(--lfh-seiten-polsterung) 14px;
+  padding: var(--lfh-luft-3) var(--lfh-seiten-polsterung) var(--lfh-luft-4);
   background: var(--lfh-kopf);
   border-top: 1px solid var(--lfh-linie-stark);
 }
 .etb-erfassung-sticky .ant-tabs-nav {
-  margin-bottom: 8px;
+  margin-bottom: var(--lfh-luft-2);
 }
 .etb-erfassung-sticky .markdown-editor__vorschau {
   max-height: 28vh;
@@ -885,7 +885,7 @@ main:has([data-lfh='ausgabe-kurzzeile']) {
 .markdown pre {
   background: var(--md-flaeche);
   border-radius: 6px;
-  padding: 12px 14px;
+  padding: var(--lfh-luft-3) var(--lfh-luft-4);
   overflow-x: auto;
 }
 .markdown pre code {
@@ -894,7 +894,7 @@ main:has([data-lfh='ausgabe-kurzzeile']) {
 }
 .markdown blockquote {
   margin: 0.75em 0;
-  padding: 2px 14px;
+  padding: 2px var(--lfh-luft-4);
   border-left: 3px solid var(--md-akzent);
   color: var(--lfh-text-2);
 }
@@ -906,7 +906,7 @@ main:has([data-lfh='ausgabe-kurzzeile']) {
 .markdown th,
 .markdown td {
   border: 1px solid var(--md-rahmen);
-  padding: 6px 10px;
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
   text-align: left;
 }
 .markdown th {
@@ -984,7 +984,7 @@ main:has([data-lfh='ausgabe-kurzzeile']) {
   margin: 0.35em 0;
 }
 .markdown--kompakt pre {
-  padding: 8px 10px;
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
 }
 </style>
 <style>

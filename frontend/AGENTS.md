@@ -64,9 +64,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
   handschuh 4·8·16·24·44·64. In TSX nimmst du das antd-Token (`paddingXXS…XL`, `marginXXS…XL`;
   MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. Ein festes Kompakt-Raster gibt es nicht.
-  Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
-  `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
-  `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
+  Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und `gutter`
+  verbietet `theme/abstandsraster.guard.test.ts` ohne Schuldliste (ADR-0065). Wo kein `token` zur
+  Hand ist (Stil auf Modulebene, `tagRender`), nimmst du `var(--lfh-luft-*)`; ein Wert, der kein
+  Layoutabstand ist (Kartenrand bei `fitBounds`), steht als benannte Konstante. Feste Ausnahmen
   (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter.
 - **Bausteine** in `components/instrument/` (Import über `index.ts`, Dateikopf nennt die Regel):
   `Augenbraue` (`als="h2…h6"`) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
