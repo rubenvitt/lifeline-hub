@@ -71,9 +71,9 @@ Dieselbe Lagemeldung lässt sich auch im Modul „Meldungen“ erfassen, mit der
    Lagebesprechung“ steht über der Zeitachse außerdem, was nach der Besprechung übernommen wurde,
    aber davor geschah („+1 Nachtrag vor 1330 übernommen“); „anzeigen“ erweitert den Zeitraum um
    diese Lagemeldungen.
-3. Nach dem Ort filtern: „Mit Koordinaten“ oder „Ohne Koordinaten“; nach der Herkunft: „Gerät“
-   (von einem gekoppelten Gerät erfasst) oder „Übernommen“ (Meldungen anderer Art, die in die Lage
-   übernommen wurden). Der Kopf nennt dann „… von … Lagemeldungen“.
+3. Im Feld „Ort“ nach „Mit Koordinaten“ oder „Ohne Koordinaten“ filtern, im Feld „Herkunft“
+   nach „Gerät“ (von einem gekoppelten Gerät erfasst) oder „Übernommen“ (Meldungen anderer Art,
+   die in die Lage übernommen wurden). Der Kopf nennt dann „… von … Lagemeldungen“.
 4. Um zur Meldung zu springen, „Meldung #…“ in der Zeile wählen.
 
 ### Lagemeldungen als gesehen markieren

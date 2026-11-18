@@ -299,6 +299,30 @@ describe('Datensicht · Kartenzweig (LLH-1086)', () => {
     expect(hinweis()).toHaveTextContent('1 von 3 Schäden sichtbar');
   });
 
+  // Spec `einsatztauglichkeit-layout`, „Sortierung zurücksetzen am Handschirm“ (LLH-1798): das
+  // Löschkreuz war 12 × 12 px und der einzige Weg zurück; „wie geliefert“ ist ein Eintrag.
+  it('„wie geliefert“ ist ein Eintrag der Sortierauswahl, kein Löschkreuz (LLH-1798)', async () => {
+    setzeViewportBreite(390);
+    rendere();
+    const geliefert = karten().map((t) => t?.slice(0, 4));
+    const sortieren = screen.getByRole('combobox', { name: 'Sortieren' });
+    const feld = sortieren.closest('.ant-select')!;
+    // Als gewählter Wert (antd setzt dort den Titel), nicht als Platzhalter.
+    expect(feld.querySelector('[title="wie geliefert"]')).not.toBeNull();
+
+    await userEvent.click(sortieren);
+    await userEvent.click(await screen.findByTitle('Ort, absteigend'));
+    await waitFor(() =>
+      expect(karten().map((t) => t?.slice(0, 4))).toEqual(['Wald', 'Ufer', 'Deic']),
+    );
+    expect(feld.querySelector('.ant-select-clear')).toBeNull();
+
+    await userEvent.click(sortieren);
+    await userEvent.click(await screen.findByTitle('wie geliefert'));
+    await waitFor(() => expect(karten().map((t) => t?.slice(0, 4))).toEqual(geliefert));
+    expect(feld.querySelector('[title="wie geliefert"]')).not.toBeNull();
+  });
+
   it('ein Filter mit `ohneKartenfeld` hat kein Auswahlfeld, wirkt aber und steht als Chip da (LLH-1096)', () => {
     setzeViewportBreite(390);
     const ohneFeld = spalten.map((s) =>

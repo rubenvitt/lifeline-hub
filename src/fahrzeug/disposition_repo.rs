@@ -1147,8 +1147,10 @@ pub async fn zuruecknehmen_tx(
             None => ergebnis
                 .ausgelassen
                 .push(ausgelassen("Einheit", "nicht mehr vorhanden")),
-            Some((name, _)) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
-                format!("Einheit «{name}»"),
+            // Ohne Recht kein Name aus dem fremden Modul, nur die allgemeine Bezeichnung
+            // (LLH-1951, wie bei der Person in `personal::ruecknahme`).
+            Some(_) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
+                "Einheit",
                 "kein Schreibrecht im Modul Einheiten",
             )),
             Some((name, Some(_))) => ergebnis.ausgelassen.push(ausgelassen(
@@ -1180,7 +1182,7 @@ pub async fn zuruecknehmen_tx(
         if let Some(name) = name {
             if !rechte.bereitstellungsraeume {
                 ergebnis.ausgelassen.push(ausgelassen(
-                    name,
+                    "Bereitstellungsraum",
                     "kein Schreibrecht im Modul Bereitstellungsräume",
                 ));
             } else {
@@ -2576,6 +2578,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ruecknahme_ohne_raum_recht_nennt_den_raum_nicht() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von, status) \
+             VALUES (?, 'BR Nord', 1, 1, 'aktiv') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET aktueller_br_id = ? WHERE id = ?")
+            .bind(br)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        let r = nimm_zurueck(
+            &pool,
+            einsatz,
+            ef,
+            1,
+            RUECK_JETZT,
+            &v,
+            RuecknahmeRechte {
+                einheiten: true,
+                material: true,
+                bereitstellungsraeume: false,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(r.br_id, None);
+        assert_eq!(stand(&pool, ef).await.3, None);
+        assert_eq!(
+            r.ausgelassen,
+            [ausgelassen(
+                "Bereitstellungsraum",
+                "kein Schreibrecht im Modul Bereitstellungsräume"
+            )]
+        );
+    }
+
+    #[tokio::test]
     async fn ruecknahme_laesst_veraendertes_aus_und_nennt_es() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ef, einheit, ep, em, _) = seed_voll(&pool).await;
@@ -2656,12 +2706,17 @@ mod tests {
         )
         .await
         .unwrap();
-        let gruende: Vec<&str> = r.ausgelassen.iter().map(|a| a.grund.as_str()).collect();
+        let teile: Vec<(&str, &str)> = r
+            .ausgelassen
+            .iter()
+            .map(|a| (a.bezeichnung.as_str(), a.grund.as_str()))
+            .collect();
+        // Ohne Recht kein Name aus dem fremden Modul (LLH-1951), nur die allgemeine Bezeichnung.
         assert_eq!(
-            gruende,
+            teile,
             [
-                "kein Schreibrecht im Modul Einheiten",
-                "kein Schreibrecht im Modul Material"
+                ("Einheit", "kein Schreibrecht im Modul Einheiten"),
+                ("Beladung (1 Posten)", "kein Schreibrecht im Modul Material")
             ]
         );
         assert_eq!(stand(&pool, ef).await.2, None);
