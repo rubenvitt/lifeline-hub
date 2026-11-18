@@ -63,15 +63,9 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
   );
 
   // Die Herkunft trennt die übernommene von der erfassten.
-  await page
-    .getByRole('radiogroup', { name: 'Herkunft' })
-    .getByRole('radio', { name: 'Übernommen' })
-    .click();
+  await waehleIn(page.getByRole('combobox', { name: 'Herkunft' }), 'Übernommen');
   await expect(zeilen).toHaveCount(1);
-  await page
-    .getByRole('radiogroup', { name: 'Herkunft' })
-    .getByRole('radio', { name: 'Alle' })
-    .click();
+  await waehleIn(page.getByRole('combobox', { name: 'Herkunft' }), 'Alle Herkünfte');
 
   const meldungen = await page.request.get(`/api/einsaetze/${id}/meldungen`);
   const lage = ((await meldungen.json()) as { id: number; lfd_nr: number; inhalt: string }[]).find(
