@@ -11,7 +11,9 @@ const SELECT_ALLE: &str = "\
            t.halter_person_id, t.halter_kontakt, t.antreff_ort, \
            t.antreff_lat, t.antreff_lon, t.notiz, \
            t.abschluss_grund, t.abschluss_ziel, t.erfasst_at, t.erfasst_von, \
-           t.geaendert_at, t.geaendert_von, t.storniert_at, \
+           t.geaendert_at, t.geaendert_von, t.storniert_at, t.storniert_von, \
+           (SELECT b.anzeigename FROM benutzer b WHERE b.id = t.storniert_von) \
+             AS storniert_von_name, \
            hp.registrier_nr AS halter_registrier_nr, \
            hp.storniert_at  AS halter_storniert_at \
     FROM einsatz_tier t \
@@ -393,7 +395,7 @@ pub async fn storniere_tx(
         "einsatz_id",
         einsatz_id,
         tier_id,
-        crate::storno::Vermerk::Geaendert(geaendert_von),
+        crate::storno::Vermerk::GeaendertUndStorniert(geaendert_von),
         Some("Tier ist bereits storniert"),
     )
     .await
@@ -483,6 +485,23 @@ mod tests {
             matches!(&err, AppError::Conflict(m) if m == "Tier ist bereits storniert"),
             "{err:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn storno_haelt_fest_wer_storniert_hat() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let t = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
+        assert_eq!(
+            laden(&pool, e, t.id).await.unwrap().storniert_von_name,
+            None
+        );
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, t.id, b)
+            .await
+            .unwrap();
+        let detail = laden(&pool, e, t.id).await.unwrap();
+        assert_eq!(detail.storniert_von, Some(b));
+        assert_eq!(detail.storniert_von_name.as_deref(), Some("A"));
     }
 
     #[tokio::test]

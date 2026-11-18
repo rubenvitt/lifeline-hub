@@ -153,6 +153,10 @@ pub struct TierAnzeige {
     pub geaendert_at: String,
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
+    /// Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355.
+    pub storniert_von: Option<i64>,
+    /// Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“.
+    pub storniert_von_name: Option<String>,
     // Join-Felder (read-only): Halter-Auflösung über einsatz_person.
     pub halter_registrier_nr: Option<i64>,
     pub halter_storniert_at: Option<String>,

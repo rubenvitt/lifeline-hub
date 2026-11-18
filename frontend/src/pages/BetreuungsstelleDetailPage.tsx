@@ -16,6 +16,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import {
   aendereStelle,
   ladeBetreuung,
+  loadBetreuungsstelleStand,
   meldeBelegung,
   nimmBelegungZurueck,
   storniereStelle,
@@ -81,6 +82,7 @@ import { Select } from '../components/Select';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
 import StatusTag from '../components/StatusTag';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
@@ -223,11 +225,6 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
   const bearbeiten = sitzung != null;
   const speicherLeiste = useSpeicherLeiste({ hasAbbrechen: true });
-  // Verlassen-Schutz nur bei offener Sitzung; der Schlüssel hängt an der Stelle.
-  const schutz = useFormularVerlassenSchutz({
-    aktiv: bearbeiten,
-    schluessel: bearbeiten ? stelleId : null,
-  });
   const schliessen = useCallback(() => setDialog(null), []);
 
   const einsatzQuery = useQuery({
@@ -238,13 +235,15 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),
   });
-  const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
+  const darfSchreibenImEinsatz = einsatzQuery.data
+    ? darfImEinsatzSchreiben(einsatzQuery.data)
+    : false;
   // Belegung melden, Registrieren und Abmelden: am Spiegel ein Antrag (LLH-1492, D13).
-  const darfErfassen = darfBeantragen(einsatzQuery.data);
+  const darfErfassenImEinsatz = darfBeantragen(einsatzQuery.data);
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
-    enabled: darfSchreiben,
+    enabled: darfSchreibenImEinsatz,
   });
   const abschnitte = useMemo(
     () => (abschnitteQuery.data ?? []).map((a) => ({ value: a.id, label: a.name })),
@@ -252,7 +251,43 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   );
 
   const stellen = useMemo(() => betreuungQuery.data?.stellen ?? [], [betreuungQuery.data]);
-  const stelle = stellen.find((s) => s.id === stelleId);
+  const gefuehrt = stellen.find((s) => s.id === stelleId);
+  /**
+   * Storno-Sperre (LLH-1832, Spec `storno-sperre`): die Übersicht lässt stornierte Stellen weg.
+   * Fällt die hier gesehene Stelle heraus, fragt die Seite ihren Stand ab; ist sie storniert,
+   * bleibt ihr letzter Stand gesperrt mit Banner stehen, sonst (fremd, Bindung) wie bisher das
+   * Muster „gibt es nicht (mehr)“. Ein Direktaufruf hat keinen gesehenen Stand und fragt nicht.
+   */
+  const [gesehen, setGesehen] = useState<Betreuungsstelle | null>(null);
+  if (gefuehrt && gefuehrt !== gesehen) setGesehen(gefuehrt);
+  const zuletzt = gesehen?.id === stelleId ? gesehen : null;
+  const verschwunden = !gefuehrt && zuletzt != null && betreuungQuery.isSuccess;
+  const standQuery = useQuery({
+    queryKey: einsatzKeys.betreuungsstelleStand(einsatzId, stelleId),
+    queryFn: () => loadBetreuungsstelleStand(einsatzId, stelleId),
+    enabled: verschwunden,
+  });
+  const storniertStand = verschwunden && standQuery.data?.storniert_at ? standQuery.data : null;
+  const stelle = gefuehrt ?? (verschwunden ? zuletzt : undefined);
+  // Gesperrt, sobald sie herausfiel: bis der Stand da ist, schreibt hier niemand mehr.
+  const storniert = verschwunden;
+  const darfSchreiben = darfSchreibenImEinsatz && !storniert;
+  const darfErfassen = darfErfassenImEinsatz && !storniert;
+  // Verlassen-Schutz nur bei offener Sitzung; der Schlüssel hängt an der Stelle. Nach einem Storno
+  // ist nichts mehr zu speichern, also auch nichts zu verlieren (LLH-1832).
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: bearbeiten && !storniert,
+    schluessel: bearbeiten ? stelleId : null,
+  });
+  // Storno während der Bearbeitung: eine unberührte Sitzung schließt, ein Entwurf bleibt
+  // schreibgeschützt stehen, bis „Schließen“ (LLH-1832).
+  useEffect(() => {
+    if (storniert && bearbeiten && !form.isFieldsTouched()) setSitzung(null);
+  }, [storniert, bearbeiten, form]);
+  // Offene Dialoge sind Schreibaktionen: der Storno schließt sie (Spec `storno-sperre`).
+  useEffect(() => {
+    if (storniert) setDialog(null);
+  }, [storniert]);
   // Ohne Personenrecht liefert die Übersicht kein `namentlich`: Zahl und Paneel entfallen.
   const namentlichListe = betreuungQuery.data?.namentlich;
   const personenFrei = namentlichListe != null;
@@ -415,8 +450,13 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       />
     );
   }
-  // Unbekannt, fremd oder storniert: die Übersicht trägt sie nicht.
-  if (!stelle) return <StelleNichtGefunden einsatzId={einsatzId} />;
+  // Unbekannt, fremd oder storniert: die Übersicht trägt sie nicht. Eine gesehene, die
+  // herausfiel und nicht storniert ist, zeigt dasselbe Muster (LLH-1832).
+  if (
+    !stelle ||
+    (verschwunden && (standQuery.isError || (standQuery.isSuccess && !storniertStand)))
+  )
+    return <StelleNichtGefunden einsatzId={einsatzId} />;
 
   const einsatz = einsatzQuery.data;
   const s = stelle;
@@ -523,7 +563,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   ) =>
     bearbeiten ? (
       <DatenfeldEingabe label={label} name={name} rules={rules} breit={breit}>
-        {eingabe}
+        {storniert ? entwurfNurLesen(eingabe) : eingabe}
       </DatenfeldEingabe>
     ) : (
       <Datenfeld label={label} mono={mono} breit={breit}>
@@ -662,12 +702,16 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       }
       aktionen={kopfAktionen || undefined}
       hinweis={
-        <SeitenHinweise
-          rechteFehlt={!darfSchreiben}
-          rechteText={einsatzRechteGrund(einsatz)}
-          fehler={fehlerHinweis.fehler}
-          fehlerTitel={fehlerHinweis.titel}
-        />
+        storniertStand ? (
+          <StornoBanner stand={storniertStand} />
+        ) : (
+          <SeitenHinweise
+            rechteFehlt={!darfSchreibenImEinsatz}
+            rechteText={einsatzRechteGrund(einsatz)}
+            fehler={fehlerHinweis.fehler}
+            fehlerTitel={fehlerHinweis.titel}
+          />
+        )
       }
     >
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
@@ -685,13 +729,14 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           einsatzId={einsatzId}
           stelleId={s.id}
           kapazitaet={s.kapazitaet_personen ?? null}
+          planbar={!storniert}
         />
         <RegistrierungPaneel
           einsatzId={einsatzId}
           stelle={s}
           personenFrei={personenFrei}
           darfSchreiben={darfErfassen}
-          rechteGrund={einsatzRechteGrund(einsatz)}
+          rechteGrund={storniert ? 'Stelle storniert' : einsatzRechteGrund(einsatz)}
         />
 
         <Paneel
@@ -715,6 +760,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
               // Nach gescheiterter Prüfung steht der Fokus im ersten Feld mit Meldung (LLH-1101).
               scrollToFirstError={{ focus: true }}
               onFinish={(werte) => {
+                if (storniert) return;
                 // Dreiseitig: nur, was hier geändert wurde UND vom aktuellen Stand abweicht.
                 const patch = stellePatchDreiseitig(sitzung.beimOeffnen, s, werte);
                 if (Object.keys(patch).length === 0) {
@@ -749,13 +795,20 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
                 </div>
               )}
               <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
-                <Button type="primary" htmlType="submit" loading={speichernMut.isPending}>
-                  Speichern
-                </Button>
-                {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-                <Button disabled={speichernMut.isPending} onClick={() => setSitzung(null)}>
-                  Abbrechen
-                </Button>
+                {storniert ? (
+                  // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
+                  <Button onClick={() => setSitzung(null)}>Schließen</Button>
+                ) : (
+                  <>
+                    <Button type="primary" htmlType="submit" loading={speichernMut.isPending}>
+                      Speichern
+                    </Button>
+                    {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                    <Button disabled={speichernMut.isPending} onClick={() => setSitzung(null)}>
+                      Abbrechen
+                    </Button>
+                  </>
+                )}
               </div>
             </Form>
           ) : (

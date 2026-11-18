@@ -71,6 +71,9 @@ const ERWARTET_AUSGELASSEN = [
   'anlass_at',
   // LLH-1612: Freitext und Gesundheitsangabe.
   'unvertraeglichkeiten',
+  // qm3orral: wer storniert hat, braucht das Lagebild ohne Netz nicht.
+  'storniert_von',
+  'storniert_von_name',
 ].sort();
 
 /** Eine Person mit JEDEM Feld gesetzt — ein ausgelassenes Feld fiele sonst nicht auf. */
@@ -93,6 +96,8 @@ const VOLL: Person = {
   geaendert_at: '2026-10-09 10:05:00',
   geaendert_von: 3,
   storniert_at: null,
+  storniert_von: 3,
+  storniert_von_name: 'Anna Beispiel',
   versorgung: 'unterwegs',
   aktueller_transport_durch: 'eigen',
   aktuelles_einsatz_fahrzeug_id: 9,
