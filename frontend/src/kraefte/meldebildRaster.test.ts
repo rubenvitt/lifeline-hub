@@ -10,6 +10,7 @@ import {
   fmsWort,
   istProblemZeile,
   toenungsGruende,
+  einheitenTreffer,
   grundWort,
   istRueckmeldungProblem,
   keineRueckmeldungZelle,
@@ -1014,5 +1015,92 @@ describe('Rückmeldung je Rasterzeile', () => {
 
   it('zählt über die übergebenen (gefilterten) Zeilen, nicht über den ganzen Einsatz', () => {
     expect(keineRueckmeldungZelle([zeile('eh-1'), zeile('eh-2')], DATEN)).toBeNull();
+  });
+});
+
+// ── Einheiten-Filter (LLH-1792) ───────────────────────────────────────────────
+
+describe('einheitenTreffer', () => {
+  const JETZT = dayjs.utc('2026-09-22 12:00:00');
+  const rm = (bezug_id: number, faellig_at: string): LetzteRueckmeldung => ({
+    bezug_id,
+    meldung_id: bezug_id * 100,
+    lfd_nr: bezug_id,
+    ereigniszeit: '2026-09-22 11:00:00',
+    inhalt: 'Lage unverändert',
+    meldeweg: 'funk',
+    faellig_at,
+  });
+  /** E1 in der Frist, E2 überfällig, E3 nie zurückgemeldet. */
+  const RUECKMELDUNGEN: Rueckmeldungen = {
+    frist_min: 60,
+    einheiten: [rm(1, '2026-09-22 12:30:00'), rm(2, '2026-09-22 11:59:00')],
+    abschnitte: [],
+  };
+  const EINHEITEN = [eh(1, null), eh(2, null), eh(3, null)];
+  /** E1 mit laufendem Auftrag, E2 nur mit erledigtem. */
+  const AUFTRAEGE = [
+    auftrag(1, [1], 'in_arbeit', '2026-09-22T08:00:00'),
+    auftrag(2, [2], 'vollzogen', '2026-09-22T08:00:00'),
+  ];
+  const treffer = (
+    f: { ohneAuftrag?: boolean; rueckmeldungFehlt?: boolean },
+    quellen: {
+      auftraege?: Auftrag[] | null;
+      rueckmeldungen?: Rueckmeldungen | null;
+      jetzt?: dayjs.Dayjs;
+    } = {},
+  ) => {
+    const ergebnis = einheitenTreffer({
+      einheiten: EINHEITEN,
+      ohneAuftrag: f.ohneAuftrag ?? false,
+      rueckmeldungFehlt: f.rueckmeldungFehlt ?? false,
+      auftraege: quellen.auftraege === undefined ? AUFTRAEGE : quellen.auftraege,
+      rueckmeldungen:
+        quellen.rueckmeldungen === undefined ? RUECKMELDUNGEN : quellen.rueckmeldungen,
+      jetzt: quellen.jetzt ?? JETZT,
+    });
+    return ergebnis == null ? null : [...ergebnis].sort();
+  };
+
+  it('ohne gesetzten Schalter kein Einheiten-Filter', () => {
+    expect(treffer({})).toBeNull();
+  });
+
+  it('„ohne Auftrag“ trifft Einheiten ohne offenen oder laufenden Auftrag', () => {
+    expect(treffer({ ohneAuftrag: true })).toEqual([2, 3]);
+  });
+
+  it('„Rückmeldung fehlt oder überfällig“ trifft überfällige und nie zurückgemeldete', () => {
+    expect(treffer({ rueckmeldungFehlt: true })).toEqual([2, 3]);
+  });
+
+  it('schlägt mit der Seitenuhr um', () => {
+    expect(
+      treffer({ rueckmeldungFehlt: true }, { jetzt: dayjs.utc('2026-09-22 12:31:00') }),
+    ).toEqual([1, 2, 3]);
+  });
+
+  it('beide gesetzt verlangen beide Bedingungen', () => {
+    const auftraege = [auftrag(1, [3], 'offen', '2026-09-22T08:00:00')];
+    expect(treffer({ ohneAuftrag: true, rueckmeldungFehlt: true }, { auftraege })).toEqual([2]);
+  });
+
+  it('eine nicht lesbare Quelle macht ihren Schalter unwirksam, nie alle oder keine', () => {
+    expect(treffer({ ohneAuftrag: true }, { auftraege: null })).toBeNull();
+    expect(treffer({ rueckmeldungFehlt: true }, { rueckmeldungen: null })).toBeNull();
+    // Der andere Schalter wirkt weiter.
+    expect(
+      treffer({ ohneAuftrag: true, rueckmeldungFehlt: true }, { rueckmeldungen: null }),
+    ).toEqual([2, 3]);
+  });
+});
+
+describe('keineRueckmeldungZelle mit Einheiten-Filter (LLH-1792)', () => {
+  it('zählt nur die Treffer, nicht die Rahmen-Obereinheit', () => {
+    const raster = baueMeldebildRaster(eingabe({ einheiten: [eh(1, null), eh(2, null, 1)] }));
+    const daten: Rueckmeldungen = { frist_min: 60, einheiten: [], abschnitte: [] };
+    expect(keineRueckmeldungZelle(raster, daten)?.wert).toBe(2);
+    expect(keineRueckmeldungZelle(raster, daten, new Set([2]))?.wert).toBe(1);
   });
 });

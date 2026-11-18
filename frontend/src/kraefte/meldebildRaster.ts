@@ -330,6 +330,46 @@ export function offeneAuftraegeJeEinheit(auftraege: readonly Auftrag[]): Map<num
   return ergebnis;
 }
 
+// ── Einheiten-Filter (LLH-1792) ───────────────────────────────────────────────
+
+export interface EinheitenFilterEingabe {
+  einheiten: readonly Einheit[];
+  /** Schalter „ohne Auftrag“. */
+  ohneAuftrag: boolean;
+  /** Schalter „Rückmeldung fehlt oder überfällig“. */
+  rueckmeldungFehlt: boolean;
+  /** Offene Aufträge; `null`, solange sie nicht lesbar sind (gesperrt, laden, Fehler). */
+  auftraege: readonly Auftrag[] | null;
+  /** Rückmeldungen; `null`, solange sie nicht lesbar sind. */
+  rueckmeldungen: Rueckmeldungen | null;
+  /** Seitenuhr: „überfällig“ schlägt mit ihr um. */
+  jetzt: Dayjs;
+}
+
+/**
+ * Die Einheiten, die die Schalter „ohne Auftrag“ und „Rückmeldung fehlt oder überfällig“ treffen
+ * (Change `t3q2y33z-meldebild-schnellfilter`, design.md D1, D4). `null` heißt: kein wirksamer
+ * Einheiten-Filter. Ein Schalter, dessen Quelle nicht lesbar ist, wirkt nicht: eine leere Liste
+ * Aufträge oder Rückmeldungen hieße sonst „alle ohne Auftrag“ bzw. „alle ohne Rückmeldung“ (wie
+ * in {@link rueckmeldungDerZeile}). Beide wirksam verlangen beide Bedingungen.
+ */
+export function einheitenTreffer(e: EinheitenFilterEingabe): Set<number> | null {
+  const auftragJe = e.ohneAuftrag && e.auftraege ? offeneAuftraegeJeEinheit(e.auftraege) : null;
+  const rueckmeldungJe =
+    e.rueckmeldungFehlt && e.rueckmeldungen
+      ? new Map(e.rueckmeldungen.einheiten.map((r) => [r.bezug_id, r]))
+      : null;
+  if (!auftragJe && !rueckmeldungJe) return null;
+  const treffer = new Set<number>();
+  for (const x of e.einheiten) {
+    if (auftragJe && auftragJe.has(x.id)) continue;
+    if (rueckmeldungJe && rueckmeldungZustand(rueckmeldungJe.get(x.id), e.jetzt) === 'aktuell')
+      continue;
+    treffer.add(x.id);
+  }
+  return treffer;
+}
+
 // ── Funkrufname ───────────────────────────────────────────────────────────────
 
 /**
@@ -741,14 +781,17 @@ export function toenungsGruende(
  * Die Kachel „keine Rückmeldung": Einheiten, von denen NIE eine Rückmeldung kam; überfällige
  * zählen nicht (das zeigt ihre Zeile). Gezählt über die GEFILTERTEN Zeilen wie die übrigen
  * Bandzellen, rekursiv samt Untereinheiten (D12). Bei 0 entfällt die Kachel — eine rote Null meldete das Gegenteil.
+ * `nur`: die Treffer eines Einheiten-Filters (LLH-1792); Rahmen-Obereinheiten zählen nicht.
  */
 export function keineRueckmeldungZelle(
   zeilen: readonly RasterZeile[],
   daten: Rueckmeldungen,
+  nur: ReadonlySet<number> | null = null,
 ): BandZelle | null {
   const ids = einheitZeilen(zeilen)
     .filter(istEchteEinheit)
-    .map((z) => z.einheitId);
+    .map((z) => z.einheitId)
+    .filter((id) => !nur || nur.has(id));
   const anzahl = ohneRueckmeldung(ids, daten);
   if (anzahl === 0) return null;
   return {

@@ -149,7 +149,7 @@ pub async fn disponieren(
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die aufgelöste Anzeige (funkrufname)
     // für ETB-Text UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let disponiert = match &vorbereitet {
             // Ein entlassenes oder storniertes Fahrzeug wird wieder aufgenommen (LLH-1079, D7).
             Vorbereitet::Stamm(fahrzeug_id) => {
@@ -194,9 +194,14 @@ pub async fn disponieren(
         } else {
             crate::fahrzeug::etb_text_disponiert(&anzeige.funkrufname)
         };
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(anzeige)
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        Ok((anzeige, etb_id))
     })?;
+    // `fahrzeug` frischt das Einsatztagebuch nicht auf, der Eintrag geht eigens hinaus
+    // (LLH-1952).
+    state.live.publiziere(einsatz_id, etb_id);
     sse_fahrzeug(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -345,8 +350,9 @@ pub async fn update(
     // auf den alten Status ETB, Zeitachse und Ereignis. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (vorher, nachher, beruehrt, traegt_fuehrungsstelle) =
+    let (vorher, nachher, beruehrt, traegt_fuehrungsstelle, etb_ids) =
         crate::write_retry!(&state.pool, |conn| {
+            let mut etb_ids = Vec::new();
             let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
             disposition_repo::update_tx(conn, einsatz_id, ef_id, patch).await?;
             let nachher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
@@ -372,30 +378,43 @@ pub async fn update(
                             .await?;
                     }
                 }
-                crate::etb::system_audit_tx(
-                    conn,
-                    einsatz_id,
-                    ctx.benutzer.id,
-                    startwert,
-                    &crate::fahrzeug::etb_text_status_wechsel(
-                        &nachher.funkrufname,
-                        vorher.status_label.as_deref(),
-                        nachher.status_label.as_deref(),
-                    ),
-                )
-                .await?;
+                etb_ids.push(
+                    crate::etb::system_audit_tx(
+                        conn,
+                        einsatz_id,
+                        ctx.benutzer.id,
+                        startwert,
+                        &crate::fahrzeug::etb_text_status_wechsel(
+                            &nachher.funkrufname,
+                            vorher.status_label.as_deref(),
+                            nachher.status_label.as_deref(),
+                        ),
+                    )
+                    .await?,
+                );
             }
             // LLH-1073, design.md D1: ein Eintrag für alle geänderten Ad-hoc-Angaben.
             let angaben_text = crate::fahrzeug::etb_text_angaben(&vorher, &nachher);
             let mut traegt_fuehrungsstelle = false;
             if let Some(text) = angaben_text {
-                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                    .await?;
+                etb_ids.push(
+                    crate::etb::system_audit_tx(
+                        conn,
+                        einsatz_id,
+                        ctx.benutzer.id,
+                        startwert,
+                        &text,
+                    )
+                    .await?,
+                );
                 traegt_fuehrungsstelle =
                     crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
             }
-            Ok((vorher, nachher, beruehrt, traegt_fuehrungsstelle))
+            Ok((vorher, nachher, beruehrt, traegt_fuehrungsstelle, etb_ids))
         })?;
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     let has_status_changed = vorher.status_id != nachher.status_id;
     let has_angaben_changed = vorher.funkrufname != nachher.funkrufname
         || vorher.fahrzeugtyp != nachher.fahrzeugtyp
@@ -536,12 +555,12 @@ pub async fn entlassen(
     // F06/LFH-244 Tier-A: Bindungen lösen, Austritt, Endzustand und System-ETB atomar in EINER
     // Tx. Was das Fahrzeug außerhalb des Fahrzeugmoduls trug, liefert `entlassen_tx`; SSE erst
     // nach dem Commit.
-    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let ergebnis =
             disposition_repo::entlassen_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt)
                 .await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -554,9 +573,10 @@ pub async fn entlassen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        Ok((ergebnis, anzeige))
+        Ok((ergebnis, anzeige, etb_id))
     })?;
     let vorzustand = ergebnis.vorzustand(&jetzt);
+    state.live.publiziere(einsatz_id, etb_id);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     // Die Zuordnung an der Führungsstelle ist gelöscht (LFH-1106): deren Leser hängen am
     // Ereignis `einsatz`. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
@@ -628,7 +648,7 @@ pub async fn zuruecknehmen(
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis = disposition_repo::zuruecknehmen_tx(
             conn,
             einsatz_id,
@@ -640,7 +660,7 @@ pub async fn zuruecknehmen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -651,9 +671,10 @@ pub async fn zuruecknehmen(
             ),
         )
         .await?;
-        Ok((ergebnis, anzeige))
+        Ok((ergebnis, anzeige, etb_id))
     })?;
     // Live wie beim Entlassen: dieselben Leser, nur in der Gegenrichtung.
+    state.live.publiziere(einsatz_id, etb_id);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     if ergebnis.fuehrungsstelle {
         crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
@@ -691,7 +712,7 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt).await?;
@@ -702,9 +723,9 @@ pub async fn stornieren(
             startwert,
             &crate::fahrzeug::etb_text_storniert(&vorher.funkrufname),
         )
-        .await?;
-        Ok(())
+        .await
     })?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -719,7 +740,7 @@ pub async fn reaktivieren(
 ) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::reaktivieren_tx(
             conn,
             einsatz_id,
@@ -729,7 +750,7 @@ pub async fn reaktivieren(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -737,8 +758,9 @@ pub async fn reaktivieren(
             &crate::fahrzeug::etb_text_erneut_disponiert(&anzeige.funkrufname),
         )
         .await?;
-        Ok(anzeige)
+        Ok((anzeige, etb_id))
     })?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(Json(anzeige))
 }
@@ -767,7 +789,7 @@ pub async fn besatzung_zuordnen(
         disposition_repo::load_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let geaendert = crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         if nur_wenn_frei {
             besatzung_repo::require_besatzung_frei_tx(conn, einsatz_id, ef_id, ep_id).await?;
         }
@@ -782,10 +804,10 @@ pub async fn besatzung_zuordnen(
         .fetch_optional(&mut *conn)
         .await?;
         if schon == Some(Some(ef_id)) {
-            return Ok(false);
+            return Ok(None);
         }
         let person = besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, ef_id, ep_id).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -793,9 +815,10 @@ pub async fn besatzung_zuordnen(
             &crate::fahrzeug::etb_text_besatzung_zugeordnet(&fahrzeug.funkrufname, &[person]),
         )
         .await?;
-        Ok(true)
+        Ok(Some(etb_id))
     })?;
-    if geaendert {
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
         sse_fahrzeug(&state, einsatz_id, ef_id);
         sse_personal(&state, einsatz_id, ep_id);
     }
@@ -894,7 +917,7 @@ pub async fn besatzung_freigeben(
         disposition_repo::load_anzeige(&state.pool, einsatz_id, ef_id, ctx.einsatz.ist_aktiv())
             .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         let person = besatzung_repo::gib_besatzung_frei_tx(conn, einsatz_id, ef_id, ep_id).await?;
         crate::etb::system_audit_tx(
             conn,
@@ -906,9 +929,9 @@ pub async fn besatzung_freigeben(
                 fahrzeug.funkrufname, person
             ),
         )
-        .await?;
-        Ok(())
+        .await
     })?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)

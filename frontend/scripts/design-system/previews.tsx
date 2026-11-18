@@ -100,6 +100,12 @@ import {
 import { RechteHinweis, SpeicherFehler } from '../../src/components/SpeicherHinweis';
 import { EINSATZ_ABGESCHLOSSEN, MODUL_PERSONAL_GESPERRT } from '../../src/components/nurAnsicht';
 import EinsatzSeite from '../../src/components/EinsatzSeite';
+import { ThemeModusFest } from '../../src/theme/ThemeModeProvider';
+import IconRail from '../../src/einsatz/IconRail';
+import ModulPanel from '../../src/einsatz/ModulPanel';
+import { kategorien, moduleNachKategorie, modulRegistry } from '../../src/einsatz/modulRegistry';
+import { sprungmarkenNachKategorie } from '../../src/einsatz/sprungmarken';
+import type { ModulFreigaben } from '../../src/api/types';
 import { ApiError, NetzFehler } from '../../src/api/client';
 import { IconPlus, IconPunkteSenkrecht, IconStift } from '../../src/icons';
 import type { ListenGedaechtnis } from '../../src/components/listenGedaechtnis';
@@ -1327,6 +1333,47 @@ function SeitenkopfBeispiel() {
 }
 
 /**
+ * Navigation im Einsatz (d78gipem D3): die Rail mit „Führung“ offen und dem Griff „Menü“, daneben
+ * das Modulpanel der Kategorie mit dem ETB als aktivem Modul, Zählern, der Sprungmarke
+ * „Entscheidungen“, einem vom Server gesperrten Modul und dem Fuß „Einsatzdauer“. Ohne Kleben
+ * (`kleben={false}`): der Träger gibt die Höhe vor, nicht das Fenster des Betrachters. Die Dauer
+ * steht fest, weil der Einsatz abgeschlossen ist; eine laufende Dauer änderte die Karte bei jedem
+ * Lauf.
+ */
+const NAVIGATION_FREIGABEN: ModulFreigaben = Object.fromEntries(
+  modulRegistry.map((m) => [m.key, { sichtbar: true, zugriff: m.key !== 'dokumente' }]),
+);
+
+function NavigationBeispiel() {
+  return (
+    <div style={{ display: 'flex', height: 600 }}>
+      <IconRail
+        kategorien={kategorien}
+        aktiveKategorie="fuehrung"
+        onKategorieKlick={nichts}
+        panel={{ offen: true, onUmschalten: nichts }}
+        kleben={false}
+      />
+      <ModulPanel
+        einsatzId={7}
+        titel="Führung"
+        einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: '2026-11-15T11:12:00Z' }}
+        module={moduleNachKategorie('fuehrung')}
+        freigaben={NAVIGATION_FREIGABEN}
+        zaehler={{
+          etb: { wert: 14, beschreibung: '14 Einträge im Einsatztagebuch' },
+          auftraege: { wert: 3, beschreibung: '3 offene Aufträge, davon 1 überfällig' },
+        }}
+        aktiverModulKey="etb"
+        onModulKlick={nichts}
+        sprungmarken={sprungmarkenNachKategorie('fuehrung')}
+        kleben={false}
+      />
+    </div>
+  );
+}
+
+/**
  * Eine Formularseite: zwei Feldgruppen als `Formularpaneel` im selben `<Form>`, danach die
  * Speicherleiste mit genau einem Knopf. Eigener Formularname je Instanz.
  */
@@ -1414,6 +1461,15 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     styles: ['components/EinsatzSeite.css', 'icons/icons.css'],
     client: true,
     content: () => <SeitenkopfBeispiel />,
+  },
+  {
+    name: 'Navigation',
+    title: 'Navigation im Einsatz (Rail und Modulpanel)',
+    group: 'Rahmen',
+    height: 1330,
+    source: 'einsatz/IconRail.tsx',
+    docAnchor: 'export default function IconRail',
+    content: () => <NavigationBeispiel />,
   },
   {
     name: 'Dashboard',
@@ -2160,10 +2216,14 @@ function ThemaAbschnitt({ dunkel, children }: { dunkel: boolean; children: React
       checkbox={antdKaestchen(DICHTE)}
       radio={antdOptionsknopf(DICHTE)}
     >
-      <section className="ds-thema" data-theme={dunkel ? 'dark' : 'light'}>
-        <Augenbraue als="h2">{dunkel ? 'Nacht' : 'Tag'}</Augenbraue>
-        <div className="ds-inhalt">{children}</div>
-      </section>
+      {/* Der Modus der App je Abschnitt (d78gipem D5): Bausteine mit `useModusFarben` (Modulpanel,
+         Seitenkopf) folgen sonst im Tag der Vorgabe Nacht. */}
+      <ThemeModusFest effektiv={dunkel ? 'dark' : 'light'} dichte={DICHTE}>
+        <section className="ds-thema" data-theme={dunkel ? 'dark' : 'light'}>
+          <Augenbraue als="h2">{dunkel ? 'Nacht' : 'Tag'}</Augenbraue>
+          <div className="ds-inhalt">{children}</div>
+        </section>
+      </ThemeModusFest>
     </ConfigProvider>
   );
 }

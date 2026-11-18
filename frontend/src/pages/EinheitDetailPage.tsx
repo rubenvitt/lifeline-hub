@@ -72,6 +72,7 @@ import EinheitMaterial from './einheit/EinheitMaterial';
 import FahrzeugeBesatzung from './einheit/FahrzeugeBesatzung';
 import { useBesatzungErrors } from './einheit/useBesatzungErrors';
 import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
+import EinheitGliederung, { Sprungziel, useEinheitGliederung } from './einheit/EinheitGliederung';
 
 /**
  * Vollseiten-Ansicht einer Einheit (LFH-339, seit LLH-1036 Spec `einheit-ansicht`): eigene Route,
@@ -244,9 +245,11 @@ interface EinheitAnsichtProps {
 }
 
 /**
- * Der Inhalt einer geladenen Einheit in der Reihenfolge von design.md D2: Kopf, Fahrzeuge und
- * Besatzung (mit „Person zuordnen …“ und „Fahrzeug zuordnen …“), Zeitachse, Material, Funk und
- * Kommunikation, Taktisches Zeichen, zuletzt abgesetzt „Einheit auflösen“. Was bedienbar ist, sagt allein `buildEinheitRechte` (D6).
+ * Der Inhalt einer geladenen Einheit: oben die Gliederung (LLH-1797), eine offene Übernahme,
+ * dann Fahrzeuge und Besatzung (mit „Person zuordnen …“ und „Fahrzeug zuordnen …“) vor den
+ * Kopfdaten — wer die Seite öffnet, will meist die Besatzung sehen (LLH-1797, vorher D2: Kopf
+ * zuerst) —, Zeitachse, Material, Funk und Kommunikation, Taktisches Zeichen, zuletzt abgesetzt
+ * „Einheit auflösen“. Was bedienbar ist, sagt allein `buildEinheitRechte` (D6).
  */
 function EinheitAnsicht({
   einsatzId,
@@ -263,6 +266,7 @@ function EinheitAnsicht({
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const freigaben = useModulFreigaben(einsatzId);
   const rechte = buildEinheitRechte(darfSchreiben, freigaben);
+  const gliederung = useEinheitGliederung();
 
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
   const abschnitteQuery = useQuery({
@@ -519,25 +523,11 @@ function EinheitAnsicht({
       )}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
-        <EinheitKopf
-          einheit={aktuell}
-          einheiten={einheiten}
-          typen={typenQuery}
-          abschnitte={abschnitteQuery}
-          canEdit={rechte.canEditEinheit}
-          orgDefault={orgDefault}
-          onPatch={onPatch}
-          onSetHandStatus={(statusId) => handStatus.mutateAsync(statusId)}
-          nachforderungPfad={
-            aktuell.nachforderung_id != null && istKeyFreigegeben('nachforderungen', freigaben)
-              ? nachforderungenPfad(einsatzId, { nachforderung: aktuell.nachforderung_id })
-              : null
-          }
-        />
+        <EinheitGliederung onSprung={gliederung.springe} />
 
-        {/* Offene Übernahme (LLH-1075, D14): direkt unter dem Kopf, nur mit Recht Einheiten;
-            Abweisen entlässt die Fahrzeuge und braucht deren Freigabe. Ohne Recht bleibt das
-            Kennzeichen im Kopf. */}
+        {/* Offene Übernahme (LLH-1075, D14): zuoberst, vor der Besatzung (LLH-1797), nur mit
+            Recht Einheiten; Abweisen entlässt die Fahrzeuge und braucht deren Freigabe. Ohne
+            Recht bleibt das Kennzeichen im Kopf. */}
         {aktuell.nicht_uebernommen_seit != null && rechte.canEditEinheit && (
           <EinheitUebernahme
             key={aktuell.id}
@@ -557,80 +547,108 @@ function EinheitAnsicht({
           />
         )}
 
-        {/* Jede Handlung hier wirkt mit dem Klick: die Zeile erscheint, wandert oder
-            verschwindet, das quittiert ohne Satz (LFH-1078). */}
-        <FahrzeugeBesatzung
-          einsatzId={einsatzId}
-          einheit={aktuell}
-          mittel={besatzungMittel}
-          personal={besatzungPersonal}
-          rechte={rechte}
-          listState={besatzungListState}
-          onReload={() => {
-            void personalQuery.refetch();
-            void fahrzeugeQuery.refetch();
-          }}
-          onSetFuehrer={setFuehrer}
-          errors={besatzungErrors}
-          onGehalten={setGehalteneFahrzeuge}
-        >
-          {/* Erst mit den Freigaben: die Auswahl fragt den Stamm nur mit Freigabe ab, und ein
-              Feld, das kurz offen und dann gesperrt stünde, spränge unter dem Zeiger. */}
-          {freigabenDa && (
-            <>
-              <ZuordnenAuswahl
-                art="personal"
-                einsatzId={einsatzId}
-                einheitId={einheitId}
-                rechte={rechte}
-                einsatzList={personalQuery}
-              />
-              <ZuordnenAuswahl
-                art="fahrzeug"
-                einsatzId={einsatzId}
-                einheitId={einheitId}
-                rechte={rechte}
-                einsatzList={fahrzeugeQuery}
-              />
-            </>
-          )}
-        </FahrzeugeBesatzung>
-
-        {/* Kräfte-Zeitachse (LFH-552): Einsatzdauer und Ereignisse der Einheit; ein Nachtrag
-            gilt per Fan-out auch für ihre Personen. */}
-        <Paneel titel="Zeitachse" koerperPolster>
-          <KraftZeitachse
+        <Sprungziel id={gliederung.anker('besatzung')}>
+          {/* Jede Handlung hier wirkt mit dem Klick: die Zeile erscheint, wandert oder
+              verschwindet, das quittiert ohne Satz (LFH-1078). */}
+          <FahrzeugeBesatzung
             einsatzId={einsatzId}
-            art="einheit"
-            id={einheitId}
-            kennung={aktuell.name}
-            darfSchreiben={darfSchreiben}
+            einheit={aktuell}
+            mittel={besatzungMittel}
+            personal={besatzungPersonal}
+            rechte={rechte}
+            listState={besatzungListState}
+            onReload={() => {
+              void personalQuery.refetch();
+              void fahrzeugeQuery.refetch();
+            }}
+            onSetFuehrer={setFuehrer}
+            errors={besatzungErrors}
+            onGehalten={setGehalteneFahrzeuge}
+          >
+            {/* Erst mit den Freigaben: die Auswahl fragt den Stamm nur mit Freigabe ab, und ein
+                Feld, das kurz offen und dann gesperrt stünde, spränge unter dem Zeiger. */}
+            {freigabenDa && (
+              <>
+                <ZuordnenAuswahl
+                  art="personal"
+                  einsatzId={einsatzId}
+                  einheitId={einheitId}
+                  rechte={rechte}
+                  einsatzList={personalQuery}
+                />
+                <ZuordnenAuswahl
+                  art="fahrzeug"
+                  einsatzId={einsatzId}
+                  einheitId={einheitId}
+                  rechte={rechte}
+                  einsatzList={fahrzeugeQuery}
+                />
+              </>
+            )}
+          </FahrzeugeBesatzung>
+        </Sprungziel>
+
+        <Sprungziel id={gliederung.anker('kopfdaten')}>
+          <EinheitKopf
+            einheit={aktuell}
+            einheiten={einheiten}
+            typen={typenQuery}
+            abschnitte={abschnitteQuery}
+            canEdit={rechte.canEditEinheit}
+            orgDefault={orgDefault}
+            onPatch={onPatch}
+            onSetHandStatus={(statusId) => handStatus.mutateAsync(statusId)}
+            nachforderungPfad={
+              aktuell.nachforderung_id != null && istKeyFreigegeben('nachforderungen', freigaben)
+                ? nachforderungenPfad(einsatzId, { nachforderung: aktuell.nachforderung_id })
+                : null
+            }
           />
-        </Paneel>
+        </Sprungziel>
 
-        <EinheitMaterial
-          einsatzId={einsatzId}
-          einheit={aktuell}
-          rechte={rechte}
-          materialList={materialQuery}
-        />
+        <Sprungziel id={gliederung.anker('zeitachse')}>
+          {/* Kräfte-Zeitachse (LFH-552): Einsatzdauer und Ereignisse der Einheit; ein Nachtrag
+              gilt per Fan-out auch für ihre Personen. */}
+          <Paneel titel="Zeitachse" koerperPolster>
+            <KraftZeitachse
+              einsatzId={einsatzId}
+              art="einheit"
+              id={einheitId}
+              kennung={aktuell.name}
+              darfSchreiben={darfSchreiben}
+            />
+          </Paneel>
+        </Sprungziel>
 
-        <EinheitFunk
-          einheit={aktuell}
-          einsatzId={einsatzId}
-          canEdit={rechte.canEditEinheit}
-          onPatch={onPatch}
-          onSprechgruppen={(aenderung, onSchritt) =>
-            sprechgruppen.mutateAsync({ aenderung, onSchritt })
-          }
-        />
+        <Sprungziel id={gliederung.anker('material')}>
+          <EinheitMaterial
+            einsatzId={einsatzId}
+            einheit={aktuell}
+            rechte={rechte}
+            materialList={materialQuery}
+          />
+        </Sprungziel>
 
-        <EinheitZeichenPaneel
-          einheit={aktuell}
-          canEdit={rechte.canEditEinheit}
-          orgDefault={orgDefault}
-          onPatchZeichen={(etikett, p) => patchZeichen.mutateAsync({ etikett, patch: p })}
-        />
+        <Sprungziel id={gliederung.anker('funk')}>
+          <EinheitFunk
+            einheit={aktuell}
+            einsatzId={einsatzId}
+            canEdit={rechte.canEditEinheit}
+            onPatch={onPatch}
+            onSprechgruppen={(aenderung, onSchritt) =>
+              sprechgruppen.mutateAsync({ aenderung, onSchritt })
+            }
+          />
+        </Sprungziel>
+
+        <Sprungziel id={gliederung.anker('zeichen')}>
+          <EinheitZeichenPaneel
+            einheit={aktuell}
+            canEdit={rechte.canEditEinheit}
+            orgDefault={orgDefault}
+            onPatchZeichen={(etikett, p) => patchZeichen.mutateAsync({ etikett, patch: p })}
+          />
+        </Sprungziel>
 
         {rechte.canEditEinheit &&
           aktuell.nachforderung_id != null &&

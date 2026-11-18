@@ -10,6 +10,7 @@ import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
+import { waehle } from '../test/auswahlListe';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
@@ -300,7 +301,7 @@ describe('MeldungenPage', () => {
   it('filtert nach Richtung extern (LFH-87)', async () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('Extern'));
+    await waehle('Richtung', 'Extern');
     await waitFor(() =>
       expect(listeMeldungen).toHaveBeenCalledWith(
         1,
@@ -324,7 +325,7 @@ describe('MeldungenPage', () => {
     );
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('Extern'));
+    await waehle('Richtung', 'Extern');
     await waitFor(() =>
       expect(listeMeldungen).toHaveBeenCalledWith(
         1,
@@ -1532,12 +1533,12 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     await within(karte(1)).findByText('Übergang nicht erlaubt');
 
     // In „Extern“ fehlt die Karte wirklich: der Grund steht im Seitenhinweis.
-    await userEvent.click(screen.getByRole('radio', { name: 'Extern' }));
+    await waehle('Richtung', 'Extern');
     await waitFor(() => expect(karte(1)).toBeNull());
     await within(await seitenHinweis()).findByRole('alert');
 
     // „Intern“ lädt, bis dahin steht die Liste aus „Extern“ — ohne die Karte, aber nur vorläufig.
-    await userEvent.click(screen.getByRole('radio', { name: 'Intern' }));
+    await waehle('Richtung', 'Intern');
     await waitFor(() =>
       expect(listeMeldungen).toHaveBeenCalledWith(
         1,

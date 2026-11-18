@@ -2377,3 +2377,59 @@ async fn rueckname_glaubt_dem_beleg_keinen_vorzustand() {
         vec![("eintreffen".into(), true)]
     );
 }
+
+/// LLH-1952: Jeder ETB-Eintrag des Fahrzeugmoduls geht als Ereignis `etb` hinaus. `fahrzeug`
+/// frischt das Einsatztagebuch nicht auf; ohne das eigene Ereignis sähe ein zweiter Schirm den
+/// Eintrag erst nach dem Neuladen.
+#[tokio::test]
+async fn etb_eintraege_der_fahrzeuge_gehen_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let s4 = status_nach_label(&app, &admin, "4 – Am Einsatzort").await;
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+
+    let ef = adhoc_disponieren(&app, &admin, einsatz, "83-1").await;
+    etb.pruefe(&app, &admin, einsatz, "disponieren").await;
+    let fehl = adhoc_disponieren(&app, &admin, einsatz, "83-2").await;
+    etb.pruefe(&app, &admin, einsatz, "zweites disponieren")
+        .await;
+
+    let body = format!(r#"{{"status_id":{s4},"funkrufname":"83-1a"}}"#);
+    let (s, json) = fahrzeug_patch(&app, &admin, einsatz, ef, &body).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "Status und Angaben ändern")
+        .await;
+
+    let besatzung = format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}");
+    for methode in ["PUT", "DELETE"] {
+        let (s, json) = anfrage(&app, methode, &besatzung, &admin, None).await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{methode}: {json}");
+        etb.pruefe(&app, &admin, einsatz, methode).await;
+    }
+
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "entlassen").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&json["vorzustand"].to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "zurücknehmen").await;
+
+    for (fz, was, erwartet) in [
+        (ef, "entlassen", StatusCode::OK),
+        (ef, "reaktivieren", StatusCode::OK),
+        (fehl, "stornieren", StatusCode::NO_CONTENT),
+    ] {
+        let (s, json) = aktion(&app, &admin, einsatz, fz, was).await;
+        assert_eq!(s, erwartet, "{was}: {json}");
+        etb.pruefe(&app, &admin, einsatz, was).await;
+    }
+}

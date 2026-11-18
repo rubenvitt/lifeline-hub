@@ -40,7 +40,8 @@ entlassen dürfen Einsatzleitung und Führungspersonal.
    bleiben dabei stehen. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der
    Treffer und je Wert ein Knopf, etwa „Träger: ASB“, der genau diesen Filter entfernt; „Filter
    zurücksetzen“ leert Suche und Filter. Auf dem Handy stehen Filter und „Sortieren“ als
-   Auswahlfelder über der Liste.
+   Auswahlfelder über der Liste; „wie geliefert“ in „Sortieren“ stellt die Reihenfolge ohne
+   Sortierung wieder her.
 
 ### Fahrzeuge aus dem Stamm disponieren
 
