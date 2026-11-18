@@ -31,3 +31,7 @@ Change `t39ltxxi-ios-huelle`.
 - **Bildschirmbilder:** jede native Seite bekommt ein Bild in
   `ios/AppUITests/ScreenshotTests.swift`; der Lauf lädt sie als Artefakt hoch (Bilder der
   Änderung für den PR).
+- **Marke:** App-Symbol (`ios/App/Assets.xcassets/AppIcon.appiconset`) und Startfarbe
+  `Kopfschwarz` kommen aus der Bildmarke (Spec `app-marke`); neu erzeugt mit
+  `scripts/ios/erzeuge-symbol.sh` (auch aus `scripts/marke/erzeuge-symbole.sh` gerufen), geprüft in
+  `frontend/src/marke/marke.guard.test.ts`. Nie von Hand ändern.

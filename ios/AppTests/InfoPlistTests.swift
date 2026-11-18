@@ -1,4 +1,5 @@
 import LifelineKern
+import UIKit
 import XCTest
 
 /// Prüft die gebaute App im Simulator gegen `ios/project.yml` (LLH-1978, tasks.md 8.1): Version
@@ -31,6 +32,25 @@ final class InfoPlistTests: XCTestCase {
 
     func testDieAppKennzeichnetSichAlsLifelineIos() {
         XCTAssertEqual(Bundle.main.bundleIdentifier, "dev.rubeen.lifeline.ios")
+    }
+
+    func testDasAppSymbolIstEingebunden() {
+        let symbole = info["CFBundleIcons"] as? [String: Any]
+        let haupt = symbole?["CFBundlePrimaryIcon"] as? [String: Any]
+        XCTAssertEqual(haupt?["CFBundleIconName"] as? String, "AppIcon")
+    }
+
+    func testDerStartbildschirmIstKopfSchwarz() throws {
+        let start = info["UILaunchScreen"] as? [String: Any]
+        XCTAssertEqual(start?["UIColorName"] as? String, "Kopfschwarz")
+        let farbe = try XCTUnwrap(UIColor(named: "Kopfschwarz", in: .main, compatibleWith: nil))
+        var rot: CGFloat = 0, gruen: CGFloat = 0, blau: CGFloat = 0, alpha: CGFloat = 0
+        XCTAssertTrue(farbe.getRed(&rot, green: &gruen, blue: &blau, alpha: &alpha))
+        // #0c0e11, wie das Kopf-Schwarz der Bildmarke (frontend/src/marke/marke.guard.test.ts).
+        XCTAssertEqual(Int((rot * 255).rounded()), 0x0C)
+        XCTAssertEqual(Int((gruen * 255).rounded()), 0x0E)
+        XCTAssertEqual(Int((blau * 255).rounded()), 0x11)
+        XCTAssertEqual(alpha, 1)
     }
 
     func testDasInitSkriptLiegtAlsRessourceInDerApp() throws {

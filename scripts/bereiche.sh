@@ -75,8 +75,9 @@ bereiche_von() {
     # Rust-Tests der Desktop-Hülle und der Swift-Kern der iOS-Hülle lesen sie. Vor `src-tauri/*`.
     src-tauri/faelle/*)
       echo "rust ios" ;;
-    # Vitest führt das Init-Skript der iOS-Hülle aus wie die Tauri-Skripte (src/test/huelle.ts).
-    ios/App/Huelle/*)
+    # Vitest führt das Init-Skript der iOS-Hülle aus wie die Tauri-Skripte (src/test/huelle.ts)
+    # und prüft App-Symbol und Startfarbe der iOS-App mit der Bildmarke (marke.guard.test.ts).
+    ios/App/Huelle/* | ios/App/Assets.xcassets/*)
       echo "frontend ios" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
