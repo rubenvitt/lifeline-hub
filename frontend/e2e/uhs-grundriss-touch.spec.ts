@@ -460,9 +460,14 @@ test.describe('UHS-Grundriss unter Touch', () => {
       expect(kasten, 'Karte steht im Layout').not.toBeNull();
       expect(kasten!.width, 'Kartenbreite').toBeGreaterThanOrEqual(soll);
       expect(kasten!.height, 'Kartenhöhe').toBeGreaterThanOrEqual(soll);
-      // Die Kartengröße ist dichteunabhängig.
-      expect(Math.round(kasten!.width)).toBe(140);
-      expect(Math.round(kasten!.height)).toBe(116);
+      // Die Grundgröße 140 × 116 ist dichteunabhängig; die Fläche streckt sie höchstens aufs
+      // Doppelte, in beiden Achsen gleich (LLH-1940, Spec `uhs-grundriss`).
+      expect(kasten!.width, 'Kartenbreite im Streckbereich').toBeGreaterThanOrEqual(140);
+      expect(kasten!.width, 'Kartenbreite im Streckbereich').toBeLessThanOrEqual(280);
+      expect(kasten!.height / kasten!.width, 'Seitenverhältnis der Grundgröße').toBeCloseTo(
+        116 / 140,
+        2,
+      );
 
       // Den Mauszeiger aus dem Setup aus dem Weg räumen: er bleibt an seinem letzten Klickpunkt
       // stehen. Geht das Menü darüber auf (bei 1024 px in der Reiterform der Fall), meldet Chrome
