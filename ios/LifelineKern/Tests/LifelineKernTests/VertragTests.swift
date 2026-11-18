@@ -13,7 +13,8 @@ final class VertragTests: XCTestCase {
     func shell(_ vertrag: Int, version: String = "1.0.0-alpha.300") -> ShellAbruf {
         .antwort(
             status: 200,
-            body: Data(#"{"version":"\#(version)","shell_contract":\#(vertrag)}"#.utf8))
+            body: Data(#"{"version":"\#(version)","shell_contract":\#(vertrag)}"#.utf8),
+            contentType: "application/json")
     }
 
     func testShellInfoLiestDieWireFelderUndIgnoriertNeue() throws {
@@ -48,13 +49,89 @@ final class VertragTests: XCTestCase {
 
     func testOhneEndpunktIstDerServerZuAlt() {
         XCTAssertEqual(
-            Vertragspruefung.evaluate(.antwort(status: 404, body: Data()), letzterVertrag: 1),
+            Vertragspruefung.evaluate(
+                .antwort(status: 404, body: Data(), contentType: "text/plain"), letzterVertrag: 1),
             .nichtVertraeglich(.zuAlt, server: nil))
-        // Eine 200 ohne Vertrag (etwa die Oberfläche statt JSON) nennt keinen Vertrag.
+        // JSON ohne lesbaren Vertrag nennt keinen Vertrag.
+        for typ in ["application/json", "application/json; charset=utf-8", "Application/JSON"] {
+            XCTAssertEqual(
+                Vertragspruefung.evaluate(
+                    .antwort(status: 200, body: Data(#"{"status":"ok"}"#.utf8), contentType: typ),
+                    letzterVertrag: 1),
+                .nichtVertraeglich(.zuAlt, server: nil), typ)
+        }
+    }
+
+    func testDerVertragGiltAuchMitZeichensatzImContentType() {
+        let abruf = ShellAbruf.antwort(
+            status: 200, body: Data(#"{"version":"1.0.0","shell_contract":1}"#.utf8),
+            contentType: "application/json; charset=utf-8")
+        XCTAssertEqual(
+            Vertragspruefung.evaluate(abruf, letzterVertrag: nil),
+            .vertraeglich(ShellInfo(version: "1.0.0", shellContract: 1)))
+    }
+
+    /// Ein Captive Portal oder Auth-Proxy antwortet mit 200 und HTML (oder ohne Content-Type):
+    /// das ist nicht der Server, also gilt wie ohne Verbindung der zuletzt bestätigte Vertrag.
+    func testEine200OhneJsonIstNichtDerServer() {
+        let portal = Data("<!doctype html><title>WLAN-Anmeldung</title>".utf8)
+        for typ in ["text/html", "text/html; charset=utf-8", "text/plain", nil] as [String?] {
+            XCTAssertEqual(
+                Vertragspruefung.evaluate(
+                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 1),
+                .nichtErreichbar(.nichtErreichbar), "\(typ ?? "ohne")")
+            XCTAssertEqual(
+                Vertragspruefung.evaluate(
+                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: nil),
+                .nichtErreichbar(.nichtErreichbar), "\(typ ?? "ohne")")
+            XCTAssertEqual(
+                Vertragspruefung.evaluate(
+                    .antwort(status: 200, body: portal, contentType: typ), letzterVertrag: 2),
+                .nichtVertraeglich(.zuNeu, server: nil), "\(typ ?? "ohne")")
+        }
+        // Auch ein Portal, das JSON-ähnlichen Text als HTML schickt, nennt keinen Vertrag.
         XCTAssertEqual(
             Vertragspruefung.evaluate(
-                .antwort(status: 200, body: Data("<!doctype html>".utf8)), letzterVertrag: nil),
-            .nichtVertraeglich(.zuAlt, server: nil))
+                .antwort(
+                    status: 200, body: Data(#"{"version":"9","shell_contract":1}"#.utf8),
+                    contentType: "text/html"),
+                letzterVertrag: nil),
+            .nichtErreichbar(.nichtErreichbar))
+    }
+
+    /// Eine nicht verfolgte Weiterleitung auf eine fremde Origin (Vertragsabruf) kommt als 3xx an.
+    func testEineWeiterleitungIstWieOhneVerbindung() {
+        for status in [301, 302, 303, 307, 308] {
+            XCTAssertEqual(
+                Vertragspruefung.evaluate(
+                    .antwort(status: status, body: Data(), contentType: "text/html"), letzterVertrag: 1),
+                .nichtErreichbar(.nichtErreichbar), "\(status)")
+        }
+    }
+
+    /// Der Abruf folgt nur Weiterleitungen auf derselben Origin; eine fremde (Captive Portal,
+    /// Auth-Proxy) bleibt stehen und kommt als 3xx in die Prüfung.
+    func testNurWeiterleitungenAufDerselbenOriginWerdenVerfolgt() {
+        let shell = URL(string: "https://elw.local:8443/api/shell")
+        XCTAssertTrue(
+            Vertragspruefung.followsRedirect(von: shell, nach: URL(string: "https://ELW.local:8443/api/shell/")))
+        for ziel in [
+            "https://portal.example/login", "https://elw.local/api/shell", "http://elw.local:8443/api/shell",
+            "https://elw.local:8444/api/shell",
+        ] {
+            XCTAssertFalse(Vertragspruefung.followsRedirect(von: shell, nach: URL(string: ziel)), ziel)
+        }
+        XCTAssertFalse(Vertragspruefung.followsRedirect(von: nil, nach: shell))
+        XCTAssertFalse(Vertragspruefung.followsRedirect(von: shell, nach: nil))
+    }
+
+    func testJsonErkenntDenMedientyp() {
+        for typ in ["application/json", " application/json ; charset=utf-8", "APPLICATION/JSON"] {
+            XCTAssertTrue(ShellAbruf.isJson(typ), typ)
+        }
+        for typ in ["text/html", "application/jsonp", "text/json-ish", "", nil] as [String?] {
+            XCTAssertFalse(ShellAbruf.isJson(typ), typ ?? "nil")
+        }
     }
 
     func testDieVersionEinesZuAltenServersKommtAusHealth() throws {
@@ -75,7 +152,8 @@ final class VertragTests: XCTestCase {
             Vertragspruefung.evaluate(.fehler(.cannotConnectToHost), letzterVertrag: 2),
             .nichtVertraeglich(.zuNeu, server: nil))
         XCTAssertEqual(
-            Vertragspruefung.evaluate(.antwort(status: 502, body: Data()), letzterVertrag: 1),
+            Vertragspruefung.evaluate(
+                .antwort(status: 502, body: Data(), contentType: "text/html"), letzterVertrag: 1),
             .nichtErreichbar(.nichtErreichbar))
     }
 

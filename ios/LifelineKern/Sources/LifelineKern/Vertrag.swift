@@ -57,8 +57,17 @@ public enum Fehlerklasse: Equatable, Sendable {
 
 /// Was die App beim Abruf von `GET /api/shell` erlebt hat.
 public enum ShellAbruf: Sendable {
-    case antwort(status: Int, body: Data)
+    /// `contentType` ist der Kopf `Content-Type`, wie er kam (`nil`, wenn er fehlt). Eine
+    /// Weiterleitung auf eine fremde Origin verfolgt der Abruf nicht; sie kommt als 3xx an.
+    case antwort(status: Int, body: Data, contentType: String?)
     case fehler(URLError.Code)
+
+    /// Medientyp `application/json`, gleich mit welchen Parametern (`charset`).
+    public static func isJson(_ contentType: String?) -> Bool {
+        guard let medientyp = contentType?.split(separator: ";", omittingEmptySubsequences: false).first
+        else { return false }
+        return medientyp.trimmingCharacters(in: .whitespaces).lowercased() == "application/json"
+    }
 }
 
 public enum Vertragsergebnis: Equatable, Sendable {
@@ -86,8 +95,8 @@ public enum Vertragspruefung {
         bekannt: [Int] = LifelineKern.bekannteVertraege
     ) -> Vertragsergebnis {
         switch abruf {
-        case .antwort(status: 200, let body):
-            // Eine 200 ohne lesbaren Vertrag ist ein Server ohne Vertrag, also zu alt.
+        case .antwort(status: 200, let body, let contentType) where ShellAbruf.isJson(contentType):
+            // JSON ohne lesbaren Vertrag ist ein Server ohne Vertrag, also zu alt.
             guard let info = try? JSONDecoder().decode(ShellInfo.self, from: body) else {
                 return .nichtVertraeglich(.zuAlt, server: nil)
             }
@@ -95,16 +104,25 @@ public enum Vertragspruefung {
                 return .nichtVertraeglich(richtung, server: info)
             }
             return .vertraeglich(info)
-        case .antwort(status: 404, _):
+        case .antwort(status: 404, _, _):
+            // Vom Server selbst: eine fremde Origin hat der Abruf nicht erreicht.
             return .nichtVertraeglich(.zuAlt, server: nil)
         case .antwort:
-            // Ein Proxy oder ein startender Server: wie ohne Verbindung.
+            // Ein Proxy, ein startender Server, eine Weiterleitung oder ein Captive Portal mit
+            // einer 200 ohne JSON: das ist nicht der Server, also wie ohne Verbindung.
             return ohneVerbindung(.nichtErreichbar, letzterVertrag: letzterVertrag, bekannt: bekannt)
         case .fehler(let code):
             let klasse = Fehlerklasse(code)
             if klasse == .zertifikat { return .nichtErreichbar(.zertifikat) }
             return ohneVerbindung(klasse, letzterVertrag: letzterVertrag, bekannt: bekannt)
         }
+    }
+
+    /// Folgt der Abruf einer Weiterleitung? Nur auf derselben Origin; eine fremde (Captive Portal,
+    /// Auth-Proxy) beantwortet nicht der Server, ihre 3xx gilt wie ohne Verbindung.
+    public static func followsRedirect(von: URL?, nach: URL?) -> Bool {
+        guard let von, let nach else { return false }
+        return Linkregeln.isEigeneOrigin(server: von, ziel: nach)
     }
 
     /// Richtung eines unbekannten Vertrags; `nil`, wenn die App ihn kennt.
