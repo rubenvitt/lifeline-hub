@@ -426,7 +426,7 @@ Warteschlange; ein Fehler beim Senden wird verschluckt. Der Server (`src/routes/
 ## 8.31 Hüllen-Vertrag
 
 Desktop-Hülle (`src-tauri`) und iOS-Hülle (`ios`) laden die Weboberfläche des Servers und tragen
-keine Anwendungslogik ([ADR-0065](entscheidungen/ADR-0065-die-ios-huelle-ist-eine-eigene-swift-app-ohne-anwendungslogik-die-die-serveroberflaeche-laedt.md)).
+keine Anwendungslogik ([ADR-0066](entscheidungen/ADR-0066-die-ios-huelle-ist-eine-eigene-swift-app-ohne-anwendungslogik-die-die-serveroberflaeche-laedt.md)).
 Was Server und Hülle einander zusagen, steht in der Spec `huellen-vertrag`; drei Teile:
 
 - **Server → Hülle:** `GET /api/shell` liefert anonym und ohne Datenbank `version` und
