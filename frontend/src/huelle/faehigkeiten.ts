@@ -13,6 +13,12 @@
 declare global {
   interface Window {
     __LIFELINE_HUELLE__?: {
+      /** Kennwort der Plattform; die iOS-Hülle setzt `'ios'`, die Desktop-Hüllen vorerst nichts. */
+      readonly platform?: string;
+      /** Volle Versionsangabe der Hülle (iOS: `LifelineVersion`). */
+      readonly version?: string;
+      /** Haptik der Hülle (Spec `huellen-vertrag`): nimmt jede Art an, tut für unbekannte nichts. */
+      readonly haptics?: (kind: string) => unknown;
       readonly passkey?: boolean;
       readonly anmeldungImBrowser?: () => Promise<unknown>;
       readonly benachrichtigungZeigen?: (titel: string, text?: string) => Promise<unknown>;
