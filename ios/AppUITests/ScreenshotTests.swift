@@ -82,10 +82,6 @@ final class ScreenshotTests: XCTestCase {
     func testServerEntfernenFragtVorher() {
         let app = launch("serverliste")
         XCTAssertTrue(element(app, "serverliste").waitForExistence(timeout: 15))
-        app.staticTexts["ELW 1"].swipeLeft()
-        XCTAssertFalse(app.buttons["Entfernen"].waitForExistence(timeout: 2), "aktiver Server entfernbar")
-        app.staticTexts["ELW 1"].swipeRight()
-
         app.staticTexts["Lager"].swipeLeft()
         let entfernen = app.buttons["Entfernen"]
         XCTAssertTrue(entfernen.waitForExistence(timeout: 5))
@@ -100,6 +96,11 @@ final class ScreenshotTests: XCTestCase {
         bestaetigen.tap()
         XCTAssertTrue(app.staticTexts["Lager"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["ELW 1"].exists)
+
+        // Zuletzt: auf einer Zeile ohne Wischaktionen kommt die Geste als Tippen an, und ein Tipp
+        // auf den aktiven Server führt zur Oberfläche und schließt die Liste.
+        app.staticTexts["ELW 1"].swipeLeft()
+        XCTAssertFalse(app.buttons["Entfernen"].waitForExistence(timeout: 2), "aktiver Server entfernbar")
     }
 
     @MainActor

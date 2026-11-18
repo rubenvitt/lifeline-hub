@@ -32,11 +32,13 @@ final class LinkTests: XCTestCase {
     }
 
     /// `window.open` der eigenen Origin lädt im selben Webview: die Navigation beginnt dort (und
-    /// scheitert ohne Server im Test an der Adresse, was der Begleiter meldet).
+    /// scheitert ohne Server im Test an der Adresse, was der Begleiter meldet). Der Server liegt
+    /// auf einem geschlossenen Port: die Verbindung scheitert sofort, während die Auflösung von
+    /// `elw.local` im CI länger dauert, als der Test wartet.
     func testWindowOpenDerEigenenOriginLaedtImSelbenWebview() async throws {
-        let web = try await lade("<p>ETB</p>")
+        let web = try await lade("<p>ETB</p>", server: try ServerAdresse.parse("https://127.0.0.1:9"))
         _ = try await web.evaluateJavaScript(
-            "window.open('https://elw.local:8443/einsaetze/1/etb', '_blank'); 0")
+            "window.open('https://127.0.0.1:9/einsaetze/1/etb', '_blank'); 0")
         await warte(sekunden: 15) { !self.fehlschlaege.isEmpty }
         guard let url = fehlschlaege.first else {
             return XCTFail("keine Navigation im selben Webview: \(gemeldet)")
@@ -74,8 +76,8 @@ final class LinkTests: XCTestCase {
 
     // MARK: Hilfen
 
-    private func lade(_ html: String) async throws -> WKWebView {
-        let adresse = elw
+    private func lade(_ html: String, server: ServerAdresse? = nil) async throws -> WKWebView {
+        let adresse = server ?? elw
         let begleiter = Navigationsbegleiter(
             aktiverServer: { adresse },
             oeffne: { [weak self] url in self?.geoeffnet.append(url) },
@@ -83,13 +85,13 @@ final class LinkTests: XCTestCase {
         ) { [weak self] _, event in self?.gemeldet.append(event) }
         var liste = Serverliste()
         let web = Webviewfabrik.make(
-            fuer: liste.add(elw), skript: "",
+            fuer: liste.add(adresse), skript: "",
             empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { adresse }),
             navigation: begleiter)
         halter += [begleiter, web]
         XCTAssertTrue(web.uiDelegate === begleiter)
         web.loadHTMLString(
-            "<!doctype html><html><body>\(html)<span id='bereit'></span></body></html>", baseURL: elw.url)
+            "<!doctype html><html><body>\(html)<span id='bereit'></span></body></html>", baseURL: adresse.url)
         await warte {
             ((try? await web.evaluateJavaScript("document.getElementById('bereit') ? 1 : 0")) as? Int) == 1
         }

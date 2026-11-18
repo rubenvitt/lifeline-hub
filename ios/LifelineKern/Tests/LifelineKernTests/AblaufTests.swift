@@ -237,6 +237,16 @@ final class AblaufTests: XCTestCase {
         XCTAssertEqual(step(.pruefung(elw), .seiteGeladen(url: eigen)).effects, [])
     }
 
+    /// Vor einem Ladefehler kann WebKit eine leere Seite übernehmen; sie ändert nichts, der Fehler
+    /// danach führt wie sonst zur Seite „nicht erreichbar“.
+    func testEineLeereSeiteVorDemLadefehlerBleibtOhneWirkung() {
+        let leer = step(.web(elw, vertrag: 1), .seiteGeladen(url: URL(string: "about:blank")))
+        XCTAssertEqual(leer.seite, .web(elw, vertrag: 1))
+        XCTAssertEqual(leer.effects, [])
+        let danach = step(leer.seite, .navigationFehlgeschlagen(.cannotConnectToHost, url: eigen))
+        XCTAssertEqual(danach.seite, .status(elw, .nichtErreichbar))
+    }
+
     // MARK: Webview
 
     func testNachDemEndeDesWebProzessesLaedtDieAppNeu() {
