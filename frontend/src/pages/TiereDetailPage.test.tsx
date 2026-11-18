@@ -1118,3 +1118,52 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
     });
   });
 });
+
+describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () => {
+  const storniert: Tier = {
+    ...tierBasis,
+    storniert_at: '2026-05-29 12:00:00',
+    storniert_von_name: 'Anna Beispiel',
+  };
+
+  it('am stornierten Tier steht das Banner mit Wer und Wann', async () => {
+    render(einsatzAktiv, storniert);
+    expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
+  });
+
+  it('wird es während der Bearbeitung storniert, bleibt der Entwurf lesbar, Speichern entfällt', async () => {
+    let stand: Tier = tierBasis;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+    ]);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    await user.clear(rufname);
+    await user.type(rufname, 'Bello');
+
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) }));
+
+    expect(await screen.findByText(/^Storniert von Anna Beispiel/)).toBeInTheDocument();
+    const gesperrt = screen.getByRole('textbox', { name: 'Rufname' });
+    expect(gesperrt).toHaveValue('Bello');
+    expect(gesperrt).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull();
+  });
+
+  it('eine unberührte Bearbeitung schließt beim Storno', async () => {
+    let stand: Tier = tierBasis;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('textbox', { name: 'Rufname' });
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) }));
+    await screen.findByText(/^Storniert von Anna Beispiel/);
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull());
+  });
+});

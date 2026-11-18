@@ -55,10 +55,10 @@
 
 ## 5. Frontend: Tier und Schaden live
 
-- [ ] 5.1 `tier` und `schaden` aus `NICHT_LIVE_KEYS`; `tier` in `EINSATZ_STREAM_EVENTS.tier`,
+- [x] 5.1 `tier` und `schaden` aus `NICHT_LIVE_KEYS`; `tier` in `EINSATZ_STREAM_EVENTS.tier`,
   `schaden` in `EINSATZ_STREAM_EVENTS.schaden` und `EINSATZ_STREAM_ZIELE.schaden` (D5). Prüfen:
   Guard grün; Test, dass ein `schaden`-Ereignis das Detail dieses Schadens abgleicht.
-- [ ] 5.2 `TiereDetailPage` und `SchaedenDetailPage`: Banner und Sperre aus `storniert_at` und
+- [x] 5.2 `TiereDetailPage` und `SchaedenDetailPage`: Banner und Sperre aus `storniert_at` und
   `storniert_von_name`. Tests:
   - Banner nach einem Neuabruf mit `storniert_at`;
   - eine offene Bearbeitung behält Entwurf und Basisstand über einen Live-Neuabruf.
