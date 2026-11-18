@@ -260,3 +260,108 @@ describe('Verdichtungszeile · Nachbarmodul gesperrt (LLH-1462)', () => {
     expect(listeEinsatzFahrzeuge).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Form `meta` (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D2): die Stärke steht im
+ * Seitenkopf neben dem Titel, nicht als eigene Zeile über der Liste. Beim Laden hält ein
+ * unsichtbarer Platzhalter in derselben Form die Breite, sonst bräche der Kopf nachträglich um
+ * (LLH-1463).
+ */
+describe('Verdichtungszeile — Form meta', () => {
+  function setupMeta() {
+    return renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/fahrzeuge"
+          element={<Verdichtungszeile einsatzId={1} pfad={kraefteuebersichtPfad(1)} form="meta" />}
+        />
+      </Routes>,
+      { route: '/einsaetze/1/fahrzeuge' },
+    );
+  }
+
+  it('steht ohne eigene Zeile und ohne Abstand nach unten, mit Stärke und Meldebild-Link', async () => {
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([
+      { staerke_position: 'fuehrer', status_kategorie: 'gebunden' },
+    ] as never);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { status_kategorie: 'verfuegbar' },
+    ] as never);
+    const { container } = setupMeta();
+    expect(await screen.findByText('1/0/0//1')).toBeInTheDocument();
+    const wurzel = container.querySelector<HTMLElement>('[data-lfh="verdichtung-meta"]')!;
+    expect(wurzel).not.toBeNull();
+    expect(wurzel.tagName).toBe('SPAN');
+    expect(wurzel.style.marginBlockEnd).toBe('');
+    expect(container.querySelector('[data-lfh="verdichtungszeile"]')).toBeNull();
+    expect(screen.getByText('1 verfügbar')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Kräfteübersicht' })).toBeInTheDocument();
+  });
+
+  it('hält den Link im Kopf auf der Steuerhöhe, ohne den Kopf zu erhöhen (Rand im Kasten)', () => {
+    const stil = verdichtungsLinkStil({ controlHeight: 30, paddingSM: 8 }, 'meta');
+    expect(stil.minHeight).toBe(30);
+    expect(stil.boxSizing).toBe('border-box');
+    expect(stil.padding).toBe('0 8px');
+  });
+
+  it('lässt auf der Fahrzeugseite die Fahrzeugzahl weg, die der Kopf schon nennt', async () => {
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { status_kategorie: 'verfuegbar' },
+    ] as never);
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/fahrzeuge"
+          element={
+            <Verdichtungszeile
+              einsatzId={1}
+              pfad={kraefteuebersichtPfad(1)}
+              form="meta"
+              fahrzeugzahl={false}
+            />
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/1/fahrzeuge' },
+    );
+    expect(await screen.findByText('1 verfügbar')).toBeInTheDocument();
+    expect(screen.queryByText(/^Fahrzeuge \d+$/)).toBeNull();
+  });
+
+  it('lässt die Aufteilung weg, wenn die Liste sie schon in ihren Gruppenköpfen nennt', async () => {
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { status_kategorie: 'verfuegbar' },
+    ] as never);
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/fahrzeuge"
+          element={
+            <Verdichtungszeile
+              einsatzId={1}
+              pfad={kraefteuebersichtPfad(1)}
+              form="meta"
+              fahrzeugzahl={false}
+              aufteilung={false}
+            />
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/1/fahrzeuge' },
+    );
+    expect(await screen.findByText('0/0/0//0')).toBeInTheDocument();
+    expect(screen.queryByText(/verfügbar|gebunden/)).toBeNull();
+  });
+
+  it('hält beim Laden die Breite mit einem stummen Platzhalter in derselben Form', () => {
+    vi.mocked(listeEinsatzPersonal).mockReturnValue(new Promise(() => {}));
+    vi.mocked(listeEinsatzFahrzeuge).mockReturnValue(new Promise(() => {}));
+    const { container } = setupMeta();
+    const platz = container.querySelector<HTMLElement>('[data-lfh="verdichtung-platzhalter"]')!;
+    expect(platz).not.toBeNull();
+    expect(platz).toHaveAttribute('aria-hidden', 'true');
+    expect(platz.style.visibility).toBe('hidden');
+    expect(platz.textContent).toMatch(/^Stärke .*0\/0\/0\/\/0.*0 nicht verfügbar/);
+  });
+});

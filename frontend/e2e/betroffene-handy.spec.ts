@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Betroffene am Handschirm (LFH-963): Liste und Detail bei 390 × 844, das Detail auch bei 820
@@ -273,8 +274,10 @@ test('Admin bei 390 px: Nachsichtung in der Karte, Zeilenmenü in der Karte', as
 });
 
 /**
- * Gegenprobe ab `md`: dieselbe Seite trägt Drucken und CSV als Knöpfe und keinen Auslöser — sonst
- * wären die Aussagen oben auch bei einer Seite grün, die die Nebenwege immer bündelt. Die frühere
+ * Gegenprobe ab `md` in `kompakt`: dieselbe Seite trägt Drucken und CSV als Knöpfe und keinen
+ * Auslöser — sonst wären die Aussagen oben auch bei einer Seite grün, die die Nebenwege immer
+ * bündelt. Die Stufe steht ausdrücklich da: in 48 / 72 bündelt der Kopf auch ab `md` (LLH-1786),
+ * und mit `hasTouch` beginnt das Gerät nicht in `kompakt`. Die frühere
  * Gegenprobe „Detailspalten nebeneinander" entfällt: das Detail hat eine Spalte und beginnt auch
  * quer mit dem Patientenkopf (Spec `einsatztauglichkeit-layout`).
  */
@@ -286,7 +289,7 @@ test('Gegenprobe bei 1180 px: Nebenwege als Knöpfe, Patientenkopf über den Per
   const personId = await seedeLage(page, einsatzId);
 
   await page.setViewportSize(TABLET_QUER);
-  await page.goto(`/einsaetze/${einsatzId}/personen`);
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/personen`, 'kompakt');
   await expect(page.getByText('Handtest').first()).toBeVisible();
   await expect(kopf(page).getByRole('link', { name: 'Druckansicht' })).toBeVisible();
   await expect(kopf(page).getByRole('button', { name: 'CSV exportieren' })).toBeVisible();

@@ -1,3 +1,4 @@
+import { personenZahl } from './betreuungText';
 /**
  * „Unterbringung in Zahlen" der Betreuungsübersicht (LLH-1050) — reine Ableitung aus den Stellen
  * von `GET …/betreuung`. Beantwortet die Leitfrage der Abschnittsleitung Betreuung: wie viele
@@ -76,4 +77,16 @@ export function unterbringungKennzahl(
     voll: volleStellen(stellen),
     ...(namentlich != null && { namentlich: namentlich.reduce((n, x) => n + x.anzahl, 0) }),
   };
+}
+
+/**
+ * Das Band „Unterbringung in Zahlen“ in einer Zeile, für den eingeklappten Kopf (LLH-1786,
+ * `KlappBand`): Belegung, freie Plätze und, wenn es sie gibt, volle Stellen. Ohne Meldung bzw.
+ * Kapazität „—“ statt einer erfundenen Null, wie im Band. Rein.
+ */
+export function unterbringungKurzform(k: UnterbringungKennzahl): string {
+  const zahl = (n: number | null) => (n == null ? '—' : personenZahl(n));
+  const teile = [`${zahl(k.inBetreuung)} in Betreuung`, `${zahl(k.frei)} frei`];
+  if (k.voll > 0) teile.push(`${k.voll} voll`);
+  return teile.join(' · ');
 }

@@ -21,6 +21,7 @@ export {
   type KennzahlZustand,
 } from './Kennzahl';
 export { Aufgliederung, Balken, type Segment } from './Aufgliederung';
+export { default as KlappBand, klappBandKopfStil, klappBandSchluessel } from './KlappBand';
 export { default as Zeitachseneintrag } from './Zeitachseneintrag';
 export { StatusZelle, StatusChip, NUR_VORLESER } from './Status';
 export { tonVonRolle, type StatusTon } from './statusFlaeche';

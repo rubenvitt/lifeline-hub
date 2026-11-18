@@ -42,6 +42,18 @@ export const SICHT_VORGABE: PersonenSicht = {
   abgeschlossen: false,
 };
 
+/**
+ * Wahlen der Sicht abseits der Vorgabe, für „Filter (n)“ am Handschirm (LLH-1786): Ansicht,
+ * Statusfilter und „Abgeschlossene zeigen“ — was hinter dem Knopf steht. Rein.
+ */
+export function sichtFilterZahl(sicht: PersonenSicht): number {
+  return (
+    Number(sicht.ansicht !== SICHT_VORGABE.ansicht) +
+    Number(sicht.filter !== SICHT_VORGABE.filter) +
+    Number(sicht.abgeschlossen !== SICHT_VORGABE.abgeschlossen)
+  );
+}
+
 export const FILTER_OPTIONEN: readonly { wert: PersonenFilter; label: string }[] = [
   { wert: 'alle', label: 'Alle' },
   // Dasselbe Wort wie die Statusspalte (`personStatus`), nicht „Neu“ (LFH-963).

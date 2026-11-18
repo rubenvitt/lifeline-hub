@@ -1,0 +1,10 @@
+/* Klappbares Kennzahlenband (`KlappBand.tsx`, LLH-1786). Im Druck zählt das Papier, nicht die
+   Wahl am Schirm: das Band steht offen, der Klappkopf fehlt. */
+@media print {
+  [data-lfh='klappband'] > [data-lfh='klappband-inhalt'][hidden] {
+    display: block !important;
+  }
+  [data-lfh='klappband'] > .lfh-klappband-kopf {
+    display: none !important;
+  }
+}

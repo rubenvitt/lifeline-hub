@@ -40,6 +40,7 @@ import type { EinsatzPersonal } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { useViewport } from '../components/useViewport';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
@@ -114,6 +115,7 @@ export default function PersonalPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { token } = theme.useToken();
+  const { istSchmal } = useViewport();
   /**
    * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
    * Hook gehört der Seite und steht vor jedem frühen Ausstieg.
@@ -635,6 +637,16 @@ export default function PersonalPage() {
   return (
     <EinsatzSeite
       meta={epQuery.isSuccess ? `${eps.length} Kräfte` : undefined}
+      metaPlatzhalter="0 Kräfte"
+      // Die Stärke steht als Meta im Kopf, nicht als eigene Zeile über der Liste (LLH-1786, Change
+      // `z137bgm5-seitenkopf-einzeilig` D2); sie hält ihre Breite beim Laden selbst.
+      metaZusatz={
+        <Verdichtungszeile
+          einsatzId={einsatzId}
+          pfad={kraefteuebersichtPfad(einsatzId)}
+          form="meta"
+        />
+      }
       dataUpdatedAt={gemeinsamerDatenstand(
         epQuery.dataUpdatedAt,
         einheitenQuery.dataUpdatedAt,
@@ -651,6 +663,13 @@ export default function PersonalPage() {
         />
       }
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
+      weitere={{
+        name: 'Weitere Aktionen zum Personal',
+        eintraege:
+          darfSchreiben && istSchmal
+            ? [{ key: 'adhoc', label: 'Ad-hoc-Person', onWahl: () => setAdhocOffen(true) }]
+            : [],
+      }}
       aktionen={
         darfSchreiben && (
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
@@ -659,7 +678,9 @@ export default function PersonalPage() {
             <Button type="primary" onClick={() => setDisponierenOffen(true)}>
               Personal disponieren
             </Button>
-            <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
+            {/* Am Handschirm steht genau eine Erfassung sichtbar (`frontend/AGENTS.md`,
+                „Nebenwege im Kopf“); die zweite geht hinter „Weitere“ (LLH-1786). */}
+            {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>}
           </Space>
         )
       }
@@ -695,7 +716,6 @@ export default function PersonalPage() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
           <DeeplinkHinweis lage={deeplinkHinweis} sache="Einsatzkraft" />
-          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {/* `zufluss` bleibt `sammelbanner`: Einheitswechsel, Status und Position sind Bedienziele
               der Zeile. Wechselt eine Person unter Fokus oder Zeiger die Einheit, hält die
               Schleuse Platz und Folge, bis beide die Sicht verlassen (D6). */}
