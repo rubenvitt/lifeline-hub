@@ -1962,6 +1962,83 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       expect(einheitPatches).toEqual([]);
       messung.mockRestore();
     });
+
+    // Feld-CAS (LLH-1945, `frontend/AGENTS.md`, Bedien-Leitlinie Punkt 4): der Altwert ist der Stand
+    // zu Beginn des Zugs. Lädt der Zwischenspeicher während des Zugs nach, bleibt er der Altwert;
+    // sonst passte der Vergleich auf den fremden Stand und überschriebe ihn still.
+    it('ein während des Zugs nachgeladener Stand ändert den Altwert nicht', async () => {
+      const messung = messeZiele();
+      const { abschnittPatches } = mitPatches();
+      const { client } = renderPage();
+      await screen.findByText('Nord-Ost');
+
+      const loslassen = zieheBis(griff('abschnitt', 7), mitte('Süd'));
+      // Ein anderer Arbeitsplatz hängt Nord-Ost inzwischen auf die oberste Ebene.
+      // Asynchron, damit die Seite den neuen Stand vor dem Loslassen rendert.
+      await act(async () => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          nord,
+          { ...nordOst, ueber_abschnitt_id: null },
+          sued,
+        ]);
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      loslassen();
+
+      await waitFor(() =>
+        expect(abschnittPatches).toEqual([
+          { id: 7, body: { ueber_abschnitt_id: 6, erwartet: { ueber_abschnitt_id: 5 } } },
+        ]),
+      );
+      messung.mockRestore();
+    });
+
+    it('eine Einheit behält den Altwert vom Beginn des Zugs', async () => {
+      const messung = messeZiele();
+      const { einheitPatches } = mitPatches();
+      const { client } = renderPage();
+      await userEvent.click(await findInTree('Nord'));
+      await screen.findByText('1. Zug');
+
+      const loslassen = zieheBis(griff('einheit', 10), mitte('Süd'));
+      await act(async () => {
+        client.setQueryData(einsatzKeys.einheiten(1), [{ ...zug, abschnitt_id: 7 }]);
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      loslassen();
+
+      await waitFor(() =>
+        expect(einheitPatches).toEqual([
+          { id: 10, body: { abschnitt_id: 6, erwartet: { abschnitt_id: 5 } } },
+        ]),
+      );
+      messung.mockRestore();
+    });
+  });
+
+  describe('Menü „Verschieben unter …“ · Altwert beim Öffnen', () => {
+    it('ein während des offenen Dialogs nachgeladener Stand ändert den Altwert nicht', async () => {
+      const { abschnittPatches } = mitPatches();
+      const { client } = renderPage();
+      await userEvent.click(await screen.findByText('Nord-Ost'));
+      await weitereAktion('Nord-Ost', 'Verschieben unter …');
+      const dialog = await screen.findByRole('dialog', { name: '„Nord-Ost“ verschieben unter …' });
+      // Ein anderer Arbeitsplatz hängt Nord-Ost inzwischen unter Süd.
+      act(() => {
+        client.setQueryData(einsatzKeys.abschnitte(1), [
+          nord,
+          { ...nordOst, ueber_abschnitt_id: 6 },
+          sued,
+        ]);
+      });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Oberste Ebene' }));
+
+      await waitFor(() =>
+        expect(abschnittPatches).toEqual([
+          { id: 7, body: { ueber_abschnitt_id: null, erwartet: { ueber_abschnitt_id: 5 } } },
+        ]),
+      );
+    });
   });
 
   describe('Live-Zufluss', () => {

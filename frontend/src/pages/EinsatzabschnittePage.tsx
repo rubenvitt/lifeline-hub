@@ -7,6 +7,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -200,6 +201,14 @@ export default function EinsatzabschnittePage() {
    * Umhang), träfe die Bestätigung sonst einen anderen.
    */
   const [verschiebenFuer, setVerschiebenFuer] = useState<number | null>(null);
+  /**
+   * Altwert (Feld-CAS, LLH-1945) für Zug und Dialog: der gespeicherte Ort zu Beginn der Handlung
+   * (`frontend/AGENTS.md`, Bedien-Leitlinie Punkt 4), festgehalten beim Greifen bzw. Öffnen. Der
+   * Zwischenspeicher lädt währenddessen weiter; läse das Loslassen ihn erst dann, passte der
+   * Vergleich auf einen fremden Umhang und überschriebe ihn still.
+   */
+  const zugVonRef = useRef<number | null>(null);
+  const verschiebenVonRef = useRef<number | null>(null);
   const [aufloesenFuer, setAufloesenFuer] = useState<{ id: number; name: string } | null>(null);
   /** Gründe abgelehnter Umhänge, je Ort (LFH-1077): Baum, Dialog, Seitenhinweis. */
   const [dragFehler, setDragFehler] = useState<unknown>(null);
@@ -559,23 +568,32 @@ export default function EinsatzabschnittePage() {
     },
   });
 
-  function handleDragStart() {
+  function handleDragStart(e: DragStartEvent) {
     setDragFehler(null);
     zufluss.holdDrag(true);
+    // Der Rückweg kommt aus dem gespeicherten Wert, nicht aus dem Griff: der Griff einer Einheit
+    // trägt den wirksamen Abschnitt nur für die Sperre (LLH-1744), ein geerbter ist `null`.
+    const drag = e.active.data.current as DragDaten | undefined;
+    zugVonRef.current = !drag
+      ? null
+      : drag.art === 'abschnitt'
+        ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
+        : (einheitenQuery.data?.find((x) => x.id === drag.id)?.abschnitt_id ?? null);
+  }
+
+  function handleDragCancel() {
+    zufluss.holdDrag(false);
+    zugVonRef.current = null;
   }
 
   function handleDragEnd(e: DragEndEvent) {
     zufluss.holdDrag(false);
+    const von = zugVonRef.current;
+    zugVonRef.current = null;
     const drag = e.active.data.current as DragDaten | undefined;
     const ziel = e.over?.data.current as DropDaten | undefined;
     // Gesperrte Ziele sind `disabled` und melden sich nie als `over`.
     if (!drag || !ziel) return;
-    // Der Rückweg kommt aus dem gespeicherten Wert, nicht aus dem Griff: der Griff einer Einheit
-    // trägt den wirksamen Abschnitt nur für die Sperre (LLH-1744), ein geerbter ist `null`.
-    const von =
-      drag.art === 'abschnitt'
-        ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
-        : (einheitenQuery.data?.find((x) => x.id === drag.id)?.abschnitt_id ?? null);
     verschieben.mutate({
       einsatzId,
       art: drag.art,
@@ -607,6 +625,7 @@ export default function EinsatzabschnittePage() {
 
   function openVerschieben(aid: number) {
     setDialogFehler(null);
+    verschiebenVonRef.current = abschnitte.find((a) => a.id === aid)?.ueber_abschnitt_id ?? null;
     setVerschiebenFuer(aid);
   }
 
@@ -844,7 +863,7 @@ export default function EinsatzabschnittePage() {
           }}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragCancel={() => zufluss.holdDrag(false)}
+          onDragCancel={handleDragCancel}
         >
           <div
             data-testid="abschnitte-rahmen"
@@ -1053,7 +1072,7 @@ export default function EinsatzabschnittePage() {
             art: 'abschnitt',
             id: verschiebenAbschnitt.id,
             name: verschiebenAbschnitt.name,
-            von: verschiebenAbschnitt.ueber_abschnitt_id ?? null,
+            von: verschiebenVonRef.current,
             nach,
             quelle: 'menue',
           });
