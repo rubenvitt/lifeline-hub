@@ -1122,7 +1122,7 @@ pub async fn modul_override_setzen(
 
 #[derive(Debug, Deserialize)]
 pub struct MitgliedRolle {
-    /// 'einsatzleitung' | 'fuehrungspersonal' | 'beobachter'.
+    /// 'einsatzleitung' | 'fuehrungspersonal' | 'mitarbeit' | 'beobachter'.
     pub einsatz_rolle: String,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub fuehrungsstelle: Option<Option<String>>,

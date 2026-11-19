@@ -24,6 +24,7 @@ import {
 } from '../druck/einsatzbericht/quellen';
 import { verdichteEinsatzbericht } from '../druck/einsatzbericht/verdichtung';
 import { einsatzdatenPfad } from '../routing/deeplinks';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Druckansicht des Einsatzberichts (LFH-726, `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/`): der
@@ -228,7 +229,7 @@ export default function EinsatzberichtDruckPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>Einsatzdaten</Link> },
+            { title: <ListenRueckweg to={zurueck}>Einsatzdaten</ListenRueckweg> },
             { title: 'Einsatzbericht' },
           ]}
         />

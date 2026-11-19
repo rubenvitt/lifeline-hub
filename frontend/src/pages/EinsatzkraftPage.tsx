@@ -91,6 +91,7 @@ import { personalDetailPfad } from '../stammdaten/stammdatenDetail';
 import { statusKategorie } from '../theme/statusFarben';
 import { Marke } from '../components/instrument/Marke';
 import './EinsatzkraftPage.css';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 dayjs.extend(utc);
 
@@ -510,9 +511,9 @@ export default function EinsatzkraftPage() {
             { title: einsatz.bezeichnung },
             {
               title: (
-                <Link to={personalPfad(einsatzId, { personal: ep.id })}>
+                <ListenRueckweg to={personalPfad(einsatzId, { personal: ep.id })}>
                   {modulName('personal')}
-                </Link>
+                </ListenRueckweg>
               ),
             },
             { title: ep.name },

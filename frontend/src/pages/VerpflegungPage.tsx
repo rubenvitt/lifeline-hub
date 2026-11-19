@@ -83,6 +83,7 @@ import {
 } from '../verpflegung/verpflegungText';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { flaeche } from '../theme/tokens';
+import { useAdressWert } from '../routing/useAdressWert';
 
 /** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
 const verpflegungRechteText = einsatzRechteGrund;
@@ -118,6 +119,8 @@ function zuflussText(
 
 /** Zwei Zeitfenster-Ansichten und die Stellen (LLH-1040, D13 Punkt 1): EINE Leiste. */
 type Ansicht = 'laufend' | 'vergangen' | 'stellen';
+/** Werte von `?ansicht=` (LLH-1826); exhaustiv, Vorgabe `laufend`. */
+const ANSICHT_ERLAUBT: Record<Ansicht, true> = { laufend: true, vergangen: true, stellen: true };
 
 /**
  * Die Leiste der Ansichten. Ein Wechsel hängt die Karten der bisherigen Ansicht aus; mit geänderter
@@ -209,7 +212,9 @@ export default function VerpflegungPage() {
   const jetzt = useUhr();
   const { istSchmal } = useViewport();
 
-  const [ansicht, setAnsicht] = useState<Ansicht>('laufend');
+  // Die Ansicht ist Zustand der Adresse (LLH-1826): sie überlebt Weg und Zurück. In der Gerätehülle
+  // schreibt sie genauso in die Adresse (Entwurf D3b).
+  const [ansicht, setAnsicht] = useAdressWert('ansicht', ANSICHT_ERLAUBT, 'laufend');
   const [dialog, setDialog] = useState<Dialog | null>(null);
   // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären sonst
   // alle Zeitfenster des neuen Einsatzes „fremde Neuzugänge".

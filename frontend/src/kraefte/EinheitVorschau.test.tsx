@@ -1,3 +1,4 @@
+import { aktionsKnoepfe } from '../test/kuerzel';
 import { screen } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
@@ -145,7 +146,7 @@ describe('EinheitVorschau (LFH-664)', () => {
     liefere([einheit()]);
     renderMitProviders(<EinheitVorschau einsatzId={5} id={3} />);
     await screen.findByText('1. Zug');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(aktionsKnoepfe()).toEqual([]);
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 

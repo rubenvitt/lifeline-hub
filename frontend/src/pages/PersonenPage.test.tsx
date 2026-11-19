@@ -433,7 +433,8 @@ describe('PersonenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Erfasst als R-047')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
+    // Der Filter steht in der Adresse (LLH-1826) und kommt mit der Navigation, kurz nach der Quittung.
+    expect(await screen.findByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     const kennung = await screen.findByText('R-047');
     expect(kennung.closest('tr')).toHaveClass('zeile-hervorgehoben');
   });
@@ -1071,6 +1072,24 @@ describe('PersonenPage', () => {
     },
   );
 
+  it('zeichnet eine Person mit unbekannter Sichtung in Zeilen und Raster wie „ohne Sichtung“ (LLH-1998)', async () => {
+    // Nachgestellt am Stand vom 19.11.2026: `SK_META['xyz'].label` riss die Zeilenansicht
+    // („reading 'label'“), und im Raster fehlte die Person, weil es keine Spalte „xyz“ gibt.
+    const kaputt = {
+      ...person,
+      aktuelle_sichtung: 'xyz',
+      aktuelle_sichtung_at: '2026-05-27 09:30:00',
+    };
+    render(einsatzAktiv, [kaputt, unbekannt]);
+    expect(await screen.findByText('R-001')).toBeInTheDocument();
+    expect(screen.getByText('R-002')).toBeInTheDocument();
+
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Sichtungsraster' }));
+    await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' });
+    expect(boardKarten('ohne')).toContain('R-001');
+  });
+
   it('Sichtungsraster gruppiert ALLE Personen nach Sichtung, samt unverletzt und ohne Sichtung', async () => {
     const sk2 = {
       ...person,
@@ -1643,11 +1662,6 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
 });
 
 /**
- * Sichtvorgabe aus der URL — der Anspringweg der Sprungmarken „Patienten" und „Vermisste". Beide
- * Hälften von apply-then-clean: die Sicht steht und die Parameter sind weg. Nur die erste wäre auch
- * grün, wenn die Seite den Filter bloß aus der URL spiegelte.
- */
-/**
  * Schließt die Maske und wartet, bis sie aus dem Bild ist: jsdom meldet kein Bewegungsende, das
  * Modal bliebe sonst in seiner Schließbewegung stehen.
  */
@@ -1663,7 +1677,12 @@ async function schliesseMaske(dialog: HTMLElement) {
   });
 }
 
-describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
+/**
+ * Die Sicht ist Zustand der Adresse (LLH-1826, Entwurf D4): Sprungmarken „Patienten“ und
+ * „Vermisste“ (LFH-620) sind gewöhnliche Adressen, die Parameter bleiben stehen und überleben so
+ * Weg und Zurück. Was nicht in der Adresse steht, gilt als Vorgabe.
+ */
+describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
   function Suche() {
     return <output data-testid="suche">{useLocation().search}</output>;
   }
@@ -1692,13 +1711,13 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     );
   }
 
-  it('?filter=vermisst setzt den Statusfilter und räumt den Parameter', async () => {
+  it('?filter=vermisst setzt den Statusfilter und lässt ihn in der Adresse', async () => {
     renderMitSuche('/einsaetze/1/personen?filter=vermisst&ansicht=zeilen');
     expect(await screen.findByText('R-002')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
     // Die erfasste Person steht unter „Vermisst" nicht — die Vorgabe wirkt auf die Zeilen.
     expect(screen.queryByText('R-001')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('suche')).toHaveTextContent('?filter=vermisst&ansicht=zeilen');
   });
 
   it('?ansicht=raster öffnet das Sichtungsraster über alle Personen', async () => {
@@ -1707,10 +1726,10 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
       await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('suche')).toHaveTextContent('?ansicht=raster&filter=alle');
   });
 
-  it('?ansicht=karte öffnet die Kartenansicht und räumt den Parameter', async () => {
+  it('?ansicht=karte öffnet die Kartenansicht und lässt den Parameter stehen', async () => {
     server.use(
       http.get('/api/karte/config', () => HttpResponse.json({})),
       http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
@@ -1721,16 +1740,68 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     expect(await screen.findByText('Keine Person mit Koordinate')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Karte' })).toBeChecked();
     expect(screen.getByText('1 Person ohne Koordinate — nicht auf der Karte')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('suche')).toHaveTextContent('?ansicht=karte');
   });
 
-  it('räumt einen unbrauchbaren Wert, ohne die Sicht zu verbiegen', async () => {
-    // Behält andere Parameter: nur der Sichtauftrag wird geräumt.
+  it('ein unbrauchbarer Wert gilt als Vorgabe', async () => {
     renderMitSuche('/einsaetze/1/personen?filter=patienten&x=1');
     await screen.findByText('R-001');
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Zeilen' })).toBeChecked();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?x=1'));
+  });
+
+  it('die Wahl des Sichtungsrasters steht in der Adresse, die Vorgabe nicht', async () => {
+    renderMitSuche('/einsaetze/1/personen');
+    await screen.findByText('R-001');
+    await userEvent.click(screen.getByRole('radio', { name: 'Sichtungsraster' }));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?ansicht=raster'));
+    await userEvent.click(screen.getByRole('radio', { name: 'Zeilen' }));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+  });
+
+  it('der Statusfilter steht in der Adresse', async () => {
+    renderMitSuche('/einsaetze/1/personen');
+    await screen.findByText('R-001');
+    await userEvent.click(screen.getByRole('tab', { name: 'Vermisst' }));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?filter=vermisst'));
+  });
+
+  it('die Sprungmarke „Vermisste“ zeigt genau ihre Sicht, auch aus dem Raster', async () => {
+    function Sprungmarke() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/einsaetze/1/personen?filter=vermisst')}>
+          Vermisste
+        </button>
+      );
+    }
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([person, unbekannt])),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/personen"
+          element={
+            <>
+              <Sprungmarke />
+              <PersonenPage />
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/1/personen?ansicht=raster' },
+    );
+    expect(
+      await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Vermisste' }));
+    expect(await screen.findByRole('radio', { name: 'Zeilen' })).toBeChecked();
+    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
   });
 
   /**
@@ -1771,8 +1842,9 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     );
     expect(await screen.findByRole('dialog', { name: 'Betroffene erfassen' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
-    expect(gesehen.slice(1).filter((s) => s.includes('filter='))).toEqual([]);
+    // `?neu=1` ist ein Auftrag und geht, der Filter ist Zustand und bleibt (LLH-1826).
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?filter=vermisst'));
+    expect(gesehen.slice(1).filter((s) => s.includes('neu='))).toEqual([]);
   });
 
   /**
@@ -1887,6 +1959,14 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
     await userEvent.click(within(ansicht).getByRole('radio', { name: 'Karte' }));
   }
+
+  it('zeigt eine Person mit unbekannter Sichtung als Marker „ohne Sichtung“ (LLH-1998)', async () => {
+    renderKarte([person, mitKoordinate(20, 4, { aktuelle_sichtung: 'xyz' as never })]);
+    await waehleKarte();
+    expect(
+      await screen.findByRole('button', { name: 'marker-person-20: R-004 · ohne Sichtung' }),
+    ).toBeInTheDocument();
+  });
 
   it('zeigt zwei Marker mit Registriernummer und Sichtung und nennt „3 ohne Koordinate“ (Spec-Szenario)', async () => {
     const personen = [

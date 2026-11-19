@@ -99,6 +99,7 @@ import { betreuungPfad, lagekartePfad, parseRouteId, verpflegungPfad } from '../
 import { betreuungsstelleStatus } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 type KopfMenue = 'karte' | 'verorten' | 'stornieren';
 
@@ -599,7 +600,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       {zelle(
         'kapazitaet_personen',
         'Kapazität (Personen)',
-        <InputNumber min={1} precision={0} placeholder="keine Angabe" style={{ width: '100%' }} />,
+        <InputNumber min={1} precision={0} placeholder="keine Angabe" />,
         s.kapazitaet_personen != null ? personenZahl(s.kapazitaet_personen) : leer,
         { mono: true, rules: [hoechstensRegel] },
       )}
@@ -699,7 +700,13 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={betreuungPfad(einsatzId)}>{modulName('betreuung')}</Link> },
+            {
+              title: (
+                <ListenRueckweg to={betreuungPfad(einsatzId)}>
+                  {modulName('betreuung')}
+                </ListenRueckweg>
+              ),
+            },
             { title: s.bezeichnung },
           ]}
         />

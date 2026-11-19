@@ -1,4 +1,4 @@
-import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import type { ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
@@ -53,10 +53,24 @@ export default function AbschnittDaten({
         sprechgruppen={a.sprechgruppen}
         verbindungen={a.verbindungen}
       />
-      <Datenfeld label={`Stärke (${STAERKE_SCHREIBWEISE})`} mono>
+      <Datenfeld
+        label={
+          <>
+            Stärke (<StaerkeSchreibweise />)
+          </>
+        }
+        mono
+      >
         {staerken ? <StaerkeAnzeige wert={staerken.eigene} /> : staerkenErsatz}
       </Datenfeld>
-      <Datenfeld label={`Stärke inkl. Unterabschnitte (${STAERKE_SCHREIBWEISE})`} mono>
+      <Datenfeld
+        label={
+          <>
+            Stärke inkl. Unterabschnitte (<StaerkeSchreibweise />)
+          </>
+        }
+        mono
+      >
         {staerken ? <StaerkeAnzeige wert={staerken.inklUnter} /> : staerkenErsatz}
       </Datenfeld>
       {a.bemerkung && (

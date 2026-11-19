@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::einsatz::kontext::{
-    EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff,
+    EinsatzErfassungsfreigabe, EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff,
 };
 use crate::einsatz::modul::{Auftraege, Lagemeldungen, Meldungen};
 use crate::einsatz::repo as einsatz_repo;
@@ -248,10 +248,11 @@ pub(crate) async fn empfaenger_funktion_pruefen(
     Ok(crate::fuehrung::pruefe_funktion(Some(code), None, s7_aktiv)?.funktion)
 }
 
-/// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Schreibrecht + aktiv).
+/// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Erfassungsrecht + aktiv; die Mitarbeit
+/// meldet keine Lagemeldung, LLH-1817).
 pub async fn anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibfreigabe<Meldungen>,
+    ctx: EinsatzErfassungsfreigabe<Meldungen>,
     headers: HeaderMap,
     JsonBody(req): JsonBody<NeueMeldung>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
@@ -314,6 +315,7 @@ pub async fn anlegen(
     if !crate::meldung::meldungsart_gueltig(meldungsart) {
         return Err(AppError::Validation("Ungültige Meldungsart".into()));
     }
+    crate::meldung::fordere_meldungsart_fuer_rolle(ctx.rolle, meldungsart)?;
     let prioritaet = req
         .prioritaet
         .as_deref()

@@ -23,6 +23,7 @@ import {
   SK_REIHE,
   SK_WORT,
   STATUS_META,
+  personSichtung,
   personStatusDarstellung,
   TRANSPORT_ART_WORT,
   transportRang,
@@ -105,11 +106,8 @@ export function nameText(p: Pick<Person, 'name' | 'vorname'>): string | null {
 
 /** Sichtung als `SichtungsTag` (BBK-Farbfeld, LFH-455), „—" wenn ungesichtet. */
 export function SkTag({ p }: { p: Pick<Person, 'aktuelle_sichtung'> }) {
-  return p.aktuelle_sichtung ? (
-    <SichtungsTag kategorie={p.aktuelle_sichtung} />
-  ) : (
-    <Typography.Text type="secondary">—</Typography.Text>
-  );
+  const k = personSichtung(p.aktuelle_sichtung);
+  return k ? <SichtungsTag kategorie={k} /> : <Typography.Text type="secondary">—</Typography.Text>;
 }
 
 /** Personenzelle: Name (Stufe `text`) + Geschlecht/Alter Mono 11, darunter ggf. der Lückenvermerk. */
@@ -595,10 +593,13 @@ export function personenSpalten(
       key: 'sk',
       width: 104,
       // In der Reihe der Dringlichkeit (`SK_REIHE`), ohne Sichtung hinten.
-      sortWert: (p) => (p.aktuelle_sichtung ? SK_REIHE.indexOf(p.aktuelle_sichtung) : null),
+      sortWert: (p) => {
+        const k = personSichtung(p.aktuelle_sichtung);
+        return k ? SK_REIHE.indexOf(k) : null;
+      },
       filter: {
         werte: SICHTUNG_WERTE,
-        trifft: (p, w) => (p.aktuelle_sichtung ?? OHNE_SICHTUNG) === w,
+        trifft: (p, w) => (personSichtung(p.aktuelle_sichtung) ?? OHNE_SICHTUNG) === w,
         ohneKartenfeld: true,
       },
       render: (_, p) =>

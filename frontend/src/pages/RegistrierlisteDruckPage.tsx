@@ -7,6 +7,7 @@ import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import RegistrierlisteDruckSeite from '../betreuung/registrierung/RegistrierlisteDruckSeite';
 import { modulName } from '../einsatz/modulRegistry';
 import { betreuungPfad, betreuungsstellePfad, parseRouteId } from '../routing/deeplinks';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Druckansicht der Registrierliste an der Stabsoberfläche (LLH-1616, Route
@@ -40,8 +41,18 @@ export default function RegistrierlisteDruckPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz },
-            { title: <Link to={betreuungPfad(einsatzId)}>{modulName('betreuung')}</Link> },
-            { title: <Link to={zurueck}>{stelle?.bezeichnung ?? 'Stelle'}</Link> },
+            {
+              title: (
+                <ListenRueckweg to={betreuungPfad(einsatzId)}>
+                  {modulName('betreuung')}
+                </ListenRueckweg>
+              ),
+            },
+            {
+              title: (
+                <ListenRueckweg to={zurueck}>{stelle?.bezeichnung ?? 'Stelle'}</ListenRueckweg>
+              ),
+            },
             { title: 'Registrierliste' },
           ]}
         />

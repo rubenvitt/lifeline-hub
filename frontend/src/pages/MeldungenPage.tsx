@@ -7,7 +7,12 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
-import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import {
+  darfErfassungBeantragen,
+  darfImEinsatzSchreiben,
+  darfMeldungKorrigieren,
+  istMitarbeit,
+} from '../einsatz/schreibrecht';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import BeantragtListe from '../einsatz/spiegel/BeantragtListe';
 import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
@@ -39,7 +44,13 @@ import type {
 } from '../api/types';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
 import { KennungsLink } from '../components/kennungsLink';
-import { einheitDetailPfad } from '../routing/deeplinks';
+import {
+  einheitDetailPfad,
+  RICHTUNG_ERLAUBT,
+  OFFEN_ABGESCHLOSSEN_ERLAUBT,
+  type RichtungFilter,
+} from '../routing/deeplinks';
+import { useAdressWert } from '../routing/useAdressWert';
 import { erfasseMeldungOfflineFaehig, erfassePersonOfflineFaehig } from '../offline/schreiben';
 import { ladeVersorgendeEinheiten, registrierAnzeige } from '../api/einsatzPerson';
 import PersonErfassungModal, { type AusMeldung } from '../personen/PersonErfassungModal';
@@ -157,10 +168,16 @@ export default function MeldungenPage() {
   // Empfängerfunktion der Erfassung (LLH-1214): Katalog plus lesbare Besetzung.
   const funktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
 
-  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
-  const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
-  const richtungsKey = richtungFilter ?? 'alle';
-  const richtungWaehlen = (v: string) => setRichtungFilter(v === 'alle' ? undefined : v);
+  // Sicht und Richtung sind Zustand der Adresse (LLH-1826, `frontend/AGENTS.md`, „Ansicht und
+  // Filter gehören in die Adresse“): sie überleben Weg und Zurück, die Vorgabe fehlt in der Adresse.
+  const [ansicht, setAnsicht] = useAdressWert('sicht', OFFEN_ABGESCHLOSSEN_ERLAUBT, 'offen');
+  const [richtungsKey, setRichtung] = useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
+  const richtungFilter = richtungsKey === 'alle' ? undefined : richtungsKey;
+  const setRichtungFilter = (v: RichtungFilter | undefined) => setRichtung(v ?? 'alle');
+  const richtungWaehlen = (v: string) =>
+    setRichtung(
+      Object.prototype.hasOwnProperty.call(RICHTUNG_ERLAUBT, v) ? (v as RichtungFilter) : 'alle',
+    );
   // Ein Dialog gehört zu seinem Einsatz: die Route hat keinen `key`, nach einem Wechsel schriebe
   // er sonst mit der Meldung des vorigen Einsatzes in den neuen. Der Wechsel schließt ihn.
   const [auftragAuswahl, setAuftragAuswahl] = useState<DialogAuswahl | null>(null);
@@ -183,10 +200,10 @@ export default function MeldungenPage() {
   // Schnellaktion „Meldung erfassen“ (Sprungpalette; Spec `meldungseingang`, „Das Meldungsformular
   // öffnet sich über die Adresse“): ?neu=1 klappt das Formular auf. Muster wie `TierePage`: erst
   // nach dem Laden des Einsatzes entscheiden, den Parameter immer räumen, einmal je Verlaufseintrag
-  // (`useLinkAuftrag`, LLH-1558). Das Recht ist das des Kopf-Knopfs (`darfBeantragen`).
+  // (`useLinkAuftrag`, LLH-1558). Das Recht ist das des Kopf-Knopfs (`darfErfassungBeantragen`).
   const [searchParams] = useSearchParams();
   const neuAuftrag = useLinkAuftrag();
-  const darfMeldenRoh = einsatzQuery.data != null && darfBeantragen(einsatzQuery.data);
+  const darfMeldenRoh = einsatzQuery.data != null && darfErfassungBeantragen(einsatzQuery.data);
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (neuAuftrag.verbraucht()) return;
@@ -320,7 +337,7 @@ export default function MeldungenPage() {
     if (!verlinkte || angewandtNr === deeplinkNr) return;
     setAngewandtNr(deeplinkNr);
     setAnsicht(istErledigt(verlinkte) ? 'abgeschlossen' : 'offen');
-  }, [verlinkte, angewandtNr, deeplinkNr]);
+  }, [verlinkte, angewandtNr, deeplinkNr, setAnsicht]);
   const verlinkteAngeheftet =
     verlinkte && istErledigt(verlinkte) && !abgeschlossene.some((m) => m.id === verlinkte.id)
       ? verlinkte
@@ -729,15 +746,20 @@ export default function MeldungenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   // „Meldung erfassen“ am Spiegel als Antrag (LLH-1492, D13); die Karten bleiben gesperrt.
-  const darfMelden = darfBeantragen(einsatz);
+  const darfMelden = darfErfassungBeantragen(einsatz);
 
   const lageSpeicherung = imEinsatz(lageMutation);
   const auftragSpeicherung = imEinsatz(auftragMutation);
   const patientSpeicherung = imEinsatz(patientMutation);
 
+  // Mitarbeit (LLH-1817) erfasst Meldungen ohne Lagemeldung und korrigiert nur eigene, die nicht in
+  // der Lage stehen; alles andere an der Karte bleibt bei `darfSchreiben`.
+  const ohneLagemeldungsart = istMitarbeit(einsatz);
   const listenProps = {
     einsatzId,
     darfSchreiben,
+    darfKorrigieren: (m: Meldung) => darfMeldungKorrigieren(einsatz, m, benutzer?.id),
+    ohneLagemeldungsart,
     mitglieder,
     highlightId: highlightMeldungId,
     onStatus,
@@ -962,6 +984,7 @@ export default function MeldungenPage() {
             abschnitte={abschnitteQuery.data}
             funktionsVorschlaege={funktionsVorschlaege}
             vorschlagsquellen={vorschlagsquellen}
+            ohneLagemeldungsart={ohneLagemeldungsart}
           />
         </Paneel>
       )}

@@ -28,6 +28,7 @@ import { parseRouteId } from '../../routing/deeplinks';
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
 import { modulName } from '../../einsatz/modulRegistry';
+import { ListenRueckweg } from '../../components/ListenRueckweg';
 
 /**
  * Vollseiten-Aufnahme für Personen. Die Maske ist dieselbe wie in der Schnellerfassung
@@ -179,9 +180,13 @@ export default function AufnahmePage() {
                 // Zeigt den Auftrag: mit Auftrag führt der Rückweg zur UHS, nicht in die
                 // Personenliste. Den UHS-Namen lädt die Seite bewusst nicht.
                 title: uhsAuftrag ? (
-                  <Link to={pfade.uhsDetail(einsatzId, uhsAuftrag)}>Unfallhilfsstelle</Link>
+                  <ListenRueckweg to={pfade.uhsDetail(einsatzId, uhsAuftrag)}>
+                    Unfallhilfsstelle
+                  </ListenRueckweg>
                 ) : (
-                  <Link to={pfade.personenListe(einsatzId)}>{modulName('personen')}</Link>
+                  <ListenRueckweg to={pfade.personenListe(einsatzId)}>
+                    {modulName('personen')}
+                  </ListenRueckweg>
                 ),
               },
               { title: 'Aufnahme' },

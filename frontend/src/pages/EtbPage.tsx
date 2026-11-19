@@ -10,7 +10,11 @@ import {
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
 import { istKeyFreigegeben, istSprungGesperrt, modulName } from '../einsatz/modulRegistry';
-import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import {
+  darfErfassungBeantragen,
+  darfImEinsatzSchreiben,
+  istMitarbeit,
+} from '../einsatz/schreibrecht';
 import { useAntraegeAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
 import { etbAntraegeAlsAusstehend } from '../etb/etbZeile';
 import { useAuth } from '../auth/AuthContext';
@@ -39,7 +43,7 @@ import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import type { Speicherung } from '../components/Erfassung';
-import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { NUR_LEITUNG_FUEHRUNG_MITARBEIT, einsatzRechteGrund } from '../components/nurAnsicht';
 import {
   useCallback,
   useEffect,
@@ -819,8 +823,8 @@ export default function EtbPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   // Erfassen und Berichtigen sind am Spiegel ein Antrag (LLH-1492, D13); Wiedervorlage und Auftrag
-  // bleiben gesperrt.
-  const darfErfassen = darfBeantragen(einsatz);
+  // bleiben gesperrt. Mitarbeit erfasst auch (LLH-1817), berichtigt aber nur Eigenes.
+  const darfErfassen = darfErfassungBeantragen(einsatz);
 
   /**
    * Der Zustandsraum des Tagebuchs, dritter und vierter Teil: leer mit und ohne Filter. Laden und
@@ -1144,7 +1148,12 @@ export default function EtbPage() {
       aktionen={kopfAktionen}
       // Nur mit Inhalt gesetzt: ein leerer Slot hielte Abstand (LFH-1078, Erfahrung aus P1).
       hinweis={
-        darfErfassen ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
+        darfErfassen ? undefined : (
+          <RechteHinweis
+            sichtbar
+            text={einsatzRechteGrund(einsatz, NUR_LEITUNG_FUEHRUNG_MITARBEIT)}
+          />
+        )
       }
       fuss={erfassung}
       kopfKlebt={kleben.klebt}
@@ -1293,6 +1302,7 @@ export default function EtbPage() {
               dokumente={dokumenteZuEintrag}
               onBerichtigen={darfErfassen ? (e) => setBerichtigungZu(e) : undefined}
               berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
+              berichtigenNurEigene={istMitarbeit(einsatz)}
               onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
               onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
               auftragGesperrt={auftragGesperrt}

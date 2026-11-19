@@ -10,7 +10,7 @@ import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
-import { waehle } from '../test/auswahlListe';
+import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
@@ -476,6 +476,69 @@ describe('MeldungenPage', () => {
     renderPage();
     expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Meldung erfassen' })).not.toBeInTheDocument();
+  });
+
+  // --- Mitarbeit (LLH-1817) ---
+
+  function alsMitarbeit() {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'mitarbeit',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+  }
+
+  it('Mitarbeit erfasst eine Meldung, aber ohne die Art „Lagemeldung“ und ohne deren Vorbelegung', async () => {
+    alsMitarbeit();
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
+    expect(screen.getByRole('button', { name: 'Sofortmeldung' })).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/Weitere Angaben/));
+    expect(
+      screen.queryByRole('button', { name: 'Lagemeldung an übergeordnete Stelle' }),
+    ).not.toBeInTheDocument();
+    await oeffne('Meldungsart');
+    const arten = optionenVon('Meldungsart');
+    expect(arten).toContain('Sofortmeldung');
+    expect(arten).not.toContain('Lagemeldung');
+  });
+
+  it('Mitarbeit sieht an der Karte kein Sichten, Bestätigen oder Zuweisen', async () => {
+    alsMitarbeit();
+    listeMeldungen.mockResolvedValue([meldung({ bestaetigung_pflicht: true })]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.queryByRole('button', { name: 'Sichten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Bearbeiter|Zuweisen/i })).toBeNull();
+  });
+
+  it('Mitarbeit korrigiert die eigene Meldung, ohne die Art „Lagemeldung“ zur Wahl', async () => {
+    alsMitarbeit();
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    // Die einzige Aktion steht als Knopf, ein Menü braucht es erst ab drei.
+    expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await oeffne('Meldungsart');
+    const arten = optionenVon('Meldungsart');
+    expect(arten).toContain('Rückmeldung');
+    expect(arten).not.toContain('Lagemeldung');
+  });
+
+  it.each([
+    ['eine fremde Meldung', { erfasst_von_id: 2 }],
+    ['eine Meldung in der Lage', { lagerelevant: true }],
+    ['eine Lagemeldung', { meldungsart: 'lagemeldung' as const, lagerelevant: true }],
+  ])('Mitarbeit korrigiert %s nicht', async (_name, abweichung) => {
+    alsMitarbeit();
+    listeMeldungen.mockResolvedValue([meldung(abweichung)]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).not.toBeInTheDocument();
   });
 
   // --- Sichten/Status/Beobachter ---
@@ -1716,5 +1779,55 @@ describe('MeldungenPage · Übernahme an der Meldung (LLH-1075, design.md D14)',
       status: 'aktiv',
       meine_rolle: 'einsatzleitung',
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
+  });
+});
+
+/** LLH-1826: Sicht und Richtung stehen in der Adresse und überleben Weg und Zurück. */
+describe('MeldungenPage — Sicht und Richtung in der Adresse (LLH-1826)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setzeOnline(true);
+    await queueLeerenFuerTests();
+    listeMeldungen.mockResolvedValue([meldung()]);
+  });
+
+  it('„Extern“ steht nach der Wahl in der Adresse', async () => {
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await waehle('Richtung', 'Extern');
+    await waitFor(() =>
+      expect(screen.getByTestId('loc-search').textContent).toBe('?richtung=extern'),
+    );
+  });
+
+  it('?richtung=extern&sicht=abgeschlossen zeigt die gewählte Sicht', async () => {
+    renderPage('/einsaetze/1/meldungen?richtung=extern&sicht=abgeschlossen');
+    await waitFor(() =>
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ richtung: 'extern' }),
+      ),
+    );
+    expect(await screen.findByRole('radio', { name: /Abgeschlossen/ })).toBeChecked();
+  });
+
+  it('die Vorgabe steht nicht in der Adresse', async () => {
+    renderPage('/einsaetze/1/meldungen?richtung=extern');
+    await screen.findByText('Florian Nord 1');
+    await waehle('Richtung', 'Alle Richtungen');
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+  });
+
+  it('der Filter eines Einsatzes gilt nicht im anderen', async () => {
+    renderPage('/einsaetze/1/meldungen?richtung=extern');
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
+    await waitFor(() =>
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        2,
+        expect.not.objectContaining({ richtung: 'extern' }),
+      ),
+    );
+    expect(screen.getByTestId('loc-search').textContent).toBe('');
   });
 });

@@ -1635,3 +1635,50 @@ describe('AuftraegePage', () => {
     });
   });
 });
+
+/** LLH-1826: Ansicht, Richtung, Empfänger und Suche der Einzelaufträge stehen in der Adresse. */
+describe('AuftraegePage — Zustand in der Adresse (LLH-1826)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listeAuftraege.mockResolvedValue([auftrag()]);
+  });
+  const adresse = () => screen.getByTestId('loc-search').textContent;
+
+  it('Ansicht und Richtung stehen nach der Wahl in der Adresse', async () => {
+    renderPage();
+    await geladen();
+    await waehleAuswahl('Richtung', 'Extern');
+    await waitFor(() => expect(adresse()).toBe('?richtung=extern'));
+    await userEvent.click(screen.getByRole('radio', { name: /^Abgeschlossen/ }));
+    await waitFor(() => expect(adresse()).toBe('?richtung=extern&sicht=abgeschlossen'));
+  });
+
+  it('eine Adresse mit Richtung, Sicht und Suche zeigt sie gesetzt', async () => {
+    renderPage('/einsaetze/1/auftraege?richtung=extern&sicht=abgeschlossen&q=Pegel');
+    await waitFor(() =>
+      expect(listeAuftraege).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ richtung: 'extern', suche: 'Pegel' }),
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'Aufträge durchsuchen' })).toHaveValue('Pegel');
+    expect(screen.getByRole('radio', { name: /^Abgeschlossen/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('die Suche steht unter q in der Adresse', async () => {
+    renderPage();
+    await geladen();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Aufträge durchsuchen' }), 'Pegel');
+    await waitFor(() => expect(adresse()).toBe('?q=Pegel'));
+  });
+
+  it('ein Empfänger in der Adresse geht an den Abruf', async () => {
+    renderPage('/einsaetze/1/auftraege?empf=abschnitt%3A4');
+    await waitFor(() =>
+      expect(listeAuftraege).toHaveBeenCalledWith(1, expect.objectContaining({ abschnittId: 4 })),
+    );
+  });
+});

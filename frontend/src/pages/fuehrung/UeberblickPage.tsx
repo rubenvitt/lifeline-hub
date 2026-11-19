@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { IconBericht, IconPlus } from '../../icons';
 import { useWasBrennt } from '../../lage/useWasBrennt';
@@ -16,7 +17,7 @@ import {
   modulRegistry,
   modulName,
 } from '../../einsatz/modulRegistry';
-import { darfBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfErfassungBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
   Augenbraue,
@@ -431,8 +432,8 @@ export default function UeberblickPage() {
     queryFn: () => listeEtb(einsatzId, ETB_ERSTE_LAGE),
     enabled: startlisteMoeglich && etbFrei,
   });
-  // Ein ETB-Eintrag ist am Spiegel ein Antrag (LLH-1492, D13).
-  const darfEtbErfassen = darfBeantragen(einsatz);
+  // Ein ETB-Eintrag ist am Spiegel ein Antrag (LLH-1492, D13); Mitarbeit erfasst auch (LLH-1817).
+  const darfEtbErfassen = darfErfassungBeantragen(einsatz);
   // Daten nur aus freien Quellen: der Cache eines gesperrten Moduls kann einen Altstand tragen.
   const personal = personalFrei ? personalQ.data : undefined;
   const fahrzeuge = fahrzeugeFrei ? fahrzeugeQ.data : undefined;
@@ -960,6 +961,25 @@ export default function UeberblickPage() {
                           }
                           onNeuladen={() =>
                             nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
+                          }
+                          // Die Zeilen sind Links (kein Knopf im Link): die Schreibweise der Stärke
+                          // erklärt sich einmal über ihnen, nicht im Kopf-Meta, das schmal
+                          // abgeschnitten wird (LLH-1825, Review B4).
+                          vorspann={
+                            zeilen.length > 0 ? (
+                              <div
+                                data-lfh="abschnitt-legende"
+                                // fluchtet mit den Zeilen (`listenZeileStil`)
+                                style={{
+                                  paddingInline: token.padding,
+                                  paddingBlock: token.paddingXS,
+                                }}
+                              >
+                                <Textstufe stufe="meta" ton="gedaempft">
+                                  Stärke <StaerkeSchreibweise />
+                                </Textstufe>
+                              </div>
+                            ) : undefined
                           }
                           zeilen={zeilen.map((z) =>
                             abschnittGliederung(z, einsatzId, kurz, token, rollen, jetzt),

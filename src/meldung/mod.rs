@@ -519,6 +519,38 @@ pub(crate) async fn sofortalarm_nach_heraufstufung(
     auto_frist_erinnerung_sicherstellen(state, meldung, AutoFristHerkunft::Meldung).await
 }
 
+/// Die Mitarbeit (LLH-1817) meldet nur normale Meldungen: eine Lagemeldung setzt implizit
+/// `lagerelevant` und wirkt damit in die Lage, die sie nicht ändert. Für alle anderen Rollen
+/// gilt keine Einschränkung.
+pub fn fordere_meldungsart_fuer_rolle(
+    rolle: Option<crate::einsatz::EinsatzRolle>,
+    art: &str,
+) -> Result<(), crate::error::AppError> {
+    if rolle.is_some_and(|r| r.ist_mitarbeit()) && art == ART_LAGEMELDUNG {
+        return Err(crate::error::AppError::Forbidden);
+    }
+    Ok(())
+}
+
+/// Die Mitarbeit (LLH-1817) korrigiert nur Meldungen, die sie selbst erfasst hat; eine fremde
+/// oder fehlende Meldung ist 404 (`src/AGENTS.md`, Statuscode-Konvention).
+pub async fn fordere_eigene_meldung(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    meldung_id: i64,
+    benutzer_id: i64,
+) -> Result<(), crate::error::AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM meldung WHERE id = ? AND einsatz_id = ? AND erfasst_von_id = ?",
+    )
+    .bind(meldung_id)
+    .bind(einsatz_id)
+    .bind(benutzer_id)
+    .fetch_optional(pool)
+    .await?;
+    treffer.map(|_| ()).ok_or(crate::error::AppError::NotFound)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -710,8 +710,8 @@ export default function EintreffenDialog({
                 <Form.List name="weitere">
                   {(zeilen, { add, remove }) => (
                     // Die Zeilen tragen ihren Abstand selbst (`Stapel`): ohne den Feldabstand
-                    // darunter stünde unter jeder Zeile eine Lücke wie unter einem ganzen Feld.
-                    // `Feld` kennt das noch nicht (Folgeaufgabe zu LLH-1971), deshalb `Form.Item`.
+                    // darunter stünde unter jeder Zeile eine Lücke wie unter einem ganzen Feld
+                    // (`abstand="ohne"`).
                     <Stapel abstand="sm">
                       {zeilen.map((z, i) => (
                         <Stapel
@@ -721,8 +721,9 @@ export default function EintreffenDialog({
                           abstand="sm"
                           ausrichten="start"
                         >
-                          <Form.Item
-                            style={{ flex: '2 1 180px', marginBottom: 0 }}
+                          <Feld
+                            abstand="ohne"
+                            zeile="schmal"
                             name={[z.name, 'funkrufname']}
                             dependencies={[['weitere', z.name, 'fahrzeugtyp']]}
                             rules={[
@@ -742,9 +743,10 @@ export default function EintreffenDialog({
                               placeholder="Funkrufname"
                               count={zeichenGrenze(FAHRZEUG_ADHOC_TEXT_MAX)}
                             />
-                          </Form.Item>
-                          <Form.Item
-                            style={{ flex: '1 1 120px', marginBottom: 0 }}
+                          </Feld>
+                          <Feld
+                            abstand="ohne"
+                            zeile="kurz"
                             name={[z.name, 'fahrzeugtyp']}
                             rules={[zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Fahrzeugtyp')]}
                           >
@@ -753,7 +755,7 @@ export default function EintreffenDialog({
                               placeholder="Fahrzeugtyp"
                               count={zeichenGrenze(FAHRZEUG_ADHOC_TEXT_MAX)}
                             />
-                          </Form.Item>
+                          </Feld>
                           <Button
                             danger
                             aria-label={`Fahrzeug ${i + 1} entfernen`}

@@ -1,6 +1,6 @@
 use crate::anhang::{self, AnhangAnzeige};
 use crate::app::AppState;
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{EinsatzErfassungszugriff, EinsatzLesezugriff};
 use crate::error::AppError;
 use crate::extract::PfadParam;
 use axum::extract::{Multipart, State};
@@ -29,15 +29,33 @@ async fn fordere_hochladende_bei_ungebunden(
     Ok(())
 }
 
+/// Die Mitarbeit löscht nur selbst hochgeladene Anhänge — in jedem Linker-Zustand, auch wenn der
+/// Anhang an einer fremden Chat-Nachricht hängt (Design
+/// `2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit`, D4). Fremde bekommen 404 wie für einen
+/// unbekannten Anhang. Andere Rollen bleiben unberührt.
+async fn fordere_hochladende_bei_mitarbeit(
+    pool: &sqlx::SqlitePool,
+    rolle: Option<crate::einsatz::EinsatzRolle>,
+    anhang_id: i64,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    if rolle.is_some_and(|r| r.ist_mitarbeit())
+        && anhang::repo::hochgeladen_von(pool, anhang_id).await? != Some(benutzer_id)
+    {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
 /// POST /api/einsaetze/{id}/anhaenge — generischer Datei-Upload (multipart). Schreibrecht und
 /// aktiver Einsatz. Jedes Datei-Feld wird geprüft (MIME aus Endung, Größe, AV-Scan) und als
 /// BLOB gespeichert. Die Verknüpfung mit einer Chat-Nachricht entsteht beim Senden.
 pub async fn hochladen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff,
+    ctx: EinsatzErfassungszugriff,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<Vec<AnhangAnzeige>>), AppError> {
-    // fordere_schreibrecht + fordere_aktiv erledigt der Extractor.
+    // fordere_erfassungsrecht + fordere_aktiv erledigt der Extractor.
     let einsatz_id = ctx.einsatz.id;
 
     // Geteilt mit dem ETB-Upload, hier mit der Chat-Allowlist.
@@ -100,13 +118,14 @@ pub async fn herunterladen(
 /// wer ihn hochgeladen hat (sonst 404).
 pub async fn loeschen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff,
+    ctx: EinsatzErfassungszugriff,
     PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     // Ownership zuerst (fremd/unbekannt → 404), dann die Linker-Frage.
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
+    fordere_hochladende_bei_mitarbeit(&state.pool, ctx.rolle, anhang_id, ctx.benutzer.id).await?;
     // Ein modulgebundener Anhang wird in seinem Modul entfernt (Soft-Delete mit ETB-Nachweis) oder
     // gar nicht (ETB: nur per Schwärzung). Der generische Hard-Delete umginge das → 422.
     let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;

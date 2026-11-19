@@ -3,12 +3,7 @@ import { Alert, App, Breadcrumb, Button, Checkbox, Flex, type InputRef } from 'a
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  lagekartePfad,
-  parsePersonenSicht,
-  personDetailPfad,
-  personenDruckPfad,
-} from '../routing/deeplinks';
+import { lagekartePfad, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfBeantragen, darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
@@ -32,7 +27,7 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import type { Person, Sichtungskategorie } from '../api/types';
-import { SK_META } from '../personen/personMeta';
+import { SK_META, personSichtung } from '../personen/personMeta';
 import {
   abgleichSpalten,
   nameText,
@@ -49,16 +44,15 @@ import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import {
   FILTER_OPTIONEN,
-  SICHT_VORGABE,
   filterPersonen,
   gefundenePersonen,
   sichtFilterZahl,
   sichtFuerNeuePerson,
-  sichtNachSprung,
   type PersonenAnsicht,
   type PersonenFilter,
   type PersonenSicht,
 } from '../personen/personenFilter';
+import { usePersonenSicht } from '../personen/usePersonenSicht';
 import { hatLuecke, istAbgeschlossen } from '../personen/personenBilanz';
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
@@ -172,11 +166,12 @@ function ZuletztText({ q }: { q: ZeilenQuittung }) {
     );
   }
   const p = q.person;
+  const sk = personSichtung(p.aktuelle_sichtung);
   return (
     <>
       Zuletzt: <ZeitAnzeige wert={p.erfasst_at} rolle="kurz" /> {registrierAnzeige(p.registrier_nr)}
       {nameText(p) ? ` ${nameText(p)}` : ''}
-      {p.aktuelle_sichtung ? ` · ${SK_META[p.aktuelle_sichtung].label}` : ''}
+      {sk ? ` · ${SK_META[sk].label}` : ''}
     </>
   );
 }
@@ -194,8 +189,9 @@ export default function PersonenPage() {
   const [listenFilterZahl, setListenFilterZahl] = useState(0);
   const mitSeitenleiste = abBreite('xl');
   const feldRef = useRef<InputRef>(null);
-  const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
-  const sicht = sichtNachEinsatz[einsatzId] ?? SICHT_VORGABE;
+  // Die Sicht ist Zustand der Adresse (LLH-1826, Entwurf D4): sie überlebt Weg und Zurück, eine
+  // Sprungmarke zeigt genau ihre Sicht, ein anderer Einsatz ist eine andere Adresse.
+  const [sicht, setzeSicht] = usePersonenSicht();
   /**
    * Sortierung und Kopffilter stehen in der Adresse (LLH-1096, Muster der Schadenliste); der Hook
    * gehört der Seite und steht vor jedem frühen Ausstieg. Die Suche NICHT (`sucheInAdresse`): sie
@@ -212,11 +208,9 @@ export default function PersonenPage() {
     },
   );
 
+  /** Nur die Sicht des gezeigten Einsatzes steht in der Adresse; ein anderer beginnt mit der Vorgabe. */
   const aendereSichtFuer = (zielEinsatzId: number, aenderung: (alt: Sicht) => Sicht) => {
-    setSichtNachEinsatz((alt) => ({
-      ...alt,
-      [zielEinsatzId]: aenderung(alt[zielEinsatzId] ?? SICHT_VORGABE),
-    }));
+    if (zielEinsatzId === einsatzId) setzeSicht(aenderung);
   };
   /** Die neue Person muss in der Sicht stehen, in der sie hervorgehoben wird. */
   const zeigeNeuePerson = (zielEinsatzId: number, person: Person) =>
@@ -519,12 +513,7 @@ export default function PersonenPage() {
       const neuestePerson = bekannt.get(neueste.person_id);
       const bestaetigenNach = qc.getQueryState(einsatzKeys.personen(einsatzId))?.dataUpdatedAt ?? 0;
       if (personen.length > 0) merkeFrisch(einsatzId, personen, bestaetigenNach);
-      if (neuestePerson) {
-        setSichtNachEinsatz((alt) => ({
-          ...alt,
-          [einsatzId]: sichtFuerNeuePerson(alt[einsatzId] ?? SICHT_VORGABE, neuestePerson),
-        }));
-      }
+      if (neuestePerson) setzeSicht((alt) => sichtFuerNeuePerson(alt, neuestePerson));
       setHighlightNachEinsatz((alt) => ({ ...alt, [einsatzId]: neueste.person_id }));
       setQuittungNachEinsatz((alt) => {
         const bisher = alt[einsatzId];
@@ -553,7 +542,7 @@ export default function PersonenPage() {
       // IndexedDB bleibt bei einem Lesefehler unverändert; ein späteres Signal, visibilitychange
       // oder Mount kann dieselbe Quittung erneut laden.
     }
-  }, [benutzer?.id, einsatzId, qc, merkeFrisch]);
+  }, [benutzer?.id, einsatzId, qc, merkeFrisch, setzeSicht]);
 
   useEffect(() => {
     void ladePersistiertePersonQuittungen();
@@ -585,13 +574,9 @@ export default function PersonenPage() {
       merkeFrisch(detail.einsatzId, [detail.daten]);
       // Aus der Antwort (`detail.daten`), nicht aus der vorgemerkten Sicht: mit Erst-Sichtung hebt
       // der Server `erfasst` auf `betroffen`.
-      setSichtNachEinsatz((alt) => ({
-        ...alt,
-        [detail.einsatzId]: sichtFuerNeuePerson(
-          alt[detail.einsatzId] ?? SICHT_VORGABE,
-          detail.daten,
-        ),
-      }));
+      if (detail.einsatzId === einsatzId) {
+        setzeSicht((alt) => sichtFuerNeuePerson(alt, detail.daten));
+      }
       setHighlightFuer(detail.einsatzId, detail.daten.id);
       setQuittungNachEinsatz((alt) => {
         const bisher = alt[detail.einsatzId];
@@ -613,7 +598,7 @@ export default function PersonenPage() {
     window.addEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, erfolgreichGesendet);
     return () =>
       window.removeEventListener(OFFLINE_SCHREIBAKTION_GESENDET_EVENT, erfolgreichGesendet);
-  }, [benutzer?.id, qc, merkeFrisch]);
+  }, [benutzer?.id, einsatzId, qc, merkeFrisch, setzeSicht]);
 
   const quittungSchliessen = () => {
     if (!erfassungsQuittung || benutzer?.id == null) return;
@@ -634,42 +619,11 @@ export default function PersonenPage() {
   // Deeplink ?person=<id> leitet auf die Detailseite um (rückwärtskompatibel, z. B. „Vollständig
   // öffnen" aus dem UHS-Drawer).
   const [searchParams] = useSearchParams();
-  const sichtAuftrag = useLinkAuftrag();
   const neuAuftrag = useLinkAuftrag();
   useEffect(() => {
     const pid = searchParams.get('person');
     if (pid) navigate(personDetailPfad(einsatzId, Number(pid)), { replace: true });
   }, [searchParams, einsatzId, navigate]);
-
-  // Sichtvorgabe ?filter= / ?ansicht= (Sprungmarken „Patienten"/„Vermisste"). Apply-then-clean wie
-  // `?neu=1`: die Sicht ist Seitenzustand, die URL trägt nur den Auftrag. Geräumt wird auch ein
-  // unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
-  //
-  // Über den Setter direkt, nicht über `aendereSichtFuer`: der ist je Render neu und löste den
-  // Effekt bei jedem Render aus.
-  //
-  // Keine Weiche „eigene gegen fremde Änderung" wie auf der ETB-Seite: `sicht` ist kontrollierter
-  // Zustand, nichts wird neu aufgesetzt.
-  //
-  // Einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1558), ebenso `?neu=1` unten: Trägt ein Link
-  // beide, räumen sie gemeinsam. Bisher stellte das zweite Räumen (vom Stand des Renders aus) den
-  // schon geräumten Parameter des ersten wieder her, und die Seite navigierte ein zweites Mal.
-  useEffect(() => {
-    if (
-      !searchParams.has('filter') &&
-      !searchParams.has('ansicht') &&
-      !searchParams.has('abgeschlossen')
-    )
-      return;
-    if (sichtAuftrag.verbraucht()) return;
-    const vorgabe = parsePersonenSicht(searchParams);
-    setSichtNachEinsatz((alt) => {
-      const bisher = alt[einsatzId] ?? SICHT_VORGABE;
-      const neu = sichtNachSprung(bisher, vorgabe);
-      return neu === bisher ? alt : { ...alt, [einsatzId]: neu };
-    });
-    sichtAuftrag.raeume('filter', 'ansicht', 'abgeschlossen');
-  }, [searchParams, sichtAuftrag, einsatzId]);
 
   // Schnellaktion: ?neu=1 öffnet die eine Maske „Betroffene erfassen“ (Command-Palette). Warten bis der Einsatz
   // geladen ist; Param immer löschen, Modal nur bei Schreibrecht. Bewusst die Maske und nicht die

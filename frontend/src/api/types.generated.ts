@@ -3005,7 +3005,7 @@ export interface components {
          *     Wird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).
          * @enum {string}
          */
-        EinsatzRolle: "einsatzleitung" | "fuehrungspersonal" | "beobachter";
+        EinsatzRolle: "einsatzleitung" | "fuehrungspersonal" | "mitarbeit" | "beobachter";
         /** @description Die Kopie eines Schichtmodells am Einsatz. */
         EinsatzSchichtmodell: {
             bezeichnung: string;

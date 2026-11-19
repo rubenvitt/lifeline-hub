@@ -263,9 +263,9 @@ führt.
 - **Ausgeblendet** fehlt ein Modul in der Navigation aller Personen und ist für sie gesperrt.
   Nur System-Admins erreichen es noch über seine Adresse; in ihrer Navigation fehlt es ebenso.
 - **„Führung im Einsatz“** lässt die Einsatzleitung, das Führungspersonal, Führungskräfte der
-  Organisation und System-Admins in das Modul. Beobachter bleiben draußen, ebenso gekoppelte
-  Geräte: ein Gerät arbeitet an einer Stelle und zählt nicht als Führung. Wer als Einsatzleitung
-  ein Modul der Führung vorbehalten will, wählt diese Stufe; damit sperrt sie sich nicht selbst
+  Organisation und System-Admins in das Modul. Beobachter und Mitarbeit bleiben draußen, ebenso
+  gekoppelte Geräte: ein Gerät arbeitet an einer Stelle und zählt nicht als Führung. Wer als
+  Einsatzleitung ein Modul der Führung vorbehalten will, wählt diese Stufe; damit sperrt sie sich nicht selbst
   aus.
 - **„Führungskraft der Organisation“** lässt nur Führungskräfte der Organisation und
   System-Admins in das Modul. Gemeint ist die Rolle in der Organisation, nicht die im Einsatz:

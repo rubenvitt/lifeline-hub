@@ -1,3 +1,4 @@
+import { aktionsKnoepfe, ganzerText } from '../test/kuerzel';
 import { describe, expect, it, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
@@ -268,10 +269,10 @@ describe('EinsatzabschnittePage', () => {
 
     // Datenraster statt `Descriptions`: die Zeile ist das Datenfeld.
     const eigene = screen
-      .getByText('Stärke (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     const inkl = screen
-      .getByText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(eigene).not.toBe(inkl);
     expect(within(eigene).getByText('1/2/3//6')).toBeInTheDocument();
@@ -346,7 +347,7 @@ describe('EinsatzabschnittePage', () => {
 
     await userEvent.click(knoten);
     const eigene = screen
-      .getByText('Stärke (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(within(eigene).getByText('0/1/1//2')).toBeInTheDocument();
     expect(screen.getByText('Sanitätsgruppe UHS')).toBeInTheDocument();
@@ -406,7 +407,7 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     await userEvent.click(await findInTree('Nord'));
     const eigene = screen
-      .getByText('Stärke (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(within(eigene).getByText('1/1/3//5')).toBeInTheDocument();
     const zugZeile = screen.getByText('Zug Nord').closest<HTMLElement>('li')!;
@@ -911,7 +912,7 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     const karte = (await screen.findByText('Noch keine Abschnitte')).closest('[data-lfh="paneel"]');
     expect(karte, 'der Leerzustand muss in der Gliederungs-Karte stehen').not.toBeNull();
-    const knoepfe = within(karte as HTMLElement).getAllByRole('button');
+    const knoepfe = aktionsKnoepfe(karte as HTMLElement);
     expect(knoepfe).toHaveLength(1);
 
     await userEvent.click(
@@ -1217,11 +1218,11 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
   });
 
-  it('?ansicht=organigramm öffnet das Organigramm und räumt den Parameter', async () => {
+  it('?ansicht=organigramm öffnet das Organigramm und bleibt in der Adresse (LLH-1826)', async () => {
     server.use(...handlers(), ...organigrammHandler);
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
     expect(await screen.findByRole('region', { name: 'Organigramm' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('suche').textContent).toBe('?ansicht=organigramm');
     expect(
       within(screen.getByRole('radiogroup', { name: 'Ansicht' })).getByRole('radio', {
         name: 'Organigramm',
@@ -1229,12 +1230,23 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     ).toBeChecked();
   });
 
-  it('ein unbrauchbarer Wert wird nur geräumt, die Ansicht bleibt Gliederung', async () => {
+  it('ein unbrauchbarer Wert gilt als Gliederung', async () => {
     server.use(...handlers(), ...organigrammHandler);
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=quatsch');
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     expect(await screen.findByTestId('abschnitte-gliederung')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
+  });
+
+  it('die Wahl des Organigramms steht in der Adresse, die Gliederung nicht (LLH-1826)', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte');
+    const ansicht = await screen.findByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Organigramm' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche').textContent).toBe('?ansicht=organigramm'),
+    );
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Gliederung' }));
+    await waitFor(() => expect(screen.getByTestId('suche').textContent).toBe(''));
   });
 
   it('der Name eines Abschnitts führt in die Gliederung mit diesem Abschnitt gewählt', async () => {

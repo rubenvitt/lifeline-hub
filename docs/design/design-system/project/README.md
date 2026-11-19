@@ -703,10 +703,23 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   neues Kürzel kommt in die Liste und in die Tabelle des Kapitels `zeiten-und-kuerzel.md`
   (`anzeige/kuerzel.test.ts` hält beide gleich). Kurzbezeichnungen der Organisation („EA 1.1“) sind
   Daten und bleiben. **Die Stärke** schreibt nur `anzeige/staerke.ts` (`staerkeText`, Wert
-  „1/2/5//8“); jede Fläche mit Stärke nennt `STAERKE_SCHREIBWEISE` („F/UF/M//Σ“) einmal sichtbar
+  „1/2/5//8“); jede Fläche mit Stärke nennt die Schreibweise „F/UF/M//Σ“ einmal sichtbar
   (Spaltenkopf, Feldetikett, Legende), der Wert trägt `STAERKE_AUSGESCHRIEBEN` als `title`
   (`StaerkeAnzeige`, `Kennzahl notizBeschreibung`). „Ges“, „Gesamt“ und eine Stärke ohne Summe gibt
-  es nicht (Wächter `anzeige/staerke.guard.test.ts`).
+  es nicht (Wächter `anzeige/staerke.guard.test.ts`). **Die Schreibweise erklärt sich auf Tippen**: in Komponenten
+  steht sie nur über `anzeige/KuerzelErklaerung.tsx` (`StaerkeSchreibweise`, schmale Spalte
+  `umbruchVorSumme`), einen Knopf ohne Knopfoptik mit Popover aus Bedeutung, Beispiel und dem Link
+  „Zeiten und Kürzel“; ein Tooltip allein trägt auf Touch nicht. Der Knopf hält Klicks, Enter und
+  Leertaste, Zeile und Tabellenkopf darum lösen nicht aus; Esc und Pfeile reicht er geschlossen
+  weiter, und ein Klick auf den Verweis im Fenster erreicht die Umgebung (Sprungpalette schließt).
+  Nie in einem Link oder `<label>`: dort bleibt die Schreibweise Text, und die Erklärung steht einmal
+  über den Zeilen (Überblick: `vorspann` des Paneels, nicht im Kopf-Meta, das schmal abgeschnitten
+  wird). Ein Spaltentitel als Knoten trägt `etikett` mit dem Klartext. **Die Trefffläche ist die
+  Textzeile**, eine begründete Ausnahme von der Staffel 30/48/72 (Entscheidung 19.11.2026): das
+  Kürzel steht in dichten Etiketten direkt über bearbeitbaren Werten, ein größeres Feld überdeckte
+  sie, und die Erklärung ist ein Zusatz, keine Handlung. Ausnahmen mit Grund und der Wächter (auch
+  Etiketten in `.ts`): `anzeige/kuerzelErklaerung.guard.test.ts`; in Leseansichten zählt der
+  Erklär-Knopf nicht als Aktion (`test/kuerzel.ts`, `aktionsKnoepfe`).
 
 ## Begriffe
 

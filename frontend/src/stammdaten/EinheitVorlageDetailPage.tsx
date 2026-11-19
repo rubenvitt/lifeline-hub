@@ -1,6 +1,6 @@
 import { App, Col, Form, Input, Row, Switch, theme } from 'antd';
 import { useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
@@ -49,6 +49,7 @@ import {
   StammbesetzungSection,
   UntereinheitenSection,
 } from './EinheitVorlageSections';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 interface FormValues {
   name: string;
@@ -309,9 +310,21 @@ function DetailContent({
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <AdminPage
         pfad={[
-          { title: <Link to={einheitVorlageListPath()}>Einheiten-Vorlagen</Link> },
+          {
+            title: (
+              <ListenRueckweg to={einheitVorlageListPath()}>Einheiten-Vorlagen</ListenRueckweg>
+            ),
+          },
           ...(parent
-            ? [{ title: <Link to={einheitVorlageDetailPath(parent.id)}>{parent.name}</Link> }]
+            ? [
+                {
+                  title: (
+                    <ListenRueckweg to={einheitVorlageDetailPath(parent.id)}>
+                      {parent.name}
+                    </ListenRueckweg>
+                  ),
+                },
+              ]
             : []),
           { title: vorlage.name },
         ]}
@@ -494,6 +507,8 @@ function SollField({ typen, vorlage }: { typen: EinheitTyp[]; vorlage: EinheitVo
     <>
       {/* EIN `Feld` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
           `FahrzeugDetailPage`). */}
+      {/* Das Etikett ist ein `<label>`: kein Knopf darin (LLH-1825, Review B6), die Schreibweise
+          bleibt Text. */}
       <Feld
         label={`Soll-Stärke (${STAERKE_SCHREIBWEISE})`}
         name="soll"

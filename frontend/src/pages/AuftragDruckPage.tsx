@@ -20,6 +20,7 @@ import { auftragKennung } from '../auftraege/AuftragTeile';
 import { modulName } from '../einsatz/modulRegistry';
 import { auftraegePfad, parseRouteId } from '../routing/deeplinks';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Druckansicht eines Einzelauftrags (LLH-1171, Spec `druck-dokumente`, Change
@@ -90,7 +91,7 @@ export default function AuftragDruckPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>{modul}</Link> },
+            { title: <ListenRueckweg to={zurueck}>{modul}</ListenRueckweg> },
             { title: 'Druckansicht' },
           ]}
         />

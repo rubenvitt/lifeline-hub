@@ -46,6 +46,7 @@ import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusab
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
 import { flaeche } from '../theme/tokens';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Formularwerte des Entwurfs: Titel und Abschnitte als Text, daneben der Verteiler (LLH-1172).
@@ -402,7 +403,9 @@ function BefehlDetail() {
               {
                 // Zurück auf den Reiter Befehle, dieser Befehl gewählt und markiert (oxgob5gk D6).
                 title: (
-                  <Link to={auftraegePfad(einsatzId, { befehl: befehlId })}>Aufträge/Befehle</Link>
+                  <ListenRueckweg to={auftraegePfad(einsatzId, { befehl: befehlId })}>
+                    Aufträge/Befehle
+                  </ListenRueckweg>
                 ),
               },
               { title: befehl.titel },

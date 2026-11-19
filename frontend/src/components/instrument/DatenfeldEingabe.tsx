@@ -1,8 +1,9 @@
-import { cloneElement, useId, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, useId, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { Form } from 'antd';
 import type { FormItemProps, FormRule } from 'antd';
 import Augenbraue from './Augenbraue';
-import { FELD_KLASSE } from './Feld';
+import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
+import { FELD_GRENZE, FELD_KLASSE } from './Feld';
 import GeaendertPunkt from './GeaendertPunkt';
 import { useRollen } from './rollenwerte';
 import { datenfeldStil } from './datenrasterStil';
@@ -24,7 +25,9 @@ import { datenfeldStil } from './datenrasterStil';
  *
  * Kein unterer Rand am `Form.Item`: die Zelle trägt ihr Polster selbst, eine Meldung macht sie
  * höher. Die Klasse von `Feld` (`FELD_KLASSE`) zieht auch `InputNumber`, `DatePicker` und
- * `Select` auf die Zellbreite, ohne Breite an der Eingabe (Feld-Wächter, LLH-1970).
+ * `Select` auf die Zellbreite, ohne Breite an der Eingabe (Feld-Wächter, LLH-1970). Eine schmalere
+ * Obergrenze nennt `breite` wie bei `Feld` (LLH-2000): die Eingabe wird geklont und lässt sich
+ * deshalb nicht in eine eigene `Feld`-Hülle setzen.
  */
 export interface DatenfeldEingabeProps {
   /** Begriff — Augenbraue und zugänglicher Name der Eingabe. */
@@ -35,6 +38,8 @@ export interface DatenfeldEingabeProps {
   rules?: FormRule[];
   /** Über alle Spalten (Freitext, Auswahl mit langen Einträgen). */
   breit?: boolean;
+  /** Obergrenze der Eingabe (`FELDBREITE`); ohne Stufe füllt sie die Zelle. */
+  breite?: Feldbreite;
   /**
    * Hilfe unter der Eingabe (antds `extra`, etwa ein Vorschlag mit Herkunft, LLH-1139); die
    * Eingabe verweist per `aria-describedby` auf sie. Keine Bedienerklärung (`frontend/AGENTS.md`,
@@ -50,12 +55,14 @@ export default function DatenfeldEingabe({
   name,
   rules,
   breit = false,
+  breite,
   hilfe,
   children,
 }: DatenfeldEingabeProps) {
   const { token, rollen } = useRollen();
   const erzeugt = useId();
   const eingabeId = children.props.id ?? erzeugt;
+  const grenze = breite === undefined ? undefined : FELDBREITE[breite];
   return (
     <div data-lfh="datenfeld" style={datenfeldStil(rollen, token, breit)}>
       <Augenbraue als="dt">
@@ -70,7 +77,12 @@ export default function DatenfeldEingabe({
           rules={rules}
           extra={hilfe}
           className={FELD_KLASSE}
-          style={{ marginBottom: 0 }}
+          style={
+            {
+              marginBottom: 0,
+              ...(grenze === undefined ? {} : { [FELD_GRENZE]: `${grenze}px` }),
+            } as CSSProperties
+          }
         >
           {cloneElement(children, { id: eingabeId })}
         </Form.Item>

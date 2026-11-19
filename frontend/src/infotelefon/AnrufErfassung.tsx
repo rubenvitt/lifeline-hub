@@ -7,7 +7,8 @@ import type { Dayjs } from 'dayjs';
 import { useEffect, useRef, useState } from 'react';
 import type { InfotelefonAnliegen } from '../api/types';
 import type { AnrufEingabe } from '../api/infotelefon';
-import { Schnellerfassungszeile, useRollen } from '../components/instrument';
+import { Feld, Schnellerfassungszeile, useRollen } from '../components/instrument';
+import type { Feldbreite } from '../theme/tokens';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import Tastenkuerzel from '../components/Tastenkuerzel';
@@ -122,17 +123,20 @@ export default function AnrufErfassung({
     }
   };
 
-  const rueckrufFeld = (
-    <Form.Item
+  // In der Zeile „Anrufer und Uhrzeit“ mit Anteil, darunter allein ohne: in der senkrechten Reihe
+  // wäre die Flex-Basis eine Höhe.
+  const rueckrufFeld = (zeile?: Feldbreite) => (
+    <Feld
       label="Rückrufnummer"
       name="rueckruf"
       rules={[
         { required: rueckrufNoetig, whitespace: true, message: 'Für einen Rückruf erforderlich' },
       ]}
-      style={{ marginBottom: 0 }}
+      abstand="ohne"
+      zeile={zeile}
     >
       <Input placeholder="Telefon" maxLength={INFOTELEFON_KURZ_MAX} />
-    </Form.Item>
+    </Feld>
   );
 
   return (
@@ -147,14 +151,11 @@ export default function AnrufErfassung({
           hinweis={gespeichert > 0 && !eingeklappt ? `${gespeichert} erfasst` : undefined}
         >
           <Flex wrap gap={token.marginXS} style={{ width: '100%', padding: token.paddingXS }}>
-            <Form.Item
+            <Feld
               name="anliegen"
               rules={[{ required: true, message: 'Anliegen wählen' }]}
-              style={
-                eingeklappt
-                  ? { marginBottom: 0, minWidth: 0, flex: '1 1 0' }
-                  : { marginBottom: 0, minWidth: 180, flex: '0 0 auto' }
-              }
+              abstand="ohne"
+              zeile={eingeklappt ? 'voll' : 'schmal'}
             >
               <Select
                 ref={anliegenRef}
@@ -162,13 +163,14 @@ export default function AnrufErfassung({
                 placeholder="Anliegen"
                 options={ANLIEGEN_REIHENFOLGE.map((a) => ({ value: a, label: ANLIEGEN_LABEL[a] }))}
               />
-            </Form.Item>
+            </Feld>
             {!eingeklappt && (
               <>
-                <Form.Item
+                <Feld
                   name="notiz"
                   rules={[zeichenRegel(INFOTELEFON_NOTIZ_MAX, 'Notiz')]}
-                  style={{ marginBottom: 0, flex: '1 1 240px', minWidth: 0 }}
+                  abstand="ohne"
+                  zeile="mittel"
                 >
                   <Input
                     aria-label="Notiz"
@@ -176,14 +178,10 @@ export default function AnrufErfassung({
                     // Zähler ab 80 % im Feld selbst (Suffix), keine weitere Zeile (LFH-937).
                     count={zeichenGrenze(INFOTELEFON_NOTIZ_MAX)}
                   />
-                </Form.Item>
-                <Form.Item
-                  name="rueckruf_noetig"
-                  valuePropName="checked"
-                  style={{ marginBottom: 0, alignSelf: 'center' }}
-                >
+                </Feld>
+                <Feld name="rueckruf_noetig" valuePropName="checked" abstand="ohne">
                   <Checkbox>Rückruf nötig</Checkbox>
-                </Form.Item>
+                </Feld>
               </>
             )}
             <Button type="primary" htmlType="submit" loading={laeuft} aria-keyshortcuts="Enter">
@@ -196,7 +194,7 @@ export default function AnrufErfassung({
             </Button>
           </Flex>
         </Schnellerfassungszeile>
-        {rueckrufNoetig && rueckrufFeld}
+        {rueckrufNoetig && rueckrufFeld()}
         {!eingeklappt && (
           <Collapse
             ghost
@@ -207,25 +205,17 @@ export default function AnrufErfassung({
                 forceRender: true,
                 children: (
                   <Flex wrap gap={token.marginSM}>
-                    <Form.Item
-                      label="Name"
-                      name="anrufer_name"
-                      style={{ marginBottom: 0, flex: '1 1 200px' }}
-                    >
+                    <Feld label="Name" name="anrufer_name" abstand="ohne" zeile="schmal">
                       <Input maxLength={INFOTELEFON_KURZ_MAX} />
-                    </Form.Item>
-                    {!rueckrufNoetig && <div style={{ flex: '1 1 200px' }}>{rueckrufFeld}</div>}
-                    <Form.Item
-                      label="Uhrzeit"
-                      name="eingang"
-                      style={{ marginBottom: 0, flex: '1 1 200px' }}
-                    >
+                    </Feld>
+                    {!rueckrufNoetig && rueckrufFeld('schmal')}
+                    <Feld label="Uhrzeit" name="eingang" abstand="ohne" zeile="schmal">
                       <ZeitpunktEingabe
                         art="ereignis"
                         placeholder="jetzt"
                         style={{ width: '100%' }}
                       />
-                    </Form.Item>
+                    </Feld>
                   </Flex>
                 ),
               },

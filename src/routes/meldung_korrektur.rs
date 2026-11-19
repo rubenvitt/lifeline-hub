@@ -2,7 +2,7 @@
 //! Spec `meldungseingang`). Eigene Datei neben `routes/meldung.rs`: die Prüfung der Felder steht
 //! hier, das Schreiben in [`crate::meldung::korrektur`].
 use crate::app::AppState;
-use crate::einsatz::kontext::EinsatzSchreibzugriff;
+use crate::einsatz::kontext::EinsatzErfassungszugriff;
 use crate::einsatz::modul::Meldungen;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -122,15 +122,28 @@ impl MeldungAenderung {
 }
 
 /// PATCH /api/einsaetze/{id}/meldungen/{mid} — Art, Priorität, Richtung, Von-Bezug, Empfänger,
-/// Empfängerfunktion und Lage-Angaben korrigieren (Schreibrecht, Freigabe Meldungen, aktiver Einsatz). Fremde
-/// Meldung 404. Gekoppelte Geräte erreichen die Route nicht (keine Routenliste, D10). Antwortet
-/// mit dem Stand; ohne wirksame Änderung ohne ETB-Eintrag und ohne Live-Ereignis.
+/// Empfängerfunktion und Lage-Angaben korrigieren (Erfassungsrecht, Freigabe Meldungen,
+/// aktiver Einsatz). Fremde Meldung 404. Gekoppelte Geräte erreichen die Route nicht (keine
+/// Routenliste, D10). Antwortet mit dem Stand; ohne wirksame Änderung ohne ETB-Eintrag und ohne
+/// Live-Ereignis.
 pub async fn korrigieren(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Meldungen>,
+    ctx: EinsatzErfassungszugriff<Meldungen>,
     PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
     JsonBody(mut req): JsonBody<MeldungAenderung>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
+    // Die Mitarbeit (LLH-1817) korrigiert nur ihre eigene Meldung, und das vor allem anderen:
+    // fremd ist 404, auch bei einem ungültigen Body.
+    let mitarbeit = ctx.rolle.is_some_and(|r| r.ist_mitarbeit());
+    if mitarbeit {
+        crate::meldung::fordere_eigene_meldung(
+            &state.pool,
+            ctx.einsatz.id,
+            meldung_id,
+            ctx.benutzer.id,
+        )
+        .await?;
+    }
     let funktion = req.empfaenger_funktion.take();
     let mut aenderung = req.pruefen()?;
     if let Some(code) = funktion {
@@ -146,6 +159,18 @@ pub async fn korrigieren(
     let jetzt = jetzt();
     let vorher =
         repo::laden_im_einsatz(&state.pool, ctx.einsatz.id, meldung_id, None, &jetzt).await?;
+    // Die Lage bleibt der Einsatzleitung: die Mitarbeit korrigiert keine Meldung, die in der Lage
+    // steht oder eine Lagemeldung ist (was auch immer der Body ändert), setzt weder `lagerelevant`
+    // noch Lage-Text und stellt keine Meldung auf Lagemeldung um.
+    if mitarbeit
+        && (vorher.lagerelevant
+            || vorher.meldungsart == Meldungsart::Lagemeldung
+            || aenderung.lagerelevant.is_some()
+            || aenderung.lage_text.is_some()
+            || aenderung.meldungsart == Some(Meldungsart::Lagemeldung))
+    {
+        return Err(AppError::Forbidden);
+    }
     let ergebnis = korrektur::korrigieren(
         &state.pool,
         ctx.einsatz.id,

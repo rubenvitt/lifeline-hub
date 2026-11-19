@@ -55,6 +55,7 @@ import { AenderungsstandProvider, EnterOhneAenderung } from '../components/aende
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { flaeche } from '../theme/tokens';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
   value: t,
@@ -340,12 +341,10 @@ export default function SchaedenDetailPage() {
         bearbeiten
           ? {
               typ: {
-                feld: lockIfStorniert(<Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />),
+                feld: lockIfStorniert(<Select options={TYP_OPTIONS} />),
               },
               ausmass: {
-                feld: lockIfStorniert(
-                  <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
-                ),
+                feld: lockIfStorniert(<Select options={AUSMASS_OPTIONS} />),
               },
               gefahrenart: { feld: lockIfStorniert(<GefahrAuswahlImFormular />) },
               schadensgrad: { feld: lockIfStorniert(<SchadensgradAuswahl />) },
@@ -391,7 +390,7 @@ export default function SchaedenDetailPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>Schäden</Link> },
+            { title: <ListenRueckweg to={zurueck}>Schäden</ListenRueckweg> },
             { title: kennung },
           ]}
         />

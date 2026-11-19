@@ -2,7 +2,9 @@ use crate::app::AppState;
 use crate::chat::erwaehnung::{self, ErwaehnungEingabe};
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{
+    EinsatzErfassungszugriff, EinsatzLesezugriff, EinsatzSchreibzugriff,
+};
 use crate::einsatz::modul::{Auftraege, Chat, Etb, Meldungen};
 use crate::error::AppError;
 use crate::extract::JsonBody;
@@ -167,7 +169,7 @@ pub struct NeueNachricht {
 /// Erwähnten den Hinweis `chat_erwaehnung` (`chat::erwaehnung::melden`).
 pub async fn nachricht_erfassen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Chat>,
+    ctx: EinsatzErfassungszugriff<Chat>,
     PfadParam((_eid, kanal_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<NeueNachricht>,
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
@@ -241,7 +243,7 @@ async fn fordere_autor(
 /// PATCH /api/einsaetze/{id}/chat/nachrichten/{mid} — eigene Nachricht bearbeiten.
 pub async fn nachricht_bearbeiten(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Chat>,
+    ctx: EinsatzErfassungszugriff<Chat>,
     PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<NeueNachricht>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
@@ -256,7 +258,7 @@ pub async fn nachricht_bearbeiten(
 /// DELETE /api/einsaetze/{id}/chat/nachrichten/{mid} — eigene Nachricht soft-löschen.
 pub async fn nachricht_loeschen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Chat>,
+    ctx: EinsatzErfassungszugriff<Chat>,
     PfadParam((_eid, nachricht_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;

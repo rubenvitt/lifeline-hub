@@ -60,6 +60,7 @@ import {
 import { Feld, Paneel, monoStil, Knopfreihe } from '../components/instrument';
 import './lageberichtPrint.css';
 import { flaeche } from '../theme/tokens';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Formularwerte des Entwurfs: Titel, Zeitstand (Zeitpunkt, die Anzeigezone nur im Feld, UTC erst
@@ -391,7 +392,11 @@ function LageberichtDetail() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={lageberichtePfad(einsatzId)}>Lageberichte</Link> },
+              {
+                title: (
+                  <ListenRueckweg to={lageberichtePfad(einsatzId)}>Lageberichte</ListenRueckweg>
+                ),
+              },
               { title: bericht.titel },
             ]}
           />

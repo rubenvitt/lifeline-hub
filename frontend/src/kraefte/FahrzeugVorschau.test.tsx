@@ -1,3 +1,4 @@
+import { aktionsKnoepfe } from '../test/kuerzel';
 import { act, screen, waitFor } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
@@ -80,7 +81,7 @@ describe('FahrzeugVorschau (LFH-664)', () => {
     liefere([fahrzeug()]);
     renderMitProviders(<FahrzeugVorschau einsatzId={5} id={7} />);
     await screen.findByText('Florian Musterstadt 1/44-1');
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(aktionsKnoepfe()).toEqual([]);
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 

@@ -29,7 +29,11 @@ import { listeAuftraege } from '../api/auftraege';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BezugTyp, ChatErwaehnung, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
+import {
+  darfImEinsatzErfassen,
+  darfImEinsatzSchreiben,
+  darfOriginalLaden,
+} from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import KanalListe, { sortiereKanaele } from '../chat/KanalListe';
 import KanalAnlegenDialog from '../chat/KanalAnlegenDialog';
@@ -59,7 +63,7 @@ import {
 } from '../chat/bezug';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { NUR_LEITUNG_FUEHRUNG_MITARBEIT, einsatzRechteGrund } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { Segmentleiste, useRollen } from '../components/instrument';
 
@@ -428,6 +432,9 @@ export default function ChatPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  // Mitarbeit (LLH-1817) schreibt und ändert eigene Nachrichten, legt aber keinen Kanal an und
+  // setzt weder Bezug noch Heraufstufung.
+  const darfErfassen = darfImEinsatzErfassen(einsatz);
 
   const nachrichten = [...(nachrichtenQuery.data?.pages.flat() ?? [])].sort((a, b) => a.id - b.id);
 
@@ -581,6 +588,7 @@ export default function ChatPage() {
             eigeneSendungen={eigeneSendungen}
             eigeneBenutzerId={benutzer?.id ?? null}
             darfSchreiben={darfSchreiben}
+            darfErfassen={darfErfassen}
             darfOriginal={darfOriginalLaden(einsatz, benutzer)}
             onBearbeiten={(n) => setBearbeitenAuswahl({ einsatzId, nachricht: n })}
             // mutateAsync: die Rückfrage schließt erst, wenn das Löschen angekommen ist.
@@ -601,7 +609,7 @@ export default function ChatPage() {
             bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
             bezugInfo={bezugInfo}
           />
-          {darfSchreiben && kanalId !== null && (
+          {darfErfassen && kanalId !== null && (
             <NachrichtEingabe
               onSenden={(t, d, e) =>
                 sendenMutation.mutateAsync({ text: t, dateien: d, erwaehnungen: e })
@@ -613,9 +621,12 @@ export default function ChatPage() {
             />
           )}
           {/* Statt der Eingabe: „Nur Ansicht · Grund“, kein Satz (LFH-1078). */}
-          {!darfSchreiben && (
+          {!darfErfassen && (
             <div style={{ marginTop: token.marginSM }}>
-              <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
+              <RechteHinweis
+                sichtbar
+                text={einsatzRechteGrund(einsatz, NUR_LEITUNG_FUEHRUNG_MITARBEIT)}
+              />
             </div>
           )}
         </Col>

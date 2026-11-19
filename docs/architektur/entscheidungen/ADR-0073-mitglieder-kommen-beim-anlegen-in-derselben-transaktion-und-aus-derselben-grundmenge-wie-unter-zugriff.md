@@ -1,5 +1,5 @@
 ---
-id: ADR-0072
+id: ADR-0073
 titel: Mitglieder kommen beim Anlegen in derselben Transaktion und aus derselben Grundmenge wie unter „Zugriff“
 status: akzeptiert
 datum: 2026-11-19
@@ -10,7 +10,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md
 ---
 
-# ADR-0072: Mitglieder kommen beim Anlegen in derselben Transaktion und aus derselben Grundmenge wie unter „Zugriff“
+# ADR-0073: Mitglieder kommen beim Anlegen in derselben Transaktion und aus derselben Grundmenge wie unter „Zugriff“
 
 ## Regeln
 

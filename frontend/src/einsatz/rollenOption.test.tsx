@@ -24,6 +24,11 @@ describe('rollenOptionen und rollenOptionRender (LLH-1818)', () => {
         label: 'Führungspersonal',
         darf: 'schreibt in Modulen, Kopfdaten und Einstellungen',
       },
+      {
+        value: 'mitarbeit',
+        label: 'Mitarbeit',
+        darf: 'erfasst Meldungen, Chat und ETB-Einträge, ändert sonst nichts',
+      },
       { value: 'beobachter', label: 'Beobachter', darf: 'liest nur' },
     ]);
   });

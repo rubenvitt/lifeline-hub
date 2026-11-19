@@ -1,7 +1,7 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -48,6 +48,8 @@ import {
   zumKopf,
 } from '../components/listenFenster';
 import { flaeche } from '../theme/tokens';
+import { OFFEN_ABGESCHLOSSEN_ERLAUBT } from '../routing/deeplinks';
+import { useAdressWert } from '../routing/useAdressWert';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { segmentLabel } from '../anzeige/anzahl';
 
@@ -58,7 +60,8 @@ export default function ErinnerungenPage() {
   const qc = useQueryClient();
   const { token } = useRollen();
 
-  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
+  // Die Ansicht ist Zustand der Adresse (LLH-1826): sie überlebt Weg und Zurück.
+  const [ansicht, setAnsicht] = useAdressWert('sicht', OFFEN_ABGESCHLOSSEN_ERLAUBT, 'offen');
   // Inline-Anlegen-Formular: per Kopf-Button auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
   // Sprung `?erinnerung=` (LLH-1429): die angesprungene Karte, die noch ins Bild zu rollende und
@@ -120,11 +123,14 @@ export default function ErinnerungenPage() {
    * sie nicht (mehr): dann steht über der Liste die Hinweisleiste (LLH-1827). Hat die Liste weitere
    * Seiten oder scheitert ihr Abruf, ist das nicht entschieden, und die Suche endet still.
    */
-  const springeZu = (eid: number, ziel: 'offen' | 'abgeschlossen') => {
-    setAnsicht(ziel);
-    setHervorgehobenId(eid);
-    setScrollZiel(eid);
-  };
+  const springeZu = useCallback(
+    (eid: number, ziel: 'offen' | 'abgeschlossen') => {
+      setAnsicht(ziel);
+      setHervorgehobenId(eid);
+      setScrollZiel(eid);
+    },
+    [setAnsicht],
+  );
   const deeplinkHinweis = useQueryParamSelektion(
     'erinnerung',
     deeplinkStand([offeneQuery, einsatzQuery]),
@@ -170,6 +176,7 @@ export default function ErinnerungenPage() {
     qc,
     einsatzId,
     meldeUnbekannt,
+    springeZu,
   ]);
   // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel oder den Daten).
   useEffect(() => {

@@ -18,6 +18,7 @@ import {
   Augenbraue,
   Datenfeld,
   Datenraster,
+  Feld,
   ListenAbschnitt,
   PaneelZustand,
   listenZeileStil,
@@ -262,19 +263,18 @@ export default function EinsatzAbschlussDialog({
             <span data-lfh="abschluss-kopplung-satz">{KOPPLUNG_SATZ}</span>
           </Textstufe>
 
-          {/* Letztes Feld des Dialogs: ohne Feldabstand darunter. `Feld` kennt das noch nicht
-              (Folgeaufgabe zu LLH-1971), deshalb hier noch `Form.Item`. */}
-          <Form.Item
+          {/* Letztes Feld des Dialogs: ohne Feldabstand darunter. */}
+          <Feld
             label={
               hatNummer
                 ? 'Zur Bestätigung Einsatznummer oder Bezeichnung eintippen'
                 : 'Zur Bestätigung Bezeichnung eintippen'
             }
             name="bestaetigung"
-            style={{ marginBottom: 0 }}
+            abstand="ohne"
           >
             <Input autoComplete="off" spellCheck={false} />
-          </Form.Item>
+          </Feld>
         </Stapel>
       </div>
     </ErfassungsModal>

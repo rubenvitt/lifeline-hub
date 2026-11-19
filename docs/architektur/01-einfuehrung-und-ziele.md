@@ -52,6 +52,7 @@ stehen in [Kapitel 4](04-loesungsstrategie.md).
 | --- | --- | --- |
 | Einsatzleitung | Führt einen Einsatz, verwaltet seinen Zugriff, koppelt Geräte, schreibt in allen freigegebenen Modulen | `EinsatzRolle::Einsatzleitung` in `src/einsatz/mod.rs`; [`rechte-im-einsatz.md`](../anwender/kapitel/rechte-im-einsatz.md) |
 | Führungspersonal | Schreibt in den Modulen; wer ein Sachgebiet S1 bis S7 führt, trägt es als Führungsfunktion seiner Mitgliedschaft im Einsatz | `EinsatzRolle::Fuehrungspersonal`; [`frontend/src/fuehrung/AGENTS.md`](../../frontend/src/fuehrung/AGENTS.md) |
+| Mitarbeit | Erfasst Meldungen, Chat und ETB-Einträge, ändert sonst nichts | `EinsatzRolle::Mitarbeit`; [`rechte-im-einsatz.md`](../anwender/kapitel/rechte-im-einsatz.md) |
 | Beobachter | Liest einen Einsatz mit, ohne zu schreiben | `EinsatzRolle::Beobachter` |
 | Führungskräfte der Organisation | Lesen Einsätze der Organisation ohne eigene Einsatzrolle mit | `OrgRolle::Fuehrungskraft` in `src/auth/mod.rs` |
 | Einsatzkräfte an gekoppelten Geräten | Bedienen an UHS, Betreuungsstelle, Bereitstellungsraum oder Abschnitt eine schmale, touchtaugliche Oberfläche ohne eigenes Konto; der Lagemonitor zeigt das Lagebild ohne Bedienung | Specs [`feldgeraet-bedienung`](../../openspec/specs/feldgeraet-bedienung/spec.md), [`lagemonitor`](../../openspec/specs/lagemonitor/spec.md); [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |

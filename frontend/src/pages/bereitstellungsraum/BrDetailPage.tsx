@@ -1,4 +1,4 @@
-import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { dauer } from '../../anzeige/dauer';
 import { Alert, App, Breadcrumb, Button, Space, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
@@ -105,6 +105,7 @@ import dayjs from 'dayjs';
 import { flaeche as flaechenMass } from '../../theme/tokens';
 import { Status } from '../../components/instrument/Status';
 import { Marke } from '../../components/instrument/Marke';
+import { ListenRueckweg } from '../../components/ListenRueckweg';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
@@ -802,7 +803,7 @@ export default function BrDetailPage() {
             items={[
               { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
               { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
-              { title: <Link to={listenPfad}>Bereitstellungsräume</Link> },
+              { title: <ListenRueckweg to={listenPfad}>Bereitstellungsräume</ListenRueckweg> },
               { title: br.bezeichnung },
             ]}
           />
@@ -884,7 +885,7 @@ export default function BrDetailPage() {
                 titel="Bereitgestellt"
                 groesse="klein"
                 wert={unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />}
-                einheit={unvollstaendig ? undefined : STAERKE_SCHREIBWEISE}
+                einheit={unvollstaendig ? undefined : <StaerkeSchreibweise />}
                 // Gesperrt ist kein Ausfall (LLH-1462): neutraler Ton, das Modul als Grund.
                 ton={unvollstaendig && einheitenFrei !== false ? 'achtung' : 'neutral'}
                 notiz={

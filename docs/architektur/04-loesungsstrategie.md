@@ -46,7 +46,7 @@ ADRs in [Kapitel 9](09-architekturentscheidungen.md), die Bausteine in
 
 | Ziel | Ansatz | Beleg |
 | --- | --- | --- |
-| Rechte im einzelnen Einsatz | Rollen `Einsatzleitung`, `Fuehrungspersonal`, `Beobachter` je Einsatz; die Modulfreigabe hat eine Quelle, den Server. | `src/einsatz/mod.rs`, `src/einsatz/berechtigung.rs`; Specs [`einsatz-zugriff`](../../openspec/specs/einsatz-zugriff/spec.md), [`modul-freigabe`](../../openspec/specs/modul-freigabe/spec.md) |
+| Rechte im einzelnen Einsatz | Rollen `Einsatzleitung`, `Fuehrungspersonal`, `Mitarbeit`, `Beobachter` je Einsatz; die Modulfreigabe hat eine Quelle, den Server. | `src/einsatz/mod.rs`, `src/einsatz/berechtigung.rs`; Specs [`einsatz-zugriff`](../../openspec/specs/einsatz-zugriff/spec.md), [`modul-freigabe`](../../openspec/specs/modul-freigabe/spec.md) |
 | Personendaten nur so lange wie nötig | Sperre nach Frist, Schwärzung nach Karenz, pseudonymes ETB-Skelett, Löschprotokoll; Offline-Bestände auf Geräten werden mitgeräumt. | `src/aufbewahrung/`; Spec [`aufbewahrung`](../../openspec/specs/aufbewahrung/spec.md); `frontend/src/offline/schwaerzungsWaechter.ts` |
 | Geräte ohne Personenkonto | Befristete, widerrufbare Kopplung an genau einen Einsatz mit eigener Urheberschaft in ETB und Audit. | `src/geraet/`; Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md) |
 | Anmeldung | Passwort (Argon2), TOTP als zweiter Faktor, Passkeys (WebAuthn), OIDC; Bremse gegen Fehlversuche je Quelle. | `src/auth/`; `argon2`, `totp-rs`, `webauthn-rs`, `openidconnect` in [`Cargo.toml`](../../Cargo.toml); [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md) |

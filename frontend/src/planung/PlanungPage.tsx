@@ -38,6 +38,7 @@ import { mappeDateiname } from '../abloesung/schichtplan/ausgabe/mappeDateiname'
 import { NebenwegeImKopf } from '../components/EinsatzSeite';
 import { useViewport } from '../components/useViewport';
 import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /** Name der Reiterfläche je Reiter, ohne die Zahl im Wortlaut des Reiters. */
 const REITER_NAME: Record<PlanungReiter, string> = {
@@ -103,7 +104,7 @@ export default function PlanungPage() {
     personalFrei: true,
   });
   const pfad = [
-    { title: <Link to={planungenPfad()}>Planungen</Link> },
+    { title: <ListenRueckweg to={planungenPfad()}>Planungen</ListenRueckweg> },
     { title: planung?.kopf.bezeichnung ?? 'Planung' },
   ];
 

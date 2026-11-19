@@ -91,6 +91,7 @@ wire_enum! {
     pub enum EinsatzRolle {
         Einsatzleitung => "einsatzleitung",
         Fuehrungspersonal => "fuehrungspersonal",
+        Mitarbeit => "mitarbeit",
         Beobachter => "beobachter",
     }
     try_from = |s| format!("Ungültige EinsatzRolle: {s}");
@@ -103,7 +104,7 @@ impl EinsatzRolle {
     }
 
     /// Ob diese Rolle zur Führung im Einsatz gehört (Modulstufe `einsatzfuehrung`, LFH-1150):
-    /// Einsatzleitung und Führungspersonal, nicht Beobachter.
+    /// Einsatzleitung und Führungspersonal, nicht Mitarbeit und nicht Beobachter.
     pub fn gehoert_zur_fuehrung(&self) -> bool {
         matches!(
             self,
@@ -112,12 +113,23 @@ impl EinsatzRolle {
     }
 
     /// Ob diese Rolle ETB-Einträge erfassen/berichtigen darf
-    /// (Einsatzleitung und Führungspersonal; Beobachter ist nur lesend).
+    /// (Einsatzleitung und Führungspersonal; Mitarbeit und Beobachter sind nur lesend).
     pub fn darf_schreiben(&self) -> bool {
         matches!(
             self,
             EinsatzRolle::Einsatzleitung | EinsatzRolle::Fuehrungspersonal
         )
+    }
+
+    /// Ob diese Rolle Meldungen erfassen darf (LLH-1817): alle außer Beobachter, also
+    /// Einsatzleitung, Führungspersonal und Mitarbeit.
+    pub fn darf_erfassen(&self) -> bool {
+        !matches!(self, EinsatzRolle::Beobachter)
+    }
+
+    /// Ob diese Rolle die Mitarbeit ist (erfasst, schreibt aber keinen ETB und führt nicht).
+    pub fn ist_mitarbeit(&self) -> bool {
+        matches!(self, EinsatzRolle::Mitarbeit)
     }
 }
 
@@ -502,6 +514,19 @@ mod tests {
         assert!(EinsatzRolle::Einsatzleitung.darf_schreiben());
         assert!(EinsatzRolle::Fuehrungspersonal.darf_schreiben());
         assert!(!EinsatzRolle::Beobachter.darf_schreiben());
+    }
+
+    #[test]
+    fn mitarbeit_erfasst_aber_schreibt_nicht_und_fuehrt_nicht() {
+        let m = EinsatzRolle::Mitarbeit;
+        assert_eq!(m.as_str(), "mitarbeit");
+        assert!(m.darf_erfassen());
+        assert!(!m.darf_schreiben());
+        assert!(!m.gehoert_zur_fuehrung());
+        assert!(m.ist_mitarbeit());
+        assert!(EinsatzRolle::Einsatzleitung.darf_erfassen());
+        assert!(EinsatzRolle::Fuehrungspersonal.darf_erfassen());
+        assert!(!EinsatzRolle::Beobachter.darf_erfassen());
     }
 
     #[test]

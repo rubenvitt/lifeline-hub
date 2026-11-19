@@ -193,6 +193,21 @@ export const sichtung: Record<Sichtungskategorie, SichtungsDarstellung> = {
 };
 
 /**
+ * Die Sichtung einer Person, wie die Oberfläche sie liest (LLH-1998): eine fehlende oder unbekannte
+ * Kategorie gilt als „ohne Sichtung“ (`null`). Der Server liefert nur gültige Werte, aber ein
+ * veralteter Stand im Gerät darf nicht die ganze Liste reißen: `sichtung[k]` allein war bei einem
+ * unbekannten Wert `undefined`, und Liste, Detail und Druck stürzten ab („reading 'label'“).
+ * Ungesichtet ist die fachlich sichere Lesart, denn die Person fällt so zur Nachsichtung auf.
+ * Jede Stelle, die mit `aktuelle_sichtung` einer Person nachschlägt, zählt oder gruppiert, geht
+ * hier durch; die kompakte `SichtungsTag`-Form zeigt einen unbekannten Wert ohnehin als „—“.
+ */
+export function personSichtung(
+  wert: Sichtungskategorie | null | undefined,
+): Sichtungskategorie | null {
+  return wert != null && Object.prototype.hasOwnProperty.call(sichtung, wert) ? wert : null;
+}
+
+/**
  * Kräfte-Statuskategorie (Fallback-Achse für Fahrzeug- und Personalstatus).
  *
  * `gebunden` (auf Anfahrt, am Einsatzort, alarmiert, im Einsatz) ist Normalbetrieb und deshalb

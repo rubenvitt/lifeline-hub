@@ -36,6 +36,7 @@ import {
 } from './tagAusVorlageKern';
 import { useBedarfsvorschlag } from './useBedarfsvorschlag';
 import { VERPFLEGUNGSART_LABEL, zeitraumText } from './verpflegungText';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Tag aus Vorlage anlegen (LLH-1058, Spec `kraefte-verpflegung`, „Tag aus der Vorlage in der
@@ -183,7 +184,13 @@ function TagAusVorlageInhalt({
       items={[
         { title: <Link to="/einsaetze">Einsätze</Link> },
         { title: einsatz.bezeichnung },
-        { title: <Link to={verpflegungPfad(einsatzId)}>{modulName('verpflegung')}</Link> },
+        {
+          title: (
+            <ListenRueckweg to={verpflegungPfad(einsatzId)}>
+              {modulName('verpflegung')}
+            </ListenRueckweg>
+          ),
+        },
         { title: 'Tag aus Vorlage' },
       ]}
     />

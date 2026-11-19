@@ -86,7 +86,7 @@ pub async fn anlegen_mit_mitgliedern(
 
 /// Wer sich überhaupt aufnehmen lässt (Alias `b`): aktiv, kein Geräte-, Stellvertreter- oder
 /// Archivkonto. Die EINE Bedingung für die Auswahl ([`auswahl_sql`]) und den Schreibweg beim
-/// Anlegen ([`aufnehmbar_in`], ADR-0072); ein neuer Ausschluss gehört hierher.
+/// Anlegen ([`aufnehmbar_in`], ADR-0073); ein neuer Ausschluss gehört hierher.
 fn aufnehmbar_bedingung() -> String {
     format!(
         "b.aktiv = 1 AND {} AND {}",

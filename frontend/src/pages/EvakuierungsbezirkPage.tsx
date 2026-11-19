@@ -32,6 +32,7 @@ import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { evakuierungPfad, parseRouteId } from '../routing/deeplinks';
 import { raeumungszustand } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /** Schlüssel eines Menüeintrags im Kopf: ein Räumungsschritt (`raeumung:<ziel>`) oder `stornieren`. */
 type MenueAktion = string;
@@ -182,7 +183,7 @@ export default function EvakuierungsbezirkPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={uebersicht}>{modulName('evakuierung')}</Link> },
+            { title: <ListenRueckweg to={uebersicht}>{modulName('evakuierung')}</ListenRueckweg> },
             { title: bezirk.bezeichnung },
           ]}
         />

@@ -357,6 +357,18 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
     expect(within(abschnitt).queryByRole('button', { name: /Rückmeldung geben/ })).toBeNull();
   });
 
+  // LLH-1825: wer ein Kürzel nicht versteht, findet das Glossar über das Kürzel selbst.
+  for (const wort of ['F/UF/M', 'SK', 'Glossar', 'EA 1']) {
+    it(`die Suche nach „${wort}“ findet „Zeiten und Kürzel“`, async () => {
+      zeige('/hilfe');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Kapitel durchsuchen' }), wort);
+      expect(
+        (await screen.findAllByRole('link', { name: 'Zeiten und Kürzel' })).length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText('Kein Kapitel passt zur Suche.')).toBeNull();
+    });
+  }
+
   it('ohne Suchtreffer bleiben „Rückmeldung geben“ und „Lizenzen“ erreichbar', async () => {
     zeige('/hilfe');
     await userEvent.type(

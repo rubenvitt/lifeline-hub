@@ -103,7 +103,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten) ·
   `Textstufe` (Stufe und Ton, kein `style`) · `Stapel` (Abstand als Rasterstufe) · `Knopfreihe` (Knöpfe nebeneinander, Abstand `md`, „Aktionen“) · `MetaZeile`
   (Angaben mit „·“, leere Teile fallen weg, `Teil mono` für Zahlen) · `Feld` (`Form.Item` mit
-  `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`). Im
+  `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`;
+  Felder einer Zeile und das letzte Feld eines Dialogs: `abstand="ohne"` statt `marginBottom: 0`,
+  `zeile` mit derselben Stufe als Flex-Basis statt `flex`, LLH-1999). Im
   Verwaltungsteil, auf den Einsatzseiten unter `pages/` samt Fach- und Restbereichen (LLH-1971),
   in ETB, Aufträgen, Meldungen, Nachforderungen, Lageberichten, Erinnerungen und Chat (LLH-1969)
   sowie in Personen, Betreuung, Verpflegung, Kräfte und Ablösung (LLH-1970; Liste `BEREICHE`)
@@ -776,7 +778,7 @@ nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`
 in der Kategorie ihres Zielmoduls direkt hinter ihm oder einer Marke desselben Ziels (Entscheidungen
 unter ETB in der Erfassung) und erscheint als eingerückte Unteransicht mit Führungslinie, ohne
 Pfeil-Symbol (LLH-1733, `sprungmarken.test.ts` hält die Kategorie);
-`parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
+Die Sicht ist Zustand der Adresse (`personen/usePersonenSicht.ts`, LLH-1826): eine Marke zeigt genau ihre Sicht, was sie nicht nennt, gilt als Vorgabe. Kein Filterwert „patienten".
 Fernmeldeskizze und Kommunikationsplan sind Marken
 hinter „Fernmeldewesen“ (Ziel `fernmeldewesen`, LLH-1180), eine Marke „Funkplan“ gibt es nicht. Gesperrt
 heißt mit Schloss, nicht weg. Jede Marke steht auch in der Sprungpalette (Gruppe „Ansichten“,
@@ -844,10 +846,24 @@ anwendbar), „nicht geprüft" ist keins.
   neues Kürzel kommt in die Liste und in die Tabelle des Kapitels `zeiten-und-kuerzel.md`
   (`anzeige/kuerzel.test.ts` hält beide gleich). Kurzbezeichnungen der Organisation („EA 1.1“) sind
   Daten und bleiben. **Die Stärke** schreibt nur `anzeige/staerke.ts` (`staerkeText`, Wert
-  „1/2/5//8“); jede Fläche mit Stärke nennt `STAERKE_SCHREIBWEISE` („F/UF/M//Σ“) einmal sichtbar
+  „1/2/5//8“); jede Fläche mit Stärke nennt die Schreibweise „F/UF/M//Σ“ einmal sichtbar
   (Spaltenkopf, Feldetikett, Legende), der Wert trägt `STAERKE_AUSGESCHRIEBEN` als `title`
   (`StaerkeAnzeige`, `Kennzahl notizBeschreibung`). „Ges“, „Gesamt“ und eine Stärke ohne Summe gibt
-  es nicht (Wächter `anzeige/staerke.guard.test.ts`).
+  es nicht (Wächter `anzeige/staerke.guard.test.ts`). **Die Schreibweise erklärt sich auf Tippen**
+  (LLH-1825, `docs/superpowers/specs/2026-11-19-f71gxt0s-kuerzel-legende-design.md`): in Komponenten
+  steht sie nur über `anzeige/KuerzelErklaerung.tsx` (`StaerkeSchreibweise`, schmale Spalte
+  `umbruchVorSumme`), einen Knopf ohne Knopfoptik mit Popover aus Bedeutung, Beispiel und dem Link
+  „Zeiten und Kürzel“; ein Tooltip allein trägt auf Touch nicht. Der Knopf hält Klicks, Enter und
+  Leertaste, Zeile und Tabellenkopf darum lösen nicht aus; Esc und Pfeile reicht er geschlossen
+  weiter, und ein Klick auf den Verweis im Fenster erreicht die Umgebung (Sprungpalette schließt).
+  Nie in einem Link oder `<label>`: dort bleibt die Schreibweise Text, und die Erklärung steht einmal
+  über den Zeilen (Überblick: `vorspann` des Paneels, nicht im Kopf-Meta, das schmal abgeschnitten
+  wird). Ein Spaltentitel als Knoten trägt `etikett` mit dem Klartext. **Die Trefffläche ist die
+  Textzeile**, eine begründete Ausnahme von der Staffel 30/48/72 (Entscheidung 19.11.2026): das
+  Kürzel steht in dichten Etiketten direkt über bearbeitbaren Werten, ein größeres Feld überdeckte
+  sie, und die Erklärung ist ein Zusatz, keine Handlung. Ausnahmen mit Grund und der Wächter (auch
+  Etiketten in `.ts`): `anzeige/kuerzelErklaerung.guard.test.ts`; in Leseansichten zählt der
+  Erklär-Knopf nicht als Aktion (`test/kuerzel.ts`, `aktionsKnoepfe`).
 
 **Tabelle und Dichte**
 
@@ -1746,11 +1762,43 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   Personenansicht (`einsatzkraftPfad`), ihre Brotkrume führt auf die Zeilenmarke zurück.
   `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
   Befehls bleibt Vollseite für Entwurf, Druck und Deeplink.
-- **Filter gehören in die URL** (`etbFilterPfad`/`parseEtbFilter`, `mitQuery` kodiert; ETB-Systemeinträge: `frontend/src/etb/AGENTS.md`). Unbekannter
+- **Ansicht und Filter gehören in die Adresse** (LLH-1826, Entwurf
+  `docs/superpowers/specs/2026-11-19-yht1wcsw-ansicht-filter-rueckweg-design.md`): jede Wahl über
+  einer Einsatzliste (Ansicht, Segment, Filter, Suche) ist ein Query-Parameter, gelesen und
+  geschrieben über `routing/useAdressWert.ts` (`useAdressWert`, `useAdressWahl` ohne feste Vorgabe,
+  `useAdressSchalter`, `useAdressKennung`, `useAdressText`, `useAdressSuche` entprellt,
+  `useAdressWertNachRueckfrage` für eine Ansicht, deren Wechsel eine offene Bearbeitung aushängt).
+  Geschrieben mit `replace`, die Vorgabe fehlt in der Adresse, ein unbekannter Wert gilt als
+  Vorgabe. **Kein Sitzungsspeicher** dafür: ein Neueinstieg über das Modulmenü beginnt mit der
+  Vorgabe, damit ein vergessener Filter nichts versteckt (nur Sortierung, Spaltenfilter und die
+  Suche einer Tabelle mit `useListenGedaechtnis` merkt die Sitzung, LLH-1086). Kein `useState` für eine solche Wahl, auch nicht je Einsatz
+  (`…NachEinsatz`): ein anderer Einsatz ist eine andere Adresse. Ausgenommen: die Personensuche
+  (Namen), Aufklappzustände, die Gerätehülle für die Rollposition. Mehrere Schreiber im selben Zug
+  (Link-Aufträge, Listengedächtnis, Werte) gehen über `useAdressAenderung`
+  (`routing/useLinkAuftrag.ts`), nie über `setSearchParams` vom Stand des Renders: der zweite
+  stellte sonst zurück, was der erste geändert hat. Zwei Listen auf einer Seite tragen getrennte
+  Namen (Befehle: `befehle_…`). ETB: `etbFilterPfad`/`parseEtbFilter`, `mitQuery` kodiert;
+  ETB-Systemeinträge: `frontend/src/etb/AGENTS.md`. Unbekannter
   Enum-Wert wird ganz verworfen (exhaustiver `Record<EtbTyp, true>`). Für Tabellen gilt eine
   gemeinsame Kodierung (LLH-1086, `listenZustandParams`/`parseListenZustand`): `sort=<spalte>:auf|ab`
   (`aus` = bewusst unsortiert, die Vorgabe steht nicht da), `f.<spalte>=a,b`, `q=`; geschrieben
   mit `replace`, fremde Parameter bleiben, Unbekanntes prüft `bereinigeListenZustand` weg.
+- **Ortspfad zur Liste über `ListenRueckweg`** (LLH-1997): Ein Ortspfad-Glied, das auf eine Liste
+  oder eine übergeordnete Seite führt, ist `ListenRueckweg` (`components/ListenRueckweg.tsx`), nie
+  ein nackter `Link`, im Einsatz wie in der Verwaltung. Kam man per PUSH von genau diesem Pfad
+  (Query zählt nicht), geht der einfache Klick per `navigate(-1)` zurück, damit Ansicht, Filter und
+  Rollposition wieder stehen; das `href` trägt die vorige Adresse für Strg- und Mittelklick. Sonst
+  ist es ein Link auf das Ziel. Die Herkunft je Verlaufseintrag merkt `VerlaufMerken` im
+  `BetriebsLayout` (`routing/verlaufGedaechtnis.ts`, `sessionStorage lfh:verlauf`, räumt bei jedem
+  Ausgang). Andere Rückwege (nach Storno oder Löschen, „Zur Liste“ in `SeitenNichtGefunden`) bleiben
+  Links: nach einer Aktion ist kein Zurück im Verlauf gemeint. Herleitung:
+  `docs/superpowers/specs/2026-11-19-z7oww8sf-ortspfad-rueckweg-liste-design.md`.
+- **Rollposition beim Zurück** (LLH-1826): `components/RollWiederherstellung.tsx` im
+  `BetriebsLayout` (Stab und Einsatzrahmen; in der Gerätehülle rollt das `main`, dort nicht). Sie
+  merkt die Position je `location.key` (`routing/rollGedaechtnis.ts`, `sessionStorage`), stellt sie
+  beim POP wieder her, sobald die Seite hoch genug ist (höchstens `ROLL_FRIST_MS`), gibt bei eigener
+  Eingabe auf und hält still, wenn die Adresse ein Deeplink-Ziel trägt (`traegtZiel`; ein neuer
+  Deeplink-Parameter gehört in `ZIEL_PARAMETER`; ein Filter trägt nie den Namen eines Ziels, Wächter `routing/rollGedaechtnis.guard.test.ts`). PUSH beginnt oben, REPLACE rollt nicht.
 - **Zeit in der URL** ist UTC ohne Zone (`dayjs(s)` läse Ortszeit) — Umkehr in `anzeige/zeitEingabe.ts`
   mit eigenem Test. Kodierung per Round-Trip durch `URLSearchParams` prüfen.
 - Filterleiste nur bei **fremder** Änderung neu aufsetzen (nach der Navigation); entprellt wird

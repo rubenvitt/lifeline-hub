@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react';
 import { schriftStil } from '../components/instrument';
-import type { EtbBaustein } from '../api/types';
+import type { EtbBaustein, EtbTyp } from '../api/types';
 import { filterSlashEintraege, type MetaFeld, type SlashEintrag } from './schnellerfassungModell';
 
 export interface SlashMenuHandle {
@@ -30,6 +30,8 @@ interface Props {
    * Bausteinen.
    */
   typenAnbieten?: boolean;
+  /** Die wählbaren Typen (Mitarbeit: nur Meldung und Lage, LLH-1817); fehlt: alle. */
+  erlaubteTypen?: readonly EtbTyp[];
   /**
    * `@`-Modus: statt Typen/Feldern/Bausteinen genau diese Einheiten-Einträge
    * (`filterAtEintraege`). `null`/fehlend = `/`-Modus.
@@ -62,6 +64,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
     onWahl,
     onSchliessen,
     typenAnbieten = false,
+    erlaubteTypen,
     einheiten = null,
     richtung = 'unten',
     topInset = 0,
@@ -69,8 +72,12 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   ref,
 ) {
   const treffer = useMemo(
-    () => filterSlashEintraege(filter, bausteine, gesetzteFelder, { typen: typenAnbieten }),
-    [filter, bausteine, gesetzteFelder, typenAnbieten],
+    () =>
+      filterSlashEintraege(filter, bausteine, gesetzteFelder, {
+        typen: typenAnbieten,
+        erlaubteTypen,
+      }),
+    [filter, bausteine, gesetzteFelder, typenAnbieten, erlaubteTypen],
   );
   // EINE flache Folge in Anzeigereihenfolge — die Pfeiltasten wandern über alle Sektionen.
   const flach: SlashEintrag[] = useMemo(

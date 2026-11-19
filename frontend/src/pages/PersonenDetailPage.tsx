@@ -33,7 +33,7 @@ import {
 import { listeUhs, aenderePersonBelegung, nimmUhsAustrittZurueck } from '../api/einsatzUhs';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META, personStatusDarstellung } from '../personen/personMeta';
+import { STATUS_META, personSichtung, personStatusDarstellung } from '../personen/personMeta';
 import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -64,6 +64,7 @@ import { flaeche } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
 import { Stapel } from '../components/instrument';
 import Knopfreihe from '../components/instrument/Knopfreihe';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). Ein fehlender oder unbekannter
@@ -436,6 +437,8 @@ export default function PersonenDetailPage() {
           storniert_von_name: stand.storniert_von_name ?? undefined,
         }
       : detailQuery.data;
+  // Eine unbekannte Sichtung aus einem veralteten Stand gilt als ungesichtet (LLH-1998).
+  const sk = personSichtung(p.aktuelle_sichtung);
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
@@ -851,7 +854,7 @@ export default function PersonenDetailPage() {
         <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
           Person {registrierAnzeige(p.registrier_nr)}
           <Status darstellung={personStatusDarstellung(p.status)} />
-          {p.aktuelle_sichtung && <SichtungsTag kategorie={p.aktuelle_sichtung} />}
+          {sk && <SichtungsTag kategorie={sk} />}
           {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
         </Stapel>
       }
@@ -861,7 +864,7 @@ export default function PersonenDetailPage() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={zurueck}>{modulName('personen')}</Link> },
+              { title: <ListenRueckweg to={zurueck}>{modulName('personen')}</ListenRueckweg> },
               { title: registrierAnzeige(p.registrier_nr) },
             ]}
           />
