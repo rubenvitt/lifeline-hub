@@ -218,6 +218,8 @@ pruefe "ios-pruefung.yml fährt scripts/ios/simulator-pruefung.sh" \
   enthaelt "$(job "$IOS" simulator)" "run: ./scripts/ios/simulator-pruefung.sh"
 pruefe "ios-pruefung.yml installiert XcodeGen nur über das Skript" \
   fehlt "$(code_ohne_kommentar "$IOS")" "brew install"
+pruefe "simulator-pruefung.sh testet die Simulatoren nacheinander" \
+  enthaelt "$(code_ohne_kommentar "$SKRIPTE/ios/simulator-pruefung.sh")" "-disable-concurrent-destination-testing"
 pruefe "iOS-Simulator ist kein Pflicht-Check" fehlt "$(cat "$SKRIPTE/ruleset-pruefen.sh")" "iOS-Simulator"
 
 echo "==> ci-stufen: ios.yml (TestFlight)"

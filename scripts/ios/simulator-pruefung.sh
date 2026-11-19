@@ -50,11 +50,15 @@ if [ -n "$ipad" ]; then
 fi
 echo "Simulatoren: iPhone $iphone${ipad:+, iPad $ipad}"
 
+# Die Geräte nacheinander: nebeneinander auf dem Runner (eine VM mit 7 GB) brauchte der Start der
+# App auf dem iPhone 34 bis 56 s und der erste Webinhalt über 80 s, rote Tests aus reiner Last;
+# das iPad allein danach startete in 6 s (Lauf 44427089802).
 rc=0
 xcodebuild test \
   -project "$WURZEL/ios/LifelineHub.xcodeproj" \
   -scheme LifelineHub \
   "${ziele[@]}" \
+  -disable-concurrent-destination-testing \
   -resultBundlePath "$ERGEBNIS" \
   CODE_SIGNING_ALLOWED=NO || rc=$?
 
