@@ -69,7 +69,9 @@ final class LinkTests: XCTestCase {
             document.body.appendChild(a);
             a.click(); 0
             """)
-        await warte(sekunden: 10) { !self.geteilt.isEmpty }
+        // 30 s: der erste Webinhalt im frisch gestarteten Simulator kam im CI erst nach über 80 s
+        // (Lauf 44427089802, iPhone und iPad nebeneinander); geprüft wird, dass die Datei ankommt.
+        await warte(sekunden: 30) { !self.geteilt.isEmpty }
         let datei = try XCTUnwrap(geteilt.first)
         XCTAssertEqual(datei.lastPathComponent, "etb.csv")
         XCTAssertEqual(try String(contentsOf: datei, encoding: .utf8), "Zeit;Text\n12:00;Lage")
@@ -94,9 +96,12 @@ final class LinkTests: XCTestCase {
         XCTAssertTrue(web.uiDelegate === begleiter)
         web.loadHTMLString(
             "<!doctype html><html><body>\(html)<span id='bereit'></span></body></html>", baseURL: adresse.url)
-        await warte {
+        // Ohne geladene Seite liefe jeder Klick ins Leere; das soll als Grund dastehen, nicht als
+        // fehlende Wirkung danach.
+        let bereit = await warte(sekunden: 30) {
             ((try? await web.evaluateJavaScript("document.getElementById('bereit') ? 1 : 0")) as? Int) == 1
         }
+        XCTAssertTrue(bereit, "Testseite nach 30 s nicht im Webview geladen")
         return web
     }
 
@@ -108,10 +113,14 @@ final class LinkTests: XCTestCase {
         }
     }
 
-    private func warte(sekunden: Double = 5, bis bedingung: () async -> Bool) async {
+    /// Wartet, bis `bedingung` gilt, höchstens `sekunden`; liefert, ob sie gilt.
+    @discardableResult
+    private func warte(sekunden: Double = 5, bis bedingung: () async -> Bool) async -> Bool {
         let ende = Date().addingTimeInterval(sekunden)
-        while !(await bedingung()), Date() < ende {
+        while Date() < ende {
+            if await bedingung() { return true }
             try? await Task.sleep(for: .milliseconds(50))
         }
+        return await bedingung()
     }
 }
