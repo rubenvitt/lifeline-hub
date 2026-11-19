@@ -14,7 +14,14 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StatusWahl, { type StatusBedienung } from '../components/StatusWahl';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { Paneel, Sammelbanner, monoStil, useRollen } from '../components/instrument';
+import {
+  Paneel,
+  Sammelbanner,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import { kategorieDarstellung, type StatusDarstellung } from '../theme/statusFarben';
 import {
   baueFmsTableau,
@@ -247,7 +254,11 @@ export default function FmsTableau({
       onBlur={verlassen}
       style={{ display: 'flex', flexDirection: 'column', gap: token.margin, minWidth: 0 }}
     >
-      {einheitenHinweis && <span style={{ ...gedaempft, fontSize: 12 }}>{einheitenHinweis}</span>}
+      {einheitenHinweis && (
+        <Textstufe stufe="textKlein" ton="gedaempft">
+          {einheitenHinweis}
+        </Textstufe>
+      )}
 
       {zufluessig > 0 && (
         <Sammelbanner aktion={{ label: 'anzeigen', onKlick: friereEin }}>
@@ -329,7 +340,12 @@ export default function FmsTableau({
                   {zusatz && (
                     <span
                       data-lfh="fms-zusatz"
-                      style={{ fontSize: 12, ...gedaempft, ...abgeschnitten, maxWidth: '100%' }}
+                      style={{
+                        ...schriftStil('textKlein'),
+                        ...gedaempft,
+                        ...abgeschnitten,
+                        maxWidth: '100%',
+                      }}
                       title={zusatz}
                     >
                       {zusatz}

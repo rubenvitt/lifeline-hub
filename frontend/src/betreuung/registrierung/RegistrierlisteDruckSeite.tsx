@@ -11,7 +11,13 @@ import { ApiError } from '../../api/client';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
 import EinsatzSeite from '../../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
+import type { PlatzhalterRueckweg } from '../../components/Platzhalter';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+} from '../../components/SeitenZustand';
 import Druckkopf from '../../components/druck/Druckkopf';
 import DruckKnopf from '../../components/druck/DruckKnopf';
 import { DRUCK_ABFRAGE } from '../../druck/abfrageOptionen';
@@ -25,6 +31,11 @@ export interface RegistrierlisteDruckSeiteProps {
   /** Bezeichnung der Stelle für Seitenkopf und Druckkopf, sobald bekannt. */
   stelleBezeichnung?: string;
   zurueck: { pfad: string; label: string };
+  /**
+   * Rückweg, wenn es die Stelle nicht (mehr) gibt (404, LLH-1960): die Betreuung des Einsatzes bzw.
+   * des Geräts, nicht die Stelle selbst.
+   */
+  liste: PlatzhalterRueckweg;
   /** Brotkrumen der Stabsoberfläche; das Gerät hat keine. */
   breadcrumb?: (einsatzBezeichnung: string) => ReactNode;
 }
@@ -44,13 +55,15 @@ const zahl = (n: number, eins: string, viele: string) => `${n} ${n === 1 ? eins 
  * - **Gesundheitsangaben nur auf Wunsch:** der Schalter „Unverträglichkeiten mitdrucken“ steht in
  *   der Adresse (`?unvertraeglichkeiten=1`), Vorgabe aus; ohne ihn liefert der Server das Feld
  *   nicht. Die Wahl steht im Key, ein Wechsel ist ein neuer (protokollierter) Abruf.
- * - Leer: ein Satz, kein Druckknopf. 403 „Kein Zugriff“, 404 „Stelle nicht gefunden“.
+ * - Leer: ein Satz, kein Druckknopf. 403 „Kein Zugriff“. 404: `SeitenNichtGefunden` ersetzt die
+ *   ganze Druckansicht, der Rückweg führt zur Liste (`liste`, LLH-1960).
  */
 export default function RegistrierlisteDruckSeite({
   einsatzId,
   stelleId,
   stelleBezeichnung,
   zurueck,
+  liste: listeRueckweg,
   breadcrumb,
 }: RegistrierlisteDruckSeiteProps) {
   const navigate = useNavigate();
@@ -72,6 +85,14 @@ export default function RegistrierlisteDruckSeite({
     gcTime: 0,
   });
 
+  if (istNichtGefunden(druckQuery.error)) {
+    return (
+      <SeitenNichtGefunden
+        titel="Diese Betreuungsstelle gibt es nicht (mehr)"
+        rueckweg={listeRueckweg}
+      />
+    );
+  }
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -83,7 +104,7 @@ export default function RegistrierlisteDruckSeite({
   }
   const einsatz = einsatzQuery.data;
   const status = druckQuery.error instanceof ApiError ? druckQuery.error.status : null;
-  const isOhneDruck = status === 403 || status === 404;
+  const isOhneDruck = status === 403;
   const liste = druckQuery.data;
   const personen = liste ? allePersonen(liste).length : 0;
   const isLeer = liste != null && personen === 0;
@@ -154,9 +175,7 @@ export default function RegistrierlisteDruckSeite({
           </Typography.Text>
         </div>
       )}
-      {status === 404 ? (
-        <Alert type="info" showIcon title="Stelle nicht gefunden" />
-      ) : status === 403 ? (
+      {status === 403 ? (
         <Alert
           type="info"
           showIcon
@@ -164,11 +183,11 @@ export default function RegistrierlisteDruckSeite({
           description="Modul gesperrt oder Aufbewahrungsfrist abgelaufen"
         />
       ) : druckQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          title="Die Registrierliste konnte nicht geladen werden"
-          action={<Button onClick={() => void druckQuery.refetch()}>Erneut laden</Button>}
+        <SeitenFehler
+          text="Die Registrierliste konnte nicht geladen werden"
+          ursache={druckQuery.error}
+          laedt={druckQuery.isFetching}
+          onWiederholen={() => void druckQuery.refetch()}
         />
       ) : !liste || druckQuery.isFetching ? (
         <Typography.Text role="status" aria-live="polite">

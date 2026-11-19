@@ -12,6 +12,7 @@ import { KennungsLink } from '../components/kennungsLink';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import { useRollen } from '../components/instrument/rollenwerte';
+import { Stapel } from '../components/instrument';
 import { SPEZIES_META } from '../pages/tiere/tierHelfer';
 import { schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
 import { BezugHinzufuegenDialog } from './ZuweisungsDialoge';
@@ -107,12 +108,12 @@ export default function PersonBezuege({ einsatzId, personId, darfZuordnen }: Per
 
   return (
     <Flex vertical gap={token.marginSM} data-lfh="bezuege">
-      <Flex align="center" gap={token.marginSM} wrap>
+      <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
         <Typography.Text strong>Bezüge {laedt ? '…' : zeilen.length}</Typography.Text>
         {darfZuordnen && (
           <Button onClick={() => setHinzufuegenOffen(true)}>Bezug hinzufügen</Button>
         )}
-      </Flex>
+      </Stapel>
       {fehler
         .gemeldet()
         .filter((k) => !da.has(k))
@@ -137,7 +138,7 @@ export default function PersonBezuege({ einsatzId, personId, darfZuordnen }: Per
               data-lfh="bezug"
               style={{ padding: `${token.paddingXXS}px 0` }}
             >
-              <Flex align="center" gap={token.marginSM} wrap>
+              <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
                 <KennungsLink to={z.pfad}>{z.text}</KennungsLink>
                 {darfZuordnen && (
                   <Button
@@ -150,7 +151,7 @@ export default function PersonBezuege({ einsatzId, personId, darfZuordnen }: Per
                     Bezug lösen
                   </Button>
                 )}
-              </Flex>
+              </Stapel>
               {zeilenGrund(fehler.grund(z.kennung))}
             </li>
           ))}

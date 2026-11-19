@@ -31,12 +31,14 @@ import {
 import {
   Augenbraue,
   Aufgliederung,
+  Feld,
   Kennzahl,
   Kennzahlenband,
   Sammelbanner,
   Zeitachseneintrag,
   sammelbannerKurz,
   monoStil,
+  schriftStil,
   useRollen,
   zahlFarbe,
 } from '../components/instrument';
@@ -1128,7 +1130,8 @@ export default function AusgabeAnsicht() {
                 style={{
                   ...zaehltasteStil(token, 'plus1'),
                   ...(istSchmal ? { flex: '1 1 0' } : {}),
-                  fontSize: 22,
+                  // „+1“ ist die Haupttaste: groß wie ein Datenwert der Paneelzeilen (22 px).
+                  ...schriftStil('datenwertKlein'),
                 }}
                 disabled={tastenGesperrt}
                 aria-describedby={beschrieben(tastenGesperrt)}
@@ -1154,7 +1157,7 @@ export default function AusgabeAnsicht() {
           onFertig={() => setDialog(null)}
           onAbbrechen={() => setDialog(null)}
         >
-          <Form.Item<{ menge: number }>
+          <Feld<{ menge: number }>
             name="menge"
             label="Menge (EP)"
             rules={[
@@ -1166,8 +1169,8 @@ export default function AusgabeAnsicht() {
               },
             ]}
           >
-            <MengenFeld beschriftung="Menge (EP)" style={{ width: '100%' }} />
-          </Form.Item>
+            <MengenFeld beschriftung="Menge (EP)" />
+          </Feld>
         </ErfassungsModal>
       )}
       {dialog?.art === 'nachtragen' && (

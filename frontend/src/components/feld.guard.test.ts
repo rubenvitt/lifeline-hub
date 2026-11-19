@@ -7,7 +7,8 @@ import { quellwurzel } from '../test/ratsche';
 /**
  * Feld-Wächter (Spec `feldbreiten`, „Keine feste Feldbreite im Verwaltungsteil", Change
  * `hzru8iq7-text-stapel-meta-feld`, design.md D7; auf die Führungsmodule ausgeweitet mit
- * LLH-1969). Löst den Feldbreiten-Guard aus LFH-329 · B1 ab.
+ * LLH-1969, auf Personen, Betreuung, Verpflegung, Kräfte und Ablösung mit LLH-1970). Löst den
+ * Feldbreiten-Guard aus LFH-329 · B1 ab.
  *
  * Ein Eingabefeld bekommt seine Breite nur über `Feld` (`components/instrument/Feld.tsx`) mit einer
  * benannten Obergrenze; dann ist es fluid und ragt am schmalen Schirm nicht über den Rand. Der
@@ -32,8 +33,9 @@ const SRC = quellwurzel('Feld-Wächter');
 
 /**
  * Die geprüften Bereiche: der Verwaltungsteil (Stammdaten, Karten, globale Einstellungen,
- * Benutzer; LLH-1810) und die Führungsmodule ETB, Aufträge, Meldungen, Nachforderungen,
- * Lageberichte, Erinnerungen und Chat (LLH-1969).
+ * Benutzer; LLH-1810), die Führungsmodule ETB, Aufträge, Meldungen, Nachforderungen,
+ * Lageberichte, Erinnerungen und Chat (LLH-1969) und die Einsatzmodule Personen, Betreuung,
+ * Verpflegung, Kräfte und Ablösung (LLH-1970).
  */
 const BEREICHE = [
   'stammdaten',
@@ -47,6 +49,11 @@ const BEREICHE = [
   'lageberichte',
   'erinnerung',
   'chat',
+  'personen',
+  'betreuung',
+  'verpflegung',
+  'kraefte',
+  'abloesung',
 ];
 
 /** Was eine feste Zahlbreite behalten darf, wie oft — und warum. Keine davon ist ein Eingabefeld. */
@@ -65,6 +72,31 @@ const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = 
   'etb/EtbFeldzeile.tsx': {
     anzahl: 3,
     grund: '6-px-Typpunkt in Menü und Typ-Knopf, 32-px-Spalte des Feldworts am Handschirm',
+  },
+  // Einsatzmodule (LLH-1970).
+  'personen/personenSpalten.tsx': {
+    anzahl: 9,
+    grund: 'Spaltenbreiten der Betroffenenliste und der nur vorgelesene Spaltenkopf (1 px)',
+  },
+  'personen/BetroffeneZeile.tsx': { anzahl: 1, grund: 'nur vorgelesener Text (1 px)' },
+  'personen/BetroffenenSeitenleiste.tsx': {
+    anzahl: 1,
+    grund: 'Kürzelspalte der Sichtungsliste',
+  },
+  'personen/Sichtungszeile.tsx': { anzahl: 1, grund: 'Farbfeld der Sichtungskategorie' },
+  'personen/ZeilenSichtung.tsx': {
+    anzahl: 1,
+    grund: 'Popover-Breite aus drei Sichtungsflächen je Reihe',
+  },
+  'kraefte/DauerMitEinstufung.tsx': { anzahl: 1, grund: 'nur vorgelesener Text (1 px)' },
+  'kraefte/EinheitZeichen.tsx': { anzahl: 1, grund: 'Kästchen des taktischen Zeichens' },
+  'abloesung/schichtplan/SchichtplanRaster.tsx': {
+    anzahl: 1,
+    grund: 'senkrechte Jetzt-Linie im Raster',
+  },
+  'abloesung/schichtplan/planEditor.cases.tsx': {
+    anzahl: 3,
+    grund: 'Rechtecke als Testfälle des Planeditors',
   },
 };
 
@@ -140,7 +172,7 @@ function sammleDateien(bereich: string): Quelle[] {
 
 const QUELLEN = BEREICHE.flatMap(sammleDateien);
 
-describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => {
+describe('Feld-Wächter: Felder im Verwaltungsteil und den umgestellten Einsatzmodulen (Spec `feldbreiten`)', () => {
   it('kein Form.Item, keine Breite am Eingabefeld, keine feste Zahlbreite außer zugelassen', () => {
     const meldungen = feldBefunde(QUELLEN, ZUGELASSEN);
     expect(meldungen, meldungen.join('\n')).toEqual([]);
@@ -149,6 +181,7 @@ describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => 
   it('sieht die Bereiche wirklich — sonst ist der Wächter eine Attrappe', () => {
     expect(QUELLEN.length).toBeGreaterThan(50);
     expect(QUELLEN.some((q) => q.pfad === 'stammdaten/FahrzeugDetailPage.tsx')).toBe(true);
+    expect(QUELLEN.some((q) => q.pfad === 'personen/AufnahmeFelder.tsx')).toBe(true);
   });
 
   describe('Regeln an Texten', () => {

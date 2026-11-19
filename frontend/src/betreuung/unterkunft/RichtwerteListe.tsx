@@ -1,9 +1,9 @@
-import { Space, Typography } from 'antd';
+import { Typography } from 'antd';
 import { useEffect, useState, type CSSProperties } from 'react';
 import type { RichtwertEbenen, RichtwertHerkunft, UnterkunftRichtwerte } from '../../api/types';
 import { DezimalFeld } from '../../components/DezimalFeld';
 import { MengenFeld } from '../../components/MengenFeld';
-import { Paneel, useRollen } from '../../components/instrument';
+import { Paneel, Stapel, useRollen } from '../../components/instrument';
 import { mitVorgabe, orgVorgabe } from '../../components/vorgabeText';
 import { HerkunftAbzeichen, VomHubGesperrt, type Herkunft } from '../../instanz/herkunft';
 import { menge } from './ErgebnisAnzeige';
@@ -74,7 +74,7 @@ export default function RichtwerteListe({
 }: Props) {
   const nachSchluessel = new Map((ebenen?.werte ?? []).map((w) => [w.schluessel, w]));
   return (
-    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+    <Stapel abstand="lg">
       {GRUPPEN.map((g) => (
         <Paneel key={g} titel={GRUPPE_TITEL[g]}>
           {RICHTWERTE_BASIS.filter((b) => b.gruppe === g).map((b) => (
@@ -91,7 +91,7 @@ export default function RichtwerteListe({
           ))}
         </Paneel>
       ))}
-    </Space>
+    </Stapel>
   );
 }
 
@@ -159,10 +159,10 @@ function RichtwertZeile({
 
   return (
     <div style={zeile} data-schluessel={b.schluessel}>
-      <Space size={token.marginSM} wrap>
+      <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
         <Typography.Text>{b.bezeichnung}</Typography.Text>
         {b.herkunft === 'annahme' && <Marke>Annahme</Marke>}
-      </Space>
+      </Stapel>
       {ebene === 'anzeige' ? (
         <Typography.Text style={{ fontVariantNumeric: 'tabular-nums' }}>
           {richtwertText(wert, b.einheit)}
@@ -178,13 +178,13 @@ function RichtwertZeile({
           {vomHub && <VomHubGesperrt />}
         </div>
       )}
-      <Space size={token.marginSM} wrap>
+      <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
         <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
           {HERKUNFT_LABEL[herkunft]}
           {herkunft !== 'basis' && ` · ${mitVorgabe(richtwertText(b.wert, b.einheit))}`}
         </Typography.Text>
         <HerkunftAbzeichen herkunft={abzeichen} quelle={stammdatenHerkunft?.quelle} />
-      </Space>
+      </Stapel>
       <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
         {b.quelle}
       </Typography.Text>

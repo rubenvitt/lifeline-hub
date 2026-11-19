@@ -22,7 +22,9 @@ import { ErfassungsFormular } from '../components/Erfassung';
 import {
   Datenfeld,
   Datenraster,
+  Feld,
   Schnellerfassungszeile,
+  Stapel,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -244,7 +246,7 @@ export default function Patientenkopf({
       >
         <Datenraster spalten={1} beschriftung="Patientenangaben">
           <Datenfeld label="Sichtung">
-            <Flex vertical gap={token.marginXXS}>
+            <Stapel abstand="xxs">
               <SichtungsAnzeige
                 person={person}
                 bedienbar={erfassbar && darfSichten && angetroffen}
@@ -260,7 +262,7 @@ export default function Patientenkopf({
                     ` · bestätigt: ${letzteSichtung.bestaetigt_name}`}
                 </Typography.Text>
               )}
-            </Flex>
+            </Stapel>
           </Datenfeld>
 
           {/* Anlass der Hilfeleistung (LLH-1566): wer sichten darf, legt ihn fest; am Gerät nur
@@ -308,7 +310,7 @@ export default function Patientenkopf({
           )}
 
           <Datenfeld label={person.aufenthalt || !letzterVerbleib ? 'Aufenthalt' : 'Verbleib'}>
-            <Flex vertical gap={token.marginXS}>
+            <Stapel abstand="xs">
               <span data-lfh="aufenthalt">
                 {person.aufenthalt ? (
                   <>
@@ -331,7 +333,7 @@ export default function Patientenkopf({
                 )}
               </span>
               {modus === 'bedienen' && (
-                <Flex gap={token.marginSM} wrap>
+                <Stapel richtung="zeile" umbruch abstand="sm">
                   {aufenthaltAktionen}
                   {/* Ein Eigentransport endet mit der quittierten Übergabe (LLH-1332). */}
                   {bedienbar && angetroffen && person.versorgung === 'unterwegs' && (
@@ -353,9 +355,9 @@ export default function Patientenkopf({
                       Verbleib erfassen
                     </Button>
                   )}
-                </Flex>
+                </Stapel>
               )}
-            </Flex>
+            </Stapel>
           </Datenfeld>
 
           <Datenfeld label="Transport">
@@ -521,7 +523,7 @@ export default function Patientenkopf({
       )}
       {offen === 'verletzung' && (
         <section aria-label="Verletzung markieren" data-lfh="verletzung-paneel">
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             <Koerperschema
               einsatzId={einsatzId}
               verletzungen={person.verletzungen ?? []}
@@ -537,7 +539,7 @@ export default function Patientenkopf({
                 Schließen
               </Button>
             </div>
-          </Flex>
+          </Stapel>
         </section>
       )}
       {offen === 'massnahme' && (
@@ -885,7 +887,7 @@ function NotizZeile({
         hinweiszeile={<span id={`notiz-folge-${personId}`}>nicht änderbar · nicht im ETB</span>}
       >
         <Flex gap={token.marginXS} style={{ width: '100%' }}>
-          <Form.Item
+          <Feld
             name="text"
             noStyle
             rules={[
@@ -903,7 +905,7 @@ function NotizZeile({
               readOnly={gesperrt}
               count={zeichenGrenze(VERLAUFSNOTIZ_MAX)}
             />
-          </Form.Item>
+          </Feld>
           {!gesperrt && (
             <Button type="primary" htmlType="submit" loading={mutation.isPending}>
               Notiz anlegen

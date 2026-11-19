@@ -28,7 +28,7 @@ import {
   VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX,
 } from '../api/eingabegrenzen';
 import { ErfassungsModal } from '../components/Erfassung';
-import { Augenbraue } from '../components/instrument';
+import { Augenbraue, Feld } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
@@ -208,8 +208,12 @@ export function ausgabeBody(w: AusgabeWerte): AusgabeEingabe {
 
 // ── Bausteine ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * Ganzzahlfeld für EP. Ohne eigene Breite: `Feld` und `DatenfeldEingabe` (in
+ * `ZeitfensterBearbeiten`) ziehen es per Feld-Klasse auf die Zeile.
+ */
 export function anzahlFeld(min = 0) {
-  return <InputNumber min={min} precision={0} style={{ width: '100%' }} />;
+  return <InputNumber min={min} precision={0} />;
 }
 
 /** Eingeklappter Bereich — `forceRender` ist TRAGEND (sonst fehlen die Werte in `onFinish`). */
@@ -250,18 +254,13 @@ function sonderkostFelder(vorschlag?: { hinweis: string | null; beruehrt: (k: Ko
         </Typography.Paragraph>
       )}
       {KOSTFORMEN.map((k) => (
-        <Form.Item key={k} name={['sonderkost', k]} label={KOSTFORM_LABEL[k]}>
+        <Feld key={k} name={['sonderkost', k]} label={KOSTFORM_LABEL[k]}>
           {vorschlag ? (
-            <InputNumber
-              min={0}
-              precision={0}
-              style={{ width: '100%' }}
-              onChange={() => vorschlag.beruehrt(k)}
-            />
+            <InputNumber min={0} precision={0} onChange={() => vorschlag.beruehrt(k)} />
           ) : (
             anzahlFeld()
           )}
-        </Form.Item>
+        </Feld>
       ))}
     </>
   );
@@ -428,7 +427,7 @@ export function ZeitfensterDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<ZeitfensterWerte>
+      <Feld<ZeitfensterWerte>
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
@@ -440,16 +439,11 @@ export function ZeitfensterDialog({
           placeholder="z. B. Mittag"
           count={zeichenGrenze(VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX)}
         />
-      </Form.Item>
-      <Form.Item<ZeitfensterWerte>
-        name="zeitraum"
-        label="Zeitraum"
-        required
-        rules={[ZEITRAUM_REGEL]}
-      >
-        <ZeitraumEingabe placeholder={['Beginn', 'Ende']} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item<ZeitfensterWerte>
+      </Feld>
+      <Feld<ZeitfensterWerte> name="zeitraum" label="Zeitraum" required rules={[ZEITRAUM_REGEL]}>
+        <ZeitraumEingabe placeholder={['Beginn', 'Ende']} />
+      </Feld>
+      <Feld<ZeitfensterWerte>
         name="bedarf_kraefte"
         label="Einsatzkräfte (EP)"
         extra={
@@ -461,34 +455,24 @@ export function ZeitfensterDialog({
         }
         rules={[BEDARF_REGEL]}
       >
-        <InputNumber
-          min={0}
-          precision={0}
-          style={{ width: '100%' }}
-          onChange={merke('bedarf_kraefte')}
-        />
-      </Form.Item>
-      <Form.Item<ZeitfensterWerte>
+        <InputNumber min={0} precision={0} onChange={merke('bedarf_kraefte')} />
+      </Feld>
+      <Feld<ZeitfensterWerte>
         name="bedarf_betreute"
         label="Betreute (EP)"
         extra={vorschlagHilfe(vorschlag.betreute, true)}
         rules={[BEDARF_REGEL]}
       >
-        <InputNumber
-          min={0}
-          precision={0}
-          style={{ width: '100%' }}
-          onChange={merke('bedarf_betreute')}
-        />
-      </Form.Item>
+        <InputNumber min={0} precision={0} onChange={merke('bedarf_betreute')} />
+      </Feld>
       {eingeklappt(
         sonderkostKopf
           ? `Weitere Personen und Sonderkost · ${sonderkostKopf}`
           : 'Weitere Personen und Sonderkost',
         <>
-          <Form.Item<ZeitfensterWerte> name="bedarf_weitere" label="Weitere Personen (EP)">
+          <Feld<ZeitfensterWerte> name="bedarf_weitere" label="Weitere Personen (EP)">
             {anzahlFeld()}
-          </Form.Item>
+          </Feld>
           {sonderkostFelder({
             hinweis: skHinweis,
             beruehrt: (k) => {
@@ -500,15 +484,11 @@ export function ZeitfensterDialog({
       {eingeklappt(
         stellenKopf,
         <>
-          <Form.Item<ZeitfensterWerte>
-            name="verpflegungsart"
-            label="Art"
-            style={hasStellen ? undefined : { marginBottom: 0 }}
-          >
+          <Feld<ZeitfensterWerte> name="verpflegungsart" label="Art">
             <Select allowClear placeholder="ohne Angabe" options={VERPFLEGUNGSART_OPTIONEN} />
-          </Form.Item>
+          </Feld>
           {hasStellen && (
-            <Form.Item<ZeitfensterWerte>
+            <Feld<ZeitfensterWerte>
               name="stelle_ids"
               label="Stellen"
               rules={[
@@ -518,10 +498,9 @@ export function ZeitfensterDialog({
                   message: `Höchstens ${VERPFLEGUNG_STELLEN_JE_ZEITFENSTER_MAX} Stellen`,
                 },
               ]}
-              style={{ marginBottom: 0 }}
             >
               <Select mode="multiple" placeholder="einsatzweit" options={stellenOptionen} />
-            </Form.Item>
+            </Feld>
           )}
         </>,
         { offen: stellenOffen, setOffen: setStellenOffen },
@@ -654,7 +633,7 @@ export function AusgabeDialog({
         Bedarf {zf.bedarf.gesamt} · ausgegeben {zf.ausgegeben.gesamt} · fehlt {zf.fehlmenge.gesamt}{' '}
         EP
       </Typography.Paragraph>
-      <Form.Item<AusgabeWerte>
+      <Feld<AusgabeWerte>
         name="menge"
         label="Menge (EP)"
         rules={[
@@ -668,40 +647,40 @@ export function AusgabeDialog({
         ]}
       >
         {anzahlFeld(1)}
-      </Form.Item>
+      </Feld>
       {empfaengerGruppen.length > 0 && (
-        <Form.Item<AusgabeWerte> name="empfaenger" label="Empfänger">
+        <Feld<AusgabeWerte> name="empfaenger" label="Empfänger">
           <Select<string>
             allowClear
             placeholder="ohne Empfänger"
             options={empfaengerGruppen}
             onChange={waehleEmpfaenger}
           />
-        </Form.Item>
+        </Feld>
       )}
       {festeStelle ? (
-        <Form.Item<AusgabeWerte> label="Stelle">
+        <Feld<AusgabeWerte> label="Stelle">
           <span data-lfh="nachtrag-stelle-fest">{festeStelle.bezeichnung}</span>
-        </Form.Item>
+        </Feld>
       ) : (
         hasStellen && (
-          <Form.Item<AusgabeWerte> name="verpflegungsstelle_id" label="Stelle">
+          <Feld<AusgabeWerte> name="verpflegungsstelle_id" label="Stelle">
             <Select
               allowClear
               placeholder="ohne Stelle"
               options={nachtragStellenOptionen(stellen, zf)}
             />
-          </Form.Item>
+          </Feld>
         )
       )}
-      <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
+      <Feld<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
-      </Form.Item>
+      </Feld>
       {eingeklappt(
         ['Weitere Angaben', ...abweichungen].join(' · '),
         <>
           {stelleId == null && (
-            <Form.Item<AusgabeWerte>
+            <Feld<AusgabeWerte>
               name="ort"
               label={ortLabel}
               rules={[zeichenRegel(VERPFLEGUNG_ORT_MAX, ortLabel)]}
@@ -723,30 +702,29 @@ export function AusgabeDialog({
               ) : (
                 <Input count={zeichenGrenze(VERPFLEGUNG_ORT_MAX)} />
               )}
-            </Form.Item>
+            </Feld>
           )}
           {sonderkostFelder()}
           {nachforderungen != null && (
-            <Form.Item<AusgabeWerte> name="nachforderung_id" label="Nachforderung">
+            <Feld<AusgabeWerte> name="nachforderung_id" label="Nachforderung">
               <Select
                 allowClear
                 placeholder="ohne Nachforderung"
                 options={[...nachforderungen]}
                 notFoundContent="Keine Nachforderungen im Einsatz"
               />
-            </Form.Item>
+            </Feld>
           )}
-          <Form.Item<AusgabeWerte>
+          <Feld<AusgabeWerte>
             name="bemerkung"
             label="Bemerkung"
             rules={[zeichenRegel(VERPFLEGUNG_BEMERKUNG_MAX, 'Bemerkung')]}
-            style={{ marginBottom: 0 }}
           >
             <Input.TextArea
               autoSize={{ minRows: 2 }}
               count={zeichenGrenze(VERPFLEGUNG_BEMERKUNG_MAX)}
             />
-          </Form.Item>
+          </Feld>
         </>,
         { offen: weitereOffen, setOffen: setWeitereOffen },
       )}
