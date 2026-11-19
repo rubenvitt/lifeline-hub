@@ -1,4 +1,5 @@
 pub mod org;
+pub mod praesenz;
 pub mod strom;
 
 use crate::wire_enum::wire_enum;
@@ -406,6 +407,10 @@ pub struct LiveHub {
     /// ([`Self::web_push_einrichten`]). Hier, weil jede Benachrichtigung über den Hub zugestellt
     /// wird und `benachrichtigung::melden` sonst an jedem Aufrufer einen Parameter mehr bräuchte.
     web_push: Arc<std::sync::OnceLock<crate::web_push::WebPush>>,
+    /// Wer gerade welche Angabe bearbeitet (LLH-1946, Entwurf D3): nur im Speicher.
+    praesenz: Arc<praesenz::PraesenzSpeicher>,
+    /// Geänderte Präsenzstände, am Replay-Ring vorbei (Entwurf D2): ohne Id, ohne Nachlieferung.
+    praesenz_tx: broadcast::Sender<praesenz::PraesenzStand>,
 }
 
 impl Default for LiveHub {
@@ -482,7 +487,69 @@ impl LiveHub {
             sitzung_ende: broadcast::channel(256).0,
             stroeme: strom::StromZulassung::neu(grenzen),
             web_push: Arc::default(),
+            praesenz: Arc::default(),
+            praesenz_tx: broadcast::channel(256).0,
         }
+    }
+
+    /// Beginnt oder verlängert die Präsenz eines Fensters (LLH-1946) und verteilt den Stand,
+    /// wenn er sich geändert hat — auch den eines anderen Einsatzes, den das Fenster verlassen hat.
+    pub fn praesenz_setzen(
+        &self,
+        einsatz_id: i64,
+        eintrag: praesenz::PraesenzEintrag,
+    ) -> Result<(), crate::error::AppError> {
+        let (geaendert, vorgaenger) =
+            self.praesenz
+                .setze_mit_vorgaenger(einsatz_id, eintrag, Instant::now())?;
+        if let Some(alt) = vorgaenger {
+            self.praesenz_verteilen(alt);
+        }
+        if geaendert {
+            self.praesenz_verteilen(einsatz_id);
+        }
+        Ok(())
+    }
+
+    /// Beendet die Präsenz eines Fensters in diesem Einsatz; verteilt nur, wenn es eine gab.
+    pub fn praesenz_entfernen(&self, einsatz_id: i64, benutzer_id: i64, fenster: &str) {
+        if self.praesenz.entferne(einsatz_id, benutzer_id, fenster) {
+            self.praesenz_verteilen(einsatz_id);
+        }
+    }
+
+    /// Der ungefilterte Präsenzstand eines Einsatzes (für den Stand beim Verbinden).
+    pub fn praesenz_stand(&self, einsatz_id: i64) -> praesenz::PraesenzStand {
+        self.praesenz.stand(einsatz_id)
+    }
+
+    /// Abonniert geänderte Präsenzstände aller Einsätze; gefiltert wird beim Abonnenten.
+    pub fn abonniere_praesenz(&self) -> broadcast::Receiver<praesenz::PraesenzStand> {
+        self.praesenz_tx.subscribe()
+    }
+
+    /// Entfernt Abgelaufenes und verteilt die betroffenen Stände.
+    pub fn praesenz_raeumen(&self, jetzt: Instant) {
+        for einsatz_id in self.praesenz.raeume(jetzt) {
+            self.praesenz_verteilen(einsatz_id);
+        }
+    }
+
+    fn praesenz_verteilen(&self, einsatz_id: i64) {
+        // Ohne Abonnenten ist `send` ein Fehler ohne Folgen.
+        let _ = self.praesenz_tx.send(self.praesenz.stand(einsatz_id));
+    }
+
+    /// Startet den Aufräumtakt der Präsenz (nur im Server-Lauf, wie [`Self::starte_kanal_sweep`]).
+    pub fn starte_praesenz_sweep(&self) {
+        let hub = self.clone();
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(praesenz::PRAESENZ_RAEUM_TAKT);
+            loop {
+                ticker.tick().await;
+                hub.praesenz_raeumen(Instant::now());
+            }
+        });
     }
 
     /// Richtet Web Push für diesen Hub ein (LLH-1223, nur beim Start mit `--web-push`). Ein
