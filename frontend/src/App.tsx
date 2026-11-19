@@ -123,6 +123,7 @@ import BereitstellungsraeumePage from './pages/bereitstellungsraum/Bereitstellun
 import BereitstellungsraeumeDefault from './pages/bereitstellungsraum/BereitstellungsraeumeDefault';
 import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import AdminLayout from './admin/AdminLayout';
+import { VerlaufMerken } from './routing/VerlaufMerken';
 import DemoDatenPage from './admin/DemoDatenPage';
 import AufbewahrungUebersicht from './aufbewahrung/AufbewahrungUebersicht';
 import ZugangsprotokollPage from './zugangsprotokoll/ZugangsprotokollPage';
@@ -265,6 +266,8 @@ function BetriebsLayout() {
           (nufmon70 D1, `frontend/AGENTS.md`, Rahmen, „Sprunglink zum Inhalt“). */}
       <SprungZumInhalt />
       <LiveStatusBanner benutzerId={benutzer?.id} klebend />
+      {/* Herkunft je Verlaufseintrag für den Rückweg im Ortspfad (LLH-1997, `ListenRueckweg`). */}
+      <VerlaufMerken />
       <Outlet />
     </>
   );
