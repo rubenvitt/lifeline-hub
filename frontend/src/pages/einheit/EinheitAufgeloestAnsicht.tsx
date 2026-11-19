@@ -11,6 +11,8 @@ import {
   Datenraster,
   monoStil,
   Paneel,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -66,9 +68,15 @@ export default function EinheitAufgeloestAnsicht({
     minHeight: token.controlHeight,
   } as const;
   const nebentext = (text: string | null | undefined) =>
-    text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
+    text ? (
+      <Textstufe stufe="textKlein" ton="gedaempft">
+        {text}
+      </Textstufe>
+    ) : null;
   const leer = (text: string) => (
-    <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{text}</span>
+    <Textstufe stufe="textKlein" ton="gedaempft">
+      {text}
+    </Textstufe>
   );
 
   const person = (p: LetztePerson) => (
@@ -136,7 +144,7 @@ export default function EinheitAufgeloestAnsicht({
             <div role="group" aria-label="Ohne Fahrzeug">
               {fahrzeuge.length > 0 && (
                 <div style={zeile}>
-                  <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
+                  <Augenbraue>Ohne Fahrzeug</Augenbraue>
                 </div>
               )}
               {personen(ohneFahrzeug)}
@@ -184,7 +192,7 @@ export default function EinheitAufgeloestAnsicht({
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={hinweis ?? undefined}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <Paneel titel="Kopfdaten">
           <Datenraster beschriftung="Kopfdaten">
             <Datenfeld label="Aufgelöst" mono>
@@ -214,7 +222,7 @@ export default function EinheitAufgeloestAnsicht({
             lesend
           />
         </Paneel>
-      </div>
+      </Stapel>
     </EinsatzSeite>
   );
 }

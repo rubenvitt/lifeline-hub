@@ -3,18 +3,7 @@ import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { abgleichStatus } from '../theme/statusFarben';
 import SichtungsTag from '../components/SichtungsTag';
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Collapse,
-  Flex,
-  Modal,
-  Space,
-  Spin,
-  Typography,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Collapse, Modal, Spin, Typography } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import {
   istNichtGefunden,
@@ -73,6 +62,7 @@ import {
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { flaeche } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
+import { Stapel } from '../components/instrument';
 import Knopfreihe from '../components/instrument/Knopfreihe';
 
 /**
@@ -456,7 +446,7 @@ export default function PersonenDetailPage() {
    */
   function verlaufBlock(person: PersonDetail) {
     return (
-      <Space orientation="vertical" style={{ width: '100%' }} size="large">
+      <Stapel abstand="lg">
         {darfSchreiben &&
           !person.storniert_at &&
           person.aktuelle_sichtung === 'tot' &&
@@ -570,7 +560,7 @@ export default function PersonenDetailPage() {
             </ul>
           </div>
         )}
-      </Space>
+      </Stapel>
     );
   }
 
@@ -607,7 +597,7 @@ export default function PersonenDetailPage() {
 
   function stammdatenSpalte(person: PersonDetail) {
     return (
-      <Space orientation="vertical" style={{ width: '100%' }} size="large">
+      <Stapel abstand="lg">
         {/* Feldweise in der Ansicht (LLH-1103); am Personenwechsel neu, damit kein Entwurf
             mitwandert. */}
         <Personendaten
@@ -690,7 +680,7 @@ export default function PersonenDetailPage() {
               (abschnitt.key !== 'anhaenge' || darf('person-anhaenge')),
           )}
         />
-      </Space>
+      </Stapel>
     );
   }
 
@@ -824,7 +814,7 @@ export default function PersonenDetailPage() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (veraltet || p.storniert_at != null || seitenGruende.length > 0) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             {veraltet && (
               <SeitenStandVeraltet
                 onWiederholen={() => {
@@ -842,7 +832,7 @@ export default function PersonenDetailPage() {
                 fallback={g.fallback}
               />
             ))}
-          </Flex>
+          </Stapel>
         )
       }
       dataUpdatedAt={gemeinsamerDatenstand(detailQuery.dataUpdatedAt, auditQuery.dataUpdatedAt)}
@@ -858,12 +848,12 @@ export default function PersonenDetailPage() {
           : undefined
       }
       titel={
-        <Space>
+        <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
           Person {registrierAnzeige(p.registrier_nr)}
           <Status darstellung={personStatusDarstellung(p.status)} />
           {p.aktuelle_sichtung && <SichtungsTag kategorie={p.aktuelle_sichtung} />}
           {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
-        </Space>
+        </Stapel>
       }
       breadcrumb={
         darf('fremde-module') && (
@@ -900,7 +890,7 @@ export default function PersonenDetailPage() {
     >
       {/* Eine Spalte (LLH-1094, Spec `personen-detail`): zuerst der Patientenkopf mit den
           Patientenfragen, dann Verlauf, Personendaten und die eingeklappten Abschnitte. */}
-      <Flex vertical gap={token.marginLG}>
+      <Stapel abstand="lg">
         <Patientenkopf
           key={personSchluessel}
           einsatzId={einsatzId}
@@ -923,7 +913,7 @@ export default function PersonenDetailPage() {
           </Typography.Text>
           {stammdatenSpalte(p)}
         </div>
-      </Flex>
+      </Stapel>
 
       {/* Beide Rückfragen warten auf die Antwort (design.md D3): sie schließen erst beim Erfolg,
           bis dahin sind ihre Auswege gesperrt, und eine Ablehnung steht in ihnen. */}

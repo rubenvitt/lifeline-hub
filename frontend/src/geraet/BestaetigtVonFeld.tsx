@@ -1,9 +1,9 @@
-import { Form } from 'antd';
 import { queryOptions, useQuery } from '@tanstack/react-query';
 import { ladeBestaetiger } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Bestaetiger, GeraetAnzeige } from '../api/types';
 import { useAuthOptional } from '../auth/AuthContext';
+import { Feld } from '../components/instrument';
 import { Select } from '../components/Select';
 import { personLabel } from '../kraefte/einsatzfunktionKern';
 
@@ -53,12 +53,12 @@ export default function BestaetigtVonFeld({ einsatzId }: { einsatzId: number }) 
   const query = useQuery(bestaetigerAbfrage(einsatzId, aktiv));
   if (!aktiv) return null;
   return (
-    <Form.Item label="Bestätigt von" name={BESTAETIGT_FELD}>
+    <Feld label="Bestätigt von" name={BESTAETIGT_FELD}>
       <Select<number>
         allowClear
         loading={query.isPending}
         options={bestaetigerOptionen(query.data ?? [])}
       />
-    </Form.Item>
+    </Feld>
   );
 }

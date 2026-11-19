@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Button, Space } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Paneel, useRollen } from '../components/instrument';
+import { Paneel, Stapel } from '../components/instrument';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -291,7 +291,6 @@ function EinheitAnsicht({
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { token } = useRollen();
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const freigaben = useModulFreigaben(einsatzId);
   const rechte = buildEinheitRechte(darfSchreiben, freigaben);
@@ -582,7 +581,7 @@ function EinheitAnsicht({
         materialQuery.dataUpdatedAt,
       )}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <EinheitGliederung onSprung={gliederung.springe} />
 
         {/* Offene Übernahme (LLH-1075, D14): zuoberst, vor der Besatzung (LLH-1797), nur mit
@@ -738,7 +737,7 @@ function EinheitAnsicht({
             onStornieren={() => stornieren.mutateAsync()}
           />
         )}
-      </div>
+      </Stapel>
     </EinsatzSeite>
   );
 }

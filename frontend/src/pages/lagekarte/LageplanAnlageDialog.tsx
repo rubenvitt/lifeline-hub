@@ -11,7 +11,8 @@
  * Zurück: Schließen hielte den Upload nicht auf.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { App, Button, Empty, Modal, Radio, Space, Spin, theme } from 'antd';
+import { App, Button, Empty, Modal, Radio, Spin, theme } from 'antd';
+import { Stapel } from '../../components/instrument';
 import Knopfreihe from '../../components/instrument/Knopfreihe';
 import dayjs from 'dayjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -234,13 +235,13 @@ export default function LageplanAnlageDialog({
           disabled={laeuft}
           aria-label="Ziel der Anlage"
         >
-          <Space orientation="vertical">
+          <Stapel abstand="xs">
             {ziele.map((z) => (
               <Radio key={z.schluessel} value={z.schluessel}>
                 {z.art === 'neu' ? 'Neuer Lagevortrag' : z.titel}
               </Radio>
             ))}
-          </Space>
+          </Stapel>
         </Radio.Group>
       )}
       {listenFehler != null && (

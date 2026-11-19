@@ -5,7 +5,7 @@ import { loadBrVerlauf } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrVerlaufEintrag } from '../../api/types';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { monoStil, NUR_VORLESER, useRollen } from '../../components/instrument';
+import { monoStil, NUR_VORLESER, Stapel, Textstufe, useRollen } from '../../components/instrument';
 import {
   PANEEL_FEHLER_TEXT,
   PANEEL_FEHLER_TITEL,
@@ -36,7 +36,7 @@ interface BrVerlaufProps {
  */
 export default function BrVerlauf({ einsatzId, brId, bezeichnung }: BrVerlaufProps) {
   const [isOpen, setOpen] = useState(false);
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const query = useQuery({
     queryKey: einsatzKeys.brVerlauf(einsatzId, brId),
     queryFn: () => loadBrVerlauf(einsatzId, brId),
@@ -47,18 +47,18 @@ export default function BrVerlauf({ einsatzId, brId, bezeichnung }: BrVerlaufPro
   let body;
   if (query.isError) {
     body = (
-      <div
-        role="alert"
-        data-lfh="br-verlauf-fehler"
-        style={{ ...paddingStyle, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
-      >
-        <b style={{ color: rollen.alarmText, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
-        <span style={{ color: rollen.gedaempft, fontSize: 12 }}>
-          Verlauf konnte nicht geladen werden. {PANEEL_FEHLER_TEXT}
-        </span>
-        <span>
-          <Button onClick={() => void query.refetch()}>{PANEEL_NEULADEN}</Button>
-        </span>
+      <div role="alert" data-lfh="br-verlauf-fehler" style={paddingStyle}>
+        <Stapel abstand="xs">
+          <Textstufe stufe="seitentitel" ton="alarm">
+            {PANEEL_FEHLER_TITEL}
+          </Textstufe>
+          <Textstufe stufe="textKlein" ton="gedaempft">
+            Verlauf konnte nicht geladen werden. {PANEEL_FEHLER_TEXT}
+          </Textstufe>
+          <span>
+            <Button onClick={() => void query.refetch()}>{PANEEL_NEULADEN}</Button>
+          </span>
+        </Stapel>
       </div>
     );
   } else if (query.isPending) {
@@ -130,9 +130,9 @@ function VerlaufZeile({ eintrag: e }: { eintrag: BrVerlaufEintrag }) {
         {e.objekt_name}
       </span>
       {e.notiz && (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           {e.notiz}
-        </Typography.Text>
+        </Textstufe>
       )}
     </li>
   );

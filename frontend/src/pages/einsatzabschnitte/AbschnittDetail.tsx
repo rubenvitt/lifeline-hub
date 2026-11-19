@@ -12,6 +12,8 @@ import {
   Datenfeld,
   Datenraster,
   Segmentleiste,
+  Stapel,
+  Textstufe,
   monoStil,
   useRollen,
   type SegmentOption,
@@ -286,7 +288,7 @@ function LagezustandSelect({
   darfSchreiben: boolean;
   onPatch: AbschnittPatchHandler;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const [pending, setPending] = useState<LagezustandValue | null>(null);
   const [error, setError] = useState<unknown>(null);
   const isSendingRef = useRef(false);
@@ -297,7 +299,7 @@ function LagezustandSelect({
     return value ? (
       <Status darstellung={abschnittLagezustand[value]} />
     ) : (
-      <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
+      <Textstufe ton="gedaempft">nicht beurteilt</Textstufe>
     );
   }
 
@@ -342,15 +344,8 @@ function LagezustandSelect({
   }
 
   return (
-    // `flex-start`: gestreckt zöge die Leiste (`inline-flex`) ihren Fugengrund über die ganze Zeile.
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: token.marginXS,
-      }}
-    >
+    // `start`: gestreckt zöge die Leiste (`inline-flex`) ihren Fugengrund über die ganze Zeile.
+    <Stapel abstand="xs" ausrichten="start">
       <Segmentleiste<LagezustandValue>
         beschriftung="Lagezustand"
         optionen={options}
@@ -358,6 +353,6 @@ function LagezustandSelect({
         onWechsel={(w) => void select(w)}
       />
       <ZeilenFehler fehler={error} />
-    </div>
+    </Stapel>
   );
 }

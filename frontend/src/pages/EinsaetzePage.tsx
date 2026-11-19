@@ -47,7 +47,14 @@ import { einsatzStatus } from '../theme/statusFarben';
 // Ausfall wäre in keinem Test sichtbar.
 import '../theme/sprache.css';
 import './EinsaetzePage.css';
-import { monoStil, Sammelbanner, UebungsMarke, useRollen } from '../components/instrument';
+import {
+  Feld,
+  monoStil,
+  Sammelbanner,
+  Stapel,
+  UebungsMarke,
+  useRollen,
+} from '../components/instrument';
 import {
   flachZufluss,
   useZuflussSchleuse,
@@ -485,7 +492,7 @@ function EinsaetzeInhalt() {
           </Link>
         </div>
         <div className="lfh-einsatzkachel__leib">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}>
+          <Stapel richtung="zeile" umbruch abstand="xs">
             <Status darstellung={einsatzStatus[e.status]} />
             {/* Eine Übung trägt die Übungsmarke statt des neutralen Tags (LLH-1725, Spec
                 `uebungsmarke`); die übrigen Arten bleiben grau. */}
@@ -497,7 +504,7 @@ function EinsaetzeInhalt() {
             {/* Mit Kontext: allein gelesen hielte man „Einsatzleitung“ für eine Eigenschaft des
                 Einsatzes, nicht für die eigene Rolle (LFH-946). */}
             {e.meine_rolle && <Marke>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
-          </div>
+          </Stapel>
           {/* Ort und Beginn beantworten „welcher ist meiner?". Das Icon trägt eine
               `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}
           {e.einsatzort && (
@@ -680,7 +687,7 @@ function EinsaetzeInhalt() {
         }}
       >
         {vorlagen.length > 0 && (
-          <Form.Item
+          <Feld
             label="Vorlage"
             htmlFor={vorlageFeldId}
             extra={<span data-lfh="anlage-vorlage-module">{moduleText(vorlageAusgeblendet)}</span>}
@@ -692,9 +699,9 @@ function EinsaetzeInhalt() {
               options={vorlagenOptionen(vorlagen, 'Alle Module')}
               onChange={(wert) => setzeVorlage({ vorlageId: vorlageAusWert(wert), vonHand: true })}
             />
-          </Form.Item>
+          </Feld>
         )}
-        <Form.Item
+        <Feld
           label="Bezeichnung"
           name="bezeichnung"
           rules={[{ required: true, message: 'Bitte Bezeichnung eingeben' }]}
@@ -702,8 +709,8 @@ function EinsaetzeInhalt() {
           {/* Ausdrückliches Fokusziel: sonst fokussiert die Erfassungs-Hülle die Vorlage darüber
               (LLH-1816, Design-Doc D3). */}
           <Input data-erfassung-fokus="" />
-        </Form.Item>
-        <Form.Item label="Stichwort" name="stichwort">
+        </Feld>
+        <Feld label="Stichwort" name="stichwort">
           <AutoComplete
             options={stichwortOptionen}
             allowClear
@@ -714,25 +721,25 @@ function EinsaetzeInhalt() {
               setzeVorlage(wahlNachStichwort(vorlageWahl, text, stichwortVorschlaege, vorlagen));
             }}
           />
-        </Form.Item>
-        <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
+        </Feld>
+        <Feld label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
           <Select
             options={EINSATZART_OPTIONEN}
             onChange={() => {
               einsatzartVonHand.current = true;
             }}
           />
-        </Form.Item>
-        <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
+        </Feld>
+        <Feld label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item label="Einsatzort" name="einsatzort">
+        </Feld>
+        <Feld label="Einsatzort" name="einsatzort">
           <Ortsfeld
             suchen={sucheOrtInOrg}
             suchSchluessel={globalKeys.orgOrtSuche}
             karte={{ etikett: 'Einsatzort', hoehe: AUSSCHNITT_ANLEGEN_PX }}
           />
-        </Form.Item>
+        </Feld>
         {/* Gedämpfte Zeile unter den Feldern: das Schichtmodell, das der Einsatz bekommt (LLH-1122,
             LLH-1313). Die Vorlage steht seit LLH-1816 als oberstes Feld. */}
         {schichtmodellText && (

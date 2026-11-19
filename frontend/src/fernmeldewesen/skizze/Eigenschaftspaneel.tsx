@@ -31,8 +31,11 @@ import {
   Augenbraue,
   Datenfeld,
   Datenraster,
+  FELD_KLASSE,
   Paneel,
   Segmentleiste,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../../components/instrument/index';
 import { Select } from '../../components/Select';
@@ -156,15 +159,17 @@ function AuswahlAngabe<W extends string>({
       darfSchreiben={darf}
       onSpeichern={onSpeichern}
       eingabe={({ feld, popup, value, onChange }) => (
-        <Select<W | null>
-          {...feld}
-          {...popup}
-          allowClear
-          style={{ width: '100%' }}
-          value={value}
-          options={optionen.map((o) => ({ value: o.value, label: o.label }))}
-          onChange={(w) => onChange(w ?? null)}
-        />
+        // Die Hülle trägt die Feldbreite (`frontend/AGENTS.md`, Bausteine, `Feld`).
+        <div className={FELD_KLASSE}>
+          <Select<W | null>
+            {...feld}
+            {...popup}
+            allowClear
+            value={value}
+            options={optionen.map((o) => ({ value: o.value, label: o.label }))}
+            onChange={(w) => onChange(w ?? null)}
+          />
+        </div>
       )}
     />
   );
@@ -394,7 +399,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                     if (!sch) return null;
                     return (
                       <li key={k.key} style={{ marginBlockEnd: token.marginXS }}>
-                        <Flex gap={token.marginSM} wrap align="center">
+                        <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
                           <span style={{ fontFamily: token.fontFamilyCode }}>{sch.zeichen}</span>
                           {stelle.art === 'extern' && darf ? (
                             <Segmentleiste<Verbindungsstatus>
@@ -417,7 +422,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                               Lösen
                             </Button>
                           ) : null}
-                        </Flex>
+                        </Stapel>
                       </li>
                     );
                   })}
@@ -686,9 +691,9 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                 }
               />
               {!sf?.herausgeber ? (
-                <div
-                  style={{ color: rollen.gedaempft }}
-                >{`Vorgabe: ${props.einsatzbezeichnung}`}</div>
+                <Textstufe als="div" ton="gedaempft">
+                  {`Vorgabe: ${props.einsatzbezeichnung}`}
+                </Textstufe>
               ) : null}
             </Datenfeld>
             <Datenfeld label="VS-Vermerk">
@@ -752,10 +757,12 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
       );
     } else {
       inhalt = (
-        <Flex vertical align="start" gap={token.marginSM} data-lfh="skizze-paneel-leer">
-          <span style={{ color: rollen.gedaempft }}>Kein Element gewählt</span>
-          <Button onClick={() => onWahl(SCHRIFTFELD)}>Schriftfeld wählen</Button>
-        </Flex>
+        <div data-lfh="skizze-paneel-leer">
+          <Stapel abstand="sm" ausrichten="start">
+            <Textstufe ton="gedaempft">Kein Element gewählt</Textstufe>
+            <Button onClick={() => onWahl(SCHRIFTFELD)}>Schriftfeld wählen</Button>
+          </Stapel>
+        </div>
       );
     }
 

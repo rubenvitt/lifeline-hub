@@ -34,6 +34,8 @@ import {
   listenZeileStil,
   monoStil,
   schriftStil,
+  Stapel,
+  Textstufe,
   useRollen,
   type DashboardZustand,
   type Gliederungszeile,
@@ -839,9 +841,9 @@ export default function UeberblickPage() {
                           fuss={
                             // Im Leerzustand steht der Hinweis im Leertext.
                             zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
-                              <span style={{ fontSize: 12, color: rollen.gedaempft }}>
+                              <Textstufe stufe="textKlein" ton="gedaempft">
                                 {markenHinweis}
-                              </span>
+                              </Textstufe>
                             ) : undefined
                           }
                           leerText={
@@ -873,28 +875,13 @@ export default function UeberblickPage() {
                                 <span style={{ ...monoStil('monoGross'), color: markenFarbe(m) }}>
                                   {kurz(m.zeit)}
                                 </span>
-                                <span
-                                  style={{
-                                    ...schriftStil('meta'),
-                                    fontSize: 11,
-                                    color: markenFarbe(m),
-                                  }}
-                                >
+                                <span style={{ ...schriftStil('meta'), color: markenFarbe(m) }}>
                                   {m.wort}
                                 </span>
                               </span>
-                              <span
-                                style={{
-                                  flex: '1 1 auto',
-                                  minWidth: 0,
-                                  fontSize: 12,
-                                  lineHeight: 1.4,
-                                  color: rollen.gedaempft,
-                                  overflowWrap: 'anywhere',
-                                }}
-                              >
+                              <Textstufe stufe="textKlein" ton="gedaempft" umbruch="ueberall">
                                 {m.text}
-                              </span>
+                              </Textstufe>
                             </MarkenZeile>
                           )}
                         />
@@ -950,15 +937,9 @@ export default function UeberblickPage() {
                           }}
                           fuss={
                             zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
-                              <span
-                                style={{
-                                  ...schriftStil('meta'),
-                                  fontSize: 11,
-                                  color: rollen.schwach,
-                                }}
-                              >
+                              <Textstufe stufe="meta" ton="schwach">
                                 Aufträge nicht abrufbar, Auftragstexte fehlen
-                              </span>
+                              </Textstufe>
                             ) : undefined
                           }
                           leerText={
@@ -1044,7 +1025,6 @@ export default function UeberblickPage() {
                                       data-lfh="entscheidung-folge"
                                       style={{
                                         ...schriftStil('meta'),
-                                        fontSize: 11,
                                         letterSpacing: '0.06em',
                                         color: rollen.bedien,
                                       }}
@@ -1143,7 +1123,7 @@ function abschnittGliederung(
     kante: lage ? { farbe: rollenFarbe(lage.rolle, token), rolle: lage.rolle } : null,
     kopf: (
       <>
-        <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere' }}>
+        <span style={{ ...schriftStil('text'), fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
         </span>
         {leitung && <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{leitung}</span>}
@@ -1157,25 +1137,24 @@ function abschnittGliederung(
             ` inkl. Unterabschnitte · ${anzahlWort(zeile.unterabschnitte, 'Unterabschnitt', 'Unterabschnitte')}`}
         </span>
         {(lage || zeile.unterLage || gruende.length > 0) && (
-          <span
-            data-lfh="abschnitt-zustand"
-            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginSM }}
-          >
-            {lage && <Status darstellung={lage} />}
-            {/* Ein schlechter beurteilter Unterabschnitt bekommt dieselbe Form wie der eigene
+          <span data-lfh="abschnitt-zustand">
+            <Stapel als="span" richtung="zeile" umbruch ausrichten="mitte" abstand="sm">
+              {lage && <Status darstellung={lage} />}
+              {/* Ein schlechter beurteilter Unterabschnitt bekommt dieselbe Form wie der eigene
                 Zustand (Rollenrand + Wort), sonst stünde „Unterabschnitt kritisch“ leiser da als ein grünes
                 „planmäßig“. */}
-            {zeile.unterLage && (
-              <Status
-                darstellung={{
-                  ...abschnittLagezustand[zeile.unterLage],
-                  label: `Unterabschnitt ${abschnittLagezustand[zeile.unterLage].label}`,
-                }}
-              />
-            )}
-            {gruende.map((g) => (
-              <Status groesse="klein" key={g.art} ton="alarm" wort={grundWort(g)} />
-            ))}
+              {zeile.unterLage && (
+                <Status
+                  darstellung={{
+                    ...abschnittLagezustand[zeile.unterLage],
+                    label: `Unterabschnitt ${abschnittLagezustand[zeile.unterLage].label}`,
+                  }}
+                />
+              )}
+              {gruende.map((g) => (
+                <Status groesse="klein" key={g.art} ton="alarm" wort={grundWort(g)} />
+              ))}
+            </Stapel>
           </span>
         )}
       </>
@@ -1215,7 +1194,7 @@ function abschnittGliederung(
                 <span
                   title={rueck.inhalt}
                   style={{
-                    fontSize: 11,
+                    ...schriftStil('textKlein'),
                     color: rollen.schwach,
                     minWidth: 0,
                     overflow: 'hidden',
@@ -1227,7 +1206,9 @@ function abschnittGliederung(
                 </span>
               </>
             ) : (
-              <span style={{ fontSize: 11, color: rollen.schwach }}>noch keine Rückmeldung</span>
+              <Textstufe stufe="textKlein" ton="schwach">
+                noch keine Rückmeldung
+              </Textstufe>
             )}
           </span>
         )}

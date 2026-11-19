@@ -5,6 +5,8 @@ import {
   Paneel,
   PaneelZustand,
   monoStil,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
@@ -139,7 +141,9 @@ export default function KraefteOhneBrSidebar({
         </Augenbraue>
         {g.einheiten.map((e) => (
           <div key={`einheit-${e.id}`} data-lfh="br-kraft-zeile" style={kraftZeileStil(token)}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: rollen.text }}>{e.name}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <Textstufe>{e.name}</Textstufe>
+            </span>
             {!schreibgeschuetzt && (
               <Button aria-label={`${e.name} zuweisen`} onClick={() => onZuweisenEinheit(e)}>
                 zuweisen
@@ -192,18 +196,12 @@ export default function KraefteOhneBrSidebar({
           />
         )}
         {verdeckt.length > 0 && (
-          <div
-            data-lfh="br-verdeckte-fehler"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: token.marginXXS,
-              marginBottom: token.marginSM,
-            }}
-          >
-            {verdeckt.map(({ k, name, g }) => (
-              <ZeilenFehler key={k} fehler={g.fehler} fallback={g.fallback} kennung={name} />
-            ))}
+          <div data-lfh="br-verdeckte-fehler" style={{ marginBottom: token.marginSM }}>
+            <Stapel abstand="xxs">
+              {verdeckt.map(({ k, name, g }) => (
+                <ZeilenFehler key={k} fehler={g.fehler} fallback={g.fallback} kennung={name} />
+              ))}
+            </Stapel>
           </div>
         )}
         {/* Eigener Scroll: die Höhenkette endet hier an der Karte, nicht am Layout (vgl. H51) —

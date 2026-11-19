@@ -4,8 +4,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Datenfeld,
   Datenraster,
+  Feld,
+  MetaZeile,
   Paneel,
   SegmentFeld,
+  Stapel,
   Status,
   monoStil,
   useRollen,
@@ -144,7 +147,7 @@ export function UebernahmeEntscheidung({
   const laeuft = bestaetigen.isPending || widersprechen.isPending;
   const beschrieben = ohneNetz ? grundId : undefined;
   return (
-    <Space orientation="vertical" size="small">
+    <Stapel abstand="xs">
       {ohneNetz && ohneNetzGrundId == null && <OhneNetzGrund id={eigeneGrundId} />}
       <Space wrap>
         <Popconfirm
@@ -191,7 +194,7 @@ export function UebernahmeEntscheidung({
       </Space>
       <SpeicherFehler fehler={bestaetigen.error} titel="Nicht bestätigt" />
       <SpeicherFehler fehler={widersprechen.error} titel="Nicht widersprochen" />
-    </Space>
+    </Stapel>
   );
 }
 
@@ -204,7 +207,7 @@ interface NotuebernahmeWerte {
 /** Pflichtgrund einer Notübernahme und des Zurückholens, im Formular des jeweiligen Dialogs. */
 function GrundFeld() {
   return (
-    <Form.Item
+    <Feld
       label="Grund"
       name="grund"
       rules={[
@@ -217,7 +220,7 @@ function GrundFeld() {
         count={zeichenGrenze(FUEHRUNG_GRUND_MAX)}
         placeholder="ohne Verbindung seit 40 min"
       />
-    </Form.Item>
+    </Feld>
   );
 }
 
@@ -638,13 +641,17 @@ export default function FuehrungPaneel({
                 </span>
               }
               description={
-                <span>
-                  {zeit(v.at)}
-                  {v.wer ? ` · ${v.wer}` : ''}
-                  {v.unterzeichner ? ` · unterzeichnet von ${v.unterzeichner}` : ''}
-                  {v.grund ? ` · ${v.grund}` : ''}
-                  {v.bruch_at ? ` · Bruchstelle ${zeit(v.bruch_at)}` : ''}
-                </span>
+                <MetaZeile>
+                  <MetaZeile.Teil mono>{zeit(v.at)}</MetaZeile.Teil>
+                  {v.wer}
+                  {v.unterzeichner ? `unterzeichnet von ${v.unterzeichner}` : ''}
+                  {v.grund}
+                  {v.bruch_at && (
+                    <MetaZeile.Teil>
+                      Bruchstelle <MetaZeile.Zahl>{zeit(v.bruch_at)}</MetaZeile.Zahl>
+                    </MetaZeile.Teil>
+                  )}
+                </MetaZeile>
               }
             />
           </ListenEintrag>
@@ -677,7 +684,7 @@ export default function FuehrungPaneel({
         {moeglich.notuebernahmeMitBeweis && (
           <>
             {moeglich.unterschrift && (
-              <Form.Item label="Beweis" name="beweis">
+              <Feld label="Beweis" name="beweis">
                 <SegmentFeld<'unterschrift' | 'code'>
                   beschriftung="Beweis"
                   optionen={[
@@ -685,10 +692,10 @@ export default function FuehrungPaneel({
                     { wert: 'code', label: 'Code des Gegenübers' },
                   ]}
                 />
-              </Form.Item>
+              </Feld>
             )}
             {(!moeglich.unterschrift || beweisWahl === 'code') && (
-              <Form.Item
+              <Feld
                 label="Code"
                 name="code"
                 rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
@@ -699,7 +706,7 @@ export default function FuehrungPaneel({
                   placeholder="ABCD-EFGH-JKMN-PQRS"
                   style={monoStil('monoGross')}
                 />
-              </Form.Item>
+              </Feld>
             )}
           </>
         )}

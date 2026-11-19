@@ -1,6 +1,6 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
-import { monoStil, Segmentleiste } from '../../components/instrument';
+import { monoStil, Segmentleiste, Stapel, Textstufe } from '../../components/instrument';
 import type { GriffModus } from './bildGriffe';
 import { bandStil } from './KartenFuss';
 
@@ -24,10 +24,9 @@ export interface VerortetMeldung {
  * (ab `lg`), damit beide denselben Wortlaut tragen. Gerendert wird er je Breite nur an einer Stelle.
  */
 export function VerortetInhalt({ meldung }: { meldung: VerortetMeldung }) {
-  const { token } = theme.useToken();
   const { kennung, titel, onZurueck, onBleiben } = meldung;
   return (
-    <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
+    <Stapel abstand="sm">
       <Typography.Text strong>
         {titel ?? (kennung ? `${kennung} verortet` : 'Objekt verortet')}
       </Typography.Text>
@@ -39,7 +38,7 @@ export function VerortetInhalt({ meldung }: { meldung: VerortetMeldung }) {
         )}
         <Button onClick={onBleiben}>Auf der Karte bleiben</Button>
       </Space>
-    </Space>
+    </Stapel>
   );
 }
 
@@ -99,38 +98,43 @@ export function ModusBedienung({
   if (modus.art === 'verortet')
     return bedienung ? <VerortetInhalt meldung={modus.meldung} /> : null;
   return (
-    <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
+    // Knöpfe stehen in einer Hülle: als Kind des Stapels würden sie auf seine Breite gestreckt.
+    <Stapel abstand="sm">
       <Typography.Text strong>{modusTitel(modus)}</Typography.Text>
       {zusatz}
       {bedienung && modus.art === 'platzieren' && (
-        <Button onClick={modus.onAbbrechen}>Abbrechen</Button>
+        <div>
+          <Button onClick={modus.onAbbrechen}>Abbrechen</Button>
+        </div>
       )}
       {bedienung && modus.art === 'zeichen' && (
         <>
           {/* Schalter, Zähler und Beenden teilen eine umbrechende Reihe: jede Zeile mehr hebt
               den Fuß bei 390 px über die Karte. */}
-          <Space wrap>
+          <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
             <Switch
               checked={modus.serie}
               onChange={modus.onSerieWechsel}
               aria-label="Weitere platzieren"
             />
-            <Typography.Text>Weitere platzieren</Typography.Text>
+            <Textstufe>Weitere platzieren</Textstufe>
             {modus.anzahl > 0 && (
               <Typography.Text type="secondary" style={monoStil(token.fontSize)}>
                 {modus.anzahl} platziert
               </Typography.Text>
             )}
-          </Space>
+          </Stapel>
           {/* Solange nichts gesetzt ist, verwirft Beenden nur die Absicht („Abbrechen"); danach
               bleibt das Gesetzte, also „Fertig". */}
-          {modus.anzahl > 0 ? (
-            <Button type="primary" onClick={modus.onFertig}>
-              Fertig
-            </Button>
-          ) : (
-            <Button onClick={modus.onAbbrechen}>Abbrechen</Button>
-          )}
+          <div>
+            {modus.anzahl > 0 ? (
+              <Button type="primary" onClick={modus.onFertig}>
+                Fertig
+              </Button>
+            ) : (
+              <Button onClick={modus.onAbbrechen}>Abbrechen</Button>
+            )}
+          </div>
         </>
       )}
       {bedienung && modus.art === 'bild' && (
@@ -152,7 +156,7 @@ export function ModusBedienung({
           </Button>
         </Space>
       )}
-    </Space>
+    </Stapel>
   );
 }
 

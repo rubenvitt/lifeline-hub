@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Form, Input, InputNumber, Space, Typography, theme } from 'antd';
+import { App, Breadcrumb, Button, Form, Input, InputNumber, Space, Typography } from 'antd';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -74,6 +74,7 @@ import {
   Datenraster,
   Paneel,
   PaneelLink,
+  Stapel,
   monoStil,
 } from '../components/instrument';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -216,7 +217,6 @@ export default function BetreuungsstelleDetailPage() {
 }
 
 function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }) {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const { benutzer } = useAuth();
   const { message } = App.useApp();
@@ -634,7 +634,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       {!bearbeiten && (
         <Datenfeld label="Koordinate">
           {verortet ? (
-            <Space wrap size="small">
+            <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               <span style={monoStil('monoGross')}>
                 {s.lat!.toFixed(5)}, {s.lon!.toFixed(5)}
               </span>
@@ -643,7 +643,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
                   Auf Karte zeigen
                 </Link>
               )}
-            </Space>
+            </Stapel>
           ) : (
             <Typography.Text type="secondary">nicht verortet</Typography.Text>
           )}
@@ -687,11 +687,11 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   return (
     <EinsatzSeite
       titel={
-        <Space wrap size={token.marginSM}>
+        <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>Betreuungsstelle {s.bezeichnung}</span>
           <Marke>{ART_LABEL[s.art]}</Marke>
           <Status darstellung={betreuungsstelleStatus[s.status]} />
-        </Space>
+        </Stapel>
       }
       dataUpdatedAt={betreuungQuery.dataUpdatedAt}
       breadcrumb={
@@ -719,7 +719,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       }
     >
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
-      <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+      <Stapel abstand="lg">
         {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
         <StelleBelegung stelle={s} namentlich={namentlich} />
         {/* Was die Stelle braucht, direkt unter dem, was sie hat (LLH-1082). */}
@@ -876,7 +876,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
             </Typography.Text>
           )}
         </Paneel>
-      </Space>
+      </Stapel>
 
       {dialog === 'belegung' && (
         <BelegungMeldenDialog

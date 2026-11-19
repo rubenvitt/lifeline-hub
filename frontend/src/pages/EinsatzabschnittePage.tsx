@@ -1,5 +1,5 @@
 import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { App, Breadcrumb, Button, Modal, Space, Tree, type TreeDataNode } from 'antd';
+import { App, Breadcrumb, Button, Modal, Tree, type TreeDataNode } from 'antd';
 import {
   DndContext,
   DragOverlay,
@@ -42,9 +42,11 @@ import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
-  Knopfreihe,
   Paneel,
   Segmentleiste,
+  Stapel,
+  Textstufe,
+  Knopfreihe,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -736,7 +738,7 @@ export default function EinsatzabschnittePage() {
         dataSource={zugeordneteEinheiten}
         renderItem={(e) => (
           <ListenEintrag>
-            <Space>
+            <Stapel richtung="zeile" abstand="xs" ausrichten="mitte">
               {darfSchreiben && (
                 <DragHandle
                   daten={{
@@ -755,11 +757,11 @@ export default function EinsatzabschnittePage() {
                 eigene <StaerkeAnzeige wert={e.ist} />
               </span>
               {e.abschnitt_id == null && e.ueber_einheit_id != null && (
-                <span style={{ color: rollen.gedaempft }}>
+                <Textstufe ton="gedaempft">
                   über {einheitName.get(e.ueber_einheit_id) ?? 'Obereinheit'}
-                </span>
+                </Textstufe>
               )}
-            </Space>
+            </Stapel>
           </ListenEintrag>
         )}
       />
@@ -965,14 +967,10 @@ export default function EinsatzabschnittePage() {
                             {wartet}
                           </Sammelbanner>
                         ) : (
-                          <span
-                            style={{
-                              alignSelf: 'center',
-                              fontSize: token.fontSizeSM,
-                              color: rollen.gedaempft,
-                            }}
-                          >
-                            {zufluss.offen ? 'Live' : 'Live pausiert'}
+                          <span style={{ alignSelf: 'center' }}>
+                            <Textstufe stufe="textKlein" ton="gedaempft">
+                              {zufluss.offen ? 'Live' : 'Live pausiert'}
+                            </Textstufe>
                           </span>
                         )}
                       </div>

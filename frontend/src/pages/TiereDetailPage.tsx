@@ -7,10 +7,8 @@ import {
   Input,
   InputNumber,
   Modal,
-  Space,
   Spin,
   Typography,
-  theme,
 } from 'antd';
 import type { FormRule } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -18,7 +16,9 @@ import {
   Datenfeld,
   DatenfeldEingabe,
   Datenraster,
+  Feld,
   Paneel,
+  Stapel,
   Status,
   monoStil,
 } from '../components/instrument';
@@ -168,7 +168,6 @@ function halterAnzeige(t: Tier): ReactNode {
 }
 
 export default function TiereDetailPage() {
-  const { token } = theme.useToken();
   const { id, tierId: tierIdParam } = useParams();
   const einsatzId = Number(id);
   const tierId = Number(tierIdParam);
@@ -522,7 +521,7 @@ export default function TiereDetailPage() {
         />
       }
       titel={
-        <Space wrap size={token.marginSM}>
+        <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>
             Tier <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
@@ -533,7 +532,7 @@ export default function TiereDetailPage() {
           />
           <Marke>{SPEZIES_META[t.spezies]}</Marke>
           {t.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}
-        </Space>
+        </Stapel>
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       aktionen={
@@ -567,7 +566,7 @@ export default function TiereDetailPage() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (storniert || veraltet || statusMutation.error != null) && (
-          <Space orientation="vertical" style={{ width: '100%' }}>
+          <Stapel abstand="xs">
             <StornoBanner stand={t} />
             {standVeraltet}
             <SeitenHinweise
@@ -575,12 +574,12 @@ export default function TiereDetailPage() {
               fehlerTitel="Status nicht geändert"
               fehlerFallback="Statuswechsel fehlgeschlagen"
             />
-          </Space>
+          </Stapel>
         )
       }
     >
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
-      <Space orientation="vertical" style={{ width: '100%' }} size="large">
+      <Stapel abstand="lg">
         {sitzung ? (
           <Form
             form={editForm}
@@ -664,7 +663,7 @@ export default function TiereDetailPage() {
             trägt ein eigenes Formular, verschachtelt schickte es beim Absenden das äußere nativ
             ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
         <TierAnhaenge einsatzId={einsatzId} tier={t} darfSchreiben={darfSchreiben} />
-      </Space>
+      </Stapel>
 
       {/* Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). „Verbleib erfassen“ wie bei
           Personen (LLH-1092): das Tier verlässt die Obhut der Einsatzkräfte. Der Status heißt
@@ -682,7 +681,7 @@ export default function TiereDetailPage() {
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Verbleib"
           name="abschluss_grund"
           rules={[{ required: true, message: 'Verbleib ist Pflicht' }]}
@@ -704,10 +703,10 @@ export default function TiereDetailPage() {
                 abschlussForm.setFieldValue('abschluss_ziel', undefined);
             }}
           />
-        </Form.Item>
-        <Form.Item label="Übergeben an / Ort" name="abschluss_ziel">
+        </Feld>
+        <Feld label="Übergeben an / Ort" name="abschluss_ziel">
           <Input placeholder="z. B. Tierarzt Dr. Müller, Tierheim Nord" />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <Modal

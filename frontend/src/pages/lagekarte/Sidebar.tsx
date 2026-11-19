@@ -1,6 +1,6 @@
-import { Button, Typography } from 'antd';
+import { Button } from 'antd';
 import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
-import { Segmentleiste, useRollen } from '../../components/instrument';
+import { Segmentleiste, Textstufe, useRollen } from '../../components/instrument';
 import { griffHinweis, type GriffModus, type KantenAus } from './bildGriffe';
 import type {
   PersonenEbenenAngabe,
@@ -387,8 +387,7 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
    */
   const zeilenAktion = (e: ObjektEintrag): ReactNode => {
     if (!darfSchreiben) return null;
-    if (e.schluessel === ziel)
-      return <Typography.Text type="secondary">wird platziert</Typography.Text>;
+    if (e.schluessel === ziel) return <Textstufe ton="gedaempft">wird platziert</Textstufe>;
     if (e.typ === 'einsatzort')
       return (
         <Button onClick={props.onEinsatzortPlatzieren}>

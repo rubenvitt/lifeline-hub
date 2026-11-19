@@ -20,7 +20,16 @@ import type {
 } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { Paneel, monoStil, useRollen, zielEinzug } from '../components/instrument';
+import {
+  Feld,
+  MetaZeile,
+  Paneel,
+  Stapel,
+  Textstufe,
+  monoStil,
+  useRollen,
+  zielEinzug,
+} from '../components/instrument';
 import type { PaneelUeberschrift } from '../components/instrument/Paneel';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
@@ -294,9 +303,9 @@ function EinheitAusVorlage({
           <>
             {zusammenfassung(vorschau, wahl)}
             {deckel != null && (
-              <Typography.Text type="danger" style={{ display: 'block' }}>
+              <Textstufe als="div" ton="alarm">
                 {deckel}
-              </Typography.Text>
+              </Textstufe>
             )}
           </>
         }
@@ -361,7 +370,7 @@ function KopfFelder({
   const vergeben = isNameVergeben(name, einheiten);
   return (
     <>
-      <Form.Item
+      <Feld
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
@@ -370,15 +379,15 @@ function KopfFelder({
         help={vergeben ? 'Name schon vergeben' : undefined}
       >
         <Input maxLength={EINHEIT_NAME_MAX} />
-      </Form.Item>
-      <Form.Item label="Abschnitt" name="abschnitt_id">
+      </Feld>
+      <Feld label="Abschnitt" name="abschnitt_id">
         <Select<number>
           allowClear
           placeholder="ohne Abschnitt"
           options={abschnitte}
           notFoundContent={abschnitteInhalt}
         />
-      </Form.Item>
+      </Feld>
     </>
   );
 }
@@ -419,7 +428,7 @@ function Baum({
   const { token } = useRollen();
   const tiefe = tiefen(vorschau.knoten);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+    <Stapel abstand="sm">
       {(vorschau.fahrzeuge_gesperrt ||
         vorschau.personal_gesperrt ||
         vorschau.material_gesperrt) && (
@@ -531,7 +540,7 @@ function Baum({
           </Paneel>
         );
       })}
-    </div>
+    </Stapel>
   );
 }
 
@@ -651,9 +660,9 @@ function MaterialZeile({
       {((an && ort != null) || grund != null) && (
         <div style={{ flexBasis: '100%', paddingInlineStart: token.marginLG }}>
           {an && ort != null && (
-            <Typography.Text type="secondary" style={{ display: 'block' }}>
+            <Textstufe als="div" stufe="textKlein" ton="gedaempft">
               {ort}
-            </Typography.Text>
+            </Textstufe>
           )}
           <ZeilenFehler fehler={grund} />
         </div>
@@ -733,9 +742,11 @@ function KraftZeile({
       {(hinweise.length > 0 || grund != null || griff != null) && (
         <div style={{ flexBasis: '100%', paddingInlineStart: token.marginLG }}>
           {hinweise.length > 0 && (
-            <Typography.Text type="secondary" style={{ display: 'block' }}>
-              {hinweise.join(' · ')}
-            </Typography.Text>
+            <MetaZeile>
+              {hinweise.map((h) => (
+                <MetaZeile.Teil key={h}>{h}</MetaZeile.Teil>
+              ))}
+            </MetaZeile>
           )}
           <ZeilenFehler fehler={grund} />
           {griff != null && (

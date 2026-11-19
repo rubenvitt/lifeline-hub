@@ -2,7 +2,7 @@ import { IconPersonPlus } from '../../icons';
 import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
-import { Alert, App, Breadcrumb, Button, Flex, Modal, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Modal, Spin } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useId, useState } from 'react';
@@ -33,7 +33,7 @@ import {
 } from '../../components/SeitenZustand';
 import { useRollen } from '../../components/instrument/rollenwerte';
 import { useViewport } from '../../components/useViewport';
-import { Segmentleiste } from '../../components/instrument';
+import { Segmentleiste, Stapel } from '../../components/instrument';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
 import UhsSwitcher from './UhsSwitcher';
 import { merkeLetzteUhs } from './uhsAuswahl';
@@ -326,14 +326,14 @@ function UhsDetailInhalt() {
       titel={
         // `wrap`: bei langem Namen rutscht der Status unter den Namen, statt auf 390 px
         // über den Rand zu ragen (gemessen 11 px, LFH-435).
-        <Space wrap>
+        <Stapel als="span" richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           {darf('uhs-verwalten') ? (
             <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
           ) : (
             uhs.bezeichnung
           )}
           <Status darstellung={uhsStatus[uhs.status]} />
-        </Space>
+        </Stapel>
       }
       meta={meta}
       // Das Soll (LLH-1553) steht vor der Notiz; die Zeile darf umbrechen, die Meta nicht.
@@ -349,7 +349,7 @@ function UhsDetailInhalt() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (veraltet || kopfFehler != null) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             {veraltet && (
               <SeitenStandVeraltet
                 onWiederholen={() => {
@@ -367,7 +367,7 @@ function UhsDetailInhalt() {
                   : 'Stornieren fehlgeschlagen'
               }
             />
-          </Flex>
+          </Stapel>
         )
       }
       /* Datenstand im Kopf über das Primitiv — der Grundriss läuft live mit. */

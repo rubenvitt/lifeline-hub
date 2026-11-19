@@ -1,4 +1,4 @@
-import { Button, Input, InputNumber, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Input, InputNumber, Popconfirm, Typography, theme } from 'antd';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Select } from '../../components/Select';
@@ -18,9 +18,12 @@ import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel, zoneStil } from '.
 import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
 import {
   Augenbraue,
-  Knopfreihe,
   Datenfeld,
   Datenraster,
+  FELD_KLASSE,
+  Stapel,
+  Textstufe,
+  Knopfreihe,
   monoStil,
 } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
@@ -59,78 +62,59 @@ function GefahrenImGebiet({
   einsatzId: number;
   gebietId: number;
 }) {
-  const { token } = theme.useToken();
   const titelId = useId();
   const gefahren = matrix ? gesetzteGefahren(matrix) : [];
   return (
-    <section
-      aria-labelledby={titelId}
-      data-lfh="inspector-gefahren"
-      style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
-    >
-      {/* h4 unter dem h3 des Inspectors (`KartenDetailCard`). */}
-      <Augenbraue als="h4" id={titelId}>
-        Gefahren
-      </Augenbraue>
-      {fehler ? (
-        <Typography.Text type="danger">Gefahren nicht geladen</Typography.Text>
-      ) : matrix == null ? null : gefahren.length === 0 ? (
-        <Typography.Text type="secondary">keine Gefahr über „keine“</Typography.Text>
-      ) : (
-        <>
-          <ul
-            style={{
-              margin: 0,
-              padding: 0,
-              listStyle: 'none',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: token.marginXS,
-            }}
-          >
-            {gefahren.slice(0, GEFAHREN_IM_INSPECTOR).map((z) => {
-              const text = erlaeuterungEinzeilig(z);
-              return (
-                <li key={z.id} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                  <span
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'baseline',
-                      gap: token.marginXS,
-                    }}
-                  >
-                    <GefahrenStufe stufe={z.warnstufe} />
-                    <span>{zellTitel(z.gefahrentyp, z.schutzobjekt)}</span>
-                  </span>
-                  {text && (
-                    <Typography.Text
-                      type="secondary"
-                      title={text}
-                      style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {text}
-                    </Typography.Text>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {gefahren.length > GEFAHREN_IM_INSPECTOR && (
-            // Ein Sprung ist keine Handlung (LFH-616): eigene Zeile, das ↗ ohne Vorlesen.
-            <div data-lfh="inspector-sprung">
-              <Link to={gefahrenPfad(einsatzId, { gefahrengebiet: gebietId })}>
-                alle in Gefahren <span aria-hidden="true">↗</span>
-              </Link>
-            </div>
-          )}
-        </>
-      )}
+    <section aria-labelledby={titelId} data-lfh="inspector-gefahren">
+      <Stapel abstand="xs">
+        {/* h4 unter dem h3 des Inspectors (`KartenDetailCard`). */}
+        <Augenbraue als="h4" id={titelId}>
+          Gefahren
+        </Augenbraue>
+        {fehler ? (
+          <Textstufe ton="alarm">Gefahren nicht geladen</Textstufe>
+        ) : matrix == null ? null : gefahren.length === 0 ? (
+          <Textstufe ton="gedaempft">keine Gefahr über „keine“</Textstufe>
+        ) : (
+          <>
+            <Stapel als="ul" abstand="xs">
+              {gefahren.slice(0, GEFAHREN_IM_INSPECTOR).map((z) => {
+                const text = erlaeuterungEinzeilig(z);
+                return (
+                  <li key={z.id} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <Stapel als="span" richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
+                      <GefahrenStufe stufe={z.warnstufe} />
+                      <span>{zellTitel(z.gefahrentyp, z.schutzobjekt)}</span>
+                    </Stapel>
+                    {text && (
+                      <Typography.Text
+                        type="secondary"
+                        title={text}
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {text}
+                      </Typography.Text>
+                    )}
+                  </li>
+                );
+              })}
+            </Stapel>
+            {gefahren.length > GEFAHREN_IM_INSPECTOR && (
+              // Ein Sprung ist keine Handlung (LFH-616): eigene Zeile, das ↗ ohne Vorlesen.
+              <div data-lfh="inspector-sprung">
+                <Link to={gefahrenPfad(einsatzId, { gefahrengebiet: gebietId })}>
+                  alle in Gefahren <span aria-hidden="true">↗</span>
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+      </Stapel>
     </section>
   );
 }
@@ -346,12 +330,12 @@ export default function ZonenInspector({
       akzentFarbe={zoneStil(entwurf.typ, entwurf.farbe).lineColor}
       onSchliessen={onSchliessen}
     >
-      <Space orientation="vertical" style={{ width: '100%' }}>
+      {/* `FELD_KLASSE` streckt Auswahl und Zahl auf die volle Breite der Leiste. */}
+      <Stapel abstand="xs" className={FELD_KLASSE}>
         {darfSchreiben ? (
           <Select<ZoneTyp>
             aria-label="Zonen-Typ"
             value={entwurf.typ}
-            style={{ width: '100%' }}
             disabled={gesperrt}
             options={erlaubteTypen.map((t) => ({ value: t.typ, label: t.label }))}
             onChange={(typ) => {
@@ -360,14 +344,13 @@ export default function ZonenInspector({
             }}
           />
         ) : (
-          <Typography.Text>{zoneTypLabel(zone.typ)}</Typography.Text>
+          <Textstufe>{zoneTypLabel(zone.typ)}</Textstufe>
         )}
 
         {/* Warnstufe und Zonen-Anzahl stehen im selben Label→Wert-Raster (`zusatz`-Slot); die
             Warnstufe ist ein Tag und läuft mit `zahl={false}` an der Zahlenschrift vorbei.
 
-            Die Bedingung steht hier: antds `Space` wickelt auch eine Komponente, die null
-            rendert, in ein `.ant-space-item` — ohne Kennzahlen gäbe das eine leere Lücke. */}
+            Die Bedingung steht hier, damit ohne Kennzahlen kein leeres Kind im Stapel steht. */}
         {(kennzahlen || zusatzZeilen) && (
           <GeoKennzahlen kennzahlen={kennzahlen} zusatz={zusatzZeilen} />
         )}
@@ -391,7 +374,7 @@ export default function ZonenInspector({
             suffix="m"
             inputMode="numeric"
             disabled={gesperrt}
-            style={{ width: '100%', ...monoStil(token.fontSize) }}
+            style={monoStil(token.fontSize)}
             onChange={(v) => setRadiusEntwurf(typeof v === 'number' ? v : null)}
             onBlur={radiusSpeichern}
             onPressEnter={radiusSpeichern}
@@ -449,7 +432,6 @@ export default function ZonenInspector({
             <FeldLabel text="Gehört zu Gefahrengebiet" htmlFor={gebietId}>
               <Select<number>
                 id={gebietId}
-                style={{ width: '100%' }}
                 value={entwurf.gefahrengebiet_id ?? undefined}
                 disabled={gesperrt}
                 options={[
@@ -481,15 +463,12 @@ export default function ZonenInspector({
         {/* Grund in wenigen Wörtern als Lesezeile (LFH-1083): ein gesperrtes Select läse der
             Vorleser ohne seinen Platzhalter. */}
         {istBezirksflaeche && !evakuierungFrei && (
-          <Typography.Text type="secondary">
-            Evakuierungsbezirk · kein Zugriff auf Evakuierung
-          </Typography.Text>
+          <Textstufe ton="gedaempft">Evakuierungsbezirk · kein Zugriff auf Evakuierung</Textstufe>
         )}
         {istBezirksflaeche && evakuierungFrei && darfSchreiben && (
           <FeldLabel text="Gehört zu Evakuierungsbezirk" htmlFor={bezirkFeldId}>
             <Select<number>
               id={bezirkFeldId}
-              style={{ width: '100%' }}
               value={entwurf.evakuierungsbezirk_id ?? KEIN_BEZIRK}
               disabled={gesperrt}
               options={[
@@ -507,7 +486,7 @@ export default function ZonenInspector({
           </FeldLabel>
         )}
         {istBezirksflaeche && evakuierungFrei && !darfSchreiben && !aktuellerBezirk && (
-          <Typography.Text type="secondary">keinem Evakuierungsbezirk zugeordnet</Typography.Text>
+          <Textstufe ton="gedaempft">keinem Evakuierungsbezirk zugeordnet</Textstufe>
         )}
         {aktuellerBezirk && (
           <>
@@ -586,7 +565,7 @@ export default function ZonenInspector({
                 : 'nicht gespeichert'}
           </Typography.Text>
         )}
-      </Space>
+      </Stapel>
       {/* Rückfrage in jedem Fall: die Zone wird hart gelöscht. Die Warnstufen entscheiden nur
           über den Hinweis. Abgesetzt unter der Reihe um `token.padding` (Stufe `md`): die
           neutralen Knöpfe darin (Gefahrenmatrix, Sprung ins Fachmodul) sind keine Nachbarn. */}

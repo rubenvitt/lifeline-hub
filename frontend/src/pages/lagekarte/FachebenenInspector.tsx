@@ -42,6 +42,7 @@ import FachebeneStand from './FachebeneStand';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { Status } from '../../components/instrument/Status';
 import { Marke } from '../../components/instrument/Marke';
+import { Stapel, Textstufe, schriftStil } from '../../components/instrument';
 
 interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
@@ -174,28 +175,26 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
         )}
         <Descriptions.Item label="Quelle">{quelle}</Descriptions.Item>
       </Descriptions>
-      {beschreibung && (
-        <Typography.Paragraph
-          style={{
-            marginTop: token.marginSM,
-            marginBottom: hinweis ? token.marginSM : 0,
-            fontSize: 13,
-          }}
-        >
-          {beschreibung}
-        </Typography.Paragraph>
-      )}
-      {hinweis && (
-        <>
-          <Typography.Text strong style={{ fontSize: 12 }}>
-            Handlungsempfehlung
-          </Typography.Text>
-          <Typography.Paragraph
-            style={{ marginTop: token.marginXS, marginBottom: 0, fontSize: 13 }}
-          >
-            {hinweis}
-          </Typography.Paragraph>
-        </>
+      {(beschreibung || hinweis) && (
+        <div style={{ marginTop: token.marginSM }}>
+          <Stapel abstand="sm">
+            {beschreibung && (
+              <Textstufe als="p" stufe="textKlein">
+                {beschreibung}
+              </Textstufe>
+            )}
+            {hinweis && (
+              <Stapel abstand="xs">
+                <Textstufe stufe="textKlein">
+                  <strong>Handlungsempfehlung</strong>
+                </Textstufe>
+                <Textstufe als="p" stufe="textKlein">
+                  {hinweis}
+                </Textstufe>
+              </Stapel>
+            )}
+          </Stapel>
+        </div>
       )}
     </>
   );
@@ -257,22 +256,24 @@ function PegelFestlegen({
 
   const voll = (liste?.length ?? 0) >= PEGEL_MAX;
   return (
-    <div style={{ ...abstand, display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-      <SpeicherFehler fehler={festlegen.error} />
-      <Button
-        // Solange die Liste lädt, ist weder „schon maßgeblich" noch „voll" bekannt.
-        disabled={pegelQ.isLoading || voll}
-        loading={festlegen.isPending}
-        onClick={() => festlegen.mutate()}
-      >
-        Als maßgeblichen Pegel festlegen
-      </Button>
-      {voll && (
-        <Typography.Text type="secondary" data-lfh="pegel-grenze">
-          {`Höchstens ${PEGEL_MAX} Pegel · `}
-          <Link to={einsatzEinstellungenPfad(einsatzId, 'pegel')}>Pegel verwalten</Link>
-        </Typography.Text>
-      )}
+    <div style={abstand}>
+      <Stapel abstand="xs">
+        <SpeicherFehler fehler={festlegen.error} />
+        <Button
+          // Solange die Liste lädt, ist weder „schon maßgeblich" noch „voll" bekannt.
+          disabled={pegelQ.isLoading || voll}
+          loading={festlegen.isPending}
+          onClick={() => festlegen.mutate()}
+        >
+          Als maßgeblichen Pegel festlegen
+        </Button>
+        {voll && (
+          <Typography.Text type="secondary" data-lfh="pegel-grenze">
+            {`Höchstens ${PEGEL_MAX} Pegel · `}
+            <Link to={einsatzEinstellungenPfad(einsatzId, 'pegel')}>Pegel verwalten</Link>
+          </Typography.Text>
+        )}
+      </Stapel>
     </div>
   );
 }
@@ -431,7 +432,7 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
   const wert = typeof p.wert === 'number' && Number.isFinite(p.wert) ? p.wert : null;
   const messende = fmtZeit(s(p.messende));
   const grundlage = odlGrundlage(p);
-  const hinweisStil = { fontSize: token.fontSizeSM, marginTop: token.marginXS, marginBottom: 0 };
+  const hinweisStil = { marginTop: token.marginXS };
   return (
     <>
       <div style={{ marginBottom: token.marginSM }}>
@@ -456,19 +457,23 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
         {s(p.kennung) && <Descriptions.Item label="Kennung">{s(p.kennung)}</Descriptions.Item>}
       </Descriptions>
       {grundlage.art === 'standort' ? (
-        <Typography.Paragraph type="secondary" style={hinweisStil}>
-          Stufen nach Grundpegel: über 1,5 × erhöht, über 3 × stark erhöht
-          <br />
-          {ODL_VORBEHALT}
-        </Typography.Paragraph>
+        <div style={hinweisStil}>
+          <Textstufe als="p" stufe="textKlein" ton="gedaempft">
+            Stufen nach Grundpegel: über 1,5 × erhöht, über 3 × stark erhöht
+            <br />
+            {ODL_VORBEHALT}
+          </Textstufe>
+        </div>
       ) : (
-        <Typography.Paragraph type="secondary" style={hinweisStil}>
-          {/* Nur mit Messwert in µSv/h — unter fremder Einheit wird nicht bewertet. */}
-          {wert !== null && (s(p.einheit) ?? 'µSv/h') === 'µSv/h' && 'Kein Grundpegel · '}
-          Stufen nach natürlichem Bereich (0,05–0,2 µSv/h, BfS)
-          <br />
-          {ODL_VORBEHALT}
-        </Typography.Paragraph>
+        <div style={hinweisStil}>
+          <Textstufe als="p" stufe="textKlein" ton="gedaempft">
+            {/* Nur mit Messwert in µSv/h — unter fremder Einheit wird nicht bewertet. */}
+            {wert !== null && (s(p.einheit) ?? 'µSv/h') === 'µSv/h' && 'Kein Grundpegel · '}
+            Stufen nach natürlichem Bereich (0,05–0,2 µSv/h, BfS)
+            <br />
+            {ODL_VORBEHALT}
+          </Textstufe>
+        </div>
       )}
     </>
   );
@@ -549,9 +554,11 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
   const [fehler, setFehler] = useState(false);
   if (fehler) {
     return (
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: token.marginSM }}>
-        Standbild nicht abrufbar
-      </Typography.Paragraph>
+      <div style={{ marginBottom: token.marginSM }}>
+        <Textstufe als="p" stufe="textKlein" ton="gedaempft">
+          Standbild nicht abrufbar
+        </Textstufe>
+      </div>
     );
   }
   return (
@@ -691,7 +698,7 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
           style={{
             marginTop: token.marginSM,
             marginBottom: 0,
-            fontSize: 13,
+            ...schriftStil('textKlein'),
             whiteSpace: 'pre-line',
           }}
         >
@@ -742,10 +749,10 @@ export default function FachebenenInspector({
         ? IconWarndreieck
         : null;
   const titel = TitelIcon ? (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+    <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
       <TitelIcon />
       {titelText}
-    </span>
+    </Stapel>
   ) : (
     titelText
   );

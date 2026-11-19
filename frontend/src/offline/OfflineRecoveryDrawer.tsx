@@ -7,7 +7,6 @@ import {
   Drawer,
   Empty,
   Popconfirm,
-  Space,
   Typography,
 } from 'antd';
 import Knopfreihe from '../components/instrument/Knopfreihe';
@@ -29,6 +28,7 @@ import { verwerfeAbgelehntenAntrag } from '../api/spiegelAntraege';
 import type { AbgelehnterAntragAnzeige } from '../api/types';
 import { ladeVerpflegung } from '../api/verpflegung';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { Stapel } from '../components/instrument';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import {
   OFFLINE_QUEUE_EVENT,
@@ -494,7 +494,7 @@ export default function OfflineRecoveryDrawer({
       loading={laedt}
       destroyOnHidden
     >
-      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      <Stapel abstand="md">
         <SpeicherFehler
           fehler={ladeFehler}
           titel="Nicht geladen"
@@ -519,7 +519,7 @@ export default function OfflineRecoveryDrawer({
             showIcon
             title="Aus früherer Kopplung"
             description={
-              <Space orientation="vertical" size="small">
+              <Stapel abstand="xs" ausrichten="start">
                 {/* Passende Kopplungen (gleicher Einsatz, Ansicht und Stelle) übernimmt die neue
                     Sitzung von selbst (LLH-1331, D3); hier steht nur, was nicht passt. */}
                 <Typography.Text>
@@ -546,7 +546,7 @@ export default function OfflineRecoveryDrawer({
                 {fruehereGrund && (
                   <ZeilenFehler fehler={fruehereGrund.fehler} fallback={fruehereGrund.fallback} />
                 )}
-              </Space>
+              </Stapel>
             }
           />
         )}
@@ -556,7 +556,7 @@ export default function OfflineRecoveryDrawer({
             showIcon
             title="Alte Offline-Daten ohne Zuordnung"
             description={
-              <Space orientation="vertical" size="small">
+              <Stapel abstand="xs" ausrichten="start">
                 <Typography.Text>
                   {`${anzahl(sichtbareNichtZugeordnet, 'Offline-Aktion', 'Offline-Aktionen')} · Inhalt nicht einsehbar, nicht übernehmbar`}
                 </Typography.Text>
@@ -582,7 +582,7 @@ export default function OfflineRecoveryDrawer({
                 {legacyGrund && (
                   <ZeilenFehler fehler={legacyGrund.fehler} fallback={legacyGrund.fallback} />
                 )}
-              </Space>
+              </Stapel>
             }
           />
         )}
@@ -699,7 +699,7 @@ export default function OfflineRecoveryDrawer({
         })}
 
         {leer && <Empty description="Keine wiederherzustellenden Offline-Aktionen" />}
-      </Space>
+      </Stapel>
     </Drawer>
   );
 }

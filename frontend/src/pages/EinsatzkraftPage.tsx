@@ -53,7 +53,9 @@ import {
   Datenfeld,
   Datenraster,
   Paneel,
+  Stapel,
   Status,
+  Textstufe,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -127,7 +129,7 @@ export default function EinsatzkraftPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const { benutzer } = useAuth();
   const { zeitKurz } = useAnzeigeKonventionen();
   const uhr = useUhr(60_000);
@@ -472,12 +474,12 @@ export default function EinsatzkraftPage() {
   const einheitGesperrt = istSprungGesperrt('einheiten', freigaben);
 
   const titel: ReactNode = (
-    <Space size={token.marginSM} wrap>
+    <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
       {ep.name}
       {ep.ist_adhoc && <Marke>ad-hoc</Marke>}
       {ep.ist_demo && <DemoMarke />}
       {isEntlassen && <Status ton="neutral" wort="entlassen" groesse="klein" />}
-    </Space>
+    </Stapel>
   );
 
   return (
@@ -524,7 +526,7 @@ export default function EinsatzkraftPage() {
       )}
       hinweis={
         veraltet || !darfSchreiben || rueckgaengigFehler != null || ausgelassenText != null ? (
-          <Space orientation="vertical" style={{ width: '100%' }}>
+          <Stapel abstand="xs">
             {veraltet && (
               <SeitenStandVeraltet
                 onWiederholen={() => {
@@ -548,11 +550,11 @@ export default function EinsatzkraftPage() {
                 onClose={() => setRueckgaengig(null)}
               />
             )}
-          </Space>
+          </Stapel>
         ) : null
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <Paneel titel="Einteilung" koerperPolster>
           {/* Der Statuskatalog trägt die Auswahl des Status. Fällt er aus, wäre der Wechsel
               lautlos unmöglich (leeres Menü); Meldung wie in der Personalliste. Wer nur liest,
@@ -644,7 +646,6 @@ export default function EinsatzkraftPage() {
                       placeholder="an keiner"
                       onChange={(v) => onChange(v ?? null)}
                       options={uhsOptionen}
-                      style={{ width: '100%' }}
                     />
                   )}
                 />
@@ -728,7 +729,7 @@ export default function EinsatzkraftPage() {
           </Datenraster>
           {!ep.ist_adhoc && (
             <Space size="middle" wrap style={{ marginTop: token.marginSM }}>
-              <span style={{ color: rollen.gedaempft }}>aus dem Stamm</span>
+              <Textstufe ton="gedaempft">aus dem Stamm</Textstufe>
               {ep.personal_id != null && darfVerwaltung(benutzer) && (
                 <DetailSprung ziel={personalDetailPfad(ep.personal_id)}>
                   im Stamm ändern
@@ -752,7 +753,7 @@ export default function EinsatzkraftPage() {
         </Paneel>
 
         <Paneel titel="Aus dem Einsatz" koerperPolster>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+          <Stapel abstand="sm">
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
@@ -801,9 +802,9 @@ export default function EinsatzkraftPage() {
                     </Button>
                   </Popconfirm>
                   {fristAbgelaufen && (
-                    <span id={fristId} style={{ color: rollen.gedaempft }}>
+                    <Textstufe id={fristId} ton="gedaempft">
                       nur in den ersten {STORNO_FRIST_MIN} Minuten
-                    </span>
+                    </Textstufe>
                   )}
                 </Space>
               </Space>
@@ -817,9 +818,9 @@ export default function EinsatzkraftPage() {
                 fallback={ausGrund.fallback}
               />
             )}
-          </div>
+          </Stapel>
         </Paneel>
-      </div>
+      </Stapel>
     </EinsatzSeite>
   );
 }

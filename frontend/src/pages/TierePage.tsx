@@ -1,5 +1,5 @@
 import { Breadcrumb, Button, Collapse, Form, Input, Space, Typography, theme } from 'antd';
-import { Segmentleiste, Status } from '../components/instrument';
+import { Feld, Segmentleiste, Status } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -583,20 +583,20 @@ export default function TierePage() {
         onAbbrechen={() => setModus((alt) => (alt?.einsatzId === einsatzId ? null : alt))}
       >
         <FormularEingehaengt onWechsel={formular.melde} />
-        <Form.Item
+        <Feld
           label="Spezies"
           name="spezies"
           rules={[{ required: true, message: 'Bitte Spezies wählen' }]}
         >
           <Select options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
-        </Form.Item>
-        <Form.Item label="Rufname" name="rufname">
+        </Feld>
+        <Feld label="Rufname" name="rufname">
           <Input />
-        </Form.Item>
+        </Feld>
         {/* Ortsfeld (LLH-1114): Suche, getippte Koordinate, Vorschau mit Nadel. */}
-        <Form.Item label="Fundort" name="antreff_ort">
+        <Feld label="Fundort" name="antreff_ort">
           <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Fundort" />
-        </Form.Item>
+        </Feld>
         {/* FELDBUDGET (LFH-963, `frontend/AGENTS.md`, Feldbudget): drei sichtbare Felder in
             beiden Modi, der Rest eingeklappt. `forceRender` ist TRAGEND: ohne ihn fehlten die
             eingeklappten Werte in `onFinish`, und die Feldzählung des Budgets wäre nicht prüfbar. */}
@@ -610,25 +610,25 @@ export default function TierePage() {
               forceRender: true,
               children: (
                 <>
-                  <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung">
+                  <Feld label="Rasse / Beschreibung" name="rasse_beschreibung">
                     <Input placeholder="z. B. Haflinger, Deutscher Schäferhund" />
-                  </Form.Item>
+                  </Feld>
                   {aktuellerModus === 'vermisst' && (
                     <>
-                      <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung">
+                      <Feld label="Farbe / Erscheinung" name="farbe_beschreibung">
                         <Input />
-                      </Form.Item>
-                      <Form.Item label="Kennzeichnung" name="kennzeichnung">
+                      </Feld>
+                      <Feld label="Kennzeichnung" name="kennzeichnung">
                         <Input placeholder="Chip / Tätowierung / Halsband" />
-                      </Form.Item>
-                      <Form.Item label="Halter-Kontakt" name="halter_kontakt">
+                      </Feld>
+                      <Feld label="Halter-Kontakt" name="halter_kontakt">
                         <Input placeholder="Name, Telefon" />
-                      </Form.Item>
+                      </Feld>
                     </>
                   )}
-                  <Form.Item label="Notiz" name="notiz">
+                  <Feld label="Notiz" name="notiz">
                     <Input.TextArea rows={2} />
-                  </Form.Item>
+                  </Feld>
                 </>
               ),
             },

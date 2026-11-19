@@ -1,7 +1,14 @@
-import { Button, Input, Modal, Space, Typography } from 'antd';
+import { Button, Input, Modal, Typography } from 'antd';
 import { useId, useState } from 'react';
 import { IconHaken, IconLupe, IconMinus, IconSchloss } from '../../icons';
-import { Segmentleiste, monoStil, useRollen } from '../../components/instrument';
+import {
+  Segmentleiste,
+  Stapel,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../../components/instrument';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { fachebeneFarbe } from '../../theme/statusFarben';
@@ -69,7 +76,7 @@ function EbenenZeilenKnopf({
       }}
     >
       <Farbfeld an={zeile.sichtbar} farbe={farbe} />
-      <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>
+      <span style={{ flex: 1, minWidth: 0, ...schriftStil('textKlein') }}>
         {zeile.name}
         {/* Aus, aber für den Verortungsauftrag gezeichnet (LLH-1125): der Zusatz sagt, warum Marker
             trotz ausgeschalteter Ebene stehen. Der zugängliche Name bleibt der Ebenenname. */}
@@ -141,14 +148,16 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 11,
+          ...schriftStil('meta'),
           color: rollen.schwach,
         }}
       >
         <IconSchloss />
       </span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
-      <span style={{ fontSize: 11 }}>{grund}</span>
+      <span style={{ flex: 1, minWidth: 0, ...schriftStil('textKlein') }}>{zeile.name}</span>
+      <Textstufe stufe="textKlein" ton="text2">
+        {grund}
+      </Textstufe>
     </button>
   );
 }
@@ -209,14 +218,16 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
           farbe={def.klassenfarben ? rollen.text2 : fachebeneFarbe(quelle, token)}
         />
         <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 12 }}>{def.label}</span>
+          <Textstufe stufe="textKlein" ton={sichtbar ? 'text' : 'text2'}>
+            {def.label}
+          </Textstufe>
           {/* Der Geltungsbereich steht als Zeile, nicht als Tooltip: auf dem Tablet gibt es kein
               Hovern. */}
           {def.geltung && (
             <span
               id={geltungId}
               data-lfh="fachebene-geltung"
-              style={{ fontSize: 11, color: rollen.text2 }}
+              style={{ ...schriftStil('textKlein'), color: rollen.text2 }}
             >
               {def.geltung}
             </span>
@@ -233,7 +244,7 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
           id={zustandId}
           data-lfh="fachebene-zustand"
           style={{
-            fontSize: 11,
+            ...schriftStil('textKlein'),
             whiteSpace: zoomHinweis ? undefined : 'nowrap',
             color: zoomHinweis ? rollen.achtungText : rollen.text2,
           }}
@@ -436,39 +447,35 @@ export default function Ebenenbaum(props: SidebarProps) {
             />
           )}
           {darfSchreiben && props.ansichtDirty && (
-            <Space orientation="vertical" style={{ width: '100%', marginTop: token.marginSM }}>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                Ungespeicherte Änderungen
-              </Typography.Text>
-              {/* Schreibt in die aktive Ansicht, nicht in eine einsatzweite Einstellung. */}
-              <Button
-                type="primary"
-                block
-                loading={props.ansichtSpeichert}
-                onClick={props.onAnsichtSpeichern}
-              >
-                In dieser Ansicht speichern
-              </Button>
-            </Space>
+            <div style={{ marginTop: token.marginSM }}>
+              <Stapel abstand="xs">
+                <Textstufe stufe="textKlein" ton="gedaempft">
+                  Ungespeicherte Änderungen
+                </Textstufe>
+                {/* Schreibt in die aktive Ansicht, nicht in eine einsatzweite Einstellung. */}
+                <Button
+                  type="primary"
+                  block
+                  loading={props.ansichtSpeichert}
+                  onClick={props.onAnsichtSpeichern}
+                >
+                  In dieser Ansicht speichern
+                </Button>
+              </Stapel>
+            </div>
           )}
           {(props.ansichtFehler?.length ?? 0) > 0 && (
-            <div
-              data-lfh="ansicht-fehler"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: token.marginSM,
-                marginTop: token.marginSM,
-              }}
-            >
-              {props.ansichtFehler?.map((g) => (
-                <SpeicherFehler
-                  key={g.schluessel}
-                  fehler={g.fehler}
-                  titel={g.titel}
-                  fallback={g.fallback}
-                />
-              ))}
+            <div data-lfh="ansicht-fehler" style={{ marginTop: token.marginSM }}>
+              <Stapel abstand="sm">
+                {props.ansichtFehler?.map((g) => (
+                  <SpeicherFehler
+                    key={g.schluessel}
+                    fehler={g.fehler}
+                    titel={g.titel}
+                    fallback={g.fallback}
+                  />
+                ))}
+              </Stapel>
             </div>
           )}
           {/* Schlichtes Eingabefeld statt Suchvariante: gefiltert wird live, deren Suchknopf wäre
@@ -594,27 +601,24 @@ export default function Ebenenbaum(props: SidebarProps) {
               offen={istOffen('grundlage')}
               onUmschalten={umschalten('grundlage')}
             >
-              <Space orientation="vertical" style={{ width: '100%' }}>
+              <Stapel abstand="xs">
                 {props.grundlageWahl}
                 {/* Mit der Wahl im Baum (Handschirm) nennt deren Sperrgrund das schon. */}
                 {!props.grundlageWahl && !props.onlineVerfuegbar && (
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  <Textstufe stufe="textKlein" ton="gedaempft">
                     Online-Karte: nicht konfiguriert
-                  </Typography.Text>
+                  </Textstufe>
                 )}
                 {!props.grundlageWahl && !props.offlineVerfuegbar && (
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  <Textstufe stufe="textKlein" ton="gedaempft">
                     Offline-Karte: nicht konfiguriert
-                  </Typography.Text>
+                  </Textstufe>
                 )}
                 {props.basemap === 'offline' && (
-                  <div>
-                    <Typography.Text
-                      type="secondary"
-                      style={{ fontSize: 12, display: 'block', marginBottom: token.marginXS }}
-                    >
+                  <Stapel abstand="xs">
+                    <Textstufe stufe="textKlein" ton="gedaempft">
                       Karten-Design
-                    </Typography.Text>
+                    </Textstufe>
                     <Segmentleiste<KartenThemeWahl>
                       beschriftung="Karten-Design"
                       wert={props.kartenTheme}
@@ -625,9 +629,9 @@ export default function Ebenenbaum(props: SidebarProps) {
                         { wert: 'dark', label: 'Dunkel' },
                       ]}
                     />
-                  </div>
+                  </Stapel>
                 )}
-              </Space>
+              </Stapel>
             </KlappPaneel>
           )}
           {bilderTreffer && (

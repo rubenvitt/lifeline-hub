@@ -1209,15 +1209,18 @@ export default function EtbPage() {
                     />
                     {/* Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
                         der Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert. */}
-                    <Select<number>
-                      aria-label="Nach Einheit filtern"
-                      placeholder="Einheit"
-                      allowClear
-                      style={{ minWidth: 160 }}
-                      value={filter.einheit_id}
-                      options={einheitOptionen}
-                      onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
-                    />
+                    {/* Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): das Raster
+                        streckt die Auswahl, mindestens aber `schmal`. */}
+                    <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+                      <Select<number>
+                        aria-label="Nach Einheit filtern"
+                        placeholder="Einheit"
+                        allowClear
+                        value={filter.einheit_id}
+                        options={einheitOptionen}
+                        onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
+                      />
+                    </div>
                     {istSchmal && systemKnopf}
                   </>
                 }

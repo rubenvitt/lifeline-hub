@@ -1,6 +1,12 @@
 import { IconChevronRechts, IconChevronRunter } from '../../icons';
 import { useId, type CSSProperties, type ReactNode } from 'react';
-import { augenbraueStil, monoStil, paneelKopfStil, useRollen } from '../../components/instrument';
+import {
+  Stapel,
+  augenbraueStil,
+  monoStil,
+  paneelKopfStil,
+  useRollen,
+} from '../../components/instrument';
 
 /**
  * Abschnitt der rechten Kartenleiste, zwei Formen desselben Kopfes:
@@ -67,7 +73,7 @@ export function LeistenAbschnitt({ titel, meta, zeichen, kennung, children }: Ab
         <h2 id={kopfId} className="lfh-augenbraue" style={augenbraueStil(rollen)}>
           {titel}
         </h2>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingSM }}>
+        <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
           {meta != null && (
             <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
           )}
@@ -76,7 +82,7 @@ export function LeistenAbschnitt({ titel, meta, zeichen, kennung, children }: Ab
               {zeichen}
             </span>
           )}
-        </span>
+        </Stapel>
       </div>
       {children}
     </section>
@@ -132,14 +138,14 @@ export function KlappPaneel({
         </span>
         {/* Trenner für den zugänglichen Namen („Nicht verortet 45", nicht „…verortet45");
               als Flex-Kind ohne Breite unsichtbar. */}{' '}
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingSM }}>
+        <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
           {meta != null && (
             <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
           )}
           <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
             {offen ? <IconChevronRunter size={14} /> : <IconChevronRechts size={14} />}
           </span>
-        </span>
+        </Stapel>
       </button>
     </Ueberschrift>
   );

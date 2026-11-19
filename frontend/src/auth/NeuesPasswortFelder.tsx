@@ -1,4 +1,5 @@
-import { Form, Input } from 'antd';
+import { Input } from 'antd';
+import { Feld } from '../components/instrument';
 import { PASSWORT_MIN_LAENGE } from '../api/auth';
 
 /**
@@ -13,7 +14,7 @@ import { PASSWORT_MIN_LAENGE } from '../api/auth';
 export default function NeuesPasswortFelder({ autoFocus = false }: { autoFocus?: boolean }) {
   return (
     <>
-      <Form.Item
+      <Feld
         label="Neues Passwort"
         name="neues_passwort"
         rules={[
@@ -25,8 +26,8 @@ export default function NeuesPasswortFelder({ autoFocus = false }: { autoFocus?:
         ]}
       >
         <Input.Password autoComplete="new-password" autoFocus={autoFocus} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Neues Passwort wiederholen"
         name="wiederholung"
         dependencies={['neues_passwort']}
@@ -41,7 +42,7 @@ export default function NeuesPasswortFelder({ autoFocus = false }: { autoFocus?:
         ]}
       >
         <Input.Password autoComplete="new-password" />
-      </Form.Item>
+      </Feld>
     </>
   );
 }

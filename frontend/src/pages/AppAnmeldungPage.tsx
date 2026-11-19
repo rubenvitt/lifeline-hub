@@ -4,6 +4,7 @@ import { useLocation } from 'react-router';
 import { appCodeAusstellen } from '../api/auth';
 import { fehlerText } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { Stapel, Textstufe } from '../components/instrument';
 import { Bildmarke } from '../marke/Bildmarke';
 import './LoginPage.css';
 
@@ -72,10 +73,14 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
   } else {
     inhalt = (
       <>
-        <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
-          In der Lifeline-App anmelden als {benutzer?.anzeigename}
-        </Typography.Title>
-        <Typography.Paragraph type="secondary">Konto {benutzer?.benutzername}</Typography.Paragraph>
+        <Stapel abstand="xs">
+          <Textstufe als="h2" stufe="kartentitel">
+            In der Lifeline-App anmelden als {benutzer?.anzeigename}
+          </Textstufe>
+          <Typography.Paragraph type="secondary">
+            Konto {benutzer?.benutzername}
+          </Typography.Paragraph>
+        </Stapel>
         {/* Gegen untergeschobene Links: der Code geht an die Lifeline-App auf DIESEM Gerät, eine
             Bestätigung ohne eigenen Anstoß aus der App meldet womöglich eine fremde App an. */}
         <Alert

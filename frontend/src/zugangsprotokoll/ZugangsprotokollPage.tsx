@@ -35,7 +35,7 @@ import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensic
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import { teilwortSuche } from '../components/teilwortSuche';
-import { Segmentleiste } from '../components/instrument';
+import { FELD_KLASSE, Segmentleiste } from '../components/instrument';
 import { istAdmin } from '../einsatz/schreibrecht';
 import {
   AKTION_TEXT,
@@ -276,44 +276,45 @@ function Filterleiste({
           })
         }
       />
-      <AutoComplete
-        aria-label="Konto"
-        placeholder="Konto"
-        allowClear
-        value={konto}
-        options={kontoOptionen}
-        showSearch={teilwortSuche}
-        onChange={(wert: string | undefined) => meldeKonto(wert ?? '', false)}
-        onSelect={(wert?: string) => meldeKonto(wert ?? '', true)}
-        style={{ width: 200 }}
-      />
-      {filter.spur === 'anmeldungen' ? (
-        <Select<AnmeldeEreignis>
-          aria-label="Ereignis"
-          placeholder="alle Ereignisse"
+      <div className={FELD_KLASSE} style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}>
+        <AutoComplete
+          aria-label="Konto"
+          placeholder="Konto"
           allowClear
-          value={filter.ereignis}
-          onChange={(ereignis) => onChange({ ereignis: ereignis ?? undefined })}
-          options={Object.entries(EREIGNIS_TEXT).map(([value, label]) => ({
-            value: value as AnmeldeEreignis,
-            label,
-          }))}
-          style={{ width: 240 }}
+          value={konto}
+          options={kontoOptionen}
+          showSearch={teilwortSuche}
+          onChange={(wert: string | undefined) => meldeKonto(wert ?? '', false)}
+          onSelect={(wert?: string) => meldeKonto(wert ?? '', true)}
         />
-      ) : (
-        <Select<AdminAktion>
-          aria-label="Aktion"
-          placeholder="alle Aktionen"
-          allowClear
-          value={filter.aktion}
-          onChange={(aktion) => onChange({ aktion: aktion ?? undefined })}
-          options={Object.entries(AKTION_TEXT).map(([value, label]) => ({
-            value: value as AdminAktion,
-            label,
-          }))}
-          style={{ width: 240 }}
-        />
-      )}
+      </div>
+      <div className={FELD_KLASSE} style={{ width: 'var(--lfh-feld-mittel)', maxWidth: '100%' }}>
+        {filter.spur === 'anmeldungen' ? (
+          <Select<AnmeldeEreignis>
+            aria-label="Ereignis"
+            placeholder="alle Ereignisse"
+            allowClear
+            value={filter.ereignis}
+            onChange={(ereignis) => onChange({ ereignis: ereignis ?? undefined })}
+            options={Object.entries(EREIGNIS_TEXT).map(([value, label]) => ({
+              value: value as AnmeldeEreignis,
+              label,
+            }))}
+          />
+        ) : (
+          <Select<AdminAktion>
+            aria-label="Aktion"
+            placeholder="alle Aktionen"
+            allowClear
+            value={filter.aktion}
+            onChange={(aktion) => onChange({ aktion: aktion ?? undefined })}
+            options={Object.entries(AKTION_TEXT).map(([value, label]) => ({
+              value: value as AdminAktion,
+              label,
+            }))}
+          />
+        )}
+      </div>
     </Space>
   );
 }

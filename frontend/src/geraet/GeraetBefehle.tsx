@@ -1,4 +1,4 @@
-import { Alert, App, Button, Flex, Space, Typography } from 'antd';
+import { Alert, App, Button } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -14,14 +14,12 @@ import BefehlLesefassung from '../auftraege/BefehlLesefassung';
 import EmpfaengerQuittung from '../auftraege/EmpfaengerQuittung';
 import { befehlSchemaLabel } from '../auftraege/befehlTexte';
 import { vorlage } from '../befehle/vorlagen';
-import { Augenbraue, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, Textstufe, monoStil, useRollen } from '../components/instrument';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import KommKarte from '../kommunikation/KommKarte';
 import type { EmpfaengerZiel } from './GeraetAuftraegePage';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
-
-const { Text } = Typography;
 
 type QuittungsZiel = { befehlId: number; eintragId: number };
 
@@ -161,25 +159,19 @@ function BefehlKarte({
       }
       nr={`v${b.version}`}
     >
-      <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+      <div style={{ marginBottom: token.marginSM }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           {befehlSchemaLabel(b.vorlage)}
-        </Text>
-      </Space>
-      <Text strong style={{ display: 'block', fontSize: 15, lineHeight: 1.4 }}>
+        </Textstufe>
+      </div>
+      <Textstufe stufe="kartentitel" als="div">
         {b.titel}
-      </Text>
+      </Textstufe>
       {b.freigegeben_at && (
-        <Flex
-          gap={token.marginSM}
-          wrap
-          style={{ marginTop: token.marginXS, ...monoStil('meta'), color: rollen.gedaempft }}
-        >
-          <span>
-            freigegeben <ZeitAnzeige wert={b.freigegeben_at} rolle="kurz" />
-            {b.freigegeben_von_name ? ` von ${b.freigegeben_von_name}` : ''}
-          </span>
-        </Flex>
+        <div style={{ marginTop: token.marginXS, ...monoStil('meta'), color: rollen.gedaempft }}>
+          freigegeben <ZeitAnzeige wert={b.freigegeben_at} rolle="kurz" />
+          {b.freigegeben_von_name ? ` von ${b.freigegeben_von_name}` : ''}
+        </div>
       )}
       <div style={{ marginTop: token.marginSM }}>
         <EmpfaengerQuittung

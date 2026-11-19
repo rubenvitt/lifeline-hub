@@ -34,7 +34,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } 
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Knopfreihe, monoStil, Segmentleiste } from '../components/instrument';
+import { FELD_KLASSE, monoStil, Segmentleiste, Stapel, Knopfreihe } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   parseFahrzeugeAnsicht,
@@ -270,7 +270,11 @@ function BesatzungsBlock({
             <div key={m.id}>
               <Space
                 size="middle"
-                style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  maxWidth: 'var(--lfh-feld-mittel)',
+                }}
               >
                 <Space size={token.marginSM} wrap>
                   <Typography.Text type={geloest ? 'secondary' : undefined}>
@@ -342,17 +346,23 @@ function BesatzungsBlock({
         })
       )}
       {darfSchreiben && (
-        <Select
-          style={{ width: '100%', maxWidth: 420, marginTop: token.marginSM }}
-          placeholder="Kraft zur Besatzung …"
-          value={null}
-          notFoundContent={freiInhalt}
-          options={frei.map((p) => ({ value: p.id, label: p.name }))}
-          onSelect={(epId) => onZuordnen(Number(epId))}
-        />
+        // Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): die Hülle trägt die Breite
+        // der Besatzungszeilen darüber (Stufe `mittel`).
+        <div
+          className={FELD_KLASSE}
+          style={{ maxWidth: 'var(--lfh-feld-mittel)', marginTop: token.marginSM }}
+        >
+          <Select
+            placeholder="Kraft zur Besatzung …"
+            value={null}
+            notFoundContent={freiInhalt}
+            options={frei.map((p) => ({ value: p.id, label: p.name }))}
+            onSelect={(epId) => onZuordnen(Number(epId))}
+          />
+        </div>
       )}
       {zuordnenFehler && (
-        <div style={{ maxWidth: 420, marginTop: token.marginSM }}>
+        <div style={{ maxWidth: 'var(--lfh-feld-mittel)', marginTop: token.marginSM }}>
           <SpeicherFehler
             fehler={zuordnenFehler.fehler}
             titel="Nicht zugeordnet"
@@ -1055,12 +1065,12 @@ function FahrzeugeInhalt() {
       render: (_, ef) => (
         <KennungMitZusatz
           kennung={
-            <Space wrap>
+            <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               {/* Funkrufname in Mono. */}
               <span style={monoStil('mono')}>{ef.funkrufname}</span>
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
               {ef.ist_demo && <DemoMarke />}
-            </Space>
+            </Stapel>
           }
           zusatz={ef.fahrzeugtyp}
           ausSpalte="typ"

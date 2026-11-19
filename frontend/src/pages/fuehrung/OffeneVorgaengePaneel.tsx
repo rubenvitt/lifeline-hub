@@ -12,6 +12,8 @@ import {
   DashboardPaneel,
   ListenAbschnitt,
   Segmentleiste,
+  Stapel,
+  Textstufe,
   listenZeileStil,
   monoStil,
   useRollen,
@@ -190,16 +192,12 @@ export default function OffeneVorgaengePaneel({
     </span>
   );
   const text = (haupt: ReactNode, unter: ReactNode) => (
-    <span
-      style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}
-    >
-      <span
-        style={{ fontSize: 12, lineHeight: 1.45, color: rollen.text2, overflowWrap: 'anywhere' }}
-      >
+    <Stapel als="span" abstand="xxs" wachsen>
+      <Textstufe stufe="textKlein" ton="text2" umbruch="ueberall">
         {haupt}
-      </span>
+      </Textstufe>
       {unter && <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{unter}</span>}
-    </span>
+    </Stapel>
   );
   const wort = (w: string, t: 'alarm' | 'achtung' | null) => (
     <span

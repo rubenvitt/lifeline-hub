@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Alert, App, Button, Space, Spin, Typography, theme } from 'antd';
+import { Alert, App, Button, Spin, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ladeBetreuung } from '../api/betreuung';
@@ -14,7 +14,7 @@ import { NAMENTLICH_SPERRE, personenZahl } from '../betreuung/betreuungText';
 import RegistrierungPaneel from '../betreuung/registrierung/RegistrierungPaneel';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Paneel, Segmentleiste } from '../components/instrument';
+import { Paneel, Segmentleiste, Stapel } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
@@ -40,7 +40,7 @@ function BelegungBereich({
   darfSchreiben: boolean;
 }) {
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+    <Stapel abstand="md">
       <StelleBelegung stelle={stelle} namentlich={namentlich} />
       <Paneel titel="Meldeverlauf" koerperPolster>
         <MeldeVerlauf
@@ -50,7 +50,7 @@ function BelegungBereich({
           {...verlaufRuecknahme(stelle, darfSchreiben)}
         />
       </Paneel>
-    </Space>
+    </Stapel>
   );
 }
 

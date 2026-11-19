@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Space, Typography } from 'antd';
+import { Button, Popconfirm, Space } from 'antd';
 import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { useId, useMemo, useState } from 'react';
@@ -17,7 +17,16 @@ import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { Augenbraue, Status, monoStil, tonVonRolle, useRollen } from '../../components/instrument';
+import {
+  Augenbraue,
+  FELD_KLASSE,
+  Stapel,
+  Status,
+  Textstufe,
+  monoStil,
+  tonVonRolle,
+  useRollen,
+} from '../../components/instrument';
 import {
   LEERE_ROHDATEN,
   auswahlRaster,
@@ -124,27 +133,21 @@ function markerBildUrl(mk: KarteMarker, dunkel: boolean): string | null {
 
 /** Ein Feld des Datenrasters: Augenbraue über dem Wert; mit Statusrolle als getönter Chip. */
 function RasterZelle({ feld }: { feld: RasterFeld }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   const ton = feld.rolle ? tonVonRolle(feld.rolle) : null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}>
+    <Stapel abstand="xs">
       <Augenbraue als="dt">{feld.label}</Augenbraue>
       <dd style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
         {ton ? (
           <Status groesse="klein" ton={ton} wort={feld.wert} />
+        ) : feld.mono === false ? (
+          <Textstufe>{feld.wert}</Textstufe>
         ) : (
-          <span
-            style={
-              feld.mono === false
-                ? { fontSize: 13, color: rollen.text }
-                : { ...monoStil(15), color: rollen.text }
-            }
-          >
-            {feld.wert}
-          </span>
+          <span style={{ ...monoStil(15), color: rollen.text }}>{feld.wert}</span>
         )}
       </dd>
-    </div>
+    </Stapel>
   );
 }
 
@@ -228,24 +231,20 @@ export default function Inspector({
       {/* Eigener Block neben dem Raster: ein Meldungstext ist kein Feld, und im zweispaltigen
           `dl` bräche er auf halbe Breite. */}
       {letzte && (
-        <section
-          data-lfh="auswahl-letzte-meldung"
-          aria-label="Letzte Meldung"
-          style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
-        >
-          <Augenbraue>Letzte Meldung</Augenbraue>
-          <span
-            style={{ fontSize: 12, lineHeight: 1.5, color: rollen.text2, overflowWrap: 'anywhere' }}
-          >
-            {letzte.text}
-          </span>
-          <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{letzte.meta}</span>
+        <section data-lfh="auswahl-letzte-meldung" aria-label="Letzte Meldung">
+          <Stapel abstand="xs">
+            <Augenbraue>Letzte Meldung</Augenbraue>
+            <Textstufe stufe="textKlein" ton="text2" umbruch="ueberall">
+              {letzte.text}
+            </Textstufe>
+            <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{letzte.meta}</span>
+          </Stapel>
         </section>
       )}
       {marker.typ === 'lagemeldung' && marker.lageMeldung && !lageOffen && (
-        <Typography.Paragraph style={{ margin: 0, fontSize: 12, color: rollen.text2 }}>
+        <Textstufe als="p" stufe="textKlein" ton="text2">
           {marker.lageMeldung.inhalt}
-        </Typography.Paragraph>
+        </Textstufe>
       )}
       {lageOffen && marker.lageMeldung && (
         <LageAngabenBearbeiten
@@ -261,7 +260,7 @@ export default function Inspector({
         />
       )}
       {!ohneOrt && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+        <Stapel abstand="xs">
           <Augenbraue>Koordinate</Augenbraue>
           {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
             der Tooltip mit dem vollen Wortlaut hängt an Hover/Fokus, und auf Touch muss das
@@ -273,19 +272,19 @@ export default function Inspector({
             exclude={inspectorExclude(marker, einsatzId)}
             maxOrtZeilen={3}
           />
-        </div>
+        </Stapel>
       )}
       {/* `GeoKennzahlen` rendert ohne Kennzahlen nichts — also kein Wrapper mit Abstand. */}
       {kennzahlen && <GeoKennzahlen kennzahlen={kennzahlen} />}
       {symbolAuswahl && (
-        <Space orientation="vertical" size={token.marginXS} style={{ width: '100%' }}>
+        // `FELD_KLASSE` streckt beide Auswahlen auf die volle Breite der Leiste.
+        <Stapel abstand="xs" className={FELD_KLASSE}>
           {/* Das FeldLabel trägt den Namen; ein zusätzliches `aria-label` gewönne und koppelte
               den sichtbaren Text vom Accessible Name ab. */}
           <FeldLabel text="Fachaufgabe" htmlFor={fachaufgabeId}>
             <Select
               id={fachaufgabeId}
               allowClear
-              style={{ width: '100%' }}
               value={marker.tz?.fachaufgabe ?? undefined}
               options={FACHAUFGABE_OPTIONS}
               onChange={(v) => onSymbolAendern!(marker, { tz_fachaufgabe: v ?? null })}
@@ -295,13 +294,12 @@ export default function Inspector({
             <Select
               id={organisationId}
               allowClear
-              style={{ width: '100%' }}
               value={marker.tz?.organisation ?? undefined}
               options={ORGANISATION_OPTIONS}
               onChange={(v) => onSymbolAendern!(marker, { tz_organisation: v ?? null })}
             />
           </FeldLabel>
-        </Space>
+        </Stapel>
       )}
       {/* Senkrecht: die zwei volltextigen Knöpfe passen in der 300-px-Leiste in keiner
           Dichtestufe nebeneinander (wie `ZonenInspector`, `FreiesZeichenInspector`). Kein

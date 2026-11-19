@@ -1,12 +1,12 @@
 import { useSprungSperre } from '../einsatz/useSprungSperre';
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, theme } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Spin } from 'antd';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder, ortRegeln, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Status, monoStil } from '../components/instrument';
+import { Feld, Stapel, Status, monoStil } from '../components/instrument';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import {
@@ -115,7 +115,6 @@ const KOPFAKTIONEN: Record<SchadenStatus, { primaer: Kopfaktion | null; weitere:
 export default function SchaedenDetailPage() {
   const { id, schadenId: schadenIdParam } = useParams();
   const einsatzId = Number(id);
-  const { token } = theme.useToken();
   // Verortungsauftrag nur in eine freie Lagekarte (LFH-888, design.md D4).
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const schadenId = Number(schadenIdParam);
@@ -398,22 +397,22 @@ export default function SchaedenDetailPage() {
         />
       }
       titel={
-        <Space wrap size={token.marginSM}>
+        <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>
             Schaden <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status darstellung={STATUS_META[s.status]} />
           {s.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}
-        </Space>
+        </Stapel>
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (storniert || veraltet) && (
-          <Space orientation="vertical" style={{ width: '100%' }}>
+          <Stapel abstand="xs">
             <StornoBanner stand={s} />
             {standVeraltet}
-          </Space>
+          </Stapel>
         )
       }
       aktionen={
@@ -547,13 +546,13 @@ export default function SchaedenDetailPage() {
         onFertig={() => setUebergebenOffen(false)}
         onAbbrechen={() => setUebergebenOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Übergeben an"
           name="uebergeben_an"
           rules={[{ required: true, message: 'Adressat ist Pflicht' }]}
         >
           <Input placeholder="z. B. Stadtwerke, Bauhof, Umweltamt" />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <ErfassungsModal<{ abschluss_grund: string; notiz?: string }>
@@ -569,16 +568,16 @@ export default function SchaedenDetailPage() {
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Abschlussgrund"
           name="abschluss_grund"
           rules={[{ required: true, message: 'Grund ist Pflicht' }]}
         >
           <Select options={ABSCHLUSS_GRUENDE} />
-        </Form.Item>
-        <Form.Item label="Notiz (optional)" name="notiz">
+        </Feld>
+        <Feld label="Notiz (optional)" name="notiz">
           <Input.TextArea rows={2} />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       {/* Wartet auf die Antwort: schließt erst beim Erfolg, bis dahin sind die Auswege gesperrt,

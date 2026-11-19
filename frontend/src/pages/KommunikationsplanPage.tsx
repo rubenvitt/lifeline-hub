@@ -38,7 +38,14 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { NUR_VORLESER, Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import {
+  NUR_VORLESER,
+  Paneel,
+  PaneelZeile,
+  Stapel,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -171,9 +178,9 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
   const { token } = useRollen();
   if (verbindungen.length === 0) return <Gedaempft>—</Gedaempft>;
   return (
-    <Flex vertical gap={token.marginXXS}>
+    <Stapel abstand="xxs">
       {verbindungen.map((v) => (
-        <Flex key={v.schluessel} wrap align="baseline" gap={token.marginXS}>
+        <Stapel key={v.schluessel} richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
           {v.mittelLabel && <Gedaempft>{v.mittelLabel}</Gedaempft>}
           {v.wert &&
             (v.verweis ? (
@@ -192,9 +199,9 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
               <span style={{ ...monoStil('monoGross'), overflowWrap: 'anywhere' }}>{v.wert}</span>
             ))}
           {v.hinweis && <Gedaempft>{v.hinweis}</Gedaempft>}
-        </Flex>
+        </Stapel>
       ))}
-    </Flex>
+    </Stapel>
   );
 }
 

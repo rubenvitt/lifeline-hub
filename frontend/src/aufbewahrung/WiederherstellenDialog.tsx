@@ -8,6 +8,7 @@ import type { WiederherstellenBody } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { Feld } from '../components/instrument';
 
 /**
  * „Wiederherstellen" während der Karenz als `ErfassungsModal`.
@@ -78,7 +79,7 @@ export default function WiederherstellenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Neue Aufbewahrungsfrist"
         name="frist"
         extra="Hebt die Löschvormerkung auf."
@@ -96,10 +97,10 @@ export default function WiederherstellenDialog({
         dependencies={['unbegrenzt']}
       >
         <ZeitpunktEingabe art="frist" disabled={unbegrenzt} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="Unbegrenzt aufbewahren" name="unbegrenzt" valuePropName="checked">
+      </Feld>
+      <Feld label="Unbegrenzt aufbewahren" name="unbegrenzt" valuePropName="checked">
         <Switch />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={mutation.error} titel="Wiederherstellen fehlgeschlagen" />
     </ErfassungsModal>
   );

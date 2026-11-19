@@ -7,10 +7,12 @@ import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
   Augenbraue,
+  FELD_KLASSE,
   Paneel,
   kennzahlenbandStil,
   monoStil,
   paneelZeileStil,
+  schriftStil,
   useRollen,
 } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -387,7 +389,7 @@ function KopfAngabe({
       <Augenbraue style={{ display: 'block', marginBottom: token.marginXXS }}>{etikett}</Augenbraue>
       <div
         style={{
-          ...(mono ? monoStil(15, 500) : { fontSize: 15, fontWeight: 500 }),
+          ...(mono ? monoStil(15, 500) : { ...schriftStil('kartentitel'), fontWeight: 500 }),
           color: rollen.text,
           overflowWrap: 'anywhere',
         }}
@@ -1285,6 +1287,7 @@ function RufnameInput({
   );
   return (
     <div
+      className={FELD_KLASSE}
       onKeyDownCapture={(e) => {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') navigated.current = true;
         else if (e.key === 'Enter' && !navigated.current) e.stopPropagation();
@@ -1301,7 +1304,6 @@ function RufnameInput({
           navigated.current = false;
           onChange(v ?? '');
         }}
-        style={{ width: '100%' }}
       />
     </div>
   );
@@ -1347,7 +1349,6 @@ function FahrzeugeAngabe({
           options={quelle.fahrzeuge.map((f) => ({ value: f.id, label: fahrzeugText(f) }))}
           value={value}
           onChange={(w) => onChange(w ?? [])}
-          style={{ width: '100%' }}
         />
       )}
     />
@@ -1804,14 +1805,16 @@ export default function EinsatzdatenPage() {
                       )
                     }
                     eingabe={({ feld, value, onChange }) => (
-                      <InputNumber<number>
-                        {...feld}
-                        min={0}
-                        precision={0}
-                        style={{ width: 180 }}
-                        value={value}
-                        onChange={(n) => onChange(n ?? null)}
-                      />
+                      // Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`).
+                      <div className={FELD_KLASSE} style={{ maxWidth: 'var(--lfh-feld-schmal)' }}>
+                        <InputNumber<number>
+                          {...feld}
+                          min={0}
+                          precision={0}
+                          value={value}
+                          onChange={(n) => onChange(n ?? null)}
+                        />
+                      </div>
                     )}
                   />
                 ),

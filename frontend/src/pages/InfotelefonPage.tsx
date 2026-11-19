@@ -29,6 +29,7 @@ import {
   PaneelZeile,
   Sammelbanner,
   Segmentleiste,
+  Stapel,
   Zeitachseneintrag,
   monoStil,
   useRollen,
@@ -475,13 +476,13 @@ export default function InfotelefonPage() {
         ) : undefined
       }
     >
-      <Flex vertical gap={token.margin}>
+      <Stapel abstand="md">
         {istSchmal ? (
           anliegenOffen && aufgliederung && <div id={ANLIEGEN_ID}>{aufgliederung}</div>
         ) : (
           <>
             {/* Kein `Kennzahlenband`: dessen sechs Plätze gehören der Lage (LFH-640). */}
-            <Flex wrap gap={token.margin}>
+            <Stapel richtung="zeile" umbruch abstand="md">
               <Kennzahl titel="Anrufe" wert={gesamt} zustand={zustand} groesse="klein" />
               <Kennzahl
                 titel="offene Rückrufe"
@@ -490,7 +491,7 @@ export default function InfotelefonPage() {
                 ton={offen > 0 ? 'achtung' : 'neutral'}
                 groesse="klein"
               />
-            </Flex>
+            </Stapel>
             {aufgliederung}
             {segmentleiste}
           </>
@@ -607,7 +608,7 @@ export default function InfotelefonPage() {
             </div>
           </div>
         )}
-      </Flex>
+      </Stapel>
     </EinsatzSeite>
   );
 }

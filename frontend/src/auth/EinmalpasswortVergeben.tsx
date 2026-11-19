@@ -1,10 +1,10 @@
-import { Alert, Button, Flex, Popconfirm } from 'antd';
+import { Alert, Button, Popconfirm } from 'antd';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useId } from 'react';
 import type { BenutzerAnzeige, Einmalpasswort } from '../api/types';
 import KopierbarerText from '../components/KopierbarerText';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { monoStil, useRollen } from '../components/instrument';
+import { Stapel, Textstufe, monoStil, useRollen } from '../components/instrument';
 import { EIGENES_PASSWORT, SSO_KONTO } from '../stammdaten/rechteText';
 
 /**
@@ -31,7 +31,7 @@ export default function EinmalpasswortVergeben({
   /** `POST /api/benutzer/{id}/einmalpasswort`, Variable ist die Benutzer-id. */
   vergeben: UseMutationResult<Einmalpasswort, Error, number>;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const grundId = useId();
 
   const sperrGrund = eigenesKonto
@@ -47,19 +47,19 @@ export default function EinmalpasswortVergeben({
         showIcon
         title={`Einmalpasswort für ${benutzer.anzeigename}`}
         description={
-          <Flex vertical gap={token.marginXXS}>
+          <Stapel abstand="xxs">
             <KopierbarerText text={vergeben.data.einmalpasswort} bezeichnung="Einmalpasswort">
               <span style={monoStil(token.fontSizeLG, 500)}>{vergeben.data.einmalpasswort}</span>
             </KopierbarerText>
             <span>Wird nur jetzt angezeigt.</span>
-          </Flex>
+          </Stapel>
         }
       />
     );
   }
 
   return (
-    <Flex vertical gap={token.marginXXS} align="flex-start">
+    <Stapel abstand="xxs" ausrichten="start">
       <Popconfirm
         title="Einmalpasswort vergeben?"
         description={`Das bisherige Passwort gilt nicht mehr, und alle Anmeldungen von ${benutzer.anzeigename} enden.`}
@@ -77,11 +77,11 @@ export default function EinmalpasswortVergeben({
         </Button>
       </Popconfirm>
       {sperrGrund !== null && (
-        <span id={grundId} style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+        <Textstufe id={grundId} stufe="textKlein" ton="text2">
           {sperrGrund}
-        </span>
+        </Textstufe>
       )}
       <SpeicherFehler fehler={vergeben.error} titel="Kein Einmalpasswort vergeben" />
-    </Flex>
+    </Stapel>
   );
 }

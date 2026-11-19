@@ -26,6 +26,7 @@ import {
   Datenfeld,
   Datenraster,
   Paneel,
+  Stapel,
   Status,
   monoStil,
   useRollen,
@@ -131,7 +132,6 @@ export default function EinheitKopf({
   onSetHandStatus,
   nachforderungPfad,
 }: EinheitKopfProps) {
-  const { token } = useRollen();
   // Grenzen wie der Server (Spec `eingabegrenzen`, LLH-1242): der kurze Funkrufname über
   // `maxLength`, die mehrzeilige Bemerkung mit Zähler und Prüfung, nie gekürzt
   // (`frontend/AGENTS.md`, „Freitext nie länger als der Server erlaubt“).
@@ -205,14 +205,7 @@ export default function EinheitKopf({
       }
       koerperPolster
     >
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'flex-start',
-          gap: token.margin,
-        }}
-      >
+      <Stapel richtung="zeile" umbruch ausrichten="start" abstand="md">
         {/* Der gespeicherte Stand; die Vorschau beim Ändern steht im Eingabefeld (D4). */}
         <EinheitZeichen
           tz={{
@@ -475,7 +468,7 @@ export default function EinheitKopf({
             </Datenfeld>
           </Datenraster>
         </div>
-      </div>
+      </Stapel>
     </Paneel>
   );
 }
@@ -493,16 +486,8 @@ function IstAnzeige({
   kumuliert: Staerke | null;
   urteil: ReturnType<typeof einheitStaerkeUrteilVon>;
 }) {
-  const { token } = useRollen();
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        gap: token.marginXS,
-      }}
-    >
+    <Stapel als="span" richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
       <span style={monoStil('mono')}>
         <StaerkeAnzeige wert={ist} />
         {kumuliert && (
@@ -513,7 +498,7 @@ function IstAnzeige({
         )}
       </span>
       {urteil !== 'kein_soll' && <Status darstellung={einheitStaerkeUrteil[urteil]} umbrechen />}
-    </span>
+    </Stapel>
   );
 }
 
@@ -532,7 +517,7 @@ function StatusZeile({
   canEdit: boolean;
   onSetHandStatus: HandStatusHandler;
 }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const isHand = canEdit && e.fahrzeug_mitglieder.length === 0;
   const katalogQuery = useQuery({
@@ -585,22 +570,15 @@ function StatusZeile({
   }
 
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: token.marginXXS }}>
-      <span
-        style={{
-          display: 'inline-flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: token.marginXS,
-        }}
-      >
+    <Stapel als="span" abstand="xxs">
+      <Stapel als="span" richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
         {status}
         {seit}
-      </span>
+      </Stapel>
       {s.verteilung && (
         <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{s.verteilung}</span>
       )}
       {fehler != null && <ZeilenFehler fehler={fehler} fallback="Status nicht gesetzt" />}
-    </span>
+    </Stapel>
   );
 }
