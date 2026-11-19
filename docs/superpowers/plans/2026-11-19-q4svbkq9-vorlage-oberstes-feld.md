@@ -39,7 +39,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/q4svbkq9xdsd2tarix8busg8
    Fehler (Task 2).
 3. Hub-verteilter Vorschlag → Migration bricht nicht mit `stammdaten_vom_hub` ab und lässt ihn aus
    (Task 2).
-4. Org ohne Vorlage „Unwetter“ → Demo-Import läuft durch, Einsatz ohne Vorlage (Task 3).
+4. ~~Demo ohne Vorlage „Unwetter“~~ entfallen (D6): Demo bleibt ohne Vorlage.
 5. Leeres Stichwortfeld fokussiert → keine Vorschlagsliste offen, Einsatzart bleibt bedienbar
    (Task 4).
 
@@ -103,7 +103,9 @@ let erwartet = [
 
 - [ ] **Step 5: Commit** — `feat: Migration koppelt Start-Stichworte bestehender Organisationen (LLH-1816)`.
 
-### Task 3: Demo-Einsatz mit Vorlage „Unwetter“
+### Task 3: Demo-Einsatz mit Vorlage „Unwetter“ — entfallen
+
+> Entscheidung 19.11.2026 (Design-Doc D6): „Unwetter“ blendet Module aus, in denen die Demo Daten anlegt. Stattdessen nur ein Kommentar am Aufruf in `src/demo/import.rs`; die Schritte unten gelten nicht.
 
 **Files:**
 - Modify: `src/demo/import.rs:103-118` (`vorlage_id: None`)

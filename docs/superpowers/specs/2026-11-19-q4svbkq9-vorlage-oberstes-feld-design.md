@@ -22,7 +22,7 @@ gekoppeltes Stichwort nimmt, sieht oben deutlich „Alle Module“ und kann umst
   Modulzahl.
 - Die Start-Stichworte neuer Organisationen kommen **gekoppelt**.
 - Bestehende Organisationen bekommen dieselbe Kopplung **behutsam per Migration**.
-- Der Demo-Einsatz wird mit Vorlage angelegt.
+- ~~Der Demo-Einsatz wird mit Vorlage angelegt.~~ Entfallen, siehe D6.
 - Das Stichwortfeld verdeckt das Feld Einsatzart nicht mehr.
 
 ## Nicht-Ziele
@@ -100,11 +100,13 @@ Optionen), gefiltert nach Teiltext ohne Groß/Klein. Vor dem Bau im Browser best
 leere Aufklappen die Ursache ist; ist es eine andere (etwa Popup-Breite), wird diese behoben und
 im Plan vermerkt.
 
-### D6 Demo
+### D6 Demo — entfallen (Entscheidung 19.11.2026, beim Bauen)
 
-Der Demo-Einsatz (`src/demo/import.rs`, Stichwort „Unwetter – Starkregen“ als Freitext) wird mit
-der Vorlage „Unwetter“ der Organisation angelegt, wenn sie existiert; sonst ohne. Das Stichwort
-bleibt Freitext ohne Katalogvorschlag (unverändert).
+Ursprünglich sollte der Demo-Einsatz mit der Vorlage „Unwetter“ entstehen. „Unwetter“ blendet
+aber Personen und Unfallhilfsstellen aus, in denen die Starkregen-Demo Daten anlegt
+(`Vorgang::Person`, `Vorgang::Uhs` in `src/demo/szenario.rs`). Der Demo-Einsatz bleibt deshalb
+ohne Vorlage („Alle Module“), damit alles Gezeigte erreichbar ist; ein Kommentar am Aufruf in
+`src/demo/import.rs` hält das fest.
 
 ## Ansätze
 
