@@ -171,8 +171,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xdj6orw3n3wzx7b7rb543ihi
 
 ### Task 5: Abschluss
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` als ein Aufruf. Erwartet: grün.
-- [ ] **Step 2:** Review nach Ermessen am Diff entscheiden. Der Vermerk kommt in den PR.
-- [ ] **Step 3:** Bilder: ETB-Lesemarke-Text, Einsatzkachel „Eigene Rolle“ und das Gerippe mit
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` als ein Aufruf. Erwartet: grün.
+- [x] **Step 2:** Review nach Ermessen am Diff entscheiden. Der Vermerk kommt in den PR.
+- [x] **Step 3:** Bilder: ETB-Lesemarke-Text, Einsatzkachel „Eigene Rolle“ und das Gerippe mit
   Kopf beim Erstaufruf (verzögerte Route), aufgenommen per Wegwerf-Spec.
-- [ ] **Step 4:** Push, PR gegen `alpha`, Zunder `review` mit `pr_url`.
+- [x] **Step 4:** Push, PR gegen `alpha`, Zunder `review` mit `pr_url`.
