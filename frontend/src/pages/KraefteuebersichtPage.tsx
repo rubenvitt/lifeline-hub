@@ -43,6 +43,7 @@ import {
 import { abrufZustand, zustandNachFreigabe, type AbrufZustand } from '../api/abrufZustand';
 import { ladeZeitachseGrenzwerte, listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import DauerMitEinstufung from '../kraefte/DauerMitEinstufung';
+import { useMeldebildFilter } from '../kraefte/useMeldebildFilter';
 import {
   ankerText,
   kraftDauern,
@@ -817,7 +818,9 @@ export default function KraefteuebersichtPage() {
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useJetzt();
 
-  const [filter, setFilter] = useState<MeldebildFilter>(LEERER_FILTER);
+  // Der Filter ist Zustand der Adresse (LLH-1826): er überlebt Weg und Zurück, ein anderer Einsatz
+  // ist eine andere Adresse. Aufklappzustand und Stufe bleiben Seitenzustand (Entwurf, Nicht-Ziele).
+  const [filter, setFilter] = useMeldebildFilter();
   /**
    * Offene Zeilen; `null` heißt „Vorgabestufe Einheiten“ (Untereinheiten sichtbar, Mittel zu).
    * Als `null` statt einer berechneten Liste, weil das Raster beim ersten Bild noch leer ist.
@@ -1257,15 +1260,14 @@ export default function KraefteuebersichtPage() {
     // Werkzeugzeile) und geht beim nächsten Versuch von selbst.
   });
 
-  // Ein Einsatzwechsel setzt Filter und Aufklappzustand zurück — sonst trüge die Filtermarke den
-  // Abschnittsnamen des vorigen Einsatzes.
+  // Ein Einsatzwechsel setzt den Aufklappzustand zurück. Den Filter trägt die Adresse, ein anderer
+  // Einsatz beginnt dort ohne (LLH-1826).
   //
   // Vorgabe „Einheiten“ (Ruben, 13.10.2026): die Gliederung steht offen, die Mittel sind Detail —
   // die Einheitenzeile trägt Stärke, Verteilung und Auftrag schon selbst.
   useEffect(() => {
     setExpandedKeys(null);
     setGewaehlteStufe(null);
-    setFilter(LEERER_FILTER);
     setSprungZeile(null);
   }, [einsatzId]);
 

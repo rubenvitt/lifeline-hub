@@ -2,7 +2,7 @@ import { IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -44,10 +44,14 @@ import LageAngabenBearbeiten from '../meldungen/LageAngabenBearbeiten';
 import { MELDUNGSART_LABEL } from '../meldungen/meldungKennzahlen';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { useOhneVerbindung } from '../offline/verbindung';
-import { lagemeldungenPfad, meldungenPfad, parseLageZeitraum } from '../routing/deeplinks';
+import { meldungenPfad, parseLageZeitraum } from '../routing/deeplinks';
+import { useAdressSuche, useAdressWert } from '../routing/useAdressWert';
+import { useAdressAenderung } from '../routing/useLinkAuftrag';
 import { etbTyp } from '../theme/statusFarben';
 import {
+  HERKUNFT_ERLAUBT,
   LEERER_FILTER,
+  ORT_ERLAUBT,
   filterAktiv,
   filtereLagemeldungen,
   gruppiereNachTag,
@@ -131,21 +135,38 @@ export default function LagemeldungenPage() {
   const queryClient = useQueryClient();
   const ohneVerbindung = useOhneVerbindung();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   // Über den Query-String, nicht das Objekt: react-router gibt bei jeder Navigation ein neues.
   const adresse = searchParams.toString();
   const zeitraum = useMemo(() => parseLageZeitraum(new URLSearchParams(adresse)), [adresse]);
-  const [uebrige, setFilter] = useState<LageFilter>(LEERER_FILTER);
+  // Ort, Herkunft und Suche stehen neben dem Zeitraum in der Adresse (LLH-1826): sie überleben Weg
+  // und Zurück. Alle Schreiber bauen im selben Zug aufeinander auf (`useAdressAenderung`).
+  const [ort, setzeOrt] = useAdressWert('ort', ORT_ERLAUBT, LEERER_FILTER.ort);
+  const [herkunft, setzeHerkunft] = useAdressWert(
+    'herkunft',
+    HERKUNFT_ERLAUBT,
+    LEERER_FILTER.herkunft,
+  );
+  const [suche, setzeSuche] = useAdressSuche();
+  const aendereAdresse = useAdressAenderung();
   const filter = useMemo<LageFilter>(
-    () => ({ ...uebrige, von: zeitraum.von, bis: zeitraum.bis }),
-    [uebrige, zeitraum],
+    () => ({ ort, herkunft, suche, von: zeitraum.von, bis: zeitraum.bis }),
+    [ort, herkunft, suche, zeitraum],
   );
   const { stand: letzteLbStand, von: letzteLb } = useLetzteLagebesprechung(einsatzId);
   // `replace` wie im ETB: eine Wahl ist ein Filterstand, kein Verlaufsschritt.
+  // Die übrigen Filter bleiben stehen; Kodierung wie `lagemeldungenPfad`.
   const zeitraumWaehlen = (g: ZeitraumGrenzen) =>
-    navigate(lagemeldungenPfad(einsatzId, g), { replace: true });
+    aendereAdresse((p) => {
+      for (const grenze of ['von', 'bis'] as const) {
+        const wert = g[grenze];
+        if (wert) p.set(grenze, wert);
+        else p.delete(grenze);
+      }
+    });
   const filterZuruecksetzen = () => {
-    setFilter(LEERER_FILTER);
+    setzeOrt(LEERER_FILTER.ort);
+    setzeHerkunft(LEERER_FILTER.herkunft);
+    setzeSuche(LEERER_FILTER.suche);
     zeitraumWaehlen({ von: undefined, bis: undefined });
   };
   // Offen ist der Dialog nur für den Einsatz, in dem er geöffnet wurde (Review LLH-1921): ein
@@ -584,7 +605,7 @@ export default function LagemeldungenPage() {
             aria-label="Suche in Lagemeldungen"
             placeholder="Meldungstext, Absender oder Nr."
             value={filter.suche}
-            onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
+            onChange={(e) => setzeSuche(e.target.value)}
             style={{ flex: '1 1 220px', maxWidth: 360 }}
           />
           <ZeitraumWahl
@@ -602,14 +623,14 @@ export default function LagemeldungenPage() {
             style={{ minWidth: 170 }}
             options={ORT_OPTIONEN}
             value={filter.ort}
-            onChange={(ort: Ortsfilter) => setFilter((f) => ({ ...f, ort }))}
+            onChange={(wert: Ortsfilter) => setzeOrt(wert)}
           />
           <Select
             aria-label="Herkunft"
             style={{ minWidth: 150 }}
             options={HERKUNFT_OPTIONEN}
             value={filter.herkunft}
-            onChange={(herkunft: Herkunftsfilter) => setFilter((f) => ({ ...f, herkunft }))}
+            onChange={(wert: Herkunftsfilter) => setzeHerkunft(wert)}
           />
         </div>
       )}
