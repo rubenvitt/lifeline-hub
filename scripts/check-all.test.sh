@@ -186,14 +186,15 @@ fehlt "14 schnell fährt den Swift-Schritt nicht" '^Schritte: .*\b18\b'
 # rot; mit Toolchain fährt er `swift test` im Paket und übernimmt dessen Ergebnis. Gefahren wird
 # der echte Schritt gegen eine Attrappe von `swift`; PATH zeigt nur auf deren Verzeichnis, damit
 # eine installierte Toolchain den Fall „fehlt“ nicht verdeckt (der Schritt nutzt sonst nur
-# Builtins).
+# Builtins). Der Fall „lokal“ setzt IOS_SWIFT_PFLICHT=0 selbst: ein Aufrufer mit der Variable
+# (`IOS_SWIFT_PFLICHT=1 check-all.sh`) machte ihn sonst rot.
 mkdir -p "$ARBEIT/s18/ios/LifelineKern" "$ARBEIT/s18/leer" "$ARBEIT/s18/gruen" "$ARBEIT/s18/rot"
 printf '#!/bin/sh\necho "swift-lief $* in $(pwd)"\n' > "$ARBEIT/s18/gruen/swift"
 printf '#!/bin/sh\necho swift-rot; exit 1\n' > "$ARBEIT/s18/rot/swift"
 chmod +x "$ARBEIT/s18/gruen/swift" "$ARBEIT/s18/rot/swift"
 schritt_18_def="$(sed -n '/^schritt_18() {/,/^}/p' "$CHECK_ALL")"
 [ -n "$schritt_18_def" ] || { echo "FAIL 15 schritt_18 fehlt in check-all.sh" >&2; fehler=1; }
-rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/leer'; $schritt_18_def" 0 18 || rc=$?
+rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/leer'; IOS_SWIFT_PFLICHT=0; $schritt_18_def" 0 18 || rc=$?
 pruefe "15 ohne swift → Exit 0" 0 "$rc"
 enthaelt "15 ohne swift → übersprungen, nicht grün" '\[18/9\] +übersprungen'
 enthaelt "15 ohne swift → OK mit Lücke" '^==> OK mit Lücke'

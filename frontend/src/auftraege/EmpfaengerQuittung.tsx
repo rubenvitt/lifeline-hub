@@ -1,6 +1,6 @@
 import { Button, Flex, Popconfirm, Space, Typography, theme } from 'antd';
 import { useMemo } from 'react';
-import { Status, monoStil, useRollen } from '../components/instrument';
+import { Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
@@ -112,9 +112,9 @@ export default function EmpfaengerQuittung({
           ))}
           {/* „+n" zählt nur verborgene QUITTIERTE — das ✓ sagt es ohne Farbe (WCAG 1.4.1). */}
           {restQuittierte > 0 && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Textstufe stufe="textKlein" ton="gedaempft">
               +{restQuittierte} ✓
-            </Text>
+            </Textstufe>
           )}
         </Space>
       </Flex>
@@ -124,7 +124,7 @@ export default function EmpfaengerQuittung({
          quittiert, steht im zugänglichen Namen. */}
       {offene.length > 0 && (
         <Flex align="center" gap={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
-          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+          <Text type="secondary" style={{ ...schriftStil('textKlein'), whiteSpace: 'nowrap' }}>
             {offenLabel}
           </Text>
           {offene.map((e) => {
@@ -140,7 +140,7 @@ export default function EmpfaengerQuittung({
             );
             return (
               <Space key={e.id} size={token.marginXS}>
-                <Text style={{ fontSize: 13 }}>{e.name}</Text>
+                <Textstufe>{e.name}</Textstufe>
                 {canQuittieren &&
                   (canQuittierenFor?.(e.id) ?? true) &&
                   (rueckfrage ? (

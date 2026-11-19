@@ -2,7 +2,7 @@ import { Col, Input, InputNumber, Form, Row, theme } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { serverJetzt } from '../offline/serveruhr';
-import { Paneel } from '../components/instrument';
+import { Feld, Paneel } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import type { NeueErinnerung } from '../api/types';
@@ -101,28 +101,28 @@ export default function ErinnerungFormular({
       serie
       uebernahme={UEBERNAHME}
     >
-      <Form.Item
+      <Feld
         name="titel"
         label="Titel / Anlass"
         rules={[{ required: true, message: 'Titel ist erforderlich' }]}
       >
         <Input aria-label="Titel" placeholder="z. B. Lagemeldung aller EA" />
-      </Form.Item>
-      <Form.Item name="beschreibung" label="Beschreibung (optional)">
+      </Feld>
+      <Feld name="beschreibung" label="Beschreibung (optional)">
         <TextArea aria-label="Beschreibung" rows={2} />
-      </Form.Item>
+      </Feld>
       <Row gutter={token.marginLG}>
         <Col xs={24} sm={12}>
-          <Form.Item
+          <Feld
             name="faellig"
             label="Fällig"
             rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
           >
             <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
-          </Form.Item>
+          </Feld>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item
+          <Feld
             name="intervall"
             label="Intervall (Min, optional)"
             rules={[
@@ -133,16 +133,11 @@ export default function ErinnerungFormular({
               },
             ]}
           >
-            <InputNumber
-              aria-label="Intervall"
-              min={1}
-              placeholder="30"
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
+            <InputNumber aria-label="Intervall" min={1} placeholder="30" />
+          </Feld>
         </Col>
       </Row>
-      <Form.Item
+      <Feld
         name="empfaenger"
         label="Empfänger/Funktion (optional)"
         // EIN Wert: eine neue Wahl ersetzt die alte, statt sich daneben zu stellen.
@@ -153,7 +148,7 @@ export default function ErinnerungFormular({
           aria-label="Empfänger"
           placeholder="Funktion (z. B. S2) oder Freitext"
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsFormular>
   );
 

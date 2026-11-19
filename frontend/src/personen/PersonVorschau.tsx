@@ -2,7 +2,7 @@ import { Spin, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { ladePerson } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
-import { GESCHLECHT_WORT, STATUS_META } from './personMeta';
+import { GESCHLECHT_WORT, personStatusDarstellung } from './personMeta';
 import { formatKalenderdatum } from '../anzeige/kalenderdatum';
 import Patientenkopf from './Patientenkopf';
 import PersonVerlauf from './PersonVerlauf';
@@ -49,7 +49,7 @@ export default function PersonVorschau({
       {p && (
         <Stapel abstand="lg">
           <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
-            <Status darstellung={STATUS_META[p.status]} />
+            <Status darstellung={personStatusDarstellung(p.status)} />
             {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
           </Stapel>
 

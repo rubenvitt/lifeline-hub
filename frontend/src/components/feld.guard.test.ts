@@ -5,13 +5,14 @@ import { ohneKommentare } from '../test/ohneKommentare';
 import { quellwurzel } from '../test/ratsche';
 
 /**
- * Feld-Wächter des Verwaltungsteils und der umgestellten Einsatzmodule (Spec `feldbreiten`,
- * „Keine feste Feldbreite im Verwaltungsteil", Change `hzru8iq7-text-stapel-meta-feld`, design.md
- * D7; ausgedehnt mit LLH-1970). Löst den Feldbreiten-Guard aus LFH-329 · B1 ab.
+ * Feld-Wächter (Spec `feldbreiten`, „Keine feste Feldbreite im Verwaltungsteil", Change
+ * `hzru8iq7-text-stapel-meta-feld`, design.md D7; auf die Führungsmodule ausgeweitet mit
+ * LLH-1969, auf Personen, Betreuung, Verpflegung, Kräfte und Ablösung mit LLH-1970). Löst den
+ * Feldbreiten-Guard aus LFH-329 · B1 ab.
  *
  * Ein Eingabefeld bekommt seine Breite nur über `Feld` (`components/instrument/Feld.tsx`) mit einer
  * benannten Obergrenze; dann ist es fluid und ragt am schmalen Schirm nicht über den Rand. Der
- * Wächter prüft in den Bereichen unter `BEREICHE`:
+ * Wächter prüft in den Bereichen aus {@link BEREICHE}:
  *
  * 1. kein `<Form.Item` — Formularfelder sind `Feld`;
  * 2. keine Breite (`width`, `maxWidth`, `minWidth`, als Zahl, String oder Konstante) im `style`
@@ -24,21 +25,30 @@ import { quellwurzel } from '../test/ratsche';
  * ── BEKANNTE GRENZEN ──
  * 1. Regel 2 sieht das Eingabefeld nur, solange zwischen Elementname und `style=` kein `>` steht
  *    (Pfeilfunktion in einer Prop davor).
- * 2. Der Scan hört an den Bereichen unter `BEREICHE` auf; außerhalb gilt die Regel ebenso, wird
- *    aber erst mit der Umstellung des Bereichs erzwungen.
+ * 2. Der Scan hört an den Bereichen aus {@link BEREICHE} auf; außerhalb gilt die Regel ebenso,
+ *    wird aber erst mit der Umstellung des Bereichs erzwungen.
  */
 
 const SRC = quellwurzel('Feld-Wächter');
 
 /**
- * Die Bereiche: der Verwaltungsteil (Stammdaten, Karten, globale Einstellungen, Benutzer) und die
- * Einsatzmodule Personen, Betreuung, Verpflegung, Kräfte und Ablösung (LLH-1970).
+ * Die geprüften Bereiche: der Verwaltungsteil (Stammdaten, Karten, globale Einstellungen,
+ * Benutzer; LLH-1810), die Führungsmodule ETB, Aufträge, Meldungen, Nachforderungen,
+ * Lageberichte, Erinnerungen und Chat (LLH-1969) und die Einsatzmodule Personen, Betreuung,
+ * Verpflegung, Kräfte und Ablösung (LLH-1970).
  */
 const BEREICHE = [
   'stammdaten',
   'karten',
   'pages/einstellungen',
   'pages/BenutzerPage.tsx',
+  'etb',
+  'auftraege',
+  'meldungen',
+  'nachforderungen',
+  'lageberichte',
+  'erinnerung',
+  'chat',
   'personen',
   'betreuung',
   'verpflegung',
@@ -55,6 +65,13 @@ const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = 
   'pages/BenutzerPage.tsx': {
     anzahl: 2,
     grund: 'Spaltenbreiten der Benutzertabelle neben ihrer Fließspalte',
+  },
+  'chat/KanalListe.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbSpaltenzeile.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbEintragVorschau.tsx': { anzahl: 1, grund: '2-px-Typkante der Vorschau' },
+  'etb/EtbFeldzeile.tsx': {
+    anzahl: 3,
+    grund: '6-px-Typpunkt in Menü und Typ-Knopf, 32-px-Spalte des Feldworts am Handschirm',
   },
   // Einsatzmodule (LLH-1970).
   'personen/personenSpalten.tsx': {

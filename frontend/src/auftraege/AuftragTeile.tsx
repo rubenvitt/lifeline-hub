@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Status, monoStil, useRollen } from '../components/instrument';
+import { Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -114,7 +114,7 @@ export function AuftragKopf({
       </Space>
       <Space size={token.margin} wrap>
         {a.ist_ueberfaellig && (
-          <Text type="danger" strong style={{ fontSize: 12 }}>
+          <Text type="danger" strong style={schriftStil('textKlein')}>
             <span aria-hidden="true">
               <IconUhr />
             </span>{' '}
@@ -204,15 +204,15 @@ export function AuftragAufhebung({ auftrag: a }: { auftrag: Auftrag }) {
   if (a.bearbeitungsstatus !== 'aufgehoben') return null;
   return (
     <Space orientation="vertical" size={0} style={{ marginBottom: token.marginSM }}>
-      <Text style={{ fontSize: 13 }}>
+      <Textstufe>
         {[
           `Aufgehoben am: ${a.aufgehoben_at ? zeitpunkt(a.aufgehoben_at) : '—'}`,
           a.aufgehoben_von_name,
         ]
           .filter(Boolean)
           .join(' · ')}
-      </Text>
-      {a.aufhebungsgrund && <Text style={{ fontSize: 13 }}>{`Grund: ${a.aufhebungsgrund}`}</Text>}
+      </Textstufe>
+      {a.aufhebungsgrund && <Textstufe>{`Grund: ${a.aufhebungsgrund}`}</Textstufe>}
     </Space>
   );
 }
@@ -231,26 +231,26 @@ export function AuftragVollzug({
     return (
       <Space orientation="vertical" size={0} style={{ marginBottom: token.marginSM }}>
         {a.vollzogen_at && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             Vollzogen am: {zeitpunkt(a.vollzogen_at)}
-          </Text>
+          </Textstufe>
         )}
         {a.abgenommen_at && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             Abgenommen am: {zeitpunkt(a.abgenommen_at)}
-          </Text>
+          </Textstufe>
         )}
         {a.vollzugsmeldung && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             Vollzugsvermerk: {a.vollzugsmeldung}
-          </Text>
+          </Textstufe>
         )}
       </Space>
     );
   }
   if (!a.vollzugsmeldung) return null;
   return (
-    <Text style={{ fontSize: 13, display: 'block', marginBottom: token.marginSM }}>
+    <Text style={{ ...schriftStil('text'), display: 'block', marginBottom: token.marginSM }}>
       <Text type="secondary">Vollzug: </Text>
       {a.vollzugsmeldung}
     </Text>

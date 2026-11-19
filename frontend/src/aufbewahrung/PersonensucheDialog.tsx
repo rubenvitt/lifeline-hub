@@ -6,7 +6,11 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachFolge, nachText, werteAusKatalog } from '../components/katalogVergleich';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { personStatus, schwaerzungsantragStand } from '../theme/statusFarben';
+import {
+  personStatus,
+  personStatusDarstellung,
+  schwaerzungsantragStand,
+} from '../theme/statusFarben';
 import { ZIEL_ART } from './archivText';
 import { Status } from '../components/instrument/Status';
 
@@ -79,7 +83,7 @@ export default function PersonensucheDialog({
       width: 140,
       sorter: nachFolge(Object.keys(personStatus), (t: PersonTreffer) => t.person_status),
       render: (_, t) =>
-        t.person_status ? <Status darstellung={personStatus[t.person_status]} /> : leer,
+        t.person_status ? <Status darstellung={personStatusDarstellung(t.person_status)} /> : leer,
     },
     {
       key: 'antrag',
