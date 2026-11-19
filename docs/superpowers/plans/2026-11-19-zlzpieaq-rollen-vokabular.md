@@ -17,7 +17,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
 - Keine Wire-Werte, Spalten, Routen oder gespeicherten Schlüssel umbenennen; kein Backend-Diff.
 - Namen: „Einsatzleitung“, „Führungspersonal“, „Beobachter“, „Keine“, „Führungskraft der Organisation“, „System-Admin“, „Frei (alle)“, „Führung im Einsatz“; „System-Admin der Organisation“ statt „Org-Admin“; ohne jede Rolle „Keine Rolle“.
 - Feldnamen: „Rolle in der Verwaltung“, „Rolle in der Organisation“, „Rolle im Einsatz“.
-- Darf-Texte wörtlich aus dem Spec, Abschnitt „Vokabular“; jeder ≤ 70 Zeichen.
+- Darf-Texte wörtlich aus dem Spec, Abschnitt „Vokabular“; jeder ≤ 80 Zeichen (Entwurf: „etwa 70“; die freigegebene Zeile der Stufe „Führung im Einsatz“ hat 78 Zeichen, die Grenze ist deshalb 80).
 - Geschlossenes Auswahlfeld zeigt nur den Namen.
 - Bezeichner: Fachwörter deutsch, Technik englisch (`AGENTS.md`, LFH-1312); Prosa deutsch.
 - Node/pnpm nur über `mise exec --`.
@@ -49,11 +49,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
   - `SYSTEM_ADMIN_DER_ORG = 'System-Admin der Organisation'`, `KEINE_ROLLE = 'Keine Rolle'`
   - `kontoRollenNamen(b: { system_rolle: SystemRolle; org_rolle: OrgRolle }): string[]` — Namen der gesetzten Rollen (System-Admin zuerst), sonst `[KEINE_ROLLE]`.
 
-- [ ] **Step 1: Test schreiben** — jeder Record: `name` nicht leer, `darf` nicht leer und `≤ 70` Zeichen; Stichproben `EINSATZ_ROLLE.beobachter` = `{ name: 'Beobachter', darf: 'liest nur' }`, `ORG_ROLLE.fuehrungskraft.name` = `'Führungskraft der Organisation'`, `SYSTEM_ROLLE.admin.name` = `'System-Admin'`, `MODUL_STUFE.admin.name` = `'System-Admin'`; `kontoRollenNamen({system_rolle:'admin',org_rolle:'fuehrungskraft'})` = `['System-Admin','Führungskraft der Organisation']`, `kontoRollenNamen({system_rolle:'keiner',org_rolle:'keine'})` = `['Keine Rolle']`.
-- [ ] **Step 2: Test laufen lassen, schlägt fehl** (`mise exec -- pnpm exec vitest run src/einsatz/rollenVokabular.test.ts`).
-- [ ] **Step 3: Datei anlegen** mit den Werten aus dem Spec.
-- [ ] **Step 4: Test grün.**
-- [ ] **Step 5: Commit** `feat: Rollen-Vokabular als eine Quelle (LLH-1818)`.
+- [x] **Step 1: Test schreiben** — jeder Record: `name` nicht leer, `darf` nicht leer und `≤ 70` Zeichen; Stichproben `EINSATZ_ROLLE.beobachter` = `{ name: 'Beobachter', darf: 'liest nur' }`, `ORG_ROLLE.fuehrungskraft.name` = `'Führungskraft der Organisation'`, `SYSTEM_ROLLE.admin.name` = `'System-Admin'`, `MODUL_STUFE.admin.name` = `'System-Admin'`; `kontoRollenNamen({system_rolle:'admin',org_rolle:'fuehrungskraft'})` = `['System-Admin','Führungskraft der Organisation']`, `kontoRollenNamen({system_rolle:'keiner',org_rolle:'keine'})` = `['Keine Rolle']`.
+- [x] **Step 2: Test laufen lassen, schlägt fehl** (`mise exec -- pnpm exec vitest run src/einsatz/rollenVokabular.test.ts`).
+- [x] **Step 3: Datei anlegen** mit den Werten aus dem Spec.
+- [x] **Step 4: Test grün.**
+- [x] **Step 5: Commit** `feat: Rollen-Vokabular als eine Quelle (LLH-1818)`.
 
 ### Task 2: Options-Baustein
 

@@ -133,7 +133,7 @@ zusammen, nicht aus eigenen Literalen.
   `taktischesZeichen.ts`, `fachobjektZeichen.ts`) steht nur in Kommentaren und fällt nicht
   darunter; wo nötig eine kleine Ausnahmeliste mit Begründung.
 - Ein Test je Record prüft, dass jeder Darf-Text gesetzt ist und unter einer Längengrenze bleibt
-  (etwa 70 Zeichen), damit das Anti-Ziel prüfbar ist.
+  (80 Zeichen), damit das Anti-Ziel prüfbar ist.
 
 ## Doku
 
