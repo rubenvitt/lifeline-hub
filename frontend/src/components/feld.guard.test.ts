@@ -92,11 +92,6 @@ const AUSGESPART: Readonly<Record<string, string>> = {
   'lagebesprechung/LagebesprechungModal.tsx': 'LLH-1999',
   'pages/bereitstellungsraum/EintreffenDialog.tsx': 'LLH-1999',
   'pages/einsatzdaten/EinsatzAbschlussDialog.tsx': 'LLH-1999',
-  // `DatenfeldEingabe` klont sein Kind mit der Label-`id` und kennt noch keine Breite (LLH-2000).
-  'pages/uhs/UhsAngaben.tsx': 'LLH-2000',
-  'pages/BetreuungsstelleDetailPage.tsx': 'LLH-2000',
-  'pages/SchaedenDetailPage.tsx': 'LLH-2000',
-  'pages/TiereDetailPage.tsx': 'LLH-2000',
 };
 
 /** Was eine feste Zahlbreite behalten darf, wie oft — und warum. Keine davon ist ein Eingabefeld. */

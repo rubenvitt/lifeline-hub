@@ -12,6 +12,7 @@ import BearbeitbaresPaneel, {
   type BearbeitbaresFeld,
   type BearbeitbaresPaneelProps,
 } from './BearbeitbaresPaneel';
+import { FELD_GRENZE } from './Feld';
 
 /**
  * Baustein „Bearbeiten in der Ansicht“ (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten in der
@@ -48,6 +49,7 @@ function funkFelder(w: Funk): BearbeitbaresFeld<Funk>[] {
       anzeige: w.kanal ?? '—',
       eingabe: <InputNumber />,
       mono: true,
+      breite: 'kurz',
     },
   ];
 }
@@ -110,6 +112,16 @@ describe('BearbeitbaresPaneel · Umschalten', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Funk bearbeiten' })).toHaveFocus(),
     );
+  });
+
+  it('reicht die Breitenstufe eines Felds an seine Eingabezelle durch (LLH-2000)', async () => {
+    const user = userEvent.setup();
+    rendern(<FunkPaneel />);
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    const zelle = (await screen.findByRole('spinbutton', { name: /^Kanal/ })).closest(
+      '.ant-form-item',
+    ) as HTMLElement;
+    expect(zelle.style.getPropertyValue(FELD_GRENZE)).toBe('120px');
   });
 
   it('Abbrechen verwirft die Eingabe: beim nächsten Öffnen steht wieder der gespeicherte Wert', async () => {
