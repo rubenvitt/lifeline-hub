@@ -1,4 +1,4 @@
-import { Space, Typography, theme } from 'antd';
+import { Typography } from 'antd';
 import type { ReactNode } from 'react';
 import { zahlText } from '../../anzeige/zahl';
 import {
@@ -7,6 +7,7 @@ import {
   Kennzahl,
   Kennzahlenband,
   Paneel,
+  Stapel,
 } from '../../components/instrument';
 import type { Ergebnis, TypAnzahl } from './rechnerKern';
 import { ZELTTYPEN, richtwertBasis, type Richtwerte } from './richtwerte';
@@ -36,12 +37,11 @@ export function ruhtAufAnnahme(schluessel: readonly string[], richtwerte: Richtw
 }
 
 function Etikett({ text, annahme }: { text: string; annahme: boolean }) {
-  const { token } = theme.useToken();
   return (
-    <Space size={token.marginSM} wrap>
+    <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
       <span>{text}</span>
       {annahme && <Marke data-lfh="annahme">Annahme</Marke>}
-    </Space>
+    </Stapel>
   );
 }
 
@@ -74,7 +74,7 @@ export default function ErgebnisAnzeige({
     : ['urinal_je_maenner', 'maenneranteil_ohne_trennung_prozent'];
 
   return (
-    <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+    <Stapel abstand="lg">
       <Kennzahlenband beschriftung="Ergebnis in Zahlen" spalten={4}>
         <Kennzahl
           titel={e.weg === 'personen' ? 'Personen' : 'Plätze'}
@@ -246,6 +246,6 @@ export default function ErgebnisAnzeige({
           </Datenfeld>
         </Datenraster>
       </Paneel>
-    </Space>
+    </Stapel>
   );
 }

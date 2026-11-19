@@ -34,7 +34,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } 
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { monoStil, Segmentleiste } from '../components/instrument';
+import { FELD_KLASSE, monoStil, Segmentleiste, Stapel, Knopfreihe } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   FAHRZEUGE_ANSICHT_ERLAUBT,
@@ -129,7 +129,7 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
   return (
     <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <Status darstellung={besatzungsUrteil[urteil]} />
-      <span style={monoStil(12)}>
+      <span style={monoStil('monoKlein')}>
         {urteil !== 'nicht_erfasst' && (
           <>
             Ist <StaerkeAnzeige wert={ist} />
@@ -270,7 +270,11 @@ function BesatzungsBlock({
             <div key={m.id}>
               <Space
                 size="middle"
-                style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  maxWidth: 'var(--lfh-feld-mittel)',
+                }}
               >
                 <Space size={token.marginSM} wrap>
                   <Typography.Text type={geloest ? 'secondary' : undefined}>
@@ -342,17 +346,23 @@ function BesatzungsBlock({
         })
       )}
       {darfSchreiben && (
-        <Select
-          style={{ width: '100%', maxWidth: 420, marginTop: token.marginSM }}
-          placeholder="Kraft zur Besatzung …"
-          value={null}
-          notFoundContent={freiInhalt}
-          options={frei.map((p) => ({ value: p.id, label: p.name }))}
-          onSelect={(epId) => onZuordnen(Number(epId))}
-        />
+        // Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): die Hülle trägt die Breite
+        // der Besatzungszeilen darüber (Stufe `mittel`).
+        <div
+          className={FELD_KLASSE}
+          style={{ maxWidth: 'var(--lfh-feld-mittel)', marginTop: token.marginSM }}
+        >
+          <Select
+            placeholder="Kraft zur Besatzung …"
+            value={null}
+            notFoundContent={freiInhalt}
+            options={frei.map((p) => ({ value: p.id, label: p.name }))}
+            onSelect={(epId) => onZuordnen(Number(epId))}
+          />
+        </div>
       )}
       {zuordnenFehler && (
-        <div style={{ maxWidth: 420, marginTop: token.marginSM }}>
+        <div style={{ maxWidth: 'var(--lfh-feld-mittel)', marginTop: token.marginSM }}>
           <SpeicherFehler
             fehler={zuordnenFehler.fehler}
             titel="Nicht zugeordnet"
@@ -1039,12 +1049,12 @@ function FahrzeugeInhalt() {
       render: (_, ef) => (
         <KennungMitZusatz
           kennung={
-            <Space wrap>
+            <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               {/* Funkrufname in Mono. */}
-              <span style={monoStil(13)}>{ef.funkrufname}</span>
+              <span style={monoStil('mono')}>{ef.funkrufname}</span>
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
               {ef.ist_demo && <DemoMarke />}
-            </Space>
+            </Stapel>
           }
           zusatz={ef.fahrzeugtyp}
           ausSpalte="typ"
@@ -1264,9 +1274,7 @@ function FahrzeugeInhalt() {
             : [],
       }}
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. Am
               Handschirm hinter „Filter (n)“ (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig`
               D5), samt Sortierung und Status der Liste. */}
@@ -1290,7 +1298,7 @@ function FahrzeugeInhalt() {
               {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>}
             </>
           )}
-        </Space>
+        </>
       }
       hinweis={
         nurAnsicht ||
@@ -1550,7 +1558,7 @@ function FahrzeugeInhalt() {
         }}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureStorno()) setStornoFuer(null);
@@ -1568,7 +1576,7 @@ function FahrzeugeInhalt() {
             >
               Stornieren
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Das Fahrzeug erscheint danach in keiner Liste und keinem Nachweis.

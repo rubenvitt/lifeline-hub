@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Alert, Button, Space, Spin, theme } from 'antd';
+import { Alert, Button, Spin, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { IconKachelraster } from '../icons';
@@ -10,7 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { UhsDetail } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Segmentleiste } from '../components/instrument';
+import { Segmentleiste, Stapel } from '../components/instrument';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import MaterialTab from '../pages/uhs/MaterialTab';
 import UhsAnhaenge from '../pages/uhs/UhsAnhaenge';
@@ -32,7 +32,7 @@ const BEREICHE = Object.keys(BEREICH_NAME) as Bereich[];
 function PlaetzeBereich({ einsatzId, uhs }: { einsatzId: number; uhs: UhsDetail }) {
   const navigate = useNavigate();
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+    <Stapel abstand="md">
       <UhsLagezeile
         einsatzId={einsatzId}
         uhs={uhs}
@@ -42,13 +42,15 @@ function PlaetzeBereich({ einsatzId, uhs }: { einsatzId: number; uhs: UhsDetail 
           patienten: geraetPatientenPfad(einsatzId),
         }}
       />
-      <Button
-        icon={<IconKachelraster />}
-        onClick={() => navigate(geraetUhsPfad(einsatzId, uhs.id))}
-      >
-        Grundriss bearbeiten
-      </Button>
-    </Space>
+      <div>
+        <Button
+          icon={<IconKachelraster />}
+          onClick={() => navigate(geraetUhsPfad(einsatzId, uhs.id))}
+        >
+          Grundriss bearbeiten
+        </Button>
+      </div>
+    </Stapel>
   );
 }
 

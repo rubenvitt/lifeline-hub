@@ -1,7 +1,7 @@
 import { Button, Typography } from 'antd';
 import { useId, useState } from 'react';
 import FeldLabel from '../../components/FeldLabel';
-import { useRollen } from '../../components/instrument';
+import { Stapel, schriftStil, useRollen } from '../../components/instrument';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import { istLatLon, type KoordinatenWert } from '../../anzeige/koordinatenWert';
@@ -65,7 +65,7 @@ export default function ModusBand({
 
   const zusatz =
     modus.art === 'platzieren' && platzieren ? (
-      <div>
+      <Stapel abstand="xs">
         {/* Ein Tipp auf die Karte setzt die Position; hier steht der Weg über die Koordinate. */}
         <FeldLabel text="Koordinate" htmlFor={koordId}>
           <KoordinatenEingabe
@@ -76,7 +76,7 @@ export default function ModusBand({
             exclude={platzieren.exclude}
           />
         </FeldLabel>
-        <div style={{ marginTop: token.marginXS }}>
+        <div>
           <Button
             disabled={!istLatLon(koord)}
             onClick={() => {
@@ -89,13 +89,13 @@ export default function ModusBand({
             Übernehmen
           </Button>
         </div>
-      </div>
+      </Stapel>
     ) : modus.art === 'bild' && bild ? (
-      <div>
+      <Stapel abstand="xs">
         {bild.griffHinweis && (
           <Typography.Text
             type="warning"
-            style={{ fontSize: 12, display: 'block', marginBottom: token.marginXS }}
+            style={schriftStil('textKlein')}
             data-lfh="bildgriff-hinweis"
           >
             {bild.griffHinweis}
@@ -109,7 +109,7 @@ export default function ModusBand({
             einsatzId={bild.einsatzId}
           />
         </FeldLabel>
-        <div style={{ marginTop: token.marginXS }}>
+        <div>
           <Button
             disabled={!istLatLon(mitte)}
             onClick={() => {
@@ -122,7 +122,7 @@ export default function ModusBand({
             Mittelpunkt setzen
           </Button>
         </div>
-      </div>
+      </Stapel>
     ) : null;
 
   // Unter `lg` ohne Zusatz (Taktisches Zeichen, Rückmeldung): alles steht im Fuß.

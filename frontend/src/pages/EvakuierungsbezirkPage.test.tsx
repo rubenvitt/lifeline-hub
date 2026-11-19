@@ -482,10 +482,11 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       );
     });
 
-    it('ohne Änderung schließt Speichern die Sitzung, ohne zu senden', async () => {
+    it('ohne Änderung ist Speichern gesperrt, Enter schließt die Sitzung, ohne zu senden', async () => {
       renderSeite();
       await starteBearbeitung();
-      await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+      expect(await screen.findByRole('button', { name: 'Speichern' })).toBeDisabled();
+      await userEvent.type(await screen.findByLabelText('Plangröße (Personen)'), '{Enter}');
       expect(await screen.findByRole('button', { name: kopfAusloeser })).toBeInTheDocument();
       expect(api.aendereBezirk).not.toHaveBeenCalled();
     });
@@ -534,7 +535,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       await userEvent.type(feld, 'x');
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       expect(await screen.findByText('Bezirk konnte nicht gespeichert werden')).toBeInTheDocument();
-      expect(screen.getByLabelText('Bezeichnung')).toHaveValue('Uferstraße 12–40x');
+      expect(screen.getByLabelText(/^Bezeichnung/)).toHaveValue('Uferstraße 12–40x');
     });
 
     it('Verlassen-Schutz: mit offener Änderung fragt der Wechsel nach', async () => {
@@ -544,7 +545,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       await userEvent.click(screen.getByRole('link', { name: 'Evakuierung' }));
       const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
       await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
-      expect(screen.getByLabelText('Sammelstelle')).toHaveValue('Turnhalle Süd Ost');
+      expect(screen.getByLabelText(/^Sammelstelle/)).toHaveValue('Turnhalle Süd Ost');
       expect(screen.queryByText('UEBERSICHT')).toBeNull();
 
       await userEvent.click(screen.getByRole('link', { name: 'Evakuierung' }));

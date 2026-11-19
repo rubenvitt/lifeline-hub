@@ -1,9 +1,9 @@
-import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import type { ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import FunkUndTelefon from '../../components/FunkUndTelefon';
-import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
+import { Datenfeld, Datenraster, Textstufe } from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import type { AbschnittStaerken } from './abschnittStaerke';
 import { Status } from '../../components/instrument/Status';
@@ -27,7 +27,6 @@ export default function AbschnittDaten({
   staerkenErsatz?: ReactNode;
   spalten?: number;
 }) {
-  const { rollen } = useRollen();
   return (
     <Datenraster spalten={spalten} beschriftung="Abschnittsdaten">
       {a.kurzbezeichnung && <Datenfeld label="Kurzbezeichnung">{a.kurzbezeichnung}</Datenfeld>}
@@ -38,7 +37,7 @@ export default function AbschnittDaten({
         {a.lagezustand ? (
           <Status darstellung={abschnittLagezustand[a.lagezustand]} />
         ) : (
-          <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
+          <Textstufe ton="gedaempft">nicht beurteilt</Textstufe>
         )}
       </Datenfeld>
       {/* Kein Fortschritt (LFH-1208, LLH-1170): eine geschätzte Prozentzahl ist im Einsatz nicht
@@ -54,10 +53,24 @@ export default function AbschnittDaten({
         sprechgruppen={a.sprechgruppen}
         verbindungen={a.verbindungen}
       />
-      <Datenfeld label={`Stärke (${STAERKE_SCHREIBWEISE})`} mono>
+      <Datenfeld
+        label={
+          <>
+            Stärke (<StaerkeSchreibweise />)
+          </>
+        }
+        mono
+      >
         {staerken ? <StaerkeAnzeige wert={staerken.eigene} /> : staerkenErsatz}
       </Datenfeld>
-      <Datenfeld label={`Stärke inkl. Unterabschnitte (${STAERKE_SCHREIBWEISE})`} mono>
+      <Datenfeld
+        label={
+          <>
+            Stärke inkl. Unterabschnitte (<StaerkeSchreibweise />)
+          </>
+        }
+        mono
+      >
         {staerken ? <StaerkeAnzeige wert={staerken.inklUnter} /> : staerkenErsatz}
       </Datenfeld>
       {a.bemerkung && (

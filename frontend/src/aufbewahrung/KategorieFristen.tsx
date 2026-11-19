@@ -10,7 +10,14 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { Datenfeld, Datenraster, monoStil } from '../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  Feld,
+  Stapel,
+  Textstufe,
+  monoStil,
+} from '../components/instrument';
 import { aufbewahrungZustand } from '../theme/statusFarben';
 import { fristAusEingabe, istFristverkuerzung } from './fristModell';
 import { KATEGORIE_TEXT, vorgabeSatz } from './kategorieText';
@@ -54,12 +61,11 @@ export function KategorieWert({
   eintrag: KategorieAufbewahrung;
   aktiv: boolean;
 }) {
-  const { token } = theme.useToken();
   // Zeiten immer Mono mit `tabular-nums` (frontend/AGENTS.md, Gestaltungssprache).
-  const zeitStil = monoStil(13);
+  const zeitStil = monoStil('mono');
   return (
-    <Flex vertical gap={token.marginXXS}>
-      <Flex gap={token.marginXS} wrap align="center">
+    <Stapel abstand="xxs">
+      <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
         {eintrag.zustand && <Status darstellung={aufbewahrungZustand[eintrag.zustand]} />}
         {aktiv ? (
           <span>{vorgabeSatz(eintrag.dauer_tage_vorgabe)}</span>
@@ -89,13 +95,11 @@ export function KategorieWert({
         ) : (
           <span>folgt der Frist des Einsatzes</span>
         )}
-      </Flex>
+      </Stapel>
       {eintrag.rechtsgrundlage && (
-        <Typography.Text type="secondary">
-          Rechtsgrundlage: {eintrag.rechtsgrundlage}
-        </Typography.Text>
+        <Textstufe ton="gedaempft">Rechtsgrundlage: {eintrag.rechtsgrundlage}</Textstufe>
       )}
-    </Flex>
+    </Stapel>
   );
 }
 
@@ -175,7 +179,7 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
           const text = KATEGORIE_TEXT[eintrag.kategorie];
           return (
             <Datenfeld key={eintrag.kategorie} label={text.bezeichnung} breit>
-              <Flex vertical gap={token.marginXS}>
+              <Stapel abstand="xs">
                 <KategorieWert eintrag={eintrag} aktiv={aktiv} />
                 {!aktiv && aenderbar(eintrag) && (
                   <Flex gap={token.marginSM} wrap>
@@ -205,7 +209,7 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
                     )}
                   </Flex>
                 )}
-              </Flex>
+              </Stapel>
             </Datenfeld>
           );
         })}
@@ -236,7 +240,7 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
         onFertig={schliessen}
         onAbbrechen={schliessen}
       >
-        <Form.Item
+        <Feld
           label="Neue Frist"
           name="frist"
           rules={[{ required: true, message: 'Zeitpunkt wählen' }]}
@@ -247,8 +251,8 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
           }
         >
           <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Rechtsgrundlage"
           name="rechtsgrundlage"
           rules={[
@@ -259,7 +263,7 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
           ]}
         >
           <Input placeholder="z. B. Paragraf und Gesetz" />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={auswahl ? mutation.error : null} />
       </ErfassungsModal>
       <Modal

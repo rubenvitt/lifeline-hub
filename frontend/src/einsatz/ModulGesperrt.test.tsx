@@ -13,7 +13,7 @@ function PfadAnzeige() {
   return <span data-testid="pfad">{useLocation().pathname}</span>;
 }
 
-function rendern(ausgeblendet: boolean, freigabenPfad?: string) {
+function rendern(ausgeblendet: boolean, freigabenPfad?: string, einsatzleitung?: string[]) {
   return renderMitProviders(
     <Routes>
       <Route
@@ -25,6 +25,7 @@ function rendern(ausgeblendet: boolean, freigabenPfad?: string) {
               ausgeblendet={ausgeblendet}
               rueckweg={{ pfad: '/einsaetze/7/ueberblick', label: 'Überblick öffnen' }}
               freigabenPfad={freigabenPfad}
+              einsatzleitung={einsatzleitung}
             />
             <PfadAnzeige />
           </>
@@ -41,7 +42,7 @@ describe('ModulGesperrt (LFH-888)', () => {
     expect(screen.getByRole('heading', { level: 1, name: /Lagemeldungen/ })).toBeInTheDocument();
     expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
     // Eine kurze Sperrzeile, kein Satz über die Einstellungen (LFH-1078).
-    expect(screen.getByText('Für deine Rolle nicht freigegeben')).toBeInTheDocument();
+    expect(screen.getByText('Für die eigene Rolle nicht freigegeben')).toBeInTheDocument();
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Einstellungen › Module/)).not.toBeInTheDocument();
   });
@@ -74,5 +75,38 @@ describe('ModulGesperrt (LFH-888)', () => {
     expect(screen.getByRole('button', { name: 'Überblick öffnen' })).toHaveClass('ant-btn-primary');
     await userEvent.click(knopf);
     expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/7/einstellungen/module');
+  });
+
+  // --- Ansprechpartner (LLH-1819) ---
+
+  it('nennt die Einsatzleitung beim Namen, alle in Reihenfolge', () => {
+    rendern(false, undefined, ['Anna Muster', 'Ben Beispiel']);
+    expect(
+      screen.getByText('Freigabe erteilt die Einsatzleitung: Anna Muster, Ben Beispiel'),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne bekannte Einsatzleitung steht der Satz ohne Namen und ohne Doppelpunkt', () => {
+    rendern(false, undefined, []);
+    expect(screen.getByText('Freigabe erteilt die Einsatzleitung.')).toBeInTheDocument();
+  });
+
+  it('ohne geladene Liste steht der Satz ohne Namen', () => {
+    rendern(false);
+    expect(screen.getByText('Freigabe erteilt die Einsatzleitung.')).toBeInTheDocument();
+  });
+
+  it('wer die Freigaben verwaltet, bekommt keinen Ansprechpartner, nur den Knopf', () => {
+    rendern(false, '/einsaetze/7/einstellungen/module', ['Anna Muster']);
+    expect(screen.queryByText(/Freigabe erteilt/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Anna Muster/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Modulfreigaben öffnen' })).toBeInTheDocument();
+  });
+
+  it('auch ein ausgeblendetes Modul nennt die Einsatzleitung', () => {
+    rendern(true, undefined, ['Anna Muster']);
+    expect(
+      screen.getByText('Freigabe erteilt die Einsatzleitung: Anna Muster'),
+    ).toBeInTheDocument();
   });
 });

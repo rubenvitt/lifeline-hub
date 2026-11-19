@@ -9,6 +9,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZIEL_ART } from './archivText';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { personenUmfang, vollzugAb } from './SchwaerzungsantragDialog';
+import { Feld } from '../components/instrument';
 
 /**
  * Löschersuchen für eine Person an einem archivierten Einsatz (LLH-1712, Spec
@@ -131,7 +132,7 @@ export default function ArchivPersonAntragDialog({
         <Typography.Text code>lifeline-hub archiv personen</Typography.Text> im Archiv. Erwähnungen
         in Freitexten bleiben stehen.
       </Typography.Paragraph>
-      <Form.Item
+      <Feld
         label="Kennung der Person"
         name="kennung"
         extra={ziel ? `${ZIEL_ART[ziel.art]} ${ziel.kennung}` : 'R-042, EK-17 oder IT-5'}
@@ -145,8 +146,8 @@ export default function ArchivPersonAntragDialog({
         ]}
       >
         <Input autoComplete="off" />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Aktenzeichen des Löschersuchens"
         name="aktenzeichen"
         extra="Ohne Namen; bleibt im Einsatztagebuch stehen"
@@ -156,7 +157,7 @@ export default function ArchivPersonAntragDialog({
         ]}
       >
         <Input autoComplete="off" />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={mutation.error} titel="Löschersuchen nicht erfasst" />
     </ErfassungsModal>
   );

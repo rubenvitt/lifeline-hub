@@ -19,7 +19,7 @@ import { anzahl, segmentLabel } from '../anzeige/anzahl';
 import ListeDetail from '../components/ListeDetail';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { FELD_KLASSE, Feld, Segmentleiste, useRollen } from '../components/instrument';
 import BefehlListenKarte from './BefehlListenKarte';
 import BefehlDetail from './BefehlDetail';
 import { befehlSchemaLabel } from './befehlTexte';
@@ -247,14 +247,15 @@ export default function BefehlListe({
             },
           ]}
         />
-        <Input
-          allowClear
-          aria-label="Befehle durchsuchen"
-          placeholder="Titel oder Schema"
-          style={{ width: 260, maxWidth: '100%' }}
-          value={suche}
-          onChange={(e) => setSuche(e.target.value)}
-        />
+        <div className={FELD_KLASSE} style={{ width: '100%', maxWidth: 'var(--lfh-feld-mittel)' }}>
+          <Input
+            allowClear
+            aria-label="Befehle durchsuchen"
+            placeholder="Titel oder Schema"
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+          />
+        </div>
         <EmpfaengerFilter
           abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
           einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
@@ -340,17 +341,17 @@ export default function BefehlListe({
         }}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Form.Item label="Schema" name="vorlage" rules={[{ required: true }]}>
+        <Feld label="Schema" name="vorlage" rules={[{ required: true }]}>
           {/* Nur Vorlagen für neue Befehle; der Bestand liest weiter `VORLAGEN` (LLH-1091). */}
           <Select options={NEW_SELECTABLE.map((v) => ({ value: v.schluessel, label: v.label }))} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Titel"
           name="titel"
           rules={[{ required: true, message: 'Titel erforderlich' }]}
         >
           <Input placeholder="z. B. Befehl an 2. Zug 10:30" />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
     </div>
   );

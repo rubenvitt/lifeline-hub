@@ -1,4 +1,4 @@
-import { App, Button, Space, Typography } from 'antd';
+import { App, Button, Space } from 'antd';
 import { useLayoutEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
@@ -23,6 +23,8 @@ import {
   monoStil,
   Paneel,
   PaneelZustand,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -459,7 +461,11 @@ export default function FahrzeugeBesatzung({
   } as const;
   const secondaryText = (parts: readonly (string | null | undefined)[]) => {
     const text = parts.filter(Boolean).join(' · ');
-    return text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
+    return text ? (
+      <Textstufe stufe="textKlein" ton="gedaempft">
+        {text}
+      </Textstufe>
+    ) : null;
   };
 
   /** `gedaempft`: unter einer gehaltenen Fahrzeugzeile, ohne Bedienung (LLH-1722). */
@@ -470,11 +476,11 @@ export default function FahrzeugeBesatzung({
       style={gedaempft ? { ...rowStyle, color: rollen.gedaempft } : rowStyle}
       {...(gedaempft ? {} : kontext.ausloeser(p))}
     >
-      <span style={{ display: 'inline-flex', gap: token.marginXXS }}>
+      <Stapel als="span" richtung="zeile" abstand="xxs">
         <PositionsMarken
           person={{ position: p.position, isFuehrer: p.isFuehrer, faehrtAuf: p.faehrtAuf }}
         />
-      </span>
+      </Stapel>
       <span data-lfh="einheit-person-name" style={{ minWidth: 0 }}>
         {rechte.hasPersonalLink ? (
           <KennungsLink to={einsatzkraftPfad(einsatzId, p.epId)}>{p.name}</KennungsLink>
@@ -494,7 +500,7 @@ export default function FahrzeugeBesatzung({
 
   /** Name eines Fahrzeugs, als Sprung in die Fahrzeugzeile, wenn das Modul offen ist. */
   const renderFunkrufname = (efId: number, name: string) => (
-    <span style={monoStil(13)}>
+    <span style={monoStil('mono')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: efId })}>{name}</KennungsLink>
       ) : (
@@ -529,7 +535,7 @@ export default function FahrzeugeBesatzung({
           Personal der Einheit übernehmen
         </Button>
         {kandidaten.length === 0 && (
-          <Typography.Text type="secondary">keine freien Kräfte der Einheit</Typography.Text>
+          <Textstufe ton="gedaempft">keine freien Kräfte der Einheit</Textstufe>
         )}
       </Space>
     );
@@ -635,7 +641,7 @@ export default function FahrzeugeBesatzung({
   /** Name eines Fahrzeugs: gelöst ohne Link und ohne Kontextmenü, in derselben Breite. */
   const renderFahrzeugName = (eintrag: FahrzeugEintrag, geloest: boolean) =>
     geloest ? (
-      <span style={monoStil(13)}>{eintrag.funkrufname}</span>
+      <span style={monoStil('mono')}>{eintrag.funkrufname}</span>
     ) : (
       // Eine Zeile mit Reglern trägt das Kontextmenü nur an ihrer Bezeichnung (Spec
       // `datensatz-aktionsmenue`).
@@ -674,20 +680,14 @@ export default function FahrzeugeBesatzung({
         {renderZeichen(eintrag)}
         {renderFahrzeugName(eintrag, geloest)}
         {secondaryText([ef.fahrzeugtyp])}
-        <span
-          data-lfh="einheit-besatzung"
-          style={{
-            display: 'inline-flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: token.marginXS,
-          }}
-        >
-          {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
-            <Status darstellung={besatzungsUrteil[f.urteil]} />
-          )}
-          <span style={monoStil(12)}>{besatzungText(f)}</span>
-          {secondaryText([fremdText(f)])}
+        <span data-lfh="einheit-besatzung">
+          <Stapel als="span" richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
+            {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
+              <Status darstellung={besatzungsUrteil[f.urteil]} />
+            )}
+            <span style={monoStil('monoKlein')}>{besatzungText(f)}</span>
+            {secondaryText([fremdText(f)])}
+          </Stapel>
         </span>
         {renderFahrzeugActions(eintrag, { wahl: ef }, renderUebernehmen(ef), geloest)}
         {errorRow(fahrzeugErrors.grund(ef.id))}
@@ -737,8 +737,8 @@ export default function FahrzeugeBesatzung({
         {needsOhneFahrzeugKnoten(mittel) ? (
           <div role="group" aria-label="Ohne Fahrzeug">
             <div style={rowStyle}>
-              <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
-              <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
+              <Augenbraue>Ohne Fahrzeug</Augenbraue>
+              <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
                 · {kraefteText(ohne.length)}
               </span>
             </div>

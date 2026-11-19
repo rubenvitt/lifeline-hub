@@ -295,7 +295,7 @@ pub async fn stellen(
     aktenzeichen: &str,
     bestaetigung: &str,
     jetzt: DateTime<Utc>,
-) -> Result<i64, AppError> {
+) -> Result<(i64, i64), AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let faellig = antrag_faellig_at(jetzt);
@@ -379,7 +379,7 @@ pub async fn stellen(
              eingegangen. Schwärzung fällig am {faellig} UTC; bis dahin zurücknehmbar.",
             ziel_text(ziel.art(), &kennung)
         );
-        crate::etb::repo::anlegen_tx(
+        let etb_id = crate::etb::repo::anlegen_tx(
             &mut *conn,
             einsatz_id,
             admin_id,
@@ -387,7 +387,7 @@ pub async fn stellen(
             system_eintrag(&audit),
         )
         .await?;
-        Ok(antrag_id)
+        Ok((antrag_id, etb_id))
     })
 }
 
@@ -454,7 +454,7 @@ pub async fn zuruecknehmen(
     antrag_id: i64,
     admin_id: i64,
     jetzt: DateTime<Utc>,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     crate::write_retry!(pool, |conn| {
@@ -513,8 +513,7 @@ pub async fn zuruecknehmen(
             etb_startwert,
             system_eintrag(&audit),
         )
-        .await?;
-        Ok(())
+        .await
     })
 }
 
@@ -646,6 +645,16 @@ pub async fn vollziehen_ergebnis(
     antrag_id: i64,
     jetzt: DateTime<Utc>,
 ) -> Result<Vollzug, AppError> {
+    Ok(vollziehen_mit_etb(pool, antrag_id, jetzt).await?.0)
+}
+
+/// Wie [`vollziehen_ergebnis`], dazu die Kennung des ETB-Eintrags, den der Löschlauf nach dem
+/// Commit verteilt (LLH-1976).
+pub async fn vollziehen_mit_etb(
+    pool: &SqlitePool,
+    antrag_id: i64,
+    jetzt: DateTime<Utc>,
+) -> Result<(Vollzug, Option<i64>), AppError> {
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let Some(einsatz_id): Option<i64> =
         sqlx::query_scalar("SELECT einsatz_id FROM schwaerzung_antrag WHERE id = ?")
@@ -653,10 +662,10 @@ pub async fn vollziehen_ergebnis(
             .fetch_optional(pool)
             .await?
     else {
-        return Ok(Vollzug::Nichts);
+        return Ok((Vollzug::Nichts, None));
     };
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
-    let vollzug = crate::write_retry!(pool, |conn| {
+    let (vollzug, etb_id) = crate::write_retry!(pool, |conn| {
         // Ein Personen-Antrag am archivierten Einsatz bleibt offen (LLH-1712): der Klartext steht
         // nur in den Blöcken, und die öffnet allein der Befehl mit dem Archiv-Schlüssel.
         let im_archiv: bool = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
@@ -666,7 +675,7 @@ pub async fn vollziehen_ergebnis(
         .fetch_one(&mut *conn)
         .await?;
         if im_archiv {
-            return Ok(Vollzug::Nichts);
+            return Ok((Vollzug::Nichts, None));
         }
         let zeile: Option<AntragZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "UPDATE schwaerzung_antrag SET vollzogen_at = ?1 \
@@ -679,7 +688,7 @@ pub async fn vollziehen_ergebnis(
         .fetch_optional(&mut *conn)
         .await?;
         let Some(z) = zeile else {
-            return Ok(Vollzug::Nichts);
+            return Ok((Vollzug::Nichts, None));
         };
         let art = z.ziel_art()?;
         let kennung = gespeicherte_kennung(&mut *conn, art, z.ziel_id, z.einsatz_id).await?;
@@ -771,7 +780,7 @@ pub async fn vollziehen_ergebnis(
                 }
             }
         };
-        crate::etb::repo::anlegen_tx(
+        let etb_id = crate::etb::repo::anlegen_tx(
             &mut *conn,
             z.einsatz_id,
             akteur,
@@ -779,13 +788,13 @@ pub async fn vollziehen_ergebnis(
             system_eintrag(&audit),
         )
         .await?;
-        Ok(geaendert)
+        Ok((geaendert, Some(etb_id)))
     })?;
     // Nachlauf nach dem Commit (LFH-905): Anhänge und Bilder der Lagekarte des Einsatzes einzeln.
     if let Vollzug::Einsatz(einsatz_id) = vollzug {
         crate::einsatz::schwaerzung_nachlauf::nachlaufen(pool, einsatz_id).await;
     }
-    Ok(vollzug)
+    Ok((vollzug, etb_id))
 }
 
 /// Vollzieht einen Personen-Antrag, dessen Person der Befehl `archiv loeschersuchen` in allen
@@ -886,14 +895,29 @@ pub async fn vollziehe_faellige(
             antrag_id = id,
             "Purge: Schwärzungsantrag fällig — Vollzug (irreversibel)"
         );
-        match vollziehen_ergebnis(pool, id, jetzt).await {
+        match vollziehen_mit_etb(pool, id, jetzt).await {
             // Kopf und Liste melden (LFH-996): ein gesperrter Einsatz räumt offene Tabs am 404,
             // ein Personen-Vollzug erhöht `teilschwaerzungen` und räumt die Geräte-Stände.
-            Ok(Vollzug::Einsatz(einsatz_id) | Vollzug::Person(einsatz_id)) => {
+            // Den ETB-Eintrag verteilt nur der Personen-Vollzug (LLH-1976): ein geschwärzter
+            // Einsatz verlässt den Betrieb, der Kopf meldet es.
+            Ok((Vollzug::Einsatz(einsatz_id), etb_id)) => {
                 geschwaerzt += 1;
+                if let Some(etb_id) = etb_id {
+                    crate::etb::nachlauf::ausnehmen(
+                        crate::etb::nachlauf::GRUND_BETRIEB_VERLASSEN,
+                        etb_id,
+                    );
+                }
                 crate::live::org::kopf_melden(pool, live, einsatz_id, &[]).await;
             }
-            Ok(Vollzug::Nichts) => {}
+            Ok((Vollzug::Person(einsatz_id), etb_id)) => {
+                geschwaerzt += 1;
+                if let Some(etb_id) = etb_id {
+                    live.publiziere(einsatz_id, etb_id);
+                }
+                crate::live::org::kopf_melden(pool, live, einsatz_id, &[]).await;
+            }
+            Ok((Vollzug::Nichts, _)) => {}
             Err(e) => tracing::error!(antrag_id = id, "Vollzug des Antrags fehlgeschlagen: {e}"),
         }
     }

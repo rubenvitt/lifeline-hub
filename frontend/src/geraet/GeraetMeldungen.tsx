@@ -1,4 +1,4 @@
-import { Alert, App, Form, Input, Space, Spin } from 'antd';
+import { Alert, App, Form, Input, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
@@ -8,7 +8,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Meldung, MeldungPrioritaet, NeueMeldung } from '../api/types';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { Paneel, Segmentleiste } from '../components/instrument';
+import { Feld, Paneel, Segmentleiste, Stapel } from '../components/instrument';
 import MeldungKarte from '../meldungen/MeldungKarte';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { serverJetzt } from '../offline/serveruhr';
@@ -176,7 +176,7 @@ export default function GeraetMeldungen({
   );
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+    <Stapel abstand="md">
       {!schreibgeschuetzt && (
         <Paneel titel="Meldung an die Einsatzleitung" koerperPolster>
           <ErfassungsFormular<MeldungWerte>
@@ -191,23 +191,23 @@ export default function GeraetMeldungen({
             speicherFehlerTitel="Meldung nicht gesendet"
             speicherFehlerFallback="Senden fehlgeschlagen"
           >
-            <Form.Item<MeldungWerte>
+            <Feld<MeldungWerte>
               name="inhalt"
               label="Inhalt"
               rules={[{ required: true, whitespace: true, message: 'Bitte den Inhalt eingeben' }]}
             >
               <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} maxLength={ETB_INHALT_MAX} />
-            </Form.Item>
-            <Form.Item<MeldungWerte> name="art" label="Art">
+            </Feld>
+            <Feld<MeldungWerte> name="art" label="Art">
               <ArtFeld />
-            </Form.Item>
-            <Form.Item<MeldungWerte> name="prioritaet" label="Priorität">
+            </Feld>
+            <Feld<MeldungWerte> name="prioritaet" label="Priorität">
               <PrioritaetFeld />
-            </Form.Item>
+            </Feld>
             {standort && (
-              <Form.Item<MeldungWerte> name="standort" label="Standort">
+              <Feld<MeldungWerte> name="standort" label="Standort">
                 <StandortFeld />
-              </Form.Item>
+              </Feld>
             )}
           </ErfassungsFormular>
         </Paneel>
@@ -220,13 +220,13 @@ export default function GeraetMeldungen({
         ) : meldungen.length === 0 ? (
           <span>Noch keine Meldungen von dieser Stelle</span>
         ) : (
-          <Space orientation="vertical" style={{ width: '100%' }}>
+          <Stapel abstand="xs">
             {meldungen.map((m) => (
               <MeldungKarte key={m.id} meldung={m} einsatzId={einsatzId} />
             ))}
-          </Space>
+          </Stapel>
         )}
       </Paneel>
-    </Space>
+    </Stapel>
   );
 }

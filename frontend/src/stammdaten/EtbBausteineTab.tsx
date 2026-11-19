@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Popconfirm, Typography, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
-import { Stapel, monoStil } from '../components/instrument';
+import { Knopfreihe, Stapel, monoStil } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
@@ -112,7 +112,7 @@ export default function EtbBausteineTab() {
           <span
             data-typ={t}
             style={{
-              ...monoStil(11, 500),
+              ...monoStil('meta', 500),
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: farbe.wort,
@@ -131,7 +131,7 @@ export default function EtbBausteineTab() {
       key: 'sortier',
       sorter: nachZahl((b: EtbBaustein) => b.sortier),
       // Zahlen in Mono — die Spalte wird zeilenweise verglichen.
-      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+      render: (n: number) => <span style={monoStil('monoKlein')}>{n}</span>,
     },
     ...(istAdmin
       ? ([
@@ -142,7 +142,7 @@ export default function EtbBausteineTab() {
               herkunft.istVomHub('etb_baustein', b.id) ? (
                 <VomHubGesperrt />
               ) : (
-                <Space size="middle">
+                <Knopfreihe umbruch={false}>
                   <Button
                     onClick={() => {
                       setBearbeite(b);
@@ -159,7 +159,7 @@ export default function EtbBausteineTab() {
                   >
                     <Button danger>Deaktivieren</Button>
                   </Popconfirm>
-                </Space>
+                </Knopfreihe>
               ),
           },
         ] as KatalogSpalte<EtbBaustein>[])

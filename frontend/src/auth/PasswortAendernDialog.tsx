@@ -1,4 +1,5 @@
 import { App, Form, Input, theme } from 'antd';
+import { Feld } from '../components/instrument';
 import { useMutation } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -65,13 +66,13 @@ export default function PasswortAendernDialog({
           <SpeicherFehler fehler={mutation.error} titel="Passwort nicht geändert" />
         </div>
       )}
-      <Form.Item
+      <Feld
         label="Bisheriges Passwort"
         name="altes_passwort"
         rules={[{ required: true, message: 'Bitte das bisherige Passwort eingeben' }]}
       >
         <Input.Password autoComplete="current-password" />
-      </Form.Item>
+      </Feld>
       <NeuesPasswortFelder />
     </ErfassungsModal>
   );

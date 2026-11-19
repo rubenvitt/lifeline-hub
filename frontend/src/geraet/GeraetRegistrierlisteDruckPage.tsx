@@ -20,6 +20,7 @@ export default function GeraetRegistrierlisteDruckPage() {
       stelleId={geraet.stelle_id}
       stelleBezeichnung={geraet.stelle ?? undefined}
       zurueck={{ pfad: geraetBetreuungPfad(geraet.einsatz_id), label: 'Zurück zur Stelle' }}
+      liste={{ pfad: geraetBetreuungPfad(geraet.einsatz_id), label: 'Zur Betreuung' }}
     />
   );
 }

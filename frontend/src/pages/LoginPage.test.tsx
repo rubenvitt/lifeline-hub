@@ -173,9 +173,7 @@ describe('LoginPage', () => {
     expect(await screen.findByLabelText('Passwort')).toBeInTheDocument();
     // Weg zur Hilfe bei vergessenem Passwort (LFH-946): statisch, verrät nichts über das Konto.
     expect(
-      screen.getByText(
-        'Passwort vergessen? Die Administration deiner Organisation setzt es zurück.',
-      ),
+      screen.getByText('Passwort vergessen? Die Administration der Organisation setzt es zurück.'),
     ).toBeInTheDocument();
   });
 
@@ -743,7 +741,7 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       // Die erste Stufe (Passwort) weicht der Code-Eingabe.
-      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      const codeFeld = await screen.findByLabelText('Code aus der Authenticator-App');
       expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument();
 
       // Kein Klick auf „Anmelden": die sechste Ziffer sendet selbst ab. Der Knopf bleibt als
@@ -779,7 +777,7 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      const codeFeld = await screen.findByLabelText('Code aus der Authenticator-App');
       await userEvent.type(codeFeld, '12345');
       expect(gesendet).toEqual([]);
 
@@ -829,7 +827,7 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      const codeFeld = await screen.findByLabelText('Code aus der Authenticator-App');
       await userEvent.type(codeFeld, '123456');
 
       // Das Auto-Absenden läuft: der Aufruf ist beim Server, die Maske ist gesperrt.
@@ -864,7 +862,7 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      const codeFeld = await screen.findByLabelText('Code aus der Authenticator-App');
       expect(codeFeld).toHaveAttribute('inputmode', 'numeric');
       expect(codeFeld).toHaveAttribute('autocomplete', 'one-time-code');
       expect(codeFeld).toHaveAttribute('maxlength', '6');
@@ -889,13 +887,13 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-      await screen.findByLabelText('Code aus deiner Authenticator-App');
+      await screen.findByLabelText('Code aus der Authenticator-App');
       await userEvent.click(
         screen.getByRole('button', { name: 'Wiederherstellungscode verwenden' }),
       );
 
       const recoveryFeld = await screen.findByLabelText('Wiederherstellungscode');
-      expect(screen.queryByLabelText('Code aus deiner Authenticator-App')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Code aus der Authenticator-App')).not.toBeInTheDocument();
 
       await userEvent.type(recoveryFeld, 'a1b2-c3d4-e5f6-0718-293a');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
@@ -919,7 +917,7 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
-      await screen.findByLabelText('Code aus deiner Authenticator-App');
+      await screen.findByLabelText('Code aus der Authenticator-App');
       await userEvent.click(
         screen.getByRole('button', { name: 'Wiederherstellungscode verwenden' }),
       );
@@ -929,7 +927,7 @@ describe('LoginPage', () => {
         screen.getByRole('button', { name: 'Code aus der Authenticator-App verwenden' }),
       );
 
-      expect(await screen.findByLabelText('Code aus deiner Authenticator-App')).toBeInTheDocument();
+      expect(await screen.findByLabelText('Code aus der Authenticator-App')).toBeInTheDocument();
       expect(screen.queryByLabelText('Wiederherstellungscode')).not.toBeInTheDocument();
     });
 
@@ -948,9 +946,7 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
 
       await waitFor(() =>
-        expect(
-          screen.queryByLabelText('Code aus deiner Authenticator-App'),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByLabelText('Code aus der Authenticator-App')).not.toBeInTheDocument(),
       );
       expect(screen.queryByText('Verbindung zum Server fehlgeschlagen')).not.toBeInTheDocument();
     });
@@ -1089,12 +1085,12 @@ describe('LoginPage', () => {
       );
       await mitEinmalpasswortAnmelden();
       await userEvent.type(
-        await screen.findByLabelText('Code aus deiner Authenticator-App'),
+        await screen.findByLabelText('Code aus der Authenticator-App'),
         '123456',
       );
 
       expect(await screen.findByText('Neues Passwort festlegen')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Code aus deiner Authenticator-App')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Code aus der Authenticator-App')).not.toBeInTheDocument();
     });
   });
 

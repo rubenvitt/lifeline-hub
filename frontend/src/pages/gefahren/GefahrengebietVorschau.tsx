@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Space, theme } from 'antd';
+import { theme } from 'antd';
 import type { Gefahrengebiet, Warnstufe } from '../../api/types';
-import { Augenbraue, Datenfeld, Datenraster } from '../../components/instrument';
+import { Augenbraue, Datenfeld, Datenraster, Stapel } from '../../components/instrument';
 import { warnstufeKarte } from '../../theme/statusFarben';
 import { datensatzAbfrage } from '../../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../../command-palette/VorschauZustand';
@@ -43,7 +43,7 @@ export default function GefahrengebietVorschau({
   return (
     <VorschauZustand abfrage={abfrage} sorte="Das Gefahrengebiet">
       {(g) => (
-        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <Stapel abstand="md">
           <Datenraster spalten={2} beschriftung="Gebietsdaten">
             <Datenfeld label="Höchste Warnstufe">
               <Status darstellung={hoechsteStufe(g.hoechste_warnstufe)} />
@@ -56,7 +56,7 @@ export default function GefahrengebietVorschau({
           </Datenraster>
           {/* Erst mit vorhandenem Gebiet: für ein verschwundenes gäbe es keine Matrix. */}
           <MatrixAuszug einsatzId={einsatzId} gebietId={g.id} />
-        </Space>
+        </Stapel>
       )}
     </VorschauZustand>
   );

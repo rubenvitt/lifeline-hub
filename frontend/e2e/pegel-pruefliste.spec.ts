@@ -85,7 +85,14 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
   const r = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
   expect(r.ok(), `Seeding Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
-  return String(((await r.json()) as { id: number }).id);
+  const id = String(((await r.json()) as { id: number }).id);
+  // Ein verorteter Einsatzort fern aller Stationen: ohne ihn stünde das Band „Einsatzort fehlt“
+  // im Kartenfuß (LLH-1953) und deckte bei 390 px die Station, die der Test anklickt.
+  const ort = await page.request.patch(`/api/einsaetze/${id}`, {
+    data: { einsatzort: 'Bereitstellung Süd', einsatzort_lat: 50.0, einsatzort_lon: 9.0 },
+  });
+  expect(ort.ok(), `Seeding Einsatzort: ${ort.status()}`).toBeTruthy();
+  return id;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { modulName } from '../einsatz/modulRegistry';
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -211,6 +212,23 @@ const boardKarten = (sk: string) =>
     .map((k) => /R-\d+/.exec(k.textContent ?? '')?.[0]);
 
 describe('PersonenPage', () => {
+  it('LLH-1830: zeigt, solange der Einsatz lädt, schon den Seitenkopf mit Modulnamen', async () => {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => new Promise<never>(() => {})),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/personen', datenRouter: true },
+    );
+    const gerippe = await screen.findByTestId('modul-gerippe');
+    expect(
+      within(gerippe).getByRole('heading', { level: 1, name: modulName('personen') }),
+    ).toBeInTheDocument();
+  });
+
   it('zeigt in der Vorgabe ALLE Personen; der Filter „Erfasst" zeigt nur erfasste', async () => {
     // Vorgabe „Alle": eine mit Sichtung erfasste Person hebt der Server auf `betroffen` — unter
     // „Erfasst" verschwände sie beim Erfassen.
@@ -298,6 +316,7 @@ describe('PersonenPage', () => {
 
   it('Einsatzleitung sieht die Erfassungszeile, EINE Maske und „Vermisst melden"', async () => {
     render(einsatzAktiv, []);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.getByRole('textbox', { name: 'Kurzeingabe Person' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Person erfassen' })).toBeInTheDocument();
@@ -702,6 +721,7 @@ describe('PersonenPage', () => {
     zweiteSeite.unmount();
 
     render(einsatzAktiv, [vermisst]);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.queryByText('Erfasst als R-049')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
@@ -745,6 +765,7 @@ describe('PersonenPage', () => {
       name: 'Aus anderem Tab',
     };
     render(einsatzAktiv, []);
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /Betroffene/ });
     await schreibaktionEinreihen(nutzer.id, 1, {
       art: 'person',
@@ -1032,6 +1053,25 @@ describe('PersonenPage', () => {
     await waitFor(() => expect(regFolge()).toHaveLength(3));
   });
 
+  it.each([
+    ['ohne Status', undefined],
+    ['mit unbekanntem Status', 'xyz'],
+  ])(
+    'zeichnet eine Person %s als „unbekannt“, ohne Absturz der Liste (LLH-1957)',
+    async (_fall, status) => {
+      // Nachgestellt am Stand vom 12.11.2026: `StatusTag` las `STATUS_META[status].rolle`, und
+      // „Cannot read properties of undefined (reading 'rolle')“ ersetzte die ganze Liste.
+      const kaputt = { ...person, status };
+      render(einsatzAktiv, [kaputt, unbekannt]);
+      expect(await screen.findByText('R-001')).toBeInTheDocument();
+      const marken = Array.from(document.querySelectorAll('[data-lfh="status"]')).map(
+        (m) => m.textContent,
+      );
+      expect(marken).toContain('unbekannt');
+      expect(marken).toContain('vermisst');
+    },
+  );
+
   it('Sichtungsraster gruppiert ALLE Personen nach Sichtung, samt unverletzt und ohne Sichtung', async () => {
     const sk2 = {
       ...person,
@@ -1092,6 +1132,7 @@ describe('PersonenPage', () => {
   it('öffnet via ?neu=1 die Maske NICHT für Beobachter', async () => {
     render(einsatzBeobachter, [], '/einsaetze/1/personen?neu=1');
     // Seite lädt durch (Tabelle leer, kein Spinner mehr)
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

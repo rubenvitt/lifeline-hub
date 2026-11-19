@@ -82,7 +82,36 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
 /// Seiten in der Hauptdatei und der Vorzustand aus dem WAL getilgt. Blockiert eine andere
 /// Verbindung den Rückschrieb, bleibt `rueckschrieb_ausstehend` gesetzt, und jeder folgende Tick
 /// versucht es erneut, bis es gelingt.
+///
+/// Unter dem ETB-Wächter (LLH-1976, `src/AGENTS.md`, „Backend — ETB live verteilen“): ein in
+/// diesem Tick committeter, aber nicht verteilter ETB-Eintrag ist ein Panic. So macht er die
+/// Tests rot; der Dauerlauf nimmt [`tick_mit_luecken`] und loggt.
 pub async fn tick_mit_rueckschrieb(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    jetzt: DateTime<Utc>,
+    rueckschrieb_ausstehend: &mut bool,
+) -> usize {
+    let (anzahl, luecken) = tick_mit_luecken(pool, live, jetzt, rueckschrieb_ausstehend).await;
+    if !luecken.is_empty() {
+        panic!("{}", crate::etb::nachlauf::melde(&luecken));
+    }
+    anzahl
+}
+
+/// Wie [`tick_mit_rueckschrieb`], liefert die Lücken des ETB-Wächters aber zurück, statt zu
+/// panicen: der gespawnte Dauerlauf soll nach einer Lücke weiterlaufen.
+pub async fn tick_mit_luecken(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    jetzt: DateTime<Utc>,
+    rueckschrieb_ausstehend: &mut bool,
+) -> (usize, Vec<crate::etb::nachlauf::Luecke>) {
+    crate::etb::nachlauf::klammer(pool, tick_rumpf(pool, live, jetzt, rueckschrieb_ausstehend))
+        .await
+}
+
+async fn tick_rumpf(
     pool: &SqlitePool,
     live: &LiveHub,
     jetzt: DateTime<Utc>,
@@ -99,7 +128,12 @@ pub async fn tick_mit_rueckschrieb(
     match super::archiv::faellige(pool, &jetzt_s).await {
         Ok(ids) => {
             for id in ids {
-                match super::archiv::archivieren(pool, id, jetzt).await {
+                match crate::etb::nachlauf::ohne_verteilung(
+                    crate::etb::nachlauf::GRUND_BETRIEB_VERLASSEN,
+                    super::archiv::archivieren(pool, id, jetzt),
+                )
+                .await
+                {
                     Ok(true) => {
                         anzahl += 1;
                         geschwaerzt += 1;
@@ -114,7 +148,7 @@ pub async fn tick_mit_rueckschrieb(
         }
         Err(e) => tracing::warn!("Purge Phase N: Abfrage fehlgeschlagen: {e}"),
     }
-    match super::archiv::abgelaufene_bloecke_loeschen(pool, &jetzt_s).await {
+    match super::archiv::abgelaufene_bloecke_loeschen(pool, live, &jetzt_s).await {
         Ok(0) => {}
         Ok(n) => {
             anzahl += n;
@@ -133,7 +167,12 @@ pub async fn tick_mit_rueckschrieb(
             for id in ids {
                 // Gemeldet wird erst der Erfolg (LFH-756): ein fail-closed gescheiterter Versuch
                 // stünde sonst bei jeder Blockade alle 10 min als Erfolg neben dem `error!`.
-                match repo::soft_delete_einsatz(pool, id, &jetzt_s).await {
+                match crate::etb::nachlauf::ohne_verteilung(
+                    crate::etb::nachlauf::GRUND_BETRIEB_VERLASSEN,
+                    repo::soft_delete_einsatz(pool, id, &jetzt_s),
+                )
+                .await
+                {
                     Ok(true) => {
                         tracing::info!(
                             einsatz_id = id,
@@ -171,12 +210,13 @@ pub async fn tick_mit_rueckschrieb(
                     kategorie = k.as_str(),
                     "Purge Phase K1: Datenkategorie vorgemerkt (Frist abgelaufen)"
                 );
-                match kategorie::vormerken(pool, id, k, &jetzt_s).await {
-                    Ok(true) => {
+                match kategorie::vormerken_mit_etb(pool, id, k, &jetzt_s).await {
+                    Ok(Some(etb_id)) => {
                         anzahl += 1;
-                        live.publiziere_einsatz(id, LiveEvent::Etb);
+                        // Mit Kennung (LLH-1976): frischt das ETB auf wie die Listenmeldung.
+                        live.publiziere(id, etb_id);
                     }
-                    Ok(false) => {}
+                    Ok(None) => {}
                     Err(e) => tracing::error!(
                         einsatz_id = id,
                         kategorie = k.as_str(),
@@ -200,24 +240,25 @@ pub async fn tick_mit_rueckschrieb(
                     kategorie = k.as_str(),
                     "Purge Phase K2: Schwärzung einer Datenkategorie (irreversibel)"
                 );
-                match kategorie::schwaerzen(pool, id, k, jetzt).await {
-                    Ok(true) => {
+                match kategorie::schwaerzen_mit_etb(pool, id, k, jetzt).await {
+                    Ok(Some(etb_id)) => {
                         anzahl += 1;
                         geschwaerzt += 1;
-                        // Offene Clients laden neu und tragen keinen Altstand weiter (design.md D5).
+                        // Offene Clients laden neu und tragen keinen Altstand weiter (design.md D5);
+                        // das ETB über den Eintrag mit Kennung (LLH-1976).
                         for event in [
                             LiveEvent::Person,
                             LiveEvent::Dokument,
                             LiveEvent::Schaden,
                             LiveEvent::Chat,
-                            LiveEvent::Etb,
                         ] {
                             live.publiziere_einsatz(id, event);
                         }
+                        live.publiziere(id, etb_id);
                         // `teilschwaerzungen` steigt: Geräte verwerfen ihre älteren Stände (LFH-996).
                         crate::live::org::kopf_melden(pool, live, id, &[]).await;
                     }
-                    Ok(false) => {}
+                    Ok(None) => {}
                     Err(e) => tracing::error!(
                         einsatz_id = id,
                         kategorie = k.as_str(),
@@ -239,7 +280,12 @@ pub async fn tick_mit_rueckschrieb(
                     continue;
                 }
                 // Wie Phase A: erst nach dem Erfolg melden (LFH-756).
-                match repo::schwaerze_einsatz(pool, id, &jetzt_s).await {
+                match crate::etb::nachlauf::ohne_verteilung(
+                    crate::etb::nachlauf::GRUND_BETRIEB_VERLASSEN,
+                    repo::schwaerze_einsatz(pool, id, &jetzt_s),
+                )
+                .await
+                {
                     Ok(true) => {
                         tracing::warn!(
                             einsatz_id = id,
@@ -465,7 +511,11 @@ pub fn starte_purge_scheduler(pool: SqlitePool, live: LiveHub) {
             // Task baut niemand Archive, also gehört zwischen zwei Läufen jede vorhandene zu
             // einem toten Bau; die eines Einspielens erst nach einigen Stunden.
             super::archiv::zwischendateien_aufraeumen(&pool).await;
-            tick_mit_rueckschrieb(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;
+            let (_, luecken) =
+                tick_mit_luecken(&pool, &live, Utc::now(), &mut rueckschrieb_ausstehend).await;
+            if !luecken.is_empty() {
+                tracing::error!("{}", crate::etb::nachlauf::melde(&luecken));
+            }
         }
     });
 }

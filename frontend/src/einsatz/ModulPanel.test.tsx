@@ -30,6 +30,7 @@ const basis = (over: Partial<ModulEintrag>): ModulEintrag => ({
   kategorie: 'erfassung',
   label: 'L',
   icon: () => null,
+  hilfeKapitel: 'einsatz-oberflaeche',
   route: 'k',
   status: 'geplant',
   ...over,

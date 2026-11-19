@@ -1,8 +1,9 @@
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { IconPersonPlus } from '../../icons';
 import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
-import { Alert, App, Breadcrumb, Button, Flex, Modal, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Modal, Spin } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useId, useState } from 'react';
@@ -33,7 +34,7 @@ import {
 } from '../../components/SeitenZustand';
 import { useRollen } from '../../components/instrument/rollenwerte';
 import { useViewport } from '../../components/useViewport';
-import { Segmentleiste } from '../../components/instrument';
+import { Segmentleiste, Stapel } from '../../components/instrument';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
 import UhsSwitcher from './UhsSwitcher';
 import { merkeLetzteUhs } from './uhsAuswahl';
@@ -43,7 +44,7 @@ import UhsLagezeile from './UhsLagezeile';
 import BewegungenTab from './BewegungenTab';
 import UhsAnhaenge from './UhsAnhaenge';
 import UhsKraefte from './UhsKraefte';
-import { STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
+import { staerkeText } from '../../anzeige/staerke';
 import { qualiSollText } from '../../kraefte/qualiSoll';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -280,7 +281,9 @@ function UhsDetailInhalt() {
   const metaTeile = [
     uhsTyp[uhs.typ].label,
     uhs.standort ?? 'ohne Standort',
-    `Stärke ${STAERKE_SCHREIBWEISE} ${staerkeText(uhs.staerke)}`,
+    <>
+      Stärke <StaerkeSchreibweise /> {staerkeText(uhs.staerke)}
+    </>,
   ];
   // Die Materialzahl im Wortlaut des Bausteins („3 Posten · 1 Ausfall“, eine Heimat je Zahl,
   // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät), ohne Freigabe
@@ -294,7 +297,8 @@ function UhsDetailInhalt() {
   const meta = (
     <span style={{ whiteSpace: 'normal' }}>
       {metaTeile.map((teil, i) => (
-        <Fragment key={`${i}-${teil}`}>
+        // Teile sind fest in ihrer Folge; die Stärke ist ein Knoten, kein Text.
+        <Fragment key={i}>
           <span style={{ whiteSpace: 'nowrap' }}>
             {teil}
             {i < metaTeile.length - 1 || showMaterialzahl ? ' ·' : ''}
@@ -326,14 +330,14 @@ function UhsDetailInhalt() {
       titel={
         // `wrap`: bei langem Namen rutscht der Status unter den Namen, statt auf 390 px
         // über den Rand zu ragen (gemessen 11 px, LFH-435).
-        <Space wrap>
+        <Stapel als="span" richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           {darf('uhs-verwalten') ? (
             <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
           ) : (
             uhs.bezeichnung
           )}
           <Status darstellung={uhsStatus[uhs.status]} />
-        </Space>
+        </Stapel>
       }
       meta={meta}
       // Das Soll (LLH-1553) steht vor der Notiz; die Zeile darf umbrechen, die Meta nicht.
@@ -349,7 +353,7 @@ function UhsDetailInhalt() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (veraltet || kopfFehler != null) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             {veraltet && (
               <SeitenStandVeraltet
                 onWiederholen={() => {
@@ -367,7 +371,7 @@ function UhsDetailInhalt() {
                   : 'Stornieren fehlgeschlagen'
               }
             />
-          </Flex>
+          </Stapel>
         )
       }
       /* Datenstand im Kopf über das Primitiv — der Grundriss läuft live mit. */
@@ -385,7 +389,7 @@ function UhsDetailInhalt() {
         )
       }
       aktionen={
-        <Space wrap size="middle">
+        <>
           {/* Die Zustände schließen sich aus; die Dev-Warnung des Primitivs zählt die
               Primäraktionen, der Test prüft beide Zustände. */}
           {!schreibgeschuetzt && uhs.status === 'aktiv' && (
@@ -438,7 +442,7 @@ function UhsDetailInhalt() {
               onWahl={(key) => setFrage(key === 'aufloesen' ? 'aufloesen' : 'stornieren')}
             />
           )}
-        </Space>
+        </>
       }
       // Die Leiste gehört zum Kopf, den der Fensterrahmen misst: so steht sie bei 1440 × 900 ohne
       // Bildlauf über dem Grundriss, und jeder Bereich behält die Mindesthöhe. Ein einzelner

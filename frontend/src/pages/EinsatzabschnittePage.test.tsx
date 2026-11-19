@@ -1,3 +1,4 @@
+import { aktionsKnoepfe, ganzerText } from '../test/kuerzel';
 import { describe, expect, it, vi } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
@@ -268,10 +269,10 @@ describe('EinsatzabschnittePage', () => {
 
     // Datenraster statt `Descriptions`: die Zeile ist das Datenfeld.
     const eigene = screen
-      .getByText('Stärke (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     const inkl = screen
-      .getByText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(eigene).not.toBe(inkl);
     expect(within(eigene).getByText('1/2/3//6')).toBeInTheDocument();
@@ -346,7 +347,7 @@ describe('EinsatzabschnittePage', () => {
 
     await userEvent.click(knoten);
     const eigene = screen
-      .getByText('Stärke (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(within(eigene).getByText('0/1/1//2')).toBeInTheDocument();
     expect(screen.getByText('Sanitätsgruppe UHS')).toBeInTheDocument();
@@ -406,7 +407,7 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     await userEvent.click(await findInTree('Nord'));
     const eigene = screen
-      .getByText('Stärke (F/UF/M//Σ)')
+      .getByText(ganzerText('Stärke (F/UF/M//Σ)'))
       .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(within(eigene).getByText('1/1/3//5')).toBeInTheDocument();
     const zugZeile = screen.getByText('Zug Nord').closest<HTMLElement>('li')!;
@@ -911,7 +912,7 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     const karte = (await screen.findByText('Noch keine Abschnitte')).closest('[data-lfh="paneel"]');
     expect(karte, 'der Leerzustand muss in der Gliederungs-Karte stehen').not.toBeNull();
-    const knoepfe = within(karte as HTMLElement).getAllByRole('button');
+    const knoepfe = aktionsKnoepfe(karte as HTMLElement);
     expect(knoepfe).toHaveLength(1);
 
     await userEvent.click(

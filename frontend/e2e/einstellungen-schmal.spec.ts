@@ -241,14 +241,16 @@ for (const [name, fenster] of [
 // ── LFH-435: die Sektionen ohne volles Recht ────────────────────────────────────────────
 //
 // Ohne Recht fügen die Sektionen hinzu (Rechtehinweis, Sperrgrund „nur Einsatzleitung oder
-// Org-Admin" an jeder Modulzeile) — genau die Zweige, die ein Admin-Durchgang nie sieht. Jede
-// Vorbedingung steht VOR der Messung; ohne sie wäre der Durchgang grün durch Nichtstun.
+// System-Admin der Organisation" an jeder Modulzeile) — genau die Zweige, die ein
+// Admin-Durchgang nie sieht. Jede Vorbedingung steht VOR der Messung; ohne sie wäre der
+// Durchgang grün durch Nichtstun.
 
 /** Die Rechtehinweise der Sektionen, je über ein Fragment, das nur EINEN Hinweis trifft —
  *  auf der Aufbewahrung stehen zwei (Einstellungen und Frist). */
-const HINWEIS_EINSTELLUNGEN = 'nur Einsatzleitung, Führungspersonal oder Org-Admin';
-const HINWEIS_FRIST = 'nur Einsatzleitung oder Org-Admin';
-const HINWEIS_MODULE = 'nur Einsatzleitung oder Org-Admin';
+const HINWEIS_EINSTELLUNGEN =
+  'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation';
+const HINWEIS_FRIST = 'nur Einsatzleitung oder System-Admin der Organisation';
+const HINWEIS_MODULE = 'nur Einsatzleitung oder System-Admin der Organisation';
 /** Pegel schreibt über die Modul-Achse, nicht die Verwaltungsachse (LFH-1118). */
 const HINWEIS_PEGEL = 'nur Einsatzleitung und Führungspersonal';
 

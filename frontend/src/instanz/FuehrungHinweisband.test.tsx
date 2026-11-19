@@ -102,7 +102,7 @@ describe('FuehrungHinweisband (LLH-1491)', () => {
     renderMitProviders(<FuehrungHinweisband einsatz={einsatz('einsatzleitung', true)} />);
     expect(
       await screen.findByText(
-        'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+        'Die Notübernahme dieser Instanz hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Übernahme bestätigen' })).toBeInTheDocument();

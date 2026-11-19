@@ -16,7 +16,9 @@ import {
   useHatOffeneBearbeitung,
   useOffeneBearbeitungBelegung,
 } from '../offeneBearbeitung';
+import { AenderungsstandProvider, EnterOhneAenderung } from '../aenderungsstand';
 import { SpeicherFehler } from '../SpeicherHinweis';
+import SpeicherKnopf from '../SpeicherKnopf';
 import { useSpeicherLeiste } from '../speicherLeiste';
 import { useEditSitzung, type CasBasis, type MitGeaendertAt } from '../useEditSitzung';
 import Datenraster, { Datenfeld } from './Datenraster';
@@ -270,11 +272,16 @@ function Innen<W extends object, P = Partial<W>>({
     schliesse();
   };
 
+  // Enter ohne Änderung schließt wie bisher (LLH-1829): `EnterOhneAenderung` im Formular.
+  const schliesseOhneAenderung = () => {
+    if (laeuft) return;
+    melde('zu');
+    schliesse();
+  };
+
   const knoepfe = (
     <>
-      <Button type="primary" htmlType="submit" loading={laeuft}>
-        Speichern
-      </Button>
+      <SpeicherKnopf loading={laeuft} />
       <Button
         htmlType="button"
         disabled={laeuft}
@@ -351,7 +358,10 @@ function Innen<W extends object, P = Partial<W>>({
         onValuesChange={() => melde('geaendert')}
         scrollToFirstError={{ focus: true }}
       >
-        {inhalt}
+        {/* Ausgangsstand ist der Stand beim Öffnen (LLH-1829): Punkt und „N Änderungen“. */}
+        <AenderungsstandProvider ausgangswerte={sitzung?.werte}>
+          <EnterOhneAenderung onSchliessen={schliesseOhneAenderung}>{inhalt}</EnterOhneAenderung>
+        </AenderungsstandProvider>
       </Form>
     </div>
   );

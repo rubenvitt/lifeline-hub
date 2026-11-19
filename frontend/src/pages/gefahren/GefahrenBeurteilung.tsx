@@ -1,7 +1,7 @@
 import { Button, Typography } from 'antd';
 import type { Gefahrengebiet } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { Status, monoStil, useRollen } from '../../components/instrument';
+import { Stapel, Status, monoStil, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { BESTAETIGT, UNBESTAETIGT } from './beurteilung';
 
@@ -39,43 +39,33 @@ export default function GefahrenBeurteilung({
     <div
       data-lfh="gefahrengebiet-beurteilung"
       className={className}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: token.marginXS,
-        marginBottom: token.margin,
-      }}
+      style={{ marginBottom: token.margin }}
     >
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          // `marginSM` (8/12/16): Aussage und Knopf halten den Zielabstand der Stufe.
-          gap: token.marginSM,
-        }}
-      >
-        {gebiet.beurteilt_at ? (
-          <Typography.Text data-lfh="beurteilung-stand">
-            {BESTAETIGT}{' '}
-            <span style={monoStil(token.fontSize)}>{zeitpunkt(gebiet.beurteilt_at)}</span>
-            {gebiet.beurteilt_von_name ? ` · ${gebiet.beurteilt_von_name}` : ''}
-          </Typography.Text>
-        ) : (
-          <Status groesse="klein" ton="achtung" wort={UNBESTAETIGT} />
+      <Stapel abstand="xs">
+        {/* `sm` (8/12/16): Aussage und Knopf halten den Zielabstand der Stufe. */}
+        <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
+          {gebiet.beurteilt_at ? (
+            <Typography.Text data-lfh="beurteilung-stand">
+              {BESTAETIGT}{' '}
+              <span style={monoStil(token.fontSize)}>{zeitpunkt(gebiet.beurteilt_at)}</span>
+              {gebiet.beurteilt_von_name ? ` · ${gebiet.beurteilt_von_name}` : ''}
+            </Typography.Text>
+          ) : (
+            <Status groesse="klein" ton="achtung" wort={UNBESTAETIGT} />
+          )}
+          {darfSchreiben && (
+            // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).
+            <Button onClick={onBestaetigen} loading={laeuft} disabled={matrixLaedt}>
+              Beurteilung bestätigen
+            </Button>
+          )}
+        </Stapel>
+        {fehler != null && (
+          <div data-fehler>
+            <SpeicherFehler fehler={fehler} titel="Beurteilung nicht bestätigt" />
+          </div>
         )}
-        {darfSchreiben && (
-          // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).
-          <Button onClick={onBestaetigen} loading={laeuft} disabled={matrixLaedt}>
-            Beurteilung bestätigen
-          </Button>
-        )}
-      </div>
-      {fehler != null && (
-        <div data-fehler>
-          <SpeicherFehler fehler={fehler} titel="Beurteilung nicht bestätigt" />
-        </div>
-      )}
+      </Stapel>
     </div>
   );
 }

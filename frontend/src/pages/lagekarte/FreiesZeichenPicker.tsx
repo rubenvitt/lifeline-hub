@@ -10,13 +10,13 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
-import { Collapse, Input, Space, Tooltip, Typography } from 'antd';
+import { Collapse, Input, Tooltip } from 'antd';
 import { serializeAnySpec } from '@einsatzzeichen/core/exact';
 import type { AnySpec, Drawing, SymbolKind, SymbolSpec } from '@einsatzzeichen/schema';
 import { Select } from '../../components/Select';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import type { Farbrollen } from '../../theme/tokens';
-import { useRollen } from '../../components/instrument';
+import { FELD_KLASSE, Stapel, Textstufe, useRollen } from '../../components/instrument';
 import { ZeichenBild } from '../../zeichen/EinsatzZeichen';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 import { abonniereZuletztVerwendet, leseZuletztVerwendet } from './zuletztVerwendet';
@@ -364,7 +364,7 @@ function Raster({
   };
 
   return (
-    <div style={{ width: '100%' }}>
+    <Stapel abstand="xxs">
       <Input
         aria-label={suchName}
         placeholder={suchName}
@@ -373,7 +373,6 @@ function Raster({
         value={suche}
         onChange={(e) => setSuche(e.target.value)}
         onPressEnter={aufSuchEnter}
-        style={{ marginBottom: token.marginXXS }}
       />
       <div
         ref={rasterRef}
@@ -410,9 +409,9 @@ function Raster({
         ))}
       </div>
       {treffer.length === 0 && begriff !== '' && (
-        <Typography.Text type="secondary">Kein Treffer</Typography.Text>
+        <Textstufe ton="gedaempft">Kein Treffer</Textstufe>
       )}
-    </div>
+    </Stapel>
   );
 }
 
@@ -555,182 +554,185 @@ export default function FreiesZeichenPicker({
   const farbOptionen = details.farbe;
 
   return (
-    <Space orientation="vertical" style={{ width: '100%' }} data-lfh="zeichen-picker">
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: VORSCHAU_BILD,
-        }}
-        aria-label="Vorschau"
-      >
-        {vorschau ? (
-          <ZeichenAufPlatte drawing={vorschau} size={VORSCHAU_BILD} />
-        ) : (
-          <Typography.Text type="secondary">{OHNE_ZEICHEN_HINWEIS}</Typography.Text>
-        )}
-      </div>
-
-      {zuletzt.length > 0 && (
+    <div data-lfh="zeichen-picker">
+      <Stapel abstand="xs">
         <div
-          role="group"
-          aria-label="Zuletzt verwendet"
-          style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXXS }}
-        >
-          {zuletzt.map((z) => {
-            const name = zeichenName(leseEntwurf(z));
-            return (
-              /* Name als `aria-label` samt Tooltip: sechs ausgeschriebene DV-102-Namen sprengten
-                 die Leiste. Die kanonische Spec ist der Schlüssel (die Leiste ist entdoppelt). */
-              <Tooltip key={z} title={name}>
-                <button
-                  type="button"
-                  aria-label={name}
-                  onClick={() => uebernimm(z)}
-                  style={leistenKnopf}
-                >
-                  <ZeichenAufPlatte
-                    drawing={freiesZeichen({ zeichen_spec: z }).drawing}
-                    size={KACHEL_BILD}
-                  />
-                </button>
-              </Tooltip>
-            );
-          })}
-        </div>
-      )}
-
-      <Raster
-        gruppenName="Grundzeichen"
-        suchName="Grundzeichen suchen"
-        autoFocus={autoFokus}
-        eintraege={gzEintraege}
-        gewaehlt={grundzeichen}
-        onWaehle={waehleGrundzeichen}
-        onWaehleUndSende={
-          onAbsenden
-            ? (id) => {
-                const neu = nachGrundzeichen(id);
-                if (neu) uebernimmUndSende(neu);
-                // „Kein Grundzeichen“: ein schon freistehendes Zeichen gilt, sonst nur wählen.
-                else if (hatZeichen(wert) && !koerper) uebernimmUndSende(wert);
-                else waehleGrundzeichen(id);
-              }
-            : undefined
-        }
-      />
-
-      {symbolEintraege.some((e) => e.id != null) && (
-        <Raster
-          gruppenName="Symbol"
-          suchName="Symbol suchen"
-          eintraege={symbolEintraege}
-          gewaehlt={entwurf ? symbolVon(entwurf) : null}
-          onWaehle={(id) => {
-            const neu = nachSymbol(id);
-            if (neu) melde(neu);
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: VORSCHAU_BILD,
           }}
+          aria-label="Vorschau"
+        >
+          {vorschau ? (
+            <ZeichenAufPlatte drawing={vorschau} size={VORSCHAU_BILD} />
+          ) : (
+            <Textstufe ton="gedaempft">{OHNE_ZEICHEN_HINWEIS}</Textstufe>
+          )}
+        </div>
+
+        {zuletzt.length > 0 && (
+          <Stapel
+            role="group"
+            aria-label="Zuletzt verwendet"
+            richtung="zeile"
+            umbruch
+            abstand="xxs"
+          >
+            {zuletzt.map((z) => {
+              const name = zeichenName(leseEntwurf(z));
+              return (
+                /* Name als `aria-label` samt Tooltip: sechs ausgeschriebene DV-102-Namen sprengten
+                 die Leiste. Die kanonische Spec ist der Schlüssel (die Leiste ist entdoppelt). */
+                <Tooltip key={z} title={name}>
+                  <button
+                    type="button"
+                    aria-label={name}
+                    onClick={() => uebernimm(z)}
+                    style={leistenKnopf}
+                  >
+                    <ZeichenAufPlatte
+                      drawing={freiesZeichen({ zeichen_spec: z }).drawing}
+                      size={KACHEL_BILD}
+                    />
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </Stapel>
+        )}
+
+        <Raster
+          gruppenName="Grundzeichen"
+          suchName="Grundzeichen suchen"
+          autoFocus={autoFokus}
+          eintraege={gzEintraege}
+          gewaehlt={grundzeichen}
+          onWaehle={waehleGrundzeichen}
           onWaehleUndSende={
             onAbsenden
               ? (id) => {
-                  const neu = nachSymbol(id);
+                  const neu = nachGrundzeichen(id);
                   if (neu) uebernimmUndSende(neu);
+                  // „Kein Grundzeichen“: ein schon freistehendes Zeichen gilt, sonst nur wählen.
+                  else if (hatZeichen(wert) && !koerper) uebernimmUndSende(wert);
+                  else waehleGrundzeichen(id);
                 }
               : undefined
           }
         />
-      )}
 
-      <Collapse
-        ghost
-        items={[
-          {
-            key: 'details',
-            label: 'Details',
-            // Ohne `forceRender` stünden die Felder erst beim Aufklappen im Baum — die Zählung
-            // „offen liegen nur zwei" wäre trivial.
-            forceRender: true,
-            children: (
-              <div data-lfh="zeichen-details">
-                <Space orientation="vertical" style={{ width: '100%' }}>
-                  {DETAIL_ACHSEN.map(({ achse, label }) =>
-                    details[achse].length > 0 ? (
+        {symbolEintraege.some((e) => e.id != null) && (
+          <Raster
+            gruppenName="Symbol"
+            suchName="Symbol suchen"
+            eintraege={symbolEintraege}
+            gewaehlt={entwurf ? symbolVon(entwurf) : null}
+            onWaehle={(id) => {
+              const neu = nachSymbol(id);
+              if (neu) melde(neu);
+            }}
+            onWaehleUndSende={
+              onAbsenden
+                ? (id) => {
+                    const neu = nachSymbol(id);
+                    if (neu) uebernimmUndSende(neu);
+                  }
+                : undefined
+            }
+          />
+        )}
+
+        <Collapse
+          ghost
+          items={[
+            {
+              key: 'details',
+              label: 'Details',
+              // Ohne `forceRender` stünden die Felder erst beim Aufklappen im Baum — die Zählung
+              // „offen liegen nur zwei" wäre trivial.
+              forceRender: true,
+              children: (
+                <div data-lfh="zeichen-details">
+                  {/* `FELD_KLASSE` streckt die Auswahlen auf die volle Breite. */}
+                  <Stapel abstand="xs" className={FELD_KLASSE}>
+                    {DETAIL_ACHSEN.map(({ achse, label }) =>
+                      details[achse].length > 0 ? (
+                        <Select
+                          key={achse}
+                          aria-label={label}
+                          allowClear
+                          placeholder={label}
+                          value={(koerper && detailVon(koerper, achse)) ?? undefined}
+                          options={details[achse]}
+                          onChange={(v?: string) =>
+                            melde(mitSpec(mitDetail(koerper!, achse, v ?? null)))
+                          }
+                        />
+                      ) : null,
+                    )}
+
+                    {/* Farbe nur aus der Palette und nur, wo das Zeichen eine Füllung trägt (D6). */}
+                    {farbOptionen.length > 0 && (
                       <Select
-                        key={achse}
-                        aria-label={label}
+                        aria-label="Farbe"
                         allowClear
-                        placeholder={label}
-                        style={{ width: '100%' }}
-                        value={(koerper && detailVon(koerper, achse)) ?? undefined}
-                        options={details[achse]}
+                        placeholder="Farbe"
+                        value={(koerper && detailVon(koerper, 'farbe')) ?? undefined}
+                        options={farbOptionen}
+                        optionRender={(o) => (
+                          <span>
+                            <Farbfeld farbe={o.data.farbe} rand={rollen.steuerRahmen} />
+                            {o.data.label}
+                          </span>
+                        )}
+                        labelRender={(o) => {
+                          const option = farbOptionen.find((f) => f.value === o.value);
+                          return option ? (
+                            <span>
+                              <Farbfeld farbe={option.farbe} rand={rollen.steuerRahmen} />
+                              {option.label}
+                            </span>
+                          ) : (
+                            o.label
+                          );
+                        }}
                         onChange={(v?: string) =>
-                          melde(mitSpec(mitDetail(koerper!, achse, v ?? null)))
+                          melde(mitSpec(mitDetail(koerper!, 'farbe', v ?? null)))
                         }
                       />
-                    ) : null,
-                  )}
+                    )}
 
-                  {/* Farbe nur aus der Palette und nur, wo das Zeichen eine Füllung trägt (D6). */}
-                  {farbOptionen.length > 0 && (
-                    <Select
-                      aria-label="Farbe"
-                      allowClear
-                      placeholder="Farbe"
-                      style={{ width: '100%' }}
-                      value={(koerper && detailVon(koerper, 'farbe')) ?? undefined}
-                      options={farbOptionen}
-                      optionRender={(o) => (
-                        <span>
-                          <Farbfeld farbe={o.data.farbe} rand={rollen.steuerRahmen} />
-                          {o.data.label}
-                        </span>
-                      )}
-                      labelRender={(o) => {
-                        const option = farbOptionen.find((f) => f.value === o.value);
-                        return option ? (
-                          <span>
-                            <Farbfeld farbe={option.farbe} rand={rollen.steuerRahmen} />
-                            {option.label}
-                          </span>
-                        ) : (
-                          o.label
-                        );
+                    <Input
+                      aria-label="Bezeichnung"
+                      placeholder="Bezeichnung"
+                      value={bezeichnung}
+                      onChange={(e) => {
+                        setBezeichnung(e.target.value);
+                        setBezeichnungGetippt(true);
                       }}
-                      onChange={(v?: string) =>
-                        melde(mitSpec(mitDetail(koerper!, 'farbe', v ?? null)))
-                      }
+                      onBlur={() => {
+                        if (!bezeichnungGetippt) return;
+                        const spec = bezeichnungUebernehmen();
+                        if (spec) onChange(spec);
+                      }}
+                      onPressEnter={() => {
+                        const geaendert = bezeichnungUebernehmen();
+                        const stand = geaendert ?? wert;
+                        // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) oder ohne
+                        // Zeichen übernimmt es nur den getippten Namen.
+                        if (onAbsenden && hatZeichen(stand)) uebernimmUndSende(stand);
+                        else if (geaendert) onChange(geaendert);
+                      }}
                     />
-                  )}
-
-                  <Input
-                    aria-label="Bezeichnung"
-                    placeholder="Bezeichnung"
-                    value={bezeichnung}
-                    onChange={(e) => {
-                      setBezeichnung(e.target.value);
-                      setBezeichnungGetippt(true);
-                    }}
-                    onBlur={() => {
-                      if (!bezeichnungGetippt) return;
-                      const spec = bezeichnungUebernehmen();
-                      if (spec) onChange(spec);
-                    }}
-                    onPressEnter={() => {
-                      const geaendert = bezeichnungUebernehmen();
-                      const stand = geaendert ?? wert;
-                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) oder ohne
-                      // Zeichen übernimmt es nur den getippten Namen.
-                      if (onAbsenden && hatZeichen(stand)) uebernimmUndSende(stand);
-                      else if (geaendert) onChange(geaendert);
-                    }}
-                  />
-                </Space>
-              </div>
-            ),
-          },
-        ]}
-      />
-    </Space>
+                  </Stapel>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </Stapel>
+    </div>
   );
 }

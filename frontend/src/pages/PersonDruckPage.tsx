@@ -1,4 +1,4 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Typography } from 'antd';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -7,13 +7,19 @@ import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+} from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import { modulName } from '../einsatz/modulRegistry';
 import PersonDruckBlatt from '../personen/PersonDruckBlatt';
 import { parseRouteId, personDetailPfad, personenPfad } from '../routing/deeplinks';
+import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 
 /**
@@ -26,7 +32,10 @@ import { zeitpunkt } from '../anzeige/zeitDarstellung';
  * mit Person ins Zugriffsprotokoll (`frontend/src/druck/AGENTS.md`, Personendruck). Deshalb die
  * Optionen aus `druck/abfrageOptionen.ts` (kein stiller Retry, offline scheitern) und ein eigener,
  * nicht live geführter Key: das Blatt ist ein Schnappschuss, „Neu laden“ holt den neuen Stand.
- * Eine unbekannte Person steht als solche da, ohne Druckknopf.
+ *
+ * Eine Person, die es nicht (mehr) gibt (404 oder ungültige Kennung in der Adresse), ersetzt die
+ * ganze Druckansicht durch `SeitenNichtGefunden` mit dem Rückweg zur Liste, wie am Detail (LLH-1960):
+ * „Zurück zur Person“ führte auf ein Detail, das es auch nicht gibt.
  */
 export default function PersonDruckPage() {
   const { id, personId: personIdParam } = useParams();
@@ -34,6 +43,7 @@ export default function PersonDruckPage() {
   const personId = parseRouteId(personIdParam);
   const navigate = useNavigate();
   const { konventionen } = useAnzeigeKonventionen();
+  const pfade = useEinsatzPfade();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -47,7 +57,15 @@ export default function PersonDruckPage() {
     gcTime: 0,
   });
 
-  if (personId == null) return <Navigate to={personenPfad(einsatzId)} replace />;
+  // Nach allen Hooks (Rules-of-Hooks); keine stille Weiterleitung, die Adresse bleibt stehen.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diese Person gibt es nicht (mehr)"
+      rueckweg={{ label: pfade.personenListeLabel, pfad: pfade.personenListe(einsatzId) }}
+    />
+  );
+  if (personId == null) return nichtGefunden;
+  if (istNichtGefunden(druckQuery.error)) return nichtGefunden;
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -59,7 +77,7 @@ export default function PersonDruckPage() {
   }
   const einsatz = einsatzQuery.data;
   const status = druckQuery.error instanceof ApiError ? druckQuery.error.status : null;
-  const isOhneDruck = status === 403 || status === 404;
+  const isOhneDruck = status === 403;
   const person = druckQuery.data;
   const kennung = person ? registrierAnzeige(person.registrier_nr) : undefined;
   const zurueck = personDetailPfad(einsatzId, personId);
@@ -100,9 +118,7 @@ export default function PersonDruckPage() {
         </>
       }
     >
-      {status === 404 ? (
-        <Alert type="info" showIcon title="Person nicht gefunden" />
-      ) : status === 403 ? (
+      {status === 403 ? (
         <Alert
           type="info"
           showIcon
@@ -110,11 +126,11 @@ export default function PersonDruckPage() {
           description="Modul gesperrt oder Aufbewahrungsfrist abgelaufen"
         />
       ) : druckQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          title="Die Person konnte nicht geladen werden"
-          action={<Button onClick={() => void druckQuery.refetch()}>Erneut laden</Button>}
+        <SeitenFehler
+          text="Die Person konnte nicht geladen werden"
+          ursache={druckQuery.error}
+          laedt={druckQuery.isFetching}
+          onWiederholen={() => void druckQuery.refetch()}
         />
       ) : !person || druckQuery.isFetching ? (
         <Typography.Text role="status" aria-live="polite">

@@ -1,7 +1,8 @@
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
 import { Input, InputNumber, type TableColumnsType } from 'antd';
 import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
-import { STAERKE_SCHREIBWEISE, staerkeSumme } from '../anzeige/staerke';
+import { staerkeSumme } from '../anzeige/staerke';
 import { aktualisiereTyp, deaktiviereTyp, legeTypAn, listeEinheitTypen } from '../api/einheitTypen';
 import type { EinheitTyp, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -31,7 +32,11 @@ const spalten: TableColumnsType<EinheitTyp> = [
     sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
   },
   {
-    title: `Soll-Stärke (${STAERKE_SCHREIBWEISE})`,
+    title: (
+      <>
+        Soll-Stärke (<StaerkeSchreibweise />)
+      </>
+    ),
     key: 'soll',
     // Nach der Gesamtstärke (Σ); ohne Soll hinten (LLH-1096).
     sorter: nachZahl((t: EinheitTyp) => staerkeSumme(t.soll)),
@@ -40,7 +45,7 @@ const spalten: TableColumnsType<EinheitTyp> = [
     // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
     render: (_, t) => (
       <>
-        <span style={monoStil(12)}>
+        <span style={monoStil('monoKlein')}>
           <StaerkeAnzeige wert={t.soll ?? null} />
         </span>
         {t.quali_soll?.length ? ` · ${qualiSollText(t.quali_soll)}` : null}
@@ -51,7 +56,7 @@ const spalten: TableColumnsType<EinheitTyp> = [
     title: 'Sortierung',
     dataIndex: 'sortier',
     key: 'sortier',
-    render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    render: (n: number) => <span style={monoStil('monoKlein')}>{n}</span>,
     // Numerisch vergleichen, nicht über die Zeichenkette: nur so steht 5 vor 40.
     sorter: (a, b) => a.sortier - b.sortier,
   },

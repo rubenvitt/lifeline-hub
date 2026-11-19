@@ -1,4 +1,4 @@
-import { Alert, Checkbox, Modal, Space, Typography } from 'antd';
+import { Alert, Checkbox, Modal, Typography } from 'antd';
 import { useState, type CSSProperties } from 'react';
 import { AUSGANG_UNBEKANNT_TEXT, NetzFehler, fehlerText } from '../../api/client';
 import { legeNachforderungAn } from '../../api/nachforderungen';
@@ -9,7 +9,7 @@ import type {
 } from '../../api/types';
 import { MengenFeld } from '../../components/MengenFeld';
 import { Select } from '../../components/Select';
-import { useRollen } from '../../components/instrument';
+import { Stapel, useRollen } from '../../components/instrument';
 import { neueClientId } from '../../offline/clientId';
 import {
   ADRESSAT_OPTIONEN,
@@ -170,7 +170,7 @@ export default function NachforderungenDialog({
       mask={{ closable: !laeuft }}
       destroyOnHidden
     >
-      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      <Stapel abstand="md">
         <div role="group" aria-label="Posten">
           {zeilen.map((z) => (
             <div key={z.schluessel} style={zeile}>
@@ -256,7 +256,7 @@ export default function NachforderungenDialog({
             description={gescheitert.map((z) => z.art).join(', ')}
           />
         )}
-      </Space>
+      </Stapel>
     </Modal>
   );
 }

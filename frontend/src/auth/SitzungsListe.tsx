@@ -1,7 +1,14 @@
 import { relativ } from '../anzeige/dauer';
-import { Button, Flex, Space } from 'antd';
+import { Button, Flex } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { PaneelZustand, Status, monoStil, useRollen } from '../components/instrument';
+import {
+  PaneelZustand,
+  Stapel,
+  Status,
+  Textstufe,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -65,7 +72,7 @@ export default function SitzungsListe({
   alleText,
 }: SitzungsListeProps) {
   const qc = useQueryClient();
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const { zeitpunkt } = useAnzeigeKonventionen();
   // Die Minute, damit „vor 12 min“ nicht stehen bleibt, solange die Liste offen ist.
   const jetzt = useMinutenTakt();
@@ -111,12 +118,12 @@ export default function SitzungsListe({
               wrap
               style={{ paddingBlock: token.paddingXXS }}
             >
-              <Flex vertical gap={2}>
-                <Space size="small" wrap>
+              <Stapel abstand="xxs">
+                <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                   <span style={{ fontWeight: 600 }}>{geraet}</span>
                   {s.aktuell && <Status groesse="klein" ton="normal" wort="dieses Gerät" />}
-                </Space>
-                <span style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+                </Stapel>
+                <Textstufe stufe="textKlein" ton="text2">
                   angemeldet{' '}
                   <span style={monoStil(token.fontSizeSM)}>{zeitpunkt(s.angemeldet_at)}</span>
                   {' · '}zuletzt{' '}
@@ -125,8 +132,8 @@ export default function SitzungsListe({
                       {zeitpunkt(s.zuletzt_gesehen_at)}
                     </span>
                   )}
-                </span>
-              </Flex>
+                </Textstufe>
+              </Stapel>
               {!s.aktuell && (
                 <Button
                   danger

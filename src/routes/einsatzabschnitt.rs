@@ -499,7 +499,7 @@ pub async fn aufloesen(
     let von = ctx.benutzer.id;
     // Ein an den Abschnitt gekoppeltes Gerät (LFH-1040) hätte keine Stelle mehr: es endet mit
     // dem Abschnitt, wie bei einem Widerruf durch die Einsatzleitung.
-    let (widerrufen, traeger) = crate::write_retry!(&state.pool, |conn| {
+    let (widerrufen, traeger, etb_ids) = crate::write_retry!(&state.pool, |conn| {
         // Vor dem Freigeben der Bezüge: danach zeigen Räume, Stellen, Bezirke, Einheiten und
         // Dokumente keinen Abschnitt mehr, und ihre Leser erfahren das sonst nicht (LLH-1291,
         // LLH-1501).
@@ -507,16 +507,20 @@ pub async fn aufloesen(
         let geraete =
             crate::geraet::repo::widerrufe_am_abschnitt(conn, einsatz_id, aid, von).await?;
         abschnitt_repo::aufloesen_tx(conn, einsatz_id, aid).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?;
+        let mut etb_ids =
+            vec![crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?];
         for (_, anzeigename) in &geraete {
             let geraet_text = format!(
                 "Gerät „{anzeigename}“ (Einsatzabschnitt) widerrufen: Abschnitt «{}» aufgelöst.",
                 vorher.name
             );
-            crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &geraet_text).await?;
+            etb_ids.push(
+                crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &geraet_text).await?,
+            );
         }
-        Ok((geraete, traeger))
+        Ok((geraete, traeger, etb_ids))
     })?;
+    super::etb_verteilen(&state, einsatz_id, etb_ids);
     for (kopplung_id, _) in &widerrufen {
         state.live.melde_kopplung_ende(*kopplung_id);
     }

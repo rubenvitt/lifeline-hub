@@ -14,6 +14,8 @@ import {
   Paneel,
   PaneelLink,
   PaneelZustand,
+  Stapel,
+  Textstufe,
   monoStil,
   useRollen,
   type PaneelDatenzustand,
@@ -106,11 +108,11 @@ export default function PegelPaneel({
                     {z.name}
                     {z.gewaesser ? ` · ${z.gewaesser}` : ''}
                   </Augenbraue>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS }}>
+                  <Stapel richtung="zeile" abstand="xs" ausrichten="baseline">
                     <span style={{ ...monoStil(28, 500), color: rollen.text }}>{z.wert}</span>
-                    {z.einheit && <span style={{ color: rollen.gedaempft }}>{z.einheit}</span>}
-                  </div>
-                  <div style={{ color: rollen.text2, fontSize: 12 }}>
+                    {z.einheit && <Textstufe ton="gedaempft">{z.einheit}</Textstufe>}
+                  </Stapel>
+                  <Textstufe als="div" stufe="textKlein" ton="text2">
                     {[z.trend, z.stand].filter(Boolean).join(' · ')}
                     {z.veraltet && (
                       <span style={{ color: rollen.achtungText, fontWeight: 600 }}>
@@ -118,16 +120,22 @@ export default function PegelPaneel({
                         {VERALTET}
                       </span>
                     )}
-                  </div>
+                  </Textstufe>
                   {z.prognose && (
-                    <div style={{ color: rollen.text2, fontSize: 12 }}>{z.prognose}</div>
+                    <Textstufe als="div" stufe="textKlein" ton="text2">
+                      {z.prognose}
+                    </Textstufe>
                   )}
                 </div>
                 <div style={{ minWidth: 0 }}>
                   {z.fall === 'ausfall' ? null : verlauf === null ? (
-                    <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{VERLAUF_FEHLT}</span>
+                    <Textstufe stufe="textKlein" ton="gedaempft">
+                      {VERLAUF_FEHLT}
+                    </Textstufe>
                   ) : verlauf === undefined ? null : reihe.length === 0 ? (
-                    <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{KEIN_VERLAUF}</span>
+                    <Textstufe stufe="textKlein" ton="gedaempft">
+                      {KEIN_VERLAUF}
+                    </Textstufe>
                   ) : (
                     <Verlaufslinie
                       punkte={reihe}

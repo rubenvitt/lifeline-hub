@@ -210,7 +210,7 @@ pub async fn disponieren(
     // Material stammt die Bezeichnung erst aus dem Snapshot des INSERT) für ETB-Text UND
     // Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         // Status und Übernahmen der Nachforderung erst hier: sie kippen sonst zwischen Prüfung
         // und Schreiben (design.md D2).
         let herkunft = match nachforderung_id {
@@ -264,9 +264,12 @@ pub async fn disponieren(
             Some(bezeichnung) => crate::material::etb_text_aus_nachforderung(&text, bezeichnung),
             None => text,
         };
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(anzeige)
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        Ok((anzeige, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_material(&state, einsatz_id, anzeige.id);
     if let Some(o) = anzeige.ort() {
         sse_ort(&state, einsatz_id, o);
@@ -508,7 +511,7 @@ pub async fn update(
     // IMMEDIATE + Retry). Vor- und Nachzustand liest die Tx selbst; der Reload (`nachher`) liefert
     // die frischen Werte für ETB-Texte UND Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
+    let (vorher, nachher, etb_ids) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         if nur_wenn_frei {
             // Rückgängig nach dem Lösen (LLH-1924): nur wenn der Posten nicht inzwischen woanders
@@ -561,11 +564,16 @@ pub async fn update(
                 &ort::ort_text_tx(conn, einsatz_id, nachher.ort()).await?,
             ));
         }
+        let mut etb_ids = Vec::new();
         for text in &texte {
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, text).await?;
+            etb_ids.push(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, text)
+                    .await?,
+            );
         }
-        Ok((vorher, nachher))
+        Ok((vorher, nachher, etb_ids))
     })?;
+    super::etb_verteilen(&state, einsatz_id, etb_ids);
     sse_material(&state, einsatz_id, em_id);
     notify_orte(&state, einsatz_id, &vorher, &nachher);
     Ok(Json(nachher))
@@ -657,7 +665,7 @@ pub async fn aufteilen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     // F06/LFH-244 Tier-A: Mindern, Anlegen, Ort und System-ETB atomar in EINER Tx; SSE erst nach
     // dem Commit.
-    let (ausgang, neu, wechsel) = crate::write_retry!(&state.pool, |conn| {
+    let (ausgang, neu, wechsel, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let (neu_id, wechsel) =
             disposition_repo::teile_auf_tx(conn, einsatz_id, em_id, body.menge, ort_patch).await?;
@@ -669,7 +677,7 @@ pub async fn aufteilen(
         } else {
             None
         };
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -686,8 +694,9 @@ pub async fn aufteilen(
         .await?;
         let ausgang = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let neu = disposition_repo::load_anzeige_tx(conn, einsatz_id, neu_id, true).await?;
-        Ok((ausgang, neu, wechsel))
+        Ok((ausgang, neu, wechsel, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_material(&state, einsatz_id, ausgang.id);
     sse_material(&state, einsatz_id, neu.id);
     notify_nachforderung(&state, &ausgang);
@@ -731,7 +740,7 @@ pub async fn verknuepfen(
     ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
         .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let posten = disposition_repo::check_verknuepfbar_tx(conn, einsatz_id, em_id).await?;
         let herkunft = crate::nachforderung::repo::check_uebernahme_tx(
             conn,
@@ -741,7 +750,7 @@ pub async fn verknuepfen(
         )
         .await?;
         disposition_repo::set_nachforderung_tx(conn, einsatz_id, em_id, nachforderung_id).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -753,8 +762,10 @@ pub async fn verknuepfen(
             ),
         )
         .await?;
-        disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        Ok((anzeige, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_material(&state, einsatz_id, em_id);
     notify_nachforderung(&state, &anzeige);
     Ok(Json(anzeige))
@@ -776,11 +787,11 @@ pub async fn loesen(
     ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
         .await?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let (posten, _nid, herkunft) =
             disposition_repo::check_loesbar_tx(conn, einsatz_id, em_id).await?;
         disposition_repo::clear_nachforderung_tx(conn, einsatz_id, em_id).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -792,8 +803,10 @@ pub async fn loesen(
             ),
         )
         .await?;
-        disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
+        Ok((anzeige, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_material(&state, einsatz_id, em_id);
     // Der Posten trägt den Bezug nicht mehr: die Karte zählt neu, die Rücknahme wird möglich.
     super::nachforderung::sse(&state, einsatz_id);
@@ -816,12 +829,12 @@ pub async fn entlassen(
     let jetzt = crate::zeit::jetzt();
     // F06/LFH-244 Tier-A: Bindungen lösen, Endzustand und System-ETB atomar in EINER Tx; SSE erst
     // nach dem Commit.
-    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let ergebnis =
             disposition_repo::entlassen_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt)
                 .await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -834,8 +847,9 @@ pub async fn entlassen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        Ok((ergebnis, anzeige))
+        Ok((ergebnis, anzeige, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     let vorzustand = ergebnis.vorzustand(&jetzt);
     sse_material(&state, einsatz_id, em_id);
     // Der Ort zeigt das Material; `material` erreicht seine Leser ohne Materialrecht nicht
@@ -867,7 +881,7 @@ pub async fn zuruecknehmen(
     vorzustand.ort()?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis = disposition_repo::zuruecknehmen_tx(
             conn,
             einsatz_id,
@@ -882,7 +896,7 @@ pub async fn zuruecknehmen(
             Some(o) => Some(ort::ort_text_tx(conn, einsatz_id, Some(o)).await?),
             None => None,
         };
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -895,8 +909,9 @@ pub async fn zuruecknehmen(
             ),
         )
         .await?;
-        Ok((ergebnis, anzeige))
+        Ok((ergebnis, anzeige, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     // Live wie beim Herausnehmen: dieselben Leser, nur in der Gegenrichtung.
     sse_material(&state, einsatz_id, em_id);
     if let Some(o) = ergebnis.ort {
@@ -919,11 +934,11 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let vorher = crate::write_retry!(&state.pool, |conn| {
+    let (vorher, etb_id) = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, em_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         disposition_repo::stornieren_tx(conn, einsatz_id, em_id, ctx.benutzer.id, &jetzt).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -931,8 +946,9 @@ pub async fn stornieren(
             &crate::material::etb_text_storniert(&vorher.bezeichnung, vorher.menge),
         )
         .await?;
-        Ok(vorher)
+        Ok((vorher, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_material(&state, einsatz_id, em_id);
     // Ein stornierter Posten zählt nicht mehr als Übernahme (LLH-1226, design.md D3).
     notify_nachforderung(&state, &vorher);
@@ -952,7 +968,7 @@ pub async fn reaktivieren(
 ) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let anzeige = crate::write_retry!(&state.pool, |conn| {
+    let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let storniert = vorher.beendet_als.as_deref()
             == Some(crate::entlassung::BeendetAls::Storniert.as_str());
@@ -968,7 +984,7 @@ pub async fn reaktivieren(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -976,8 +992,9 @@ pub async fn reaktivieren(
             &crate::material::etb_text_erneut_disponiert(&anzeige.bezeichnung, anzeige.menge),
         )
         .await?;
-        Ok(anzeige)
+        Ok((anzeige, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_material(&state, einsatz_id, em_id);
     notify_nachforderung(&state, &anzeige);
     Ok(Json(anzeige))

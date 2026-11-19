@@ -1,3 +1,4 @@
+import { ganzerText } from '../test/kuerzel';
 import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -934,7 +935,7 @@ describe('FahrzeugePage', () => {
         container.querySelector('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]'),
       ).not.toBeNull(),
     );
-    expect(kopfZahlen(container).getByText('Stärke F/UF/M//Σ')).toBeInTheDocument();
+    expect(kopfZahlen(container).getByText(ganzerText('Stärke F/UF/M//Σ'))).toBeInTheDocument();
     expect(kopfZahlen(container).getByText('1 verfügbar')).toBeInTheDocument();
     expect(kopfZahlen(container).getByText('1 gebunden')).toBeInTheDocument();
     // Kein zweiter Streifen mit derselben Aufteilung und keine Stärkezeile über der Tabelle.
@@ -2169,7 +2170,9 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       within(kopf).getByRole('button', { name: 'Weitere Aktionen zu den Fahrzeugen' }),
     );
     expect(await screen.findByRole('menuitem', { name: 'Ad-hoc-Fahrzeug' })).toBeInTheDocument();
-    await waitFor(() => expect(within(kopf).getByText('Stärke F/UF/M//Σ')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(within(kopf).getByText(ganzerText('Stärke F/UF/M//Σ'))).toBeInTheDocument(),
+    );
     expect(within(kopf).queryByText(/\d+ (verfügbar|gebunden)/)).toBeNull();
   });
 

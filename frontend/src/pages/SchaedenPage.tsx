@@ -5,7 +5,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { Breadcrumb, Button, Typography, theme } from 'antd';
-import { Segmentleiste, monoStil } from '../components/instrument';
+import { Segmentleiste, Textstufe, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
@@ -74,7 +74,7 @@ const schaedenSpalten = (einsatzId: number) =>
       suchText: (s) => schadenRegistrierAnzeige(s.registrier_nr),
       // Kein Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
       render: (_, s) => (
-        <Typography.Text strong style={monoStil(13, 500)}>
+        <Typography.Text strong style={monoStil('mono', 500)}>
           {schadenRegistrierAnzeige(s.registrier_nr)}
         </Typography.Text>
       ),
@@ -503,8 +503,10 @@ export default function SchaedenPage() {
                   Ältere laden
                 </Button>
                 {ausschnittZahl != null && (
-                  <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                    {geladen.length} von {ausschnittZahl} geladen
+                  <div style={{ marginTop: token.marginXS }}>
+                    <Textstufe ton="gedaempft">
+                      {geladen.length} von {ausschnittZahl} geladen
+                    </Textstufe>
                   </div>
                 )}
               </div>

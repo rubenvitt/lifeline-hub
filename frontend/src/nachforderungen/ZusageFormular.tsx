@@ -19,6 +19,7 @@ import {
   zusageStart,
   type ZusageWerte,
 } from './zusage';
+import { Feld } from '../components/instrument';
 
 const KEINE: string[] = [];
 
@@ -75,7 +76,6 @@ export function WerFeld({
       // Freitext ohne Vorschläge: eine leere Liste darunter wäre nur Rauschen.
       open={optionen.length > 0 ? undefined : false}
       suffixIcon={null}
-      style={{ width: '100%' }}
     />
   );
 }
@@ -130,24 +130,24 @@ export default function ZusageFormular({
         {/* Für eine Person ist es genau ein Rettungsmittel (LLH-1573 D1): statt der Menge die
             Einsatznummer der Leitstelle (D5), das Budget bleibt bei drei Feldern. */}
         {mitEinsatznummer(n) ? (
-          <Form.Item name="einsatznummer" label="Einsatznummer Leitstelle">
+          <Feld name="einsatznummer" label="Einsatznummer Leitstelle">
             <Input aria-label="Einsatznummer Leitstelle" maxLength={EINSATZNUMMER_MAX} />
-          </Form.Item>
+          </Feld>
         ) : (
-          <Form.Item name="anzahl" label="Zugesagt" rules={mengenRegeln}>
-            <MengenFeld beschriftung="Zugesagt" style={{ width: '100%' }} />
-          </Form.Item>
+          <Feld name="anzahl" label="Zugesagt" rules={mengenRegeln}>
+            <MengenFeld beschriftung="Zugesagt" />
+          </Feld>
         )}
-        <Form.Item name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
+        <Feld name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
           <WerFeld aria-label="Wer" vorschlaege={werVorschlaege} />
-        </Form.Item>
-        <Form.Item name="eintreffen" label="Eintreffen erwartet">
+        </Feld>
+        <Feld name="eintreffen" label="Eintreffen erwartet">
           <ZeitpunktEingabe
             art="frist"
             aria-label="Eintreffen erwartet"
             style={{ width: '100%' }}
           />
-        </Form.Item>
+        </Feld>
       </ErfassungsFormular>
     </section>
   );

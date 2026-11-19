@@ -197,11 +197,22 @@ function momentaufnahme(): Momentaufnahme {
   return letzte;
 }
 
+/**
+ * Ohne Fenster (Server-Rendering, etwa die Vorschauen des Design Systems) gilt die breite Ansicht
+ * mit feinem Zeiger: jede Breite erreicht, keine Höhe unterschritten. Die App selbst rendert nur im
+ * Browser und fragt diese Aufnahme nie.
+ */
+const SERVER_AUFNAHME: Momentaufnahme = {
+  screens: { xs: false, sm: true, md: true, lg: true, xl: true, xxl: true },
+  istBeruehrung: false,
+  niedrig: NIEDRIG_ABFRAGEN.map(() => false),
+};
+
 /** Gemeinsame Ableitung je Momentaufnahme, damit auch `abBreite` eine stabile Referenz bleibt. */
 const zustaende = new WeakMap<Momentaufnahme, ViewportZustand>();
 
 export function useViewport(): ViewportZustand {
-  const aufnahme = useSyncExternalStore(abonniere, momentaufnahme);
+  const aufnahme = useSyncExternalStore(abonniere, momentaufnahme, () => SERVER_AUFNAHME);
   let zustand = zustaende.get(aufnahme);
   if (!zustand) {
     const { screens, istBeruehrung, niedrig } = aufnahme;

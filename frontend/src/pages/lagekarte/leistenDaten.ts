@@ -40,7 +40,8 @@ import type { TierKartenEintrag } from './tierMarker';
 import { SPEZIES_META, TIER_STATUS } from '../tiere/tierHelfer';
 import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { ART_LABEL, evakuiertText, personenZahl } from '../../betreuung/betreuungText';
-import { STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
+import type { Kuerzel } from '../../anzeige/kuerzel';
+import { staerkeText } from '../../anzeige/staerke';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { GEFAHR_LABEL, SCHADENSGRAD_LABEL } from '../schaeden/gefahrWorte';
 import { einheitenImAbschnitt } from '../einsatzabschnitte/abschnittStaerke';
@@ -460,6 +461,8 @@ export const LEERE_ROHDATEN: AuswahlRoh = {
 /** Ein Feld des Datenrasters: Augenbraue + Wert, optional mit Statusrolle (getönter Chip). */
 export interface RasterFeld {
   label: string;
+  /** Ein eingeführtes Kürzel hinter dem Etikett, antippbar erklärt (LLH-1825). */
+  labelKuerzel?: Kuerzel;
   wert: string;
   rolle?: Statusrolle;
   /** Wert in Mono (Zahlen, Zeiten, Kennungen) — Vorgabe ja. */
@@ -556,7 +559,7 @@ export function auswahlRaster(
       const st = einheitStatusAnzeige(e.status);
       const statusText = st.code ? `${st.code} · ${st.wort}` : st.wort;
       return [
-        { label: `Stärke ${STAERKE_SCHREIBWEISE}`, wert: staerkeText(e.ist) },
+        { label: 'Stärke', labelKuerzel: 'F/UF/M//Σ', wert: staerkeText(e.ist) },
         {
           label: 'Status',
           wert: st.verteilung ? `${statusText} (${st.verteilung})` : statusText,
@@ -668,7 +671,8 @@ export function auswahlRaster(
       return [
         { label: 'Status', wert: st?.label ?? r.status, rolle: st?.rolle, mono: false },
         {
-          label: `Stärke ${STAERKE_SCHREIBWEISE}`,
+          label: 'Stärke',
+          labelKuerzel: 'F/UF/M//Σ',
           wert: unvollstaendig ? '—' : staerkeText(staerke),
         },
         { label: 'Fahrzeuge', wert: String(r.belegung.fahrzeuge) },

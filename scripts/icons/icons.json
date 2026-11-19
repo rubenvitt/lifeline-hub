@@ -292,6 +292,15 @@
       }
     },
     {
+      "name": "hilfe",
+      "bedeutung": "Hilfe zu dieser Seite (Knopf „?“ im Kopf, LLH-1824)",
+      "herkunft": "icons8",
+      "icons8": {
+        "id": "646",
+        "commonName": "help"
+      }
+    },
+    {
       "name": "hochladen",
       "bedeutung": "Datei/Bild hochladen",
       "herkunft": "icons8",

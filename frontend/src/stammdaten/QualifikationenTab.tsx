@@ -38,7 +38,7 @@ const spaltenMit = (katalog: readonly Qualifikation[]): TableColumnsType<Qualifi
     dataIndex: 'sortier',
     key: 'sortier',
     sorter: nachZahl((q: Qualifikation) => q.sortier),
-    render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    render: (n: number) => <span style={monoStil('monoKlein')}>{n}</span>,
   },
   {
     title: 'Schließt ein',

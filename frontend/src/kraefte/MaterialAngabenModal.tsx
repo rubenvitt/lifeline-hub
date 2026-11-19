@@ -1,4 +1,5 @@
 import { Collapse, Form, Input } from 'antd';
+import { Feld } from '../components/instrument';
 import { useEffect, useRef, useState } from 'react';
 import type { MaterialPatch } from '../api/einsatzMaterial';
 import { MATERIAL_ADHOC_TEXT_MAX } from '../api/eingabegrenzen';
@@ -115,7 +116,7 @@ export default function MaterialAngabenModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[
@@ -124,21 +125,21 @@ export default function MaterialAngabenModal({
         ]}
       >
         <Input count={grenze} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Kategorie"
         name="kategorie"
         rules={[zeichenRegel(MATERIAL_ADHOC_TEXT_MAX, 'Kategorie')]}
       >
         <Input count={grenze} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Trägerorganisation"
         name="traegerorganisation"
         rules={[zeichenRegel(MATERIAL_ADHOC_TEXT_MAX, 'Trägerorganisation')]}
       >
         <Input count={grenze} />
-      </Form.Item>
+      </Feld>
       <Collapse
         ghost
         activeKey={weitereOffen ? ['weitere'] : []}
@@ -151,14 +152,13 @@ export default function MaterialAngabenModal({
               : 'Weitere Angaben',
             forceRender: true,
             children: (
-              <Form.Item
+              <Feld
                 label="Bestandsnummer"
                 name="bestandsnummer"
                 rules={[zeichenRegel(MATERIAL_ADHOC_TEXT_MAX, 'Bestandsnummer')]}
-                style={{ marginBottom: 0 }}
               >
                 <Input count={grenze} />
-              </Form.Item>
+              </Feld>
             ),
           },
         ]}

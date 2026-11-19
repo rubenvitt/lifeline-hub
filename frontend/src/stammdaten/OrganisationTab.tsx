@@ -18,6 +18,8 @@ import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Feld, Formularpaneel, Paneel, Stapel } from '../components/instrument';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, useAenderungsstandMerken } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 
@@ -96,6 +98,7 @@ export default function OrganisationTab() {
   const [form] = Form.useForm<FormWerte>();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
 
   const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
 
@@ -119,7 +122,9 @@ export default function OrganisationTab() {
       name: server.name,
       ...(server.tz_organisation ? { tz_organisation: server.tz_organisation } : {}),
     });
-  }, [server, schutz.ungespeichert, form]);
+    // Der Serverstand ist der Ausgangsstand des Punkts (LLH-1829), auch nach fremder Änderung.
+    stand.merke(basisRef.current);
+  }, [server, schutz.ungespeichert, form, stand]);
 
   /**
    * EIN Speicherweg für Name und DV-102-Organisation (LFH-979): vorher hatte jedes Feld sein
@@ -158,7 +163,12 @@ export default function OrganisationTab() {
       schutz.gespeichert(fassung);
       return;
     }
-    speichern.mutate(felder, { onSuccess: () => schutz.gespeichert(fassung) });
+    speichern.mutate(felder, {
+      onSuccess: () => {
+        schutz.gespeichert(fassung);
+        stand.merke(felder);
+      },
+    });
   }
 
   // ── Logo (LFH-22) ─────────────────────────────────────────────────────────────
@@ -210,123 +220,123 @@ export default function OrganisationTab() {
         onValuesChange={schutz.geaendert}
         onFinish={absenden}
       >
-        <Formularpaneel titel="Name">
-          <Feld
-            label="Name der Organisation"
-            name="name"
-            rules={[
-              { required: true, whitespace: true, message: 'Der Name darf nicht leer sein.' },
-              { max: MAX_NAME, message: `Höchstens ${MAX_NAME} Zeichen.` },
-            ]}
-          >
-            <Input />
-          </Feld>
-        </Formularpaneel>
-
-        {/* LOGO (LFH-22): keine Felder — Hochladen wirkt sofort, Entfernen fragt nach,
-          weil die Datei danach weg ist (unumkehrbar, LFH-363). */}
-        <Paneel
-          titel="Logo"
-          meta={
-            logo
-              ? `${logo.mime === 'image/png' ? 'PNG' : 'JPEG'} · ${Math.ceil(logo.groesse / 1024)} KiB`
-              : 'kein Logo'
+        <AenderungsstandProvider
+          ausgangswerte={
+            server ? { name: server.name, tz_organisation: server.tz_organisation } : undefined
           }
-          koerperPolster
-          style={{ marginBlockEnd: token.marginLG }}
+          merkeRef={stand.merkeRef}
         >
-          <Stapel abstand="md">
-            {logo && kaputtesLogo === logo.sha256 ? (
-              // Anders als im Druckkopf mit Hinweis: hier ist der Ort, an dem man es behebt.
-              <Alert
-                type="warning"
-                showIcon
-                title="Das hinterlegte Logo lässt sich nicht anzeigen."
-                description="Fehlt auf Ausdrucken."
-              />
-            ) : logo ? (
-              // Eigener Block: der Stapel streckt seine Kinder, das Bild bleibt so in seiner Größe.
-              <div>
-                <img
-                  src={orgLogoPfad(logo.sha256)}
-                  alt={`Logo von ${orgQuery.data?.name ?? 'der Organisation'}`}
-                  style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
-                  onError={() => setKaputtesLogo(logo.sha256)}
+          <Formularpaneel titel="Name">
+            <Feld
+              label="Name der Organisation"
+              name="name"
+              rules={[
+                { required: true, whitespace: true, message: 'Der Name darf nicht leer sein.' },
+                { max: MAX_NAME, message: `Höchstens ${MAX_NAME} Zeichen.` },
+              ]}
+            >
+              <Input />
+            </Feld>
+          </Formularpaneel>
+
+          {/* LOGO (LFH-22): keine Felder — Hochladen wirkt sofort, Entfernen fragt nach,
+          weil die Datei danach weg ist (unumkehrbar, LFH-363). */}
+          <Paneel
+            titel="Logo"
+            meta={
+              logo
+                ? `${logo.mime === 'image/png' ? 'PNG' : 'JPEG'} · ${Math.ceil(logo.groesse / 1024)} KiB`
+                : 'kein Logo'
+            }
+            koerperPolster
+            style={{ marginBlockEnd: token.marginLG }}
+          >
+            <Stapel abstand="md">
+              {logo && kaputtesLogo === logo.sha256 ? (
+                // Anders als im Druckkopf mit Hinweis: hier ist der Ort, an dem man es behebt.
+                <Alert
+                  type="warning"
+                  showIcon
+                  title="Das hinterlegte Logo lässt sich nicht anzeigen."
+                  description="Fehlt auf Ausdrucken."
                 />
-              </div>
-            ) : null}
-            {/* Ohne Logo kein Satz (LFH-1078): „kein Logo“ steht im Kopf, darunter „Logo hochladen“.
+              ) : logo ? (
+                // Eigener Block: der Stapel streckt seine Kinder, das Bild bleibt so in seiner Größe.
+                <div>
+                  <img
+                    src={orgLogoPfad(logo.sha256)}
+                    alt={`Logo von ${orgQuery.data?.name ?? 'der Organisation'}`}
+                    style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
+                    onError={() => setKaputtesLogo(logo.sha256)}
+                  />
+                </div>
+              ) : null}
+              {/* Ohne Logo kein Satz (LFH-1078): „kein Logo“ steht im Kopf, darunter „Logo hochladen“.
                Keine Formatzeile: `accept` filtert den Dateidialog, die Vorprüfung nennt die Grenze,
                wenn sie verletzt ist. */}
-            {vorpruefung && (
-              <Alert
-                type="error"
-                showIcon
-                title="Logo nicht übernommen"
-                description={vorpruefung}
-              />
-            )}
-            <SpeicherFehler fehler={logoHoch.error} titel="Logo nicht übernommen" />
-            {/* `size="middle"`: Rot steht nicht bündig neben Neutralem (LFH-352). */}
-            <Space wrap size="middle">
-              <Upload
-                accept={LOGO_TYPEN.join(',')}
-                showUploadList={false}
-                disabled={!istAdmin}
-                beforeUpload={(datei) => {
-                  const grund = logoVorpruefung(datei);
-                  setVorpruefung(grund);
-                  // Ein alter Server-Grund stünde sonst neben dem neuen Versuch (`mutate`
-                  // räumt ihn nur, wenn die Vorprüfung besteht).
-                  logoHoch.reset();
-                  if (grund === null) logoHoch.mutate(datei);
-                  // Nie antds eigenen Upload: der Aufruf läuft über `api/organisation.ts`.
-                  return Upload.LIST_IGNORE;
-                }}
-              >
-                <Button disabled={!istAdmin} loading={logoHoch.isPending}>
-                  {logo ? 'Logo ersetzen' : 'Logo hochladen'}
-                </Button>
-              </Upload>
-              {logo && (
-                <Button
-                  danger
+              {vorpruefung && (
+                <Alert
+                  type="error"
+                  showIcon
+                  title="Logo nicht übernommen"
+                  description={vorpruefung}
+                />
+              )}
+              <SpeicherFehler fehler={logoHoch.error} titel="Logo nicht übernommen" />
+              {/* `size="middle"`: Rot steht nicht bündig neben Neutralem (LFH-352). */}
+              <Space wrap size="middle">
+                <Upload
+                  accept={LOGO_TYPEN.join(',')}
+                  showUploadList={false}
                   disabled={!istAdmin}
-                  onClick={() => {
-                    // Ein Grund aus einem früheren Versuch gehört nicht in einen frischen
-                    // Dialog — react-query hält `error` bis zum nächsten `mutate()` (LFH-535).
-                    logoEntfernen.reset();
-                    setEntfernenOffen(true);
+                  beforeUpload={(datei) => {
+                    const grund = logoVorpruefung(datei);
+                    setVorpruefung(grund);
+                    // Ein alter Server-Grund stünde sonst neben dem neuen Versuch (`mutate`
+                    // räumt ihn nur, wenn die Vorprüfung besteht).
+                    logoHoch.reset();
+                    if (grund === null) logoHoch.mutate(datei);
+                    // Nie antds eigenen Upload: der Aufruf läuft über `api/organisation.ts`.
+                    return Upload.LIST_IGNORE;
                   }}
                 >
-                  Logo entfernen
-                </Button>
-              )}
-            </Space>
-          </Stapel>
-        </Paneel>
+                  <Button disabled={!istAdmin} loading={logoHoch.isPending}>
+                    {logo ? 'Logo ersetzen' : 'Logo hochladen'}
+                  </Button>
+                </Upload>
+                {logo && (
+                  <Button
+                    danger
+                    disabled={!istAdmin}
+                    onClick={() => {
+                      // Ein Grund aus einem früheren Versuch gehört nicht in einen frischen
+                      // Dialog — react-query hält `error` bis zum nächsten `mutate()` (LFH-535).
+                      logoEntfernen.reset();
+                      setEntfernenOffen(true);
+                    }}
+                  >
+                    Logo entfernen
+                  </Button>
+                )}
+              </Space>
+            </Stapel>
+          </Paneel>
 
-        <Formularpaneel titel="Taktische Zeichen">
-          <Feld label="DV-102-Organisation" name="tz_organisation">
-            <Select
-              options={ORG_OPTIONEN}
-              placeholder="Organisation wählen"
-              loading={orgQuery.isLoading}
-            />
-          </Feld>
-        </Formularpaneel>
-        {/* Ein Speicherweg, ein Grund: direkt über dem Knopf, der ihn ausgelöst hat. */}
-        <SpeicherFehler fehler={speichern.error} />
-        <div {...speicherLeiste}>
-          <Button
-            type="primary"
-            htmlType="submit"
-            disabled={!istAdmin}
-            loading={speichern.isPending}
-          >
-            Speichern
-          </Button>
-        </div>
+          <Formularpaneel titel="Taktische Zeichen">
+            <Feld label="DV-102-Organisation" name="tz_organisation">
+              <Select
+                options={ORG_OPTIONEN}
+                placeholder="Organisation wählen"
+                loading={orgQuery.isLoading}
+              />
+            </Feld>
+          </Formularpaneel>
+          {/* Ein Speicherweg, ein Grund: direkt über dem Knopf, der ihn ausgelöst hat. */}
+          <SpeicherFehler fehler={speichern.error} />
+          <div {...speicherLeiste}>
+            <SpeicherKnopf disabled={!istAdmin} loading={speichern.isPending} />
+          </div>
+        </AenderungsstandProvider>
       </Form>
       <Modal
         open={entfernenOffen}

@@ -1,4 +1,5 @@
 import { Form, Input, theme } from 'antd';
+import { Feld } from '../components/instrument';
 import { useMutation } from '@tanstack/react-query';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -58,13 +59,13 @@ export default function TotpPasswortDialog({
           <SpeicherFehler fehler={mutation.error} titel="Einrichtung nicht gestartet" />
         </div>
       )}
-      <Form.Item
+      <Feld
         label="Aktuelles Passwort"
         name="passwort"
         rules={[{ required: true, message: 'Bitte das aktuelle Passwort eingeben' }]}
       >
         <Input.Password autoComplete="current-password" />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

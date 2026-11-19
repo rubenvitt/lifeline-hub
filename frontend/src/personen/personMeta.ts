@@ -102,7 +102,11 @@ function verbleibZusatz(v: VerbleibKurz): string {
 }
 
 // Kompatible Exportnamen; die Farbachsen liegen im Theme.
-export { sichtung as SK_META, personStatus as STATUS_META } from '../theme/statusFarben';
+export {
+  sichtung as SK_META,
+  personStatus as STATUS_META,
+  personStatusDarstellung,
+} from '../theme/statusFarben';
 
 /** Reihenfolge der Sichtungskategorien — Dringlichkeit zuerst, wie an der Aufnahme gesprochen.
  *  Eine Quelle für Erfassung, Nachsichtung (`SichtungsWahl`) und Sortierungen (LLH-1083). */

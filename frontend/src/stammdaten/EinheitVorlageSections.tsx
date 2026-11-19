@@ -214,7 +214,7 @@ export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
               )
             }
           >
-            <KennungsLink to={fahrzeugDetailPfad(f.fahrzeug_id)} style={monoStil(13)}>
+            <KennungsLink to={fahrzeugDetailPfad(f.fahrzeug_id)} style={monoStil('mono')}>
               {f.funkrufname}
             </KennungsLink>
             {f.fahrzeugtyp && <span>{f.fahrzeugtyp}</span>}
@@ -569,7 +569,7 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
               }
             >
               <span>{m.bezeichnung}</span>
-              {m.bestandsnummer && <span style={monoStil(13)}>{m.bestandsnummer}</span>}
+              {m.bestandsnummer && <span style={monoStil('mono')}>{m.bestandsnummer}</span>}
               <Typography.Text type="secondary">{ART_LABEL[m.art]}</Typography.Text>
               {m.ist_demo && <DemoMarke />}
               {m.dienststatus === 'ausser_dienst' && (

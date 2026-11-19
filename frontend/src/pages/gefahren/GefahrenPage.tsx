@@ -3,7 +3,7 @@ import { KEINE_BERECHTIGUNG, modulName } from '../../einsatz/modulRegistry';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Breadcrumb, Button, Input, Space, Spin, Typography, theme } from 'antd';
+import { Alert, Breadcrumb, Button, Input, Spin, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
@@ -29,7 +29,7 @@ import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import EinsatzSeite, { type SeitenNebenwege } from '../../components/EinsatzSeite';
-import { Paneel } from '../../components/instrument';
+import { Paneel, Stapel } from '../../components/instrument';
 import { InlineAngabe } from '../../components/InlineAngabe';
 import { useFeldKonflikt } from '../../components/useFeldKonflikt';
 import { GEFAHR_GEBIET_LABEL_MAX } from '../../api/eingabegrenzen';
@@ -315,7 +315,7 @@ export default function GefahrenPage() {
             >
               {/* `wrap`: in der 240-px-Spalte bricht die Zeile zwischen den Angaben um, nicht in
                   einem Wort. */}
-              <Space wrap>
+              <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                 {/* Etikett über `Status`, nicht `color`-Prop: für einen Nicht-Preset rechnet
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 {/* Stufe und Vorläufigkeit in EINEM Etikett: „hoch · unbestätigt“ (LLH-1745). */}
@@ -329,7 +329,7 @@ export default function GefahrenPage() {
                     {aussagen[i]}
                   </Typography.Text>
                 )}
-              </Space>
+              </Stapel>
             </ListenEintrag>
           )}
         />
@@ -361,28 +361,14 @@ export default function GefahrenPage() {
             >
               {gefahrengebietName(aktuell.label, aktuell.id)}
             </Typography.Title>
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                // `marginSM` (8/12/16): zwei Bedienziele halten den Zielabstand der Stufe.
-                gap: token.marginSM,
-              }}
-            >
+            {/* `sm` (8/12/16): zwei Bedienziele halten den Zielabstand der Stufe. */}
+            <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
               {/* Pflichtangabe (frontend/AGENTS.md, „Inline-Bearbeitung und Status"): leer sendet
                   nichts. Früher setzte ein leerer Name still auf „Gefahrengebiet #<id>" zurück.
                   `key` je Gebiet: ein offener Entwurf wandert nicht ins nächste Gebiet. */}
               {/* Eigene Spalte: der Pflicht-Hinweis steht UNTER dem Knopf und schiebt den Sprung
                   nicht weg; das offene Formular bekommt eine lesbare Breite. */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: token.marginXXS,
-                  minWidth: 0,
-                }}
-              >
+              <Stapel abstand="xxs">
                 <InlineAngabe<string>
                   key={aktuell.id}
                   etikett="Bezeichnung"
@@ -393,13 +379,15 @@ export default function GefahrenPage() {
                   darfSchreiben={darfSchreiben}
                   pflicht
                   eingabe={({ feld, value, onChange }) => (
-                    <Input
-                      {...feld}
-                      maxLength={GEFAHR_GEBIET_LABEL_MAX}
-                      value={value}
-                      onChange={(e) => onChange(e.target.value)}
-                      style={{ minWidth: 'min(16rem, 100%)' }}
-                    />
+                    // Mindestbreite über die Hülle; das Raster streckt die Eingabe auf ihre Breite.
+                    <div style={{ display: 'grid', minWidth: 'min(var(--lfh-feld-schmal), 100%)' }}>
+                      <Input
+                        {...feld}
+                        maxLength={GEFAHR_GEBIET_LABEL_MAX}
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                      />
+                    </div>
                   )}
                   // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).
                   ausloeser={({ ref, onClick }) => (
@@ -412,7 +400,7 @@ export default function GefahrenPage() {
                     saveBezeichnung(aktuell.id, w.trim(), beimOeffnen)
                   }
                 />
-              </div>
+              </Stapel>
               {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an.
                   Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗", kein Knopf darin
                   (LFH-969). `KennungsLink` trägt den Boden, ein `<a>` erbt keine Steuerhöhe. */}
@@ -435,7 +423,7 @@ export default function GefahrenPage() {
                   {`· ${aktuell.zonen_ids.length === 1 ? '1 Zone' : `${aktuell.zonen_ids.length} Zonen`}`}
                 </Typography.Text>
               </span>
-            </div>
+            </Stapel>
           </div>
         )}
         {aktuell && (

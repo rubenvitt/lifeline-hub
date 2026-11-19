@@ -52,7 +52,7 @@ import AuftragDetail from './AuftragDetail';
 import VollzugMeldenModal from './VollzugMeldenModal';
 import AuftragAufhebenDialog from './AuftragAufhebenDialog';
 import Bereichskopf from '../kommunikation/Bereichskopf';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { FELD_KLASSE, Segmentleiste, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import ListeDetail, { type ListeDetailGruppen } from '../components/ListeDetail';
 import { SeitenLeer, istNichtGefunden } from '../components/SeitenZustand';
@@ -613,27 +613,29 @@ export default function AuftraegeListe({
             { wert: 'abgeschlossen', label: segmentLabel('Abgeschlossen', abgeschlossenZahl) },
           ]}
         />
-        <Input
-          allowClear
-          aria-label="Aufträge durchsuchen"
-          placeholder="Kennung, Text oder Empfänger"
-          style={{ width: 260, maxWidth: '100%' }}
-          value={suchEingabe}
-          onChange={(e) => setSuchEingabe(e.target.value)}
-        />
+        <div className={FELD_KLASSE} style={{ width: '100%', maxWidth: 'var(--lfh-feld-mittel)' }}>
+          <Input
+            allowClear
+            aria-label="Aufträge durchsuchen"
+            placeholder="Kennung, Text oder Empfänger"
+            value={suchEingabe}
+            onChange={(e) => setSuchEingabe(e.target.value)}
+          />
+        </div>
         {/* Eine Umschaltleiste je Ebene (Spec `bedien-umschalten`): „Ansicht“ schaltet die Liste,
             „Richtung“ und „Empfänger“ schränken sie ein und stehen als Filter nebeneinander. */}
-        <Select
-          aria-label="Richtung"
-          style={{ minWidth: 160 }}
-          value={richtungFilter ?? 'alle'}
-          onChange={(v: RichtungFilter) => setRichtung(v)}
-          options={[
-            { value: 'alle', label: 'Alle Richtungen' },
-            { value: 'intern', label: 'Intern' },
-            { value: 'extern', label: 'Extern' },
-          ]}
-        />
+        <div className={FELD_KLASSE} style={{ width: '100%', maxWidth: 'var(--lfh-feld-schmal)' }}>
+          <Select
+            aria-label="Richtung"
+            value={richtungFilter ?? 'alle'}
+            onChange={(v: RichtungFilter) => setRichtung(v)}
+            options={[
+              { value: 'alle', label: 'Alle Richtungen' },
+              { value: 'intern', label: 'Intern' },
+              { value: 'extern', label: 'Extern' },
+            ]}
+          />
+        </div>
         <EmpfaengerFilter
           abschnitte={abschnitte}
           einheiten={einheiten}

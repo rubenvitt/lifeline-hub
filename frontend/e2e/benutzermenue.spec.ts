@@ -41,8 +41,8 @@ const NUTZER = ['admin', 'fuehrungskraft', 'beobachter'] as const;
 type Nutzer = (typeof NUTZER)[number];
 
 const ROLLEN_TAGS: Record<Nutzer, string[]> = {
-  admin: ['Admin'],
-  fuehrungskraft: ['Führungskraft'],
+  admin: ['System-Admin'],
+  fuehrungskraft: ['Führungskraft der Organisation'],
   beobachter: [],
 };
 
@@ -60,7 +60,7 @@ async function anmelden(page: Page, nutzer: Nutzer): Promise<string> {
 /** Vorbedingung vor der Messung: der Kopf zeigt die Person und genau ihren Rollenzweig. */
 async function pruefeKopf(menue: Locator, nutzer: Nutzer, benutzername: string) {
   await expect(menue.getByText(new RegExp(`@${benutzername}\\b`))).toBeVisible();
-  for (const tag of ['Admin', 'Führungskraft']) {
+  for (const tag of ['System-Admin', 'Führungskraft der Organisation']) {
     const element = menue.getByText(tag, { exact: true });
     if (ROLLEN_TAGS[nutzer].includes(tag)) await expect(element).toBeVisible();
     else await expect(element).toHaveCount(0);

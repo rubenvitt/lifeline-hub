@@ -1,4 +1,5 @@
 import { Form, Input } from 'antd';
+import { Feld } from '../../components/instrument';
 import { useEffect, useRef } from 'react';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -86,20 +87,20 @@ export default function GefahrenZelleDetails({
     >
       {/* Grenzen wie beim Server (LLH-1366). Ein schon längerer Wert wird nie gekürzt, die Regel
           sperrt dann das Speichern. */}
-      <Form.Item
+      <Feld
         name="beschreibung"
         label="Erläuterung"
         rules={[zeichenRegel(GEFAHR_BESCHREIBUNG_MAX, 'Erläuterung')]}
       >
         <Input.TextArea rows={3} count={zeichenGrenze(GEFAHR_BESCHREIBUNG_MAX)} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         name="gemeldet_von"
         label="Gemeldet von"
         rules={[zeichenRegel(GEFAHR_GEMELDET_VON_MAX, 'Gemeldet von')]}
       >
         <Input maxLength={GEFAHR_GEMELDET_VON_MAX} />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={fehler} />
     </ErfassungsModal>
   );

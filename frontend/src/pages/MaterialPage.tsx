@@ -80,7 +80,7 @@ import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
 import MaterialAusgabeModal, { type AusgabeModus } from '../kraefte/MaterialAusgabeModal';
 import MaterialMengeModal from '../kraefte/MaterialMengeModal';
 import MaterialAdhocDialog from '../kraefte/MaterialAdhocDialog';
-import { Segmentleiste } from '../components/instrument';
+import { Feld, Segmentleiste, Knopfreihe } from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus } from '../theme/statusFarben';
@@ -1097,9 +1097,7 @@ function MaterialInhalt() {
        * Dialog mit Absende-Knopf im `<form>`. Vorher stand hier eine Maske, die direkt absendete.
        */
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Gruppierung (LLH-1225 D4): eine Segmentleiste darf im Kopf stehen
               (`frontend/AGENTS.md`, „Nebenwege im Kopf“); Zustand der Adresse (LLH-1826). */}
           <Segmentleiste<Gruppierung>
@@ -1116,7 +1114,7 @@ function MaterialInhalt() {
               <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Material</Button>
             </>
           )}
-        </Space>
+        </>
       }
     >
       {/* Der Status steht im `karte.status`-Slot mit der Vertragsrolle aus
@@ -1226,7 +1224,7 @@ function MaterialInhalt() {
         }}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureStorno()) setStornoFuer(null);
@@ -1244,7 +1242,7 @@ function MaterialInhalt() {
             >
               Stornieren
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Das Material erscheint danach in keiner Liste und keinem Nachweis.
@@ -1332,31 +1330,32 @@ function MaterialInhalt() {
           setDisponierenOffen(false);
         }}
       >
-        <Form.Item
+        <Feld
           label="Material"
           name="material_id"
           rules={[{ required: true, message: 'Material wählen' }]}
         >
           <Select options={poolOptionen} notFoundContent={poolInhalt} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Menge"
           name="menge"
+          breite="kurz"
           rules={[{ required: true }]}
           extra={isGeraetGewaehlt ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
         >
-          <MengenFeld beschriftung="Menge" style={{ width: 120 }} disabled={isGeraetGewaehlt} />
-        </Form.Item>
+          <MengenFeld beschriftung="Menge" disabled={isGeraetGewaehlt} />
+        </Feld>
         {/* Ort (LLH-1225 D7): dieselbe Auswahl wie die Spalte, ohne Formularnamen, damit er im
             Serienlauf stehen bleibt; der Weg hinaus setzt ihn zurück. */}
-        <Form.Item label="Ort" htmlFor="material-disponieren-ort">
+        <Feld label="Ort" htmlFor="material-disponieren-ort">
           <Select<string>
             id="material-disponieren-ort"
             value={stammOrt}
             onChange={(v) => setStammOrt(v ?? OHNE_ORT_WERT)}
             options={buildOrtOptions(ortKontext.quellen)}
           />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       {/* Ad-hoc-Erfassung im geteilten Dialog (LLH-1133 D4); hier mit dem Feld „Ort“. */}

@@ -85,7 +85,9 @@ for (const dichte of DICHTEN) {
         detail.getByRole('button', { name: 'Abschnittsleiter bearbeiten' }),
       ).toHaveAccessibleDescription('Carla Christ');
       expect(bodies).toHaveLength(1);
-      expect(Object.keys(bodies[0].body as object)).toEqual(['leiter_id']);
+      // Genau `leiter_id`, dazu der Wert beim Öffnen als `erwartet` (Feldvergleich, LLH-1831).
+      expect(Object.keys(bodies[0].body as object)).toEqual(['leiter_id', 'erwartet']);
+      expect((bodies[0].body as { erwartet: unknown }).erwartet).toEqual({ leiter_id: null });
     });
 
     test('Abschnitt anlegen: drei Felder, Enter sendet, danach gewählt', async ({ page }) => {

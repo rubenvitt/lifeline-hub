@@ -7,10 +7,8 @@ import {
   Input,
   InputNumber,
   Modal,
-  Space,
   Spin,
   Typography,
-  theme,
 } from 'antd';
 import type { FormRule } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -18,7 +16,9 @@ import {
   Datenfeld,
   DatenfeldEingabe,
   Datenraster,
+  Feld,
   Paneel,
+  Stapel,
   Status,
   monoStil,
 } from '../components/instrument';
@@ -60,6 +60,8 @@ import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
 import { ErfassungsModal } from '../components/Erfassung';
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, EnterOhneAenderung } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { flaeche } from '../theme/tokens';
@@ -166,7 +168,6 @@ function halterAnzeige(t: Tier): ReactNode {
 }
 
 export default function TiereDetailPage() {
-  const { token } = theme.useToken();
   const { id, tierId: tierIdParam } = useParams();
   const einsatzId = Number(id);
   const tierId = Number(tierIdParam);
@@ -520,9 +521,9 @@ export default function TiereDetailPage() {
         />
       }
       titel={
-        <Space wrap size={token.marginSM}>
+        <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>
-            Tier <span style={monoStil(14, 500)}>{kennung}</span>
+            Tier <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status
             groesse="klein"
@@ -531,7 +532,7 @@ export default function TiereDetailPage() {
           />
           <Marke>{SPEZIES_META[t.spezies]}</Marke>
           {t.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}
-        </Space>
+        </Stapel>
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       aktionen={
@@ -541,7 +542,7 @@ export default function TiereDetailPage() {
          * Liste“-Knopf gibt es nicht: die Brotkrume trägt denselben Weg.
          */
         plan && (
-          <Space wrap size="middle">
+          <>
             <Button
               type="primary"
               loading={laeuftStatus(plan.primaer)}
@@ -559,13 +560,13 @@ export default function TiereDetailPage() {
                 if (aktion) fuehreAus(aktion);
               }}
             />
-          </Space>
+          </>
         )
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (storniert || veraltet || statusMutation.error != null) && (
-          <Space orientation="vertical" style={{ width: '100%' }}>
+          <Stapel abstand="xs">
             <StornoBanner stand={t} />
             {standVeraltet}
             <SeitenHinweise
@@ -573,12 +574,12 @@ export default function TiereDetailPage() {
               fehlerTitel="Status nicht geändert"
               fehlerFallback="Statuswechsel fehlgeschlagen"
             />
-          </Space>
+          </Stapel>
         )
       }
     >
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
-      <Space orientation="vertical" style={{ width: '100%' }} size="large">
+      <Stapel abstand="lg">
         {sitzung ? (
           <Form
             form={editForm}
@@ -613,33 +614,35 @@ export default function TiereDetailPage() {
               );
             }}
           >
-            {detailAnsicht}
-            {editFehler != null && (
-              <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
-                <SpeicherFehler fehler={editFehler} />
-              </div>
-            )}
-            {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
-                Feldern scrollten die Knöpfe sonst aus dem Bild. */}
-            <div
-              {...speicherLeiste}
-              style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
-            >
-              {storniert ? (
-                // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
-                <Button onClick={editSitzung.beende}>Schließen</Button>
-              ) : (
-                <>
-                  <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
-                    Speichern
-                  </Button>
-                  {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-                  <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
-                    Abbrechen
-                  </Button>
-                </>
-              )}
-            </div>
+            <AenderungsstandProvider ausgangswerte={sitzung.werte}>
+              <EnterOhneAenderung onSchliessen={editSitzung.beende}>
+                {detailAnsicht}
+                {editFehler != null && (
+                  <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
+                    <SpeicherFehler fehler={editFehler} />
+                  </div>
+                )}
+                {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
+                  Feldern scrollten die Knöpfe sonst aus dem Bild. */}
+                <div
+                  {...speicherLeiste}
+                  style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+                >
+                  {storniert ? (
+                    // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
+                    <Button onClick={editSitzung.beende}>Schließen</Button>
+                  ) : (
+                    <>
+                      <SpeicherKnopf loading={editMutation.isPending} />
+                      {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                      <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
+                        Abbrechen
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </EnterOhneAenderung>
+            </AenderungsstandProvider>
           </Form>
         ) : (
           detailAnsicht
@@ -660,7 +663,7 @@ export default function TiereDetailPage() {
             trägt ein eigenes Formular, verschachtelt schickte es beim Absenden das äußere nativ
             ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
         <TierAnhaenge einsatzId={einsatzId} tier={t} darfSchreiben={darfSchreiben} />
-      </Space>
+      </Stapel>
 
       {/* Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). „Verbleib erfassen“ wie bei
           Personen (LLH-1092): das Tier verlässt die Obhut der Einsatzkräfte. Der Status heißt
@@ -678,7 +681,7 @@ export default function TiereDetailPage() {
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Verbleib"
           name="abschluss_grund"
           rules={[{ required: true, message: 'Verbleib ist Pflicht' }]}
@@ -700,10 +703,10 @@ export default function TiereDetailPage() {
                 abschlussForm.setFieldValue('abschluss_ziel', undefined);
             }}
           />
-        </Form.Item>
-        <Form.Item label="Übergeben an / Ort" name="abschluss_ziel">
+        </Feld>
+        <Feld label="Übergeben an / Ort" name="abschluss_ziel">
           <Input placeholder="z. B. Tierarzt Dr. Müller, Tierheim Nord" />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <Modal

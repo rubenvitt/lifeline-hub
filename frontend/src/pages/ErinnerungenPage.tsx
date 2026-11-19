@@ -1,6 +1,6 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Alert, App, Breadcrumb, Button, Flex, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,7 +25,14 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  Segmentleiste,
+  Stapel,
+  Textstufe,
+  useRollen,
+} from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { GewanderteGruende } from '../components/GewanderteGruende';
@@ -43,6 +50,8 @@ import {
 import { flaeche } from '../theme/tokens';
 import { OFFEN_ABGESCHLOSSEN_ERLAUBT } from '../routing/deeplinks';
 import { useAdressWert } from '../routing/useAdressWert';
+import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { segmentLabel } from '../anzeige/anzahl';
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -276,8 +285,50 @@ export default function ErinnerungenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const offene = offeneQuery.data ?? [];
-  const offenZahl = kennzahlenQuery.data?.offen ?? offene.length;
-  const abgeschlossenZahl = kennzahlenQuery.data?.abgeschlossen ?? abgeschlossene.length;
+  /*
+   * Zahlen nur aus einem echten Stand (LLH-1959, Muster LLH-1823 aus `MeldungenPage`): vor der
+   * ersten Lieferung und nach einem gescheiterten Abruf ist die Menge unbekannt (`null`), nicht
+   * leer. „0 offen“ oder „Offen (0)“ wäre dann eine falsche Aussage über die Lage. Ohne Kennzahlen
+   * zählt die geladene Liste, die abgeschlossene nur, wenn sie vollständig im Client liegt.
+   */
+  const kennzahlen = kennzahlenQuery.data;
+  const offenZahl: number | null = kennzahlen?.offen ?? (offeneQuery.data ? offene.length : null);
+  const abgeschlossenZahl: number | null =
+    kennzahlen?.abgeschlossen ??
+    (abgeschlosseneQuery.data && !abgeschlosseneQuery.hasNextPage && !ohneKopf
+      ? abgeschlossene.length
+      : null);
+  // Solange noch geladen wird, hält der Platzhalter die Breite der Meta; danach steht „—“ für eine
+  // Zahl, die es nicht gibt. Ein ohne Netz angehaltener Abruf ohne Stand lädt nicht: er wartet auf
+  // das Netz, bis dahin ist die Zahl unbekannt.
+  const laedt = (q: { isPending: boolean; fetchStatus: string }) =>
+    q.isPending && q.fetchStatus !== 'paused';
+  const metaLaedt =
+    offenZahl == null &&
+    abgeschlossenZahl == null &&
+    (laedt(offeneQuery) || laedt(kennzahlenQuery));
+  const meta = metaLaedt
+    ? undefined
+    : `${offenZahl ?? '—'} offen · ${abgeschlossenZahl ?? '—'} abgeschlossen`;
+  /*
+   * Zustand der gezeigten Liste, Muster `ListeDetail`: die erste Lieferung läuft → Skelett; ein
+   * Fehler ohne Bestand tritt an die Stelle der Liste („Erneut abrufen“); mit Bestand bleiben die
+   * Karten stehen, darüber der Hinweis auf den alten Stand. Ohne Netz und ohne Stand wartet der
+   * Abruf angehalten (`fetchStatus` `paused`): das ist ein Abruffehler, kein endloses Skelett.
+   */
+  const listenQuery = ansicht === 'offen' ? offeneQuery : abgeschlosseneQuery;
+  const listenBestand = ansicht === 'offen' ? offene.length : abgeschlossene.length;
+  const listenAngehalten = listenQuery.isPending && listenQuery.fetchStatus === 'paused';
+  const listenZustand: 'laden' | 'fehler' | 'veraltet' | 'daten' = listenAngehalten
+    ? 'fehler'
+    : listenQuery.isPending
+      ? 'laden'
+      : listenQuery.isError
+        ? listenBestand > 0
+          ? 'veraltet'
+          : 'fehler'
+        : 'daten';
+  const erneutAbrufen = () => void listenQuery.refetch();
 
   // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach faellig_at aufsteigend.
   const offeneGruppen: { gruppe: FaelligGruppe; erinnerungen: Erinnerung[] }[] = GRUPPE_ORDNUNG.map(
@@ -317,12 +368,13 @@ export default function ErinnerungenPage() {
     <EinsatzSeite
       titel={modulName('erinnerungen')}
 
-      meta={`${offenZahl} offen · ${abgeschlossenZahl} abgeschlossen`}
+      meta={meta}
+      metaPlatzhalter="0 offen · 0 abgeschlossen"
       dataUpdatedAt={offeneQuery.dataUpdatedAt}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (rueckFehler != null || gewanderte.length > 0) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             <SeitenHinweise
               fehler={rueckFehler}
               fehlerTitel="Nicht wieder geöffnet"
@@ -332,7 +384,7 @@ export default function ErinnerungenPage() {
               gruende={gewanderte}
               onSchliessen={() => gewanderte.forEach((g) => kartenFehler.verwirf(g.schluessel))}
             />
-          </Flex>
+          </Stapel>
         )
       }
       breadcrumb={
@@ -387,14 +439,6 @@ export default function ErinnerungenPage() {
       )}
 
       <DeeplinkHinweis lage={deeplinkHinweis} sache="Erinnerung" />
-      {(offeneQuery.isError || (ansicht === 'abgeschlossen' && abgeschlosseneQuery.isError)) && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: token.marginSM }}
-          title="Erinnerungen konnten nicht geladen werden"
-        />
-      )}
       <div
         style={{
           display: 'flex',
@@ -409,23 +453,39 @@ export default function ErinnerungenPage() {
           wert={ansicht}
           onWechsel={setAnsicht}
           optionen={[
-            { wert: 'offen', label: `Offen (${offenZahl})` },
-            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossenZahl})` },
+            { wert: 'offen', label: segmentLabel('Offen', offenZahl) },
+            { wert: 'abgeschlossen', label: segmentLabel('Abgeschlossen', abgeschlossenZahl) },
           ]}
         />
       </div>
-      {ansicht === 'offen' ? (
+      {listenZustand === 'veraltet' && (
+        <div style={{ marginBottom: token.marginSM }}>
+          <SeitenStandVeraltet onWiederholen={erneutAbrufen} />
+        </div>
+      )}
+      {listenZustand === 'laden' ? (
+        <SeitenSkeleton />
+      ) : listenZustand === 'fehler' ? (
+        <SeitenFehler
+          text="Erinnerungen konnten nicht geladen werden"
+          ursache={listenQuery.error}
+          laedt={listenQuery.isFetching}
+          onWiederholen={erneutAbrufen}
+        />
+      ) : ansicht === 'offen' ? (
         offeneGruppen.length === 0 ? (
           <ErinnerungListe erinnerungen={[]} ansicht="offen" {...listenProps} />
         ) : (
-          offeneGruppen.map(({ gruppe, erinnerungen }) => (
-            <div key={gruppe} style={{ marginBottom: token.margin }}>
-              <Augenbraue als="h2" style={{ display: 'block', marginBottom: token.marginXS }}>
-                {GRUPPE_LABEL[gruppe]} ({erinnerungen.length})
-              </Augenbraue>
-              <ErinnerungListe erinnerungen={erinnerungen} ansicht="offen" {...listenProps} />
-            </div>
-          ))
+          <Stapel abstand="md">
+            {offeneGruppen.map(({ gruppe, erinnerungen }) => (
+              <Stapel key={gruppe} abstand="xs">
+                <Augenbraue als="h2">
+                  {GRUPPE_LABEL[gruppe]} ({erinnerungen.length})
+                </Augenbraue>
+                <ErinnerungListe erinnerungen={erinnerungen} ansicht="offen" {...listenProps} />
+              </Stapel>
+            ))}
+          </Stapel>
         )
       ) : (
         <>
@@ -435,32 +495,24 @@ export default function ErinnerungenPage() {
               ladeKopf={() => listeAbgeschlosseneErinnerungen(einsatzId)}
             />
           )}
-          {abgeschlosseneQuery.isPending ? (
-            <div style={{ textAlign: 'center', padding: token.paddingLG }}>
-              <Spin />
-            </div>
-          ) : (
-            <ErinnerungListe
-              erinnerungen={abgeschlossene}
-              ansicht="abgeschlossen"
-              {...listenProps}
-            />
-          )}
+          <ErinnerungListe erinnerungen={abgeschlossene} ansicht="abgeschlossen" {...listenProps} />
           {abgeschlosseneQuery.hasNextPage &&
             (ohneKopf ||
               kennzahlenQuery.data == null ||
               abgeschlossene.length < kennzahlenQuery.data.abgeschlossen) && (
-              <div style={{ textAlign: 'center', marginTop: token.margin }}>
-                <Button
-                  onClick={() => void abgeschlosseneQuery.fetchNextPage()}
-                  loading={abgeschlosseneQuery.isFetchingNextPage}
-                >
-                  Ältere laden
-                </Button>
-                <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {abgeschlossene.length}
-                  {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
-                </div>
+              <div style={{ marginTop: token.margin }}>
+                <Stapel abstand="xs" ausrichten="mitte">
+                  <Button
+                    onClick={() => void abgeschlosseneQuery.fetchNextPage()}
+                    loading={abgeschlosseneQuery.isFetchingNextPage}
+                  >
+                    Ältere laden
+                  </Button>
+                  <Textstufe ton="gedaempft">
+                    {abgeschlossene.length}
+                    {!ohneKopf && abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`} geladen
+                  </Textstufe>
+                </Stapel>
               </div>
             )}
         </>

@@ -15,6 +15,7 @@ import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { planungPfad } from '../routing/deeplinks';
 import { zeitraumRegel } from './planungRegeln';
 import { applyPlanung } from './planungCache';
+import { Feld } from '../components/instrument';
 
 interface Werte {
   bezeichnung: string;
@@ -78,13 +79,13 @@ export default function PlanungAnlegenDialog({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item<Werte>
+      <Feld<Werte>
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. Stadtfest 2027" maxLength={PLANUNG_BEZEICHNUNG_MAX} />
-      </Form.Item>
+      </Feld>
       <div
         style={{
           display: 'grid',
@@ -92,21 +93,21 @@ export default function PlanungAnlegenDialog({
           columnGap: token.marginSM,
         }}
       >
-        <Form.Item<Werte> label="Einsatzart" name="einsatzart">
+        <Feld<Werte> label="Einsatzart" name="einsatzart">
           <Select<Einsatzart>
             aria-label="Einsatzart"
             allowClear
             placeholder={mitVorgabe(EINSATZART_LABELS[VORGABE_ART])}
             options={EINSATZART_OPTIONEN}
           />
-        </Form.Item>
-        <Form.Item<Werte> label="Ort" name="ort">
+        </Feld>
+        <Feld<Werte> label="Ort" name="ort">
           <Input maxLength={PLANUNG_ORT_MAX} />
-        </Form.Item>
+        </Feld>
       </div>
-      <Form.Item<Werte> label="Zeitraum" name="zeitraum" required rules={[zeitraumRegel]}>
+      <Feld<Werte> label="Zeitraum" name="zeitraum" required rules={[zeitraumRegel]}>
         <ZeitraumEingabe art="frist" />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

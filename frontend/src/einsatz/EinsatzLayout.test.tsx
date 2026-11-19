@@ -98,7 +98,7 @@ function pfad(): string {
  */
 function setup(
   freigaben: ModulFreigaben = freigabenFixture(),
-  fehler: { einsatz?: boolean; freigaben?: boolean } = {},
+  fehler: { einsatz?: boolean; einsatzVerweigert?: boolean; freigaben?: boolean } = {},
   aktuellerBenutzer: typeof admin = admin,
   route: string = '/einsaetze/7/etb',
 ) {
@@ -106,7 +106,14 @@ function setup(
     meHandler(aktuellerBenutzer),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () =>
-      fehler.einsatz ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(einsatz),
+      fehler.einsatzVerweigert
+        ? HttpResponse.json(
+            { error: 'Keine Berechtigung', grund: 'kein_mitglied' },
+            { status: 403 },
+          )
+        : fehler.einsatz
+          ? new HttpResponse(null, { status: 500 })
+          : HttpResponse.json(einsatz),
     ),
     http.get('/api/einsaetze/7/modul-freigaben', () =>
       fehler.freigaben ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(freigaben),
@@ -327,6 +334,21 @@ describe('EinsatzLayout', () => {
     expect(screen.getByRole('button', { name: 'Zur Einsatzliste' })).toBeInTheDocument();
     expect(screen.queryByText('ETB-Inhalt')).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Kategorien' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * LLH-1819: ohne Recht hilft kein Neuversuch. Die Sackgasse sagt, wer den Zugriff vergibt (ohne
+   * Namen), und der Rückweg ist der eine Knopf.
+   */
+  it('bei 403 nennt die Sackgasse die Einsatzleitung und bietet kein „Erneut abrufen“', async () => {
+    setup({}, { einsatzVerweigert: true });
+    expect(await screen.findByText('Kein Zugriff auf diesen Einsatz')).toBeInTheDocument();
+    expect(
+      screen.getByText('Zugriff vergibt die Einsatzleitung dieses Einsatzes.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zur Einsatzliste' })).toBeInTheDocument();
+    expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
   });
 
   /**
@@ -1301,7 +1323,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: /Lagemeldungen/ }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Für deine Rolle nicht freigegeben')).toBeVisible();
+    expect(screen.getByText('Für die eigene Rolle nicht freigegeben')).toBeVisible();
     expect(screen.queryByText('Lagemeldungen-Inhalt')).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
   });
@@ -1334,9 +1356,38 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
       {},
       { benutzer: benutzerFixture({ anzeigename: 'Helfer' }), rolle: 'fuehrungspersonal' },
     );
-    expect(await screen.findByText('Für deine Rolle nicht freigegeben')).toBeInTheDocument();
+    expect(await screen.findByText('Für die eigene Rolle nicht freigegeben')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Überblick öffnen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Modulfreigaben öffnen' })).not.toBeInTheDocument();
+  });
+
+  /** LLH-1819: wer nicht selbst freigibt, erfährt, wen er fragt — nur die Einsatzleitung. */
+  it('ohne Verwaltungsrecht nennt der Hinweis die Einsatzleitung beim Namen', async () => {
+    const mitglied = (anzeigename: string, einsatz_rolle: string, benutzer_id: number) => ({
+      benutzer_id,
+      anzeigename,
+      benutzername: anzeigename.toLowerCase(),
+      einsatz_rolle,
+      zugewiesen_at: '2026-11-19 08:00:00',
+    });
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () =>
+        HttpResponse.json([
+          mitglied('Anna Muster', 'einsatzleitung', 1),
+          mitglied('Fritz Fuehrung', 'fuehrungspersonal', 2),
+        ]),
+      ),
+    );
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { zugriff: false } }),
+      {},
+      { benutzer: benutzerFixture({ anzeigename: 'Helfer' }), rolle: 'fuehrungspersonal' },
+    );
+    expect(
+      await screen.findByText('Freigabe erteilt die Einsatzleitung: Anna Muster'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Fritz Fuehrung/)).not.toBeInTheDocument();
   });
 
   it('Rückweg: das freie Standardmodul, sonst der Überblick', async () => {

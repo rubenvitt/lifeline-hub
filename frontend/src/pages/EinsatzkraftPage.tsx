@@ -43,12 +43,19 @@ import {
   SpeicherFehler,
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
-import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import {
   Datenfeld,
   Datenraster,
   Paneel,
+  Stapel,
   Status,
+  Textstufe,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -122,7 +129,7 @@ export default function EinsatzkraftPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const { benutzer } = useAuth();
   const { zeitKurz } = useAnzeigeKonventionen();
   const uhr = useUhr(60_000);
@@ -315,7 +322,10 @@ export default function EinsatzkraftPage() {
   if (einsatzQuery.isLoading || epQuery.isLoading || periodenQuery.isLoading) {
     return <SeitenSkeleton />;
   }
-  if (einsatzQuery.isError || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1975, wie LLH-1947): React Query setzt `error` auch, wenn
+  // nur ein Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher
+  // liegt. Dann bleibt die Seite stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return (
       <SeitenFehler
         text="Einsatz nicht gefunden oder kein Zugriff"
@@ -329,7 +339,8 @@ export default function EinsatzkraftPage() {
   const entlassen = aktiv ? undefined : entlasseneQuery.data?.find((x) => x.id === epId);
   if (!aktiv && !entlassen) {
     // Ein Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den neuen
-    // Versuch an: ohne beide Listen steht nicht fest, dass es die Kraft nicht (mehr) gibt.
+    // Versuch an: ohne beide Listen steht nicht fest, dass es die Kraft nicht (mehr) gibt. Das gilt
+    // auch mit altem Stand: aus ihm folgt nicht, dass es die Kraft nicht (mehr) gibt (LLH-1975).
     if (epQuery.isError || !epQuery.data) {
       return (
         <SeitenFehler
@@ -354,6 +365,9 @@ export default function EinsatzkraftPage() {
   }
   const ep = (aktiv ?? entlassen)!;
   const isEntlassen = !aktiv;
+  // Gescheitert ist ein Neuabruf, der Stand im Zwischenspeicher trägt die Seite weiter (LLH-1975).
+  const listeQuery = isEntlassen ? entlasseneQuery : epQuery;
+  const veraltet = einsatzQuery.isError || listeQuery.isError;
   const imEinsatzSchreiben = darfImEinsatzSchreiben(einsatz);
   /**
    * Eine entlassene Kraft lehnt der Server bei jedem Schreibweg ab (409, D12), außer an ihrer
@@ -460,12 +474,12 @@ export default function EinsatzkraftPage() {
   const einheitGesperrt = istSprungGesperrt('einheiten', freigaben);
 
   const titel: ReactNode = (
-    <Space size={token.marginSM} wrap>
+    <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
       {ep.name}
       {ep.ist_adhoc && <Marke>ad-hoc</Marke>}
       {ep.ist_demo && <DemoMarke />}
       {isEntlassen && <Status ton="neutral" wort="entlassen" groesse="klein" />}
-    </Space>
+    </Stapel>
   );
 
   return (
@@ -477,7 +491,7 @@ export default function EinsatzkraftPage() {
       // Nur die Dauer bleibt immer beisammen.
       meta={
         metaTeile.length > 0 ? (
-          <span className="lfh-personenkopf-meta" style={monoStil(12)}>
+          <span className="lfh-personenkopf-meta" style={monoStil('monoKlein')}>
             {metaTeile.map((teil, i) => (
               <Fragment key={i}>
                 {i > 0 && ' · '}
@@ -511,8 +525,16 @@ export default function EinsatzkraftPage() {
         fahrzeugeQuery.dataUpdatedAt,
       )}
       hinweis={
-        !darfSchreiben || rueckgaengigFehler != null || ausgelassenText != null ? (
-          <Space orientation="vertical" style={{ width: '100%' }}>
+        veraltet || !darfSchreiben || rueckgaengigFehler != null || ausgelassenText != null ? (
+          <Stapel abstand="xs">
+            {veraltet && (
+              <SeitenStandVeraltet
+                onWiederholen={() => {
+                  if (einsatzQuery.isError) void einsatzQuery.refetch();
+                  if (listeQuery.isError) void listeQuery.refetch();
+                }}
+              />
+            )}
             <RechteHinweis text={rechteText} sichtbar={!darfSchreiben} />
             <SeitenHinweise
               fehler={rueckgaengigFehler}
@@ -528,11 +550,11 @@ export default function EinsatzkraftPage() {
                 onClose={() => setRueckgaengig(null)}
               />
             )}
-          </Space>
+          </Stapel>
         ) : null
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <Paneel titel="Einteilung" koerperPolster>
           {/* Der Statuskatalog trägt die Auswahl des Status. Fällt er aus, wäre der Wechsel
               lautlos unmöglich (leeres Menü); Meldung wie in der Personalliste. Wer nur liest,
@@ -624,7 +646,6 @@ export default function EinsatzkraftPage() {
                       placeholder="an keiner"
                       onChange={(v) => onChange(v ?? null)}
                       options={uhsOptionen}
-                      style={{ width: '100%' }}
                     />
                   )}
                 />
@@ -708,7 +729,7 @@ export default function EinsatzkraftPage() {
           </Datenraster>
           {!ep.ist_adhoc && (
             <Space size="middle" wrap style={{ marginTop: token.marginSM }}>
-              <span style={{ color: rollen.gedaempft }}>aus dem Stamm</span>
+              <Textstufe ton="gedaempft">aus dem Stamm</Textstufe>
               {ep.personal_id != null && darfVerwaltung(benutzer) && (
                 <DetailSprung ziel={personalDetailPfad(ep.personal_id)}>
                   im Stamm ändern
@@ -732,11 +753,11 @@ export default function EinsatzkraftPage() {
         </Paneel>
 
         <Paneel titel="Aus dem Einsatz" koerperPolster>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+          <Stapel abstand="sm">
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
-                  entlassen <span style={monoStil(13)}>{zeitKurz(ep.beendet_at)}</span>
+                  entlassen <span style={monoStil('mono')}>{zeitKurz(ep.beendet_at)}</span>
                 </span>
                 {imEinsatzSchreiben && (
                   <Button
@@ -781,9 +802,9 @@ export default function EinsatzkraftPage() {
                     </Button>
                   </Popconfirm>
                   {fristAbgelaufen && (
-                    <span id={fristId} style={{ color: rollen.gedaempft }}>
+                    <Textstufe id={fristId} ton="gedaempft">
                       nur in den ersten {STORNO_FRIST_MIN} Minuten
-                    </span>
+                    </Textstufe>
                   )}
                 </Space>
               </Space>
@@ -797,9 +818,9 @@ export default function EinsatzkraftPage() {
                 fallback={ausGrund.fallback}
               />
             )}
-          </div>
+          </Stapel>
         </Paneel>
-      </div>
+      </Stapel>
     </EinsatzSeite>
   );
 }

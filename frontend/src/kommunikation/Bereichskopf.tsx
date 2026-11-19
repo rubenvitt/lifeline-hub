@@ -45,7 +45,9 @@ export default function Bereichskopf({
         }}
       >
         <Augenbraue als={ueberschrift}>{titel}</Augenbraue>
-        {meta != null && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{meta}</span>}
+        {meta != null && (
+          <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{meta}</span>
+        )}
         {dataUpdatedAt != null && <Datenstand dataUpdatedAt={dataUpdatedAt} />}
       </div>
       {aktion}

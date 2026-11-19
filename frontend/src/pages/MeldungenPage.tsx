@@ -1,5 +1,5 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
-import { Alert, App, Breadcrumb, Button, Flex, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { Select } from '../components/Select';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -66,6 +66,8 @@ import {
   Kennzahlenband,
   Paneel,
   Segmentleiste,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
@@ -860,7 +862,7 @@ export default function MeldungenPage() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (rueckFehler != null || gewanderte.length > 0) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             <SeitenHinweise
               fehler={rueckFehler}
               fehlerTitel="Nicht zurückgenommen"
@@ -870,7 +872,7 @@ export default function MeldungenPage() {
               gruende={gewanderte}
               onSchliessen={() => gewanderte.forEach((g) => kartenFehler.verwirf(g.schluessel))}
             />
-          </Flex>
+          </Stapel>
         )
       }
       breadcrumb={
@@ -1000,17 +1002,18 @@ export default function MeldungenPage() {
         ) : (
           // Eine Umschaltleiste je Ebene (Spec `bedien-umschalten`, LLH-1942): „Ansicht“ schaltet
           // die Liste, „Richtung“ schränkt sie ein und steht als Filter daneben.
-          <Select
-            aria-label="Richtung"
-            style={{ minWidth: 160 }}
-            value={richtungsKey}
-            onChange={richtungWaehlen}
-            options={[
-              { value: 'alle', label: 'Alle Richtungen' },
-              { value: 'intern', label: 'Intern' },
-              { value: 'extern', label: 'Extern' },
-            ]}
-          />
+          <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+            <Select
+              aria-label="Richtung"
+              value={richtungsKey}
+              onChange={richtungWaehlen}
+              options={[
+                { value: 'alle', label: 'Alle Richtungen' },
+                { value: 'intern', label: 'Intern' },
+                { value: 'extern', label: 'Extern' },
+              ]}
+            />
+          </div>
         )}
       </div>
       {/* Meldungen kennen keine Wahl: ein Klick in eine Karte zählt als solche und schließt den
@@ -1075,9 +1078,12 @@ export default function MeldungenPage() {
                   >
                     Ältere laden
                   </Button>
-                  <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                    {abgeschlossene.length}
-                    {!ohneKopf && abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`} geladen
+                  <div style={{ marginTop: token.marginXS }}>
+                    <Textstufe ton="gedaempft">
+                      {abgeschlossene.length}
+                      {!ohneKopf && abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`}{' '}
+                      geladen
+                    </Textstufe>
                   </div>
                 </div>
               )}

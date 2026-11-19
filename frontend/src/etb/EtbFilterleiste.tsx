@@ -1,6 +1,7 @@
 import { Input, theme } from 'antd';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
+import { FELD_KLASSE } from '../components/instrument';
 
 /**
  * Filterleiste des Einsatztagebuchs (LLH-1065, Spec `etb-filterleiste`, „Eine Filterleiste über
@@ -102,14 +103,19 @@ export default function EtbFilterleiste({ onChange, startWerte, vorn, mitte }: P
           mehr (`e2e/rahmen-stehen-bleiben.spec.ts`, 1180 × 600). Mit Platz wächst die Suche. */}
       <div data-lfh="etb-filter-weitere" style={{ ...gruppe, flexWrap: 'wrap', flex: '1 1 360px' }}>
         {mitte}
-        <Input.Search
-          placeholder="Volltextsuche"
-          aria-label="Volltextsuche"
-          allowClear
-          defaultValue={startWerte?.q}
-          style={{ flex: '1 1 140px', minWidth: 140 }}
-          onChange={(e) => aktualisiere({ q: e.target.value })}
-        />
+        {/* Breite über die Hülle (Mindestbreite Feldstufe `kurz`); das Raster streckt die Suche. */}
+        <div
+          className={FELD_KLASSE}
+          style={{ display: 'grid', flex: '1 1 140px', minWidth: 'var(--lfh-feld-kurz)' }}
+        >
+          <Input.Search
+            placeholder="Volltextsuche"
+            aria-label="Volltextsuche"
+            allowClear
+            defaultValue={startWerte?.q}
+            onChange={(e) => aktualisiere({ q: e.target.value })}
+          />
+        </div>
       </div>
     </div>
   );
