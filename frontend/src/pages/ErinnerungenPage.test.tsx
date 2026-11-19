@@ -18,6 +18,8 @@ import { ApiError } from '../api/client';
 import type { Erinnerung } from '../api/types';
 import { erinnerungenPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
+import { ladeEinsatz } from '../api/einsaetze';
+import { setzeOnline } from '../test/utils';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
@@ -666,5 +668,82 @@ describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
     expect(screen.queryByText('Zur Kenntnis')).not.toBeInTheDocument();
     expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
     expect(screen.getByText('Erinnerung #99 gibt es nicht (mehr)')).toBeInTheDocument();
+  });
+});
+
+/**
+ * LLH-1959 (Muster aus LLH-1823): Beim ersten Laden und bei einem gescheiterten Abruf ist die Lage
+ * unbekannt, nicht leer. „0 offen“, „Offen (0)“ und „Keine Erinnerungen“ wären eine falsche Aussage.
+ */
+describe('ErinnerungenPage · Laden und Fehler ohne Bestand (LLH-1959)', () => {
+  const OHNE_PLATZHALTER = 'script, style, [data-lfh="meta-platzhalter"]';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setzeOnline(true);
+    onTestFinished(() => setzeOnline(true));
+  });
+
+  it('zeigt beim ersten Laden das Skelett, keine Null und keinen Leerzustand', async () => {
+    vi.mocked(listeOffeneErinnerungen).mockImplementationOnce(() => new Promise(() => {}));
+    vi.mocked(ladeErinnerungKennzahlen).mockImplementationOnce(() => new Promise(() => {}));
+    renderPage();
+    expect(await screen.findByLabelText('Inhalt wird geladen')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Erinnerungen')).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 offen/, { ignore: OHNE_PLATZHALTER })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Offen' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Abgeschlossen' })).toBeInTheDocument();
+  });
+
+  it('zeigt bei 500 den Abruffehler mit „Erneut abrufen“ und „—“ im Kopf', async () => {
+    vi.mocked(listeOffeneErinnerungen).mockRejectedValueOnce(new ApiError(500, 'Interner Fehler'));
+    vi.mocked(ladeErinnerungKennzahlen).mockRejectedValueOnce(new ApiError(500, 'Interner Fehler'));
+    renderPage();
+    expect(
+      await screen.findByText('Erinnerungen konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText('Keine Erinnerungen')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\b0 offen/, { ignore: OHNE_PLATZHALTER })).not.toBeInTheDocument();
+    expect(screen.getByText('— offen · — abgeschlossen')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Offen' })).toBeInTheDocument();
+
+    // Erneut abrufen holt die Liste; danach steht sie normal da.
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+    expect(await screen.findByText('Lagemeldung')).toBeInTheDocument();
+  });
+
+  it('zeigt bei einem Fehler mit Bestand die Karten und den veralteten Stand', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(client);
+    await screen.findByText('Lagemeldung');
+    vi.mocked(listeOffeneErinnerungen).mockRejectedValueOnce(new ApiError(500, 'Interner Fehler'));
+    await act(() => client.refetchQueries({ queryKey: einsatzKeys.erinnerungenPhase(1, 'offen') }));
+    expect(
+      await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Lagemeldung')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Netz und ohne Stand den Abruffehler mit „Erneut abrufen“ und „—“ im Kopf', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryDefaults(einsatzKeys.einsatz(1), { staleTime: Infinity });
+    client.setQueryData(einsatzKeys.einsatz(1), await ladeEinsatz(1));
+    setzeOnline(false);
+    renderPage(client);
+    expect(
+      await screen.findByText('Erinnerungen konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Inhalt wird geladen')).not.toBeInTheDocument();
+    expect(screen.getByText('— offen · — abgeschlossen')).toBeInTheDocument();
+  });
+
+  it('zeigt im Normalfall Zahlen in Kopf und Segmenten wie bisher', async () => {
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    expect(screen.getByText('1 offen · 2 abgeschlossen')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Offen (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Abgeschlossen (2)' })).toBeInTheDocument();
   });
 });
