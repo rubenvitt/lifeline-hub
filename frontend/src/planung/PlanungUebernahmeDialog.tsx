@@ -233,16 +233,12 @@ export default function PlanungUebernahmeDialog({
                   <Marke key={m}>{m}</Marke>
                 ))}
               </Stapel>
-              <Textstufe stufe="textKlein" ton="gedaempft">
-                Die Planung ist jetzt schreibgeschützt.
-              </Textstufe>
+              <Textstufe ton="gedaempft">Die Planung ist jetzt schreibgeschützt.</Textstufe>
             </Stapel>
           </div>
         ) : (
           <Stapel abstand="md">
-            <Textstufe stufe="textKlein" ton="gedaempft">
-              Danach ist die Planung schreibgeschützt.
-            </Textstufe>
+            <Textstufe ton="gedaempft">Danach ist die Planung schreibgeschützt.</Textstufe>
             <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
               <Segmentleiste<ZielArt>
                 beschriftung="Ziel der Übernahme"

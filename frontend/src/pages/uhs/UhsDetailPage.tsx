@@ -326,7 +326,7 @@ function UhsDetailInhalt() {
       titel={
         // `wrap`: bei langem Namen rutscht der Status unter den Namen, statt auf 390 px
         // über den Rand zu ragen (gemessen 11 px, LFH-435).
-        <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
+        <Stapel als="span" richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           {darf('uhs-verwalten') ? (
             <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
           ) : (

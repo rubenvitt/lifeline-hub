@@ -97,11 +97,11 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
 
   return (
     <Paneel titel="Plan" ueberschrift="h4" koerperPolster style={{ marginBottom: token.marginSM }}>
-      <Stapel abstand="lg">
+      <Stapel abstand="md">
         {/* Datenschutz- und Protokollhinweis in einer Zeile (LFH-1078: erlaubt, kurz). */}
         <Textstufe ton="gedaempft">Keine Patientenfotos. Übernahme wird protokolliert.</Textstufe>
         <SpeicherFehler fehler={fehler} />
-        <Stapel richtung="zeile" umbruch abstand="lg" ausrichten="ende">
+        <Stapel richtung="zeile" umbruch abstand="md" ausrichten="ende">
           <div data-lfh="plan-datei">
             <Stapel abstand="xs">
               <Upload
@@ -173,7 +173,7 @@ function UebernahmeAuswahl(props: {
 }) {
   const id = useId();
   return (
-    <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
+    <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
       <Textstufe als="label" htmlFor={id}>
         Aus Dateien übernehmen
       </Textstufe>
@@ -216,8 +216,8 @@ function PlanEinstellungen({
 }) {
   const umkehrId = useId();
   return (
-    <Stapel abstand="lg">
-      <Stapel richtung="zeile" umbruch abstand="lg" ausrichten="ende">
+    <Stapel abstand="md">
+      <Stapel richtung="zeile" umbruch abstand="md" ausrichten="ende">
         {/* `key` am Serverwert und am PATCH-Zähler: ein Live-Ereignis, Einpassen, ein Fehlschlag
             oder ein eingerastet gleicher Wert setzen das Feld neu auf. */}
         <ZahlFeld
@@ -269,7 +269,7 @@ function PlanEinstellungen({
         gesperrt={gesperrt}
         onFertig={(kontrast) => onAendern({ kontrast })}
       />
-      <Stapel richtung="zeile" abstand="lg" ausrichten="mitte">
+      <Stapel richtung="zeile" abstand="md" ausrichten="mitte">
         <Switch
           id={umkehrId}
           checked={plan.nacht_umkehren}

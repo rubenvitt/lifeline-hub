@@ -756,7 +756,7 @@ export default function EinsatzabschnittePage() {
                 eigene <StaerkeAnzeige wert={e.ist} />
               </span>
               {e.abschnitt_id == null && e.ueber_einheit_id != null && (
-                <Textstufe stufe="textKlein" ton="gedaempft">
+                <Textstufe ton="gedaempft">
                   über {einheitName.get(e.ueber_einheit_id) ?? 'Obereinheit'}
                 </Textstufe>
               )}

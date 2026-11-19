@@ -87,9 +87,7 @@ export default function StandortFeld({
       <Flex align="center" gap="small" wrap data-lfh="meldung-standort">
         <IconStandortZiel size={18} />
         <span>{formatKoordinate(value.lat, value.lon)}</span>
-        <Textstufe stufe="textKlein" ton="gedaempft">
-          ± {formatDistanz(value.genauigkeit)}
-        </Textstufe>
+        <Textstufe ton="gedaempft">± {formatDistanz(value.genauigkeit)}</Textstufe>
         <Button
           type="text"
           aria-label="Standort entfernen"
@@ -110,11 +108,7 @@ export default function StandortFeld({
       >
         Mein Standort
       </Button>
-      {(sperrgrund ?? fehler) && (
-        <Textstufe stufe="textKlein" ton="gedaempft">
-          {sperrgrund ?? fehler}
-        </Textstufe>
-      )}
+      {(sperrgrund ?? fehler) && <Textstufe ton="gedaempft">{sperrgrund ?? fehler}</Textstufe>}
     </Stapel>
   );
 }

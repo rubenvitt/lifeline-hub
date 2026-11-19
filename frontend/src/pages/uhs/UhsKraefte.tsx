@@ -300,7 +300,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
   ];
 
   return (
-    <Stapel abstand="lg">
+    <Stapel abstand="md">
       {rueckgaengigMut.isError &&
         !halten.rows.some((r) => r.p.id === rueckgaengigMut.variables?.id) && (
           <SpeicherFehler

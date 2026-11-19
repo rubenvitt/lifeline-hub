@@ -18,7 +18,6 @@ import {
   Augenbraue,
   Datenfeld,
   Datenraster,
-  Feld,
   ListenAbschnitt,
   PaneelZustand,
   listenZeileStil,

@@ -691,7 +691,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                 }
               />
               {!sf?.herausgeber ? (
-                <Textstufe als="div" stufe="textKlein" ton="gedaempft">
+                <Textstufe als="div" ton="gedaempft">
                   {`Vorgabe: ${props.einsatzbezeichnung}`}
                 </Textstufe>
               ) : null}

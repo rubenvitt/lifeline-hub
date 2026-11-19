@@ -187,7 +187,7 @@ export default function EinheitAufgeloestAnsicht({
       }
       dataUpdatedAt={stand}
     >
-      <Stapel abstand="lg">
+      <Stapel abstand="md">
         <Paneel titel="Kopfdaten">
           <Datenraster beschriftung="Kopfdaten">
             <Datenfeld label="Aufgelöst" mono>

@@ -664,11 +664,7 @@ function EinheitenSchalter({
       >
         {wort}
       </Checkbox>
-      {grund && (
-        <Textstufe stufe="textKlein" ton="gedaempft">
-          {grund}
-        </Textstufe>
-      )}
+      {grund && <Textstufe ton="gedaempft">{grund}</Textstufe>}
     </div>
   );
 }

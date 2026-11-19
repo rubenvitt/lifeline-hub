@@ -460,7 +460,7 @@ export default function ErinnerungenPage() {
                   >
                     Ältere laden
                   </Button>
-                  <Textstufe stufe="textKlein" ton="gedaempft">
+                  <Textstufe ton="gedaempft">
                     {abgeschlossene.length}
                     {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
                   </Textstufe>

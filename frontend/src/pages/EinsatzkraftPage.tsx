@@ -709,9 +709,7 @@ export default function EinsatzkraftPage() {
           </Datenraster>
           {!ep.ist_adhoc && (
             <Space size="middle" wrap style={{ marginTop: token.marginSM }}>
-              <Textstufe stufe="textKlein" ton="gedaempft">
-                aus dem Stamm
-              </Textstufe>
+              <Textstufe ton="gedaempft">aus dem Stamm</Textstufe>
               {ep.personal_id != null && darfVerwaltung(benutzer) && (
                 <DetailSprung ziel={personalDetailPfad(ep.personal_id)}>
                   im Stamm ändern
@@ -784,7 +782,7 @@ export default function EinsatzkraftPage() {
                     </Button>
                   </Popconfirm>
                   {fristAbgelaufen && (
-                    <Textstufe id={fristId} stufe="textKlein" ton="gedaempft">
+                    <Textstufe id={fristId} ton="gedaempft">
                       nur in den ersten {STORNO_FRIST_MIN} Minuten
                     </Textstufe>
                   )}

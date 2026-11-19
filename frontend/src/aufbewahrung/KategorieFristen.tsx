@@ -97,9 +97,7 @@ export function KategorieWert({
         )}
       </Stapel>
       {eintrag.rechtsgrundlage && (
-        <Textstufe stufe="textKlein" ton="gedaempft">
-          Rechtsgrundlage: {eintrag.rechtsgrundlage}
-        </Textstufe>
+        <Textstufe ton="gedaempft">Rechtsgrundlage: {eintrag.rechtsgrundlage}</Textstufe>
       )}
     </Stapel>
   );

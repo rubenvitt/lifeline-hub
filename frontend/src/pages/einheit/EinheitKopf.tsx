@@ -205,7 +205,7 @@ export default function EinheitKopf({
       }
       koerperPolster
     >
-      <Stapel richtung="zeile" umbruch ausrichten="start" abstand="lg">
+      <Stapel richtung="zeile" umbruch ausrichten="start" abstand="md">
         {/* Der gespeicherte Stand; die Vorschau beim Ändern steht im Eingabefeld (D4). */}
         <EinheitZeichen
           tz={{
