@@ -1,5 +1,5 @@
 import { Button } from 'antd';
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type CSSProperties, type ReactNode } from 'react';
 import { meldeClientFehler } from '../api/clientFehler';
 import { GROSS_BEZUG, grossMass } from './grossbild/grossMass';
 import { IM_RASTER } from './instrument/DashboardPaneel';
@@ -36,6 +36,8 @@ export interface KachelGrenzeProps {
   form?: 'paneel' | 'gross';
   /** Ändert sich der Wert, versucht die Grenze die Kachel erneut. */
   neuversuch?: unknown;
+  /** Stil des Ersatzes, damit er den Platz der Kachel einnimmt (etwa `flex` der Lagekarte). */
+  ersatzStil?: CSSProperties;
   children: ReactNode;
 }
 
@@ -60,21 +62,33 @@ export default class KachelGrenze extends Component<KachelGrenzeProps, State> {
       : { hasError: false, neuversuch: props.neuversuch };
   }
 
-  componentDidCatch(fehler: unknown, _info: ErrorInfo): void {
+  componentDidCatch(fehler: unknown): void {
     void meldeClientFehler(fehler, window.location.pathname);
   }
 
   render() {
-    const { titel, form = 'paneel', children } = this.props;
+    const { titel, form = 'paneel', ersatzStil, children } = this.props;
     return (
       <div data-lfh-kachelgrenze="" style={{ display: 'contents' }}>
-        {this.state.hasError ? <KachelErsatz titel={titel} form={form} /> : children}
+        {this.state.hasError ? (
+          <KachelErsatz titel={titel} form={form} stil={ersatzStil} />
+        ) : (
+          children
+        )}
       </div>
     );
   }
 }
 
-function KachelErsatz({ titel, form }: { titel: string; form: 'paneel' | 'gross' }) {
+function KachelErsatz({
+  titel,
+  form,
+  stil,
+}: {
+  titel: string;
+  form: 'paneel' | 'gross';
+  stil?: CSSProperties;
+}) {
   const { token: t, rollen } = useRollen();
   if (form === 'gross') {
     return (
@@ -91,6 +105,7 @@ function KachelErsatz({ titel, form }: { titel: string; form: 'paneel' | 'gross'
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
+          ...stil,
         }}
       >
         <h2 style={{ margin: 0, fontSize: grossMass(GROSS_BEZUG.titel), color: rollen.text }}>
@@ -107,7 +122,7 @@ function KachelErsatz({ titel, form }: { titel: string; form: 'paneel' | 'gross'
       titel={titel}
       koerperPolster
       // Die Kante trägt „gescheitert“ zusätzlich zum Wortlaut (WCAG 1.4.1), wie die Rahmengrenze.
-      style={{ ...IM_RASTER, boxShadow: `inset 3px 0 0 0 ${rollen.alarm}` }}
+      style={{ ...IM_RASTER, boxShadow: `inset 3px 0 0 0 ${rollen.alarm}`, ...stil }}
     >
       <div
         data-lfh="kachelgrenze"

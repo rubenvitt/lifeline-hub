@@ -102,6 +102,16 @@ describe('KachelGrenze', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  it('Form gross: der Ersatz nimmt den Platz der Kachel ein (ersatzStil)', () => {
+    renderMitProviders(
+      <KachelGrenze titel="Lagekarte" form="gross" ersatzStil={{ flexGrow: 1 }}>
+        <Wirft />
+      </KachelGrenze>,
+    );
+
+    expect(screen.getByRole('region', { name: 'Lagekarte' }).style.flexGrow).toBe('1');
+  });
+
   it('ein neuer neuversuch zeichnet die Kachel neu, ein gleicher nicht', () => {
     const zustand = { wirft: true };
     function Wackelig() {
