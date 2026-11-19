@@ -1,6 +1,6 @@
 import { App, AutoComplete, Col, Form, Input, Row, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
-import { Link, Navigate, useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
 import { Select } from '../components/Select';
@@ -31,6 +31,7 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Feld, Formularpaneel, Stapel } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 interface FormWerte {
   name: string;
@@ -141,7 +142,10 @@ export default function PersonalDetailPage() {
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       {/* Der Pfad steht im Kopf der `AdminPage`, nicht als zweite Zeile darüber (LFH-954). */}
       <AdminPage
-        pfad={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
+        pfad={[
+          { title: <ListenRueckweg to={personalListePfad()}>Personal</ListenRueckweg> },
+          { title: person.name },
+        ]}
         breite="schmal"
         titel={
           <Stapel richtung="zeile" abstand="sm" ausrichten="mitte" als="span">

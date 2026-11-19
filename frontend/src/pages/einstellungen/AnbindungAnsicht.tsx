@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, Checkbox, Input } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { IconKreuz } from '../../icons';
 import AdminPage from '../../components/AdminPage';
 import {
@@ -46,6 +46,7 @@ import {
   uebernimmAnbindung,
   zustandAnzeige,
 } from './anbindungAnzeige';
+import { ListenRueckweg } from '../../components/ListenRueckweg';
 
 interface ZugangWerte {
   name: string;
@@ -204,7 +205,10 @@ export default function AnbindungAnsicht() {
 
   return (
     <AdminPage
-      pfad={[{ title: <Link to={anbindungenPath()}>Anbindungen</Link> }, { title: zugang.name }]}
+      pfad={[
+        { title: <ListenRueckweg to={anbindungenPath()}>Anbindungen</ListenRueckweg> },
+        { title: zugang.name },
+      ]}
       titel={
         <span
           style={{ display: 'inline-flex', gap: token.marginXS, alignItems: 'center' }}

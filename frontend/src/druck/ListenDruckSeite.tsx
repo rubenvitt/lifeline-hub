@@ -11,6 +11,7 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Was der Rahmen von der Abfrage der Seite braucht — eine Teilmenge von `UseQueryResult`. Die
@@ -97,7 +98,7 @@ export default function ListenDruckSeite({
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueckPfad}>{modul}</Link> },
+            { title: <ListenRueckweg to={zurueckPfad}>{modul}</ListenRueckweg> },
             { title: 'Druckansicht' },
           ]}
         />

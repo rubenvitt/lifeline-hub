@@ -19,6 +19,7 @@ import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { useModulFreigabenStand } from '../einsatz/useSprungSperre';
 import { abloesungPfad, schichtplanDruckPfad } from '../routing/deeplinks';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /** Ein 403 einer Nachbarliste heißt „Modul gesperrt“: dann fehlt sie, statt den Druck zu sperren. */
 function ohneGesperrtesModul<T>(abruf: Promise<T>): Promise<T | undefined> {
@@ -142,7 +143,7 @@ export default function SchichtplanDruckPage() {
               items={[
                 { title: <Link to="/einsaetze">Einsätze</Link> },
                 { title: einsatz.bezeichnung },
-                { title: <Link to={zurueck}>Ablösung</Link> },
+                { title: <ListenRueckweg to={zurueck}>Ablösung</ListenRueckweg> },
                 { title: 'Schichtplan drucken' },
               ]}
             />

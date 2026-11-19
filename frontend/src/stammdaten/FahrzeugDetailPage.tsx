@@ -1,6 +1,6 @@
 import { App, AutoComplete, Col, Form, Input, InputNumber, Row, Switch, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
-import { Link, Navigate, useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
@@ -30,6 +30,7 @@ import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { Feld, Formularpaneel, Stapel } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 interface FormWerte {
   funkrufname: string;
@@ -147,7 +148,7 @@ export default function FahrzeugDetailPage() {
          der `AdminPage`, damit nicht zwei Pfade übereinander stehen (LFH-954). */}
       <AdminPage
         pfad={[
-          { title: <Link to={fahrzeugListePfad()}>Fahrzeuge</Link> },
+          { title: <ListenRueckweg to={fahrzeugListePfad()}>Fahrzeuge</ListenRueckweg> },
           { title: fahrzeug.funkrufname },
         ]}
         breite="schmal"

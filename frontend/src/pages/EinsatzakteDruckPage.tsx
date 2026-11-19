@@ -32,6 +32,7 @@ import EtbDruckTabelle from '../etb/EtbDruckTabelle';
 import LageberichtText from '../lageberichte/LageberichtText';
 import PersonenDruckTabelle from '../personen/PersonenDruckTabelle';
 import { einsatzakteZipPfad, einsatzdatenPfad } from '../routing/deeplinks';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Druckansicht der Einsatzakte (LLH-1835, `openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/`): das ganze
@@ -297,7 +298,7 @@ export default function EinsatzakteDruckPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>Einsatzdaten</Link> },
+            { title: <ListenRueckweg to={zurueck}>Einsatzdaten</ListenRueckweg> },
             { title: 'Einsatzakte' },
           ]}
         />

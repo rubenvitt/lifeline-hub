@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { loadPlanung } from '../api/planungen';
@@ -11,6 +11,7 @@ import { SeitenLeer } from '../components/SeitenZustand';
 import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import { parseRouteId, planungDruckPfad, planungenPfad, planungPfad } from '../routing/deeplinks';
 import { ausPlanung } from './ausPlanung';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Druckansicht einer Planung ohne Einsatz (LLH-1593, Teil C von LLH-1557, design D8): dieselben
@@ -50,8 +51,8 @@ export default function PlanungDruckPage() {
   const bezeichnung = daten?.planung.kopf.bezeichnung;
   const zurueck = planungId != null ? planungPfad(planungId) : planungenPfad();
   const pfad = [
-    { title: <Link to={planungenPfad()}>Planungen</Link> },
-    { title: <Link to={zurueck}>{bezeichnung ?? 'Planung'}</Link> },
+    { title: <ListenRueckweg to={planungenPfad()}>Planungen</ListenRueckweg> },
+    { title: <ListenRueckweg to={zurueck}>{bezeichnung ?? 'Planung'}</ListenRueckweg> },
     { title: 'Drucken' },
   ];
 
