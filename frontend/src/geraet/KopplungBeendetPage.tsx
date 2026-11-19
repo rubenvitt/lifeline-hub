@@ -6,6 +6,7 @@ import { anzahl } from '../anzeige/anzahl';
 import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import { useOnline } from '../offline/useOnline';
 import { GERAET_START_PFAD, KOPPELN_PFAD } from '../routing/deeplinks';
+import { Stapel, Textstufe } from '../components/instrument';
 import { GeraeteKarte } from './GeraeteKarte';
 
 /**
@@ -52,10 +53,13 @@ export default function KopplungBeendetPage() {
 
   return (
     <GeraeteKarte untertitel="Gerät">
-      <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
-        {online ? 'Kopplung beendet' : 'Keine Verbindung'}
-      </Typography.Title>
-      {online && <Typography.Paragraph>Neuen Code gibt die Einsatzleitung.</Typography.Paragraph>}
+      {/* Titel und erster Satz wie in der App-Anmeldung: `Textstufe` setzt keinen Außenabstand. */}
+      <Stapel abstand="xs">
+        <Textstufe als="h2" stufe="kartentitel">
+          {online ? 'Kopplung beendet' : 'Keine Verbindung'}
+        </Textstufe>
+        {online && <Typography.Paragraph>Neuen Code gibt die Einsatzleitung.</Typography.Paragraph>}
+      </Stapel>
       {offen > 0 && (
         <Typography.Paragraph type="warning" strong>
           {`${anzahl(offen, 'Eintrag', 'Einträge')} nicht übertragen`}

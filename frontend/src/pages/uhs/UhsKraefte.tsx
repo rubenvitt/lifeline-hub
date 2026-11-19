@@ -1,6 +1,6 @@
 import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { useId, useState, type ReactNode } from 'react';
-import { App, Button, Form, Input, Space, Typography } from 'antd';
+import { App, Button, Form, Input, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   erfasseAdhocKraft,
@@ -19,7 +19,14 @@ import { ErfassungsModal } from '../../components/Erfassung';
 import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
 import { Select } from '../../components/Select';
 import { teilwortSuche } from '../../components/teilwortSuche';
-import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  Feld,
+  Stapel,
+  Textstufe,
+  useRollen,
+} from '../../components/instrument';
 import { SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
 import { schliesseRueckgaengig, zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { useHoldGeloest } from '../../components/useHoldGeloest';
@@ -68,7 +75,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
   // Ablehnungen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): die
   // Dialoge tragen ihre Mutation als `speicherung`, Abziehen meldet an der Zeile der Kraft.
   const abziehenZeilen = useZeilenFehler<number>();
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   // Die abgezogene Kraft hält ihre Zeile (LLH-1924, Spec `bedien-muster`, „Gelöste Zeile hält
   // ihre Stelle“): sonst rückt „Abziehen“ der nächsten Kraft unter den Finger.
   const halten = useHoldGeloest(uhs.kraefte, `${einsatzId}:${uhs.id}`);
@@ -187,7 +194,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
       key: 'name',
       sorter: (a, b) => a.name.localeCompare(b.name, 'de'),
       render: (name: string, k: UhsKraft) =>
-        gehalten.has(k.id) ? <span style={{ color: rollen.gedaempft }}>{name}</span> : name,
+        gehalten.has(k.id) ? <Textstufe ton="gedaempft">{name}</Textstufe> : name,
     },
     // Die eine Funktionsangabe (Einsatzfunktion vor Qualifikation), die Qualifikation darunter wie
     // in der Personalliste (LLH-1067, `kraefte/einsatzfunktionKern.ts`).
@@ -205,12 +212,9 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           <>
             {text ?? '—'}
             {qualifikation && qualifikation !== text && (
-              <Typography.Text
-                type="secondary"
-                style={{ display: 'block', overflowWrap: 'anywhere' }}
-              >
+              <Textstufe als="div" ton="gedaempft" umbruch="ueberall">
                 {qualifikation}
-              </Typography.Text>
+              </Textstufe>
             )}
           </>,
           bedienbar && (
@@ -263,7 +267,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
               const grund = abziehenZeilen.grund(k.id);
               const geloest = gehalten.has(k.id);
               return (
-                <Space orientation="vertical" size={token.marginXS}>
+                <Stapel abstand="xs" ausrichten="start">
                   {mitUeberlage(
                     k,
                     <Button
@@ -288,7 +292,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
                     </Button>,
                   )}
                   {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
-                </Space>
+                </Stapel>
               );
             },
           },
@@ -297,7 +301,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
   ];
 
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+    <Stapel abstand="md">
       {rueckgaengigMut.isError &&
         !halten.rows.some((r) => r.p.id === rueckgaengigMut.variables?.id) && (
           <SpeicherFehler
@@ -323,13 +327,13 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           {qualifikationen.length === 0 ? (
             '—'
           ) : (
-            <Space wrap size={[token.marginXS, token.marginXS]}>
+            <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               {qualifikationen.map((q) => (
                 <Marke key={q.bezeichnung}>
                   {q.bezeichnung} {q.anzahl}
                 </Marke>
               ))}
-            </Space>
+            </Stapel>
           )}
         </Datenfeld>
       </Datenraster>
@@ -352,9 +356,9 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           )}
           <Button onClick={() => setOffen('adhoc')}>Kraft erfassen</Button>
           {keineFreie && (
-            <Typography.Text type="secondary" id={sperrgrundId}>
+            <Textstufe ton="gedaempft" id={sperrgrundId}>
               Keine Kraft ohne UHS
-            </Typography.Text>
+            </Textstufe>
           )}
         </Space>
       )}
@@ -381,18 +385,17 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         onFertig={() => setOffen(null)}
         onAbbrechen={() => setOffen(null)}
       >
-        <Form.Item<KraftWerte>
+        <Feld<KraftWerte>
           name="kraft_id"
           label="Kraft"
           rules={[{ required: true, message: 'Bitte eine Kraft auswählen' }]}
         >
           <Select
             showSearch={teilwortSuche}
-            style={{ width: '100%' }}
             placeholder="Kraft auswählen…"
             options={ohneUhs.map((k) => ({ value: k.id, label: kraftAuswahlText(k) }))}
           />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
       {einheitZuordnen && (
         <ErfassungsModal<EinheitWerte>
@@ -408,20 +411,19 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           onFertig={() => setOffen(null)}
           onAbbrechen={() => setOffen(null)}
         >
-          <Form.Item<EinheitWerte>
+          <Feld<EinheitWerte>
             name="einheit_id"
             label="Einheit"
             rules={[{ required: true, message: 'Bitte eine Einheit auswählen' }]}
           >
             <Select
-              style={{ width: '100%' }}
               placeholder="Einheit auswählen…"
               options={einheiten.map((e) => ({
                 value: e.id,
                 label: `${e.name} (${e.anzahl} ${e.anzahl === 1 ? 'Kraft' : 'Kräfte'})`,
               }))}
             />
-          </Form.Item>
+          </Feld>
         </ErfassungsModal>
       )}
       <ErfassungsModal<AdhocWerte>
@@ -443,21 +445,21 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
         onFertig={() => setOffen(null)}
         onAbbrechen={() => setOffen(null)}
       >
-        <Form.Item<AdhocWerte>
+        <Feld<AdhocWerte>
           name="name"
           label="Name"
           rules={[{ required: true, whitespace: true, message: 'Bitte einen Namen angeben' }]}
         >
           <Input maxLength={PERSONAL_ADHOC_TEXT_MAX} />
-        </Form.Item>
+        </Feld>
         {/* Freitext ist die Qualifikation (`funktion`); die Einsatzfunktion setzt die Personalliste. */}
-        <Form.Item<AdhocWerte> name="funktion" label="Qualifikation">
+        <Feld<AdhocWerte> name="funktion" label="Qualifikation">
           <Input maxLength={PERSONAL_ADHOC_TEXT_MAX} />
-        </Form.Item>
-        <Form.Item<AdhocWerte> name="staerke_position" label="Position">
+        </Feld>
+        <Feld<AdhocWerte> name="staerke_position" label="Position">
           <Select allowClear placeholder="ohne" options={POSITION_OPTIONEN} />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
-    </Space>
+    </Stapel>
   );
 }

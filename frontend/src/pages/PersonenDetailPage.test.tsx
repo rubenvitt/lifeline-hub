@@ -163,6 +163,40 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     expect(screen.queryByText('Diese Person gibt es nicht (mehr)')).toBeNull();
   });
 
+  // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
+  it.each(['/personen/10', ''] as const)(
+    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite bleibt, Hinweis zeigt den alten Stand',
+    async (unterpfad) => {
+      const { client } = render(einsatzAktiv, detail);
+      await screen.findByRole('region', { name: 'Patientenkopf' });
+
+      server.use(
+        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(kopf()).toBeInTheDocument();
+      expect(screen.queryByText('Person konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
+
+  it('gescheiterter Erstabruf des Einsatzes zeigt weiter die Fehlerseite', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    ]);
+    expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+    ).toBeNull();
+  });
+
   it('verlinkt den Schadenbezug auf die Schaden-Detailseite (LFH-148)', async () => {
     const schaden = {
       id: 99,
@@ -178,6 +212,27 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     await klappeBezuegeAuf();
     const link = await screen.findByRole('link', { name: /sachschaden/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/99');
+  });
+});
+
+/**
+ * Ein Datensatz ohne oder mit unbekanntem Status (LLH-1957): nachgestellt in der Liste, auf der
+ * Detailseite rissen Statusmarke und Statusmenü (`naechsteStatus(...).map`) dieselbe Seite.
+ */
+describe('PersonenDetailPage — Status fehlt (LLH-1957)', () => {
+  it.each([
+    ['ohne Status', undefined],
+    ['mit unbekanntem Status', 'xyz'],
+  ])('zeichnet die Person %s mit „unbekannt“ und ohne Statuswechsel', async (_fall, status) => {
+    render(einsatzAktiv, { ...detail, status } as unknown as PersonDetail);
+    await waitFor(() =>
+      expect(
+        Array.from(document.querySelectorAll('[data-lfh="status"]')).map((m) => m.textContent),
+      ).toContain('unbekannt'),
+    );
+    const menue = await oeffneKopfmenue();
+    expect(within(menue).queryByText(/setzen/)).toBeNull();
+    expect(within(menue).getByText('Stornieren')).toBeInTheDocument();
   });
 });
 
@@ -399,9 +454,8 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   });
 
   /**
-   * Der Abstand zwischen „Rot" und dem Rest: `aktionsabstand.guard.test.ts` sieht einen
-   * `danger`-Menüeintrag nicht (sein Scanner matcht `<Button` mit `danger`). Geprüft wird hier,
-   * dass das Löschen hinter einem Trenner steht.
+   * Der Abstand zwischen „Rot" und dem Rest: im ⋮-Menü trägt ihn keine `Knopfreihe`, sondern der
+   * Trenner. Geprüft wird hier, dass das Löschen hinter einem Trenner steht.
    */
   it('trennt „Stornieren" durch einen Menü-Trenner vom Rest', async () => {
     render(einsatzAktiv, detail);

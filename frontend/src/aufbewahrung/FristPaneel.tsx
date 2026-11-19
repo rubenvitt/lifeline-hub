@@ -10,7 +10,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
-import { Datenfeld, Datenraster, Paneel } from '../components/instrument';
+import { Datenfeld, Datenraster, Feld, Paneel, Stapel } from '../components/instrument';
 import KategorieFristen from './KategorieFristen';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import {
@@ -163,7 +163,7 @@ export function useFristAenderung(
       >
         {/* Dieselbe Form wie im Wiederherstellen-Dialog: Zeitpunkt, darunter der Schalter, der ihn
            sperrt. Die Pflicht hängt am Schalter, nicht am Feld. */}
-        <Form.Item
+        <Feld
           label="Neue Aufbewahrungsfrist"
           name="frist"
           rules={[{ required: !unbegrenzt, message: 'Zeitpunkt wählen' }]}
@@ -175,10 +175,10 @@ export function useFristAenderung(
           }
         >
           <ZeitpunktEingabe art="frist" disabled={unbegrenzt} style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item label="Unbegrenzt aufbewahren" name="unbegrenzt" valuePropName="checked">
+        </Feld>
+        <Feld label="Unbegrenzt aufbewahren" name="unbegrenzt" valuePropName="checked">
           <Switch />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={offen ? mutation.error : null} />
       </ErfassungsModal>
       <Modal
@@ -249,7 +249,7 @@ export default function FristPaneel({ einsatzId, einsatz }: FristPaneelProps) {
 
   return (
     <Paneel titel="Aufbewahrungsfrist" koerperPolster style={{ marginBottom: token.marginLG }}>
-      <Flex vertical gap={token.marginSM}>
+      <Stapel abstand="sm">
         <RechteHinweis sichtbar={!darf} text={fristSperrGrund(einsatz)} />
         <SpeicherFehler fehler={aenderung.fehlerAussen} />
         <Datenraster spalten={1} beschriftung="Aufbewahrungsfrist">
@@ -269,7 +269,7 @@ export default function FristPaneel({ einsatzId, einsatz }: FristPaneelProps) {
         </Flex>
         {/* LFH-749: Fristen je Datenkategorie — sie wirken nur früher als die Einsatz-Frist. */}
         <KategorieFristen einsatzId={einsatzId} status={einsatz.status} darf={darf} />
-      </Flex>
+      </Stapel>
       {aenderung.dialoge}
     </Paneel>
   );

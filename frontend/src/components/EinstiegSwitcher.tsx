@@ -1,7 +1,8 @@
 import { IconChevronRunter } from '../icons';
-import { Button, Dropdown, Space, theme, Typography, type MenuProps } from 'antd';
+import { Button, Dropdown, Space, theme, type MenuProps } from 'antd';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { Status } from './instrument/Status';
+import Textstufe from './instrument/Textstufe';
 
 interface SwitcherEintrag {
   id: number;
@@ -24,7 +25,7 @@ interface Props {
  * Seitentitel und ist trotzdem ein Bedienziel: `minHeight` hält die Steuerhöhe der Stufe
  * (LFH-724; ohne sie maß er in `handschuh` 33 px). BENANNTE AUSNAHME von „Handgebautes
  * Bedienziel“ (`frontend/AGENTS.md`): kein Polster aus `paddingSM`, denn der Titel steht
- * bündig an der Seitenkante; die Breite trägt die 20-px-Bezeichnung.
+ * bündig an der Seitenkante; die Breite trägt die Bezeichnung in der Stufe `kartentitel`.
  */
 export function wechslerStil(token: { controlHeight: number }) {
   return { padding: 0, height: 'auto', minHeight: token.controlHeight } as const;
@@ -63,9 +64,9 @@ export default function EinstiegSwitcher({
   return (
     <Dropdown menu={{ items, onClick }} trigger={['click']}>
       <Button type="text" style={wechslerStil(token)}>
-        <Typography.Text strong style={{ fontSize: 20 }}>
-          {aktuell.bezeichnung} <IconChevronRunter style={{ fontSize: 14 }} />
-        </Typography.Text>
+        <Textstufe stufe="kartentitel">
+          {aktuell.bezeichnung} <IconChevronRunter size={14} />
+        </Textstufe>
       </Button>
     </Dropdown>
   );

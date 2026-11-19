@@ -1,4 +1,4 @@
-import { Alert, App, Button, Flex, Popconfirm, Space, Typography } from 'antd';
+import { Alert, App, Button, Flex, Popconfirm, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -13,7 +13,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { DokumentAnlage } from '../api/types';
 import { AnhangVorschauGruppe } from '../components/AnhangVorschau';
 import DownloadAnker from '../components/DownloadAnker';
-import { Paneel, PaneelZeile, useRollen } from '../components/instrument';
+import { Paneel, PaneelZeile, Stapel, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { IconMuelleimer } from '../icons';
 import { useOhneVerbindung } from '../offline/verbindung';
@@ -175,10 +175,10 @@ export default function DokumentAnlagen({
         style={{ marginBlock: token.marginSM }}
       >
         {(anfuegen || aufnahme) && (
-          <Flex gap={token.marginXS}>
+          <Stapel richtung="zeile" abstand="xs">
             {anfuegen}
             {aufnahme}
-          </Flex>
+          </Stapel>
         )}
         {anfuegenFehler}
       </Flex>
@@ -207,11 +207,7 @@ export default function DokumentAnlagen({
             {anlagen.map((a) => (
               <div key={a.id} data-lfh="dokument-anlage-zeile" data-anlage-id={a.id}>
                 <PaneelZeile>
-                  <Space
-                    size="middle"
-                    align="center"
-                    style={{ width: '100%', justifyContent: 'space-between' }}
-                  >
+                  <Stapel richtung="zeile" abstand="md" ausrichten="mitte" verteilen="between">
                     <DownloadAnker
                       href={pfad(a)}
                       dateiname={a.dateiname}
@@ -246,7 +242,7 @@ export default function DokumentAnlagen({
                         />
                       </Popconfirm>
                     )}
-                  </Space>
+                  </Stapel>
                 </PaneelZeile>
               </div>
             ))}

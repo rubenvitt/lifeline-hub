@@ -22,7 +22,7 @@ Für System-Admins:
 
 1. Oben „Verwaltung“ öffnen und „Zugangsprotokoll“ wählen. Die Seite zeigt die Spur
    „Zugangsänderungen“.
-2. Je Zeile ablesen, wann („Zeitpunkt“) welcher Admin („Admin“) was getan hat („Aktion“), an
+2. Je Zeile ablesen, wann („Zeitpunkt“) welcher System-Admin („System-Admin“) was getan hat („Aktion“), an
    welchem Konto oder Anmeldeweg („Ziel“), und von welcher Adresse aus („Quelle“).
 
    ![Spur „Zugangsänderungen“ mit Konto angelegt, Sitzung beendet, Rolle geändert, Konto deaktiviert und reaktiviert und Anmeldeweg aktiviert](../bilder/zugangsprotokoll/zugangsaenderungen.png)
@@ -64,9 +64,10 @@ Eine Zeile entsteht, nachdem ein System-Admin eine dieser Aktionen ausgeführt h
 abgewiesene Aktion hinterlässt nichts.
 
 - **„Konto angelegt“**: unter „Benutzer“ mit „Benutzer anlegen“. „Detail“ nennt die beiden
-  Rollen, etwa „System-Rolle: Benutzer, Org-Rolle: Keine“.
-- **„Rolle geändert“**: System- oder Org-Rolle im Dialog „Benutzer bearbeiten“ geändert.
-  „Detail“ nennt alte und neue Rolle, etwa „Org-Rolle: Keine → Führungskraft“. Eine reine
+  Rollen, etwa „Rolle in der Verwaltung: Keine, Rolle in der Organisation: Keine“.
+- **„Rolle geändert“**: Rolle in der Verwaltung oder in der Organisation im Dialog „Benutzer bearbeiten“ geändert.
+  „Detail“ nennt alte und neue Rolle, etwa „Rolle in der Organisation: Keine → Führungskraft der
+  Organisation“. Eine reine
   Änderung des Anzeigenamens schreibt nichts.
 - **„Konto deaktiviert“** und **„Konto reaktiviert“**: unter „Benutzer“.
 - **„Sitzung beendet“**: eine Anmeldung der Person unter „Benutzer“, „Anmeldungen“ beendet, eine
@@ -87,7 +88,7 @@ abgewiesene Aktion hinterlässt nichts.
 - **„Archiv heruntergeladen“**: in der Archivakte im Paneel „Archiv“. „Ziel“ ist die
   Einsatznummer, „Detail“ die Fingerabdrücke der Schlüssel und der Block, siehe
   [Aufbewahrung](aufbewahrung.md).
-- **„Archiv eingespielt“**: per Befehl am Server; unter „Admin“ steht der Befehl.
+- **„Archiv eingespielt“**: per Befehl am Server; unter „System-Admin“ steht der Befehl.
   „Ziel“ ist die Einsatznummer.
 - **„Zweitfaktor zurückgesetzt“**: steht in der Auswahl; die Oberfläche der Verwaltung bietet
   das Zurücksetzen derzeit nicht an.

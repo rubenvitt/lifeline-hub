@@ -291,7 +291,7 @@ async fn frist_setzen_verlaengern_verkuerzen_aufheben() {
     )
     .await
     .unwrap();
-    assert_eq!(r, FristErgebnis::Geaendert);
+    assert!(matches!(r, FristErgebnis::Geaendert { .. }));
     let etb = etb_texte(&pool, einsatz).await;
     let letzter = etb.last().unwrap();
     assert!(letzter.contains("„Personenauskunft“"), "{letzter}");
@@ -354,7 +354,7 @@ async fn frist_setzen_verlaengern_verkuerzen_aufheben() {
     )
     .await
     .unwrap();
-    assert_eq!(r, FristErgebnis::Geaendert);
+    assert!(matches!(r, FristErgebnis::Geaendert { .. }));
     let letzter = etb_texte(&pool, einsatz).await.last().unwrap().clone();
     assert!(
         letzter.contains("„RG“") && letzter.contains("„§ 152 StPO“"),

@@ -449,6 +449,16 @@ for (const viewport of [
       page.on('pageerror', (f) => seitenFehler.push(f));
       await anmelden(page);
       const einsatzId = await einsatzMitLage(page);
+      // Ein verorteter Einsatzort weit außerhalb des Blicks: ohne ihn stünde das Band „Einsatzort
+      // fehlt“ im Kartenfuß (LLH-1953) und läge bei 390 px über dem Donut unten links.
+      const ort = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
+        data: {
+          einsatzort: 'Bereitstellung Süd',
+          einsatzort_lat: MITTE[1] - 0.05,
+          einsatzort_lon: MITTE[0],
+        },
+      });
+      expect(ort.ok(), `Einsatzort: ${ort.status()}`).toBeTruthy();
       await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
       await ruhe(page);
       await springe(page, BLICK_EINZEL, ZOOM);

@@ -6,7 +6,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Person, Sichtungskategorie } from '../api/types';
 import SichtungsTag from '../components/SichtungsTag';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { useRollen } from '../components/instrument';
+import { Feld, Textstufe, useRollen } from '../components/instrument';
 import { SK_META } from './personMeta';
 import { useSaveSichtung } from './SichtungDialog';
 import SichtungsWahl, { SICHTUNGSFLAECHE_BREITE, sichtungsLuecke } from './SichtungsWahl';
@@ -135,12 +135,12 @@ export default function ZeilenSichtung({
         onFertig={() => {}}
         onAbbrechen={() => setOffen(false)}
       >
-        <Form.Item
+        <Feld
           name="kategorie"
           rules={[{ required: true, message: 'Bitte eine Sichtungskategorie wählen' }]}
         >
           <SichtungsWahl aria-label={`Sichtungskategorie für ${kennung}`} />
-        </Form.Item>
+        </Feld>
       </ErfassungsFormular>
     </section>
   );
@@ -194,8 +194,10 @@ export default function ZeilenSichtung({
         </Button>
       </Popover>
       {vorgemerkt && (
-        <div data-lfh="zeile-vorgemerkt" style={{ fontSize: 12, color: rollen.text2 }}>
-          Offline vorgemerkt
+        <div data-lfh="zeile-vorgemerkt">
+          <Textstufe stufe="textKlein" ton="text2">
+            Offline vorgemerkt
+          </Textstufe>
         </div>
       )}
     </div>

@@ -19,11 +19,10 @@ import KommKarte from '../kommunikation/KommKarte';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
-import { Status } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { vorText } from '../anzeige/dauer';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { monoStil, useRollen } from '../components/instrument';
+import { Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import { KennungsLink } from '../components/kennungsLink';
@@ -37,7 +36,7 @@ import {
   kannEinheitUebernehmen,
   uebernommeneEinheiten,
 } from './einheitUebernahme';
-import { EINHEITEN_SCHRIFT, einheitenSprungAufbau } from './einheitenSprung';
+import { EINHEITEN_STUFE, einheitenSprungAufbau } from './einheitenSprung';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
 import { adressatText, nachforderungName } from './nachforderungName';
@@ -125,18 +124,18 @@ function UebernommenePosten({
   return (
     <div data-lfh="nachforderung-posten">
       {posten.map((p) => (
-        <Text key={p.id} style={{ display: 'block', fontSize: 13 }}>
+        <Textstufe key={p.id} als="div">
           {[
             p.bezeichnung,
             mengeText(p),
             p.beendet_at ? AUS_DEM_EINSATZ : ortText(ortVon(p), kontext.namen),
           ].join(' · ')}
-        </Text>
+        </Textstufe>
       ))}
       {n.anzahl != null && (
-        <Text type="secondary" style={{ display: 'block', fontSize: 13 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft" als="div">
           übernommen {uebernommeneMenge(n, posten)} von {n.anzahl}
-        </Text>
+        </Textstufe>
       )}
       {/* Ein Sprung ist keine Handlung (LFH-616): eine Zeile, abgesetzt von den Knöpfen. */}
       <div data-lfh="inspector-sprung">
@@ -198,7 +197,7 @@ function EinheitenZeile({
       <Text
         type="secondary"
         // Block: mit zwei Wegen stehen beide Zeilen im selben Space-Item der Karte (LLH-1445).
-        style={{ display: 'block', fontSize: EINHEITEN_SCHRIFT }}
+        style={{ display: 'block', ...schriftStil(EINHEITEN_STUFE) }}
         data-lfh="nachforderung-einheiten"
       >
         {zahl} {einleitung === 'Am Raum eingetroffen' ? 'am Raum eingetroffen' : 'übernommen'}
@@ -219,9 +218,9 @@ function EinheitenZeile({
               flexWrap: 'wrap',
               alignItems: 'center',
               columnGap: token.marginXXS,
-              fontSize: EINHEITEN_SCHRIFT,
+              ...schriftStil(EINHEITEN_STUFE),
             }
-          : { display: 'block', fontSize: EINHEITEN_SCHRIFT }
+          : { display: 'block', ...schriftStil(EINHEITEN_STUFE) }
       }
       data-lfh="nachforderung-einheiten"
     >
@@ -359,7 +358,7 @@ function PersonBezugZeile({
 }) {
   const kennung = nr != null ? registrierAnzeige(nr) : 'eine Person';
   return (
-    <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-person">
+    <Text type="secondary" style={schriftStil('text')} data-lfh="nachforderung-person">
       Für{' '}
       {pfad && nr != null ? (
         <KennungsLink to={pfad}>
@@ -376,13 +375,13 @@ function PersonBezugZeile({
 function StellenBezug({ verweis }: { verweis: StellenVerweis | undefined }) {
   if (!verweis) {
     return (
-      <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-stelle">
+      <Text type="secondary" style={schriftStil('text')} data-lfh="nachforderung-stelle">
         Für eine Betreuungsstelle
       </Text>
     );
   }
   return (
-    <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-stelle">
+    <Text type="secondary" style={schriftStil('text')} data-lfh="nachforderung-stelle">
       Für Betreuungsstelle{' '}
       <KennungsLink to={verweis.pfad}>
         {verweis.name} <span aria-hidden="true">↗</span>
@@ -667,21 +666,21 @@ function NachforderungKarte({
         )}
       </Flex>
 
-      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block' }}>
+      <Textstufe stufe="kartentitel" als="div">
         {menge}
         {n.art}
-      </Text>
+      </Textstufe>
       {ziel && (
         <Text
           data-lfh="nachforderung-ziel"
-          style={{ display: 'block', fontSize: 13, overflowWrap: 'anywhere' }}
+          style={{ display: 'block', ...schriftStil('text'), overflowWrap: 'anywhere' }}
         >
           {ziel}
         </Text>
       )}
       <Text
         type="secondary"
-        style={{ display: 'block', fontSize: 13, marginBottom: token.marginXS }}
+        style={{ display: 'block', ...schriftStil('text'), marginBottom: token.marginXS }}
       >
         an {adressat}
       </Text>
@@ -705,9 +704,9 @@ function NachforderungKarte({
         {zusage.length > 0 && (
           <Space orientation="vertical" size={0} data-lfh="nachforderung-zusage-angaben">
             {zusage.map((z) => (
-              <Text key={z} style={{ fontSize: 13, overflowWrap: 'anywhere' }}>
+              <Textstufe key={z} umbruch="ueberall">
                 {z}
-              </Text>
+              </Textstufe>
             ))}
           </Space>
         )}
@@ -716,7 +715,7 @@ function NachforderungKarte({
             <Text
               key={z.schluessel}
               type={z.ton === 'achtung' ? 'warning' : 'secondary'}
-              style={{ fontSize: 13 }}
+              style={schriftStil('textKlein')}
             >
               {z.text}
             </Text>
@@ -727,9 +726,7 @@ function NachforderungKarte({
           <UebernommenePosten nachforderung={n} posten={posten} />
         ) : (
           n.material_ids.length > 0 && (
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              {n.material_ids.length} Posten übernommen
-            </Text>
+            <Textstufe ton="gedaempft">{n.material_ids.length} Posten übernommen</Textstufe>
           )
         )}
         {n.einheit_ids.length > 0 && (

@@ -221,14 +221,16 @@ function SchichtmodelleInhalt() {
       key: 'vorwarnung',
       abBreite: 'md',
       sorter: nachZahl((m: Schichtmodell) => m.vorwarnung_minuten),
-      render: (_, m) => <span style={monoStil(12)}>{dauer(m.vorwarnung_minuten)}</span>,
+      render: (_, m) => <span style={monoStil('monoKlein')}>{dauer(m.vorwarnung_minuten)}</span>,
     },
     {
       title: 'Planungsvorlauf',
       key: 'planungsvorlauf',
       abBreite: 'lg',
       sorter: nachZahl((m: Schichtmodell) => m.planungsvorlauf_minuten),
-      render: (_, m) => <span style={monoStil(12)}>{dauer(m.planungsvorlauf_minuten)}</span>,
+      render: (_, m) => (
+        <span style={monoStil('monoKlein')}>{dauer(m.planungsvorlauf_minuten)}</span>
+      ),
     },
     ...(istAdmin
       ? [

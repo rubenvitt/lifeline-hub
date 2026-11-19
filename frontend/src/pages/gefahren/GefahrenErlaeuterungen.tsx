@@ -1,7 +1,7 @@
 import type { GefahrBewertung } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { Liste, ListenEintrag } from '../../components/Liste';
-import { useRollen } from '../../components/instrument';
+import { MetaZeile, Stapel, useRollen } from '../../components/instrument';
 import GefahrenStufe from './GefahrenStufe';
 import { geaendertText, zellTitel, zellenMitErlaeuterung } from './erlaeuterungen';
 
@@ -43,21 +43,21 @@ export default function GefahrenErlaeuterungen({ matrix, onWaehlen }: GefahrenEr
           >
             {/* Kein `ListenEintragMeta`: die Zeile ist ein Knopf, und eine Überschrift in einem
                 Knopf verliert ihre Rolle. Gliederung trägt der Kopf „Erläuterungen“. */}
-            <span style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
+            <Stapel abstand="xxs">
               <strong>{zellTitel(z.gefahrentyp, z.schutzobjekt)}</strong>
-              <span style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS }}>
+              <Stapel richtung="zeile" abstand="xs" ausrichten="baseline">
                 <GefahrenStufe stufe={z.warnstufe} />
                 <span style={{ minWidth: 0, whiteSpace: 'pre-line' }}>
                   {z.beschreibung?.trim()}
                 </span>
-              </span>
-              <span style={{ color: token.colorTextDescription }}>
-                {[
-                  ...(z.gemeldet_von?.trim() ? [`gemeldet von ${z.gemeldet_von.trim()}`] : []),
-                  geaendertText(z, zeitpunkt),
-                ].join(' · ')}
-              </span>
-            </span>
+              </Stapel>
+              <MetaZeile>
+                <MetaZeile.Teil>
+                  {z.gemeldet_von?.trim() && `gemeldet von ${z.gemeldet_von.trim()}`}
+                </MetaZeile.Teil>
+                <MetaZeile.Teil>{geaendertText(z, zeitpunkt)}</MetaZeile.Teil>
+              </MetaZeile>
+            </Stapel>
           </ListenEintrag>
         )}
       />

@@ -1,9 +1,9 @@
 import type { ReactElement, ReactNode } from 'react';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { Link } from 'react-router';
-import { Button, Space, Typography } from 'antd';
+import { Button, Typography } from 'antd';
 import type { FormRule } from 'antd';
-import { Datenfeld, DatenfeldEingabe, Datenraster } from '../../components/instrument';
+import { Datenfeld, DatenfeldEingabe, Datenraster, Stapel } from '../../components/instrument';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 import { lagekartePfad } from '../../routing/deeplinks';
 import type { Schaden } from '../../api/types';
@@ -100,7 +100,7 @@ export default function SchadenDaten({
               einsatzId={ortZeile ? einsatzId : undefined}
             />
           ) : (
-            <Space wrap>
+            <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               <Typography.Text type="secondary">nicht verortet</Typography.Text>
               {verortenLink &&
                 (karteGesperrt ? (
@@ -117,7 +117,7 @@ export default function SchadenDaten({
                     Auf Karte verorten
                   </Link>
                 ))}
-            </Space>
+            </Stapel>
           )}
         </Datenfeld>
       )}

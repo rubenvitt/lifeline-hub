@@ -11,6 +11,7 @@ import {
   type ModulEintrag,
 } from '../../einsatz/modulRegistry';
 import { ROLLEN_OPTIONEN } from './optionen';
+import { ROLLEN_LISTE_SCHMAL, rollenOptionRender } from '../../einsatz/rollenOption';
 import { Stapel, Textstufe } from '../../components/instrument';
 
 /**
@@ -279,6 +280,8 @@ export default function ModulEinstellungsListe({
             disabled={gesperrt}
             loading={laeuft}
             options={ROLLEN_OPTIONEN}
+            optionRender={rollenOptionRender}
+            {...ROLLEN_LISTE_SCHMAL}
             onChange={(val) => aufRolle(m.key, val)}
           />
           {hinweis && (

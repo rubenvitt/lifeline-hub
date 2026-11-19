@@ -19,7 +19,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { EINSATZLEITER_NAME_MAX } from '../api/eingabegrenzen';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { istZuLang, Zeichenzaehler } from '../components/zeichenGrenze';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, Textstufe, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../einsatz/einsatzleiter';
@@ -129,7 +129,7 @@ export default function EinsatzleiterAngabe({
   ) => Promise<unknown>;
 }) {
   const { konventionen } = useAnzeigeKonventionen();
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const quelle = usePersonalQuelle(einsatzId, darfSchreiben);
   const [suche, setSuche] = useState('');
   const e = fs.einsatzleiter;
@@ -172,7 +172,7 @@ export default function EinsatzleiterAngabe({
           <>
             {einsatzleiterKurz(d)}
             {' · '}
-            <span style={monoStil(13)}>{`seit ${zeitKurz(d.seit, konventionen)}`}</span>
+            <span style={monoStil('mono')}>{`seit ${zeitKurz(d.seit, konventionen)}`}</span>
           </>
         ) : null
       }
@@ -210,13 +210,12 @@ export default function EinsatzleiterAngabe({
                 seit: eigeneZeit ? value.seit : w === gespeichert.wahl ? gespeichert.seit : null,
               });
             }}
-            style={{ width: '100%' }}
           />
           <Zeichenzaehler wert={suche.trim()} max={EINSATZLEITER_NAME_MAX} />
           {(quelle.zustand === 'gesperrt' || quelle.zustand === 'fehler') && (
-            <div style={{ color: rollen.gedaempft }}>
+            <Textstufe als="div" stufe="textKlein" ton="gedaempft">
               {`Personal ${ZUSTAND_GRUND[quelle.zustand]} — nur Freitext`}
-            </div>
+            </Textstufe>
           )}
           <ZeitpunktEingabe
             art="ereignis"

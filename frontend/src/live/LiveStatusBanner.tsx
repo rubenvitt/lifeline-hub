@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Space, theme } from 'antd';
+import { Alert, Badge, Button, theme } from 'antd';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { abonniereLiveStatus, leseLiveStatus } from './liveStatusStore';
 import {
@@ -10,6 +10,7 @@ import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
+import { Stapel } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { anzahl } from '../anzeige/anzahl';
 import {
@@ -134,10 +135,13 @@ export default function LiveStatusBanner({
         : 'info';
 
   const queueBadges = (
-    <Space size={token.margin} wrap>
+    <Stapel als="span" richtung="zeile" umbruch abstand="md" ausrichten="mitte">
       {queue.ausstehend > 0 && (
-        <Space
-          size={token.marginXS}
+        <Stapel
+          als="span"
+          richtung="zeile"
+          abstand="xs"
+          ausrichten="mitte"
           aria-label={anzahl(
             queue.ausstehend,
             'ausstehende Offline-Aktion',
@@ -146,7 +150,7 @@ export default function LiveStatusBanner({
         >
           <Badge count={queue.ausstehend} overflowCount={999} color={token.colorWarning} />
           <span>ausstehend</span>
-        </Space>
+        </Stapel>
       )}
       {queue.abgelehnt > 0 && (
         <Button
@@ -159,10 +163,10 @@ export default function LiveStatusBanner({
           )}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={token.marginXS}>
+          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
             <Badge count={queue.abgelehnt} overflowCount={999} color={token.colorError} />
             <span>abgelehnt – prüfen</span>
-          </Space>
+          </Stapel>
         </Button>
       )}
       {abgelehnteAntraege > 0 && (
@@ -173,10 +177,10 @@ export default function LiveStatusBanner({
           aria-label={`Anträge abgelehnt (${anzahl(abgelehnteAntraege, 'Antrag', 'Anträge')})`}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={token.marginXS}>
+          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
             <Badge count={abgelehnteAntraege} overflowCount={999} color={token.colorError} />
             <span>Anträge abgelehnt</span>
-          </Space>
+          </Stapel>
         </Button>
       )}
       {fruehereKopplung > 0 && (
@@ -185,10 +189,10 @@ export default function LiveStatusBanner({
           aria-label={`Aus früherer Kopplung (${anzahl(fruehereKopplung, 'Eintrag', 'Einträge')})`}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={token.marginXS}>
+          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
             <Badge count={fruehereKopplung} overflowCount={999} color={token.colorWarning} />
             <span>Aus früherer Kopplung</span>
-          </Space>
+          </Stapel>
         </Button>
       )}
       {queue.nicht_zugeordnet > 0 && (
@@ -198,15 +202,15 @@ export default function LiveStatusBanner({
           aria-label={`Alte Offline-Daten ansehen (${anzahl(queue.nicht_zugeordnet, 'Aktion', 'Aktionen')} ohne Zuordnung)`}
           onClick={() => setRecoveryOffen(true)}
         >
-          <Space size={token.marginXS}>
+          <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
             <Badge count={queue.nicht_zugeordnet} overflowCount={999} color={token.colorWarning} />
             {/* Der Knopf öffnet nur den Drawer; dort fragt das Verwerfen nach. „verwerfen“ las
                 sich wie die Löschung selbst und wurde gemieden (LFH-944). */}
             <span>Alte Offline-Daten ansehen</span>
-          </Space>
+          </Stapel>
         </Button>
       )}
-    </Space>
+    </Stapel>
   );
 
   return (
@@ -223,10 +227,10 @@ export default function LiveStatusBanner({
             showIcon
             banner
             title={
-              <Space size={token.margin} wrap>
+              <Stapel als="span" richtung="zeile" umbruch abstand="md" ausrichten="mitte">
                 {hinweise.length > 0 && <span>{hinweise.join(' · ')}</span>}
                 {queueBadges}
-              </Space>
+              </Stapel>
             }
             action={
               aktualisierungVerfuegbar ? (

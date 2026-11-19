@@ -134,7 +134,7 @@ Für die Einsatzleitung:
 
 - **Angaben und eigene Führungsstelle** ändern Einsatzleitung und Führungspersonal sowie die
   Administration der Organisation des Einsatzes, solange der Einsatz läuft. Wer das nicht darf,
-  sieht den Hinweis „nur Einsatzleitung, Führungspersonal oder Org-Admin“.
+  sieht den Hinweis „nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation“.
 - **Zugriff** (Mitglieder, Rollen, Führungsstelle je Mitglied) verwaltet nur die
   Einsatzleitung, in den Einstellungen des Einsatzes. Nur sie sieht den Sprung „Zugriff
   verwalten“.

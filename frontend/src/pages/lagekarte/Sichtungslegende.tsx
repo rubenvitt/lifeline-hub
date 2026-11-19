@@ -1,4 +1,4 @@
-import { monoStil, useRollen } from '../../components/instrument';
+import { Stapel, Textstufe, monoStil, useRollen } from '../../components/instrument';
 import { SK_WORT } from '../../personen/personMeta';
 import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { SICHTUNGSBILD_REIHE, type SichtungsbildSchluessel } from '../../personen/personenBilanz';
@@ -18,7 +18,7 @@ const KREIS = 18;
  * und kein Farbwert hier. Kein Bedienziel, also kein Dichte-Boden.
  */
 export default function Sichtungslegende() {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const neutral = rollenFarbe('neutral', token);
 
   function farbe(k: SichtungsbildSchluessel): string {
@@ -44,10 +44,7 @@ export default function Sichtungslegende() {
       }}
     >
       {SICHTUNGSBILD_REIHE.map((k) => (
-        <li
-          key={k}
-          style={{ display: 'flex', alignItems: 'center', gap: token.marginXS, fontSize: 11 }}
-        >
+        <Stapel key={k} als="li" richtung="zeile" abstand="xs" ausrichten="mitte">
           <span
             aria-hidden="true"
             data-sichtung-feld={k}
@@ -71,8 +68,10 @@ export default function Sichtungslegende() {
           >
             {SK_KURZZEICHEN[k]}
           </span>
-          <span style={{ color: rollen.text2 }}>{beschriftung(k)}</span>
-        </li>
+          <Textstufe stufe="textKlein" ton="text2">
+            {beschriftung(k)}
+          </Textstufe>
+        </Stapel>
       ))}
     </ul>
   );

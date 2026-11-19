@@ -23,8 +23,8 @@ const webauthnProvider = [
 function benutzerBody(totpAktiviert: boolean, passwortGesetzt = true) {
   return {
     id: 1,
-    // Bewusst nicht „Admin": der Anzeigename stünde sonst gleichlautend neben der
-    // Rollen-Beschriftung, und `getByText('Admin')` träfe beide.
+    // Bewusst nicht „System-Admin“: der Anzeigename stünde sonst gleichlautend neben der
+    // Rollen-Beschriftung, und `getByText('System-Admin')` träfe beide.
     anzeigename: 'Rita Beispiel',
     benutzername: 'admin',
     system_rolle: 'admin',
@@ -90,9 +90,8 @@ describe('ProfilPage — Kopfdaten (LFH-345)', () => {
 
     expect(await screen.findByText('Rita Beispiel')).toBeInTheDocument();
     expect(screen.getByText('admin')).toBeInTheDocument();
-    // Die Rolle als Wort, nicht als Wire-Wert. Die Schreibweise folgt `BenutzerPage` („Admin" /
-    // „Führungskraft" / „Benutzer"), damit dieselbe Rolle nicht zwei Namen trägt.
-    expect(screen.getByText('Admin')).toBeInTheDocument();
+    // Die Rolle als Wort aus dem Rollen-Vokabular (LLH-1818), nicht als Wire-Wert.
+    expect(screen.getByText('System-Admin')).toBeInTheDocument();
   });
 
   it('zeigt die Organisation', async () => {

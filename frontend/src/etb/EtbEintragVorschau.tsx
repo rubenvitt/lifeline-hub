@@ -8,7 +8,7 @@ import { etbNummerAbfrage } from '../command-palette/datensatzAbfrage';
 import { VORSCHAU_UNTER_EBENE, VorschauZustand } from '../command-palette/VorschauZustand';
 import Markdown from '../components/Markdown';
 import Fundstellen from '../components/Fundstellen';
-import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
+import { Datenfeld, Datenraster, Stapel, monoStil, useRollen } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbAnhaenge from './EtbAnhaenge';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
@@ -91,7 +91,7 @@ function EintragInhalt({
     ) : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+    <Stapel abstand="md">
       <Datenraster spalten={2} beschriftung={`ETB-Eintrag Nr. ${e.lfd_nr}`}>
         <Datenfeld label="Nummer" mono>
           Nr. {e.lfd_nr}
@@ -111,7 +111,7 @@ function EintragInhalt({
             <span
               data-lfh="typwort"
               style={{
-                ...monoStil(11, 500),
+                ...monoStil('meta', 500),
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
                 color: farbe.wort,
@@ -180,6 +180,6 @@ function EintragInhalt({
         darfOriginal={darfOriginal}
         grossansicht={false}
       />
-    </div>
+    </Stapel>
   );
 }

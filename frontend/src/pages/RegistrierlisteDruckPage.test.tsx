@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { RegistrierListe } from '../api/types';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 import RegistrierlisteDruckPage from './RegistrierlisteDruckPage';
 
 /**
@@ -92,6 +93,7 @@ function renderPage(
         element={<RegistrierlisteDruckPage />}
       />
       <Route path="/einsaetze/:id/betreuung/:stelleId" element={<div>Stelle</div>} />
+      <Route path="/einsaetze/:id/betreuung" element={<div>Betreuungsübersicht</div>} />
     </Routes>,
     { route },
   );
@@ -167,8 +169,36 @@ describe('RegistrierlisteDruckPage (LLH-1616)', () => {
     expect(draht.abrufe).toHaveLength(1);
   });
 
-  it('404: Stelle nicht gefunden', async () => {
-    renderPage(() => HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 }));
-    await screen.findByText('Stelle nicht gefunden');
+  it('404: „gibt es nicht (mehr)“ statt der Druckansicht, Rückweg zur Betreuung', async () => {
+    renderPage(() => HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }));
+    await erwarteNichtGefunden({
+      titel: 'Diese Betreuungsstelle gibt es nicht (mehr)',
+      knopf: 'Zur Betreuung',
+      liste: 'Betreuungsübersicht',
+    });
+  });
+
+  it('ungültige Kennung in der Adresse: dasselbe Muster, keine stille Weiterleitung', async () => {
+    const draht = renderPage(undefined, '/einsaetze/5/betreuung/acht/registrierliste/druck');
+    await erwarteNichtGefunden({
+      titel: 'Diese Betreuungsstelle gibt es nicht (mehr)',
+      knopf: 'Zur Betreuung',
+    });
+    expect(screen.queryByText('Betreuungsübersicht')).toBeNull();
+    expect(draht.abrufe).toHaveLength(0);
+  });
+
+  it('anderer Fehler (500): Fehlerbanner mit „Erneut abrufen“', async () => {
+    let fehler = true;
+    renderPage(() =>
+      fehler ? HttpResponse.json({ error: 'kaputt' }, { status: 500 }) : HttpResponse.json(LISTE),
+    );
+    expect(
+      await screen.findByText('Die Registrierliste konnte nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('kaputt');
+    fehler = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+    await fertig();
   });
 });

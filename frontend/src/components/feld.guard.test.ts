@@ -5,13 +5,14 @@ import { ohneKommentare } from '../test/ohneKommentare';
 import { quellwurzel } from '../test/ratsche';
 
 /**
- * Feld-Wächter des Verwaltungsteils (Spec `feldbreiten`, „Keine feste Feldbreite im
- * Verwaltungsteil", Change `hzru8iq7-text-stapel-meta-feld`, design.md D7). Löst den
+ * Feld-Wächter (Spec `feldbreiten`, „Keine feste Feldbreite im Verwaltungsteil", Change
+ * `hzru8iq7-text-stapel-meta-feld`, design.md D7; auf die Führungsmodule ausgeweitet mit
+ * LLH-1969, auf Personen, Betreuung, Verpflegung, Kräfte und Ablösung mit LLH-1970). Löst den
  * Feldbreiten-Guard aus LFH-329 · B1 ab.
  *
  * Ein Eingabefeld bekommt seine Breite nur über `Feld` (`components/instrument/Feld.tsx`) mit einer
  * benannten Obergrenze; dann ist es fluid und ragt am schmalen Schirm nicht über den Rand. Der
- * Wächter prüft in den vier Bereichen:
+ * Wächter prüft in den Bereichen aus {@link BEREICHE}:
  *
  * 1. kein `<Form.Item` — Formularfelder sind `Feld`;
  * 2. keine Breite (`width`, `maxWidth`, `minWidth`, als Zahl, String oder Konstante) im `style`
@@ -24,14 +25,79 @@ import { quellwurzel } from '../test/ratsche';
  * ── BEKANNTE GRENZEN ──
  * 1. Regel 2 sieht das Eingabefeld nur, solange zwischen Elementname und `style=` kein `>` steht
  *    (Pfeilfunktion in einer Prop davor).
- * 2. Der Scan hört an den vier Bereichen auf; außerhalb gilt die Regel ebenso, wird aber erst mit
- *    der Umstellung des Bereichs erzwungen.
+ * 2. Der Scan hört an den Bereichen aus {@link BEREICHE} auf; außerhalb gilt die Regel ebenso,
+ *    wird aber erst mit der Umstellung des Bereichs erzwungen (LLH-1968 bis LLH-1971).
+ * 3. `AUSGESPART` nimmt einzelne Dateien eines Bereichs aus, bis ein Baustein nachgezogen ist.
  */
 
 const SRC = quellwurzel('Feld-Wächter');
 
-/** Die Bereiche des Verwaltungsteils: Stammdaten, Karten, globale Einstellungen, Benutzer. */
-const BEREICHE = ['stammdaten', 'karten', 'pages/einstellungen', 'pages/BenutzerPage.tsx'];
+/**
+ * Die geprüften Bereiche: der Verwaltungsteil (Stammdaten, Karten, globale Einstellungen,
+ * Benutzer; LLH-1810), die Einsatzseiten unter `pages/` samt Fachbereichen und Restbereichen
+ * (LLH-1971), die Führungsmodule ETB, Aufträge, Meldungen, Nachforderungen, Lageberichte,
+ * Erinnerungen und Chat (LLH-1969) und die Einsatzmodule Personen, Betreuung, Verpflegung,
+ * Kräfte und Ablösung (LLH-1970).
+ */
+const BEREICHE = [
+  'stammdaten',
+  'karten',
+  'pages',
+  'geraet',
+  'wetter',
+  'fernmeldewesen',
+  'planung',
+  'aufbewahrung',
+  'instanz',
+  'fuehrung',
+  'admin',
+  'auth',
+  'druck',
+  'entwurf',
+  'extern',
+  'hilfe',
+  'infotelefon',
+  'kommunikation',
+  'lagebesprechung',
+  'live',
+  'marke',
+  'neuigkeiten',
+  'offline',
+  'programmpunkt',
+  'routes',
+  'zeichen',
+  'zugangsprotokoll',
+  'etb',
+  'auftraege',
+  'meldungen',
+  'nachforderungen',
+  'lageberichte',
+  'erinnerung',
+  'chat',
+  'personen',
+  'betreuung',
+  'verpflegung',
+  'kraefte',
+  'abloesung',
+];
+
+/**
+ * Dateien in einem Bereich, die der Wächter noch nicht prüft — je mit der Aufgabe, nach der sie
+ * dazukommen. Neue Einträge gibt es nicht; eine erledigte Aufgabe streicht ihre.
+ */
+const AUSGESPART: Readonly<Record<string, string>> = {
+  // `Feld` kennt noch keinen Weg ohne Feldabstand und mit Flex-Anteil (LLH-1999).
+  'infotelefon/AnrufErfassung.tsx': 'LLH-1999',
+  'entwurf/DokumentEntwurf.tsx': 'LLH-1999',
+  'lagebesprechung/LagebesprechungModal.tsx': 'LLH-1999',
+  'pages/bereitstellungsraum/EintreffenDialog.tsx': 'LLH-1999',
+  'pages/einsatzdaten/EinsatzAbschlussDialog.tsx': 'LLH-1999',
+  // `DatenfeldEingabe` klont sein Kind mit der Label-`id` und kennt noch keine Breite (LLH-2000).
+  'pages/uhs/UhsAngaben.tsx': 'LLH-2000',
+  'pages/BetreuungsstelleDetailPage.tsx': 'LLH-2000',
+  'pages/SchaedenDetailPage.tsx': 'LLH-2000',
+  'pages/TiereDetailPage.tsx': 'LLH-2000',
+};
 
 /** Was eine feste Zahlbreite behalten darf, wie oft — und warum. Keine davon ist ein Eingabefeld. */
 const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = {
@@ -42,6 +108,79 @@ const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = 
   'pages/BenutzerPage.tsx': {
     anzahl: 2,
     grund: 'Spaltenbreiten der Benutzertabelle neben ihrer Fließspalte',
+  },
+  'pages/DokumentePage.tsx': { anzahl: 5, grund: 'Spaltenbreiten der Dokumententabelle' },
+  'pages/EinheitenPage.tsx': { anzahl: 5, grund: 'Spaltenbreiten der Einheitentabelle' },
+  'pages/EinsaetzePage.tsx': { anzahl: 1, grund: 'Statuspunkt der Einsatzkachel' },
+  'pages/FahrzeugePage.tsx': { anzahl: 9, grund: 'Spaltenbreiten der Fahrzeugtabelle' },
+  // `fernmeldewesen/AGENTS.md`: die Summe der festen Spaltenbreiten bleibt 630.
+  'pages/FunkplanPage.tsx': { anzahl: 9, grund: 'Spaltenbreiten von Funkplan und Sprechgruppen' },
+  'pages/KommunikationsplanPage.tsx': {
+    anzahl: 3,
+    grund: 'Spaltenbreiten des Kommunikationsplans',
+  },
+  'pages/KraefteuebersichtPage.tsx': { anzahl: 8, grund: 'Spaltenbreiten des Meldebilds' },
+  'pages/MaterialPage.tsx': { anzahl: 6, grund: 'Spaltenbreiten der Materialtabelle' },
+  'pages/PersonalPage.tsx': { anzahl: 10, grund: 'Spaltenbreiten der Personaltabelle' },
+  'pages/TierePage.tsx': { anzahl: 3, grund: 'Spaltenbreiten der Tiertabelle' },
+  'pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx': {
+    anzahl: 1,
+    grund: 'Seitenleiste neben dem Bereitstellungsraum ab md',
+  },
+  'pages/gefahren/ErlaeuterungsMarke.tsx': { anzahl: 1, grund: 'CSS-Dreieck der Marke (Breite 0)' },
+  'pages/gefahren/GefahrenPage.tsx': { anzahl: 1, grund: 'Spalte „Gefahrengebiete“ ab lg' },
+  'pages/lage-dashboard/LagePaneele.tsx': { anzahl: 1, grund: 'Farbfeld der Verlaufslegende' },
+  'pages/lagekarte/KartenUeberlagerung.tsx': {
+    anzahl: 1,
+    grund: 'nur vorgelesener Text (Breite 1)',
+  },
+  'pages/lagekarte/Klassenlegende.tsx': { anzahl: 1, grund: 'gezeichneter Legendenpunkt' },
+  'geraet/GeraetBetroffenePage.tsx': { anzahl: 1, grund: 'Spaltenbreite „Verbleib“' },
+  'geraet/GeraetPatientenPage.tsx': { anzahl: 1, grund: 'Spaltenbreite „Platz“' },
+  'fernmeldewesen/SkizzenAufnahme.tsx': {
+    anzahl: 1,
+    grund: 'feste Fläche, von der die Skizze als Bild aufgenommen wird',
+  },
+  'aufbewahrung/ArchivAktePage.tsx': { anzahl: 19, grund: 'Spaltenbreiten der Registertabellen' },
+  'aufbewahrung/AufbewahrungUebersicht.tsx': { anzahl: 9, grund: 'Spaltenbreiten der Übersicht' },
+  'aufbewahrung/Loeschersuchen.tsx': { anzahl: 8, grund: 'Spaltenbreiten der Löschersuchen' },
+  'aufbewahrung/PersonensucheDialog.tsx': { anzahl: 6, grund: 'Spaltenbreiten der Trefferliste' },
+  'admin/AdminLayout.tsx': { anzahl: 1, grund: 'Flex-Basis 0 des Inhalts neben dem Sider' },
+  'zugangsprotokoll/ZugangsprotokollPage.tsx': {
+    anzahl: 9,
+    grund: 'Spaltenbreiten des Zugangsprotokolls',
+  },
+  'chat/KanalListe.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbSpaltenzeile.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbEintragVorschau.tsx': { anzahl: 1, grund: '2-px-Typkante der Vorschau' },
+  'etb/EtbFeldzeile.tsx': {
+    anzahl: 3,
+    grund: '6-px-Typpunkt in Menü und Typ-Knopf, 32-px-Spalte des Feldworts am Handschirm',
+  },
+  // Einsatzmodule (LLH-1970).
+  'personen/personenSpalten.tsx': {
+    anzahl: 9,
+    grund: 'Spaltenbreiten der Betroffenenliste und der nur vorgelesene Spaltenkopf (1 px)',
+  },
+  'personen/BetroffeneZeile.tsx': { anzahl: 1, grund: 'nur vorgelesener Text (1 px)' },
+  'personen/BetroffenenSeitenleiste.tsx': {
+    anzahl: 1,
+    grund: 'Kürzelspalte der Sichtungsliste',
+  },
+  'personen/Sichtungszeile.tsx': { anzahl: 1, grund: 'Farbfeld der Sichtungskategorie' },
+  'personen/ZeilenSichtung.tsx': {
+    anzahl: 1,
+    grund: 'Popover-Breite aus drei Sichtungsflächen je Reihe',
+  },
+  'kraefte/DauerMitEinstufung.tsx': { anzahl: 1, grund: 'nur vorgelesener Text (1 px)' },
+  'kraefte/EinheitZeichen.tsx': { anzahl: 1, grund: 'Kästchen des taktischen Zeichens' },
+  'abloesung/schichtplan/SchichtplanRaster.tsx': {
+    anzahl: 1,
+    grund: 'senkrechte Jetzt-Linie im Raster',
+  },
+  'abloesung/schichtplan/planEditor.cases.tsx': {
+    anzahl: 3,
+    grund: 'Rechtecke als Testfälle des Planeditors',
   },
 };
 
@@ -106,7 +245,11 @@ function sammleDateien(bereich: string): Quelle[] {
       const kind = join(verzeichnis, eintrag.name);
       const kindRel = `${rel}/${eintrag.name}`;
       if (eintrag.isDirectory()) rein(kind, kindRel);
-      else if (eintrag.name.endsWith('.tsx') && !eintrag.name.includes('.test.')) {
+      else if (
+        eintrag.name.endsWith('.tsx') &&
+        !eintrag.name.includes('.test.') &&
+        !(kindRel in AUSGESPART)
+      ) {
         treffer.push({ pfad: kindRel, text: lies(kind) });
       }
     }
@@ -117,15 +260,29 @@ function sammleDateien(bereich: string): Quelle[] {
 
 const QUELLEN = BEREICHE.flatMap(sammleDateien);
 
-describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => {
+describe('Feld-Wächter: Felder im Verwaltungsteil und den umgestellten Einsatzmodulen (Spec `feldbreiten`)', () => {
   it('kein Form.Item, keine Breite am Eingabefeld, keine feste Zahlbreite außer zugelassen', () => {
     const meldungen = feldBefunde(QUELLEN, ZUGELASSEN);
     expect(meldungen, meldungen.join('\n')).toEqual([]);
   });
 
   it('sieht die Bereiche wirklich — sonst ist der Wächter eine Attrappe', () => {
-    expect(QUELLEN.length).toBeGreaterThan(50);
+    expect(QUELLEN.length).toBeGreaterThan(300);
     expect(QUELLEN.some((q) => q.pfad === 'stammdaten/FahrzeugDetailPage.tsx')).toBe(true);
+    expect(QUELLEN.some((q) => q.pfad === 'pages/lagekarte/Inspector.tsx')).toBe(true);
+    expect(QUELLEN.some((q) => q.pfad === 'geraet/GeraetMeldenPage.tsx')).toBe(true);
+    expect(QUELLEN.some((q) => q.pfad === 'personen/AufnahmeFelder.tsx')).toBe(true);
+  });
+
+  it('spart nur vorhandene Dateien aus, und nur solange sie noch einen Befund tragen', () => {
+    for (const pfad of Object.keys(AUSGESPART)) {
+      expect(existsSync(join(SRC, pfad)), `${pfad} fehlt — aus AUSGESPART streichen`).toBe(true);
+      const text = ohneKommentare(readFileSync(join(SRC, pfad), 'utf8')).join('\n');
+      expect(
+        feldBefunde([{ pfad, text }], ZUGELASSEN).length,
+        `${pfad} ist sauber — aus AUSGESPART streichen`,
+      ).toBeGreaterThan(0);
+    }
   });
 
   describe('Regeln an Texten', () => {
@@ -152,7 +309,7 @@ describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => 
     it('meldet eine Stil-Konstante am Eingabefeld, aber keinen Stil-Aufruf', () => {
       const text = [
         '<Select<number> options={o} style={SELECT_STYLE} />',
-        '<Input style={monoStil(14)} />',
+        "<Input style={monoStil('monoGross')} />",
       ].join('\n');
       const meldungen = feldBefunde(q(text), {});
       expect(meldungen).toEqual([

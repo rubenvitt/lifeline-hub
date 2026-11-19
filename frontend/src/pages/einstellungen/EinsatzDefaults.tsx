@@ -1,4 +1,4 @@
-import { App, Button, Form, Input, InputNumber, Modal, Switch, Typography, theme } from 'antd';
+import { App, Form, Input, InputNumber, Modal, Switch, Typography, theme } from 'antd';
 import { useState } from 'react';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
@@ -15,6 +15,11 @@ import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis
 import { useAuth } from '../../auth/AuthContext';
 import { einsatzKeys, globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import SpeicherKnopf from '../../components/SpeicherKnopf';
+import {
+  AenderungsstandProvider,
+  useAenderungsstandMerken,
+} from '../../components/aenderungsstand';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import {
@@ -72,6 +77,7 @@ export default function EinsatzDefaults() {
   const [form] = Form.useForm<FormWerteEinsatz>();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
   const istAdmin = benutzer?.system_rolle === 'admin';
   // Org-Einstellungen vom Hub (LLH-1493): hier nur lesbar, der Hinweis nennt den Grund.
   const herkunft = useStammdatenHerkunft();
@@ -157,7 +163,14 @@ export default function EinsatzDefaults() {
 
   function absenden(daten: OrgEinstellungenUpdate) {
     const fassung = schutz.fassung();
-    speichernMutation.mutate(daten, { onSuccess: () => schutz.gespeichert(fassung) });
+    // Stand beim Absenden; die Rückfrage zur Skelett-Dauer sperrt die Eingabe bis dahin.
+    const gesendet = form.getFieldsValue(true);
+    speichernMutation.mutate(daten, {
+      onSuccess: () => {
+        schutz.gespeichert(fassung);
+        stand.merke(gesendet);
+      },
+    });
   }
 
   function speichern(werte: FormWerteEinsatz) {
@@ -193,85 +206,93 @@ export default function EinsatzDefaults() {
         onValuesChange={schutz.geaendert}
         disabled={!darf}
       >
-        <Formularpaneel titel="Aufbewahrung">
-          <Feld breite="schmal" label="Aufbewahrungs-Dauer (Tage)" name="retention_dauer_tage">
-            <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine Frist')} />
-          </Feld>
-          <Feld
-            breite="schmal"
-            label="Skelett endgültig löschen nach (Tage ab Abschluss)"
-            name="skelett_dauer_tage"
-          >
-            <InputNumber min={1} max={36500} placeholder={mitVorgabe('unbegrenzt')} />
-          </Feld>
-          <Feld breite="schmal" label="Nachbereitung (Tage ab Abschluss)" name="nachbereitung_tage">
-            <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine')} />
-          </Feld>
-        </Formularpaneel>
+        <AenderungsstandProvider
+          ausgangswerte={initialEinsatz(einstellungen)}
+          merkeRef={stand.merkeRef}
+        >
+          <Formularpaneel titel="Aufbewahrung">
+            <Feld breite="schmal" label="Aufbewahrungs-Dauer (Tage)" name="retention_dauer_tage">
+              <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine Frist')} />
+            </Feld>
+            <Feld
+              breite="schmal"
+              label="Skelett endgültig löschen nach (Tage ab Abschluss)"
+              name="skelett_dauer_tage"
+            >
+              <InputNumber min={1} max={36500} placeholder={mitVorgabe('unbegrenzt')} />
+            </Feld>
+            <Feld
+              breite="schmal"
+              label="Nachbereitung (Tage ab Abschluss)"
+              name="nachbereitung_tage"
+            >
+              <InputNumber min={1} max={3650} placeholder={mitVorgabe('keine')} />
+            </Feld>
+          </Formularpaneel>
 
-        <KategorieVorgabenPaneel />
+          <KategorieVorgabenPaneel />
 
-        <Formularpaneel titel="Verhalten & Automatik">
-          <Feld
-            breite="schmal"
-            label="Präfix Einsatznummer"
-            name="einsatz_nummer_praefix"
-            extra={`Neue Einsätze: ${einsatznummerVorschau(
-              // Vor dem ersten Durchlauf des Formulars liefert `useWatch` noch nichts.
-              einsatzPraefix === undefined ? einstellungen.einsatz_nummer_praefix : einsatzPraefix,
-              new Date().getFullYear(),
-            )}`}
-          >
-            <Input maxLength={8} placeholder={mitVorgabe(EINSATZ_PRAEFIX_VORGABE)} />
-          </Feld>
-          <Feld breite="schmal" label="Präfix ETB" name="etb_nummer_praefix">
-            <Input maxLength={8} placeholder="z. B. EB-" />
-          </Feld>
-          <Feld breite="schmal" label="Präfix Meldungen" name="meldung_nummer_praefix">
-            <Input maxLength={8} placeholder="z. B. M-" />
-          </Feld>
-          <Feld breite="schmal" label="Präfix Aufträge" name="auftrag_nummer_praefix">
-            <Input maxLength={8} placeholder="z. B. A-" />
-          </Feld>
+          <Formularpaneel titel="Verhalten & Automatik">
+            <Feld
+              breite="schmal"
+              label="Präfix Einsatznummer"
+              name="einsatz_nummer_praefix"
+              extra={`Neue Einsätze: ${einsatznummerVorschau(
+                // Vor dem ersten Durchlauf des Formulars liefert `useWatch` noch nichts.
+                einsatzPraefix === undefined
+                  ? einstellungen.einsatz_nummer_praefix
+                  : einsatzPraefix,
+                new Date().getFullYear(),
+              )}`}
+            >
+              <Input maxLength={8} placeholder={mitVorgabe(EINSATZ_PRAEFIX_VORGABE)} />
+            </Feld>
+            <Feld breite="schmal" label="Präfix ETB" name="etb_nummer_praefix">
+              <Input maxLength={8} placeholder="z. B. EB-" />
+            </Feld>
+            <Feld breite="schmal" label="Präfix Meldungen" name="meldung_nummer_praefix">
+              <Input maxLength={8} placeholder="z. B. M-" />
+            </Feld>
+            <Feld breite="schmal" label="Präfix Aufträge" name="auftrag_nummer_praefix">
+              <Input maxLength={8} placeholder="z. B. A-" />
+            </Feld>
 
-          <Feld
-            breite="schmal"
-            label="Vorgabe-Bestätigungsfrist Meldungen (Minuten)"
-            name="meldung_bestaetigung_frist_min"
-          >
-            <InputNumber min={1} max={10080} placeholder={mitVorgabe('5')} />
-          </Feld>
-          <Feld
-            breite="schmal"
-            label="Vorgabe-Quittierfrist Aufträge (Minuten)"
-            name="auftrag_quittierung_frist_min"
-          >
-            <InputNumber min={1} max={10080} placeholder={mitVorgabe('keine Frist')} />
-          </Feld>
-          <Feld
-            breite="schmal"
-            label="Rückmeldefrist Einheiten (Minuten)"
-            name="rueckmeldung_frist_min"
-          >
-            <InputNumber min={1} max={10080} placeholder={mitVorgabe('60')} />
-          </Feld>
+            <Feld
+              breite="schmal"
+              label="Vorgabe-Bestätigungsfrist Meldungen (Minuten)"
+              name="meldung_bestaetigung_frist_min"
+            >
+              <InputNumber min={1} max={10080} placeholder={mitVorgabe('5')} />
+            </Feld>
+            <Feld
+              breite="schmal"
+              label="Vorgabe-Quittierfrist Aufträge (Minuten)"
+              name="auftrag_quittierung_frist_min"
+            >
+              <InputNumber min={1} max={10080} placeholder={mitVorgabe('keine Frist')} />
+            </Feld>
+            <Feld
+              breite="schmal"
+              label="Rückmeldefrist Einheiten (Minuten)"
+              name="rueckmeldung_frist_min"
+            >
+              <InputNumber min={1} max={10080} placeholder={mitVorgabe('60')} />
+            </Feld>
 
-          <Feld label="Automatische ETB-Einträge" name="auto_etb_eintraege" valuePropName="checked">
-            <Switch />
-          </Feld>
-        </Formularpaneel>
+            <Feld
+              label="Automatische ETB-Einträge"
+              name="auto_etb_eintraege"
+              valuePropName="checked"
+            >
+              <Switch />
+            </Feld>
+          </Formularpaneel>
 
-        {/* Ohne Recht steht der Knopf gesperrt da, der Grund als `RechteHinweis` im Kopf. */}
-        <div {...speicherLeiste}>
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={speichernMutation.isPending}
-            disabled={!darf}
-          >
-            Speichern
-          </Button>
-        </div>
+          {/* Ohne Recht steht der Knopf gesperrt da, der Grund als `RechteHinweis` im Kopf. */}
+          <div {...speicherLeiste}>
+            <SpeicherKnopf loading={speichernMutation.isPending} disabled={!darf} />
+          </div>
+        </AenderungsstandProvider>
       </Form>
 
       {/* ── Module für alle Einsätze (Sofort-Speichern, kein Form-Feld) ── */}

@@ -155,6 +155,14 @@ export function sprungZu(
 
 export interface BefehlKontext {
   einsatzId: number | null;
+  /**
+   * Öffnet die Hilfe-Seitenleiste (LLH-1824, `hilfe/HilfeSeitenleisteProvider.tsx`) auf einem
+   * Reiter. Fehlt es (Hilfeseite, Gerät, ohne Anmeldung), fehlen „Hilfe zu dieser Seite“ und
+   * „Tastenkürzel“. Der Reiter steht als Literal hier, damit `typen.ts` nichts aus `hilfe/` lädt.
+   */
+  oeffneHilfe?: (reiter?: 'seite' | 'kuerzel') => void;
+  /** Grober Zeiger (`useViewport().istBeruehrung`): ohne Tastatur keine Kürzelübersicht. */
+  istBeruehrung?: boolean;
   benutzer: BenutzerAnzeige | null;
   einsaetze: EinsatzAnzeige[];
   /**

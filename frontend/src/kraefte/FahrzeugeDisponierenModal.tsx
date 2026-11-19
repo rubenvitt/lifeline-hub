@@ -1,4 +1,5 @@
 import { App, Form } from 'antd';
+import { Feld } from '../components/instrument';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { SAMMEL_MAX } from '../api/eingabegrenzen';
@@ -137,7 +138,7 @@ export default function FahrzeugeDisponierenModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Fahrzeuge"
         name="fahrzeug_ids"
         rules={[
@@ -173,16 +174,16 @@ export default function FahrzeugeDisponierenModal({
           tagRender={gruendeTagRender(gruende, name)}
           placeholder="Funkrufname, Typ, Kennzeichen oder Träger"
         />
-      </Form.Item>
+      </Feld>
       {einheitenFrei && (
-        <Form.Item label="In Einheit" name="einheit_id">
+        <Feld label="In Einheit" name="einheit_id">
           <Select<number>
             allowClear
             placeholder="optional"
             options={einheitOptionen}
             notFoundContent="Keine Einheit im Einsatz"
           />
-        </Form.Item>
+        </Feld>
       )}
     </ErfassungsModal>
   );

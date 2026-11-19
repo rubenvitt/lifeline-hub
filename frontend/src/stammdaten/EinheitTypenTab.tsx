@@ -45,7 +45,7 @@ const spalten: TableColumnsType<EinheitTyp> = [
     // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
     render: (_, t) => (
       <>
-        <span style={monoStil(12)}>
+        <span style={monoStil('monoKlein')}>
           <StaerkeAnzeige wert={t.soll ?? null} />
         </span>
         {t.quali_soll?.length ? ` · ${qualiSollText(t.quali_soll)}` : null}
@@ -56,7 +56,7 @@ const spalten: TableColumnsType<EinheitTyp> = [
     title: 'Sortierung',
     dataIndex: 'sortier',
     key: 'sortier',
-    render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    render: (n: number) => <span style={monoStil('monoKlein')}>{n}</span>,
     // Numerisch vergleichen, nicht über die Zeichenkette: nur so steht 5 vor 40.
     sorter: (a, b) => a.sortier - b.sortier,
   },

@@ -14,7 +14,7 @@ import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { STAERKE_AUSGESCHRIEBEN, staerkeText } from '../../anzeige/staerke';
-import { monoStil, schriftStil, Status, useRollen } from '../../components/instrument';
+import { monoStil, Stapel, Status, Textstufe, useRollen } from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 import HaengenderBaum, {
@@ -143,7 +143,7 @@ function OrganigrammKopf({
         {einsatzleiter.art === 'erfasst' ? (
           <>
             <div style={{ overflowWrap: 'anywhere' }}>{einsatzleiter.name}</div>
-            <div style={{ ...monoStil(12, 500), color: rollen.gedaempft }}>
+            <div style={{ ...monoStil('monoKlein', 500), color: rollen.gedaempft }}>
               {einsatzleiter.nichtMehrDisponiert && <span>nicht mehr disponiert · </span>}
               <span>{`seit ${zeitKurz(einsatzleiter.seit, konventionen)}`}</span>
             </div>
@@ -231,7 +231,7 @@ const OHNE_LEITUNG_PX = 22;
  * LLH-1742, Spec „Organigramm hält seine Knoten“).
  */
 function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: string | null }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   return (
     <div
       data-lfh="org-ohne-leitung"
@@ -250,7 +250,9 @@ function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: str
             <Status groesse="klein" key={teil} ton="achtung" wort={teil} title={teil} />
           ))
         : ruhe && (
-            <span style={{ fontSize: token.fontSizeSM, color: rollen.gedaempft }}>{ruhe}</span>
+            <Textstufe stufe="textKlein" ton="gedaempft">
+              {ruhe}
+            </Textstufe>
           )}
     </div>
   );
@@ -264,16 +266,15 @@ function Stabsstelle({
   zeilen: readonly SachgebietZeile[];
   stil: CSSProperties;
 }) {
-  const { token } = useRollen();
   return (
     <div role="group" aria-label="Stab" data-lfh="org-stab" style={stil}>
       <div style={{ fontWeight: 600 }}>Stab</div>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {zeilen.map((z) => (
-          <li key={z.kuerzel} style={{ display: 'flex', gap: token.marginXS }}>
-            <span style={monoStil(12, 500)}>{z.kuerzel}</span>
+          <Stapel als="li" key={z.kuerzel} richtung="zeile" abstand="xs">
+            <span style={monoStil('monoKlein', 500)}>{z.kuerzel}</span>
             <span style={{ overflowWrap: 'anywhere' }}>{z.namen}</span>
-          </li>
+          </Stapel>
         ))}
       </ul>
     </div>
@@ -294,7 +295,7 @@ function KnotenInhalt({
     knoten.art === 'abschnitt'
       ? einsatzabschnittePfad(einsatzId, { abschnitt: knoten.id })
       : einheitDetailPfad(einsatzId, knoten.id);
-  const meta: CSSProperties = { ...monoStil(12), overflowWrap: 'anywhere' };
+  const meta: CSSProperties = { ...monoStil('monoKlein'), overflowWrap: 'anywhere' };
   // Dieselbe Prüfung wie in `EinsatzZeichen` (rendert dort `null`): hier entscheidet sie, ob der
   // Platz überhaupt entsteht.
   const darstellbar = fachobjektZeichen(knoten.tz) != null;
@@ -545,13 +546,11 @@ export default function Organigramm({
       <div
         data-lfh="org-legende"
         title={STAERKE_AUSGESCHRIEBEN}
-        style={{
-          ...schriftStil('meta'),
-          color: token.colorTextSecondary,
-          marginBlockEnd: token.marginXS,
-        }}
+        style={{ marginBlockEnd: token.marginXS }}
       >
-        Stärke <StaerkeSchreibweise />
+        <Textstufe stufe="meta" ton="gedaempft">
+          Stärke <StaerkeSchreibweise />
+        </Textstufe>
       </div>
       {uebernehmen.error != null && (
         <div className="organigramm-no-print" style={{ marginBlockEnd: token.margin }}>

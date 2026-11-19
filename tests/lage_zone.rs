@@ -17,7 +17,7 @@ use std::time::Duration;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, karten_ansicht_anlegen, login_cookie,
-    recv_until_tag, setup_mit_live, standard_ansicht_id, system_etb_inhalte,
+    recv_until_tag, setup_mit_live, standard_ansicht_id, system_etb_inhalte, EtbLive,
 };
 
 const POLY: &str =
@@ -2029,4 +2029,37 @@ async fn kreis_gefahrengebiet_hat_gruppe_und_matrix() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{m:?}");
+}
+
+/// LLH-1976: Einrichten und Auflösen einer Zone gehen als Ereignis `etb` hinaus.
+#[tokio::test]
+async fn zone_etb_eintraege_gehen_live_hinaus() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+    let body =
+        json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"label":"Nord"})
+            .to_string();
+    let (s, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    etb.pruefe(&app, &admin, einsatz, "einrichten").await;
+    let zid = z["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s}");
+    etb.pruefe(&app, &admin, einsatz, "auflösen").await;
 }

@@ -1,8 +1,9 @@
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Breadcrumb } from 'antd';
 import { ladeBetreuung } from '../api/betreuung';
 import { einsatzKeys } from '../api/queryKeys';
+import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import RegistrierlisteDruckSeite from '../betreuung/registrierung/RegistrierlisteDruckSeite';
 import { modulName } from '../einsatz/modulRegistry';
 import { betreuungPfad, betreuungsstellePfad, parseRouteId } from '../routing/deeplinks';
@@ -22,7 +23,8 @@ export default function RegistrierlisteDruckPage() {
     queryFn: () => ladeBetreuung(einsatzId),
   });
 
-  if (stelleId == null) return <Navigate to={betreuungPfad(einsatzId)} replace />;
+  // Unlesbare Kennung: das Muster „gibt es nicht (mehr)“, keine stille Weiterleitung (LLH-1960).
+  if (stelleId == null) return <StelleNichtGefunden einsatzId={einsatzId} />;
   const stelle = betreuungQuery.data?.stellen.find((s) => s.id === stelleId);
   const zurueck = betreuungsstellePfad(einsatzId, stelleId);
 
@@ -32,6 +34,7 @@ export default function RegistrierlisteDruckPage() {
       stelleId={stelleId}
       stelleBezeichnung={stelle?.bezeichnung}
       zurueck={{ pfad: zurueck, label: 'Zurück zur Stelle' }}
+      liste={{ label: 'Zur Betreuung', pfad: betreuungPfad(einsatzId) }}
       breadcrumb={(einsatz) => (
         <Breadcrumb
           items={[

@@ -26,6 +26,12 @@ test.describe(KAPITEL, () => {
     // Seite leer.
     await page.setViewportSize({ width: KONTEXTE.fuekw.width, height: 300 });
     await page.goto('/einsaetze');
+    // Die Willkommenskarte (LLH-1824) steht beim ersten Besuch über dem Raster; das Bild zeigt die
+    // Liste. „Verstanden“ schließt sie für das Konto.
+    const willkommen = page.getByRole('alert').filter({ hasText: 'Willkommen bei Lifeline Hub' });
+    await expect(willkommen).toBeVisible();
+    await willkommen.getByRole('button', { name: 'Verstanden' }).click();
+    await expect(willkommen).toBeHidden();
     const kachel = page.locator('[data-lfh="einsatzkachel"]', { hasText: demo.bezeichnung });
     await expect(kachel).toBeVisible();
     await expect(kachel).toContainText('Deine Rolle: Einsatzleitung');

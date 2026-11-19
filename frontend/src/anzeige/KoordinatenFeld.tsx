@@ -1,8 +1,8 @@
-import { Form, type FormItemProps } from 'antd';
+import { Feld, type FeldProps } from '../components/instrument';
 import KoordinatenEingabe from './KoordinatenEingabe';
 import { koordinatenRegel } from './koordinatenWert';
 
-type Props = Omit<FormItemProps, 'children' | 'rules'> & {
+type Props = Omit<FeldProps, 'children' | 'rules' | 'breite'> & {
   /** Einsatz für die Ort-Zeile (Peilung), s. `KoordinatenEingabe`. */
   einsatzId?: number;
   /** `typ:id` der bearbeiteten Entität (Selbst-Ausschluss der Peilung). */
@@ -10,15 +10,16 @@ type Props = Omit<FormItemProps, 'children' | 'rules'> & {
 };
 
 /**
- * Koordinate als Formularfeld (LFH-517): `Form.Item` mit `koordinatenRegel`, damit eine
- * ungültige Eingabe das Absenden sperrt und leer erlaubt bleibt. Den Feldfehler zeigt das
- * `Form.Item`, die Eingabe schweigt dazu (`fehlerImFormular`). Formulare senden über
- * `alsLatLon`. Eine `KoordinatenEingabe` in einem `Form.Item` ohne diese Regel ist ein Fehler.
+ * Koordinate als Formularfeld (LFH-517): `Feld` mit `koordinatenRegel`, damit eine ungültige
+ * Eingabe das Absenden sperrt und leer erlaubt bleibt. Den Feldfehler zeigt das Formularfeld, die
+ * Eingabe schweigt dazu (`fehlerImFormular`). Formulare senden über `alsLatLon`. Eine
+ * `KoordinatenEingabe` in einem `Form.Item` ohne diese Regel ist ein Fehler. Die Breite ist die
+ * des Einbauorts (`breite="voll"`): ein gemeinsamer Baustein legt keine eigene Obergrenze fest.
  */
 export default function KoordinatenFeld({ einsatzId, exclude, ...item }: Props) {
   return (
-    <Form.Item {...item} rules={[koordinatenRegel]}>
+    <Feld {...item} breite="voll" rules={[koordinatenRegel]}>
       <KoordinatenEingabe einsatzId={einsatzId} exclude={exclude} fehlerImFormular />
-    </Form.Item>
+    </Feld>
   );
 }

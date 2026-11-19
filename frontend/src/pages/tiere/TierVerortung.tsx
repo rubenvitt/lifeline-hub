@@ -1,8 +1,8 @@
-import { Button, Space, Typography } from 'antd';
+import { Button, Typography } from 'antd';
 import { useNavigate } from 'react-router';
 import type { Tier } from '../../api/types';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
-import { Datenfeld } from '../../components/instrument';
+import { Datenfeld, Stapel } from '../../components/instrument';
 import { GesperrterSprung } from '../../components/Sprung';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { lagekartePfad } from '../../routing/deeplinks';
@@ -27,7 +27,7 @@ export default function TierVerortung({
   const verortet = tier.antreff_lat != null && tier.antreff_lon != null;
   return (
     <Datenfeld label="Verortung">
-      <Space wrap>
+      <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
         {verortet ? (
           <KoordinatenAnzeige
             lat={tier.antreff_lat!}
@@ -38,7 +38,7 @@ export default function TierVerortung({
           <Typography.Text type="secondary">nicht verortet</Typography.Text>
         )}
         {darfVerorten && <AufKarte einsatzId={einsatzId} tierId={tier.id} versetzen={verortet} />}
-      </Space>
+      </Stapel>
     </Datenfeld>
   );
 }

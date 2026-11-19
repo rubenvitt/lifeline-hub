@@ -1,4 +1,5 @@
 import { App, Form, Input } from 'antd';
+import { Feld } from '../../components/instrument';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ruftAbAusBr, type BrAbrufEingabe } from '../../api/einsatzBereitstellungsraum';
@@ -148,7 +149,7 @@ export default function AbrufDialog({
       onAbbrechen={onClose}
     >
       {isEinheit && (
-        <Form.Item label="Ziel-Abschnitt" name="abschnitt_id" extra={sperre.abschnitt || undefined}>
+        <Feld label="Ziel-Abschnitt" name="abschnitt_id" extra={sperre.abschnitt || undefined}>
           <Select<number>
             allowClear
             disabled={!canSetAbschnitt}
@@ -157,9 +158,9 @@ export default function AbrufDialog({
             }
             options={abschnitte.map((a) => ({ value: a.id, label: a.name }))}
           />
-        </Form.Item>
+        </Feld>
       )}
-      <Form.Item
+      <Feld
         label="Auftrag"
         name="auftrag_text"
         extra={sperre.auftrag || undefined}
@@ -171,7 +172,7 @@ export default function AbrufDialog({
           placeholder="kein Auftrag"
           count={zeichenGrenze(AUFTRAG_TEXT_MAX)}
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

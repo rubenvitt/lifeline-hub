@@ -1,7 +1,7 @@
 import { useDraggable } from '@dnd-kit/core';
 import { Input, Typography } from 'antd';
 import { useId, useMemo, useState } from 'react';
-import { useRollen } from '../../components/instrument';
+import { Textstufe, useRollen } from '../../components/instrument';
 import { IconMenue } from '../../icons';
 import { PERSONEN_GRUPPEN, type PersonOption } from './schichtplanZeilen';
 
@@ -70,12 +70,9 @@ export default function SchichtplanPersonen({ optionen, gesperrt }: SchichtplanP
               if (eigene.length === 0) return null;
               return (
                 <section key={g.gruppe} aria-label={g.titel}>
-                  <Typography.Text
-                    type="secondary"
-                    style={{ display: 'block', fontSize: 12, marginBottom: 2 }}
-                  >
+                  <Textstufe stufe="textKlein" ton="gedaempft" als="div">
                     {g.titel} ({eigene.length})
-                  </Typography.Text>
+                  </Textstufe>
                   {eigene.map((o) => (
                     <PersonZeile key={o.schluessel} option={o} />
                   ))}

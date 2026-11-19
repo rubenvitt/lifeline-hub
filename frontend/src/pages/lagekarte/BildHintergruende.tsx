@@ -1,6 +1,6 @@
-import { Button, Slider, Space, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Button, Slider, Switch, Tooltip, Typography, Upload } from 'antd';
 import { IconFadenkreuz, IconHochladen, IconMuelleimer, IconVollbildEcken } from '../../icons';
-import { useRollen } from '../../components/instrument';
+import { Stapel, Textstufe, useRollen } from '../../components/instrument';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
 import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
@@ -78,7 +78,7 @@ export default function BildHintergruende(
     schluessel: (b) => b.id,
   });
   return (
-    <Space orientation="vertical" style={{ width: '100%' }}>
+    <Stapel abstand="xs">
       {/* Der Slot ist ein Banner über der Liste, kein Ersatz: die Overlays liegen weiter auf der
           Karte, ohne Bedienelemente ließe sich keins mehr abschalten. Der Upload hängt an einer
           eigenen Route und bleibt bedienbar. */}
@@ -142,9 +142,9 @@ export default function BildHintergruende(
               </span>
             </div>
             {imPlatzieren && darfSchreiben && (
-              <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+              <Textstufe als="div" stufe="textKlein" ton="gedaempft">
                 wird eingepasst
-              </Typography.Text>
+              </Textstufe>
             )}
             <Slider
               min={0}
@@ -186,6 +186,6 @@ export default function BildHintergruende(
         </>
       )}
       {kontext.menue}
-    </Space>
+    </Stapel>
   );
 }

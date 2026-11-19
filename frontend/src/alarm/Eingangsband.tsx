@@ -1,6 +1,7 @@
 import { Button, theme } from 'antd';
 import { useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Stapel } from '../components/instrument';
 import { useBandAbstand } from '../components/untereLeiste';
 import { useViewport } from '../components/useViewport';
 import { IconKreuz } from '../icons';
@@ -66,7 +67,7 @@ export default function Eingangsband({
         lineHeight: token.lineHeight,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: token.paddingXS }}>
+      <Stapel richtung="zeile" ausrichten="start" abstand="xs">
         {/* Nur der Titel wird angesagt, nicht die Bedienelemente des Bands. */}
         <div role="status" style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>
           {titel}
@@ -78,7 +79,7 @@ export default function Eingangsband({
           onClick={beiSchliessen}
           style={{ flexShrink: 0 }}
         />
-      </div>
+      </Stapel>
       <div>{children}</div>
       <div
         style={{ display: 'flex', justifyContent: 'flex-end', marginBlockStart: token.paddingXS }}

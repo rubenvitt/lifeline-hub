@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { useState } from 'react';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { Feld } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { LAGEBESPRECHUNG_ENTSCHLUSS_MAX } from '../api/eingabegrenzen';
 import { lagebesprechungAbschliessen } from '../api/lagebesprechung';
@@ -95,7 +96,7 @@ export default function LagebesprechungModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Entschluss"
         name="entschluss"
         rules={[
@@ -108,8 +109,8 @@ export default function LagebesprechungModal({
           placeholder="z. B. Lage unverändert, Maßnahmen fortführen"
           count={zeichenGrenze(LAGEBESPRECHUNG_ENTSCHLUSS_MAX)}
         />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Nächste Lagebesprechung"
         name="naechste"
         // Clientseitiger Spiegel des 422; `dependencies`, damit ein verschobener Zeitpunkt den Termin
@@ -150,7 +151,7 @@ export default function LagebesprechungModal({
         }
       >
         <ZeitpunktEingabe art="frist" placeholder="kein Termin" style={{ width: '100%' }} />
-      </Form.Item>
+      </Feld>
       <Collapse
         ghost
         items={[

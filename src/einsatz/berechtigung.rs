@@ -3,7 +3,7 @@ use super::modul_override::EinsatzModulOverride;
 use super::{modul_override, Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 use crate::auth::Benutzer;
 use crate::einsatz::effektiv::{effektiv_sichtbar, effektive_modul_rolle};
-use crate::error::AppError;
+use crate::error::{AppError, LeseSperre};
 use crate::org::modul_einstellung::OrgModulVorgabe;
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
@@ -75,7 +75,46 @@ pub fn ist_fristverkuerzung(alt: Option<&str>, neu: Option<&str>) -> bool {
 ///   Tombstone wird ausschließlich vom Purge auf abgeschlossene Einsätze gesetzt,
 ///   die Sperre ist aber bewusst statusunabhängig defensiv).
 ///
+/// Liefert den Grund der Sperre oder `None`, wenn der Benutzer lesen darf (LLH-1819). Die
+/// Reihenfolge der Gründe ist Datenschutz: zuerst `KeinMitglied` (weder Rolle noch
+/// Fremdeinsatz-Lesezugriff), erst danach `NichtMehrLesbar` und `NachlaufAbgelaufen`. So erfährt
+/// ein Fremder nie, dass ein Einsatz gelöscht oder abgelaufen ist; für das Ja/Nein ist die
+/// Reihenfolge gleichgültig, es entspricht dem früheren `darf_lesen` für jede Eingabe.
+///
 /// `jetzt` wird injiziert (Testbarkeit).
+pub fn lese_sperre(
+    benutzer: &Benutzer,
+    einsatz_org_id: i64,
+    status: &str,
+    abgeschlossen_at: Option<&str>,
+    retention_bis: Option<&str>,
+    geloescht_at: Option<&str>,
+    rolle: Option<EinsatzRolle>,
+    jetzt: DateTime<Utc>,
+) -> Option<LeseSperre> {
+    let fremdleser = benutzer.darf_fremdeinsatz_lesen(einsatz_org_id);
+    if rolle.is_none() && !fremdleser {
+        return Some(LeseSperre::KeinMitglied);
+    }
+    // Soft-Delete-Tombstone und abgelaufene Aufbewahrung → harte Sperre, auch höhere Berechtigung.
+    if geloescht_at.is_some_and(|s| !s.is_empty())
+        || (status == STATUS_ABGESCHLOSSEN && retention_abgelaufen(retention_bis, jetzt))
+    {
+        return Some(LeseSperre::NichtMehrLesbar);
+    }
+    if fremdleser {
+        return None;
+    }
+    if status == STATUS_AKTIV || ist_in_nachlauffrist(abgeschlossen_at, jetzt) {
+        return None;
+    }
+    match rolle {
+        Some(r) if r.ist_einsatzleitung() => None,
+        _ => Some(LeseSperre::NachlaufAbgelaufen),
+    }
+}
+
+/// Darf der Benutzer den Einsatz lesen? Ja/Nein zu [`lese_sperre`].
 pub fn darf_lesen(
     benutzer: &Benutzer,
     einsatz_org_id: i64,
@@ -86,33 +125,27 @@ pub fn darf_lesen(
     rolle: Option<EinsatzRolle>,
     jetzt: DateTime<Utc>,
 ) -> bool {
-    // Soft-Delete-Tombstone → harte Sperre vor allen anderen Checks (auch höhere Berechtigung).
-    if geloescht_at.is_some_and(|s| !s.is_empty()) {
-        return false;
-    }
-    // Aufbewahrungsfrist abgelaufen → harte Sperre vor allen anderen Checks.
-    if status == STATUS_ABGESCHLOSSEN && retention_abgelaufen(retention_bis, jetzt) {
-        return false;
-    }
-    if benutzer.darf_fremdeinsatz_lesen(einsatz_org_id) {
-        return true;
-    }
-    let Some(rolle) = rolle else {
-        return false;
-    };
-    if status == STATUS_AKTIV || ist_in_nachlauffrist(abgeschlossen_at, jetzt) {
-        return true;
-    }
-    rolle.ist_einsatzleitung()
+    lese_sperre(
+        benutzer,
+        einsatz_org_id,
+        status,
+        abgeschlossen_at,
+        retention_bis,
+        geloescht_at,
+        rolle,
+        jetzt,
+    )
+    .is_none()
 }
 
-/// Handler-Gate: liefert `Forbidden`, wenn der Benutzer den Einsatz nicht lesen darf.
+/// Handler-Gate: liefert [`AppError::KeinLesezugriff`] mit dem Grund aus [`lese_sperre`], wenn
+/// der Benutzer den Einsatz nicht lesen darf.
 pub fn fordere_lesezugriff(
     benutzer: &Benutzer,
     einsatz: &Einsatz,
     rolle: Option<EinsatzRolle>,
 ) -> Result<(), AppError> {
-    if darf_lesen(
+    match lese_sperre(
         benutzer,
         einsatz.org_id,
         einsatz.status.as_str(),
@@ -122,9 +155,8 @@ pub fn fordere_lesezugriff(
         rolle,
         Utc::now(),
     ) {
-        Ok(())
-    } else {
-        Err(AppError::Forbidden)
+        None => Ok(()),
+        Some(grund) => Err(AppError::KeinLesezugriff(grund)),
     }
 }
 
@@ -136,7 +168,7 @@ pub fn fordere_lesezugriff(
 /// Erlaubt, wenn der Benutzer Mitglied ist (`rolle.is_some()`) ODER den Einsatz als
 /// höhere Berechtigung fremd lesen darf ([`Benutzer::darf_fremdeinsatz_lesen`]:
 /// System-Admin serverweit, org-weite Führungskraft nur in der EIGENEN Org). Sonst
-/// `Forbidden`.
+/// [`AppError::KeinLesezugriff`] mit [`LeseSperre::KeinMitglied`] (LLH-1819).
 ///
 /// BEWUSST schwächer als [`fordere_lesezugriff`]: dieser Floor erzwingt KEINE
 /// DSGVO-Zeit-Policy (Nachlauffrist/Aufbewahrungsfrist/Tombstone) — die bleibt
@@ -152,7 +184,7 @@ pub fn fordere_org_zugehoerigkeit(
     if rolle.is_some() || benutzer.darf_fremdeinsatz_lesen(einsatz_org_id) {
         Ok(())
     } else {
-        Err(AppError::Forbidden)
+        Err(AppError::KeinLesezugriff(LeseSperre::KeinMitglied))
     }
 }
 
@@ -903,6 +935,135 @@ mod tests {
         ));
     }
 
+    // --- Grund der Lesesperre (LLH-1819) ---
+
+    /// Kurzform für `lese_sperre` mit fester Org und festem Zeitpunkt.
+    fn sperre(
+        b: &Benutzer,
+        status: &str,
+        abgeschlossen_at: Option<&str>,
+        retention_bis: Option<&str>,
+        geloescht_at: Option<&str>,
+        rolle: Option<EinsatzRolle>,
+    ) -> Option<LeseSperre> {
+        lese_sperre(
+            b,
+            1,
+            status,
+            abgeschlossen_at,
+            retention_bis,
+            geloescht_at,
+            rolle,
+            jetzt(),
+        )
+    }
+
+    #[test]
+    fn lese_sperre_nicht_mitglied_ist_kein_mitglied() {
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert_eq!(
+            sperre(&b, STATUS_AKTIV, None, None, None, None),
+            Some(LeseSperre::KeinMitglied)
+        );
+    }
+
+    #[test]
+    fn lese_sperre_fremder_mit_tombstone_ist_kein_mitglied() {
+        // Ein Fremder erfährt nicht, dass der Einsatz gelöscht ist.
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert_eq!(
+            sperre(
+                &b,
+                STATUS_ABGESCHLOSSEN,
+                Some("2026-05-25 11:00:00"),
+                None,
+                Some("2026-05-24 12:00:00"),
+                None
+            ),
+            Some(LeseSperre::KeinMitglied)
+        );
+    }
+
+    #[test]
+    fn lese_sperre_fremder_mit_abgelaufener_aufbewahrung_ist_kein_mitglied() {
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert_eq!(
+            sperre(
+                &b,
+                STATUS_ABGESCHLOSSEN,
+                Some("2026-04-01 12:00:00"),
+                Some("2026-05-01 12:00:00"),
+                None,
+                None
+            ),
+            Some(LeseSperre::KeinMitglied)
+        );
+    }
+
+    #[test]
+    fn lese_sperre_mitglied_mit_tombstone_ist_nicht_mehr_lesbar() {
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert_eq!(
+            sperre(
+                &b,
+                STATUS_ABGESCHLOSSEN,
+                Some("2026-05-25 11:00:00"),
+                None,
+                Some("2026-05-24 12:00:00"),
+                Some(EinsatzRolle::Einsatzleitung)
+            ),
+            Some(LeseSperre::NichtMehrLesbar)
+        );
+    }
+
+    #[test]
+    fn lese_sperre_fremdleser_mit_abgelaufener_aufbewahrung_ist_nicht_mehr_lesbar() {
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert_eq!(
+            sperre(
+                &admin,
+                STATUS_ABGESCHLOSSEN,
+                Some("2026-04-01 12:00:00"),
+                Some("2026-05-01 12:00:00"),
+                None,
+                None
+            ),
+            Some(LeseSperre::NichtMehrLesbar)
+        );
+    }
+
+    #[test]
+    fn lese_sperre_mitglied_nach_nachlauf_ist_nachlauf_abgelaufen() {
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert_eq!(
+            sperre(
+                &b,
+                STATUS_ABGESCHLOSSEN,
+                Some("2026-05-24 11:00:00"),
+                None,
+                None,
+                Some(EinsatzRolle::Fuehrungspersonal)
+            ),
+            Some(LeseSperre::NachlaufAbgelaufen)
+        );
+    }
+
+    #[test]
+    fn lese_sperre_einsatzleitung_nach_nachlauf_ist_none() {
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert_eq!(
+            sperre(
+                &b,
+                STATUS_ABGESCHLOSSEN,
+                Some("2026-05-24 11:00:00"),
+                None,
+                None,
+                Some(EinsatzRolle::Einsatzleitung)
+            ),
+            None
+        );
+    }
+
     #[test]
     fn fordere_einsatzleitung_nur_fuer_leitung() {
         assert!(fordere_einsatzleitung(Some(EinsatzRolle::Einsatzleitung)).is_ok());
@@ -1044,7 +1205,7 @@ mod tests {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(matches!(
             fordere_org_zugehoerigkeit(&fk, 2, None).unwrap_err(),
-            AppError::Forbidden
+            AppError::KeinLesezugriff(LeseSperre::KeinMitglied)
         ));
     }
 
@@ -1053,7 +1214,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(matches!(
             fordere_org_zugehoerigkeit(&b, 1, None).unwrap_err(),
-            AppError::Forbidden
+            AppError::KeinLesezugriff(LeseSperre::KeinMitglied)
         ));
     }
 

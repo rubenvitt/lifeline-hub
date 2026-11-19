@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
@@ -52,6 +52,16 @@ function setup() {
   );
   return renderMitProviders(<EinsaetzePage />);
 }
+
+// Die Willkommenskarte (LLH-1824) hat eigene Tests (`hilfe/WillkommenKarte.test.tsx`); hier ist
+// sie geschlossen, damit Tab-Reihenfolge und Hinweise der Seite unverändert geprüft werden.
+beforeEach(() => {
+  server.use(
+    http.get('/api/benutzer-einstellungen', () =>
+      HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 08:00:00' } }),
+    ),
+  );
+});
 
 describe('EinsaetzePage', () => {
   it('listet Einsätze mit Bezeichnung und eigener Rolle', async () => {
@@ -392,6 +402,10 @@ describe('EinsaetzePage', () => {
     // „leer" und „darf anlegen" schließen sich nicht aus: auch Anlegeberechtigte sehen den
     // Leerzustand.
     expect(await screen.findByText('Keine Einsätze')).toBeInTheDocument();
+    // LLH-1819: der Leerzustand sagt, wer zu einem Einsatz aufnimmt (ohne Namen).
+    expect(
+      screen.getByText('Zu einem Einsatz nimmt dich dessen Einsatzleitung auf.'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
     // Getauscht ist der Knoten, nicht der Wortlaut — die Textzeile darüber belegt allein nichts.
     // Der Leerknoten trägt keine eigene Aktion: die Anlegen-Kachel steht darunter, ein zweiter
@@ -595,6 +609,8 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     await nutzer.type(feld, 'kein-treffer');
     expect(screen.queryByText('Einsatz 1')).not.toBeInTheDocument();
     expect(screen.getByText('Alter Einsatz')).toBeInTheDocument();
+    // Eine Suche ohne Treffer ist kein fehlender Zugang (LLH-1819).
+    expect(screen.queryByText(/nimmt dich dessen Einsatzleitung auf/)).not.toBeInTheDocument();
   });
 
   it('fällt die Zahl aktiver Einsätze unter die Schwelle, bleibt kein leeres Raster ohne Ausweg stehen (M6)', async () => {

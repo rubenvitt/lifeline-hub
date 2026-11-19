@@ -7,7 +7,7 @@ import type { BenachrichtigungAnzeige, BenachrichtigungVerlauf } from '../api/ty
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuthOptional } from '../auth/AuthContext';
 import Datenstand from '../components/Datenstand';
-import { Augenbraue } from '../components/instrument';
+import { Augenbraue, MetaZeile, Stapel } from '../components/instrument';
 import { useRollen } from '../components/instrument/rollenwerte';
 import { useViewport } from '../components/useViewport';
 import { useAlarmZone } from './alarmZoneSpeicher';
@@ -116,21 +116,16 @@ function Eintrag({
         >
           <ZeitAnzeige wert={a.erstellt_at} rolle="kurz" />
         </span>
-        <span style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0 }}>
           <span style={{ display: 'block', fontWeight: istNeu(a) ? 600 : 400 }}>
             {a.stufe === 'alarm' ? 'Alarm: ' : null}
             {titel}
           </span>
-          <span
-            style={{
-              display: 'block',
-              fontSize: token.fontSizeSM,
-              color: token.colorTextSecondary,
-            }}
-          >
-            {[art !== a.titel ? art : undefined, detail].filter(Boolean).join(' · ')}
-          </span>
-        </span>
+          <MetaZeile>
+            <MetaZeile.Teil>{art !== a.titel ? art : null}</MetaZeile.Teil>
+            <MetaZeile.Teil>{detail}</MetaZeile.Teil>
+          </MetaZeile>
+        </div>
         <span aria-hidden="true">↗</span>
       </Link>
     </li>
@@ -265,25 +260,18 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
       aria-label="Eingänge"
       style={{ width: 'min(420px, calc(100vw - 32px))', maxHeight: '70dvh', overflowY: 'auto' }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: token.paddingXS,
-        }}
-      >
+      <Stapel richtung="zeile" ausrichten="mitte" verteilen="between" abstand="xs">
         <Augenbraue als="h2">Eingänge</Augenbraue>
         {ohneVerbindung && <Datenstand dataUpdatedAt={dataUpdatedAt} />}
-        <span style={{ display: 'flex', gap: token.paddingXS }}>
+        <Stapel als="span" richtung="zeile" abstand="xs">
           <Button aria-expanded={stummOffen} onClick={() => setStummOffen((o) => !o)}>
             {stummZahl > 0 ? `Stumm · ${stummZahl}` : 'Stumm'}
           </Button>
           <Button onClick={alleGelesen} disabled={ungelesen === 0 || laeuft} loading={laeuft}>
             Alle gelesen
           </Button>
-        </span>
-      </div>
+        </Stapel>
+      </Stapel>
       {vorgemerkt && (
         <div
           data-lfh="eingaenge-vorgemerkt"
@@ -386,7 +374,7 @@ function AlarmAbschnitt({ schliessen }: { schliessen: () => void }) {
               {e.beschreibung}
             </span>
           )}
-          <span style={{ display: 'flex', gap: token.paddingXS }}>
+          <Stapel als="span" richtung="zeile" abstand="xs">
             <Button
               type="primary"
               onClick={() => {
@@ -404,7 +392,7 @@ function AlarmAbschnitt({ schliessen }: { schliessen: () => void }) {
               onClick={e.ausblenden}
               style={{ marginInlineStart: 'auto' }}
             />
-          </span>
+          </Stapel>
         </div>
       ))}
     </section>

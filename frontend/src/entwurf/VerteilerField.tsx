@@ -1,11 +1,11 @@
-import { Form, theme, type FormRule } from 'antd';
+import { theme, type FormRule } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef } from 'react';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys } from '../api/queryKeys';
 import type { NeuerEmpfaenger, VerteilerEintrag } from '../api/types';
-import { Datenfeld, Datenraster } from '../components/instrument';
+import { Datenfeld, Datenraster, Feld } from '../components/instrument';
 import { EmpfaengerWahl } from '../fuehrung/EmpfaengerWahl';
 import { ExterneEmpfaenger, externeEmpfaengerRule } from '../fuehrung/ExterneEmpfaenger';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
@@ -150,7 +150,7 @@ export function VerteilerField({
 }) {
   return (
     <div className={ohneDruckKlasse} data-lfh="verteiler-feld">
-      <Form.Item
+      <Feld
         label="Verteiler"
         name={[VERTEILER_FIELD, 'intern']}
         dependencies={[[VERTEILER_FIELD, 'extern']]}
@@ -163,10 +163,10 @@ export function VerteilerField({
           maxCount={VERTEILER_MAX}
           placeholder="Abschnitt, Einheit oder Funktion"
         />
-      </Form.Item>
-      <Form.Item name={[VERTEILER_FIELD, 'extern']} rules={[externeEmpfaengerRule]}>
+      </Feld>
+      <Feld name={[VERTEILER_FIELD, 'extern']} rules={[externeEmpfaengerRule]}>
         <ExterneEmpfaenger />
-      </Form.Item>
+      </Feld>
     </div>
   );
 }

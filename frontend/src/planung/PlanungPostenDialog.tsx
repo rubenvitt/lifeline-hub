@@ -25,6 +25,7 @@ import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../kraefte/Qua
 import { gleichesQualiSoll, qualiSollEingabe, qualiSollText } from '../kraefte/qualiSoll';
 import { uhsTyp } from '../theme/statusFarben';
 import { schichtlaengeRegeln } from './planungRegeln';
+import { Feld } from '../components/instrument';
 
 /** Woher ein neuer Posten kommt; danach bleibt sie (der Server ändert sie nicht). */
 export type PostenHerkunft = 'frei' | 'vorlage' | 'fahrzeug' | 'uhs';
@@ -201,11 +202,11 @@ export default function PlanungPostenDialog({
     >
       {!posten && (
         <div style={zeile}>
-          <Form.Item<PostenWerte> label="Herkunft" name="herkunft">
+          <Feld<PostenWerte> label="Herkunft" name="herkunft">
             <Select<PostenHerkunft> aria-label="Herkunft" options={HERKUNFT_OPTIONEN} />
-          </Form.Item>
+          </Feld>
           {herkunft === 'vorlage' && (
-            <Form.Item<PostenWerte>
+            <Feld<PostenWerte>
               label="Einheitenvorlage"
               name="vorlage_id"
               rules={[{ required: true, message: 'Bitte eine Vorlage wählen' }]}
@@ -217,10 +218,10 @@ export default function PlanungPostenDialog({
                 options={(vorlagenQuery.data ?? []).map((v) => ({ value: v.id, label: v.name }))}
                 onChange={(id) => uebernimmName(vorlagenQuery.data?.find((v) => v.id === id)?.name)}
               />
-            </Form.Item>
+            </Feld>
           )}
           {herkunft === 'fahrzeug' && (
-            <Form.Item<PostenWerte>
+            <Feld<PostenWerte>
               label="Stamm-Fahrzeug"
               name="fahrzeug_id"
               rules={[{ required: true, message: 'Bitte ein Fahrzeug wählen' }]}
@@ -237,10 +238,10 @@ export default function PlanungPostenDialog({
                   uebernimmName(fahrzeugeQuery.data?.find((f) => f.id === id)?.funkrufname)
                 }
               />
-            </Form.Item>
+            </Feld>
           )}
           {herkunft === 'uhs' && (
-            <Form.Item<PostenWerte>
+            <Feld<PostenWerte>
               label="Typ"
               name="uhs_typ"
               rules={[{ required: true, message: 'Bitte einen Typ wählen' }]}
@@ -249,45 +250,40 @@ export default function PlanungPostenDialog({
                 aria-label="Typ"
                 options={UHS_TYPEN.map((t) => ({ value: t, label: uhsTyp[t].label }))}
               />
-            </Form.Item>
+            </Feld>
           )}
         </div>
       )}
-      <Form.Item<PostenWerte>
+      <Feld<PostenWerte>
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. RTW 1" maxLength={PLANUNG_BEZEICHNUNG_MAX} />
-      </Form.Item>
+      </Feld>
       <div style={zeile}>
-        <Form.Item<PostenWerte> label="Abschnitt" name="abschnitt">
+        <Feld<PostenWerte> label="Abschnitt" name="abschnitt">
           <Input maxLength={PLANUNG_ABSCHNITT_MAX} />
-        </Form.Item>
-        <Form.Item<PostenWerte>
-          label="Schichtlänge"
-          name="schichtlaenge"
-          rules={schichtlaengeRegeln}
-        >
+        </Feld>
+        <Feld<PostenWerte> label="Schichtlänge" name="schichtlaenge" rules={schichtlaengeRegeln}>
           <Input placeholder="z. B. 4 h" autoComplete="off" />
-        </Form.Item>
-        <Form.Item<PostenWerte> label="Soll" name="soll">
+        </Feld>
+        <Feld<PostenWerte> label="Soll" name="soll">
           <InputNumber
             min={0}
             max={SCHICHTPLAN_SOLL_ANZAHL_MAX}
             precision={0}
             placeholder={sollPlatzhalter}
-            style={{ width: '100%' }}
           />
-        </Form.Item>
+        </Feld>
       </div>
-      <Form.Item<PostenWerte>
+      <Feld<PostenWerte>
         label="Qualifikationssoll"
         name="quali"
         extra={qualiVorgabe ? mitVorgabe(qualiVorgabe) : undefined}
       >
         <QualiSollFeld bekannt={posten?.quali_soll} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

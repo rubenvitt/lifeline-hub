@@ -20,7 +20,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { useFeldKonflikt } from '../components/useFeldKonflikt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Paneel, PaneelZeile, useRollen } from '../components/instrument';
+import { Feld, Paneel, PaneelZeile, useRollen } from '../components/instrument';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { IconMuelleimer } from '../icons';
@@ -240,20 +240,20 @@ export function AblaufListe({
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Zeitpunkt"
           name="zeitpunkt"
           rules={[{ required: true, message: 'Zeitpunkt ist erforderlich' }]}
         >
           <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Bezeichnung"
           name="bezeichnung"
           rules={[{ required: true, whitespace: true, message: 'Bezeichnung ist erforderlich' }]}
         >
           <Input maxLength={PROGRAMMPUNKT_BEZEICHNUNG_MAX} placeholder="Feuerwerk" />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
     </Paneel>
   );

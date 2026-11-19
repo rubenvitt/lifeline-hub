@@ -53,6 +53,14 @@ const einePerson = {
   vorname: 'Anna',
 };
 
+/**
+ * Kleine Änderung an der Beschreibung: ohne Änderung ist „Speichern“ gesperrt (LLH-1829). Wo sie
+ * steht, prüft der Test die Beschreibung nicht.
+ */
+async function aendereBeschreibung() {
+  await userEvent.type(await screen.findByRole('textbox', { name: 'Beschreibung' }), ' x');
+}
+
 function basisSchaden(overrides: Record<string, unknown> = {}) {
   return {
     id: 10,
@@ -179,6 +187,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.ort).toBe('Hauptstr. 17');
@@ -209,7 +218,9 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       expect(
         await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
       ).toBeInTheDocument();
-      expect(screen.getByRole('textbox', { name: 'Ort' })).toHaveValue('Hauptstr. 19');
+      expect(screen.getByRole('textbox', { name: /^Ort\s*\(geändert\)$/ })).toHaveValue(
+        'Hauptstr. 19',
+      );
       expect(screen.queryByText('Schaden konnte nicht geladen werden')).toBeNull();
       expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
     },
@@ -224,6 +235,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');
@@ -255,6 +267,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       ).toBe('2026-05-29 12:30:00'),
     );
 
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 10:00:00');
@@ -273,6 +286,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
@@ -295,6 +309,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
@@ -455,6 +470,7 @@ describe('SchaedenDetailPage — Gefahr und Schadensgrad (LLH-1115)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     expect(await screen.findByRole('combobox', { name: 'Gefahr' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Schadensgrad' })).toBeInTheDocument();
+    await aendereBeschreibung();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.gefahrenart).toBe('brand');
@@ -826,6 +842,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/schaeden/10', erstAblehnenDannWarten('Ort zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Vorher greifen: solange gespeichert wird, heißt der Knopf anders (Ladesymbol).
     const form = formular();
@@ -843,6 +860,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/schaeden/10', abgelehnt('Ort zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await within(formular()).findByRole('alert');
 
@@ -860,6 +878,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       ),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereBeschreibung();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     const ueberschreiben = await screen.findByRole('button', { name: 'Meine Änderung übernehmen' });
     expect(within(formular()).queryByRole('alert')).toBeNull();
@@ -1101,6 +1120,8 @@ describe('SchaedenDetailPage — Prüfung am Feld (LLH-1101)', () => {
   it('eine zu lange Beschreibung nennt die Grenze am Feld', async () => {
     render(einsatzAktiv, basisSchaden({ beschreibung: 'b'.repeat(8_001) }));
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    // Ohne Änderung ist „Speichern“ gesperrt (LLH-1829): eine kleine Änderung am Ort.
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Ort' }), ' a');
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     const meldung = await screen.findByText('Beschreibung darf höchstens 8.000 Zeichen lang sein');
     expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(
@@ -1136,7 +1157,7 @@ describe('SchaedenDetailPage — Verlassen-Schutz (LLH-1101)', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Schäden' }));
     const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
-    expect(screen.getByLabelText('Ort')).toHaveValue('Hauptstr. 17 Hinterhof');
+    expect(screen.getByLabelText(/^Ort\b.*\(geändert\)$/)).toHaveValue('Hauptstr. 17 Hinterhof');
     expect(screen.queryByText('LISTE')).toBeNull();
 
     await userEvent.click(screen.getByRole('link', { name: 'Schäden' }));
@@ -1273,12 +1294,12 @@ describe('SchaedenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', 
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) }));
 
     expect(await screen.findByText(/^Storniert von Anna Beispiel/)).toBeInTheDocument();
-    const gesperrt = screen.getByRole('textbox', { name: 'Beschreibung' });
+    const gesperrt = screen.getByRole('textbox', { name: /^Beschreibung\s*\(geändert\)$/ });
     expect(gesperrt).toHaveValue('Umgestürzter Baum, Ast auf Fahrbahn');
     expect(gesperrt).toHaveAttribute('readonly');
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Schließen' }));
-    expect(screen.queryByRole('textbox', { name: 'Beschreibung' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /^Beschreibung/ })).toBeNull();
   });
 
   it('eine unberührte Bearbeitung schließt beim Storno', async () => {

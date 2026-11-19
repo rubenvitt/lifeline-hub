@@ -7,7 +7,7 @@ import {
   KEINE_BERECHTIGUNG,
   modulName,
 } from '../einsatz/modulRegistry';
-import { Breadcrumb, Button, Checkbox, Input, Popover, Space, theme } from 'antd';
+import { Breadcrumb, Button, Checkbox, Input, Popover, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
@@ -108,7 +108,16 @@ import {
   toHerausgenommenesMaterial,
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Status, StatusZelle, monoStil, useRollen, KlappBand } from '../components/instrument';
+import {
+  KlappBand,
+  Stapel,
+  Status,
+  StatusZelle,
+  Textstufe,
+  monoStil,
+  useRollen,
+  Knopfreihe,
+} from '../components/instrument';
 import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -393,10 +402,10 @@ function rasterSpalten(
       render: (_t, z) =>
         !staerkeBekannt ? (
           z.art === 'einheit' || z.art === 'fahrzeug' ? (
-            <span style={monoStil(12)}>—</span>
+            <span style={monoStil('monoKlein')}>—</span>
           ) : null
         ) : z.staerke ? (
-          <span style={monoStil(12)} title={STAERKE_AUSGESCHRIEBEN}>
+          <span style={monoStil('monoKlein')} title={STAERKE_AUSGESCHRIEBEN}>
             {staerkeText(z.staerke)}
           </span>
         ) : z.besatzung ? (
@@ -412,7 +421,7 @@ function rasterSpalten(
       width: 90,
       render: (_t, z) =>
         (z.art === 'einheit' && z.einheitId != null) || z.art === 'fahrzeug' ? (
-          <span data-lfh="meldebild-seit" style={monoStil(12)}>
+          <span data-lfh="meldebild-seit" style={monoStil('monoKlein')}>
             {z.seit ? kontext.zeit(z.seit) : '—'}
           </span>
         ) : null,
@@ -444,7 +453,7 @@ function rasterSpalten(
       abBreite: 'xxl',
       render: (_t, z) =>
         z.art === 'einheit' && z.funkrufname ? (
-          <span style={monoStil(12)}>{z.funkrufname}</span>
+          <span style={monoStil('monoKlein')}>{z.funkrufname}</span>
         ) : null,
     },
     // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht
@@ -455,7 +464,7 @@ function rasterSpalten(
       title: (
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span>Fahrzeuge und Personal</span>
-          <span data-lfh="status-legende" style={{ ...monoStil(10), fontWeight: 400 }}>
+          <span data-lfh="status-legende" style={{ ...monoStil('metaKlein'), fontWeight: 400 }}>
             bereit · gebunden · Ausfall
           </span>
         </span>
@@ -481,7 +490,7 @@ function ImEinsatzZelle({
   zeit: (utc: string) => string;
 }) {
   if (zustand !== 'daten') return null;
-  if (!eintrag) return <span style={monoStil(12)}>—</span>;
+  if (!eintrag) return <span style={monoStil('monoKlein')}>—</span>;
   const { dauer, einstufung } = eintrag;
   // Der Anker steht sehend im `title`, vorgelesen hinter der Zahl; die Einstufung dahinter.
   return (
@@ -504,7 +513,12 @@ function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
   return (
     <span
       data-lfh="meldebild-besatzung"
-      style={{ ...monoStil(10), display: 'flex', flexDirection: 'column', color: rollen.gedaempft }}
+      style={{
+        ...monoStil('metaKlein'),
+        display: 'flex',
+        flexDirection: 'column',
+        color: rollen.gedaempft,
+      }}
     >
       {zeilen.map((z) => (
         <span key={z}>{z}</span>
@@ -563,7 +577,7 @@ function StatusSpalte({
         {verteilung && (
           <span
             data-lfh="meldebild-statusverteilung"
-            style={{ ...monoStil(11), color: rollen.gedaempft }}
+            style={{ ...monoStil('meta'), color: rollen.gedaempft }}
           >
             {verteilung}
           </span>
@@ -573,11 +587,11 @@ function StatusSpalte({
   }
   if (!status && !grund && !fehler) return null;
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: token.marginXXS }}>
+    <Stapel als="span" abstand="xxs">
       {status}
       {grund}
       {fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />}
-    </span>
+    </Stapel>
   );
 }
 
@@ -642,7 +656,6 @@ function EinheitenSchalter({
   grund: string | null;
   onWechsel: (an: boolean) => void;
 }) {
-  const { token } = theme.useToken();
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <Checkbox
@@ -652,7 +665,7 @@ function EinheitenSchalter({
       >
         {wort}
       </Checkbox>
-      {grund && <span style={{ color: token.colorTextSecondary }}>{grund}</span>}
+      {grund && <Textstufe ton="gedaempft">{grund}</Textstufe>}
     </div>
   );
 }
@@ -760,7 +773,7 @@ function RueckmeldungZelle({
       data-lfh="meldebild-rueckmeldung"
       data-zustand={anzeige.zustand}
       data-rolle={rolle}
-      style={{ ...monoStil(11), color: farbe, whiteSpace: 'nowrap' }}
+      style={{ ...monoStil('meta'), color: farbe, whiteSpace: 'nowrap' }}
     >
       {zeit ?? '—'}
     </span>
@@ -1517,25 +1530,26 @@ export default function KraefteuebersichtPage() {
         dataUpdatedAt={datenstand}
         weitere={{ name: 'Weitere Aktionen zum Meldebild', eintraege: nebenwege }}
         aktionen={
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-          // `paddingXS` ließ 3 / 5 / 7 px.
-          <Space className="kraefte-no-print" wrap size={token.marginSM}>
+          <Knopfreihe className="kraefte-no-print">
             {/* Sekundär: der Abschnitt-Filter. Er wirkt wie alle Filter außerhalb des Primitivs
                 auf die Rohlisten. */}
-            <Select
-              aria-label="Abschnitt filtern"
-              placeholder="Abschnitt"
-              prefix={
-                <span aria-hidden style={{ display: 'inline-flex' }}>
-                  <IconTrichter />
-                </span>
-              }
-              allowClear
-              style={{ minWidth: 160 }}
-              value={filter.abschnittId ?? undefined}
-              options={(abschnitteQuery.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
-              onChange={(wert) => setFilter((f) => ({ ...f, abschnittId: wert ?? null }))}
-            />
+            {/* Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): das Raster streckt die
+                Auswahl, mindestens aber `schmal`. */}
+            <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+              <Select
+                aria-label="Abschnitt filtern"
+                placeholder="Abschnitt"
+                prefix={
+                  <span aria-hidden style={{ display: 'inline-flex' }}>
+                    <IconTrichter />
+                  </span>
+                }
+                allowClear
+                value={filter.abschnittId ?? undefined}
+                options={(abschnitteQuery.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
+                onChange={(wert) => setFilter((f) => ({ ...f, abschnittId: wert ?? null }))}
+              />
+            </div>
             {/* Primär: eine Einheit bilden. Die Maske lebt auf der Einheiten-Seite; ein zweites
                 Formular hier wäre eine zweite Erfassungsmaske derselben Sache. Ohne
                 Schreibrecht kein Knopf. */}
@@ -1554,7 +1568,7 @@ export default function KraefteuebersichtPage() {
                 Einheit
               </Button>
             )}
-          </Space>
+          </Knopfreihe>
         }
       >
         {/* ── Druckkopf ── Einsatz, Stand, druckende Person und Auswahl — ohne sie ist ein
@@ -1634,7 +1648,7 @@ export default function KraefteuebersichtPage() {
         >
           {/* Nur mit Filter (LLH-1744): ohne nennen Statusband und Kopf die Zahlen, und die längere
               Zeile ließe die Werkzeugzeile umbrechen. */}
-          {gefiltert && <span style={{ color: token.colorTextSecondary }}>{auswahlText}</span>}
+          {gefiltert && <Textstufe ton="gedaempft">{auswahlText}</Textstufe>}
           {mittelGesperrt && (
             <span
               id={sperreId}
@@ -1663,14 +1677,15 @@ export default function KraefteuebersichtPage() {
           {/* Ein schlichtes Feld: `Input.Search` brächte einen Lupenknopf mit dem englischen
               Namen „search“ mit, und die Suche wirkt ohnehin bei jeder Eingabe. Die Basis von
               100 px hält die Zeile mit „Spalten“ bei 1366 px einzeilig; breiter wächst das Feld. */}
-          <Input
-            placeholder="Suche..."
-            aria-label="Einheiten und Kräfte durchsuchen"
-            allowClear
-            style={{ flex: '1 1 100px', minWidth: 0, maxWidth: 280 }}
-            value={filter.suche}
-            onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
-          />
+          <div style={{ flex: '1 1 100px', minWidth: 0, maxWidth: 'var(--lfh-feld-mittel)' }}>
+            <Input
+              placeholder="Suche..."
+              aria-label="Einheiten und Kräfte durchsuchen"
+              allowClear
+              value={filter.suche}
+              onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
+            />
+          </div>
           {/* Träger und Status hinter einem Knopf (D9): die Zeile bleibt bei 1366 px einzeilig.
               Gesetzte Filter stehen trotzdem sichtbar als Marken davor, der Knopf nennt ihre
               Zahl. */}
@@ -1684,29 +1699,31 @@ export default function KraefteuebersichtPage() {
                 data-lfh="meldebild-filter"
                 style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
               >
-                <Select
-                  placeholder="Trägerorganisation"
-                  aria-label="Nach Trägerorganisation filtern"
-                  allowClear
-                  style={{ minWidth: 220 }}
-                  value={filter.traeger ?? undefined}
-                  options={traeger.map((t) => ({ value: t, label: t }))}
-                  onChange={(wert) => setFilter((f) => ({ ...f, traeger: wert ?? null }))}
-                />
+                <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+                  <Select
+                    placeholder="Trägerorganisation"
+                    aria-label="Nach Trägerorganisation filtern"
+                    allowClear
+                    value={filter.traeger ?? undefined}
+                    options={traeger.map((t) => ({ value: t, label: t }))}
+                    onChange={(wert) => setFilter((f) => ({ ...f, traeger: wert ?? null }))}
+                  />
+                </div>
                 {/* Der vierte Eimer („ohne Status") bleibt draußen: `filtereKraefte` vergleicht
                     `kat === f.kategorie`, ein Wert `'ohne'` träfe nie eine Zeile. */}
-                <Select
-                  placeholder="Status"
-                  aria-label="Nach Status filtern"
-                  allowClear
-                  style={{ minWidth: 220 }}
-                  value={filter.kategorie ?? undefined}
-                  options={KATEGORIE_WERTE.filter((w) => w.value !== 'ohne').map((w) => ({
-                    value: w.value as StatusKategorie,
-                    label: w.text,
-                  }))}
-                  onChange={(wert) => setFilter((f) => ({ ...f, kategorie: wert ?? null }))}
-                />
+                <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+                  <Select
+                    placeholder="Status"
+                    aria-label="Nach Status filtern"
+                    allowClear
+                    value={filter.kategorie ?? undefined}
+                    options={KATEGORIE_WERTE.filter((w) => w.value !== 'ohne').map((w) => ({
+                      value: w.value as StatusKategorie,
+                      label: w.text,
+                    }))}
+                    onChange={(wert) => setFilter((f) => ({ ...f, kategorie: wert ?? null }))}
+                  />
+                </div>
                 {/* Einheiten-Filter (LLH-1792, design.md D6): ohne lesbare Quelle nicht wählbar,
                     der Grund steht als Text daneben, nicht nur im Tooltip. */}
                 <EinheitenSchalter

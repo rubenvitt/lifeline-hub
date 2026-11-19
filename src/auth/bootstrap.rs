@@ -10,21 +10,25 @@ use crate::personal::{
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
 
-/// Start-Stichworte je neu angelegter Organisation (Reihenfolge = sortier).
+/// Start-Stichworte je neu angelegter Organisation (Reihenfolge = sortier), jeweils mit dem
+/// Namen der Einsatz-Vorlage, die das Stichwort im Anlegedialog einstellt. Die Kopplung ab Werk
+/// gilt seit LLH-1816 (`docs/superpowers/specs/2026-11-19-q4svbkq9-vorlage-oberstes-feld-design.md`,
+/// D1) und löst die Regel „keine mitgelieferte Kopplung“ der eingefrorenen Spec `einsatz-vorlagen`
+/// ab. Bestehende Organisationen koppelt Migration `0357` mit derselben Zuordnung.
 /// Combobox erlaubt unabhängig davon Freitext.
-const STICHWORT_STARTLISTE: [&str; 12] = [
-    "B2",
-    "B2Y",
-    "B3",
-    "B3Y",
-    "B4",
-    "B4Y",
-    "MANV",
-    "MANV7",
-    "MANV15",
-    "MANV50",
-    "Sonderlage",
-    "Übung",
+const STICHWORT_STARTLISTE: [(&str, Option<&str>); 12] = [
+    ("B2", Some("Kleinlage")),
+    ("B2Y", Some("Kleinlage")),
+    ("B3", Some("Kleinlage")),
+    ("B3Y", Some("Kleinlage")),
+    ("B4", Some("Evakuierung und Betreuung")),
+    ("B4Y", Some("Evakuierung und Betreuung")),
+    ("MANV", Some("MANV")),
+    ("MANV7", Some("MANV")),
+    ("MANV15", Some("MANV")),
+    ("MANV50", Some("MANV")),
+    ("Sonderlage", None),
+    ("Übung", None),
 ];
 
 /// Ergebnis des Bootstraps: ob ein Admin neu angelegt wurde und mit welchem
@@ -103,13 +107,26 @@ pub async fn bootstrap_admin(
     .execute(&mut *tx)
     .await?;
 
-    for (i, text) in STICHWORT_STARTLISTE.iter().enumerate() {
+    // LLH-1375: Startliste der Einsatz-Vorlagen (gleiche Werte wie Migration 0238). Vor den
+    // Stichworten, weil diese ihre Vorlage über den Namen finden (LLH-1816).
+    crate::einsatz_vorlage::repo::seed_startliste_tx(&mut tx, org_id).await?;
+
+    for (i, (text, vorlage)) in STICHWORT_STARTLISTE.iter().enumerate() {
+        let vorlage_id = match vorlage {
+            Some(name) => {
+                crate::einsatz_vorlage::repo::find_id_by_bezeichnung_tx(&mut tx, org_id, name)
+                    .await?
+            }
+            None => None,
+        };
         sqlx::query(
-            "INSERT INTO einsatz_stichwort_vorschlag (org_id, text, sortier) VALUES (?, ?, ?)",
+            "INSERT INTO einsatz_stichwort_vorschlag (org_id, text, sortier, vorlage_id) \
+             VALUES (?, ?, ?, ?)",
         )
         .bind(org_id)
         .bind(text)
         .bind(i as i64)
+        .bind(vorlage_id)
         .execute(&mut *tx)
         .await?;
     }
@@ -198,9 +215,6 @@ pub async fn bootstrap_admin(
         .execute(&mut *tx)
         .await?;
     }
-
-    // LLH-1375: Startliste der Einsatz-Vorlagen (gleiche Werte wie Migration 0238).
-    crate::einsatz_vorlage::repo::seed_startliste_tx(&mut tx, org_id).await?;
 
     tx.commit().await?;
 
@@ -461,7 +475,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn seedet_einsatz_vorlagen_ohne_stichwort_kopplung_fuer_neue_org() {
+    async fn seedet_einsatz_vorlagen_und_koppelt_die_start_stichworte() {
         let pool = crate::db::test_pool().await;
         bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
             .await
@@ -488,13 +502,32 @@ mod tests {
         let manv = liste.iter().find(|v| v.bezeichnung == "MANV").unwrap();
         assert!(manv.ausgeblendet.iter().any(|k| k == "infotelefon"));
         assert!(manv.ausgeblendet.iter().any(|k| k == "tiere"));
-        let gekoppelt: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM einsatz_stichwort_vorschlag WHERE vorlage_id IS NOT NULL",
+        // LLH-1816 (Design-Doc D1): die Start-Stichworte kommen an Vorlagen gekoppelt.
+        let paare: Vec<(String, Option<String>)> = sqlx::query_as(
+            "SELECT s.text, v.bezeichnung FROM einsatz_stichwort_vorschlag s \
+             LEFT JOIN einsatz_vorlage v ON v.id = s.vorlage_id ORDER BY s.sortier",
         )
-        .fetch_one(&pool)
+        .fetch_all(&pool)
         .await
         .unwrap();
-        assert_eq!(gekoppelt, 0, "keine mitgelieferte Stichwort-Kopplung");
+        let erwartet: Vec<(String, Option<String>)> = [
+            ("B2", Some("Kleinlage")),
+            ("B2Y", Some("Kleinlage")),
+            ("B3", Some("Kleinlage")),
+            ("B3Y", Some("Kleinlage")),
+            ("B4", Some("Evakuierung und Betreuung")),
+            ("B4Y", Some("Evakuierung und Betreuung")),
+            ("MANV", Some("MANV")),
+            ("MANV7", Some("MANV")),
+            ("MANV15", Some("MANV")),
+            ("MANV50", Some("MANV")),
+            ("Sonderlage", None),
+            ("Übung", None),
+        ]
+        .into_iter()
+        .map(|(t, v)| (t.to_owned(), v.map(str::to_owned)))
+        .collect();
+        assert_eq!(paare, erwartet);
     }
 
     #[tokio::test]

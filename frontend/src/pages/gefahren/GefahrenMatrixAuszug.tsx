@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { Typography } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt } from '../../api/types';
-import { monoStil, useRollen } from '../../components/instrument';
+import { monoStil, schriftStil, Textstufe, useRollen } from '../../components/instrument';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { GEFAHRENTYPEN_ALPHABETISCH, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSchema';
 import { MIT_ERLAEUTERUNG, gesetzteGefahren, hatErlaeuterung } from './erlaeuterungen';
@@ -54,7 +54,8 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
   const kopfStil: CSSProperties = {
     border: rand,
     padding: `${token.paddingXXS}px ${token.paddingXS}px`,
-    fontSize: 12,
+    // Kopfzelle einer Tabelle: kein Text-Baustein, die Stufe kommt als Stil, fett wie ein Kopf.
+    ...schriftStil('textKlein'),
     fontWeight: 600,
     color: rollen.text2,
     textAlign: 'center',
@@ -63,7 +64,7 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
     border: rand,
     padding: `${token.paddingXXS}px ${token.paddingXS}px`,
     textAlign: 'center',
-    ...monoStil(13, 500),
+    ...monoStil('mono', 500),
   };
 
   return (
@@ -148,14 +149,15 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
       </table>
       {/* Das Zeichen der Matrix mit seinem Wort, nur wenn eine Zelle es trägt (LLH-1365). */}
       {mitMarke && (
-        <Typography.Text
-          type="secondary"
+        <div
           aria-hidden="true"
           data-lfh="auszug-legende-erlaeuterung"
-          style={{ display: 'block', marginTop: token.marginXXS, fontSize: 12 }}
+          style={{ marginTop: token.marginXXS }}
         >
-          <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
-        </Typography.Text>
+          <Textstufe stufe="textKlein" ton="gedaempft">
+            <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
+          </Textstufe>
+        </div>
       )}
     </>
   );

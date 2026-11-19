@@ -63,6 +63,16 @@ const VOLL = {
   geaendert_von: null,
 };
 
+/**
+ * „Speichern“ ist ohne Änderung gesperrt (LLH-1829). Die Sektion hat nur ein Feld: die Tests
+ * ändern die Aufbewahrungs-Dauer und erwarten für genau dieses Feld den neuen Wert.
+ */
+async function aendereDauer(wert = '400') {
+  fireEvent.change(await screen.findByLabelText(/^Aufbewahrungs-Dauer \(Tage\)/), {
+    target: { value: wert },
+  });
+}
+
 function rendern() {
   return renderMitProviders(
     <Routes>
@@ -95,11 +105,12 @@ describe('EinsatzAufbewahrung', () => {
     // Die Nachbereitung beginnt erst mit dem Abschluss (LLH-1494).
     expect(screen.queryByRole('button', { name: 'Nachbereitung ändern' })).toBeNull();
 
+    await aendereDauer();
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ retention_dauer_tage: 365 }),
+        expect.objectContaining({ retention_dauer_tage: 400 }),
       ),
     );
   });
@@ -110,6 +121,7 @@ describe('EinsatzAufbewahrung', () => {
    */
   it('schickt beim Speichern den VOLLEN Payload — alle 19 Felder (Vollersatz-PUT)', async () => {
     rendern();
+    await aendereDauer();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
@@ -133,7 +145,7 @@ describe('EinsatzAufbewahrung', () => {
         auftrag_quittierung_frist_min: 45,
         rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
-        retention_dauer_tage: 365,
+        retention_dauer_tage: 400,
       }),
     );
   });
@@ -147,6 +159,7 @@ describe('EinsatzAufbewahrung', () => {
     } as never);
 
     rendern();
+    await aendereDauer();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
@@ -186,9 +199,21 @@ describe('EinsatzAufbewahrung', () => {
       '365 (Vorgabe)',
     );
 
+    // Ohne Änderung ist „Speichern“ gesperrt (LLH-1829): leer wird das Feld erst, nachdem ein
+    // Wert gespeichert war. Leer geht dann null hinaus, nicht die Vorgabe der Organisation.
+    await aendereDauer();
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ retention_dauer_tage: 400 }),
+      ),
+    );
+    await aendereDauer('');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenLastCalledWith(
         1,
         expect.objectContaining({ retention_dauer_tage: null }),
       ),

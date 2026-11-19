@@ -825,7 +825,7 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
     {
       pfad: `${R}/einstellungen/allgemein`,
       anker: segment(/^Allgemein$/, 'tab'),
-      hinweis: /nur Einsatzleitung, Führungspersonal oder Org-Admin$/,
+      hinweis: /nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation$/,
       gesperrt: knopf('Speichern'),
       ziele: [
         {
@@ -845,7 +845,7 @@ test('C10 · Einstellungen und Einsatzdaten (Beobachter): Schreibaktionen fehlen
           weitereAusloeser(page, EINSATZDATEN_WEITERE),
         ),
       vorbereiten: weitereAufklappen(EINSATZDATEN_WEITERE),
-      hinweis: /nur Einsatzleitung, Führungspersonal oder Org-Admin$/,
+      hinweis: /nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation$/,
       fehlt: knopf('Bezeichnung bearbeiten'),
       ziele: [
         {

@@ -106,7 +106,7 @@ pub async fn bewerten(
     // Read-Vergleich gegen `alt` bleibt bewusst VOR der Tx — nur das Schreibpaar ist atomar).
     // SSE erst nach dem Commit (Reinheits-Kontrakt).
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let z = crate::write_retry!(&state.pool, |conn| {
+    let (z, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let z = gefahr_repo::upsert_bewertung_tx(
             conn,
             gid,
@@ -122,6 +122,7 @@ pub async fn bewerten(
         .await?;
         // Eine bestätigte Beurteilung nennt den letzten Stand (LLH-1090, design.md E4).
         gefahr_repo::beurteilung_auffrischen_tx(conn, gid, ctx.benutzer.id).await?;
+        let mut etb_id = None;
         if z.warnstufe.as_str() != alt {
             let text = gefahr::etb_text_bewertung(
                 z.gefahrentyp.as_str(),
@@ -130,11 +131,14 @@ pub async fn bewerten(
                 gid,
                 z.warnstufe,
             );
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
+            etb_id = Some(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                    .await?,
+            );
         }
-        Ok(z)
+        Ok((z, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, etb_id);
     sse_gefahr(&state, einsatz_id, gid);
     Ok(Json(z))
 }

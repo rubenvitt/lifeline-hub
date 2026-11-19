@@ -681,6 +681,7 @@ impl LiveHub {
     /// Aufrufstellen auf einen Schlag aus dem Broadcast. Clients refetchen über den
     /// `etb`-GET, der die Modul-Berechtigung ohnehin prüft.
     pub fn publiziere(&self, einsatz_id: i64, etb_id: i64) {
+        crate::etb::nachlauf::verteilt(etb_id);
         self.publiziere_event(
             einsatz_id,
             LiveEvent::Etb,

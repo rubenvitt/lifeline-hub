@@ -66,7 +66,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     key: 'farbe',
     // Der gepflegte Code als Wert (Mono), keine Farbfläche: `status_farbe` ist ungeprüfter
     // Freitext, sein Kontrast ist nicht zugesichert (siehe `Status`, Mandantenfarbe).
-    render: (f: string | null) => (f ? <span style={monoStil(12)}>{f}</span> : '—'),
+    render: (f: string | null) => (f ? <span style={monoStil('monoKlein')}>{f}</span> : '—'),
   },
   {
     title: 'FMS-Anker',
@@ -74,7 +74,8 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     key: 'fms_anker',
     sorter: nachZahl((s: FahrzeugStatus) => s.fms_anker),
     // `== null`, nicht Wahrheitswert: 0 ist ein gültiger Anker.
-    render: (f: number | null) => (f == null ? '—' : <span style={monoStil(12)}>{f}</span>),
+    render: (f: number | null) =>
+      f == null ? '—' : <span style={monoStil('monoKlein')}>{f}</span>,
   },
   markeSpalte,
   {
@@ -82,7 +83,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     dataIndex: 'sortier',
     key: 'sortier',
     sorter: nachZahl((s: FahrzeugStatus) => s.sortier),
-    render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    render: (n: number) => <span style={monoStil('monoKlein')}>{n}</span>,
   },
 ];
 

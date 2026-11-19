@@ -1,4 +1,5 @@
 import { App, Form } from 'antd';
+import { Feld } from '../../components/instrument';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { belegeBr } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -116,13 +117,13 @@ export default function VerlegenDialog({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Ziel-Raum"
         name="ziel_br_id"
         rules={[{ required: true, message: 'Ziel-Raum wählen' }]}
       >
         <Select<number> options={raeume.map((r) => ({ value: r.id, label: r.bezeichnung }))} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

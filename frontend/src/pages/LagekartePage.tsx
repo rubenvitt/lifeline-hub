@@ -26,10 +26,11 @@ import LageplanAnlageDialog, {
 } from './lagekarte/LageplanAnlageDialog';
 import { useModusFarben } from '../components/rahmenStil';
 import { useViewport } from '../components/useViewport';
-import { useRollen } from '../components/instrument';
+import { Knopfreihe, useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import {
+  einsatzdatenPfad,
   evakuierungsbezirkPfad,
   gefahrenPfad,
   parseKartenzentrum,
@@ -89,6 +90,7 @@ import {
 } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import SuchnadelBand from './lagekarte/SuchnadelBand';
+import EinsatzortBand from './lagekarte/EinsatzortBand';
 import FokusBand from './lagekarte/FokusBand';
 import { useAbschnittFokus } from './lagekarte/useAbschnittFokus';
 import { daempfeFlaechen, daempfeMarker } from './lagekarte/abschnittFokus';
@@ -1544,10 +1546,7 @@ export default function LagekartePage() {
       </div>
       {/* Ab `lg` sitzt der Umschalter im Knopfblock der Karte (s. `KartenUeberlagerung`). Die
           Nebenwege wie in `EinsatzSeite`: unter `md` der Auslöser „Weitere“ vorn, sonst hinten. */}
-      <div
-        data-lfh="seitenkopf-aktionen"
-        style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}
-      >
+      <Knopfreihe data-lfh="seitenkopf-aktionen">
         {istSchmal && nebenwegeImKopf}
         {!breit && (
           <Button
@@ -1567,7 +1566,7 @@ export default function LagekartePage() {
           </Button>
         )}
         {!istSchmal && nebenwegeImKopf}
-      </div>
+      </Knopfreihe>
     </div>
   );
 
@@ -1897,6 +1896,21 @@ export default function LagekartePage() {
           onBeenden={onMessenBeenden}
         />
         <SuchnadelBand ort={suchnadel} onEntfernen={() => setSuchnadel(null)} />
+        {/* Ohne Punkt nennt die Karte den fehlenden Einsatzort (LLH-1953): nur live und geladen,
+            nicht im gesicherten Stand und in keinem Kartenmodus (auch nicht beim Platzieren des
+            Einsatzorts) — jeder Modus gibt die Karte frei (LFH-765). Knöpfe nur mit Schreibrecht,
+            der Sprung nur in freie Einsatzdaten. */}
+        {einsatzortOhneOrt && snapshotParam == null && !exklusiverModusAktiv && einsatzDaten && (
+          <EinsatzortBand
+            adresse={einsatzDaten.einsatzort ?? null}
+            onPlatzieren={darfSchreiben ? onEinsatzortPlatzieren : undefined}
+            adressePfad={
+              darfSchreiben && !sprungGesperrt('einsatzdaten')
+                ? einsatzdatenPfad(einsatzId, { paneel: 'einsatzort' })
+                : undefined
+            }
+          />
+        )}
         <FokusBand
           name={fokusSicht?.name ?? null}
           escHebtAuf={abschnittFokus.escHebtAuf}

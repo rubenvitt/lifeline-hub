@@ -59,7 +59,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
                   farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
                 />
                 {status.verteilung && (
-                  <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
+                  <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
                     {status.verteilung}
                   </span>
                 )}

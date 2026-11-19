@@ -59,10 +59,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
-  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nicht. Die
-  Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue `fontSize`-Zahlen
-  verbietet `theme/schriftgroesse.guard.test.ts`; die Altlast steht in `schriftgroesse.schuld.ts`
-  und sinkt wie beim Abstandsraster.
+  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
+  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `metaKlein` 10, `meta` 11, `monoKlein`
+  12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen (ADR-0071,
+  LLH-1972). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
+  `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
+  Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
@@ -99,11 +101,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
   (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `AlarmZeile` („Was brennt“, LLH-1743,
   Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten) ·
-  `Textstufe` (Stufe und Ton, kein `style`) · `Stapel` (Abstand als Rasterstufe) · `MetaZeile`
+  `Textstufe` (Stufe und Ton, kein `style`) · `Stapel` (Abstand als Rasterstufe) · `Knopfreihe` (Knöpfe nebeneinander, Abstand `md`, „Aktionen“) · `MetaZeile`
   (Angaben mit „·“, leere Teile fallen weg, `Teil mono` für Zahlen) · `Feld` (`Form.Item` mit
   `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`). Im
-  Verwaltungsteil verlangt `components/feld.guard.test.ts` `Feld` statt `Form.Item` und keine
-  Breite am Eingabefeld; ein Feld ohne Formular steht in einem `div` mit
+  Verwaltungsteil, auf den Einsatzseiten unter `pages/` samt Fach- und Restbereichen (LLH-1971),
+  in ETB, Aufträgen, Meldungen, Nachforderungen, Lageberichten, Erinnerungen und Chat (LLH-1969)
+  sowie in Personen, Betreuung, Verpflegung, Kräfte und Ablösung (LLH-1970; Liste `BEREICHE`)
+  verlangt `components/feld.guard.test.ts` `Feld` statt `Form.Item` und keine Breite am
+  Eingabefeld; ein Feld ohne Formular steht in einem `div` mit
   `className={FELD_KLASSE}` und `maxWidth: 'var(--lfh-feld-…)'` (dann füllen auch Zahl, Datum
   und Auswahl die Hülle).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
@@ -247,6 +252,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
     neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
     Nachweis `e2e/fehlergrenze.spec.ts`.
+  - **Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze** (LLH-1958, Entwurf
+    `docs/superpowers/specs/2026-11-19-ft74hjiv-fehlergrenze-je-kachel-design.md`): Auf
+    Überblick, Lagebild, Lagebild-Großbild und Lagemonitor steht jede Kachel (Alarmzeile,
+    Startliste, Paneel, Kennzahlenband, Monitorkachel) einzeln in `KachelGrenze`
+    (`components/KachelGrenze.tsx`), damit ein Wurf nur sie ersetzt und nicht über die
+    Rahmengrenze die ganze Seite. Form `paneel` mit „Neu laden“ auf Flächen mit Bedienung, Form
+    `gross` ohne Knopf auf Großbild und Lagemonitor, dort mit dem Datenstand als `neuversuch`. Wie
+    die Rahmengrenze zeigt sie nie Meldung oder Stack und meldet über `meldeClientFehler`. Sie
+    fängt nur Würfe beim Zeichnen: Abfragefehler zeigt `PaneelZustand`, ein Wurf im Rumpf der
+    Seite bleibt bei der Rahmengrenze. Wächter `pruefeKachelGrenzen` (`test/kachelWaechter.ts`)
+    in den Seitentests von Überblick, Lagebild und Lagemonitor; Nachweis
+    `components/KachelGrenze.test.tsx`.
   - **Ortsmarke in der Bedienfarbe** (LLH-1784, Spec `farbrollen-kontrast`): die aktive
     Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
     aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
@@ -398,6 +415,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Nebenangaben eines Datensatzes in einer Zeile                                                   | `MetaZeile`                                                                                                                                      | `MetaZeile`                        |
 | Text in einer Größe und Farbe                                                                   | `Textstufe` (Stufe der `schriftskala`, Ton)                                                                                                      | `Text`                             |
 | Elemente mit Abstand reihen                                                                     | `Stapel` (Rasterstufe)                                                                                                                           | `Stapel`                           |
+| Knöpfe nebeneinander (Kopf, Paneel, Dialogfuß)                                                  | `Knopfreihe` (Abstand `md`, Fuß mit `fuss`)                                                                                                      | `Knopfreihe`                       |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
 | Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
@@ -425,7 +443,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
 | Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
-| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` („Formularseiten“)                                                                          | `Formularlayout`, `Speicherleiste` |
+| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` + `SpeicherKnopf` („Formularseiten“)                                                        | `Formularlayout`, `Speicherleiste` |
 | Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
 | **Umschalten** (Spec `bedien-umschalten`, LLH-1808)                                             |                                                                                                                                                  |                                    |
 | Fläche oder Bereich darunter umschalten                                                         | `Segmentleiste rolle="tablist"` mit Reiterfläche (`role="tabpanel"`, `steuert`); führt ein Reiter auf eine andere Seite, `aktivierung="manuell"` | `Segmentleiste`                    |
@@ -456,9 +474,13 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
   blockierende Aktion, ≤ ~3 Felder. **Inline/Expander**: Zusatz ohne Seitenwechsel.
   **Drawer**: nur Quick-View (read-only, `PersonDetailDrawer`), nie zum Anlegen (LLH-1921); Tabs,
   großer Edit-Modus oder > ~480 px → eigene Route.
-- **Einzige Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
+- **Erste Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
   `einsatz/ModulAkkordeon.tsx`): Navigation, keine Entität, schließt beim Modulklick, Inhalt erst
-  beim Öffnen (kein `forceRender`). Ein zweiter braucht eine eigene Entscheidung.
+  beim Öffnen (kein `forceRender`). Ein weiterer braucht eine eigene Entscheidung.
+- **Zweite Ausnahme: die Hilfe-Seitenleiste** (`hilfe/HilfeSeitenleiste.tsx`, LLH-1824, Entwurf
+  `docs/superpowers/specs/2026-11-19-col12d3y-hilfe-mit-kontext-design.md`): Nachschlagen neben
+  der Arbeit, nur lesen, zwei Reiter als `Segmentleiste rolle="tablist"`, 480 px (unter `lg` und
+  bei Berührung volle Breite). Die volle Hilfe bleibt die Route `/hilfe/<kapitel>`.
 - **Liste + Detailpaneel** (`components/ListeDetail.tsx`, Spec `liste-detail`, Herleitung
   `openspec/changes/archive/2026-10-12-oxgob5gk-auftraege-befehle-angleichen/design.md`): wenn
   Objekte je Stück gelesen und kurz behandelt werden (quittieren, freigeben) und man oft zwischen ihnen wechselt.
@@ -511,7 +533,8 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    „Verwerfen“ und Escape lassen die Handlung verfallen. Ohne Altwert bleiben Knöpfe und Dialoge,
    die einen festen oder errechneten Wert setzen (Status, Lagezustand, „Kapazität übernehmen“).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
-   `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
+   `SpeicherFehler` am Paneel. Enter speichert (ohne Änderung schließt es, LLH-1829), Escape
+   bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
 6. **Jede bearbeitbare Detailansicht hat eine Item-Route** („Deeplink-Muster“).
 7. **Nach dem Anlegen springt die Seite in die neue Ansicht** (Vorbild Befehl), nicht zurück in
@@ -781,7 +804,8 @@ anwendbar), „nicht geprüft" ist keins.
   (LFH-1078; der Wächter erfasst sie nicht).
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
-  Modulbeschreibungen aus wenigen Fachwörtern.
+  Modulbeschreibungen aus wenigen Fachwörtern, die Darf-Zeile unter einer Rollenoption (Umfang in
+  wenigen Wörtern, keine Bedienung; „Begriffe“, Rollen-Vokabular).
 - **Erklärendes gehört in die Anwenderdokumentation** (`docs/anwender/`, in der App unter
   „Hilfe“, LFH-1096): wer einen Erklärsatz entfernt, dessen Wissen sonst nirgends steht, schreibt
   es dort ins Kapitel. Regeln: `docs/anwender/AGENTS.md`.
@@ -964,6 +988,17 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Begriffe**
 
+- **Rollen-Vokabular** (LLH-1818, Entwurf
+  `docs/superpowers/specs/2026-11-19-zlzpieaq-rollen-vokabular-design.md`): Name und Darf-Zeile
+  jeder Rolle stehen nur in `einsatz/rollenVokabular.ts` (Rolle im Einsatz, in der Organisation,
+  in der Verwaltung, Stufe der Modulsperre). Eine Rolle heißt überall gleich: „System-Admin“ (mit
+  Bezug auf den Einsatz „System-Admin der Organisation“, nie „Org-Admin“), „Führungskraft der
+  Organisation“, ohne Rolle „Keine“ bzw. am Konto „Keine Rolle“; Felder heißen „Rolle in der
+  Verwaltung“, „Rolle in der Organisation“, „Rolle im Einsatz“. Jede Auswahl, die eine Rolle
+  vergibt, nutzt `rollenOptionen` und `rollenOptionRender` (`einsatz/rollenOption.tsx`): offen Name
+  und Darf-Zeile, geschlossen nur der Name. Darf-Zeilen höchstens 80 Zeichen. Eine neue Rolle kommt
+  zuerst ins Vokabular (der `Record` bricht sonst den Build). Wächter
+  `einsatz/rollenVokabular.guard.test.ts`.
 - **Voreingestellte Werte heißen „Vorgabe“** (LFH-944, Spec `bedien-begriffe`): nie „Default“,
   „Fallback“ oder „Standard“ im sichtbaren Text. Platzhalter nennen den Wert, der leer wirklich
   gilt; kein „Leer = …“-Satz daneben (LFH-1078). Bausteine in `components/vorgabeText.ts`
@@ -1336,13 +1371,16 @@ anwendbar), „nicht geprüft" ist keins.
   Breite (Schloss in `AppLayout.tsx`). Jede Textfarbe im Rahmen steht in
   `theme/rahmenKontrast.test.ts` und wird dort gerechnet (der Test sieht keine Verwendung, nur
   die Liste). Gilt für jede weitere dauerdunkle Fläche.
-- **Ein `<Space>` in `aktionen` nennt seinen Abstand** (LLH-1273): ohne `size` stehen die Knöpfe
-  4 / 4 / 8 px auseinander, auch im Seitenkopf, dessen Hülle selbst `marginSM` hält. Vorgabe
-  `size={token.marginSM}` (8 / 12 / 16); Wächter `components/aktionenSpace.guard.test.ts`.
-- **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
-  `size="middle"` (`aktionsabstand.guard.test.ts`). Dialogfüße halten dieselbe Stufe (LFH-653,
-  12/20/24 px, Leitlinie ≥ 8 / ≥ 16): der Fuß der Erfassungs-Hülle über `size="middle"`, antds
-  eigene Füße (Modal, `modal.confirm`, `Popconfirm`) über eine Regel in `index.css` mit
+- **Knopfreihen über `Knopfreihe`** (LLH-1973, ADR-0070): zwei oder mehr Knöpfe nebeneinander
+  stehen in `Knopfreihe` mit dem festen Abstand `md` (12 / 20 / 24 px), so steht auch Rot nie
+  bündig neben Neutralem; kein `<Space>`, kein eigener Abstand. Dialogfüße nehmen `fuss` (ab `md`
+  rechtsbündig, darunter untereinander in voller Breite). Primär steht im Kopf, im Paneel und in
+  der Zeile vorn, im Fuß hinten; die Reihe ordnet nicht um. In Tabellenzellen und Zeilen, die ihre
+  Höhe halten, `umbruch={false}`. Ein `<Space>` in `aktionen` der `EinsatzSeite` wird zum
+  Fragment, denn die Kopfhülle ist selbst eine Knopfreihe; nur eine Reihe mit Druckklasse oder
+  Hülle bleibt eine eigene `Knopfreihe` (Kräfte, Lagebericht). Bestand in
+  `components/knopfreihe.schuld.ts` (Ratsche, `knopfreihe.guard.test.ts`). antds eigene Füße
+  (Modal, `modal.confirm`, `Popconfirm`) halten dieselbe Stufe über eine Regel in `index.css` mit
   `var(--ant-padding)`. **Kein Komponenten-Token `marginXS`:** jeder antd-Knopf setzt die Variable
   mit seiner `css-var-…`-Klasse zurück, die Überschreibung kommt am Knopf nie an (gemessen 7 px).
   Nachweis `e2e/dialogfuss-dichte.spec.ts`, `e2e/dokumente.spec.ts`.
@@ -1455,6 +1493,19 @@ und `pages/personen/`.
   gilt stattdessen „höchstens eine offene Bearbeitung je Seite“ (LLH-1139, „Bearbeiten in der
   Ansicht“ unter der UI-Form-Leitlinie): ein Paneel mit eigenem Fuß ist dort kein zweiter
   Speicherweg.
+- **Ungespeichertes ist sichtbar** (LLH-1829, Design-Doc
+  `docs/superpowers/specs/2026-11-19-l1flywem-speichermodelle-kennzeichnen-design.md`): ein Feld,
+  das vom geladenen bzw. zuletzt gespeicherten Stand abweicht, trägt am Etikett einen Punkt „•“
+  (`GeaendertPunkt` in `Feld` und `DatenfeldEingabe`, für Vorleser „(geändert)“), gerechnet von
+  `components/aenderungsstand.tsx` (`AenderungsstandProvider` INNERHALB des `<Form>`, nie
+  `isFieldsTouched`; nach Erfolg `merke(gesendet)` über `useAenderungsstandMerken`). „Speichern“
+  steht nur als `components/SpeicherKnopf.tsx`: ohne Änderung gesperrt, daneben „Keine
+  Änderungen“ bzw. „N Änderungen“; wer das `<Form>` sperrt, reicht `disabled` mit. Enter ohne
+  Änderung schließt eine Bearbeitung (`EnterOhneAenderung`). Wächter
+  `components/speicherKnopf.guard.test.ts`: jede Datei mit `useSpeicherLeiste` nutzt beides. Eine
+  offene `InlineAngabe` zeigt ab der ersten Änderung „Nicht gespeichert“ mit Achtungskante (ohne
+  Tastenerklärung, „Text erklärt nie die Bedienung“); ein Klick daneben schließt sie nur
+  unverändert (still).
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
@@ -1608,9 +1659,10 @@ Spec `bedien-arbeitsplatz`).
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
-  „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026): fünf Felder, das fünfte ist der
-  optionale Einsatzort; ein sechstes gehört in die Kopfdaten. Die Einsatz-Vorlage steht als
-  gedämpfte Zeile unter den Feldern, kein Feld (LLH-1375): das Stichwort stellt sie ein. Ausnahme
+  „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026; LLH-1816, Entscheidung
+  19.11.2026): sechs Felder. Zuerst die Einsatz-Vorlage, weil sie das Menü des ganzen Einsatzes
+  bestimmt und das Stichwort sie einstellt (Modulzahl darunter, Vorgabe „Alle Module“); das letzte
+  ist der optionale Einsatzort; ein siebtes gehört in die Kopfdaten. Ausnahme
   „Lagemeldung erfassen“ (LLH-1921, Entscheidung 17.11.2026, Change
   `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
   Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.

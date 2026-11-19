@@ -4,6 +4,7 @@ import {
   IconDokumente,
   IconGlobus,
   IconHandStopp,
+  IconHilfe,
   IconListe,
   IconMond,
   IconMonitor,
@@ -674,6 +675,27 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     schlagworte: ['Anleitung', 'Dokumentation', 'Handbuch'],
     ...sprungZu(hilfePfad(), k.navigate),
   });
+  // Hilfe neben der Arbeit (LLH-1824): Aktionen, keine Navigation, deshalb ohne `ziel`.
+  if (k.oeffneHilfe) {
+    const oeffneHilfe = k.oeffneHilfe;
+    befehle.push({
+      id: 'hilfe:seite',
+      gruppe: 'navigation',
+      label: 'Hilfe zu dieser Seite',
+      icon: IconHilfe,
+      schlagworte: ['Hilfe', 'Anleitung', 'Doku', 'Kapitel', 'F1', '?'],
+      ausfuehren: () => oeffneHilfe('seite'),
+    });
+    if (!k.istBeruehrung)
+      befehle.push({
+        id: 'hilfe:kuerzel',
+        gruppe: 'navigation',
+        label: 'Tastenkürzel',
+        icon: IconHilfe,
+        schlagworte: ['Tasten', 'Kürzel', 'Shortcuts', 'Tastatur'],
+        ausfuehren: () => oeffneHilfe('kuerzel'),
+      });
+  }
   // Verwaltungsbereich und Stammdaten hängen am AdminLayout-Gate `darfVerwaltung`, wie Topbar und
   // Route.
   if (darfVerwaltung(k.benutzer)) {

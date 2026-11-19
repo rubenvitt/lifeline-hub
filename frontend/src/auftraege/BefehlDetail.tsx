@@ -14,7 +14,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { befehlDetailPfad } from '../routing/deeplinks';
 import { vorlage } from '../befehle/vorlagen';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
-import { Augenbraue, Paneel, useRollen } from '../components/instrument';
+import { Augenbraue, Paneel, Textstufe, useRollen } from '../components/instrument';
 import { DetailSprung } from '../components/ListeDetail';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -181,9 +181,9 @@ export default function BefehlDetail({
       <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
         <StatusBadge phase={status.phase} label={status.label} />
       </Space>
-      <Typography.Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block' }}>
+      <Textstufe stufe="kartentitel" als="div">
         {b.titel}
-      </Typography.Text>
+      </Textstufe>
       {fortschreibenMutation.error != null && (
         <div style={{ marginTop: token.marginSM }}>
           <SpeicherFehler

@@ -1,7 +1,8 @@
-import { Button, Flex, Modal, theme } from 'antd';
+import { Button, Modal } from 'antd';
 import { useEffect } from 'react';
 import { useBlocker } from 'react-router';
 import { SpeicherFehler } from './SpeicherHinweis';
+import Stapel from './instrument/Stapel';
 
 interface Props {
   /** Merker der Seite: offene, nicht gespeicherte Änderungen. */
@@ -79,7 +80,6 @@ export function VerlassenDialog({
   onBleiben: () => void;
   onVerwerfen: () => void;
 }) {
-  const { token } = theme.useToken();
   return (
     <Modal
       title="Ungespeicherte Änderungen"
@@ -87,11 +87,11 @@ export function VerlassenDialog({
       onCancel={onBleiben}
       mask={{ closable: false }}
       footer={
-        <Flex gap={token.margin} wrap justify="space-between">
+        <Stapel richtung="zeile" umbruch abstand="md" verteilen="between">
           <Button danger onClick={onVerwerfen}>
             Verwerfen
           </Button>
-          <Flex gap={token.marginSM} wrap>
+          <Stapel richtung="zeile" umbruch abstand="sm">
             <Button type={speichern ? 'default' : 'primary'} onClick={onBleiben}>
               Bleiben
             </Button>
@@ -100,14 +100,14 @@ export function VerlassenDialog({
                 Speichern und weiter
               </Button>
             )}
-          </Flex>
-        </Flex>
+          </Stapel>
+        </Stapel>
       }
     >
-      <Flex vertical gap={token.marginSM}>
+      <Stapel abstand="sm">
         <span>Noch nicht gespeicherte Änderungen gehen beim Verlassen verloren.</span>
         <SpeicherFehler fehler={speicherFehler} />
-      </Flex>
+      </Stapel>
     </Modal>
   );
 }

@@ -41,7 +41,7 @@ export default function FunkUndTelefon({
         <Datenfeld label="Funk" breit>
           {hatFunk ? (
             <Space size={[token.marginXS, token.marginXS]} wrap>
-              {ruf && <span style={monoStil(13)}>{ruf}</span>}
+              {ruf && <span style={monoStil('mono')}>{ruf}</span>}
               {tmo.map((s) => (
                 <Marke key={s.id}>{mitBetriebsart('TMO', s.bezeichnung)}</Marke>
               ))}

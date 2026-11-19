@@ -1,4 +1,5 @@
 import { Form, Input } from 'antd';
+import { Feld } from '../components/instrument';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { disponiereAdhoc, type AdhocEingabe } from '../api/einsatzPersonal';
@@ -68,18 +69,18 @@ export default function AdhocPersonModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+      <Feld label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
         <Input placeholder="z. B. Dr. Schmidt" maxLength={PERSONAL_ADHOC_TEXT_MAX} />
-      </Form.Item>
-      <Form.Item label="Qualifikation" name="funktion">
+      </Feld>
+      <Feld label="Qualifikation" name="funktion">
         <Input placeholder="z. B. Notarzt" maxLength={PERSONAL_ADHOC_TEXT_MAX} />
-      </Form.Item>
-      <Form.Item label="Trägerorganisation" name="traegerorganisation">
+      </Feld>
+      <Feld label="Trägerorganisation" name="traegerorganisation">
         <Input placeholder="z. B. KV Musterstadt" maxLength={PERSONAL_ADHOC_TEXT_MAX} />
-      </Form.Item>
-      <Form.Item label="Stärke-Position" name="staerke_position">
+      </Feld>
+      <Feld label="Stärke-Position" name="staerke_position">
         <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

@@ -136,7 +136,7 @@ describe('Frist am Spiegel (LLH-1492)', () => {
       'Spiegel von ELW 1',
     );
     expect(fristSperrGrund({ status: 'aktiv', meine_rolle: null, org_id: 1 })).toBe(
-      'nur Einsatzleitung oder Org-Admin',
+      'nur Einsatzleitung oder System-Admin der Organisation',
     );
   });
 });
