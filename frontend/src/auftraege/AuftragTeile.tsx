@@ -4,7 +4,14 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Knopfreihe, Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
+import {
+  Knopfreihe,
+  Status,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
