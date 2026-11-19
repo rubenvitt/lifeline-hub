@@ -163,6 +163,40 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     expect(screen.queryByText('Diese Person gibt es nicht (mehr)')).toBeNull();
   });
 
+  // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
+  it.each(['/personen/10', ''] as const)(
+    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite bleibt, Hinweis zeigt den alten Stand',
+    async (unterpfad) => {
+      const { client } = render(einsatzAktiv, detail);
+      await screen.findByRole('region', { name: 'Patientenkopf' });
+
+      server.use(
+        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(kopf()).toBeInTheDocument();
+      expect(screen.queryByText('Person konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
+
+  it('gescheiterter Erstabruf des Einsatzes zeigt weiter die Fehlerseite', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    ]);
+    expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+    ).toBeNull();
+  });
+
   it('verlinkt den Schadenbezug auf die Schaden-Detailseite (LFH-148)', async () => {
     const schaden = {
       id: 99,

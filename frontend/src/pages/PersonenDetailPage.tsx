@@ -16,7 +16,12 @@ import {
   Typography,
 } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
-import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -402,7 +407,10 @@ export default function PersonenDetailPage() {
       </div>
     );
   }
-  if (einsatzQuery.isError || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1975, wie LLH-1947): React Query setzt `error` auch, wenn
+  // nur ein Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher
+  // liegt. Dann bleibt die Seite stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
@@ -411,7 +419,7 @@ export default function PersonenDetailPage() {
   if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
   // Ein anderer Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den
   // neuen Versuch an.
-  if (detailQuery.isError || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <SeitenFehler
         text="Person konnte nicht geladen werden"
@@ -420,6 +428,7 @@ export default function PersonenDetailPage() {
       />
     );
   }
+  const veraltet = einsatzQuery.isError || detailQuery.isError;
   // Meldet der Stand einen Storno, den das (nicht live geladene) Detail noch nicht kennt, gilt die
   // Person ab sofort als storniert: alle Sperren der Seite lesen `storniert_at` (LLH-1832).
   const stand = standQuery.data;
@@ -802,8 +811,16 @@ export default function PersonenDetailPage() {
     <EinsatzSeite
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (p.storniert_at != null || seitenGruende.length > 0) && (
+        (veraltet || p.storniert_at != null || seitenGruende.length > 0) && (
           <Flex vertical gap={token.marginSM}>
+            {veraltet && (
+              <SeitenStandVeraltet
+                onWiederholen={() => {
+                  if (einsatzQuery.isError) void einsatzQuery.refetch();
+                  if (detailQuery.isError) void detailQuery.refetch();
+                }}
+              />
+            )}
             <StornoBanner stand={p} />
             {seitenGruende.map((g) => (
               <SpeicherFehler

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -77,6 +77,8 @@ interface Aufbau {
   sprung?: string[];
   /** Vorbefüllter Cache. */
   client?: QueryClient;
+  /** Der Einsatz-Abruf scheitert (500). */
+  einsatzFehler?: boolean;
 }
 
 let requests: string[];
@@ -96,7 +98,9 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
   server.use(
     meHandler(a.benutzer ?? adminFixture()),
     http.get('/api/einsaetze/7', () =>
-      HttpResponse.json(einsatzFixture({ id: 7, bezeichnung: 'Hochwasser', ...a.einsatz })),
+      a.einsatzFehler
+        ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+        : HttpResponse.json(einsatzFixture({ id: 7, bezeichnung: 'Hochwasser', ...a.einsatz })),
     ),
     http.get('/api/einsaetze/7/modul-freigaben', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
@@ -245,6 +249,43 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
     renderAnsicht('/einsaetze/7/personal/99', { marke });
     expect(await screen.findByText('Nicht (mehr) im Einsatz')).toBeVisible();
     expect(marke.current).toBe(true);
+  });
+
+  // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
+  it.each([
+    ['aktiv', '', {}],
+    ['aktiv', '/personal', {}],
+    ['entlassen', '/personal', { aktiv: [], entlassene: [kraft()] }],
+  ] as const)(
+    'gescheiterter Neuabruf (%s, /api/einsaetze/7%s): Seite bleibt, Hinweis zeigt den alten Stand',
+    async (_lage, unterpfad, aufbau) => {
+      const { client } = renderAnsicht('/einsaetze/7/personal/10', {
+        aktiv: aufbau.aktiv ? [...aufbau.aktiv] : undefined,
+        entlassene: aufbau.entlassene ? [...aufbau.entlassene] : undefined,
+      });
+      expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Lena Beispiel');
+
+      server.use(
+        http.get(`/api/einsaetze/7${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Lena Beispiel');
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+      expect(screen.queryByText(/Personal konnte nicht geladen werden/)).toBeNull();
+    },
+  );
+
+  it('gescheiterter Erstabruf des Einsatzes zeigt weiter die Fehlerseite', async () => {
+    renderAnsicht('/einsaetze/7/personal/10', { einsatzFehler: true });
+    expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 
   it('eine vorhandene Person setzt die Marke nicht', async () => {
