@@ -1132,7 +1132,11 @@ export default function Schnellerfassung({
         <span
           id={anhangGrundId}
           data-lfh="etb-anhang-grund"
-          style={{ ...(online ? monoStil(12) : {}), color: rollen.text2, whiteSpace: 'nowrap' }}
+          style={{
+            ...(online ? monoStil('monoKlein') : {}),
+            color: rollen.text2,
+            whiteSpace: 'nowrap',
+          }}
         >
           {anhangGrund}
         </span>

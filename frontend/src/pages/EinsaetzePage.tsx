@@ -495,7 +495,7 @@ function EinsaetzeInhalt() {
           </span>
           <span
             style={{
-              ...monoStil(12),
+              ...monoStil('monoKlein'),
               display: 'flex',
               flexWrap: 'wrap',
               columnGap: token.marginXS,

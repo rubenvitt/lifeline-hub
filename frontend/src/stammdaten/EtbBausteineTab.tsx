@@ -112,7 +112,7 @@ export default function EtbBausteineTab() {
           <span
             data-typ={t}
             style={{
-              ...monoStil(11, 500),
+              ...monoStil('meta', 500),
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: farbe.wort,
@@ -131,7 +131,7 @@ export default function EtbBausteineTab() {
       key: 'sortier',
       sorter: nachZahl((b: EtbBaustein) => b.sortier),
       // Zahlen in Mono — die Spalte wird zeilenweise verglichen.
-      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+      render: (n: number) => <span style={monoStil('monoKlein')}>{n}</span>,
     },
     ...(istAdmin
       ? ([

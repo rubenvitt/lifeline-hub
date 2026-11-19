@@ -61,11 +61,11 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
   const eid = parseRouteId(einsatzId);
   if (!bezug || eid == null) {
     // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → Verweistext ohne Link.
-    return <span style={monoStil(11)}>{text}</span>;
+    return <span style={monoStil('meta')}>{text}</span>;
   }
   // Verweis als Link mit ↗-Zeichen, kein farbiges Etikett.
   return (
-    <KennungsLink to={bezug.pfad(eid, e.bezug_id)} style={monoStil(11)}>
+    <KennungsLink to={bezug.pfad(eid, e.bezug_id)} style={monoStil('meta')}>
       {text}
     </KennungsLink>
   );

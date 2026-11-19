@@ -398,10 +398,10 @@ function rasterSpalten(
       render: (_t, z) =>
         !staerkeBekannt ? (
           z.art === 'einheit' || z.art === 'fahrzeug' ? (
-            <span style={monoStil(12)}>—</span>
+            <span style={monoStil('monoKlein')}>—</span>
           ) : null
         ) : z.staerke ? (
-          <span style={monoStil(12)} title={STAERKE_AUSGESCHRIEBEN}>
+          <span style={monoStil('monoKlein')} title={STAERKE_AUSGESCHRIEBEN}>
             {staerkeText(z.staerke)}
           </span>
         ) : z.besatzung ? (
@@ -417,7 +417,7 @@ function rasterSpalten(
       width: 90,
       render: (_t, z) =>
         (z.art === 'einheit' && z.einheitId != null) || z.art === 'fahrzeug' ? (
-          <span data-lfh="meldebild-seit" style={monoStil(12)}>
+          <span data-lfh="meldebild-seit" style={monoStil('monoKlein')}>
             {z.seit ? kontext.zeit(z.seit) : '—'}
           </span>
         ) : null,
@@ -449,7 +449,7 @@ function rasterSpalten(
       abBreite: 'xxl',
       render: (_t, z) =>
         z.art === 'einheit' && z.funkrufname ? (
-          <span style={monoStil(12)}>{z.funkrufname}</span>
+          <span style={monoStil('monoKlein')}>{z.funkrufname}</span>
         ) : null,
     },
     // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht
@@ -460,7 +460,7 @@ function rasterSpalten(
       title: (
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span>Fahrzeuge und Personal</span>
-          <span data-lfh="status-legende" style={{ ...monoStil(10), fontWeight: 400 }}>
+          <span data-lfh="status-legende" style={{ ...monoStil('metaKlein'), fontWeight: 400 }}>
             bereit · gebunden · Ausfall
           </span>
         </span>
@@ -486,7 +486,7 @@ function ImEinsatzZelle({
   zeit: (utc: string) => string;
 }) {
   if (zustand !== 'daten') return null;
-  if (!eintrag) return <span style={monoStil(12)}>—</span>;
+  if (!eintrag) return <span style={monoStil('monoKlein')}>—</span>;
   const { dauer, einstufung } = eintrag;
   // Der Anker steht sehend im `title`, vorgelesen hinter der Zahl; die Einstufung dahinter.
   return (
@@ -509,7 +509,12 @@ function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
   return (
     <span
       data-lfh="meldebild-besatzung"
-      style={{ ...monoStil(10), display: 'flex', flexDirection: 'column', color: rollen.gedaempft }}
+      style={{
+        ...monoStil('metaKlein'),
+        display: 'flex',
+        flexDirection: 'column',
+        color: rollen.gedaempft,
+      }}
     >
       {zeilen.map((z) => (
         <span key={z}>{z}</span>
@@ -568,7 +573,7 @@ function StatusSpalte({
         {verteilung && (
           <span
             data-lfh="meldebild-statusverteilung"
-            style={{ ...monoStil(11), color: rollen.gedaempft }}
+            style={{ ...monoStil('meta'), color: rollen.gedaempft }}
           >
             {verteilung}
           </span>
@@ -765,7 +770,7 @@ function RueckmeldungZelle({
       data-lfh="meldebild-rueckmeldung"
       data-zustand={anzeige.zustand}
       data-rolle={rolle}
-      style={{ ...monoStil(11), color: farbe, whiteSpace: 'nowrap' }}
+      style={{ ...monoStil('meta'), color: farbe, whiteSpace: 'nowrap' }}
     >
       {zeit ?? '—'}
     </span>

@@ -522,7 +522,7 @@ export default function TiereDetailPage() {
       titel={
         <Space wrap size={token.marginSM}>
           <span>
-            Tier <span style={monoStil(14, 500)}>{kennung}</span>
+            Tier <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status
             groesse="klein"

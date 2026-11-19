@@ -628,9 +628,9 @@ export default function LagemeldungenPage() {
             marginBlockEnd: token.margin,
           }}
         >
-          +<span style={monoStil(12)}>{nachtraege.length}</span>{' '}
+          +<span style={monoStil('monoKlein')}>{nachtraege.length}</span>{' '}
           {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
-          <span style={monoStil(12)}>
+          <span style={monoStil('monoKlein')}>
             {taktisch(letzteLb, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
           </span>{' '}
           übernommen ·{' '}

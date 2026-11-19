@@ -26,7 +26,7 @@ export function Quittungsstand({ anzahl, quittiert }: { anzahl: number; quittier
   return (
     <Text
       type="secondary"
-      style={{ ...monoStil(11), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
+      style={{ ...monoStil('meta'), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
     >
       {anzahl} Empfänger · {quittiert}/{anzahl} quittiert
     </Text>

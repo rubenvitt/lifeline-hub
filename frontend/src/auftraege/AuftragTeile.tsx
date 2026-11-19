@@ -60,7 +60,9 @@ export function AuftragZeit({ auftrag: a }: { auftrag: Auftrag }) {
   const { rollen } = useRollen();
   return (
     <>
-      <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>erteilt</span>
+      <span style={{ display: 'block', ...monoStil('metaKlein'), color: rollen.schwach }}>
+        erteilt
+      </span>
       <span>
         <ZeitAnzeige wert={a.erteilt_at} rolle="kurz" />
       </span>
@@ -122,7 +124,7 @@ export function AuftragKopf({
           </Text>
         )}
         {a.frist_at && (
-          <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
+          <Text type="secondary" style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
             Frist {zeitpunkt(a.frist_at)}
           </Text>
         )}

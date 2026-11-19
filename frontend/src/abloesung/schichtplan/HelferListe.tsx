@@ -289,7 +289,7 @@ export default function HelferListe({
             suchText: (h: SchichtplanHelfer) => h.kennung,
             sorter: nachText((h: SchichtplanHelfer) => h.kennung),
             render: (_: unknown, h: SchichtplanHelfer) =>
-              h.kennung ? <span style={monoStil(13)}>{h.kennung}</span> : '—',
+              h.kennung ? <span style={monoStil('mono')}>{h.kennung}</span> : '—',
           } satisfies KatalogSpalte<SchichtplanHelfer>,
         ]
       : []),

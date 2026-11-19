@@ -446,7 +446,7 @@ export default function LageDashboardPage() {
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 gap: token.padding,
-                ...monoStil(11),
+                ...monoStil('meta'),
                 color: rollen.schwach,
               }}
             >

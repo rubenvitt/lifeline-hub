@@ -98,7 +98,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       // neben der Farbe (WCAG 1.4.1). „Soll erfüllt“ bliebe ein Grün-Teppich.
       render: (_t, z) => (
         <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <span style={monoStil(12)}>{staerkeText(z.ist)}</span>
+          <span style={monoStil('monoKlein')}>{staerkeText(z.ist)}</span>
           {z.urteil === 'unterbesetzt' && (
             // `umbrechen` nimmt antds Außenrand rechts (8 px) weg: er verbreiterte die Spalte.
             <Status darstellung={einheitStaerkeUrteil.unterbesetzt} umbrechen />
@@ -110,7 +110,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       title: 'Soll',
       key: 'soll',
       width: 88,
-      render: (_t, z) => <span style={monoStil(12)}>{staerkeText(z.soll)}</span>,
+      render: (_t, z) => <span style={monoStil('monoKlein')}>{staerkeText(z.soll)}</span>,
     },
     {
       title: 'Abschnitt',
@@ -128,7 +128,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       // 11-|1“ läse sich als zwei Fahrzeuge), nur zwischen den Namen.
       render: (_t, z) =>
         z.fahrzeuge.length > 0 ? (
-          <span data-lfh="einheit-fahrzeuge" style={monoStil(12)}>
+          <span data-lfh="einheit-fahrzeuge" style={monoStil('monoKlein')}>
             {z.fahrzeuge.length} ·{' '}
             {z.fahrzeuge.map((f, i) => (
               <Fragment key={`${i}-${f}`}>

@@ -285,7 +285,7 @@ export default function Koerperschema({
                 onStern={(id) => !laeuft && setAuswahl({ art: 'stern', id })}
               />
               <figcaption
-                style={{ ...monoStil(12), color: rollen.gedaempft, textAlign: 'center' }}
+                style={{ ...monoStil('monoKlein'), color: rollen.gedaempft, textAlign: 'center' }}
                 aria-hidden="true"
               >
                 {ansicht}
@@ -352,7 +352,7 @@ export default function Koerperschema({
                 style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
               >
                 <Typography.Text strong>
-                  <span style={monoStil(13)}>{stern.nummer}</span>{' '}
+                  <span style={monoStil('mono')}>{stern.nummer}</span>{' '}
                   {verletzungText(stern.verletzung)}
                 </Typography.Text>
                 {aufhebenGesperrt && (
@@ -436,8 +436,8 @@ export function VerletzungsListe({ eintraege }: { eintraege: readonly Nummeriert
     >
       {eintraege.map(({ nummer, verletzung: v }) => (
         <li key={v.id}>
-          <span style={{ ...monoStil(13, 500) }}>{nummer}</span> {verletzungText(v)} ·{' '}
-          <span style={monoStil(13)}>
+          <span style={{ ...monoStil('mono', 500) }}>{nummer}</span> {verletzungText(v)} ·{' '}
+          <span style={monoStil('mono')}>
             <ZeitAnzeige wert={v.zeitpunkt_at} rolle="kurz" />
           </span>
         </li>

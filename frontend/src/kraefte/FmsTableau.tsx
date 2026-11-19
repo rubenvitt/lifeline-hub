@@ -313,7 +313,7 @@ export default function FmsTableau({
                     <span
                       data-lfh="fms-rufname"
                       style={{
-                        ...monoStil(22, 500),
+                        ...monoStil('datenwertKlein'),
                         letterSpacing: '-0.02em',
                         ...abgeschnitten,
                         minWidth: 0,
@@ -322,7 +322,7 @@ export default function FmsTableau({
                     >
                       {ef.funkrufname}
                     </span>
-                    <span style={{ ...monoStil(11), ...gedaempft, flex: '0 0 auto' }}>
+                    <span style={{ ...monoStil('meta'), ...gedaempft, flex: '0 0 auto' }}>
                       seit {seit}
                     </span>
                   </div>

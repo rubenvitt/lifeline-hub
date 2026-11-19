@@ -48,7 +48,9 @@ export function VerbindungenListe({
     <Flex vertical gap={token.paddingSM}>
       {verbindungen.map((v, i) => {
         const verweis = verbindungsVerweis(v.mittel, v.wert);
-        const wert = <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>{v.wert}</span>;
+        const wert = (
+          <span style={{ ...monoStil('mono'), overflowWrap: 'anywhere' }}>{v.wert}</span>
+        );
         return (
           <Flex key={`${i}-${v.mittel}-${v.wert}`} wrap align="baseline" gap={token.marginXS}>
             <span style={gedaempft}>{VERBINDUNGSMITTEL_LABEL[v.mittel]}</span>
@@ -113,7 +115,7 @@ export function VerbindungenEingabe({
               <Input
                 {...(i === 0 ? { id, autoFocus } : {})}
                 aria-label={`Nummer oder Adresse ${nr}`}
-                style={{ flex: '1 1 160px', minWidth: 0, ...monoStil(13) }}
+                style={{ flex: '1 1 160px', minWidth: 0, ...monoStil('mono') }}
                 placeholder="z. B. 0170 1234567"
                 maxLength={VERBINDUNG_TEXT_MAX}
                 value={v.wert}

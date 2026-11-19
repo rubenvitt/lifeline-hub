@@ -382,7 +382,7 @@ export default function PersonalPage() {
   /** Dauerzelle: leer ohne Daten, „—" ohne Ereignis (keine erfundene 0). */
   const dauerZelle = (minuten: number | null | undefined) =>
     periodenBereit ? (
-      <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
+      <span style={{ ...monoStil('monoKlein'), whiteSpace: 'nowrap' }}>
         {minuten == null ? '—' : dauer(minuten)}
       </span>
     ) : null;

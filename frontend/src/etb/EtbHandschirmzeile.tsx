@@ -109,7 +109,7 @@ export default function EtbHandschirmzeile({
           {zeit}
         </span>
         {nr != null && (
-          <span style={{ ...monoStil(12), color: rollen.gedaempft, flex: 'none' }}>
+          <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft, flex: 'none' }}>
             <span style={NUR_VORLESER}>Nr. </span>
             {nr}
           </span>

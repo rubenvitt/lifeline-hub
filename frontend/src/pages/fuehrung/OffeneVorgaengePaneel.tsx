@@ -185,7 +185,7 @@ export default function OffeneVorgaengePaneel({
     alarm ? { ...zeile, boxShadow: `inset 3px 0 0 ${rollen.alarm}` } : zeile;
 
   const zeit = (text: string) => (
-    <span style={{ ...monoStil(11), color: rollen.gedaempft, flex: '0 0 auto', minWidth: 48 }}>
+    <span style={{ ...monoStil('meta'), color: rollen.gedaempft, flex: '0 0 auto', minWidth: 48 }}>
       {text}
     </span>
   );
@@ -198,13 +198,13 @@ export default function OffeneVorgaengePaneel({
       >
         {haupt}
       </span>
-      {unter && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unter}</span>}
+      {unter && <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{unter}</span>}
     </span>
   );
   const wort = (w: string, t: 'alarm' | 'achtung' | null) => (
     <span
       data-lfh="vorgang-wort"
-      style={{ ...monoStil(10), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
+      style={{ ...monoStil('metaKlein'), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
     >
       {w}
     </span>
@@ -465,7 +465,7 @@ export default function OffeneVorgaengePaneel({
                       alignItems: 'center',
                       gap: token.marginXXS,
                       minHeight: token.controlHeight,
-                      ...monoStil(11),
+                      ...monoStil('meta'),
                       color: rollen.bedienText,
                       textDecoration: 'none',
                     }}

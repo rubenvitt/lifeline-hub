@@ -111,7 +111,7 @@ function EintragInhalt({
             <span
               data-lfh="typwort"
               style={{
-                ...monoStil(11, 500),
+                ...monoStil('meta', 500),
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
                 color: farbe.wort,

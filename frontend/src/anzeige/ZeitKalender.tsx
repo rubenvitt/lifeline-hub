@@ -202,7 +202,7 @@ export function ZeitKalender({
       )}
       {zonenHinweis && (
         <span style={{ color: rollen.gedaempft }}>
-          Zeiten in <span style={monoStil(12)}>{zonenHinweis}</span>
+          Zeiten in <span style={monoStil('monoKlein')}>{zonenHinweis}</span>
         </span>
       )}
       {/* Die Fußzeile klebt im Blatt unten, wenn der Inhalt rollt (`ZeitpunktEingabe.css`). */}

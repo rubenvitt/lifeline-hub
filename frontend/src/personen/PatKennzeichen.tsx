@@ -124,7 +124,7 @@ export default function PatKennzeichen({
         <InlineAngabe<string>
           etikett="PAT-Nummer"
           wert={pat}
-          anzeige={<span style={monoStil(13)}>{`PAT ${pat}`}</span>}
+          anzeige={<span style={monoStil('mono')}>{`PAT ${pat}`}</span>}
           leer={(w) => w.trim() === ''}
           gleich={(a, b) => a.trim() === b.trim()}
           isValid={(w) => !istZuLang(w, PAT_NUMMER_MAX)}
@@ -142,7 +142,7 @@ export default function PatKennzeichen({
         />
       ) : (
         pat && (
-          <span data-lfh="pat-nummer" style={{ ...monoStil(13), color: rollen.text }}>
+          <span data-lfh="pat-nummer" style={{ ...monoStil('mono'), color: rollen.text }}>
             {`PAT ${pat}`}
           </span>
         )

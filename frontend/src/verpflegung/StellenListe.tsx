@@ -259,7 +259,7 @@ export default function StellenListe({
               <Flex key={zf.id} gap={token.marginXS} wrap align="baseline">
                 <span>{`${zf.bezeichnung} ${uhrzeitenText(zf, konventionen)}`}</span>
                 <span style={{ color: rollen.text2 }}>·</span>
-                <span style={monoStil(13, 500)}>{`${ausgegeben} EP ausgegeben`}</span>
+                <span style={monoStil('mono', 500)}>{`${ausgegeben} EP ausgegeben`}</span>
               </Flex>
             ))
           )}

@@ -398,7 +398,7 @@ export default function SchaedenDetailPage() {
       titel={
         <Space wrap size={token.marginSM}>
           <span>
-            Schaden <span style={monoStil(14, 500)}>{kennung}</span>
+            Schaden <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status darstellung={STATUS_META[s.status]} />
           {s.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}

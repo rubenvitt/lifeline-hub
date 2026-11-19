@@ -55,7 +55,7 @@ export default function EtbSendestatus({ puffer, onSprung }: Props) {
       data-zustand={puffer.art}
       title="Zu den vorgemerkten Einträgen"
       onClick={onSprung}
-      style={{ background: f.grund, color: f.text, ...monoStil(12, 500) }}
+      style={{ background: f.grund, color: f.text, ...monoStil('monoKlein', 500) }}
     >
       {text}
     </Button>

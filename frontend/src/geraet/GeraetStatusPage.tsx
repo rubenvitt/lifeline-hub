@@ -93,13 +93,19 @@ export default function GeraetStatusPage() {
           <Flex align="center" gap="small" wrap data-lfh="einheit-status-aktuell">
             <Status groesse="klein" ton={s.ton} code={s.code ?? undefined} wort={s.wort} trenner />
             {einheit.status.seit && (
-              <span style={{ ...monoStil(13), color: rollen.gedaempft }}>
+              <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}>
                 seit {zeitKurz(einheit.status.seit, konventionen)}
               </span>
             )}
           </Flex>
           {s.verteilung && (
-            <div style={{ ...monoStil(12), color: rollen.gedaempft, marginTop: token.marginXXS }}>
+            <div
+              style={{
+                ...monoStil('monoKlein'),
+                color: rollen.gedaempft,
+                marginTop: token.marginXXS,
+              }}
+            >
               {s.verteilung}
             </div>
           )}

@@ -325,7 +325,7 @@ export default function MaterialAmOrt({
           {showKopfzahl && (
             <span
               data-testid="material-am-ort-kopf"
-              style={{ ...monoStil(12), color: rollen.gedaempft }}
+              style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}
             >
               {materialKopfzahl(posten)}
             </span>
@@ -390,7 +390,7 @@ export default function MaterialAmOrt({
               <span {...(isGeloest ? {} : kontext.ausloeser(p))}>{p.bezeichnung}</span>
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
               {/* Eine Zahl bricht nicht um. */}
-              <span style={{ ...monoStil(13), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
+              <span style={{ ...monoStil('mono'), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
               {/* Statuswahl und „Rückgängig“ teilen ein Gitterfeld (LLH-1722, Spec `material-am-ort`):
                   der Rückweg steht in der gehaltenen Zeile, aber nie an der Stelle des Lösen-Knopfs,
                   den ein zweiter Tipp träfe. */}

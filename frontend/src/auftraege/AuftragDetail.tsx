@@ -222,7 +222,7 @@ export default function AuftragDetail({
               key={`${e.zeit}-${i}`}
               style={{ listStyle: 'none', display: 'flex', gap: token.marginSM, paddingBlock: 2 }}
             >
-              <span style={{ ...monoStil(12), color: rollen.gedaempft, flex: '0 0 auto' }}>
+              <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft, flex: '0 0 auto' }}>
                 <ZeitAnzeige wert={e.zeit} rolle="kurz" />
               </span>
               <span>{e.wort}</span>

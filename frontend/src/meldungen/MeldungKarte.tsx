@@ -423,12 +423,12 @@ function MeldungKarte({
       <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
 
       <Flex align="center" gap={token.marginSM} wrap style={{ marginTop: token.marginSM }}>
-        <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
+        <Text type="secondary" style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
           {WEG_LABEL[m.meldeweg]} · {MELDUNGSART_LABEL[m.meldungsart]} · Ereignis:{' '}
           {zeitpunkt(m.ereigniszeit)}
         </Text>
         {ansicht === 'abgeschlossen' && m.erledigt_at && (
-          <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
+          <Text type="secondary" style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
             Erledigt: {zeitpunkt(m.erledigt_at)}
           </Text>
         )}

@@ -59,7 +59,8 @@ export default function Sichtungszeile({
       }}
     >
       <li data-sichtung-summe="">
-        <span style={{ ...monoStil(14, 500), color: rollen.text }}>{bild.gesamt}</span> gesamt
+        <span style={{ ...monoStil('monoGross', 500), color: rollen.text }}>{bild.gesamt}</span>{' '}
+        gesamt
       </li>
       {kategorien.map((k) => {
         const farbe = k === 'ohne' ? null : sichtung[k].farbe;
@@ -81,7 +82,7 @@ export default function Sichtungszeile({
                 border: `1px solid ${k === 'ohne' ? token.colorTextTertiary : token.colorText}`,
               }}
             />
-            <span style={{ ...monoStil(14, 500), color: rollen.text }}>{bild.je[k]}</span>{' '}
+            <span style={{ ...monoStil('monoGross', 500), color: rollen.text }}>{bild.je[k]}</span>{' '}
             <span>{wort(k)}</span>
           </li>
         );

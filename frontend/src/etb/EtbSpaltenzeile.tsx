@@ -250,7 +250,7 @@ export default function EtbSpaltenzeile({
       >
         {zeit}
       </span>
-      <span style={{ ...monoStil(12), lineHeight: '20px', color: rollen.gedaempft }}>
+      <span style={{ ...monoStil('monoKlein'), lineHeight: '20px', color: rollen.gedaempft }}>
         {nr != null && (
           <>
             <span style={NUR_VORLESER}>Nr. </span>

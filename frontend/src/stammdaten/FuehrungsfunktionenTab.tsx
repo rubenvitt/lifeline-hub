@@ -115,7 +115,7 @@ export default function FuehrungsfunktionenTab() {
               <ListenEintragMeta
                 title={
                   <span>
-                    <span style={monoStil(13)}>{kennung}</span>{' '}
+                    <span style={monoStil('mono')}>{kennung}</span>{' '}
                     <Typography.Text type="secondary">· {ART_TEXT[eintrag.art]}</Typography.Text>{' '}
                     <HerkunftAbzeichen
                       herkunft={herkunft.herkunft('fuehrungsfunktion', eintrag.funktion)}

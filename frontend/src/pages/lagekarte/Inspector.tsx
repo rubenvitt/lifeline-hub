@@ -239,7 +239,7 @@ export default function Inspector({
           >
             {letzte.text}
           </span>
-          <span style={{ ...monoStil(10), color: rollen.schwach }}>{letzte.meta}</span>
+          <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{letzte.meta}</span>
         </section>
       )}
       {marker.typ === 'lagemeldung' && marker.lageMeldung && !lageOffen && (

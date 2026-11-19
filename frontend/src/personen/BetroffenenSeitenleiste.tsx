@@ -123,7 +123,7 @@ export default function BetroffenenSeitenleiste({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: token.marginSM }}>
-            <span data-lfh="summe" style={{ ...monoStil(40, 500), lineHeight: 1 }}>
+            <span data-lfh="summe" style={{ ...monoStil('datenwertGross'), lineHeight: 1 }}>
               {bild.gesamt}
             </span>
             {/* „gesamt“, nicht „erfasst“: „erfasst“ ist ein Personenstatus (LFH-963). */}
@@ -148,7 +148,7 @@ export default function BetroffenenSeitenleiste({
             {SICHTUNGSBILD_REIHE.map((k) => (
               <li key={k} data-sichtung-zeile={k} style={zeile}>
                 <Farbfeld k={k} groesse={8} />
-                <span style={{ ...monoStil(12), color: rollen.text2, width: 72 }}>
+                <span style={{ ...monoStil('monoKlein'), color: rollen.text2, width: 72 }}>
                   {kuerzel(k)}
                 </span>
                 <span style={{ flex: 1, fontSize: 11, color: rollen.schwach }}>{SK_WORT[k]}</span>
@@ -178,7 +178,7 @@ export default function BetroffenenSeitenleiste({
                 </span>
                 <span
                   style={{
-                    ...monoStil(14),
+                    ...monoStil('monoGross'),
                     color: v.offen && v.wert > 0 ? rollen.achtungText : rollen.text,
                   }}
                 >
@@ -206,7 +206,7 @@ export default function BetroffenenSeitenleiste({
                   <span style={{ fontSize: 12, color: rollen.gedaempft }}>
                     {einheitText(k.name, k.abschnitt)}
                   </span>
-                  <span style={{ ...monoStil(14), color: rollen.text }}>{k.wert}</span>
+                  <span style={{ ...monoStil('monoGross'), color: rollen.text }}>{k.wert}</span>
                 </PaneelZeile>
               </li>
             ))}
