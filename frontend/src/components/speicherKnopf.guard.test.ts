@@ -43,7 +43,9 @@ describe('SpeicherKnopf-Wächter (LLH-1829)', () => {
 
   it('jede Datei mit Speichern-Leiste nutzt SpeicherKnopf und AenderungsstandProvider', () => {
     const ohne = mitLeiste()
-      .filter(({ text }) => !/<SpeicherKnopf\b/.test(text) || !/<AenderungsstandProvider\b/.test(text))
+      .filter(
+        ({ text }) => !/<SpeicherKnopf\b/.test(text) || !/<AenderungsstandProvider\b/.test(text),
+      )
       .map(({ datei }) => datei);
     expect(ohne).toEqual([]);
   });
