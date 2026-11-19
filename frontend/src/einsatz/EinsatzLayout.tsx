@@ -897,8 +897,8 @@ function GesperrtesModul({
     queryFn: () => ladeEinstellungen(einsatzId),
   });
   // Wen man fragt (LLH-1819): die Mitglieder mit Rolle Einsatzleitung. Nur wer nicht selbst
-  // freigibt, braucht sie. Scheitert der Abruf (etwa ein gekoppeltes Gerät ohne Zugang zur Route),
-  // steht der Satz ohne Namen.
+  // freigibt, braucht sie. Lädt die Liste noch oder scheitert sie (etwa ohne Netz), steht der Satz
+  // ohne Namen.
   const mitgliederQuery = useQuery({
     queryKey: einsatzKeys.mitglieder(einsatzId),
     queryFn: () => ladeMitglieder(einsatzId),

@@ -160,16 +160,15 @@ const einsatzSchluessel = (e: EinsatzAnzeige) => e.id;
 const einsatzGruppe = (e: EinsatzAnzeige) => e.status;
 
 /**
- * Die Einsatzliste liegt außerhalb jedes Einsatzes: Anzeige und „Einsatz anlegen“ nehmen die
- * Zeitzone der Organisation (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines Einsatzes“).
- */
-
-/**
- * Wer keinen Einsatz sieht, ist meist in keinem Mitglied (LLH-1819): aufnehmen kann nur die
- * Einsatzleitung des jeweiligen Einsatzes. Ohne Namen, die Liste kennt keinen Einsatz.
+ * Wer keinen Einsatz sieht, ist meist in keinem Einsatz Mitglied (LLH-1819): aufnehmen kann nur
+ * die Einsatzleitung des jeweiligen Einsatzes. Ohne Namen, die Liste kennt keinen Einsatz.
  */
 const HINWEIS_KEINE_EINSAETZE = 'Zu einem Einsatz nimmt dich dessen Einsatzleitung auf.';
 
+/**
+ * Die Einsatzliste liegt außerhalb jedes Einsatzes: Anzeige und „Einsatz anlegen“ nehmen die
+ * Zeitzone der Organisation (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines Einsatzes“).
+ */
 export default function EinsaetzePage() {
   return (
     <OrgAnzeigeProvider>
