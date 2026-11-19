@@ -8,7 +8,7 @@ quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/eins
 ## Überblick
 
 Was eine Person in einem Einsatz darf, hängt an ihrer Rolle in diesem Einsatz: **Einsatzleitung**,
-**Führungspersonal** oder **Beobachter**. Die Rollen vergibt die Einsatzleitung eines laufenden
+**Führungspersonal**, **Mitarbeit** oder **Beobachter**. Die Rollen vergibt die Einsatzleitung eines laufenden
 Einsatzes in den Einstellungen des Einsatzes, Reiter „Zugriff“. Ohne Rolle lesen Führungskräfte
 der Organisation und System-Admins mit; schreiben dürfen sie dort nur eingeschränkt.
 
@@ -22,7 +22,8 @@ Für die Einsatzleitung:
    „Zugriff“, die Auswahl „Benutzer …“ ist aufgeklappt. Alternativ im Einsatz „Einstellungen“
    und dort den Reiter „Zugriff“ öffnen, oder in den „Einsatzdaten“ „Zugriff verwalten“ wählen.
 2. Unter „Benutzer …“ die Person wählen und daneben ihre Rolle; vorgewählt ist
-   „Führungspersonal“.
+   „Führungspersonal“. Die Rolle „Mitarbeit“ trägt den Hinweis „Erfasst Meldungen, Chat und
+   ETB-Einträge, ändert sonst nichts.“
 3. „Hinzufügen“ wählen. Die Person steht danach in der Liste, mit ihrer Rolle in einem
    Auswahlfeld.
 
@@ -66,6 +67,22 @@ Sortierung und Filter stehen in der Adresse: ein geteilter Link öffnet die List
 
 - **Einsatzleitung** und **Führungspersonal** schreiben in den Modulen, ändern Kopfdaten,
   Einstellungen und die eigene Führungsstelle.
+- **Mitarbeit** erfasst und ändert sonst nichts; die Kopfzeile nennt als Grund „Du kannst
+  erfassen, aber nichts ändern.“ Gelesen wird wie als Beobachter. Erlaubt ist:
+  - Meldungen erfassen, aber keine Lagemeldung; eigene Meldungen korrigieren, solange sie nicht in
+    der Lage stehen und keine Lagemeldung sind.
+  - Im Chat schreiben sowie eigene Nachrichten bearbeiten und löschen; Kanäle anlegen, einen Bezug
+    setzen und Heraufstufen bleiben zu.
+  - Im Einsatztagebuch Einträge der Typen Meldung und Lage erfassen (die Lage nicht „in den
+    Meldungseingang“) und eigene Einträge berichtigen.
+  - Fotos und Anhänge hochladen, nur eigene anhängen und nur eigene Uploads löschen.
+
+  Alles andere bleibt zu: Meldungen bestätigen, zuweisen oder im Status ändern, Aufträge, Kräfte,
+  Abschnitte und Einstellungen. Ein Modul, das auf „Einsatzführung“ steht, bleibt der Mitarbeit
+  verschlossen. Ohne Netz laufen die erlaubten Eingaben nach (siehe [Ohne Netz](ohne-netz.md)); am
+  Spiegel einer gekoppelten Instanz beantragt Mitarbeit nur Einträge des Einsatztagebuchs und
+  Meldungen, und die führende Instanz wendet dieselben Regeln an und kann einen Antrag später
+  ablehnen (siehe [Instanzkopplung](instanzkopplung.md)).
 - **Beobachter** lesen nur.
 - Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte. Alle anderen sehen den
   Reiter „Zugriff“ als „Nur Ansicht“ mit dem Grund „nur Einsatzleitung“; die Schnellaktion

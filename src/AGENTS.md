@@ -647,7 +647,33 @@ Herleitung in
     `nach_ursprung`).
   - Nachweis: `tests/instanz_vor_ort.rs` (TLS mit rcgen-Zertifikat auf Loopback, Attrappe des
     Suchers statt Multicast).
+- **Fähigkeit `rolle_mitarbeit` (LLH-1817)** steht im Melden beider Seiten
+  (`melden::MeldenAnfrage`, `MeldenAntwort`) und in `instanz_kopplung.gegenueber_rolle_mitarbeit`
+  (Migration 0358). Ein Gegenüber ohne sie bekommt `mitarbeit` als `beobachter`; ein eingehendes
+  `beobachter` eines solchen Gegenübers überschreibt ein lokales `mitarbeit` nicht; kippt die
+  Fähigkeit von 0 auf 1, gehen die Mitgliedschaften mit `mitarbeit` einmal neu hinaus.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
+
+## Backend — Erfassungs-Gate (LLH-1817)
+
+Die Einsatzrolle Mitarbeit erfasst, ändert aber nichts. Regeln (MUST/MUST NOT) und Prüfung in
+[ADR-0070](../docs/architektur/entscheidungen/ADR-0070-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md);
+sie stehen nur dort.
+
+- **Ein Handler trägt `EinsatzErfassungszugriff` oder `EinsatzErfassungsfreigabe`
+  (`einsatz/kontext.rs`, `fordere_erfassungsrecht` in `einsatz/berechtigung.rs`) nur nach bewusster
+  Entscheidung.** Die Positivliste steht im Design-Doc
+  `docs/superpowers/specs/2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit-design.md` (D3); ein
+  Handler kommt erst dazu, wenn dieses Dokument es nennt. Ein bloßes Lockern am Handler ist keine
+  Entscheidung.
+- **`darf_schreiben()` bleibt für Mitarbeit falsch.** Jeder Weg, der Schreibrecht prüft
+  (Benachrichtigungen, Zuweisungen, Auflösung von Funktionen), schließt sie damit aus; nur das
+  Erfassungs-Gate lässt sie ein.
+- **Eigen-Prüfungen stehen im Handler, direkt nach dem Gate** (nur eigene Meldung, Typ des
+  ETB-Eintrags, nur eigene Anhänge); für Einsatzleitung und Führungspersonal ändern sie nichts.
+  Fremdes Objekt 404, verbotene Handlung am eigenen 403 („Statuscode-Konvention“).
+- **Am Spiegel gilt die Positivliste für Anträge** (`instanz/spiegel/antrag.rs`): nur ETB-Eintrag
+  und Meldung; die führende Instanz prüft dieselben Regeln neu.
 
 ## Backend — Admin-Schreibwege am Einsatz (LFH-1066)
 
