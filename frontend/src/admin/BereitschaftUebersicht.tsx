@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { useViewport } from '../components/useViewport';
 import AdminPage from '../components/AdminPage';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import {
@@ -48,6 +49,10 @@ export default function BereitschaftUebersicht() {
   const { benutzer } = useAuth();
   const admin = istAdmin(benutzer ?? undefined);
   const abfrage = useQuery({ queryKey: globalKeys.bereitschaft(), queryFn: loadBereitschaft });
+  // Am Handschirm ist die ganze Zeile der Sprung (Entwurf `Handy.dc.html`): die Bezeichnung trägt
+  // den Link für Tastatur und Vorleser, ein Tipp irgendwo in der Zeile folgt ihm, rechts nur „↗“.
+  const { istSchmal } = useViewport();
+  const navigate = useNavigate();
 
   let inhalt;
   if (abfrage.isPending) {
@@ -84,9 +89,30 @@ export default function BereitschaftUebersicht() {
               <tbody>
                 {wertung.zeilen.map((z) => {
                   const sprung = z.key !== 'benutzer' || admin;
+                  const ziel = ZIEL[z.key]();
+                  const zeileSprung = istSchmal && sprung;
+                  const keinSprungText = (
+                    <Textstufe stufe="meta" ton="schwach">
+                      nur für System-Admins
+                    </Textstufe>
+                  );
                   return (
-                    <tr key={z.key} data-lfh={`bereitschaft-${z.key}`}>
-                      <td style={zelle}>{z.label}</td>
+                    <tr
+                      key={z.key}
+                      data-lfh={`bereitschaft-${z.key}`}
+                      onClick={zeileSprung ? () => navigate(ziel) : undefined}
+                      style={zeileSprung ? { cursor: 'pointer' } : undefined}
+                    >
+                      <td style={istSchmal ? { ...zelle, height: 48 } : zelle}>
+                        {zeileSprung ? (
+                          <Link to={ziel} onClick={(e) => e.stopPropagation()}>
+                            {z.label}
+                          </Link>
+                        ) : (
+                          z.label
+                        )}
+                        {istSchmal && !sprung && <div>{keinSprungText}</div>}
+                      </td>
                       <td style={{ ...zelle, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <span style={monoStil('monoGross', 500)}>{z.zahl}</span>
                         {z.demo > 0 && (
@@ -99,12 +125,12 @@ export default function BereitschaftUebersicht() {
                         <Status ton={STATUS[z.zustand].ton} wort={STATUS[z.zustand].wort} />
                       </td>
                       <td style={{ ...zelle, textAlign: 'right' }}>
-                        {sprung ? (
-                          <Link to={ZIEL[z.key]()}>{z.label} ↗</Link>
+                        {istSchmal ? (
+                          sprung && <span aria-hidden>↗</span>
+                        ) : sprung ? (
+                          <Link to={ziel}>{z.label} ↗</Link>
                         ) : (
-                          <Textstufe stufe="meta" ton="schwach">
-                            nur für System-Admins
-                          </Textstufe>
+                          keinSprungText
                         )}
                       </td>
                     </tr>

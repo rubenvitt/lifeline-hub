@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
@@ -7,6 +8,7 @@ import { renderMitProviders } from '../test/utils';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige, Bereitschaft } from '../api/types';
 import BereitschaftUebersicht from './BereitschaftUebersicht';
+import { setzeViewportBreite } from '../test/viewport';
 
 /** Übersicht der Verwaltung (LLH-1820): Satz, fünf Zeilen, Sprünge, Demo-Anteil. */
 
@@ -36,6 +38,7 @@ function setup(me: BenutzerAnzeige, antwort: Bereitschaft | 'fehler' = BESTAND) 
   return renderMitProviders(
     <Routes>
       <Route path="/admin/uebersicht" element={<BereitschaftUebersicht />} />
+      <Route path="/admin/stammdaten/fahrzeuge" element={<div>Seite Fahrzeuge</div>} />
     </Routes>,
     { route: '/admin/uebersicht' },
   );
@@ -97,5 +100,30 @@ describe('BereitschaftUebersicht (LLH-1820)', () => {
   it('fehler_zeigt_seitenfehler', async () => {
     setup(admin, 'fehler');
     expect(await screen.findByRole('button', { name: /erneut|wiederholen/i })).toBeVisible();
+  });
+
+  describe('am Handschirm (Entwurf Handy.dc.html)', () => {
+    it('die_ganze_zeile_ist_der_sprung', async () => {
+      setzeViewportBreite(390);
+      setup(admin);
+      const fahrzeuge = await zeile('Fahrzeuge');
+      // Die Bezeichnung trägt den Link, rechts nur der Pfeil.
+      expect(within(fahrzeuge).getByRole('link', { name: 'Fahrzeuge' })).toHaveAttribute(
+        'href',
+        '/admin/stammdaten/fahrzeuge',
+      );
+      expect(within(fahrzeuge).queryByRole('link', { name: /↗/ })).toBeNull();
+      // Ein Tipp auf die Zahl genügt.
+      await userEvent.click(within(fahrzeuge).getByText('4'));
+      expect(await screen.findByText('Seite Fahrzeuge')).toBeInTheDocument();
+    });
+
+    it('fuehrungskraft_ohne_sprung_zu_benutzern', async () => {
+      setzeViewportBreite(390);
+      setup(fuehrungskraft);
+      const benutzer = await zeile('Benutzer');
+      expect(within(benutzer).queryByRole('link')).toBeNull();
+      expect(within(benutzer).getByText('nur für System-Admins')).toBeInTheDocument();
+    });
   });
 });
