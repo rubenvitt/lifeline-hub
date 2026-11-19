@@ -735,7 +735,7 @@ nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`
 in der Kategorie ihres Zielmoduls direkt hinter ihm oder einer Marke desselben Ziels (Entscheidungen
 unter ETB in der Erfassung) und erscheint als eingerückte Unteransicht mit Führungslinie, ohne
 Pfeil-Symbol (LLH-1733, `sprungmarken.test.ts` hält die Kategorie);
-`parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
+Die Sicht ist Zustand der Adresse (`personen/usePersonenSicht.ts`, LLH-1826): eine Marke zeigt genau ihre Sicht, was sie nicht nennt, gilt als Vorgabe. Kein Filterwert „patienten".
 Fernmeldeskizze und Kommunikationsplan sind Marken
 hinter „Fernmeldewesen“ (Ziel `fernmeldewesen`, LLH-1180), eine Marke „Funkplan“ gibt es nicht. Gesperrt
 heißt mit Schloss, nicht weg. Jede Marke steht auch in der Sprungpalette (Gruppe „Ansichten“,
@@ -1666,11 +1666,33 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   Personenansicht (`einsatzkraftPfad`), ihre Brotkrume führt auf die Zeilenmarke zurück.
   `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
   Befehls bleibt Vollseite für Entwurf, Druck und Deeplink.
-- **Filter gehören in die URL** (`etbFilterPfad`/`parseEtbFilter`, `mitQuery` kodiert; ETB-Systemeinträge: `frontend/src/etb/AGENTS.md`). Unbekannter
+- **Ansicht und Filter gehören in die Adresse** (LLH-1826, Entwurf
+  `docs/superpowers/specs/2026-11-19-yht1wcsw-ansicht-filter-rueckweg-design.md`): jede Wahl über
+  einer Einsatzliste (Ansicht, Segment, Filter, Suche) ist ein Query-Parameter, gelesen und
+  geschrieben über `routing/useAdressWert.ts` (`useAdressWert`, `useAdressWahl` ohne feste Vorgabe,
+  `useAdressSchalter`, `useAdressKennung`, `useAdressText`, `useAdressSuche` entprellt,
+  `useAdressWertNachRueckfrage` für eine Ansicht, deren Wechsel eine offene Bearbeitung aushängt).
+  Geschrieben mit `replace`, die Vorgabe fehlt in der Adresse, ein unbekannter Wert gilt als
+  Vorgabe. **Kein Sitzungsspeicher** dafür: ein Neueinstieg über das Modulmenü beginnt mit der
+  Vorgabe, damit ein vergessener Filter nichts versteckt (nur Sortierung und Spaltenfilter merkt
+  das Listengedächtnis). Kein `useState` für eine solche Wahl, auch nicht je Einsatz
+  (`…NachEinsatz`): ein anderer Einsatz ist eine andere Adresse. Ausgenommen: die Personensuche
+  (Namen), Aufklappzustände, die Gerätehülle für die Rollposition. Mehrere Schreiber im selben Zug
+  (Link-Aufträge, Listengedächtnis, Werte) gehen über `useAdressAenderung`
+  (`routing/useLinkAuftrag.ts`), nie über `setSearchParams` vom Stand des Renders: der zweite
+  stellte sonst zurück, was der erste geändert hat. Zwei Listen auf einer Seite tragen getrennte
+  Namen (Befehle: `befehle_…`). ETB: `etbFilterPfad`/`parseEtbFilter`, `mitQuery` kodiert;
+  ETB-Systemeinträge: `frontend/src/etb/AGENTS.md`. Unbekannter
   Enum-Wert wird ganz verworfen (exhaustiver `Record<EtbTyp, true>`). Für Tabellen gilt eine
   gemeinsame Kodierung (LLH-1086, `listenZustandParams`/`parseListenZustand`): `sort=<spalte>:auf|ab`
   (`aus` = bewusst unsortiert, die Vorgabe steht nicht da), `f.<spalte>=a,b`, `q=`; geschrieben
   mit `replace`, fremde Parameter bleiben, Unbekanntes prüft `bereinigeListenZustand` weg.
+- **Rollposition beim Zurück** (LLH-1826): `components/RollWiederherstellung.tsx` im
+  `BetriebsLayout` (Stab und Einsatzrahmen; in der Gerätehülle rollt das `main`, dort nicht). Sie
+  merkt die Position je `location.key` (`routing/rollGedaechtnis.ts`, `sessionStorage`), stellt sie
+  beim POP wieder her, sobald die Seite hoch genug ist (höchstens `ROLL_FRIST_MS`), gibt bei eigener
+  Eingabe auf und hält still, wenn die Adresse ein Deeplink-Ziel trägt (`traegtZiel`; ein neuer
+  Deeplink-Parameter gehört in dessen Liste). PUSH beginnt oben, REPLACE rollt nicht.
 - **Zeit in der URL** ist UTC ohne Zone (`dayjs(s)` läse Ortszeit) — Umkehr in `anzeige/zeitEingabe.ts`
   mit eigenem Test. Kodierung per Round-Trip durch `URLSearchParams` prüfen.
 - Filterleiste nur bei **fremder** Änderung neu aufsetzen (nach der Navigation); entprellt wird
