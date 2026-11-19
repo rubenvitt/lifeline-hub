@@ -25,7 +25,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
-import { rollenOptionRender } from '../einsatz/rollenOption';
+import { ROLLEN_LISTE_SCHMAL, rollenOptionRender } from '../einsatz/rollenOption';
 import { ROLLE_IM_EINSATZ_FELD } from '../einsatz/rollenVokabular';
 import { anzahl } from '../anzeige/anzahl';
 
@@ -309,6 +309,7 @@ export default function MitgliederAbschnitt({
           : EINSATZ_ROLLE_OPTIONEN
       }
       optionRender={rollenOptionRender}
+      {...ROLLEN_LISTE_SCHMAL}
       onChange={(rolle) => rolleWaehlen(m, rolle)}
     />
   );
@@ -458,6 +459,7 @@ export default function MitgliederAbschnitt({
             aria-label={ROLLE_IM_EINSATZ_FELD}
             options={EINSATZ_ROLLE_OPTIONEN}
             optionRender={rollenOptionRender}
+            {...ROLLEN_LISTE_SCHMAL}
             onChange={setNeueRolle}
           />
           <Button

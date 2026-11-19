@@ -11,7 +11,7 @@ import {
   type ModulEintrag,
 } from '../../einsatz/modulRegistry';
 import { ROLLEN_OPTIONEN } from './optionen';
-import { rollenOptionRender } from '../../einsatz/rollenOption';
+import { ROLLEN_LISTE_SCHMAL, rollenOptionRender } from '../../einsatz/rollenOption';
 import { Stapel, Textstufe } from '../../components/instrument';
 
 /**
@@ -281,9 +281,7 @@ export default function ModulEinstellungsListe({
             loading={laeuft}
             options={ROLLEN_OPTIONEN}
             optionRender={rollenOptionRender}
-            // Die Liste ist mindestens 280 px breit, damit die Darf-Zeile in höchstens zwei Zeilen
-            // bricht (LLH-1818); das geschlossene Feld zeigt nur den Namen.
-            popupMatchSelectWidth={280}
+            {...ROLLEN_LISTE_SCHMAL}
             onChange={(val) => aufRolle(m.key, val)}
           />
           {hinweis && (

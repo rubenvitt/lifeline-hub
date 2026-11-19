@@ -22,6 +22,13 @@ export function rollenOptionen<K extends string>(
 }
 
 /**
+ * Liste einer Rollenauswahl in einer schmalen Spalte (Reiter Zugriff, Modul-Einstellungen): breit
+ * genug, dass die Darf-Zeile höchstens zweizeilig umbricht, und hoch genug für alle Stufen ohne
+ * Scrollen. Breite Felder (Benutzerdialog) behalten die Breite des Felds.
+ */
+export const ROLLEN_LISTE_SCHMAL = { popupMatchSelectWidth: 340, listHeight: 400 } as const;
+
+/**
  * `optionRender` jeder Rollenauswahl: in der aufgeklappten Liste unter dem Namen klein, was die
  * Rolle darf (`frontend/AGENTS.md`, „Begriffe“, und die Ausnahme in „Texte: zeigen statt
  * erklären“). Muster wie die Zeit unter dem Stand der Lagekarte (`SnapshotLeiste.tsx`).
