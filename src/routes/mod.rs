@@ -148,6 +148,19 @@ pub(crate) async fn etb_sprechgruppe(
     }
 }
 
+/// Verteilt die ETB-Einträge einer Route nach dem Commit, je ID (LLH-1976, `src/AGENTS.md`,
+/// „Backend — ETB live verteilen“). Die IDs kommen aus der `write_retry!`-Closure, nie aus
+/// einem Vec außerhalb: die Closure läuft bei `SQLITE_BUSY` erneut.
+pub(crate) fn etb_verteilen(
+    state: &AppState,
+    einsatz_id: i64,
+    etb_ids: impl IntoIterator<Item = i64>,
+) {
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
+}
+
 /// Legt einen System-ETB-Eintrag DEGRADIERT an (F06/LFH-244, Tier-B): schlägt der ETB-Write
 /// NACH dem bereits committeten Domänen-Write fehl, wird der Fehler NICHT fatal propagiert
 /// (kein falscher 500) — er wird geloggt, die Domänen-Aktion samt ihres SSE-Broadcasts bleibt

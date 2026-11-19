@@ -5,7 +5,7 @@ mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, objekt_ereignisse,
     rolle_setzen, setup, setup_mit_live, setup_mit_pool_und_live, system_etb_anzahl,
-    system_etb_inhalte,
+    system_etb_inhalte, EtbLive,
 };
 
 // ---------- Zusatz-Helfer ----------
@@ -4247,4 +4247,64 @@ async fn ort_altwert_ohne_ortswechsel_ist_422() {
     let (s, j) = material_patch(&app, &admin, einsatz, em, &body.to_string()).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
     assert!(material_zeile(&app, &admin, einsatz, em).await["bemerkung"].is_null());
+}
+
+/// LLH-1976: Jeder System-Eintrag des Materialmoduls geht nach dem Commit als Ereignis `etb`
+/// hinaus; `material` frischt das Einsatztagebuch nicht auf.
+#[tokio::test]
+async fn material_etb_eintraege_gehen_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Feldbetten",
+        "20 Feldbetten",
+        20,
+        "eingetroffen",
+    )
+    .await;
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Feldbetten", 20).await;
+    etb.pruefe(&app, &admin, einsatz, "disponieren").await;
+    let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"menge":30}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "aendern").await;
+    let (s, json) = aufteilen(&app, &admin, einsatz, em, r#"{"menge":10}"#).await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "aufteilen").await;
+    let (s, json) = verknuepfen(&app, &admin, einsatz, em, nid).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "verknuepfen").await;
+    let (s, json) = loesen(&app, &admin, einsatz, em).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "loesen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "entlassen").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&json["vorzustand"].to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "zuruecknehmen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "erneut entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "reaktivieren").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "reaktivieren").await;
+    let frisch = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    etb.pruefe(&app, &admin, einsatz, "zweites disponieren")
+        .await;
+    let (s, json) = aktion(&app, &admin, einsatz, frisch, "stornieren").await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "stornieren").await;
 }
