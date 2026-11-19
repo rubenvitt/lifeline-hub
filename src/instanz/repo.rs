@@ -666,7 +666,7 @@ pub async fn load_gegenueber_rolle_mitarbeit(
 /// Ob das Gegenüber die Einsatzrolle `mitarbeit` kennt (LLH-1817, design.md D7); die erreichte
 /// Seite ruft das mit der Anfrage, die meldende über [`save_faehigkeiten`] mit der Antwort. Lernt
 /// die Kopplung die Fähigkeit neu (0 → 1), gehen die Mitarbeiten, die das Gegenüber bisher als
-/// `beobachter` bekam, einmal neu hinaus (`spiegel::liefern::mitarbeit_nachliefern`). Der
+/// `beobachter` bekam, einmal neu hinaus (`spiegel::liefern::resend_mitarbeit`). Der
 /// Wechsel steht in der Bedingung des UPDATE: eine weitere Meldung mit 1 ändert keine Zeile und
 /// liefert nichts nach.
 pub async fn save_rolle_mitarbeit(
@@ -685,7 +685,7 @@ pub async fn save_rolle_mitarbeit(
     .await?
     .rows_affected();
     if rolle_mitarbeit && geaendert > 0 {
-        super::spiegel::liefern::mitarbeit_nachliefern(conn, kopplung_id).await?;
+        super::spiegel::liefern::resend_mitarbeit(conn, kopplung_id).await?;
     }
     Ok(())
 }

@@ -383,7 +383,7 @@ async fn konten(
 /// führt, neu ins Log. Wie im Log-Trigger (`art::trigger_sql`): alte Logzeile weg, neue mit
 /// frischem Stand; so gehen sie im nächsten Abgleich mit dem echten Wert hinaus. Andere Tabellen
 /// und Rollen bleiben unberührt. Der Aufrufer ruft das nur beim Wechsel 0 → 1, also einmal.
-pub async fn mitarbeit_nachliefern(
+pub async fn resend_mitarbeit(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
 ) -> Result<(), AppError> {

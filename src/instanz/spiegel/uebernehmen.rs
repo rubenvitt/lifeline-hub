@@ -334,7 +334,7 @@ async fn uebernehme_zeilen(
                         .push((z.art.clone(), z.schluessel.clone()));
                 }
                 Abgebildet::Fertig(mut werte, spaeter) => {
-                    behalte_mitarbeit(conn, t, e, &mut werte).await?;
+                    keep_mitarbeit(conn, t, e, &mut werte).await?;
                     match zeile_schreiben(conn, t, einsatz_id, &z.schluessel, &werte).await {
                         Ok(lokal) => {
                             ergebnis.kategorien.insert(t.kategorie);
@@ -716,7 +716,7 @@ async fn ist_mitgliedschaft_eines_stellvertreters(
 /// `mitarbeit`, bleibt die Rolle stehen: Die Spalte behält den hiesigen Wert, die übrigen gelten
 /// (LLH-1817, design.md D7). Ein Gegenüber mit der Fähigkeit stuft wirklich herab. Kein Echo:
 /// Der Spiegel liefert diesen Einsatz nicht zurück, und am Führer bleibt der Stand unberührt.
-async fn behalte_mitarbeit(
+async fn keep_mitarbeit(
     conn: &mut SqliteConnection,
     t: &Tabelle,
     e: &Empfaenger,
