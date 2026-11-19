@@ -114,8 +114,7 @@ Die Zusätze aus D3 stehen im Handler, direkt nach dem Gate, als eine Hilfsfunkt
 
 `einsatz_mitgliedschaft.einsatz_rolle` hat einen CHECK (`migrations/0003_einsatz.sql`). Neue
 Migration mit Tabellenumbau nach `migrations/AGENTS.md` („Tabellenumbau“, ohne
-`-- no-transaction`); CHECK um `'mitarbeit'` erweitert. Die drei Spiegel-Trigger
-alle sechs Trigger aus `0314_einsatz_spiegel.sql` (`einsatz_mitgliedschaft_spiegellog_{i,u,d}`
+`-- no-transaction`); CHECK um `'mitarbeit'` erweitert. Alle sechs Trigger aus `0314_einsatz_spiegel.sql` (`einsatz_mitgliedschaft_spiegellog_{i,u,d}`
 und `…_spiegelschutz_{i,u,d}`), alle übrigen Trigger, der Index `idx_mitgliedschaft_benutzer`
 und die Spalten aus 0100 und 0128 werden übernommen bzw. neu angelegt; der Plan listet sie aus
 dem aktuellen Schema (`sqlite_master`). Nummer per Vergabe-Skript.
