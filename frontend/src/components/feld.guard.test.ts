@@ -86,12 +86,6 @@ const BEREICHE = [
  * dazukommen. Neue Einträge gibt es nicht; eine erledigte Aufgabe streicht ihre.
  */
 const AUSGESPART: Readonly<Record<string, string>> = {
-  // `Feld` kennt noch keinen Weg ohne Feldabstand und mit Flex-Anteil (LLH-1999).
-  'infotelefon/AnrufErfassung.tsx': 'LLH-1999',
-  'entwurf/DokumentEntwurf.tsx': 'LLH-1999',
-  'lagebesprechung/LagebesprechungModal.tsx': 'LLH-1999',
-  'pages/bereitstellungsraum/EintreffenDialog.tsx': 'LLH-1999',
-  'pages/einsatzdaten/EinsatzAbschlussDialog.tsx': 'LLH-1999',
   // `DatenfeldEingabe` klont sein Kind mit der Label-`id` und kennt noch keine Breite (LLH-2000).
   'pages/uhs/UhsAngaben.tsx': 'LLH-2000',
   'pages/BetreuungsstelleDetailPage.tsx': 'LLH-2000',

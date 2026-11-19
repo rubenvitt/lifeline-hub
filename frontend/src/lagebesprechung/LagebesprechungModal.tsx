@@ -160,14 +160,10 @@ export default function LagebesprechungModal({
             label: 'Weitere Angaben',
             forceRender: true,
             children: (
-              <Form.Item
-                label="Zeitpunkt der Besprechung"
-                name="abgehalten"
-                style={{ marginBottom: 0 }}
-              >
+              <Feld label="Zeitpunkt der Besprechung" name="abgehalten" abstand="ohne">
                 {/* Leer gilt der Zeitpunkt des Abschließens (`abschlussBody`). */}
                 <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
-              </Form.Item>
+              </Feld>
             ),
           },
         ]}

@@ -18,7 +18,7 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
 import { useKontextMenue, type KontextHandler } from '../components/useKontextMenue';
-import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { Feld, Paneel, Segmentleiste, useRollen } from '../components/instrument';
 import AbschnittsText from './AbschnittsText';
 import Einstiegsfokus from './Einstiegsfokus';
 import {
@@ -112,7 +112,7 @@ export interface DokumentEntwurfProps {
  *
  * TIPPLATENZ: der Baustein beobachtet das Formular nur über die Leer-Kette (`Form.useWatch` mit
  * Selektor) und rendert nur, wenn ein Abschnitt kippt; jeder Abschnitt ist `memo`. Tippen rendert
- * damit nur das eigene `Form.Item` (Messung `e2e/lagebericht-tippen.spec.ts`).
+ * damit nur das eigene `Feld` (Messung `e2e/lagebericht-tippen.spec.ts`).
  */
 export default function DokumentEntwurf({
   form,
@@ -523,11 +523,11 @@ const AbschnittBlock = memo(function AbschnittBlock({
           </div>
         )}
       </div>
-      <Form.Item
+      <Feld
         name={a.schluessel}
         label={a.label}
         labelCol={{ style: { display: 'none' } }}
-        style={{ marginBottom: 0 }}
+        abstand="ohne"
       >
         <AbschnittFeld
           schluessel={a.schluessel}
@@ -542,7 +542,7 @@ const AbschnittBlock = memo(function AbschnittBlock({
           autoSize={EDITOR_ZEILEN}
           aria-describedby={a.hilfetext ? hilfeId : undefined}
         />
-      </Form.Item>
+      </Feld>
     </section>
   );
 });
@@ -553,7 +553,7 @@ type AbschnittFeldProps = ComponentProps<typeof MarkdownEditor> & {
 };
 
 /**
- * Das Kind des `Form.Item`: der Editor, dazu meldet es sein `onChange` zum Leeren an (design.md
+ * Das Kind des `Feld`: der Editor, dazu meldet es sein `onChange` zum Leeren an (design.md
  * D2). „Abschnitt leeren“ ruft `onChange('')` und läuft damit den Weg des Tippens:
  * `onValuesChange` der Seite (Verlustschutz, Stand der Übernahme) und die Leer-Kette folgen.
  * `form.setFieldValue` löste `onValuesChange` nicht aus. Der Ref geht an den Editor, damit

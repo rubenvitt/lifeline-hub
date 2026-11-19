@@ -12,7 +12,9 @@ import GeaendertPunkt from './GeaendertPunkt';
  * aus 100 % breit setzt, füllt die Klasse {@link FELD_KLASSE} in `index.css`.
  *
  * Bewusst ohne `style`: eine Pixelbreite lässt sich nicht ausdrücken. Ein Sonderfall wird eine
- * neue Stufe, keine Ausnahme. Regel: `frontend/AGENTS.md`, „Gestaltungssprache“, Bausteine;
+ * neue Stufe, keine Ausnahme. Für Felder nebeneinander in einer Zeile und für das letzte Feld
+ * eines Dialogs gibt es zwei benannte Optionen (LLH-1999): `abstand="ohne"` lässt den Feldabstand
+ * darunter weg, `zeile` gibt den Flex-Anteil als Stufe aus `FELDBREITE`. Regel: `frontend/AGENTS.md`, „Gestaltungssprache“, Bausteine;
  * Wächter `components/feld.guard.test.ts`.
  */
 
@@ -29,16 +31,44 @@ export const FELD_GRENZE = '--lfh-feldgrenze';
 export interface FeldProps<Values = unknown> extends Omit<FormItemProps<Values>, 'style'> {
   /** Obergrenze der Breite; Vorgabe `voll` (ganze Zeile). */
   breite?: Feldbreite;
+  /** Abstand unter dem Feld; `ohne` für Felder einer Zeile und das letzte Feld eines Dialogs. */
+  abstand?: Feldabstand;
+  /**
+   * Anteil in einer Feldzeile (Flex-Container): Basis ist die Stufe aus `FELDBREITE`, das Feld
+   * wächst und schrumpft von dort; `voll` teilt sich den Rest ohne Basis. Ohne Angabe kein Anteil.
+   */
+  zeile?: Feldbreite;
+}
+
+export type Feldabstand = 'normal' | 'ohne';
+
+/** Der Stil des Formularfelds aus den benannten Optionen — die einzige Stelle mit Zahlen. */
+function feldStil(
+  breite: Feldbreite,
+  abstand: Feldabstand,
+  zeile: Feldbreite | undefined,
+): CSSProperties | undefined {
+  const stil: Record<string, string | number> = {};
+  const grenze = FELDBREITE[breite];
+  if (grenze !== undefined) stil[FELD_GRENZE] = `${grenze}px`;
+  if (abstand === 'ohne') stil.marginBottom = 0;
+  if (zeile !== undefined) {
+    stil.flex = `1 1 ${FELDBREITE[zeile] ?? 0}px`;
+    // Ohne `minWidth: 0` schrumpft ein Flex-Kind nie unter die Breite seines Inhalts.
+    stil.minWidth = 0;
+  }
+  return Object.keys(stil).length === 0 ? undefined : (stil as CSSProperties);
 }
 
 export default function Feld<Values = unknown>({
   breite = 'voll',
+  abstand = 'normal',
+  zeile,
   className,
   label,
   messageVariables,
   ...props
 }: FeldProps<Values>) {
-  const grenze = FELDBREITE[breite];
   return (
     <Form.Item<Values>
       {...props}
@@ -57,7 +87,7 @@ export default function Feld<Values = unknown>({
         )
       }
       className={className ? `${FELD_KLASSE} ${className}` : FELD_KLASSE}
-      style={grenze === undefined ? undefined : ({ [FELD_GRENZE]: `${grenze}px` } as CSSProperties)}
+      style={feldStil(breite, abstand, zeile)}
     />
   );
 }
