@@ -534,8 +534,9 @@ describe('ErfassungsFormular — Fuß unter md (LFH-953)', () => {
     );
     const knoepfe = fussKnoepfe();
     for (const k of knoepfe) expect(k).toHaveClass('ant-btn-block');
-    const reihe = knoepfe[0].closest('.ant-space');
-    expect(reihe).toHaveClass('ant-space-vertical');
+    // Der Fuß ist eine Knopfreihe (LLH-1973): unter md eine Spalte, Primär zuletzt.
+    const reihe = knoepfe[0].parentElement!;
+    expect(reihe).toHaveStyle({ flexDirection: 'column', alignItems: 'stretch' });
     // Reihenfolge im Baum = Reihenfolge von oben nach unten.
     const imBaum = Array.from(reihe!.querySelectorAll('button'));
     expect(imBaum).toEqual(knoepfe);
@@ -547,10 +548,12 @@ describe('ErfassungsFormular — Fuß unter md (LFH-953)', () => {
     );
     const knoepfe = fussKnoepfe();
     for (const k of knoepfe) expect(k).not.toHaveClass('ant-btn-block');
-    const reihe = knoepfe[0].closest<HTMLElement>('.ant-space');
-    expect(reihe).toHaveClass('ant-space-horizontal');
-    expect(reihe!.style.flexWrap).toBe('wrap');
-    expect(reihe!.style.justifyContent).toBe('flex-end');
+    const reihe = knoepfe[0].parentElement!;
+    expect(reihe).toHaveStyle({ flexDirection: 'row' });
+    expect(reihe.style.flexWrap).toBe('wrap');
+    expect(reihe.style.justifyContent).toBe('flex-end');
+    // Abstand `md` der Knopfreihe; nacktes Theme: antds `padding` (LLH-1973).
+    expect(reihe.style.gap).toBe(`${theme.getDesignToken().padding}px`);
   });
 });
 

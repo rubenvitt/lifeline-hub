@@ -73,6 +73,7 @@ import {
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { flaeche } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
+import Knopfreihe from '../components/instrument/Knopfreihe';
 
 /**
  * Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). Ein fehlender oder unbekannter
@@ -520,38 +521,46 @@ export default function PersonenDetailPage() {
                     )}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
-                    /* `size="middle"`: „Verwerfen" ist `danger` und stünde sonst bündig neben
-                       „Bestätigen". */
-                    <Space size="middle" style={{ marginLeft: token.margin }}>
-                      <Button
-                        type="primary"
-                        disabled={!darfEinsatzLeiten(einsatz)}
-                        onClick={() =>
-                          abgleichEntscheidenMutation.mutate({
-                            vermisstId: person.id,
-                            abgleichId: a.id,
-                            entscheidung: 'bestaetigt',
-                            person: personSchluessel,
-                          })
-                        }
-                      >
-                        Bestätigen
-                      </Button>
-                      <Button
-                        danger
-                        disabled={!darfEinsatzLeiten(einsatz)}
-                        onClick={() =>
-                          abgleichEntscheidenMutation.mutate({
-                            vermisstId: person.id,
-                            abgleichId: a.id,
-                            entscheidung: 'verworfen',
-                            person: personSchluessel,
-                          })
-                        }
-                      >
-                        Verwerfen
-                      </Button>
-                    </Space>
+                    /* Inline hinter der Kennung, darum die Hülle; den Abstand zwischen
+                       „Bestätigen" und dem roten „Verwerfen" setzt die Knopfreihe. */
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        marginLeft: token.margin,
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      <Knopfreihe umbruch={false}>
+                        <Button
+                          type="primary"
+                          disabled={!darfEinsatzLeiten(einsatz)}
+                          onClick={() =>
+                            abgleichEntscheidenMutation.mutate({
+                              vermisstId: person.id,
+                              abgleichId: a.id,
+                              entscheidung: 'bestaetigt',
+                              person: personSchluessel,
+                            })
+                          }
+                        >
+                          Bestätigen
+                        </Button>
+                        <Button
+                          danger
+                          disabled={!darfEinsatzLeiten(einsatz)}
+                          onClick={() =>
+                            abgleichEntscheidenMutation.mutate({
+                              vermisstId: person.id,
+                              abgleichId: a.id,
+                              entscheidung: 'verworfen',
+                              person: personSchluessel,
+                            })
+                          }
+                        >
+                          Verwerfen
+                        </Button>
+                      </Knopfreihe>
+                    </div>
                   )}
                   {abgleichFehler.grund(a.id) && (
                     <div>{zeilenGrund(abgleichFehler.grund(a.id))}</div>
@@ -773,9 +782,7 @@ export default function PersonenDetailPage() {
   const aufenthaltAktionen = aufenthaltBedienbar && (
     <>
       {p.aktuelle_uhs_id != null ? (
-        // `size="middle"`: eine Aktionsreihe mit einem `danger`-Knopf und weiterer Aktion trägt
-        // mindestens `token.marginSM` Abstand.
-        <Space wrap size="middle">
+        <Knopfreihe>
           <Button onClick={() => setUhsModalOffen(true)}>Verlegen</Button>
           <Button
             danger
@@ -789,7 +796,7 @@ export default function PersonenDetailPage() {
           >
             Austragen
           </Button>
-        </Space>
+        </Knopfreihe>
       ) : (
         !p.aktueller_verbleib && (
           <Button onClick={() => setUhsModalOffen(true)}>In UHS aufnehmen</Button>

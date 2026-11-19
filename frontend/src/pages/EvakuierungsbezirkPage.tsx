@@ -189,7 +189,7 @@ export default function EvakuierungsbezirkPage() {
       }
       aktionen={
         (zeigeKopf || zeigeMelden) && (
-          <Space wrap size="middle">
+          <>
             <Button type="primary" onClick={() => handlungen.oeffneStand(bezirk)}>
               Stand melden
             </Button>
@@ -212,7 +212,7 @@ export default function EvakuierungsbezirkPage() {
                 onWahl={waehle}
               />
             )}
-          </Space>
+          </>
         )
       }
       hinweis={
