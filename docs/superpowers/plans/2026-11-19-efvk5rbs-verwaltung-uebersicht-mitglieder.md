@@ -432,20 +432,20 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
 - Modify: den Bildlauf, falls ein Bild in diesen Kapiteln die Verwaltung oder den Dialog zeigt
   (`docs/anwender/AGENTS.md`, „Bilder“).
 
-- [ ] **Step 1: Texte schreiben.**
-- [ ] **Step 2: Wächter laufen lassen.** `./scripts/check-all.sh --nur schnell`, erwartet: grün,
+- [x] **Step 1: Texte schreiben.**
+- [x] **Step 2: Wächter laufen lassen.** `./scripts/check-all.sh --nur schnell`, erwartet: grün,
   einschließlich der Wächter für Doku und Prettier.
-- [ ] **Step 3: Commit.** `docs: Regeln und Anwenderdoku zu Übersicht und Mitgliedern (LLH-1820)`
+- [x] **Step 3: Commit.** `docs: Regeln und Anwenderdoku zu Übersicht und Mitgliedern (LLH-1820)`
 
 ### Task 9: Abschluss
 
-- [ ] **Step 1: Gate laufen lassen.** `./scripts/check-all.sh --geaendert --ohne-e2e` als ein
+- [x] **Step 1: Gate laufen lassen.** `./scripts/check-all.sh --geaendert --ohne-e2e` als ein
   Aufruf, erwartet: exit 0.
-- [ ] **Step 2: Review starten.** Anlass: Berechtigung und Org-Isolation, mehrere Schreibvorgänge
+- [x] **Step 2: Review starten.** Anlass: Berechtigung und Org-Isolation, mehrere Schreibvorgänge
   in einer Transaktion. Der Review läuft nach `dev-zunder-ausfuehren`, „Review nach Ermessen“.
   Befunde einarbeiten.
-- [ ] **Step 3: Bilder aufnehmen.** Übersicht in drei Zuständen und Dialog zu- und
+- [x] **Step 3: Bilder aufnehmen.** Übersicht in drei Zuständen und Dialog zu- und
   aufgeklappt, mit einer Wegwerf-Spec `frontend/e2e/doku-bilder/zz-efvk5rbs.bilder.ts` nach
   „Bilder der Änderung“.
-- [ ] **Step 4: Push und PR gegen `alpha`.** Die Zunder-Zeile kommt in die PR-Beschreibung.
+- [x] **Step 4: Push und PR gegen `alpha`.** Die Zunder-Zeile kommt in die PR-Beschreibung.
   Danach Zunder `review` mit `pr_url`.
