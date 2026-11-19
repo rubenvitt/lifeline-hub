@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Checkbox, Form, InputNumber, Typography } from 'antd';
+import { App, Breadcrumb, Checkbox, ConfigProvider, Form, InputNumber, Typography } from 'antd';
 import type { FormInstance } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -406,6 +406,8 @@ function FensterPaneel({
 }
 
 /** Die zwei Bedarfsfelder eines Fensters, vorbelegt wie im Zeitfensterdialog. */
+const OHNE_FELDABSTAND = { components: { Form: { itemMarginBottom: 0 } } };
+
 function BedarfsFelder({
   form,
   einsatzId,
@@ -466,10 +468,13 @@ function BedarfsFelder({
     </div>
   );
 
+  // Die Felder schließen das Paneel ab: kein Feldabstand darunter (wie vor LLH-1970 `marginBottom: 0`).
   return (
-    <Stapel richtung="zeile" umbruch abstand="md">
-      {feld('bedarf_kraefte', 'Einsatzkräfte (EP)', kraefteHinweis)}
-      {feld('bedarf_betreute', 'Betreute (EP)', betreuteHinweis)}
-    </Stapel>
+    <ConfigProvider theme={OHNE_FELDABSTAND}>
+      <Stapel richtung="zeile" umbruch abstand="md">
+        {feld('bedarf_kraefte', 'Einsatzkräfte (EP)', kraefteHinweis)}
+        {feld('bedarf_betreute', 'Betreute (EP)', betreuteHinweis)}
+      </Stapel>
+    </ConfigProvider>
   );
 }
