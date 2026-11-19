@@ -9,6 +9,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import Zeitachseneintrag from '../components/instrument/Zeitachseneintrag';
+import Textstufe from '../components/instrument/Textstufe';
 import {
   PANEEL_FEHLER_TITEL,
   PANEEL_FEHLER_TEXT,
@@ -63,7 +64,7 @@ export default function MeldeVerlauf({
 }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const abfrage = useQuery<StandVerlaufEintrag[] | BelegungVerlaufEintrag[], Error, VerlaufZeile[]>(
     {
@@ -133,10 +134,12 @@ export default function MeldeVerlauf({
         data-lfh="verlauf-fehler"
         style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        <b style={{ color: rollen.alarmText, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
-        <span style={{ color: rollen.gedaempft, fontSize: 12 }}>
+        <Textstufe stufe="seitentitel" ton="alarm">
+          {PANEEL_FEHLER_TITEL}
+        </Textstufe>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           Verlauf konnte nicht geladen werden. {PANEEL_FEHLER_TEXT}
-        </span>
+        </Textstufe>
         <span>
           <Button onClick={() => void abfrage.refetch()}>{PANEEL_NEULADEN}</Button>
         </span>

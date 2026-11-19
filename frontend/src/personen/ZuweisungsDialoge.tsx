@@ -12,6 +12,7 @@ import type { Uhs } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SPEZIES_META } from '../pages/tiere/tierHelfer';
+import { Feld } from '../components/instrument';
 
 /**
  * Zuweisungsdialoge der Personen-Detailseite (Aufenthalt in einer UHS, Bezug zu Tier oder Schaden), auf
@@ -80,7 +81,7 @@ export function UhsZuweisenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Unfallhilfsstelle"
         name="uhs_id"
         rules={[{ required: true, message: 'Bitte UHS wählen' }]}
@@ -91,10 +92,10 @@ export function UhsZuweisenDialog({
             .filter((u) => u.status === 'aktiv')
             .map((u) => ({ value: u.id, label: u.bezeichnung }))}
         />
-      </Form.Item>
-      <Form.Item label="Notiz (optional)" name="notiz">
+      </Feld>
+      <Feld label="Notiz (optional)" name="notiz">
         <Input />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }
@@ -165,7 +166,7 @@ export function BezugHinzufuegenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Tier oder Schaden"
         name="bezug"
         rules={[{ required: true, message: 'Bitte Tier oder Schaden wählen' }]}
@@ -199,7 +200,7 @@ export function BezugHinzufuegenDialog({
             },
           ].filter((g) => g.options.length > 0)}
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

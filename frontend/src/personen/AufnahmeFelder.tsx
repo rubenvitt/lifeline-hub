@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, Typography } from 'antd';
+import { Collapse, Input, InputNumber, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
@@ -19,6 +19,7 @@ import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import AnlassWahl from './AnlassWahl';
 import SichtungsWahl from './SichtungsWahl';
 import { VersorgendeEinheitFeld } from './VersorgtVon';
+import { Feld } from '../components/instrument';
 
 /**
  * Werte der Personen-Aufnahme: `PersonEingabe` plus Erst-Sichtung — `status` leitet der
@@ -159,16 +160,16 @@ export default function AufnahmeFelder({
   const ortssuche = einsatzId != null && geraet == null;
   const weitereAngaben = (
     <>
-      <Form.Item label="Name" name="name" rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}>
+      <Feld label="Name" name="name" rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}>
         <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
-      </Form.Item>
-      <Form.Item label="Vorname" name="vorname" rules={[zeichenRegel(PERSON_NAME_MAX, 'Vorname')]}>
+      </Feld>
+      <Feld label="Vorname" name="vorname" rules={[zeichenRegel(PERSON_NAME_MAX, 'Vorname')]}>
         <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
-      </Form.Item>
+      </Feld>
       {modus === 'vermisst' && (
         <>
           <VermisstSeitFeld platzhalter="Zeitpunkt der Meldung" />
-          <Form.Item
+          <Feld
             label="Melder / Kontakt"
             name="melder_kontakt"
             rules={[zeichenRegel(PERSON_ANGABE_MAX, 'Melder / Kontakt')]}
@@ -177,7 +178,7 @@ export default function AufnahmeFelder({
               placeholder="Angehöriger, Kontaktdaten"
               count={zeichenGrenze(PERSON_ANGABE_MAX)}
             />
-          </Form.Item>
+          </Feld>
         </>
       )}
       {modus !== 'vermisst' && (
@@ -185,11 +186,11 @@ export default function AufnahmeFelder({
           {einsatzId != null && <BestaetigtVonFeld einsatzId={einsatzId} />}
           {/* Wie die Sichtung ein Gesundheitsdatum: an der Betreuungsstelle nicht (403). */}
           {!ohneSichtung && (
-            <Form.Item label="Anlass" name="anlass">
+            <Feld label="Anlass" name="anlass">
               <AnlassWahl />
-            </Form.Item>
+            </Feld>
           )}
-          <Form.Item
+          <Feld
             label="Zustand / Verdacht"
             name="zustand"
             rules={[zeichenRegel(PERSON_ZUSTAND_MAX, 'Zustand / Verdacht')]}
@@ -198,15 +199,15 @@ export default function AufnahmeFelder({
               placeholder="z. B. gehfähig, unterkühlt"
               count={zeichenGrenze(PERSON_ZUSTAND_MAX)}
             />
-          </Form.Item>
+          </Feld>
           {!ortssuche && <KoordinateFeld />}
           {/* Nicht am gekoppelten Gerät (LLH-1567, design.md D4); dort fehlt auch die Ortssuche. */}
           {ortssuche && <VersorgendeEinheitFeld einsatzId={einsatzId} />}
         </>
       )}
-      <Form.Item label="Notiz" name="notiz" rules={[zeichenRegel(PERSON_NOTIZ_MAX, 'Notiz')]}>
+      <Feld label="Notiz" name="notiz" rules={[zeichenRegel(PERSON_NOTIZ_MAX, 'Notiz')]}>
         <Input.TextArea rows={2} count={zeichenGrenze(PERSON_NOTIZ_MAX)} />
-      </Form.Item>
+      </Feld>
     </>
   );
 
@@ -220,14 +221,14 @@ export default function AufnahmeFelder({
         </Typography.Paragraph>
       )}
       {modus !== 'vermisst' && !ohneSichtung && (
-        <Form.Item label="Sichtungskategorie" name="sichtung">
+        <Feld label="Sichtungskategorie" name="sichtung">
           {/* Dieselbe Wahl wie bei der Nachsichtung (LLH-1083); abwählbar, denn eine Person darf
              ohne Sichtung entstehen (`FOLGESTATUS_HINWEIS`). Die Gruppe trägt ihren Namen selbst:
              `label[for]` benennt keine `radiogroup`. */}
           <SichtungsWahl abwaehlbar aria-label="Sichtungskategorie" />
-        </Form.Item>
+        </Feld>
       )}
-      <Form.Item label="Geschlecht" name="geschlecht">
+      <Feld label="Geschlecht" name="geschlecht">
         <Select
           allowClear
           placeholder="unbekannt"
@@ -238,28 +239,24 @@ export default function AufnahmeFelder({
             { value: 'unbekannt', label: 'unbekannt' },
           ]}
         />
-      </Form.Item>
-      <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
-        <InputNumber min={0} max={120} style={{ width: 140 }} />
-      </Form.Item>
+      </Feld>
+      <Feld label="Geschätztes Alter (Jahre)" name="alter_geschaetzt" breite="kurz">
+        <InputNumber min={0} max={120} />
+      </Feld>
       {/* „Fundort" ist das LETZTE sichtbare Eingabefeld: der Ort steht am Ende eines
          Aufnahmegesprächs. */}
       {ortssuche ? (
-        <Form.Item
-          label="Fundort"
-          name="antreff_ort"
-          rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}
-        >
+        <Feld label="Fundort" name="antreff_ort" rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}>
           <EinsatzOrtsfeld
             einsatzId={einsatzId}
             etikett="Fundort"
             count={zeichenGrenze(PERSON_ANGABE_MAX)}
             eigenePosition
           />
-        </Form.Item>
+        </Feld>
       ) : (
         // Am Gerät nur Text; der Wert bleibt ein Ortsfeld-Wert, damit beide Wege gleich zerlegen.
-        <Form.Item
+        <Feld
           label="Fundort"
           name="antreff_ort"
           rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}
@@ -270,7 +267,7 @@ export default function AufnahmeFelder({
             placeholder="z. B. Brücke, Sammelstelle"
             count={zeichenGrenze(PERSON_ANGABE_MAX)}
           />
-        </Form.Item>
+        </Feld>
       )}
       <Collapse
         ghost

@@ -1,4 +1,5 @@
 import { App, Form } from 'antd';
+import { Feld } from '../components/instrument';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { SAMMEL_MAX } from '../api/eingabegrenzen';
@@ -159,7 +160,7 @@ export default function PersonalDisponierenModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Personen"
         name="personal_ids"
         rules={[
@@ -195,9 +196,9 @@ export default function PersonalDisponierenModal({
           tagRender={gruendeTagRender(gruende, name)}
           placeholder="Name, Personalnummer, Träger oder Qualifikation"
         />
-      </Form.Item>
+      </Feld>
       {einheitenFrei && (
-        <Form.Item label="In Einheit" name="einheit_id">
+        <Feld label="In Einheit" name="einheit_id">
           <Select<number>
             allowClear
             placeholder="optional"
@@ -208,10 +209,10 @@ export default function PersonalDisponierenModal({
                 form.setFieldValue('fahrzeug_id', undefined);
             }}
           />
-        </Form.Item>
+        </Feld>
       )}
       {fahrzeugeFrei && (
-        <Form.Item label="Auf Fahrzeug" name="fahrzeug_id">
+        <Feld label="Auf Fahrzeug" name="fahrzeug_id">
           <Select<number>
             allowClear
             placeholder="optional"
@@ -220,7 +221,7 @@ export default function PersonalDisponierenModal({
               einheitId != null ? 'Kein Fahrzeug in dieser Einheit' : 'Kein Fahrzeug im Einsatz'
             }
           />
-        </Form.Item>
+        </Feld>
       )}
     </ErfassungsModal>
   );

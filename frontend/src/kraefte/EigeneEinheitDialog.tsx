@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { App, Form, Input, Typography } from 'antd';
+import { Feld } from '../components/instrument';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { bildeEinheit } from '../api/einheiten';
@@ -121,14 +122,14 @@ export default function EigeneEinheitDialog({
     >
       {/* Ein vorbelegter Stamm-Funkrufname über der Grenze wird nie gekürzt, er sperrt das Senden
           (`frontend/AGENTS.md`, Erfassungs-Norm). */}
-      <Form.Item
+      <Feld
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true }, zeichenRegel(EINHEIT_NAME_MAX, 'Name')]}
       >
         <Input maxLength={EINHEIT_NAME_MAX} />
-      </Form.Item>
-      <Form.Item label="Typ" name="typ_id">
+      </Feld>
+      <Feld label="Typ" name="typ_id">
         <Select<number>
           allowClear
           placeholder="ohne Typ"
@@ -137,16 +138,16 @@ export default function EigeneEinheitDialog({
           })}
           options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
         />
-      </Form.Item>
+      </Feld>
       {abschnitte && (
-        <Form.Item label="Abschnitt" name="abschnitt_id">
+        <Feld label="Abschnitt" name="abschnitt_id">
           <Select<number>
             allowClear
             placeholder="ohne Abschnitt"
             notFoundContent="Kein Abschnitt im Einsatz"
             options={abschnitte.map((a) => ({ value: a.id, label: a.name }))}
           />
-        </Form.Item>
+        </Feld>
       )}
       {grund && fahrzeug && (
         <Typography.Paragraph type="danger" data-lfh="eigene-einheit-grund">

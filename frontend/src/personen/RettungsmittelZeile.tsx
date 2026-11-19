@@ -1,9 +1,10 @@
-import { Flex, Typography, theme } from 'antd';
+import { Typography } from 'antd';
 import type { Person } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuthOptional } from '../auth/AuthContext';
 import { KennungsLink } from '../components/kennungsLink';
 import { SprungKnopf } from '../components/Sprung';
+import { Stapel } from '../components/instrument';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { NACHFORDERUNG_STATUS } from '../kommunikation';
 import { rettungsmittelAnforderbar } from '../nachforderungen/personBezug';
@@ -35,7 +36,6 @@ export default function RettungsmittelZeile({
   /** Schreibrecht, Bedienfassung, nicht storniert und angetroffen. */
   bedienbar: boolean;
 }) {
-  const { token } = theme.useToken();
   const geraet = useAuthOptional()?.geraet ?? null;
   const gesperrt = useSprungSperre(einsatzId)('nachforderungen');
   const stand = person.rettungsmittel;
@@ -68,7 +68,7 @@ export default function RettungsmittelZeile({
   );
 
   return (
-    <Flex gap={token.marginSM} wrap align="center">
+    <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
       {anzeige}
       {anfordern && (
         <SprungKnopf
@@ -78,6 +78,6 @@ export default function RettungsmittelZeile({
           Rettungsmittel anfordern
         </SprungKnopf>
       )}
-    </Flex>
+    </Stapel>
   );
 }

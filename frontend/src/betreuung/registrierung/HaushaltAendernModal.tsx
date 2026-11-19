@@ -4,7 +4,7 @@ import { loadRegistrierListe, sendHaushaltWechsel } from '../../api/betreuungReg
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Haushalt, HaushaltZielEingabe } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { useRollen } from '../../components/instrument';
+import { Feld, useRollen } from '../../components/instrument';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import { haushaltKennung } from './registrierKern';
 
@@ -94,7 +94,7 @@ export default function HaushaltAendernModal({
         </Typography.Paragraph>
       )}
       {folge && <Typography.Paragraph>{folge}</Typography.Paragraph>}
-      <Form.Item name="ziel" label="Ziel" rules={[{ required: true, message: 'Haushalt wählen' }]}>
+      <Feld name="ziel" label="Ziel" rules={[{ required: true, message: 'Haushalt wählen' }]}>
         <Radio.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
           {andere.map((h) => (
             <Radio key={h.id} value={String(h.id)} data-lfh="haushalt-ziel">
@@ -107,7 +107,7 @@ export default function HaushaltAendernModal({
             Neuer Haushalt
           </Radio>
         </Radio.Group>
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }
