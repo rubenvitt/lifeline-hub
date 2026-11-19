@@ -241,7 +241,10 @@ final class WebviewTests: XCTestCase {
     func testEinUnerreichbarerServerMeldetSeineFehlerklasse() async throws {
         var gemeldet: [Ablauf.Event] = []
         let begleiter = Navigationsbegleiter(aktiverServer: { nil }) { _, event in gemeldet.append(event) }
-        let ziel = try ServerAdresse.parse("https://127.0.0.1:9")
+        // Ein geschlossener Port, den WebKit nicht sperrt: auf 9 (discard, Fetch-Liste „bad
+        // ports“) meldet WebKit keinen Ladefehler der URL-Schicht, der Webview blieb auf
+        // `about:blank` (Lauf 44419406791).
+        let ziel = try ServerAdresse.parse("https://127.0.0.1:2")
         let web = Webviewfabrik.make(
             fuer: eintrag(ziel), skript: "",
             empfang: Brueckenempfang(dienste: Attrappe(), aktiverServer: { nil }),

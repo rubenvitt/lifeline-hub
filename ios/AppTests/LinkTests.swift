@@ -34,11 +34,13 @@ final class LinkTests: XCTestCase {
     /// `window.open` der eigenen Origin lädt im selben Webview: die Navigation beginnt dort (und
     /// scheitert ohne Server im Test an der Adresse, was der Begleiter meldet). Der Server liegt
     /// auf einem geschlossenen Port: die Verbindung scheitert sofort, während die Auflösung von
-    /// `elw.local` im CI länger dauert, als der Test wartet.
+    /// `elw.local` im CI länger dauert, als der Test wartet. Port 2, nicht 9: 9 (discard) sperrt
+    /// WebKit wie jeden Port der Fetch-Liste „bad ports“, ohne Ladefehler der URL-Schicht; der
+    /// Webview blieb dann auf `about:blank` (Lauf 44419406791).
     func testWindowOpenDerEigenenOriginLaedtImSelbenWebview() async throws {
-        let web = try await lade("<p>ETB</p>", server: try ServerAdresse.parse("https://127.0.0.1:9"))
+        let web = try await lade("<p>ETB</p>", server: try ServerAdresse.parse("https://127.0.0.1:2"))
         _ = try await web.evaluateJavaScript(
-            "window.open('https://127.0.0.1:9/einsaetze/1/etb', '_blank'); 0")
+            "window.open('https://127.0.0.1:2/einsaetze/1/etb', '_blank'); 0")
         await warte(sekunden: 15) { !self.fehlschlaege.isEmpty }
         guard let url = fehlschlaege.first else {
             return XCTFail("keine Navigation im selben Webview: \(gemeldet)")
