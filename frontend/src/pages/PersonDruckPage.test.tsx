@@ -143,8 +143,8 @@ describe('PersonDruckPage', () => {
   });
 
   it('druckt eine Person ohne Status mit „unbekannt“, statt abzustürzen (LLH-1957)', async () => {
-    const { status: _ohne, ...ohneStatus } = person();
-    renderPage(() => HttpResponse.json(ohneStatus));
+    // `undefined` fällt beim Serialisieren weg: das Feld fehlt in der Antwort.
+    renderPage(() => HttpResponse.json({ ...person(), status: undefined }));
     await fertig();
     const dt = within(wurzel()).getByText('Status', { selector: 'dt' });
     expect(dt.nextElementSibling).toHaveTextContent('unbekannt');

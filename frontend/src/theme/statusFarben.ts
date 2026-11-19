@@ -147,7 +147,7 @@ const PERSON_STATUS_UNBEKANNT: StatusDarstellung = { rolle: 'neutral', label: 'u
 export function personStatusDarstellung(
   status: PersonStatus | null | undefined,
 ): StatusDarstellung {
-  return status != null && Object.hasOwn(personStatus, status)
+  return status != null && Object.prototype.hasOwnProperty.call(personStatus, status)
     ? personStatus[status]
     : PERSON_STATUS_UNBEKANNT;
 }
