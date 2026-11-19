@@ -59,7 +59,7 @@ function useSchreibe(schluessel: string): (wert: string | undefined) => void {
 export function useAdressWert<T extends string>(
   schluessel: string,
   erlaubt: Record<T, true>,
-  vorgabe: T,
+  vorgabe: NoInfer<T>,
 ): [T, (neu: T) => void] {
   const [params] = useSearchParams();
   const schreibe = useSchreibe(schluessel);

@@ -1068,6 +1068,21 @@ export function parseAbschnitteAnsicht(params: URLSearchParams): AbschnitteAnsic
     : undefined;
 }
 
+/** Sicht der Meldungen, Zustand der Adresse `?sicht=` (LLH-1826); Vorgabe `offen`. */
+export type MeldungenSicht = 'offen' | 'abgeschlossen';
+export const MELDUNGEN_SICHT_ERLAUBT: Record<MeldungenSicht, true> = {
+  offen: true,
+  abgeschlossen: true,
+};
+
+/** Richtungsfilter der Meldungen, Zustand der Adresse `?richtung=` (LLH-1826); Vorgabe `alle`. */
+export type MeldungenRichtung = 'alle' | 'intern' | 'extern';
+export const MELDUNGEN_RICHTUNG_ERLAUBT: Record<MeldungenRichtung, true> = {
+  alle: true,
+  intern: true,
+  extern: true,
+};
+
 /** `neu` öffnet das Meldungsformular (Schnellaktion „Meldung erfassen“, Leser `MeldungenPage`). */
 export function meldungenPfad(
   einsatzId: number,
