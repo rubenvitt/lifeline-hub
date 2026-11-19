@@ -9262,3 +9262,34 @@ async fn geraetestrom_bekommt_keine_praesenz() {
     strom_lesen(&mut body, &mut ereignisse, Duration::from_millis(400)).await;
     assert!(ereignisse.iter().any(|e| e == "praesenz"), "{ereignisse:?}");
 }
+
+/// Ein Gerät meldet keine Präsenz (LLH-1946, Entwurf D4): die Routen stehen in keiner Liste einer
+/// Funktionsansicht und sind damit verboten.
+#[tokio::test]
+async fn geraet_darf_keine_praesenz_melden() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let einheit = einheit_bilden(&app, &admin, eid, "Trupp 1").await;
+    let uhs = uhs_anlegen(&app, &admin, eid, "BHP 1").await;
+    let (_, geraet) = tablet(&app, &admin, eid, uhs).await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/praesenz"),
+        &geraet,
+        Some(r#"{"objekt":"einsatz","felder":["stichwort"],"fenster":"t"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{eid}/einheiten/{einheit}/praesenz"),
+        &geraet,
+        Some(r#"{"felder":["bemerkung"],"fenster":"t"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert!(live.praesenz_stand(eid).eintraege.is_empty());
+}

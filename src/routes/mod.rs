@@ -87,6 +87,7 @@ pub mod person_verletzung;
 pub mod personal;
 pub mod personal_status;
 pub mod planung;
+pub mod praesenz;
 pub mod programmpunkt;
 pub mod qualifikation;
 pub mod schaden_anhang;

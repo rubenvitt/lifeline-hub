@@ -8,8 +8,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    benutzer_anlegen, einheit_bilden, einsatz_anlegen_mit, live_oeffnen, login_cookie,
-    rolle_setzen, setup_mit_pool_und_live, sse_anfang_lesen,
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen_mit, fremde_org_anlegen,
+    live_oeffnen, login_cookie, rolle_setzen, setup_mit_pool_und_live, sse_anfang_lesen,
 };
 
 use lifeline_hub::live::praesenz::{PraesenzEintrag, PraesenzObjekt};
@@ -162,4 +162,162 @@ async fn ohne_einheiten_kein_einheit_eintrag() {
     assert!(frames[0].1.contains("stichwort"));
     assert!(!gelesen.contains("bemerkung"), "{gelesen:?}");
     assert!(!gelesen.contains(r#""einheit""#), "{gelesen:?}");
+}
+
+// ---------- Schreibwege (Entwurf D4) ----------
+
+fn pfad(eid: i64) -> String {
+    format!("/api/einsaetze/{eid}/praesenz")
+}
+
+fn einheit_pfad(eid: i64, einheit: i64) -> String {
+    format!("/api/einsaetze/{eid}/einheiten/{einheit}/praesenz")
+}
+
+#[tokio::test]
+async fn put_setzt_und_strom_zeigt_den_namen() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let feed = live_oeffnen(&app, &admin, eid).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &pfad(eid),
+        &admin,
+        Some(r#"{"objekt":"einsatz","felder":["leitstellen_nr"],"fenster":"tab-1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &pfad(eid),
+        &admin,
+        Some(r#"{"fenster":"tab-1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &pfad(eid),
+        &admin,
+        Some(r#"{"fenster":"tab-1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "DELETE ist idempotent");
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 300).await;
+    let frames = praesenz_frames(&gelesen);
+    assert_eq!(frames.len(), 2, "{gelesen:?}");
+    assert!(frames[0].1.contains("leitstellen_nr"), "{gelesen:?}");
+    assert!(frames[0].1.contains(r#""fenster":"tab-1""#), "{gelesen:?}");
+    assert!(frames[0].1.contains(r#""von":""#), "{gelesen:?}");
+    assert!(frames[1].1.contains(r#""eintraege":[]"#), "{gelesen:?}");
+}
+
+#[tokio::test]
+async fn einheit_praesenz_ueber_ihre_route() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let einheit = einheit_bilden(&app, &admin, eid, "Trupp 1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &einheit_pfad(eid, einheit),
+        &admin,
+        Some(r#"{"felder":["bemerkung"],"fenster":"tab-1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let stand = live.praesenz_stand(eid);
+    assert_eq!(stand.eintraege.len(), 1);
+    assert_eq!(stand.eintraege[0].objekt, PraesenzObjekt::Einheit);
+    assert_eq!(stand.eintraege[0].einheit_id, Some(einheit));
+}
+
+#[tokio::test]
+async fn ungueltige_meldungen_sind_400() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let einheit = einheit_bilden(&app, &admin, eid, "Trupp 1").await;
+    for body in [
+        r#"{"objekt":"einsatz","felder":["gibtsnicht"],"fenster":"t"}"#,
+        r#"{"objekt":"einsatz","felder":[],"fenster":"t"}"#,
+        r#"{"objekt":"einsatz","felder":["bezeichnung","stichwort","einsatzart","sachverhalt","einsatzort"],"fenster":"t"}"#,
+        r#"{"objekt":"einsatz","felder":["bezeichnung"],"fenster":"a b"}"#,
+        r#"{"objekt":"einheit","felder":["bemerkung"],"fenster":"t"}"#,
+        r#"{"objekt":"gibtsnicht","felder":["bezeichnung"],"fenster":"t"}"#,
+    ] {
+        let (s, v) = anfrage(&app, "PUT", &pfad(eid), &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {v}");
+    }
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &einheit_pfad(eid, einheit),
+        &admin,
+        Some(r#"{"felder":["leitstellen_nr"],"fenster":"t"}"#),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "Einsatzfeld an der Einheit: {v}"
+    );
+}
+
+#[tokio::test]
+async fn ohne_schreibrecht_403_fremde_einheit_404_fremde_org_wie_patch() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
+    let einheit = einheit_bilden(&app, &admin, eid, "Trupp 1").await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Andere Lage").await;
+    let fremde_einheit = einheit_bilden(&app, &admin, anderer, "Trupp 2").await;
+    let bid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, bid, "beobachter").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let einsatz_body = r#"{"objekt":"einsatz","felder":["stichwort"],"fenster":"t"}"#;
+    let einheit_body = r#"{"felder":["bemerkung"],"fenster":"t"}"#;
+
+    let (s, _) = anfrage(&app, "PUT", &pfad(eid), &frieda, Some(einsatz_body)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &einheit_pfad(eid, einheit),
+        &frieda,
+        Some(einheit_body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &einheit_pfad(eid, fremde_einheit),
+        &admin,
+        Some(einheit_body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+
+    fremde_org_anlegen(&pool, "Fremde Org", "fremd", "fremdpw12", "fuehrungskraft").await;
+    let fremd = login_cookie(&app, "fremd", "fremdpw12").await;
+    let (s, _) = anfrage(&app, "PUT", &pfad(eid), &fremd, Some(einsatz_body)).await;
+    let (patch, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{eid}"),
+        &fremd,
+        Some(r#"{"stichwort":"x"}"#),
+    )
+    .await;
+    assert!(s.is_client_error(), "fremde Org: {s}");
+    assert_eq!(s, patch, "fremde Org antwortet wie der PATCH daneben");
 }

@@ -345,6 +345,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_fuehrungsstelle::lesen)
                 .patch(routes::einsatz_fuehrungsstelle::aendern),
         )
+        // Präsenz an Einzelangaben (LLH-1946): nur Speicher, Gate wie der PATCH daneben.
+        .route(
+            "/api/einsaetze/{id}/praesenz",
+            put(routes::praesenz::einsatz_melden).delete(routes::praesenz::einsatz_beenden),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/praesenz",
+            put(routes::praesenz::einheit_melden).delete(routes::praesenz::einheit_beenden),
+        )
         // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
         // Rechten der Kopfdaten.
         .route(
