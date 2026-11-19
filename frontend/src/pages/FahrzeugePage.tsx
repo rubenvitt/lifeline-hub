@@ -270,7 +270,11 @@ function BesatzungsBlock({
             <div key={m.id}>
               <Space
                 size="middle"
-                style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  maxWidth: 'var(--lfh-feld-mittel)',
+                }}
               >
                 <Space size={token.marginSM} wrap>
                   <Typography.Text type={geloest ? 'secondary' : undefined}>
@@ -343,8 +347,11 @@ function BesatzungsBlock({
       )}
       {darfSchreiben && (
         // Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): die Hülle trägt die Breite
-        // der Besatzungszeilen darüber.
-        <div className={FELD_KLASSE} style={{ maxWidth: 420, marginTop: token.marginSM }}>
+        // der Besatzungszeilen darüber (Stufe `mittel`).
+        <div
+          className={FELD_KLASSE}
+          style={{ maxWidth: 'var(--lfh-feld-mittel)', marginTop: token.marginSM }}
+        >
           <Select
             placeholder="Kraft zur Besatzung …"
             value={null}
@@ -355,7 +362,7 @@ function BesatzungsBlock({
         </div>
       )}
       {zuordnenFehler && (
-        <div style={{ maxWidth: 420, marginTop: token.marginSM }}>
+        <div style={{ maxWidth: 'var(--lfh-feld-mittel)', marginTop: token.marginSM }}>
           <SpeicherFehler
             fehler={zuordnenFehler.fehler}
             titel="Nicht zugeordnet"

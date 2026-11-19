@@ -101,9 +101,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten) ·
   `Textstufe` (Stufe und Ton, kein `style`) · `Stapel` (Abstand als Rasterstufe) · `MetaZeile`
   (Angaben mit „·“, leere Teile fallen weg, `Teil mono` für Zahlen) · `Feld` (`Form.Item` mit
-  `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`). Im
-  Verwaltungsteil verlangt `components/feld.guard.test.ts` `Feld` statt `Form.Item` und keine
-  Breite am Eingabefeld; ein Feld ohne Formular steht in einem `div` mit
+  `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`). In
+  den umgestellten Bereichen (`BEREICHE`: Verwaltungsteil, `pages/`, Fachbereiche, LLH-1971)
+  verlangt `components/feld.guard.test.ts` `Feld` statt `Form.Item` und keine Breite am
+  Eingabefeld; ein Feld ohne Formular steht in einem `div` mit
   `className={FELD_KLASSE}` und `maxWidth: 'var(--lfh-feld-…)'` (dann füllen auch Zahl, Datum
   und Auswahl die Hülle).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):

@@ -6,6 +6,7 @@ import { anzahl } from '../anzeige/anzahl';
 import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import { useOnline } from '../offline/useOnline';
 import { GERAET_START_PFAD, KOPPELN_PFAD } from '../routing/deeplinks';
+import { Textstufe } from '../components/instrument';
 import { GeraeteKarte } from './GeraeteKarte';
 
 /**
@@ -52,9 +53,9 @@ export default function KopplungBeendetPage() {
 
   return (
     <GeraeteKarte untertitel="Gerät">
-      <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
+      <Textstufe als="h2" stufe="kartentitel">
         {online ? 'Kopplung beendet' : 'Keine Verbindung'}
-      </Typography.Title>
+      </Textstufe>
       {online && <Typography.Paragraph>Neuen Code gibt die Einsatzleitung.</Typography.Paragraph>}
       {offen > 0 && (
         <Typography.Paragraph type="warning" strong>

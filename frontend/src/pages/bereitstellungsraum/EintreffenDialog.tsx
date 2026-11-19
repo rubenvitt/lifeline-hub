@@ -1,16 +1,4 @@
-import {
-  Alert,
-  App,
-  Button,
-  Collapse,
-  ConfigProvider,
-  Form,
-  Input,
-  Modal,
-  Space,
-  Typography,
-  type ThemeConfig,
-} from 'antd';
+import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../api/client';
@@ -104,9 +92,6 @@ function isDoppelbuchung(fehler: unknown): boolean {
 function kurz(text: string, max = 30): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
-
-/** Feldzeilen der weiteren Fahrzeuge ohne antds Abstand unter jedem Feld; die Zeilen reiht `Stapel`. */
-const OHNE_FELDABSTAND: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } };
 
 /** Hinweise einer Trefferzeile („vorgemerkt …“, „mit 1 Untereinheit“) als Metazeile. */
 function HinweisZeile({ hinweise }: { hinweise: readonly string[] }) {
@@ -726,67 +711,64 @@ export default function EintreffenDialog({
                   {(zeilen, { add, remove }) => (
                     // Die Zeilen tragen ihren Abstand selbst (`Stapel`): ohne den Feldabstand
                     // darunter stünde unter jeder Zeile eine Lücke wie unter einem ganzen Feld.
-                    <ConfigProvider theme={OHNE_FELDABSTAND}>
-                      <Stapel abstand="sm">
-                        {zeilen.map((z, i) => (
-                          <Stapel
-                            key={z.key}
-                            richtung="zeile"
-                            umbruch
-                            abstand="sm"
-                            ausrichten="start"
+                    // `Feld` kennt das noch nicht (Folgeaufgabe zu LLH-1971), deshalb `Form.Item`.
+                    <Stapel abstand="sm">
+                      {zeilen.map((z, i) => (
+                        <Stapel
+                          key={z.key}
+                          richtung="zeile"
+                          umbruch
+                          abstand="sm"
+                          ausrichten="start"
+                        >
+                          <Form.Item
+                            style={{ flex: '2 1 180px', marginBottom: 0 }}
+                            name={[z.name, 'funkrufname']}
+                            dependencies={[['weitere', z.name, 'fahrzeugtyp']]}
+                            rules={[
+                              // Eine Zeile mit Typ, aber ohne Namen ginge beim Senden still verloren.
+                              ({ getFieldValue }) => ({
+                                validator: (_, wert?: string) =>
+                                  wert?.trim() ||
+                                  !getFieldValue(['weitere', z.name, 'fahrzeugtyp'])?.trim()
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Funkrufname angeben')),
+                              }),
+                              zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Funkrufname'),
+                            ]}
                           >
-                            <div style={{ flex: '2 1 180px' }}>
-                              <Feld
-                                name={[z.name, 'funkrufname']}
-                                dependencies={[['weitere', z.name, 'fahrzeugtyp']]}
-                                rules={[
-                                  // Eine Zeile mit Typ, aber ohne Namen ginge beim Senden still verloren.
-                                  ({ getFieldValue }) => ({
-                                    validator: (_, wert?: string) =>
-                                      wert?.trim() ||
-                                      !getFieldValue(['weitere', z.name, 'fahrzeugtyp'])?.trim()
-                                        ? Promise.resolve()
-                                        : Promise.reject(new Error('Funkrufname angeben')),
-                                  }),
-                                  zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Funkrufname'),
-                                ]}
-                              >
-                                <Input
-                                  aria-label={`Funkrufname weiteres Fahrzeug ${i + 1}`}
-                                  placeholder="Funkrufname"
-                                  count={zeichenGrenze(FAHRZEUG_ADHOC_TEXT_MAX)}
-                                />
-                              </Feld>
-                            </div>
-                            <div style={{ flex: '1 1 120px' }}>
-                              <Feld
-                                name={[z.name, 'fahrzeugtyp']}
-                                rules={[zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Fahrzeugtyp')]}
-                              >
-                                <Input
-                                  aria-label={`Fahrzeugtyp weiteres Fahrzeug ${i + 1}`}
-                                  placeholder="Fahrzeugtyp"
-                                  count={zeichenGrenze(FAHRZEUG_ADHOC_TEXT_MAX)}
-                                />
-                              </Feld>
-                            </div>
-                            <Button
-                              danger
-                              aria-label={`Fahrzeug ${i + 1} entfernen`}
-                              onClick={() => remove(z.name)}
-                            >
-                              entfernen
-                            </Button>
-                          </Stapel>
-                        ))}
-                        {zeilen.length < SAMMEL_MAX - 1 && (
-                          <Button onClick={() => add({})} style={{ alignSelf: 'flex-start' }}>
-                            Fahrzeug hinzufügen
+                            <Input
+                              aria-label={`Funkrufname weiteres Fahrzeug ${i + 1}`}
+                              placeholder="Funkrufname"
+                              count={zeichenGrenze(FAHRZEUG_ADHOC_TEXT_MAX)}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            style={{ flex: '1 1 120px', marginBottom: 0 }}
+                            name={[z.name, 'fahrzeugtyp']}
+                            rules={[zeichenRegel(FAHRZEUG_ADHOC_TEXT_MAX, 'Fahrzeugtyp')]}
+                          >
+                            <Input
+                              aria-label={`Fahrzeugtyp weiteres Fahrzeug ${i + 1}`}
+                              placeholder="Fahrzeugtyp"
+                              count={zeichenGrenze(FAHRZEUG_ADHOC_TEXT_MAX)}
+                            />
+                          </Form.Item>
+                          <Button
+                            danger
+                            aria-label={`Fahrzeug ${i + 1} entfernen`}
+                            onClick={() => remove(z.name)}
+                          >
+                            entfernen
                           </Button>
-                        )}
-                      </Stapel>
-                    </ConfigProvider>
+                        </Stapel>
+                      ))}
+                      {zeilen.length < SAMMEL_MAX - 1 && (
+                        <Button onClick={() => add({})} style={{ alignSelf: 'flex-start' }}>
+                          Fahrzeug hinzufügen
+                        </Button>
+                      )}
+                    </Stapel>
                   )}
                 </Form.List>
               ),

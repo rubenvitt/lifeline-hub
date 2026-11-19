@@ -1,4 +1,4 @@
-import { App, Button, ConfigProvider, Form, Input, type ThemeConfig } from 'antd';
+import { App, Button, Form, Input } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, type ReactNode } from 'react';
 import { loadAbschlussPruefung, schliesseEinsatzAb } from '../../api/einsaetze';
@@ -125,9 +125,6 @@ const EINZEILIG = {
   whiteSpace: 'nowrap',
   textOverflow: 'ellipsis',
 } as const;
-
-/** Das Bestätigungsfeld schließt den Dialog ab: ohne antds Abstand unter dem Feld. */
-const OHNE_FELDABSTAND: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } };
 
 interface AbschlussWerte {
   bestaetigung?: string;
@@ -266,19 +263,19 @@ export default function EinsatzAbschlussDialog({
             <span data-lfh="abschluss-kopplung-satz">{KOPPLUNG_SATZ}</span>
           </Textstufe>
 
-          {/* Letztes Feld des Dialogs: ohne antds Feldabstand darunter, den Abstand trägt `Stapel`. */}
-          <ConfigProvider theme={OHNE_FELDABSTAND}>
-            <Feld
-              label={
-                hatNummer
-                  ? 'Zur Bestätigung Einsatznummer oder Bezeichnung eintippen'
-                  : 'Zur Bestätigung Bezeichnung eintippen'
-              }
-              name="bestaetigung"
-            >
-              <Input autoComplete="off" spellCheck={false} />
-            </Feld>
-          </ConfigProvider>
+          {/* Letztes Feld des Dialogs: ohne Feldabstand darunter. `Feld` kennt das noch nicht
+              (Folgeaufgabe zu LLH-1971), deshalb hier noch `Form.Item`. */}
+          <Form.Item
+            label={
+              hatNummer
+                ? 'Zur Bestätigung Einsatznummer oder Bezeichnung eintippen'
+                : 'Zur Bestätigung Bezeichnung eintippen'
+            }
+            name="bestaetigung"
+            style={{ marginBottom: 0 }}
+          >
+            <Input autoComplete="off" spellCheck={false} />
+          </Form.Item>
         </Stapel>
       </div>
     </ErfassungsModal>
