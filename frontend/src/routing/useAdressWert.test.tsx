@@ -11,6 +11,7 @@ import {
   useAdressWert,
 } from './useAdressWert';
 import { GEDAECHTNIS_ENTPRELLUNG_MS } from '../components/listenGedaechtnis';
+import { useLinkAuftrag } from './useLinkAuftrag';
 
 type Richtung = 'alle' | 'intern' | 'extern';
 const RICHTUNG_ERLAUBT: Record<Richtung, true> = { alle: true, intern: true, extern: true };
@@ -153,5 +154,39 @@ describe('useAdressSuche (LLH-1826)', () => {
     await act(() => router.navigate(-2));
     expect(stand.search).toBe('?q=erst');
     expect(stand.wert).toBe('erst');
+  });
+});
+
+describe('Schreiben im selben Zug (LLH-1826)', () => {
+  it('zwei Setter im selben Handler überschreiben einander nicht', async () => {
+    let sicht: (v: 'offen' | 'abgeschlossen') => void = () => {};
+    starte(() => {
+      const [, setzeSicht] = useAdressWert(
+        'sicht',
+        { offen: true, abgeschlossen: true },
+        'offen',
+      );
+      sicht = setzeSicht;
+      return useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
+    }, ['/m']);
+    act(() => {
+      (stand.setze as (v: Richtung) => void)('extern');
+      sicht('abgeschlossen');
+    });
+    await waitFor(() => expect(stand.search).toBe('?richtung=extern&sicht=abgeschlossen'));
+  });
+
+  it('ein Setter stellt einen eben geräumten Link-Auftrag nicht wieder her', async () => {
+    let raeume: () => void = () => {};
+    starte(() => {
+      const auftrag = useLinkAuftrag();
+      raeume = () => auftrag.raeume('meldung');
+      return useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
+    }, ['/m?meldung=7&richtung=extern']);
+    act(() => {
+      raeume();
+      (stand.setze as (v: Richtung) => void)('alle');
+    });
+    await waitFor(() => expect(stand.search).toBe(''));
   });
 });

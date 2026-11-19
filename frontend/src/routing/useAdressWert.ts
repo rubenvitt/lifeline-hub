@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { GEDAECHTNIS_ENTPRELLUNG_MS } from '../components/listenGedaechtnis';
 import { parseRouteId } from './deeplinks';
+import { useAdressAenderung } from './useLinkAuftrag';
 
 /**
  * Ansicht und Filter einer Seite als Zustand der Adresse (LLH-1826, Entwurf
@@ -13,9 +14,8 @@ import { parseRouteId } from './deeplinks';
  * fremde Parameter bleiben. Ein unbekannter Wert gilt als Vorgabe. Es gibt kein
  * Sitzungsgedächtnis: wer über das Modulmenü neu einsteigt, beginnt mit der Vorgabe.
  *
- * Setzt ein Handler zwei Parameter im selben Zug, sieht der zweite Setter den Stand vor dem
- * ersten (`setSearchParams` liest den Stand des Renders). Dafür `setSearchParams` mit zwei
- * `setzeParam` hintereinander nehmen.
+ * Mehrere Setter im selben Zug (auch neben `useLinkAuftrag`) bauen aufeinander auf
+ * (`useAdressAenderung`): keiner stellt zurück, was ein anderer eben geändert hat.
  */
 
 /** Neue Instanz mit gesetztem bzw. (bei `undefined` oder `''`) gelöschtem Parameter. */
@@ -42,13 +42,16 @@ export function liesErlaubt<T extends string>(
     : undefined;
 }
 
-/** Schreiber eines Parameters mit `replace`. */
+/** Schreiber eines Parameters mit `replace`, verträglich mit anderen Schreibern im selben Zug. */
 function useSchreibe(schluessel: string): (wert: string | undefined) => void {
-  const [, setSearchParams] = useSearchParams();
+  const aendereAdresse = useAdressAenderung();
   return useCallback(
     (wert: string | undefined) =>
-      setSearchParams((alt) => setzeParam(alt, schluessel, wert), { replace: true }),
-    [setSearchParams, schluessel],
+      aendereAdresse((naechste) => {
+        if (wert === undefined || wert === '') naechste.delete(schluessel);
+        else naechste.set(schluessel, wert);
+      }),
+    [aendereAdresse, schluessel],
   );
 }
 
