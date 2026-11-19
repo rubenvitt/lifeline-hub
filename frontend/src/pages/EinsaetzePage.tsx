@@ -17,7 +17,12 @@ import {
   wahlNachStichwort,
   type VorlageWahl,
 } from './einsatzVorlageWahlKern';
-import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
+import {
+  auswahlWert,
+  moduleText,
+  vorlageAusWert,
+  vorlagenOptionen,
+} from '../stammdaten/einsatzVorlageModule';
 import { mitVorgabe, vorlageVorgabe } from '../components/vorgabeText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -180,10 +185,14 @@ function EinsaetzeInhalt() {
   const qc = useQueryClient();
   const [dialogOffen, setDialogOffen] = useState(false);
   const [form] = Form.useForm<AnlegeWerte>();
-  // Vorlage und Handänderung der Einsatzart (LLH-1375) leben neben dem Formular, nicht als Feld
-  // (Feldbudget, siehe Dialog unten). Deshalb setzt sie `dialogSchliessen` selbst zurück: der
-  // Reset der Erfassungs-Hülle erreicht nur die Felder.
+  // Vorlage und Handänderung der Einsatzart (LLH-1375) leben neben den Formularwerten: die Vorlage
+  // steht zwar als oberstes Feld im Dialog (LLH-1816), ihre Wahl folgt aber den Vorrangregeln aus
+  // `einsatzVorlageWahlKern.ts`. Deshalb setzt sie `dialogSchliessen` selbst zurück: der Reset der
+  // Erfassungs-Hülle erreicht nur die Formularwerte.
   const [vorlageWahl, setVorlageWahl] = useState<VorlageWahl>(OHNE_VORLAGE);
+  // Eingetippter Stichwort-Text: die Vorschläge klappen erst beim Tippen auf, sonst verdeckt die
+  // volle Liste das Feld Einsatzart darunter (LLH-1816).
+  const [stichwortText, setStichwortText] = useState('');
   const einsatzartVonHand = useRef(false);
   const vorlageFeldId = useId();
 
@@ -243,7 +252,13 @@ function EinsaetzeInhalt() {
     queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
   });
-  const stichwortOptionen = stichwortVorschlaege.map((v) => ({ value: v.text }));
+  const stichwortSuche = stichwortText.trim().toLocaleLowerCase('de');
+  const stichwortOptionen =
+    stichwortSuche === ''
+      ? []
+      : stichwortVorschlaege
+          .filter((v) => v.text.toLocaleLowerCase('de').includes(stichwortSuche))
+          .map((v) => ({ value: v.text }));
   // Das Schichtmodell der Vorlage oder die Vorgabe der Organisation geht als Kopie in den neuen
   // Einsatz (LLH-1122, LLH-1313). Kein Feld (Feldbudget): eine Zeile sagt, was der Einsatz
   // bekommt; geändert wird in den Einsatz-Einstellungen. Ohne beides keine Zeile (keine erfundene
@@ -265,7 +280,9 @@ function EinsaetzeInhalt() {
   // „Schichtmodell in der Einsatzanlage“): das Modell der gewählten Vorlage, sonst die Vorgabe der
   // Organisation, sonst keins. Dieselbe Rangfolge rechnet der Server beim Anlegen. Kennt der Cache
   // das Modell der Vorlage (noch) nicht, keine Zeile statt der falschen Org-Vorgabe.
-  const vorlageModellId = vorlagen.find((v) => v.id === vorlageWahl.vorlageId)?.schichtmodell_id;
+  const gewaehlteVorlage = vorlagen.find((v) => v.id === vorlageWahl.vorlageId);
+  const vorlageAusgeblendet = gewaehlteVorlage?.ausgeblendet ?? [];
+  const vorlageModellId = gewaehlteVorlage?.schichtmodell_id;
   const vorlageSchichtmodell =
     vorlageModellId == null ? undefined : schichtmodelle?.find((m) => m.id === vorlageModellId);
   const schichtmodellText =
@@ -292,6 +309,7 @@ function EinsaetzeInhalt() {
   function dialogSchliessen() {
     setDialogOffen(false);
     setVorlageWahl(OHNE_VORLAGE);
+    setStichwortText('');
     einsatzartVonHand.current = false;
   }
 
@@ -633,12 +651,11 @@ function EinsaetzeInhalt() {
         </div>
       )}
 
-      {/* Fünf Felder: Einsatzart und Alarmzeit gleich beim Anlegen, damit die Nachpflege in den
-          Kopfdaten im Regelfall entfällt. Vier war die Obergrenze einer Schnellerfassung; das
-          optionale fünfte, der Einsatzort, ist die wichtigste Erstangabe und erspart den Gang in
-          die Kopfdaten (LFH-1175, Entscheidung 11.10.2026). Ein sechstes gehört in die Kopfdaten.
-          Die Einsatz-Vorlage ist kein Feld, sondern eine Zeile unter den Feldern (LLH-1375): sie
-          muss im Dialog stehen, weil das Stichwort sie einstellt. */}
+      {/* Sechs Felder (frontend/AGENTS.md, Feldbudget): zuerst die Einsatz-Vorlage, weil sie das
+          Menü des ganzen Einsatzes bestimmt und das Stichwort sie einstellt (LLH-1816). Einsatzart
+          und Alarmzeit gleich beim Anlegen, damit die Nachpflege in den Kopfdaten im Regelfall
+          entfällt; der optionale Einsatzort ist die wichtigste Erstangabe (LFH-1175). Ein
+          siebtes gehört in die Kopfdaten. */}
       <ErfassungsModal<AnlegeWerte>
         offen={dialogOffen}
         titel="Neuen Einsatz anlegen"
@@ -656,6 +673,21 @@ function EinsaetzeInhalt() {
           dialogSchliessen();
         }}
       >
+        {vorlagen.length > 0 && (
+          <Form.Item
+            label="Vorlage"
+            htmlFor={vorlageFeldId}
+            extra={<span data-lfh="anlage-vorlage-module">{moduleText(vorlageAusgeblendet)}</span>}
+          >
+            <Select<number>
+              id={vorlageFeldId}
+              aria-label="Vorlage"
+              value={auswahlWert(vorlageWahl.vorlageId)}
+              options={vorlagenOptionen(vorlagen, 'Alle Module')}
+              onChange={(wert) => setzeVorlage({ vorlageId: vorlageAusWert(wert), vonHand: true })}
+            />
+          </Form.Item>
+        )}
         <Form.Item
           label="Bezeichnung"
           name="bezeichnung"
@@ -669,9 +701,10 @@ function EinsaetzeInhalt() {
             allowClear
             placeholder="z. B. H1, MANV …"
             // Form.Item ruft dieses `onChange` neben seinem eigenen (Tippen, Wahl, Leeren).
-            onChange={(text?: string) =>
-              setzeVorlage(wahlNachStichwort(vorlageWahl, text, stichwortVorschlaege, vorlagen))
-            }
+            onChange={(text?: string) => {
+              setStichwortText(text ?? '');
+              setzeVorlage(wahlNachStichwort(vorlageWahl, text, stichwortVorschlaege, vorlagen));
+            }}
           />
         </Form.Item>
         <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
@@ -692,43 +725,14 @@ function EinsaetzeInhalt() {
             karte={{ etikett: 'Einsatzort', hoehe: AUSSCHNITT_ANLEGEN_PX }}
           />
         </Form.Item>
-        {/* Gedämpfte Zeile unter den Feldern (design.md D3): Vorlage als kompakte Auswahl ohne
-            Rahmen, daneben das Schichtmodell, das der Einsatz bekommt (LLH-1122, LLH-1313). */}
-        {(vorlagen.length > 0 || schichtmodellText) && (
+        {/* Gedämpfte Zeile unter den Feldern: das Schichtmodell, das der Einsatz bekommt (LLH-1122,
+            LLH-1313). Die Vorlage steht seit LLH-1816 als oberstes Feld. */}
+        {schichtmodellText && (
           <div
             data-lfh="anlage-vorgaben"
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              columnGap: token.marginSM,
-              marginBlockEnd: token.margin,
-              color: rollen.gedaempft,
-            }}
+            style={{ marginBlockEnd: token.margin, color: rollen.gedaempft }}
           >
-            {vorlagen.length > 0 && (
-              <span
-                data-lfh="anlage-vorlage"
-                style={{ display: 'inline-flex', alignItems: 'center' }}
-              >
-                <label htmlFor={vorlageFeldId}>Module:</label>
-                <Select<number>
-                  id={vorlageFeldId}
-                  aria-label="Module"
-                  variant="borderless"
-                  popupMatchSelectWidth={false}
-                  value={auswahlWert(vorlageWahl.vorlageId)}
-                  options={vorlagenOptionen(vorlagen, 'Alle Module')}
-                  onChange={(wert) =>
-                    setzeVorlage({ vorlageId: vorlageAusWert(wert), vonHand: true })
-                  }
-                />
-              </span>
-            )}
-            {vorlagen.length > 0 && schichtmodellText && <span aria-hidden>·</span>}
-            {schichtmodellText && (
-              <span data-lfh="anlage-schichtmodell">{`Schichtmodell: ${schichtmodellText}`}</span>
-            )}
+            <span data-lfh="anlage-schichtmodell">{`Schichtmodell: ${schichtmodellText}`}</span>
           </div>
         )}
         <SpeicherFehler
