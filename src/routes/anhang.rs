@@ -1,6 +1,6 @@
 use crate::anhang::{self, AnhangAnzeige};
 use crate::app::AppState;
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{EinsatzErfassungszugriff, EinsatzLesezugriff};
 use crate::error::AppError;
 use crate::extract::PfadParam;
 use axum::extract::{Multipart, State};
@@ -34,10 +34,10 @@ async fn fordere_hochladende_bei_ungebunden(
 /// BLOB gespeichert. Die Verknüpfung mit einer Chat-Nachricht entsteht beim Senden.
 pub async fn hochladen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff,
+    ctx: EinsatzErfassungszugriff,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<Vec<AnhangAnzeige>>), AppError> {
-    // fordere_schreibrecht + fordere_aktiv erledigt der Extractor.
+    // fordere_erfassungsrecht + fordere_aktiv erledigt der Extractor.
     let einsatz_id = ctx.einsatz.id;
 
     // Geteilt mit dem ETB-Upload, hier mit der Chat-Allowlist.
@@ -100,7 +100,7 @@ pub async fn herunterladen(
 /// wer ihn hochgeladen hat (sonst 404).
 pub async fn loeschen(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff,
+    ctx: EinsatzErfassungszugriff,
     PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     // Ownership zuerst (fremd/unbekannt → 404), dann die Linker-Frage.
