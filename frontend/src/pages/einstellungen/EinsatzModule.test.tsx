@@ -126,7 +126,7 @@ describe('EinsatzModule', () => {
     rendern();
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(setzeModulOverride).toHaveBeenCalledWith(1, 'etb', {
@@ -516,7 +516,7 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
       expect(screen.getByRole('switch', { name: 'Sichtbar: Lagebesprechung' })).not.toBeChecked(),
     );
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
 
     await waitFor(() =>

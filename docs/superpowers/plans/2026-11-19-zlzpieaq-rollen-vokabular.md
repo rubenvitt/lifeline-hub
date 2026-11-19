@@ -91,9 +91,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
 - Modify: `frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx` (`optionRender={rollenOptionRender}`)
 - Test: bestehende Tests der Modul-Einstellungen / `EinsatzModule.test.tsx`
 
-- [ ] **Step 1: Test** — `rollenName('admin')` = `'System-Admin'`, `rollenName('')` = `undefined`; offene Stufenauswahl zeigt „Einsatzleitung, Führungspersonal, Führungskraft der Organisation, System-Admin“.
-- [ ] **Step 2–4: rot, umsetzen, grün** (Tests mit „Admin“ umstellen).
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Test** — `rollenName('admin')` = `'System-Admin'`, `rollenName('')` = `undefined`; offene Stufenauswahl zeigt „Einsatzleitung, Führungspersonal, Führungskraft der Organisation, System-Admin“.
+- [x] **Step 2–4: rot, umsetzen, grün** (Tests mit „Admin“ umstellen).
+- [x] **Step 5: Commit.**
 
 ### Task 5: Benutzerverwaltung, Profil, Menü, Zugangsprotokoll
 

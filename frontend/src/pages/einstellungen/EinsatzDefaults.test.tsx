@@ -323,7 +323,7 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(client.getQueryState(['einsatz-modul-freigaben', 7])?.isInvalidated).toBe(true),
@@ -342,7 +342,7 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(client.getQueryState(['einsatz-modul-vorgaben', 7])?.isInvalidated).toBe(true),
@@ -359,7 +359,7 @@ describe('EinsatzDefaults', () => {
 
     const etbSelect = await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' });
     fireEvent.mouseDown(etbSelect);
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', {
@@ -375,13 +375,17 @@ describe('EinsatzDefaults', () => {
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
     // Dieselben vier Stufen wie im Einsatz, in derselben Reihenfolge (`ROLLEN_OPTIONEN`).
     await screen.findByText('Führung im Einsatz');
-    const optionen = [...document.querySelectorAll('.ant-select-item-option-content')];
-    expect(optionen.map((o) => o.textContent)).toEqual([
+    const optionen = [...document.querySelectorAll('.ant-select-item-option')];
+    expect(optionen.map((o) => o.getAttribute('title'))).toEqual([
       'Frei (alle)',
       'Führung im Einsatz',
       'Führungskraft der Organisation',
-      'Admin',
+      'System-Admin',
     ]);
+    // Unter jedem Namen steht, wer das Modul öffnet (LLH-1818).
+    expect(optionen[1]).toHaveTextContent(
+      'Einsatzleitung, Führungspersonal, Führungskraft der Organisation, System-Admin',
+    );
     fireEvent.click(await screen.findByText('Führung im Einsatz'));
 
     await waitFor(() =>
@@ -399,7 +403,7 @@ describe('EinsatzDefaults', () => {
       fireEvent.mouseDown(
         await screen.findByRole('combobox', { name: `Benötigte Rolle: ${modul}` }),
       );
-      const optionen = await screen.findAllByText('Admin');
+      const optionen = await screen.findAllByText('System-Admin');
       fireEvent.click(optionen[optionen.length - 1]);
       await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledTimes(i + 1));
     }
@@ -436,7 +440,7 @@ describe('EinsatzDefaults', () => {
     expect([container.textContent, ...platzhalter].join(' ')).not.toMatch(/Default|Fallback/);
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
     expect(await screen.findByText('Modul-Vorgabe gespeichert')).toBeInTheDocument();
   });
@@ -488,7 +492,7 @@ describe('EinsatzDefaults', () => {
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeChecked();
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
 
     await waitFor(() =>
@@ -530,7 +534,7 @@ describe('EinsatzDefaults', () => {
       ).not.toBeDisabled(),
     );
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
     await waitFor(() =>
       expect(setzeOrgModulEinstellung).toHaveBeenLastCalledWith('lagebesprechung', {
@@ -658,7 +662,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
 
     const etb = screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' });
     fireEvent.mouseDown(etb);
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     // Beide stehen, nebeneinander.
     expect(await screen.findByText('Modul gesperrt')).toBeInTheDocument();
