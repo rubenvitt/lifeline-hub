@@ -5,6 +5,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import type { Meldung } from '../api/types';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
 import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
+import { Feld } from '../components/instrument';
 
 export interface LagerelevantDaten {
   text?: string;
@@ -88,9 +89,9 @@ export default function LagerelevantModal({
       width={460}
     >
       <Form<FormWerte> form={form} layout="vertical" onFinish={absenden}>
-        <Form.Item name="text" label="Lage-Text">
+        <Feld name="text" label="Lage-Text">
           <Input.TextArea rows={3} placeholder="Kurzbeschreibung für die Lage" />
-        </Form.Item>
+        </Feld>
         <KoordinatenFeld name="koord" label="Verortung (optional)" einsatzId={einsatzId} />
         {speicherung?.error != null && (
           <div style={{ marginBottom: token.margin }}>

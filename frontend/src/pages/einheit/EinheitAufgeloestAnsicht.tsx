@@ -34,6 +34,8 @@ interface EinheitAufgeloestAnsichtProps {
   rechte: Pick<EinheitRechte, 'hasPersonalLink' | 'hasFahrzeugLink'>;
   /** `dataUpdatedAt` der Liste der aufgelösten Einheiten. */
   stand: number;
+  /** Hinweis über der Seite, etwa ein gescheiterter Neuabruf (LLH-1975). */
+  hinweis?: ReactNode;
 }
 
 /**
@@ -51,6 +53,7 @@ export default function EinheitAufgeloestAnsicht({
   einheit,
   rechte,
   stand,
+  hinweis,
 }: EinheitAufgeloestAnsichtProps) {
   const { token, rollen } = useRollen();
   const { zeitKurz } = useAnzeigeKonventionen();
@@ -186,6 +189,8 @@ export default function EinheitAufgeloestAnsicht({
         </>
       }
       dataUpdatedAt={stand}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={hinweis ?? undefined}
     >
       <Stapel abstand="md">
         <Paneel titel="Kopfdaten">

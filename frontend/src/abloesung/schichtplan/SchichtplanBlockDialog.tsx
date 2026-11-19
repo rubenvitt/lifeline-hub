@@ -25,6 +25,7 @@ import { ZeitraumEingabe, type Zeitraum } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { Feld } from '../../components/instrument';
 import { mitVorgabe } from '../../components/vorgabeText';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import QualiSollFeld, { vollstaendig, type QualiSollZeile } from '../../kraefte/QualiSollFeld';
@@ -345,14 +346,14 @@ export default function SchichtplanBlockDialog({
             ))}
           </div>
         )}
-        <Form.Item<BlockWerte>
+        <Feld<BlockWerte>
           name="posten"
           label="Posten"
           rules={[{ required: true, message: 'Bitte einen Posten wählen' }]}
         >
           <Select placeholder="Posten wählen…" options={postenOptionen} />
-        </Form.Item>
-        <Form.Item<BlockWerte>
+        </Feld>
+        <Feld<BlockWerte>
           name="zeit"
           label="Zeit"
           rules={[
@@ -370,8 +371,8 @@ export default function SchichtplanBlockDialog({
           ]}
         >
           <ZeitraumEingabe art="frist" />
-        </Form.Item>
-        <Form.Item<BlockWerte>
+        </Feld>
+        <Feld<BlockWerte>
           name="personen"
           label="Personen"
           extra={personenGesperrt}
@@ -390,17 +391,16 @@ export default function SchichtplanBlockDialog({
             placeholder={personenGesperrt ? '—' : 'unbesetzt'}
             options={personenOptionen}
           />
-        </Form.Item>
+        </Feld>
         {!istPause && (
-          <Form.Item<BlockWerte> name="soll" label="Soll">
+          <Feld<BlockWerte> name="soll" label="Soll" breite="kurz">
             <InputNumber
               min={0}
               max={SCHICHTPLAN_PERSONEN_MAX}
               precision={0}
               placeholder={sollPlatzhalter}
-              style={{ width: '100%' }}
             />
-          </Form.Item>
+          </Feld>
         )}
         <Collapse
           ghost
@@ -413,12 +413,12 @@ export default function SchichtplanBlockDialog({
                     label: qualiKopf ? `Qualifikationssoll · ${qualiKopf}` : 'Qualifikationssoll',
                     forceRender: true,
                     children: (
-                      <Form.Item<BlockWerte> name="quali" label="Qualifikationssoll">
+                      <Feld<BlockWerte> name="quali" label="Qualifikationssoll">
                         <QualiSollFeld
                           disabled={!darfSchreiben}
                           bekannt={block?.quali_soll ?? (posten ? qualiVorgabe.get(posten) : null)}
                         />
-                      </Form.Item>
+                      </Feld>
                     ),
                   },
                 ]),
@@ -427,13 +427,13 @@ export default function SchichtplanBlockDialog({
               label: block?.notiz ? 'Notiz · vorhanden' : 'Notiz',
               forceRender: true,
               children: (
-                <Form.Item<BlockWerte>
+                <Feld<BlockWerte>
                   name="notiz"
                   label="Notiz"
                   rules={[zeichenRegel(SCHICHTPLAN_NOTIZ_MAX, 'Notiz')]}
                 >
                   <Input.TextArea rows={2} count={zeichenGrenze(SCHICHTPLAN_NOTIZ_MAX)} />
-                </Form.Item>
+                </Feld>
               ),
             },
           ]}

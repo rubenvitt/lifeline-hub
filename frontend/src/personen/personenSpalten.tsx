@@ -7,7 +7,7 @@ import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser'
 import { sprungGesperrtText } from '../components/Sprung';
 import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
-import { monoStil, useRollen } from '../components/instrument';
+import { FELD_KLASSE, monoStil, schriftStil, Textstufe, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ladePerson, registrierAnzeige, savePersonFeld } from '../api/einsatzPerson';
 import { OFFEN_LASSEN } from '../components/InlineAngabe';
@@ -23,6 +23,7 @@ import {
   SK_REIHE,
   SK_WORT,
   STATUS_META,
+  personStatusDarstellung,
   TRANSPORT_ART_WORT,
   transportRang,
 } from './personMeta';
@@ -111,7 +112,7 @@ export function SkTag({ p }: { p: Pick<Person, 'aktuelle_sichtung'> }) {
   );
 }
 
-/** Personenzelle: Name 13 + Geschlecht/Alter Mono 11, darunter ggf. der Lückenvermerk. */
+/** Personenzelle: Name (Stufe `text`) + Geschlecht/Alter Mono 11, darunter ggf. der Lückenvermerk. */
 function PersonZelle({ p }: { p: Person }) {
   const { token, rollen } = useRollen();
   const ga = geschlechtAlter(p);
@@ -119,9 +120,7 @@ function PersonZelle({ p }: { p: Person }) {
   return (
     <div style={{ minWidth: 0 }}>
       <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: token.marginXS }}>
-        <span style={{ fontSize: 13, color: nameText(p) ? rollen.text : rollen.gedaempft }}>
-          {nameText(p) ?? 'unbekannt'}
-        </span>
+        <Textstufe ton={nameText(p) ? 'text' : 'gedaempft'}>{nameText(p) ?? 'unbekannt'}</Textstufe>
         {ga && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{ga}</span>}
         {/* Kontamination „ja“ als Marke (LLH-1326, design.md D11): Gefahr für die Kräfte, Rolle
             `achtung` mit Wort; „nein“ und „keine Angabe“ tragen keine. Die Personenzelle steht
@@ -141,7 +140,7 @@ function PersonZelle({ p }: { p: Person }) {
 function NichtGeladenZelle() {
   const { rollen } = useRollen();
   return (
-    <span data-lfh="nicht-geladen" style={{ fontSize: 12, color: rollen.gedaempft }}>
+    <span data-lfh="nicht-geladen" style={{ ...schriftStil('textKlein'), color: rollen.gedaempft }}>
       nicht geladen
     </span>
   );
@@ -160,7 +159,11 @@ function FundortZelle({ p }: { p: Person }) {
   if (!p.antreff_ort && !koordinate) return <Leerzelle offen={lueckenVon(p).fundort} />;
   return (
     <div style={{ minWidth: 0 }}>
-      {p.antreff_ort && <div style={{ fontSize: 12, color: rollen.text2 }}>{p.antreff_ort}</div>}
+      {p.antreff_ort && (
+        <Textstufe stufe="textKlein" ton="text2" als="div">
+          {p.antreff_ort}
+        </Textstufe>
+      )}
       {koordinate && (
         <div data-lfh="koordinate" style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {koordinate}
@@ -187,9 +190,9 @@ function TransportZelle({ p }: { p: Person }) {
     >
       <PrioritaetMarke prioritaet={p.transport_prioritaet} />{' '}
       {p.transport_art && (
-        <span style={{ fontSize: 12, color: rollen.text2 }}>
+        <Textstufe stufe="textKlein" ton="text2">
           {TRANSPORT_ART_WORT[p.transport_art]}
-        </span>
+        </Textstufe>
       )}
     </span>
   );
@@ -447,7 +450,7 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
         }}
       />
       {fehler && (
-        <div role="alert" style={{ fontSize: 12, color: rollen.alarmText }}>
+        <div role="alert" style={{ ...schriftStil('textKlein'), color: rollen.alarmText }}>
           Nicht gespeichert: {fehler}
         </div>
       )}
@@ -463,7 +466,9 @@ function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: PersonenBedienu
   // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht angeboten.
   if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {
     return p.zustand ? (
-      <span style={{ fontSize: 12, color: rollen.text2 }}>{p.zustand}</span>
+      <Textstufe stufe="textKlein" ton="text2">
+        {p.zustand}
+      </Textstufe>
     ) : (
       <span style={{ color: rollen.schwach }}>—</span>
     );
@@ -507,23 +512,34 @@ function VerbleibZelle({
   uhsName: (id: number) => string | undefined;
   bedienung?: PersonenBedienung;
 }) {
-  const { rollen } = useRollen();
   const text = verbleibText(p, uhsName);
   // Ein vorgemerkter Verbleib (LLH-1138) steht neben dem Serverstand, nicht an seiner Stelle.
   const vorgemerkt = bedienung?.vorgemerkt?.get(p.id)?.has('verbleib') && (
-    <div data-lfh="zeile-vorgemerkt" style={{ fontSize: 12, color: rollen.text2 }}>
-      Offline vorgemerkt
+    <div data-lfh="zeile-vorgemerkt">
+      <Textstufe stufe="textKlein" ton="text2">
+        Offline vorgemerkt
+      </Textstufe>
     </div>
   );
   if (vorgemerkt) {
     return (
       <>
-        {text != null && <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>}
+        {text != null && (
+          <Textstufe stufe="textKlein" ton="text2">
+            {text}
+          </Textstufe>
+        )}
         {vorgemerkt}
       </>
     );
   }
-  if (text != null) return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
+  if (text != null) {
+    return (
+      <Textstufe stufe="textKlein" ton="text2">
+        {text}
+      </Textstufe>
+    );
+  }
   const offen = lueckenVon(p).verbleib;
   const onVerbleib = bedienung?.darfSchreiben && !p.storniert_at ? bedienung.onVerbleib : undefined;
   if (!offen || !onVerbleib) return <Leerzelle offen={offen} />;
@@ -613,7 +629,7 @@ export function personenSpalten(
       width: 118,
       sortWert: (p) => STATUS_FOLGE.indexOf(p.status),
       filter: { werte: STATUS_WERTE, trifft: (p, w) => p.status === w, ohneKartenfeld: true },
-      render: (_, p) => <Status darstellung={STATUS_META[p.status]} />,
+      render: (_, p) => <Status darstellung={personStatusDarstellung(p.status)} />,
     },
     {
       title: 'Fundort',
@@ -686,7 +702,7 @@ export function personenSpalten(
           <Typography.Text
             type="secondary"
             ellipsis={{ tooltip: p.notiz }}
-            style={{ fontSize: 12 }}
+            style={schriftStil('textKlein')}
           >
             {p.notiz}
           </Typography.Text>
@@ -769,7 +785,7 @@ type KartenPlanZweig<T, K extends string> = Extract<Kartenplan<T, K>, { art: 'pl
 export const personenKarte = (einsatzId: number): KartenPlanZweig<Person, PersonenSpaltenKey> => ({
   art: 'plan',
   titel: { spalte: 'reg', ziel: (p) => personDetailPfad(einsatzId, p.id) },
-  status: (p) => STATUS_META[p.status],
+  status: (p) => personStatusDarstellung(p.status),
   sekundaer: ['person', 'sk', 'seit'],
 });
 
@@ -790,10 +806,13 @@ export function abgleichSpalten(
       render: (_: unknown, v: Person) => (
         // Der Klick gehört der Zelle, sonst navigierte die Zeile auf die Detailseite. Die Hülle
         // fängt auch die Wahl im Auswahlmenü: React reicht Klicks aus dem Portal durch den Baum.
-        <div onClick={(e) => e.stopPropagation()}>
+        <div
+          className={FELD_KLASSE}
+          style={{ maxWidth: 'var(--lfh-feld-schmal)' }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <Select<number>
             placeholder="gefundene Person …"
-            style={{ width: 200 }}
             onChange={(gid) => onAbgleich(v.id, gid)}
             options={gefundene.map((g) => ({
               value: g.id,

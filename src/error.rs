@@ -22,6 +22,11 @@ pub enum AppError {
     /// Verweigert mit Begründung (403), wo der Aufrufer wissen muss, welcher Weg stattdessen geht,
     /// etwa „Admins melden sich hier per Passkey an“ (LLH-1493).
     ForbiddenMit(String),
+    /// Die Lesesperre eines Einsatzes (403, LLH-1819): `{error, grund}` mit dem Grund aus
+    /// [`LeseSperre`], damit der Client den Weg heraus nennt statt „Erneut abrufen“ anzubieten.
+    /// Nur `berechtigung::fordere_lesezugriff` und der Org-Floor liefern ihn; jeder andere 403
+    /// bleibt [`AppError::Forbidden`] (`src/AGENTS.md`, Statuscode-Konvention).
+    KeinLesezugriff(LeseSperre),
     /// Ressource nicht gefunden (404).
     NotFound,
     /// Eingabe ungültig (400) — Meldung wird ausgegeben.
@@ -80,6 +85,22 @@ pub const GRUND_NICHT_IN_LISTE: &str = "nicht_in_liste";
 pub const GRUND_VERALTET: &str = "veraltet";
 
 crate::wire_enum::wire_enum! {
+    /// Warum ein Einsatz nicht lesbar ist (LLH-1819), als `grund` im 403 von
+    /// [`AppError::KeinLesezugriff`]. Der Client vergleicht die Werte
+    /// (`frontend/src/api/client.ts`, `GRUND_KEIN_MITGLIED` u. a.). Reihenfolge der Prüfung und
+    /// warum ein Fremder nur `kein_mitglied` sieht: `einsatz::berechtigung::lese_sperre`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+    pub enum LeseSperre {
+        /// Weder Mitglied noch höhere Berechtigung mit Fremdeinsatz-Lesezugriff.
+        KeinMitglied => "kein_mitglied",
+        /// Mitglied ohne Einsatzleitung; der Einsatz ist abgeschlossen und die Nachlauffrist vorbei.
+        NachlaufAbgelaufen => "nachlauf_abgelaufen",
+        /// Löschvermerk (`geloescht_at`) oder abgelaufene Aufbewahrungsfrist (`retention_bis`).
+        NichtMehrLesbar => "nicht_mehr_lesbar",
+    }
+}
+
+crate::wire_enum::wire_enum! {
     /// Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können
     /// kollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im
     /// Einsatz die der Disposition (LLH-1073). Wire == `as_str()`.
@@ -128,7 +149,7 @@ impl std::fmt::Display for AppError {
             AppError::SitzungsBenutzerMismatch => {
                 write!(f, "Die Sitzung gehört inzwischen einem anderen Benutzer")
             }
-            AppError::Forbidden => write!(f, "Keine Berechtigung"),
+            AppError::Forbidden | AppError::KeinLesezugriff(_) => write!(f, "Keine Berechtigung"),
             AppError::ForbiddenMit(m) => write!(f, "{m}"),
             AppError::NotFound | AppError::NichtInListe => write!(f, "Nicht gefunden"),
             AppError::Validation(m) => write!(f, "{m}"),
@@ -166,7 +187,9 @@ impl AppError {
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
             AppError::OfflineQueueBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
             AppError::SitzungsBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
-            AppError::Forbidden | AppError::ForbiddenMit(_) => StatusCode::FORBIDDEN,
+            AppError::Forbidden | AppError::ForbiddenMit(_) | AppError::KeinLesezugriff(_) => {
+                StatusCode::FORBIDDEN
+            }
             AppError::NotFound | AppError::NichtInListe => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::Conflict(_) | AppError::Veraltet => StatusCode::CONFLICT,
@@ -328,6 +351,14 @@ impl IntoResponse for AppError {
             )
                 .into_response();
         }
+        if let AppError::KeinLesezugriff(sperre) = self {
+            let message = self.public_message();
+            return (
+                status,
+                Json(json!({ "error": message, "grund": sperre.as_str() })),
+            )
+                .into_response();
+        }
         if let AppError::NichtInListe = self {
             let message = self.public_message();
             return (
@@ -354,6 +385,18 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json["error"], "Nicht gefunden");
         assert_eq!(json["grund"], GRUND_NICHT_IN_LISTE);
+    }
+
+    /// LLH-1819: die Lesesperre eines Einsatzes nennt ihren Grund, damit der Client den Weg
+    /// heraus beschreiben kann statt „Erneut abrufen“ anzubieten.
+    #[tokio::test]
+    async fn kein_lesezugriff_ist_403_mit_grund() {
+        let resp = AppError::KeinLesezugriff(LeseSperre::NachlaufAbgelaufen).into_response();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Keine Berechtigung");
+        assert_eq!(json["grund"], "nachlauf_abgelaufen");
     }
 
     /// LLH-1920: der Sperrkonflikt (CAS) trägt `grund: "veraltet"`, damit der Client ihn vom

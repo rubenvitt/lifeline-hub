@@ -17,7 +17,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { Feld, Segmentleiste, Stapel, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import BestaetigtVonFeld, { BESTAETIGT_FELD } from '../geraet/BestaetigtVonFeld';
@@ -137,18 +137,18 @@ export function TransportPaneel({
         onFertig={onSchliessen}
         onAbbrechen={onSchliessen}
       >
-        <Form.Item label="Priorität" name="prioritaet">
+        <Feld label="Priorität" name="prioritaet">
           <SegmentFeld<TransportPrioritaet>
             optionen={PRIORITAET_OPTIONEN}
             beschriftung="Priorität"
           />
-        </Form.Item>
-        <Form.Item label="Art" name="art">
+        </Feld>
+        <Feld label="Art" name="art">
           <SegmentFeld<TransportArt> optionen={ART_OPTIONEN} beschriftung="Art" />
-        </Form.Item>
-        <Form.Item label="Fachrichtung" name="fachrichtung">
+        </Feld>
+        <Feld label="Fachrichtung" name="fachrichtung">
           <Select<Fachrichtung> allowClear options={FACHRICHTUNG_OPTIONEN} />
-        </Form.Item>
+        </Feld>
         <BestaetigtVonFeld einsatzId={einsatzId} />
       </ErfassungsFormular>
     </section>
@@ -205,13 +205,13 @@ export function AnlassPaneel({
         onFertig={onSchliessen}
         onAbbrechen={onSchliessen}
       >
-        <Form.Item
+        <Feld
           label="Anlass"
           name="anlass"
           rules={hatAnlass ? [] : [{ required: true, message: 'Bitte einen Anlass wählen' }]}
         >
           <AnlassWahl />
-        </Form.Item>
+        </Feld>
       </ErfassungsFormular>
     </section>
   );
@@ -284,16 +284,16 @@ export function MassnahmePaneel({
         onFertig={onSchliessen}
         onAbbrechen={onSchliessen}
       >
-        <Form.Item
+        <Feld
           label="Maßnahme"
           name="art"
           rules={[{ required: true, message: 'Bitte eine Maßnahme wählen' }]}
         >
           <FlaechenWahl<MassnahmeArt> optionen={MASSNAHME_OPTIONEN} aria-label="Maßnahme" />
-        </Form.Item>
-        <Form.Item label="Durchgeführt (optional)" name="durchgefuehrt">
+        </Feld>
+        <Feld label="Durchgeführt (optional)" name="durchgefuehrt">
           <ZeitpunktEingabe art="ereignis" keineZukunftstage />
-        </Form.Item>
+        </Feld>
         <BestaetigtVonFeld einsatzId={einsatzId} />
       </ErfassungsFormular>
       {erfasst.length > 0 && (
@@ -307,7 +307,7 @@ export function MassnahmePaneel({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {erfasst.map((m) => (
               <li key={m.id}>
-                <Flex align="center" gap={token.marginSM} wrap>
+                <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
                   <span>
                     {MASSNAHME_WORT[m.art]} · <ZeitAnzeige wert={m.zeitpunkt_at} rolle="kurz" />
                     {m.bestaetigt_name && (
@@ -334,7 +334,7 @@ export function MassnahmePaneel({
                       Aufheben
                     </Button>
                   </Popconfirm>
-                </Flex>
+                </Stapel>
               </li>
             ))}
           </ul>

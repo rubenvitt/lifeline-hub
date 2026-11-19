@@ -20,6 +20,7 @@ import {
   type KorrekturWerte,
   wirdHeraufgestuft,
 } from './meldungKorrekturKern';
+import { Feld } from '../components/instrument';
 
 /** Auswahl des Von-Bezugs, gruppiert wie im Erfassen: `einheit:<id>` / `abschnitt:<id>`. */
 export interface VonGruppe {
@@ -125,30 +126,30 @@ export default function MeldungKorrektur({
     >
       <Row gutter={token.marginLG}>
         <Col xs={24} sm={12}>
-          <Form.Item name="meldungsart" label="Meldungsart">
+          <Feld name="meldungsart" label="Meldungsart">
             <Select<Meldungsart> aria-label="Meldungsart" options={MELDUNGSART_OPTIONEN} />
-          </Form.Item>
+          </Feld>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="prioritaet" label="Priorität">
+          <Feld name="prioritaet" label="Priorität">
             <Select<MeldungPrioritaet> aria-label="Priorität" options={PRIORITAET_OPTIONEN} />
-          </Form.Item>
+          </Feld>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="richtung" label="Richtung">
+          <Feld name="richtung" label="Richtung">
             <Select<Richtung> aria-label="Richtung" options={RICHTUNG_OPTIONEN} />
-          </Form.Item>
+          </Feld>
         </Col>
         {vonOptionen.length > 0 && (
           <Col xs={24} sm={12}>
-            <Form.Item name="von" label="Von Einheit / Abschnitt">
+            <Feld name="von" label="Von Einheit / Abschnitt">
               <Select<string>
                 aria-label="Von Einheit / Abschnitt"
                 allowClear
                 placeholder="nicht zugeordnet"
                 options={vonOptionen}
               />
-            </Form.Item>
+            </Feld>
           </Col>
         )}
         {funktionsOptionen.length > 0 && (
@@ -156,20 +157,20 @@ export default function MeldungKorrektur({
           // im Erfassen füllt die Wahl den Empfänger nicht vor: die Korrektur ändert nur, was man
           // ändert.
           <Col xs={24} sm={12}>
-            <Form.Item name="empfaenger_funktion" label="Empfängerfunktion">
+            <Feld name="empfaenger_funktion" label="Empfängerfunktion">
               <Select<Fuehrungsfunktion>
                 aria-label="Empfängerfunktion"
                 allowClear
                 placeholder="keine"
                 options={funktionsOptionen}
               />
-            </Form.Item>
+            </Feld>
           </Col>
         )}
         <Col xs={24} sm={12}>
-          <Form.Item name="empfaenger" label="Empfänger / Adressat">
+          <Feld name="empfaenger" label="Empfänger / Adressat">
             <Input aria-label="Empfänger / Adressat" maxLength={ETB_PARTEI_MAX} />
-          </Form.Item>
+          </Feld>
         </Col>
       </Row>
       {heraufgestuft && (

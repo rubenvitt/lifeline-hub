@@ -1,6 +1,6 @@
-import { Alert, Typography } from 'antd';
+import { Alert } from 'antd';
 import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/types';
-import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, Paneel, Textstufe, monoStil, useRollen } from '../components/instrument';
 import { DetailSprung } from '../components/ListeDetail';
 import { NebenwegeImKopf } from '../components/EinsatzSeite';
 import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
@@ -23,8 +23,6 @@ import {
   gefuellteFelder,
 } from './AuftragTeile';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-
-const { Text } = Typography;
 
 export interface AuftragDetailProps {
   auftrag: Auftrag;
@@ -166,9 +164,9 @@ export default function AuftragDetail({
         />
       )}
       <AuftragKopf auftrag={a} mitEtbSprung={false} />
-      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block' }}>
+      <Textstufe stufe="kartentitel" als="div">
         {a.auftrag_text}
-      </Text>
+      </Textstufe>
       <AuftragAufhebung auftrag={a} />
       <AuftragVollzug auftrag={a} ansicht="offen" />
       <AuftragHandlungen

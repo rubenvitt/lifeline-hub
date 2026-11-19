@@ -1,4 +1,4 @@
-import { Form, Typography, theme } from 'antd';
+import { Typography, theme } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { ladeVersorgendeEinheiten, savePersonEinheit } from '../api/einsatzPerson';
@@ -13,6 +13,7 @@ import { useGeraetDarf } from '../geraet/geraetSicht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { meldungenPfad } from '../routing/deeplinks';
+import { Feld } from '../components/instrument';
 
 /** Der Grund der Sperre ohne Netz, in wenigen Wörtern (LFH-966). */
 export const EINHEIT_OHNE_NETZ = 'ohne Netz nicht änderbar';
@@ -141,16 +142,17 @@ export default function VersorgtVon({
           }}
           onSpeichern={(w) => mutation.mutateAsync(w)}
           eingabe={({ feld, value, onChange, popup }) => (
-            <Select<number>
-              {...feld}
-              {...popup}
-              allowClear
-              loading={wahl.isFetching}
-              value={value ?? undefined}
-              onChange={(w) => onChange(w ?? null)}
-              options={optionen}
-              style={{ minWidth: 220 }}
-            />
+            <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+              <Select<number>
+                {...feld}
+                {...popup}
+                allowClear
+                loading={wahl.isFetching}
+                value={value ?? undefined}
+                onChange={(w) => onChange(w ?? null)}
+                options={optionen}
+              />
+            </div>
           )}
         />
       ) : (
@@ -189,13 +191,13 @@ export function VersorgendeEinheitFeld({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeVersorgendeEinheiten(einsatzId),
   });
   return (
-    <Form.Item label="Versorgende Einheit" name="versorgende_einheit_id">
+    <Feld label="Versorgende Einheit" name="versorgende_einheit_id">
       <Select<number>
         allowClear
         loading={wahl.isLoading}
         placeholder="Streife, Trupp, RTW"
         options={einheitOptionen(wahl.data)}
       />
-    </Form.Item>
+    </Feld>
   );
 }

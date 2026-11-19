@@ -1,5 +1,6 @@
 import { Form, Input } from 'antd';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
+import { Feld } from '../components/instrument';
 
 interface KanalFormWerte {
   name: string;
@@ -45,16 +46,16 @@ export default function KanalAnlegenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true, message: 'Name erforderlich' }]}
       >
         <Input placeholder="z. B. S2/S3 oder Abschnitt Nord" />
-      </Form.Item>
-      <Form.Item label="Beschreibung (optional)" name="beschreibung">
+      </Feld>
+      <Feld label="Beschreibung (optional)" name="beschreibung">
         <Input placeholder="Kurzbeschreibung" />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

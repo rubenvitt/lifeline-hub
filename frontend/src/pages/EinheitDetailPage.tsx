@@ -1,8 +1,8 @@
-import { App, Breadcrumb, Button } from 'antd';
+import { App, Breadcrumb, Button, Space } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, Stapel } from '../components/instrument';
 import { Link, useNavigate, useParams } from 'react-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
@@ -40,7 +40,12 @@ import {
   parseRouteId,
 } from '../routing/deeplinks';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
-import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import {
   schreibeSprechgruppen,
   type SprechgruppenAenderung,
@@ -176,7 +181,10 @@ export default function EinheitDetailPage() {
   if (!idGueltig) return nichtGefunden;
 
   if (einsatzQuery.isLoading || einheitenQuery.isLoading) return <SeitenSkeleton />;
-  if (einsatzQuery.isError || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1975, wie LLH-1947): React Query setzt `error` auch, wenn
+  // nur ein Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher
+  // liegt. Dann bleibt die Seite stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return (
       <SeitenFehler
         text="Einsatz nicht gefunden oder kein Zugriff"
@@ -185,7 +193,9 @@ export default function EinheitDetailPage() {
       />
     );
   }
-  if (einheitenQuery.isError) {
+  // Mit altem Stand bleibt die Seite stehen, solange er die Einheit nennt. Nennt er sie nicht, folgt
+  // daraus kein „gibt es nicht (mehr)“, und die aufgelösten fragt erst eine gelungene Liste ab.
+  if (!einheitenQuery.data || (einheitenQuery.isError && !aktuell)) {
     return (
       <SeitenFehler
         text="Gliederung konnte nicht geladen werden"
@@ -194,6 +204,16 @@ export default function EinheitDetailPage() {
       />
     );
   }
+
+  /** Hinweis über einem Stand, dessen Neuabruf scheiterte (LLH-1975); `null` ohne Anlass. */
+  const standVeraltet = (...queries: { isError: boolean; refetch: () => unknown }[]) =>
+    queries.some((q) => q.isError) ? (
+      <SeitenStandVeraltet
+        onWiederholen={() => {
+          for (const q of queries) if (q.isError) void q.refetch();
+        }}
+      />
+    ) : null;
 
   if (!aktuell && aufgeloest) {
     return (
@@ -204,6 +224,7 @@ export default function EinheitDetailPage() {
         einheit={aufgeloest}
         rechte={buildEinheitRechte(false, freigaben)}
         stand={aufgeloesteQuery.dataUpdatedAt}
+        hinweis={standVeraltet(einsatzQuery, aufgeloesteQuery)}
       />
     );
   }
@@ -235,6 +256,7 @@ export default function EinheitDetailPage() {
       einheit={aktuell}
       einheiten={einheiten}
       einheitenStand={einheitenQuery.dataUpdatedAt}
+      standVeraltet={standVeraltet(einsatzQuery, einheitenQuery)}
     />
   );
 }
@@ -246,6 +268,8 @@ interface EinheitAnsichtProps {
   einheiten: readonly Einheit[];
   /** `dataUpdatedAt` der Einheitenliste, für den gemeinsamen Datenstand. */
   einheitenStand: number;
+  /** Hinweis, dass ein Neuabruf scheiterte und der Stand alt sein kann (LLH-1975). */
+  standVeraltet: ReactNode;
 }
 
 /**
@@ -261,6 +285,7 @@ function EinheitAnsicht({
   einheit: aktuell,
   einheiten,
   einheitenStand,
+  standVeraltet,
 }: EinheitAnsichtProps) {
   const einheitId = aktuell.id;
   const qc = useQueryClient();
@@ -520,11 +545,16 @@ function EinheitAnsicht({
       titel={aktuell.name}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        besatzungErrors.orphaned.length > 0 && (
-          <GewanderteGruende
-            gruende={besatzungErrors.orphaned}
-            onSchliessen={besatzungErrors.dismissOrphaned}
-          />
+        (standVeraltet != null || besatzungErrors.orphaned.length > 0) && (
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            {standVeraltet}
+            {besatzungErrors.orphaned.length > 0 && (
+              <GewanderteGruende
+                gruende={besatzungErrors.orphaned}
+                onSchliessen={besatzungErrors.dismissOrphaned}
+              />
+            )}
+          </Space>
         )
       }
       // Typ und Stärke im Mono-Meta des Seitenkopfs. Soll nur, wenn gesetzt — eine erfundene

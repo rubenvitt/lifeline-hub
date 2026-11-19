@@ -1,5 +1,5 @@
 import type { Person } from '../api/types';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, schriftStil, useRollen } from '../components/instrument';
 import { sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
 import {
@@ -54,7 +54,7 @@ export default function Sichtungszeile({
         alignItems: 'center',
         columnGap: token.margin,
         rowGap: token.marginXXS,
-        fontSize: 12,
+        ...schriftStil('textKlein'),
         color: rollen.text2,
       }}
     >

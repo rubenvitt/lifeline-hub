@@ -9,6 +9,7 @@ import {
 import type { SchichtplanGrenzwerte, SchichtplanGrenzwerteBody } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { mitVorgabe } from '../components/vorgabeText';
+import { Feld } from '../components/instrument';
 import { dauerRegel } from './dauer';
 import {
   grenzwerteBody,
@@ -65,7 +66,7 @@ export default function GrenzwerteModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<GrenzwerteFormWerte>
+      <Feld<GrenzwerteFormWerte>
         label="Höchstdienst"
         name="max_dienst"
         rules={[
@@ -77,14 +78,14 @@ export default function GrenzwerteModal({
         ]}
       >
         <Input placeholder={mitVorgabe(dauer(MAX_DIENST_VORGABE_MINUTEN))} autoComplete="off" />
-      </Form.Item>
-      <Form.Item<GrenzwerteFormWerte>
+      </Feld>
+      <Feld<GrenzwerteFormWerte>
         label="Mindestruhe"
         name="min_ruhe"
         rules={[dauerRegel({ pflicht: false, min: 0, max: SCHICHTPLAN_MIN_RUHE_MAX_MINUTEN })]}
       >
         <Input placeholder={mitVorgabe(dauer(MIN_RUHE_VORGABE_MINUTEN))} autoComplete="off" />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }
