@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { AnhangVerweis } from '../components/DownloadAnker';
-import { useRollen } from '../components/instrument';
+import { schriftStil, useRollen } from '../components/instrument';
 import { vermerkeTitel, type Vermerk } from './vermerke';
 
 /**
@@ -215,7 +215,7 @@ export function EtbVermerkListe({
         flexWrap: 'wrap',
         alignItems: 'center',
         columnGap: token.marginSM,
-        fontSize: 12,
+        ...schriftStil('textKlein'),
         lineHeight: '18px',
         color: 'var(--lfh-gedaempft)',
       }}

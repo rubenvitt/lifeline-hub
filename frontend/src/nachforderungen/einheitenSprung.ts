@@ -1,7 +1,14 @@
 import type { CSSProperties } from 'react';
+import { schriftskala } from '../theme/tokens';
 
-/** Schriftgröße der Zeile „Als Einheit übernommen: …“, wie die übrigen Zusatzzeilen der Karte. */
-export const EINHEITEN_SCHRIFT = 13;
+/**
+ * Schriftstufe der Zeile „Als Einheit übernommen: …“: Namen in einer Zeile tragen `text`
+ * (Spec `schriftstufen`, LLH-1969), wie Ziel, Zusage und Posten der Karte.
+ */
+export const EINHEITEN_STUFE = 'text';
+
+/** Schriftgröße dieser Stufe in px, für die Trefffläche der fließenden Links. */
+export const EINHEITEN_SCHRIFT = schriftskala[EINHEITEN_STUFE].groesse;
 
 /**
  * Aufbau der Zeile „Als Einheit übernommen: 83-1 ↗, 83-2 ↗“ (LLH-1410) — rein und exportiert,

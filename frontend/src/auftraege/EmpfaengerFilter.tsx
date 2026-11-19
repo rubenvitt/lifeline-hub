@@ -1,4 +1,5 @@
 import { Select } from '../components/Select';
+import { FELD_KLASSE } from '../components/instrument';
 
 export interface FilterZiel {
   id: number;
@@ -33,14 +34,15 @@ export default function EmpfaengerFilter({
     },
   ];
   return (
-    <Select
-      allowClear
-      placeholder="Empfänger filtern"
-      style={{ minWidth: 220 }}
-      value={value}
-      onChange={(v) => onChange(v ?? undefined)}
-      options={optionen}
-    />
+    <div className={FELD_KLASSE} style={{ width: '100%', maxWidth: 'var(--lfh-feld-schmal)' }}>
+      <Select
+        allowClear
+        placeholder="Empfänger filtern"
+        value={value}
+        onChange={(v) => onChange(v ?? undefined)}
+        options={optionen}
+      />
+    </div>
   );
 }
 

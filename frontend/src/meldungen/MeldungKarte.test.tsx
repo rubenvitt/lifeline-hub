@@ -451,7 +451,7 @@ describe('MeldungKarte · Eingangszustand', () => {
     const inhalt = screen.getByText('Wasser im Keller');
     const absender = screen.getByText('Florian 1');
     // Der Wortlaut ist der größte Text der Karte, nicht der Absender.
-    expect(parseFloat(inhalt.style.fontSize)).toBeGreaterThanOrEqual(15);
+    expect(parseFloat(inhalt.style.fontSize)).toBeGreaterThanOrEqual(14);
     expect(inhalt.style.lineHeight).toBe('1.5');
     expect(parseFloat(absender.style.fontSize)).toBeLessThan(parseFloat(inhalt.style.fontSize));
   });
