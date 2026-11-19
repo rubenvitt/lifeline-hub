@@ -1,8 +1,10 @@
 import type { EinsatzAnzeige, EinsatzSpiegelAnzeige, EinsatzStatus } from '../api/types';
+import { istMitarbeit } from '../einsatz/schreibrecht';
 import { EINSATZ_ROLLE, SYSTEM_ADMIN_DER_ORG, SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
 
 const LEITUNG = EINSATZ_ROLLE.einsatzleitung.name;
 const FUEHRUNG = EINSATZ_ROLLE.fuehrungspersonal.name;
+const MITARBEIT = EINSATZ_ROLLE.mitarbeit.name;
 
 /**
  * Gründe der Zeile „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078; `frontend/AGENTS.md`,
@@ -19,11 +21,15 @@ export const NUR_ADMIN = `nur ${SYSTEM_ROLLE.admin.name}`;
 /** Aktionen, die nur die Einsatzleitung ausführt. */
 export const NUR_LEITUNG = `nur ${LEITUNG}`;
 export const NUR_LEITUNG_FUEHRUNG = `nur ${LEITUNG} und ${FUEHRUNG}`;
+/** Erfassen in Chat und ETB (LLH-1817): dort erfasst auch die Mitarbeit. */
+export const NUR_LEITUNG_FUEHRUNG_MITARBEIT = `nur ${LEITUNG}, ${FUEHRUNG} und ${MITARBEIT}`;
 /** Kopfdaten, Einstellungen und Führungsstelle (LFH-1066): der Admin nur der Org des Einsatzes. */
 export const NUR_LEITUNG_FUEHRUNG_ORG_ADMIN = `nur ${LEITUNG}, ${FUEHRUNG} oder ${SYSTEM_ADMIN_DER_ORG}`;
 /** Fristen ändert nur der Admin der Org, der der Einsatz gehört (LFH-753) — nicht jeder Admin. */
 export const NUR_LEITUNG_ORG_ADMIN = `nur ${LEITUNG} oder ${SYSTEM_ADMIN_DER_ORG}`;
 export const EINSATZ_ABGESCHLOSSEN = 'Einsatz abgeschlossen';
+/** Mitarbeit (LLH-1817) erfasst, ändert sonst nichts: der Grund an jeder Fläche, die sie sperrt. */
+export const NUR_ERFASSEN = `als ${MITARBEIT} nur erfassen`;
 /**
  * Ein Modul, dessen Freigabe der Person fehlt, an dem Ort, der es braucht (LLH-1036, Einheit-Ansicht
  * D5/D11): die Besatzung braucht Personal und Fahrzeuge, die Zuordnung ihr Zielmodul.
@@ -72,7 +78,9 @@ export function spiegelGrund(
  * `rollen` nennt sie für Flächen mit anderem Recht, etwa die Einsatz-Einstellungen (LLH-1675).
  */
 export function einsatzRechteGrund(
-  einsatz: EinsatzStatus | Pick<EinsatzAnzeige, 'status' | 'spiegel'>,
+  einsatz:
+    | EinsatzStatus
+    | (Pick<EinsatzAnzeige, 'status' | 'spiegel'> & Partial<Pick<EinsatzAnzeige, 'meine_rolle'>>),
   rollen: string = NUR_LEITUNG_FUEHRUNG,
 ): string {
   if (typeof einsatz !== 'string' && einsatz.spiegel != null) {
@@ -80,5 +88,6 @@ export function einsatzRechteGrund(
   }
   const status = typeof einsatz === 'string' ? einsatz : einsatz.status;
   if (status !== 'aktiv') return EINSATZ_ABGESCHLOSSEN;
+  if (typeof einsatz !== 'string' && istMitarbeit(einsatz)) return NUR_ERFASSEN;
   return rollen;
 }

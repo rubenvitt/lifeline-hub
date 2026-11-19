@@ -103,11 +103,12 @@ zum Objekt, das Kreuz an der Marke entfernt ihn. Ein vorhandener Bezug lässt si
 
 - **Lesen** kann jedes Mitglied des Einsatzes, auch als Beobachter. Statt des Eingabefelds steht
   dann „Nur Ansicht“ mit dem Grund „nur Einsatzleitung und Führungspersonal“.
-- **Schreiben, Kanäle anlegen, Bezüge setzen und Übernehmen** können Einsatzleitung und
-  Führungspersonal. Nach dem Abschluss des Einsatzes ist der Chat nur noch lesbar („Einsatz
-  abgeschlossen“).
-- **Bearbeiten und Löschen** kann nur, wer die Nachricht geschrieben hat. Nachrichten anderer
-  zeigen im Aktionsmenü diese beiden Punkte nicht.
+- **Schreiben** können Einsatzleitung, Führungspersonal und Mitarbeit. **Kanäle anlegen, Bezüge
+  setzen und Übernehmen** (auch Heraufstufen) bleiben Einsatzleitung und Führungspersonal
+  vorbehalten; der Mitarbeit sind sie gesperrt. Nach dem Abschluss des Einsatzes ist der Chat nur
+  noch lesbar („Einsatz abgeschlossen“).
+- **Bearbeiten und Löschen** kann nur, wer die Nachricht geschrieben hat, auch in der Mitarbeit.
+  Nachrichten anderer zeigen im Aktionsmenü diese beiden Punkte nicht.
 - **„Zu ETB“** braucht zusätzlich die Freigabe des Moduls ETB, **„Zu Auftrag“** die des Moduls
   Aufträge. Fehlt sie, steht der Punkt mit „Keine Berechtigung“ gesperrt im Menü.
 

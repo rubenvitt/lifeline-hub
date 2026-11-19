@@ -21,14 +21,18 @@ prüft `tests/cross_org.rs`. Wie ein System-Admin über die Org-Grenze liest und
 
 ## 8.2 Autorisierung: Einsatzrollen und Modulrechte
 
-Im Einsatz gibt es drei Rollen (`EinsatzRolle` in `src/einsatz/mod.rs`: `einsatzleitung`,
-`fuehrungspersonal`, `beobachter`); ein gekoppeltes Gerät bekommt seine Rolle aus der
+Im Einsatz gibt es vier Rollen (`EinsatzRolle` in `src/einsatz/mod.rs`: `einsatzleitung`,
+`fuehrungspersonal`, `mitarbeit`, `beobachter`); ein gekoppeltes Gerät bekommt seine Rolle aus der
 Funktionsansicht, nicht aus einer Mitgliedschaft (`src/einsatz/kontext.rs`). Die Lese-, Schreib-
 und Modul-Gates stehen in `src/einsatz/berechtigung.rs`, die gültigen Modul-Keys in
 `src/einsatz/modul.rs` (Spiegel der Frontend-`modulRegistry.ts`, Drift-Test in
 `tests/modul_override.rs`). Die effektive Modulfreigabe rechnet allein der Server; der Client
 zeigt nur an (Spec [`modul-freigabe`](../../openspec/specs/modul-freigabe/spec.md)). Wer Zugriff
 verwaltet, regelt Spec [`einsatz-zugriff`](../../openspec/specs/einsatz-zugriff/spec.md).
+Mitarbeit erfasst ohne Schreibrecht: `EinsatzErfassungszugriff` und `EinsatzErfassungsfreigabe`
+(`src/einsatz/kontext.rs`) stehen nur an einer Positivliste, Regeln in
+[ADR-0072](entscheidungen/ADR-0072-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md)
+und [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Erfassungs-Gate (LLH-1817)“.
 
 ## 8.3 Fehlervertrag und Statuscodes
 

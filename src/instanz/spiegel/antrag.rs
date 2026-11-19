@@ -62,6 +62,17 @@ pub struct Beantragbar {
     pub ergebnis: &'static str,
     /// Wo die Antwort deren Kennung trägt (`id`, `belegung.id`); leer = keine neue Zeile.
     pub ergebnis_feld: &'static str,
+    /// Welches Recht der Einsatzrolle den Antrag trägt, wie die Route selbst (LLH-1817).
+    pub recht: Antragsrecht,
+}
+
+/// Das Recht, das ein Antrag am Spiegel braucht: dieselbe Schranke wie die Route am Führer.
+/// `Erfassen` gilt genau für die Routen der Positivliste des Erfassungs-Gates (ADR-0072):
+/// ETB-Eintrag und Meldung; dort darf auch die Einsatzrolle Mitarbeit erfassen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Antragsrecht {
+    Schreiben,
+    Erfassen,
 }
 
 /// Das Feld, in dem die Route einer beantragbaren Erfassung ihre Erfassungszeit annimmt;
@@ -290,7 +301,31 @@ const fn b(
         client_id: Some("client_id"),
         ergebnis,
         ergebnis_feld,
+        recht: if is_erfassung(pfad) {
+            Antragsrecht::Erfassen
+        } else {
+            Antragsrecht::Schreiben
+        },
     }
+}
+
+/// Ob die Route zur Positivliste des Erfassungs-Gates gehört: ETB-Eintrag und Meldung.
+const fn is_erfassung(pfad: &str) -> bool {
+    const fn gleich(a: &str, b: &str) -> bool {
+        let (a, b) = (a.as_bytes(), b.as_bytes());
+        if a.len() != b.len() {
+            return false;
+        }
+        let mut i = 0;
+        while i < a.len() {
+            if a[i] != b[i] {
+                return false;
+            }
+            i += 1;
+        }
+        true
+    }
+    gleich(pfad, "/api/einsaetze/{id}/etb") || gleich(pfad, "/api/einsaetze/{id}/meldungen")
 }
 
 /// Arten der Offline-Warteschlange, die keine Anträge sind, mit Grund.
@@ -470,10 +505,15 @@ async fn beantragen(
     let (mut parts, body) = req.into_parts();
     let crate::auth::session::CurrentUser(benutzer) =
         crate::auth::session::CurrentUser::from_request_parts(&mut parts, state).await?;
-    // Dieselbe Schranke wie die Route: Einsatzrolle mit Schreibrecht (die Mitgliedschaft ist
-    // gespiegelt).
+    // Dieselbe Schranke wie die Route: Einsatzrolle mit Schreib- oder Erfassungsrecht (die
+    // Mitgliedschaft ist gespiegelt). Die Eigen-Prüfungen der Mitarbeit (keine Lagemeldung,
+    // nur eigene Berichtigungen) greifen beim Führer, der den Antrag unter dem Konto des
+    // Antragstellers über dieselbe Route ausführt (`AntragAkteur`).
     let rolle = crate::einsatz::repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    crate::einsatz::berechtigung::fordere_schreibrecht(rolle)?;
+    match b.recht {
+        Antragsrecht::Schreiben => crate::einsatz::berechtigung::fordere_schreibrecht(rolle)?,
+        Antragsrecht::Erfassen => crate::einsatz::berechtigung::fordere_erfassungsrecht(rolle)?,
+    }
     let status: String = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
         .bind(einsatz_id)
         .fetch_one(&state.pool)

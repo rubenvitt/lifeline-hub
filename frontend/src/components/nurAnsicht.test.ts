@@ -5,6 +5,7 @@ import {
   MODULE_PERSONAL_FAHRZEUGE_GESPERRT,
   modulSperre,
   NUR_ADMIN,
+  NUR_LEITUNG_FUEHRUNG_MITARBEIT,
   NUR_LEITUNG_FUEHRUNG_ORG_ADMIN,
   NUR_LEITUNG_ORG_ADMIN,
 } from './nurAnsicht';
@@ -12,6 +13,9 @@ import {
 describe('nurAnsicht (LFH-1078)', () => {
   it('nennt die Rollen mit den Namen des Rollen-Vokabulars (LLH-1818)', () => {
     expect(NUR_ADMIN).toBe('nur System-Admin');
+    expect(NUR_LEITUNG_FUEHRUNG_MITARBEIT).toBe(
+      'nur Einsatzleitung, Führungspersonal und Mitarbeit',
+    );
     expect(NUR_LEITUNG_ORG_ADMIN).toBe('nur Einsatzleitung oder System-Admin der Organisation');
     expect(NUR_LEITUNG_FUEHRUNG_ORG_ADMIN).toBe(
       'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation',
@@ -21,6 +25,35 @@ describe('nurAnsicht (LFH-1078)', () => {
   it('nennt beim abgeschlossenen Einsatz den Abschluss, sonst die Rolle', () => {
     expect(einsatzRechteGrund('abgeschlossen')).toBe('Einsatz abgeschlossen');
     expect(einsatzRechteGrund('aktiv')).toBe('nur Einsatzleitung und Führungspersonal');
+  });
+
+  it('sagt der Mitarbeit, dass sie nur erfasst (LLH-1817)', () => {
+    const mitarbeit = {
+      status: 'aktiv' as const,
+      spiegel: null,
+      meine_rolle: 'mitarbeit' as const,
+    };
+    expect(einsatzRechteGrund(mitarbeit)).toBe('als Mitarbeit nur erfassen');
+    expect(einsatzRechteGrund(mitarbeit, 'nur Einsatzleitung')).toBe('als Mitarbeit nur erfassen');
+    // Abschluss und Spiegel gehen vor: dort gilt der Grund für jede Rolle.
+    expect(einsatzRechteGrund({ ...mitarbeit, status: 'abgeschlossen' })).toBe(
+      'Einsatz abgeschlossen',
+    );
+    expect(
+      einsatzRechteGrund({
+        ...mitarbeit,
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      }),
+    ).toBe('Spiegel von ELW 1');
+    expect(einsatzRechteGrund({ ...mitarbeit, meine_rolle: 'beobachter' })).toBe(
+      'nur Einsatzleitung und Führungspersonal',
+    );
   });
 
   it('nennt am Spiegel die führende Instanz, auch im abgeschlossenen Einsatz (LLH-1492)', () => {

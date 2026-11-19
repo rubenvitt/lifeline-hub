@@ -48,6 +48,8 @@ import {
   erkenneAtTrigger,
   erkenneSlashTrigger,
   erkenneTypBefehl,
+  TYP_BEFEHLE,
+  TYP_BEFEHLE_MITARBEIT,
   fehlendeSeiten,
   filterAtEintraege,
   hatFormatierung,
@@ -72,7 +74,7 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { lageberichtePfad } from '../routing/deeplinks';
-import { istSpiegel } from '../einsatz/schreibrecht';
+import { istMitarbeit, istSpiegel } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { MODUL_MELDUNGEN_GESPERRT } from '../components/nurAnsicht';
 
@@ -346,7 +348,11 @@ export default function Schnellerfassung({
   const [veranlassungOffen, setVeranlassungOffen] = useState(false);
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
-  const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
+  // Mitarbeit erfasst nur Meldung und Lage (LLH-1817); der Server lehnt anderes mit 403 ab.
+  const erlaubteTypen = istMitarbeit(einsatz) ? TYP_BEFEHLE_MITARBEIT : TYP_BEFEHLE;
+  const [typ, setTyp] = useState<EtbTyp>(
+    initialWerte?.typ && erlaubteTypen.includes(initialWerte.typ) ? initialWerte.typ : 'meldung',
+  );
   /**
    * Handwahl des Schalters „Auch in den Meldungseingang“ (LLH-1037; Change
    * `kwc2yszv-etb-neuentwurf`, design.md D4), gespeichert als `nur_protokollieren`: `true` = von
@@ -544,8 +550,11 @@ export default function Schnellerfassung({
   // wirkende Übernahme wäre für den Erfasser nicht erklärbar.
   const zeigeSchalter = !berichtigungZu && onWerteBehaltenChange != null;
   const uebernahmeAktiv = zeigeSchalter && werteBehalten;
-  /** Typ Meldung oder Lage, nicht in der Berichtigung: nur dann gibt es den Weg in den Eingang. */
-  const eingangMoeglich = !berichtigungZu && (typ === 'meldung' || typ === 'lage');
+  /** Typ Meldung oder Lage, nicht in der Berichtigung: nur dann gibt es den Weg in den Eingang.
+      Mitarbeit hat ihn bei Lage nicht: Lage zusammen mit dem Meldungseingang lehnt der Server mit
+      403 ab (LLH-1817), es erzeugte eine Lagemeldung. */
+  const eingangMoeglich =
+    !berichtigungZu && (typ === 'meldung' || (typ === 'lage' && !istMitarbeit(einsatz)));
   /** Geht dieser Eintrag in den Meldungseingang? Der Client sendet es immer ausdrücklich. */
   const inMeldungseingang =
     eingangMoeglich &&
@@ -607,7 +616,7 @@ export default function Schnellerfassung({
 
   function onInhaltChange(neu: string) {
     // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
-    const befehl = berichtigungZu ? null : erkenneTypBefehl(neu);
+    const befehl = berichtigungZu ? null : erkenneTypBefehl(neu, erlaubteTypen);
     let text = neu;
     if (befehl) {
       setTyp(befehl.typ);
@@ -699,7 +708,7 @@ export default function Schnellerfassung({
       ...(felder.meldeweg ? { meldeweg: felder.meldeweg } : {}),
       ...(felder.veranlassung ? { veranlassung: felder.veranlassung } : {}),
     }));
-    if (felder.typ) setTyp(felder.typ);
+    if (felder.typ && erlaubteTypen.includes(felder.typ)) setTyp(felder.typ);
     setBausteinOffen(null);
     fokusInsFeld();
   }
@@ -930,7 +939,7 @@ export default function Schnellerfassung({
       {etbTyp.berichtigung.label}
     </span>
   ) : istSchmal ? (
-    <TypKnopf typ={typ} gesperrt={sendet} onTyp={typWaehlen} />
+    <TypKnopf typ={typ} gesperrt={sendet} onTyp={typWaehlen} typen={erlaubteTypen} />
   ) : undefined;
 
   /*
@@ -1277,6 +1286,7 @@ export default function Schnellerfassung({
           <EtbFeldzeile
             typ={berichtigungZu ? null : typ}
             onTyp={typWaehlen}
+            typen={erlaubteTypen}
             metadaten={metadaten}
             wirksam={wirksam}
             ausVorgabe={(seite) => ausStandard(seite, metadaten, rufname.standard, vorgabeTyp)}
@@ -1361,6 +1371,7 @@ export default function Schnellerfassung({
           bausteine={berichtigungZu ? [] : bausteine}
           gesetzteFelder={gesetzteFelder}
           typenAnbieten={typenAnbieten}
+          erlaubteTypen={erlaubteTypen}
           einheiten={einheitenTreffer}
           richtung="oben"
           topInset={menuTopInset}

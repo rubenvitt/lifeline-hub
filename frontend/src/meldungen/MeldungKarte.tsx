@@ -64,6 +64,13 @@ interface MeldungKarteProps {
   /** Einsatz-id für den Backlink auf den ausgelösten Auftrag (`/einsaetze/:id/auftraege`). */
   einsatzId: number;
   darfSchreiben?: boolean;
+  /**
+   * „Bearbeiten“ an DIESER Karte (LLH-1817: Mitarbeit korrigiert nur Eigenes, und nicht mehr, wenn
+   * die Meldung in der Lage steht). Ohne Angabe gilt `darfSchreiben`.
+   */
+  darfKorrigieren?: boolean;
+  /** Die Korrektur bietet keine Meldungsart „Lagemeldung“ an (Mitarbeit, LLH-1817). */
+  ohneLagemeldungsart?: boolean;
   mitglieder?: BearbeiterOption[];
   /** Deeplink-Hervorhebung (?meldung=): markierte Karte, scroll-adressierbar. */
   hervorgehoben?: boolean;
@@ -156,6 +163,8 @@ function MeldungKarte({
   ansicht = 'offen',
   einsatzId,
   darfSchreiben,
+  darfKorrigieren = darfSchreiben,
+  ohneLagemeldungsart,
   mitglieder,
   hervorgehoben,
   onStatus,
@@ -220,6 +229,10 @@ function MeldungKarte({
           ? { ziel: 'erledigt', label: MELDUNG_HANDLUNG.erledigt }
           : null;
 
+  const bearbeitenAktion: WeitereAktion[] =
+    darfKorrigieren && onKorrigieren
+      ? [{ key: 'bk', label: 'Bearbeiten', onClick: () => setBearbeiten(true) }]
+      : [];
   const weitere: WeitereAktion[] = darfSchreiben
     ? [
         // Was der Primär-Knopf gerade nicht zeigt, bleibt über das Menü erreichbar (z. B. der
@@ -242,9 +255,7 @@ function MeldungKarte({
               },
             ]
           : []),
-        ...(onKorrigieren
-          ? [{ key: 'bk', label: 'Bearbeiten', onClick: () => setBearbeiten(true) }]
-          : []),
+        ...bearbeitenAktion,
         // Übernahme in die Lage und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung
         // selbst. Ein Wort für den Vorgang: „In die Lage übernehmen“, Etikett „In der Lage ✓“
         // (LLH-1046, `frontend/AGENTS.md`, Begriffe).
@@ -284,7 +295,7 @@ function MeldungKarte({
             ]
           : []),
       ]
-    : [];
+    : bearbeitenAktion;
   // Patienten aus dieser Meldung (D6): die pseudonyme Registriernummer, mit Zugriff als Verweis.
   const patientenVerweis = !personenGesperrt && darf('fremde-module');
 
@@ -465,6 +476,7 @@ function MeldungKarte({
           funktionsOptionen={funktionsOptionen}
           onSpeichern={(aenderung) => onKorrigieren(m.id, aenderung)}
           onFertig={() => setBearbeiten(false)}
+          ohneLagemeldungsart={ohneLagemeldungsart}
         />
       )}
       {!bearbeiten && (zuweisbar || gesamt > 0) && (

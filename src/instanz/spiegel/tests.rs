@@ -109,11 +109,23 @@ async fn abgleichen_mit_hinweisen(
             .await
             .unwrap();
     let staende: HashMap<String, i64> = staende.into_iter().collect();
+    // Was das Gegenüber kann, steht je Seite an ihrer Kopplung (LLH-1817, design.md D7).
+    let mitarbeit = |p: &SqlitePool| {
+        let p = p.clone();
+        async move {
+            eine::<bool>(
+                &p,
+                "SELECT gegenueber_rolle_mitarbeit FROM instanz_kopplung WHERE id = 1",
+            )
+            .await
+        }
+    };
     let a = Absender {
         kennung: "elw",
         kopplung_id: 1,
         kopplung_org_id: 1,
         meldend: true,
+        gegenueber_mitarbeit: mitarbeit(f).await,
     };
     let mut budget = Budget::neu(1024 * 1024);
     budget.zeilen = zeilen;
@@ -130,6 +142,7 @@ async fn abgleichen_mit_hinweisen(
         }
     }
     fc.commit().await.unwrap();
+    let gegenueber_mitarbeit = mitarbeit(s).await;
     let mut sc = s.begin().await.unwrap();
     let e = Empfaenger {
         kopplung_id: 1,
@@ -137,6 +150,7 @@ async fn abgleichen_mit_hinweisen(
         org_id: 1,
         meldend: false,
         vor_ort: false,
+        gegenueber_mitarbeit,
     };
     let mut hinweise = Vec::new();
     for l in &lieferungen {
@@ -429,6 +443,7 @@ async fn unbekannte_freigabestufe_haelt_den_spiegel_an() {
         org_id: 1,
         meldend: false,
         vor_ort: false,
+        gegenueber_mitarbeit: true,
     };
     let erg = uebernehmen::uebernehmen(&mut sc, &e, &l).await.unwrap();
     assert_eq!(erg.stand, vorher, "Stand bleibt");
@@ -507,6 +522,7 @@ async fn grosse_abhaengigkeit_nach_einer_frueheren_lieferung_wartet() {
         kopplung_id: 1,
         kopplung_org_id: 1,
         meldend: true,
+        gegenueber_mitarbeit: true,
     };
     let mut fc = f.begin().await.unwrap();
     let e = liefern::list_gefuehrt(&mut fc, 1, &HashMap::new())
@@ -667,6 +683,7 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
         kopplung_id: 1,
         kopplung_org_id: 1,
         meldend: true,
+        gegenueber_mitarbeit: true,
     };
     let mut budget = Budget::neu(1024 * 1024);
     let mut fc = f.begin().await.unwrap();
@@ -693,6 +710,7 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
         org_id: 1,
         meldend: false,
         vor_ort: false,
+        gegenueber_mitarbeit: true,
     };
     for (katalog, rueckt_vor) in [(true, false), (false, true)] {
         l.katalog = katalog;
@@ -964,6 +982,7 @@ async fn eine_zeile_ueber_der_paketgrenze_kommt_als_hinweis_und_haelt_den_abglei
         kopplung_id: 1,
         kopplung_org_id: 1,
         meldend: true,
+        gegenueber_mitarbeit: true,
     };
     // Erster Einsatz eines leeren Pakets: dort ging eine übergroße Zeile bisher allein mit und
     // trieb das Paket über die Grenze.
@@ -999,6 +1018,7 @@ async fn eine_zeile_ueber_der_paketgrenze_kommt_als_hinweis_und_haelt_den_abglei
             org_id: 1,
             meldend: false,
             vor_ort: false,
+            gegenueber_mitarbeit: true,
         },
         &l,
     )
@@ -1361,6 +1381,7 @@ async fn eine_zuordnung_einer_anderen_org_haengt_den_spiegel_nicht_um() {
         org_id: 2,
         meldend: false,
         vor_ort: false,
+        gegenueber_mitarbeit: true,
     };
     let mut sc = s.acquire().await.unwrap();
     let erg = uebernehmen::uebernehmen(&mut sc, &e, &l).await.unwrap();
@@ -1386,4 +1407,340 @@ async fn eine_zuordnung_einer_anderen_org_haengt_den_spiegel_nicht_um() {
     .await
     .unwrap();
     assert_eq!(nachher, vorher, "Spiegel unverändert");
+}
+
+// ── Einsatzrolle „Mitarbeit“ und ältere Gegenüber (LLH-1817, design.md D7) ──────────────────
+
+/// Ein Konto am Hub, das der ELW als Stammdatum übernommen hat: Mitgliedschaften kommen beim
+/// Spiegel als echtes Konto an, nicht als Stellvertreter. Liefert (Konto am ELW, Konto am Hub).
+async fn gemeinsames_konto(f: &SqlitePool, s: &SqlitePool, name: &str) -> (i64, i64) {
+    let hub = konto(s, name).await;
+    let elw = konto(f, name).await;
+    exec(
+        f,
+        &format!(
+            "INSERT INTO stammdaten_herkunft (kopplung_org_id, org_id, art, fremder_schluessel, \
+             lokaler_schluessel) VALUES (1, 1, 'konto', '{hub}', '{elw}')"
+        ),
+    )
+    .await;
+    (elw, hub)
+}
+
+async fn rolle(pool: &SqlitePool, benutzer: i64) -> String {
+    eine(
+        pool,
+        &format!("SELECT einsatz_rolle FROM einsatz_mitgliedschaft WHERE benutzer_id = {benutzer}"),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn mitarbeit_geht_an_altes_gegenueber_als_beobachter() {
+    let (f, _s) = zwei_seiten().await;
+    let erika = konto(&f, "Erika").await;
+    let max = konto(&f, "Max").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({einsatz}, {erika}, 'mitarbeit'), ({einsatz}, {max}, 'fuehrungspersonal')"
+        ),
+    )
+    .await;
+    for (kann, erwartet) in [(false, "beobachter"), (true, "mitarbeit")] {
+        let a = Absender {
+            kennung: "elw",
+            kopplung_id: 1,
+            kopplung_org_id: 1,
+            meldend: true,
+            gegenueber_mitarbeit: kann,
+        };
+        let mut fc = f.begin().await.unwrap();
+        let e = liefern::list_gefuehrt(&mut fc, 1, &HashMap::new())
+            .await
+            .unwrap()
+            .remove(0);
+        let k = liefern::ensure_kennung(&mut fc, "elw", &e).await.unwrap();
+        let mut budget = Budget::neu(1024 * 1024);
+        let l = liefern::liefere_einsatz(&mut fc, &a, &e, &k, "hub/1", 0, &mut budget)
+            .await
+            .unwrap()
+            .expect("Lieferung");
+        fc.commit().await.unwrap();
+        let rollen: HashMap<i64, String> = l
+            .zeilen
+            .iter()
+            .filter(|z| z.art == "einsatz_mitgliedschaft")
+            .filter_map(|z| {
+                let d = z.daten.as_ref()?;
+                Some((
+                    d["benutzer_id"].as_i64()?,
+                    d["einsatz_rolle"].as_str()?.to_string(),
+                ))
+            })
+            .collect();
+        assert_eq!(rollen.get(&erika).map(String::as_str), Some(erwartet));
+        assert_eq!(
+            rollen.get(&max).map(String::as_str),
+            Some("fuehrungspersonal"),
+            "andere Rollen gehen unverändert"
+        );
+    }
+    // Herabgestuft wird nur, was hinausgeht: die Zeile hier bleibt Mitarbeit.
+    assert_eq!(rolle(&f, erika).await, "mitarbeit");
+}
+
+#[tokio::test]
+async fn beobachter_vom_alten_gegenueber_ueberschreibt_mitarbeit_nicht() {
+    let (f, s) = zwei_seiten().await;
+    let (erika_elw, erika_hub) = gemeinsames_konto(&f, &s, "Erika").await;
+    let (max_elw, max_hub) = gemeinsames_konto(&f, &s, "Max").await;
+    exec(
+        &f,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+    )
+    .await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({einsatz}, {erika_elw}, 'mitarbeit'), ({einsatz}, {max_elw}, 'mitarbeit')"
+        ),
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    assert_eq!(rolle(&s, erika_hub).await, "mitarbeit");
+
+    // Das Gegenüber kennt die Mitarbeit nicht (es liefert, was es als Beobachter bekam). Seine
+    // übrigen Spalten gelten, die Rolle bleibt.
+    exec(
+        &s,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 0",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = 'beobachter', \
+             fuehrungsstelle = 'ELW 1' WHERE benutzer_id = {erika_elw}"
+        ),
+    )
+    .await;
+    // Eine andere Rolle als Beobachter übernimmt der Spiegel auch von diesem Gegenüber.
+    exec(
+        &f,
+        &format!(
+            "UPDATE einsatz_mitgliedschaft SET einsatz_rolle = 'fuehrungspersonal' \
+             WHERE benutzer_id = {max_elw}"
+        ),
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    assert_eq!(rolle(&s, erika_hub).await, "mitarbeit");
+    let stelle: Option<String> = eine(
+        &s,
+        &format!(
+            "SELECT fuehrungsstelle FROM einsatz_mitgliedschaft WHERE benutzer_id = {erika_hub}"
+        ),
+    )
+    .await;
+    assert_eq!(stelle.as_deref(), Some("ELW 1"), "übrige Spalten gelten");
+    assert_eq!(rolle(&s, max_hub).await, "fuehrungspersonal");
+    assert_eq!(
+        abgleichen(&f, &s, 500).await,
+        0,
+        "die behaltene Rolle löst keine neue Lieferung aus"
+    );
+
+    // Ein Gegenüber, das die Mitarbeit kennt, stuft wirklich herab.
+    exec(
+        &s,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+    )
+    .await;
+    exec(
+        &f,
+        &format!(
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = 'ELW 2' \
+             WHERE benutzer_id = {erika_elw}"
+        ),
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    assert_eq!(rolle(&s, erika_hub).await, "beobachter");
+}
+
+/// Stand einer Zeile im Log des Führers.
+async fn log_stand(pool: &SqlitePool, art: &str, schluessel: &str) -> i64 {
+    eine(
+        pool,
+        &format!(
+            "SELECT stand FROM einsatz_aenderung WHERE art = '{art}' AND schluessel = '{schluessel}'"
+        ),
+    )
+    .await
+}
+
+/// Führer mit einer Mitarbeit (Erika), einem Führungspersonal (Max) und einem ETB-Eintrag; der
+/// Spiegel ist ein älterer Stand und hat Erika als Beobachter übernommen. Liefert (Einsatz am
+/// Führer, Erika am Führer, Erika am Spiegel, Max am Führer).
+async fn mitarbeit_beim_alten_spiegel(f: &SqlitePool, s: &SqlitePool) -> (i64, i64, i64, i64) {
+    let (erika_elw, erika_hub) = gemeinsames_konto(f, s, "Erika").await;
+    let (max_elw, _) = gemeinsames_konto(f, s, "Max").await;
+    let einsatz: i64 = eine(
+        f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    exec(
+        f,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({einsatz}, {erika_elw}, 'mitarbeit'), ({einsatz}, {max_elw}, 'fuehrungspersonal')"
+        ),
+    )
+    .await;
+    etb(f, einsatz, 1, erika_elw).await;
+    while abgleichen(f, s, 500).await > 0 {}
+    assert_eq!(rolle(s, erika_hub).await, "beobachter");
+    (einsatz, erika_elw, erika_hub, max_elw)
+}
+
+#[tokio::test]
+async fn aufgeruestetes_gegenueber_bekommt_mitarbeit_nachgeliefert() {
+    // Beide Speicherstellen: die meldende Seite aus der Antwort, die erreichte aus der Anfrage.
+    for erreicht in [false, true] {
+        let (f, s) = zwei_seiten().await;
+        let (einsatz, erika, erika_hub, max) = mitarbeit_beim_alten_spiegel(&f, &s).await;
+        let erika_key = format!("[{einsatz},{erika}]");
+        let max_key = format!("[{einsatz},{max}]");
+        let vorher_erika = log_stand(&f, "einsatz_mitgliedschaft", &erika_key).await;
+        let vorher_max = log_stand(&f, "einsatz_mitgliedschaft", &max_key).await;
+        let vorher_einsatz = log_stand(&f, "einsatz", &einsatz.to_string()).await;
+        // Das Gegenüber ist aufgerüstet und nennt die Fähigkeit beim nächsten Melden.
+        let mut fc = f.acquire().await.unwrap();
+        if erreicht {
+            crate::instanz::repo::save_rolle_mitarbeit(&mut fc, 1, true)
+                .await
+                .unwrap();
+        } else {
+            crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+                .await
+                .unwrap();
+        }
+        drop(fc);
+        exec(
+            &s,
+            "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+        )
+        .await;
+        assert!(
+            log_stand(&f, "einsatz_mitgliedschaft", &erika_key).await > vorher_erika,
+            "die Mitarbeit steht neu im Log"
+        );
+        assert_eq!(
+            log_stand(&f, "einsatz_mitgliedschaft", &max_key).await,
+            vorher_max,
+            "andere Rollen bleiben"
+        );
+        assert_eq!(
+            log_stand(&f, "einsatz", &einsatz.to_string()).await,
+            vorher_einsatz,
+            "andere Tabellen bleiben"
+        );
+        assert_eq!(abgleichen(&f, &s, 500).await, 1);
+        assert_eq!(
+            rolle(&s, erika_hub).await,
+            "mitarbeit",
+            "erreicht={erreicht}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn zweites_melden_ohne_wechsel_liefert_nichts_nach() {
+    let (f, s) = zwei_seiten().await;
+    mitarbeit_beim_alten_spiegel(&f, &s).await;
+    let mut fc = f.acquire().await.unwrap();
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+        .await
+        .unwrap();
+    drop(fc);
+    exec(
+        &s,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    let log: i64 = eine(&f, "SELECT MAX(stand) FROM einsatz_aenderung").await;
+    // Nächste Meldungen mit derselben Fähigkeit, von beiden Speicherstellen.
+    let mut fc = f.acquire().await.unwrap();
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+        .await
+        .unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut fc, 1, true)
+        .await
+        .unwrap();
+    drop(fc);
+    assert_eq!(
+        eine::<i64>(&f, "SELECT MAX(stand) FROM einsatz_aenderung").await,
+        log,
+        "kein neuer Logeintrag"
+    );
+    assert_eq!(abgleichen(&f, &s, 500).await, 0, "nichts nachgeliefert");
+}
+
+/// Ein Austausch, der seine Kopplung vor dem Wechsel geladen hat, darf die Nachlieferung nicht mit
+/// der alten Fähigkeit verbrauchen: Die Lieferung liest sie frisch (LLH-1817, design.md D7).
+#[tokio::test]
+async fn nachlieferung_nutzt_das_frische_flag() {
+    let (f, s) = zwei_seiten().await;
+    let (_, erika, _, _) = mitarbeit_beim_alten_spiegel(&f, &s).await;
+    let veraltet = crate::instanz::repo::load_kopplung(&f, 1).await.unwrap();
+    assert!(!veraltet.gegenueber_rolle_mitarbeit);
+    let mut fc = f.acquire().await.unwrap();
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+        .await
+        .unwrap();
+    drop(fc);
+    let staende: Vec<(String, i64)> =
+        sqlx::query_as("SELECT fremde_kennung, stand FROM einsatz_spiegel")
+            .fetch_all(&s)
+            .await
+            .unwrap();
+    let staende: HashMap<String, i64> = staende.into_iter().collect();
+    let eigen = crate::instanz::identitaet::load_or_create(&f)
+        .await
+        .unwrap();
+    let mut fc = f.begin().await.unwrap();
+    let orgs = crate::instanz::repo::list_orgs_aktiv(&mut fc, 1)
+        .await
+        .unwrap();
+    let mut budget = Budget::neu(1024 * 1024);
+    let lieferungen =
+        super::abgleich::liefere_alle(&mut fc, &eigen, &veraltet, &orgs, &staende, &mut budget)
+            .await
+            .unwrap();
+    fc.commit().await.unwrap();
+    let rollen: Vec<String> = lieferungen
+        .iter()
+        .flat_map(|l| &l.zeilen)
+        .filter(|z| z.art == "einsatz_mitgliedschaft")
+        .filter_map(|z| {
+            let d = z.daten.as_ref()?;
+            (d["benutzer_id"].as_i64() == Some(erika)).then(|| d["einsatz_rolle"].to_string())
+        })
+        .collect();
+    assert_eq!(rollen, ["\"mitarbeit\""]);
 }

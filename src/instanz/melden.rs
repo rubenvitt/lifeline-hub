@@ -133,6 +133,10 @@ pub struct MeldenAnfrage {
     /// Seite als beglaubigt gespeichert hat (LLH-1497, Anzeige „Zertifikat bestätigt“).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_zertifikat: Option<String>,
+    /// Die meldende Seite kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7). Ein
+    /// älterer Stand nennt es nicht: dann `false`, und `mitarbeit` geht ihm als `beobachter` zu.
+    #[serde(default)]
+    pub rolle_mitarbeit: bool,
 }
 
 /// Eine Org in der Antwort.
@@ -186,6 +190,10 @@ pub struct MeldenAntwort {
     /// Die erreichte Seite bietet Web Push an (D4).
     #[serde(default)]
     pub web_push: bool,
+    /// Die erreichte Seite kennt die Einsatzrolle `mitarbeit` (LLH-1817, design.md D7); wie
+    /// [`MeldenAnfrage::rolle_mitarbeit`].
+    #[serde(default)]
+    pub rolle_mitarbeit: bool,
 }
 
 /// Bytes eines Feldes der Antwort samt Namen und Trennzeichen (LLH-1871): was es vom Budget der
@@ -821,6 +829,7 @@ async fn melden_einmal_mit(
         fuehrung_bis: fuehrung_empfangen,
         fuehrung_gesendet_bis: fuehrung_gesendet,
         tls_zertifikat: kopplung.tls_zertifikat.clone(),
+        rolle_mitarbeit: true,
     };
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
@@ -889,7 +898,8 @@ async fn melden_einmal_mit(
             &jetzt,
         )
         .await?;
-        repo::save_faehigkeiten(conn, kopplung.id, a.hinweise, a.web_push).await?;
+        repo::save_faehigkeiten(conn, kopplung.id, a.hinweise, a.web_push, a.rolle_mitarbeit)
+            .await?;
         let ids: Vec<i64> = offen.iter().map(|o| o.id).collect();
         repo::mark_widerruf_gemeldet(conn, &ids, &jetzt).await?;
         for oa in &a.orgs {
@@ -1307,6 +1317,7 @@ pub async fn handle_meldung(
             &jetzt,
         )
         .await?;
+        repo::save_rolle_mitarbeit(conn, kopplung.id, anfrage.rolle_mitarbeit).await?;
         if kopplung.art() == super::InstanzKopplungArt::VorOrt {
             repo::save_tls_zertifikat_gemeldet(
                 conn,
@@ -1703,6 +1714,7 @@ pub async fn handle_meldung(
         fuehrung_mehr: fuehrung_ausgang.mehr,
         hinweise: true,
         web_push,
+        rolle_mitarbeit: true,
     })
 }
 
@@ -1735,6 +1747,7 @@ mod tests {
             tls_zertifikat: None,
             fuehrung_bis: 0,
             fuehrung_gesendet_bis: 0,
+            rolle_mitarbeit: true,
         }
     }
 
@@ -1803,6 +1816,7 @@ mod tests {
             fuehrung_mehr: false,
             hinweise: true,
             web_push: false,
+            rolle_mitarbeit: true,
         }
     }
 
@@ -2102,6 +2116,25 @@ mod tests {
         .expect("ältere Antwort");
         assert!(!a.hinweise);
         assert!(!a.web_push);
+    }
+
+    #[test]
+    fn alte_antwort_ohne_feld_heisst_keine_mitarbeit() {
+        // Ein Stand vor LLH-1817 nennt `rolle_mitarbeit` weder in der Anfrage noch in der Antwort.
+        let mut v = serde_json::to_value(anfrage(&["h/1"], &[])).unwrap();
+        v.as_object_mut().unwrap().remove("rolle_mitarbeit");
+        let a: MeldenAnfrage = serde_json::from_value(v).unwrap();
+        assert!(!a.rolle_mitarbeit, "Anfrage");
+        let a: MeldenAntwort = serde_json::from_value(serde_json::json!({
+            "name": "Hub", "softwarestand": "1", "protokoll": PROTOKOLL, "orgs": []
+        }))
+        .expect("ältere Antwort");
+        assert!(!a.rolle_mitarbeit, "Antwort");
+        // Der eigene Stand nennt die Fähigkeit in beiden Richtungen.
+        assert_eq!(
+            serde_json::to_value(anfrage(&[], &[])).unwrap()["rolle_mitarbeit"],
+            serde_json::json!(true)
+        );
     }
 
     #[test]

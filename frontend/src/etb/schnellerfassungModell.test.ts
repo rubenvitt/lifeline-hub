@@ -19,6 +19,7 @@ import {
   filterAtEintraege,
   filterSlashEintraege,
   METADATEN_FELDER,
+  TYP_BEFEHLE_MITARBEIT,
   type MetaFeld,
 } from './schnellerfassungModell';
 dayjs.extend(utc);
@@ -189,6 +190,17 @@ describe('Typbefehle (Neuentwurf S4)', () => {
     expect(amZeilenanfang('/an', 0)).toBe(true);
     expect(amZeilenanfang('Zeile 1\n/an', 8)).toBe(true);
     expect(amZeilenanfang('Lage /an', 5)).toBe(false);
+  });
+
+  it('lässt der Mitarbeit nur Meldung und Lage als Typbefehl und im Menü (LLH-1817)', () => {
+    expect(erkenneTypBefehl('/anordnung x', TYP_BEFEHLE_MITARBEIT)).toBeNull();
+    expect(erkenneTypBefehl('/entscheidung x', TYP_BEFEHLE_MITARBEIT)).toBeNull();
+    expect(erkenneTypBefehl('/lage x', TYP_BEFEHLE_MITARBEIT)).toEqual({ typ: 'lage', rest: 'x' });
+    const treffer = filterSlashEintraege('', [], [], {
+      typen: true,
+      erlaubteTypen: TYP_BEFEHLE_MITARBEIT,
+    });
+    expect(treffer.typen.map((t) => t.key)).toEqual(['meldung', 'lage']);
   });
 
   it('setzt einen ausgetippten Befehl mit Leerzeichen, aber nur exakte Typwörter', () => {

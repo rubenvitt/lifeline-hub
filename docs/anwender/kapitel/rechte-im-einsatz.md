@@ -2,13 +2,13 @@
 titel: Rechte im Einsatz
 gruppen: [fuehrung, administration]
 reihenfolge: 40
-quellen: [src/einsatz/berechtigung.rs, frontend/src/einsatz/rollenVokabular.ts, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs, src/fuehrung/aufloesung.rs, src/benachrichtigung/aufloesung.rs, src/einsatz/funktion.rs, frontend/src/fuehrung/besetzungAusMitgliedern.ts, frontend/src/einsatz/sackgasse.ts, frontend/src/einsatz/ModulGesperrt.tsx]
+quellen: [src/einsatz/berechtigung.rs, frontend/src/einsatz/rollenVokabular.ts, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs, src/fuehrung/aufloesung.rs, src/benachrichtigung/aufloesung.rs, src/einsatz/funktion.rs, frontend/src/fuehrung/besetzungAusMitgliedern.ts, frontend/src/einsatz/sackgasse.ts, frontend/src/einsatz/ModulGesperrt.tsx, frontend/src/components/nurAnsicht.ts]
 ---
 
 ## Überblick
 
 Was eine Person in einem Einsatz darf, hängt an ihrer Rolle in diesem Einsatz: **Einsatzleitung**,
-**Führungspersonal** oder **Beobachter**. Die Rollen vergibt die Einsatzleitung eines laufenden
+**Führungspersonal**, **Mitarbeit** oder **Beobachter**. Die Rollen vergibt die Einsatzleitung eines laufenden
 Einsatzes in den Einstellungen des Einsatzes, Reiter „Zugriff“. Ohne Rolle lesen Führungskräfte
 der Organisation und System-Admins mit; schreiben dürfen sie dort nur eingeschränkt.
 
@@ -66,11 +66,30 @@ Sortierung und Filter stehen in der Adresse: ein geteilter Link öffnet die List
 
 Die Auswahl der Rolle nennt aufgeklappt unter jedem Namen in einer Zeile, was die Rolle darf:
 „Einsatzleitung“ schreibt überall, verwaltet Zugriff und Geräte; „Führungspersonal“ schreibt in
-Modulen, Kopfdaten und Einstellungen; „Beobachter“ liest nur. Im Einzelnen:
+Modulen, Kopfdaten und Einstellungen; „Mitarbeit“ erfasst Meldungen, Chat und ETB-Einträge,
+ändert sonst nichts; „Beobachter“ liest nur. Im Einzelnen:
 
 - **Einsatzleitung** und **Führungspersonal** schreiben in den Modulen, ändern Kopfdaten,
   Einstellungen und die eigene Führungsstelle.
-- **Beobachter** lesen nur.
+- **Mitarbeit** erfasst und ändert sonst nichts; die Kopfzeile nennt als Grund „als Mitarbeit
+  nur erfassen“. Gelesen wird wie als Beobachter. Erlaubt ist:
+  - Meldungen erfassen, aber keine Lagemeldung; eigene Meldungen korrigieren, solange sie nicht in
+    der Lage stehen und keine Lagemeldung sind.
+  - Im Chat schreiben sowie eigene Nachrichten bearbeiten und löschen; Kanäle anlegen, einen Bezug
+    setzen und Heraufstufen bleiben zu.
+  - Im Einsatztagebuch Einträge der Typen Meldung und Lage erfassen (die Lage nicht „in den
+    Meldungseingang“) und eigene Einträge berichtigen, solange die Meldung dazu nicht in der Lage
+    steht und keine Lagemeldung ist.
+  - Fotos und Anhänge hochladen, nur eigene anhängen und nur eigene Uploads löschen.
+
+  Alles andere bleibt zu: Meldungen bestätigen, zuweisen oder im Status ändern, Aufträge, Kräfte,
+  Abschnitte und Einstellungen. Ein Modul, das auf „Führung im Einsatz“ steht, bleibt der Mitarbeit
+  verschlossen. Ohne Netz laufen die erlaubten Eingaben nach (siehe [Ohne Netz](ohne-netz.md)); am
+  Spiegel einer gekoppelten Instanz beantragt Mitarbeit nur Einträge des Einsatztagebuchs und
+  Meldungen, und die führende Instanz wendet dieselben Regeln an und kann einen Antrag später
+  ablehnen (siehe [Instanzkopplung](instanzkopplung.md)).
+- **Beobachter** lesen nur. Im Chat und im Einsatztagebuch nennt der Grund „nur Einsatzleitung,
+  Führungspersonal und Mitarbeit“, denn dort erfasst auch die Mitarbeit.
 - Nur die **Einsatzleitung** verwaltet den Zugriff und koppelt Geräte. Alle anderen sehen den
   Reiter „Zugriff“ als „Nur Ansicht“ mit dem Grund „nur Einsatzleitung“; die Schnellaktion
   „Mitglied aufnehmen“ und der Sprung „Zugriff verwalten“ fehlen ihnen. Am Spiegel nennt der Grund

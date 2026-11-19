@@ -6959,6 +6959,111 @@ async fn migration_0208_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema() {
     assert_eq!((ziel, anzeige.as_deref()), (None, Some("EA Deich")));
 }
 
+// --- LLH-1817: Einsatzrolle Mitarbeit (0358) ---
+
+/// Der Neubau von `einsatz_mitgliedschaft` übernimmt den Bestand samt Führungsstelle und
+/// -funktion, nimmt `mitarbeit` in den Rollen-CHECK auf, lehnt Unbekanntes weiter ab und legt
+/// Index sowie die sechs Spiegel-Trigger neu an.
+#[tokio::test]
+async fn migration_0358_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 357).await;
+    let (e, b) = bild_grundlage(&pool).await;
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+                zugewiesen_at, fuehrungsstelle, fuehrungsfunktion) \
+             VALUES (?, ?, 'fuehrungspersonal', '2026-10-16 13:42:00', 'EL-Stelle', 's2')",
+    )
+    .bind(e)
+    .bind(b)
+    .execute(&pool)
+    .await
+    .unwrap();
+    type Zeile = (i64, i64, String, String, Option<String>, Option<String>);
+    let lesen = || {
+        sqlx::query_as::<_, Zeile>(
+            "SELECT einsatz_id, benutzer_id, einsatz_rolle, zugewiesen_at, fuehrungsstelle, \
+                    fuehrungsfunktion FROM einsatz_mitgliedschaft ORDER BY benutzer_id",
+        )
+        .fetch_all(&pool)
+    };
+    let vorher = lesen().await.unwrap();
+    assert_eq!(vorher.len(), 1);
+
+    migriere_bis(&pool, 358).await;
+
+    assert_eq!(lesen().await.unwrap(), vorher, "Bestand unverändert");
+    let reste: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name = 'einsatz_mitgliedschaft_neu'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+
+    let namen: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM sqlite_master WHERE tbl_name = 'einsatz_mitgliedschaft' \
+             AND (type = 'trigger' OR name = 'idx_mitgliedschaft_benutzer') ORDER BY name",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        namen,
+        [
+            "einsatz_mitgliedschaft_spiegellog_d",
+            "einsatz_mitgliedschaft_spiegellog_i",
+            "einsatz_mitgliedschaft_spiegellog_u",
+            "einsatz_mitgliedschaft_spiegelschutz_d",
+            "einsatz_mitgliedschaft_spiegelschutz_i",
+            "einsatz_mitgliedschaft_spiegelschutz_u",
+            "idx_mitgliedschaft_benutzer",
+        ]
+    );
+
+    let weiterer: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'M', 'm', 'h') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES (?, ?, 'mitarbeit')",
+    )
+    .bind(e)
+    .bind(weiterer)
+    .execute(&pool)
+    .await
+    .expect("mitarbeit ist erlaubt");
+    let protokoll: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_aenderung \
+             WHERE einsatz_id = ? AND art = 'einsatz_mitgliedschaft' AND schluessel = ?",
+    )
+    .bind(e)
+    .bind(format!("[{e},{weiterer}]"))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(protokoll, 1, "der Trigger schreibt ins Änderungsprotokoll");
+    let dritter: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'N', 'n', 'h') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES (?, ?, 'unsinn')",
+    )
+    .bind(e)
+    .bind(dritter)
+    .execute(&pool)
+    .await
+    .expect_err("unbekannte Rolle scheitert");
+}
+
 // --- LLH-1042: Einheiten-Vorlagen (0190) ---
 
 /// Org, Einheitstyp, zwei Fahrzeuge, eine Person und ein Demo-Kopf mit zwei Marken auf dem

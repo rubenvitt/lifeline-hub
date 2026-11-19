@@ -9,6 +9,7 @@ describe('EINSATZ_ROLLE_LABELS', () => {
     const alle = [
       'einsatzleitung',
       'fuehrungspersonal',
+      'mitarbeit',
       'beobachter',
     ] as const satisfies readonly EinsatzRolle[];
     type Fehlend = Exclude<EinsatzRolle, (typeof alle)[number]>;
@@ -25,6 +26,7 @@ describe('EINSATZ_ROLLE_LABELS', () => {
     expect(EINSATZ_ROLLE_OPTIONEN).toEqual([
       expect.objectContaining({ value: 'einsatzleitung', label: 'Einsatzleitung' }),
       expect.objectContaining({ value: 'fuehrungspersonal', label: 'Führungspersonal' }),
+      expect.objectContaining({ value: 'mitarbeit', label: 'Mitarbeit' }),
       { value: 'beobachter', label: 'Beobachter', darf: 'liest nur' },
     ]);
   });

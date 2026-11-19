@@ -297,6 +297,27 @@ describe('MitgliederAbschnitt', () => {
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
   });
 
+  it('bietet die Rolle Mitarbeit mit ihrer Darf-Zeile in der Rollenwahl an (LLH-1817)', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
+      http.get('/api/einsaetze/:id/mitglieder/auswahl', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
+    );
+    await screen.findByText('Eva Einsatz');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Rolle von Eva Einsatz' }));
+    const optionen = [...document.querySelectorAll<HTMLElement>('.ant-select-item-option')].map(
+      (o) => o.textContent,
+    );
+    expect(optionen).toEqual([
+      'Einsatzleitungschreibt überall, verwaltet Zugriff und Geräte',
+      'Führungspersonalschreibt in Modulen, Kopfdaten und Einstellungen',
+      'Mitarbeiterfasst Meldungen, Chat und ETB-Einträge, ändert sonst nichts',
+      'Beobachterliest nur',
+    ]);
+  });
+
   it('zählt im Kopf „1 Mitglied“ in der Einzahl und ab zwei in der Mehrzahl', async () => {
     server.use(
       http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
