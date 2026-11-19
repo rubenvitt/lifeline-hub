@@ -7,6 +7,7 @@ import { teilwortSuche } from '../components/teilwortSuche';
 import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
 import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
 import { uebernahmeBezeichnung, zuordenbarePosten } from './materialUebernahme';
+import { Feld } from '../components/instrument';
 
 /** Ein Posten, wie der Dialog ihn aus der Material-Query der Seite liest. */
 export type ZuordnenPosten = Pick<
@@ -130,13 +131,8 @@ function PostenFeld({
     );
   }
   return (
-    <Form.Item
-      label="Posten"
-      name="posten"
-      rules={[{ required: true, message: 'Posten wählen' }]}
-      style={{ marginBottom: 0 }}
-    >
+    <Feld label="Posten" name="posten" rules={[{ required: true, message: 'Posten wählen' }]}>
       <Select<number> options={optionen} showSearch={teilwortSuche} />
-    </Form.Item>
+    </Feld>
   );
 }

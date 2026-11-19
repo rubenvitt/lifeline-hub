@@ -57,6 +57,11 @@ describe('PersonenDruckTabelle', () => {
     ]);
   });
 
+  it('druckt einen Datensatz ohne Status mit „unbekannt“, statt abzustürzen (LLH-1957)', () => {
+    rendere([{ ...basis, status: undefined } as unknown as Person]);
+    expect(within(zeilen()[0]).getByText('unbekannt')).toBeInTheDocument();
+  });
+
   it('trägt die Spalten der Spec, Sichtung als Wort ohne Farbe', () => {
     rendere([{ ...basis, aktuelle_sichtung: 'sk1' }]);
     expect(

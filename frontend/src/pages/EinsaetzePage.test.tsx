@@ -392,6 +392,10 @@ describe('EinsaetzePage', () => {
     // „leer" und „darf anlegen" schließen sich nicht aus: auch Anlegeberechtigte sehen den
     // Leerzustand.
     expect(await screen.findByText('Keine Einsätze')).toBeInTheDocument();
+    // LLH-1819: der Leerzustand sagt, wer zu einem Einsatz aufnimmt (ohne Namen).
+    expect(
+      screen.getByText('Zu einem Einsatz nimmt dich dessen Einsatzleitung auf.'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
     // Getauscht ist der Knoten, nicht der Wortlaut — die Textzeile darüber belegt allein nichts.
     // Der Leerknoten trägt keine eigene Aktion: die Anlegen-Kachel steht darunter, ein zweiter
@@ -595,6 +599,8 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     await nutzer.type(feld, 'kein-treffer');
     expect(screen.queryByText('Einsatz 1')).not.toBeInTheDocument();
     expect(screen.getByText('Alter Einsatz')).toBeInTheDocument();
+    // Eine Suche ohne Treffer ist kein fehlender Zugang (LLH-1819).
+    expect(screen.queryByText(/nimmt dich dessen Einsatzleitung auf/)).not.toBeInTheDocument();
   });
 
   it('fällt die Zahl aktiver Einsätze unter die Schwelle, bleibt kein leeres Raster ohne Ausweg stehen (M6)', async () => {

@@ -20,6 +20,18 @@ interface Props {
    * Ohne ihn steht nur die Sperrzeile da (LFH-1078: zeigen statt erklären).
    */
   freigabenPfad?: string;
+  /**
+   * Anzeigenamen der Mitglieder mit Einsatzrolle Einsatzleitung (LLH-1819): sie erteilen die
+   * Freigabe. `undefined` oder leer = unbekannt, dann steht der Satz ohne Namen.
+   */
+  einsatzleitung?: string[];
+}
+
+/** Wer die Freigabe erteilt (LLH-1819); ohne Namen ein Satz statt einer leeren Aufzählung. */
+function ansprechpartnerZeile(einsatzleitung: string[] | undefined): string {
+  return einsatzleitung && einsatzleitung.length > 0
+    ? `Freigabe erteilt die Einsatzleitung: ${einsatzleitung.join(', ')}`
+    : 'Freigabe erteilt die Einsatzleitung.';
 }
 
 /**
@@ -33,7 +45,13 @@ interface Props {
  * in Einstellungen › Module. Anders als dort trägt der Modulname das `h1`, über dem Paneel: die
  * Modulseite, die sonst den Seitentitel stellt, wird nicht gerendert.
  */
-export default function ModulGesperrt({ modul, ausgeblendet, rueckweg, freigabenPfad }: Props) {
+export default function ModulGesperrt({
+  modul,
+  ausgeblendet,
+  rueckweg,
+  freigabenPfad,
+  einsatzleitung,
+}: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
   return (
@@ -68,6 +86,13 @@ export default function ModulGesperrt({ modul, ausgeblendet, rueckweg, freigaben
           <Textstufe als="p" stufe="textKlein" ton="text2">
             {ausgeblendet ? 'In diesem Einsatz ausgeblendet' : 'Für deine Rolle nicht freigegeben'}
           </Textstufe>
+          {/* Wen man fragt (LLH-1819). Wer die Freigaben selbst verwaltet, hat den Knopf statt
+             eines Namens. */}
+          {!freigabenPfad && (
+            <Textstufe als="p" stufe="textKlein" ton="text2">
+              {ansprechpartnerZeile(einsatzleitung)}
+            </Textstufe>
+          )}
           {(rueckweg || freigabenPfad) && (
             <Stapel richtung="zeile" umbruch abstand="xs">
               {rueckweg && (

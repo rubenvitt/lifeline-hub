@@ -7,6 +7,7 @@ import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { EINSATZ_KEYS } from '../api/queryKeys';
 import type { Auftrag } from '../api/types';
 import { druckAuftrag, druckEmpfaenger } from '../auftraege/auftragDruckTestdaten';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 import AuftragDruckPage from './AuftragDruckPage';
 
 /** Druckansicht eines Auftrags (LLH-1171, Change `ianaw5k1-auftrag-drucken` D2/D3). */
@@ -105,15 +106,27 @@ describe('AuftragDruckPage', () => {
     expect(wert?.textContent).toMatch(/^11\d{2}15jun26$/);
   });
 
-  it('unbekannter Auftrag: „nicht gefunden“ mit Rückweg, kein Druck', async () => {
-    renderPage(() => HttpResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 }));
-    expect(await screen.findByText('Auftrag nicht gefunden')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Zurück zu Aufträge/Befehle' })).toHaveAttribute(
-      'href',
-      '/einsaetze/5/auftraege?auftrag=31',
-    );
+  it('unbekannter Auftrag (404): „gibt es nicht (mehr)“ statt der Druckansicht, Rückweg zur Liste', async () => {
+    renderPage(() => HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }));
+    await erwarteNichtGefunden({
+      titel: 'Diesen Auftrag gibt es nicht (mehr)',
+      knopf: 'Zu den Aufträgen',
+      liste: 'Aufträge-Liste',
+    });
     expect(screen.queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
-    expect(document.querySelector('[data-lfh="druckwurzel"]')).toBeNull();
+  });
+
+  it('ungültige Kennung in der Adresse: dasselbe Muster, keine stille Weiterleitung', async () => {
+    const abrufe = renderPage(
+      () => HttpResponse.json(druckAuftrag()),
+      '/einsaetze/5/auftraege/x/druck',
+    );
+    await erwarteNichtGefunden({
+      titel: 'Diesen Auftrag gibt es nicht (mehr)',
+      knopf: 'Zu den Aufträgen',
+    });
+    expect(screen.queryByText('Aufträge-Liste')).toBeNull();
+    expect(abrufe.auftrag).toBe(0);
   });
 
   it('ohne Zugriff (403): „Kein Zugriff“, kein Druck', async () => {
@@ -122,7 +135,7 @@ describe('AuftragDruckPage', () => {
     expect(screen.queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
   });
 
-  it('anderer Fehler: Grund mit „Erneut laden“', async () => {
+  it('anderer Fehler (500): Fehlerbanner mit „Erneut abrufen“', async () => {
     let fehler = true;
     renderPage(() =>
       fehler
@@ -130,8 +143,9 @@ describe('AuftragDruckPage', () => {
         : HttpResponse.json(druckAuftrag()),
     );
     expect(await screen.findByText('Der Auftrag konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('kaputt');
     fehler = false;
-    fireEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
     await fertig();
   });
 
@@ -141,11 +155,6 @@ describe('AuftragDruckPage', () => {
     const zurueck = screen.getByRole('link', { name: 'Zurück zu Aufträge/Befehle' });
     expect(zurueck).toHaveAttribute('href', '/einsaetze/5/auftraege?auftrag=31');
     fireEvent.click(zurueck);
-    expect(await screen.findByText('Aufträge-Liste')).toBeInTheDocument();
-  });
-
-  it('ungültige Auftrags-ID führt auf die Liste', async () => {
-    renderPage(() => HttpResponse.json(druckAuftrag()), '/einsaetze/5/auftraege/abc/druck');
     expect(await screen.findByText('Aufträge-Liste')).toBeInTheDocument();
   });
 });
