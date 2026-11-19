@@ -79,7 +79,16 @@ for (const nutzer of NUTZER) {
     await pruefeKopf(menue, nutzer, benutzername);
     const gerollt = await menue.evaluate((m) => m.scrollTop);
     expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
-    for (const name of ['Profil', 'Benachrichtigungen', 'Neuigkeiten', 'Hilfe', 'Abmelden']) {
+    // „Hilfe zu dieser Seite“ steht am Handy im Menü, weil der Kopf für „?“ keinen Platz hat
+    // (LLH-1824); „Hilfe“ deshalb mit Ende, sonst träfe es beide.
+    for (const name of [
+      'Profil',
+      'Benachrichtigungen',
+      'Neuigkeiten',
+      'Hilfe zu dieser Seite$',
+      'Hilfe$',
+      'Abmelden',
+    ]) {
       await expect(menue.getByRole('menuitem', { name: new RegExp(`^${name}`) })).toBeInViewport({
         ratio: 1,
       });
@@ -88,7 +97,7 @@ for (const nutzer of NUTZER) {
       await expect(menue.getByRole('radiogroup', { name: leiste })).toBeInViewport({ ratio: 1 });
     }
     // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): „Hilfe“ führt auf die Hilfe.
-    await menue.getByRole('menuitem', { name: 'Hilfe' }).click();
+    await menue.getByRole('menuitem', { name: 'Hilfe', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
   });
 

@@ -3,6 +3,7 @@ import {
   IconChevronRunter,
   IconDokumente,
   IconGlocke,
+  IconHilfe,
   IconPerson,
   IconPosteingang,
 } from '../icons';
@@ -23,6 +24,7 @@ import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
 import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD, hilfePfad } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
 import { useAbmeldenRueckfrage } from '../auth/AbmeldenRueckfrage';
+import { useHilfeSeitenleiste } from '../hilfe/HilfeSeitenleisteProvider';
 import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schriftskala } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
@@ -120,6 +122,10 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * `inNavigation` (LLH-1728, D3): am Handy steht der Auslöser im Fuß des Drawers „Navigation“ statt
  * im Kopf. Dann ist er eine volle Zeile mit Kachel und Name (oder Funktion) in den Farben der
  * Fläche, nicht des dunklen Rahmens, und das Menü öffnet nach oben. Das Menü selbst bleibt gleich.
+ *
+ * `hilfeZurSeite` (LLH-1824): wo der Kopf für den Knopf „?“ keinen Platz hat (App-Rahmen unter
+ * `md`, Einsatz-Kopf von `md` bis unter `xl`), steht „Hilfe zu dieser Seite“ als Eintrag vor „Hilfe“
+ * und öffnet die Seitenleiste. Ohne Leiste (Gerät, Hilfeseite) fehlt der Eintrag.
  */
 /**
  * Aus der Navigation darf das Menü seitlich ins Fenster rücken (`shiftX`, LLH-1728). antds Typ
@@ -132,17 +138,20 @@ export default function BenutzerMenu({
   funktion,
   hasFixedWidth = false,
   hilfeDaneben = false,
+  hilfeZurSeite = false,
   inNavigation = false,
 }: {
   funktion?: string | null;
   hasFixedWidth?: boolean;
   hilfeDaneben?: boolean;
+  hilfeZurSeite?: boolean;
   inNavigation?: boolean;
 } = {}) {
   const { benutzer } = useAuth();
   const abmelden = useAbmeldenRueckfrage();
   const navigate = useNavigate();
   const location = useLocation();
+  const { oeffneHilfe } = useHilfeSeitenleiste();
   const { data: versionsstand } = useVersionsstand();
   const neuigkeitenUngelesen = istUngelesen(versionsstand);
   const { token } = theme.useToken();
@@ -321,6 +330,10 @@ export default function BenutzerMenu({
     // Hilfe (LFH-1096). Rückmeldung (LLH-1549) und Lizenzhinweis (LFH-1000) stehen seit LLH-1642
     // auf der Hilfe-Seite; die Hilfe bekommt den Pfad mit, aus dem sie geöffnet wurde, damit die
     // Rückmeldung dort den Bereich der App vorbefüllt (design.md D5).
+    // Hilfe zur Seite, wo der Kopf für „?“ keinen Platz hat (LLH-1824, `hilfeZurSeite`).
+    ...(hilfeZurSeite && oeffneHilfe
+      ? [{ key: 'hilfe-seite', icon: <IconHilfe />, label: 'Hilfe zu dieser Seite' }]
+      : []),
     { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
     // ZULETZT, DURCH EINEN TRENNER ABGESETZT (LLH-1730, Spec `benutzermenue`): direkt unter
     // „Profil“ (LFH-952) lag es im Griff, und ein Klick beendete die Sitzung sofort. Jetzt steht es
@@ -333,6 +346,7 @@ export default function BenutzerMenu({
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') abmelden.open();
+    else if (key === 'hilfe-seite') oeffneHilfe?.('seite');
     else if (key === 'hilfe' && isHilfeImNeuenTab) {
       window.open(hilfePfad({ von: location.pathname }), '_blank', 'noopener');
     } else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });

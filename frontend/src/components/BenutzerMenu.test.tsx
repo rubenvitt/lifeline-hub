@@ -30,6 +30,14 @@ import { ThemeModeProvider, useWarnsperre } from '../theme/ThemeModeProvider';
 import BenutzerMenu from './BenutzerMenu';
 import { adminFixture } from '../test/fixtures';
 
+/** Die Hilfe-Seitenleiste (LLH-1824): ihr Öffner, oder keiner wie auf dem Gerät. */
+const hilfe = vi.hoisted(() => ({
+  oeffneHilfe: undefined as ((reiter?: string) => void) | undefined,
+}));
+vi.mock('../hilfe/HilfeSeitenleisteProvider', () => ({
+  useHilfeSeitenleiste: () => ({ oeffneHilfe: hilfe.oeffneHilfe }),
+}));
+
 /** Zwei Wörter, damit die Initialen (erstes + letztes Wort) prüfbar sind. */
 const ANZEIGENAME = 'Chef Dienst';
 const INITIALEN = 'CD';
@@ -219,6 +227,59 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     zeige();
     await oeffne();
     expect((await screen.findByRole('menu')).style.width).toBe(erwartet);
+  });
+
+  describe('„Hilfe zu dieser Seite“, wo der Kopf keinen Platz für „?“ hat (LLH-1824)', () => {
+    afterEach(() => {
+      hilfe.oeffneHilfe = undefined;
+    });
+
+    function zeigeMitHilfeZurSeite() {
+      server.use(meHandler(benutzer));
+      return renderMitProviders(
+        <ThemeModeProvider>
+          <BenutzerMenu hilfeZurSeite />
+        </ThemeModeProvider>,
+      );
+    }
+
+    it('steht vor „Hilfe“ und öffnet die Seitenleiste mit dem Kapitel zur Seite', async () => {
+      const oeffneHilfe = vi.fn();
+      hilfe.oeffneHilfe = oeffneHilfe;
+      zeigeMitHilfeZurSeite();
+      await oeffne();
+      const eintraege = await screen.findAllByRole('menuitem');
+      expect(eintraege.map((e) => e.textContent)).toEqual([
+        'Profil',
+        'Benachrichtigungen',
+        'Neuigkeiten',
+        'Hilfe zu dieser Seite',
+        'Hilfe',
+        'Abmelden',
+      ]);
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Hilfe zu dieser Seite' }));
+      expect(oeffneHilfe).toHaveBeenCalledWith('seite');
+    });
+
+    it('fehlt ohne Seitenleiste (Gerät, Hilfeseite)', async () => {
+      zeigeMitHilfeZurSeite();
+      await oeffne();
+      // Positive Gegenprobe mit derselben Abfrage: die Einträge sind geladen.
+      expect(await screen.findByRole('menuitem', { name: 'Hilfe' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: 'Hilfe zu dieser Seite' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('fehlt ohne `hilfeZurSeite`, auch mit Seitenleiste (Kopf mit „?“)', async () => {
+      hilfe.oeffneHilfe = vi.fn();
+      zeige();
+      await oeffne();
+      expect(await screen.findByRole('menuitem', { name: 'Hilfe' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: 'Hilfe zu dieser Seite' }),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('kein Eintrag „Rückmeldung“ und keiner „Lizenzen“ — die stehen auf der Hilfe-Seite', async () => {

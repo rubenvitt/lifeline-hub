@@ -699,8 +699,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               <CommandPaletteTrigger />
             </div>
           )}
-          {/* Hilfe zur Seite (LLH-1824); am Handy steht sie im Fuß der Navigation. */}
-          {mittel && (
+          {/* Hilfe zur Seite (LLH-1824) erst ab `xl`: darunter bräche sie den Kopf mit den
+              längsten Störungswörtern um (820 px Finger, 1024 px Maus; `alarmton-freischalten`).
+              Von `md` bis `xl` steht „Hilfe zu dieser Seite“ im Benutzermenü, am Handy im Fuß der
+              Navigation. */}
+          {weit && (
             <div style={kopfZelleStil(zellToken)}>
               <HilfeKnopf />
             </div>
@@ -710,7 +713,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
             >
               {/* Das Etikett hält seine Breite: die Funktion kommt erst mit dem Einsatz (LLH-1272). */}
-              <BenutzerMenu funktion={einsatz?.meine_funktion} hasFixedWidth hilfeDaneben />
+              <BenutzerMenu
+                funktion={einsatz?.meine_funktion}
+                hasFixedWidth
+                hilfeDaneben
+                hilfeZurSeite={!weit}
+              />
             </div>
           )}
         </KopfRechts>
