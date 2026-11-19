@@ -247,6 +247,7 @@ export default function AdminLayout() {
      * aktuellen Bereich; nach der Wahl klappt die Liste zu, sonst schöbe sie jede Sektion nach unten.
      */
     const aktuell = [
+      { key: adminUebersicht.key, label: adminUebersicht.label },
       ...adminGruppen.flatMap((g) =>
         g.sektionen.map((sek) => ({ key: sektionsKey(g.key, sek.key), label: sek.label })),
       ),

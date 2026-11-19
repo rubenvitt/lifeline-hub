@@ -173,6 +173,13 @@ describe('AdminLayout — unter lg (Handschirm)', () => {
     expect(screen.queryByRole('menuitem', { name: 'Fahrzeuge' })).not.toBeInTheDocument();
   });
 
+  it('auf der Übersicht nennt der Knopf sie auch (LLH-1820)', async () => {
+    setzeViewportBreite(390);
+    setup(fuehrungskraft);
+    await screen.findByText(`PFAD:${defaultAdminPfad()}`);
+    expect(screen.getByRole('button', { name: /Verwaltung: Übersicht/ })).toBeInTheDocument();
+  });
+
   it('aufklappen, wählen → navigiert und klappt wieder zu', async () => {
     setzeViewportBreite(390);
     setup(fuehrungskraft, '/admin/stammdaten/fahrzeuge');
