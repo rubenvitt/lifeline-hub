@@ -19,6 +19,7 @@ const wipModul: ModulEintrag = {
   label: 'WIP-Probe',
   icon: () => null,
   route: 'wip-probe',
+  hilfeKapitel: 'einsatz-oberflaeche',
   status: 'wip',
   beschreibung: 'Platzhalter-Beschreibung für den Stellvertreter-Test.',
 };
