@@ -1719,6 +1719,16 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   gemeinsame Kodierung (LLH-1086, `listenZustandParams`/`parseListenZustand`): `sort=<spalte>:auf|ab`
   (`aus` = bewusst unsortiert, die Vorgabe steht nicht da), `f.<spalte>=a,b`, `q=`; geschrieben
   mit `replace`, fremde Parameter bleiben, Unbekanntes prüft `bereinigeListenZustand` weg.
+- **Ortspfad zur Liste über `ListenRueckweg`** (LLH-1997): Ein Ortspfad-Glied, das auf eine Liste
+  oder eine übergeordnete Seite führt, ist `ListenRueckweg` (`components/ListenRueckweg.tsx`), nie
+  ein nackter `Link`, im Einsatz wie in der Verwaltung. Kam man per PUSH von genau diesem Pfad
+  (Query zählt nicht), geht der einfache Klick per `navigate(-1)` zurück, damit Ansicht, Filter und
+  Rollposition wieder stehen; das `href` trägt die vorige Adresse für Strg- und Mittelklick. Sonst
+  ist es ein Link auf das Ziel. Die Herkunft je Verlaufseintrag merkt `VerlaufMerken` im
+  `BetriebsLayout` (`routing/verlaufGedaechtnis.ts`, `sessionStorage lfh:verlauf`, räumt bei jedem
+  Ausgang). Andere Rückwege (nach Storno oder Löschen, „Zur Liste“ in `SeitenNichtGefunden`) bleiben
+  Links: nach einer Aktion ist kein Zurück im Verlauf gemeint. Herleitung:
+  `docs/superpowers/specs/2026-11-19-z7oww8sf-ortspfad-rueckweg-liste-design.md`.
 - **Zeit in der URL** ist UTC ohne Zone (`dayjs(s)` läse Ortszeit) — Umkehr in `anzeige/zeitEingabe.ts`
   mit eigenem Test. Kodierung per Round-Trip durch `URLSearchParams` prüfen.
 - Filterleiste nur bei **fremder** Änderung neu aufsetzen (nach der Navigation); entprellt wird
