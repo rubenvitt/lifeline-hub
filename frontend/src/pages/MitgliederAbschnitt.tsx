@@ -19,7 +19,7 @@ import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import Datenstand from '../components/Datenstand';
-import { Paneel, useRollen } from '../components/instrument';
+import { Paneel, Textstufe, useRollen } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
@@ -42,7 +42,11 @@ function rolleOption(option: { value?: string | number | null; label?: unknown }
     <div>
       <div>{option.label as string}</div>
       {beschreibung && (
-        <div style={{ fontSize: 12, whiteSpace: 'normal', opacity: 0.75 }}>{beschreibung}</div>
+        <div style={{ whiteSpace: 'normal' }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
+            {beschreibung}
+          </Textstufe>
+        </div>
       )}
     </div>
   );
