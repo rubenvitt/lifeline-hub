@@ -42,6 +42,11 @@ interface NeuerEinsatz {
   einsatzort_lon?: number;
   /** Einsatz-Vorlage (LLH-1375): ihre ausgeblendeten Module werden eigene Einsatzwerte. */
   vorlage_id?: number;
+  /**
+   * Personen, die mit dem Einsatz gleich aufgenommen werden (LLH-1820). Wer anlegt, wird
+   * immer Einsatzleitung und steht nicht in der Liste.
+   */
+  mitglieder?: { benutzer_id: number; rolle: EinsatzRolle }[];
 }
 
 export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {

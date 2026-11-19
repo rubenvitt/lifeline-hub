@@ -80,6 +80,52 @@ pub struct NeuerEinsatz {
     /// `null` → keine Modulwerte. Fremd oder unbekannt → **400**, ohne dass ein Einsatz entsteht.
     #[serde(default)]
     pub vorlage_id: Option<i64>,
+    /// Personen, die mit dem Einsatz gleich aufgenommen werden (LLH-1820). Absent oder leer →
+    /// nur die anlegende Person (Einsatzleitung). Jede ungültige Angabe ist **400**, und dann
+    /// entsteht kein Einsatz.
+    #[serde(default)]
+    pub mitglieder: Option<Vec<NeuesMitglied>>,
+}
+
+/// Eine Person für [`NeuerEinsatz::mitglieder`]; die Rolle wird per `EinsatzRolle::parse` geprüft.
+#[derive(Debug, Deserialize)]
+pub struct NeuesMitglied {
+    pub benutzer_id: i64,
+    pub rolle: String,
+}
+
+/// Prüft die Mitglieder beim Anlegen, bevor etwas geschrieben wird (LLH-1820): Obergrenze, Rolle,
+/// keine Person doppelt, nicht die anlegende Person. Ob eine Person aufnehmbar ist, prüft
+/// `repo::anlegen_mit_mitgliedern` in der Transaktion.
+fn pruefe_mitglieder(
+    mitglieder: Vec<NeuesMitglied>,
+    ersteller_id: i64,
+) -> Result<Vec<(i64, EinsatzRolle)>, AppError> {
+    if mitglieder.len() > crate::einsatz::MITGLIEDER_MAX {
+        return Err(AppError::Validation(format!(
+            "Mitglieder: höchstens {} Personen",
+            crate::einsatz::MITGLIEDER_MAX
+        )));
+    }
+    let mut gesehen = std::collections::HashSet::new();
+    mitglieder
+        .into_iter()
+        .map(|m| {
+            let rolle = EinsatzRolle::parse(m.rolle.trim())
+                .ok_or_else(|| AppError::Validation("Mitglieder: ungültige Rolle".into()))?;
+            if m.benutzer_id == ersteller_id {
+                return Err(AppError::Validation(
+                    "Mitglieder: Wer anlegt, ist schon Einsatzleitung.".into(),
+                ));
+            }
+            if !gesehen.insert(m.benutzer_id) {
+                return Err(AppError::Validation(
+                    "Mitglieder: Eine Person steht doppelt in der Liste.".into(),
+                ));
+            }
+            Ok((m.benutzer_id, rolle))
+        })
+        .collect()
 }
 
 /// Prüft die Koordinate des Einsatzorts im Tri-State von Anlegen und PATCH (LFH-1175, Spec
@@ -165,8 +211,9 @@ pub async fn anlegen(
     let adresse =
         support::optional_max(req.einsatzort, "Einsatzort", crate::einsatz::EINSATZORT_MAX)?;
     let koordinate = pruefe_koordinate(req.einsatzort_lat, req.einsatzort_lon)?;
+    let mitglieder = pruefe_mitglieder(req.mitglieder.unwrap_or_default(), benutzer.id)?;
 
-    let einsatz = repo::anlegen(
+    let einsatz = repo::anlegen_mit_mitgliedern(
         &state.pool,
         repo::NeuerEinsatzDaten {
             bezeichnung: req.bezeichnung.trim(),
@@ -180,9 +227,26 @@ pub async fn anlegen(
             vorlage_id: req.vorlage_id,
         },
         benutzer.id,
+        &mitglieder,
     )
     .await?;
     publish_neuer_einsatz(&state, einsatz.id, benutzer.id).await;
+    // Jede mit aufgenommene Person bekommt den Hinweis „Aufgenommen in …“ wie über „Zugriff“
+    // (Spec `benachrichtigungen`, „Aufnahme in einen Einsatz“; `mitglied_setzen`).
+    for (ziel_id, _) in &mitglieder {
+        benachrichtigung::melden(
+            &state.pool,
+            &state.live,
+            Anlass::neu(
+                einsatz.id,
+                BenachrichtigungArt::EinsatzAufnahme,
+                Bezug::neu(BenachrichtigungBezugTyp::Einsatz, einsatz.id),
+            )
+            .von(benutzer.id)
+            .an(Adressat::Nutzer(*ziel_id)),
+        )
+        .await;
+    }
     Ok((
         StatusCode::CREATED,
         Json(einsatz.anzeige(

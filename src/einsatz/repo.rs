@@ -67,6 +67,99 @@ pub(crate) async fn anlegen_zum(
     laden(pool, einsatz_id).await
 }
 
+/// [`anlegen`] mit Mitgliedern, die gleich mitkommen (LLH-1820): Einsatz und Mitgliedschaften
+/// entstehen in **einer** Transaktion. Scheitert eine Person, entsteht nichts.
+pub async fn anlegen_mit_mitgliedern(
+    pool: &SqlitePool,
+    daten: NeuerEinsatzDaten<'_>,
+    ersteller_id: i64,
+    mitglieder: &[(i64, EinsatzRolle)],
+) -> Result<Einsatz, AppError> {
+    let jetzt = chrono::Utc::now();
+    let einsatz_id = crate::write_retry!(pool, |conn| {
+        let id = anlegen_tx(conn, &daten, ersteller_id, jetzt).await?;
+        mitglieder_aufnehmen_tx(conn, id, mitglieder).await?;
+        Ok(id)
+    })?;
+    laden(pool, einsatz_id).await
+}
+
+/// Bedingung „Person `{b}` lässt sich in den Einsatz `?1` aufnehmen“: dieselbe Grundmenge wie
+/// [`auswahl_sql`], in der Org des Einsatzes.
+fn aufnehmbar_in(b: &str) -> String {
+    format!(
+        "EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
+                 WHERE b.id = {b} AND b.org_id = e.org_id AND b.aktiv = 1 AND {} AND {})",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
+    )
+}
+
+/// Nimmt die Personen beim Anlegen auf (LLH-1820). Prüfen und Schreiben sind je eine Anweisung
+/// über `json_each`, unabhängig von der Zahl (`src/AGENTS.md`, Eingabegrenzen). Doppelte und die
+/// anlegende Person hat der Aufrufer schon abgewiesen. Lässt sich eine Person nicht aufnehmen,
+/// ist das 400; eine Person der eigenen Org nennt die Meldung beim Namen, eine fremde oder
+/// unbekannte nur mit ihrer Kennung, damit sich fremde Konten nicht ertasten lassen.
+async fn mitglieder_aufnehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    mitglieder: &[(i64, EinsatzRolle)],
+) -> Result<(), AppError> {
+    if mitglieder.is_empty() {
+        return Ok(());
+    }
+    let liste = serde_json::Value::Array(
+        mitglieder
+            .iter()
+            .map(|(id, rolle)| serde_json::json!({ "b": id, "r": rolle.as_str() }))
+            .collect(),
+    )
+    .to_string();
+    let person = "json_extract(j.value, '$.b')";
+    let erste_ungueltige: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT {person} FROM json_each(?2) j WHERE NOT {} ORDER BY j.key LIMIT 1",
+        aufnehmbar_in(person)
+    )))
+    .bind(einsatz_id)
+    .bind(&liste)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(id) = erste_ungueltige {
+        let name: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT b.anzeigename FROM benutzer b JOIN einsatz e ON e.id = ? \
+             WHERE b.id = ? AND b.org_id = e.org_id AND {} AND {}",
+            crate::geraet::repo::OHNE_GERAETEKONTEN,
+            crate::instanz::spiegel::OHNE_STELLVERTRETER
+        )))
+        .bind(einsatz_id)
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let wer = name.unwrap_or_else(|| format!("Person {id}"));
+        return Err(AppError::Validation(format!(
+            "Mitglieder: {wer} kann nicht aufgenommen werden."
+        )));
+    }
+    // Die Org-Prüfung steht zusätzlich im INSERT (wie `setze_mitgliedschaft`): ein Weg, der die
+    // Vorprüfung umgeht, schreibt trotzdem keine org-fremde Mitgliedschaft.
+    let geschrieben = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         SELECT ?1, {person}, json_extract(j.value, '$.r') FROM json_each(?2) j WHERE {}",
+        aufnehmbar_in(person)
+    )))
+    .bind(einsatz_id)
+    .bind(&liste)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if geschrieben != mitglieder.len() as u64 {
+        return Err(AppError::Validation(
+            "Mitglieder: nicht jede Person konnte aufgenommen werden.".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// ID für einen neuen Einsatz (LFH-690, design.md D6): über allen bestehenden Einsätzen UND über
 /// jeder ID, die ein Demo-Import je getragen hat oder die das Löschprotokoll der endgültigen
 /// Löschung führt (LFH-750, design.md D5). Ohne Demo-Historie ist das `MAX(id)+1`, dieselbe
@@ -2016,24 +2109,6 @@ pub async fn mitglied_auswahl_fuer_anlage(
             .fetch_all(pool)
             .await?,
     )
-}
-
-/// Ob `benutzer_id` zur Grundmenge der Auswahl in `org_id` gehört (LLH-1820): der Schreibweg beim
-/// Anlegen nimmt genau, was [`mitglied_auswahl_fuer_anlage`] anbietet.
-pub(crate) async fn ist_aufnehmbar_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    benutzer_id: i64,
-) -> Result<bool, AppError> {
-    let sql = format!(
-        "SELECT EXISTS ({})",
-        auswahl_sql("", "b.org_id = ? AND b.id = ?")
-    );
-    Ok(sqlx::query_scalar::<_, bool>(sqlx::AssertSqlSafe(sql))
-        .bind(org_id)
-        .bind(benutzer_id)
-        .fetch_one(&mut *conn)
-        .await?)
 }
 
 /// Alle Mitglieder eines Einsatzes (mit Benutzer-Klartext), sortiert nach Zuweisung.
