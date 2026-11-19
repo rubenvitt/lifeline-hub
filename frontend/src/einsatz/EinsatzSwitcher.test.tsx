@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import DefaultModulRedirect from './DefaultModulRedirect';
+import { schriftskala } from '../theme/tokens';
 
 function einsatz(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -300,11 +301,11 @@ describe('EinsatzSwitcher', () => {
     expect(span.style.whiteSpace).toBe('normal');
   });
 
-  it('setzt den Namen in 16 px, in jeder Dichte (LLH-1726)', async () => {
+  it('setzt den Namen in der Stufe `kartentitel`, in jeder Dichte (LLH-1726, LLH-1968)', async () => {
     server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
     setup();
     const knopf = await screen.findByRole('button', { name: /Hochwasser/ });
-    expect(knopf.style.fontSize).toBe('16px');
+    expect(knopf.style.fontSize).toBe(`${schriftskala.kartentitel.groesse}px`);
   });
 
   it('navigiert ueber „Alle Einsätze …" zur Heim-Seite', async () => {

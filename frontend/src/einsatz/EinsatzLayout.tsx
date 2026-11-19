@@ -70,6 +70,7 @@ import {
   navDrawerRand,
   rahmenFarben,
   schrift,
+  schriftskala,
 } from '../theme/tokens';
 import {
   einsaetzePfad,
@@ -211,7 +212,7 @@ const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
 
 const EINSATZNUMMER_STIL = {
   fontFamily: schrift.zahl,
-  fontSize: 12,
+  fontSize: schriftskala.textKlein.groesse,
   color: rahmenFarben.text,
   whiteSpace: 'nowrap',
   flexShrink: 0,
