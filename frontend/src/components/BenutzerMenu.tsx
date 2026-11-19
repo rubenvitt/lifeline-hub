@@ -28,6 +28,7 @@ import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
 import { useViewport } from './useViewport';
 import { Marke } from './instrument/Marke';
+import { KEINE_ROLLE, kontoRollenNamen } from '../einsatz/rollenVokabular';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
 function initialen(name: string): string {
@@ -160,21 +161,14 @@ export default function BenutzerMenu({
 
   if (!benutzer) return null;
 
-  const rollenTags = [];
-  if (benutzer.system_rolle === 'admin') {
-    rollenTags.push(
-      <Marke key="admin" style={{ marginInlineEnd: 0 }}>
-        Admin
-      </Marke>,
-    );
-  }
-  if (benutzer.org_rolle === 'fuehrungskraft') {
-    rollenTags.push(
-      <Marke key="fk" style={{ marginInlineEnd: 0 }}>
-        Führungskraft
-      </Marke>,
-    );
-  }
+  // Rollen aus dem Rollen-Vokabular (LLH-1818); ohne Rolle keine Marke.
+  const rollenTags = kontoRollenNamen(benutzer)
+    .filter((name) => name !== KEINE_ROLLE)
+    .map((name) => (
+      <Marke key={name} style={{ marginInlineEnd: 0 }}>
+        {name}
+      </Marke>
+    ));
 
   const items: MenuProps['items'] = [
     {

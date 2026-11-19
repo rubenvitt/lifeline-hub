@@ -104,9 +104,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
 - Modify: `frontend/src/zugangsprotokoll/zugangsprotokollText.ts`
 - Test: `BenutzerPage*.test.tsx`, `BenutzerMenu*.test.tsx`, `ProfilPage*.test.tsx`, `zugangsprotokollText.test.ts`, `ZugangsprotokollPage.test.tsx`
 
-- [ ] **Step 1: Test** — `rollenText` liefert `'Rolle in der Verwaltung: Keine, Rolle in der Organisation: Keine'` und `'Rolle in der Organisation: Keine → Führungskraft der Organisation'`; Dialog zeigt Felder „Rolle in der Verwaltung“/„Rolle in der Organisation“ und offen „legt Einsätze an, liest jeden Einsatz der Organisation“; Liste zeigt „System-Admin“/„Führungskraft der Organisation“/„Keine Rolle“.
-- [ ] **Step 2–4: rot, umsetzen, grün.**
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Test** — `rollenText` liefert `'Rolle in der Verwaltung: Keine, Rolle in der Organisation: Keine'` und `'Rolle in der Organisation: Keine → Führungskraft der Organisation'`; Dialog zeigt Felder „Rolle in der Verwaltung“/„Rolle in der Organisation“ und offen „legt Einsätze an, liest jeden Einsatz der Organisation“; Liste zeigt „System-Admin“/„Führungskraft der Organisation“/„Keine Rolle“.
+- [x] **Step 2–4: rot, umsetzen, grün.**
+- [x] **Step 5: Commit.**
 
 ### Task 6: Gründe „Nur Ansicht“
 
