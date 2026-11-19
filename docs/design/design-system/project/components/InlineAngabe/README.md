@@ -27,6 +27,11 @@ als Knopf, `wertKnopfStil`, Platzhalter in `bedienText`) und die Fokusrückgabe
 darin verlässt die Eingabe, und ein Blur-Speichern schriebe einen halben Zeitpunkt. Gespeichert
 wird nur ausdrücklich: Enter, Strg/⌘+Enter im Textfeld, oder „Speichern".
 
+**Ungespeichertes ist sichtbar.** Ab der ersten Änderung steht im Feld „Nicht
+gespeichert — Enter speichert, Esc verwirft“ (mehrzeilig Strg+Enter; gesperrt nur „Nicht
+gespeichert“) und eine Achtungskante. Ein Klick daneben schließt ein unverändertes Feld still;
+ein geändertes bleibt offen, gespeichert wird es dadurch nicht.
+
 ── FELDWEISE BEARBEITUNG IN EINER ANSICHT ──────────────────────────────────
 
 Für die Personendaten (Change `f8218h1i-personendaten-feldweise`, design.md D3) kamen vier

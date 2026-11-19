@@ -425,7 +425,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
 | Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
-| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` („Formularseiten“)                                                                          | `Formularlayout`, `Speicherleiste` |
+| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` + `SpeicherKnopf` („Formularseiten“)                                                        | `Formularlayout`, `Speicherleiste` |
 | Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
 | **Umschalten** (Spec `bedien-umschalten`, LLH-1808)                                             |                                                                                                                                                  |                                    |
 | Fläche oder Bereich darunter umschalten                                                         | `Segmentleiste rolle="tablist"` mit Reiterfläche (`role="tabpanel"`, `steuert`); führt ein Reiter auf eine andere Seite, `aktivierung="manuell"` | `Segmentleiste`                    |
@@ -511,7 +511,8 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    „Verwerfen“ und Escape lassen die Handlung verfallen. Ohne Altwert bleiben Knöpfe und Dialoge,
    die einen festen oder errechneten Wert setzen (Status, Lagezustand, „Kapazität übernehmen“).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
-   `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
+   `SpeicherFehler` am Paneel. Enter speichert (ohne Änderung schließt es, LLH-1829), Escape
+   bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
 6. **Jede bearbeitbare Detailansicht hat eine Item-Route** („Deeplink-Muster“).
 7. **Nach dem Anlegen springt die Seite in die neue Ansicht** (Vorbild Befehl), nicht zurück in
@@ -1441,6 +1442,18 @@ und `pages/personen/`.
   gilt stattdessen „höchstens eine offene Bearbeitung je Seite“ (LLH-1139, „Bearbeiten in der
   Ansicht“ unter der UI-Form-Leitlinie): ein Paneel mit eigenem Fuß ist dort kein zweiter
   Speicherweg.
+- **Ungespeichertes ist sichtbar** (LLH-1829, Design-Doc
+  `docs/superpowers/specs/2026-11-19-l1flywem-speichermodelle-kennzeichnen-design.md`): ein Feld,
+  das vom geladenen bzw. zuletzt gespeicherten Stand abweicht, trägt am Etikett einen Punkt „•“
+  (`GeaendertPunkt` in `Feld` und `DatenfeldEingabe`, für Vorleser „(geändert)“), gerechnet von
+  `components/aenderungsstand.tsx` (`AenderungsstandProvider` INNERHALB des `<Form>`, nie
+  `isFieldsTouched`; nach Erfolg `merke(gesendet)` über `useAenderungsstandMerken`). „Speichern“
+  steht nur als `components/SpeicherKnopf.tsx`: ohne Änderung gesperrt, daneben „Keine
+  Änderungen“ bzw. „N Änderungen“; wer das `<Form>` sperrt, reicht `disabled` mit. Enter ohne
+  Änderung schließt eine Bearbeitung (`EnterOhneAenderung`). Wächter
+  `components/speicherKnopf.guard.test.ts`: jede Datei mit `useSpeicherLeiste` nutzt beides. Eine
+  offene `InlineAngabe` zeigt ab der ersten Änderung „Nicht gespeichert — Enter speichert, Esc
+  verwirft“ mit Achtungskante; ein Klick daneben schließt sie nur unverändert (still).
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
