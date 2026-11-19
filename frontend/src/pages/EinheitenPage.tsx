@@ -2,7 +2,6 @@ import { App, Breadcrumb, Button, Form, Input } from 'antd';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import StatusTag from '../components/StatusTag';
 import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import {
@@ -46,6 +45,7 @@ import { RechteHinweis } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import type { EinheitVorlage } from '../api/types';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LLH-1029): eine Tabelle mit Baum, Zeilen aus dem
@@ -101,7 +101,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
           <span style={monoStil(12)}>{staerkeText(z.ist)}</span>
           {z.urteil === 'unterbesetzt' && (
             // `umbrechen` nimmt antds Außenrand rechts (8 px) weg: er verbreiterte die Spalte.
-            <StatusTag darstellung={einheitStaerkeUrteil.unterbesetzt} umbrechen />
+            <Status darstellung={einheitStaerkeUrteil.unterbesetzt} umbrechen />
           )}
         </span>
       ),
@@ -316,6 +316,16 @@ export default function EinheitenPage() {
       }
       titel={modulName('einheiten')}
       meta={einheitenQuery.isSuccess ? `${einheiten.length} Einheiten` : undefined}
+      metaPlatzhalter="0 Einheiten"
+      // Die Stärke steht als Meta im Kopf, nicht als eigene Zeile über der Liste (LLH-1786, Change
+      // `z137bgm5-seitenkopf-einzeilig` D2); sie hält ihre Breite beim Laden selbst.
+      metaZusatz={
+        <Verdichtungszeile
+          einsatzId={einsatzId}
+          pfad={kraefteuebersichtPfad(einsatzId)}
+          form="meta"
+        />
+      }
       dataUpdatedAt={einheitenQuery.dataUpdatedAt}
       aktionen={
         darfSchreiben && (
@@ -329,7 +339,6 @@ export default function EinheitenPage() {
         darfSchreiben ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
     >
-      <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
       <DeeplinkHinweis lage={deeplinkHinweis} sache="Einheit" />
 
       {/* Drei Zustände, nicht zwei: `einheiten.length === 0` ist auch während des Ladens und im

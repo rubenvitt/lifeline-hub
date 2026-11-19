@@ -37,7 +37,6 @@ import {
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusWahl from '../components/StatusWahl';
-import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -570,7 +569,6 @@ export default function InfotelefonPage() {
                         if (s !== a.status && !statusMutation.isPending)
                           statusMutation.mutate({ id: a.id, status: s });
                       }}
-                      etikett={<StatusTag darstellung={infotelefonStatus[a.status]} />}
                     />
                   }
                 >

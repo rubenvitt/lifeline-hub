@@ -7,6 +7,7 @@ import {
   InputNumber,
   Popconfirm,
   Typography,
+  theme,
 } from 'antd';
 import { Select } from '../../components/Select';
 import type { Dayjs } from 'dayjs';
@@ -129,6 +130,7 @@ export default function SchichtplanBlockDialog({
   kopierFehler,
   onSchliessen,
 }: SchichtplanBlockDialogProps) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<BlockWerte>();
   const posten =
     Form.useWatch('posten', form) ?? (block ? postenSchluessel(block.posten) : vorbelegt?.zeile);
@@ -330,7 +332,7 @@ export default function SchichtplanBlockDialog({
       {/* Während die Kopie entsteht, ruht die Eingabe: danach zeigt der Dialog die Kopie. */}
       <ConfigProvider componentDisabled={!!kopierenLaeuft}>
         {(luecke || befunde.length > 0) && (
-          <div data-lfh="schichtplan-block-befunde" style={{ marginBottom: 12 }}>
+          <div data-lfh="schichtplan-block-befunde" style={{ marginBottom: token.margin }}>
             {luecke && (
               <Typography.Text type="warning" style={{ display: 'block' }}>
                 {luecke}
@@ -448,7 +450,7 @@ export default function SchichtplanBlockDialog({
             loading={kopierenLaeuft}
             disabled={geaendert}
             onClick={() => onKopieren(block)}
-            style={{ marginTop: 8, marginInlineEnd: 8 }}
+            style={{ marginTop: token.marginSM, marginInlineEnd: token.marginSM }}
           >
             Als nächsten Block kopieren
           </Button>
@@ -458,7 +460,7 @@ export default function SchichtplanBlockDialog({
             data-lfh="schichtplan-block-wechsel"
             disabled={geaendert || laeuft || loeschenLaeuft || kopierenLaeuft}
             onClick={() => onWechsel(block)}
-            style={{ marginTop: 8, marginInlineEnd: 8 }}
+            style={{ marginTop: token.marginSM, marginInlineEnd: token.marginSM }}
           >
             Wechsel vollziehen
           </Button>
@@ -471,7 +473,7 @@ export default function SchichtplanBlockDialog({
             okButtonProps={{ danger: true }}
             onConfirm={() => onLoeschen(block)}
           >
-            <Button danger loading={loeschenLaeuft} style={{ marginTop: 8 }}>
+            <Button danger loading={loeschenLaeuft} style={{ marginTop: token.marginSM }}>
               Block löschen
             </Button>
           </Popconfirm>

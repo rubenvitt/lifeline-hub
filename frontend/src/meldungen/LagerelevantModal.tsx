@@ -1,4 +1,4 @@
-import { Button, Form, Input, Modal, Space } from 'antd';
+import { Button, Form, Input, Modal, Space, theme } from 'antd';
 import { useCallback, useEffect, useRef } from 'react';
 import type { Speicherung } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -45,6 +45,7 @@ export default function LagerelevantModal({
   onUebergeben,
   speicherung,
 }: Props) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const sperrt = speicherung?.isPending === true;
   // Ref, damit das Öffnen die AKTUELLE Mutation räumt, ohne je Render neu zu laufen.
@@ -92,7 +93,7 @@ export default function LagerelevantModal({
         </Form.Item>
         <KoordinatenFeld name="koord" label="Verortung (optional)" einsatzId={einsatzId} />
         {speicherung?.error != null && (
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: token.margin }}>
             <SpeicherFehler fehler={speicherung.error} titel="Nicht übernommen" />
           </div>
         )}

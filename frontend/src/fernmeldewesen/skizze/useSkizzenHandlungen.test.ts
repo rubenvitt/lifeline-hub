@@ -5,7 +5,9 @@ import type { SkizzenBereich, SkizzenLage } from '../../api/fernmeldeskizzeVertr
 import type { KommunikationsStelle } from '../../api/types';
 import { abschnitt, daten, quellen } from '../../test/fernmeldenetz';
 import { baueFernmeldenetz, type Fernmeldenetz } from '../fernmeldeskizze';
-import type { SkizzenAktionen } from '../skizzenAktionen';
+import { OFFEN_LASSEN } from '../../components/InlineAngabe';
+import { VERWORFEN } from '../../components/useFeldKonflikt';
+import { HandlungVerfallen, type SkizzenAktionen } from '../skizzenAktionen';
 import { Befehlsstapel } from '../skizzenBefehle';
 import { VERSCHOBEN_MELDUNG, useSkizzenHandlungen } from './useSkizzenHandlungen';
 
@@ -87,7 +89,10 @@ function aktionenAttrappe() {
     ),
     entferneBereich: vi.fn(async () => {}),
     setzeSchriftfeld: vi.fn(),
-    setzeRufname: vi.fn(async () => {}),
+    // Erfüllt mit dem gespeicherten Wert vor dem Schreiben; hier der erwartete.
+    setzeRufname: vi.fn(
+      async (_stelle: string, _rufname: string | null, erwartet: string | null) => erwartet,
+    ),
   } satisfies SkizzenAktionen;
 }
 
@@ -252,5 +257,51 @@ describe('useSkizzenHandlungen — ruhige Fläche (LFH-1037 D1)', () => {
     eigenes.mockClear();
     await act(() => h.result.current.verschieben('ab-1', VORHER, ZIEL).catch(() => {}));
     expect(eigenes).toHaveBeenLastCalledWith('ab-1');
+  });
+});
+
+describe('useSkizzenHandlungen — Rufname mit Altwert (LLH-1945)', () => {
+  it('schickt den Wert beim Öffnen; Rückgängig und Wiederholen erwarten den zuletzt gesetzten', async () => {
+    const aktionen = aktionenAttrappe();
+    // Die Stelle zeigte die Kurzbezeichnung, gespeichert war kein Rufname.
+    aktionen.setzeRufname.mockResolvedValueOnce(null);
+    const h = haken(netz(), aktionen);
+    await act(() => h.result.current.setzeRufname('ab-1', 'Florian 1', 'EA 1'));
+    expect(aktionen.setzeRufname).toHaveBeenLastCalledWith('ab-1', 'Florian 1', 'EA 1');
+    await act(() => h.result.current.rueckgaengig());
+    // Zurück auf den gespeicherten Wert, nicht auf die angezeigte Kurzbezeichnung.
+    expect(aktionen.setzeRufname).toHaveBeenLastCalledWith('ab-1', null, 'Florian 1');
+    await act(() => h.result.current.wiederholen());
+    expect(aktionen.setzeRufname).toHaveBeenLastCalledWith('ab-1', 'Florian 1', null);
+  });
+
+  it('verfällt die Handlung in der Rückfrage, kommt sie nicht auf den Stapel und meldet nichts', async () => {
+    const aktionen = aktionenAttrappe();
+    aktionen.setzeRufname.mockRejectedValueOnce(new HandlungVerfallen(OFFEN_LASSEN));
+    const h = haken(netz(), aktionen);
+    let ergebnis: unknown;
+    await act(async () => {
+      ergebnis = await h.result.current.setzeRufname('ab-1', 'Florian 1', null);
+    });
+    expect(ergebnis).toBe(OFFEN_LASSEN);
+    expect(h.befehle.stand()).toMatchObject({ rueckgaengig: 0 });
+    expect(h.result.current.meldungen.has('ab-1')).toBe(false);
+  });
+
+  it('„Verwerfen“ in der Rückfrage beim Rückgängig lässt den Schritt scheitern', async () => {
+    const aktionen = aktionenAttrappe();
+    const h = haken(netz(), aktionen);
+    await act(() => h.result.current.setzeRufname('ab-1', 'Florian 1', null));
+    aktionen.setzeRufname.mockRejectedValueOnce(new HandlungVerfallen(VERWORFEN));
+    let ergebnis: Awaited<ReturnType<typeof h.result.current.rueckgaengig>> | undefined;
+    await act(async () => {
+      ergebnis = await h.result.current.rueckgaengig();
+    });
+    expect(ergebnis).toMatchObject({
+      art: 'gescheitert',
+      grund: 'von einem anderen Arbeitsplatz geändert',
+      verworfen: true,
+    });
+    expect(h.befehle.stand()).toMatchObject({ rueckgaengig: 0, wiederholen: 0 });
   });
 });

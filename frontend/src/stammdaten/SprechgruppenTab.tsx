@@ -1,6 +1,6 @@
-import { Button, Modal, Space, Tag } from 'antd';
+import { Button, Modal, Space } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil, Stapel } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -25,6 +25,7 @@ import type { Sprechgruppe } from '../api/types';
 import SprechgruppeFormModal from './SprechgruppeFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { Marke } from '../components/instrument/Marke';
 
 export default function SprechgruppenTab() {
   const { benutzer } = useAuth();
@@ -115,7 +116,7 @@ export default function SprechgruppenTab() {
       // Unter `md` gedeckelt, damit Status und Aktionen rechts daneben im Bild bleiben (LFH-980).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (b: string, sg) => (
-        <Space size={[8, 4]} wrap>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('sprechgruppe', sg.id)}
@@ -124,11 +125,11 @@ export default function SprechgruppenTab() {
           {/* Die Einsätze stehen in der Marke selbst, nicht nur im Titel: ohne Mauszeiger
              (Touch, Tastatur) wäre ein Titel nicht zu lesen. */}
           {auchLokal.has(sg.id) && (
-            <Tag style={{ whiteSpace: 'normal' }}>
+            <Marke style={{ whiteSpace: 'normal' }}>
               auch lokal in {auchLokal.get(sg.id)?.join(', ')}
-            </Tag>
+            </Marke>
           )}
-        </Space>
+        </Stapel>
       ),
     },
     {
@@ -205,9 +206,9 @@ export default function SprechgruppenTab() {
       // Status als getönte Fläche mit Wort, nicht als antd-Farbetikett.
       render: (_, sg) =>
         sg.aktiv ? (
-          <StatusChip ton="normal" wort="Aktiv" />
+          <Status groesse="klein" ton="normal" wort="Aktiv" />
         ) : (
-          <StatusChip ton="neutral" wort="Inaktiv" />
+          <Status groesse="klein" ton="neutral" wort="Inaktiv" />
         ),
     },
     ...(istAdmin

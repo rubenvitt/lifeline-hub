@@ -194,7 +194,9 @@ describe('SchichtplanEinlesen', () => {
     vorschauApi.mockResolvedValueOnce(vorschau({ zaehlung: NULL }));
     const eingabe = dialog.querySelector<HTMLInputElement>('input[type="file"]')!;
     await userEvent.upload(eingabe, new File(['x'], 'zwei.csv', { type: 'text/csv' }));
-    await within(dialog).findByText('Keine Änderungen', { selector: '.ant-tag' });
+    await within(dialog).findByText('Keine Änderungen', {
+      selector: '[data-lfh="status"], [data-marke]',
+    });
     expect(within(dialog).getByRole('button', { name: 'Übernehmen' })).toHaveAccessibleDescription(
       'Keine Änderungen',
     );

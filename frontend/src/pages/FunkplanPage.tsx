@@ -24,7 +24,7 @@ import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -785,6 +785,11 @@ export default function FunkplanPage() {
     [ansicht, quellen, einsatzId, stellen, skizzenDaten],
   );
 
+  // Drucken im Seitenkopf (LLH-1836, `druck/AGENTS.md`, „Wortlaut und Platz“). Erst nach
+  // committetem Aufklappen drucken — `useDrucken` löst den Dialog nach dem Commit aus. Die Anlage
+  // der Skizze steht ohnehin ganz offen.
+  const druckWege = useDruckNebenwege({ vorDemDruck: () => setZugeklappt(new Set()) });
+
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -890,6 +895,7 @@ export default function FunkplanPage() {
         titel={modulName('fernmeldewesen')}
         meta={umfang || undefined}
         dataUpdatedAt={datenstand}
+        weitere={{ name: 'Weitere Aktionen zum Fernmeldewesen', eintraege: druckWege }}
         breadcrumb={
           <Breadcrumb
             items={[
@@ -1116,9 +1122,6 @@ export default function FunkplanPage() {
                 In Befehl übernehmen
               </Button>
             )}
-            {/* Erst nach committetem Aufklappen drucken — `useDrucken` löst den Dialog nach dem
-              Commit aus. Die Anlage der Skizze steht ohnehin ganz offen. */}
-            <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
           </Space>
           {uebernehmen.error != null && (
             <div className="funkplan-no-print" style={{ marginBlockEnd: token.margin }}>

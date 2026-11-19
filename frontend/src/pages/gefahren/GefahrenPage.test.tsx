@@ -205,9 +205,9 @@ describe('GefahrenPage', () => {
     // rechnet den Hex-Wert in `rgb(...)` um und trägt ihn als Textfarbe — geprüft wird deshalb die
     // Abwesenheit des umgerechneten Werts. Den neuen Wert positiv zu pinnen prüfte nur antds
     // Vorgaben (nacktes `ConfigProvider` in `test/utils.tsx`).
-    expect(tag.closest('.ant-tag')!.getAttribute('style') ?? '').not.toContain(
-      'rgb(255, 163, 158)',
-    );
+    expect(
+      tag.closest('[data-lfh="status"], [data-marke]')!.getAttribute('style') ?? '',
+    ).not.toContain('rgb(255, 163, 158)');
   });
 
   it('bietet „Auf Karte zeigen" mit Reverse-Deeplink auf die Lagekarte (LFH-155)', async () => {
@@ -246,7 +246,46 @@ describe('GefahrenPage', () => {
     expect(feld).toHaveValue('Nord');
     await user.clear(feld);
     await user.type(feld, '  Nord-Ost {Enter}');
-    await waitFor(() => expect(patch).toEqual({ label: 'Nord-Ost' }));
+    await waitFor(() => expect(patch).toEqual({ label: 'Nord-Ost', erwartet: { label: 'Nord' } }));
+  });
+
+  // Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+  // Änderung“): hat ein anderer die Bezeichnung inzwischen geändert, fragt die Seite; „Meine
+  // Änderung übernehmen“ schreibt ohne Altwert.
+  it('Umbenennen mit veralteter Bezeichnung fragt „Zwischenzeitlich geändert“', async () => {
+    const anfragen: Record<string, unknown>[] = [];
+    let stand = { ...gebiet };
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([stand])),
+      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
+      http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
+        const body = (await request.json()) as { label: string; erwartet?: { label: string } };
+        anfragen.push(body);
+        if (body.erwartet && body.erwartet.label !== stand.label) {
+          return HttpResponse.json(
+            { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
+            { status: 409 },
+          );
+        }
+        stand = { ...stand, label: body.label };
+        return HttpResponse.json(stand);
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Umbenennen' }));
+    stand = { ...stand, label: 'Nord-West' };
+    const feld = screen.getByRole('textbox', { name: 'Bezeichnung' });
+    await user.clear(feld);
+    await user.type(feld, 'Nord-Ost{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent(/Bezeichnung inzwischen: „Nord-West“/);
+    expect(anfragen[0]).toEqual({ label: 'Nord-Ost', erwartet: { label: 'Nord' } });
+    await user.click(screen.getByRole('button', { name: 'Meine Änderung übernehmen' }));
+    await waitFor(() => expect(anfragen).toHaveLength(2));
+    expect(anfragen[1]).toEqual({ label: 'Nord-Ost' });
   });
 
   // Die Bezeichnung steht wörtlich im ETB der Beurteilung; der Server begrenzt sie (LLH-1531),

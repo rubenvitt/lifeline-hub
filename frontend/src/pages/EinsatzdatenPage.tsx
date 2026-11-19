@@ -3,6 +3,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
   Augenbraue,
@@ -26,6 +27,7 @@ import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { sucheOrtImEinsatz } from '../api/ortSuche';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
+  einsatzaktePfad,
   einsatzberichtPfad,
   einsatzEinstellungenPfad,
   lagekartePfad,
@@ -1473,13 +1475,15 @@ export default function EinsatzdatenPage() {
   // Der Einsatzbericht auch für Beobachter (die Rechte prüft der Bericht je Quelle), der Sprung zum
   // Zugriff nur für die, die ihn dort bedienen.
   const berichtZiel = einsatzberichtPfad(einsatzId);
+  const akteZiel = einsatzaktePfad(einsatzId);
   const zugriffZiel = einsatzEinstellungenPfad(einsatzId, 'zugriff');
   const nebenwege: Nebenweg[] = [
+    // Druckseiten anderer Dokumente: „<Dokument> – Druckansicht“ (LLH-1836).
+    druckansichtNebenweg({ ziel: berichtZiel, navigate, dokument: 'Einsatzbericht' }),
+    // Die ganze Akte (LLH-1835): Bericht, ETB, Betroffene, Aufträge, Befehle, Lageberichte.
     {
-      key: 'einsatzbericht',
-      label: 'Einsatzbericht drucken',
-      ziel: berichtZiel,
-      onWahl: () => navigate(berichtZiel),
+      ...druckansichtNebenweg({ ziel: akteZiel, navigate, dokument: 'Einsatzakte' }),
+      key: 'einsatzakte',
     },
     ...(darfLeiten
       ? [

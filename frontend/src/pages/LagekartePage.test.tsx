@@ -838,8 +838,13 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('karte-klick'));
     await waitFor(() => expect(patchBody).not.toBeNull());
     // Nur das Koordinatenpaar (LFH-1006): jede weitere Kopfzeile aus dem Seitenstand überschriebe
-    // die gleichzeitige Änderung einer anderen Person, etwa die Leitstellen-Nr.
-    expect(patchBody).toEqual({ einsatzort_lat: 50.1, einsatzort_lon: 8.6 });
+    // die gleichzeitige Änderung einer anderen Person, etwa die Leitstellen-Nr. Als Altwert geht
+    // der Ort beim Start des Verschiebens mit (Feld-CAS, LLH-1945).
+    expect(patchBody).toEqual({
+      einsatzort_lat: 50.1,
+      einsatzort_lon: 8.6,
+      erwartet: { einsatzort_lat: EINSATZ.einsatzort_lat, einsatzort_lon: EINSATZ.einsatzort_lon },
+    });
   });
 
   it('Marker-Tipp wählt aus, ohne die Karte anzufliegen (LLH-1751)', async () => {

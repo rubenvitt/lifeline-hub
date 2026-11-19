@@ -4,7 +4,7 @@ import { benachrichtigungListener, meldeNachreichen } from './benachrichtigungLi
 import { beobachteEinsatzStrom, einsatzStromOffen } from './einsatzStromStore';
 import { erzeugeLiveSammler } from './liveInvalidierung';
 import { oeffneLiveVerbindung } from './liveVerbindung';
-import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
+import { invalidiereOrgLiveKeys, merkeOrgStand, orgListener } from './orgListener';
 
 /**
  * Org-Strom `GET /api/live` (LFH-734): hält Einsatzliste und Stammdaten-Kataloge außerhalb eines
@@ -14,7 +14,8 @@ import { invalidiereOrgLiveKeys, orgListener } from './orgListener';
  * Offen nur, wenn angemeldet UND kein Einsatz-Strom offen ist: im Einsatz trägt dessen Strom die
  * Org-Ereignisse mit, und ein Tab bleibt bei EINER SSE-Verbindung (HTTP/1.1-Grenze,
  * `useEinsatzLiveStream.ts`). Schon das erste `open` gleicht die Org-Keys ab, denn beim Wechsel
- * aus dem Einsatz-Strom kann ein Ereignis zwischen beiden Verbindungen verloren gehen.
+ * aus dem Einsatz-Strom kann ein Ereignis zwischen beiden Verbindungen verloren gehen; nur die mit
+ * einem Stand von vor dem Verbindungsaufbau (LLH-1839, `merkeOrgStand`).
  */
 export function useOrgLiveStream(angemeldet: boolean): void {
   const qc = useQueryClient();
@@ -34,11 +35,16 @@ export function useOrgLiveStream(angemeldet: boolean): void {
       invalidiereOrgLiveKeys(sammler);
       meldeNachreichen();
     };
+    const erstAbgleich = merkeOrgStand(qc);
     const schliessen = oeffneLiveVerbindung({
       url: '/api/live',
       listeners: [...orgListener(sammler), ...benachrichtigungListener(true), ['lagged', abgleich]],
       beiWiederaufbau: abgleich,
-      beimErstenOpen: abgleich,
+      beimErstenOpen: (nachFehlversuch) => {
+        if (nachFehlversuch) invalidiereOrgLiveKeys(sammler);
+        else erstAbgleich(sammler);
+        meldeNachreichen();
+      },
     });
     return () => {
       schliessen();

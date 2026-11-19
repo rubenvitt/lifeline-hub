@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import { App, Button, Form, Input, Space, Tag, Typography } from 'antd';
+import { App, Button, Form, Input, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   erfasseAdhocKraft,
@@ -25,6 +25,7 @@ import { useHoldGeloest } from '../../components/useHoldGeloest';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { freieEinheiten, kraftAuswahlText, zaehleQualifikationen } from './uhsKraefteKern';
+import { Marke } from '../../components/instrument/Marke';
 
 interface Props {
   einsatzId: number;
@@ -66,7 +67,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
   // Ablehnungen am Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): die
   // Dialoge tragen ihre Mutation als `speicherung`, Abziehen meldet an der Zeile der Kraft.
   const abziehenZeilen = useZeilenFehler<number>();
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   // Die abgezogene Kraft hält ihre Zeile (LLH-1924, Spec `bedien-muster`, „Gelöste Zeile hält
   // ihre Stelle“): sonst rückt „Abziehen“ der nächsten Kraft unter den Finger.
   const halten = useHoldGeloest(uhs.kraefte, `${einsatzId}:${uhs.id}`);
@@ -261,7 +262,7 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
               const grund = abziehenZeilen.grund(k.id);
               const geloest = gehalten.has(k.id);
               return (
-                <Space orientation="vertical" size={4}>
+                <Space orientation="vertical" size={token.marginXS}>
                   {mitUeberlage(
                     k,
                     <Button
@@ -314,11 +315,11 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           {qualifikationen.length === 0 ? (
             '—'
           ) : (
-            <Space wrap size={[4, 4]}>
+            <Space wrap size={[token.marginXS, token.marginXS]}>
               {qualifikationen.map((q) => (
-                <Tag key={q.bezeichnung}>
+                <Marke key={q.bezeichnung}>
                   {q.bezeichnung} {q.anzahl}
-                </Tag>
+                </Marke>
               ))}
             </Space>
           )}

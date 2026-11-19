@@ -4,7 +4,8 @@ Gilt für den Server (`src/`, `tests/`, `migrations/`), zusätzlich zur `AGENTS.
 Pfade ohne Präfix sind relativ zu `src/`. Fachblöcke mit Server- und Client-Anteil stehen
 einmal, beim Client: ETB-Zähler und Modulzähler in `frontend/src/etb/AGENTS.md`, Betreuung und
 Verpflegung in `frontend/src/betreuung/AGENTS.md`, Sitzung über mehrere Tabs (412) in
-`frontend/src/auth/AGENTS.md`.
+`frontend/src/auth/AGENTS.md`. Migrationsvergabe und Tabellenumbau (auch für `db/migrationslauf.rs`)
+stehen in `migrations/AGENTS.md`.
 
 ## Backend — Statuscode-Konvention (LFH-267/F22)
 
@@ -21,7 +22,8 @@ Handler (`JsonBody`, LFH-1074).
 - **409 hat zwei Quellen:** CAS (Zeilen-CAS `basis_geaendert_at` in `schaden/repo.rs`,
   `tier/repo.rs`, `verpflegung/repo.rs` für Zeitfenster; Feld-CAS `erwartet` über den Baustein
   `src/feld_cas.rs` in `person/repo.rs`, am Einsatzkopf, an der Einheit und an der eigenen
-  Führungsstelle (LLH-1831); Rückfrage „Zwischenzeitlich geändert“ mit „Meine Änderung
+  Führungsstelle (LLH-1831), an Abschnitt, Gefahrengebiet, Programmpunkt, Dispositionen,
+  Betreuungsstelle und den Positionswegen der Lage (LLH-1945); Rückfrage „Zwischenzeitlich geändert“ mit „Meine Änderung
   übernehmen“) und Lebenszyklus (kein Dialog). Das Frontend trennt nur
   heuristisch (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
   `SchaedenDetailPage.tsx`/`TiereDetailPage.tsx`) — ein neuer 409 in einer
@@ -41,6 +43,12 @@ Handler (`JsonBody`, LFH-1074).
   Typs). Jeder dieser Schreibwege setzt den **Änderungsvermerk** je geänderter Angabe in
   `einsatz_feld_vermerk` (LLH-1834, `einsatz::feld_vermerk`), auch ohne `erwartet`; kein
   ETB-Eintrag daraus. Eine neue Angabe an diesen Wegen kommt in die feste Feldliste des Vermerks.
+- **Feld-CAS ohne Änderungsvermerk** (LLH-1945): Abschnitt, Gefahrengebiet, Programmpunkt, die
+  Dispositionen von Personal, Fahrzeug und Material, die Betreuungsstelle sowie `…/position` und
+  `…/flaeche` nehmen `erwartet` in derselben Form (Prüfung `feld_cas::pruefe_felder`, Vergleich in
+  der Schreibtransaktion über `check_zeile_tx` oder als Suffix des einen UPDATE, 0 Zeilen über
+  `ohne_treffer` zu 409 `Veraltet` oder 404). Die Stärke-Position vergleicht den wirksamen Wert,
+  der Material-Ort ist eine Gruppe aller vier Spalten. Kein Eintrag in `einsatz_feld_vermerk`.
 - **Personendaten nutzen Feld-CAS** (LLH-1103, design.md D1 der Change
   `f8218h1i-personendaten-feldweise`): der PATCH `…/personen/{pid}` trägt in `erwartet` je
   geändertem Feld den Wert beim Öffnen (`null` = leer, Koordinate nur als Paar), und
@@ -288,6 +296,17 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   `BEREINIGUNG_VERSION` (steht im ETag `"<sha256>.b<n>"`).
 - Testdaten mit Bild-Endung brauchen echte Bildbytes: ein `.jpg` mit Fantasie-Bytes antwortet
   beim Download mit 422.
+- **ZIP der Einsatzakte (LLH-1835)** (Spec `einsatzakte`, `GET …/einsatzakte/anlagen.zip`,
+  `routes/einsatzakte.rs`, `einsatzakte/`): liest die Bytes über `support::anhang_fuer_akte`,
+  immer bereinigt; unbereinigbar, am Spiegel noch nicht geholt oder entfernt steht als „nicht
+  enthalten“ im `inhalt.csv` statt das ZIP zu kippen. Gate: jedes Modul aus `AKTE_MODULE` lesbar
+  (403), ausgeblendet fällt weg; die Liste spiegelt `frontend/src/druck/einsatzakte/quellen.ts`
+  (Test `akte_module_wie_im_client`). Protokoll in EINER Transaktion vor dem Bau (`export` der
+  Personentabelle, `anhang` je Personen-Anhang, `anhang_zugriff_audit` je UHS-Anhang). Ein neuer
+  Linker in `MODUL_LINKER` gehört in `einsatzakte::sammeln` (mit Protokoll, falls seine Route
+  eins schreibt). Gebaut wird in `tokio::spawn` (vom Request entkoppelt) in eine Temp-Datei
+  neben der DB, ein Bau je Einsatz und höchstens `MAX_BAUTEN` je Server (`BauSperre`, 409/503),
+  gestreamt über `routes::backup::chunk_stream`.
 - **Kartenhintergrundbilder (LLH-1635)** sind keine Anhänge, laufen beim Download aber durch
   dieselbe Bereinigung (`karte_hintergrundbild::bereinigt`; ETag `"<sha256>.b<n>"`,
   `BEREINIGT_CACHE_CONTROL`). Gespeichert bleibt das Original, einen Original-Abruf gibt es

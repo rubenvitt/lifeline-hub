@@ -46,24 +46,32 @@ import {
   Datenfeld,
   DatenfeldEingabe,
   Datenraster,
+  Feld,
   FeldFehler,
   Formularpaneel,
   GliederungsPaneel,
   Kennzahl,
   Kennzahlenband,
+  KlappBand,
   ListenAbschnitt,
   ListenPaneel,
   listenZeileStil,
   MatrixPaneel,
+  MetaZeile,
   Paneel,
   PaneelZeile,
   PaneelZustand,
   Sammelbanner,
   SegmentFeld,
   Segmentleiste,
-  StatusChip,
+  Marke,
+  Stapel,
+  Status,
+  StatusBlock,
+  StatusKnopf,
   StatusZelle,
   StromPaneel,
+  Textstufe,
   UebungsBand,
   UebungsMarke,
   VerteilungsPaneel,
@@ -72,7 +80,6 @@ import {
   useRollen,
 } from '../../src/components/instrument';
 import { GrossKennzahl, GrossZeile, GrossZeilen } from '../../src/components/grossbild';
-import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
 import BreiteHalten from '../../src/components/BreiteHalten';
 import { InlineAngabe } from '../../src/components/InlineAngabe';
@@ -96,8 +103,15 @@ import {
   SeitenStandVeraltet,
 } from '../../src/components/SeitenZustand';
 import { RechteHinweis, SpeicherFehler } from '../../src/components/SpeicherHinweis';
+import { StornoBanner } from '../../src/components/StornoBanner';
 import { EINSATZ_ABGESCHLOSSEN, MODUL_PERSONAL_GESPERRT } from '../../src/components/nurAnsicht';
 import EinsatzSeite from '../../src/components/EinsatzSeite';
+import { ThemeModusFest } from '../../src/theme/ThemeModeProvider';
+import IconRail from '../../src/einsatz/IconRail';
+import ModulPanel from '../../src/einsatz/ModulPanel';
+import { kategorien, moduleNachKategorie, modulRegistry } from '../../src/einsatz/modulRegistry';
+import { sprungmarkenNachKategorie } from '../../src/einsatz/sprungmarken';
+import type { ModulFreigaben } from '../../src/api/types';
 import { ApiError, NetzFehler } from '../../src/api/client';
 import { IconPlus, IconPunkteSenkrecht, IconStift } from '../../src/icons';
 import type { ListenGedaechtnis } from '../../src/components/listenGedaechtnis';
@@ -1126,16 +1140,16 @@ function EingabefeldBeispiel() {
           eingetroffen: dayjs(ZEIT_LAGE),
         }}
       >
-        <Form.Item label="Einheit (Funkrufname)" name="einheit">
+        <Feld label="Einheit (Funkrufname)" name="einheit" breite="mittel">
           <Input />
-        </Form.Item>
-        <Form.Item label="Einsatzabschnitt" name="abschnitt">
+        </Feld>
+        <Feld label="Einsatzabschnitt" name="abschnitt" breite="mittel">
           <Select options={ABSCHNITTE} />
-        </Form.Item>
-        <Form.Item label="Eingetroffen" name="eingetroffen">
+        </Feld>
+        <Feld label="Eingetroffen" name="eingetroffen">
           <ZeitpunktEingabe art="ereignis" />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Auftrag"
           name="auftrag"
           required
@@ -1143,7 +1157,7 @@ function EingabefeldBeispiel() {
           help="Auftrag ist Pflicht"
         >
           <Input />
-        </Form.Item>
+        </Feld>
       </Form>
       <div className="ds-feld">
         <label htmlFor={feldId}>Einsatzort</label>
@@ -1268,11 +1282,15 @@ function ZustaendeBeispiel() {
 /**
  * Hinweise einer Fläche: fehlendes Recht als eine Zeile, die Warnstufe im Seitenkopf und `Alert`
  * auf den Statusflächen (bedien, normal, achtung, alarm). Achtung und Alarm sind die echten
- * Hinweise der App: veralteter Stand und Speicherfehler ohne Netz.
+ * Hinweise der App: veralteter Stand und Speicherfehler ohne Netz. Das Storno-Banner sperrt eine
+ * offene Detailseite, deren Datensatz storniert wurde (LLH-1832).
  */
 function HinweisBeispiel() {
   return (
     <div className="ds-stapel">
+      <StornoBanner
+        stand={{ storniert_at: '2026-10-09 12:32:00', storniert_von_name: 'Anna Beispiel' }}
+      />
       <RechteHinweis sichtbar text={EINSATZ_ABGESCHLOSSEN} />
       <RechteHinweis sichtbar marke="Ohne Besatzung" text={MODUL_PERSONAL_GESPERRT} />
       <div className="ds-reihe">
@@ -1321,6 +1339,47 @@ function SeitenkopfBeispiel() {
         </Paneel>
       </EinsatzSeite>
     </MemoryRouter>
+  );
+}
+
+/**
+ * Navigation im Einsatz (d78gipem D3): die Rail mit „Führung“ offen und dem Griff „Menü“, daneben
+ * das Modulpanel der Kategorie mit dem ETB als aktivem Modul, Zählern, der Sprungmarke
+ * „Entscheidungen“, einem vom Server gesperrten Modul und dem Fuß „Einsatzdauer“. Ohne Kleben
+ * (`kleben={false}`): der Träger gibt die Höhe vor, nicht das Fenster des Betrachters. Die Dauer
+ * steht fest, weil der Einsatz abgeschlossen ist; eine laufende Dauer änderte die Karte bei jedem
+ * Lauf.
+ */
+const NAVIGATION_FREIGABEN: ModulFreigaben = Object.fromEntries(
+  modulRegistry.map((m) => [m.key, { sichtbar: true, zugriff: m.key !== 'dokumente' }]),
+);
+
+function NavigationBeispiel() {
+  return (
+    <div style={{ display: 'flex', height: 600 }}>
+      <IconRail
+        kategorien={kategorien}
+        aktiveKategorie="fuehrung"
+        onKategorieKlick={nichts}
+        panel={{ offen: true, onUmschalten: nichts }}
+        kleben={false}
+      />
+      <ModulPanel
+        einsatzId={7}
+        titel="Führung"
+        einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: '2026-11-15T11:12:00Z' }}
+        module={moduleNachKategorie('fuehrung')}
+        freigaben={NAVIGATION_FREIGABEN}
+        zaehler={{
+          etb: { wert: 14, beschreibung: '14 Einträge im Einsatztagebuch' },
+          auftraege: { wert: 3, beschreibung: '3 offene Aufträge, davon 1 überfällig' },
+        }}
+        aktiverModulKey="etb"
+        onModulKlick={nichts}
+        sprungmarken={sprungmarkenNachKategorie('fuehrung')}
+        kleben={false}
+      />
+    </div>
   );
 }
 
@@ -1414,6 +1473,15 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     content: () => <SeitenkopfBeispiel />,
   },
   {
+    name: 'Navigation',
+    title: 'Navigation im Einsatz (Rail und Modulpanel)',
+    group: 'Rahmen',
+    height: 1330,
+    source: 'einsatz/IconRail.tsx',
+    docAnchor: 'export default function IconRail',
+    content: () => <NavigationBeispiel />,
+  },
+  {
     name: 'Dashboard',
     title: 'Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)',
     group: 'Flächen',
@@ -1452,29 +1520,145 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     ),
   },
   {
+    name: 'Text',
+    title: 'Textstufe (Stufen der Schriftskala und Töne)',
+    group: 'Flächen',
+    height: 555,
+    source: 'components/instrument/Textstufe.tsx',
+    content: () => (
+      <Stapel abstand="sm">
+        <Textstufe stufe="seitentitel" als="h2">
+          Fahrzeuge
+        </Textstufe>
+        <Textstufe stufe="kartentitel" als="h3">
+          RTW 1/83-1
+        </Textstufe>
+        <Textstufe>Fahrzeug steht ab 06:00 wieder bereit.</Textstufe>
+        <Textstufe ton="text2">Besatzung: zwei Notfallsanitäter</Textstufe>
+        <Textstufe stufe="textKlein" ton="gedaempft">
+          Hinweis unter einem Feld
+        </Textstufe>
+        <Textstufe stufe="textKlein" ton="alarm">
+          Funkrufname ist schon vergeben
+        </Textstufe>
+        <Textstufe stufe="meta" ton="schwach">
+          14:32 · Nr. 0412
+        </Textstufe>
+        <Textstufe stufe="augenbraue" ton="schwach">
+          Augenbraue
+        </Textstufe>
+      </Stapel>
+    ),
+  },
+  {
+    name: 'Stapel',
+    title: 'Stapel (Abstand als Rasterstufe, senkrecht und als Zeile)',
+    group: 'Flächen',
+    height: 890,
+    source: 'components/instrument/Stapel.tsx',
+    content: () => {
+      const kachel: CSSProperties = { height: 20, background: 'var(--lfh-flaeche-3)' };
+      return (
+        <Stapel abstand="lg">
+          {(['xs', 'sm', 'md', 'lg'] as const).map((stufe) => (
+            <Stapel key={stufe} abstand="xs">
+              <Textstufe stufe="meta" ton="schwach">
+                abstand=&quot;{stufe}&quot;
+              </Textstufe>
+              <Stapel abstand={stufe}>
+                <div style={kachel} />
+                <div style={kachel} />
+              </Stapel>
+            </Stapel>
+          ))}
+          <Stapel richtung="zeile" abstand="sm" umbruch>
+            <Button>Übernehmen</Button>
+            <Button>Verwerfen</Button>
+          </Stapel>
+        </Stapel>
+      );
+    },
+  },
+  {
+    name: 'MetaZeile',
+    title: 'MetaZeile (Nebenangaben eines Datensatzes)',
+    group: 'Daten',
+    height: 335,
+    source: 'components/instrument/MetaZeile.tsx',
+    content: () => (
+      <Stapel abstand="md">
+        <Stapel abstand="xs">
+          <Textstufe stufe="kartentitel">RTW 1/83-1</Textstufe>
+          <MetaZeile>
+            <MetaZeile.Teil mono>HH-RK 1083</MetaZeile.Teil>
+            <MetaZeile.Teil>Wache Nord</MetaZeile.Teil>
+            <MetaZeile.Teil mono>17.11. 14:32</MetaZeile.Teil>
+          </MetaZeile>
+        </Stapel>
+        <Stapel abstand="xs">
+          <Textstufe stufe="kartentitel">Leitstelle Nord</Textstufe>
+          <MetaZeile>
+            <MetaZeile.Teil>Leitstelle</MetaZeile.Teil>
+            <MetaZeile.Teil mono>040 4285-0</MetaZeile.Teil>
+            <MetaZeile.Teil ton="alarm">nicht erreichbar</MetaZeile.Teil>
+          </MetaZeile>
+        </Stapel>
+      </Stapel>
+    ),
+  },
+  {
     name: 'Status',
-    title: 'StatusZelle, StatusChip und StatusTag',
+    title: 'Status, Marke und Statusknopf (Rahmen heißt bedienbar)',
     group: 'Status',
-    height: 340,
+    height: 520,
     source: 'components/instrument/Status.tsx',
     content: () => (
       <div className="ds-stapel">
         <div className="ds-fugenraster" data-fugenraster="">
           <StatusZelle ton="normal" wert={12} wort="bereit" />
           <StatusZelle ton="bedien" wert={4} wort="unterwegs" />
-          <StatusZelle ton="achtung" wert={3} wort="gebunden" />
+          <StatusZelle ton="achtung" wert={3} wort="Sprechwunsch" />
           <StatusZelle ton="alarm" wert={1} wort="ausgefallen" />
-          <StatusZelle ton="neutral" wert={0} wort="außer Dienst" />
+          <StatusZelle ton="neutral" wert={0} wort="gebunden" />
         </div>
         <div className="ds-reihe">
-          <StatusChip ton="normal" code="2" trenner wort="Einsatzbereit Wache" />
-          <StatusChip ton="bedien" code="3" trenner wort="Einsatz übernommen" />
-          <StatusChip ton="achtung" code="4" trenner wort="Am Einsatzort" />
+          <Status groesse="klein" ton="normal" code="S2" trenner wort="Einsatzbereit Wache" />
+          <Status groesse="klein" ton="neutral" code="S3" trenner wort="Einsatz übernommen" />
+          <Status groesse="klein" ton="achtung" code="S5" trenner wort="Sprechwunsch" />
+          <Status groesse="klein" ton="alarm" code="S6" trenner wort="außer Dienst" />
         </div>
         <div className="ds-reihe">
           {Object.values(statusKategorie).map((darstellung) => (
-            <StatusTag key={darstellung.label} darstellung={darstellung} />
+            <Status key={darstellung.label} darstellung={darstellung} />
           ))}
+          <Status ton="alarm" wort="unterbesetzt" />
+        </div>
+        <div className="ds-reihe">
+          <Marke>ad-hoc</Marke>
+          <Marke>Einheitsführer</Marke>
+          <Marke>RTW</Marke>
+          <Marke onEntfernen={() => {}}>Suche: „85“</Marke>
+        </div>
+        <div className="ds-reihe">
+          <StatusKnopf
+            darstellung={{ rolle: 'normal', label: 'Einsatzbereit Wache' }}
+            code="S2"
+            aria-label="Status von 85-1 ändern"
+          />
+          <StatusKnopf
+            darstellung={{ rolle: 'achtung', label: 'Sprechwunsch' }}
+            code="S5"
+            aria-label="Status von 85-2 ändern"
+          />
+        </div>
+        <div className="ds-reihe" style={{ width: 260 }}>
+          <StatusKnopf
+            variante="gross"
+            darstellung={{ rolle: 'normal', label: 'Einsatzbereit Wache' }}
+            code="2"
+            aria-label="Status von 85-1 ändern"
+          />
+          <StatusBlock darstellung={{ rolle: 'neutral', label: 'Einsatz übernommen' }} code="3" />
         </div>
       </div>
     ),
@@ -1493,6 +1677,28 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         <Kennzahl titel="Aufträge überfällig" wert={2} ton="achtung" notiz="älteste 18 min" />
         <Kennzahl titel="Meldungen offen" wert={5} ton="alarm" notiz="Bestätigung überfällig" />
       </Kennzahlenband>
+    ),
+  },
+  {
+    name: 'KlappBand',
+    title: 'Klappbares Kennzahlenband',
+    group: 'Daten',
+    height: 320,
+    source: 'components/instrument/KlappBand.tsx',
+    content: () => (
+      <div style={{ display: 'grid', gap: 12 }}>
+        <KlappBand
+          seite="design-system-offen"
+          titel="Unterbringung in Zahlen"
+          kurzform="12 in Betreuung · 18 frei · 1 voll"
+        >
+          <Kennzahlenband spalten={3} beschriftung="Unterbringung in Zahlen">
+            <Kennzahl titel="In Betreuung" wert={12} groesse="klein" />
+            <Kennzahl titel="Frei" wert={18} groesse="klein" />
+            <Kennzahl titel="Voll/überbelegt" wert={1} ton="alarm" groesse="klein" />
+          </Kennzahlenband>
+        </KlappBand>
+      </div>
     ),
   },
   // Großbild (LLH-1747): die Vorschau hat kein ganzes Fenster, deshalb setzt sie die Einheit auf
@@ -1679,7 +1885,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Hinweis',
     title: 'Hinweis: Rechte, Warnstufe und Alert auf der Statusfläche',
     group: 'Rückmeldung',
-    height: 820,
+    height: 880,
     source: 'components/SpeicherHinweis.tsx',
     moreDoc: 'components/instrument/WarnstufenHinweis.tsx',
     styles: ['icons/icons.css'],
@@ -1859,10 +2065,11 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'Eingabefeld',
-    title: 'Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)',
+    title: 'Eingabefeld (Feld mit Breitenstufe, Pflicht mit Fehlerzeile, FeldFehler)',
     group: 'Eingabe',
     height: 903,
-    source: 'components/instrument/FeldFehler.tsx',
+    source: 'components/instrument/Feld.tsx',
+    moreDoc: 'components/instrument/FeldFehler.tsx',
     styles: ['anzeige/ZeitpunktEingabe.css'],
     content: () => <EingabefeldBeispiel />,
     interact: beendeBewegung,
@@ -2129,10 +2336,14 @@ function ThemaAbschnitt({ dunkel, children }: { dunkel: boolean; children: React
       checkbox={antdKaestchen(DICHTE)}
       radio={antdOptionsknopf(DICHTE)}
     >
-      <section className="ds-thema" data-theme={dunkel ? 'dark' : 'light'}>
-        <Augenbraue als="h2">{dunkel ? 'Nacht' : 'Tag'}</Augenbraue>
-        <div className="ds-inhalt">{children}</div>
-      </section>
+      {/* Der Modus der App je Abschnitt (d78gipem D5): Bausteine mit `useModusFarben` (Modulpanel,
+         Seitenkopf) folgen sonst im Tag der Vorgabe Nacht. */}
+      <ThemeModusFest effektiv={dunkel ? 'dark' : 'light'} dichte={DICHTE}>
+        <section className="ds-thema" data-theme={dunkel ? 'dark' : 'light'}>
+          <Augenbraue als="h2">{dunkel ? 'Nacht' : 'Tag'}</Augenbraue>
+          <div className="ds-inhalt">{children}</div>
+        </section>
+      </ThemeModusFest>
     </ConfigProvider>
   );
 }

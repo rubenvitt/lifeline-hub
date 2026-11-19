@@ -15,7 +15,6 @@ import type {
 } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
-import StatusTag from '../../components/StatusTag';
 import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
 import { Augenbraue, Datenfeld, Datenraster, monoStil } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
@@ -30,6 +29,7 @@ import { gefahrenPfad } from '../../routing/deeplinks';
 import { gefahrenMatrixAbfrage } from '../gefahren/gefahrenMatrixAbfrage';
 import GefahrenStufe from '../gefahren/GefahrenStufe';
 import { erlaeuterungEinzeilig, gesetzteGefahren, zellTitel } from '../gefahren/erlaeuterungen';
+import { Status } from '../../components/instrument/Status';
 
 /** So viele Gefahren zeigt der Inspector, danach „alle in Gefahren ↗“ (LLH-1110). */
 export const GEFAHREN_IM_INSPECTOR = 5;
@@ -323,7 +323,7 @@ export default function ZonenInspector({
             zahl={false}
             /* Kartenlesart, nicht Kennzahllesart: der Inspektor beschreibt ein Objekt, deshalb
                ist `keine` hier `alarm` — unbewertet gilt vorsichtshalber als Gefahr. */
-            wert={<StatusTag darstellung={warnstufeKarte[aktuellesGebiet.hoechste_warnstufe]} />}
+            wert={<Status darstellung={warnstufeKarte[aktuellesGebiet.hoechste_warnstufe]} />}
           />
         )}
         <KennzahlZeile label="Zonen" wert={String(aktuellesGebiet.zonen_ids.length)} />
@@ -513,7 +513,7 @@ export default function ZonenInspector({
                 <Datenfeld label="Bezirk">{aktuellerBezirk.bezeichnung}</Datenfeld>
               )}
               <Datenfeld label="Räumung">
-                <StatusTag darstellung={raeumungszustand[aktuellerBezirk.raeumung]} />
+                <Status darstellung={raeumungszustand[aktuellerBezirk.raeumung]} />
               </Datenfeld>
               <Datenfeld label="Evakuiert" mono>
                 {evakuiertText(aktuellerBezirk)}

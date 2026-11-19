@@ -171,14 +171,16 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(page.locator('.ant-table-row')).toHaveCount(saetze.length);
       for (const { id, label } of saetze) {
         const tag = page
-          .locator(`.ant-table-row[data-row-key="${id}"] .ant-tag`)
+          .locator(`.ant-table-row[data-row-key="${id}"] :is([data-lfh="status"],[data-marke])`)
           .filter({ hasText: new RegExp(`^${label}(?: \\(Teststelle\\))?$`) });
         await expect(tag).toHaveCount(1);
         await pruefe(tag, minimum, `${modus}/${modul}/${label}/Liste`);
       }
       for (const { id, label } of saetze) {
         await page.goto(`${basis}/${modul}/${id}`);
-        const tag = page.locator('.ant-tag').filter({ hasText: new RegExp(`^${label}$`) });
+        const tag = page
+          .locator(':is([data-lfh="status"],[data-marke])')
+          .filter({ hasText: new RegExp(`^${label}$`) });
         await expect(tag).toHaveCount(1);
         await pruefe(tag, minimum, `${modus}/${modul}/${label}/Detail`);
       }

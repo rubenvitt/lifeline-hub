@@ -17,7 +17,7 @@ import {
 } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Status, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -115,7 +115,8 @@ function bestaetigungsAchse(m: Meldung, zeitpunkt: (wire?: string | null) => str
   }
   if (m.ist_ueberfaellig || m.eskaliert) {
     return (
-      <StatusChip
+      <Status
+        groesse="klein"
         ton="alarm"
         code={
           <span aria-hidden="true">
@@ -127,7 +128,8 @@ function bestaetigungsAchse(m: Meldung, zeitpunkt: (wire?: string | null) => str
     );
   }
   return (
-    <StatusChip
+    <Status
+      groesse="klein"
       ton="achtung"
       wort={`Bestätigung offen bis ${zeitpunkt(m.bestaetigung_frist_at)}`}
     />
@@ -338,20 +340,26 @@ function MeldungKarte({
       zeit={m.ereigniszeit ? <ZeitAnzeige wert={m.ereigniszeit} rolle="kurz" /> : '—'}
       nr={`#${m.lfd_nr}`}
     >
-      <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
-        <Space size={6} wrap>
+      <Flex
+        justify="space-between"
+        align="center"
+        style={{ marginBottom: token.marginSM }}
+        gap={token.marginSM}
+        wrap
+      >
+        <Space size={token.marginSM} wrap>
           <PrioBadge prio={m.prioritaet} />
           <StatusBadge
             phase={status.phase}
             label={status.label}
             unbearbeitet={!!status.unbearbeitet}
           />
-          {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
-          {m.lagerelevant && <StatusChip ton="bedien" wort="In der Lage ✓" />}
+          {m.richtung === 'extern' && <Status groesse="klein" ton="neutral" wort="Extern" />}
+          {m.lagerelevant && <Status groesse="klein" ton="bedien" wort="In der Lage ✓" />}
           {m.auftrag_id != null &&
             darf('fremde-module') &&
             (m.is_auftrag_aufgehoben ? (
-              <StatusChip ton="neutral" wort="Auftrag aufgehoben" />
+              <Status groesse="klein" ton="neutral" wort="Auftrag aufgehoben" />
             ) : (
               <KennungsLink to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>
                 ↗ Auftrag
@@ -379,13 +387,13 @@ function MeldungKarte({
             berichtigungLfdNr={m.etb_berichtigung_lfd_nr}
           />
         </Space>
-        <Space size={10} wrap>
+        <Space size={token.margin} wrap>
           {bestaetigungsAchse(m, zeitpunkt)}
         </Space>
       </Flex>
 
       {/* Absender und Empfänger sind Metadaten, nicht Inhalt — Metazeilen-Größe. */}
-      <Space size={6} wrap style={{ marginBottom: 6 }}>
+      <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
           {m.absender}
         </Text>
@@ -414,7 +422,7 @@ function MeldungKarte({
          Empfänger, die Verwaltung steht danach (LFH-974): am Handy liegt er so im ersten Schirm. */}
       <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
 
-      <Flex align="center" gap={8} wrap style={{ marginTop: 8 }}>
+      <Flex align="center" gap={token.marginSM} wrap style={{ marginTop: token.marginSM }}>
         <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {WEG_LABEL[m.meldeweg]} · {MELDUNGSART_LABEL[m.meldungsart]} · Ereignis:{' '}
           {zeitpunkt(m.ereigniszeit)}
@@ -431,11 +439,11 @@ function MeldungKarte({
         )}
       </Flex>
 
-      {uebernahme != null && <div style={{ marginTop: 8 }}>{uebernahme}</div>}
+      {uebernahme != null && <div style={{ marginTop: token.marginSM }}>{uebernahme}</div>}
       {/* Grund einer abgelehnten Karten-Aktion über der Aktionszeile, bis zur nächsten Aktion an
          dieser Karte (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). */}
       {fehlerGrund && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: token.marginSM }}>
           <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
         </div>
       )}
@@ -459,7 +467,7 @@ function MeldungKarte({
           // Zwischen Auswahl und Knöpfen derselbe Abstand wie zwischen den Knöpfen (Handschuh).
           gap={token.padding}
           wrap
-          style={{ marginTop: 8 }}
+          style={{ marginTop: token.marginSM }}
         >
           {zuweisbar ? (
             <Select<number | null>

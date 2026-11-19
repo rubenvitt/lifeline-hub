@@ -149,7 +149,9 @@ test.describe(KAPITEL, () => {
     await erstes.click();
     await bezug.getByRole('button', { name: 'Speichern' }).click();
     await expect(bezug).toBeHidden();
-    await expect(strom.locator('.ant-tag', { hasText: objektName })).toBeVisible();
+    await expect(
+      strom.locator(':is([data-lfh="status"],[data-marke])', { hasText: objektName }),
+    ).toBeVisible();
     await evasMenue.click();
     menue = page.getByRole('menu');
     await expect(menue.getByRole('menuitem', { name: 'Bezug ändern' })).toBeVisible();

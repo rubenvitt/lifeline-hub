@@ -1,10 +1,10 @@
 import userEvent from '@testing-library/user-event';
 import { screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Button } from 'antd';
+import { Button, ConfigProvider } from 'antd';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite, setzeViewportZurueck } from '../test/viewport';
-import EinsatzSeite, { type Nebenweg } from './EinsatzSeite';
+import EinsatzSeite, { nebenwegeImMenue, type Nebenweg } from './EinsatzSeite';
 
 /**
  * Nebenwege im Seitenkopf (LFH-963, design.md D1): ab `md` je Nebenweg ein sekundärer Knopf,
@@ -19,15 +19,18 @@ afterEach(() => setzeViewportZurueck());
 
 const NAME = 'Weitere Aktionen zu den Betroffenen';
 
-function zeige(eintraege: readonly Nebenweg[]) {
+/** Steuerhöhe der Stufe als Literal (30 / 48 / 72): `test/utils` montiert `ConfigProvider` ohne Thema. */
+function zeige(eintraege: readonly Nebenweg[], controlHeight = 30) {
   return renderMitProviders(
-    <EinsatzSeite
-      titel="Betroffene"
-      aktionen={<Button type="primary">Betroffene erfassen</Button>}
-      weitere={{ name: NAME, eintraege }}
-    >
-      <div>Inhalt</div>
-    </EinsatzSeite>,
+    <ConfigProvider theme={{ token: { controlHeight } }}>
+      <EinsatzSeite
+        titel="Betroffene"
+        aktionen={<Button type="primary">Betroffene erfassen</Button>}
+        weitere={{ name: NAME, eintraege }}
+      >
+        <div>Inhalt</div>
+      </EinsatzSeite>
+    </ConfigProvider>,
   );
 }
 
@@ -43,11 +46,11 @@ describe('EinsatzSeite — Nebenwege ab md', () => {
     const druck = vi.fn();
     const csv = vi.fn();
     const { container } = zeige([
-      { key: 'druck', label: 'Drucken / als PDF', onWahl: druck, ziel: '/einsaetze/1/druck' },
+      { key: 'druck', label: 'Druckansicht', onWahl: druck, ziel: '/einsaetze/1/druck' },
       { key: 'csv', label: 'CSV exportieren', onWahl: csv },
     ]);
     const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
-    const druckKnopf = within(kopf).getByRole('link', { name: 'Drucken / als PDF' });
+    const druckKnopf = within(kopf).getByRole('link', { name: 'Druckansicht' });
     // Link mit Knopfgestalt: Strg/⌘+Klick öffnet einen Tab, das Ziel steht als Adresse da.
     expect(druckKnopf).toHaveAttribute('href', '/einsaetze/1/druck');
     await userEvent.click(within(kopf).getByRole('button', { name: 'CSV exportieren' }));
@@ -60,26 +63,72 @@ describe('EinsatzSeite — Nebenwege ab md', () => {
   });
 });
 
+/**
+ * Stufen 48 und 72 (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D1): auch ab `md` bündeln
+ * sich die Nebenwege hinter „Weitere“, der Auslöser steht dann HINTER den Aktionen.
+ */
+describe.each([
+  ['komfortabel', 48],
+  ['handschuh', 72],
+])('EinsatzSeite — Nebenwege ab md in %s', (_stufe, controlHeight) => {
+  it('stehen nur im Menü, der Auslöser hinter den Aktionen', async () => {
+    setzeViewportBreite(1180);
+    const csv = vi.fn();
+    const { container } = zeige(
+      [
+        { key: 'druck', label: 'Drucken / als PDF', onWahl: vi.fn(), ziel: '/einsaetze/1/druck' },
+        { key: 'csv', label: 'CSV exportieren', onWahl: csv },
+      ],
+      controlHeight,
+    );
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).queryByText('Drucken / als PDF')).not.toBeInTheDocument();
+    expect(within(kopf).queryByText('CSV exportieren')).not.toBeInTheDocument();
+    const knoepfe = within(kopf).getAllByRole('button');
+    expect(knoepfe.map((k) => k.getAttribute('aria-label') ?? k.textContent)).toEqual([
+      'Betroffene erfassen',
+      NAME,
+    ]);
+    await userEvent.click(within(kopf).getByRole('button', { name: NAME }));
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    await userEvent.click(
+      within(offenesMenue()).getByRole('menuitem', { name: 'CSV exportieren' }),
+    );
+    expect(csv).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('nebenwegeImMenue', () => {
+  it('bündelt unter md und ab der Stufe 48, sonst nicht', () => {
+    expect(nebenwegeImMenue(true, 30)).toBe(true);
+    expect(nebenwegeImMenue(false, 30)).toBe(false);
+    // antds Vorgabe ohne Thema ist keine Touch-Stufe.
+    expect(nebenwegeImMenue(false, 32)).toBe(false);
+    expect(nebenwegeImMenue(false, 48)).toBe(true);
+    expect(nebenwegeImMenue(false, 72)).toBe(true);
+  });
+});
+
 describe('EinsatzSeite — Nebenwege unter md', () => {
   it('bündeln sich hinter EINEM Auslöser mit dem Namen der Seite', async () => {
     setzeViewportBreite(390);
     const druck = vi.fn();
     const csv = vi.fn();
     const { container } = zeige([
-      { key: 'druck', label: 'Drucken / als PDF', onWahl: druck, ziel: '/einsaetze/1/druck' },
+      { key: 'druck', label: 'Druckansicht', onWahl: druck, ziel: '/einsaetze/1/druck' },
       { key: 'csv', label: 'CSV exportieren', onWahl: csv },
     ]);
     const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
     // Die Erfassung bleibt sichtbar, die Nebenwege nicht.
     expect(within(kopf).getByRole('button', { name: 'Betroffene erfassen' })).toBeInTheDocument();
-    expect(within(kopf).queryByText('Drucken / als PDF')).not.toBeInTheDocument();
+    expect(within(kopf).queryByText('Druckansicht')).not.toBeInTheDocument();
     expect(within(kopf).queryByText('CSV exportieren')).not.toBeInTheDocument();
 
     const ausloeser = within(kopf).getByRole('button', { name: NAME });
     await userEvent.click(ausloeser);
     await waitFor(() => expect(offenesMenue()).not.toBeNull());
     const menue = offenesMenue();
-    expect(within(menue).getByRole('menuitem', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: 'Druckansicht' })).toBeInTheDocument();
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'CSV exportieren' }));
     expect(csv).toHaveBeenCalledTimes(1);
     expect(druck).not.toHaveBeenCalled();

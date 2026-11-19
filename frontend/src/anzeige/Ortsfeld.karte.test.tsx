@@ -656,3 +656,29 @@ describe('Ortsfeld — Eigene Position', () => {
     expect(screen.queryByRole('button', { name: 'Eigene Position' })).toBeNull();
   });
 });
+
+describe('Ortsfeld schreibgeschützt (LLH-1832, Spec `storno-sperre`)', () => {
+  it('zeigt nur den Text, lesbar und unveränderlich, ohne Suche, Karte und Knöpfe', async () => {
+    const onChange = vi.fn();
+    renderMitProviders(
+      <Ortsfeld
+        aria-label="Fundort"
+        readOnly
+        value={{ text: 'Kleingartenanlage Nord', koordinate: { lat: 52.5, lon: 13.4 } }}
+        onChange={onChange}
+        suchen={vi.fn()}
+        suchSchluessel={(b) => einsatzKeys.einsatzortSuche(7, b)}
+        karte={{ etikett: 'Fundort', einsatzId: 7, eigenePosition: true }}
+      />,
+    );
+    const feld = screen.getByRole('textbox', { name: 'Fundort' });
+    expect(feld).toHaveValue('Kleingartenanlage Nord');
+    expect(feld).toHaveAttribute('readonly');
+    await userEvent.type(feld, 'x{Enter}');
+    expect(onChange).not.toHaveBeenCalled();
+    for (const knopf of ['Ort suchen', 'Auf Karte wählen', 'Eigene Position']) {
+      expect(screen.queryByRole('button', { name: knopf })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole('group', { name: 'Karte: Fundort' })).not.toBeInTheDocument();
+  });
+});

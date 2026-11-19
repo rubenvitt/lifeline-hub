@@ -1,6 +1,7 @@
-import { Button, Tag, Typography } from 'antd';
+import { Button, Typography } from 'antd';
 import type { SelectProps } from 'antd';
 import type { ReactNode } from 'react';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Gründe je Kraft einer abgelehnten Sammel-Disposition (LLH-1100, Change
@@ -22,7 +23,7 @@ export function GruendeListe({ gruende, name, onAbwaehlen }: GruendeListeProps) 
   if (gruende.size === 0) return null;
   return (
     <div>
-      <ul aria-label="Nicht disponiert" style={{ margin: 0, paddingInlineStart: 18 }}>
+      <ul aria-label="Nicht disponiert" style={{ margin: 0, paddingInlineStart: '1.2em' }}>
         {[...gruende].map(([id, grund]) => (
           <li key={id}>
             <Typography.Text type="danger">
@@ -52,15 +53,15 @@ export function gruendeTagRender(
     const grund = gruende.get(id);
     const text = label === value || label == null ? name(id) : label;
     return (
-      <Tag
-        closable={closable}
-        onClose={onClose}
-        // Ein Mausdruck auf den Tag öffnet sonst die Liste (antd-Muster für `tagRender`).
+      <Marke
+        onEntfernen={closable ? () => onClose() : undefined}
+        entfernenLabel={`${typeof text === 'string' ? text : 'Kraft'} entfernen`}
+        // Ein Mausdruck auf die Marke öffnet sonst die Liste (antd-Muster für `tagRender`).
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
-        style={{ marginInlineEnd: 4 }}
+        style={{ marginInlineEnd: 'var(--lfh-luft-1)' }}
       >
         {grund ? (
           <Typography.Text type="danger">
@@ -69,7 +70,7 @@ export function gruendeTagRender(
         ) : (
           text
         )}
-      </Tag>
+      </Marke>
     );
   };
 }

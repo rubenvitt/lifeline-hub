@@ -287,6 +287,55 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     assert!(st["storniert_at"].is_string());
     let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
     assert_eq!(u["stellen"].as_array().unwrap().len(), 0);
+
+    // … der Stand nennt Wann und Wer (LLH-1832, Spec `storno-sperre`)
+    let (s, stand) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/stellen/{sid}/stand", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{stand:?}");
+    assert!(stand["storniert_at"].is_string(), "{stand:?}");
+    assert!(stand["storniert_von_name"].is_string(), "{stand:?}");
+}
+
+/// Der Stand einer Stelle (LLH-1832): unbekannt oder fremder Einsatz 404, ohne Modul 403.
+#[tokio::test]
+async fn stand_einer_stelle_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Halle").await;
+    let (s, stand) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/stellen/{sid}/stand", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{stand:?}");
+    assert!(stand["storniert_at"].is_null(), "{stand:?}");
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    for pfad_stand in [
+        format!("{}/stellen/{sid}/stand", pfad(anderer)),
+        format!("{}/stellen/999999/stand", pfad(e)),
+    ] {
+        let (s, _) = anfrage(&app, "GET", &pfad_stand, &admin, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{pfad_stand}");
+    }
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let pfad_stand = format!("{}/stellen/{sid}/stand", pfad(e));
+    let (s, _) = anfrage(&app, "GET", &pfad_stand, &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: sichtbar liest sie");
+    override_setzen(&app, &admin, e, "betreuung", false, None).await;
+    let (s, _) = anfrage(&app, "GET", &pfad_stand, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
 }
 
 /// Ein PATCH ohne neuen Wert schreibt kein ETB und verteilt nichts live (Leerlauf-Riegel,
@@ -2557,4 +2606,163 @@ async fn bezirk_freitexte_haben_grenzen() {
         assert_eq!(s, StatusCode::OK, "{feld}: {j:?}");
         assert_eq!(j[feld], "y".repeat(max).as_str(), "{feld}");
     }
+}
+
+// ── LLH-1945: Feld-CAS an der Betreuungsstelle ──────────────────────────────────────────────
+
+/// Speichert B eine Angabe auf einem Stand, den A an genau dieser Angabe inzwischen geändert hat,
+/// ist es 409 `veraltet` und nichts wird überschrieben, auch kein ETB-Eintrag; ohne `erwartet`
+/// wird wie bisher ohne Vergleich geschrieben.
+#[tokio::test]
+async fn angabe_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
+    let url = format!("{}/stellen/{sid}", pfad(e));
+    // A ändert die Kapazität und die Leitung.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"kapazitaet_personen":180,"leitung":"Frau A"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let vorher = etb_eintraege(&app, &admin, e).await.len();
+
+    // B hatte 150 und keine Leitung gesehen.
+    for (body, feld) in [
+        (
+            r#"{"kapazitaet_personen":200,"erwartet":{"kapazitaet_personen":150}}"#,
+            "kapazitaet_personen",
+        ),
+        (
+            r#"{"leitung":"Herr B","erwartet":{"leitung":null}}"#,
+            "leitung",
+        ),
+    ] {
+        let (s, j) = anfrage(&app, "PATCH", &url, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::CONFLICT, "{feld}: {j:?}");
+        assert_eq!(j["grund"], "veraltet", "{feld}: {j:?}");
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["stellen"][0]["kapazitaet_personen"], 180, "{u:?}");
+    assert_eq!(u["stellen"][0]["leitung"], "Frau A", "{u:?}");
+    assert_eq!(
+        etb_eintraege(&app, &admin, e).await.len(),
+        vorher,
+        "kein ETB"
+    );
+
+    // Mit dem aktuellen Altwert (Text whitespace-tolerant) geht es durch.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"leitung":"Herr B","erwartet":{"leitung":" Frau A "}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["leitung"], "Herr B");
+    // Ohne `erwartet` ohne Vergleich.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"kapazitaet_personen":200}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["kapazitaet_personen"], 200);
+}
+
+/// Hat A eine ANDERE Angabe derselben Stelle geändert, speichert B seine ohne Konflikt; jede
+/// Angabe vergleicht nur sich selbst.
+#[tokio::test]
+async fn andere_angabe_dazwischen_ist_kein_konflikt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ab = abschnitt(&app, &admin, e, "EA Nord").await;
+    let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
+    let url = format!("{}/stellen/{sid}", pfad(e));
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"notiz":"Eingang Süd","lat":51.93,"lon":8.87}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+
+    // Jede Angabe mit dem Wert, den B beim Öffnen sah; A hat nur Notiz und Koordinate geändert.
+    let faelle = [
+        r#"{"bezeichnung":"NU Turnhalle Süd","erwartet":{"bezeichnung":"NU Turnhalle Nord"}}"#
+            .to_string(),
+        r#"{"art":"betreuungsstelle","erwartet":{"art":"notunterkunft"}}"#.to_string(),
+        format!(r#"{{"abschnitt_id":{ab},"erwartet":{{"abschnitt_id":null}}}}"#),
+        r#"{"kapazitaet_personen":160,"erwartet":{"kapazitaet_personen":150}}"#.to_string(),
+        r#"{"standort":"Schulstraße 1","erwartet":{"standort":null}}"#.to_string(),
+        r#"{"leitung":"Frau A","erwartet":{"leitung":null}}"#.to_string(),
+        r#"{"kontaktweg":"Kanal 3","erwartet":{"kontaktweg":""}}"#.to_string(),
+        r#"{"belegungsart":"namentlich","erwartet":{"belegungsart":"gezaehlt"}}"#.to_string(),
+    ];
+    for body in &faelle {
+        let (s, j) = anfrage(&app, "PATCH", &url, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::OK, "{body}: {j:?}");
+    }
+    // Notiz und Koordinate mit ihrem aktuellen Stand.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(
+            r#"{"notiz":"Eingang West","lat":52.0,"lon":9.0,
+                "erwartet":{"notiz":"Eingang Süd","lat":51.93,"lon":8.87}}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["notiz"], "Eingang West");
+    // Die Koordinate ist EIN Paar: ein überholter Wert darin ist ein Konflikt.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"lat":50.0,"lon":7.0,"erwartet":{"lat":52.0,"lon":8.87}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+}
+
+/// Ein Altwert ohne Änderung desselben Felds und ein halbes Koordinatenpaar in `erwartet` sind
+/// Feldkombinationen: 422, nichts wird geschrieben.
+#[tokio::test]
+async fn altwert_ohne_aenderung_oder_halbes_paar_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
+    let url = format!("{}/stellen/{sid}", pfad(e));
+    for body in [
+        r#"{"notiz":"x","erwartet":{"leitung":null}}"#,
+        r#"{"status":"in_betrieb","erwartet":{"kapazitaet_personen":150}}"#,
+        r#"{"lat":51.0,"lon":8.0,"erwartet":{"lat":null}}"#,
+        r#"{"lat":51.0,"lon":8.0,"erwartet":{"lon":null}}"#,
+    ] {
+        let (s, j) = anfrage(&app, "PATCH", &url, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body}: {j:?}");
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let st = &u["stellen"][0];
+    assert!(st["notiz"].is_null() && st["lat"].is_null(), "{u:?}");
+    assert_eq!(st["status"], "vorbereitet", "{u:?}");
 }

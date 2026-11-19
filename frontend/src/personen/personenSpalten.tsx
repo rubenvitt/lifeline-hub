@@ -1,7 +1,6 @@
 import { Button, Typography } from 'antd';
-import type { CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -10,7 +9,9 @@ import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { aktualisierePerson, registrierAnzeige } from '../api/einsatzPerson';
+import { ladePerson, registrierAnzeige, savePersonFeld } from '../api/einsatzPerson';
+import { OFFEN_LASSEN } from '../components/InlineAngabe';
+import { useFeldKonflikt, VERWORFEN } from '../components/useFeldKonflikt';
 import { fehlerText } from '../api/client';
 import { PERSON_ZUSTAND_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
@@ -41,6 +42,7 @@ import {
   type VerbleibKlasse,
 } from './personenBilanz';
 import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Das EINE Spaltenregister der Betroffenen-Listen; speist Zeilen- und Rasteransicht und über den
@@ -124,7 +126,7 @@ function PersonZelle({ p }: { p: Person }) {
         {/* Kontamination „ja“ als Marke (LLH-1326, design.md D11): Gefahr für die Kräfte, Rolle
             `achtung` mit Wort; „nein“ und „keine Angabe“ tragen keine. Die Personenzelle steht
             in Liste, Karte und Patientenliste am Gerät. */}
-        {p.kontamination === true && <StatusTag darstellung={kontamination} />}
+        {p.kontamination === true && <Status darstellung={kontamination} />}
       </span>
       {offen && (
         <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtungText }}>
@@ -350,15 +352,22 @@ function isSichtungBedienbar(p: Person, b: PersonenBedienung | undefined): boole
   );
 }
 
+/** Der Zustand als Wire-Wert: leer oder nur Leerraum ist `null`. */
+const alsZustand = (z: string): string | null => (z.trim() === '' ? null : z);
+
 /**
- * Schreibzweig der Zustand-Zelle: PATCH mit NUR `zustand`, also kann `patchBody` kein anderes
- * Feld leeren. Kein `basis_geaendert_at`: ein Kurzfeld überschreibt bewusst blind.
+ * Schreibzweig der Zustand-Zelle: PATCH mit NUR `zustand` (`savePersonFeld`), also wird kein
+ * anderes Feld geleert. Feld-CAS (LLH-1945, Entscheidung 18.11.2026): auch dieses Kurzfeld prüft
+ * auf zwischenzeitliche Änderung. Der Zustand beim Öffnen der Zelle (`onOeffnen`) geht als Altwert
+ * mit; hat ein anderer ihn inzwischen geändert, fragt `useFeldKonflikt` „Zwischenzeitlich
+ * geändert“. „Meine Änderung übernehmen“ schreibt ohne Altwert; „Verwerfen“, Escape und Schließen
+ * schreiben nichts, die Zelle zeigt den frischen Stand ohne Fehler (das Feld ist dann schon zu).
  *
  * - Während der Mutation zeigt die Zelle den GETIPPTEN Wert mit Ladeanzeige (`variables`).
  * - `onSuccess` gibt die Invalidierung ZURÜCK: react-query hält `isPending`, bis der neue Stand
  *   in der Liste steht — sonst spränge der Wert eine Runde lang auf den alten zurück.
  * - Ein Fehler steht AN DER ZELLE (`data-fehler`, Rand aus `colorError`, Satz in `alarmText`),
- *   kein Toast. Er geht beim nächsten Versuch von selbst.
+ *   kein Toast. Er geht beim nächsten Versuch von selbst. Während der Rückfrage steht er nicht.
  */
 export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
   const qc = useQueryClient();
@@ -367,17 +376,46 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
   // Mutation pausierte sonst und überschriebe nach der Rückkehr still einen ungesehenen Wert.
   // `useOhneVerbindung`, nie `navigator.onLine` allein (WLAN ohne Server).
   const ohneVerbindung = useOhneVerbindung();
+  const konflikt = useFeldKonflikt();
   const mutation = useMutation({
-    mutationFn: (zustand: string) =>
-      aktualisierePerson(einsatzId, p.id, { zustand: zustand.trim() === '' ? null : zustand }),
+    mutationFn: (v: { zustand: string; erwartet?: string | null }) =>
+      savePersonFeld(einsatzId, p.id, 'zustand', alsZustand(v.zustand), v.erwartet),
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) }),
         qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, p.id) }),
       ]),
   });
+  // Der Zustand beim Öffnen der Zelle: Altwert des Feld-CAS, fest bis zum nächsten Öffnen.
+  const beimOeffnen = useRef<string | null>(p.zustand ?? null);
+  // Solange die Rückfrage klärt, ist der 409 der ersten Anfrage kein Fehler an der Zelle.
+  const [klaert, setKlaert] = useState(false);
+  const save = async (zustand: string) => {
+    setKlaert(true);
+    const ergebnis = await konflikt({
+      etikett: 'Zustand / Verdacht',
+      erwartet: alsZustand(beimOeffnen.current ?? ''),
+      speichern: async (erwartet) => {
+        await mutation.mutateAsync({ zustand, erwartet });
+      },
+      ladeFrisch: async () => {
+        const frisch = await qc.fetchQuery({
+          queryKey: einsatzKeys.person(einsatzId, p.id),
+          queryFn: () => ladePerson(einsatzId, p.id),
+          staleTime: 0,
+        });
+        // Die Liste zeigt danach den frischen Stand.
+        void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+        return frisch;
+      },
+      aktuell: (frisch) => ({ wert: alsZustand(frisch.zustand ?? '') }),
+      text: (w) => w ?? '',
+    }).finally(() => setKlaert(false));
+    // Nichts geschrieben: der 409 der ersten Anfrage ist kein Fehler an der Zelle.
+    if (ergebnis === VERWORFEN || ergebnis === OFFEN_LASSEN) mutation.reset();
+  };
   const laeuft = mutation.isPending;
-  const fehler = mutation.isError ? fehlerText(mutation.error, 'Grund unbekannt') : null;
+  const fehler = mutation.isError && !klaert ? fehlerText(mutation.error, 'Grund unbekannt') : null;
   return (
     <div
       data-lfh="zustand-zelle"
@@ -392,14 +430,21 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
       }
     >
       <BemerkungZelle
-        wert={laeuft ? mutation.variables : p.zustand}
+        wert={laeuft ? mutation.variables?.zustand : p.zustand}
         laeuft={laeuft}
         darfSchreiben
         bezeichnung="Zustand / Verdacht"
         kennung={registrierAnzeige(p.registrier_nr)}
         max={PERSON_ZUSTAND_MAX}
         gesperrt={ohneVerbindung ? OHNE_VERBINDUNG_NICHT_AENDERBAR : undefined}
-        onSpeichern={(wert) => mutation.mutate(wert)}
+        onOeffnen={() => {
+          beimOeffnen.current = p.zustand ?? null;
+        }}
+        // Ohne Zusage: die Zelle schließt sofort und zeigt den getippten Wert mit Ladeanzeige
+        // (LFH-650); ein Fehler steht an der Zelle, die Rückfrage kommt als Dialog.
+        onSpeichern={(wert) => {
+          save(wert).catch(() => undefined);
+        }}
       />
       {fehler && (
         <div role="alert" style={{ fontSize: 12, color: rollen.alarmText }}>
@@ -568,7 +613,7 @@ export function personenSpalten(
       width: 118,
       sortWert: (p) => STATUS_FOLGE.indexOf(p.status),
       filter: { werte: STATUS_WERTE, trifft: (p, w) => p.status === w, ohneKartenfeld: true },
-      render: (_, p) => <StatusTag darstellung={STATUS_META[p.status]} />,
+      render: (_, p) => <Status darstellung={STATUS_META[p.status]} />,
     },
     {
       title: 'Fundort',

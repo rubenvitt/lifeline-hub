@@ -16,7 +16,6 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { SprungKnopf } from '../components/Sprung';
-import StatusTag from '../components/StatusTag';
 import {
   FOKUSABSTAND_AUSGABE_KURZZEILE,
   FOKUSABSTAND_ZAEHLTASTEN,
@@ -96,6 +95,7 @@ import {
 } from './verpflegungText';
 import { zaehltasteStil, zaehltastenAbstand } from './zaehltasteStil';
 import { flaeche as flaechenMass } from '../theme/tokens';
+import { Status } from '../components/instrument/Status';
 
 /** So viele Buchungen stehen unter „Letzte Buchungen“; ältere führt ein Link zur Karte (D6). */
 const LETZTE = 10;
@@ -571,7 +571,7 @@ export default function AusgabeAnsicht() {
             wrap
             style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
           >
-            <StatusTag darstellung={darstellung} />
+            <Status darstellung={darstellung} />
             {/* Fester Platz: das Band erscheint ohne Netz, ohne die Zeile wachsen zu lassen. */}
             <span
               role="status"

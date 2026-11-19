@@ -2,7 +2,6 @@ import { useRollen } from '../components/instrument/rollenwerte';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { abgleichStatus } from '../theme/statusFarben';
-import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import {
   Alert,
@@ -14,7 +13,6 @@ import {
   Modal,
   Space,
   Spin,
-  Tag,
   Typography,
 } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
@@ -33,6 +31,7 @@ import {
   entscheideAbgleich,
   ladePerson,
   ladePersonAudit,
+  loadPersonStand,
   registrierAnzeige,
   setzePersonStatus,
   stornierePerson,
@@ -41,6 +40,7 @@ import { listeUhs, aenderePersonBelegung, nimmUhsAustrittZurueck } from '../api/
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzKeys } from '../api/queryKeys';
 import { STATUS_META } from '../personen/personMeta';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
@@ -59,6 +59,7 @@ import { useGeraetDarf } from '../geraet/geraetSicht';
 import { istAngetroffen } from '../personen/personenBilanz';
 import { verortenLinkStil } from '../personen/personBearbeiten';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
+import { StornoBanner } from '../components/StornoBanner';
 import {
   useZeilenFehler,
   type ZeilenFehlerSpeicher,
@@ -66,6 +67,7 @@ import {
 } from '../components/useZeilenFehler';
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { flaeche } from '../theme/tokens';
+import { Status } from '../components/instrument/Status';
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
@@ -168,9 +170,30 @@ export default function PersonenDetailPage() {
     queryFn: () => ladePerson(einsatzId, personId),
     enabled: idGueltig,
     // Dieser GET schreibt serverseitig einen Zugriffsaudit. Ein automatischer Retry erzeugte für
-    // dieselbe Öffnung mehrere Auditzeilen.
+    // dieselbe Öffnung mehrere Auditzeilen, ebenso ein Neuladen beim Fensterwechsel (LLH-1832).
     retry: false,
+    refetchOnWindowFocus: false,
   });
+  /**
+   * Storno-Stand ohne Zugriffsprotokoll (LLH-1832, Spec `storno-sperre`): live über das
+   * `person`-Ereignis, während das Detail selbst nicht live ist. Beim Öffnen trägt das Detail den
+   * Stand schon (`initialData`), ein eigener Abruf folgt erst auf ein Ereignis.
+   */
+  const standQuery = useQuery({
+    queryKey: einsatzKeys.personStand(einsatzId, personId),
+    queryFn: () => loadPersonStand(einsatzId, personId),
+    enabled: idGueltig && detailQuery.data != null,
+    initialData: () =>
+      detailQuery.data && {
+        storniert_at: detailQuery.data.storniert_at ?? null,
+        storniert_von_name: detailQuery.data.storniert_von_name ?? null,
+      },
+    initialDataUpdatedAt: () => detailQuery.dataUpdatedAt,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+  const personStorniert =
+    (detailQuery.data?.storniert_at ?? standQuery.data?.storniert_at ?? null) != null;
   /**
    * Ladehoheit: Bezüge, Fotos und Dateien und das Audit hängen am aufgeklappten Abschnitt, nicht am
    * Öffnen der Seite. Beim Öffnen laufen nur Einsatz und Detail; Verlauf und Aufenthalt (UHS- und
@@ -278,6 +301,12 @@ export default function PersonenDetailPage() {
    * Menüs. Beide Dialoge stehen außerhalb jeder Aufzählung, also genau einmal im Baum.
    */
   const [statusDialog, setStatusDialog] = useState<PersonStatus | null>(null);
+  // Offene Dialoge sind Schreibaktionen: der Storno schließt sie (LLH-1832, Spec `storno-sperre`).
+  useEffect(() => {
+    if (!personStorniert) return;
+    setStatusDialog(null);
+    setUhsModalOffen(false);
+  }, [personStorniert]);
   const [stornoOffen, setStornoOffen] = useState(false);
 
   // UHS-Zuweisung (Dialog in `personen/ZuweisungsDialoge.tsx`). Austragen = austritt.
@@ -391,7 +420,17 @@ export default function PersonenDetailPage() {
       />
     );
   }
-  const p = detailQuery.data;
+  // Meldet der Stand einen Storno, den das (nicht live geladene) Detail noch nicht kennt, gilt die
+  // Person ab sofort als storniert: alle Sperren der Seite lesen `storniert_at` (LLH-1832).
+  const stand = standQuery.data;
+  const p: PersonDetail =
+    stand?.storniert_at && !detailQuery.data.storniert_at
+      ? {
+          ...detailQuery.data,
+          storniert_at: stand.storniert_at,
+          storniert_von_name: stand.storniert_von_name ?? undefined,
+        }
+      : detailQuery.data;
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
@@ -403,37 +442,40 @@ export default function PersonenDetailPage() {
   function verlaufBlock(person: PersonDetail) {
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
-        {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
-          <Alert
-            type="warning"
-            showIcon
-            title={`Sichtung „tot“, Status noch „${STATUS_META[person.status].label}“`}
-            action={
-              <Button
-                loading={
-                  statusMutation.isPending &&
-                  statusMutation.variables?.einsatzId === einsatzId &&
-                  statusMutation.variables.personId === person.id &&
-                  statusMutation.variables.status === 'verstorben'
-                }
-                disabled={
-                  statusMutation.isPending &&
-                  statusMutation.variables?.einsatzId === einsatzId &&
-                  statusMutation.variables.personId === person.id
-                }
-                onClick={() =>
-                  statusMutation.mutate({
-                    einsatzId,
-                    personId: person.id,
-                    status: 'verstorben',
-                  })
-                }
-              >
-                Auf „verstorben“ setzen
-              </Button>
-            }
-          />
-        )}
+        {darfSchreiben &&
+          !person.storniert_at &&
+          person.aktuelle_sichtung === 'tot' &&
+          person.status !== 'verstorben' && (
+            <Alert
+              type="warning"
+              showIcon
+              title={`Sichtung „tot“, Status noch „${STATUS_META[person.status].label}“`}
+              action={
+                <Button
+                  loading={
+                    statusMutation.isPending &&
+                    statusMutation.variables?.einsatzId === einsatzId &&
+                    statusMutation.variables.personId === person.id &&
+                    statusMutation.variables.status === 'verstorben'
+                  }
+                  disabled={
+                    statusMutation.isPending &&
+                    statusMutation.variables?.einsatzId === einsatzId &&
+                    statusMutation.variables.personId === person.id
+                  }
+                  onClick={() =>
+                    statusMutation.mutate({
+                      einsatzId,
+                      personId: person.id,
+                      status: 'verstorben',
+                    })
+                  }
+                >
+                  Auf „verstorben“ setzen
+                </Button>
+              }
+            />
+          )}
         <div>
           <Typography.Text
             type="secondary"
@@ -453,8 +495,8 @@ export default function PersonenDetailPage() {
             </Typography.Text>
             <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
               {person.abgleiche.map((a) => (
-                <li key={a.id} style={{ padding: '4px 0' }}>
-                  <StatusTag darstellung={abgleichStatus[a.status]} />
+                <li key={a.id} style={{ padding: `${token.paddingXS}px 0` }}>
+                  <Status darstellung={abgleichStatus[a.status]} />
                   <Typography.Text>
                     {registrierNummer(
                       'R',
@@ -466,7 +508,7 @@ export default function PersonenDetailPage() {
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
                     /* `size="middle"`: „Verwerfen" ist `danger` und stünde sonst bündig neben
                        „Bestätigen". */
-                    <Space size="middle" style={{ marginLeft: 12 }}>
+                    <Space size="middle" style={{ marginLeft: token.margin }}>
                       <Button
                         type="primary"
                         disabled={!darfEinsatzLeiten(einsatz)}
@@ -760,8 +802,9 @@ export default function PersonenDetailPage() {
     <EinsatzSeite
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        seitenGruende.length > 0 && (
+        (p.storniert_at != null || seitenGruende.length > 0) && (
           <Flex vertical gap={token.marginSM}>
+            <StornoBanner stand={p} />
             {seitenGruende.map((g) => (
               <SpeicherFehler
                 key={g.schluessel}
@@ -780,12 +823,7 @@ export default function PersonenDetailPage() {
           ? {
               name: `Weitere Wege zu Person ${registrierAnzeige(p.registrier_nr)}`,
               eintraege: [
-                {
-                  key: 'druck',
-                  label: 'Druckansicht',
-                  ziel: personDruckPfad(einsatzId, p.id),
-                  onWahl: () => navigate(personDruckPfad(einsatzId, p.id)),
-                },
+                druckansichtNebenweg({ ziel: personDruckPfad(einsatzId, p.id), navigate }),
               ],
             }
           : undefined
@@ -793,9 +831,9 @@ export default function PersonenDetailPage() {
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
-          <StatusTag darstellung={STATUS_META[p.status]} />
+          <Status darstellung={STATUS_META[p.status]} />
           {p.aktuelle_sichtung && <SichtungsTag kategorie={p.aktuelle_sichtung} />}
-          {p.storniert_at && <Tag color="default">storniert</Tag>}
+          {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
         </Space>
       }
       breadcrumb={

@@ -1,4 +1,4 @@
-import { Flex, Typography } from 'antd';
+import { Flex, Typography, theme } from 'antd';
 import type { Person } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuthOptional } from '../auth/AuthContext';
@@ -35,6 +35,7 @@ export default function RettungsmittelZeile({
   /** Schreibrecht, Bedienfassung, nicht storniert und angetroffen. */
   bedienbar: boolean;
 }) {
+  const { token } = theme.useToken();
   const geraet = useAuthOptional()?.geraet ?? null;
   const gesperrt = useSprungSperre(einsatzId)('nachforderungen');
   const stand = person.rettungsmittel;
@@ -67,7 +68,7 @@ export default function RettungsmittelZeile({
   );
 
   return (
-    <Flex gap={8} wrap align="center">
+    <Flex gap={token.marginSM} wrap align="center">
       {anzeige}
       {anfordern && (
         <SprungKnopf

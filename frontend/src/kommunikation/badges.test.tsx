@@ -9,7 +9,7 @@ import QuittungIndikator from './QuittungIndikator';
 dayjs.extend(utc);
 
 /** Der Statuschip um einen Wortlaut — `data-ton` trägt den Ton der getönten Fläche. */
-const chip = (text: string) => screen.getByText(text).closest('[data-lfh="status-chip"]')!;
+const chip = (text: string) => screen.getByText(text).closest('[data-lfh="status"]')!;
 
 describe('StatusBadge', () => {
   it('rendert das Label als Statusfläche im Ton der Phase', () => {

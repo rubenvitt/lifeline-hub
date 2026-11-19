@@ -495,7 +495,7 @@ describe('EinheitenPage', () => {
       const oben = await zeileVon('1. Zug');
       const unten = await zeileVon('Gruppe Deich');
       const marke = within(unten).getByText('unterbesetzt');
-      expect(marke.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'achtung');
+      expect(marke.closest('[data-lfh="status"]')).toHaveAttribute('data-ton', 'achtung');
       expect(within(oben).queryByText('unterbesetzt')).toBeNull();
       expect(screen.queryByText('Soll erfüllt')).toBeNull();
     });
@@ -525,16 +525,17 @@ describe('EinheitenPage', () => {
       expect(within(unten).getByText('Gruppe')).toBeInTheDocument();
     });
 
-    it('zeigt keine eigene Σ-Stärke: die Summe steht nur in der Verdichtungszeile', async () => {
+    it('zeigt keine eigene Σ-Stärke: die Summe steht nur im Seitenkopf', async () => {
       zeige();
       await zeileVon('Gruppe Deich');
       // Σ der Zeilen wäre 1/2/10//13 (Zug kumuliert + Gruppe): eine solche Summe darf nirgends
       // stehen, auch nicht als Fußzeile der Tabelle.
       expect(screen.queryByText(/1\/2\/10\/\/13/)).toBeNull();
       expect(document.querySelector('.ant-table-summary')).toBeNull();
-      // Die Stärke der Seite steht genau einmal, in der Verdichtungszeile über der Tabelle.
+      // Die Stärke der Seite steht genau einmal, als Meta im Seitenkopf (LLH-1786).
+      expect(document.querySelector('[data-lfh="verdichtungszeile"]')).toBeNull();
       const verdichtung = await waitFor(() => {
-        const v = document.querySelector('[data-lfh="verdichtungszeile"]');
+        const v = document.querySelector('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]');
         expect(v).not.toBeNull();
         return v as HTMLElement;
       });

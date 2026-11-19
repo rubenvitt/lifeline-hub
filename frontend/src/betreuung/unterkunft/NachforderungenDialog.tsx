@@ -227,7 +227,7 @@ export default function NachforderungenDialog({
             gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
           }}
         >
-          <label style={{ display: 'grid', gap: 4 }}>
+          <label style={{ display: 'grid', gap: token.marginXS }}>
             <Typography.Text type="secondary">Adressat</Typography.Text>
             <Select<AdressatKategorie>
               aria-label="Adressat"
@@ -237,7 +237,7 @@ export default function NachforderungenDialog({
               disabled={laeuft}
             />
           </label>
-          <label style={{ display: 'grid', gap: 4 }}>
+          <label style={{ display: 'grid', gap: token.marginXS }}>
             <Typography.Text type="secondary">Priorität</Typography.Text>
             <Select<NachforderungPrioritaet>
               aria-label="Priorität"

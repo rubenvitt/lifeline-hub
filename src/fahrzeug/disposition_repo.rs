@@ -440,6 +440,9 @@ pub async fn disponiere_adhoc(
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FahrzeugPatch<'a> {
     pub status_id: Option<i64>,
+    /// Wer den Status setzt; bei einem echten Wechsel in `status_gesetzt_von` (LLH-1781, für die
+    /// Rücknahme). `None` lässt die Spalte bei einem Wechsel leer.
+    pub gesetzt_von: Option<i64>,
     pub bemerkung: Option<Option<&'a str>>,
     /// Ad-hoc-Angaben (LLH-1073, design.md D1): nur an einer Zeile ohne Stamm-Bezug, sonst 422.
     /// Sie schreiben die `snap_*`-Spalten, die bei einem Ad-hoc-Fahrzeug die Daten sind.
@@ -471,12 +474,14 @@ pub fn stamm_angaben_error() -> AppError {
 /// `status_id` per COALESCE. `status_seit` springt nur bei einem ECHTEN Wechsel, sonst läse
 /// „Seit“ den letzten Klick. `NotFound`, falls die Zeile nicht zum Einsatz gehört, `Conflict` an
 /// einem beendeten Fahrzeug (LLH-1079), `UnprocessableEntity` bei Ad-hoc-Angaben an einem
-/// Stamm-Fahrzeug; jede Ablehnung schreibt nichts, auch keinen Status.
+/// Stamm-Fahrzeug, `Veraltet` (409), wenn eine Spalte aus `erwartet` inzwischen einen anderen Wert
+/// trägt (Feld-CAS, LLH-1945); jede Ablehnung schreibt nichts, auch keinen Status.
 pub async fn update_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     patch: FahrzeugPatch<'_>,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<(), AppError> {
     // Ein entlassenes oder storniertes Fahrzeug bekommt keinen Status mehr (409, LLH-1079).
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
@@ -493,6 +498,8 @@ pub async fn update_tx(
             return Err(stamm_angaben_error());
         }
     }
+    // Feld-CAS (LLH-1945): nach 404, 409 (beendet) und 422 (Stamm-Fahrzeug), vor dem Schreiben.
+    crate::feld_cas::check_zeile_tx(conn, "einsatz_fahrzeug", einsatz_id, ef_id, erwartet).await?;
     // Ungezählte Bindungen mit Merkern statt `?1..?n`: ein neues Feld verschiebt keine Bindung
     // still (Muster LLH-1067). Die `snap_*`-Spalten schreibt das UPDATE nur ohne Stammbezug, auch
     // wenn eine Route die Prüfung oben vergäße.
@@ -500,6 +507,14 @@ pub async fn update_tx(
         "UPDATE einsatz_fahrzeug \
          SET status_seit = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
                                 THEN datetime('now') ELSE status_seit END, \
+             status_gesetzt_von = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
+                                       THEN ? ELSE status_gesetzt_von END, \
+             status_vorher_id = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
+                                     THEN status_id ELSE status_vorher_id END, \
+             status_vorher_seit = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
+                                       THEN status_seit ELSE status_vorher_seit END, \
+             status_ereignis_id = CASE WHEN ? IS NOT NULL AND ? IS NOT status_id \
+                                       THEN NULL ELSE status_ereignis_id END, \
              status_id = COALESCE(?, status_id), \
              bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END, \
              snap_funkrufname = CASE WHEN fahrzeug_id IS NULL \
@@ -516,6 +531,18 @@ pub async fn update_tx(
     )
     .bind(patch.status_id)
     .bind(patch.status_id)
+    // status_gesetzt_von
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.gesetzt_von)
+    // status_vorher_id, status_vorher_seit, status_ereignis_id
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    .bind(patch.status_id)
+    // status_id
     .bind(patch.status_id)
     .bind(patch.bemerkung.is_some())
     .bind(patch.bemerkung.flatten())
@@ -546,7 +573,14 @@ pub async fn update(
     patch: FahrzeugPatch<'_>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    update_tx(&mut conn, einsatz_id, ef_id, patch).await
+    update_tx(
+        &mut conn,
+        einsatz_id,
+        ef_id,
+        patch,
+        &crate::feld_cas::ExpectedValues::new(),
+    )
+    .await
 }
 
 /// Geo-/Symbol-Felder einer Disposition. `Some(None)` = NULL, `None` = unverändert.
@@ -567,32 +601,41 @@ pub async fn update_position(
     ef_id: i64,
     daten: PositionPatch<'_>,
     einsatz_aktiv: bool,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
 ) -> Result<EinsatzFahrzeugAnzeige, AppError> {
     // Ein beendetes Fahrzeug steht auf keiner Karte mehr (409, LLH-1079).
     require_aktiv_tx(&mut *pool.acquire().await?, einsatz_id, ef_id).await?;
-    let betroffen = sqlx::query(
+    // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
+    let sql = format!(
         "UPDATE einsatz_fahrzeug SET \
-            lat = CASE WHEN ? THEN ? ELSE lat END, \
-            lon = CASE WHEN ? THEN ? ELSE lon END, \
-            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.lat.is_some())
-    .bind(daten.lat.flatten())
-    .bind(daten.lon.is_some())
-    .bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some())
-    .bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some())
-    .bind(daten.tz_organisation.flatten())
-    .bind(ef_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+            lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
+            lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+         WHERE id = ?9 AND einsatz_id = ?10{}",
+        erwartet.sql_suffix(11)
+    );
+    let q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.lat.is_some())
+        .bind(daten.lat.flatten())
+        .bind(daten.lon.is_some())
+        .bind(daten.lon.flatten())
+        .bind(daten.tz_fachaufgabe.is_some())
+        .bind(daten.tz_fachaufgabe.flatten())
+        .bind(daten.tz_organisation.is_some())
+        .bind(daten.tz_organisation.flatten())
+        .bind(ef_id)
+        .bind(einsatz_id);
+    let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
-        return Err(AppError::NotFound);
+        return Err(crate::feld_cas::ohne_treffer(
+            pool,
+            "einsatz_fahrzeug",
+            einsatz_id,
+            ef_id,
+            erwartet,
+        )
+        .await);
     }
     let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE ef.id = ? AND ef.einsatz_id = ?"
@@ -1130,21 +1173,27 @@ pub async fn zuruecknehmen_tx(
 
     let mut ergebnis = Ruecknahme::default();
     if let Some(einheit_id) = vorzustand.einheit_id {
+        // Spurlos aufgelöst heißt gelöscht (`einheit::repo::aufloesen_tx`), und die ID kann an
+        // eine danach gebildete Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT). Eine
+        // Einheit, die jünger ist als das Entlassen, war nie der Ort davor (LLH-1949).
         let einheit: Option<(String, Option<String>)> = sqlx::query_as(
-            "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+            "SELECT name, aufgeloest_at FROM einsatz_einheit \
+             WHERE id = ? AND einsatz_id = ? AND angelegt_at <= ?",
         )
         .bind(einheit_id)
         .bind(einsatz_id)
+        .bind(&vorzustand.entlassen_at)
         .fetch_optional(&mut *conn)
         .await?;
         match einheit {
-            // Spurlos aufgelöst und darum gelöscht (`einheit::repo::aufloesen_tx`): den Namen
-            // kennt niemand mehr, die Lücke steht trotzdem in der Antwort.
+            // Den Namen kennt niemand mehr, die Lücke steht trotzdem in der Antwort.
             None => ergebnis
                 .ausgelassen
-                .push(ausgelassen("Einheit", "inzwischen aufgelöst")),
-            Some((name, _)) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
-                format!("Einheit «{name}»"),
+                .push(ausgelassen("Einheit", "nicht mehr vorhanden")),
+            // Ohne Recht kein Name aus dem fremden Modul, nur die allgemeine Bezeichnung
+            // (LLH-1951, wie bei der Person in `personal::ruecknahme`).
+            Some(_) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
+                "Einheit",
                 "kein Schreibrecht im Modul Einheiten",
             )),
             Some((name, Some(_))) => ergebnis.ausgelassen.push(ausgelassen(
@@ -1176,7 +1225,7 @@ pub async fn zuruecknehmen_tx(
         if let Some(name) = name {
             if !rechte.bereitstellungsraeume {
                 ergebnis.ausgelassen.push(ausgelassen(
-                    name,
+                    "Bereitstellungsraum",
                     "kein Schreibrecht im Modul Bereitstellungsräume",
                 ));
             } else {
@@ -1382,6 +1431,7 @@ mod tests {
                 tz_organisation: Some(Some("feuerwehr")),
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1396,6 +1446,7 @@ mod tests {
                 tz_organisation: None,
             },
             true,
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -1792,9 +1843,16 @@ mod tests {
             AppError::Conflict(_)
         ));
         assert!(matches!(
-            update_position(&pool, einsatz, ef, PositionPatch::default(), true)
-                .await
-                .unwrap_err(),
+            update_position(
+                &pool,
+                einsatz,
+                ef,
+                PositionPatch::default(),
+                true,
+                &Default::default()
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -2572,6 +2630,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ruecknahme_ohne_raum_recht_nennt_den_raum_nicht() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von, status) \
+             VALUES (?, 'BR Nord', 1, 1, 'aktiv') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET aktueller_br_id = ? WHERE id = ?")
+            .bind(br)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        let r = nimm_zurueck(
+            &pool,
+            einsatz,
+            ef,
+            1,
+            RUECK_JETZT,
+            &v,
+            RuecknahmeRechte {
+                einheiten: true,
+                material: true,
+                bereitstellungsraeume: false,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(r.br_id, None);
+        assert_eq!(stand(&pool, ef).await.3, None);
+        assert_eq!(
+            r.ausgelassen,
+            [ausgelassen(
+                "Bereitstellungsraum",
+                "kein Schreibrecht im Modul Bereitstellungsräume"
+            )]
+        );
+    }
+
+    #[tokio::test]
     async fn ruecknahme_laesst_veraendertes_aus_und_nennt_es() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ef, einheit, ep, em, _) = seed_voll(&pool).await;
@@ -2652,12 +2758,17 @@ mod tests {
         )
         .await
         .unwrap();
-        let gruende: Vec<&str> = r.ausgelassen.iter().map(|a| a.grund.as_str()).collect();
+        let teile: Vec<(&str, &str)> = r
+            .ausgelassen
+            .iter()
+            .map(|a| (a.bezeichnung.as_str(), a.grund.as_str()))
+            .collect();
+        // Ohne Recht kein Name aus dem fremden Modul (LLH-1951), nur die allgemeine Bezeichnung.
         assert_eq!(
-            gruende,
+            teile,
             [
-                "kein Schreibrecht im Modul Einheiten",
-                "kein Schreibrecht im Modul Material"
+                ("Einheit", "kein Schreibrecht im Modul Einheiten"),
+                ("Beladung (1 Posten)", "kein Schreibrecht im Modul Material")
             ]
         );
         assert_eq!(stand(&pool, ef).await.2, None);
@@ -2764,8 +2875,210 @@ mod tests {
             r.ausgelassen,
             [crate::fahrzeug::RuecknahmeAusgelassen {
                 bezeichnung: "Einheit".into(),
-                grund: "inzwischen aufgelöst".into(),
+                grund: "nicht mehr vorhanden".into(),
             }]
         );
     }
+
+    /// LLH-1949: eine spurlos aufgelöste Einheit ist gelöscht, ihre ID kann an eine danach
+    /// gebildete Einheit gehen (`einsatz_einheit.id` ohne AUTOINCREMENT). Das Fahrzeug kommt dann
+    /// ohne Einheit zurück, und `ausgelassen` nennt keinen fremden Namen.
+    #[tokio::test]
+    async fn ruecknahme_nimmt_keine_neue_einheit_mit_der_alten_id() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
+            .bind(einheit)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        assert_eq!(v.einheit_id, Some(einheit));
+        sqlx::query("DELETE FROM einsatz_einheit WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (id, einsatz_id, name, angelegt_at) \
+             VALUES (?, ?, 'Trupp B', '2099-01-01 00:01:00')",
+        )
+        .bind(einheit)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let r = nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        assert_eq!(r.einheit_id, None);
+        assert_eq!(
+            r.ausgelassen,
+            [crate::fahrzeug::RuecknahmeAusgelassen {
+                bezeichnung: "Einheit".into(),
+                grund: "nicht mehr vorhanden".into(),
+            }]
+        );
+        let (einheit_jetzt, beendet): (Option<i64>, Option<String>) =
+            sqlx::query_as("SELECT einheit_id, beendet_at FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((einheit_jetzt, beendet), (None, None));
+    }
+}
+
+/// Grund, mit dem die Rücknahme eines Statuswechsels sein Zeitachsen-Ereignis streicht (LLH-1781).
+pub const GRUND_STATUS_RUECKNAHME: &str = "Statuswechsel zurückgenommen";
+
+fn status_ruecknahme_conflict() -> AppError {
+    AppError::Conflict(
+        "Der Statuswechsel lässt sich nicht mehr zurücknehmen: nur direkt danach und nur von \
+         der Person, die gewechselt hat"
+            .into(),
+    )
+}
+
+/// Ergebnis der Rücknahme eines Statuswechsels: für die Live-Meldungen nach dem Commit.
+#[derive(Debug, Default)]
+pub struct StatusRuecknahme {
+    pub einheit_id: Option<i64>,
+    pub beruehrt: crate::zeitachse::repo::Beruehrt,
+}
+
+/// Merkt das Zeitachsen-Ereignis, das ein Statuswechsel geschrieben hat (LLH-1781, design.md D8),
+/// in der Transaktion des Wechsels.
+pub async fn merke_status_ereignis_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    ereignis_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET status_ereignis_id = ? WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ereignis_id)
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Nimmt einen Statuswechsel zurück (LLH-1781, Spec `fahrzeugstatus-quittung`, Change
+/// `eon26eat-status-und-bedienung`, design.md D8), in der Transaktion des Aufrufers.
+///
+/// Was wiederhergestellt wird (Status und „seit“ davor, das Ereignis des Wechsels), hält der
+/// Server selbst fest; vom Client zählen nur `status_id` und `status_seit` als Prüfwerte.
+/// Riegel: das Fahrzeug ist aktiv und steht noch auf diesem Wechsel (sonst `Veraltet`),
+/// `benutzer_id` hat gewechselt, und höchstens [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`]
+/// sind vergangen (sonst `Conflict`). Bräche das Streichen die Ordnung der Zeitachse, ist es
+/// ebenfalls `Conflict`, und der Aufrufer rollt alles zurück. Ein inzwischen schon gestrichenes
+/// Ereignis bleibt, wie es ist.
+pub async fn status_zuruecknehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    beleg: &crate::fahrzeug::StatusRuecknahmeBeleg,
+) -> Result<StatusRuecknahme, AppError> {
+    require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    type Zeile = (
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+    );
+    let zeile: Option<Zeile> = sqlx::query_as(
+        "SELECT status_id, status_seit, status_gesetzt_von, status_vorher_id, \
+                status_vorher_seit, status_ereignis_id, einheit_id \
+         FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (status_id, status_seit, gesetzt_von, vorher_id, vorher_seit, ereignis, einheit_id) =
+        zeile.ok_or(AppError::NotFound)?;
+    // Inzwischen anders gesetzt: ein CAS-Konflikt (`src/AGENTS.md`, Statuscode-Konvention).
+    if status_id != Some(beleg.status_id)
+        || status_seit.as_deref() != Some(beleg.status_seit.as_str())
+    {
+        return Err(AppError::Veraltet);
+    }
+    if gesetzt_von != Some(benutzer_id)
+        || !crate::entlassung::is_in_ruecknahme_frist(&beleg.status_seit, jetzt)
+    {
+        return Err(status_ruecknahme_conflict());
+    }
+
+    let mut ergebnis = StatusRuecknahme {
+        einheit_id,
+        ..Default::default()
+    };
+    if let (Some(ereignis), Some(eid)) = (ereignis, einheit_id) {
+        let offen: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM einsatz_kraft_zeitachse \
+             WHERE id = ? AND einsatz_id = ? AND einheit_id = ? AND gestrichen_at IS NULL)",
+        )
+        .bind(ereignis)
+        .bind(einsatz_id)
+        .bind(eid)
+        .fetch_one(&mut *conn)
+        .await?;
+        if offen {
+            let g = crate::zeitachse::repo::streiche_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                crate::zeitachse::repo::Kraft::Einheit(eid),
+                ereignis,
+                GRUND_STATUS_RUECKNAHME,
+                false,
+            )
+            .await
+            .map_err(|e| match e {
+                AppError::UnprocessableEntity(m) | AppError::Conflict(m) => AppError::Conflict(
+                    format!("Der Statuswechsel lässt sich nicht zurücknehmen: {m}"),
+                ),
+                andere => andere,
+            })?;
+            ergebnis.beruehrt = g.beruehrt;
+        }
+    }
+
+    let r = sqlx::query(
+        "UPDATE einsatz_fahrzeug SET status_id = ?, status_seit = ?, status_gesetzt_von = NULL, \
+                status_vorher_id = NULL, status_vorher_seit = NULL, status_ereignis_id = NULL \
+         WHERE id = ? AND einsatz_id = ? AND status_id = ? AND status_seit = ?",
+    )
+    .bind(vorher_id)
+    .bind(vorher_seit.as_deref())
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .bind(beleg.status_id)
+    .bind(&beleg.status_seit)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(AppError::Veraltet);
+    }
+    Ok(ergebnis)
 }

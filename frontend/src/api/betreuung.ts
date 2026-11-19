@@ -8,6 +8,7 @@ import type {
   BetreuungsstelleEingabe,
   BetreuungsstellePatch,
   StelleMeldung,
+  StornoStand,
 } from './types';
 
 /**
@@ -57,8 +58,29 @@ export function aendereStelle(
   einsatzId: number,
   stelleId: number,
   body: BetreuungsstellePatch,
+  /**
+   * Werte beim Öffnen (Feld-CAS, LLH-1945): hat ein anderer eine dieser Angaben inzwischen
+   * geändert, antwortet der Server 409 `veraltet`; ohne `erwartet` schreibt er ohne Vergleich.
+   * Der Status trägt keinen Altwert, die Koordinate nur als Paar.
+   */
+  erwartet?: Partial<Omit<BetreuungsstellePatch, 'status'>>,
 ): Promise<Betreuungsstelle> {
-  return apiSend<Betreuungsstelle>(`${basis(einsatzId)}/stellen/${stelleId}`, 'PATCH', body);
+  return apiSend<Betreuungsstelle>(
+    `${basis(einsatzId)}/stellen/${stelleId}`,
+    'PATCH',
+    erwartet ? { ...body, erwartet } : body,
+  );
+}
+
+/**
+ * Storno-Stand einer Stelle (LLH-1832, Spec `storno-sperre`): die Übersicht lässt stornierte Stellen
+ * weg; fällt eine gesehene heraus, nennt dieser Abruf Wann und Wer.
+ */
+export function loadBetreuungsstelleStand(
+  einsatzId: number,
+  stelleId: number,
+): Promise<StornoStand> {
+  return apiGet<StornoStand>(`${basis(einsatzId)}/stellen/${stelleId}/stand`);
 }
 
 /** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */

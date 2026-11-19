@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Privacy-Manifest der iOS-Hülle (Regeln: ios/AGENTS.md). Die Hülle verfolgt niemanden und erhebt
+  selbst keine Daten; die Oberfläche kommt vom Einsatzserver des Betreibers. Required-Reason-API ist
+  nur UserDefaults (Schalter „Haptik“, `@AppStorage` und `UserDefaults.standard`), gelesen und
+  geschrieben nur von der App selbst: Grund CA92.1. Wer eine weitere Required-Reason-API nutzt
+  (Dateizeitstempel, Systemstartzeit, Speicherplatz, aktive Tastaturen), trägt sie hier ein;
+  geprüft in ios/AppTests/InfoPlistTests.swift.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

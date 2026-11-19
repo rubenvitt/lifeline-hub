@@ -3,8 +3,8 @@ import type { Farbrollen } from '../../theme/tokens';
 
 /**
  * Status als getönte FLÄCHE mit getöntem Text — „Ampel als Fläche, Zahl bleibt lesbar". Die eine
- * Übersetzung Ton → Grund/Text/Kante für `StatusZelle`, `StatusChip` und die
- * Flächen-Darstellung von `StatusTag`.
+ * Übersetzung Ton → Grund/Text/Kante für `StatusZelle`, `Status`, `StatusKnopf` und
+ * `StatusBlock`.
  *
  * ── DIE KONTRASTRECHNUNG ────────────────────────────────────────────────────────────
  *
@@ -28,7 +28,7 @@ import type { Farbrollen } from '../../theme/tokens';
  * neutrale Zustandswort nachts nicht schwächer wirkt als die übrigen (alle ≥ 6,89).
  *
  * `kante` ist die Rollenfarbe für einen Rahmen, der sich vom Grund abhebt (WCAG 1.4.11,
- * ≥ 3 : 1 — `kraefte-kontrast.spec.ts` prüft ihn am `StatusTag`): Tag normal 5,96 · bedien
+ * ≥ 3 : 1 — `kraefte-kontrast.spec.ts` prüft ihn am Statusknopf): Tag normal 5,96 · bedien
  * 5,57 · achtung 6,02 · alarm 5,52 · neutral (schwach/flaeche3) 7,05; Nacht 7,93 · 5,66 ·
  * 11,18 · 6,89 · 5,11.
  */

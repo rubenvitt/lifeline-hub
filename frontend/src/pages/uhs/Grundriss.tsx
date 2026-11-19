@@ -66,7 +66,6 @@ import { ladePlanBild, type UhsPlan } from '../../api/uhsPlan';
 import UhsPlanPaneel from './UhsPlanPaneel';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
-import StatusTag from '../../components/StatusTag';
 import PrioritaetMarke from '../../personen/PrioritaetMarke';
 import SichtungsTag from '../../components/SichtungsTag';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
@@ -80,7 +79,7 @@ import {
   Augenbraue,
   Paneel,
   Segmentleiste,
-  StatusChip,
+  Status,
   monoStil,
   useRollen,
 } from '../../components/instrument';
@@ -96,6 +95,8 @@ import {
   SEITENSPALTE_BREITE,
   SPALTEN_LUECKE,
   dreiSpaltenPassen,
+  einpassFaktor,
+  grundrissInhalt,
   markenZielStil,
   seitlicherUeberlauf,
 } from './grundrissLayout';
@@ -110,12 +111,13 @@ import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { WIRD_GEHOLT_WORT, isAnhangWirdGeholt } from '../../api/anhangAbruf';
 import { useSpiegelAusCache } from '../../einsatz/spiegel/useSpiegelAntraege';
 
-// Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
+// Grundhöhe der Karte: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
-// Titel + Tag + Belegung + Aktionszeile).
+// Titel + Tag + Belegung + Aktionszeile). Angezeigt wird sie mit dem Einpassfaktor der Fläche
+// gestreckt (LLH-1940, `einpassFaktor`); Bedienform und Aktionszeile rechnen mit der Grundgröße.
 export const PLATZ_KARTE_HOEHE = 116;
 
-// Feste Karten-Breite — dieselbe Bindung an der anderen Achse: SCHRITT_X = 160, die 20 px je Seite
+// Grundbreite der Karte — dieselbe Bindung an der anderen Achse: SCHRITT_X = 160, die 20 px je Seite
 // sind der Spaltengraben.
 export const PLATZ_KARTE_BREITE = 140;
 const PLATZ_KARTE_RAND = 2;
@@ -411,7 +413,8 @@ function RettungsmittelMarke({ person }: { person: Person }) {
   if (!marke) return null;
   return (
     <span data-lfh="rettungsmittel-marke">
-      <StatusChip
+      <Status
+        groesse="klein"
         ton={person.rettungsmittel?.status === 'eingetroffen' ? 'normal' : 'achtung'}
         wort={marke}
       />
@@ -518,6 +521,8 @@ function PersonenkarteDrag({
 
 interface PlatzKarteProps {
   platz: UhsPlatz;
+  /** Einpassfaktor der Fläche (LLH-1940): streckt Lage und Größe, nicht den Inhalt. */
+  faktor?: number;
   belegtVon: Person | undefined;
   schreibgeschuetzt: boolean;
   /**
@@ -566,6 +571,7 @@ function PlatzKarte({
   abgelehnt = false,
   verbleibVorgemerkt = false,
   onRettungsmittel,
+  faktor = 1,
 }: PlatzKarteProps) {
   // Die Platzkarte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus — Drag-Source
   // (Layout verschieben).
@@ -624,12 +630,13 @@ function PlatzKarte({
     : rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token);
   const style: React.CSSProperties = {
     position: 'absolute',
-    left: platz.pos_x ?? 10,
-    top: platz.pos_y ?? 10,
-    width: PLATZ_KARTE_BREITE,
+    // Lage und Größe mit dem Einpassfaktor gestreckt (LLH-1940); Rand, Polster und Inhalt nicht.
+    left: (platz.pos_x ?? 10) * faktor,
+    top: (platz.pos_y ?? 10) * faktor,
+    width: PLATZ_KARTE_BREITE * faktor,
     // Feste Höhe + overflow:hidden: die Kartengröße ist invariant gegen Belegung, Titelumbruch und
-    // Tag-Anzahl, alle Karten bleiben unter dem Raster-Zeilenabstand (120 px).
-    height: PLATZ_KARTE_HOEHE,
+    // Tag-Anzahl, alle Karten bleiben unter dem gestreckten Raster-Zeilenabstand (120 px × Faktor).
+    height: PLATZ_KARTE_HOEHE * faktor,
     overflow: 'hidden',
     boxSizing: 'border-box',
     cursor: bearbeitbar ? 'grab' : zuweisbar || (karte && belegtVon) ? 'pointer' : 'default',
@@ -759,7 +766,7 @@ function PlatzKarte({
         id={`${beschreibungsId}-status`}
         style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}
       >
-        {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
+        {zeigeVerfTag && <Status darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
         {/* Vorgemerkt statt „belegt“: beides fasst die Zeile nicht, belegt zeigen schon Fläche
             und Personenmarke. */}
         {belegtVon && verbleibVorgemerkt ? (
@@ -769,7 +776,7 @@ function PlatzKarte({
           // schon Fläche und Personenmarke.
           <RettungsmittelMarke person={belegtVon} />
         ) : (
-          belegtVon && <StatusChip ton="bedien" wort="belegt" />
+          belegtVon && <Status groesse="klein" ton="bedien" wort="belegt" />
         )}
       </div>
       {/* Belegung: feste Höhe, auch wenn leer. Die belegte Person ist ziehbar (→ Wartebereich
@@ -1149,7 +1156,7 @@ function UnterwegsSpalte({
                 <PrioritaetMarke prioritaet={p.transport_prioritaet} />
                 {seit && <Wartezeit seit={seit} vorwort="seit" />}
                 {minuten != null && minuten >= UEBERGABE_OFFEN_AB_MIN && (
-                  <StatusTag darstellung={uebergabeOffen} />
+                  <Status darstellung={uebergabeOffen} />
                 )}
                 {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
               </div>
@@ -1251,7 +1258,16 @@ export function planHoehe(plan: UhsPlan): number {
  * ohne neuen Plan lädt es nicht neu; die Object-URL gibt `erzeugeQueryClient` frei. Scheitert der
  * Abruf, bleibt die Fläche ohne Bild — die Plätze sind ohne Plan voll bedienbar.
  */
-function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
+function PlanEbene({
+  einsatzId,
+  plan,
+  faktor,
+}: {
+  einsatzId: number;
+  plan: UhsPlan;
+  /** Einpassfaktor der Fläche (LLH-1940): der Plan wächst mit den Karten. */
+  faktor: number;
+}) {
   const { dunkel, rollen } = useRollen();
   const bild = useQuery({
     queryKey: einsatzKeys.uhsPlanBild(einsatzId, plan.uhs_id, plan.sha256),
@@ -1273,8 +1289,8 @@ function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
         data-lfh="uhs-plan-wird-geholt"
         style={{
           position: 'absolute',
-          left: plan.x,
-          top: plan.y,
+          left: plan.x * faktor,
+          top: plan.y * faktor,
           color: rollen.text2,
           pointerEvents: 'none',
         }}
@@ -1293,10 +1309,10 @@ function PlanEbene({ einsatzId, plan }: { einsatzId: number; plan: UhsPlan }) {
       draggable={false}
       style={{
         position: 'absolute',
-        left: plan.x,
-        top: plan.y,
-        width: plan.breite,
-        height: planHoehe(plan),
+        left: plan.x * faktor,
+        top: plan.y * faktor,
+        width: plan.breite * faktor,
+        height: planHoehe(plan) * faktor,
         maxWidth: 'none',
         pointerEvents: 'none',
         userSelect: 'none',
@@ -1333,7 +1349,7 @@ export default function Grundriss({
 }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   // Zeiger-Sensor mit 5-px-Aktivierungsdistanz (sonst löst jeder Klick einen Drag aus),
   // KeyboardSensor für Tastatur und Tests. `ZugPointerSensor` statt `PointerSensor`: sonst ging
   // der erste Klick nach einem Drag unter Last verloren, etwa aufs Platzmenü (LFH-519).
@@ -1358,6 +1374,8 @@ export default function Grundriss({
   // Läuft die Fläche seitlich über (Reiterform am Handy, ein Platz weit rechts), zeigt ein Rand
   // mit Hinweis die Richtung; auf Touch ist der innere Bildlauf sonst kaum zu erkennen (U71).
   const [ueberlauf, setUeberlauf] = useState({ links: false, rechts: false, leiste: 0 });
+  // Sicht der Bildlauffläche, aus der der Einpassfaktor folgt (LLH-1940, `einpassFaktor`).
+  const [sicht, setSicht] = useState({ breite: 0, hoehe: 0 });
   const flaecheKnoten = useRef<HTMLDivElement | null>(null);
   const ueberlaufPruefen = useCallback(() => {
     const el = flaecheKnoten.current;
@@ -1371,6 +1389,9 @@ export default function Grundriss({
     setUeberlauf((alt) =>
       alt.links === neu.links && alt.rechts === neu.rechts && alt.leiste === neu.leiste ? alt : neu,
     );
+    const breite = el.clientWidth;
+    const hoehe = el.clientHeight;
+    setSicht((alt) => (alt.breite === breite && alt.hoehe === hoehe ? alt : { breite, hoehe }));
   }, []);
   const flaecheMessen = useCallback(
     (el: HTMLDivElement | null) => {
@@ -1477,6 +1498,24 @@ export default function Grundriss({
   // einer neuen Rasterspalte), montierte sonst Quelle und Ziel des laufenden Zugs neu.
   const [formImZug, setFormImZug] = useState<boolean | null>(null);
   const breit = formImZug ?? dreiSpaltenPassen(rahmenBreite, flaecheBreite);
+  // Einpassfaktor (LLH-1940, Spec `uhs-grundriss`): Lage, Karten und Plan wachsen gemeinsam, so
+  // weit die Sicht es ohne Bildlauf zulässt, höchstens aufs Doppelte. Die Drei-Spalten-Weiche oben
+  // rechnet mit der ungestreckten Fläche; die Streckung füllt nur, was sie vergeben hat. Während
+  // eines Zugs steht der Faktor wie die Form, sonst verschöbe ein Live-Update die Fläche unter dem
+  // Zeiger; danach rastet er neu ein.
+  const inhalt = grundrissInhalt(
+    uhs.plaetze,
+    plan ? { x: plan.x, y: plan.y, breite: plan.breite, hoehe: planHoehe(plan) } : null,
+  );
+  const [faktorImZug, setFaktorImZug] = useState<number | null>(null);
+  const faktor =
+    faktorImZug ??
+    einpassFaktor({
+      sichtBreite: sicht.breite,
+      sichtHoehe: sicht.hoehe,
+      inhaltBreite: inhalt.breite,
+      inhaltHoehe: inhalt.hoehe,
+    });
   // Der gewählte Reiter überdauert einen Formwechsel hin und zurück.
   const [reiter, setReiter] = useState<GrundrissReiter>('flaeche');
   const reiterflaecheId = useId();
@@ -1718,6 +1757,7 @@ export default function Grundriss({
 
   function onDragStart(event: DragStartEvent) {
     setFormImZug(breit);
+    setFaktorImZug(faktor);
     const data = event.active.data.current as { kind: string; personId?: number } | undefined;
     if (data?.kind === 'person' && data.personId != null) setAktivePersonId(data.personId);
   }
@@ -1727,11 +1767,13 @@ export default function Grundriss({
   function onDragCancel() {
     setAktivePersonId(null);
     setFormImZug(null);
+    setFaktorImZug(null);
   }
 
   function onDragEnd(event: DragEndEvent) {
     setAktivePersonId(null);
     setFormImZug(null);
+    setFaktorImZug(null);
     const { active, over, delta } = event;
     const data = active.data.current as
       { kind: string; personId?: number; platzId?: number } | undefined;
@@ -1741,8 +1783,10 @@ export default function Grundriss({
       if (layoutMut.isPending) return;
       const platz = uhs.plaetze.find((p) => p.id === data.platzId);
       if (!platz) return;
-      const nx = Math.max(0, (platz.pos_x ?? 10) + delta.x);
-      const ny = Math.max(0, (platz.pos_y ?? 10) + delta.y);
+      // Die Strecke ist in gestreckten Pixeln gemessen; gespeichert wird das Server-Raster
+      // (LLH-1940). `faktor` ist hier noch der beim Zugbeginn festgehaltene.
+      const nx = Math.max(0, (platz.pos_x ?? 10) + Math.round(delta.x / faktor));
+      const ny = Math.max(0, (platz.pos_y ?? 10) + Math.round(delta.y / faktor));
       if (nx === (platz.pos_x ?? 10) && ny === (platz.pos_y ?? 10)) return;
       layoutMut.mutate({ pid: data.platzId, pos_x: nx, pos_y: ny });
       return;
@@ -1777,7 +1821,7 @@ export default function Grundriss({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: token.margin,
         minHeight: 0,
         overflow: 'auto',
         height: '100%',
@@ -1823,8 +1867,8 @@ export default function Grundriss({
           flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 8,
-          gap: 8,
+          marginBottom: token.marginSM,
+          gap: token.marginSM,
           minWidth: 0,
         }}
       >
@@ -1869,10 +1913,11 @@ export default function Grundriss({
           <UhsPlanPaneel einsatzId={einsatzId} uhs={uhs} />
         </div>
       )}
-      {/* Gründe abgelehnter Platz-Aktionen, je Platz eine Zeile: die Karte hat feste 140 × 116 px
-          (Raster im Backend) und keinen Platz für einen Satz. */}
+      {/* Gründe abgelehnter Platz-Aktionen, je Platz eine Zeile: die Karte hat 140 × 116 px
+          Grundgröße (Raster im Backend), gestreckt höchstens das Doppelte, und keinen Platz für
+          einen Satz. */}
       {platzGruende.length > 0 && (
-        <Flex vertical gap={4} style={{ marginBottom: 8 }}>
+        <Flex vertical gap={token.marginXS} style={{ marginBottom: token.marginSM }}>
           {platzGruende.map(({ pid, bezeichnung, grund }) => (
             <div key={pid} data-lfh="platz-fehler">
               {/* Der Platzname steht IN der Meldung: vorgelesen wird, wo abgelehnt wurde. */}
@@ -1897,14 +1942,21 @@ export default function Grundriss({
             borderRadius: 0,
           }}
         >
-          <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
-            {plan && <PlanEbene einsatzId={einsatzId} plan={plan} />}
+          <div
+            style={{
+              position: 'relative',
+              width: Math.max(flaecheBreite, inhalt.breite * faktor),
+              height: Math.max(flaecheHoehe, inhalt.hoehe * faktor),
+            }}
+          >
+            {plan && <PlanEbene einsatzId={einsatzId} plan={plan} faktor={faktor} />}
             {uhs.plaetze.map((p) => {
               const belegt = belegtAn(p.id);
               return (
                 <PlatzKarte
                   key={p.id}
                   platz={p}
+                  faktor={faktor}
                   belegtVon={belegt}
                   schreibgeschuetzt={schreibgeschuetzt}
                   belegungLaeuft={belegungLaeuft}
@@ -1957,7 +2009,10 @@ export default function Grundriss({
             {uhs.plaetze.length === 0 && (
               // Nur der Zustand (LFH-1078): der Weg steht direkt darüber im Kopf — geplant „Plätze
               // anlegen", im Betrieb hinter „Plätze bearbeiten" (LFH-58), kein zweiter Knopf hier.
-              <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
+              <Typography.Text
+                type="secondary"
+                style={{ padding: token.padding, display: 'block' }}
+              >
                 Keine Plätze
               </Typography.Text>
             )}
@@ -2038,7 +2093,7 @@ export default function Grundriss({
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 12,
+              gap: token.margin,
               height: '100%',
               minHeight: 0,
             }}
@@ -2303,6 +2358,7 @@ function NeuerPlatzKnopf({
   primaer?: boolean;
 }) {
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const [open, setOpen] = useState(false);
   const [typ, setTyp] = useState<PlatzTyp>('bett');
   const [menge, setMenge] = useState(1);
@@ -2331,7 +2387,7 @@ function NeuerPlatzKnopf({
     );
   }
   return (
-    <Flex vertical gap={4} data-lfh="plaetze-anlegen">
+    <Flex vertical gap={token.marginXS} data-lfh="plaetze-anlegen">
       <Space align="center" wrap>
         <Select<PlatzTyp>
           value={typ}

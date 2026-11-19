@@ -83,7 +83,7 @@ export interface EinsatzberichtRoh {
   geladenAt: string;
 }
 
-async function eineQuelle<T>(
+export async function eineQuelle<T>(
   freigabe: QuellenFreigabe,
   laden: () => Promise<T>,
 ): Promise<QuellenErgebnis<T>> {

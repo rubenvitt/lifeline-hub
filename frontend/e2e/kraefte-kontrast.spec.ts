@@ -232,8 +232,10 @@ for (const modus of ['light', 'dark']) {
             name: `Status von ${fall.kennung} ändern`,
             exact: true,
           });
-          const etikett = knopf.locator('.ant-tag');
-          await expect(etikett).toHaveAttribute('data-rolle', fall.rolle);
+          // Der Statusknopf selbst trägt Fläche, Rahmen und Wort (LLH-1780, „Rahmen heißt
+          // bedienbar“): gemessen wird sein Rahmen, nicht mehr der eines Etiketts darin.
+          const etikett = knopf;
+          await expect(etikett).toHaveAttribute('data-ton', fall.rolle);
           // Kein Hovergrund aus einer vorausgehenden Interaktion in die Messung mischen.
           await page.mouse.move(0, 0);
           const werte = await kontrastVon(etikett);
@@ -405,18 +407,20 @@ for (const modus of ['light', 'dark'] as const) {
       ZIEL[modus],
     );
 
-    // (2) SEITENGRUND — dieselben drei Rollen in der Verdichtungszeile.
+    // (2) SEITENGRUND — dieselben drei Rollen in der Stärke, seit LLH-1786 als Meta im Seitenkopf.
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     // In der Zeile gesucht: die Einsatz-Navigation trägt seit LLH-1732 einen gleichnamigen Link.
     await expect(
       page
-        .locator('[data-lfh="verdichtungszeile"]')
+        .locator('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]')
         .getByRole('link', { name: 'Kräfteübersicht', exact: true }),
     ).toHaveCount(1);
     for (const m of ZEILEN_ZAHLEN) {
       // In der Zeile gesucht: der Zählerstreifen der Tabelle schreibt dieselben Wörter (LFH-973).
-      const ziel = page.locator('[data-lfh="verdichtungszeile"]').getByText(m);
+      const ziel = page
+        .locator('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]')
+        .getByText(m);
       await expect(ziel, `Verdichtungszeile ${m}: genau ein Knoten`).toHaveCount(1);
       await pruefe(ziel, 'Verdichtungszeile (Seitengrund)', String(m), ZIEL[modus]);
     }

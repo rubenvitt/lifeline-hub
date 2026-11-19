@@ -4,7 +4,7 @@
 
 **Goal:** OpenSpec verschwindet als Werkzeug, Superpowers ist im Repo als Standard verankert, die Zunder-Spur bleibt.
 
-**Architecture:** Werkzeug raus, Ablage einfrieren: `openspec/` bleibt als Archiv, ein umgebauter Wächter (Schritt 13) hält es eingefroren. Die Skills `dev-zunder-*` führen durch `superpowers:*`; Regeln stehen in Wurzel-`AGENTS.md` und ADR-0065.
+**Architecture:** Werkzeug raus, Ablage einfrieren: `openspec/` bleibt als Archiv, ein umgebauter Wächter (Schritt 13) hält es eingefroren. Die Skills `dev-zunder-*` führen durch `superpowers:*`; Regeln stehen in Wurzel-`AGENTS.md` und ADR-0069.
 
 **Tech Stack:** Bash-Wächter (`scripts/`), Claude-Code-Settings, Markdown (Skills, `AGENTS.md`, arc42, ADR).
 
@@ -19,7 +19,7 @@
 - Gate-Schritte nicht umnummerieren: Schritt 13 bleibt Schritt 13, Bündel `schnell`.
 - Prosa deutsch; Commit-Body mit `Zunder: https://zunder.rubeen.dev/#/aufgabe/sv47amf1u9yob6xlk4ic5p3r`.
 - ADR-0013 ist `akzeptiert` und damit unveränderlich bis auf `status`, `ersetzt_durch`, Pfadnachzüge in `gilt_fuer`/Prüfung.
-- Neue ADR: `ADR-0065` (nächste freie auf `origin/alpha`, Stand 18.11.2026), unter 80 Zeilen.
+- Neue ADR: `ADR-0069` (nächste freie auf `origin/alpha`; ursprünglich 0065, nach dem Merge von alpha am 19.11.2026 umnummeriert), unter 80 Zeilen.
 - Plugin-Eintrag: `superpowers@superpowers-marketplace`, Marktplatz-Quelle GitHub `obra/superpowers-marketplace`.
 
 ## Review Focus
@@ -45,13 +45,13 @@
 
 Rot ist: ein Verzeichnis unter `openspec/changes/` außer `archive/`; `openspec/config.yaml`; `.claude/commands/opsx/`; ein Verzeichnis `.claude/skills/openspec-*`.
 
-- [ ] **Step 1: Selbsttest schreiben** (Muster von `check-openspec-archiv.test.sh`: Miniaturbaum je Fall). Fälle: „nur Archiv und Specs“ gruen · „kein openspec/“ gruen · „neue aktive Change“ rot, Ausgabe nennt `openspec/changes/lfh-9-neu` · „config.yaml zurück“ rot · „opsx-Befehle zurück“ rot, nennt `.claude/commands/opsx` · „openspec-Skill zurück“ rot, nennt `openspec-propose`.
-- [ ] **Step 2:** `scripts/check-openspec-eingefroren.test.sh` → FAIL (Skript fehlt).
-- [ ] **Step 3: Wächter schreiben**, Bash 3.2, `set -euo pipefail`, Kopf mit Zweck und Verweis auf Wurzel-`AGENTS.md`, „Planung und Ausführung“, Abhilfe-Zeile „Planung über superpowers:brainstorming/writing-plans, Ablage docs/superpowers/“.
-- [ ] **Step 4:** Selbsttest → alle `ok`; `scripts/check-openspec-eingefroren.sh` im Repo → rot (laufende Change).
-- [ ] **Step 5:** `git mv` der Change ins Archiv; Wächter meldet nur noch die Werkzeuge (Task 2). Alte Skripte löschen, `schritt_13` und Kopfzeile 29 auf die neuen Skripte und den Text „OpenSpec bleibt eingefrorenes Archiv (LLH-1967)“.
-- [ ] **Step 6:** Kopfzeile „fertige OpenSpec-Changes archiviert“ im Bündel `schnell` (Z. 29) mitziehen; Selbsttest grün (Schritt 13 im Repo wird erst mit Task 2 grün).
-- [ ] **Step 7: Commit** `chore(gate): OpenSpec-Wächter hält das Archiv eingefroren`.
+- [x] **Step 1: Selbsttest schreiben** (Muster von `check-openspec-archiv.test.sh`: Miniaturbaum je Fall). Fälle: „nur Archiv und Specs“ gruen · „kein openspec/“ gruen · „neue aktive Change“ rot, Ausgabe nennt `openspec/changes/lfh-9-neu` · „config.yaml zurück“ rot · „opsx-Befehle zurück“ rot, nennt `.claude/commands/opsx` · „openspec-Skill zurück“ rot, nennt `openspec-propose`.
+- [x] **Step 2:** `scripts/check-openspec-eingefroren.test.sh` → FAIL (Skript fehlt).
+- [x] **Step 3: Wächter schreiben**, Bash 3.2, `set -euo pipefail`, Kopf mit Zweck und Verweis auf Wurzel-`AGENTS.md`, „Planung und Ausführung“, Abhilfe-Zeile „Planung über superpowers:brainstorming/writing-plans, Ablage docs/superpowers/“.
+- [x] **Step 4:** Selbsttest → alle `ok`; `scripts/check-openspec-eingefroren.sh` im Repo → rot (laufende Change).
+- [x] **Step 5:** `git mv` der Change ins Archiv; Wächter meldet nur noch die Werkzeuge (Task 2). Alte Skripte löschen, `schritt_13` und Kopfzeile 29 auf die neuen Skripte und den Text „OpenSpec bleibt eingefrorenes Archiv (LLH-1967)“.
+- [x] **Step 6:** Kopfzeile „fertige OpenSpec-Changes archiviert“ im Bündel `schnell` (Z. 29) mitziehen; Selbsttest grün (Schritt 13 im Repo wird erst mit Task 2 grün).
+- [x] **Step 7: Commit** `chore(gate): OpenSpec-Wächter hält das Archiv eingefroren`.
 
 ### Task 2: Werkzeug raus, Plugin rein
 
@@ -62,11 +62,11 @@ Rot ist: ein Verzeichnis unter `openspec/changes/` außer `archive/`; `openspec/
 **Interfaces:**
 - Produces: `.claude/settings.json` mit `extraKnownMarketplaces.superpowers-marketplace.source = {"source":"github","repo":"obra/superpowers-marketplace"}` und `enabledPlugins["superpowers@superpowers-marketplace"] = true`; bestehende `hooks` bleiben.
 
-- [ ] **Step 1:** `scripts/check-openspec-eingefroren.sh` → rot, nennt `.claude/commands/opsx`, `openspec/config.yaml` und die `openspec-*`-Skills (die Werkzeuge liegen noch).
-- [ ] **Step 2:** Löschen, `mise.toml`-Block entfernen; Wächter → grün.
-- [ ] **Step 3:** `settings.json` ergänzen; `python3 -m json.tool .claude/settings.json` → gültig.
-- [ ] **Step 4:** `scripts/check-toolversionen.test.sh && scripts/check-toolversionen.sh` → grün; `./scripts/check-all.sh --nur schnell` → Schritt 13 grün.
-- [ ] **Step 5: Commit** `chore: OpenSpec-Werkzeug entfernt, Superpowers als Plugin im Repo`.
+- [x] **Step 1:** `scripts/check-openspec-eingefroren.sh` → rot, nennt `.claude/commands/opsx`, `openspec/config.yaml` und die `openspec-*`-Skills (die Werkzeuge liegen noch).
+- [x] **Step 2:** Löschen, `mise.toml`-Block entfernen; Wächter → grün.
+- [x] **Step 3:** `settings.json` ergänzen; `python3 -m json.tool .claude/settings.json` → gültig.
+- [x] **Step 4:** `scripts/check-toolversionen.test.sh && scripts/check-toolversionen.sh` → grün; `./scripts/check-all.sh --nur schnell` → Schritt 13 grün.
+- [x] **Step 5: Commit** `chore: OpenSpec-Werkzeug entfernt, Superpowers als Plugin im Repo`.
 
 ### Task 3: Zunder-Skills auf Superpowers umhängen
 
@@ -83,19 +83,19 @@ Abbildung (aus dem Entwurf, Tabelle „Ablauf je Route“):
 - Verbot für Workflows/Subagents: kein Design-Doc und kein Plan unter `docs/superpowers/` schreiben, kein `brainstorming`/`writing-plans` im Workflow.
 - Route-`entwurf`-Gründe E1–E3, Zunder-Status-Tabelle, Checkpoints bleiben inhaltlich.
 
-- [ ] **Step 1:** `git grep -nE 'opsx|openspec/changes|OpenSpec' -- .claude/` → Trefferliste als Ausgangsstand.
-- [ ] **Step 2:** Abschnitte umschreiben (Überblick, Agenten-Tabelle, Board-Status, Gemeinsam ausarbeiten, Schritt 3, Schritt 4, Don'ts; Orchestrierung Phasen 1–5, Entwurfs-Hoheit, Checkpoints, Don'ts; Bausteine).
-- [ ] **Step 3:** `git grep -nE 'opsx|openspec/changes/<|/opsx' -- .claude/` → leer; `git grep -n 'openspec' -- .claude/` zeigt nur Archiv-Verweise (`changes/archive/`, `openspec/specs/`).
-- [ ] **Step 4: Commit** `docs(skills): Zunder-Skills führen durch Superpowers`.
+- [x] **Step 1:** `git grep -nE 'opsx|openspec/changes|OpenSpec' -- .claude/` → Trefferliste als Ausgangsstand.
+- [x] **Step 2:** Abschnitte umschreiben (Überblick, Agenten-Tabelle, Board-Status, Gemeinsam ausarbeiten, Schritt 3, Schritt 4, Don'ts; Orchestrierung Phasen 1–5, Entwurfs-Hoheit, Checkpoints, Don'ts; Bausteine).
+- [x] **Step 3:** `git grep -nE 'opsx|openspec/changes/<|/opsx' -- .claude/` → leer; `git grep -n 'openspec' -- .claude/` zeigt nur Archiv-Verweise (`changes/archive/`, `openspec/specs/`).
+- [x] **Step 4: Commit** `docs(skills): Zunder-Skills führen durch Superpowers`.
 
 ### Task 4: Regeln, ADR, arc42
 
 **Files:**
 - Modify: `AGENTS.md` (Abschnitt Z. 111–155 neu: „Planung und Ausführung — Superpowers (LLH-1967)“; Kopfzeile 4 bleibt), `scripts/AGENTS.md` (Z. 11 Schrittliste, Z. 128–129 CLI-Absatz streichen), `docs/architektur/AGENTS.md` (Mitänderungstabelle „Route `entwurf`“, `herleitung` nennt Design-Doc), `docs/architektur/entscheidungen/VORLAGE.md` (`herleitung`-Beispiel → `docs/superpowers/specs/<datum>-<name>-design.md`), `docs/architektur/01-einfuehrung-und-ziele.md:62`, `docs/architektur/04-loesungsstrategie.md:71`, `docs/architektur/08-querschnittliche-konzepte.md:8`
-- Create: `docs/architektur/entscheidungen/ADR-0065-superpowers-traegt-den-aenderungszyklus.md`
-- Modify: `docs/architektur/entscheidungen/ADR-0013-…md` (nur `status: ersetzt`, `ersetzt_durch: ADR-0065`, `gilt_fuer`/Prüfung: Skriptpfad auf `scripts/check-openspec-eingefroren.sh`)
+- Create: `docs/architektur/entscheidungen/ADR-0069-superpowers-traegt-den-aenderungszyklus.md`
+- Modify: `docs/architektur/entscheidungen/ADR-0013-…md` (nur `status: ersetzt`, `ersetzt_durch: ADR-0069`, `gilt_fuer`/Prüfung: Skriptpfad auf `scripts/check-openspec-eingefroren.sh`)
 
-ADR-0065 Regeln (Kern):
+ADR-0069 Regeln (Kern):
 - MUST: Route `entwurf` → Design-Doc unter `docs/superpowers/specs/`, Plan unter `docs/superpowers/plans/`, Halt vor dem Plan; Ablauf Wurzel-`AGENTS.md`.
 - MUST NOT: Neues unter `openspec/` (Archiv; Wächter Schritt 13).
 - MUST: Superpowers als Plugin in `.claude/settings.json`.
@@ -104,13 +104,13 @@ ADR-0065 Regeln (Kern):
 
 Neuer `AGENTS.md`-Abschnitt trägt: Superpowers besitzt Zyklus und Disziplin; Routen-Abbildung (Verweis `dev-zunder-ausfuehren`, Schritt 3); Pflicht-Halt nach Design-Doc; Entwurfs-Hoheit (Workflows liefern zu, schreiben nicht unter `docs/superpowers/`); Ablageorte: `docs/superpowers/specs|plans` (lebendig), `openspec/` (eingefroren, lesbar); „Ein Plan allein bekommt keinen PR“ unverändert ohne Archivschritt; Review/Mit-dem-Menschen-Absätze unverändert; Skills nur unter `.claude/`.
 
-- [ ] **Step 1:** `scripts/check-architektur.test.sh && scripts/check-architektur.sh` → Ausgangsstand (rot erwartet wegen ADR-0013 `gilt_fuer`, falls Task 1 schon gelöscht hat).
-- [ ] **Step 2:** ADR-0065 anlegen, ADR-0013 nachziehen, Kapitel und `AGENTS.md`-Dateien ändern.
-- [ ] **Step 3:** `scripts/check-architektur.sh` → grün; `scripts/adr-fuer.sh .claude/settings.json` nennt ADR-0065.
-- [ ] **Step 4:** `git grep -nE '/opsx|opsx:' -- . ':!openspec/changes/archive' ':!docs/superpowers'` → leer.
-- [ ] **Step 5: Commit** `docs: Superpowers trägt den Änderungszyklus (ADR-0065)`.
+- [x] **Step 1:** `scripts/check-architektur.test.sh && scripts/check-architektur.sh` → Ausgangsstand (rot erwartet wegen ADR-0013 `gilt_fuer`, falls Task 1 schon gelöscht hat).
+- [x] **Step 2:** ADR-0069 anlegen, ADR-0013 nachziehen, Kapitel und `AGENTS.md`-Dateien ändern.
+- [x] **Step 3:** `scripts/check-architektur.sh` → grün; `scripts/adr-fuer.sh .claude/settings.json` nennt ADR-0069.
+- [x] **Step 4:** `git grep -nE '/opsx|opsx:' -- . ':!openspec/changes/archive' ':!docs/superpowers'` → leer.
+- [x] **Step 5: Commit** `docs: Superpowers trägt den Änderungszyklus (ADR-0069)`.
 
 ### Task 5: Abschluss
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ohne `| tail`).
-- [ ] **Step 2:** Push, PR gegen `alpha` mit Entwurf, Plan, Umsetzung; Zunder: `pr_url`, `plan`, Status `review`.
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ohne `| tail`).
+- [x] **Step 2:** Push, PR gegen `alpha` mit Entwurf, Plan, Umsetzung; Zunder: `pr_url`, `plan`, Status `review`.

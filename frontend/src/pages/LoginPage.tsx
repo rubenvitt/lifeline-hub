@@ -1,5 +1,5 @@
 import { IconAnmelden, IconGlobus, IconSchluessel } from '../icons';
-import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
+import { Alert, Button, Divider, Form, Input, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { hilfePfad } from '../routing/deeplinks';
@@ -24,6 +24,7 @@ import {
   type AppAnmeldungErgebnis,
 } from '../huelle/faehigkeiten';
 import { Bildmarke } from '../marke/Bildmarke';
+import { Marke } from '../components/instrument/Marke';
 import './LoginPage.css';
 
 interface FormWerte {
@@ -438,7 +439,7 @@ export default function LoginPage() {
                       }
                     >
                       {b.anzeigename}
-                      <Tag style={{ marginInlineStart: 6, marginInlineEnd: 0 }}>{b.rolle}</Tag>
+                      <Marke style={{ marginInlineStart: 6, marginInlineEnd: 0 }}>{b.rolle}</Marke>
                     </Button>
                   ))}
                 </Space>

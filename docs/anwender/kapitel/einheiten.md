@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/einsatz/feld_vermerk.rs, frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/components/Datensicht.tsx]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/einsatz/feld_vermerk.rs, frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/pages/einheit/EinheitZeichenPaneel.tsx]
 ---
 
 ## Überblick
@@ -13,8 +13,8 @@ Einsatzabschnitt zuordnen. Ihre Ist-Stärke ergibt sich aus dem zugeordneten Per
 Soll-Stärke trägt die Führung ein.
 
 Das Modul zeigt die Gliederung aller Einheiten; jede Einheit hat eine eigene Seite mit den
-Paneelen „Kopfdaten“, „Fahrzeuge und Besatzung“, „Zeitachse“, „Material“, „Funk und
-Kommunikation“ und „Taktisches Zeichen“; für die Einsatzleitung „Gerät“ mit „Gerät koppeln“ für
+Paneelen „Fahrzeuge und Besatzung“, „Kopfdaten“, „Zeitachse“, „Material“, „Funk und
+Kommunikation“ und „Taktisches Zeichen“, oben eine Leiste mit Sprüngen zu diesen Paneelen; für die Einsatzleitung „Gerät“ mit „Gerät koppeln“ für
 das Handy der Einheit (siehe [Einheit am Gerät](geraet-einheit.md)), zuletzt „Einheit auflösen oder stornieren“. „Fahrzeuge und Besatzung“
 zeigt je Fahrzeug, wer darauf sitzt, und darunter, wer ohne Fahrzeug zur Einheit gehört. Jede
 Angabe wird an ihrem Wert geändert. Eine stehende Einheit wie ein Sanitätszug lässt sich in einem Zug aus ihrer
@@ -25,7 +25,8 @@ zuordnen dürfen Einsatzleitung und Führungspersonal.
 
 ### Die Gliederung lesen
 
-1. Unter „Kräfte & Mittel“ „Einheiten“ öffnen.
+1. Unter „Kräfte & Mittel“ „Einheiten“ öffnen. Im Kopf der Seite steht neben dem Titel die Stärke
+   aller Einheiten mit der Verteilung der Fahrzeuge und dem Sprung in die „Kräfteübersicht“.
 2. In der Tabelle „Gliederung“ je Einheit „Einheitsführer“, „Ist“, „Soll“, „Abschnitt“ und
    „Fahrzeuge“ lesen. Unterstellte Einheiten stehen eingerückt unter ihrer Über-Einheit; das Plus-
    bzw. Minuszeichen vor einer Einheit klappt ihre Untereinheiten auf und zu. Am Handy steht
@@ -225,8 +226,8 @@ Für Einsatzleitung und Führungspersonal. Bucht ein Bereitstellungsraum eine Kr
 noch nicht kannte, entsteht eine Einheit mit „nicht übernommen“ (Kapitel
 [Bereitstellungsräume](bereitstellungsraeume.md)). Die Meldung dazu steht unter „Meldungen“.
 
-1. Die Einheit öffnen: in der Gliederung oder in der Kräfteübersicht. Unter dem Kopf steht das Paneel
-   „Übernahme“ mit „eingetroffen …“.
+1. Die Einheit öffnen: in der Gliederung oder in der Kräfteübersicht. Oben, vor „Fahrzeuge und
+   Besatzung“, steht das Paneel „Übernahme“ mit „eingetroffen …“.
 2. „Übernehmen“ wählen, bei Bedarf „Abschnitt“ und „Über-Einheit“ wählen und mit „Übernehmen“
    bestätigen. Die Bestätigung lautet „… übernommen“; „nicht übernommen“ und das Paneel
    verschwinden, die Einheit bleibt im Raum.
@@ -330,7 +331,8 @@ Hat ein anderer Arbeitsplatz **dieselbe** Angabe seit dem Öffnen geändert, ste
 Feld („Inzwischen geändert von …“), und „Speichern“ fragt „Zwischenzeitlich geändert“: „Meine
 Änderung übernehmen“ speichert die eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen
 Stand. Soll-Stärke und Qualifikationssoll gelten dabei mit dem Wert, den die Zeile zeigt, auch
-wenn er vom Typ kommt. Das taktische Zeichen und die Sprechgruppen fragen nicht nach.
+wenn er vom Typ kommt. Das taktische Zeichen fragt ebenso nach, im Paneel „Taktisches Zeichen“
+wie auf der [Lagekarte](lagekarte.md); die Sprechgruppen fragen nicht nach.
 
 Unter jeder geänderten Angabe steht leise, wer sie zuletzt geändert hat und wann, im Kopf der
 Paneele „Kopfdaten“ und „Telefon und weitere Verbindungen“ die jüngste Änderung. Diese Vermerke

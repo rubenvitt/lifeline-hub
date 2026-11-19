@@ -1692,7 +1692,7 @@
       },
       "AppCode": {
         "type": "object",
-        "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.",
+        "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS).",
         "required": [
           "code"
         ],
@@ -8857,6 +8857,13 @@
             ],
             "format": "int64"
           },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die Kennung, die das erfassende Gerät beim Senden vergab (Idempotenz der Warteschlange,\nLFH-261). Das Gerät erkennt daran seine eigenen Einträge: die Zeitachse lässt hochgerollt\nnur sie sofort durch, Einträge desselben Kontos von einem anderen Gerät warten hinter dem\nSammelbanner (LLH-1833). Fehlt bei Einträgen ohne Kennung (Systemeinträge, ältere)."
+          },
           "einheiten": {
             "type": "array",
             "items": {
@@ -9461,6 +9468,29 @@
             "description": "Organisation; die Oberfläche fragt sie einmal und setzt sie in jedes Fahrzeug."
           }
         }
+      },
+      "FahrzeugPatchAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinsatzFahrzeugAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/StatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der\nBeleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781)."
       },
       "FahrzeugStatus": {
         "type": "object",
@@ -16561,6 +16591,21 @@
               "null"
             ]
           },
+          "storniert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355 und ungelöscht."
+          },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“."
+          },
           "transport_art": {
             "oneOf": [
               {
@@ -18882,6 +18927,13 @@
             ],
             "format": "int64"
           },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `storniert_von` (LLH-1832), für das Banner „Storniert von … um …“."
+          },
           "typ": {
             "$ref": "#/components/schemas/SchadenTyp"
           },
@@ -19344,6 +19396,26 @@
           "positionen:write",
           "rechner:use"
         ]
+      },
+      "ShellInfo": {
+        "type": "object",
+        "description": "Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`).",
+        "required": [
+          "version",
+          "shell_contract"
+        ],
+        "properties": {
+          "shell_contract": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).",
+            "minimum": 0
+          },
+          "version": {
+            "type": "string",
+            "description": "Laufende Anwendungsversion, dieselbe wie in `GET /api/health`."
+          }
+        }
       },
       "SichtungAnzeige": {
         "type": "object",
@@ -20140,6 +20212,33 @@
           "nicht_verfuegbar"
         ]
       },
+      "StatusRuecknahmeBeleg": {
+        "type": "object",
+        "description": "Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,\nChange `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,\nwenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er\nträgt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "required": [
+          "status_id",
+          "status_seit"
+        ],
+        "properties": {
+          "status_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht."
+          },
+          "status_seit": {
+            "type": "string",
+            "description": "„Status seit“ des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt."
+          },
+          "vorher_status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Status vor dem Wechsel, nur für die Quittung („S2 → S3“); die Rücknahme nimmt den Wert,\nden der Server beim Wechsel festgehalten hat."
+          }
+        }
+      },
       "StatusWert": {
         "type": "object",
         "description": "Ein aufgelöster Eintrag des FMS-Statuskatalogs (`fahrzeug_status`), wie ihn Fahrzeug\nund Einheit tragen (LFH-609).",
@@ -20285,6 +20384,24 @@
             ],
             "format": "int64",
             "description": "Gekoppelte Einsatz-Vorlage derselben Organisation (LLH-1375): wählt der Anlegedialog\ndieses Stichwort, stellt sich die Vorlage ein, solange niemand sie von Hand gewählt hat.\nFehlt ohne Kopplung."
+          }
+        }
+      },
+      "StornoStand": {
+        "type": "object",
+        "description": "Storno-Stand eines Datensatzes für eine offene Detailseite (LLH-1832, Spec `storno-sperre`):\nnur ob und wann storniert, und von wem (Anzeigename, `None` bei Altbestand). Trägt keine\nFachangaben, damit die Abfrage protokollfrei und live abrufbar bleibt.",
+        "properties": {
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -20511,6 +20628,21 @@
               "string",
               "null"
             ]
+          },
+          "storniert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355."
+          },
+          "storniert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“."
           }
         }
       },

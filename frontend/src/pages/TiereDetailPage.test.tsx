@@ -141,6 +141,33 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(screen.getByText('Weide')).toBeInTheDocument();
   });
 
+  // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
+  it.each(['/tiere/10', ''] as const)(
+    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite und offene Eingabe bleiben, Hinweis zeigt den alten Stand',
+    async (unterpfad) => {
+      const { client } = render(einsatzAktiv, tierBasis);
+      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      const feld = screen.getByRole('textbox', { name: 'Notiz' });
+      await userEvent.clear(feld);
+      await userEvent.type(feld, 'Halsband rot');
+
+      server.use(
+        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Notiz' })).toHaveValue('Halsband rot');
+      expect(screen.queryByText('Tier konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
+
   it('Einsatzleitung kann bearbeiten und speichern (ohne Halter → beide null)', async () => {
     // Edit-Modus öffnen, das vorbefüllte Formular direkt speichern und den PATCH prüfen.
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } | null = null;
@@ -1116,5 +1143,76 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
       antreff_lat: 51.5,
       antreff_lon: 8.25,
     });
+  });
+});
+
+describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () => {
+  const storniert: Tier = {
+    ...tierBasis,
+    storniert_at: '2026-05-29 12:00:00',
+    storniert_von_name: 'Anna Beispiel',
+  };
+
+  it('am stornierten Tier steht das Banner mit Wer und Wann', async () => {
+    render(einsatzAktiv, storniert);
+    expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
+  });
+
+  it('wird es während der Bearbeitung storniert, bleibt der Entwurf lesbar, Speichern entfällt', async () => {
+    let stand: Tier = tierBasis;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+    ]);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    await user.clear(rufname);
+    await user.type(rufname, 'Bello');
+
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) }));
+
+    expect(await screen.findByText(/^Storniert von Anna Beispiel/)).toBeInTheDocument();
+    const gesperrt = screen.getByRole('textbox', { name: 'Rufname' });
+    expect(gesperrt).toHaveValue('Bello');
+    expect(gesperrt).toHaveAttribute('readonly');
+    // Auch der Fundort: lesbar, ohne Suche und Karte (Ortsfeld `readOnly`).
+    expect(screen.getByRole('textbox', { name: 'Fundort' })).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Ort suchen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Auf Karte wählen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull();
+  });
+
+  it('ein offener Dialog schließt beim Storno', async () => {
+    let stand: Tier = tierBasis;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib erfassen' }));
+    await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) }));
+    await screen.findByText(/^Storniert von Anna Beispiel/);
+    // Geschlossen: das Modal blendet aus (`ant-zoom-leave`); die Animation endet in jsdom nicht.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: 'Verbleib von T-001' }).closest('.ant-modal'),
+      ).toHaveClass('ant-zoom-leave'),
+    );
+  });
+
+  it('eine unberührte Bearbeitung schließt beim Storno', async () => {
+    let stand: Tier = tierBasis;
+    const { client } = render(einsatzAktiv, tierBasis, [
+      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('textbox', { name: 'Rufname' });
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) }));
+    await screen.findByText(/^Storniert von Anna Beispiel/);
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull());
   });
 });

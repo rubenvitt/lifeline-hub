@@ -19,11 +19,23 @@ Jede Dichtestufe (`kompakt`, `komfortabel`, `handschuh`) SHALL ein Abstandsraste
 
 ### Requirement: Alle Abstandstoken der Komponentenbibliothek folgen dem Raster
 
-Jedes Innen- und Außenabstandstoken der Komponentenbibliothek (`padding` und `margin` in allen Größen von XXS bis XL) SHALL seinen Wert aus dem Raster der aktiven Dichtestufe beziehen. Keines dieser Token MUST auf einer festen Vorgabe der Bibliothek stehen bleiben. Abgeleitete Polsterungen einzelner Steuerelemente und Inhaltsflächen gehören nicht dazu.
+Jedes Innen- und Außenabstandstoken der Komponentenbibliothek (`padding` und `margin` von XXS bis XL) und das seitliche Polster der Steuerelemente (normal auf Stufe `md`, klein auf `sm`) SHALL seinen Wert aus dem Raster der aktiven Dichtestufe beziehen; keines MUST auf einer festen Vorgabe der Bibliothek stehen bleiben. Die Inhaltspolster (Knopf, Dialog, Hinweis, Liste) sind ausgenommen: im Handschuh sprengten sie schmale Geräte.
 
 #### Scenario: Mittlere und große Abstandsstufe in Handschuh
 - **WHEN** die Dichtestufe `handschuh` aktiv ist
 - **THEN** sind die Abstandstoken der Größen MD und XL größer als in `kompakt`
+
+#### Scenario: Seitliches Polster der Steuerelemente in Handschuh
+- **WHEN** die Dichtestufe `handschuh` aktiv ist
+- **THEN** misst das seitliche Polster einer Option in einer Auswahlliste und eines Eintrags im Dropdown-Menü 24 px, und das kleine Steuerelementpolster 16 px
+
+#### Scenario: Kompakt bleibt unverändert
+- **WHEN** die Dichtestufe `kompakt` aktiv ist
+- **THEN** misst das seitliche Polster der Steuerelemente 12 px und das kleine 8 px, wie vor dieser Änderung
+
+#### Scenario: Inhaltspolster bleiben fest
+- **WHEN** von `kompakt` auf `handschuh` umgeschaltet wird
+- **THEN** behalten das seitliche Knopfpolster, der Inhaltsrand von Dialog und Benachrichtigung sowie die Polster von Hinweis und Liste ihre Werte aus `kompakt`
 
 ### Requirement: Kein fester Abstand an der Dichte vorbei
 
@@ -33,17 +45,13 @@ Ein Baustein oder eine Seite MUST einen Abstand aus dem Raster der aktiven Dicht
 - **WHEN** eine Seite, die einen Rasterabstand nutzt, in `komfortabel` steht
 - **THEN** misst dieser Abstand den Wert der Stufe in `komfortabel`, nicht den in `kompakt`
 
-### Requirement: Keine neuen Abstands-Literale
+### Requirement: Abstände ohne Literal
 
-Neuer Code MUST NOT einen Innen- oder Außenabstand oder eine Lücke als Zahl-Literal größer als 2 px setzen, weder im Stilobjekt noch als Abstandsangabe einer Layoutkomponente noch als px-Wert in handgeschriebenem CSS außerhalb der Rollenquelle. Bestehende Literale SHALL als Schuld je Datei geführt werden, die nur sinken darf.
+Code MUST NOT einen Innen- oder Außenabstand oder eine Lücke als Zahl-Literal größer als 2 px setzen, weder im Stilobjekt noch als Abstandsangabe einer Layoutkomponente noch als px-Wert in handgeschriebenem CSS außerhalb der Rollenquelle. Die Prüfung SHALL keine Altlast dulden: Jede Datei außerhalb der festen Ausnahmen ist ohne ein solches Literal.
 
-#### Scenario: Neues Literal
-- **WHEN** eine Datei ohne Schuld ein Abstands-Literal wie 8 oder `12px` bekommt
+#### Scenario: Literal in einer Datei
+- **WHEN** eine Datei außerhalb der festen Ausnahmen ein Abstands-Literal wie 8 oder `12px` bekommt
 - **THEN** schlägt die Prüfung fehl und nennt Datei, Zeile und Wert
-
-#### Scenario: Schuld sinkt
-- **WHEN** in einer verschuldeten Datei Literale auf das Raster umgestellt werden
-- **THEN** schlägt die Prüfung fehl, bis die geführte Schuld dieser Datei auf den neuen Stand gesenkt ist, und steigen darf sie nie
 
 #### Scenario: Feinsatz
 - **WHEN** ein Abstand 1 oder 2 px beträgt (Haarlinie, Symbolversatz) oder 0 ist
@@ -56,3 +64,15 @@ Flächen, deren Abstände bewusst nicht der Bediendichte folgen, SHALL als Ausna
 #### Scenario: Lagemonitor im Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und der Lagemonitor angezeigt wird
 - **THEN** behalten seine Großbild-Abstände ihre festen Werte
+
+### Requirement: Stapel nehmen nur Rasterstufen
+
+Ein Layoutbaustein, der Elemente senkrecht oder waagerecht reiht, SHALL seinen Abstand nur als benannte Stufe (`xxs`, `xs`, `sm`, `md`, `lg`, `xl`) annehmen und den Wert aus dem Raster der aktiven Dichtestufe lesen. Eine Zahl als Abstand MUST NOT übergeben werden können.
+
+#### Scenario: Stapel in komfortabel
+- **WHEN** ein Stapel mit Abstand `md` in der Dichtestufe `komfortabel` steht
+- **THEN** beträgt die Lücke zwischen seinen Elementen 20 px
+
+#### Scenario: Stapel in kompakt
+- **WHEN** derselbe Stapel in `kompakt` steht
+- **THEN** beträgt die Lücke 12 px

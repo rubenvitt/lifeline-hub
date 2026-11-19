@@ -1,0 +1,74 @@
+# iOS-Prüfung (LLH-1978, Spec `ios-auslieferung`, „Ein PR mit iOS-Änderungen baut die App im
+# Simulator“): an einem PR, der die iOS-Hülle oder die gemeinsamen Fälle der Hüllen ändert, auf
+# einem macOS-Runner das Projekt erzeugen, die App für den Simulator bauen, App-, UI- und
+# Kern-Tests auf iOS fahren und die Bildschirmbilder der nativen Seiten als Artefakt ablegen
+# (Bilder der Änderung für den PR).
+#
+# KEIN PFLICHT-CHECK: Pflicht sind nur die Checks in `scripts/ruleset-pruefen.sh` (ADR-0048). Ein
+# PR ohne solche Änderungen startet keinen macOS-Lauf (Pfadfilter); macOS-Minuten sind teuer.
+# Der Swift-Kern läuft zusätzlich unter Linux in `suiten.yml` (Job `ios`).
+#
+# EIN WORKFLOW JE EREIGNIS (ADR-0048): nur `pull_request`. Der Ablauf steht in
+# `scripts/ios/simulator-pruefung.sh` (lokal auf einem Mac genauso), die XcodeGen-Version in
+# `scripts/ios/xcodegen-installieren.sh`. Runner und Xcode sind gepinnt: Xcode 16.4 bringt Swift
+# 6.1.2 wie der Linux-Job und kann `xcresulttool export attachments`.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in pr.yml.
+name: iOS-Prüfung
+
+on:
+  pull_request:
+    paths:
+      - "ios/**"
+      - "src-tauri/faelle/**"
+      - "scripts/ios/**"
+      - ".github/workflows/ios-pruefung.yml"
+
+# Least privilege: der Lauf liest nur und legt ein Artefakt ab.
+permissions:
+  contents: read
+
+# Ein neuer Push auf den PR ersetzt den laufenden Lauf.
+concurrency:
+  group: ios-pruefung-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    name: iOS-Simulator
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      XCODE_APP: /Applications/Xcode_16.4.app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Xcode wählen
+        run: |
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "FEHLER: $XCODE_APP fehlt auf dem Runner. Vorhanden:" >&2
+            ls -d /Applications/Xcode*.app >&2
+            exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+      - name: XcodeGen (gepinnt)
+        run: ./scripts/ios/xcodegen-installieren.sh
+      - name: Bauen und testen im Simulator
+        run: ./scripts/ios/simulator-pruefung.sh "$RUNNER_TEMP/ios-pruefung"
+      - name: Bildschirmbilder
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-simulator-bilder
+          path: ${{ runner.temp }}/ios-pruefung/bilder/
+          if-no-files-found: warn
+          retention-days: 14
+      # Zur Diagnose nur bei Rot: das Ergebnisbündel ist groß.
+      - name: Ergebnisbündel
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-xcresult
+          path: ${{ runner.temp }}/ios-pruefung/LifelineHub.xcresult
+          if-no-files-found: ignore
+          retention-days: 3

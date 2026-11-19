@@ -1173,6 +1173,8 @@ describe('PersonenPage', () => {
     setzeViewportBreite(390);
     const gefunden = { ...person, id: 20, registrier_nr: 7, status: 'betroffen' as const };
     const schmal = render(einsatzAktiv, [unbekannt, gefunden]);
+    // Unter `md` steht der Statusfilter hinter „Filter“ (LLH-1786).
+    await userEvent.click(await screen.findByRole('button', { name: 'Filter' }));
     await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
     await screen.findByRole('region', { name: 'Personen' });
     // Genau ein Zweig im Baum.
@@ -1974,7 +1976,7 @@ describe('PersonenPage — Einstieg in den Druck (LFH-727)', () => {
   it('verlinkt im Kopf auf die Druckansicht mit dem aktiven Statusfilter', async () => {
     render(einsatzAktiv, [person, unbekannt], '/einsaetze/1/personen?filter=vermisst');
     await screen.findByText('R-002');
-    const link = await within(await kopf()).findByRole('link', { name: 'Drucken / als PDF' });
+    const link = await within(await kopf()).findByRole('link', { name: 'Druckansicht' });
     const ziel = new URL(link.getAttribute('href')!, 'http://x');
     expect(ziel.pathname).toBe('/einsaetze/1/personen/druck');
     expect(Object.fromEntries(ziel.searchParams)).toEqual({ filter: 'vermisst' });
@@ -1984,9 +1986,10 @@ describe('PersonenPage — Einstieg in den Druck (LFH-727)', () => {
   it('steht auch für Beobachter ohne Schreibrecht da', async () => {
     render(einsatzBeobachter, [person]);
     await screen.findByText('R-001');
-    expect(
-      await within(await kopf()).findByRole('link', { name: 'Drucken / als PDF' }),
-    ).toHaveAttribute('href', '/einsaetze/1/personen/druck');
+    expect(await within(await kopf()).findByRole('link', { name: 'Druckansicht' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/personen/druck',
+    );
   });
 });
 
@@ -2066,6 +2069,77 @@ describe('PersonenPage — Abgeschlossene (LLH-1332)', () => {
     expect(screen.queryByText(/^Entlassen/)).toBeNull();
     await userEvent.click(schalter);
     expect(await screen.findByText(/^Entlassen/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Ansichtswahl und Filter am Handschirm hinter EINEM Knopf (LLH-1786, Spec
+ * `einsatztauglichkeit-layout`, „Filter und Ansichtswahl am Handschirm hinter einem Knopf“).
+ */
+describe('PersonenPage — Filter am Handschirm (LLH-1786)', () => {
+  const entlassen: Person = {
+    ...person,
+    id: 12,
+    registrier_nr: 3,
+    name: 'Entlassen',
+    status: 'betroffen',
+    versorgung: 'abgeschlossen',
+    aktuelle_verbleib_art: 'entlassung',
+    aktueller_verbleib: 'Entlassung vor Ort',
+  };
+
+  it('unter md: „Filter“ im Kopf, Ansicht und Status erst nach dem Antippen, die Zahl zählt mit', async () => {
+    setzeViewportBreite(390);
+    render(einsatzAktiv, [person, entlassen]);
+    await screen.findByText('Mustermann, Max');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    const knopf = within(kopf).getByRole('button', { name: 'Filter' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('radiogroup', { name: 'Ansicht' })).toBeNull();
+    expect(screen.queryByRole('tablist', { name: 'Personen nach Status filtern' })).toBeNull();
+
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('radiogroup', { name: 'Ansicht' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Personen nach Status filtern' }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Abgeschlossene zeigen/ }));
+    // Die Wahl wirkt sofort, der Knopf zählt sie.
+    expect(await screen.findByText(/^Entlassen/)).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Filter (1)' })).toBeInTheDocument();
+  });
+
+  it('ab md ohne Knopf, Ansicht im Kopf und Status über der Liste', async () => {
+    setzeViewportBreite(1180);
+    render(einsatzAktiv, [person]);
+    await screen.findByText('Mustermann, Max');
+    expect(screen.queryByRole('button', { name: /^Filter( \(\d+\))?$/ })).toBeNull();
+    expect(screen.getByRole('radiogroup', { name: 'Ansicht' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tablist', { name: 'Personen nach Status filtern' }),
+    ).toBeInTheDocument();
+  });
+
+  it('ab md stehen die Statusreiter in der Werkzeugzeile der Liste, neben der Suche', async () => {
+    setzeViewportBreite(1180);
+    render(einsatzAktiv, [person]);
+    await screen.findByText('Mustermann, Max');
+    const werkzeuge = document.querySelector<HTMLElement>('[data-lfh="datensicht-werkzeuge"]')!;
+    expect(
+      within(werkzeuge).getByRole('tablist', { name: 'Personen nach Status filtern' }),
+    ).toBeInTheDocument();
+    expect(within(werkzeuge).getByRole('searchbox')).toBeInTheDocument();
+  });
+
+  it('der Fokus bleibt nach einem Reiterwechsel auf dem gewählten Reiter', async () => {
+    setzeViewportBreite(1180);
+    render(einsatzAktiv, [person]);
+    await screen.findByText('Mustermann, Max');
+    await userEvent.click(screen.getByRole('tab', { name: 'Vermisst' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Vermisst' })),
+    );
   });
 });
 

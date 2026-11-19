@@ -297,6 +297,19 @@ export function einsatzberichtPfad(
   });
 }
 
+/**
+ * Druckansicht der Einsatzakte (LLH-1835): Unterroute der Einsatzdaten wie der Bericht; ohne
+ * Parameter, die Akte hat einen festen Umfang.
+ */
+export function einsatzaktePfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'einsatzdaten')}/akte`;
+}
+
+/** Pfad des ZIP mit Anhängen und Tabellen der Einsatzakte (LLH-1835, `src/routes/einsatzakte.rs`). */
+export function einsatzakteZipPfad(einsatzId: number): string {
+  return `/api/einsaetze/${einsatzId}/einsatzakte/anlagen.zip`;
+}
+
 /** Umkehr von {@link einsatzberichtPfad}: unbekannte Schlüssel fallen weg, leer = Standardumfang. */
 export { parseBerichtAuswahl };
 

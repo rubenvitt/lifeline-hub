@@ -1,4 +1,4 @@
-import { Typography, theme } from 'antd';
+import { theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import type { CSSProperties } from 'react';
@@ -14,7 +14,7 @@ import type {
   VorgabeFunktion,
 } from '../../api/types';
 import { BENACHRICHTIGUNG_ARTEN } from '../../alarm/benachrichtigungKatalog';
-import { Formularpaneel } from '../../components/instrument';
+import { Formularpaneel, Stapel, Textstufe } from '../../components/instrument';
 import { EINSATZ_ABGESCHLOSSEN } from '../../components/nurAnsicht';
 import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
@@ -120,11 +120,11 @@ export default function EinsatzBenachrichtigungen() {
         rechteText={daten.rechteGrund()}
       />
       <Formularpaneel titel="Still je Funktion">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+        <Stapel abstand="xs">
           {!istSchmal && (
-            <div style={{ ...raster, fontSize: token.fontSizeSM, opacity: 0.6 }}>
-              <span>Eingang</span>
-              <span>Still für</span>
+            <div style={{ ...raster, opacity: 0.6 }}>
+              <Textstufe stufe="textKlein">Eingang</Textstufe>
+              <Textstufe stufe="textKlein">Still für</Textstufe>
             </div>
           )}
           {arten.map(({ art, still }) => {
@@ -145,19 +145,17 @@ export default function EinsatzBenachrichtigungen() {
                 <label htmlFor={feldId} style={{ minWidth: 0 }}>
                   {name}
                   {!darf && (
-                    <Typography.Text
-                      type="secondary"
-                      style={{ fontSize: token.fontSizeSM, marginInlineStart: token.marginXS }}
-                    >
-                      {daten.istAktiv ? 'nur lesen' : EINSATZ_ABGESCHLOSSEN}
-                    </Typography.Text>
+                    <span style={{ marginInlineStart: token.marginXS }}>
+                      <Textstufe stufe="textKlein" ton="gedaempft">
+                        {daten.istAktiv ? 'nur lesen' : EINSATZ_ABGESCHLOSSEN}
+                      </Textstufe>
+                    </span>
                   )}
                 </label>
                 <Select<VorgabeFunktion[]>
                   id={feldId}
                   mode="multiple"
                   aria-label={`Still für: ${name}`}
-                  style={{ width: '100%' }}
                   value={still}
                   options={optionen}
                   disabled={!darf}
@@ -167,7 +165,7 @@ export default function EinsatzBenachrichtigungen() {
               </div>
             );
           })}
-        </div>
+        </Stapel>
       </Formularpaneel>
     </>
   );

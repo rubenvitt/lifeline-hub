@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRef, type ReactElement, type ReactNode, type Ref } from 'react';
 import {
   ErfassungsFormular,
@@ -21,6 +21,7 @@ import type { Dayjs } from 'dayjs';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { antdThema } from '../theme/tokens';
+import { beendeHuelle, type IosNachricht, starteIosHuelle } from '../test/huelle';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -1048,5 +1049,68 @@ describe('kopfBoden — Abstand des Schließkreuzes zum ersten Feld (LLH-1274)',
     const t = theme.getDesignToken(antdThema(true, 'kompakt'));
     const kopf = Math.max(titelzeilenHoehe(t), kopfBoden(t));
     expect(t.paddingMD + kopf + t.marginXS).toBeLessThanOrEqual(47);
+  });
+});
+
+/** Haptik der iOS-Hülle (Change t39ltxxi, Spec `huellen-vertrag`, „Erfassungen geben haptische Rückmeldung“). */
+describe('ErfassungsFormular — Haptik in der Hülle', () => {
+  afterEach(beendeHuelle);
+
+  function mitIosHuelle() {
+    const nachrichten: IosNachricht[] = [];
+    starteIosHuelle({ bruecke: { postMessage: (n) => nachrichten.push(n) } });
+    return () => nachrichten.filter((n) => n.cmd === 'haptics').map((n) => n.kind);
+  }
+
+  async function erfasse(onErfassen: (w: Werte) => Promise<unknown>) {
+    renderMitProviders(<Harness onErfassen={onErfassen} />);
+    await userEvent.setup().type(screen.getByLabelText('Melder'), 'Löschzug 1{Enter}');
+  }
+
+  it('meldet `success`, wenn der Server die Erfassung annimmt, genau einmal', async () => {
+    const haptik = mitIosHuelle();
+    const onFertig = vi.fn();
+    renderMitProviders(
+      <Harness onErfassen={vi.fn().mockResolvedValue({ id: 7 })} onFertig={onFertig} />,
+    );
+    await userEvent.setup().type(screen.getByLabelText('Melder'), 'Löschzug 1{Enter}');
+    await waitFor(() => expect(onFertig).toHaveBeenCalled());
+    expect(haptik()).toEqual(['success']);
+  });
+
+  it('meldet `tap`, nicht `success`, wenn die Erfassung ohne Netz nur vorgemerkt ist', async () => {
+    const haptik = mitIosHuelle();
+    const onErfassen = vi.fn().mockResolvedValue({ zustand: 'vorgemerkt', client_id: 'c-1' });
+    await erfasse(onErfassen);
+    await waitFor(() => expect(haptik()).toEqual(['tap']));
+  });
+
+  it('meldet `error`, wenn der Server die Erfassung ablehnt', async () => {
+    const haptik = mitIosHuelle();
+    await erfasse(vi.fn().mockRejectedValue(new Error('abgelehnt')));
+    await waitFor(() => expect(haptik()).toEqual(['error']));
+    expect(screen.getByLabelText('Melder')).toHaveValue('Löschzug 1');
+  });
+
+  it('meldet keine Haptik, solange die Prüfung im Client scheitert', async () => {
+    const haptik = mitIosHuelle();
+    const onErfassen = vi.fn();
+    renderMitProviders(<PflichtHarness onErfassen={onErfassen} onFertig={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Erfassen/ }));
+    expect(await screen.findByText('Ort ist Pflicht')).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(haptik()).toEqual([]);
+  });
+
+  it('die Erfassung gilt auch dann, wenn die Haptik der Hülle wirft', async () => {
+    window.__LIFELINE_HUELLE__ = {
+      haptics: () => {
+        throw new Error('kaputt');
+      },
+    };
+    const onFertig = vi.fn();
+    renderMitProviders(<Harness onErfassen={vi.fn().mockResolvedValue({})} onFertig={onFertig} />);
+    await userEvent.setup().type(screen.getByLabelText('Melder'), 'Löschzug 1{Enter}');
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
   });
 });

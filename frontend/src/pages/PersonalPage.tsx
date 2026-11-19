@@ -1,6 +1,7 @@
 import { dauer } from '../anzeige/dauer';
-import { Breadcrumb, Button, Space, Tag, theme } from 'antd';
+import { Breadcrumb, Button, Space, theme } from 'antd';
 import { BemerkungZelle } from '../components/BemerkungZelle';
+import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -39,6 +40,7 @@ import type { EinsatzPersonal } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { useViewport } from '../components/useViewport';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
@@ -64,6 +66,7 @@ import { abschnittDerEinheit, buildEinheitOptions } from '../kraefte/kraeftebaum
 import { POSITION_LABELS } from '../api/personal';
 import type { StaerkePosition } from '../api/types';
 import { useEinteilungSchreiben } from '../kraefte/useEinteilungSchreiben';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Die Personalliste eines Einsatzes (LLH-1060, Spec `personal-ansicht`): gruppiert nach Einheit,
@@ -113,6 +116,7 @@ export default function PersonalPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { token } = theme.useToken();
+  const { istSchmal } = useViewport();
   /**
    * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
    * Hook gehört der Seite und steht vor jedem frühen Ausstieg.
@@ -228,12 +232,25 @@ export default function PersonalPage() {
     onFehler: (e, v) => zeilen.melde(v.epId, e, 'Status nicht geändert'),
     onSettled: invalidate,
   });
+  // Der Grund einer Ablehnung kommt aus `saveBemerkung` an die Zeile: ein 409 mit Rückfrage
+  // ist keiner (LLH-1945).
   const bemerkungMutation = useMutation({
-    mutationFn: (v: { epId: number; bemerkung: string }) =>
-      updateDisposition(einsatzId, v.epId, { bemerkung: v.bemerkung }),
+    mutationFn: (v: { epId: number; bemerkung: string; erwartet?: string | null }) =>
+      updateDisposition(
+        einsatzId,
+        v.epId,
+        { bemerkung: v.bemerkung },
+        v.erwartet === undefined ? undefined : { bemerkung: v.erwartet },
+      ),
     onMutate: (v) => zeilen.beginne(v.epId),
     onSuccess: invalidate,
-    onError: (e, v) => zeilen.melde(v.epId, e, 'Bemerkung nicht gespeichert'),
+  });
+  const saveBemerkung = useBemerkungMitAltwert({
+    queryKey: einsatzKeys.personal(einsatzId),
+    laden: () => listeEinsatzPersonal(einsatzId),
+    speichern: (epId, bemerkung, erwartet) =>
+      bemerkungMutation.mutateAsync({ epId, bemerkung, erwartet }),
+    melde: (epId, e) => zeilen.melde(epId, e, 'Bemerkung nicht gespeichert'),
   });
   // Erneut disponieren (LLH-1079) bleibt im Block „Entlassen“ unter der Liste; die Ablehnung steht
   // an ihrem Eintrag.
@@ -401,9 +418,9 @@ export default function PersonalPage() {
       // deshalb keinen Anker. `wrap`: eine Marke darf unter einen langen Namen rutschen, statt die
       // Fließspalte über ihr Maß zu drücken (LFH-975).
       render: (_, ep) => (
-        <Space wrap size={4}>
+        <Space wrap size={token.marginXS}>
           {ep.name}
-          {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
+          {ep.ist_adhoc && <Marke>ad-hoc</Marke>}
           {ep.ist_demo && <DemoMarke />}
         </Space>
       ),
@@ -424,7 +441,13 @@ export default function PersonalPage() {
           funktion={ep.funktion}
           vorschlaege={vorschlaege}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(einsatzfunktion) => schreiben.angabe(ep.id, { einsatzfunktion })}
+          onSpeichern={(einsatzfunktion, { beimOeffnen }) =>
+            schreiben.angabe(
+              ep.id,
+              { einsatzfunktion },
+              { etikett: 'Funktion', erwartet: { einsatzfunktion: beimOeffnen } },
+            )
+          }
         />
       ),
     },
@@ -458,7 +481,7 @@ export default function PersonalPage() {
                 marke={
                   ep.einheit_id != null &&
                   einheiten.find((e) => e.id === ep.einheit_id)?.fuehrer_id === ep.id ? (
-                    <Tag>Einheitsführer</Tag>
+                    <Marke>Einheitsführer</Marke>
                   ) : undefined
                 }
                 onSpeichern={schreiben.einheit(ep.id)}
@@ -521,7 +544,13 @@ export default function PersonalPage() {
           kennung={ep.name}
           wert={ep.staerke_position ?? null}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(staerke_position) => schreiben.angabe(ep.id, { staerke_position })}
+          onSpeichern={(staerke_position, { beimOeffnen }) =>
+            schreiben.angabe(
+              ep.id,
+              { staerke_position },
+              { etikett: 'Position', erwartet: { staerke_position: beimOeffnen } },
+            )
+          }
         />
       ),
     },
@@ -585,7 +614,7 @@ export default function PersonalPage() {
           darfSchreiben={darfSchreiben}
           max={PERSONAL_BEMERKUNG_MAX}
           // Die Zusage lässt die Zelle bis zur Antwort offen (`BemerkungZelle`, LFH-1077).
-          onSpeichern={(val) => bemerkungMutation.mutateAsync({ epId: ep.id, bemerkung: val })}
+          onSpeichern={(val, { beimOeffnen }) => saveBemerkung(ep.id, val, beimOeffnen)}
         />
       ),
     },
@@ -609,6 +638,16 @@ export default function PersonalPage() {
   return (
     <EinsatzSeite
       meta={epQuery.isSuccess ? `${eps.length} Kräfte` : undefined}
+      metaPlatzhalter="0 Kräfte"
+      // Die Stärke steht als Meta im Kopf, nicht als eigene Zeile über der Liste (LLH-1786, Change
+      // `z137bgm5-seitenkopf-einzeilig` D2); sie hält ihre Breite beim Laden selbst.
+      metaZusatz={
+        <Verdichtungszeile
+          einsatzId={einsatzId}
+          pfad={kraefteuebersichtPfad(einsatzId)}
+          form="meta"
+        />
+      }
       dataUpdatedAt={gemeinsamerDatenstand(
         epQuery.dataUpdatedAt,
         einheitenQuery.dataUpdatedAt,
@@ -625,6 +664,13 @@ export default function PersonalPage() {
         />
       }
       // Der Kopf ÖFFNET nur (LFH-983): disponiert wird im Dialog, nie schon beim Auswählen.
+      weitere={{
+        name: 'Weitere Aktionen zum Personal',
+        eintraege:
+          darfSchreiben && istSchmal
+            ? [{ key: 'adhoc', label: 'Ad-hoc-Person', onWahl: () => setAdhocOffen(true) }]
+            : [],
+      }}
       aktionen={
         darfSchreiben && (
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
@@ -633,7 +679,9 @@ export default function PersonalPage() {
             <Button type="primary" onClick={() => setDisponierenOffen(true)}>
               Personal disponieren
             </Button>
-            <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>
+            {/* Am Handschirm steht genau eine Erfassung sichtbar (`frontend/AGENTS.md`,
+                „Nebenwege im Kopf“); die zweite geht hinter „Weitere“ (LLH-1786). */}
+            {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>}
           </Space>
         )
       }
@@ -669,7 +717,6 @@ export default function PersonalPage() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void epQuery.refetch()} />}
           <DeeplinkHinweis lage={deeplinkHinweis} sache="Einsatzkraft" />
-          <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
           {/* `zufluss` bleibt `sammelbanner`: Einheitswechsel, Status und Position sind Bedienziele
               der Zeile. Wechselt eine Person unter Fokus oder Zeiger die Einheit, hält die
               Schleuse Platz und Folge, bis beide die Sicht verlassen (D6). */}

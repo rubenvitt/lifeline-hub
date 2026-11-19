@@ -699,7 +699,7 @@ export interface components {
          * @enum {string}
          */
         AntragZielArt: "einsatz" | "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
-        /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App. */
+        /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS). */
         AppCode: {
             code: string;
         };
@@ -3558,6 +3558,13 @@ export interface components {
             /** Format: int64 */
             berichtigt_eintrag_id?: number | null;
             /**
+             * @description Die Kennung, die das erfassende Gerät beim Senden vergab (Idempotenz der Warteschlange,
+             *     LFH-261). Das Gerät erkennt daran seine eigenen Einträge: die Zeitachse lässt hochgerollt
+             *     nur sie sofort durch, Einträge desselben Kontos von einem anderen Gerät warten hinter dem
+             *     Sammelbanner (LLH-1833). Fehlt bei Einträgen ohne Kennung (Systemeinträge, ältere).
+             */
+            client_id?: string | null;
+            /**
              * @description Die Einheiten, die dieser Eintrag festhält (LLH-1266, Spec `etb-vorgaenge`, „Verweis auf
              *     genannte Einheiten“; Tabelle `etb_eintrag_einheit`): die Empfänger eines Auftrags beim
              *     Schreiben (LLH-1175) und die Einheit des Systemeintrags ihrer Auflösung. Nach `id`, leer
@@ -3821,6 +3828,13 @@ export interface components {
             funkrufname?: string;
             /** @description Organisation; die Oberfläche fragt sie einmal und setzt sie in jedes Fahrzeug. */
             traegerorganisation?: string | null;
+        };
+        /**
+         * @description Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der
+         *     Beleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781).
+         */
+        FahrzeugPatchAntwort: components["schemas"]["EinsatzFahrzeugAnzeige"] & {
+            status_ruecknahme?: components["schemas"]["StatusRuecknahmeBeleg"] | null;
         };
         /**
          * @description Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
@@ -6727,6 +6741,13 @@ export interface components {
             rtw_angefordert?: boolean;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355 und ungelöscht.
+             */
+            storniert_von?: number | null;
+            /** @description Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“. */
+            storniert_von_name?: string | null;
             transport_art?: components["schemas"]["TransportArt"] | null;
             /** @description Erfassungszeit des aktuellen Transportstands. */
             transport_at?: string | null;
@@ -7588,6 +7609,8 @@ export interface components {
             storniert_at?: string | null;
             /** Format: int64 */
             storniert_von?: number | null;
+            /** @description Anzeigename von `storniert_von` (LLH-1832), für das Banner „Storniert von … um …“. */
+            storniert_von_name?: string | null;
             typ: components["schemas"]["SchadenTyp"];
             uebergeben_an?: string | null;
             uebergeben_at?: string | null;
@@ -7761,6 +7784,16 @@ export interface components {
          * @enum {string}
          */
         Scope: "lage:read" | "einsaetze:read" | "events:read" | "alarmmeldungen:write" | "positionen:write" | "rechner:use";
+        /** @description Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`). */
+        ShellInfo: {
+            /**
+             * Format: int32
+             * @description Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).
+             */
+            shell_contract: number;
+            /** @description Laufende Anwendungsversion, dieselbe wie in `GET /api/health`. */
+            version: string;
+        };
         /** @description Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`). */
         SichtungAnzeige: {
             /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
@@ -8069,6 +8102,27 @@ export interface components {
          */
         StatusKategorie: "verfuegbar" | "gebunden" | "nicht_verfuegbar";
         /**
+         * @description Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,
+         *     Change `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,
+         *     wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er
+         *     trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
+         */
+        StatusRuecknahmeBeleg: {
+            /**
+             * Format: int64
+             * @description Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht.
+             */
+            status_id: number;
+            /** @description „Status seit“ des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt. */
+            status_seit: string;
+            /**
+             * Format: int64
+             * @description Status vor dem Wechsel, nur für die Quittung („S2 → S3“); die Rücknahme nimmt den Wert,
+             *     den der Server beim Wechsel festgehalten hat.
+             */
+            vorher_status_id?: number | null;
+        };
+        /**
          * @description Ein aufgelöster Eintrag des FMS-Statuskatalogs (`fahrzeug_status`), wie ihn Fahrzeug
          *     und Einheit tragen (LFH-609).
          */
@@ -8142,6 +8196,15 @@ export interface components {
             vorlage_id?: number | null;
         };
         /**
+         * @description Storno-Stand eines Datensatzes für eine offene Detailseite (LLH-1832, Spec `storno-sperre`):
+         *     nur ob und wann storniert, und von wem (Anzeigename, `None` bei Altbestand). Trägt keine
+         *     Fachangaben, damit die Abfrage protokollfrei und live abrufbar bleibt.
+         */
+        StornoStand: {
+            storniert_at?: string | null;
+            storniert_von_name?: string | null;
+        };
+        /**
          * @description System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
          * @enum {string}
          */
@@ -8213,6 +8276,13 @@ export interface components {
             spezies: components["schemas"]["Spezies"];
             status: components["schemas"]["TierStatus"];
             storniert_at?: string | null;
+            /**
+             * Format: int64
+             * @description Wer storniert hat (LLH-1832); `None` bei Altbestand vor 0355.
+             */
+            storniert_von?: number | null;
+            /** @description Anzeigename von `storniert_von`, für das Banner „Storniert von … um …“. */
+            storniert_von_name?: string | null;
         };
         /**
          * @description Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).

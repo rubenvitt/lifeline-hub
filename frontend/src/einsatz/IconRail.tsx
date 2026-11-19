@@ -23,6 +23,12 @@ interface Props {
    * `aria-expanded` an der offenen Kategorie. Ohne (Drawer-Zweig) kein Griff.
    */
   panel?: { offen: boolean; onUmschalten: () => void };
+  /**
+   * Ob die Spalte unter dem Kopf klebt und ihre Höhe aus dem Fenster nimmt (Vorgabe). `false` nur
+   * für einen Träger fester Höhe, die Karte „Navigation“ des Design Systems (d78gipem D1): dann
+   * füllt die Spalte den Träger und misst nichts am Fenster.
+   */
+  kleben?: boolean;
 }
 
 /** `id` des Modulpanels, auf das Griff und offene Kategorie zeigen. */
@@ -51,7 +57,7 @@ const MARKE_BREITE = 2;
  * Etikett beim Aktivieren verschöbe.
  */
 export function railZielStil(
-  token: { controlHeight: number; paddingXS: number },
+  token: { controlHeight: number; paddingXS: number; marginXS: number },
   zustand: { aktiv: boolean },
 ): CSSProperties {
   return {
@@ -68,7 +74,7 @@ export function railZielStil(
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: token.marginXS,
     // Nachtrollen, nicht Modus-Token: die Rail ist in BEIDEN Modi dunkel. Inaktiv heißt nicht
     // gesperrt: das Etikett ist bedienbarer Text und hält die Tag-Schwelle (LFH-434).
     background: zustand.aktiv ? rahmenFarben.aktiv : 'transparent',
@@ -107,12 +113,12 @@ const ETIKETT_STIL: CSSProperties = {
  * Neu gemessen, wenn sich `body` in der Größe ändert (eine Zeile erscheint oder verschwindet) oder
  * der Rahmen eine neue Höhe meldet; geschrieben im nächsten Bild, wie in `rahmenOben.ts` (LLH-1335).
  */
-function useVorlauf(): [(el: HTMLElement | null) => void, number] {
+function useVorlauf(aktiv: boolean): [(el: HTMLElement | null) => void, number] {
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [vorlauf, setVorlauf] = useState(0);
   const kopfOben = useKopfOben();
   useLayoutEffect(() => {
-    if (!el) return;
+    if (!el || !aktiv) return;
     const measure = () => {
       const top = el.getBoundingClientRect().top + window.scrollY;
       setVorlauf(Math.max(0, Math.round(top - readKopfOben())));
@@ -131,7 +137,7 @@ function useVorlauf(): [(el: HTMLElement | null) => void, number] {
       observer.disconnect();
       if (pending) cancelAnimationFrame(pending);
     };
-  }, [el, kopfOben]);
+  }, [el, kopfOben, aktiv]);
   return [setEl, vorlauf];
 }
 
@@ -149,9 +155,10 @@ export default function IconRail({
   onKategorieKlick,
   kategoriePfad,
   panel,
+  kleben = true,
 }: Props) {
   const { token } = theme.useToken();
-  const [navRef, vorlauf] = useVorlauf();
+  const [navRef, vorlauf] = useVorlauf(kleben);
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
@@ -204,7 +211,7 @@ export default function IconRail({
       ref={navRef}
       aria-label="Kategorien"
       style={{
-        ['--lfh-rail-vorlauf' as string]: `${vorlauf}px`,
+        ...(kleben ? { ['--lfh-rail-vorlauf' as string]: `${vorlauf}px` } : {}),
         display: 'flex',
         flexDirection: 'column',
         background: rahmenFarben.grund,
@@ -229,9 +236,13 @@ export default function IconRail({
       <div
         data-lfh="rail-spalte"
         style={{
-          position: 'sticky',
-          top: 'var(--lfh-kopf-oben, 0px)',
-          height: 'calc(100dvh - var(--lfh-kopf-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
+          ...(kleben
+            ? {
+                position: 'sticky',
+                top: 'var(--lfh-kopf-oben, 0px)',
+                height: 'calc(100dvh - var(--lfh-kopf-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
+              }
+            : { height: '100%' }),
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',

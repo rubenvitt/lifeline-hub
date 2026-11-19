@@ -1,17 +1,5 @@
 import { useState } from 'react';
-import {
-  Alert,
-  App,
-  Button,
-  Form,
-  Input,
-  Modal,
-  Space,
-  Spin,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { Alert, App, Button, Form, Input, Modal, Space, Spin, Tooltip, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
@@ -65,6 +53,7 @@ import {
   zertifikatWarnt,
   zertifikatZeile,
 } from './instanzText';
+import { Marke } from '../components/instrument/Marke';
 
 /** Längste Bezeichnung eines Unterschriftsschlüssels (`routes::instanz::BEZEICHNUNG_MAX`). */
 const BEZEICHNUNG_MAX = 80;
@@ -362,13 +351,12 @@ export default function InstanzkopplungSeite() {
                           {k.gegenueber_name} · {richtungText(k)}
                           {!standard && (
                             <Tooltip title={VOR_ORT_ERKLAERUNG}>
-                              <Tag
-                                bordered
+                              <Marke
                                 style={{ marginInlineStart: token.marginXS }}
                                 data-lfh="instanz-kopplung-vor-ort"
                               >
                                 {VOR_ORT_CHIP}
-                              </Tag>
+                              </Marke>
                             </Tooltip>
                           )}
                         </span>
@@ -899,9 +887,9 @@ function ImNetzGefunden({
   onSuchen: () => void;
   onWahl: (adresse: string) => void;
 }) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   return (
-    <div style={{ marginBlockEnd: 16 }} data-lfh="instanz-im-netz">
+    <div style={{ marginBlockEnd: token.marginLG }} data-lfh="instanz-im-netz">
       <Button onClick={onSuchen} loading={laeuft} data-lfh="instanz-im-netz-suchen">
         Im Netz suchen
       </Button>
@@ -910,7 +898,7 @@ function ImNetzGefunden({
         <Alert
           type="info"
           showIcon
-          style={{ marginBlockStart: 8 }}
+          style={{ marginBlockStart: token.marginSM }}
           title={LAN_AUS}
           data-lfh="instanz-im-netz-aus"
         />
@@ -918,7 +906,7 @@ function ImNetzGefunden({
       {antwort && !antwort.aus && (
         <Liste<InstanzGefunden>
           bordered
-          style={{ marginBlockStart: 8 }}
+          style={{ marginBlockStart: token.marginSM }}
           dataSource={antwort.gefunden}
           // Kennung UND Fingerabdruck: eine fremde Ankündigung unter derselben Kennung ist ein
           // eigener Eintrag (Review LLH-1497).

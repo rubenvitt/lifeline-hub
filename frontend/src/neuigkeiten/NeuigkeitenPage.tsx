@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Tag, Typography } from 'antd';
+import { Alert, Button, Typography, theme } from 'antd';
 import { EINTRAEGE } from 'virtual:neuigkeiten';
 import type { ChangelogEintrag, Kanal } from '../../scripts/changelog-zerlegen.mjs';
 import AdminPage from '../components/AdminPage';
@@ -14,6 +14,7 @@ import {
   VORSCHAU_GRENZE,
   type KanalFilter,
 } from './neuigkeiten';
+import { Marke } from '../components/instrument/Marke';
 
 const KANAL_TITEL: Record<Kanal, string> = { alpha: 'Alpha', beta: 'Beta', stabil: 'Stabil' };
 
@@ -35,6 +36,7 @@ function datumAnzeige(datum: string | null): string {
  * gelesen.
  */
 export default function NeuigkeitenPage() {
+  const { token } = theme.useToken();
   const { data: stand } = useVersionsstand();
   const { mutate: markiereGelesen } = useMarkiereGelesen();
   const [filter, setFilter] = useState<KanalFilter>('alle');
@@ -56,7 +58,7 @@ export default function NeuigkeitenPage() {
     // Seitenkopf der Ebene 1 (LLH-1731 D2): Ortspfad „Einsätze › Neuigkeiten“ und der Rückweg in
     // den Einsatz, wie auf Profil und Benachrichtigungen. Die Lesebreite bleibt 900 px.
     <AdminPage titel="Neuigkeiten">
-      <div style={{ display: 'grid', gap: 24, maxWidth: 900 }}>
+      <div style={{ display: 'grid', gap: token.marginXL, maxWidth: 900 }}>
         {notizenFehlen && (
           <Alert
             type="info"
@@ -72,7 +74,7 @@ export default function NeuigkeitenPage() {
         )}
 
         <Paneel titel="Archiv" koerperPolster>
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: token.marginLG }}>
             <Segmentleiste
               optionen={FILTER_OPTIONEN}
               wert={filter}
@@ -96,8 +98,9 @@ export default function NeuigkeitenPage() {
 }
 
 function Eintragsliste({ eintraege }: { eintraege: ChangelogEintrag[] }) {
+  const { token } = theme.useToken();
   return (
-    <div style={{ display: 'grid', gap: 32 }}>
+    <div style={{ display: 'grid', gap: token.marginXL }}>
       {/* Die Position schlüsselt: die CHANGELOG führt historisch eine Version doppelt (alpha.55). */}
       {eintraege.map((e, i) => (
         <EintragAnzeige key={`${i}-${e.version}`} eintrag={e} />
@@ -107,6 +110,7 @@ function Eintragsliste({ eintraege }: { eintraege: ChangelogEintrag[] }) {
 }
 
 function EintragAnzeige({ eintrag }: { eintrag: ChangelogEintrag }) {
+  const { token } = theme.useToken();
   const [vollstaendig, setVollstaendig] = useState(false);
   const lang = eintrag.kanal === 'stabil' && eintrag.text.length > VORSCHAU_GRENZE;
   const { text, gekuerzt } =
@@ -116,16 +120,18 @@ function EintragAnzeige({ eintrag }: { eintrag: ChangelogEintrag }) {
 
   return (
     <article data-lfh="neuigkeit" data-version={eintrag.version}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' }}>
+      <div
+        style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginSM, alignItems: 'baseline' }}
+      >
         <Typography.Title level={2} style={{ margin: 0, fontSize: 18 }}>
           <span style={{ fontFamily: 'monospace' }}>{eintrag.version}</span>
         </Typography.Title>
-        <Tag>{KANAL_TITEL[eintrag.kanal]}</Tag>
+        <Marke>{KANAL_TITEL[eintrag.kanal]}</Marke>
         {eintrag.datum && (
           <Typography.Text type="secondary">{datumAnzeige(eintrag.datum)}</Typography.Text>
         )}
       </div>
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: token.marginSM }}>
         <Markdown unterEbene={3}>{text}</Markdown>
       </div>
       {lang && (

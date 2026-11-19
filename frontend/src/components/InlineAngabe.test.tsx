@@ -185,6 +185,37 @@ describe('InlineAngabe · Bearbeitung', () => {
   });
 });
 
+describe('InlineAngabe · Schreibrecht fällt weg (LLH-1832, Spec storno-sperre)', () => {
+  it('ein geänderter Entwurf bleibt schreibgeschützt lesbar, ohne Speichern', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), ' neu');
+
+    rerender(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} darfSchreiben={false} />);
+
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    expect(feld).toHaveValue('ILS-1 neu');
+    expect(feld).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: /speichern/ })).toBeNull();
+    fireEvent.submit(feld.closest('form')!);
+    expect(onSpeichern).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Entwurf von Leitstellen-Nr. schließen' }));
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByText('ILS-1')).toBeInTheDocument();
+  });
+
+  it('eine unveränderte Bearbeitung schließt', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    rerender(<TextAngabe wert="ILS-1" darfSchreiben={false} />);
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+});
+
 describe('InlineAngabe · Riegel', () => {
   it('unveränderter Wert sendet nicht und kehrt in die Anzeige zurück', async () => {
     const onSpeichern = vi.fn().mockResolvedValue(undefined);
@@ -986,6 +1017,40 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
       expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
     );
     expect(onSpeichern).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Die Frist der Fokusrückgabe läuft über einen Timer und einen Zeigerdruck-Hörer am Dokument.
+   * Hängt die Zelle vor Ablauf aus (Seitenwechsel, Testende), räumt sie beides; sonst lief der
+   * Timer ins Leere, und nach dem Ende der Testumgebung warf er `document is not defined`
+   * (`alpha` rot am 18.11.2026, Frontend-Suite 3/4).
+   */
+  it('räumt Frist-Timer und Zeigerhörer beim Aushängen', async () => {
+    const setze = vi.spyOn(window, 'setTimeout');
+    const raeume = vi.spyOn(window, 'clearTimeout');
+    const entferne = vi.spyOn(document, 'removeEventListener');
+    try {
+      const { unmount } = renderMitProviders(schwebend(<Zelle wert="ILS-1" />));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+      );
+      const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+      fireEvent.keyDown(feld, { key: 'Escape' });
+      await waitFor(() =>
+        expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
+      );
+      const fristIndex = setze.mock.calls.findIndex(([, ms]) => ms === 1500);
+      expect(fristIndex).toBeGreaterThanOrEqual(0);
+      const fristId = setze.mock.results[fristIndex]!.value;
+      entferne.mockClear();
+      unmount();
+      expect(raeume).toHaveBeenCalledWith(fristId);
+      expect(entferne).toHaveBeenCalledWith('pointerdown', expect.any(Function), {
+        capture: true,
+      });
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it('eine Tabelle hält eine Bearbeitung: eine unveränderte schließt, eine geänderte behält den Fokus', async () => {

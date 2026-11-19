@@ -1,4 +1,4 @@
-import { Space, Tag, Typography } from 'antd';
+import { Space, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import { zahlText } from '../../anzeige/zahl';
 import {
@@ -10,6 +10,7 @@ import {
 } from '../../components/instrument';
 import type { Ergebnis, TypAnzahl } from './rechnerKern';
 import { ZELTTYPEN, richtwertBasis, type Richtwerte } from './richtwerte';
+import { Marke } from '../../components/instrument/Marke';
 
 const ZELT_NAME = new Map(ZELTTYPEN.map((t) => [t.typ, t.bezeichnung]));
 
@@ -35,14 +36,11 @@ export function ruhtAufAnnahme(schluessel: readonly string[], richtwerte: Richtw
 }
 
 function Etikett({ text, annahme }: { text: string; annahme: boolean }) {
+  const { token } = theme.useToken();
   return (
-    <Space size={6} wrap>
+    <Space size={token.marginSM} wrap>
       <span>{text}</span>
-      {annahme && (
-        <Tag variant="filled" data-lfh="annahme">
-          Annahme
-        </Tag>
-      )}
+      {annahme && <Marke data-lfh="annahme">Annahme</Marke>}
     </Space>
   );
 }

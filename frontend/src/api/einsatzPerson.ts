@@ -12,6 +12,7 @@ import type {
   PersonAnlass,
   PersonAuswahl,
   PersonDetail,
+  StornoStand,
   PersonKostform,
   PersonStatus,
   PersonZugriff,
@@ -219,6 +220,15 @@ export function ladePerson(einsatzId: number, personId: number): Promise<PersonD
 }
 
 /**
+ * Storno-Stand einer Person für ihre offene Detailseite (LLH-1832, Spec `storno-sperre`): nur
+ * `storniert_at` und der Name des Stornierenden. Schreibt KEINEN Audit-Eintrag, deshalb darf ihn
+ * der Live-Abgleich bei jedem `person`-Ereignis abrufen; das Detail nicht.
+ */
+export function loadPersonStand(einsatzId: number, personId: number): Promise<StornoStand> {
+  return apiGet<StornoStand>(`/api/einsaetze/${einsatzId}/personen/${personId}/stand`);
+}
+
+/**
  * Druckansicht einer Person (LLH-1120, Spec `druck-dokumente`): dasselbe Detail, aber
  * serverseitig als `druck`-Eintrag mit Person im Zugriffsprotokoll. Nie still wiederholen und nie
  * aus dem Cache des Details ersetzen (`frontend/src/druck/AGENTS.md`, Personendruck).
@@ -272,6 +282,10 @@ export interface PersonFeldEingabe {
   /** LLH-1612. */
   kostform: PersonKostform | null;
   unvertraeglichkeiten: string | null;
+  /** Kopf und Liste (LLH-1945): Zustand / Verdacht, PAT-Nummer und Kontamination. */
+  zustand: string | null;
+  pat_nummer: string | null;
+  kontamination: boolean | null;
 }
 export type PersonFeld = keyof PersonFeldEingabe;
 
@@ -287,8 +301,8 @@ function feldAufWire<K extends PersonFeld>(feld: K, wert: PersonFeldEingabe[K]):
  * Ein Feld der Personendaten schreiben, mit Feld-CAS (design.md D1): `erwartet` ist der Wert beim
  * Öffnen (`null` = leer); weicht der gespeicherte ab, antwortet der Server mit 409 und schreibt
  * nichts. `erwartet` `undefined` schreibt ohne Vergleich („Meine Änderung übernehmen“ nach der Rückfrage).
- * Der Body nennt nur dieses Feld, kein anderes wird geleert; `aktualisierePerson` bleibt für den
- * Kopf (Zustand, PAT) und andere Aufrufer.
+ * Der Body nennt nur dieses Feld, kein anderes wird geleert. Auch Zustand, PAT-Nummer und
+ * Kontamination gehen hierüber (LLH-1945); `aktualisierePerson` bleibt für andere Aufrufer.
  */
 export function savePersonFeld<K extends PersonFeld>(
   einsatzId: number,

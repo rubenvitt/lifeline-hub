@@ -281,6 +281,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
             retain("geaendert_von", G_FK),
             retain("storniert_at", G_ZEIT),
+            retain("storniert_von", G_FK),
             retain("aktuelle_sichtung", G_TRIAGE),
             retain("aktuelle_sichtung_at", G_ZEIT),
             // Denormalisierter Cache: trägt bei Transporten „Transport → {Klinik}“ im Klartext.
@@ -615,6 +616,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
             retain("geaendert_von", G_FK),
             retain("storniert_at", G_ZEIT),
+            retain("storniert_von", G_FK),
         ],
     },
     // ---------- Schäden ----------
@@ -1201,6 +1203,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("fahrzeug_id", G_FK),
             retain("status_id", G_FK),
             retain("status_seit", G_ZEIT),
+            // Wer zuletzt gewechselt hat, für die Rücknahme (LLH-1781): Benutzer-FK.
+            retain("status_gesetzt_von", G_FK),
+            retain("status_vorher_id", G_FK),
+            retain("status_vorher_seit", G_ZEIT),
+            retain("status_ereignis_id", G_FK),
             retain("snap_funkrufname", G_OP_SNAP),
             retain("snap_kennzeichen", G_OP_SNAP),
             retain("snap_fahrzeugtyp", G_OP_SNAP),

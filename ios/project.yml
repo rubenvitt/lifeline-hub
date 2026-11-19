@@ -1,0 +1,132 @@
+# XcodeGen-Projekt der iOS-Hülle (LLH-1978, design.md D1; Regeln: ios/AGENTS.md).
+#
+# Keine .xcodeproj im Repo: `xcodegen generate --spec ios/project.yml` erzeugt
+# ios/LifelineHub.xcodeproj. Vorher schreibt `scripts/ios/version.sh` ios/App/Version.xcconfig
+# (Version aus [workspace.package]); ohne die Datei bricht XcodeGen ab. Die XcodeGen-Version ist
+# in scripts/ios/xcodegen-installieren.sh gepinnt, den Ablauf in der CI fährt
+# scripts/ios/simulator-pruefung.sh (`.github/workflows/ios-pruefung.yml`).
+name: LifelineHub
+
+options:
+  bundleIdPrefix: dev.rubeen.lifeline
+  deploymentTarget:
+    iOS: "17.4"
+  developmentLanguage: de
+  createIntermediateGroups: true
+  xcodeVersion: "16.4"
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: H95J852PKP
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    # Die Hülle läuft auf iPhone und iPad (1 = iPhone, 2 = iPad).
+    TARGETED_DEVICE_FAMILY: "1,2"
+
+packages:
+  # Testbare Logik ohne UIKit und WebKit, auch unter Linux geprüft (Schritt 18 von check-all.sh).
+  LifelineKern:
+    path: LifelineKern
+
+targets:
+  LifelineHub:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: App
+        excludes:
+          - "Huelle/**"
+          - "Info.plist"
+          - "PrivacyInfo.xcprivacy"
+          - "Version.xcconfig"
+      # Das Init-Skript ist reines JS (Vitest führt es aus, frontend/src/test/huelle.ts); die
+      # App liest es als Ressource und spielt es als WKUserScript ein.
+      - path: App/Huelle/huelle.js
+        buildPhase: resources
+      # Privacy-Manifest (Required-Reason-APIs) liegt an der Wurzel des App-Bündels.
+      - path: App/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: LifelineKern
+    configFiles:
+      Debug: App/Version.xcconfig
+      Release: App/Version.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.ios
+        PRODUCT_NAME: LifelineHub
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: "NO"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Lifeline
+        # Aus App/Version.xcconfig (scripts/ios/version.sh); gelesen von LifelineKern.AppVersion.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LifelineVersion: $(LIFELINE_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        LSRequiresIPhoneOS: true
+        NSCameraUsageDescription: Die Kamera liest den QR-Code mit der Adresse des Einsatzservers.
+        NSLocalNetworkUsageDescription: Lifeline verbindet sich mit dem Einsatzserver im lokalen Netz, etwa mit elw.local.
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.rubeen.lifeline.ios
+            CFBundleURLSchemes:
+              - lifeline
+        # Startbildschirm in Kopf-Schwarz (Farbe aus App/Assets.xcassets), ohne Storyboard.
+        UILaunchScreen:
+          UIColorName: Kopfschwarz
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+
+  # Unit-Tests im Simulator gegen die gebaute App (Info.plist, Ressourcen).
+  LifelineHubTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: LifelineHub
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.ios.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+
+  # UI-Tests im Simulator; legen Bildschirmbilder der nativen Seiten als XCTAttachment ab, die
+  # scripts/ios/simulator-pruefung.sh aus dem Ergebnisbündel holt.
+  LifelineHubUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: AppUITests
+    dependencies:
+      - target: LifelineHub
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.ios.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+
+schemes:
+  LifelineHub:
+    build:
+      targets:
+        LifelineHub: all
+    test:
+      config: Debug
+      targets:
+        - LifelineHubTests
+        - LifelineHubUITests
+        # Der Swift-Kern läuft hier zusätzlich auf iOS (Foundation weicht von Linux ab).
+        - package: LifelineKern/LifelineKernTests

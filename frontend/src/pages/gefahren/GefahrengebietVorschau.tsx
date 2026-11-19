@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Space } from 'antd';
+import { Space, theme } from 'antd';
 import type { Gefahrengebiet, Warnstufe } from '../../api/types';
-import StatusTag from '../../components/StatusTag';
 import { Augenbraue, Datenfeld, Datenraster } from '../../components/instrument';
 import { warnstufeKarte } from '../../theme/statusFarben';
 import { datensatzAbfrage } from '../../command-palette/datensatzAbfrage';
@@ -11,6 +10,7 @@ import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import GefahrenMatrixAuszug from './GefahrenMatrixAuszug';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { beurteilungText } from './beurteilung';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Höchste Warnstufe als Etikett wie auf der Gefahrenseite, aber mit „keine Stufe gesetzt" statt
@@ -46,7 +46,7 @@ export default function GefahrengebietVorschau({
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           <Datenraster spalten={2} beschriftung="Gebietsdaten">
             <Datenfeld label="Höchste Warnstufe">
-              <StatusTag darstellung={hoechsteStufe(g.hoechste_warnstufe)} />
+              <Status darstellung={hoechsteStufe(g.hoechste_warnstufe)} />
             </Datenfeld>
             <Datenfeld label="Zonen" mono>
               {g.zonen_ids.length}
@@ -64,9 +64,12 @@ export default function GefahrengebietVorschau({
 
 function MatrixAuszug({ einsatzId, gebietId }: { einsatzId: number; gebietId: number }) {
   const matrix = useQuery(gefahrenMatrixAbfrage(einsatzId, gebietId));
+  const { token } = theme.useToken();
   return (
     <div>
-      <Augenbraue style={{ display: 'block', marginBottom: 6 }}>Bewertete Gefahren</Augenbraue>
+      <Augenbraue style={{ display: 'block', marginBottom: token.marginSM }}>
+        Bewertete Gefahren
+      </Augenbraue>
       <VorschauZustand abfrage={matrix} sorte="Die Gefahrenmatrix">
         {(m) => <GefahrenMatrixAuszug matrix={m} />}
       </VorschauZustand>

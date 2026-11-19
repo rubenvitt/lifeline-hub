@@ -110,7 +110,7 @@ test('Einsatzbericht: Einstieg, acht Blöcke, nicht genutztes Modul, kein Person
   // ── Einstieg über die Einsatzdaten.
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/einsatzdaten`);
-  await page.getByRole('link', { name: 'Einsatzbericht drucken' }).click();
+  await page.getByRole('link', { name: 'Einsatzbericht – Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einsatzdaten/bericht$`));
   const drucken = page.getByRole('button', { name: 'Drucken / als PDF' });
   await expect(drucken).toBeEnabled({ timeout: 60_000 });

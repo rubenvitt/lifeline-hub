@@ -1,5 +1,5 @@
 import { dauer } from '../anzeige/dauer';
-import { Alert, App, Breadcrumb, Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Input, Popconfirm, Space, Typography } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Fragment, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import {
   reaktiviereDisposition,
   storniereDisposition,
   updateDisposition,
+  type DispositionErwartet,
 } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -31,7 +32,8 @@ import { useUhr } from '../abloesung/useUhr';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import DemoMarke from '../components/DemoMarke';
-import { InlineAngabe } from '../components/InlineAngabe';
+import { InlineAngabe, OFFEN_LASSEN } from '../components/InlineAngabe';
+import { VERWORFEN } from '../components/useFeldKonflikt';
 import { DetailSprung } from '../components/ListeDetail';
 import { Select } from '../components/Select';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
@@ -42,7 +44,14 @@ import {
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
-import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  Paneel,
+  Status,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
@@ -73,6 +82,7 @@ import {
 } from '../routing/deeplinks';
 import { personalDetailPfad } from '../stammdaten/stammdatenDetail';
 import { statusKategorie } from '../theme/statusFarben';
+import { Marke } from '../components/instrument/Marke';
 import './EinsatzkraftPage.css';
 
 dayjs.extend(utc);
@@ -391,15 +401,24 @@ export default function EinsatzkraftPage() {
   }));
   const statusLaeuft = statusMutation.isPending;
 
-  /** Erfolg einer Angabe als Toast; die Ablehnung bleibt an der Zeile (`InlineAngabe`). */
+  /**
+   * Erfolg einer Angabe als Toast; die Ablehnung bleibt an der Zeile (`InlineAngabe`). Endet die
+   * Rückfrage „Zwischenzeitlich geändert“ ohne Speichern (LLH-1945), kein Toast: ihr Ergebnis geht
+   * an die Angabe (`OFFEN_LASSEN` hält sie offen).
+   */
   const mitToast =
     <A extends unknown[]>(angabe: string, speichern: (...a: A) => Promise<unknown>) =>
     async (...a: A) => {
-      await speichern(...a);
+      const ergebnis = await speichern(...a);
+      if (ergebnis === OFFEN_LASSEN || ergebnis === VERWORFEN) return ergebnis;
       message.success(`Gespeichert: ${angabe}`);
     };
-  const patch = (angabe: string, felder: Parameters<typeof schreiben.angabe>[1]) =>
-    mitToast(angabe, () => schreiben.angabe(ep.id, felder))();
+  /** Eine Angabe der Disposition mit ihrem Wert beim Öffnen als Altwert (Feld-CAS, LLH-1945). */
+  const patch = (
+    angabe: string,
+    felder: Parameters<typeof schreiben.angabe>[1],
+    erwartet: DispositionErwartet,
+  ) => mitToast(angabe, () => schreiben.angabe(ep.id, felder, { etikett: angabe, erwartet }))();
 
   /** Freitext einer Ad-hoc-Person (Name Pflicht, Qualifikation, Träger). */
   const textAngabe = (
@@ -416,8 +435,10 @@ export default function EinsatzkraftPage() {
       pflicht={feld === 'name'}
       isValid={(w) => !istZuLang(w, PERSONAL_ADHOC_TEXT_MAX)}
       darfSchreiben={darfSchreiben}
-      onSpeichern={(w) =>
-        patch(etikett, feld === 'name' ? { name: w.trim() } : { [feld]: w.trim() || null })
+      onSpeichern={(w, { beimOeffnen }) =>
+        feld === 'name'
+          ? patch(etikett, { name: w.trim() }, { name: beimOeffnen.trim() })
+          : patch(etikett, { [feld]: w.trim() || null }, { [feld]: beimOeffnen.trim() || null })
       }
       eingabe={({ feld: f, value, onChange }) => (
         <Input
@@ -439,11 +460,11 @@ export default function EinsatzkraftPage() {
   const einheitGesperrt = istSprungGesperrt('einheiten', freigaben);
 
   const titel: ReactNode = (
-    <Space size={8} wrap>
+    <Space size={token.marginSM} wrap>
       {ep.name}
-      {ep.ist_adhoc && <Tag>ad-hoc</Tag>}
+      {ep.ist_adhoc && <Marke>ad-hoc</Marke>}
       {ep.ist_demo && <DemoMarke />}
-      {isEntlassen && <Tag>entlassen</Tag>}
+      {isEntlassen && <Status ton="neutral" wort="entlassen" groesse="klein" />}
     </Space>
   );
 
@@ -555,7 +576,9 @@ export default function EinsatzkraftPage() {
                 einsatzfunktion={ep.einsatzfunktion}
                 vorschlaege={vorschlaege}
                 darfSchreiben={darfSchreiben}
-                onSpeichern={(einsatzfunktion) => patch('Einsatzfunktion', { einsatzfunktion })}
+                onSpeichern={(einsatzfunktion, { beimOeffnen }) =>
+                  patch('Einsatzfunktion', { einsatzfunktion }, { einsatzfunktion: beimOeffnen })
+                }
               />
             </Datenfeld>
             {einheitenFrei && (
@@ -564,7 +587,7 @@ export default function EinsatzkraftPage() {
                   wert={ep.einheit_id ?? null}
                   optionen={einheitOptionen}
                   darfSchreiben={darfSchreiben}
-                  marke={fuehrtEinheit ? <Tag>Einheitsführer</Tag> : undefined}
+                  marke={fuehrtEinheit ? <Marke>Einheitsführer</Marke> : undefined}
                   onSpeichern={mitToast('Einheit', schreiben.einheit(ep.id))}
                 />
               </Datenfeld>
@@ -612,7 +635,9 @@ export default function EinsatzkraftPage() {
                 wert={ep.staerke_position ?? null}
                 ausgeschrieben
                 darfSchreiben={darfSchreiben}
-                onSpeichern={(staerke_position) => patch('Position', { staerke_position })}
+                onSpeichern={(staerke_position, { beimOeffnen }) =>
+                  patch('Position', { staerke_position }, { staerke_position: beimOeffnen })
+                }
               />
             </Datenfeld>
             <Datenfeld label="Bemerkung" breit>
@@ -625,7 +650,13 @@ export default function EinsatzkraftPage() {
                 mehrzeilig
                 isValid={(w) => !istZuLang(w, PERSONAL_BEMERKUNG_MAX)}
                 darfSchreiben={darfSchreiben}
-                onSpeichern={(w) => patch('Bemerkung', { bemerkung: w.trim() })}
+                onSpeichern={(w, { beimOeffnen }) =>
+                  patch(
+                    'Bemerkung',
+                    { bemerkung: w.trim() },
+                    { bemerkung: beimOeffnen.trim() || null },
+                  )
+                }
                 eingabe={({ feld, value, onChange }) => (
                   <Input.TextArea
                     {...feld}

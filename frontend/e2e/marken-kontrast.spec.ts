@@ -48,7 +48,7 @@ for (const modus of ['light', 'dark'] as const) {
 
     await page.goto(`/einsaetze/${einsatzId}/personal`);
     const personalMarke = page
-      .locator(`tr[data-row-key="${kraft.id}"] .ant-tag`)
+      .locator(`tr[data-row-key="${kraft.id}"] :is([data-lfh="status"],[data-marke])`)
       .filter({ hasText: /^ad-hoc$/ });
     await expect(personalMarke).toHaveCount(1);
     // Zeiger aus der Tabelle, damit antds Zeilen-Hover die Ruhemessung nicht verfälscht.
@@ -57,7 +57,7 @@ for (const modus of ['light', 'dark'] as const) {
 
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     const fahrzeugMarke = page
-      .locator(`tr[data-row-key="${fahrzeug.id}"] .ant-tag`)
+      .locator(`tr[data-row-key="${fahrzeug.id}"] :is([data-lfh="status"],[data-marke])`)
       .filter({ hasText: /^ad-hoc$/ });
     await expect(fahrzeugMarke).toHaveCount(1);
     await page.mouse.move(1, 1);
@@ -83,7 +83,9 @@ for (const modus of ['light', 'dark'] as const) {
     // mit dem Patientenkopf (LLH-1094, die Sichtungsfläche trägt die Frage); gemessen wird
     // dieselbe Bauform (`Tag` ohne `color`) im Verlauf derselben Seite.
     await page.goto(`/einsaetze/${einsatzId}/personen/${gefunden.id}`);
-    const notiz = page.locator('.ant-tag').filter({ hasText: /^Notiz$/ });
+    const notiz = page
+      .locator(':is([data-lfh="status"],[data-marke])')
+      .filter({ hasText: /^Notiz$/ });
     await expect(notiz).toHaveCount(1);
     await page.mouse.move(1, 1);
     await pruefe(notiz, TEXT[modus], `${modus}: Notiz im Verlauf der Personen-Detailseite`);
@@ -91,7 +93,7 @@ for (const modus of ['light', 'dark'] as const) {
     // Status: der offene Abgleich war `gold` (Tag 2,76) und ist jetzt `achtung` aus dem Vertrag.
     await page.goto(`/einsaetze/${einsatzId}/personen/${vermisst.id}`);
     const verdacht = page
-      .locator('.ant-tag[data-rolle="achtung"]')
+      .locator('[data-lfh="status"][data-ton="achtung"]')
       .filter({ hasText: /^Verdacht$/ });
     await expect(verdacht).toHaveCount(1);
     await page.mouse.move(1, 1);
@@ -99,7 +101,9 @@ for (const modus of ['light', 'dark'] as const) {
 
     // Rolle im Benutzermenü: „Admin“ war `gold`.
     await page.getByRole('button', { name: 'Benutzermenü' }).click();
-    const admin = page.locator('.ant-dropdown .ant-tag').filter({ hasText: /^Admin$/ });
+    const admin = page
+      .locator('.ant-dropdown :is([data-lfh="status"],[data-marke])')
+      .filter({ hasText: /^Admin$/ });
     await expect(admin).toHaveCount(1);
     await pruefe(admin, TEXT[modus], `${modus}: Admin im Benutzermenü`);
     await page.keyboard.press('Escape');
@@ -120,7 +124,7 @@ for (const modus of ['light', 'dark'] as const) {
       const inaktiv = page
         .locator('tr.ant-table-row')
         .filter({ hasText: `E2E 1022 ${modus}` })
-        .locator('.ant-tag[data-rolle="neutral"]')
+        .locator('[data-lfh="status"][data-ton="neutral"]')
         .filter({ hasText: /^inaktiv$/ });
       await expect(inaktiv).toHaveCount(1);
       await page.mouse.move(1, 1);

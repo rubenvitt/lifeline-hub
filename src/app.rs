@@ -36,6 +36,8 @@ pub struct AppState {
     pub auto_aktualisierung: crate::karte::auto_aktualisierung::AutoAktualisierung,
     /// Lässt höchstens einen Sicherungs-Download zugleich zu (LFH-926, `GET /api/backup`).
     pub backup_download: crate::backup::DownloadSperre,
+    /// Ein ZIP der Einsatzakte je Einsatz zugleich (LLH-1835, design.md D7).
+    pub einsatzakte_bau: crate::einsatzakte::BauSperre,
     /// Öffentliche Schlüssel, an die `GET /api/backup` verschlüsselt (LFH-1002); leer → Klartext.
     pub backup_empfaenger: crate::backup::Empfaenger,
     /// Letztes Ergebnis der Datenträgerprüfung (LFH-1100), `GET /api/system/datentraeger`.
@@ -135,6 +137,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
 
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
+        .route("/api/shell", get(routes::shell::load_shell))
         .route("/api/backup", get(routes::backup::download))
         .route(
             "/api/system/datentraeger",
@@ -762,6 +765,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/betreuung/stellen/{sid}/stornieren",
             post(routes::betreuung::stelle_stornieren),
         )
+        // Storno-Stand für die offene Detailseite (LLH-1832).
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/stand",
+            get(routes::betreuung::stelle_stand),
+        )
         .route(
             "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
             get(routes::betreuung::belegung_verlauf).post(routes::betreuung::belegung_melden),
@@ -1070,6 +1078,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen/zuruecknehmen",
             post(routes::einsatz_fahrzeug::zuruecknehmen),
         )
+        // LLH-1781: „Rückgängig“ nach einem Statuswechsel.
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/status/zuruecknehmen",
+            post(routes::einsatz_fahrzeug::status_zuruecknehmen),
+        )
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/stornieren",
             post(routes::einsatz_fahrzeug::stornieren),
@@ -1240,6 +1253,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::export),
         )
         .route(
+            "/api/einsaetze/{id}/einsatzakte/anlagen.zip",
+            get(routes::einsatzakte::anlagen_zip),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/druck",
             get(routes::einsatz_person::druck),
         )
@@ -1255,6 +1272,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen/{pid}/zeile",
             get(routes::einsatz_person::zeile),
+        )
+        // Storno-Stand für die offene Detailseite, ohne Zugriffsprotokoll (LLH-1832).
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/stand",
+            get(routes::einsatz_person::stand),
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}",
@@ -3115,6 +3137,7 @@ mod tests {
                 reqwest::Client::new(),
             ),
             backup_download: Default::default(),
+            einsatzakte_bau: Default::default(),
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
         }

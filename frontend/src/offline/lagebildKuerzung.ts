@@ -37,6 +37,10 @@ export const PERSON_AUF_DER_PLATTE = {
   geaendert_at: 'behalten',
   geaendert_von: 'behalten',
   storniert_at: 'behalten',
+  // LLH-1832: wer storniert hat, braucht nur das Banner der offenen Detailseite; die Listen führen
+  // stornierte Personen ohnehin nicht.
+  storniert_von: 'auslassen',
+  storniert_von_name: 'auslassen',
   aktuelle_sichtung: 'behalten',
   aktuelle_sichtung_at: 'behalten',
   aktueller_verbleib: 'behalten',

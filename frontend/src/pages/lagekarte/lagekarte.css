@@ -52,7 +52,7 @@
    ohne Fläche. Die BREITE setzt MapLibre bei jeder Bewegung inline; sie bleibt unangetastet. */
 .lfh-massstab .maplibregl-ctrl-scale {
   margin: 0;
-  padding: 0 4px;
+  padding: 0 var(--lfh-luft-1);
   background: transparent;
   border: 2px solid var(--lfh-gedaempft);
   border-top: 0;

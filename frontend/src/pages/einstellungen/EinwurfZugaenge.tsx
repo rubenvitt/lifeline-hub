@@ -3,7 +3,7 @@ import { Alert, App, Button, Form, Input, Modal, Radio, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { IconKreuz, IconPlus } from '../../icons';
-import { Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
+import { Paneel, Status, monoStil, useRollen, Feld, Stapel } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -133,7 +133,7 @@ function AdresseDialog({
   transport: EinwurfTransport | undefined;
   onFertig: () => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   const adresse = neu
     ? einwurfAdresse(window.location.origin, neu.schluessel, neu.zugang.scope)
     : '';
@@ -152,32 +152,33 @@ function AdresseDialog({
       destroyOnHidden
     >
       {neu && (
-        <div
-          data-lfh="einwurf-adresse"
-          style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
-        >
-          <span style={{ color: rollen.gedaempft }}>Nur jetzt sichtbar.</span>
-          {transport && adresseBrauchtHttps(transport, window.location.protocol) && (
-            <Alert
-              type="warning"
-              showIcon
-              title="Adresse beginnt mit http"
-              description="Der Server nimmt Einwürfe nur über https an."
-            />
-          )}
-          <KopierbarerText text={adresse} bezeichnung="Adresse">
-            <span
-              data-lfh="einwurf-adresse-text"
-              style={{ ...monoStil(13, 500), wordBreak: 'break-all' }}
-            >
-              {adresse}
-            </span>
-          </KopierbarerText>
-          <KopierbarerText text={neu.schluessel} bezeichnung="Schlüssel">
-            <span style={{ ...monoStil(12, 500), color: rollen.gedaempft, wordBreak: 'break-all' }}>
-              {neu.schluessel}
-            </span>
-          </KopierbarerText>
+        <div data-lfh="einwurf-adresse">
+          <Stapel abstand="sm">
+            <span style={{ color: rollen.gedaempft }}>Nur jetzt sichtbar.</span>
+            {transport && adresseBrauchtHttps(transport, window.location.protocol) && (
+              <Alert
+                type="warning"
+                showIcon
+                title="Adresse beginnt mit http"
+                description="Der Server nimmt Einwürfe nur über https an."
+              />
+            )}
+            <KopierbarerText text={adresse} bezeichnung="Adresse">
+              <span
+                data-lfh="einwurf-adresse-text"
+                style={{ ...monoStil(13, 500), wordBreak: 'break-all' }}
+              >
+                {adresse}
+              </span>
+            </KopierbarerText>
+            <KopierbarerText text={neu.schluessel} bezeichnung="Schlüssel">
+              <span
+                style={{ ...monoStil(12, 500), color: rollen.gedaempft, wordBreak: 'break-all' }}
+              >
+                {neu.schluessel}
+              </span>
+            </KopierbarerText>
+          </Stapel>
         </div>
       )}
     </Modal>
@@ -439,30 +440,25 @@ export default function EinwurfZugaenge() {
                             }}
                           >
                             <span data-lfh="einwurf-name">{z.name}</span>
-                            <StatusChip ton={zustand.ton} wort={zustand.wort} />
+                            <Status groesse="klein" ton={zustand.ton} wort={zustand.wort} />
                           </span>
                         }
                         description={
-                          <span
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 2,
-                              color: rollen.gedaempft,
-                            }}
-                          >
-                            <RechteText scopes={[z.scope]} />
-                            <span>
-                              {z.zuletzt_genutzt_at
-                                ? `zuletzt genutzt ${zeit(z.zuletzt_genutzt_at)}`
-                                : 'noch nie genutzt'}
-                              {z.gueltig_bis && ` · gültig bis ${zeitVoll(z.gueltig_bis)}`}
-                              {z.schluessel_gewechselt_at &&
-                                !widerrufenAm &&
-                                ` · Schlüssel gewechselt ${zeit(z.schluessel_gewechselt_at)}`}
-                              {z.widerrufen_at &&
-                                ` · widerrufen ${zeitVoll(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
-                            </span>
+                          <span style={{ color: rollen.gedaempft }}>
+                            <Stapel als="span" abstand="xxs">
+                              <RechteText scopes={[z.scope]} />
+                              <span>
+                                {z.zuletzt_genutzt_at
+                                  ? `zuletzt genutzt ${zeit(z.zuletzt_genutzt_at)}`
+                                  : 'noch nie genutzt'}
+                                {z.gueltig_bis && ` · gültig bis ${zeitVoll(z.gueltig_bis)}`}
+                                {z.schluessel_gewechselt_at &&
+                                  !widerrufenAm &&
+                                  ` · Schlüssel gewechselt ${zeit(z.schluessel_gewechselt_at)}`}
+                                {z.widerrufen_at &&
+                                  ` · widerrufen ${zeitVoll(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
+                              </span>
+                            </Stapel>
                           </span>
                         }
                       />
@@ -489,7 +485,7 @@ export default function EinwurfZugaenge() {
         onFertig={() => setAnlegenOffen(false)}
         onAbbrechen={() => setAnlegenOffen(false)}
       >
-        <Form.Item
+        <Feld
           label="Name"
           name="name"
           rules={[
@@ -498,20 +494,22 @@ export default function EinwurfZugaenge() {
           ]}
         >
           <Input placeholder="BOSWatch Wache 1" maxLength={ANBINDUNG_NAME_MAX} />
-        </Form.Item>
-        <Form.Item label="Zweck" name="scope" rules={[{ required: true, message: 'Zweck wählen' }]}>
-          <Radio.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
-            {EINWURF_ZWECKE.map((s) => (
-              <Radio key={s} value={s}>
-                {SCOPE_TEXT[s]}{' '}
-                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
-              </Radio>
-            ))}
+        </Feld>
+        <Feld label="Zweck" name="scope" rules={[{ required: true, message: 'Zweck wählen' }]}>
+          <Radio.Group>
+            <Stapel abstand="xxs">
+              {EINWURF_ZWECKE.map((s) => (
+                <Radio key={s} value={s}>
+                  {SCOPE_TEXT[s]}{' '}
+                  <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+                </Radio>
+              ))}
+            </Stapel>
           </Radio.Group>
-        </Form.Item>
-        <Form.Item label="Gültig bis" name="gueltig_bis">
+        </Feld>
+        <Feld label="Gültig bis" name="gueltig_bis">
           <ZeitpunktEingabe art="frist" placeholder="bis zum Widerruf" style={{ width: '100%' }} />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <Rueckfrage

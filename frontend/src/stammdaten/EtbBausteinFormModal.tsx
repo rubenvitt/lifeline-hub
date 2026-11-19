@@ -1,4 +1,5 @@
-import { Collapse, Form, Input, InputNumber, Typography } from 'antd';
+import { Collapse, Form, Input, InputNumber } from 'antd';
+import { Feld, MetaZeile, Stapel, Textstufe } from '../components/instrument';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -91,34 +92,37 @@ export default function EtbBausteinFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+      <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
         <Input placeholder="z. B. Lage unverändert" />
-      </Form.Item>
-      <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
+      </Feld>
+      <Feld label="Typ" name="typ" rules={[{ required: true }]}>
         <Select options={ERFASSBARE_TYPEN.map((t) => ({ value: t, label: etbTyp[t].label }))} />
-      </Form.Item>
+      </Feld>
       {/* Die automatischen Platzhalter als sichtbare Legende, kein Satz (LFH-1078); die Form
          (`10okt26`) gehört sichtbar dazu, nicht nur in einen `title` (Touch). Dass ein freier
          Platzhalter wie `{einheit}` beim Einsetzen abgefragt wird, zeigt das Beispiel im Feld;
          Klick-Chips wären eine neue Funktion. */}
-      <Form.Item
+      <Feld
         label="Inhalt"
         name="inhalt"
         rules={[{ required: true, whitespace: true }]}
         extra={
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Automatisch:{' '}
-            {AUTO_PLATZHALTER.map((p, i) => (
-              <span key={p.name}>
-                {i > 0 && ' · '}
-                <code>{`{${p.name}}`}</code> {p.beschreibung}
-              </span>
-            ))}
-          </Typography.Text>
+          <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
+            <Textstufe stufe="textKlein" ton="gedaempft">
+              Automatisch:
+            </Textstufe>
+            <MetaZeile>
+              {AUTO_PLATZHALTER.map((p) => (
+                <MetaZeile.Teil key={p.name} ton="gedaempft">
+                  <code>{`{${p.name}}`}</code> {p.beschreibung}
+                </MetaZeile.Teil>
+              ))}
+            </MetaZeile>
+          </Stapel>
         }
       >
         <Input.TextArea rows={2} placeholder="z. B. {einheit} an Einsatzstelle eingetroffen" />
-      </Form.Item>
+      </Feld>
       {/* FELDBUDGET: drei sichtbare Felder, drei eingeklappt. Label, Typ und Inhalt sind die
          Pflichtwerte und bleiben oben; Meldeweg und Veranlassung sind optional, die Sortierung hat
          mit 0 einen brauchbaren Vorgabewert (LFH-343).
@@ -127,22 +131,22 @@ export default function EtbBausteinFormModal({
          Felder" nicht prüfbar. Gegenmittel am `onErfassen` oben. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: 'calc(-1 * var(--lfh-luft-2))' }}
         items={[
           {
             key: 'weitere',
             label: 'Weitere Angaben',
             children: (
               <>
-                <Form.Item label="Meldeweg (optional)" name="meldeweg">
+                <Feld label="Meldeweg (optional)" name="meldeweg">
                   <Select allowClear options={MELDEWEG_OPTIONEN} />
-                </Form.Item>
-                <Form.Item label="Veranlassung (optional)" name="veranlassung">
+                </Feld>
+                <Feld label="Veranlassung (optional)" name="veranlassung">
                   <Input />
-                </Form.Item>
-                <Form.Item label="Sortierung" name="sortier">
-                  <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-                </Form.Item>
+                </Feld>
+                <Feld label="Sortierung" name="sortier" breite="kurz">
+                  <InputNumber min={0} />
+                </Feld>
               </>
             ),
           },

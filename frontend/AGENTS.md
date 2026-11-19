@@ -58,21 +58,33 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
-  30/48/72 gilt, nicht die Entwurfsskizze.
+  30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
+  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nicht. Die
+  Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue `fontSize`-Zahlen
+  verbietet `theme/schriftgroesse.guard.test.ts`; die Altlast steht in `schriftgroesse.schuld.ts`
+  und sinkt wie beim Abstandsraster.
 - **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
   handschuh 4·8·16·24·44·64. In TSX nimmst du das antd-Token (`paddingXXS…XL`, `marginXXS…XL`;
-  MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. Ein festes Kompakt-Raster gibt es nicht.
-  Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
-  `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
-  `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
-  (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter.
+  MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. antds Steuerelement-Polster
+  (`controlPaddingHorizontal`/`…SM`) stehen auf `md`/`sm`; die Inhaltspolster (`paddingContent*`:
+  Knopf, Modal, Alert, Liste) bleiben bewusst antds feste Werte. Ein festes Kompakt-Raster gibt es nicht.
+  Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und `gutter`
+  verbietet `theme/abstandsraster.guard.test.ts` ohne Schuldliste (ADR-0067). Wo kein `token` zur
+  Hand ist (Stil auf Modulebene, `tagRender`), nimmst du `var(--lfh-luft-*)`; ein Wert, der kein
+  Layoutabstand ist (Kartenrand bei `fitBounds`), steht als benannte Konstante. Feste Ausnahmen
+  (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter. Elemente
+  reiht `Stapel abstand="…"` (Stufe, nie Zahl) statt `Space direction="vertical"` oder eines
+  Flex-`div` mit `gap`.
 - **Bausteine** in `components/instrument/` (Import über `index.ts`, Dateikopf nennt die Regel):
   `Augenbraue` (`als="h2…h6"`) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
-  Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`StatusChip` (`wort` Pflicht, Übersetzung
-  nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; wann welche Form: Bausteinwahl, „Umschalten“;
+  Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`Status` (`wort` Pflicht, Übersetzung
+  nur in `statusFlaeche.ts`; `Status` randlos, getönt, Formzeichen, Größen `klein`/`normal`) ·
+  `Marke` (Kennzeichnung ohne Zustand, neutral, randlos; `onEntfernen` macht sie bedienbar) ·
+  `StatusKnopf`/`StatusBlock` (bedienbarer Status, nur über `StatusWahl`; Spec
+  `status-darstellung`, Change `eon26eat-status-und-bedienung`) · `Segmentleiste` (statt antds `Segmented`; wann welche Form: Bausteinwahl, „Umschalten“;
   `SegmentFeld` als Formularfeld; `SegmentUmschalter` als ein Umschaltknopf daneben, LLH-1065; Wortlaut einzeilig; ein `\n` im `label` bricht ihn in zwei
   Zeilen, nur wo die Höhe sie trägt und einzeilig kein Platz bliebe: „Ohne\nSchicht“ der
   Ablösung im Handschuh-Betrieb auf dem Handschirm, LLH-1128) · `Sammelbanner` ·
@@ -86,7 +98,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
   (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `AlarmZeile` („Was brennt“, LLH-1743,
-  Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten).
+  Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten) ·
+  `Textstufe` (Stufe und Ton, kein `style`) · `Stapel` (Abstand als Rasterstufe) · `MetaZeile`
+  (Angaben mit „·“, leere Teile fallen weg, `Teil mono` für Zahlen) · `Feld` (`Form.Item` mit
+  `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`). Im
+  Verwaltungsteil verlangt `components/feld.guard.test.ts` `Feld` statt `Form.Item` und keine
+  Breite am Eingabefeld; ein Feld ohne Formular steht in einem `div` mit
+  `className={FELD_KLASSE}` und `maxWidth: 'var(--lfh-feld-…)'` (dann füllen auch Zahl, Datum
+  und Auswahl die Hülle).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
   `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
   `anzeige/Ortsfeld.tsx`, im Einsatz `anzeige/EinsatzOrtsfeld.tsx` (Ortsfeld) ·
@@ -152,6 +171,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block).
     `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die Leiste, nicht
     Hinweis oder Beschreibung darunter.
+  - **Modulwechsel zeigt sofort Kopf und Gerippe** (LLH-1838, Spec `seiten-zustaende`): Der
+    Router zeichnet jeden Wechsel als Übergang und hält das alte Bild, bis die neue Seite fertig
+    ist. Deshalb hängt das `<Outlet />` des Einsatzrahmens in `einsatz/ModulWechselGerippe.tsx`.
+    Wechselt das Modul, steht im ersten Bild `ModulGerippeSeite` (Seitenkopf mit `modulName` und Ortspfad,
+    `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
+    im selben Modul und nicht beim ersten Aufruf. Eine Seite baut kein eigenes Vorab-Gerippe für
+    den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
+    Ladetext. Herleitung: `openspec/changes/archive/2026-11-18-q71gt8zq-modulwechsel-gerippe/design.md`.
   - **Zwei Höhen** (zjt7c073 D2, `components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
     (`useRahmenOben`) dazu der klebende Seitenkopf. Die Kopfhöhe nehmen nur, was neben dem Inhalt
@@ -365,11 +392,18 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Lagebild aus Zahlen, Verteilung und Listen                                                      | Dashboard-Baukasten                                                                                                                              | `Dashboard`, `DashboardListen`     |
 | Kopfaktion mit wechselndem Wortlaut                                                             | `BreiteHalten`                                                                                                                                   | `BreiteHalten`                     |
 | Übung kennzeichnen                                                                              | `UebungsBand`/`UebungsMarke` (Rahmen, „Übung“)                                                                                                   | `Uebung`                           |
+| Navigation im Einsatz (Kategorien und Module)                                                   | `IconRail`/`ModulPanel` ab `lg`, darunter Navigations-Drawer („UI-Form-Leitlinie“)                                                               | `Navigation`                       |
 | **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
+| Nebenangaben eines Datensatzes in einer Zeile                                                   | `MetaZeile`                                                                                                                                      | `MetaZeile`                        |
+| Text in einer Größe und Farbe                                                                   | `Textstufe` (Stufe der `schriftskala`, Ton)                                                                                                      | `Text`                             |
+| Elemente mit Abstand reihen                                                                     | `Stapel` (Rasterstufe)                                                                                                                           | `Stapel`                           |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
+| Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
-| Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
+| Zustand eines Datensatzes (Status, Urteil, storniert)                                           | `Status`, im Raster `StatusZelle` (Farbachsen, „Rahmen heißt bedienbar“)                                                                         | `Status`                           |
+| Status, den man wechseln kann                                                                   | `StatusWahl` (rendert `StatusKnopf`; Tableau `variante="gross"`)                                                                                 | `Status`                           |
+| Kennzeichnung ohne Zustand (ad-hoc, Rolle, Typ, Herkunft)                                       | `Marke` (entfernbar mit `onEntfernen`), nie rohes `Tag`                                                                                          | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
 | Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts`, Dauer `anzeige/dauer.ts` („Zeitdarstellung“, „Uhr, Dauer und Datenstand“)                                          | `Zeitdarstellung`                  |
 | Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
@@ -386,7 +420,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | **Eingabe**                                                                                     |                                                                                                                                                  |                                    |
 | Eine Handlung auslösen                                                                          | antd `Button`, Farben aus `antdKnopf` („Farbe und Zeichen“, „Rot bedient nichts“)                                                                | `Knopf`                            |
 | Frei oder gesperrt mit Grund                                                                    | Sperrzeichen aus `index.css` („Gesperrt trägt die Sperre ohne Farbe“)                                                                            | `Gesperrt`                         |
-| Ein Feld mit Beschriftung und Fehlerzeile                                                       | antd `Input`/`Select` in `Form.Item`, ohne `Form.Item` `FeldFehler`                                                                              | `Eingabefeld`                      |
+| Ein Feld mit Beschriftung und Fehlerzeile                                                       | `Feld` mit `breite` (Hülle um `Form.Item`), ohne Formular `FeldFehler`                                                                           | `Eingabefeld`                      |
 | Zeitpunkt eingeben                                                                              | `ZeitpunktEingabe`                                                                                                                               | `Zeiteingabe`                      |
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
@@ -471,7 +505,11 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    `useFeldKonflikt` lädt beim 409 neu und fragt nur, wenn die Angabe sich wirklich geändert hat.
    Ein fremder Wert im offenen Feld steht dort als Hinweis, die Eingabe bleibt. Wo der Server einen
    Änderungsvermerk liefert (`vermerke`), steht er leise an der Zeile (`VermerkZeile`) und der
-   jüngste im Paneelkopf (`PaneelVermerk`). Noch ohne Feld-CAS: die Schreibwege in LLH-1945.
+   jüngste im Paneelkopf (`PaneelVermerk`). **Wege ohne offenes Feld** (Platzieren, Fläche, Zeichen
+   wählen, Umhängen per Ziehen, Skizze; LLH-1945) schicken den Stand zu Beginn der Handlung als
+   `erwartet` und zeigen beim 409 denselben Dialog; „Übernehmen“ schreibt ohne Altwert,
+   „Verwerfen“ und Escape lassen die Handlung verfallen. Ohne Altwert bleiben Knöpfe und Dialoge,
+   die einen festen oder errechneten Wert setzen (Status, Lagezustand, „Kapazität übernehmen“).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
@@ -506,8 +544,10 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   `personen/Sichtungsboard.tsx`): es ordnet dieselbe Menge in Spalten je Kategorie, statt dieselbe
   Liste als Tabelle oder Karten zu zeigen.
 - **FMS-Tableau** (LFH-642, `kraefte/FmsTableau.tsx`): Ansicht `?ansicht=tableau` der
-  Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl`), Kachel selbst nicht
-  klickbar; Sortierung Abschnitt → Einheit → Funkrufname, nie Status; der Abschnitt ist der
+  Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl` `variante="gross"`: der
+  Statusblock mit Ziffer 40 px, LLH-1782, Spec `fms-tableau`), Kachel selbst nicht klickbar;
+  Rufname 22 px Mono, Typ und Einheit darunter, Kacheln ab 240 px (`auto-fill`, eine einzelne wird
+  nie fensterbreit); Sortierung Abschnitt → Einheit → Funkrufname, nie Status; der Abschnitt ist der
   eigene der Einheit, sonst der geerbte (`abschnittDerEinheit`, dieselbe Lesart wie die
   Abschnitt-Spalte der Liste, LLH-1073); `fms_anker` 0–9 nur Beschleuniger (Doppelbelegung setzt
   nichts) (`docs/superpowers/specs/2026-09-23-lfh-642-pruefliste.md`).
@@ -560,7 +600,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 
 **Farbachsen** (Vertrag `theme/statusFarben.ts`)
 
-- **Betroffene** (LFH-455, `StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
+- **Betroffene** (LFH-455, `Status`): Personenstatus neutral, „vermisst" `achtung`; Schaden
   „offen" neutral (Eingang, Spec `statusrollen`), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (LFH-608, `abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
@@ -594,11 +634,17 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
   jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
   nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung (LLH-1083, LLH-1785,
-  Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
-  Spec `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): kein Preset hält
-  den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
-  Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
-  Demo-Marke, Blau bedient.
+  Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein rohes antds `Tag`**
+  (LLH-1779, Spec `status-darstellung`, ESLint `no-restricted-imports`; Ausnahme nur
+  `SichtungsTag`): ein Zustand steht in `Status` mit einer Rolle aus dem Vertrag; eine
+  Kennzeichnung ohne Zustand (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist eine neutrale `Marke`,
+  Blau bedient. Urteile („unterbesetzt“, „Soll erfüllt“) sind Zustände, keine Marken.
+- **Rahmen heißt bedienbar** (LLH-1780, Spec `status-darstellung`): einen Rahmen trägt nur, was
+  man bedienen kann. `Status` und `Marke` sind randlos; der bedienbare Status ist der
+  `StatusKnopf` (Fläche der Rolle, Rahmen in ihrer Kante, Pfeil ▾, 14 px, sichtbar so hoch wie
+  die Dichtehöhe 30/48/72), eine entfernbare Marke trägt Rahmen und ✕. Die Sichtung bleibt das
+  umrandete BBK-Feld; wo sie bedienbar ist, legt sich der Knopfrahmen außen darum. Nachweis
+  `theme/statusKnopfKontrast.test.ts`.
   Übergabe, Geschädigt-Bezug, UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind
   unabhängig.
 - **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)
@@ -779,7 +825,9 @@ anwendbar), „nicht geprüft" ist keins.
   „Filter zurücksetzen“ leert Suche und Filter, nicht die Sortierung). Die gefilterte Kopfzelle
   trägt eine 2-px-Linie in `bedien`. Was man nicht sieht, wirkt nicht: der Filter einer
   ausgeblendeten Spalte schneidet nichts und steht nicht als Chip da. Der Kartenzweig zeigt
-  dieselbe Menge und sortiert über „Sortieren“. Im Servermodus zählt das Kopfmenü nicht und die
+  dieselbe Menge und sortiert über „Sortieren“; zurück geht es über den Eintrag „wie geliefert“,
+  nicht über ein Löschkreuz (LLH-1798, Spec `einsatztauglichkeit-layout`: es war 12 × 12 px und der
+  einzige Rückweg). Im Servermodus zählt das Kopfmenü nicht und die
   Zahlen kommen vom Server (`serverseitig.zahlen`). Sortierung, Filter und Suche stehen in der
   Adresse (`?sort=ort:auf&f.ausmass=gross&q=`, `routing/deeplinks.ts`), sonst gilt der Stand der
   Sitzung; die Spaltenwahl liegt am Gerät — beides über `useListenGedaechtnis`
@@ -874,6 +922,12 @@ anwendbar), „nicht geprüft" ist keins.
   (21,5/36). Ohne Text (antds Tabellenfilter) kein Boden; im Menüeintrag hebt
   `style={{ minHeight: 0 }}` ihn auf, dort ist der Eintrag das Ziel (`SpaltenSchalter`).
   Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7).
+- **Schließen-Kreuz eines Hinweises** (LLH-1798, Spec `einsatztauglichkeit-layout`): jedes
+  schließbare `Alert` bekommt den Boden über den Kontext (`antdHinweis(dichte)` in
+  `theme/tokens.ts`, `alert` am `ConfigProvider`: 24 / 48 / 72 auf beiden Achsen am Knopf selbst),
+  höhenneutral über einen negativen Rand; antd zeichnete es 12 × 14 px in jeder Stufe. Kein eigenes
+  `closeIcon` oder `styles.close` je Stelle. Nachweis `e2e/gate3-trefflaeche.spec.ts` („Hinweis-Kreuz
+  und kurzer Ortspfad-Link“, wirksame Fläche per `elementFromPoint`).
 - **Handgebautes Bedienziel** (LFH-365): `minHeight: token.controlHeight` **plus** `padding` aus
   `token.paddingSM`/`token.padding` (aufgelöste Tokens, nie `var(--lfh-*)`), geprüft über eine
   reine exportierte Stilfunktion (`bedienzielStil`) mit Böden als **Literalen**. **Ein `<a>` erbt
@@ -884,8 +938,9 @@ anwendbar), „nicht geprüft" ist keins.
   trägt die Karte, ein Klick darauf wählt über den Kartenhalter.
 - **Die Brotkrume hat keine Dichte-Ausnahme** (LFH-909): jeder Link im Ortspfad des Seitenkopfs
   hält die Staffel über `ortspfadStil` (`components/EinsatzSeite.tsx`) und die Pfad-Link-Regel in
-  `EinsatzSeite.css`, durchsichtiger Rand statt Schrift (bleibt 12 px). Die CSS liest
-  `--lfh-ortspfad-ziel`, die Stilfunktion setzt dort den aufgelösten Token, kein `var(--lfh-*)`
+  `EinsatzSeite.css`, durchsichtiger Rand statt Schrift (bleibt 12 px), dazu die Mindestbreite eines
+  Knopfs der Stufe (`controlHeightSM`, LLH-1798: „ETB“ war 32 px breit). Die CSS liest
+  `--lfh-ortspfad-ziel` und `--lfh-ortspfad-breite`, die Stilfunktion setzt dort den aufgelösten Token, kein `var(--lfh-*)`
   der Dichte. Seiten geben nur ihre `Breadcrumb` hinein, kein eigener Boden je Seite.
 - **Tastenkürzel als Marke** (LFH-335), nie nacktes `<kbd>`: `components/Tastenkuerzel.tsx`
   (Flex mit `gap`, `currentColor`, **kein** `controlHeight`-Boden; `tastenkuerzelStil` pinnt die
@@ -1001,16 +1056,21 @@ anwendbar), „nicht geprüft" ist keins.
 - **Ein Anker in der Zeile bedient den Klick allein** (Riegel `closest('a')` in `Datensicht`);
   mit `titel.ziel` erzeugt das `render` keinen Anker.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET**; Speichern gehört ins `<form>`.
-- **Nebenwege im Kopf gehen über `weitere` der `EinsatzSeite`** (LFH-963, Spec
-  `einsatztauglichkeit-layout`, Entscheidung 8): Drucken, CSV, Listenzugriffe und ähnliche
-  Öffnen-Wege stehen ab `md` als sekundäre Knöpfe, unter `md` hinter EINEM Auslöser „Weitere“
-  (`MenueAusloeser`, Name nennt die Seite). In `aktionen` bleibt nur, was am Handy sichtbar sein
+- **Nebenwege im Kopf gehen über `weitere` der `EinsatzSeite`** (LFH-963, LLH-1786, Spec
+  `einsatztauglichkeit-layout`, „Der Seitenkopf bündelt Nebenwege unter md und ab Stufe 48“):
+  Drucken, CSV, Listenzugriffe und ähnliche Öffnen-Wege stehen in `kompakt` ab `md` als sekundäre
+  Knöpfe, unter `md` und in den Stufen 48 / 72 in jeder Breite hinter EINEM Auslöser „Weitere“
+  (`MenueAusloeser`, Name nennt die Seite; Weiche `nebenwegeImMenue`, Seiten mit eigenem Kopf
+  `useNebenwegeImMenue`). e2e wählt einen Nebenweg über `e2e/nebenweg-kern.ts`. In `aktionen` bleibt nur, was am Handy sichtbar sein
   muss: Segmentleiste und genau eine Erfassung, auf Betroffenen- und Tiere-Liste dazu „Vermisst
   melden“. Nachgezogen sind Betroffene, Tiere, Schäden und die Detailseiten Lagebericht und
   Befehl (LFH-1079: Sprung und Drucken über `etb/useZumEtbEintrag.ts` und
   `components/druck/useDruckNebenwege.ts`; ein gesperrter Weg nennt den Grund im `label`).
-  Kräfteübersicht, Funkplan und Kommunikationsplan tragen keinen Nebenweg im Kopf.
-  Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`.
+  Das Meldebild (Kräfteübersicht) trägt „In Lagebericht übernehmen“ als Nebenweg (LLH-1786).
+  Wortlaut und Platz jedes Druckeinstiegs: `src/druck/AGENTS.md`, „Wortlaut und Platz der
+  Druckeinstiege“ (LLH-1836).
+  Herleitung: `openspec/changes/archive/2026-10-06-lfh-963-betroffene-tiere-handy/design.md`,
+  Stufen 48 / 72: `openspec/changes/archive/2026-11-18-z137bgm5-seitenkopf-einzeilig/design.md`.
 - **Eine Sektion wickelt ihren Seitenrahmen selbst** (`AdminPage` in der Sektion; Drift-Test
   `adminNav.test.tsx`). Detailseite ohne Einzel-Endpunkt, wenn die Listenform alles trägt
   (`/admin/stammdaten/{fahrzeuge,personal}/:id`), sonst Einzel-GET; Admin-Pfade in
@@ -1183,10 +1243,17 @@ anwendbar), „nicht geprüft" ist keins.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
-- **Statusfarbe: Rollenfarben als getönte Fläche, Mandantenfarben nur am Rand** (Neuentwurf
-  22.09.2026): `StatusTag` Vorgabe `flaeche`, Werte/Kontrast nur in
-  `components/instrument/statusFlaeche.ts`; gesetzte `status_farbe` erzwingt `rand`
-  (`wirksameDarstellungsart`). Gemessen in `kraefte-kontrast.spec.ts`.
+- **Statusfarbe: Rollenfarben als getönte Fläche, Mandantenfarben nur als Punkt** (Neuentwurf
+  22.09.2026, LLH-1779): `Status` und `StatusKnopf` tönen nach der Rolle, Werte/Kontrast nur in
+  `components/instrument/statusFlaeche.ts`; eine gesetzte `status_farbe` ist ein Punkt neben dem
+  Wort, nie Fläche oder Rand. Der Knopfrand ist gemessen in `kraefte-kontrast.spec.ts`.
+- **Statusmenü und Quittung bei Fahrzeugen** (LLH-1781, Spec `fahrzeugstatus-quittung`):
+  `StatusWahl` mit `titel` = Rufname als Menükopf; das Menü misst beim Öffnen den Platz
+  (`menueLage`), öffnet zur größeren Seite, begrenzt die Höhe und steht im Handschuh-Betrieb
+  in zwei Spalten, wenn eine nicht passt, in drei, wenn auch zwei nicht passen. Nach jedem Wechsel des Fahrzeug-FMS die Quittung
+  „85-1: S2 → S3 · Rückgängig“ (`kraefte/useFahrzeugStatusQuittung.ts`, Schlüssel je Fahrzeug)
+  mit dem Beleg aus der PATCH-Antwort an `…/status/zuruecknehmen`. Personal-, Material- und
+  Einheitsstatus haben noch keinen Rückweg.
 - **Material** (LFH-341, `materialStatus`): `im_einsatz` `bedien`, `defekt`/`verbraucht` `alarm`;
   `pages/MaterialPage.tsx` und `kraefte/MaterialAmOrt.tsx` (Material am Ort) lesen beide von dort — zwei
   Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss. Am Ort (LLH-1133,
@@ -1211,7 +1278,7 @@ anwendbar), „nicht geprüft" ist keins.
   `openspec/changes/archive/2026-10-01-lfh-662-dwd-ebene-gueltigkeit-warnstufe/design.md` D5,
   `pegelZustand` in `openspec/changes/archive/2026-10-04-lfh-881-pegelzustand-statusvertrag/design.md` D1–D2,
   `besatzungsUrteil` in `openspec/changes/archive/2026-10-06-lfh-962-farbvertrag-wort/design.md` D1). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
-  der Datei, kein `<Tag color={…}>` auf Vertrags-Enums (dafür `components/StatusTag.tsx`).
+  der Datei; rohes `Tag` sperrt ESLint (LLH-1779).
 
 **Farbe und Zeichen**
 
@@ -1654,6 +1721,15 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   Seitenkette (`useInfiniteQuery`) bekommt eine Zeile nur innerhalb des geladenen Fensters
   (`fensterEinsortieren`, LFH-1075); entscheidet über die Zugehörigkeit nur der Server
   (Suchbegriff), geht die Kette an den Sammler. Kennzahlen gleicht immer der Sammler ab.
+- **Storno sperrt offene Detailseiten** (LLH-1832, Spec `storno-sperre`): Person, Tier, Schaden
+  und Betreuungsstelle zeigen einen Storno ohne Zutun. Oben steht `components/StornoBanner.tsx`
+  („Storniert von … um …“), alle Schreibwege hängen an `storniert_at`. Tier- und Schadendetail
+  sind dafür live; die Person gleicht ihren protokollfreien Stand ab (`personStand`), die
+  Betreuungsstelle fragt ihn erst ab, wenn sie aus der Übersicht fällt
+  (`betreuungsstelleStand`). Eine offene Eingabe verliert dabei ihren Text nicht: `InlineAngabe`
+  hält einen geänderten Entwurf schreibgeschützt, wenn `darfSchreiben` wegfällt; Formulare
+  sperren ihre Felder über `entwurfNurLesen` (Text `readOnly`, sonst `disabled`) und zeigen nur
+  „Schließen“. Eine unberührte Bearbeitung schließt.
 - **Kein Inline-String-Array als Query-Key** (`queryKeys.guard.test.ts`, `queryKeyScan.ts`).
 - **Wire-Strings sind eingefroren** (`globalKeys.test.ts`, gegen handgeschriebene Literale).
 - Sub-Keys: String-Union-Token als zweites Element; der argumentlose Accessor ist der

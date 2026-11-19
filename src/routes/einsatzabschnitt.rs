@@ -258,6 +258,30 @@ pub struct AbschnittPatchBody {
     pub lagezustand: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschnittsauftrag: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+    /// Änderung“): je Feld der Wert beim Öffnen; fehlt = kein Vergleich, `null` = leer erwartet.
+    pub erwartet: Option<AbschnittErwartet>,
+}
+
+/// Altwerte des Abschnitts, dreiwertig wie [`AbschnittPatchBody`]; die Verbindungen als ganze
+/// Liste. Der Lagezustand trägt keinen: jede Wahl ist eine neue Beurteilung mit eigenem
+/// ETB-Eintrag, kein Überschreiben eines Stammdatums.
+#[derive(Debug, Default, Deserialize)]
+pub struct AbschnittErwartet {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ueber_abschnitt_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub leiter_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub rufname: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kurzbezeichnung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub abschnittsauftrag: Option<Option<String>>,
+    pub verbindungen: Option<Vec<VerbindungBody>>,
 }
 
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid} — echter Teil-Patch (LFH-306).
@@ -303,33 +327,110 @@ pub async fn update(
         None => None,
     };
     let abschnittsauftrag = trimme_tri(body.abschnittsauftrag);
-    // Nur ein echter Namenswechsel meldet die Träger des Namens (LLH-1291).
-    let name_vorher = match &name {
-        Some(_) => Some(
-            abschnitt_repo::load(&state.pool, einsatz_id, aid)
-                .await?
-                .name,
+
+    // Feld-CAS (LLH-1945): Altwert nur mit Änderung desselben Felds (422); Formen wie der Patch
+    // (getrimmt, gespeicherte Form). Die Lage je Feld steht vor den Einzelprüfungen, die
+    // Kombination prüft erst danach (`src/AGENTS.md`, Statuscode-Konvention).
+    let erwartet = body.erwartet.unwrap_or_default();
+    let erwartet_lage: &[crate::feld_cas::FeldLage] = &[
+        ("name", erwartet.name.is_some(), name.is_some()),
+        (
+            "ueber_abschnitt_id",
+            erwartet.ueber_abschnitt_id.is_some(),
+            body.ueber_abschnitt_id.is_some(),
         ),
-        None => None,
+        (
+            "leiter_id",
+            erwartet.leiter_id.is_some(),
+            body.leiter_id.is_some(),
+        ),
+        (
+            "bemerkung",
+            erwartet.bemerkung.is_some(),
+            bemerkung.is_some(),
+        ),
+        ("rufname", erwartet.rufname.is_some(), rufname.is_some()),
+        (
+            "kurzbezeichnung",
+            erwartet.kurzbezeichnung.is_some(),
+            kurz.is_some(),
+        ),
+        (
+            "abschnittsauftrag",
+            erwartet.abschnittsauftrag.is_some(),
+            abschnittsauftrag.is_some(),
+        ),
+        (
+            "verbindungen",
+            erwartet.verbindungen.is_some(),
+            neue_verbindungen.is_some(),
+        ),
+    ];
+    let erwartet_name = erwartet.name.as_deref().map(str::trim);
+    let erwartet_bemerkung = trimme_tri(erwartet.bemerkung);
+    let erwartet_rufname = trimme_tri(erwartet.rufname);
+    let erwartet_kurz = trimme_tri(erwartet.kurzbezeichnung);
+    let erwartet_auftrag = trimme_tri(erwartet.abschnittsauftrag);
+    let erwartet_verbindungen = erwartet
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
+    crate::feld_cas::pruefe_felder(erwartet_lage, &[])?;
+    let altwerte = {
+        use crate::feld_cas::ExpectedValue::{Integer, Text};
+        fn text(v: &Option<Option<String>>) -> Option<crate::feld_cas::ExpectedValue<'_>> {
+            v.as_ref().map(|v| Text(v.as_deref()))
+        }
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        w.push("name", erwartet_name.map(|n| Text(Some(n))));
+        w.push(
+            "ueber_abschnitt_id",
+            erwartet.ueber_abschnitt_id.map(Integer),
+        );
+        w.push("leiter_id", erwartet.leiter_id.map(Integer));
+        w.push("bemerkung", text(&erwartet_bemerkung));
+        w.push("rufname", text(&erwartet_rufname));
+        w.push("kurzbezeichnung", text(&erwartet_kurz));
+        w.push("abschnittsauftrag", text(&erwartet_auftrag));
+        w
     };
-    let mut anzeige = abschnitt_repo::update(
-        &state.pool,
-        einsatz_id,
-        aid,
-        AbschnittPatch {
-            name: name.as_deref(),
-            ueber_abschnitt_id: body.ueber_abschnitt_id,
-            leiter_id: body.leiter_id,
-            bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
-            rufname: rufname.as_ref().map(|v| v.as_deref()),
-            sortier: body.sortier,
-            kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
-            abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
-        },
-    )
-    .await?;
-    // Der Name ist jetzt gespeichert: sofort melden, auch wenn ein späterer Schritt (Sprechgruppen,
-    // Verbindungen) mit 422 scheitert.
+
+    let patch = AbschnittPatch {
+        name: name.as_deref(),
+        ueber_abschnitt_id: body.ueber_abschnitt_id,
+        leiter_id: body.leiter_id,
+        bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
+        rufname: rufname.as_ref().map(|v| v.as_deref()),
+        sortier: body.sortier,
+        kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
+        abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
+    };
+    abschnitt_repo::check_patch(&state.pool, einsatz_id, aid, &patch).await?;
+    // Altwerte, Spaltenfelder und Verbindungen in EINER Schreibtransaktion (LLH-1945, Vorbild
+    // Einheit): ein überholter Altwert schreibt nichts. Nur ein echter Namenswechsel meldet die
+    // Träger des Namens (LLH-1291).
+    let bezug = verbindungen::Bezug::Abschnitt(aid);
+    let name_vorher = crate::write_retry!(&state.pool, |conn| {
+        let name_vorher = match &name {
+            Some(_) => Some(abschnitt_repo::name_tx(conn, einsatz_id, aid).await?),
+            None => None,
+        };
+        if let Some(alt) = &erwartet_verbindungen {
+            if *alt != verbindungen::liste_tx(conn, einsatz_id, bezug).await? {
+                // Erst die Existenz: ein unbekannter Abschnitt bleibt 404.
+                abschnitt_repo::name_tx(conn, einsatz_id, aid).await?;
+                return Err(AppError::Veraltet);
+            }
+        }
+        abschnitt_repo::update_tx(conn, einsatz_id, aid, &patch, &altwerte).await?;
+        if let Some(liste) = &neue_verbindungen {
+            verbindungen::ersetzen_tx(conn, einsatz_id, bezug, liste).await?;
+        }
+        Ok(name_vorher)
+    })?;
+    let mut anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
+    // Der Name ist jetzt gespeichert: sofort melden, auch wenn ein späterer Schritt (Lage,
+    // Sprechgruppen) mit 422 scheitert.
     if name_vorher.is_some_and(|v| v != anzeige.name) {
         sse_umbenannt(&state, einsatz_id, aid).await;
     }
@@ -374,16 +475,6 @@ pub async fn update(
             einsatz_id,
             aid,
             &ids,
-        )
-        .await?;
-        anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
-    }
-    if let Some(liste) = neue_verbindungen {
-        verbindungen::ersetzen(
-            &state.pool,
-            einsatz_id,
-            verbindungen::Bezug::Abschnitt(aid),
-            &liste,
         )
         .await?;
         anzeige = abschnitt_repo::load(&state.pool, einsatz_id, aid).await?;
@@ -503,6 +594,8 @@ pub struct FlaecheBody {
     pub tz_fachaufgabe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_organisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945): je Feld der Wert zu Beginn der Handlung; fehlt = kein Vergleich.
+    pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid}/flaeche — Lage-Pflege, KEIN ETB.
@@ -513,6 +606,12 @@ pub async fn flaeche(
     JsonBody(body): JsonBody<FlaecheBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let erwartet = body.erwartet.unwrap_or_default();
+    let altwerte = erwartet.altwerte(&[
+        ("flaeche_geojson", body.flaeche_geojson.is_some()),
+        ("tz_fachaufgabe", body.tz_fachaufgabe.is_some()),
+        ("tz_organisation", body.tz_organisation.is_some()),
+    ])?;
     if let Some(Some(gj)) = &body.flaeche_geojson {
         // Größe vor dem Parsen, Struktur nach den bestehenden 422 (LFH-937, design.md D7).
         crate::lage_zone::pruefe_geometrie_groesse(gj, "flaeche_geojson")?;
@@ -536,6 +635,7 @@ pub async fn flaeche(
             tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
             tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
         },
+        &altwerte,
     )
     .await?;
     sse_abschnitt(&state, einsatz_id, aid);

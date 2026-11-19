@@ -102,11 +102,11 @@ Wie die Aktionen selbst gehen, beschreiben [Benutzer](benutzer.md) und
 ### Anmeldungen
 
 - **„Anmeldung“**: eine Anmeldung ist gelungen, mit Passwort, SSO, Passkey oder zweitem Faktor,
-  ebenso das Koppeln eines Geräts und die Anmeldung der Mac-App über den Browser. Wer einen
-  zweiten Faktor eingerichtet hat, ist erst nach dem Code angemeldet; das Passwort allein
+  ebenso das Koppeln eines Geräts und die Anmeldung der Mac- oder iOS-App über den Browser. Wer
+  einen zweiten Faktor eingerichtet hat, ist erst nach dem Code angemeldet; das Passwort allein
   schreibt noch keine Zeile. Ebenso schreibt ein Einmalpasswort allein noch keine Zeile: Mit dem
-  Festlegen des eigenen Passworts entstehen „Passwort geändert“ und „Anmeldung“. Mit zweitem
-  Faktor steht „Anmeldung“ schon nach dem Code, beim Festlegen folgt nur „Passwort geändert“.
+  Festlegen des eigenen Passworts entstehen „Passwort geändert“ und „Anmeldung“. Mit zweitem Faktor
+  steht „Anmeldung“ schon nach dem Code, beim Festlegen folgt nur „Passwort geändert“.
 - **„Anmeldung fehlgeschlagen“**: falsches Passwort, unbekannter Name, falscher Code des zweiten
   Faktors, abgewiesener Passkey oder SSO-Rücksprung, ungültiger Kopplungscode.
 - **„Abmeldung“**: die Person hat „Abmelden“ gewählt.
@@ -124,10 +124,10 @@ in dieser Spur, und eine Anmeldung, die nur abläuft, endet still.
 
 - **„Konto“**: der angemeldete Name, beim Fehlversuch der versuchte. Gekoppelte Geräte stehen mit
   ihrem Gerätekonto „geraet-…“. Namen über 64 Zeichen stehen gekürzt mit „…“.
-- **„Anmeldeweg“**: „Passwort“, „SSO“, „Passkey“, „Zweiter Faktor“ (Passwort und Code),
-  „Gerätecode“ (gekoppelte Geräte) oder „Mac-App“ (Anmeldung der Mac-App über den Browser). Bei
-  „Abmeldung“ und „Sitzung beendet“ steht der Weg, auf dem die beendete Anmeldung entstand. Ist
-  er nicht bekannt, steht „—“: so bei Anmeldungen, die schon vor dem Update mit diesem Klartext
+- **„Anmeldeweg“**: „Passwort“, „SSO“, „Passkey“, „Zweiter Faktor“ (Passwort und Code), „Gerätecode“
+  (gekoppelte Geräte) oder „Lifeline-App“ (Anmeldung der Mac- oder iOS-App über den Browser). Bei
+  „Abmeldung“ und „Sitzung beendet“ steht der Weg, auf dem die beendete Anmeldung entstand. Ist er
+  nicht bekannt, steht „—“: so bei Anmeldungen, die schon vor dem Update mit diesem Klartext
   bestanden. Ältere Abmeldungen zeigen noch „Passwort“, auch wenn die Anmeldung anders entstand.
 - **„Quelle“**: die IP-Adresse, von der die Anfrage kam. Steht der Server hinter einem
   Reverse-Proxy, ist das nur dann die Adresse des Geräts, wenn der Betrieb den Proxy als

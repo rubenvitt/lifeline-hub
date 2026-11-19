@@ -20,13 +20,14 @@ import {
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
-import { StatusChip, UebungsBand, UebungsMarke } from '../components/instrument';
+import { Status, UebungsBand, UebungsMarke } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
 import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
+import ModulWechselGerippe from './ModulWechselGerippe';
 import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
@@ -604,7 +605,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 Paneel „Führung“ auf Einsatzdaten; der Kopf bleibt dem Einsatznamen. */}
               {mittel && einsatz?.fuehrung && !einsatz.fuehrung.fuehrend && (
                 <span data-lfh="kopf-fuehrung">
-                  <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
+                  <Status
+                    groesse="klein"
+                    ton="achtung"
+                    wort={fuehrungBeiKurz(einsatz.fuehrung.bei)}
+                  />
                 </span>
               )}
               {/* Übung (LLH-1725, D5): ab `md` vor dem Namen; darunter trägt das klebende Band.
@@ -790,7 +795,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                       darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
                     />
                   ) : (
-                    <Outlet />
+                    // Modulwechsel zeigt sofort Kopf und Gerippe (LLH-1838, Spec
+                    // `seiten-zustaende`): nach Wächter und Sperre, damit beide Vorrang behalten.
+                    <ModulWechselGerippe modul={aktuellesModul}>
+                      <Outlet />
+                    </ModulWechselGerippe>
                   )}
                 </NichtGefundenProvider>
               </ImEinsatzRahmenProvider>

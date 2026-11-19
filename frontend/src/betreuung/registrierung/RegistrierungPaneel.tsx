@@ -17,6 +17,8 @@ import type {
 } from '../../api/types';
 import { useAuth } from '../../auth/AuthContext';
 import { ErfassungsModal } from '../../components/Erfassung';
+import { NebenwegeImKopf } from '../../components/EinsatzSeite';
+import { druckansichtNebenweg } from '../../components/druck/useDruckNebenwege';
 import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloeser';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
@@ -72,9 +74,10 @@ import {
  *   Haushalte stehen oben als „vorgemerkt“, vorgemerkt abgemeldete Personen tragen das Wort statt
  *   des Knopfs.
  * - Gesperrt mit Grund: ohne Schreibrecht (`rechteGrund`) oder an einer geschlossenen Stelle.
- * - **„Registrierliste drucken“** (LLH-1616) führt auf die Druckansicht der Stelle, auch ohne
- *   Schreibrecht und an einer geschlossenen Stelle; am Gerät nur an der Betreuungsstelle. Eigene
- *   Zeile über dem Band, nicht im Kopf: bei 390 px liefe der Kopf sonst über (Gate 1).
+ * - **„Registrierliste – Druckansicht“** (LLH-1616) führt auf die Druckansicht der Stelle, auch
+ *   ohne Schreibrecht und an einer geschlossenen Stelle; am Gerät nur an der Betreuungsstelle. Er
+ *   steht im Kopf des Paneels (LLH-1836, `druck/AGENTS.md`, „Wortlaut und Platz“), unter `md`
+ *   hinter dem schmalen Auslöser „Weitere“: so läuft der Kopf bei 390 px nicht über (Gate 1).
  */
 
 interface Ziel {
@@ -203,7 +206,7 @@ export default function RegistrierungPaneel({
     onError: (e, { personId }) => zeilenFehler.melde(personId, e, 'Bezugsperson nicht geändert'),
   });
 
-  // Registrierliste drucken (LLH-1616): auch ohne Schreibrecht; am Gerät nur die Betreuungsstelle
+  // Registrierliste – Druckansicht (LLH-1616): auch ohne Schreibrecht; am Gerät nur die Betreuungsstelle
   // (`geraetDarf`), sonst fehlt der Pfad (`EinsatzPfade.registrierlisteDruck`).
   const druckPfad =
     pfade.registrierlisteDruck && geraetDarfHier('registrierliste-druck')
@@ -456,32 +459,17 @@ export default function RegistrierungPaneel({
           >
             Registrieren
           </Button>
+          {druckPfad && (
+            <NebenwegeImKopf
+              name="Weitere zur Registrierung"
+              eintraege={[
+                druckansichtNebenweg({ ziel: druckPfad, navigate, dokument: 'Registrierliste' }),
+              ]}
+            />
+          )}
         </span>
       }
     >
-      {/* Eigene Zeile statt Kopf (LLH-1616): bei 390 px trägt der Kopf neben Grund und
-          „Registrieren“ keinen dritten Knopf (Gate 1), und eine Aktion wird nie gekürzt. */}
-      {druckPfad && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            marginBlockEnd: token.marginXS,
-          }}
-        >
-          <Button
-            href={druckPfad}
-            onClick={(e) => {
-              // Ein Link mit Knopfgestalt: Strg/⌘+Klick öffnet den neuen Tab wie jeder Link.
-              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-              e.preventDefault();
-              navigate(druckPfad);
-            }}
-          >
-            Registrierliste drucken
-          </Button>
-        </div>
-      )}
       {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
           nicht (sie liegt bewusst nicht auf der Platte), die Vormerkungen sind trotzdem zu sehen. */}
       {abmeldungBeantragt && (

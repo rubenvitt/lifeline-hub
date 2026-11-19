@@ -524,7 +524,10 @@ export default function ChatPage() {
           umbrechende Flex-Zeile bemisst sich an ihrem Inhalt, statt ihre Kinder auf die
           Containerhöhe zu strecken — die Begrenzung liefe ins Leere und die Eingabe stünde
           unter dem Bild. Unbedenklich, weil unter `md` nur ein Col in der Zeile steht. */}
-      <Row gutter={16} style={{ flex: 1, minHeight: 0, flexWrap: 'nowrap', alignItems: 'stretch' }}>
+      <Row
+        gutter={token.marginLG}
+        style={{ flex: 1, minHeight: 0, flexWrap: 'nowrap', alignItems: 'stretch' }}
+      >
         {!istSchmal && (
           <Col data-testid="kanal-spalte" md={6} lg={5} style={{ overflowY: 'auto' }}>
             <KanalListe

@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Modal, Spin, Tag, Typography, Upload } from 'antd';
+import { Alert, Button, Flex, Modal, Spin, Typography, Upload } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 import { SCHICHTPLAN_DATEI_MAX_BYTES } from '../../api/eingabegrenzen';
@@ -9,6 +9,7 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useRollen } from '../../components/instrument';
 import { IconHochladen } from '../../icons';
 import { ImportVorschauAnsicht, LEERE_WAHL, zaehlungMarken } from './ImportVorschauAnsicht';
+import { Marke } from '../../components/instrument/Marke';
 
 /**
  * „Schichtplan einlesen“ (LLH-1556, design.md D10): Knopf und Dialog in drei Stufen — Datei,
@@ -146,7 +147,7 @@ export default function SchichtplanEinlesen({ einsatzId }: SchichtplanEinlesenPr
               </Typography.Text>
               <Flex gap={token.marginXS} wrap>
                 {zaehlungMarken(ergebnis.zaehlung).map((m) => (
-                  <Tag key={m}>{m}</Tag>
+                  <Marke key={m}>{m}</Marke>
                 ))}
               </Flex>
             </Flex>

@@ -1,6 +1,6 @@
 import { Button, Modal, Space } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -100,7 +100,7 @@ export default function ExterneStellenTab() {
           {s.zustaendig && (
             <>
               {' '}
-              <StatusChip ton="normal" wort="zuständig" />
+              <Status groesse="klein" ton="normal" wort="zuständig" />
             </>
           )}
           {herkunft.quelle && (
@@ -159,9 +159,9 @@ export default function ExterneStellenTab() {
       onFilter: (wert, s) => s.aktiv === wert,
       render: (_, s) =>
         s.aktiv ? (
-          <StatusChip ton="normal" wort="Aktiv" />
+          <Status groesse="klein" ton="normal" wort="Aktiv" />
         ) : (
-          <StatusChip ton="neutral" wort="Inaktiv" />
+          <Status groesse="klein" ton="neutral" wort="Inaktiv" />
         ),
     },
     ...(istAdmin

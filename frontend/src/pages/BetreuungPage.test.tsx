@@ -186,6 +186,21 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(screen.queryByText(/Keine Betreuungsstellen/)).toBeNull();
   });
 
+  it('klappt „Unterbringung in Zahlen“ ein: eine Zeile mit Belegung und freien Plätzen (LLH-1786)', async () => {
+    try {
+      renderPage();
+      await screen.findByText('Turnhalle Ost');
+      const kopf = screen.getByRole('button', { name: /^Unterbringung in Zahlen/ });
+      expect(kopf).toHaveAttribute('aria-expanded', 'true');
+      await userEvent.click(kopf);
+      expect(kopf).toHaveAttribute('aria-expanded', 'false');
+      expect(kopf).toHaveTextContent(/in Betreuung · .* frei/);
+      expect(screen.queryByRole('group', { name: 'Unterbringung in Zahlen' })).toBeNull();
+    } finally {
+      window.localStorage.clear();
+    }
+  });
+
   it('Block Betreuungsstellen: Tabelle, „frei" nur mit Kapazität, Auslastungswort als zweiter Kanal', async () => {
     renderPage();
     await screen.findByText('Turnhalle Ost');

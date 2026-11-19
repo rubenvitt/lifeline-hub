@@ -29,11 +29,18 @@ die Karten deckungsgleich.
 | Lagebild aus Zahlen, Verteilung und Listen                                                      | Dashboard-Baukasten                                                                                                                              | `Dashboard`, `DashboardListen`     |
 | Kopfaktion mit wechselndem Wortlaut                                                             | `BreiteHalten`                                                                                                                                   | `BreiteHalten`                     |
 | Übung kennzeichnen                                                                              | `UebungsBand`/`UebungsMarke` (Rahmen, „Übung“)                                                                                                   | `Uebung`                           |
+| Navigation im Einsatz (Kategorien und Module)                                                   | `IconRail`/`ModulPanel` ab `lg`, darunter Navigations-Drawer („UI-Form-Leitlinie“)                                                               | `Navigation`                       |
 | **Darstellen**                                                                                  |                                                                                                                                                  |                                    |
 | Angaben eines Datensatzes                                                                       | `Datenraster`/`Datenfeld`                                                                                                                        | `Datenraster`                      |
+| Nebenangaben eines Datensatzes in einer Zeile                                                   | `MetaZeile`                                                                                                                                      | `MetaZeile`                        |
+| Text in einer Größe und Farbe                                                                   | `Textstufe` (Stufe der `schriftskala`, Ton)                                                                                                      | `Text`                             |
+| Elemente mit Abstand reihen                                                                     | `Stapel` (Rasterstufe)                                                                                                                           | `Stapel`                           |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
+| Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
-| Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
+| Zustand eines Datensatzes (Status, Urteil, storniert)                                           | `Status`, im Raster `StatusZelle` (Farbachsen, „Rahmen heißt bedienbar“)                                                                         | `Status`                           |
+| Status, den man wechseln kann                                                                   | `StatusWahl` (rendert `StatusKnopf`; Tableau `variante="gross"`)                                                                                 | `Status`                           |
+| Kennzeichnung ohne Zustand (ad-hoc, Rolle, Typ, Herkunft)                                       | `Marke` (entfernbar mit `onEntfernen`), nie rohes `Tag`                                                                                          | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
 | Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts`, Dauer `anzeige/dauer.ts` („Zeitdarstellung“, „Uhr, Dauer und Datenstand“)                                          | `Zeitdarstellung`                  |
 | Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
@@ -50,7 +57,7 @@ die Karten deckungsgleich.
 | **Eingabe**                                                                                     |                                                                                                                                                  |                                    |
 | Eine Handlung auslösen                                                                          | antd `Button`, Farben aus `antdKnopf` („Farbe und Zeichen“, „Rot bedient nichts“)                                                                | `Knopf`                            |
 | Frei oder gesperrt mit Grund                                                                    | Sperrzeichen aus `index.css` („Gesperrt trägt die Sperre ohne Farbe“)                                                                            | `Gesperrt`                         |
-| Ein Feld mit Beschriftung und Fehlerzeile                                                       | antd `Input`/`Select` in `Form.Item`, ohne `Form.Item` `FeldFehler`                                                                              | `Eingabefeld`                      |
+| Ein Feld mit Beschriftung und Fehlerzeile                                                       | `Feld` mit `breite` (Hülle um `Form.Item`), ohne Formular `FeldFehler`                                                                           | `Eingabefeld`                      |
 | Zeitpunkt eingeben                                                                              | `ZeitpunktEingabe`                                                                                                                               | `Zeiteingabe`                      |
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
@@ -81,10 +88,15 @@ die Karten deckungsgleich.
 
 - **Paneel** (`components/Paneel/`, Gruppe Flächen)
 - **Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)** (`components/Seitenkopf/`, Gruppe Rahmen)
+- **Navigation im Einsatz (Rail und Modulpanel)** (`components/Navigation/`, Gruppe Rahmen)
 - **Dashboard-Baukasten (Verteilung, Matrix, Kopf-Aktion)** (`components/Dashboard/`, Gruppe Flächen)
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
-- **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
+- **Textstufe (Stufen der Schriftskala und Töne)** (`components/Text/`, Gruppe Flächen)
+- **Stapel (Abstand als Rasterstufe, senkrecht und als Zeile)** (`components/Stapel/`, Gruppe Flächen)
+- **MetaZeile (Nebenangaben eines Datensatzes)** (`components/MetaZeile/`, Gruppe Daten)
+- **Status, Marke und Statusknopf (Rahmen heißt bedienbar)** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
+- **Klappbares Kennzahlenband** (`components/KlappBand/`, Gruppe Daten)
 - **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
 - **Großbild: Zeilen** (`components/GrossZeile/`, Gruppe Großbild)
 - **Segmentleiste (Filter, Umbruch, als Formularfeld)** (`components/Segmentleiste/`, Gruppe Bedienung)
@@ -98,7 +110,7 @@ die Karten deckungsgleich.
 - **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
 - **BearbeitbaresPaneel (offen und gesperrt)** (`components/BearbeitbaresPaneel/`, Gruppe Formular)
 - **Knopf (primär, Standard, Text, Gefahr, gesperrt, mit Symbol)** (`components/Knopf/`, Gruppe Eingabe)
-- **Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)** (`components/Eingabefeld/`, Gruppe Eingabe)
+- **Eingabefeld (Feld mit Breitenstufe, Pflicht mit Fehlerzeile, FeldFehler)** (`components/Eingabefeld/`, Gruppe Eingabe)
 - **Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)** (`components/Formularlayout/`, Gruppe Eingabe)
 - **Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)** (`components/Dialog/`, Gruppe Eingabe)
 - **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
@@ -155,16 +167,25 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
-  30/48/72 gilt, nicht die Entwurfsskizze.
+  30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
+  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nicht. Die
+  Stufen wachsen nicht mit der Dichte. Neue `fontSize`-Zahlen
+  verbietet `theme/schriftgroesse.guard.test.ts`; die Altlast steht in `schriftgroesse.schuld.ts`
+  und sinkt wie beim Abstandsraster.
 - **Abstandsraster**: Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
   handschuh 4·8·16·24·44·64. In TSX nimmst du das antd-Token (`paddingXXS…XL`, `marginXXS…XL`;
-  MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. Ein festes Kompakt-Raster gibt es nicht.
-  Neue Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und
-  `gutter` verbietet `theme/abstandsraster.guard.test.ts`. Die Altlast steht je Datei in
-  `abstandsraster.schuld.ts`; die Zahl sinkt im selben Commit wie der Abbau. Feste Ausnahmen
-  (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter.
+  MD = LG). In CSS nimmst du `var(--lfh-luft-0…5)`. antds Steuerelement-Polster
+  (`controlPaddingHorizontal`/`…SM`) stehen auf `md`/`sm`; die Inhaltspolster (`paddingContent*`:
+  Knopf, Modal, Alert, Liste) bleiben bewusst antds feste Werte. Ein festes Kompakt-Raster gibt es nicht.
+  Zahl-Literale über 2 px in `padding*`/`margin*`/`gap`, `<Space size>`, `gap=` und `gutter`
+  verbietet `theme/abstandsraster.guard.test.ts` ohne Schuldliste. Wo kein `token` zur
+  Hand ist (Stil auf Modulebene, `tagRender`), nimmst du `var(--lfh-luft-*)`; ein Wert, der kein
+  Layoutabstand ist (Kartenrand bei `fitBounds`), steht als benannte Konstante. Feste Ausnahmen
+  (Lagemonitor, Hilfe-Prosa, Anmeldung, Druck) stehen mit Grund im Wächter. Elemente
+  reiht `Stapel abstand="…"` (Stufe, nie Zahl) statt `Space direction="vertical"` oder eines
+  Flex-`div` mit `gap`.
 - **Orientierung**: den Tab-Titel setzen nur die Rahmen über
   `components/useDokumentTitel.ts`, aus dem Modulnamen der Registry („Seite · Einsatz ·
   lifeline-hub“); keine Seite setzt `document.title`. Der Einsatzstatus steht nie im h1, sondern
@@ -206,6 +227,14 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block).
     `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die Leiste, nicht
     Hinweis oder Beschreibung darunter.
+  - **Modulwechsel zeigt sofort Kopf und Gerippe**: Der
+    Router zeichnet jeden Wechsel als Übergang und hält das alte Bild, bis die neue Seite fertig
+    ist. Deshalb hängt das `<Outlet />` des Einsatzrahmens in `einsatz/ModulWechselGerippe.tsx`.
+    Wechselt das Modul, steht im ersten Bild `ModulGerippeSeite` (Seitenkopf mit `modulName` und Ortspfad,
+    `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
+    im selben Modul und nicht beim ersten Aufruf. Eine Seite baut kein eigenes Vorab-Gerippe für
+    den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
+    Ladetext.
   - **Zwei Höhen** (`components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
     (`useRahmenOben`) dazu der klebende Seitenkopf. Die Kopfhöhe nehmen nur, was neben dem Inhalt
@@ -288,7 +317,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 
 (Vertrag `theme/statusFarben.ts`)
 
-- **Betroffene** (`StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
+- **Betroffene** (`Status`): Personenstatus neutral, „vermisst" `achtung`; Schaden
   „offen" neutral (Eingang), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (`abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
@@ -321,10 +350,17 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `text` (`sichtungsKante`), gewählt mit ✓ und 3-px-Rahmen. Nach einer Wahl behalten die übrigen
   ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
   jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
-  nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein `color` an antds `Tag`** außer `"default"`: kein Preset hält
-  den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
-  Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
-  Demo-Marke, Blau bedient.
+  nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein rohes antds `Tag`**
+  (ESLint `no-restricted-imports`; Ausnahme nur
+  `SichtungsTag`): ein Zustand steht in `Status` mit einer Rolle aus dem Vertrag; eine
+  Kennzeichnung ohne Zustand (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist eine neutrale `Marke`,
+  Blau bedient. Urteile („unterbesetzt“, „Soll erfüllt“) sind Zustände, keine Marken.
+- **Rahmen heißt bedienbar**: einen Rahmen trägt nur, was
+  man bedienen kann. `Status` und `Marke` sind randlos; der bedienbare Status ist der
+  `StatusKnopf` (Fläche der Rolle, Rahmen in ihrer Kante, Pfeil ▾, 14 px, sichtbar so hoch wie
+  die Dichtehöhe 30/48/72), eine entfernbare Marke trägt Rahmen und ✕. Die Sichtung bleibt das
+  umrandete BBK-Feld; wo sie bedienbar ist, legt sich der Knopfrahmen außen darum. Nachweis
+  `theme/statusKnopfKontrast.test.ts`.
   Übergabe, Geschädigt-Bezug, UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind
   unabhängig.
 - **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)
@@ -492,7 +528,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   „Filter zurücksetzen“ leert Suche und Filter, nicht die Sortierung). Die gefilterte Kopfzelle
   trägt eine 2-px-Linie in `bedien`. Was man nicht sieht, wirkt nicht: der Filter einer
   ausgeblendeten Spalte schneidet nichts und steht nicht als Chip da. Der Kartenzweig zeigt
-  dieselbe Menge und sortiert über „Sortieren“. Im Servermodus zählt das Kopfmenü nicht und die
+  dieselbe Menge und sortiert über „Sortieren“; zurück geht es über den Eintrag „wie geliefert“,
+  nicht über ein Löschkreuz (es war 12 × 12 px und der
+  einzige Rückweg). Im Servermodus zählt das Kopfmenü nicht und die
   Zahlen kommen vom Server (`serverseitig.zahlen`). Sortierung, Filter und Suche stehen in der
   Adresse (`?sort=ort:auf&f.ausmass=gross&q=`, `routing/deeplinks.ts`), sonst gilt der Stand der
   Sitzung; die Spaltenwahl liegt am Gerät — beides über `useListenGedaechtnis`
@@ -584,6 +622,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (21,5/36). Ohne Text (antds Tabellenfilter) kein Boden; im Menüeintrag hebt
   `style={{ minHeight: 0 }}` ihn auf, dort ist der Eintrag das Ziel (`SpaltenSchalter`).
   Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7).
+- **Schließen-Kreuz eines Hinweises**: jedes
+  schließbare `Alert` bekommt den Boden über den Kontext (`antdHinweis(dichte)` in
+  `theme/tokens.ts`, `alert` am `ConfigProvider`: 24 / 48 / 72 auf beiden Achsen am Knopf selbst),
+  höhenneutral über einen negativen Rand; antd zeichnete es 12 × 14 px in jeder Stufe. Kein eigenes
+  `closeIcon` oder `styles.close` je Stelle. Nachweis `e2e/gate3-trefflaeche.spec.ts` („Hinweis-Kreuz
+  und kurzer Ortspfad-Link“, wirksame Fläche per `elementFromPoint`).
 - **Handgebautes Bedienziel**: `minHeight: token.controlHeight` **plus** `padding` aus
   `token.paddingSM`/`token.padding` (aufgelöste Tokens, nie `var(--lfh-*)`), geprüft über eine
   reine exportierte Stilfunktion (`bedienzielStil`) mit Böden als **Literalen**. **Ein `<a>` erbt
@@ -594,8 +638,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   trägt die Karte, ein Klick darauf wählt über den Kartenhalter.
 - **Die Brotkrume hat keine Dichte-Ausnahme**: jeder Link im Ortspfad des Seitenkopfs
   hält die Staffel über `ortspfadStil` (`components/EinsatzSeite.tsx`) und die Pfad-Link-Regel in
-  `EinsatzSeite.css`, durchsichtiger Rand statt Schrift (bleibt 12 px). Die CSS liest
-  `--lfh-ortspfad-ziel`, die Stilfunktion setzt dort den aufgelösten Token, kein `var(--lfh-*)`
+  `EinsatzSeite.css`, durchsichtiger Rand statt Schrift (bleibt 12 px), dazu die Mindestbreite eines
+  Knopfs der Stufe (`controlHeightSM`, „ETB“ war 32 px breit). Die CSS liest
+  `--lfh-ortspfad-ziel` und `--lfh-ortspfad-breite`, die Stilfunktion setzt dort den aufgelösten Token, kein `var(--lfh-*)`
   der Dichte. Seiten geben nur ihre `Breadcrumb` hinein, kein eigener Boden je Seite.
 - **Tastenkürzel als Marke**, nie nacktes `<kbd>`: `components/Tastenkuerzel.tsx`
   (Flex mit `gap`, `currentColor`, **kein** `controlHeight`-Boden; `tastenkuerzelStil` pinnt die

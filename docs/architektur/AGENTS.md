@@ -13,7 +13,7 @@ arc42, von Agenten geschrieben und laufend fortgeführt; ADRs nach
 - **Verweisen statt kopieren.** Eine Regel steht genau einmal (Wurzel-`AGENTS.md`). Kapitel 8
   nennt das Konzept und zeigt auf die Bereichs-`AGENTS.md`, ein Design-Doc unter
   `docs/superpowers/specs/`, `openspec/specs/<name>/` oder ein Archiv-`design.md` (beide
-  eingefroren, ADR-0065); es wiederholt deren Regeln nicht. Pfade stehen in Backticks, relative
+  eingefroren, ADR-0069); es wiederholt deren Regeln nicht. Pfade stehen in Backticks, relative
   Links müssen auflösen (Wächter).
 - **Diagramme als Mermaid** in ```` ```mermaid ````, keine Bilddateien. Knoten heißen wie die
   Bausteine in Kapitel 5.

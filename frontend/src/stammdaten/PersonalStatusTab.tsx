@@ -1,5 +1,5 @@
-import { Collapse, Form, Input, InputNumber, Switch, type TableColumnsType } from 'antd';
-import { monoStil } from '../components/instrument';
+import { Collapse, Input, InputNumber, Switch, type TableColumnsType } from 'antd';
+import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
 import { Select } from '../components/Select';
 import {
@@ -11,10 +11,10 @@ import {
 import type { PersonalStatus, StatusKategorie, ZeitachseMarke } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
-import StatusTag from '../components/StatusTag';
 import { statusKategorie } from '../theme/statusFarben';
 import KatalogVerwaltung from './KatalogVerwaltung';
 import { markeFeld, markeHinweis, markeSpalte } from './zeitachseMarke';
+import { Status } from '../components/instrument/Status';
 
 interface FormWerte {
   label: string;
@@ -53,14 +53,14 @@ const spalten: TableColumnsType<PersonalStatus> = [
     onFilter: (wert, s) => s.kategorie === wert,
     // In der Folge der Kategorien, nicht nach dem Wort (LLH-1096).
     sorter: nachZahl((s: PersonalStatus) => kategorien.indexOf(s.kategorie)),
-    render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
+    render: (k: StatusKategorie) => <Status darstellung={statusKategorie[k]} />,
   },
   {
     title: 'Farbe',
     dataIndex: 'farbe',
     key: 'farbe',
     // Der gepflegte Code als Wert (Mono), keine Farbfläche: `status_farbe` ist ungeprüfter
-    // Freitext, sein Kontrast ist nicht zugesichert (siehe `StatusTag`, Mandantenfarbe).
+    // Freitext, sein Kontrast ist nicht zugesichert (siehe `Status`, Mandantenfarbe).
     render: (f: string | null) => (f ? <span style={monoStil(12)}>{f}</span> : '—'),
   },
   markeSpalte,
@@ -109,24 +109,24 @@ const aktualisiere = (id: number, werte: FormWerte) =>
 
 const felder = (
   <>
-    <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
+    <Feld label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
       <Input />
-    </Form.Item>
-    <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
+    </Feld>
+    <Feld label="Kategorie" name="kategorie" rules={[{ required: true }]}>
       <Select options={kategorien.map((k) => ({ value: k, label: statusKategorie[k].label }))} />
-    </Form.Item>
-    <Form.Item label="Farbe (Hex, optional)" name="farbe">
+    </Feld>
+    <Feld label="Farbe (Hex, optional)" name="farbe">
       <Input placeholder="#22aa55" />
-    </Form.Item>
-    <Form.Item label="Sortierung" name="sortier">
-      <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
-    </Form.Item>
+    </Feld>
+    <Feld label="Sortierung" name="sortier" breite="kurz">
+      <InputNumber min={0} />
+    </Feld>
     {/* Die Marke (LFH-552) und der Schalter „Pause“ (LLH-1555) liegen eingeklappt: vier Felder
         stehen schon offen, ein fünftes sprengte das Feldbudget. Ohne `forceRender` — die
         Vorbelegung erreicht sie trotzdem. */}
     <Collapse
       ghost
-      style={{ marginInline: -8 }}
+      style={{ marginInline: 'calc(-1 * var(--lfh-luft-2))' }}
       items={[
         {
           key: 'weitere',
@@ -134,9 +134,9 @@ const felder = (
           children: (
             <>
               {markeFeld}
-              <Form.Item label="Pause im Schichtplan" name="pause" valuePropName="checked">
+              <Feld label="Pause im Schichtplan" name="pause" valuePropName="checked">
                 <Switch />
-              </Form.Item>
+              </Feld>
             </>
           ),
         },

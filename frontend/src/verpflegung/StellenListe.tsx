@@ -13,13 +13,13 @@ import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue
 import { useKontextMenue } from '../components/useKontextMenue';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import StatusTag from '../components/StatusTag';
 import { monoStil, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { verpflegungsstelleStatus } from '../theme/statusFarben';
 import { laufendeZeitfensterDerStelle } from './stellenKern';
 import { Rueckfrage } from './VerpflegungDialoge';
 import { STELLE_ART_LABEL, uhrzeitenText, zitat } from './verpflegungText';
+import { Status } from '../components/instrument/Status';
 
 const { Text } = Typography;
 
@@ -243,7 +243,7 @@ export default function StellenListe({
             </Text>
             <span style={{ color: rollen.text2 }}>{STELLE_ART_LABEL[s.art]}</span>
           </Flex>
-          <StatusTag darstellung={verpflegungsstelleStatus[s.status]} />
+          <Status darstellung={verpflegungsstelleStatus[s.status]} />
         </Flex>
         {s.standort && (
           <div style={{ color: rollen.text2, overflowWrap: 'anywhere' }}>{s.standort}</div>

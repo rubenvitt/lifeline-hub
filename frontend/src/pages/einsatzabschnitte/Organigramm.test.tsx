@@ -16,6 +16,9 @@ import type {
 import type { Quelle } from '../../api/abrufZustand';
 import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenContext';
+import { useState } from 'react';
+import EinsatzSeite from '../../components/EinsatzSeite';
+import { useDruckNebenwege } from '../../components/druck/useDruckNebenwege';
 import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { antdToken, dichten, farbenDunkel } from '../../theme/tokens';
@@ -332,7 +335,7 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
   const knotenFrom = (name: string) =>
     screen.getByRole('link', { name }).closest('[data-lfh="org-knoten"]') as HTMLElement;
   const lageTag = (knoten: HTMLElement) =>
-    knoten.querySelector('[data-lfh="org-lagezustand"] [data-rolle]') as HTMLElement | null;
+    knoten.querySelector('[data-lfh="org-lagezustand"] [data-lfh="status"]') as HTMLElement | null;
 
   it('zeigt den eigenen Lagezustand als Etikett am Abschnitt, nicht beurteilt ohne', () => {
     renderBild(
@@ -345,8 +348,7 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
     );
     const uhs = lageTag(knotenFrom('UHS Turnhalle'));
     expect(uhs).toHaveTextContent('kritisch');
-    expect(uhs).toHaveAttribute('data-rolle', 'alarm');
-    expect(uhs).toHaveAttribute('data-darstellung', 'rand');
+    expect(uhs).toHaveAttribute('data-ton', 'alarm');
     // Nur der eigene Zustand: der kritische Unterabschnitt färbt seinen Abschnitt nicht.
     expect(lageTag(knotenFrom('EA Nord'))).toHaveTextContent('planmäßig');
     expect(lageTag(knotenFrom('EA West'))).toBeNull();
@@ -368,7 +370,7 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
     expect(getComputedStyle(wort).color).toBe(getComputedStyle(rufname).color);
     // Keine eigene Farbe am Wort: es erbt die gedämpfte Metazeile.
     expect(wort.style.color).toBe('');
-    expect(container.querySelector('[data-lfh="status-chip"]')).toBeNull();
+    expect(container.querySelector('[data-lfh="status"]')).toBeNull();
   });
 });
 
@@ -555,7 +557,7 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     const z = zeile(container)!;
     expect(z).toHaveTextContent('2 Abschnitte ohne Leitung');
     expect(z).toHaveTextContent('2 Einheiten ohne Führer');
-    const chips = z.querySelectorAll('[data-lfh="status-chip"]');
+    const chips = z.querySelectorAll('[data-lfh="status"]');
     expect([...chips].map((c) => c.getAttribute('data-ton'))).toEqual(['achtung', 'achtung']);
     // Feste Höhe ohne Umbruch: wird ein Chip auf schmalem Schirm gekappt, nennt der Titel ihn ganz.
     expect([...chips].map((c) => c.getAttribute('title'))).toEqual([
@@ -580,7 +582,7 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     );
     const z = zeile(container)!;
     expect(z.textContent).toBe('Leitung überall besetzt');
-    expect(z.querySelector('[data-lfh="status-chip"]')).toBeNull();
+    expect(z.querySelector('[data-lfh="status"]')).toBeNull();
   });
 
   it('zählt bei fehlenden Einheiten nur die Abschnitte, ohne „0“', () => {
@@ -864,7 +866,7 @@ describe('Organigramm — In Lagebericht übernehmen', () => {
 
   it('fehlt ohne Schreibrecht', async () => {
     container({ ...EINSATZ, meine_rolle: 'beobachter' } as EinsatzAnzeige);
-    expect(await screen.findByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Alle aufklappen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
   });
 
@@ -896,11 +898,32 @@ describe('Organigramm — Druck', () => {
     expect(container.querySelectorAll('[data-lfh="druckwurzel"]')).toHaveLength(1);
   });
 
-  it('klappt vor dem Druck alles auf', async () => {
-    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+  it('trägt selbst keinen Druckknopf: gedruckt wird aus dem Seitenkopf (LLH-1836)', () => {
     renderMitProviders(
       <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
     );
+    expect(screen.queryByRole('button', { name: /Drucken/ })).toBeNull();
+  });
+
+  it('klappt vor dem Druck aus dem Seitenkopf alles auf', async () => {
+    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    // Dieselbe Verdrahtung wie `EinsatzabschnittePage`: Klappzustand außen, Druck im Kopf.
+    function MitKopf() {
+      const [zu, setZu] = useState<ReadonlySet<string>>(new Set());
+      const wege = useDruckNebenwege({ vorDemDruck: () => setZu(new Set()) });
+      return (
+        <EinsatzSeite titel="Abschnitte" weitere={{ name: 'Weitere', eintraege: wege }}>
+          <Organigramm
+            einsatz={EINSATZ}
+            abschnitte={ABSCHNITTE}
+            einheiten={daten(EINHEITEN)}
+            zugeklappt={zu}
+            onZugeklappt={setZu}
+          />
+        </EinsatzSeite>
+      );
+    }
+    renderMitProviders(<MitKopf />);
     await userEvent.click(screen.getByRole('button', { name: 'Alle zuklappen' }));
     expect(screen.queryByRole('link', { name: '1. Zug' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));

@@ -56,6 +56,7 @@ import PersonDruckPage from './pages/PersonDruckPage';
 import TiereDruckPage from './pages/TiereDruckPage';
 import SchaedenDruckPage from './pages/SchaedenDruckPage';
 import EinsatzberichtDruckPage from './pages/EinsatzberichtDruckPage';
+import EinsatzakteDruckPage from './pages/EinsatzakteDruckPage';
 import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
 import AuftraegePage from './pages/AuftraegePage';
@@ -138,7 +139,8 @@ import SeiteNichtGefunden from './einsatz/SeiteNichtGefunden';
 import ModulRedirect from './einsatz/ModulRedirect';
 import AltpfadWeiterleitung from './einsatz/AltpfadWeiterleitung';
 import ModulStub from './einsatz/ModulStub';
-import { modulName, modulRegistry } from './einsatz/modulRegistry';
+import { ModulGerippeSeite } from './einsatz/ModulWechselGerippe';
+import { modulRegistry } from './einsatz/modulRegistry';
 import {
   EINSTELLUNGEN_SEKTIONEN,
   GERAET_START_PFAD,
@@ -209,21 +211,14 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   tiere: <TierePage />,
   schaeden: <SchaedenPage />,
   lageberichte: <LageberichtePage />,
+  // Nachgeladene Module: derselbe Kopf mit Gerippe wie beim Modulwechsel (LLH-1838, D3).
   lagekarte: (
-    <Suspense
-      fallback={<div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>Karte wird geladen…</div>}
-    >
+    <Suspense fallback={<ModulGerippeSeite modulKey="lagekarte" />}>
       <LagekartePage />
     </Suspense>
   ),
   kraefteuebersicht: (
-    <Suspense
-      fallback={
-        <div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
-          {modulName('kraefteuebersicht')} wird geladen…
-        </div>
-      }
-    >
+    <Suspense fallback={<ModulGerippeSeite modulKey="kraefteuebersicht" />}>
       <KraefteuebersichtPage />
     </Suspense>
   ),
@@ -393,7 +388,7 @@ export const appRouten = createRoutesFromElements(
           <Route path="*" element={<GeraetStart />} />
         </Route>
       </Route>
-      {/* Bestätigung im Systembrowser für die Mac-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
+      {/* Bestätigung im Systembrowser für die Lifeline-App (LFH-818): ohne Rahmen, wie die Anmeldung. */}
       <Route path="/app-anmeldung" element={<AppAnmeldungPage />} />
       <Route element={<BetriebsLayout />}>
         {/* Ebene 1 — globale Shell */}
@@ -526,6 +521,7 @@ export const appRouten = createRoutesFromElements(
             {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder
               gesperrt sind; die Rechte prüft der Bericht je Quelle selbst. */}
             <Route path="einsatzdaten/bericht" element={<EinsatzberichtDruckPage />} />
+            <Route path="einsatzdaten/akte" element={<EinsatzakteDruckPage />} />
             {/* Kommunikationsplan S6 (LFH-848): Unterroute des Moduls Fernmeldewesen (LLH-1180). */}
             <Route path="fernmeldewesen/kommunikationsplan" element={<KommunikationsplanPage />} />
             {/* Ausgabeansicht eines Zeitfensters (LLH-1032): Unterroute des Moduls Verpflegung,

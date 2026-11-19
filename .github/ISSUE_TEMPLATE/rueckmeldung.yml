@@ -28,7 +28,7 @@ body:
     id: oberflaeche
     attributes:
       label: Oberfläche
-      placeholder: Browser, Desktop-App oder gekoppeltes Gerät
+      placeholder: Browser, Desktop-App, iOS-App oder gekoppeltes Gerät
   - type: input
     id: seite
     attributes:

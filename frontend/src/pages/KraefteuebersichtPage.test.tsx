@@ -407,6 +407,23 @@ describe('KraefteuebersichtPage — Statusband', () => {
     expect(container.querySelector('[data-lfh="meldebild-bandluecke"]')).toBeNull();
   });
 
+  it('klappt das Statusband ein: eine Zeile mit den Zahlen, gemerkt je Gerät (LLH-1786)', async () => {
+    mitEinheit();
+    try {
+      setup();
+      await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+      const kopf = screen.getByRole('button', { name: /^Status in Zahlen/ });
+      expect(kopf).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(kopf);
+      expect(kopf).toHaveAttribute('aria-expanded', 'false');
+      await waitFor(() => expect(kopf).toHaveTextContent(/1 Einheit · \d+ Kr(aft|äfte)/));
+      expect(screen.queryByRole('region', { name: 'Einheiten nach FMS-Status' })).toBeNull();
+      expect(window.localStorage.getItem('lfh:klappband:meldebild')).toBe('zu');
+    } finally {
+      window.localStorage.clear();
+    }
+  });
+
   it('sagt am Einheitenband, dass Suche/Träger/Status nur die Mittel filtern — und schweigt ohne', async () => {
     mitEinheit();
     const { container } = setup();
@@ -595,7 +612,7 @@ describe('KraefteuebersichtPage — Raster', () => {
       expect(m).not.toBeNull();
       return m!;
     });
-    const chip = mittel.querySelector('[data-lfh="status-chip"]') as HTMLElement;
+    const chip = mittel.querySelector('[data-lfh="status"]') as HTMLElement;
     expect(chip).toHaveTextContent('S4');
     expect(chip).toHaveTextContent('Am Einsatzort');
   });
@@ -668,7 +685,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     const grund = (key: string) =>
       zeile(container, key)!.querySelector('[data-lfh="meldebild-toenungsgrund"]');
     const etiketten = (key: string) =>
-      Array.from(grund(key)?.querySelectorAll('[data-lfh="status-chip"]') ?? []).map((c) => [
+      Array.from(grund(key)?.querySelectorAll('[data-lfh="status"]') ?? []).map((c) => [
         c.textContent,
         c.getAttribute('data-ton'),
       ]);
@@ -686,7 +703,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     const { container } = setup();
     await screen.findByText('1. Zug');
     const e = zeile(container, 'eh-20')!;
-    const chip = e.querySelector('[data-lfh="status-chip"]') as HTMLElement;
+    const chip = e.querySelector('[data-lfh="status"]') as HTMLElement;
     expect(chip).toHaveTextContent('S4');
     expect(chip).toHaveTextContent('Am Einsatzort');
     // Mit Fahrzeug führen die Fahrzeuge — kein Handstatus-Auslöser.
@@ -904,7 +921,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(c).toHaveAttribute('data-rolle', 'alarm');
     expect(zeile(container, 'eh-20')).toHaveClass('meldebild-problemzeile');
     const etikett = zeile(container, 'eh-20')!.querySelector(
-      '[data-lfh="meldebild-toenungsgrund"] [data-lfh="status-chip"]',
+      '[data-lfh="meldebild-toenungsgrund"] [data-lfh="status"]',
     );
     expect(etikett).toHaveAttribute('data-ton', 'alarm');
     expect(etikett?.textContent).toMatch(/^Rückm\. überfällig seit \d+ min$/);
@@ -1413,20 +1430,23 @@ describe('KraefteuebersichtPage — Druck', () => {
     await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
   });
 
-  it('„Drucken" und „Spalten" stehen in der Werkzeugzeile der Seite, nicht in der des Primitivs', async () => {
+  it('„Spalten" steht in der Werkzeugzeile der Seite, nicht in der des Primitivs; Drucken im Kopf', async () => {
     // `.kraefte-no-print` ist innerhalb von `Datensicht` nicht setzbar (kein `className`), und
     // Fokus in der Sicht hielte die Zeilen (LLH-1417). Vom Primitiv bleibt nur der Anker ohne
-    // Höhe, an dem der Sammelbanner als Pille über dem Tabellenkopf schwebt (LLH-1479).
+    // Höhe, an dem der Sammelbanner als Pille über dem Tabellenkopf schwebt (LLH-1479). Drucken
+    // ist seit LLH-1786 ein Nebenweg des Seitenkopfs, den der Druck ausblendet
+    // (`kraefteuebersichtPrint.css`).
     mitEinheit();
     const { container } = setup();
     await screen.findByText('1. Zug');
     const seite = container.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
     const primitiv = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
+    const kopf = container.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
     expect(primitiv).not.toBeNull();
     expect(primitiv).toHaveAttribute('data-schwebend');
     expect(within(primitiv).queryByRole('button', { name: /Drucken/i })).toBeNull();
     expect(within(primitiv).queryByRole('button', { name: /Spalten/ })).toBeNull();
-    expect(within(seite).getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
     expect(within(seite).getByRole('button', { name: /^Spalten/ })).toBeInTheDocument();
     expect(seite).toHaveClass('kraefte-no-print');
   });
@@ -1575,7 +1595,7 @@ describe('KraefteuebersichtPage — Filterwahrheit', () => {
       document.querySelector<HTMLElement>('[data-lfh="meldebild-werkzeuge"]')!,
     );
     const marke = await werkzeuge.findByText('Abschnitt: Abschnitt Nord');
-    fireEvent.click(marke.closest('.ant-tag')!.querySelector('.ant-tag-close-icon')!);
+    fireEvent.click(marke.closest('[data-lfh="status"], [data-marke]')!.querySelector('button')!);
     await waitFor(() => expect(screen.queryByText('Abschnitt: Abschnitt Nord')).toBeNull());
     expect(screen.queryByText(/von \d+ Kräften/)).toBeNull();
   });
@@ -1590,20 +1610,44 @@ describe('aktiveFilterChips', () => {
 
   it('führt jeden gesetzten Filter mit sprechendem Etikett, in fester Reihenfolge', () => {
     const chips = aktiveFilterChips(
-      { abschnittId: 10, traeger: 'FF Musterstadt', kategorie: 'verfuegbar', suche: '  HLF  ' },
+      {
+        abschnittId: 10,
+        traeger: 'FF Musterstadt',
+        kategorie: 'verfuegbar',
+        ohneAuftrag: true,
+        rueckmeldungFehlt: true,
+        suche: '  HLF  ',
+      },
       name,
     );
     expect(chips.map((c) => c.label)).toEqual([
       'Abschnitt: Abschnitt Nord',
       'Träger: FF Musterstadt',
       'Status: verfügbar',
+      'ohne Auftrag',
+      'Rückmeldung fehlt oder überfällig',
       'Suche: „HLF"',
     ]);
     expect(chips.map((c) => c.schluessel)).toEqual([
       'abschnittId',
       'traeger',
       'kategorie',
+      'ohneAuftrag',
+      'rueckmeldungFehlt',
       'suche',
+    ]);
+    expect(chips.every((c) => c.wirksam)).toBe(true);
+  });
+
+  it('sagt an einem Einheiten-Filter ohne lesbare Quelle, dass er gerade nicht wirkt (LLH-1792)', () => {
+    const chips = aktiveFilterChips(
+      { ...LEERER_FILTER, ohneAuftrag: true, rueckmeldungFehlt: true },
+      name,
+      { ohneAuftrag: false, rueckmeldungFehlt: true },
+    );
+    expect(chips.map((c) => [c.label, c.wirksam])).toEqual([
+      ['ohne Auftrag (wirkt gerade nicht)', false],
+      ['Rückmeldung fehlt oder überfällig', true],
     ]);
   });
 
@@ -1811,14 +1855,36 @@ describe('KraefteuebersichtPage Sprungziele (LFH-888)', () => {
     expect(screen.queryByText(/Keine Einheiten und keine Kräfte im Einsatz/)).toBeNull();
   });
 
+  it('Drucken und „In Lagebericht übernehmen“ stehen als Nebenwege im Seitenkopf (LLH-1786)', async () => {
+    mitEinheit();
+    setup();
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    expect(
+      await within(kopf).findByRole('button', { name: /In Lagebericht übernehmen/ }),
+    ).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /^Drucken/ })).toBeInTheDocument();
+    const werkzeuge = document.querySelector<HTMLElement>('[data-lfh="meldebild-werkzeuge"]')!;
+    expect(
+      within(werkzeuge).queryByRole('button', { name: /In Lagebericht übernehmen/ }),
+    ).toBeNull();
+    expect(within(werkzeuge).queryByRole('button', { name: /^Drucken/ })).toBeNull();
+  });
+
   it('gesperrte Lageberichte: „In Lagebericht übernehmen" gesperrt mit Grund', async () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValue(
       freigabenFixture({ lageberichte: { zugriff: false } }),
     );
     setup();
-    const knopf = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    // Der Grund steht im sichtbaren Namen des Nebenwegs (LFH-1079), ein `title` erscheint auf
+    // Touch nie.
+    const knopf = await screen.findByRole('button', {
+      name: 'In Lagebericht übernehmen (Keine Berechtigung)',
+    });
     await waitFor(() => expect(knopf).toBeDisabled());
-    expect(knopf).toHaveAttribute('title', 'Keine Berechtigung');
     // Gegenprobe im selben Bild: der Einheiten-Knopf bleibt frei.
     expect(screen.getByRole('button', { name: /^Einheit$/ })).toBeEnabled();
   });
@@ -2149,5 +2215,76 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
       expect(within(zeile(container, 'eh-20')!).getByText('Modul Aufträge gesperrt')).toBeVisible(),
     );
     expect(listeOffeneAuftraege).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Einheiten-Filter „ohne Auftrag“ und „Rückmeldung fehlt oder überfällig“ (LLH-1792, Spec
+ * `kraeftebaum`). `mitBaum`: Zug 20 mit Fahrzeug und Meier, Gruppe 21 darunter mit Schulz.
+ */
+describe('KraefteuebersichtPage — Einheiten-Filter (LLH-1792)', () => {
+  const kaestchen = async (name: string) => {
+    await oeffneFilter();
+    return screen.findByRole('checkbox', { name });
+  };
+  const leiste = () => document.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
+
+  it('„ohne Auftrag“ zeigt nur die Gruppe, der Zug bleibt als Rahmen, das Statusband folgt', async () => {
+    mitBaum();
+    vi.mocked(listeOffeneAuftraege).mockResolvedValue([AUFTRAG_A3]);
+    const { container } = setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('ohne Auftrag');
+    await waitFor(() => expect(box).toBeEnabled());
+    fireEvent.click(box);
+    expect(await screen.findByRole('button', { name: /^Filter \(1\)$/ })).toBeInTheDocument();
+    expect(within(leiste()).getByText('ohne Auftrag')).toBeInTheDocument();
+    expect(within(leiste()).getByText('1 von 2 Kräften · 0 von 1 Fahrzeugen')).toBeInTheDocument();
+    expect(zeile(container, 'eh-20')).not.toBeNull();
+    expect(zeile(container, 'eh-21')).not.toBeNull();
+    const band = screen.getByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(band).getByText('1 Einheit')).toBeInTheDocument());
+    expect(container.querySelector('[data-lfh="statusband-hinweis"]')).toBeNull();
+  });
+
+  it('„Rückmeldung fehlt oder überfällig“ trifft die nie zurückgemeldete Gruppe', async () => {
+    mitBaum();
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30)],
+    });
+    setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('Rückmeldung fehlt oder überfällig');
+    await waitFor(() => expect(box).toBeEnabled());
+    fireEvent.click(box);
+    expect(
+      await within(leiste()).findByText('Rückmeldung fehlt oder überfällig'),
+    ).toBeInTheDocument();
+    expect(within(leiste()).getByText('1 von 2 Kräften · 0 von 1 Fahrzeugen')).toBeInTheDocument();
+  });
+
+  it('ohne Freigabe der Aufträge ist „ohne Auftrag“ deaktiviert und nennt den Grund', async () => {
+    mitBaum();
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ auftraege: { zugriff: false } }),
+    );
+    setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('ohne Auftrag');
+    await waitFor(() => expect(box).toBeDisabled());
+    const feld = document.querySelector('[data-lfh="meldebild-filter"]') as HTMLElement;
+    expect(within(feld).getByText('Aufträge nicht freigegeben')).toBeInTheDocument();
+  });
+
+  it('scheitert der Abruf der Rückmeldungen, ist ihr Schalter deaktiviert und nennt den Grund', async () => {
+    mitBaum();
+    vi.mocked(holeRueckmeldungen).mockRejectedValue(new Error('500'));
+    setup();
+    await screen.findByText('1. Gruppe');
+    const box = await kaestchen('Rückmeldung fehlt oder überfällig');
+    await waitFor(() => expect(box).toBeDisabled());
+    const feld = document.querySelector('[data-lfh="meldebild-filter"]') as HTMLElement;
+    expect(within(feld).getByText('Rückmeldungen nicht abrufbar')).toBeInTheDocument();
   });
 });

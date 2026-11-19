@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Modal, Spin, Tag, Typography } from 'antd';
+import { Alert, Button, Flex, Modal, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -27,6 +27,7 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { abloesungPfad } from '../routing/deeplinks';
 import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
 import { applyPlanung } from './planungCache';
+import { Marke } from '../components/instrument/Marke';
 
 type ZielArt = 'neu' | 'einsatz';
 
@@ -218,7 +219,7 @@ export default function PlanungUebernahmeDialog({
             </Typography.Text>
             <Flex gap={token.marginXS} wrap>
               {zaehlungMarken(ergebnis.zaehlung).map((m) => (
-                <Tag key={m}>{m}</Tag>
+                <Marke key={m}>{m}</Marke>
               ))}
             </Flex>
             <Typography.Text type="secondary">
@@ -279,7 +280,13 @@ export default function PlanungUebernahmeDialog({
                       value: e.id,
                       title: text,
                       label: isUebung(e) ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: token.marginSM,
+                          }}
+                        >
                           <UebungsMarke einsatz={e} />
                           {text}
                         </span>

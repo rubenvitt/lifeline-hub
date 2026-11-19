@@ -1524,6 +1524,8 @@ pub struct PositionBody {
     pub tz_fachaufgabe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub tz_organisation: Option<Option<String>>,
+    /// Feld-CAS (LLH-1945): je Feld der Wert zu Beginn der Handlung; fehlt = kein Vergleich.
+    pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
 /// PATCH /api/einsaetze/{id}/einheiten/{eid}/position — reine Lage-Pflege, KEIN ETB.
@@ -1534,6 +1536,13 @@ pub async fn position(
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let erwartet = body.erwartet.unwrap_or_default();
+    let altwerte = erwartet.altwerte(&[
+        ("lat", body.lat.is_some()),
+        ("lon", body.lon.is_some()),
+        ("tz_fachaufgabe", body.tz_fachaufgabe.is_some()),
+        ("tz_organisation", body.tz_organisation.is_some()),
+    ])?;
     require_aktiv(&state, einsatz_id, einheit_id).await?; // 404 falls fremd, 409 aufgelöst
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, einheit_id).await?;
     let eff_lat = body.lat.unwrap_or(vorher.lat);
@@ -1550,6 +1559,7 @@ pub async fn position(
             tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
             tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
         },
+        &altwerte,
     )
     .await?;
     sse_einheit(&state, einsatz_id, einheit_id);
@@ -1606,7 +1616,7 @@ pub async fn status_setzen(
                 StatusKategorie::wird_wieder_verfuegbar(w.vorher_kategorie, w.nachher_kategorie);
             // LFH-552: ein markierter Handstatus wirkt wie ein Wechsel an der Einheit.
             if let Some(sid) = status_id {
-                if let Some((_, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
+                if let Some((_, _, b)) = crate::zeitachse::repo::aus_einheit_handstatus_tx(
                     conn,
                     einsatz_id,
                     ctx.benutzer.id,

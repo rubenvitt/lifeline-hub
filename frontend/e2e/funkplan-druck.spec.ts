@@ -14,6 +14,7 @@ import {
   sgZeile,
   tabelle,
 } from './funkplan-kern';
+import { waehleDruckweg } from './druckweg-kern';
 
 /**
  * Druck des Funkplans S6 (LFH-548, LFH-848 D8): was nur der Browser zeigt. Chromium, Firefox und
@@ -54,7 +55,7 @@ test('Druckpfad bei A4-Breite: alles offen, Telefon da, nichts ragt heraus', asy
       window.dispatchEvent(new Event('beforeprint'));
     };
   });
-  await page.getByRole('button', { name: /Drucken/ }).click();
+  await waehleDruckweg(page, { weitere: 'Weitere Aktionen zum Fernmeldewesen' });
   await page.emulateMedia({ media: 'print' });
 
   await expect(tabelle(page).getByText(FAHRZEUG)).toHaveCount(1);
@@ -104,7 +105,7 @@ test('Sprechgruppen im Druck bei A4-Breite: Druckkopf, Bedienung aus, nichts rag
       window.dispatchEvent(new Event('beforeprint'));
     };
   });
-  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
+  await waehleDruckweg(page, { weitere: 'Weitere Aktionen zum Fernmeldewesen' });
   await page.emulateMedia({ media: 'print' });
 
   const lage = await page.evaluate(() => {

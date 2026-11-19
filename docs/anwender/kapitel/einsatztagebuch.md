@@ -53,7 +53,9 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
    Ausgeblendete Systemeinträge zählen dabei nicht als neu.
 7. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
    läuft mit. Wer hochgerollt hat oder ein Menü in der Zeitachse offen hat, sieht stattdessen
-   unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende.
+   unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende. Was auf diesem Gerät
+   gesendet wird, erscheint immer sofort; Einträge desselben Kontos von einem anderen Gerät zählen
+   wie fremde zu den neuen.
 
 Wer einen Eintrag geschrieben hat, erscheint beim Zeigen auf die Zeile und im Menü „Aktionen zu
 Eintrag …“ als „Verfasser: …“; die Zeile selbst bleibt einzeilig. Ein berichtigter Eintrag steht

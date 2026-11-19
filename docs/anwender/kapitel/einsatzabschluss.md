@@ -2,7 +2,7 @@
 titel: Einsatz abschließen und Einsatzbericht
 gruppen: [fuehrung]
 reihenfolge: 610
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussPaneel.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussDialog.tsx, frontend/src/pages/einsatzdaten/EinsatzWiedereroeffnenDialog.tsx, src/einsatz/abschluss.rs, src/einsatz/kontext.rs, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs, src/einsatz/nachbereitung.rs, src/instanz/spiegel/uebernehmen.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussPaneel.tsx, frontend/src/pages/einsatzdaten/EinsatzAbschlussDialog.tsx, frontend/src/pages/einsatzdaten/EinsatzWiedereroeffnenDialog.tsx, src/einsatz/abschluss.rs, src/einsatz/kontext.rs, frontend/src/pages/EinsatzberichtDruckPage.tsx, frontend/src/druck/einsatzbericht/Auswahlleiste.tsx, frontend/src/druck/einsatzbericht/auswahl.ts, frontend/src/druck/einsatzbericht/quellen.ts, frontend/src/druck/einsatzbericht/verdichtung.ts, frontend/src/pages/EinsatzakteDruckPage.tsx, frontend/src/druck/einsatzakte/quellen.ts, frontend/src/druck/einsatzakte/abruf.ts, src/routes/einsatzakte.rs, src/einsatzakte/mod.rs, frontend/src/personen/personenBilanz.ts, src/person/verbleib_repo.rs, frontend/src/einsatz/einsatzleiter.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz.rs, src/einsatz/repo.rs, src/einsatz/berechtigung.rs, src/einsatz/nachbereitung.rs, src/instanz/spiegel/uebernehmen.rs]
 ---
 
 ## Überblick
@@ -15,15 +15,16 @@ falsche Einsatz oder zu früh, öffnen Einsatzleitung und System-Admins der Orga
 zusammen, aus Stammdaten, Zeiten, Führung, Kräften, Lage, Bilanz, Hilfeleistungen und einem
 Auszug des Einsatztagebuchs. Er lässt sich jederzeit erzeugen, auch während der Einsatz noch
 läuft. Für den Auftraggeber eines Sanitätsdienstes gibt es einen Kurzbericht ohne
-Einsatztagebuch und ohne Anlagen.
+Einsatztagebuch und ohne Anlagen. Für die Übergabe an die Einsatzleitung sichert die Einsatzakte
+das ganze Einsatzgeschehen in einem Zug: ein Druckstück und ein ZIP mit allen Anhängen und
+Tabellen.
 
 ## Abläufe
 
-### Einsatzbericht drucken
+### Den Einsatzbericht drucken
 
-1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht drucken“ wählen (am Handy unter
-   „Weitere“). Die Seite
-   „Einsatzbericht – Druckansicht“ öffnet sich.
+1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzbericht – Druckansicht“ wählen (am Handy
+   unter „Weitere“). Die Druckansicht des Einsatzberichts öffnet sich.
 2. Unter „Blöcke“ abwählen, was nicht in den Bericht soll, und bei Bedarf eine der Anlagen
    dazunehmen.
 
@@ -43,6 +44,16 @@ holt den aktuellen Stand, „Zurück zu den Einsatzdaten“ verlässt die Drucka
 3. Bei Bedarf eine Anlage dazunehmen, etwa „Anlage Materialverbrauch“. Der Kopf nennt dann die
    gewählten Blöcke als „Auswahl“.
 4. „Drucken / als PDF“ wählen.
+
+### Einsatzakte sichern
+
+1. Im Einsatz „Einsatzdaten“ öffnen und oben „Einsatzakte – Druckansicht“ wählen (am Handy unter „Weitere“).
+   Die Seite „Einsatzakte – Druckansicht“ öffnet sich und lädt alle Kapitel.
+2. „Drucken / als PDF“ wählen und im Druckdialog des Browsers als PDF speichern oder drucken.
+3. „Anhänge und Tabellen (ZIP)“ wählen. Der Browser lädt eine Datei
+   `Einsatzakte_<Einsatznummer>_<Datum>_Anlagen.zip` herunter.
+
+„Neu laden“ holt den aktuellen Stand, „Zurück zu den Einsatzdaten“ verlässt die Druckansicht.
 
 ### Einsatz abschließen
 
@@ -167,6 +178,37 @@ Aufbewahrungsfrist abgelaufen“.
   am Block „– kein Zugriff: …“ mit dem Modul, und die Druckansicht zeigt „Einsatzbericht nicht
   verfügbar“, bis der Block abgewählt ist.
 - Ein im Einsatz ausgeblendetes Modul erscheint im Bericht als „In diesem Einsatz nicht genutzt“.
+
+### Was die Einsatzakte enthält
+
+Das Druckstück hat sechs Kapitel, jedes beginnt auf einer neuen Seite mit eigenem Druckkopf:
+
+- **Einsatzbericht** mit allen Blöcken und allen drei Anlagen,
+- **Einsatztagebuch** mit allen Einträgen,
+- **Betroffene** mit Namen, wie die Betroffenenliste,
+- **Aufträge** als Liste mit Nummer, Auftrag, Empfänger, Status, Erteilung und Abschluss; auch
+  aufgehobene stehen darin,
+- **Einsatzbefehle** und **Lageberichte**, nur freigegebene, je Kette der jüngste Stand, mit
+  ihren Bildanlagen.
+
+Ein Kapitel ohne Daten steht mit „keine Einträge“ da, ein im Einsatz ausgeblendetes Modul mit
+„nicht genutzt“. Bei einem laufenden Einsatz trägt jeder Druckkopf „Vorläufig – Einsatz läuft“.
+
+Das ZIP enthält jeden nicht gelöschten Anhang eines nicht stornierten Eintrags aus Einsatztagebuch, Dokumentenablage,
+Betroffenen, Schäden, Tieren, Unfallhilfsstellen und den Anlagen freigegebener Befehle und
+Lageberichte, je Modul und Datensatz in einem eigenen Ordner, dazu unter `Tabellen/` die Listen
+der Betroffenen, Tiere und Schäden als CSV und die Datei `inhalt.csv` mit Pfad, Größe und
+Prüfsumme jeder Datei. Die Dateien sind dieselben wie beim einzelnen Herunterladen, also ohne
+Standort- und Gerätedaten. Eine Datei, die sich davon nicht bereinigen lässt, fehlt und steht in
+`inhalt.csv` als „nicht enthalten“. Chat-Anhänge gehören nicht dazu.
+
+Die Einsatzakte gibt es nur vollständig: wer eines ihrer Module nicht lesen darf, sieht
+„Einsatzakte nicht verfügbar“ mit den gesperrten Modulen und bekommt kein ZIP. Wer die Akte
+öffnet, steht im Zugriffsprotokoll der Betroffenen mit einem Druck; wer das ZIP lädt, mit einem
+Export und je Anhang einer Person einem Eintrag, ebenso im Protokoll der Dateien jeder
+Unfallhilfsstelle. Auf einem gekoppelten Gerät gibt es kein ZIP. Wird das ZIP für einen Einsatz
+gerade erstellt, lehnt Lifeline Hub einen zweiten Abruf ab, bis das erste fertig ist; entstehen
+auf dem Server schon zwei ZIPs, kommt der Hinweis, es gleich noch einmal zu versuchen.
 
 ### Wer im Bericht als Einsatzleitung steht
 

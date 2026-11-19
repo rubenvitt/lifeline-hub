@@ -203,6 +203,12 @@ interface Props extends ListeProps {
   titel: string;
   /** Der Einsatz für den Fuß „Einsatzdauer". Fehlt er (lädt noch), entfällt der Fuß. */
   einsatz?: Pick<EinsatzAnzeige, 'begonnen_at' | 'abgeschlossen_at'> | null;
+  /**
+   * Ob die Spalte unter dem Kopf klebt und ihre Höhe aus dem Fenster nimmt (Vorgabe). `false` nur
+   * für einen Träger fester Höhe, die Karte „Navigation“ des Design Systems (d78gipem D1): dann
+   * füllt die Spalte den Träger und misst nichts am Fenster.
+   */
+  kleben?: boolean;
 }
 
 /**
@@ -397,10 +403,10 @@ export function ModulListe({
  * einmal je Bild; geschrieben direkt am Element, ohne neues Rendern. Die feste Höhe bleibt als Stil
  * für das erste Bild und ohne Messung.
  */
-function useFitToWindow(ref: RefObject<HTMLElement | null>) {
+function useFitToWindow(ref: RefObject<HTMLElement | null>, aktiv: boolean) {
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return undefined;
+    if (!el || !aktiv) return undefined;
     let frame = 0;
     const fit = () => {
       frame = 0;
@@ -423,7 +429,7 @@ function useFitToWindow(ref: RefObject<HTMLElement | null>) {
       unsubscribe();
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [ref]);
+  }, [ref, aktiv]);
 }
 
 /**
@@ -438,7 +444,7 @@ function useFitToWindow(ref: RefObject<HTMLElement | null>) {
  * sind. Die Spalte hängt an der Kopfhöhe, nicht an der Rahmenhöhe, die den klebenden Seitenkopf
  * mitzählt (D2).
  */
-export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
+export default function ModulPanel({ titel, einsatz, kleben = true, ...liste }: Props) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
   const jetzt = useMinutenTakt();
@@ -451,7 +457,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   // Sprung über die Palette. Nur im Container, nie im Fenster (`bringIntoView`).
   const listRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
-  useFitToWindow(columnRef);
+  useFitToWindow(columnRef, kleben);
   const prevTitel = useRef(titel);
   useLayoutEffect(() => {
     const container = listRef.current;
@@ -483,9 +489,13 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
         ref={columnRef}
         data-lfh="modul-panel-spalte"
         style={{
-          position: 'sticky',
-          top: 'var(--lfh-kopf-oben, 0px)',
-          height: 'calc(100dvh - var(--lfh-kopf-oben, 0px))',
+          ...(kleben
+            ? {
+                position: 'sticky',
+                top: 'var(--lfh-kopf-oben, 0px)',
+                height: 'calc(100dvh - var(--lfh-kopf-oben, 0px))',
+              }
+            : { height: '100%' }),
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -519,7 +529,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
               padding: `${token.paddingSM}px ${token.padding}px`,
               display: 'flex',
               flexDirection: 'column',
-              gap: 6,
+              gap: token.marginSM,
             }}
           >
             <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>

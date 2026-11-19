@@ -62,12 +62,29 @@ export interface DispositionPatch {
   traegerorganisation?: string | null;
 }
 
+/**
+ * Altwerte einer Einzelangabe (Feld-CAS, LLH-1945): je Schlüssel des Patches der Wert beim Öffnen,
+ * `null` = leer. Die Position ist der wirksame Wert, wie die Oberfläche ihn zeigt.
+ */
+export type DispositionErwartet = Partial<Omit<DispositionPatch, 'status_id' | 'bemerkung'>> & {
+  bemerkung?: string | null;
+};
+
+/**
+ * Ändert eine Disposition. Mit `erwartet` antwortet der Server 409 `veraltet`, wenn ein anderer
+ * eine dieser Angaben inzwischen geändert hat; ohne schreibt er ohne Vergleich.
+ */
 export function updateDisposition(
   einsatzId: number,
   epId: number,
   felder: DispositionPatch,
+  erwartet?: DispositionErwartet,
 ): Promise<EinsatzPersonal> {
-  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal/${epId}`, 'PATCH', felder);
+  return apiSend<EinsatzPersonal>(
+    `/api/einsaetze/${einsatzId}/personal/${epId}`,
+    'PATCH',
+    erwartet ? { ...felder, erwartet } : felder,
+  );
 }
 
 /** Entlassene Kräfte des Einsatzes (LLH-1079, Block „Entlassen“); Stornierte liefert keine Liste. */
@@ -126,15 +143,19 @@ export function listeFuehrungskraefte(einsatzId: number): Promise<Fuehrungskraft
   return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/karte/fuehrungskraefte`);
 }
 
-/** L‑2: Verortet eine Führungskraft (Einsatzpersonal) auf der Lagekarte. */
+/**
+ * L‑2: Verortet eine Führungskraft (Einsatzpersonal) auf der Lagekarte; `erwartet` wie
+ * `verorteEinheit`.
+ */
 export function verortePerson(
   einsatzId: number,
   epId: number,
   daten: PositionPatch,
+  erwartet?: PositionPatch,
 ): Promise<FuehrungskraftKarte> {
   return apiSend<FuehrungskraftKarte>(
     `/api/einsaetze/${einsatzId}/personal/${epId}/position`,
     'PATCH',
-    daten,
+    erwartet ? { ...daten, erwartet } : daten,
   );
 }

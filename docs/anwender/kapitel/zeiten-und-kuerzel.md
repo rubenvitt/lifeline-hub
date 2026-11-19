@@ -16,10 +16,10 @@ sich an alle, die Lifeline Hub lesen oder bedienen.
 
 ### Eine Stärke lesen
 
-1. Im Bereich „Kräfte & Mittel“ „Einheiten“ öffnen. Über der Tabelle steht „Stärke F/UF/M//Σ“ und
-   daneben die Stärke, etwa „1/2/5//8“.
+1. Im Bereich „Kräfte & Mittel“ „Einheiten“ öffnen. Im Kopf der Seite steht neben dem Titel
+   „Stärke F/UF/M//Σ“ und daneben die Stärke, etwa „1/2/5//8“.
 
-   ![Zeile über der Einheitentabelle mit „Stärke F/UF/M//Σ“, der Stärke und den Fahrzeugen](../bilder/zeiten-und-kuerzel/staerke.png)
+   ![Kopf der Einheitenseite mit „Stärke F/UF/M//Σ“, der Stärke und den Fahrzeugen](../bilder/zeiten-und-kuerzel/staerke.png)
 
 2. Die Zahlen vor dem Doppelstrich nennen Führer, Unterführer und Mannschaft, die Zahl dahinter die
    Summe. „1/2/5//8“ heißt: ein Führer, zwei Unterführer, fünf Helferinnen und Helfer, zusammen acht.

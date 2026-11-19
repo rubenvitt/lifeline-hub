@@ -1,6 +1,6 @@
 import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { dauer } from '../../anzeige/dauer';
-import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -46,6 +46,7 @@ import {
   istNichtGefunden,
   SeitenFehler,
   SeitenNichtGefunden,
+  SeitenStandVeraltet,
 } from '../../components/SeitenZustand';
 import SektionHeader from '../../components/SektionHeader';
 import {
@@ -56,7 +57,6 @@ import {
   sammelbannerKurz,
   useRollen,
 } from '../../components/instrument';
-import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brAbgerufen, brStatus } from '../../theme/statusFarben';
 import BrSwitcher from './BrSwitcher';
@@ -102,6 +102,8 @@ import NichtUebernommenMarke, { UnangemeldetMarke } from '../../kraefte/NichtUeb
 import { useVorgemerkteEintreffen } from '../../offline/useVorgemerkteSchreibaktionen';
 import dayjs from 'dayjs';
 import { flaeche as flaechenMass } from '../../theme/tokens';
+import { Status } from '../../components/instrument/Status';
+import { Marke } from '../../components/instrument/Marke';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
@@ -462,11 +464,14 @@ export default function BrDetailPage() {
       </div>
     );
   }
-  if (einsatzQuery.error || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1947): React Query setzt `error` auch, wenn nur ein
+  // Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher liegt. Dann
+  // bliebe sonst eine offene Bearbeitung der Raumdaten nicht stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
-  if (detailQuery.error || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <SeitenFehler
         text="Bereitstellungsraum konnte nicht geladen werden"
@@ -478,6 +483,7 @@ export default function BrDetailPage() {
 
   const einsatz = einsatzQuery.data;
   const br = detailQuery.data;
+  const veraltet = einsatzQuery.isError || detailQuery.isError;
   const schreibgeschuetzt =
     !darfImEinsatzSchreiben(einsatz) || br.status === 'geplant' || br.status === 'aufgeloest';
   // Raumdaten ändern (LFH-1147): geplant und aktiv, nicht mehr nach dem Auflösen oder Stornieren
@@ -699,7 +705,7 @@ export default function BrDetailPage() {
       ) : (
         e.unangemeldet && <UnangemeldetMarke />
       )}
-      {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
+      {einheitVon.get(e.id)?.typ_label && <Marke>{einheitVon.get(e.id)!.typ_label}</Marke>}
       <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
         <StaerkeAnzeige
           wert={staerkeDerEinheitImRaum(e.id, einheitIdsImRaum, einheitenQuery.data)}
@@ -715,7 +721,7 @@ export default function BrDetailPage() {
   const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
     <>
       <span style={monoStil(13)}>{f.funkrufname}</span>
-      {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
+      {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Marke>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Marke>}
     </>
   );
   /** Name der Einheit, mit der eine Untereinheit abgerufen wurde (Verband). */
@@ -742,13 +748,24 @@ export default function BrDetailPage() {
           ) : (
             <span>{br.bezeichnung}</span>
           )}
-          <StatusTag darstellung={brStatus[br.status]} />
+          <Status darstellung={brStatus[br.status]} />
         </Space>
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (kopfFehler != null || ohneZeile.length > 0 || austrittZurueckFehler != null) && (
+        (veraltet ||
+          kopfFehler != null ||
+          ohneZeile.length > 0 ||
+          austrittZurueckFehler != null) && (
           <Flex vertical gap={token.marginSM}>
+            {veraltet && (
+              <SeitenStandVeraltet
+                onWiederholen={() => {
+                  if (einsatzQuery.isError) void einsatzQuery.refetch();
+                  if (detailQuery.isError) void detailQuery.refetch();
+                }}
+              />
+            )}
             <SeitenHinweise
               fehler={kopfFehler}
               fehlerTitel="Status nicht geändert"
@@ -931,7 +948,7 @@ export default function BrDetailPage() {
                         </Space>
                         <div data-lfh="br-abruf">
                           <Space wrap size={token.marginXS}>
-                            <StatusTag darstellung={brAbgerufen} />
+                            <Status darstellung={brAbgerufen} />
                             <span style={monoStil(12)}>
                               {abrufAngabe(zeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
                             </span>

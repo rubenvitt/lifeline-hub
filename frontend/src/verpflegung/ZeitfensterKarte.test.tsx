@@ -86,12 +86,15 @@ describe('ZeitfensterKarte — Einstufung (Spec „Deckung und Unterdeckung")', 
     expect(within(fehlt).getByText('20')).toBeInTheDocument();
     // Kein Blinken — weder an der Karte noch am Etikett.
     expect(karte.style.animation).toBe('');
-    expect(within(karte).getByText('Unterdeckung').closest('.ant-tag')).toHaveAttribute(
-      'data-rolle',
-      'alarm',
-    );
     expect(
-      (within(karte).getByText('Unterdeckung').closest('.ant-tag') as HTMLElement).style.animation,
+      within(karte).getByText('Unterdeckung').closest('[data-lfh="status"], [data-marke]'),
+    ).toHaveAttribute('data-ton', 'alarm');
+    expect(
+      (
+        within(karte)
+          .getByText('Unterdeckung')
+          .closest('[data-lfh="status"], [data-marke]') as HTMLElement
+      ).style.animation,
     ).toBe('');
   });
 
@@ -99,10 +102,9 @@ describe('ZeitfensterKarte — Einstufung (Spec „Deckung und Unterdeckung")', 
     const { karte } = zeige(zeitfenster(), { jetzt: VORHER });
     expect(karte).toHaveAttribute('data-einstufung', 'offen');
     expect(karte).not.toHaveAttribute('data-alarm');
-    expect(within(karte).getByText('offen').closest('.ant-tag')).toHaveAttribute(
-      'data-rolle',
-      'neutral',
-    );
+    expect(
+      within(karte).getByText('offen').closest('[data-lfh="status"], [data-marke]'),
+    ).toHaveAttribute('data-ton', 'neutral');
     const fehlt = fehltWert(karte);
     expect(fehlt).toHaveAttribute('data-ton', 'neutral');
     expect(within(fehlt).getByText('20')).toBeInTheDocument();
@@ -116,7 +118,9 @@ describe('ZeitfensterKarte — Einstufung (Spec „Deckung und Unterdeckung")', 
       }),
     );
     expect(karte).toHaveAttribute('data-einstufung', 'gedeckt');
-    expect(within(karte).getByText('gedeckt', { selector: '.ant-tag' })).toBeInTheDocument();
+    expect(
+      within(karte).getByText('gedeckt', { selector: '[data-lfh="status"], [data-marke]' }),
+    ).toBeInTheDocument();
     expect(within(fehltWert(karte)).getByText('0')).toBeInTheDocument();
   });
 

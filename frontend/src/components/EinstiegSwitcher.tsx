@@ -1,7 +1,7 @@
 import { IconChevronRunter } from '../icons';
 import { Button, Dropdown, Space, theme, Typography, type MenuProps } from 'antd';
-import StatusTag from './StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
+import { Status } from './instrument/Status';
 
 interface SwitcherEintrag {
   id: number;
@@ -49,7 +49,7 @@ export default function EinstiegSwitcher({
       label: (
         <Space>
           {e.bezeichnung}
-          <StatusTag darstellung={e.darstellung} />
+          <Status darstellung={e.darstellung} />
         </Space>
       ),
     })),

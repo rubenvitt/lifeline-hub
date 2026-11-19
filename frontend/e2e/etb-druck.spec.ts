@@ -128,7 +128,7 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   // als `system=aus` mit (Review S7).
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/etb?system=an`);
-  await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb/druck$`));
   const drucken = page.getByRole('button', { name: 'Drucken / als PDF' });
   await expect(drucken).toBeEnabled({ timeout: 60_000 });
@@ -169,9 +169,18 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
       seitenkopf: anzeige('[data-lfh="seitenkopf"]'),
       tabellenkopf: anzeige('[data-lfh="etb-druck-tabelle"] thead'),
       // Das Blatt behält seine sechs Spalten; die Metazeile gilt nur am schmalen Schirm (LFH-956).
-      spalten: Array.from(document.querySelectorAll('[data-lfh="etb-druck-tabelle"] thead th'))
+      spalten: Array.from(
+        document.querySelectorAll('[data-lfh="etb-druck-tabelle"] thead th[scope="col"]'),
+      )
         .filter((th) => getComputedStyle(th).display !== 'none')
         .map((th) => th.textContent),
+      // Laufzeile (LLH-1837): im wiederholten Kopf, über den Spaltenköpfen.
+      laufzeile: (() => {
+        const el = document.querySelector('[data-lfh="etb-druck-laufzeile"]');
+        return el && el.closest('thead') && getComputedStyle(el).display !== 'none'
+          ? el.textContent
+          : null;
+      })(),
       metazeilen: Array.from(document.querySelectorAll('.druckansicht-nur-schmal')).filter(
         (el) => getComputedStyle(el).display !== 'none',
       ).length,
@@ -185,6 +194,10 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   expect(druck.tabellenkopf, 'Tabellenkopf wiederholt sich je Seite').toBe('table-header-group');
   expect(druck.spalten).toEqual(['Nr.', 'Zeit', 'Typ', 'Von/An', 'Inhalt', 'Erfasser']);
   expect(druck.metazeilen, 'keine Metazeile auf dem Blatt').toBe(0);
+  expect(druck.laufzeile, 'Laufzeile mit Einsatz und Stand im Tabellenkopf').toContain(
+    `bis Nr. ${saat.berichtigung.lfd_nr}`,
+  );
+  expect(druck.laufzeile).toContain('E2E ETB-Druck');
   await page.emulateMedia({ media: null });
 
   // ── PDF (nur Chromium): jede Seite trägt „Seite n von m", der letzte Eintrag steht hinten.
@@ -194,6 +207,11 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
     expect(m, 'mehrseitiges PDF').toBeGreaterThanOrEqual(2);
     auszug.forEach((s, i) => {
       expect(s.text, `Seite ${i + 1} trägt die Seitenzählung`).toContain(`Seite ${i + 1} von ${m}`);
+      // Ein loses Blatt bleibt zuordenbar (LLH-1837): Einsatz und Stand auf jeder Seite.
+      expect(s.text, `Seite ${i + 1} nennt den Einsatz`).toContain('E2E ETB-Druck');
+      expect(s.text, `Seite ${i + 1} nennt den Stand`).toContain(
+        `bis Nr. ${saat.berichtigung.lfd_nr}`,
+      );
     });
     expect(auszug[m - 1].text, 'letzter Eintrag auf der letzten Seite').toContain(
       'Berichtigung: Deich Süd, nicht Nord',
@@ -214,7 +232,7 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   // ── Gefilterter Druck: nur Meldungen; die Berichtigung liegt außerhalb der Auswahl. Die Seite
   // blendet Systemeinträge in der Vorgabe aus und gibt das als `system=aus` mit (Review S7).
   await page.goto(`/einsaetze/${einsatzId}/etb?typ=meldung`);
-  await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
+  await page.getByRole('link', { name: 'Druckansicht' }).click();
   await expect(page).toHaveURL(new RegExp(`/etb/druck\\?typ=meldung&system=aus$`));
   await expect(drucken).toBeEnabled({ timeout: 60_000 });
   await expect(kopf).toContainText('Typ: Meldung');
@@ -418,4 +436,113 @@ test('ETB-Druck einer Übung: „ÜBUNG“ im Druckkopf, in Chromium auf jeder S
       description: `ETB-Druck Übung: PDF ${auszug.length} Seiten, jede mit „ÜBUNG“`,
     });
   }
+});
+
+/** Ein Gefahrengebiet: der Server schreibt dafür einen Systemeintrag ins ETB. */
+async function gefahrengebiet(page: Page, einsatzId: string, i: number) {
+  const x = 10 + i / 200;
+  const antwort = await mitWiederholung(() =>
+    page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+      data: {
+        typ: 'gefahrengebiet',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [x, 50],
+              [x + 0.001, 50],
+              [x + 0.001, 50.001],
+              [x, 50.001],
+              [x, 50],
+            ],
+          ],
+        }),
+        label: `Sektor ${i}`,
+      },
+    }),
+  );
+  expect(antwort.ok(), await antwort.text()).toBe(true);
+}
+
+/**
+ * Systemeinträge verdichtet (LLH-1837, Spec `etb-druck`, „Systemeinträge verdichtet“): jeder
+ * Systemeintrag bleibt eine Zeile an seiner Nummer, aber Typwort, Inhalt und Erfasser stehen in
+ * einer Zelle über vier Spalten, und die Zeile ist niedriger als eine gewöhnliche Meldung. Am Handy
+ * bleibt der Layout-Viewport bei 390 px.
+ */
+test('ETB-Druck: Systemeinträge stehen verdichtet an ihrer Nummer', async ({
+  page,
+  browser,
+  browserName,
+}) => {
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E ETB-Druck System ${Date.now()}`);
+  for (let i = 0; i < 40; i += 1) {
+    await erfasse(page, einsatzId, {
+      typ: 'meldung',
+      von: 'Florian 1',
+      an: 'ELW',
+      inhalt: `Meldung ${i}: Lage im Abschnitt unverändert.`,
+    });
+    await gefahrengebiet(page, einsatzId, 2 * i);
+    await gefahrengebiet(page, einsatzId, 2 * i + 1);
+  }
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/etb/druck`);
+  await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled({
+    timeout: 60_000,
+  });
+  const alle = await nummern(page);
+  expect(alle, 'lückenlos, auch mit Systemeinträgen').toEqual(
+    Array.from({ length: alle.length }, (_, i) => i + 1),
+  );
+
+  await page.emulateMedia({ media: 'print' });
+  const messung = await page.evaluate(() => {
+    const zeilen = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-lfh="etb-druck-tabelle"] tbody tr'),
+    );
+    const system = zeilen.filter((z) => z.dataset.lfh === 'etb-druck-system');
+    const voll = zeilen.filter((z) => z.dataset.lfh !== 'etb-druck-system');
+    const median = (hs: number[]) => [...hs].sort((a, b) => a - b)[Math.floor(hs.length / 2)];
+    return {
+      system: system.length,
+      zellen: system.map((z) => z.querySelectorAll('td').length),
+      texte: system.slice(0, 3).map((z) => z.querySelectorAll('td')[2]?.textContent ?? ''),
+      hoeheSystem: median(system.map((z) => z.getBoundingClientRect().height)),
+      hoeheVoll: median(voll.map((z) => z.getBoundingClientRect().height)),
+    };
+  });
+  await page.emulateMedia({ media: null });
+  expect(messung.system, 'Vorbedingung: Systemeinträge gesät').toBeGreaterThanOrEqual(80);
+  expect(new Set(messung.zellen)).toEqual(new Set([3]));
+  for (const text of messung.texte) expect(text).toMatch(/^System · .+ · /);
+  expect(messung.hoeheSystem, 'verdichtete Zeile ist niedriger').toBeLessThan(messung.hoeheVoll);
+  test.info().annotations.push({
+    type: 'messwert',
+    description: `ETB-Druck System: Zeilenhöhe ${messung.hoeheSystem.toFixed(1)} px statt ${messung.hoeheVoll.toFixed(1)} px`,
+  });
+
+  if (browserName === 'chromium') {
+    const auszug = await pdfAuszug(await page.pdf({ format: 'A4' }));
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `ETB-Druck System: ${alle.length} Einträge, davon ${messung.system} System, PDF ${auszug.length} Seiten`,
+    });
+  }
+
+  const { viewport } = await mitHandy(
+    browser,
+    browserName,
+    { benutzername: ADMIN, passwort: PW },
+    `/einsaetze/${einsatzId}/etb/druck`,
+    async (p) => {
+      await expect(p.locator('[data-lfh="etb-druck-system"]').first()).toBeVisible({
+        timeout: 60_000,
+      });
+    },
+  );
+  erwarteHandyBreite('Admin, Systemeinträge', viewport);
 });

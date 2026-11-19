@@ -71,12 +71,12 @@ describe('AbschnittKnoten', () => {
     renderKnoten(nord);
     expect(screen.getByText(/Leiter Nord/)).toBeInTheDocument();
     expect(screen.queryByText('ohne Leiter')).not.toBeInTheDocument();
-    expect(document.querySelector('[data-lfh="status-chip"]')).toBeNull();
+    expect(document.querySelector('[data-lfh="status"]')).toBeNull();
   });
 
   it('zeigt die unbesetzte Führung als sichtbares Wort „ohne Leiter", nicht als reinen Farbpunkt (LFH-962)', () => {
     renderKnoten({ ...nord, leiter_id: null, leiter_name: null });
-    const chip = screen.getByText('ohne Leiter').closest('[data-lfh="status-chip"]');
+    const chip = screen.getByText('ohne Leiter').closest('[data-lfh="status"]');
     expect(chip).not.toBeNull();
     expect(chip).toHaveAttribute('data-ton', 'achtung');
     // Kein Punkt mehr, der die Bedeutung nur über Farbe trägt.
@@ -86,10 +86,9 @@ describe('AbschnittKnoten', () => {
   it('zeigt den Lagezustand mit demselben Wort wie der Überblick', () => {
     renderKnoten({ ...nord, lagezustand: 'angespannt' } as Einsatzabschnitt);
     expect(screen.getByText('angespannt')).toBeInTheDocument();
-    // Dieselbe Form wie im Überblick: Rollenrand am `StatusTag`, nicht Fläche oder Chip.
-    const tag = screen.getByText('angespannt').closest('[data-rolle]');
-    expect(tag).toHaveAttribute('data-rolle', 'achtung');
-    expect(tag).toHaveAttribute('data-darstellung', 'rand');
+    // Dieselbe Form wie im Überblick: der eine `Status` (LLH-1779).
+    const tag = screen.getByText('angespannt').closest('[data-lfh="status"]');
+    expect(tag).toHaveAttribute('data-ton', 'achtung');
   });
 
   it('lässt einen nicht beurteilten Lagezustand leer', () => {

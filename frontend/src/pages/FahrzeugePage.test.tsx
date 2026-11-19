@@ -593,7 +593,9 @@ describe('FahrzeugePage', () => {
     // Kein Ist-Wert, der wie eine Unterschreitung aussähe; das Soll bleibt als Auskunft.
     expect(urteil).not.toHaveTextContent('Ist');
     expect(urteil).toHaveTextContent('Soll 0/1/8//9');
-    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
+    expect(urteil.querySelector('[data-lfh="status"], [data-marke]')?.className).not.toMatch(
+      /ant-tag-(blue|green|red)\b/,
+    );
   });
 
   it('zählt Besatzung ohne Stärke-Position als Mannschaft (BOS-Σ ist Kopfzahl)', async () => {
@@ -644,7 +646,9 @@ describe('FahrzeugePage', () => {
     expect(urteil).toHaveAttribute('data-urteil', 'kein_soll');
     expect(urteil).toHaveTextContent('Ist 1/0/0//1');
     expect(urteil).not.toHaveTextContent('Soll 0');
-    expect(urteil.querySelector('.ant-tag')?.className).not.toMatch(/ant-tag-(blue|green|red)\b/);
+    expect(urteil.querySelector('[data-lfh="status"], [data-marke]')?.className).not.toMatch(
+      /ant-tag-(blue|green|red)\b/,
+    );
   });
 
   it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker nach dem Aufklappen', async () => {
@@ -914,17 +918,29 @@ describe('FahrzeugePage', () => {
   const zeilenFolge = (container: HTMLElement) =>
     [...container.querySelectorAll('tr.ant-table-row')].map((r) => r.getAttribute('data-row-key'));
 
-  it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
+  /** Die Aufteilung steht im Seitenkopf (Stärke als Meta, LLH-1786), nicht im Zählerstreifen. */
+  const kopfZahlen = (container: HTMLElement) =>
+    within(
+      container.querySelector<HTMLElement>(
+        '[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]',
+      )!,
+    );
+
+  it('gruppiert nach Statuskategorie; die Aufteilung steht genau einmal, im Seitenkopf', async () => {
     const { container } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
     await screen.findByText('Florian 1');
-    // Ein Textknoten, nicht zwei: sonst würfe dieselbe Abfrage später mit Mehrfachtreffern, sobald
-    // ein Zähler daneben steht. Im Streifen gesucht: die Verdichtungszeile darüber schreibt
-    // dieselben Wörter in derselben Folge (LFH-973).
-    const streifen = within(
-      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]'),
+      ).not.toBeNull(),
     );
-    expect(streifen.getByText('1 verfügbar')).toBeInTheDocument();
-    expect(streifen.getByText('1 gebunden')).toBeInTheDocument();
+    expect(kopfZahlen(container).getByText('Stärke F/UF/M//Σ')).toBeInTheDocument();
+    expect(kopfZahlen(container).getByText('1 verfügbar')).toBeInTheDocument();
+    expect(kopfZahlen(container).getByText('1 gebunden')).toBeInTheDocument();
+    // Kein zweiter Streifen mit derselben Aufteilung und keine Stärkezeile über der Tabelle.
+    expect(container.querySelector('[data-lfh="datensicht-gruppenzaehler"]')).toBeNull();
+    expect(container.querySelector('[data-lfh="verdichtungszeile"]')).toBeNull();
+    expect(screen.getAllByText('1 verfügbar')).toHaveLength(1);
     // Und die Gruppenachse führt wirklich: verfügbar (Florian 9) steht vor gebunden.
     expect(zeilenFolge(container)).toEqual(['11', '10']);
   });
@@ -958,16 +974,12 @@ describe('FahrzeugePage', () => {
     expect(zeilenFolge(container)).toEqual(vorher);
 
     /**
-     * Regressionsanker: der Zählerstreifen rechnet über die frischen Zeilenobjekte in der
-     * gefrorenen Folge (`gruppiere(sichtbareZeilen, …)` in `Datensicht`), ist also nicht
-     * eingefroren. Und weil der Statuswechsel keinen Schlüssel ändert, ist `zufluessig === 0`, ein
-     * Sammelbanner erscheint nie. Beides gehört dem Primitiv.
+     * Regressionsanker: die Zahlen im Kopf rechnen über die frischen Daten, die Folge der Tabelle
+     * bleibt eingefroren. Und weil der Statuswechsel keinen Schlüssel ändert, ist
+     * `zufluessig === 0`, ein Sammelbanner erscheint nie (gehört dem Primitiv).
      */
-    const streifen = within(
-      container.querySelector<HTMLElement>('[data-lfh="datensicht-gruppenzaehler"]')!,
-    );
-    expect(streifen.getByText('2 verfügbar')).toBeInTheDocument();
-    expect(streifen.queryByText(/^\d+ gebunden$/)).toBeNull();
+    await waitFor(() => expect(kopfZahlen(container).getByText('2 verfügbar')).toBeInTheDocument());
+    expect(kopfZahlen(container).getByText('0 gebunden')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /neue? Ein(trag|träge)/ })).toBeNull();
   });
 
@@ -1720,7 +1732,17 @@ describe('FahrzeugePage · Datenzustände', () => {
 
   it('gescheiterte Dispositionsliste: Fehler statt Leertext', async () => {
     zeige(http.get('/api/einsaetze/7/fahrzeuge', () => new HttpResponse(null, { status: 500 })));
-    expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    const alarm = (
+      await screen.findByText('Disponierte Fahrzeuge konnten nicht geladen werden')
+    ).closest<HTMLElement>('[role="alert"]')!;
+    // Die Stärke im Kopf (LLH-1786) ist ein zweiter Beobachter derselben Liste und holt sie nach den
+    // Freigaben noch einmal; solange läuft der Knopf. Danach trägt er seinen Namen.
+    // In jsdom endet die Ausblendbewegung des Ladesymbols nie, sein Name („loading“) bleibt vorn
+    // stehen; der Knopf selbst ist wieder frei.
+    await waitFor(() => {
+      const knopf = within(alarm).getByRole('button', { name: /Erneut abrufen$/ });
+      expect(knopf).not.toHaveClass('ant-btn-loading');
+    });
     expect(screen.queryByText('Noch keine Fahrzeuge disponiert')).not.toBeInTheDocument();
   });
 
@@ -1729,9 +1751,9 @@ describe('FahrzeugePage · Datenzustände', () => {
     const text = 'Disponierte Fahrzeuge konnten nicht geladen werden';
     expect(await screen.findByText(text)).toBeInTheDocument();
     const alarm = screen.getByText(text).closest<HTMLElement>('[role="alert"]')!;
-    const knopf = within(alarm).getByRole('button', { name: 'Erneut abrufen' });
-    // Der zweite Beobachter (`Verdichtungszeile`) schaltet erst mit den Freigaben ein und holt die
-    // gescheiterte Liste noch einmal: erst danach steht der Fehler endgültig.
+    const knopf = within(alarm).getByText('Erneut abrufen').closest<HTMLElement>('button')!;
+    // Der zweite Beobachter (`Verdichtungszeile` im Kopf) schaltet erst mit den Freigaben ein und
+    // holt die gescheiterte Liste noch einmal: erst danach steht der Fehler endgültig.
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
 
     server.use(http.get('/api/einsaetze/7/fahrzeuge', () => new Promise<never>(() => {})));
@@ -2014,6 +2036,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     optionen: { adresseSteht?: boolean; daneben?: ReactNode } = {},
   ) {
     const patches: unknown[] = [];
+    const ruecknahmen: unknown[] = [];
     // Der Serverstand wandert mit dem PATCH — sonst holte der Refetch nach `onSettled` den alten
     // Status zurück.
     let stand: Record<string, unknown> = {
@@ -2032,11 +2055,30 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       http.patch('/api/einsaetze/7/fahrzeuge/10', async ({ request }) => {
         const body = await request.json();
         patches.push(body);
+        const vorher = stand;
         stand = {
           ...stand,
           status_id: 3,
           status_label: 'vor_ort',
           status_seit: '2026-05-26 09:30:00',
+        };
+        // Beleg für „Rückgängig“ (LLH-1781).
+        return HttpResponse.json({
+          ...stand,
+          status_ruecknahme: {
+            vorher_status_id: vorher.status_id,
+            status_id: 3,
+            status_seit: '2026-05-26 09:30:00',
+          },
+        });
+      }),
+      http.post('/api/einsaetze/7/fahrzeuge/10/status/zuruecknehmen', async ({ request }) => {
+        ruecknahmen.push(await request.json());
+        stand = {
+          ...stand,
+          status_id: 2,
+          status_label: 'disponiert',
+          status_seit: '2026-05-26 09:10:00',
         };
         return HttpResponse.json(stand);
       }),
@@ -2061,7 +2103,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       </>,
       { route, datenRouter: true },
     );
-    return { patches };
+    return { patches, ruecknahmen };
   }
 
   /**
@@ -2109,6 +2151,38 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull();
   });
 
+  it('am Handschirm steht „Ad-hoc-Fahrzeug“ hinter „Weitere“, die Aufteilung nur in den Gruppen (LLH-1786)', async () => {
+    setzeViewportBreite(390);
+    renderTableau(undefined, '/einsaetze/7/fahrzeuge');
+    await screen.findByText('Florian 1');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(within(kopf).queryByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toBeNull();
+    expect(within(kopf).getByRole('button', { name: 'Fahrzeuge disponieren' })).toBeInTheDocument();
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Weitere Aktionen zu den Fahrzeugen' }),
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Ad-hoc-Fahrzeug' })).toBeInTheDocument();
+    await waitFor(() => expect(within(kopf).getByText('Stärke F/UF/M//Σ')).toBeInTheDocument());
+    expect(within(kopf).queryByText(/\d+ (verfügbar|gebunden)/)).toBeNull();
+  });
+
+  it('am Handschirm steht die Ansicht hinter „Filter“ und zählt mit (LLH-1786)', async () => {
+    setzeViewportBreite(390);
+    renderTableau(undefined, '/einsaetze/7/fahrzeuge');
+    await screen.findByText('Florian 1');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    const knopf = within(kopf).getByRole('button', { name: 'Filter' });
+    expect(screen.queryByRole('radiogroup', { name: 'Ansicht' })).toBeNull();
+    // Auch die Wahlen der Liste (Sortierung, Status) stehen erst offen da; die Suche bleibt.
+    expect(screen.queryByRole('combobox', { name: 'Sortieren' })).toBeNull();
+    await userEvent.click(knopf);
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    expect(screen.getByRole('combobox', { name: 'Sortieren' })).toBeInTheDocument();
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'FMS-Tableau' }));
+    expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Filter (1)' })).toBeInTheDocument();
+  });
+
   it('schaltet über die Segmentleiste zwischen Liste und Tableau', async () => {
     renderTableau(undefined, '/einsaetze/7/fahrzeuge');
     const ansicht = await screen.findByRole('radiogroup', { name: 'Ansicht' });
@@ -2128,8 +2202,33 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     act(() => knopf.focus());
     fireEvent.keyDown(knopf, { key: '4' });
     await waitFor(() => expect(patches).toEqual([{ status_id: 3 }]));
-    // Serverstand übernommen: der Chip zeigt S4, „seit" die Zeit aus der Antwort.
-    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+    // Serverstand übernommen: der Statusblock zeigt die Ziffer 4.
+    await waitFor(() => expect(within(knopf).getByText('4')).toBeInTheDocument());
+  });
+
+  it('nach dem Wechsel per Ziffer quittiert ein Hinweis mit Rückgängig, der Fokus bleibt (LLH-1781)', async () => {
+    const { ruecknahmen } = renderTableau();
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    const knopf = await within(tableau).findByRole('button', {
+      name: 'Status von Florian 1 ändern',
+    });
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: '4' });
+    expect(await screen.findByText('Florian 1: S3 → S4')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.activeElement?.closest('[data-lfh="fms-kachel"]')).not.toBeNull(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(ruecknahmen).toEqual([
+        {
+          vorher_status_id: 2,
+          status_id: 3,
+          status_seit: '2026-05-26 09:30:00',
+        },
+      ]),
+    );
+    await waitFor(() => expect(within(knopf).getByText('3')).toBeInTheDocument());
   });
 
   it('bleibt ohne Einheiten (Modul gesperrt) bedienbar und sagt, warum ungegliedert', async () => {
@@ -2173,7 +2272,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     act(() => knopf.focus());
     fireEvent.keyDown(knopf, { key: '4' });
     await waitFor(() => expect(abrufe).toBeGreaterThanOrEqual(2));
-    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+    await waitFor(() => expect(within(tableau).getByText('4')).toBeInTheDocument());
     expect(within(tableau).getByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
     expect(within(tableau).queryByText(/Einheiten nicht abrufbar/)).toBeNull();
   });
@@ -2203,7 +2302,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     // Vorher fiel das Tableau für die Dauer des Abrufs aufs Skelett, und der Hinweis verschwand.
     // Frisch gesucht: ein ausgehängtes Tableau fände `within(tableau)` noch.
     const jetzt = () => screen.getByRole('region', { name: 'FMS-Tableau' });
-    await waitFor(() => expect(within(jetzt()).getByText('S4')).toBeInTheDocument());
+    await waitFor(() => expect(within(jetzt()).getByText('4')).toBeInTheDocument());
     expect(within(jetzt()).getByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
     expect(within(jetzt()).getByRole('heading', { name: 'Alle Fahrzeuge' })).toBeInTheDocument();
   });

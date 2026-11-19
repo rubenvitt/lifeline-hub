@@ -208,18 +208,13 @@ for (const modus of ['light', 'dark'] as const) {
       }
 
       // Das Etikett der Einstufung; die Verpflegungsart (Mittag, „warm“) ist ein eigenes Tag.
-      const etikett = karte.locator('.ant-tag:not([data-lfh="verpflegungsart"])');
+      const etikett = karte.locator(
+        ':is([data-lfh="status"],[data-marke]):not([data-lfh="verpflegungsart"])',
+      );
       await expect(etikett).toHaveCount(1);
       await expect(etikett).toHaveText(k.wort);
-      const tagRand = await randKontrast(etikett, 'top');
-      messwerte.push({ modus, karte: k.stufe, art: 'etikettrand', ...tagRand });
-      const kontext = `${modus}, ${k.stufe}, Etikettrand ${JSON.stringify(tagRand)}`;
-      expect
-        .soft(tagRand.gegenAussen, `${kontext} gegen Kartenfläche`)
-        .toBeGreaterThanOrEqual(ZUSTAND);
-      expect
-        .soft(tagRand.gegenInnen, `${kontext} gegen eigene Tönung`)
-        .toBeGreaterThanOrEqual(ZUSTAND);
+      // Das Etikett ist ein randloser `Status` (LLH-1780, „Rahmen heißt bedienbar“): kein Rand
+      // mehr zu messen; Wort und Tönung tragen den Zustand, der Text ist oben gemessen.
 
       // Legende der Aufgliederung: sichtbar, aber `aria-hidden` — der Textbaum sähe sie nicht.
       const legende = karte.locator('[data-lfh="aufgliederung"] + div');
@@ -247,7 +242,10 @@ for (const modus of ['light', 'dark'] as const) {
     const skFehlt = unter.locator('li[data-kostform="vegan"] [data-lfh="sonderkost-fehlt"]');
     await expect(skFehlt).toHaveText('fehlt 8 vegan');
     for (const [was, ziel] of [
-      ['Etikett', unter.locator('.ant-tag:not([data-lfh="verpflegungsart"])')],
+      [
+        'Etikett',
+        unter.locator(':is([data-lfh="status"],[data-marke]):not([data-lfh="verpflegungsart"])'),
+      ],
       ['Fehlmenge', fehlmenge],
       ['Sonderkost-Fehlmenge', skFehlt],
     ] as const) {
@@ -354,7 +352,7 @@ for (const modus of ['light', 'dark'] as const) {
       ['aufgeloest', 'aufgelöst'],
     ] as const) {
       const etikett = stellen.locator(
-        `[data-lfh="verpflegungsstelle"][data-status="${status}"] .ant-tag`,
+        `[data-lfh="verpflegungsstelle"][data-status="${status}"] :is([data-lfh="status"],[data-marke])`,
       );
       await expect(etikett).toHaveText(wort);
     }
@@ -512,7 +510,7 @@ for (const modus of ['light', 'dark'] as const) {
 
       const kopf = page.locator('[data-lfh="ausgabe-kopf"]');
       await expect(kopf).toHaveAttribute('data-einstufung', k.stufe);
-      await expect(kopf.locator('.ant-tag')).toHaveText(k.wort);
+      await expect(kopf.locator(':is([data-lfh="status"],[data-marke])')).toHaveText(k.wort);
       if (k.stufe !== 'offen') {
         const rand = await randKontrast(kopf, 'left');
         messwerte.push({ modus, karte: k.stufe, art: 'kopfrand', ...rand });
@@ -520,10 +518,8 @@ for (const modus of ['light', 'dark'] as const) {
           .soft(rand.gegenInnen, `${modus}, ${k.stufe}, Kopfrand ${JSON.stringify(rand)}`)
           .toBeGreaterThanOrEqual(ZUSTAND);
       }
-      const tagRand = await randKontrast(kopf.locator('.ant-tag'), 'top');
-      expect
-        .soft(tagRand.gegenAussen, `${modus}, ${k.stufe}, Etikettrand ${JSON.stringify(tagRand)}`)
-        .toBeGreaterThanOrEqual(ZUSTAND);
+      // Das Etikett ist ein randloser `Status` (LLH-1780, „Rahmen heißt bedienbar“); die
+      // Einstufung trägt der Kopfrand oben und das Wort.
 
       // Legende: sichtbar, aber `aria-hidden`.
       const legende = kopf.locator('[data-lfh="aufgliederung-legende"]');

@@ -215,3 +215,62 @@ describe('useFunkprotokollLauf (LLH-1149)', () => {
     expect(document.documentElement.style.overflowAnchor).toBe('');
   });
 });
+
+/*
+ * LLH-1833: Die Höhe der Liste ändert sich, ohne dass ein Bildlauf-Ereignis kommt — etwa wenn
+ * eine Stundengruppe mit `content-visibility: auto` erst nach dem Öffnen ihre echte Höhe statt der
+ * geschätzten bekommt. Der Hook beobachtet die Höhe: in der Öffnungsphase bleibt die Seite am Ende,
+ * danach misst er „am Ende“ nur neu. Sonst hielte er sich für „am Ende“, obwohl die Seite oben
+ * steht, und der nächste Eintrag risse sie nach unten.
+ */
+describe('useFunkprotokollLauf – Höhe ändert sich ohne Bildlauf (LLH-1833)', () => {
+  let beobachter: ResizeObserverCallback[] = [];
+  const vorher = globalThis.ResizeObserver;
+  beforeEach(() => {
+    beobachter = [];
+    globalThis.ResizeObserver = class {
+      constructor(private readonly cb: ResizeObserverCallback) {
+        beobachter.push(cb);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {
+        beobachter = beobachter.filter((b) => b !== this.cb);
+      }
+    } as unknown as typeof ResizeObserver;
+  });
+  afterEach(() => {
+    globalThis.ResizeObserver = vorher;
+  });
+  function hoeheGeaendert(neu: number) {
+    hoehe = neu;
+    act(() => {
+      for (const b of beobachter) b([], {} as ResizeObserver);
+    });
+  }
+
+  it('bleibt beim Öffnen am Ende, während die Liste nachträglich wächst', async () => {
+    let amEnde = false;
+    render(<Liste zeilen={['a', 'b']} onLauf={(l) => (amEnde = l.amEnde)} />);
+    await naechsterRahmen();
+    expect(y).toBe(2000);
+    hoeheGeaendert(3300);
+    expect(y).toBe(3300);
+    expect(amEnde).toBe(true);
+  });
+
+  it('misst nach der ersten Eingabe nur neu und reißt beim nächsten Eintrag nicht ans Ende', async () => {
+    let amEnde = true;
+    const { rerender } = render(<Liste zeilen={['a', 'b']} onLauf={(l) => (amEnde = l.amEnde)} />);
+    await naechsterRahmen();
+    act(() => {
+      window.dispatchEvent(new Event('wheel'));
+    });
+    hoeheGeaendert(3300);
+    expect(y).toBe(2000);
+    expect(amEnde).toBe(false);
+    hoehe = 3350;
+    rerender(<Liste zeilen={['a', 'b', 'c']} onLauf={(l) => (amEnde = l.amEnde)} />);
+    expect(y).toBe(2000);
+  });
+});

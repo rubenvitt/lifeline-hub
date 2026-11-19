@@ -1,4 +1,4 @@
-import { Modal, Typography } from 'antd';
+import { Modal, Typography, theme } from 'antd';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
 import type { Speicherung } from '../components/Erfassung';
@@ -38,6 +38,7 @@ export default function AuftragAusEtbModal({
   onAbbrechen,
   onAnlegen,
 }: Props) {
+  const { token } = theme.useToken();
   const sperrt = speicherung?.isPending === true;
   return (
     <Modal
@@ -69,7 +70,7 @@ export default function AuftragAusEtbModal({
             // Read-only Wortlaut des Quell-Eintrags (LFH-343 · C8) — dieselbe
             // Begründung wie bei Meldung→Auftrag: der vorbelegte Auftragstext wird
             // beim Formulieren überschrieben, das ETB ist beweissichernd.
-            <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+            <Typography.Paragraph type="secondary" style={{ marginBottom: token.margin }}>
               {eintrag.inhalt}
             </Typography.Paragraph>
           )

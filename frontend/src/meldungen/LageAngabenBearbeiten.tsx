@@ -1,4 +1,4 @@
-import { App, Button, Form, Input, Space } from 'antd';
+import { App, Button, Form, Input, Space, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { korrigiereMeldung } from '../api/meldungen';
@@ -34,6 +34,7 @@ interface FormWerte {
  * umstellen**.
  */
 export default function LageAngabenBearbeiten({ einsatzId, lage, onFertig }: Props) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -95,7 +96,7 @@ export default function LageAngabenBearbeiten({ einsatzId, lage, onFertig }: Pro
         exclude={`lagemeldung:${lage.meldung_id}`}
       />
       {speichern.error != null && (
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: token.margin }}>
           <SpeicherFehler fehler={speichern.error} />
         </div>
       )}

@@ -19,7 +19,7 @@ import KommKarte from '../kommunikation/KommKarte';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
-import { StatusChip } from '../components/instrument';
+import { Status } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { vorText } from '../anzeige/dauer';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -256,8 +256,9 @@ function EinheitenZeile({
 
 /** Ein gesperrter Übernahme-Knopf mit dem Grund sichtbar daneben (M16, LFH-1078). */
 function GesperrterKnopf({ etikett, grundId }: { etikett: string; grundId: string }) {
+  const { token } = theme.useToken();
   return (
-    <Space size={8} wrap>
+    <Space size={token.marginSM} wrap>
       <Button disabled title={KEINE_BERECHTIGUNG} aria-describedby={grundId}>
         {etikett}
       </Button>
@@ -641,14 +642,20 @@ function NachforderungKarte({
       data-status={n.status}
       tabIndex={-1}
     >
-      <Flex justify="space-between" align="center" style={{ marginBottom: 4 }} gap={8} wrap>
-        <Space size={6} wrap>
+      <Flex
+        justify="space-between"
+        align="center"
+        style={{ marginBottom: token.marginXS }}
+        gap={token.marginSM}
+        wrap
+      >
+        <Space size={token.marginSM} wrap>
           <PrioBadge prio={n.prioritaet} />
           {statusZeigen && (
             <StatusBadge phase={status.phase} label={status.label} ton={status.ton} />
           )}
           {/* Das Wort ist der zweite Kanal neben dem Ton (LLH-1097 D7); kein Alarm. */}
-          {ueberfaellig && <StatusChip ton="achtung" wort="überfällig" />}
+          {ueberfaellig && <Status groesse="klein" ton="achtung" wort="überfällig" />}
         </Space>
         {jetzt != null && (
           <span
@@ -672,11 +679,18 @@ function NachforderungKarte({
           {ziel}
         </Text>
       )}
-      <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
+      <Text
+        type="secondary"
+        style={{ display: 'block', fontSize: 13, marginBottom: token.marginXS }}
+      >
         an {adressat}
       </Text>
 
-      <Space orientation="vertical" size={2} style={{ width: '100%', marginBottom: 4 }}>
+      <Space
+        orientation="vertical"
+        size={2}
+        style={{ width: '100%', marginBottom: token.marginXS }}
+      >
         {n.bezeichnung && <Text style={{ overflowWrap: 'anywhere' }}>{n.bezeichnung}</Text>}
         {n.betreuungsstelle_id != null && (
           <StellenBezug verweis={stellenJeId?.get(n.betreuungsstelle_id)} />
@@ -736,7 +750,7 @@ function NachforderungKarte({
       </Space>
 
       {offenesFormular === 'zusage' && onFormular && onZusage && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: token.marginSM }}>
           <ZusageFormular
             nachforderung={n}
             werVorschlaege={werVorschlaege}
@@ -747,7 +761,7 @@ function NachforderungKarte({
         </div>
       )}
       {offenesFormular === 'bearbeiten' && onFormular && onBearbeiten && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: token.marginSM }}>
           <BearbeitenFormular
             nachforderung={n}
             zielNamen={zielNamen}
@@ -764,14 +778,14 @@ function NachforderungKarte({
       {/* Grund einer abgelehnten Fortschaltung über den Knöpfen, bis zur nächsten an dieser Karte
          (LFH-1077). */}
       {fehlerGrund && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: token.marginSM }}>
           <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
         </div>
       )}
       {/* Fortschaltung und ⋮-Menü; „Zurückziehen“ und „Ablehnen“ stehen rot hinter dem Trenner des
          Menüs (LLH-1097 D10), nicht in der Reihe. */}
       {aktionen.length > 0 && (
-        <Space size="middle" wrap style={{ marginTop: 8, width: '100%' }}>
+        <Space size="middle" wrap style={{ marginTop: token.marginSM, width: '100%' }}>
           {aktionen}
         </Space>
       )}

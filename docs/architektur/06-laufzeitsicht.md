@@ -51,7 +51,7 @@ sequenceDiagram
   Dev-Seeds, weil es nur auf leerer Datenbank Kataloge anlegt; ohne `--admin-password` schreibt
   es ein erzeugtes Passwort ins Log.
 - `db::connect` (`src/db.rs`): WAL, `busy_timeout` 5 s, `secure_delete`, höchstens 5
-  Verbindungen. Neue Migrationen: Wurzel-[`AGENTS.md`](../../AGENTS.md), „Migrationsvergabe“.
+  Verbindungen. Neue Migrationen: [`migrations/AGENTS.md`](../../migrations/AGENTS.md), „Migrationsvergabe“.
 - Hintergrund-Tasks aus `run_server`: Kanal-Sweep des `LiveHub` (alle 5 min,
   `src/live/mod.rs`), Erinnerungen (30 s, `src/erinnerung/scheduler.rs`), Purge und Schwärzung
   (600 s, `src/einsatz/purge_scheduler.rs`), Sicherung (nur mit `--backup-verzeichnis`,

@@ -475,6 +475,45 @@ pub async fn anhang_bereinigt_kopieren(
     Ok((mime, daten))
 }
 
+/// Was ein Anhang zum ZIP der Einsatzakte beiträgt (LLH-1835, design.md D6).
+pub enum AkteInhalt {
+    /// Die bereinigten Bytes, wie sie auch der Einzel-Download liefert.
+    Datei(Vec<u8>),
+    /// Kein Inhalt; der Grund steht im Inhaltsverzeichnis.
+    NichtEnthalten(&'static str),
+}
+
+/// Bereinigte Bytes eines Anhangs für das ZIP der Einsatzakte. Wie
+/// [`anhang_bereinigt_kopieren`] eine Lesestelle von `anhang::repo::laden_bytes` und deshalb
+/// hier (Guard in `tests/anhang_metadaten.rs`); gibt nie das Original heraus. Statt eines
+/// Fehlers, der das ganze ZIP kippte, meldet er „nicht enthalten“: unbereinigbar, am Spiegel
+/// noch nicht geholt, inzwischen entfernt. Zugriffsprüfung und Protokoll macht der Aufrufer
+/// VORHER.
+pub async fn anhang_fuer_akte(pool: &SqlitePool, anhang_id: i64) -> Result<AkteInhalt, AppError> {
+    match crate::instanz::spiegel::anhang::pruefe_vorhanden(pool, "anhang", &anhang_id.to_string())
+        .await
+    {
+        Ok(()) => {}
+        Err(AppError::Conflict(_)) => {
+            return Ok(AkteInhalt::NichtEnthalten("Inhalt wird noch geholt"));
+        }
+        Err(e) => return Err(e),
+    }
+    let (_, mime, daten) = match anhang::repo::laden_bytes(pool, anhang_id).await {
+        Ok(t) => t,
+        Err(AppError::NotFound) => return Ok(AkteInhalt::NichtEnthalten("entfernt")),
+        Err(e) => return Err(e),
+    };
+    Ok(match anhang::metadaten::bereinigen(&daten, &mime) {
+        Ok(Cow::Owned(neu)) => AkteInhalt::Datei(neu),
+        Ok(Cow::Borrowed(_)) => AkteInhalt::Datei(daten),
+        Err(anhang::metadaten::Unbereinigbar(grund)) => {
+            tracing::warn!(anhang_id, grund, "Anhang lässt sich nicht bereinigen");
+            AkteInhalt::NichtEnthalten("lässt sich nicht bereinigen")
+        }
+    })
+}
+
 /// Schalter aus der Query (`?entlassene=1`): fehlt, leer, `0` oder `false` = aus, `1` oder
 /// `true` = an, alles andere 400 mit dem Namen (LLH-1079).
 pub fn parse_flag(wert: Option<&str>, name: &str) -> Result<bool, AppError> {
@@ -606,6 +645,77 @@ pub fn pruefe_koordinate(
         )));
     }
     Ok(())
+}
+
+/// Altwerte eines Lagewegs (LLH-1945): Position und taktisches Zeichen von Einheit, Fahrzeug und
+/// Person, Fläche und Zeichen des Abschnitts. Je Feld der Wert zu Beginn der Handlung (Platzieren,
+/// Ziehen, Zeichen wählen); fehlt = kein Vergleich, `null` = leer erwartet. Die Spalten heißen wie
+/// die Felder (`crate::feld_cas`).
+#[derive(Debug, Default, Deserialize)]
+pub struct LageErwartet {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub flaeche_geojson: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_fachaufgabe: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_organisation: Option<Option<String>>,
+}
+
+impl LageErwartet {
+    /// Prüft die Altwerte gegen den Patch und liefert sie für den Feld-CAS: die Koordinate nur als
+    /// Paar, jedes Feld mit Altwert muss im Patch stehen (`im_patch` nennt die Felder, die der Weg
+    /// kennt und die der Patch ändert; ein Feld, das der Weg nicht kennt, ist nie im Patch). Beides
+    /// ist 422 (`feld_cas::pruefe_felder`).
+    pub fn altwerte(
+        &self,
+        im_patch: &[(&'static str, bool)],
+    ) -> Result<crate::feld_cas::ExpectedValues<'_>, AppError> {
+        use crate::feld_cas::ExpectedValue::{Real, Text};
+        let patch = |feld: &str| im_patch.iter().any(|(f, ja)| *f == feld && *ja);
+        let felder = [
+            ("lat", self.lat.is_some(), patch("lat")),
+            ("lon", self.lon.is_some(), patch("lon")),
+            (
+                "flaeche_geojson",
+                self.flaeche_geojson.is_some(),
+                patch("flaeche_geojson"),
+            ),
+            (
+                "tz_fachaufgabe",
+                self.tz_fachaufgabe.is_some(),
+                patch("tz_fachaufgabe"),
+            ),
+            (
+                "tz_organisation",
+                self.tz_organisation.is_some(),
+                patch("tz_organisation"),
+            ),
+        ];
+        crate::feld_cas::pruefe_felder(
+            &felder,
+            &[("lat", "lon", "erwartet trägt die Koordinate nur als Paar")],
+        )?;
+        let mut w = crate::feld_cas::ExpectedValues::new();
+        w.push("lat", self.lat.map(Real));
+        w.push("lon", self.lon.map(Real));
+        w.push(
+            "flaeche_geojson",
+            self.flaeche_geojson.as_ref().map(|v| Text(v.as_deref())),
+        );
+        w.push(
+            "tz_fachaufgabe",
+            self.tz_fachaufgabe.as_ref().map(|v| Text(v.as_deref())),
+        );
+        w.push(
+            "tz_organisation",
+            self.tz_organisation.as_ref().map(|v| Text(v.as_deref())),
+        );
+        Ok(w)
+    }
 }
 
 /// Wie [`trimme`], aber für Tri-State-PATCH-Felder (LFH-266/F12).

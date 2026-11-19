@@ -1,5 +1,5 @@
 import { IconUhr } from '../icons';
-import { Button, Flex, Space, Typography } from 'antd';
+import { Button, Flex, Space, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
@@ -13,7 +13,7 @@ import {
 import { ERINNERUNG_HANDLUNG, ERINNERUNG_STATUS, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
@@ -103,6 +103,7 @@ export default function ErinnerungKarte({
   fehlerGrund,
   hervorgehoben = false,
 }: ErinnerungKarteProps) {
+  const { token } = theme.useToken();
   const { id: einsatzId } = useParams();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
   const { zeitpunkt } = useAnzeigeKonventionen();
@@ -133,21 +134,29 @@ export default function ErinnerungKarte({
       data-erinnerung-id={e.id}
       zeit={e.faellig_at ? <ZeitAnzeige wert={e.faellig_at} rolle="kurz" /> : undefined}
     >
-      <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
-        <Space size={6} wrap>
+      <Flex
+        justify="space-between"
+        align="center"
+        style={{ marginBottom: token.marginSM }}
+        gap={token.marginSM}
+        wrap
+      >
+        <Space size={token.marginSM} wrap>
           <Text strong style={{ fontSize: 15, lineHeight: 1.4 }}>
             {e.titel}
           </Text>
           {istAbg && <StatusBadge phase={status.phase} label={status.label} />}
-          {faellig && <StatusChip ton="alarm" wort="fällig" />}
+          {faellig && <Status groesse="klein" ton="alarm" wort="fällig" />}
           {e.intervall_minuten && (
-            <StatusChip ton="neutral" wort={`alle ${e.intervall_minuten} Min`} />
+            <Status groesse="klein" ton="neutral" wort={`alle ${e.intervall_minuten} Min`} />
           )}
-          {e.quelle === 'auto_frist' && <StatusChip ton="achtung" wort="automatisch" />}
-          {e.vollzug_status === 'vollzogen' && <StatusChip ton="normal" wort="Vollzogen" />}
+          {e.quelle === 'auto_frist' && <Status groesse="klein" ton="achtung" wort="automatisch" />}
+          {e.vollzug_status === 'vollzogen' && (
+            <Status groesse="klein" ton="normal" wort="Vollzogen" />
+          )}
           <BezugLink e={e} einsatzId={einsatzId} />
         </Space>
-        <Space size={10} wrap>
+        <Space size={token.margin} wrap>
           {e.faellig_at && (
             <Text type={faellig ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
               {faellig && (
@@ -161,7 +170,11 @@ export default function ErinnerungKarte({
         </Space>
       </Flex>
 
-      <Space orientation="vertical" size={2} style={{ marginBottom: aktionen.length ? 8 : 0 }}>
+      <Space
+        orientation="vertical"
+        size={2}
+        style={{ marginBottom: aktionen.length ? token.marginSM : 0 }}
+      >
         {(e.empfaenger_anzeige ?? e.empfaenger_funktion) && (
           <Text type="secondary" style={{ fontSize: 13 }}>
             für:{' '}
@@ -173,7 +186,7 @@ export default function ErinnerungKarte({
         )}
         {e.beschreibung && <Text style={{ fontSize: 13 }}>{e.beschreibung}</Text>}
         {istAbg && (
-          <Space wrap size={[8, 4]}>
+          <Space wrap size={[token.marginSM, token.marginXS]}>
             {e.status === 'erledigt' && e.erledigt_at && (
               <Text type="secondary" style={{ fontSize: 13 }}>
                 Erledigt: {zeitpunkt(e.erledigt_at)}
@@ -191,12 +204,12 @@ export default function ErinnerungKarte({
       {/* Grund einer abgelehnten Aktion über ihren Knöpfen, bis zur nächsten Aktion an dieser
          Karte (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“). */}
       {fehlerGrund && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: token.marginSM }}>
           <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
         </div>
       )}
       {aktionen.length > 0 && (
-        <Flex justify="flex-end" gap={8} wrap style={{ marginTop: 8 }}>
+        <Flex justify="flex-end" gap={token.marginSM} wrap style={{ marginTop: token.marginSM }}>
           {aktionen}
         </Flex>
       )}

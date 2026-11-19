@@ -21,7 +21,6 @@ import { deeplinkStand, useQueryParamSelektion } from '../../routing/useQueryPar
 import { DeeplinkHinweis } from '../../components/DeeplinkHinweis';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
-import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import GefahrenBeurteilung from './GefahrenBeurteilung';
 import { beurteilungText, istBeurteilt } from './beurteilung';
@@ -32,6 +31,7 @@ import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import EinsatzSeite, { type SeitenNebenwege } from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
 import { InlineAngabe } from '../../components/InlineAngabe';
+import { useFeldKonflikt } from '../../components/useFeldKonflikt';
 import { GEFAHR_GEBIET_LABEL_MAX } from '../../api/eingabegrenzen';
 import { KennungsLink } from '../../components/kennungsLink';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
@@ -41,6 +41,7 @@ import { useDruckNebenwege } from '../../components/druck/useDruckNebenwege';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import './gefahrenPrint.css';
 import { flaeche } from '../../theme/tokens';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Trefflächenboden der Gebietszeile. Sie ist ein handgebautes Bedienziel (`ListenEintrag` legt
@@ -165,9 +166,34 @@ export default function GefahrenPage() {
   const beurteilenFehler =
     beurteilen.isError && beurteilen.variables === gewaehlt ? beurteilen.error : null;
   const umbenennen = useMutation({
-    mutationFn: (label: string) => benenneGefahrengebiet(einsatzId, gewaehlt as number, label),
+    mutationFn: (v: { label: string; erwartet?: { label: string | null } }) =>
+      benenneGefahrengebiet(einsatzId, gewaehlt as number, v.label, v.erwartet),
     onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
   });
+  /*
+   * Feld-CAS der Bezeichnung (LLH-1945, `components/useFeldKonflikt`): die Bezeichnung beim Öffnen
+   * geht als Altwert mit; nach einem 409 fragt die Seite mit dem frisch geladenen Stand.
+   */
+  const konflikt = useFeldKonflikt();
+  const saveBezeichnung = (gebietId: number, neu: string, beimOeffnen: string) =>
+    konflikt({
+      etikett: 'Bezeichnung',
+      erwartet: { label: beimOeffnen.trim() === '' ? null : beimOeffnen.trim() },
+      speichern: async (erwartet) => {
+        await umbenennen.mutateAsync({ label: neu, erwartet });
+      },
+      ladeFrisch: async () => {
+        const liste = await qc.fetchQuery({
+          queryKey: einsatzKeys.gefahrengebiete(einsatzId),
+          queryFn: () => ladeGefahrengebiete(einsatzId),
+          staleTime: 0,
+        });
+        return liste.find((g) => g.id === gebietId);
+      },
+      aktuell: (frisch) => frisch && { wert: { label: frisch.label?.trim() || null } },
+      text: (w) => w.label ?? '',
+      leer: (w) => w.label == null,
+    });
 
   if (einsatzQuery.isLoading)
     return (
@@ -225,7 +251,7 @@ export default function GefahrenPage() {
      * Schreibrecht zeichnet die Karte nicht; dann steht kein Knopf, der es verspräche.
      */
     return seite(
-      <div style={{ marginTop: 64, textAlign: 'center' }}>
+      <div style={{ marginTop: flaeche.zustandOben, textAlign: 'center' }}>
         <SeitenLeer
           titel="Noch keine Gefahrengebiete"
           aktion={
@@ -290,10 +316,10 @@ export default function GefahrenPage() {
               {/* `wrap`: in der 240-px-Spalte bricht die Zeile zwischen den Angaben um, nicht in
                   einem Wort. */}
               <Space wrap>
-                {/* Etikett über `StatusTag`, nicht `color`-Prop: für einen Nicht-Preset rechnet
+                {/* Etikett über `Status`, nicht `color`-Prop: für einen Nicht-Preset rechnet
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 {/* Stufe und Vorläufigkeit in EINEM Etikett: „hoch · unbestätigt“ (LLH-1745). */}
-                <StatusTag darstellung={gebietEtikett(g)} />
+                <Status darstellung={gebietEtikett(g)} />
                 <span>{gefahrengebietName(g.label, g.id)}</span>
                 {/* Was im Gebiet los ist (LLH-1102): „3 Gefahren · hoch“; unbestätigt trägt es das
                     Etikett der Stufe (LLH-1745) — hier wählt man, was zu tun ist. Die Zonenzahl steht am Sprung zur
@@ -382,7 +408,9 @@ export default function GefahrenPage() {
                       Umbenennen
                     </Button>
                   )}
-                  onSpeichern={(w) => umbenennen.mutateAsync(w.trim())}
+                  onSpeichern={(w, { beimOeffnen }) =>
+                    saveBezeichnung(aktuell.id, w.trim(), beimOeffnen)
+                  }
                 />
               </div>
               {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an.
@@ -425,12 +453,12 @@ export default function GefahrenPage() {
           />
         )}
         {!darfSchreiben && (
-          <div className="gefahren-no-print" style={{ marginBottom: 12 }}>
+          <div className="gefahren-no-print" style={{ marginBottom: token.margin }}>
             <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
           </div>
         )}
         {setzen.isError && (
-          <div data-fehler className="gefahren-no-print" style={{ marginBottom: 12 }}>
+          <div data-fehler className="gefahren-no-print" style={{ marginBottom: token.margin }}>
             <SpeicherFehler fehler={setzen.error} titel="Bewertung nicht gespeichert" />
           </div>
         )}

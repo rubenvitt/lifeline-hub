@@ -92,7 +92,7 @@ export function passwortAendern(altesPasswort: string, neuesPasswort: string): P
   });
 }
 
-/** Stellt aus der Browsersitzung einen Einmalcode für die Mac-App aus (LFH-818), gebunden an die
+/** Stellt aus der Browsersitzung einen Einmalcode für die Lifeline-App aus (LFH-818), gebunden an die
  *  `challenge` der Hülle. `401` ohne Sitzung, `400` bei falscher Form der `challenge`. Request-DTO
  *  handgepflegt (Server: `AppCodeAnfrage`). */
 export function appCodeAusstellen(challenge: string): Promise<AppCode> {

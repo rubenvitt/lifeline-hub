@@ -6,7 +6,7 @@ import {
   Datenraster,
   Paneel,
   SegmentFeld,
-  StatusChip,
+  Status,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -371,7 +371,8 @@ export default function FuehrungPaneel({
   const stand = (
     <Datenraster spalten={2}>
       <Datenfeld label="Führung">
-        <StatusChip
+        <Status
+          groesse="klein"
           ton={fuehrung.fuehrend ? 'normal' : 'neutral'}
           wort={fuehrung.fuehrend ? 'hier' : fuehrung.fuehrer_name}
         />

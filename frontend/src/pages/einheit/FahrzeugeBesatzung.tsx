@@ -31,7 +31,6 @@ import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
 import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
 import { useHoldGeloest } from '../../components/useHoldGeloest';
 import { RechteHinweis, ZeilenFehler } from '../../components/SpeicherHinweis';
-import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
 import type { ZeilenGrund } from '../../components/useZeilenFehler';
 import BesatzungUebernehmenDialog from '../../kraefte/BesatzungUebernehmenDialog';
@@ -51,6 +50,7 @@ import {
 import { PositionsMarken } from '../../kraefte/KraeftebaumZelle';
 import { fmsEtikett } from '../../kraefte/meldebildRaster';
 import { fahrzeugStatusDarstellung } from '../../kraefte/mittelStatus';
+import { useFahrzeugStatusQuittung } from '../../kraefte/useFahrzeugStatusQuittung';
 import { gruendeJeKraft } from '../../kraefte/sammelDisposition';
 import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
 import { besatzungsUrteil, kategorieDarstellung } from '../../theme/statusFarben';
@@ -64,6 +64,7 @@ import {
   type PersonMenuKey,
 } from './einheitAnsichtKern';
 import type { BesatzungErrors } from './useBesatzungErrors';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Paneel „Fahrzeuge und Besatzung“ der Einheit-Ansicht (LLH-1036 Teil II, design.md D5, D9, D10,
@@ -331,11 +332,16 @@ export default function FahrzeugeBesatzung({
     onError: (e, f) => fahrzeugErrors.melde(f.id, e, 'Lösen fehlgeschlagen'),
     onSettled: (_d, _e, f) => trackFahrzeug(f.id).end(),
   });
+  const quittiereStatus = useFahrzeugStatusQuittung(einsatzId, katalogQuery.data);
   const fmsStatus = useMutation({
     mutationFn: (v: { efId: number; statusId: number }) =>
       updateDisposition(einsatzId, v.efId, { status_id: v.statusId }),
     onMutate: (v) => trackFahrzeug(v.efId).start(),
-    onSuccess: invalidate,
+    // Quittung mit Rückweg wie in der Fahrzeugliste (LLH-1781).
+    onSuccess: (antwort) => {
+      invalidate();
+      quittiereStatus(antwort);
+    },
     onError: (e, v) => fahrzeugErrors.melde(v.efId, e, 'Status nicht geändert'),
     onSettled: (_d, _e, v) => trackFahrzeug(v.efId).end(),
   });
@@ -562,6 +568,7 @@ export default function FahrzeugeBesatzung({
                 aktuell={status.wahl.status_id ?? null}
                 optionen={fmsStatusOptionen(katalog)}
                 kennung={status.wahl.funkrufname}
+                titel={status.wahl.funkrufname}
                 laeuft={isPending}
                 darfSchreiben={canBesatzung}
                 gesperrt={geloest}
@@ -677,7 +684,7 @@ export default function FahrzeugeBesatzung({
           }}
         >
           {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
-            <StatusTag darstellung={besatzungsUrteil[f.urteil]} />
+            <Status darstellung={besatzungsUrteil[f.urteil]} />
           )}
           <span style={monoStil(12)}>{besatzungText(f)}</span>
           {secondaryText([fremdText(f)])}
@@ -763,7 +770,7 @@ export default function FahrzeugeBesatzung({
                 eintrag,
                 {
                   wort: (
-                    <StatusTag
+                    <Status
                       darstellung={
                         m.status
                           ? {

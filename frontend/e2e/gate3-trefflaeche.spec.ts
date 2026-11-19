@@ -14,6 +14,7 @@ import { SPERR_SZENARIEN, seedKraefteGesperrt, sperrzweigSteht } from './kraefte
 import { baumLage, pruefeHaengendenEinzug } from './baum-einzug-kern';
 import { tippe } from './fernmeldeskizze-kern';
 import { seedeVorlage } from './vorlage-kern';
+import { weitereOeffnen } from './nebenweg-kern';
 import { benutzerAnlegen, mitgliedEintragen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import {
   BODEN_KARTE,
@@ -372,6 +373,84 @@ for (const { liste, api, daten, pfad } of [
 // ── Einheiten-Detailroute ───────────────────────────────────────────────────────────
 // Verwaltung → Führungsfunktionen (LFH-549): das Label ist eine Inline-Angabe, ihr Bearbeiten-Knopf
 // ist das Bedienziel jeder Zeile. Gemessen wird er als Admin (nur dort ist er ein Ziel).
+/**
+ * Wirksame Trefffläche eines Ziels (LLH-1798): wie weit trifft ein Tipp um die Mitte noch das Ziel
+ * oder eines seiner Kinder? Die Box allein täuscht, wo die Fläche bewusst aus dem Layout ragt
+ * (Hinweis-Kreuz, Kreuz des ETB-Entwurfstabs); sie träfe ein darüberliegendes Element.
+ */
+async function wirksameFlaeche(ziel: Locator): Promise<{ breite: number; hoehe: number }> {
+  return ziel.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const mx = r.left + r.width / 2;
+    const my = r.top + r.height / 2;
+    const trifft = (x: number, y: number) => {
+      const t = document.elementFromPoint(x, y);
+      return t != null && (t === el || el.contains(t));
+    };
+    const weit = (dx: number, dy: number) => {
+      let n = 0;
+      while (n < 120 && trifft(mx + dx * (n + 1), my + dy * (n + 1))) n += 1;
+      return n;
+    };
+    return { breite: weit(-1, 0) + weit(1, 0) + 1, hoehe: weit(0, -1) + weit(0, 1) + 1 };
+  });
+}
+
+// Spec `einsatztauglichkeit-layout`, „Schließen-Kreuz eines Hinweises“ und „Kurzer Link im
+// Ortspfad“ (LLH-1798). Der Hinweis: Deeplink auf einen Posten, den es nicht gibt. Höhenneutral
+// heißt: ohne den Boden des Kreuzes (Stil im Browser zurückgenommen) ist der Hinweis gleich hoch.
+test('Hinweis-Kreuz und kurzer Ortspfad-Link folgen der kleinen Steuerhöhe 24 / 48 / 72 px auf beiden Achsen (LLH-1798)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 Restziele ${Date.now()}`);
+  const gemessen: string[] = [];
+
+  for (const { dichte } of STAFFEL) {
+    const boden = BODEN_MENUE[dichte];
+
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/material?material=999999`, dichte);
+    const hinweis = page.locator('[data-lfh="deeplink-hinweis"]');
+    await expect(hinweis).toContainText('Posten #999999 gibt es nicht (mehr)');
+    const kreuz = hinweis.getByRole('button', { name: 'Hinweis schließen' });
+    const flaeche = await wirksameFlaeche(kreuz);
+    expect(
+      Math.min(flaeche.breite, flaeche.hoehe),
+      `Hinweis-Kreuz (${dichte}): wirksam ${flaeche.breite}×${flaeche.hoehe}, Soll ≥ ${boden}`,
+    ).toBeGreaterThanOrEqual(boden - 1);
+    const mitBoden = (await hinweis.boundingBox())!.height;
+    await kreuz.evaluate((el: HTMLElement) => {
+      el.style.minWidth = '0';
+      el.style.minHeight = '0';
+      el.style.marginBlock = '0';
+    });
+    const ohneBoden = (await hinweis.boundingBox())!.height;
+    expect(
+      Math.abs(mitBoden - ohneBoden),
+      `Hinweis (${dichte}) mit Boden ${mitBoden}px, ohne ${ohneBoden}px`,
+    ).toBeLessThanOrEqual(SUBPIXEL);
+
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/etb/druck`, dichte);
+    const etb = page
+      .locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad .ant-breadcrumb-item a:visible')
+      .filter({ hasText: /^ETB$/ });
+    await expect(etb).toHaveCount(1);
+    const kasten = (await etb.boundingBox())!;
+    expect(
+      kasten.width,
+      `Ortspfad-Link „ETB“ (${dichte}): ${kasten.width}px breit, Soll ≥ ${boden}`,
+    ).toBeGreaterThanOrEqual(boden - SUBPIXEL);
+    await expect(etb).toHaveCSS('font-size', PFAD_SCHRIFT);
+
+    gemessen.push(
+      `${dichte}: Kreuz ${flaeche.breite}×${flaeche.hoehe}, Hinweis ${mitBoden}/${ohneBoden}, „ETB“ ${kasten.width}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Führungsfunktionen: der Bearbeiten-Knopf je Zeile hält 30 / 48 / 72 px', async ({ page }) => {
   await page.setViewportSize(FUEKW);
   await anmelden(page, { startseite: false });
@@ -685,7 +764,9 @@ for (const szenario of SPERR_SZENARIEN) {
           await ladeInDichte(page, seite.pfad(sperre), dichte);
           await sperrzweigSteht(page, seite, sperre);
           let minimum = Infinity;
-          const ziele = seite.ziele(page, rolle);
+          const ziele = seite
+            .ziele(page, rolle)
+            .filter((z) => !z.nurIn || z.nurIn.includes(dichte));
           for (const { name, ziel, gesperrt, mindestens } of ziele) {
             const titel = `${seite.name}: ${name} (${dichte})`;
             const hoehe = mindestens
@@ -1092,7 +1173,9 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     // (3) Filter setzen — der Suchfilter kommt als einziger ohne Stammdaten aus.
     await page.getByPlaceholder('Suche...').fill('Messkraft');
-    const marke = page.locator('.ant-tag').filter({ hasText: 'Suche:' });
+    const marke = page
+      .locator(':is([data-lfh="status"],[data-marke])')
+      .filter({ hasText: 'Suche:' });
     await expect(marke).toHaveCount(1);
 
     // (4) Der Zweitweg, an dem die Ausnahme der Marke hängt: zuerst DA, dann groß genug.
@@ -1101,7 +1184,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     // (5) Die Marke selbst, protokolliert statt gepinnt.
     const markenKasten = (await marke.boundingBox())!;
-    const kreuz = (await marke.locator('.ant-tag-close-icon').boundingBox())!;
+    const kreuz = (await marke.locator('button').boundingBox())!;
 
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Umschalter-Segment ${segment}, ` +
@@ -1172,7 +1255,9 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
       `Filter-Suchfeld (${dichte})`,
     );
     await page.getByPlaceholder('Suche...').fill('Messkraft');
-    await expect(page.locator('.ant-tag').filter({ hasText: 'Suche:' })).toHaveCount(1);
+    await expect(
+      page.locator(':is([data-lfh="status"],[data-marke])').filter({ hasText: 'Suche:' }),
+    ).toHaveCount(1);
     const knopf = await haeltStufe(
       page.getByRole('button', { name: 'Filter zurücksetzen', exact: true }),
       soll,
@@ -1219,9 +1304,10 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
-    // In der Zeile gesucht: die Einsatz-Navigation trägt seit LLH-1732 einen gleichnamigen Link.
+    // Im Seitenkopf gesucht (Stärke als Meta, LLH-1786): die Einsatz-Navigation trägt seit
+    // LLH-1732 einen gleichnamigen Link.
     const link = page
-      .locator('[data-lfh="verdichtungszeile"]')
+      .locator('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]')
       .getByRole('link', { name: 'Kräfteübersicht', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
@@ -1319,6 +1405,33 @@ test('Fahrzeuge: der Besatzungs-Auslöser folgt in Tabelle und Karte der Dichte-
   const einsatzId = await besatzungEinsatz(page, `E2E Gate3 ${Date.now()} Besatzung`);
 
   const gemessen = await messeBesatzungsAusloeser(page, einsatzId, true);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Fahrzeuge: der Statusknopf ist sichtbar so hoch wie die Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  // LLH-1780 (Change `eon26eat-status-und-bedienung`, D4): der Rahmen des Statusknopfs ist
+  // die Trefffläche, also misst die sichtbare Höhe — nicht ein unsichtbar vergrößerter Kasten.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Statusknopf`);
+  const funkrufname = 'Florian Musterstadt 3/83-1';
+  await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, 'Fahrzeug');
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
+    const knopf = page.getByRole('button', { name: `Status von ${funkrufname} ändern` });
+    // Vorbedingung: es ist der bedienbare Knopf, nicht die randlose Anzeige.
+    await expect(knopf).toHaveAttribute('data-lfh', 'status-knopf');
+    const hoehe = await haeltStufe(knopf, soll, `Statusknopf (${dichte})`);
+    // Sichtbar = Rahmen: der Rand liegt auf dem gemessenen Kasten.
+    const rand = await knopf.evaluate((k) => getComputedStyle(k).borderTopWidth);
+    expect(rand, `Statusknopf (${dichte}) trägt einen Rahmen`).not.toBe('0px');
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${hoehe}`);
+  }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
@@ -5278,6 +5391,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       )}`,
       // Sprung und Drucken stehen als Nebenwege im Seitenkopf (LFH-1079).
       aktionen: '[data-lfh="seitenkopf-aktionen"]',
+      weitere: 'Weitere Aktionen zum Lagebericht',
       fortschreiben: 'Fortschreiben',
     },
     {
@@ -5291,6 +5405,7 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
       // Sprung und Drucken stehen in jeder Breite im Seitenkopf (LFH-1079); unter `lg` trägt die
       // verankerte Leiste nur die Handlungen.
       aktionen: '[data-lfh="seitenkopf-aktionen"]',
+      weitere: 'Weitere Aktionen zum Befehl',
       fortschreiben: 'Fortschreiben',
     },
   ];
@@ -5299,14 +5414,26 @@ async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
 /**
  * Misst den ETB-Sprung einer Detailseite: Stufe, „↗“ und Abstand zu jedem anderen Ziel im
  * Aktionsblock (Drucken, Fortschreiben). Liefert Höhe und Abstand für die Anmerkung.
+ *
+ * In `komfortabel` und `handschuh` steht der Sprung ab `md` im Menü „Weitere“ (LLH-1786, Spec
+ * `einsatztauglichkeit-layout`): dann misst die Stufe der Menüeintrag, ohne „↗“ (es stünde im
+ * vorgelesenen Namen) und ohne Nachbarabstand (die Einträge eines Menüs stoßen aneinander).
  */
 async function etbSprungMessen(
   page: Page,
   aktionen: string,
+  weitere: string,
   dichte: keyof typeof ZIELABSTAND,
   soll: number,
   name: string,
 ): Promise<{ hoehe: number; abstand: number }> {
+  if (dichte !== 'kompakt') {
+    const eintrag = await weitereOeffnen(page, weitere, 'Zum ETB-Eintrag');
+    // Das Menü steht ausgezoomt (`weitereOeffnen`); gemessen wird der Eintrag selbst.
+    const hoehe = await haeltStufe(eintrag, soll, `${name}: ETB-Sprung im Menü (${dichte})`);
+    await page.keyboard.press('Escape');
+    return { hoehe, abstand: Number.NaN };
+  }
   const sprung = page.getByRole('link', { name: 'Zum ETB-Eintrag', exact: true });
   const hoehe = await haeltStufe(sprung, soll, `${name}: ETB-Sprung (${dichte})`);
   await expect(sprung, `${name}: der Sprung trägt „↗“`).toContainText('↗');
@@ -5342,7 +5469,14 @@ test('Detailseiten (LFH-968): der ETB-Sprung hält die Staffel und den Zielabsta
           `Vorbedingung ${seite.name}: „${seite.fortschreiben}“ steht`,
         ).toHaveCount(1);
         const name = `${seite.name} ${lage.width}`;
-        const { hoehe, abstand } = await etbSprungMessen(page, seite.aktionen, dichte, soll, name);
+        const { hoehe, abstand } = await etbSprungMessen(
+          page,
+          seite.aktionen,
+          seite.weitere,
+          dichte,
+          soll,
+          name,
+        );
         je.set(`${dichte} ${name}`, hoehe);
         gemessen.push(`${name} ${dichte}: Höhe ${hoehe}, Abstand ${abstand}`);
       }
@@ -5378,7 +5512,10 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   for (const { dichte, soll } of STAFFEL) {
     for (const seite of seitenFrei) {
       await ladeInDichte(page, seite.pfad, dichte);
-      await expect(page.getByRole('button', { name: 'Drucken' })).toHaveCount(1);
+      // Drucken steht in `kompakt` als Knopf, in 48 / 72 im Menü (LLH-1786).
+      if (dichte === 'kompakt') {
+        await expect(page.getByRole('button', { name: 'Drucken' })).toHaveCount(1);
+      }
       // Vorbedingung: der Rollenzweig steht — ohne Schreibrecht kein „Fortschreiben“.
       await expect(
         page.getByRole('button', { name: seite.fortschreiben, exact: true }),
@@ -5387,6 +5524,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
       const { hoehe, abstand } = await etbSprungMessen(
         page,
         seite.aktionen,
+        seite.weitere,
         dichte,
         soll,
         seite.name,
@@ -5397,10 +5535,15 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
 
     // Gesperrtes ETB: der Grund steht im Text, nicht nur im `title` (auf Touch unsichtbar).
     await ladeInDichte(page, berichtGesperrt.pfad, dichte);
-    const gesperrterSprung = page.getByRole('button', {
-      name: 'Zum ETB-Eintrag (Keine Berechtigung)',
-      exact: true,
-    });
+    // In 48 / 72 steht der gesperrte Sprung als gesperrter Eintrag im Menü (LLH-1786).
+    const gesperrterSprung =
+      dichte === 'kompakt'
+        ? page.getByRole('button', { name: 'Zum ETB-Eintrag (Keine Berechtigung)', exact: true })
+        : await weitereOeffnen(
+            page,
+            berichtGesperrt.weitere,
+            'Zum ETB-Eintrag (Keine Berechtigung)',
+          );
     const hoehe = await gesperrtHaeltStufe(
       gesperrterSprung,
       soll,

@@ -339,7 +339,7 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     );
     const chip = within(container)
       .getByText('Bestätigung überfällig')
-      .closest('[data-lfh="status-chip"]')!;
+      .closest('[data-lfh="status"]')!;
     expect(chip).toHaveAttribute('data-ton', 'alarm');
     expect(chip.querySelector('svg')).not.toBeNull();
     expect(within(container).queryByText(/^\s*Alarm\s*$/)).not.toBeInTheDocument();
@@ -399,7 +399,7 @@ describe('MeldungKarte · Eingangszustand', () => {
       'data-unbearbeitet',
       'true',
     );
-    expect(screen.getByText('Neu').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+    expect(screen.getByText('Neu').closest('[data-lfh="status"]')).toHaveAttribute(
       'data-ton',
       'neutral',
     );
@@ -412,7 +412,7 @@ describe('MeldungKarte · Eingangszustand', () => {
     expect(container.querySelector('[data-lfh="komm-karte"]')).not.toHaveAttribute(
       'data-unbearbeitet',
     );
-    expect(screen.getByText('Gesichtet').closest('[data-lfh="status-chip"]')).not.toHaveAttribute(
+    expect(screen.getByText('Gesichtet').closest('[data-lfh="status"]')).not.toHaveAttribute(
       'data-ton',
       'achtung',
     );
@@ -435,7 +435,7 @@ describe('MeldungKarte · Eingangszustand', () => {
     expect(karte).toHaveAttribute('data-alarm', 'true');
     expect(karte).not.toHaveAttribute('data-unbearbeitet');
     // Das ETIKETT bleibt trotzdem das der neuen Meldung — nur der Rand ist vergeben.
-    expect(screen.getByText('Neu').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+    expect(screen.getByText('Neu').closest('[data-lfh="status"]')).toHaveAttribute(
       'data-ton',
       'neutral',
     );

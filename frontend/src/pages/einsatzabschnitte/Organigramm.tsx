@@ -1,21 +1,19 @@
 import { Button, Space } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
 import { abrufZustand } from '../../api/abrufZustand';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { einsatzKeys } from '../../api/queryKeys';
-import DruckKnopf from '../../components/druck/DruckKnopf';
 import Druckkopf from '../../components/druck/Druckkopf';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
-import { monoStil, schriftStil, StatusChip, useRollen } from '../../components/instrument';
-import StatusTag from '../../components/StatusTag';
+import { monoStil, schriftStil, Status, useRollen } from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 import HaengenderBaum, {
@@ -222,7 +220,7 @@ export function OrganigrammBild({
   );
 }
 
-/** Höhe der Sammelzeile = die eines `StatusChip`: mit und ohne Lücke gleich hoch. */
+/** Höhe der Sammelzeile = die eines `Status`: mit und ohne Lücke gleich hoch. */
 const OHNE_LEITUNG_PX = 22;
 
 /**
@@ -247,7 +245,9 @@ function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: str
       }}
     >
       {teile.length > 0
-        ? teile.map((teil) => <StatusChip key={teil} ton="achtung" wort={teil} title={teil} />)
+        ? teile.map((teil) => (
+            <Status groesse="klein" key={teil} ton="achtung" wort={teil} title={teil} />
+          ))
         : ruhe && (
             <span style={{ fontSize: token.fontSizeSM, color: rollen.gedaempft }}>{ruhe}</span>
           )}
@@ -342,10 +342,7 @@ function KnotenInhalt({
           {/* Dieselbe Form wie Gliederungsbaum und Überblick; nicht beurteilt = kein Etikett. */}
           {knoten.art === 'abschnitt' && knoten.lagezustand && (
             <span data-lfh="org-lagezustand" style={{ display: 'inline-flex' }}>
-              <StatusTag
-                darstellung={abschnittLagezustand[knoten.lagezustand]}
-                darstellungsart="rand"
-              />
+              <Status darstellung={abschnittLagezustand[knoten.lagezustand]} />
             </span>
           )}
         </div>
@@ -383,6 +380,12 @@ interface Props {
   einheiten: Quelle<Einheit>;
   /** Ältester Stand der Quellen (`gemeinsamerDatenstand`) für den Druckkopf; ms seit Epoche. */
   datenstand?: number;
+  /**
+   * Klappzustand von außen (LLH-1836): die Seite druckt aus ihrem Kopf und klappt dafür vorher alles
+   * auf. Ohne diese Angabe hält das Organigramm den Zustand selbst.
+   */
+  zugeklappt?: ReadonlySet<string>;
+  onZugeklappt?: Dispatch<SetStateAction<ReadonlySet<string>>>;
 }
 
 /**
@@ -390,7 +393,14 @@ interface Props {
  * ZUGEklappten Schlüssel: es startet offen, und was live hinzukommt, steht offen da (Muster
  * `FunkplanPage`).
  */
-export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand }: Props) {
+export default function Organigramm({
+  einsatz,
+  abschnitte,
+  einheiten,
+  datenstand,
+  zugeklappt: zugeklapptVonAussen,
+  onZugeklappt,
+}: Props) {
   const { token, rollen } = useRollen();
   const navigate = useNavigate();
   const { konventionen } = useAnzeigeKonventionen();
@@ -402,7 +412,9 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
       ),
     [abschnitte, einheiten],
   );
-  const [zugeklappt, setZugeklappt] = useState<ReadonlySet<string>>(new Set());
+  const [eigenZugeklappt, setEigenZugeklappt] = useState<ReadonlySet<string>>(new Set());
+  const zugeklappt = zugeklapptVonAussen ?? eigenZugeklappt;
+  const setZugeklappt = onZugeklappt ?? setEigenZugeklappt;
   const klappbar = useMemo(() => klappbareSchluessel(org.wurzeln), [org]);
   // Aus dem Live-Stand; die Zeile steht außerhalb der Schleuse und hält ihre Höhe (Review LLH-1742).
   const ohneLeitung = useMemo(() => {
@@ -525,9 +537,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
             In Lagebericht übernehmen
           </Button>
         )}
-        {/* Erst nach committetem Aufklappen drucken — `useDrucken` löst den Dialog nach dem
-            Commit aus. */}
-        <DruckKnopf vorbereiten={() => setZugeklappt(new Set())} />
+        {/* Gedruckt wird aus dem Seitenkopf (LLH-1836, `EinsatzabschnittePage`). */}
       </Space>
       {/* Die Schreibweise der Stärke einmal über den Knoten, auch im Druck (LLH-1750, Spec
           `lage-verdichtung`, „Die Stärke nennt ihre Schreibweise“). */}

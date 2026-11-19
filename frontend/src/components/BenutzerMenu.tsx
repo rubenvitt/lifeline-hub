@@ -11,7 +11,6 @@ import {
   Button,
   Dropdown,
   Space,
-  Tag,
   Typography,
   theme,
   type DropdownProps,
@@ -28,6 +27,7 @@ import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
 import { useViewport } from './useViewport';
+import { Marke } from './instrument/Marke';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
 function initialen(name: string): string {
@@ -163,16 +163,16 @@ export default function BenutzerMenu({
   const rollenTags = [];
   if (benutzer.system_rolle === 'admin') {
     rollenTags.push(
-      <Tag key="admin" style={{ marginInlineEnd: 0 }}>
+      <Marke key="admin" style={{ marginInlineEnd: 0 }}>
         Admin
-      </Tag>,
+      </Marke>,
     );
   }
   if (benutzer.org_rolle === 'fuehrungskraft') {
     rollenTags.push(
-      <Tag key="fk" style={{ marginInlineEnd: 0 }}>
+      <Marke key="fk" style={{ marginInlineEnd: 0 }}>
         Führungskraft
-      </Tag>,
+      </Marke>,
     );
   }
 
@@ -207,7 +207,7 @@ export default function BenutzerMenu({
                 display: 'flex',
                 flexWrap: 'wrap',
                 alignItems: 'center',
-                columnGap: 6,
+                columnGap: token.marginSM,
                 rowGap: token.marginXS,
               }}
             >
@@ -240,7 +240,7 @@ export default function BenutzerMenu({
               </Typography.Text>
             )}
             {!isKnapp && rollenTags.length > 0 && (
-              <div style={{ marginTop: 6 }}>
+              <div style={{ marginTop: token.marginSM }}>
                 <Space size={token.marginXS} wrap>
                   {rollenTags}
                 </Space>
@@ -249,7 +249,7 @@ export default function BenutzerMenu({
             {!isKnapp && (
               <Typography.Text
                 type="secondary"
-                style={{ display: 'block', fontSize: 11, marginTop: 6 }}
+                style={{ display: 'block', fontSize: 11, marginTop: token.marginSM }}
               >
                 Version {__APP_VERSION__}
               </Typography.Text>
@@ -345,7 +345,7 @@ export default function BenutzerMenu({
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: inNavigation ? 'flex-start' : undefined,
-            gap: 9,
+            gap: token.marginSM,
           }}
         >
           {/* Initialen-Kachel 24 px, quadratisch. Kein antd-`Avatar`: der färbt über

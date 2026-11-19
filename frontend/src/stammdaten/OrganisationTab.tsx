@@ -16,7 +16,7 @@ import {
 import type { OrganisationInfo } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import { Formularpaneel, Paneel } from '../components/instrument';
+import { Feld, Formularpaneel, Paneel, Stapel } from '../components/instrument';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
@@ -211,17 +211,16 @@ export default function OrganisationTab() {
         onFinish={absenden}
       >
         <Formularpaneel titel="Name">
-          <Form.Item
+          <Feld
             label="Name der Organisation"
             name="name"
-            style={{ maxWidth: 480 }}
             rules={[
               { required: true, whitespace: true, message: 'Der Name darf nicht leer sein.' },
               { max: MAX_NAME, message: `Höchstens ${MAX_NAME} Zeichen.` },
             ]}
           >
             <Input />
-          </Form.Item>
+          </Feld>
         </Formularpaneel>
 
         {/* LOGO (LFH-22): keine Felder — Hochladen wirkt sofort, Entfernen fragt nach,
@@ -236,7 +235,7 @@ export default function OrganisationTab() {
           koerperPolster
           style={{ marginBlockEnd: token.marginLG }}
         >
-          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+          <Stapel abstand="md">
             {logo && kaputtesLogo === logo.sha256 ? (
               // Anders als im Druckkopf mit Hinweis: hier ist der Ort, an dem man es behebt.
               <Alert
@@ -246,12 +245,15 @@ export default function OrganisationTab() {
                 description="Fehlt auf Ausdrucken."
               />
             ) : logo ? (
-              <img
-                src={orgLogoPfad(logo.sha256)}
-                alt={`Logo von ${orgQuery.data?.name ?? 'der Organisation'}`}
-                style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
-                onError={() => setKaputtesLogo(logo.sha256)}
-              />
+              // Eigener Block: der Stapel streckt seine Kinder, das Bild bleibt so in seiner Größe.
+              <div>
+                <img
+                  src={orgLogoPfad(logo.sha256)}
+                  alt={`Logo von ${orgQuery.data?.name ?? 'der Organisation'}`}
+                  style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
+                  onError={() => setKaputtesLogo(logo.sha256)}
+                />
+              </div>
             ) : null}
             {/* Ohne Logo kein Satz (LFH-1078): „kein Logo“ steht im Kopf, darunter „Logo hochladen“.
                Keine Formatzeile: `accept` filtert den Dateidialog, die Vorprüfung nennt die Grenze,
@@ -301,17 +303,17 @@ export default function OrganisationTab() {
                 </Button>
               )}
             </Space>
-          </Space>
+          </Stapel>
         </Paneel>
 
         <Formularpaneel titel="Taktische Zeichen">
-          <Form.Item label="DV-102-Organisation" name="tz_organisation" style={{ maxWidth: 480 }}>
+          <Feld label="DV-102-Organisation" name="tz_organisation">
             <Select
               options={ORG_OPTIONEN}
               placeholder="Organisation wählen"
               loading={orgQuery.isLoading}
             />
-          </Form.Item>
+          </Feld>
         </Formularpaneel>
         {/* Ein Speicherweg, ein Grund: direkt über dem Knopf, der ihn ausgelöst hat. */}
         <SpeicherFehler fehler={speichern.error} />
@@ -337,12 +339,12 @@ export default function OrganisationTab() {
       >
         {/* Scheitert das Entfernen, bleibt der Dialog offen — der Grund steht deshalb HIER, nicht
            hinter seiner Maske an der Seite (Bauform `FreigabeDialog`). */}
-        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <Stapel abstand="md">
           <Typography.Paragraph style={{ margin: 0 }}>
             Das Logo wird unwiderruflich gelöscht.
           </Typography.Paragraph>
           <SpeicherFehler fehler={logoEntfernen.error} titel="Logo nicht entfernt" />
-        </Space>
+        </Stapel>
       </Modal>
     </AdminPage>
   );

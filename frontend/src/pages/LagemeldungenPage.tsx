@@ -1,5 +1,6 @@
 import { IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -27,11 +28,9 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
   monoStil,
-  Segmentleiste,
-  StatusChip,
+  Status,
   useRollen,
   Zeitachseneintrag,
-  type SegmentOption,
 } from '../components/instrument';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useModulFreigabenStand, useSprungSperre } from '../einsatz/useSprungSperre';
@@ -68,16 +67,16 @@ import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 import { flaeche } from '../theme/tokens';
 
-const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
-  { wert: 'alle', label: 'Alle Orte' },
-  { wert: 'mit', label: 'Mit Koordinaten' },
-  { wert: 'ohne', label: 'Ohne Koordinaten' },
+const ORT_OPTIONEN: { value: Ortsfilter; label: string }[] = [
+  { value: 'alle', label: 'Alle Orte' },
+  { value: 'mit', label: 'Mit Koordinaten' },
+  { value: 'ohne', label: 'Ohne Koordinaten' },
 ];
 
-const HERKUNFT_OPTIONEN: SegmentOption<Herkunftsfilter>[] = [
-  { wert: 'alle', label: 'Alle' },
-  { wert: 'geraet', label: 'Gerät' },
-  { wert: 'uebernommen', label: 'Übernommen' },
+const HERKUNFT_OPTIONEN: { value: Herkunftsfilter; label: string }[] = [
+  { value: 'alle', label: 'Alle Herkünfte' },
+  { value: 'geraet', label: 'Gerät' },
+  { value: 'uebernommen', label: 'Übernommen' },
 ];
 
 /**
@@ -365,21 +364,33 @@ export default function LagemeldungenPage() {
         // Deeplink zur Meldung — der Weg zum Vorgang; ihr Stand steht dabei, solange er nicht
         // „neu“ ist (die Marke „Neu“ ist die Kenntnisnahme der Lage, nicht der Meldungsstatus).
         <>
-          {l.is_neu && <StatusChip ton="bedien" wort="Neu" style={{ marginInlineEnd: 8 }} />}
+          {l.is_neu && (
+            <Status
+              groesse="klein"
+              ton="bedien"
+              wort="Neu"
+              style={{ marginInlineEnd: token.marginSM }}
+            />
+          )}
           {l.prioritaet !== 'normal' && (
-            <span style={{ marginInlineEnd: 8 }}>
+            <span style={{ marginInlineEnd: token.marginSM }}>
               <PrioBadge prio={l.prioritaet} />
             </span>
           )}
           {l.richtung === 'extern' && (
-            <StatusChip ton="neutral" wort="Extern" style={{ marginInlineEnd: 8 }} />
+            <Status
+              groesse="klein"
+              ton="neutral"
+              wort="Extern"
+              style={{ marginInlineEnd: token.marginSM }}
+            />
           )}
           {/* Der Text bleibt Lage-Text oder Wortlaut, die Berichtigung steht im ETB (LLH-1382, D1). */}
           <BerichtigtMarke
             einsatzId={l.einsatz_id}
             berichtigungId={l.etb_berichtigung_id}
             berichtigungLfdNr={l.etb_berichtigung_lfd_nr}
-            style={{ marginInlineEnd: 8 }}
+            style={{ marginInlineEnd: token.marginSM }}
           />
           <KennungsLink to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
             {`Meldung #${l.meldung_lfd_nr}`}
@@ -583,17 +594,22 @@ export default function LagemeldungenPage() {
             onWahl={zeitraumWaehlen}
             kennung="lagemeldungen-zeitraum"
           />
-          <Segmentleiste
-            beschriftung="Ort"
-            optionen={ORT_OPTIONEN}
-            wert={filter.ort}
-            onWechsel={(ort) => setFilter((f) => ({ ...f, ort }))}
+          {/* Keine Segmentleiste: „Ort“ und „Herkunft“ schalten keine Sicht, sie schränken die
+              Achse ein und stehen als Filter neben Suche und Zeitraum (Spec `bedien-umschalten`,
+              LLH-1942). */}
+          <Select
+            aria-label="Ort"
+            style={{ minWidth: 170 }}
+            options={ORT_OPTIONEN}
+            value={filter.ort}
+            onChange={(ort: Ortsfilter) => setFilter((f) => ({ ...f, ort }))}
           />
-          <Segmentleiste
-            beschriftung="Herkunft"
-            optionen={HERKUNFT_OPTIONEN}
-            wert={filter.herkunft}
-            onWechsel={(herkunft) => setFilter((f) => ({ ...f, herkunft }))}
+          <Select
+            aria-label="Herkunft"
+            style={{ minWidth: 150 }}
+            options={HERKUNFT_OPTIONEN}
+            value={filter.herkunft}
+            onChange={(herkunft: Herkunftsfilter) => setFilter((f) => ({ ...f, herkunft }))}
           />
         </div>
       )}

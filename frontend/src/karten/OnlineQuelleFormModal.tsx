@@ -1,4 +1,4 @@
-import { Collapse, Form, Input, InputNumber, Switch } from 'antd';
+import { Collapse, Form, Input, InputNumber, Switch, theme } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import {
   type OnlineQuelleBody,
 } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
+import { Feld } from '../components/instrument';
 
 interface FormWerte {
   name: string;
@@ -55,6 +56,7 @@ export default function OnlineQuelleFormModal({
   naechsteSortier: number;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const [form] = Form.useForm<FormWerte>();
   const qc = useQueryClient();
   const typ = Form.useWatch('typ', form) ?? 'vektor';
@@ -129,50 +131,50 @@ export default function OnlineQuelleFormModal({
       onFertig={onClose}
       onAbbrechen={onClose}
     >
-      <Form.Item
+      <Feld
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. OpenStreetMap" />
-      </Form.Item>
-      <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
+      </Feld>
+      <Feld label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
         <Select options={TYP_OPTIONEN} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="URL"
         name="url"
         rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
       >
         <Input placeholder={URL_PLATZHALTER[typ]} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Attribution"
         name="attribution"
         rules={[{ required: true, whitespace: true, message: 'Attribution ist Pflicht' }]}
       >
         <Input.TextArea rows={2} placeholder="© OpenStreetMap-Mitwirkende" />
-      </Form.Item>
+      </Feld>
       {/* Bewusst OHNE `forceRender`: nur so ist „im Ausgangszustand vier Felder" prüfbar; das
          Gegenmittel steht am `onErfassen` oben. */}
       <Collapse
         ghost
-        style={{ marginInline: -8 }}
+        style={{ marginInline: -token.paddingSM }}
         items={[
           {
             key: 'weitere',
             label: 'Weitere Angaben',
             children: (
               <>
-                <Form.Item label="Sortierung" name="sortier">
-                  <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
-                </Form.Item>
-                <Form.Item label="Aktiv" name="aktiv" valuePropName="checked">
+                <Feld breite="schmal" label="Sortierung" name="sortier">
+                  <InputNumber min={0} />
+                </Feld>
+                <Feld label="Aktiv" name="aktiv" valuePropName="checked">
                   <Switch />
-                </Form.Item>
+                </Feld>
                 {/* Proxy hält den Schlüssel server-seitig und cacht (LFH-182/190). Abgeschaltet
                     steht die Folge sichtbar am Feld, nicht im Tooltip (Touch). */}
-                <Form.Item
+                <Feld
                   label="Über Server proxen"
                   name="proxy"
                   valuePropName="checked"
@@ -181,12 +183,12 @@ export default function OnlineQuelleFormModal({
                   }
                 >
                   <Switch />
-                </Form.Item>
+                </Feld>
                 {/* Dunkle Grundlage: die Lagekarte rastert die Zeichen darauf mit dem Theme
                     `dark` (LLH-1486, `grundlageTheme` in `pages/lagekarte/basemapStil.ts`). */}
-                <Form.Item label="Dunkle Karte" name="dunkel" valuePropName="checked">
+                <Feld label="Dunkle Karte" name="dunkel" valuePropName="checked">
                   <Switch />
-                </Form.Item>
+                </Feld>
               </>
             ),
           },

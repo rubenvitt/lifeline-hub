@@ -127,8 +127,35 @@ describe('AbschnittDetail (LFH-1208)', () => {
     await user.click(screen.getByRole('combobox', { name: 'Abschnittsleiter' }));
     await user.click(await screen.findByText('Dora Dreher'));
     await user.click(screen.getByRole('button', { name: 'Abschnittsleiter speichern' }));
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Abschnittsleiter', { leiter_id: 4 }));
+    // Der Wert beim Öffnen geht als Altwert mit (Feld-CAS, LLH-1945).
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith(
+        'Abschnittsleiter',
+        { leiter_id: 4 },
+        { leiter_id: null },
+      ),
+    );
     expect(onPatch).toHaveBeenCalledTimes(1);
+  });
+
+  // Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
+  // Änderung“): jede Zeile reicht ihren Wert beim Öffnen in Patch-Form weiter.
+  it('Name und Kurzbezeichnung schicken den Wert beim Öffnen als Altwert', async () => {
+    const user = userEvent.setup();
+    const { onPatch } = renderDetail(nord());
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    const name = screen.getByRole('textbox', { name: 'Name' });
+    await user.clear(name);
+    await user.type(name, 'Nord-Ost');
+    await user.click(screen.getByRole('button', { name: 'Name speichern' }));
+    await user.click(screen.getByRole('button', { name: 'Kurzbezeichnung bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Kurzbezeichnung' }));
+    await user.click(screen.getByRole('button', { name: 'Kurzbezeichnung speichern' }));
+    await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(2));
+    expect(onPatch.mock.calls).toEqual([
+      ['Name', { name: 'Nord-Ost' }, { name: 'Nord' }],
+      ['Kurzbezeichnung', { kurzbezeichnung: null }, { kurzbezeichnung: 'EA N' }],
+    ]);
   });
 
   // Die Gegenprobe gegen einen geänderten Serverstand steht in `EinsatzabschnittePage.test.tsx`.
@@ -143,8 +170,8 @@ describe('AbschnittDetail (LFH-1208)', () => {
     await user.click(screen.getByRole('button', { name: 'Abschnittsauftrag speichern' }));
     await waitFor(() => expect(onPatch).toHaveBeenCalledTimes(2));
     expect(onPatch.mock.calls).toEqual([
-      ['Bemerkung', { bemerkung: 'Zufahrt Nord' }],
-      ['Abschnittsauftrag', { abschnittsauftrag: 'Deich halten' }],
+      ['Bemerkung', { bemerkung: 'Zufahrt Nord' }, { bemerkung: null }],
+      ['Abschnittsauftrag', { abschnittsauftrag: 'Deich halten' }, { abschnittsauftrag: null }],
     ]);
   });
 
@@ -163,7 +190,13 @@ describe('AbschnittDetail (LFH-1208)', () => {
     await user.click(screen.getByRole('button', { name: 'Rufname bearbeiten' }));
     await user.clear(screen.getByRole('textbox', { name: 'Rufname' }));
     await user.click(screen.getByRole('button', { name: 'Rufname speichern' }));
-    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Rufname', { rufname: null }));
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith(
+        'Rufname',
+        { rufname: null },
+        { rufname: 'Rotkreuz Musterstadt 1/10-1' },
+      ),
+    );
   });
 
   // LLH-1134: Funk und Telefon getrennt, die Verbindungen als Ersatzliste.
@@ -187,9 +220,11 @@ describe('AbschnittDetail (LFH-1208)', () => {
       screen.getByRole('button', { name: 'Telefon und weitere Verbindungen speichern' }),
     );
     await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Telefon und weitere Verbindungen', {
-        verbindungen: [{ mittel: 'festnetz', wert: '0511 22', hinweis: 'Lagedienst' }],
-      }),
+      expect(onPatch).toHaveBeenCalledWith(
+        'Telefon und weitere Verbindungen',
+        { verbindungen: [{ mittel: 'festnetz', wert: '0511 22', hinweis: 'Lagedienst' }] },
+        { verbindungen: [{ mittel: 'festnetz', wert: '0511 22' }] },
+      ),
     );
     expect(document.body.textContent).not.toMatch(/erreichbar|kommunikationsmittel/i);
   });

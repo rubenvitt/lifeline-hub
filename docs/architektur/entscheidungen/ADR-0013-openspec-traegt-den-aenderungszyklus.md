@@ -2,7 +2,7 @@
 id: ADR-0013
 titel: OpenSpec trägt den Änderungszyklus, Fähigkeits-Specs liegen unter openspec/specs
 status: ersetzt
-ersetzt_durch: ADR-0065
+ersetzt_durch: ADR-0069
 datum: 2026-09-20
 gilt_fuer:
   - openspec/**

@@ -12,6 +12,7 @@ import { OFFLINE_QUEUE_BENUTZER_HEADER } from '../api/client';
 import { queueEinreihen, queueLaden, queueLeerenFuerTests } from './queue';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 import { useEtbErfassung } from './useEtbErfassung';
+import { beendeHuelle, type IosNachricht, starteIosHuelle } from '../test/huelle';
 
 const eintrag: NeuerEintrag = {
   typ: 'meldung',
@@ -149,6 +150,54 @@ describe('useEtbErfassung – Antwort an den Aufrufer (LLH-1071)', () => {
       eingereiht = await result.current.erfassen(eintrag);
     });
     expect(eingereiht).toBeNull();
+  });
+});
+
+/*
+ * LLH-1833: Die Zeitachse lässt hochgerollt nur Einträge durch, die DIESES Gerät schrieb. Der Hook
+ * kennt sie an der client_id: selbst vergeben (Direktversand und Einreihen) oder aus der
+ * gerätweiten Warteschlange gelesen (ein anderer Tab hat eingereiht). Die Menge wächst nur, damit
+ * ein gesendeter Eintrag nach dem Leeren der Warteschlange weiter als eigener gilt.
+ */
+describe('useEtbErfassung – client_ids dieses Geräts (LLH-1833)', () => {
+  it('merkt sich direkt gesendete, eingereihte und vorgefundene client_ids', async () => {
+    await queueEinreihen(11, 9, { ...eintrag, client_id: 'anderer-tab' });
+    let versuch = 0;
+    server.use(
+      http.post('/api/einsaetze/9/etb', () => {
+        versuch += 1;
+        return versuch === 1
+          ? HttpResponse.json({ id: 7, lfd_nr: 1 }, { status: 201 })
+          : HttpResponse.error();
+      }),
+    );
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await waitFor(() => expect(result.current.eigeneClientIds.has('anderer-tab')).toBe(true));
+
+    await act(async () => {
+      await result.current.erfassen({ ...eintrag, client_id: 'direkt' });
+    });
+    await act(async () => {
+      await result.current.erfassen({ ...eintrag, client_id: 'eingereiht' });
+    });
+    await waitFor(() => expect(result.current.eigeneClientIds.has('eingereiht')).toBe(true));
+    expect(result.current.eigeneClientIds.has('direkt')).toBe(true);
+
+    // Gesendet und aus der Warteschlange genommen: die Kennung bleibt bekannt.
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ id: 8, lfd_nr: 2 }, { status: 201 }),
+      ),
+    );
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+    expect([...result.current.eigeneClientIds].sort()).toEqual([
+      'anderer-tab',
+      'direkt',
+      'eingereiht',
+    ]);
   });
 });
 
@@ -617,5 +666,78 @@ describe('useEtbErfassung – Neuladen nur nach Versand (LFH-947)', () => {
       await result.current.flush();
     });
     expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['etb', 9] });
+  });
+});
+
+/**
+ * Haptik der ETB-Schnellerfassung in der iOS-Hülle (Change t39ltxxi, Spec `huellen-vertrag`,
+ * „Erfassungen geben haptische Rückmeldung“): je Erfassen genau eine Rückmeldung.
+ */
+describe('useEtbErfassung – Haptik in der Hülle', () => {
+  afterEach(beendeHuelle);
+
+  function mitIosHuelle() {
+    const nachrichten: IosNachricht[] = [];
+    starteIosHuelle({ bruecke: { postMessage: (n) => nachrichten.push(n) } });
+    return () => nachrichten.filter((n) => n.cmd === 'haptics').map((n) => n.kind);
+  }
+
+  it('meldet `success`, wenn der Server den Eintrag annimmt', async () => {
+    const haptik = mitIosHuelle();
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ id: 7, lfd_nr: 135 }, { status: 201 }),
+      ),
+    );
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    expect(haptik()).toEqual(['success']);
+  });
+
+  it('meldet `tap`, nicht `success`, wenn der Eintrag ohne Netz vorgemerkt wird', async () => {
+    const haptik = mitIosHuelle();
+    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+    expect(haptik()).toEqual(['tap']);
+  });
+
+  it('meldet `error`, wenn der Server den Eintrag ablehnt', async () => {
+    const haptik = mitIosHuelle();
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'Einsatz abgeschlossen' }, { status: 409 }),
+      ),
+    );
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await expect(result.current.erfassen(eintrag)).rejects.toMatchObject({ status: 409 });
+    expect(haptik()).toEqual(['error']);
+  });
+
+  it('meldet beim Nachsenden der Queue nichts', async () => {
+    let versuch = 0;
+    server.use(
+      http.post('/api/einsaetze/9/etb', () => {
+        versuch += 1;
+        return versuch === 1
+          ? HttpResponse.error()
+          : HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+      }),
+    );
+    const haptik = mitIosHuelle();
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+    expect(haptik()).toEqual(['tap']);
   });
 });

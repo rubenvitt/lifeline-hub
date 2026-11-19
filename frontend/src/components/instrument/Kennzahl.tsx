@@ -147,7 +147,7 @@ export function zahlFarbe(
 
 /**
  * Farbe des Statuspunkts — die KANTE der Statusfläche (`statusFlaeche`), dieselbe Rollenfarbe
- * wie der Rand von `StatusZelle`/`StatusChip`. Außerhalb von `daten` neutral. Rein.
+ * wie der Rand von `StatusZelle`/`StatusKnopf`. Außerhalb von `daten` neutral. Rein.
  */
 export function punktFarbe(
   rollen: Parameters<typeof statusFlaeche>[0],

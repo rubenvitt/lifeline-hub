@@ -8,7 +8,7 @@ import type { VerpflegungVorlage, Verpflegungsart } from '../api/types';
 import { listVerpflegungVorlagen, updateVerpflegungVorlage } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil, Stapel } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -104,13 +104,13 @@ function VerpflegungsplanInhalt() {
       // Unter `md` gedeckelt, damit Zeit und Aktionen daneben im Bild bleiben (wie Sprechgruppen).
       width: istSchmal ? KENNUNG_SCHMAL_BREITE : undefined,
       render: (b: string, m) => (
-        <Space size={[8, 4]} wrap>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{b}</span>
           <HerkunftAbzeichen
             herkunft={herkunft.herkunft('verpflegung_vorlage', m.id)}
             quelle={herkunft.quelle}
           />
-        </Space>
+        </Stapel>
       ),
     },
     {
@@ -125,7 +125,10 @@ function VerpflegungsplanInhalt() {
             {uhrzeitOhneDatum(m.beginn, konventionen)}–{uhrzeitOhneDatum(m.ende, konventionen)}
           </span>
           {m.folgetag && (
-            <Typography.Text type="secondary" style={{ ...monoStil(12), marginInlineStart: 6 }}>
+            <Typography.Text
+              type="secondary"
+              style={{ ...monoStil(12), marginInlineStart: 'var(--lfh-luft-2)' }}
+            >
               +1 Tag
             </Typography.Text>
           )}
@@ -154,9 +157,9 @@ function VerpflegungsplanInhalt() {
       onFilter: (wert, m) => m.aktiv === wert,
       render: (_, m) =>
         m.aktiv ? (
-          <StatusChip ton="normal" wort="Aktiv" />
+          <Status groesse="klein" ton="normal" wort="Aktiv" />
         ) : (
-          <StatusChip ton="neutral" wort="Inaktiv" />
+          <Status groesse="klein" ton="neutral" wort="Inaktiv" />
         ),
     },
     ...(istAdmin

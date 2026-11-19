@@ -51,7 +51,7 @@ describe('StatusKatalogTab', () => {
   });
 
   // Farbcode, FMS-Anker und Sortierung stehen Mono mit `tabular-nums`, das Label nicht. Die
-  // Kategorie ist bereits Fläche (`StatusTag`-Vorgabe).
+  // Kategorie ist bereits Fläche (`Status`-Vorgabe).
   it('setzt Farbcode, FMS-Anker und Sortierung in die Zahlenschrift, das Label nicht', async () => {
     render(admin, [{ ...status[0], farbe: '#22aa55' }, status[1]]);
     await screen.findByText('einsatzbereit');

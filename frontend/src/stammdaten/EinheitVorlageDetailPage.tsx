@@ -1,10 +1,10 @@
-import { App, Button, Col, Form, Input, Row, Space, Switch, theme } from 'antd';
+import { App, Button, Col, Form, Input, Row, Switch, theme } from 'antd';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
 import DemoMarke from '../components/DemoMarke';
-import { Formularpaneel, StatusChip } from '../components/instrument';
+import { Formularpaneel, Status, Feld, Stapel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -312,11 +312,11 @@ function DetailContent({
           { title: vorlage.name },
         ]}
         titel={
-          <Space size={8} wrap>
+          <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             <span>{vorlage.name}</span>
             {vorlage.ist_demo && <DemoMarke />}
-            {!vorlage.aktiv && <StatusChip ton="neutral" wort="Inaktiv" />}
-          </Space>
+            {!vorlage.aktiv && <Status groesse="klein" ton="neutral" wort="Inaktiv" />}
+          </Stapel>
         }
         hinweis={
           <SeitenHinweise
@@ -336,7 +336,7 @@ function DetailContent({
           <Formularpaneel titel="Kopf" dataUpdatedAt={dataUpdatedAt}>
             <Row gutter={token.margin}>
               <Col xs={24} lg={12}>
-                <Form.Item
+                <Feld
                   label="Name"
                   name="name"
                   rules={[
@@ -344,36 +344,32 @@ function DetailContent({
                   ]}
                 >
                   <Input maxLength={EINHEIT_VORLAGE_NAME_MAX} />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item
-                  label="Typ"
-                  name="typ_id"
-                  rules={[{ required: true, message: 'Typ wählen' }]}
-                >
+                <Feld label="Typ" name="typ_id" rules={[{ required: true, message: 'Typ wählen' }]}>
                   <Select<number> aria-label="Typ" options={typOptions} />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Unter" name="ueber_vorlage_id">
+                <Feld label="Unter" name="ueber_vorlage_id">
                   <Select<number>
                     aria-label="Unter"
                     allowClear
                     placeholder="keine"
                     options={ueberOptions}
                   />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Funkrufname" name="funkrufname">
+                <Feld label="Funkrufname" name="funkrufname">
                   <Input maxLength={EINHEIT_VORLAGE_FUNKRUFNAME_MAX} />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={12}>
-                <Form.Item label="Aktiv" name="aktiv" valuePropName="checked">
+                <Feld label="Aktiv" name="aktiv" valuePropName="checked">
                   <Switch />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
@@ -381,29 +377,29 @@ function DetailContent({
           <Formularpaneel titel="Taktisches Zeichen">
             <Row gutter={token.margin} align="bottom">
               <Col xs={24} lg={10}>
-                <Form.Item label="Fachaufgabe" name="tz_fachaufgabe">
+                <Feld label="Fachaufgabe" name="tz_fachaufgabe">
                   <Select<string>
                     aria-label="Fachaufgabe"
                     allowClear
                     placeholder="keine"
                     options={FACHAUFGABE_OPTIONS}
                   />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={10}>
-                <Form.Item label="Organisation" name="tz_organisation">
+                <Feld label="Organisation" name="tz_organisation">
                   <Select<string>
                     aria-label="Organisation"
                     allowClear
                     placeholder="keine"
                     options={ORGANISATION_OPTIONS}
                   />
-                </Form.Item>
+                </Feld>
               </Col>
               <Col xs={24} lg={4}>
-                <Form.Item label="Vorschau">
+                <Feld label="Vorschau">
                   <ZeichenVorschau typen={typen} />
-                </Form.Item>
+                </Feld>
               </Col>
             </Row>
           </Formularpaneel>
@@ -413,13 +409,13 @@ function DetailContent({
           </Formularpaneel>
 
           <Formularpaneel titel="Freitext">
-            <Form.Item
+            <Feld
               label="Bemerkung"
               name="bemerkung"
               rules={[zeichenRegel(EINHEIT_VORLAGE_BEMERKUNG_MAX, 'Bemerkung')]}
             >
               <Input.TextArea rows={3} count={zeichenGrenze(EINHEIT_VORLAGE_BEMERKUNG_MAX)} />
-            </Form.Item>
+            </Feld>
           </Formularpaneel>
 
           <div {...speicherLeiste}>
@@ -488,16 +484,16 @@ function SollField({ typen, vorlage }: { typen: EinheitTyp[]; vorlage: EinheitVo
   const typQualiSoll = qualiSollText(typ?.quali_soll);
   return (
     <>
-      {/* EIN `Form.Item` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
+      {/* EIN `Feld` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
           `FahrzeugDetailPage`). */}
-      <Form.Item
+      <Feld
         label={`Soll-Stärke (${STAERKE_SCHREIBWEISE})`}
         name="soll"
         extra={soll == null && typSoll ? typVorgabe(staerkeText(typSoll)) : undefined}
       >
         <StaerkeEingabe />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Qualifikationssoll"
         name="quali_soll"
         extra={
@@ -508,7 +504,7 @@ function SollField({ typen, vorlage }: { typen: EinheitTyp[]; vorlage: EinheitVo
       >
         {/* Labels deaktivierter Qualifikationen aus dem eigenen Soll (LLH-1553). */}
         <QualiSollFeld bekannt={vorlage.quali_soll_eigen ? vorlage.quali_soll : null} />
-      </Form.Item>
+      </Feld>
     </>
   );
 }

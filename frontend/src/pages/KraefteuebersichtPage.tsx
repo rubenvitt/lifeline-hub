@@ -6,7 +6,7 @@ import {
   KEINE_BERECHTIGUNG,
   modulName,
 } from '../einsatz/modulRegistry';
-import { Breadcrumb, Button, Input, Popover, Space, Tag, theme } from 'antd';
+import { Breadcrumb, Button, Checkbox, Input, Popover, Space, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
@@ -63,6 +63,7 @@ import {
 import {
   baueMeldebildRaster,
   einheitBand,
+  einheitenTreffer,
   einheitZeilen,
   istProblemZeile,
   istRueckmeldungProblem,
@@ -76,7 +77,7 @@ import {
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../kraefte/fmsTableauKern';
-import Statusband, { type StatusbandZustand } from '../kraefte/Statusband';
+import Statusband, { statusbandKurzform, type StatusbandZustand } from '../kraefte/Statusband';
 import KraeftebaumZelle, { type SprungGesperrt } from '../kraefte/KraeftebaumZelle';
 import {
   besatzungZeilen,
@@ -95,9 +96,9 @@ import { kategorieDarstellung, statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/SpaltenSchalter';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
-import EinsatzSeite from '../components/EinsatzSeite';
+import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
-import DruckKnopf from '../components/druck/DruckKnopf';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import {
@@ -106,7 +107,7 @@ import {
   toHerausgenommenesMaterial,
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
+import { Status, StatusZelle, monoStil, useRollen, KlappBand } from '../components/instrument';
 import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -119,6 +120,7 @@ import {
 } from '../components/nurAnsicht';
 import { funktionText } from '../kraefte/einsatzfunktionKern';
 import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
@@ -151,43 +153,86 @@ import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
  */
 
 /**
+ * Der Filterzustand der Seite: die Filter über die Mittel (`FilterWerte`) und die zwei Schalter über
+ * die Einheiten (LLH-1792, Change `t3q2y33z-meldebild-schnellfilter`). Die Schalter wirken über
+ * `einheitenTreffer`, nicht über `filtereKraefte` selbst: sie brauchen Aufträge, Rückmeldungen und
+ * die Seitenuhr.
+ */
+export interface MeldebildFilter extends FilterWerte {
+  /** Nur Einheiten ohne offenen oder laufenden Auftrag. */
+  ohneAuftrag: boolean;
+  /** Nur Einheiten, deren Rückmeldung überfällig ist oder die nie zurückgemeldet haben. */
+  rueckmeldungFehlt: boolean;
+}
+
+/**
  * Der leere Filterzustand — eine Quelle für Startwert, Zurücksetzen und das Zurücknehmen einer
  * einzelnen Marke.
  */
-export const LEERER_FILTER: FilterWerte = {
+export const LEERER_FILTER: MeldebildFilter = {
   abschnittId: null,
   traeger: null,
   kategorie: null,
+  ohneAuftrag: false,
+  rueckmeldungFehlt: false,
   suche: '',
 };
 
 export interface FilterChip {
-  schluessel: keyof FilterWerte;
+  schluessel: keyof MeldebildFilter;
   label: string;
+  /**
+   * `false`, solange ein Einheiten-Schalter mangels lesbarer Quelle nicht wirkt (design.md D4): die
+   * Marke bleibt stehen und sagt es, die Seite gilt dafür nicht als gefiltert.
+   */
+  wirksam: boolean;
 }
+
+/** Ob die Quelle eines Einheiten-Schalters lesbar ist; fehlt die Angabe, gilt sie als lesbar. */
+export interface SchalterLesbar {
+  ohneAuftrag?: boolean;
+  rueckmeldungFehlt?: boolean;
+}
+
+export const OHNE_AUFTRAG_WORT = 'ohne Auftrag';
+export const RUECKMELDUNG_FEHLT_WORT = 'Rückmeldung fehlt oder überfällig';
 
 /**
  * Die gesetzten Filter als Beschriftungen, in fester Reihenfolge (Abschnitt · Träger · Status ·
- * Suche); `suche` getrimmt wie in `filtereKraefte`.
+ * ohne Auftrag · Rückmeldung · Suche); `suche` getrimmt wie in `filtereKraefte`.
  */
 export function aktiveFilterChips(
-  filter: FilterWerte,
+  filter: MeldebildFilter,
   abschnittName: (id: number) => string,
+  lesbar: SchalterLesbar = {},
 ): FilterChip[] {
   const chips: FilterChip[] = [];
   if (filter.abschnittId != null) {
     chips.push({
       schluessel: 'abschnittId',
       label: `Abschnitt: ${abschnittName(filter.abschnittId)}`,
+      wirksam: true,
     });
   }
-  if (filter.traeger) chips.push({ schluessel: 'traeger', label: `Träger: ${filter.traeger}` });
+  if (filter.traeger)
+    chips.push({ schluessel: 'traeger', label: `Träger: ${filter.traeger}`, wirksam: true });
   if (filter.kategorie) {
     const wert = KATEGORIE_WERTE.find((w) => w.value === filter.kategorie);
-    chips.push({ schluessel: 'kategorie', label: `Status: ${wert?.text ?? filter.kategorie}` });
+    chips.push({
+      schluessel: 'kategorie',
+      label: `Status: ${wert?.text ?? filter.kategorie}`,
+      wirksam: true,
+    });
   }
+  const schalter = (schluessel: 'ohneAuftrag' | 'rueckmeldungFehlt', wort: string) => {
+    if (!filter[schluessel]) return;
+    const wirksam = lesbar[schluessel] !== false;
+    chips.push({ schluessel, label: wirksam ? wort : `${wort} (wirkt gerade nicht)`, wirksam });
+  };
+  schalter('ohneAuftrag', OHNE_AUFTRAG_WORT);
+  schalter('rueckmeldungFehlt', RUECKMELDUNG_FEHLT_WORT);
   if (filter.suche.trim())
-    chips.push({ schluessel: 'suche', label: `Suche: „${filter.suche.trim()}"` });
+    chips.push({ schluessel: 'suche', label: `Suche: „${filter.suche.trim()}"`, wirksam: true });
   return chips;
 }
 
@@ -503,7 +548,7 @@ function StatusSpalte({
       style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXXS }}
     >
       {gruende.map((g) => (
-        <StatusChip key={g.art} ton="alarm" wort={grundWort(g)} />
+        <Status groesse="klein" key={g.art} ton="alarm" wort={grundWort(g)} />
       ))}
     </span>
   );
@@ -513,7 +558,8 @@ function StatusSpalte({
     const verteilung = 'verteilung' in z.status ? z.status.verteilung : null;
     status = (
       <>
-        <StatusChip
+        <Status
+          groesse="klein"
           ton={z.status.ton}
           code={z.status.code ?? undefined}
           wort={z.status.wort}
@@ -582,6 +628,36 @@ function MittelVerteilungZellen({ zeile: z }: { zeile: RasterZeile }) {
           hoehe={24}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * Ein Einheiten-Schalter im Filter-Menü (LLH-1792). Ohne lesbare Quelle ist er deaktiviert und
+ * nennt den Grund; ein schon gesetzter lässt sich über seine Marke zurücknehmen.
+ */
+function EinheitenSchalter({
+  wort,
+  gesetzt,
+  grund,
+  onWechsel,
+}: {
+  wort: string;
+  gesetzt: boolean;
+  grund: string | null;
+  onWechsel: (an: boolean) => void;
+}) {
+  const { token } = theme.useToken();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <Checkbox
+        checked={gesetzt}
+        disabled={grund != null}
+        onChange={(e) => onWechsel(e.target.checked)}
+      >
+        {wort}
+      </Checkbox>
+      {grund && <span style={{ color: token.colorTextSecondary }}>{grund}</span>}
     </div>
   );
 }
@@ -741,7 +817,7 @@ export default function KraefteuebersichtPage() {
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useJetzt();
 
-  const [filter, setFilter] = useState<FilterWerte>(LEERER_FILTER);
+  const [filter, setFilter] = useState<MeldebildFilter>(LEERER_FILTER);
   /**
    * Offene Zeilen; `null` heißt „Vorgabestufe Einheiten“ (Untereinheiten sichtbar, Mittel zu).
    * Als `null` statt einer berechneten Liste, weil das Raster beim ersten Bild noch leer ist.
@@ -858,6 +934,47 @@ export default function KraefteuebersichtPage() {
     [personalQuery.data, fahrzeugeQuery.data],
   );
 
+  const auftraegeZustand = zustandNachFreigabe(
+    auftraegeQuery,
+    frei.auftraege,
+    freigabenGescheitert,
+  );
+  const rueckmeldungZustand = zustandNachFreigabe(
+    rueckmeldungenQuery,
+    frei.meldungen,
+    freigabenGescheitert,
+  );
+  /**
+   * Die Einheiten der Schalter „ohne Auftrag“ und „Rückmeldung fehlt oder überfällig“ (LLH-1792,
+   * design.md D1, D4); `null` ohne wirksamen Schalter. Nur lesbare Quellen gehen hinein. An der
+   * Seitenuhr hängt die Menge nur, solange der Rückmeldungs-Schalter wirkt (D5): sonst baute der
+   * 30-s-Takt den ganzen Baum neu.
+   */
+  const auftraegeLesbar = auftraegeZustand === 'daten';
+  const rueckmeldungLesbar = rueckmeldungZustand === 'daten';
+  const trefferUhr = filter.rueckmeldungFehlt && rueckmeldungLesbar ? jetzt.valueOf() : 0;
+  const treffer = useMemo(
+    () =>
+      einheitenTreffer({
+        einheiten: einheitenQuery.data ?? [],
+        ohneAuftrag: filter.ohneAuftrag,
+        rueckmeldungFehlt: filter.rueckmeldungFehlt,
+        auftraege: auftraegeLesbar ? (auftraegeQuery.data ?? []) : null,
+        rueckmeldungen: rueckmeldungLesbar ? (rueckmeldungenQuery.data ?? null) : null,
+        jetzt: dayjs(trefferUhr),
+      }),
+    [
+      einheitenQuery.data,
+      filter.ohneAuftrag,
+      filter.rueckmeldungFehlt,
+      auftraegeLesbar,
+      auftraegeQuery.data,
+      rueckmeldungLesbar,
+      rueckmeldungenQuery.data,
+      trefferUhr,
+    ],
+  );
+
   const gefiltertRoh = useMemo(() => {
     const roh: Rohdaten = {
       abschnitte: abschnitteQuery.data ?? [],
@@ -866,7 +983,7 @@ export default function KraefteuebersichtPage() {
       fahrzeuge: fahrzeugeQuery.data ?? [],
       material: materialQuery.data ?? [],
     };
-    return filtereKraefte(roh, filter);
+    return filtereKraefte(roh, filter, treffer);
   }, [
     abschnitteQuery.data,
     einheitenQuery.data,
@@ -874,6 +991,7 @@ export default function KraefteuebersichtPage() {
     fahrzeugeQuery.data,
     materialQuery.data,
     filter,
+    treffer,
   ]);
 
   const raster = useMemo(
@@ -904,11 +1022,6 @@ export default function KraefteuebersichtPage() {
     [expandedKeys, raster],
   );
 
-  const rueckmeldungZustand = zustandNachFreigabe(
-    rueckmeldungenQuery,
-    frei.meldungen,
-    freigabenGescheitert,
-  );
   const rueckmeldungDaten = rueckmeldungZustand === 'daten' ? rueckmeldungenQuery.data : undefined;
   /**
    * Anzeige je Zeilenschlüssel — nur bei lesbaren Daten. Beim Laden, bei Fehler und bei 403 bleibt
@@ -929,12 +1042,17 @@ export default function KraefteuebersichtPage() {
 
   const band = useMemo(
     () => ({
-      einheiten: einheitBand(gefiltertRoh.einheiten),
+      // Rahmen-Obereinheiten eines Einheiten-Filters zählen nicht (design.md D3).
+      einheiten: einheitBand(
+        treffer ? gefiltertRoh.einheiten.filter((e) => treffer.has(e.id)) : gefiltertRoh.einheiten,
+      ),
       personal: personalBand(gefiltertRoh.personal),
-      rueckmeldung: rueckmeldungDaten ? keineRueckmeldungZelle(raster, rueckmeldungDaten) : null,
+      rueckmeldung: rueckmeldungDaten
+        ? keineRueckmeldungZelle(raster, rueckmeldungDaten, treffer)
+        : null,
     }),
     // `einheitBand` liest den Status an der Einheit selbst, nicht über den Katalog.
-    [gefiltertRoh, raster, rueckmeldungDaten],
+    [gefiltertRoh, raster, rueckmeldungDaten, treffer],
   );
   /**
    * Zulauf (LLH-1384): nur mit lesbaren Daten. Zählt nicht in Stärke, Einheiten oder Personal
@@ -983,11 +1101,6 @@ export default function KraefteuebersichtPage() {
     [personalQuery.data, fahrzeugeQuery.data, materialQuery.data],
   );
 
-  const auftraegeZustand = zustandNachFreigabe(
-    auftraegeQuery,
-    frei.auftraege,
-    freigabenGescheitert,
-  );
   const periodenZustand = zustandNachFreigabe(periodenQuery, frei.einheiten, freigabenGescheitert);
   const jetztMs = jetzt.valueOf();
   const grenzwerte = grenzwerteQuery.data;
@@ -1085,6 +1198,15 @@ export default function KraefteuebersichtPage() {
   // nur so bleibt sie einzeilig, und sein Fokus hält die Zeilenschleuse nicht.
   const spaltenSchalter = useSpaltenSchalterZustand<(typeof spalten)[number]['key']>();
 
+  // Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel): `useDrucken` löst den
+  // Dialog nach dem Commit aus.
+  const druckNebenwege = useDruckNebenwege({
+    vorbereiten: async () => {
+      setGewaehlteStufe('alles');
+      setExpandedKeys(schluesselBisStufe(raster, 'alles'));
+      return true;
+    },
+  });
   const uebernehmen = useMutation({
     mutationFn: async () => {
       // Stand in der Anzeigezone: die DTG landet als Text im Lagebericht (LFH-692).
@@ -1208,8 +1330,12 @@ export default function KraefteuebersichtPage() {
 
   const abschnittName = (aid: number) =>
     (abschnitteQuery.data ?? []).find((a) => a.id === aid)?.name ?? `Abschnitt ${aid}`;
-  const chips = aktiveFilterChips(filter, abschnittName);
-  const gefiltert = chips.length > 0;
+  const chips = aktiveFilterChips(filter, abschnittName, {
+    ohneAuftrag: auftraegeLesbar,
+    rueckmeldungFehlt: rueckmeldungLesbar,
+  });
+  /** Gefiltert ist nur, was wirkt: ein Schalter ohne lesbare Quelle filtert nicht (D4). */
+  const gefiltert = chips.some((c) => c.wirksam);
   /**
    * Auswahlzahl bei gesetztem Filter. „Kräfte“ sind Köpfe, die Fahrzeuge zählen eigens (LLH-1744,
    * Spec `lage-verdichtung`), Material
@@ -1229,9 +1355,28 @@ export default function KraefteuebersichtPage() {
         ]),
   ].join(' · ');
   // Rekursiv (D12): eine Untereinheit ist eine Einheit der Auswahl.
-  const einheitenZeilen = einheitZeilen(raster).filter((z) => z.einheitId != null).length;
-  /** Die zwei Filter hinter „Filter (n)“ — Abschnitt steht im Kopf, die Suche offen. */
-  const filterZahl = (filter.traeger ? 1 : 0) + (filter.kategorie ? 1 : 0);
+  // Rahmen-Obereinheiten eines Einheiten-Filters zählen nicht (design.md D3).
+  const einheitenZeilen = einheitZeilen(raster).filter(
+    (z) => z.einheitId != null && (!treffer || treffer.has(z.einheitId)),
+  ).length;
+  /** Die Filter hinter „Filter (n)“ — Abschnitt steht im Kopf, die Suche offen. */
+  const filterZahl = [
+    filter.traeger,
+    filter.kategorie,
+    filter.ohneAuftrag,
+    filter.rueckmeldungFehlt,
+  ].filter(Boolean).length;
+  /** Warum ein Einheiten-Schalter nicht wählbar ist (D4, D6); `null`, solange seine Quelle lesbar ist. */
+  const schalterGrund = (zustand: AbrufZustand, quelle: string): string | null =>
+    zustand === 'daten'
+      ? null
+      : zustand === 'gesperrt'
+        ? `${quelle} nicht freigegeben`
+        : zustand === 'laden'
+          ? `${quelle} laden …`
+          : `${quelle} nicht abrufbar`;
+  const ohneAuftragGrund = schalterGrund(auftraegeZustand, 'Aufträge');
+  const rueckmeldungGrund = schalterGrund(rueckmeldungZustand, 'Rückmeldungen');
 
   const listenFehler =
     freigabenGescheitert ||
@@ -1317,6 +1462,46 @@ export default function KraefteuebersichtPage() {
     gefiltert,
   });
 
+  /**
+   * Nebenwege des Kopfs (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D4): Drucken und die
+   * Übernahme in den Lagebericht standen in der Werkzeugzeile über dem Baum; jetzt folgen sie der
+   * Regel aller Seiten (`frontend/AGENTS.md`, „Nebenwege im Kopf“). Der Grund einer Sperre steht
+   * im sichtbaren Namen (LFH-1079), ein `title` erscheint auf Touch nie. Ein Bericht ohne eine der
+   * Listen meldete eine Lage, die niemand geprüft hat (LLH-1462).
+   */
+  // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel, das
+  // Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts). Steht auch in der
+  // Kurzform des eingeklappten Bands (LLH-1786).
+  // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel, das
+  // Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts). Ein wirksamer
+  // Einheiten-Filter (LLH-1792) trifft auch das Einheitenband: dann kein Vermerk (design.md D7).
+  const einheitenFilterHinweis =
+    !treffer && (filter.traeger || filter.kategorie || filter.suche.trim())
+      ? filter.abschnittId != null
+        ? 'nur nach Abschnitt gefiltert'
+        : 'ungefiltert'
+      : null;
+  const lageberichtSperre = lageberichtGesperrt ? KEINE_BERECHTIGUNG : berichtGesperrt;
+  const nebenwege: Nebenweg[] = [
+    ...(darfSchreiben
+      ? [
+          {
+            key: 'lagebericht',
+            label:
+              lageberichtSperre != null
+                ? `In Lagebericht übernehmen (${lageberichtSperre})`
+                : berichtQuellenDa
+                  ? 'In Lagebericht übernehmen'
+                  : 'In Lagebericht übernehmen (Listen laden …)',
+            laeuft: uebernehmen.isPending,
+            ...(lageberichtSperre != null || !berichtQuellenDa ? { gesperrt: true as const } : {}),
+            onWahl: () => uebernehmen.mutate(),
+          },
+        ]
+      : []),
+    ...druckNebenwege,
+  ];
+
   return (
     // `kraefte-print-root` bleibt die äußere Hülle: `kraefteuebersichtPrint.css` hängt daran, und
     // `EinsatzSeite` nimmt kein `className`.
@@ -1335,6 +1520,7 @@ export default function KraefteuebersichtPage() {
         meta={metaLaedt ? undefined : meta}
         metaPlatzhalter={metaPlatzhalter}
         dataUpdatedAt={datenstand}
+        weitere={{ name: 'Weitere Aktionen zum Meldebild', eintraege: nebenwege }}
         aktionen={
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
@@ -1396,35 +1582,40 @@ export default function KraefteuebersichtPage() {
         />
 
         <div style={{ marginBlock: token.marginLG }}>
-          <Statusband
-            einheiten={band.einheiten}
-            // Eine Marke, kein Satz (LFH-1078): Träger, Status und Suche treffen nur die Mittel,
-            // das Einheitenband zählt weiter alle Einheiten (des gewählten Abschnitts).
-            einheitenHinweis={
-              filter.traeger || filter.kategorie || filter.suche.trim()
-                ? filter.abschnittId != null
-                  ? 'nur nach Abschnitt gefiltert'
-                  : 'ungefiltert'
-                : null
+          {/* Einklappbar (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D3): in 48 / 72 nahm das
+              Band die halbe Höhe vor der ersten Zeile. Eingeklappt bleibt die Kurzform. */}
+          <KlappBand
+            seite="meldebild"
+            titel="Status in Zahlen"
+            kurzform={
+              statusbandKurzform(band, {
+                einheiten: bandZustand(frei.einheiten),
+                personal: bandZustand(frei.personal),
+              }) + (einheitenFilterHinweis ? ` (${einheitenFilterHinweis})` : '')
             }
-            personal={band.personal}
-            rueckmeldung={band.rueckmeldung}
-            // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
-            // Lagebericht): gefiltert entfällt er.
-            zulauf={gefiltert ? null : zulauf}
-            zulaufZiel={nachforderungenPfad(einsatzId)}
-            // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
-            rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
-            einheitenZustand={bandZustand(frei.einheiten)}
-            personalZustand={bandZustand(frei.personal)}
-            onNeuladen={() => {
-              // Nur freie Listen: `refetch` liefe trotz `enabled: false` in den 403.
-              if (freigabenGescheitert) freigabenWiederholen();
-              if (frei.personal === true) void personalQuery.refetch();
-              if (frei.fahrzeuge === true) void fahrzeugeQuery.refetch();
-              if (frei.einheiten === true) void einheitenQuery.refetch();
-            }}
-          />
+          >
+            <Statusband
+              einheiten={band.einheiten}
+              einheitenHinweis={einheitenFilterHinweis}
+              personal={band.personal}
+              rueckmeldung={band.rueckmeldung}
+              // Der Zulauf gehört zu keiner Auswahl (design.md D8, wie die Entlassenen im
+              // Lagebericht): gefiltert entfällt er.
+              zulauf={gefiltert ? null : zulauf}
+              zulaufZiel={nachforderungenPfad(einsatzId)}
+              // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
+              rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
+              einheitenZustand={bandZustand(frei.einheiten)}
+              personalZustand={bandZustand(frei.personal)}
+              onNeuladen={() => {
+                // Nur freie Listen: `refetch` liefe trotz `enabled: false` in den 403.
+                if (freigabenGescheitert) freigabenWiederholen();
+                if (frei.personal === true) void personalQuery.refetch();
+                if (frei.fahrzeuge === true) void fahrzeugeQuery.refetch();
+                if (frei.einheiten === true) void einheitenQuery.refetch();
+              }}
+            />
+          </KlappBand>
         </div>
 
         <div className="kraefte-no-print">
@@ -1459,15 +1650,15 @@ export default function KraefteuebersichtPage() {
             </span>
           )}
           {chips.map((chip) => (
-            <Tag
+            <Marke
               key={chip.schluessel}
-              closable
-              onClose={() =>
+              onEntfernen={() =>
                 setFilter((f) => ({ ...f, [chip.schluessel]: LEERER_FILTER[chip.schluessel] }))
               }
+              entfernenLabel={`Filter ${chip.label} entfernen`}
             >
               {chip.label}
-            </Tag>
+            </Marke>
           ))}
           {gefiltert && (
             <Button type="link" onClick={() => setFilter(LEERER_FILTER)}>
@@ -1521,6 +1712,20 @@ export default function KraefteuebersichtPage() {
                   }))}
                   onChange={(wert) => setFilter((f) => ({ ...f, kategorie: wert ?? null }))}
                 />
+                {/* Einheiten-Filter (LLH-1792, design.md D6): ohne lesbare Quelle nicht wählbar,
+                    der Grund steht als Text daneben, nicht nur im Tooltip. */}
+                <EinheitenSchalter
+                  wort={OHNE_AUFTRAG_WORT}
+                  gesetzt={filter.ohneAuftrag}
+                  grund={ohneAuftragGrund}
+                  onWechsel={(an) => setFilter((f) => ({ ...f, ohneAuftrag: an }))}
+                />
+                <EinheitenSchalter
+                  wort={RUECKMELDUNG_FEHLT_WORT}
+                  gesetzt={filter.rueckmeldungFehlt}
+                  grund={rueckmeldungGrund}
+                  onWechsel={(an) => setFilter((f) => ({ ...f, rueckmeldungFehlt: an }))}
+                />
               </div>
             }
           >
@@ -1555,27 +1760,6 @@ export default function KraefteuebersichtPage() {
             bezeichnung={modulName('kraefteuebersicht')}
             spalten={spalten}
             {...spaltenSchalter}
-          />
-          {darfSchreiben && (
-            <Button
-              loading={uebernehmen.isPending}
-              // Ein Bericht ohne eine der Listen meldete eine Lage, die niemand geprüft hat
-              // (LLH-1462): gesperrt, der Grund steht sichtbar in derselben Zeile.
-              disabled={lageberichtGesperrt || berichtGesperrt != null || !berichtQuellenDa}
-              title={lageberichtGesperrt ? KEINE_BERECHTIGUNG : (berichtGesperrt ?? undefined)}
-              aria-describedby={berichtGesperrt != null && mittelGesperrt ? sperreId : undefined}
-              onClick={() => uebernehmen.mutate()}
-            >
-              In Lagebericht übernehmen
-            </Button>
-          )}
-          {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel) — `useDrucken`
-              löst den Dialog nach dem Commit aus. */}
-          <DruckKnopf
-            vorbereiten={() => {
-              setGewaehlteStufe('alles');
-              setExpandedKeys(schluesselBisStufe(raster, 'alles'));
-            }}
           />
         </div>
         {uebernehmen.error != null && (

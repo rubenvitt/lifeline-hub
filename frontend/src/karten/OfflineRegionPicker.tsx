@@ -1,4 +1,4 @@
-import { App, Button, Modal, Spin, Typography } from 'antd';
+import { App, Button, Modal, Spin, Typography, theme } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -22,8 +22,9 @@ import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
-import StatusTag from '../components/StatusTag';
+import { Textstufe } from '../components/instrument';
 import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
 
 /** Bau-Status, während derer gepollt wird (2 s). */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -71,6 +72,7 @@ export default function OfflineRegionPicker({
   offen: boolean;
   onClose: () => void;
 }) {
+  const { token } = theme.useToken();
   const qc = useQueryClient();
   const { message } = App.useApp();
   // Regionen im „Bauen & laden"-Fluss: slug → name. Der Name wird mitgeführt, damit die
@@ -261,8 +263,8 @@ export default function OfflineRegionPicker({
     if (baut) {
       const phase = job ? BAU_PHASE_LABEL[job.status.status] : 'baut';
       return (
-        <StatusTag
-          icon={<Spin size="small" style={{ marginInlineEnd: 4 }} />}
+        <Status
+          icon={<Spin size="small" style={{ marginInlineEnd: token.marginXS }} />}
           darstellung={{ ...kartenBauStatus.building, label: `Baut… ${phase}` }}
         />
       );
@@ -271,11 +273,11 @@ export default function OfflineRegionPicker({
     const k = z.karte;
     if (k && k.status !== 'fehler') {
       if (k.status === 'laedt' || k.geladen != null) {
-        return <StatusTag darstellung={{ ...offlineKarteStatus.laedt, label: 'Lädt…' }} />;
+        return <Status darstellung={{ ...offlineKarteStatus.laedt, label: 'Lädt…' }} />;
       }
       // bereit
       return (
-        <StatusTag
+        <Status
           darstellung={{
             ...offlineKarteStatus.bereit,
             label: `Auf dem Gerät${k.update_verfuegbar && !istRasterKarte(k) ? ' · Update verfügbar' : ''}`,
@@ -310,9 +312,9 @@ export default function OfflineRegionPicker({
     }
     // 5) Nicht gebaut und kein Bau möglich: der Grund steht sichtbar da, kein Tooltip (Touch).
     return (
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Textstufe stufe="textKlein" ton="gedaempft">
         Nicht gebaut
-      </Typography.Text>
+      </Textstufe>
     );
   };
 
@@ -326,15 +328,15 @@ export default function OfflineRegionPicker({
       width={560}
     >
       {ladend ? (
-        <div style={{ textAlign: 'center', padding: 24 }}>
+        <div style={{ textAlign: 'center', padding: token.paddingXL }}>
           <Spin />
         </div>
       ) : leer ? (
         <Typography.Text type="secondary">Keine Regionen verfügbar</Typography.Text>
       ) : (
         Object.entries(gruppen).map(([gruppe, items]) => (
-          <div key={gruppe} style={{ marginBottom: 8 }}>
-            <Typography.Title level={5} style={{ marginBottom: 4 }}>
+          <div key={gruppe} style={{ marginBottom: token.marginSM }}>
+            <Typography.Title level={5} style={{ marginBottom: token.marginXS }}>
               {gruppe}
             </Typography.Title>
             <Liste
@@ -350,9 +352,9 @@ export default function OfflineRegionPicker({
                       title={z.name}
                       description={
                         <>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          <Textstufe stufe="textKlein" ton="gedaempft">
                             {z.region}
-                          </Typography.Text>
+                          </Textstufe>
                           {grund && (
                             <div>
                               <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />

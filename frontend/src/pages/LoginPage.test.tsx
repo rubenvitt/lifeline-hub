@@ -521,7 +521,7 @@ describe('LoginPage', () => {
       expect(
         screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
       ).not.toBeInTheDocument();
-      expect(screen.queryByText(/in der Mac-App/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/in der (Mac|Lifeline)-App/)).not.toBeInTheDocument();
     });
 
     it('zeigt in der Hülle keinen Hinweis, solange OIDC ohne Passwort bleibt', async () => {
@@ -537,7 +537,7 @@ describe('LoginPage', () => {
       expect(
         screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
       ).not.toBeInTheDocument();
-      expect(screen.queryByText(/in der Mac-App/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/in der (Mac|Lifeline)-App/)).not.toBeInTheDocument();
     });
 
     it('nennt den Browser, wenn in der Hülle kein Anmeldeweg übrig bleibt', async () => {

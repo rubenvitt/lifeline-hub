@@ -27,6 +27,17 @@ export interface DruckEinsatz {
 }
 
 /**
+ * Der Einsatz in Worten, wie er auf Papier steht: „Bezeichnung (interne Nummer)“, ohne Klammer, wenn
+ * die Nummer fehlt oder leer ist. Druckkopf und Laufzeile des ETB-Drucks (LLH-1837) nennen ihn gleich.
+ */
+export function druckEinsatzName(
+  einsatz: Pick<DruckEinsatz, 'bezeichnung' | 'einsatznummer_intern'>,
+): string {
+  const nummer = einsatz.einsatznummer_intern?.trim();
+  return nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung;
+}
+
+/**
  * „ÜBUNG“ auf Papier (LLH-1725): ein umrandeter Block, Rahmen und Wort tragen ihn, kein Hintergrund
  * (den druckt der Browser ohne `print-color-adjust` nicht). Im Druckkopf und im Titel eines Blatts
  * ohne Druckkopf (Bild-Anlage).
@@ -121,9 +132,8 @@ export default function Druckkopf({
     return () => window.removeEventListener('beforeprint', vorDruck);
   }, []);
 
-  const nummer = einsatz.einsatznummer_intern?.trim();
   const uebung = isUebung(einsatz);
-  const name = nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung;
+  const name = druckEinsatzName(einsatz);
   const angaben: DruckkopfZeile[] = [
     {
       etikett: bezug,

@@ -24,14 +24,13 @@ import Markdown from '../components/Markdown';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import SichtungsTag from '../components/SichtungsTag';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import StatusTag from '../components/StatusTag';
 import {
   Augenbraue,
   Datenfeld,
   Datenraster,
   Paneel,
   Segmentleiste,
-  StatusChip,
+  Status,
   Zeitachseneintrag,
 } from '../components/instrument';
 import { istAdmin } from '../einsatz/schreibrecht';
@@ -125,7 +124,7 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
     sorter: nachFolge(Object.keys(personStatus), (p: ArchivPerson) => p.status),
     filters: werteAusKatalog(personStatus),
     onFilter: (w, p) => p.status === w,
-    render: (_, p) => <StatusTag darstellung={personStatus[p.status]} />,
+    render: (_, p) => <Status darstellung={personStatus[p.status]} />,
   },
   {
     key: 'sichtung',
@@ -202,7 +201,7 @@ const tierSpalten: KatalogSpalte<ArchivTier>[] = [
     filters: werteAusKatalog(TIER_STATUS),
     onFilter: (w, t) => t.status === w,
     render: (_, t) => (
-      <StatusChip ton={TIER_STATUS[t.status].ton} wort={TIER_STATUS[t.status].label} />
+      <Status groesse="klein" ton={TIER_STATUS[t.status].ton} wort={TIER_STATUS[t.status].label} />
     ),
   },
   {
@@ -251,7 +250,7 @@ const schadenSpalten: KatalogSpalte<ArchivSchaden>[] = [
     sorter: nachFolge(Object.keys(schadenAusmass), (s: ArchivSchaden) => s.ausmass),
     filters: werteAusKatalog(schadenAusmass),
     onFilter: (w, s) => s.ausmass === w,
-    render: (_, s) => <StatusTag darstellung={schadenAusmass[s.ausmass]} />,
+    render: (_, s) => <Status darstellung={schadenAusmass[s.ausmass]} />,
   },
   {
     // Gefahr und Schadensgrad in einer Spalte wie in der Schadensliste (LLH-1342).
@@ -269,7 +268,7 @@ const schadenSpalten: KatalogSpalte<ArchivSchaden>[] = [
     sorter: nachFolge(Object.keys(schadenStatus), (s: ArchivSchaden) => s.status),
     filters: werteAusKatalog(schadenStatus),
     onFilter: (w, s) => s.status === w,
-    render: (_, s) => <StatusTag darstellung={schadenStatus[s.status]} />,
+    render: (_, s) => <Status darstellung={schadenStatus[s.status]} />,
   },
   {
     key: 'abschluss',
@@ -497,7 +496,7 @@ function AkteInhalt({
         <Paneel titel="Aufbewahrung" koerperPolster>
           <Datenraster spalten={3} beschriftung="Aufbewahrung">
             <Datenfeld label="Zustand">
-              <StatusTag darstellung={aufbewahrungZustand[akte.zustand]} />
+              <Status darstellung={aufbewahrungZustand[akte.zustand]} />
             </Datenfeld>
             <Datenfeld label="Frist" mono={kopf.retention_bis != null}>
               <FristWert einsatz={{ status: 'abgeschlossen', retention_bis: kopf.retention_bis }} />

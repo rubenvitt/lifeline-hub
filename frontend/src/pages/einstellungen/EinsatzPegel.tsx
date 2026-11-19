@@ -1,6 +1,6 @@
 import { IconMuelleimer, IconPfeilHoch, IconPfeilRunter, IconStift } from '../../icons';
 import { useId, useMemo, useState } from 'react';
-import { Alert, App, Button, Tag, Typography } from 'antd';
+import { Alert, App, Button, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Formularpaneel, useRollen } from '../../components/instrument';
@@ -40,6 +40,7 @@ import { NUR_LEITUNG_FUEHRUNG } from '../../components/nurAnsicht';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import PegelPrognoseModal from './PegelPrognoseModal';
 import { wiederherstellBody } from './pegelPrognoseKern';
+import { Marke } from '../../components/instrument/Marke';
 
 /** Eine wählbare PEGELONLINE-Station aus der Fachebene (`properties` der Features). */
 interface PegelStation {
@@ -376,7 +377,7 @@ export default function EinsatzPegel() {
                       }}
                     >
                       <span data-lfh="pegel-titel">{`${index + 1}. ${p.name}`}</span>
-                      {index === 0 && <Tag data-lfh="leitpegel">Leitpegel</Tag>}
+                      {index === 0 && <Marke data-lfh="leitpegel">Leitpegel</Marke>}
                     </span>
                   }
                   description={
@@ -416,28 +417,30 @@ export default function EinsatzPegel() {
             gap: token.marginSM,
           }}
         >
-          <Select<string>
-            id={auswahlId}
-            style={{ flex: '1 1 16rem', minWidth: 0 }}
-            placeholder="Station suchen (Name, Gewässer, km)"
-            value={auswahl ?? undefined}
-            onChange={(v) => setAuswahl(v)}
-            allowClear
-            onClear={() => setAuswahl(null)}
-            loading={stationenQ.isLoading}
-            disabled={!darf || voll || laeuft || stationenFehlen}
-            showSearch={{
-              filterOption: (eingabe, option) =>
-                String(option?.label ?? '')
-                  .toLowerCase()
-                  .includes(eingabe.trim().toLowerCase()),
-            }}
-            options={stationen.map((s) => ({
-              value: s.uuid,
-              label: stationsLabel(s),
-              disabled: festgelegt.has(s.uuid),
-            }))}
-          />
+          {/* Die Hülle wächst in der Reihe, das Raster streckt die Auswahl auf ihre Breite. */}
+          <div style={{ flex: '1 1 16rem', minWidth: 0, display: 'grid' }}>
+            <Select<string>
+              id={auswahlId}
+              placeholder="Station suchen (Name, Gewässer, km)"
+              value={auswahl ?? undefined}
+              onChange={(v) => setAuswahl(v)}
+              allowClear
+              onClear={() => setAuswahl(null)}
+              loading={stationenQ.isLoading}
+              disabled={!darf || voll || laeuft || stationenFehlen}
+              showSearch={{
+                filterOption: (eingabe, option) =>
+                  String(option?.label ?? '')
+                    .toLowerCase()
+                    .includes(eingabe.trim().toLowerCase()),
+              }}
+              options={stationen.map((s) => ({
+                value: s.uuid,
+                label: stationsLabel(s),
+                disabled: festgelegt.has(s.uuid),
+              }))}
+            />
+          </div>
           <Button
             type="primary"
             disabled={!darf || voll || laeuft || !gewaehlt || festgelegt.has(gewaehlt.uuid)}

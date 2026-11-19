@@ -165,7 +165,7 @@ test('LLH-1616: Tablet der Betreuungsstelle druckt die Registrierliste der eigen
     const nav = tablet.getByRole('navigation', { name: 'Gerätenavigation' });
     await nav.getByRole('link', { name: 'Stelle' }).click();
     await tablet.getByRole('tab', { name: 'Registrierung' }).click();
-    await tablet.getByRole('link', { name: 'Registrierliste drucken' }).click();
+    await tablet.getByRole('link', { name: 'Registrierliste – Druckansicht' }).click();
     await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/betreuung/registrierliste/druck$`));
 
     const tabelle = tablet

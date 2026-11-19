@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
-import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
+import { dichten, flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
 // Seiten unter diesem Primitiv benutzen die `.lfh-*`-Klassen aus `sprache.css`. Alle Selektoren
 // dort sind klassengebunden, sie färben nichts ein, was sie nicht anfassen.
 import '../theme/sprache.css';
@@ -20,10 +20,10 @@ import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
 import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useRollen } from './instrument/rollenwerte';
-import StatusTag from './StatusTag';
 import { useEinsatzRahmen, useImEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
 import type { EinsatzAnzeige } from '../api/types';
+import { Status } from './instrument/Status';
 
 /** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — in
  *  `komfortabel`/`handschuh` wächst sie mit der Staffel (48/72, {@link titelblockStil}), eine
@@ -85,21 +85,22 @@ export function titelblockStil(token: {
   paddingXS: number;
   marginXS: number;
 }): CSSProperties {
+  const zeile = Math.max(
+    token.controlHeight,
+    SEITENKOPF_HOEHE - 2 * token.paddingXS - SEITENKOPF_LINIE,
+  );
   return {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    // Mehrzeilig (Ortspfad, Titel, Meta unter `md`) stehen die Zeilen beisammen in der Mitte,
-    // statt sich über den Boden zu verteilen.
-    alignContent: 'center',
+    // Wie die Zeilen stehen, sagt `EinsatzSeite.css`: unter `md` mittig beisammen (Ortspfad, Titel,
+    // Meta), ab `md` oben gestapelt, die Titelzeile so hoch wie `--lfh-titelzeile` (LLH-1786).
     alignSelf: 'flex-start',
-    minHeight: Math.max(
-      token.controlHeight,
-      SEITENKOPF_HOEHE - 2 * token.paddingXS - SEITENKOPF_LINIE,
-    ),
+    minHeight: zeile,
     columnGap: token.marginXS * 3,
     rowGap: 2,
     minWidth: 0,
+    ['--lfh-titelzeile' as string]: `${zeile}px`,
   };
 }
 
@@ -133,9 +134,18 @@ export function seitenMetaStil(farben: Pick<Farbrollen, 'gedaempft'>): CSSProper
  * hat keine Dichte-Ausnahme (LFH-909, `frontend/AGENTS.md`, Handgebautes Bedienziel): antd setzt
  * den Link auf die Zeilenhöhe der 12-px-Schrift (20 px), die Trefffläche wächst über einen
  * durchsichtigen Rand, nicht über die Schrift.
+ *
+ * Dazu die Mindestbreite eines Knopfs der Stufe (`controlHeightSM`, wie `antdKnopf`, LLH-1798): ein
+ * kurzes Wort wie „ETB“ war sonst 32 px breit, auch in `handschuh`.
  */
-export function ortspfadStil(token: { controlHeight: number }): CSSProperties {
-  return { '--lfh-ortspfad-ziel': `${token.controlHeight}px` } as CSSProperties;
+export function ortspfadStil(token: {
+  controlHeight: number;
+  controlHeightSM: number;
+}): CSSProperties {
+  return {
+    '--lfh-ortspfad-ziel': `${token.controlHeight}px`,
+    '--lfh-ortspfad-breite': `${token.controlHeightSM}px`,
+  } as CSSProperties;
 }
 
 /**
@@ -213,7 +223,7 @@ export function Ortspfad({
 export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | undefined }) {
   // Rollen aus dem antd-Theme (wie jeder Baustein): in der App derselbe Modus wie
   // `useThemeMode`, in den Vorschauen des Design Systems das Thema der Karte.
-  const { rollen: farben } = useRollen();
+  const { token, rollen: farben } = useRollen();
   if (!einsatz || einsatz.status === 'aktiv') return null;
   return (
     <span
@@ -221,14 +231,14 @@ export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | unde
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
+        gap: token.marginSM,
         fontSize: 12,
         color: farben.gedaempft,
         whiteSpace: 'nowrap',
       }}
     >
       Einsatzstatus
-      <StatusTag darstellung={einsatzStatus[einsatz.status]} />
+      <Status darstellung={einsatzStatus[einsatz.status]} />
     </span>
   );
 }
@@ -272,15 +282,40 @@ export interface SeitenNebenwege {
 }
 
 /**
- * Die Nebenwege im Kopf (LFH-963): ab `md` je Eintrag ein sekundärer Knopf, unter `md` EIN
- * Auslöser „Weitere“ — Regel `frontend/AGENTS.md`, Aktionen. Der Dreipunkt ist derselbe Baustein
- * wie im ETB-Kopf (`MenueAusloeser`), damit der Weg auf jeder Seite gleich aussieht. Exportiert für
- * Seiten mit eigenem Kopf (Lagekarte, LLH-1051).
+ * Steuerhöhe der Stufe `komfortabel`; ab ihr (48 / 72) bündelt der Kopf seine Nebenwege. Als
+ * Untergrenze statt „über `kompakt`“: ohne Thema setzt antd 32 px (Tests, fremde Hüllen), und das
+ * ist keine Touch-Stufe.
+ */
+const BUENDELN_AB_STEUERHOEHE = dichten.komfortabel.zeilenhoehe;
+
+/**
+ * Stehen die Nebenwege hinter „Weitere“? Unter `md` immer (LFH-963), ab `md` in den Stufen 48 und
+ * 72 (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig` D1): dort brachen bis zu vier Knöpfe den
+ * Kopf in eine zweite Zeile. Entschieden am Token der Stufe, nicht an `useDichte`, damit auch die
+ * Karte im Design System dem Thema der Karte folgt. Rein und exportiert.
+ */
+export function nebenwegeImMenue(istSchmal: boolean, controlHeight: number): boolean {
+  return istSchmal || controlHeight >= BUENDELN_AB_STEUERHOEHE;
+}
+
+/** Die Weiche für Kopf und Seiten mit eigenem Kopf (Lagekarte): Breite und Stufe zusammen. */
+export function useNebenwegeImMenue(): boolean {
+  const { istSchmal } = useViewport();
+  const { token } = theme.useToken();
+  return nebenwegeImMenue(istSchmal, token.controlHeight);
+}
+
+/**
+ * Die Nebenwege im Kopf (LFH-963, LLH-1786): in `kompakt` ab `md` je Eintrag ein sekundärer Knopf,
+ * unter `md` und in den Stufen 48 / 72 EIN Auslöser „Weitere“ ({@link nebenwegeImMenue}) — Regel
+ * `frontend/AGENTS.md`, Aktionen. Der Dreipunkt ist derselbe Baustein wie im ETB-Kopf
+ * (`MenueAusloeser`), damit der Weg auf jeder Seite gleich aussieht. Exportiert für Seiten mit
+ * eigenem Kopf (Lagekarte, LLH-1051).
  */
 export function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
-  const { istSchmal } = useViewport();
+  const imMenue = useNebenwegeImMenue();
   if (eintraege.length === 0) return null;
-  if (istSchmal) {
+  if (imMenue) {
     return (
       <MenueAusloeser
         // Ein laufender Nebenweg sperrt nur seinen Eintrag, nicht den Auslöser: ein Knopf im
@@ -352,6 +387,12 @@ interface EinsatzSeiteProps {
    * Zahlen als `0`: Mono mit Tabellenziffern, eine Ziffer ist so breit wie jede andere.
    */
   metaPlatzhalter?: string;
+  /**
+   * Zusatz in der Meta-Gruppe hinter der Meta, in eigener Schrift (keine Mono): die Stärke der
+   * Kräfteseiten (LLH-1786, `kraefte/Verdichtungszeile` in der Form `meta`). Er hält seine Breite
+   * beim Laden selbst; unter `md` bricht er mit der Gruppe in ihre eigene Zeile.
+   */
+  metaZusatz?: ReactNode;
   /**
    * Rechter Header-Slot — **genau eine Primäraktion**, der Rest sekundär.
    *
@@ -466,6 +507,7 @@ export default function EinsatzSeite({
   ortspfadAbMd = false,
   meta,
   metaPlatzhalter,
+  metaZusatz,
   aktionen,
   weitere,
   neueZeile,
@@ -579,7 +621,7 @@ export default function EinsatzSeite({
           {/* Meta und Datenstand sind EINE Gruppe mit eigener Zeile unter `md` (`EinsatzSeite.css`,
               LFH-373): in der Titelzeile schöbe eine spät eintreffende Meta alles darunter nach unten.
               Per CSS, nicht per `useViewport`, dessen erstes Bild bewusst breit ist. */}
-          {(meta || metaPlatzhalter || dataUpdatedAt !== undefined) && (
+          {(meta || metaPlatzhalter || metaZusatz || dataUpdatedAt !== undefined) && (
             <span
               className="lfh-seitenkopf__meta"
               style={{
@@ -610,6 +652,7 @@ export default function EinsatzSeite({
                   </span>
                 )
               )}
+              {metaZusatz}
               {/* Führt die Seite einen Datenstand (auch `0` vor dem ersten Abruf), hält der Kopf seinen
                   Platz frei, in jeder Breite (LLH-1463) — sonst bräche er beim Eintreffen um. Der
                   `key` macht aus Platzhalter und Stand zwei Knoten: kommt die Meta mit den Daten,
@@ -641,8 +684,9 @@ export default function EinsatzSeite({
           >
             {/* Unter `md` steht der Auslöser „Weitere“ VORN (LFH-963): hinten bräche er bei 390 px in
                 eine eigene Zeile und kostete die erste Personenzeile ihren Platz; vorn teilt er die
-                Zeile mit der Segmentleiste. Ab `md` folgen die Knöpfe den Aktionen. Umgestellt wird
-                im Baum, nicht per CSS-`order`: Lese- und Tabfolge bleiben die sichtbare Folge. */}
+                Zeile mit der Segmentleiste. Ab `md` folgen Knöpfe bzw. Auslöser (Stufen 48 / 72)
+                den Aktionen. Umgestellt wird im Baum, nicht per CSS-`order`: Lese- und Tabfolge
+                bleiben die sichtbare Folge. */}
             {weitere && istSchmal && <NebenwegeImKopf {...weitere} />}
             {aktionen}
             {weitere && !istSchmal && <NebenwegeImKopf {...weitere} />}

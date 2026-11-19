@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { waehleIn } from '../auswahl-kern';
 import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
@@ -110,11 +111,11 @@ test.describe(KAPITEL, () => {
     await suche.fill('Kellerabgang');
     await expect(eintraege).toHaveCount(1);
     await suche.fill('');
-    await page.getByRole('radio', { name: 'Mit Koordinaten' }).click();
+    await waehleIn(page.getByRole('combobox', { name: 'Ort' }), 'Mit Koordinaten');
     await expect(eintraege).toHaveCount(2);
     await expect(page.getByText('2 von 6 Lagemeldungen')).toBeVisible();
-    await page.getByRole('radio', { name: 'Alle Orte' }).click();
-    await page.getByRole('radio', { name: 'Übernommen' }).click();
+    await waehleIn(page.getByRole('combobox', { name: 'Ort' }), 'Alle Orte');
+    await waehleIn(page.getByRole('combobox', { name: 'Herkunft' }), 'Übernommen');
     await expect(eintraege).toHaveCount(4);
     await eintraege
       .first()

@@ -10,6 +10,7 @@ import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue'
 import AufnahmePage from './AufnahmePage';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 import { FakeEventSource } from '../../test/eventSource';
+import { beendeHuelle, type IosNachricht, starteIosHuelle } from '../../test/huelle';
 
 /**
  * Vollseiten-Aufnahme. Die Maske selbst prüft `personen/AufnahmeFelder.test.tsx`; hier geht es um
@@ -602,5 +603,37 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
     await waitFor(() => expect(inB).toBe(1));
     await act(async () => antwortFreigeben());
     await waitFor(() => expect(client.isMutating()).toBe(0));
+  });
+});
+
+/** Haptik der iOS-Hülle (Change t39ltxxi, Spec `huellen-vertrag`, „Erfassungen geben haptische Rückmeldung“). */
+describe('AufnahmePage — Haptik in der Hülle', () => {
+  afterEach(beendeHuelle);
+
+  function mitIosHuelle() {
+    const nachrichten: IosNachricht[] = [];
+    starteIosHuelle({ bruecke: { postMessage: (n) => nachrichten.push(n) } });
+    return () => nachrichten.filter((n) => n.cmd === 'haptics').map((n) => n.kind);
+  }
+
+  it('meldet ohne Netz `tap`, nicht `success`: die Person ist nur vorgemerkt', async () => {
+    const haptik = mitIosHuelle();
+    render();
+    await screen.findByRole('radiogroup');
+    setzeOnline(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    expect(await screen.findByText('Offline vorgemerkt · R-…')).toBeInTheDocument();
+    await waitFor(() => expect(haptik()).toEqual(['tap']));
+  });
+
+  it('meldet `success`, wenn der Server die Person annimmt, genau einmal', async () => {
+    const haptik = mitIosHuelle();
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 })),
+    ]);
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await screen.findByText('PERSONENLISTE');
+    expect(haptik()).toEqual(['success']);
   });
 });

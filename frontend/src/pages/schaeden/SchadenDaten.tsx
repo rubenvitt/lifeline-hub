@@ -1,9 +1,8 @@
 import type { ReactElement, ReactNode } from 'react';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { Link } from 'react-router';
-import { Button, Space, Tag, Typography } from 'antd';
+import { Button, Space, Typography } from 'antd';
 import type { FormRule } from 'antd';
-import StatusTag from '../../components/StatusTag';
 import { Datenfeld, DatenfeldEingabe, Datenraster } from '../../components/instrument';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 import { lagekartePfad } from '../../routing/deeplinks';
@@ -16,6 +15,8 @@ import {
   TYP_LABEL,
   geschaedigtAnzeige,
 } from './schadenHelfer';
+import { Status } from '../../components/instrument/Status';
+import { Marke } from '../../components/instrument/Marke';
 
 /** Die Felder, die die Detailseite im Bearbeiten-Modus an Ort und Stelle als Eingabe zeigt. */
 type SchadenEingabeFeld =
@@ -74,8 +75,8 @@ export default function SchadenDaten({
 
   return (
     <Datenraster spalten={spalten} beschriftung="Schadensdaten">
-      {zelle('typ', 'Typ', <Tag>{TYP_LABEL[s.typ]}</Tag>)}
-      {zelle('ausmass', 'Ausmaß', <StatusTag darstellung={AUSMASS_META[s.ausmass]} />)}
+      {zelle('typ', 'Typ', <Marke>{TYP_LABEL[s.typ]}</Marke>)}
+      {zelle('ausmass', 'Ausmaß', <Status darstellung={AUSMASS_META[s.ausmass]} />)}
       {/* Gefahr und Schadensgrad in Worten, wie im Gefahrengebiet und im Lagekarten-Inspektor
           (LLH-1115); das Zeichen dazu steht auf der Karte. */}
       {zelle('gefahrenart', 'Gefahr', s.gefahrenart ? GEFAHR_LABEL[s.gefahrenart] : '—')}

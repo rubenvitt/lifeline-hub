@@ -1,10 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { beendeHuelle, starteMacHuelle, starteWindowsHuelle } from '../test/huelle';
+import {
+  beendeHuelle,
+  type IosNachricht,
+  starteIosHuelle,
+  starteMacHuelle,
+  starteWindowsHuelle,
+} from '../test/huelle';
 import {
   huelleAnmeldungImBrowser,
   huelleAppBadge,
   huelleBenachrichtigung,
+  huelleHaptics,
+  huellePlatform,
   huelleSperrtPasskey,
+  huelleVersion,
 } from './faehigkeiten';
 
 describe('huelleSperrtPasskey (LFH-817)', () => {
@@ -138,5 +147,80 @@ describe('huelleAppBadge (LLH-1423)', () => {
   it('liefert nichts ohne IPC-Brücke', () => {
     starteMacHuelle();
     expect(huelleAppBadge()).toBeNull();
+  });
+});
+
+describe('huellePlatform und huelleVersion (t39ltxxi)', () => {
+  afterEach(beendeHuelle);
+
+  it('liefern im Browser nichts', () => {
+    expect(huellePlatform()).toBeNull();
+    expect(huelleVersion()).toBeNull();
+  });
+
+  it('liefern in der Desktop-Hülle nichts, die beide Felder nicht setzt', () => {
+    starteMacHuelle({ invoke: vi.fn().mockResolvedValue(undefined) });
+    expect(huellePlatform()).toBeNull();
+    expect(huelleVersion()).toBeNull();
+  });
+
+  it('nennen in der iOS-Hülle Plattform und Version (ausgeliefertes Init-Skript)', () => {
+    starteIosHuelle({ bruecke: { postMessage: vi.fn() }, version: '1.0.0-alpha.42' });
+    expect(huellePlatform()).toBe('ios');
+    expect(huelleVersion()).toBe('1.0.0-alpha.42');
+  });
+
+  it('übergehen Felder in fremder Form', () => {
+    window.__LIFELINE_HUELLE__ = { platform: 7, version: {} } as never;
+    expect(huellePlatform()).toBeNull();
+    expect(huelleVersion()).toBeNull();
+  });
+});
+
+describe('huelleHaptics (t39ltxxi, Spec huellen-vertrag)', () => {
+  afterEach(beendeHuelle);
+
+  it('tut im Browser nichts und wirft nicht', () => {
+    expect(() => huelleHaptics('success')).not.toThrow();
+  });
+
+  it('tut in der Desktop-Hülle ohne `haptics` nichts', () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    starteMacHuelle({ invoke });
+    huelleHaptics('success');
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('meldet in der iOS-Hülle die Art genau einmal (ausgeliefertes Init-Skript)', () => {
+    const nachrichten: IosNachricht[] = [];
+    starteIosHuelle({ bruecke: { postMessage: (n) => nachrichten.push(n) } });
+    expect(huelleHaptics('selection')).toBeUndefined();
+    expect(nachrichten).toEqual([{ cmd: 'haptics', kind: 'selection' }]);
+  });
+
+  it('wirft nie, auch wenn die Hülle wirft oder ablehnt', async () => {
+    const unbehandelt = vi.fn();
+    process.on('unhandledRejection', unbehandelt);
+    try {
+      window.__LIFELINE_HUELLE__ = {
+        haptics: () => {
+          throw new Error('kaputt');
+        },
+      };
+      expect(() => huelleHaptics('error')).not.toThrow();
+      window.__LIFELINE_HUELLE__ = { haptics: () => Promise.reject(new Error('abgelehnt')) };
+      expect(() => huelleHaptics('error')).not.toThrow();
+      await new Promise((fertig) => setTimeout(fertig, 0));
+      expect(unbehandelt).not.toHaveBeenCalled();
+    } finally {
+      process.off('unhandledRejection', unbehandelt);
+    }
+  });
+
+  it('wartet nicht auf die Hülle', () => {
+    const haptics = vi.fn(() => new Promise(() => {}));
+    window.__LIFELINE_HUELLE__ = { haptics };
+    expect(huelleHaptics('tap')).toBeUndefined();
+    expect(haptics).toHaveBeenCalledExactlyOnceWith('tap');
   });
 });

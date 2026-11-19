@@ -1126,7 +1126,7 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
     const k = kontext();
     const b = baueBefehle(k).find((x) => x.id === 'sprung:einsatzbericht');
     expect(b).toBeDefined();
-    expect(b!.label).toBe('Einsatzbericht drucken');
+    expect(b!.label).toBe('Einsatzbericht – Druckansicht');
     expect(b!.gruppe).toBe('module');
     b!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einsatzdaten/bericht');
@@ -1144,6 +1144,26 @@ describe('baueBefehle — Einsatzbericht (LFH-726)', () => {
         (x) => x.id === 'sprung:einsatzbericht',
       ),
     ).toBe(true);
+  });
+});
+
+describe('baueBefehle — Einsatzakte (LLH-1835)', () => {
+  it('springt im Einsatz auf die Druckansicht der Akte und ist über „Akte“ findbar', () => {
+    const k = kontext();
+    const b = baueBefehle(k).find((x) => x.id === 'sprung:einsatzakte');
+    expect(b).toBeDefined();
+    expect(b!.label).toBe('Einsatzakte – Druckansicht');
+    b!.ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/einsatzdaten/akte');
+    expect(ordneTreffer(filtereBefehle(baueBefehle(k), 'akte'), 'akte')[0]?.id).toBe(
+      'sprung:einsatzakte',
+    );
+  });
+
+  it('fehlt ohne Einsatz-Kontext', () => {
+    expect(
+      baueBefehle(kontext({ einsatzId: null })).some((x) => x.id === 'sprung:einsatzakte'),
+    ).toBe(false);
   });
 });
 

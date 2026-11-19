@@ -1,8 +1,9 @@
-import { Tag, Typography } from 'antd';
+import { Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { loadStammdatenHerkunft } from '../api/instanz';
 import { globalKeys } from '../api/queryKeys';
 import type { StammdatenArt, StammdatenHerkunftAnzeige } from '../api/types';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Herkunft der Stammdaten (LLH-1493, Spec `stammdaten-verteilung`, design.md D9): bezieht die Org
@@ -66,9 +67,9 @@ export function HerkunftAbzeichen({
 }) {
   if (!herkunft) return null;
   return herkunft === 'vom_hub' ? (
-    <Tag title={`Kommt aus ${quelle ?? 'der Kopplung'} und wird dort gepflegt`}>vom Hub</Tag>
+    <Marke title={`Kommt aus ${quelle ?? 'der Kopplung'} und wird dort gepflegt`}>vom Hub</Marke>
   ) : (
-    <Tag title="Hier ergänzt, nicht am Hub">nur hier</Tag>
+    <Marke title="Hier ergänzt, nicht am Hub">nur hier</Marke>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Space, Typography } from 'antd';
+import { Space, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { listeNachforderungen } from '../api/nachforderungen';
@@ -66,6 +66,7 @@ export default function StelleBedarf({
   freigaben: ModulFreigaben | undefined;
   darfSchreiben: boolean;
 }) {
+  const { token } = theme.useToken();
   const frei = istKeyFreigegeben('nachforderungen', freigaben);
   const query = useQuery({
     queryKey: einsatzKeys.nachforderungen(einsatzId),
@@ -132,7 +133,7 @@ export default function StelleBedarf({
             return (
               <ListenEintrag
                 actions={[
-                  <Space key="stand" size={8} wrap>
+                  <Space key="stand" size={token.marginSM} wrap>
                     <StatusBadge phase={status.phase} label={status.label} ton={status.ton} />
                     <ZeitAnzeige wert={n.angefordert_at} rolle="kurz" />
                   </Space>,

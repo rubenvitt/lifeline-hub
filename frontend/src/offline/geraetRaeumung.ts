@@ -111,6 +111,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Sortierung, Spaltenfilter und Suchbegriff einer Liste für den Rückweg ohne Adressparameter (LLH-1086); ein Suchbegriff kann einen Namen tragen, die nächste Person im Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LLH-1428).',
   },
   {
+    ort: 'localStorage lfh:klappband:<seite>',
+    datei: 'components/instrument/KlappBand.tsx',
+    entscheidung: 'bleibt',
+    grund:
+      'Ob ein Kennzahlenband einer Seite eingeklappt ist (LLH-1786): Geräte-Einstellung „offen“/„zu“, ohne Personenbezug und ohne Einsatzinhalt.',
+  },
+  {
     ort: 'localStorage lfh:spalten:<seite>',
     datei: 'components/listenGedaechtnis.ts',
     entscheidung: 'bleibt',
@@ -245,6 +252,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'bleibt',
     grund:
       'Nur „diese Person hat hier Push gewählt“ (LLH-1223) und ob mit Absender und Wortlaut (LLH-1369), damit ihre nächste Sitzung das Abo samt Wahl wieder anmeldet; kein Inhalt. Das Abo selbst liegt am Server und fällt mit der Sitzung.',
+  },
+  {
+    ort: 'localStorage lfh:web-push-endpunkt',
+    datei: 'alarm/webPush.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'SHA-256 des zuletzt angemeldeten Push-Endpunkts dieses Browsers (LLH-1839): der Seitenstart erkennt daran ein rotiertes Abo. Kein Endpunkt, kein Personenbezug; ausschalten entfernt ihn.',
   },
   {
     ort: 'localStorage lfh:lagekarte:zeitachse-eingeklappt',

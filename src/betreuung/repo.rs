@@ -415,6 +415,25 @@ pub async fn stelle_laden(
     .try_into()
 }
 
+/// Storno-Stand einer Stelle (LLH-1832): Wann und Wer, auch für eine stornierte. `NotFound`,
+/// wenn sie nicht zum Einsatz gehört.
+pub async fn stelle_stand(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<crate::storno::StornoStand, AppError> {
+    sqlx::query_as::<_, crate::storno::StornoStand>(
+        "SELECT s.storniert_at, b.anzeigename AS storniert_von_name \
+         FROM betreuungsstelle s LEFT JOIN benutzer b ON b.id = s.storniert_von_id \
+         WHERE s.einsatz_id = ? AND s.id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 /// Kopfzahl „in Betreuung“ zum Stichtag `zeitpunkt_at` (UTC, `YYYY-MM-DD HH:MM:SS`): je nicht
 /// stornierter Stelle die aktuelle Meldung mit Zeitpunkt ≤ Stichtag. Stellen ohne solche
 /// Meldung stehen ohne Anzahl in der Liste und gehen nicht in die Summe ein. Ein unlesbarer
@@ -1444,6 +1463,32 @@ pub async fn stelle_aendern_tx(
     startwert: i64,
     eingabe: &StelleAenderung,
 ) -> Result<Geschrieben, AppError> {
+    let ohne_altwert = crate::feld_cas::ExpectedValues::new();
+    update_stelle_mit_altwert_tx(
+        conn,
+        einsatz_id,
+        id,
+        benutzer_id,
+        startwert,
+        eingabe,
+        &ohne_altwert,
+    )
+    .await
+}
+
+/// [`stelle_aendern_tx`] mit Feld-CAS (LLH-1945): trägt eine erwartete Spalte inzwischen einen
+/// anderen Wert, ist der Altwert überholt (409 `veraltet`) und nichts wird geschrieben, auch kein
+/// ETB-Eintrag. Verglichen wird in DIESER Transaktion nach 404, 409 (storniert) und den Feld- und
+/// Zusammenhangsprüfungen, vor dem Leerlauf-Riegel und dem ersten Schreiben.
+pub async fn update_stelle_mit_altwert_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    benutzer_id: i64,
+    startwert: i64,
+    eingabe: &StelleAenderung,
+    erwartet: &crate::feld_cas::ExpectedValues<'_>,
+) -> Result<Geschrieben, AppError> {
     let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
     stelle_lebt(&roh)?;
 
@@ -1504,6 +1549,7 @@ pub async fn stelle_aendern_tx(
     let verortung_neu = lat != roh.lat || lon != roh.lon;
     let belegungsart = eingabe.belegungsart.unwrap_or(roh.belegungsart);
     let belegungsart_neu = belegungsart != roh.belegungsart;
+    crate::feld_cas::check_zeile_tx(conn, "betreuungsstelle", einsatz_id, id, erwartet).await?;
     if stammdaten.leer() && !status_neu && !verortung_neu && !belegungsart_neu {
         return Ok(Geschrieben {
             id,

@@ -50,7 +50,7 @@ function aktionenAttrappe() {
     aendereBereich: vi.fn(),
     entferneBereich: vi.fn(),
     setzeSchriftfeld: vi.fn(),
-    setzeRufname: vi.fn(async () => {}),
+    setzeRufname: vi.fn(async (): Promise<string | null> => null),
   } satisfies SkizzenAktionen;
 }
 

@@ -97,6 +97,11 @@ export interface SperrZiel {
   mindestens?: number;
   /** Mindestzahl der Tabulatorstopps, wenn ein Teil der Ziele gesperrt steht. */
   fokusMindestens?: number;
+  /**
+   * Nur in diesen Dichtestufen als Ziel auf der Seite: ein Nebenweg des Seitenkopfs steht in 48 / 72
+   * im Menü „Weitere“ (LLH-1786), dort misst ihn `gate3-trefflaeche.spec.ts` als Menüeintrag.
+   */
+  nurIn?: readonly string[];
 }
 
 export interface SperrSeite {
@@ -133,10 +138,14 @@ function meldebildZiele(berichtGesperrt: boolean) {
       },
     ];
     if (rolle === 'fuehrungspersonal') {
-      const bericht = page.getByRole('button', { name: 'In Lagebericht übernehmen' });
+      // Nebenweg des Kopfs (LLH-1786): gesperrt mit dem Grund im Namen, in 48 / 72 im Menü.
+      const bericht = page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: /^In Lagebericht übernehmen/ });
       ziele.push({
         name: '„In Lagebericht übernehmen“',
         ziel: bericht,
+        nurIn: ['kompakt'],
         ...(berichtGesperrt ? { gesperrt: true } : { fokus: bericht }),
       });
     }
@@ -144,10 +153,10 @@ function meldebildZiele(berichtGesperrt: boolean) {
   };
 }
 
-/** Der Meldebild-Link der Verdichtungszeile über Fahrzeugliste und Tableau. */
+/** Der Meldebild-Link der Stärke im Seitenkopf über Fahrzeugliste und Tableau (LLH-1786). */
 function verdichtungsLink(page: Page): SperrZiel {
   const link = page
-    .locator('[data-lfh="verdichtungszeile"]')
+    .locator('[data-lfh="seitenkopf"] [data-lfh="verdichtung-meta"]')
     .getByRole('link', { name: 'Kräfteübersicht', exact: true });
   return { name: 'Verdichtungszeile „Kräfteübersicht“', ziel: link, fokus: link };
 }

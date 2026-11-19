@@ -952,7 +952,7 @@ async fn handstatus_wirkt_an_der_einheit_mit_fanout() {
         .await
         .unwrap();
     drop(conn);
-    let (einheit, beruehrt) = r.unwrap();
+    let (einheit, _, beruehrt) = r.unwrap();
     assert_eq!(einheit, w.f1);
     assert_eq!(beruehrt.personen.len(), 3);
     assert_eq!(

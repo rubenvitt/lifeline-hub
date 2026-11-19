@@ -62,7 +62,7 @@ export function ZeitKalender({
   onUebernehmen,
   onAbbrechen,
 }: ZeitKalenderProps) {
-  const { rollen } = useRollen();
+  const { token, rollen } = useRollen();
   const start = wert ?? jetzt();
   const heute = heuteInZone(zone, jetzt());
   const [tag, setTag] = useState(() => tagInZone(start, zone));
@@ -127,7 +127,13 @@ export function ZeitKalender({
       role="dialog"
       aria-label={nurTag ? 'Tag wählen' : 'Tag und Uhrzeit wählen'}
       onKeyDown={tasten}
-      style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, width: breite }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: token.marginSM,
+        minWidth: 0,
+        width: breite,
+      }}
     >
       <Calendar
         fullscreen={false}

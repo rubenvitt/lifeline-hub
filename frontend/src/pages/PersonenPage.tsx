@@ -23,8 +23,10 @@ import {
 import { einsatzKeys } from '../api/queryKeys';
 import { listeUhs } from '../api/einsatzUhs';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { useViewport } from '../components/useViewport';
+import FilterKnopf from '../components/FilterKnopf';
 import { Segmentleiste, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
@@ -49,6 +51,7 @@ import {
   SICHT_VORGABE,
   filterPersonen,
   gefundenePersonen,
+  sichtFilterZahl,
   sichtFuerNeuePerson,
   sichtNachSprung,
   type PersonenAnsicht,
@@ -132,6 +135,9 @@ const GEDAECHTNIS_AUS_DATEN: readonly PersonenSpaltenKey[] = ['abschnitt'];
 /** Ohne Abgleich: eine feste leere Menge, damit die gemerkten Spalten stehen bleiben. */
 const KEINE_GEFUNDENEN: readonly Person[] = [];
 
+/** Wahlfläche hinter „Filter (n)“ am Handschirm (`aria-controls`). */
+const FILTERFLAECHE_ID = 'betroffene-wahlen';
+
 const ANSICHT_OPTIONEN = [
   { wert: 'zeilen', label: 'Zeilen' },
   { wert: 'raster', label: 'Sichtungsraster' },
@@ -180,7 +186,11 @@ export default function PersonenPage() {
   const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { rollen, token } = useRollen();
-  const { abBreite } = useViewport();
+  const { abBreite, istSchmal } = useViewport();
+  // Am Handschirm stehen Ansicht und Filter hinter „Filter (n)“ (LLH-1786, Change
+  // `z137bgm5-seitenkopf-einzeilig` D5); der Zustand offen/zu ist flüchtig.
+  const [filterOffen, setFilterOffen] = useState(false);
+  const [listenFilterZahl, setListenFilterZahl] = useState(0);
   const mitSeitenleiste = abBreite('xl');
   const feldRef = useRef<InputRef>(null);
   const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
@@ -859,6 +869,22 @@ export default function PersonenPage() {
   );
 
   /**
+   * Die Liste baut sich bei einem Reiterwechsel neu auf (`key` mit dem Filter); steht der Reiter
+   * in ihrer Werkzeugzeile, ginge der Fokus mit ihm verloren. Er kehrt auf den gewählten Reiter
+   * zurück, wenn er vorher auf einem Reiter stand.
+   */
+  const reiterFokus = useRef(false);
+  useEffect(() => {
+    if (!reiterFokus.current) return;
+    reiterFokus.current = false;
+    document
+      .querySelector<HTMLElement>(
+        '[role="tablist"][aria-label="Personen nach Status filtern"] [role="tab"][aria-selected="true"]',
+      )
+      ?.focus();
+  }, [sicht.filter]);
+
+  /**
    * Seitenzustand — nur `einsatzQuery`: Breadcrumb, Titelzeile und `darfImEinsatzSchreiben(...)`
    * hängen an ihr. Deshalb hier ein Frühausstieg, und nur hier.
    */
@@ -988,6 +1014,59 @@ export default function PersonenPage() {
     />
   );
 
+  const ansichtWahl = (
+    <Segmentleiste<PersonenAnsicht>
+      beschriftung="Ansicht"
+      optionen={ANSICHT_OPTIONEN}
+      wert={sicht.ansicht}
+      onWechsel={(ansicht) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, ansicht }))}
+    />
+  );
+  /** Unter `xl` steht die Lagezahl über der Liste (LFH-963), ab `xl` in der Seitenleiste. */
+  const zeigtSichtungszeile = !mitSeitenleiste && !personenQuery.isLoading;
+  /** Unter `md` steht die Wahlfläche nur offen da (LLH-1786). */
+  const wahlenSichtbar = !istSchmal || filterOffen;
+  /**
+   * Ab `md` in der Zeilenansicht stehen die Statusreiter in der Werkzeugzeile der Liste neben Suche
+   * und „Spalten“ (LLH-1786: Filter in einer Zeile); sonst mit „Abgeschlossene“ über der Ansicht.
+   */
+  const wahlenInListe = !istSchmal && sicht.ansicht === 'zeilen';
+  const wahlenInLagezeile =
+    wahlenSichtbar && (!wahlenInListe || abgeschlosseneZahl > 0 || sicht.abgeschlossen);
+  const statusReiter = (
+    <Segmentleiste<PersonenFilter>
+      rolle="tablist"
+      beschriftung="Personen nach Status filtern"
+      optionen={FILTER_OPTIONEN}
+      wert={sicht.filter}
+      onWechsel={(filter) => {
+        reiterFokus.current = document.activeElement?.getAttribute('role') === 'tab';
+        // Der Suchbegriff gehört zur Menge des Reiters (meist ein Name daraus), Sortierung
+        // und Kopffilter gehen mit (LLH-1096): die Sicht beginnt beim gemeldeten Stand.
+        gedaechtnis.melde({ ...gedaechtnis.start, suche: '' });
+        aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }));
+      }}
+    />
+  );
+  const abgeschlossenSchalter =
+    /* Abgeschlossene stehen nicht in den Standardansichten (LLH-1332, Spec
+      `betroffene-lagedaten`); die Zahl sagt, wie viele fehlen. Ohne Abgeschlossene
+      fehlt der Schalter: „(0)“ sagt nichts und kostet am Handy die erste Zeile. In der Lagezeile, nicht
+      in der Werkzeugzeile der Liste: Fokus dort hielte die Zeilen fest (LLH-1417). */
+    (abgeschlosseneZahl > 0 || sicht.abgeschlossen) && (
+      <Checkbox
+        checked={sicht.abgeschlossen}
+        onChange={(e) =>
+          aendereSichtFuer(einsatzId, (alt) => ({
+            ...alt,
+            abgeschlossen: e.target.checked,
+          }))
+        }
+      >
+        Abgeschlossene zeigen ({abgeschlosseneZahl})
+      </Checkbox>
+    );
+
   return (
     <EinsatzSeite
       dataUpdatedAt={personenQuery.dataUpdatedAt}
@@ -1005,12 +1084,16 @@ export default function PersonenPage() {
       }
       aktionen={
         <>
-          <Segmentleiste<PersonenAnsicht>
-            beschriftung="Ansicht"
-            optionen={ANSICHT_OPTIONEN}
-            wert={sicht.ansicht}
-            onWechsel={(ansicht) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, ansicht }))}
-          />
+          {istSchmal ? (
+            <FilterKnopf
+              offen={filterOffen}
+              onWechsel={setFilterOffen}
+              zahl={sichtFilterZahl(sicht) + (sicht.ansicht === 'zeilen' ? listenFilterZahl : 0)}
+              steuert={FILTERFLAECHE_ID}
+            />
+          ) : (
+            ansichtWahl
+          )}
           {/* EINE Maske (LFH-963, Entscheidung 9): sie legt mit Status „erfasst" an und sagt das
               im Dialog. Primär, weil sie der eine Erfassungsweg des Kopfes ist; die Zeile darunter
               ist der schnelle Weg ohne Dialog. „Vermisst melden" bleibt ein eigener Weg. */}
@@ -1044,12 +1127,7 @@ export default function PersonenPage() {
                 },
               ]
             : []),
-          {
-            key: 'druck',
-            label: 'Drucken / als PDF',
-            ziel: druckPfad,
-            onWahl: () => navigate(druckPfad),
-          },
+          druckansichtNebenweg({ ziel: druckPfad, navigate }),
           {
             key: 'csv',
             label: 'CSV exportieren',
@@ -1183,37 +1261,27 @@ export default function PersonenPage() {
             )}
             {/* Unter `xl` steht die Seitenleiste unter allen Zeilen; die Lagezahl bleibt hier im
                 ersten Bildschirm (LFH-963). Ab `xl` steht die Seitenleiste daneben. */}
-            {!mitSeitenleiste && !personenQuery.isLoading && <Sichtungszeile alle={alle} />}
-            <Flex wrap align="center" gap={token.marginSM} style={{ marginBottom: token.marginSM }}>
-              <Segmentleiste<PersonenFilter>
-                rolle="tablist"
-                beschriftung="Personen nach Status filtern"
-                optionen={FILTER_OPTIONEN}
-                wert={sicht.filter}
-                onWechsel={(filter) => {
-                  // Der Suchbegriff gehört zur Menge des Reiters (meist ein Name daraus), Sortierung
-                  // und Kopffilter gehen mit (LLH-1096): die Sicht beginnt beim gemeldeten Stand.
-                  gedaechtnis.melde({ ...gedaechtnis.start, suche: '' });
-                  aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }));
-                }}
-              />
-              {/* Abgeschlossene stehen nicht in den Standardansichten (LLH-1332, Spec
-                  `betroffene-lagedaten`); die Zahl sagt, wie viele fehlen. Ohne Abgeschlossene
-                  fehlt der Schalter: „(0)“ sagt nichts und kostet am Handy die erste Zeile. */}
-              {(abgeschlosseneZahl > 0 || sicht.abgeschlossen) && (
-                <Checkbox
-                  checked={sicht.abgeschlossen}
-                  onChange={(e) =>
-                    aendereSichtFuer(einsatzId, (alt) => ({
-                      ...alt,
-                      abgeschlossen: e.target.checked,
-                    }))
-                  }
-                >
-                  Abgeschlossene zeigen ({abgeschlosseneZahl})
-                </Checkbox>
-              )}
-            </Flex>
+            {/* Lagezahl und Statuswahl teilen sich ab `md` EINE Zeile (LLH-1786, Change
+                `z137bgm5-seitenkopf-einzeilig`): im Handschuh-Betrieb stand die erste Person sonst
+                unter dem Fensterrand. Sie bricht um, wo die Breite nicht reicht. */}
+            {(zeigtSichtungszeile || wahlenInLagezeile) && (
+              <Flex
+                data-lfh="betroffene-lagezeile"
+                wrap
+                align="center"
+                gap={token.marginSM}
+                style={{ columnGap: token.marginLG, marginBottom: token.marginSM }}
+              >
+                {zeigtSichtungszeile && <Sichtungszeile alle={alle} ohneAbstand />}
+                {wahlenInLagezeile && (
+                  <Flex id={FILTERFLAECHE_ID} wrap align="center" gap={token.marginSM}>
+                    {istSchmal && ansichtWahl}
+                    {!wahlenInListe && statusReiter}
+                    {abgeschlossenSchalter}
+                  </Flex>
+                )}
+              </Flex>
+            )}
             {sicht.ansicht === 'karte' ? (
               // Statusfilter und Lücken-Filter gelten auch hier: die Karte zeigt dieselbe Menge wie
               // die Zeilen, nur verortet.
@@ -1273,6 +1341,9 @@ export default function PersonenPage() {
                 karte={listenKarte}
                 zeilenFehler={zeilenGrund}
                 halten={halten}
+                wahlenVerborgen={!wahlenSichtbar}
+                onFilterZahl={setListenFilterZahl}
+                werkzeuge={wahlenInListe ? statusReiter : undefined}
               />
             )}
           </div>

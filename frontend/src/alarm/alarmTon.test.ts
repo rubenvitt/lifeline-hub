@@ -1,5 +1,6 @@
 import { waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beendeHuelle, type IosNachricht, starteIosHuelle } from '../test/huelle';
 
 // `alarmTon` cacht den AudioContext modulweit; damit jeder Test seinen eigenen Mock sieht,
 // werden Modul-Registry und Import je Test frisch geladen.
@@ -260,5 +261,58 @@ describe('gesperrter Alarmton ohne Rückstau (LFH-950)', () => {
     await freigeben();
     expect(start).toHaveBeenCalledOnce();
     expect(ctx.createOscillator.mock.results[0].value.frequency.value).toBe(440);
+  });
+});
+
+/**
+ * Haptik beim neu eingehenden Alarm (Change t39ltxxi, Spec `huellen-vertrag`, „Alarm und
+ * Segmentwechsel geben haptische Rückmeldung“): der Weg jedes neuen Alarms der Stufe `alarm`
+ * (Alarmzone und Unwetter) ist `spieleAlarmTon('alarm')`; nachgespielte Alarme tönen dezent.
+ */
+describe('spieleAlarmTon – Haptik in der Hülle', () => {
+  afterEach(beendeHuelle);
+
+  function mitIosHuelle() {
+    const nachrichten: IosNachricht[] = [];
+    starteIosHuelle({ bruecke: { postMessage: (n) => nachrichten.push(n) } });
+    return () => nachrichten.filter((n) => n.cmd === 'haptics').map((n) => n.kind);
+  }
+
+  it('meldet bei einem Alarm der Stufe `alarm` einmal `warning`', () => {
+    mockAudio();
+    const haptik = mitIosHuelle();
+    spieleAlarmTon('alarm');
+    expect(haptik()).toEqual(['warning']);
+  });
+
+  it('meldet beim dezenten Ton nichts', () => {
+    mockAudio();
+    const haptik = mitIosHuelle();
+    spieleAlarmTon('dezent');
+    expect(haptik()).toEqual([]);
+  });
+
+  it('meldet bei stummgeschaltetem Alarm nichts', () => {
+    mockAudio();
+    const haptik = mitIosHuelle();
+    setzeAlarmMute(true);
+    spieleAlarmTon('alarm');
+    expect(haptik()).toEqual([]);
+  });
+
+  it('meldet auch bei gesperrtem Ton, und der aufgestaute Ton meldet nicht noch einmal', async () => {
+    const { ctx, start } = mockAudio('suspended', 'running');
+    const haptik = mitIosHuelle();
+    spieleAlarmTon('alarm');
+    expect(haptik()).toEqual(['warning']);
+    await waitFor(() => expect(ctx.resume).toHaveBeenCalled());
+    await waitFor(() => expect(start).toHaveBeenCalledOnce());
+    expect(haptik()).toEqual(['warning']);
+  });
+
+  it('meldet ohne Audio-Schnittstelle trotzdem', () => {
+    const haptik = mitIosHuelle();
+    spieleAlarmTon('alarm');
+    expect(haptik()).toEqual(['warning']);
   });
 });

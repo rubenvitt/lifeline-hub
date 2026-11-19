@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OpenSpec ist seit 18.11.2026 eingefrorenes Archiv (LLH-1967, ADR-0065): geplant wird mit
+# OpenSpec ist seit 18.11.2026 eingefrorenes Archiv (LLH-1967, ADR-0069): geplant wird mit
 # Superpowers, Entwürfe und Pläne liegen unter `docs/superpowers/`. `openspec/changes/archive/`
 # und `openspec/specs/` bleiben lesbar, weil Code, ADRs und Migrationen auf sie verweisen.
 # Regeln: Wurzel-`AGENTS.md`, „Planung und Ausführung — Superpowers“.
@@ -37,7 +37,7 @@ if [ "${#funde[@]}" -gt 0 ]; then
   echo "FEHLER: OpenSpec ist eingefrorenes Archiv, aber hier lebt es wieder:" >&2
   printf '         %s\n' "${funde[@]}" >&2
   echo "       Planung über superpowers:brainstorming und superpowers:writing-plans," >&2
-  echo "       Ablage docs/superpowers/specs/ und docs/superpowers/plans/ (AGENTS.md, ADR-0065)." >&2
+  echo "       Ablage docs/superpowers/specs/ und docs/superpowers/plans/ (AGENTS.md, ADR-0069)." >&2
   exit 1
 fi
 echo "OK: OpenSpec bleibt eingefrorenes Archiv."

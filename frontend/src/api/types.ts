@@ -327,6 +327,10 @@ export type FahrzeugStatus = S['FahrzeugStatus'];
 export type EinsatzFahrzeug = S['EinsatzFahrzeugAnzeige'];
 export type EntlassungVorzustand = S['EntlassungVorzustand'];
 export type EntlassungAntwort = S['EntlassungAntwort'];
+/** Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781). */
+export type StatusRuecknahmeBeleg = S['StatusRuecknahmeBeleg'];
+/** Antwort des Status-PATCH: das Fahrzeug, dazu der Beleg bei einem echten Wechsel. */
+export type FahrzeugPatchAntwort = S['FahrzeugPatchAntwort'];
 export type EntlassungRuecknahmeAntwort = S['EntlassungRuecknahmeAntwort'];
 export type RuecknahmeAusgelassen = S['RuecknahmeAusgelassen'];
 export type PersonalEntlassungVorzustand = S['PersonalEntlassungVorzustand'];
@@ -542,6 +546,8 @@ export type Verbleib = S['VerbleibAnzeige'];
 export type Bestaetiger = S['Bestaetiger'];
 export type Abgleich = S['AbgleichAnzeige'];
 export type PersonDetail = S['PersonDetail'];
+/** Storno-Stand einer offenen Detailseite (LLH-1832, Spec `storno-sperre`). */
+export type StornoStand = S['StornoStand'];
 /** Stand des für eine Person angeforderten Rettungsmittels (LLH-1573). */
 export type RettungsmittelStand = S['RettungsmittelStand'];
 export type PersonZugriff = S['ZugriffAnzeige'];

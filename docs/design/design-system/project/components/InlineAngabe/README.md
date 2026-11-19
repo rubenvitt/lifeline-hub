@@ -50,6 +50,8 @@ optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
 - `onSchliessen`: jedes Schließen einer offenen Bearbeitung (gespeichert, abgebrochen, von der
   Sperre geschlossen, ausgehängt). Mit `onOeffnen` hält der Aufrufer ein offenes Feld an seinem
   Ort, auch wenn ein neuer Stand es woanders einordnete.
+- Fällt `darfSchreiben` bei offenem, geändertem Entwurf weg (Datensatz storniert), bleibt der Entwurf schreibgeschützt (`feld.readOnly`) stehen, nur mit
+  „Schließen“; eine unveränderte Bearbeitung schließt.
 - Erfüllt `onSpeichern` mit `OFFEN_LASSEN`, bleibt die Eingabe mit dem Entwurf offen, ohne
   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
 

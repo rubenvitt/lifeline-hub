@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { StatusChip, useRollen } from '../components/instrument';
+import { Status, useRollen } from '../components/instrument';
 import { etbPfad } from '../routing/deeplinks';
 import { juengsteBerichtigung, type MitBerichtigungen } from './berichtigung';
 import { verweisStil } from './zeitachseModell';
@@ -36,7 +36,7 @@ export default function BerichtigtMarke({
         gap: token.marginXS,
       }}
     >
-      <StatusChip ton="achtung" wort="berichtigt" />
+      <Status groesse="klein" ton="achtung" wort="berichtigt" />
       <Link to={etbPfad(einsatzId, { eintrag: juengste.id })} style={verweisStil(token)}>
         → Nr. {juengste.lfd_nr}
       </Link>

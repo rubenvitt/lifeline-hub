@@ -11,6 +11,7 @@ import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { berichtigungsindex } from './zeitachseModell';
 import { istUeberlang } from './druckUmbruch';
 import '../druck/druckansichtSchmal.css';
+import './etbDruckTabelle.css';
 
 /**
  * Die Papierform des Einsatztagebuchs (LFH-22, design.md D5).
@@ -28,6 +29,15 @@ import '../druck/druckansichtSchmal.css';
  * - Ordnung AUFSTEIGEND nach `lfd_nr`, nicht nach Ereigniszeit: auf Papier beweist die
  *   lückenlose Nummernfolge die Vollständigkeit, und ein Nachtrag steht an seiner Nummer.
  * Das Typwort steht ohne Farbe: Farbe trägt auf Papier nichts, das Wort ist der zweite Kanal.
+ *
+ * Laufzeile (LLH-1837): die erste Zeile des `thead` nennt Dokumentart, Einsatz und Stand. Sie
+ * wiederholt sich mit dem Tabellenkopf (Chromium, Firefox; WebKit wiederholt keinen Kopf), damit ein
+ * loses Blatt zuordenbar bleibt. Nicht im `@page`-Randfeld: dort stünde Einsatztext als
+ * CSS-Zeichenkette (Regel in `druck/druck.css`).
+ *
+ * Systemeinträge stehen verdichtet (LLH-1837): Nr. und Zeit wie sonst, danach eine kleinere Zelle
+ * über die übrigen vier Spalten mit „System · Inhalt · Erfasser“. Die Zeile je Nummer bleibt, damit
+ * die Nummernfolge lückenlos ist.
  * Anhänge (LFH-744) stehen als Text unter dem Inhalt, „Name · Größe" wie in der Zeitachse, aber
  * ohne Verweis: auf Papier führt er nirgendwohin, er soll nur zeigen, dass es Dateien gibt.
  *
@@ -55,6 +65,8 @@ const MELDEWEG_WORT = Object.fromEntries(
 ) as Record<MeldeWeg, string>;
 
 interface Props {
+  /** Text der Laufzeile über den Spaltenköpfen: „Einsatztagebuch · Einsatz · Stand …“. */
+  laufzeile: string;
   /** Die gedruckte Auswahl, in beliebiger Ordnung. */
   eintraege: readonly EtbEintragAnzeige[];
   /**
@@ -91,7 +103,12 @@ function metazeile(e: EtbEintragAnzeige): string {
     .join(' · ');
 }
 
-export default function EtbDruckTabelle({ eintraege, berichtigungen, konventionen }: Props) {
+export default function EtbDruckTabelle({
+  laufzeile,
+  eintraege,
+  berichtigungen,
+  konventionen,
+}: Props) {
   const { token } = theme.useToken();
   const geordnet = [...eintraege].sort((a, b) => a.lfd_nr - b.lfd_nr);
   // Index über Auswahl ∪ Berichtigungs-Durchgang: so findet ein gedruckter Eintrag seine
@@ -115,6 +132,21 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
     >
       <thead>
         <tr>
+          <th
+            colSpan={SPALTEN.length}
+            scope="colgroup"
+            style={{
+              ...zelle,
+              ...hinweis,
+              borderBlockEnd: 'none',
+              fontWeight: 'normal',
+              paddingBlockEnd: 0,
+            }}
+          >
+            <span data-lfh="etb-druck-laufzeile">{laufzeile}</span>
+          </th>
+        </tr>
+        <tr>
           {SPALTEN.map(([k, klasse]) => (
             <th
               key={k}
@@ -135,20 +167,71 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
         {geordnet.map((e) => {
           const grund = index.grundeintrag(e);
           const durch = index.berichtigtDurch(e);
+          // Systemeinträge stehen verdichtet (LLH-1837): kleinere Schrift, kaum Polsterung.
+          const system = e.typ === 'system';
+          const groesse = system ? token.fontSizeSM : token.fontSize;
+          const rand = system ? { ...zelle, paddingBlock: 0 } : zelle;
+          const nummerZelle = (
+            <td style={{ ...rand, ...monoStil(groesse), whiteSpace: 'nowrap' }}>{e.lfd_nr}</td>
+          );
+          const zeitZelle = (
+            <td
+              className="druckansicht-zeit"
+              style={{ ...rand, ...monoStil(groesse), whiteSpace: 'nowrap' }}
+            >
+              <div>{zeitpunkt(e.ereigniszeit, konventionen)}</div>
+              {istNachgetragen(e.ereigniszeit, e.received_at) && (
+                <div style={hinweis}>{nachtrag(e, konventionen)}</div>
+              )}
+            </td>
+          );
+          const berichtigungsHinweise = (
+            <>
+              {grund && (
+                <div style={hinweis}>
+                  {/* Die Nummer des Grundeintrags ist nur bekannt, wenn er geladen ist
+                      (Auswahl oder Berichtigungs-Durchgang) — erfunden wird sie nie. */}
+                  {grund.lfd_nr != null
+                    ? `berichtigt Nr. ${grund.lfd_nr}`
+                    : 'berichtigt einen Eintrag außerhalb dieser Auswahl'}
+                </div>
+              )}
+              {durch.length > 0 && (
+                <div style={hinweis}>
+                  berichtigt durch{' '}
+                  {[...durch]
+                    .sort((a, b) => a.lfd_nr - b.lfd_nr)
+                    .map((d) => `Nr. ${d.lfd_nr}`)
+                    .join(', ')}
+                </div>
+              )}
+            </>
+          );
+          if (system) {
+            return (
+              <tr key={e.id} data-lfh="etb-druck-system" style={{ fontSize: token.fontSizeSM }}>
+                {nummerZelle}
+                {zeitZelle}
+                <td colSpan={4} className="druckansicht-textspalte" style={rand}>
+                  <div className="etb-druck-system-zeile" style={{ columnGap: token.marginXXS }}>
+                    <span>{`${etbTyp[e.typ].label} · `}</span>
+                    <Markdown variante="kompakt" unterEbene={2}>
+                      {e.inhalt}
+                    </Markdown>
+                    <span>
+                      {` · ${e.erfasser_name}`}
+                      {e.erfasser_funktion && `, ${e.erfasser_funktion}`}
+                    </span>
+                  </div>
+                  {berichtigungsHinweise}
+                </td>
+              </tr>
+            );
+          }
           return (
             <tr key={e.id} data-lfh={istUeberlang(e.inhalt) ? 'druck-ueberlang' : undefined}>
-              <td style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}>
-                {e.lfd_nr}
-              </td>
-              <td
-                className="druckansicht-zeit"
-                style={{ ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' }}
-              >
-                <div>{zeitpunkt(e.ereigniszeit, konventionen)}</div>
-                {istNachgetragen(e.ereigniszeit, e.received_at) && (
-                  <div style={hinweis}>{nachtrag(e, konventionen)}</div>
-                )}
-              </td>
+              {nummerZelle}
+              {zeitZelle}
               <td className="druckansicht-nicht-schmal" style={zelle}>
                 {etbTyp[e.typ].label}
               </td>
@@ -183,24 +266,7 @@ export default function EtbDruckTabelle({ eintraege, berichtigungen, konventione
                     </ul>
                   </div>
                 )}
-                {grund && (
-                  <div style={hinweis}>
-                    {/* Die Nummer des Grundeintrags ist nur bekannt, wenn er geladen ist
-                        (Auswahl oder Berichtigungs-Durchgang) — erfunden wird sie nie. */}
-                    {grund.lfd_nr != null
-                      ? `berichtigt Nr. ${grund.lfd_nr}`
-                      : 'berichtigt einen Eintrag außerhalb dieser Auswahl'}
-                  </div>
-                )}
-                {durch.length > 0 && (
-                  <div style={hinweis}>
-                    berichtigt durch{' '}
-                    {[...durch]
-                      .sort((a, b) => a.lfd_nr - b.lfd_nr)
-                      .map((d) => `Nr. ${d.lfd_nr}`)
-                      .join(', ')}
-                  </div>
-                )}
+                {berichtigungsHinweise}
                 <div className="druckansicht-nur-schmal" style={hinweis}>
                   Erfasser: {e.erfasser_name}
                   {e.erfasser_funktion && `, ${e.erfasser_funktion}`}

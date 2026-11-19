@@ -1305,11 +1305,24 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
       rolle?: EinsatzAnzeige['meine_rolle'];
     } = {},
   ) {
-    const stand = { br: start, gets: 0, bodies: [] as Record<string, unknown>[], haengen: false };
+    const stand = {
+      br: start,
+      gets: 0,
+      bodies: [] as Record<string, unknown>[],
+      haengen: false,
+      // Welcher Neuabruf scheitert (LLH-1947): der des Raums oder der des Einsatzes.
+      scheitert: null as 'br' | 'einsatz' | null,
+    };
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
+      http.get('/api/einsaetze/1', () =>
+        stand.scheitert === 'einsatz'
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json(einsatz({ meine_rolle: rolle })),
+      ),
       http.get('/api/einsaetze/1/bereitstellungsraeume/1', async () => {
         stand.gets += 1;
+        if (stand.scheitert === 'br')
+          return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
         // Ein Neuabruf, der (noch) nicht zurückkommt: die Seite hat nur die PATCH-Antwort.
         if (stand.haengen) await delay('infinite');
         return HttpResponse.json(stand.br);
@@ -1368,6 +1381,29 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
     expect(await within(paneel()).findByText('Festplatz')).toBeInTheDocument();
     expect(within(paneel()).queryByText('Zufahrt Nord')).toBeNull();
   });
+
+  // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
+  it.each(['br', 'einsatz'] as const)(
+    'gescheiterter Neuabruf (%s): Seite und offene Eingabe bleiben, der Hinweis zeigt den alten Stand',
+    async (was) => {
+      const { stand, qc } = seite(brDetail({ status: 'aktiv', notiz: 'A', geaendert_at: 's1' }));
+
+      await userEvent.click(await bearbeiten());
+      await userEvent.clear(feld('Notiz'));
+      await userEvent.type(feld('Notiz'), 'B offen');
+
+      stand.scheitert = was;
+      await act(() => qc.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(feld('Notiz')).toHaveValue('B offen');
+      expect(screen.queryByText('Bereitstellungsraum konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
 
   it('gleich wieder geöffnet: die Basis ist der gespeicherte Stand, nicht der vor dem Speichern', async () => {
     const { stand } = seite(brDetail({ notiz: 'A', geaendert_at: 's1' }));
@@ -2404,9 +2440,9 @@ describe('BrDetailPage — Herkunft an der Belegungszeile (LLH-1075, design.md D
     expect(within(offen).getByText('nicht übernommen')).toBeInTheDocument();
     expect(within(offen).queryByText('unangemeldet')).toBeNull();
     const uebernommen = await zeile('Florian Nachbar 4');
-    expect(within(uebernommen).getByText('unangemeldet').closest('.ant-tag')).not.toHaveAttribute(
-      'data-rolle',
-    );
+    expect(
+      within(uebernommen).getByText('unangemeldet').closest('[data-lfh="status"], [data-marke]'),
+    ).not.toHaveAttribute('data-ton');
     expect(within(uebernommen).queryByText('nicht übernommen')).toBeNull();
     const angemeldet = await zeile('Zug Nord');
     expect(within(angemeldet).queryByText('unangemeldet')).toBeNull();

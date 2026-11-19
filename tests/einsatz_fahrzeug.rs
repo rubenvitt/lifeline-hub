@@ -2058,3 +2058,520 @@ async fn besatzung_zuruecknehmen_nur_wenn_frei() {
     );
     assert_eq!(fahrzeug_von().await, a);
 }
+
+// ── Statuswechsel zurücknehmen (LLH-1781, Spec `fahrzeugstatus-quittung`) ───────────────────
+
+/// Ein Fahrzeug in einer Einheit auf S2, dann ein Wechsel auf einen Status mit Zeitachsen-Marke.
+/// Liefert (app, pool, admin, einsatz, ef, einheit, s2, s4, Antwort des Wechsels).
+async fn statuswechsel_welt() -> (
+    axum::Router,
+    sqlx::SqlitePool,
+    String,
+    i64,
+    i64,
+    i64,
+    i64,
+    i64,
+    serde_json::Value,
+) {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "85-1").await;
+    let einheit = in_einheit(&app, &admin, einsatz, ef).await;
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let nach_anfang = |p: &str| {
+        stati
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["label"].as_str().unwrap().starts_with(p))
+            .unwrap()["id"]
+            .as_i64()
+            .unwrap()
+    };
+    let (s2, s4) = (nach_anfang("2"), nach_anfang("4"));
+    sqlx::query("UPDATE fahrzeug_status SET zeitachse_marke = 'eintreffen' WHERE id = ?")
+        .bind(s4)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    // „Status seit“ von S2 in die Vergangenheit, damit vorher und nachher verschieden sind.
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET status_seit = datetime('now', '-5 minutes') WHERE id = ?",
+    )
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, wechsel) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{wechsel}");
+    (app, pool, admin, einsatz, ef, einheit, s2, s4, wechsel)
+}
+
+async fn status_zuruecknehmen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+    beleg: &serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/status/zuruecknehmen"),
+        cookie,
+        Some(&beleg.to_string()),
+    )
+    .await
+}
+
+/// Ereignisse der Einheit: (Art, gestrichen?).
+async fn einheit_ereignisse(pool: &sqlx::SqlitePool, einheit: i64) -> Vec<(String, bool)> {
+    sqlx::query_as::<_, (String, bool)>(
+        "SELECT art, gestrichen_at IS NOT NULL FROM einsatz_kraft_zeitachse \
+         WHERE einheit_id = ? ORDER BY id",
+    )
+    .bind(einheit)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Spec „Statuswechsel zurücknehmen“, Szenario „Wechsel und Rückgängig“.
+#[tokio::test]
+async fn statuswechsel_zuruecknehmen_stellt_status_und_seit_her_und_streicht_das_ereignis() {
+    let (app, pool, admin, einsatz, ef, einheit, s2, s4, wechsel) = statuswechsel_welt().await;
+    let beleg = wechsel["status_ruecknahme"].clone();
+    assert_eq!(beleg["vorher_status_id"], s2);
+    assert_eq!(beleg["status_id"], s4);
+    // Der Beleg trägt nur Prüfwerte; was zurückkommt, hält der Server selbst fest (D8).
+    assert!(beleg.get("ereignis_id").is_none(), "{beleg}");
+    let vorher_seit: String =
+        sqlx::query_scalar("SELECT status_vorher_seit FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), false)]
+    );
+
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status_id"], s2);
+    assert_eq!(json["status_seit"], vorher_seit);
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), true)]
+    );
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.starts_with("Fahrzeug «85-1»: Statuswechsel «")
+                && t.ends_with("» zurückgenommen")),
+        "{etb:?}"
+    );
+
+    // Ein zweites Mal: der Status steht nicht mehr → 409 veraltet.
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(json["grund"], "veraltet", "{json}");
+}
+
+/// Ein Wechsel ohne Änderung liefert keinen Beleg.
+#[tokio::test]
+async fn gleicher_status_liefert_keinen_beleg() {
+    let (app, _pool, admin, einsatz, ef, _einheit, _s2, s4, _) = statuswechsel_welt().await;
+    let (s, json) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(json.get("status_ruecknahme").is_none(), "{json}");
+    assert_eq!(
+        json["status_id"], s4,
+        "die Anzeige steht flach in der Antwort"
+    );
+}
+
+/// Szenario „Inzwischen erneut gewechselt“.
+#[tokio::test]
+async fn rueckname_nach_erneutem_wechsel_ist_409_und_aendert_nichts() {
+    let (app, pool, admin, einsatz, ef, einheit, s2, _s4, wechsel) = statuswechsel_welt().await;
+    let (s, _) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) =
+        status_zuruecknehmen(&app, &admin, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s2
+    );
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), false)]
+    );
+}
+
+/// Szenario „Andere Person“.
+#[tokio::test]
+async fn rueckname_durch_andere_person_ist_409() {
+    let (app, _pool, admin, einsatz, ef, _einheit, _s2, s4, wechsel) = statuswechsel_welt().await;
+    let id = benutzer_anlegen(&app, &admin, "fritz", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "fuehrungspersonal").await;
+    let fritz = login_cookie(&app, "fritz", "fritzpw1").await;
+    let (s, json) =
+        status_zuruecknehmen(&app, &fritz, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s4
+    );
+}
+
+/// Szenario „Nach elf Minuten“.
+#[tokio::test]
+async fn rueckname_nach_elf_minuten_ist_409() {
+    let (app, pool, admin, einsatz, ef, _einheit, _s2, s4, wechsel) = statuswechsel_welt().await;
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET status_seit = datetime('now', '-11 minutes') WHERE id = ?",
+    )
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let seit: String = sqlx::query_scalar("SELECT status_seit FROM einsatz_fahrzeug WHERE id = ?")
+        .bind(ef)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let mut beleg = wechsel["status_ruecknahme"].clone();
+    beleg["status_seit"] = serde_json::json!(seit);
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_ne!(
+        json["grund"], "veraltet",
+        "kein CAS-Fall, sondern die Frist"
+    );
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s4
+    );
+}
+
+/// Szenario „Zeitachse lässt sich nicht streichen“: nach dem Wechsel kam ein späteres Ereignis
+/// dazu, das ohne das Eintreffen die Ordnung bräche; die Rücknahme ist 409 und ändert nichts.
+#[tokio::test]
+async fn rueckname_scheitert_an_der_zeitachse_und_aendert_nichts() {
+    let (app, pool, admin, einsatz, ef, einheit, _s2, s4, wechsel) = statuswechsel_welt().await;
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let heim = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"].as_str().unwrap().starts_with("1"))
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    sqlx::query("UPDATE fahrzeug_status SET zeitachse_marke = 'entlassung' WHERE id = ?")
+        .bind(heim)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // Die Entlassung der Einheit von Hand, damit der Status S4 bleibt.
+    let ereignis: i64 =
+        sqlx::query_scalar("SELECT status_ereignis_id FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let admin_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_kraft_zeitachse (einsatz_id, einheit_id, art, zeitpunkt_at, quelle, erfasst_von) \
+         SELECT einsatz_id, einheit_id, 'entlassung', datetime(zeitpunkt_at, '+1 minutes'), 'nachtrag', ? \
+         FROM einsatz_kraft_zeitachse WHERE id = ?",
+    )
+    .bind(admin_id)
+    .bind(ereignis)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, json) =
+        status_zuruecknehmen(&app, &admin, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        fahrzeug_zeile(&app, &admin, einsatz, ef).await["status_id"],
+        s4
+    );
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), false), ("entlassung".into(), false)]
+    );
+}
+
+/// Ohne Schreibrecht im Modul: 403, wie beim Wechsel.
+#[tokio::test]
+async fn rueckname_ohne_schreibrecht_ist_403() {
+    let (app, _pool, admin, einsatz, ef, _einheit, _s2, _s4, wechsel) = statuswechsel_welt().await;
+    let id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, id, "beobachter").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let (s, _) =
+        status_zuruecknehmen(&app, &erika, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// Review vor dem PR: Werte im Beleg außer den Prüfwerten zählen nicht. Ein erfundener Vorzustand
+/// und ein fremdes Ereignis ändern nichts an dem, was zurückkommt.
+#[tokio::test]
+async fn rueckname_glaubt_dem_beleg_keinen_vorzustand() {
+    let (app, pool, admin, einsatz, ef, einheit, s2, _s4, wechsel) = statuswechsel_welt().await;
+    let vorher_seit: String =
+        sqlx::query_scalar("SELECT status_vorher_seit FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let mut beleg = wechsel["status_ruecknahme"].clone();
+    beleg["vorher_status_id"] = serde_json::json!(null);
+    beleg["vorher_seit"] = serde_json::json!("1970-01-01 00:00:00");
+    beleg["ereignis_id"] = serde_json::json!(999_999);
+    let (s, json) = status_zuruecknehmen(&app, &admin, einsatz, ef, &beleg).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status_id"], s2);
+    assert_eq!(json["status_seit"], vorher_seit);
+    assert_eq!(
+        einheit_ereignisse(&pool, einheit).await,
+        vec![("eintreffen".into(), true)]
+    );
+}
+
+/// LLH-1952: Jeder ETB-Eintrag des Fahrzeugmoduls geht als Ereignis `etb` hinaus. `fahrzeug`
+/// frischt das Einsatztagebuch nicht auf; ohne das eigene Ereignis sähe ein zweiter Schirm den
+/// Eintrag erst nach dem Neuladen.
+#[tokio::test]
+async fn etb_eintraege_der_fahrzeuge_gehen_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ep = adhoc_kraft(&app, &admin, einsatz, "Anna").await;
+    let s4 = status_nach_label(&app, &admin, "4 – Am Einsatzort").await;
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+
+    let ef = adhoc_disponieren(&app, &admin, einsatz, "83-1").await;
+    etb.pruefe(&app, &admin, einsatz, "disponieren").await;
+    let fehl = adhoc_disponieren(&app, &admin, einsatz, "83-2").await;
+    etb.pruefe(&app, &admin, einsatz, "zweites disponieren")
+        .await;
+
+    let body = format!(r#"{{"status_id":{s4},"funkrufname":"83-1a"}}"#);
+    let (s, json) = fahrzeug_patch(&app, &admin, einsatz, ef, &body).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "Status und Angaben ändern")
+        .await;
+
+    let besatzung = format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}");
+    for methode in ["PUT", "DELETE"] {
+        let (s, json) = anfrage(&app, methode, &besatzung, &admin, None).await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{methode}: {json}");
+        etb.pruefe(&app, &admin, einsatz, methode).await;
+    }
+
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "entlassen").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&json["vorzustand"].to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "zurücknehmen").await;
+
+    for (fz, was, erwartet) in [
+        (ef, "entlassen", StatusCode::OK),
+        (ef, "reaktivieren", StatusCode::OK),
+        (fehl, "stornieren", StatusCode::NO_CONTENT),
+    ] {
+        let (s, json) = aktion(&app, &admin, einsatz, fz, was).await;
+        assert_eq!(s, erwartet, "{was}: {json}");
+        etb.pruefe(&app, &admin, einsatz, was).await;
+    }
+}
+
+// ---------- Feld-CAS an der Disposition (LLH-1945) ----------
+
+async fn fahrzeug_patch_json(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ef: i64,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage_json(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        cookie,
+        Some(&body),
+    )
+    .await
+}
+
+async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn bemerkung_mit_ueberholtem_altwert_ist_409_und_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 3"}),
+    )
+    .await;
+    fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 5"}),
+    )
+    .await;
+
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Halle 2", "erwartet": {"bemerkung": "Tor 3"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
+    let (_, a) = fahrzeug_patch_json(&app, &admin, einsatz, ef, serde_json::json!({})).await;
+    assert_eq!(a["bemerkung"], "Tor 5");
+
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": null, "erwartet": {"bemerkung": "Tor 5"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert!(j["bemerkung"].is_null());
+}
+
+#[tokio::test]
+async fn andere_angabe_des_fahrzeugs_dazwischen_speichert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = adhoc_fahrzeug(&app, &admin, einsatz).await;
+    fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"kennzeichen": "M-X 1"}),
+    )
+    .await;
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 3", "erwartet": {"bemerkung": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["kennzeichen"], "M-X 1");
+    // Die Ad-hoc-Angabe selbst prüft ihren Altwert.
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"kennzeichen": "M-X 2", "erwartet": {"kennzeichen": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"funkrufname": "FW Extern 2", "erwartet": {"funkrufname": "FW Extern 1"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+}
+
+#[tokio::test]
+async fn altwert_ohne_aenderung_der_angabe_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let (s, j) = fahrzeug_patch_json(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        serde_json::json!({"bemerkung": "Tor 3", "erwartet": {"opta": null}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+}

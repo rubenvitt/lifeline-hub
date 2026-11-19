@@ -107,7 +107,7 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
           style={{ width: 88 }}
         />
       </span>
-      <Typography.Text type="secondary" style={{ paddingBottom: 4 }}>
+      <Typography.Text type="secondary" style={{ paddingBottom: token.paddingXS }}>
         = {begonnen ? gesamt : '—'}
       </Typography.Text>
     </Space>

@@ -6,11 +6,11 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import type { Person, UhsBelegung, UhsDetail, BelegungsArt } from '../../api/types';
 import Datensicht, { spaltenFuer } from '../../components/Datensicht';
-import StatusTag from '../../components/StatusTag';
 import { monoStil } from '../../components/instrument';
 import { belegungsArt, belegungsDarstellung } from '../../theme/statusFarben';
 import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
 import { KennungsLink } from '../../components/kennungsLink';
+import { Status } from '../../components/instrument/Status';
 
 interface Props {
   uhs: UhsDetail;
@@ -107,7 +107,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           title: 'Art',
           dataIndex: 'art',
           filter: { werte: ART_WERTE, trifft: (b, w) => b.art === w },
-          render: (_art: BelegungsArt, b) => <StatusTag darstellung={belegungsDarstellung(b)} />,
+          render: (_art: BelegungsArt, b) => <Status darstellung={belegungsDarstellung(b)} />,
         },
         {
           key: 'platz_id',

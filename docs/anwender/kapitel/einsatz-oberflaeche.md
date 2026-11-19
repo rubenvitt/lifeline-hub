@@ -258,11 +258,11 @@ zu den Einsätzen des ELW, solange es dort angemeldet ist. Wer nur am ELW ein Ko
 Spontanhelfer, schaltet wie gewohnt am ELW ein.
 
 Fehlt der Schalter, bietet ihn dieses Gerät nicht: Der Betrieb hat die Zustellung nicht
-eingeschaltet, der Browser kann sie nicht, oder die App läuft als Desktop-App, die ohnehin selbst
-meldet. Auf dem iPhone und iPad erscheint er nur in der installierten App („Zum Home-Bildschirm“
-in Safari), nicht im Browser-Tab. Steht „Vom Browser blockiert“ daneben, hat der Browser die
-Erlaubnis verweigert; sie lässt sich nur in den Einstellungen des Browsers für diese Seite wieder
-geben.
+eingeschaltet, der Browser kann sie nicht, oder die App läuft als Desktop- oder iOS-App, die ohnehin
+selbst melden. Ohne iOS-App erscheint er auf dem iPhone und iPad nur in der installierten Web-App
+(„Zum Home-Bildschirm“ in Safari), nicht im Browser-Tab. Steht „Vom Browser blockiert“ daneben, hat
+der Browser die Erlaubnis verweigert; sie lässt sich nur in den Einstellungen des Browsers für diese
+Seite wieder geben.
 
 ## Hintergrund
 

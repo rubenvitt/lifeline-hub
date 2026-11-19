@@ -280,7 +280,7 @@ export default function Zeitachseneintrag({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-end',
-            gap: 5,
+            gap: token.marginXS,
             textAlign: 'end',
           }}
         >

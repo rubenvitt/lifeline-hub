@@ -1,5 +1,6 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin } from 'antd';
+import { Select } from '../components/Select';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -130,7 +131,7 @@ export default function MeldungenPage() {
     einsatzId,
     'meldung',
   ).filter((v) => v.antrag != null);
-  // Unter `md` Zeile statt Band und Filterknopf statt Segmentleiste (LFH-974): der Wortlaut der
+  // Unter `md` Zeile statt Band und Filterknopf statt Auswahlfeld (LFH-974): der Wortlaut der
   // ersten Karte gehört in den ersten Schirm.
   const { istSchmal } = useViewport();
 
@@ -985,14 +986,17 @@ export default function MeldungenPage() {
         {istSchmal ? (
           <RichtungFilterKnopf wert={richtungsKey} onWechsel={richtungWaehlen} />
         ) : (
-          <Segmentleiste
-            beschriftung="Richtung"
-            wert={richtungsKey}
-            onWechsel={richtungWaehlen}
-            optionen={[
-              { wert: 'alle', label: 'Alle Richtungen' },
-              { wert: 'intern', label: 'Intern' },
-              { wert: 'extern', label: 'Extern' },
+          // Eine Umschaltleiste je Ebene (Spec `bedien-umschalten`, LLH-1942): „Ansicht“ schaltet
+          // die Liste, „Richtung“ schränkt sie ein und steht als Filter daneben.
+          <Select
+            aria-label="Richtung"
+            style={{ minWidth: 160 }}
+            value={richtungsKey}
+            onChange={richtungWaehlen}
+            options={[
+              { value: 'alle', label: 'Alle Richtungen' },
+              { value: 'intern', label: 'Intern' },
+              { value: 'extern', label: 'Extern' },
             ]}
           />
         )}

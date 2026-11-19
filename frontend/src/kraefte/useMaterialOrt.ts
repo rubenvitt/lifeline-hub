@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { ZuruecknahmeFilter } from '../api/einheiten';
-import { teileAuf, updateDisposition } from '../api/einsatzMaterial';
+import { listEinsatzMaterial, teileAuf, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
-import { ortPatch, ortVon, type MaterialOrtRef } from './materialPosten';
+import { useFeldKonflikt } from '../components/useFeldKonflikt';
+import { ortPatch, ortSpalten, ortVon, type MaterialOrtRef } from './materialPosten';
 import type { OrtPosten } from './materialOrtWahl';
 
 /**
@@ -19,6 +20,11 @@ import type { OrtPosten } from './materialOrtWahl';
  */
 export function useMaterialOrt(einsatzId: number) {
   const qc = useQueryClient();
+  // Die Rückfrage braucht den App-Kontext; `useFeldKonflikt` liefert je Render eine neue Funktion,
+  // über die Ref bleibt der Schreibweg stabil (Muster `fernmeldewesen/useSkizzenAktionen.ts`).
+  const konflikt = useFeldKonflikt();
+  const konfliktRef = useRef(konflikt);
+  konfliktRef.current = konflikt;
   /** Die Einheit trägt ihr Material im DTO, UHS und Bereitstellungsraum im Detail. */
   const syncOrte = useCallback(
     async (orte: readonly (MaterialOrtRef | null)[]): Promise<void> => {
@@ -39,20 +45,57 @@ export function useMaterialOrt(einsatzId: number) {
   /**
    * `optionen.nurWennFrei` für das Rückgängig nach dem Lösen (LLH-1924): liegt der Posten
    * inzwischen woanders, lehnt der Server ab, statt ihn dort wegzunehmen.
+   *
+   * `optionen.beimOeffnen` ist der Ort, den die Einzelangabe beim Öffnen zeigte (Feld-CAS,
+   * LLH-1945): er geht mit allen vier Spalten als Altwert mit, ein 409 fragt über
+   * `useFeldKonflikt` (`ortText` nennt den aktuellen Ort lesbar). Liefert dann deren Ergebnis
+   * (`OFFEN_LASSEN`, `VERWORFEN`). Handlungen ohne offenes Feld (Lösen, Rückgängig, Zuordnen im
+   * Dialog) schicken keinen.
    */
   const setOrt = useCallback(
     async (
       em: OrtPosten,
       ziel: MaterialOrtRef | null,
-      optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
-    ): Promise<void> => {
+      optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'> & {
+        beimOeffnen?: MaterialOrtRef | null;
+        ortText?: (ort: MaterialOrtRef | null) => string;
+      },
+    ) => {
       const vorher = ortVon(em);
       const patch = ortPatch(ziel, vorher);
       if (patch == null) return;
-      await updateDisposition(einsatzId, em.id, patch, optionen);
+      const { beimOeffnen, ortText, nurWennFrei } = optionen ?? {};
+      const ergebnis = await konfliktRef.current({
+        etikett: 'Ort',
+        erwartet: beimOeffnen === undefined ? undefined : ortSpalten(beimOeffnen),
+        speichern: async (erwartet) => {
+          await updateDisposition(einsatzId, em.id, patch, {
+            nurWennFrei,
+            ...(erwartet && { erwartet: { ort: erwartet } }),
+          });
+        },
+        ladeFrisch: async () => {
+          const liste = await qc.fetchQuery({
+            queryKey: einsatzKeys.material(einsatzId),
+            queryFn: () => listEinsatzMaterial(einsatzId),
+            staleTime: 0,
+          });
+          return liste.find((p) => p.id === em.id);
+        },
+        // Ein inzwischen herausgenommener Posten fehlt in der Liste: dann kein Feldkonflikt.
+        aktuell: (frisch) =>
+          frisch && {
+            wert: ortSpalten(ortVon(frisch)),
+            anzeige: ortText?.(ortVon(frisch)),
+          },
+        text: (w) => ortText?.(ortVon(w)) ?? 'ein anderer Ort',
+        leer: (w) => ortVon(w) == null,
+      });
+      // Verworfen: nichts geschrieben, die Orte gleichen trotzdem ab (der Posten liegt woanders).
       await syncOrte([vorher, ziel]);
+      return ergebnis;
     },
-    [einsatzId, syncOrte],
+    [einsatzId, syncOrte, qc],
   );
   /**
    * `menge` vom Posten abteilen und an `ziel` setzen, in EINEM Request (t1hvaqzu, design.md D1/D6):

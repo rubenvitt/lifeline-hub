@@ -1,10 +1,10 @@
 import { IconUhr } from '../icons';
-import { Button, Descriptions, Flex, Popconfirm, Space, Typography } from 'antd';
+import { Button, Descriptions, Flex, Popconfirm, Space, Typography, theme } from 'antd';
 import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Status, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -85,13 +85,19 @@ export function AuftragKopf({
   /** In der Listenkarte ohne Sprung: die Karte trägt nur das Auswahlziel und Kennungs-Links. */
   mitEtbSprung?: boolean;
 }) {
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   // Zeiten in der Anzeigezone, wie im Formular dazu (LFH-692).
   const { zeitpunkt } = useAnzeigeKonventionen();
   const status = AUFTRAG_STATUS[a.bearbeitungsstatus] ?? AUFTRAG_STATUS.offen;
   return (
-    <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
-      <Space size={6} wrap>
+    <Flex
+      justify="space-between"
+      align="center"
+      style={{ marginBottom: token.marginSM }}
+      gap={token.marginSM}
+      wrap
+    >
+      <Space size={token.marginSM} wrap>
         <PrioBadge prio={a.prioritaet} />
         <StatusBadge
           phase={status.phase}
@@ -99,14 +105,14 @@ export function AuftragKopf({
           unbearbeitet={!!status.unbearbeitet}
           ton={status.ton}
         />
-        {a.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
+        {a.richtung === 'extern' && <Status groesse="klein" ton="neutral" wort="Extern" />}
         {mitEtbSprung && a.quell_etb_eintrag_id != null && einsatzId != null && (
           <KennungsLink to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>
             ↗ ETB-Eintrag
           </KennungsLink>
         )}
       </Space>
-      <Space size={10} wrap>
+      <Space size={token.margin} wrap>
         {a.ist_ueberfaellig && (
           <Text type="danger" strong style={{ fontSize: 12 }}>
             <span aria-hidden="true">
@@ -193,10 +199,11 @@ export function AuftragEmpfaenger({
 
 /** Zeitpunkt, Person und Grund einer Aufhebung (LLH-1098); an einem anderen Auftrag nichts. */
 export function AuftragAufhebung({ auftrag: a }: { auftrag: Auftrag }) {
+  const { token } = theme.useToken();
   const { zeitpunkt } = useAnzeigeKonventionen();
   if (a.bearbeitungsstatus !== 'aufgehoben') return null;
   return (
-    <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
+    <Space orientation="vertical" size={0} style={{ marginBottom: token.marginSM }}>
       <Text style={{ fontSize: 13 }}>
         {[
           `Aufgehoben am: ${a.aufgehoben_at ? zeitpunkt(a.aufgehoben_at) : '—'}`,
@@ -218,10 +225,11 @@ export function AuftragVollzug({
   auftrag: Auftrag;
   ansicht: 'offen' | 'abgeschlossen';
 }) {
+  const { token } = theme.useToken();
   const { zeitpunkt } = useAnzeigeKonventionen();
   if (ansicht === 'abgeschlossen') {
     return (
-      <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
+      <Space orientation="vertical" size={0} style={{ marginBottom: token.marginSM }}>
         {a.vollzogen_at && (
           <Text type="secondary" style={{ fontSize: 13 }}>
             Vollzogen am: {zeitpunkt(a.vollzogen_at)}
@@ -242,7 +250,7 @@ export function AuftragVollzug({
   }
   if (!a.vollzugsmeldung) return null;
   return (
-    <Text style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>
+    <Text style={{ fontSize: 13, display: 'block', marginBottom: token.marginSM }}>
       <Text type="secondary">Vollzug: </Text>
       {a.vollzugsmeldung}
     </Text>
@@ -381,6 +389,7 @@ export function AuftragHandlungen({
   ausrichtung = 'flex-end',
   ...props
 }: AuftragHandlungenProps) {
+  const { token } = theme.useToken();
   const { knoepfe, weitere } = auftragAktionen(props);
   const aktionen: ReactNode[] = knoepfe.map((k) =>
     k.rueckfrage ? (
@@ -411,12 +420,12 @@ export function AuftragHandlungen({
       {/* Grund einer abgelehnten Handlung über ihren Knöpfen, bis zur nächsten Handlung an diesem
          Auftrag (LFH-1077). */}
       {fehlerGrund && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: token.marginSM }}>
           <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
         </div>
       )}
       {aktionen.length + weitere.length > 0 && (
-        <Flex justify={ausrichtung} style={{ marginTop: 8 }}>
+        <Flex justify={ausrichtung} style={{ marginTop: token.marginSM }}>
           {/* `middle`: Rot steht nicht bündig neben Neutralem (LFH-363). Der Abstands-Guard sieht
              diese gespreizte Reihe nicht und führt die Teile unter BEWERTET_OHNE_SCANNER_DECKUNG. */}
           <Space size="middle" wrap>

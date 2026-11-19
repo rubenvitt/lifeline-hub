@@ -344,7 +344,8 @@ gesperrt“, ohne Schreibrecht am Einsatz lässt sie sich nur lesen.
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Ansicht „Schichtplan“ „Drucken“ wählen. Die „Schichtplan – Druckansicht“ öffnet sich.
+1. In der Ansicht „Schichtplan“ im Kopf der Seite „Druckansicht“ wählen; auf schmalen Bildschirmen
+   steht der Punkt unter „Weitere“. Die „Schichtplan – Druckansicht“ öffnet sich.
 2. Unter „Blätter“ wählen, was gedruckt wird: „Je Posten“ gibt einen Aushang je Einheit oder UHS
    mit den Schichten in Zeitfolge und den eingeteilten Personen, „Je Person“ einen Schichtzettel
    je Person mit ihren Schichten, dem Posten und wer dort mit ihr eingeteilt ist.
@@ -361,12 +362,13 @@ Schichtplan“ führt zur Ansicht zurück.
 Für alle, die die Ablösung sehen und das Modul Personal freigegeben haben, auch im
 abgeschlossenen Einsatz:
 
-1. In der Ansicht „Schichtplan“ „Excel“ wählen.
+1. In der Ansicht „Schichtplan“ im Kopf der Seite „Excel“ wählen (auf schmalen Bildschirmen unter
+   „Weitere“).
 2. Die Mappe wird als Datei gespeichert, etwa `schichtplan-stadtfest-2027-06-26.xlsx`. Der Name
    folgt dem Einsatz und dem Tag des Abrufs.
 
 Scheitert der Abruf, steht der Grund unter den Knöpfen; der nächste Versuch nimmt ihn weg. Ohne das
-Modul Personal ist „Excel“ gesperrt, daneben steht der Grund. Was in der Mappe steht, beschreibt
+Modul Personal ist „Excel“ gesperrt und nennt den Grund in Klammern. Was in der Mappe steht, beschreibt
 der Abschnitt „Die Excel-Mappe“ weiter unten.
 
 ## Hintergrund

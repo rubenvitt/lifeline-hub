@@ -1,5 +1,4 @@
 import { Typography } from 'antd';
-import StatusTag from '../../components/StatusTag';
 import { bezugsDarstellung } from '../../theme/statusFarben';
 import { personDetailPfad, personalPfad } from '../../routing/deeplinks';
 import type { Schaden, SchadenAbschlussGrund, SchadenStatus, SchadenTyp } from '../../api/types';
@@ -14,6 +13,7 @@ export {
   schadenAusmass as AUSMASS_META,
 } from '../../theme/statusFarben';
 import { KennungsLink } from '../../components/kennungsLink';
+import { Status } from '../../components/instrument/Status';
 export { GEFAHR_LABEL, GEFAHRENARTEN, SCHADENSGRAD_LABEL, gefahrText } from './gefahrWorte';
 
 export const TYP_LABEL: Record<SchadenTyp, string> = {
@@ -83,22 +83,22 @@ export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNo
     }
     return s.geschaedigt_person_id != null ? (
       <KennungsLink to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}>
-        <StatusTag darstellung={bezugsDarstellung(label)} />
+        <Status darstellung={bezugsDarstellung(label)} />
       </KennungsLink>
     ) : (
-      <StatusTag darstellung={bezugsDarstellung(label)} />
+      <Status darstellung={bezugsDarstellung(label)} />
     );
   }
   if (s.geschaedigt_personal_id != null) {
     return (
       <KennungsLink to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
-        <StatusTag darstellung={bezugsDarstellung(s.geschaedigt_personal_name ?? 'Einsatzkraft')} />
+        <Status darstellung={bezugsDarstellung(s.geschaedigt_personal_name ?? 'Einsatzkraft')} />
       </KennungsLink>
     );
   }
   if (s.geschaedigt_organisation_id != null) {
     return (
-      <StatusTag
+      <Status
         darstellung={bezugsDarstellung(s.geschaedigt_organisation_name ?? 'Eigene Organisation')}
       />
     );

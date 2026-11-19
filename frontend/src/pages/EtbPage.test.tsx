@@ -1848,7 +1848,7 @@ describe('EtbPage — Ablehnungen am Ort (LFH-1077)', () => {
 /**
  * ── Einstieg in den Druck (LFH-22) ──
  *
- * „Drucken / als PDF" öffnet die Druckansicht und sendet nichts ab — deshalb im Kopf-Slot, als Link
+ * „Druckansicht" öffnet die Druckansicht und sendet nichts ab — deshalb im Kopf-Slot, als Link
  * mit Knopfgestalt (Strg+Klick öffnet einen Tab). Er nimmt den aktiven Filter mit, sonst druckte
  * die Person eine andere Auswahl als die sichtbare.
  */
@@ -1860,7 +1860,7 @@ describe('EtbPage — Einstieg in den Druck (LFH-22)', () => {
       expect(k).not.toBeNull();
       return k!;
     });
-    const link = await within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
+    const link = await within(kopf).findByRole('link', { name: 'Druckansicht' });
     const ziel = new URL(link.getAttribute('href')!, 'http://x');
     expect(ziel.pathname).toBe('/einsaetze/7/etb/druck');
     expect(Object.fromEntries(ziel.searchParams)).toEqual({
@@ -1879,7 +1879,7 @@ describe('EtbPage — Einstieg in den Druck (LFH-22)', () => {
       expect(k).not.toBeNull();
       return k!;
     });
-    const link = await within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
+    const link = await within(kopf).findByRole('link', { name: 'Druckansicht' });
     expect(link).not.toHaveClass('ant-btn-primary');
     expect(kopf.querySelectorAll('.ant-btn-primary').length).toBeLessThanOrEqual(1);
   });
@@ -1929,6 +1929,34 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
     expect(verweis).toHaveAttribute('href', '/api/einsaetze/7/dokumente/3/datei');
     expect(screen.queryByRole('link', { name: /Ohne Bezug/ })).toBeNull();
     expect(abrufe).toBe(1);
+  });
+
+  it('fragt ohne Modulrecht Abschnitte und Einheiten nicht ab (kein 403, LLH-1839)', async () => {
+    const abgefragt: string[] = [];
+    const { client } = setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({
+            einsatzabschnitte: { zugriff: false },
+            einheiten: { zugriff: false },
+          }),
+        ),
+      ),
+      http.get('/api/einsaetze/7/abschnitte', () => {
+        abgefragt.push('abschnitte');
+        return HttpResponse.json([]);
+      }),
+      http.get('/api/einsaetze/7/einheiten', () => {
+        abgefragt.push('einheiten');
+        return HttpResponse.json([]);
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(client.getQueryState(einsatzKeys.modulFreigaben(7))?.status).toBe('success'),
+    );
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(abgefragt).toEqual([]);
   });
 
   it('fragt ohne Modulrecht `dokumente` keine Dokumente ab und zeigt keinen Verweis', async () => {
@@ -2016,9 +2044,9 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     setup('/einsaetze/7/etb?typ=meldung');
     const k = await kopf();
     await within(k).findByRole('button', { name: 'Weitere Aktionen zum Einsatztagebuch' });
-    expect(within(k).queryByRole('link', { name: 'Drucken / als PDF' })).toBeNull();
+    expect(within(k).queryByRole('link', { name: 'Druckansicht' })).toBeNull();
     expect(within(k).queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
-    await weitereWaehlen('Drucken / als PDF');
+    await weitereWaehlen('Druckansicht');
     await waitFor(() =>
       expect(screen.getByTestId('ort-suche').textContent).toBe('?typ=meldung&system=aus'),
     );
@@ -2042,7 +2070,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
       within(menue)
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
-    ).toEqual(['Drucken / als PDF']);
+    ).toEqual(['Druckansicht']);
   });
 
   it('die Filter stehen hinter „Filter“ und klappen auf', async () => {
@@ -2113,7 +2141,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     setzeViewportBreite(820);
     setup();
     const k = await kopf();
-    await within(k).findByRole('link', { name: 'Drucken / als PDF' });
+    await within(k).findByRole('link', { name: 'Druckansicht' });
     expect(screen.getByPlaceholderText('Volltextsuche')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Filter/ })).toBeNull();
   });
@@ -2455,7 +2483,7 @@ describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
     setup('/einsaetze/7/etb?system=an', serverSystem());
     await screen.findByText('Person erfasst');
     // Eingeblendet heißt für den Druck: kein Ausschluss, also gar kein Merkmal (Review S7).
-    expect(screen.getByRole('link', { name: 'Drucken / als PDF' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Druckansicht' })).toHaveAttribute(
       'href',
       '/einsaetze/7/etb/druck',
     );

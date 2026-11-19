@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Bereichs-Erkennung (LFH-1115): Welche der drei schweren Suiten braucht eine Änderung?
+# Bereichs-Erkennung (LFH-1115): Welche der schweren Suiten und Prüfungen braucht eine Änderung?
 #
 # Liest geänderte Pfade (relativ zur Repo-Wurzel, einer je Zeile) von stdin und schreibt
 #   rust=true|false
 #   frontend=true|false
 #   e2e=true|false
+#   ios=true|false     (Swift-Kern der iOS-Hülle, LLH-1978)
 # im Format von $GITHUB_OUTPUT. Die Schnellprüfungen laufen immer und stehen hier nicht.
 # `check-all.sh --geaendert` fragt dieses Skript (vor dem PR lokal, LLH-1889; die CI wählt seither
 # nicht mehr nach Bereichen); die Zuordnung steht nur hier.
 #
-# IM ZWEIFEL ALLES: Ein Pfad, den keine Regel kennt, fordert alle drei Suiten, ebenso eine leere
+# IM ZWEIFEL ALLES: Ein Pfad, den keine Regel kennt, fordert alle Suiten, ebenso eine leere
 # Liste. Gespart wird nur, wo eine Regel ausdrücklich sagt, dass eine Suite die Datei nicht sieht.
 #
 # QUERBEZÜGE stehen vor den Bereichsregeln: Rust-Tests lesen einzelne Frontend-Dateien
@@ -18,7 +19,7 @@
 # einer hier fehlt: ein vergessener Querbezug ließe eine Suite still aus, die rot geworden wäre.
 set -euo pipefail
 
-# Die Suiten, die eine einzelne Datei braucht (Wörter rust, frontend, e2e; leer = keine).
+# Die Suiten, die eine einzelne Datei braucht (Wörter rust, frontend, e2e, ios; leer = keine).
 bereiche_von() {
   case "$1" in
     # ── Querbezüge ────────────────────────────────────────────────────────────────────
@@ -31,6 +32,10 @@ bereiche_von() {
     # Rust liest die gemeinsamen Fälle der Dauerform (`include_str!` in src/zeitdarstellung.rs,
     # LLH-1750); der Kern im Frontend liest sie ebenso.
     frontend/src/anzeige/dauer.faelle.json)
+      echo "rust frontend e2e" ;;
+    # Rust vergleicht die Module der Einsatzakte mit dem Client (`include_str!` in
+    # src/routes/einsatzakte.rs, Test `akte_module_wie_im_client`, LLH-1835).
+    frontend/src/druck/einsatzakte/quellen.ts)
       echo "rust frontend e2e" ;;
     # Testvektoren des Maschinenzugangs (LLH-1652): Server- und Client-Tests (Rust) und der
     # Vitest des TypeScript-Clients lesen sie; die e2e-Suite nutzt den Client selbst.
@@ -70,6 +75,14 @@ bereiche_von() {
     # (websiteModule.guard.test.ts, LLH-1378). Steht vor der Website-Regel unten.
     website/src/daten/module.json)
       echo "frontend" ;;
+    # Gemeinsame Fälle der Hüllen (LLH-1978, `src-tauri/AGENTS.md`, „Gemeinsame Fälle“): die
+    # Rust-Tests der Desktop-Hülle und der Swift-Kern der iOS-Hülle lesen sie. Vor `src-tauri/*`.
+    src-tauri/faelle/*)
+      echo "rust ios" ;;
+    # Vitest führt das Init-Skript der iOS-Hülle aus wie die Tauri-Skripte (src/test/huelle.ts)
+    # und prüft App-Symbol und Startfarbe der iOS-App mit der Bildmarke (marke.guard.test.ts).
+    ios/App/Huelle/* | ios/App/Assets.xcassets/*)
+      echo "frontend ios" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
     # liest keine Suite; Prettier über `frontend/` und `website/` läuft in den Schnellprüfungen.
@@ -85,15 +98,19 @@ bereiche_von() {
       echo "rust frontend" ;;
     src/* | tests/* | migrations/* | crates/* | .cargo/* | Cargo.toml | Cargo.lock | build.rs)
       echo "rust e2e" ;;
+    # Die iOS-Hülle (LLH-1978): `swift test` des Kerns (Schritt `ios` von check-all.sh); das
+    # App-Target baut nur der macOS-Lauf `ios-pruefung.yml`.
+    ios/*)
+      echo "ios" ;;
     # Gate-Skripte, Workflows, Werkzeugversionen, Wurzel-Konfiguration und alles Neue.
     *)
-      echo "rust frontend e2e" ;;
+      echo "rust frontend e2e ios" ;;
   esac
 }
 
-# Liest Pfade von stdin, schreibt die drei Zeilen.
+# Liest Pfade von stdin, schreibt je Suite eine Zeile.
 bereiche_ausgeben() {
-  local rust=false frontend=false e2e=false pfad wort gelesen=0
+  local rust=false frontend=false e2e=false ios=false pfad wort gelesen=0
   while IFS= read -r pfad || [ -n "$pfad" ]; do
     [ -n "$pfad" ] || continue
     gelesen=1
@@ -102,20 +119,21 @@ bereiche_ausgeben() {
         rust) rust=true ;;
         frontend) frontend=true ;;
         e2e) e2e=true ;;
+        ios) ios=true ;;
       esac
     done
   done
   if [ "$gelesen" -eq 0 ]; then
-    rust=true frontend=true e2e=true
+    rust=true frontend=true e2e=true ios=true
   fi
-  printf 'rust=%s\nfrontend=%s\ne2e=%s\n' "$rust" "$frontend" "$e2e"
+  printf 'rust=%s\nfrontend=%s\ne2e=%s\nios=%s\n' "$rust" "$frontend" "$e2e" "$ios"
 }
 
 # Als Bibliothek eingebunden (`. scripts/bereiche.sh`) nur die Funktionen, sonst der Filter.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   case "${1:-}" in
     "") bereiche_ausgeben ;;
-    -h | --help) sed -n '2,10p' "$0" ;;
+    -h | --help) sed -n '2,11p' "$0" ;;
     *) echo "FEHLER: bereiche.sh nimmt keine Argumente, die Pfade kommen über stdin." >&2; exit 2 ;;
   esac
 fi

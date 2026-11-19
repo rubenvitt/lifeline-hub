@@ -188,6 +188,33 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     expect(body!.geschaedigt_kontakt).toBeNull();
   });
 
+  // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
+  it.each(['/schaeden/10', ''] as const)(
+    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite und offene Eingabe bleiben, Hinweis zeigt den alten Stand',
+    async (unterpfad) => {
+      const { client } = render(einsatzAktiv, basisSchaden());
+      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      const feld = screen.getByRole('textbox', { name: 'Ort' });
+      await userEvent.clear(feld);
+      await userEvent.type(feld, 'Hauptstr. 19');
+
+      server.use(
+        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Ort' })).toHaveValue('Hauptstr. 19');
+      expect(screen.queryByText('Schaden konnte nicht geladen werden')).toBeNull();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+    },
+  );
+
   it('sendet beim Speichern den beim Laden gelesenen Stand als Baseline (LFH-300/F10)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, basisSchaden(), [
@@ -544,10 +571,10 @@ describe('SchaedenDetailPage — Kopfaktionen (LLH-1105)', () => {
     expect(
       screen.queryByRole('button', { name: 'Weitere Aktionen zu Schaden S-001' }),
     ).not.toBeInTheDocument();
-    const marke = within(titel).getByText('storniert').closest('[data-lfh="status-chip"]');
+    const marke = within(titel).getByText('storniert').closest('[data-lfh="status"]');
     expect(marke).toHaveAttribute('data-ton', 'neutral');
-    // Kein farbloser antd-`Tag` mehr daneben: die Zustandsmarke ist das neutrale Muster.
-    expect([...titel.querySelectorAll('.ant-tag')].map((t) => t.textContent)).not.toContain(
+    // Keine Kennzeichnung daneben: „storniert“ ist ein Zustand, keine Marke (LLH-1779).
+    expect([...titel.querySelectorAll('[data-marke]')].map((t) => t.textContent)).not.toContain(
       'storniert',
     );
   });
@@ -1214,5 +1241,56 @@ describe('SchaedenDetailPage — Schadensort über die Ortssuche (LLH-1121)', ()
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(koerper).toHaveLength(1));
     expect(koerper[0]).toMatchObject({ ort: 'Bahnhofstraße 3', lat: 52.3, lon: 9.7 });
+  });
+});
+
+describe('SchaedenDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () => {
+  const storniert = basisSchaden({
+    storniert_at: '2026-05-29 12:00:00',
+    storniert_von: 1,
+    storniert_von_name: 'Anna Beispiel',
+  });
+
+  it('am stornierten Schaden steht das Banner mit Wer und Wann', async () => {
+    render(einsatzAktiv, storniert);
+    expect(await screen.findByText(/^Storniert von Anna Beispiel (um|am) /)).toBeInTheDocument();
+    // Verorten schreibt den Punkt am Schaden: am stornierten entfällt der Auftrag.
+    expect(screen.queryByRole('link', { name: 'Auf Karte verorten' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Auf Karte verorten' })).toBeNull();
+  });
+
+  it('wird er während der Bearbeitung storniert, bleibt der Entwurf lesbar, Speichern entfällt', async () => {
+    let stand: Record<string, unknown> = basisSchaden();
+    const { client } = render(einsatzAktiv, basisSchaden(), [
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+    ]);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const beschreibung = await screen.findByRole('textbox', { name: 'Beschreibung' });
+    await user.type(beschreibung, ', Ast auf Fahrbahn');
+
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) }));
+
+    expect(await screen.findByText(/^Storniert von Anna Beispiel/)).toBeInTheDocument();
+    const gesperrt = screen.getByRole('textbox', { name: 'Beschreibung' });
+    expect(gesperrt).toHaveValue('Umgestürzter Baum, Ast auf Fahrbahn');
+    expect(gesperrt).toHaveAttribute('readonly');
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(screen.queryByRole('textbox', { name: 'Beschreibung' })).toBeNull();
+  });
+
+  it('eine unberührte Bearbeitung schließt beim Storno', async () => {
+    let stand: Record<string, unknown> = basisSchaden();
+    const { client } = render(einsatzAktiv, basisSchaden(), [
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(stand)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByRole('textbox', { name: 'Beschreibung' });
+    stand = storniert;
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.schaden(1, 10) }));
+    await screen.findByText(/^Storniert von Anna Beispiel/);
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Beschreibung' })).toBeNull());
   });
 });

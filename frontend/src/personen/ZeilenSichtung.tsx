@@ -122,13 +122,17 @@ export default function ZeilenSichtung({
       <ErfassungsFormular<SichtungEingabe>
         form={form}
         erfassenText="Übernehmen"
-        // Kein Warten auf die Antwort: das Popover schließt, die Ablehnung steht an der Zeile
-        // (design.md D1/D5). Die Hülle leert danach nur ein Formular, das ohnehin verschwindet.
+        // Kein Warten auf die Antwort: das Popover schließt sofort, die Ablehnung steht an der
+        // Zeile (design.md D1/D5). Die Zusage geht trotzdem an die Hülle, damit die Haptik der
+        // Antwort folgt (Spec `huellen-vertrag`: angenommen `success`, vorgemerkt `tap`,
+        // abgelehnt `error`); den Grund meldet `onError` der Mutation.
         onErfassen={(v) => {
-          mutation.mutate({ einsatzId, kategorie: v.kategorie });
-          return Promise.resolve();
+          setOffen(false);
+          return mutation.mutateAsync({ einsatzId, kategorie: v.kategorie });
         }}
-        onFertig={() => setOffen(false)}
+        // Schon beim Absenden zu: eine späte Antwort schlösse sonst ein inzwischen neu geöffnetes
+        // Popover.
+        onFertig={() => {}}
         onAbbrechen={() => setOffen(false)}
       >
         <Form.Item
@@ -153,17 +157,40 @@ export default function ZeilenSichtung({
         destroyOnHidden
         content={inhalt}
       >
+        {/* Rahmen heißt bedienbar (LLH-1780, Change `eon26eat-status-und-bedienung`, D6): das
+            BBK-Feld bleibt Anzeige, der Knopfrahmen mit Pfeil legt sich außen darum. */}
         <Button
           ref={ausloeser}
-          type={gezeigt ? 'text' : 'link'}
+          type={gezeigt ? 'default' : 'link'}
           aria-label={name}
           aria-expanded={offen}
           aria-busy={laeuft || undefined}
           loading={laeuft}
           data-lfh="sichtung-ausloeser"
-          style={{ paddingInline: token.paddingXS }}
+          style={
+            gezeigt
+              ? {
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: token.marginXXS,
+                  paddingInline: token.paddingXS,
+                  borderRadius: 0,
+                  borderColor: rollen.steuerRahmen,
+                  background: 'transparent',
+                }
+              : { paddingInline: token.paddingXS }
+          }
         >
-          {gezeigt ? <SichtungsTag kategorie={gezeigt} /> : 'Sichten'}
+          {gezeigt ? (
+            <>
+              <SichtungsTag kategorie={gezeigt} />
+              <span aria-hidden="true" data-lfh="status-pfeil">
+                ▾
+              </span>
+            </>
+          ) : (
+            'Sichten'
+          )}
         </Button>
       </Popover>
       {vorgemerkt && (

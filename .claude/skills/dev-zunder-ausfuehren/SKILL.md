@@ -15,7 +15,7 @@ reimplementieren. Subagents und Workflows startest du dabei nach eigenem Ermesse
 „Agenten nach Bedarf“).
 
 **Eine Quelle für Zyklus und Disziplin: Superpowers** (`superpowers:*`, seit 18.11.2026,
-LLH-1967, ADR-0065). Es besitzt den **Änderungszyklus** — klären (`brainstorming`), entwerfen
+LLH-1967, ADR-0069). Es besitzt den **Änderungszyklus** — klären (`brainstorming`), entwerfen
 (Design-Doc aus `brainstorming`), Aufgabenschnitt (`writing-plans`), abarbeiten
 (`subagent-driven-development` oder `executing-plans`) — und die **Arbeitsdisziplin** —
 Worktree, Debugging, TDD, Verifikation, Review, Branch-Abschluss. Dieser Skill legt die

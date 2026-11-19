@@ -1,11 +1,10 @@
 import { IconOrtsmarke } from '../icons';
-import StatusTag from '../components/StatusTag';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { Breadcrumb, Button, Tag, Typography, theme } from 'antd';
+import { Breadcrumb, Button, Typography, theme } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -43,12 +42,15 @@ import Datensicht, {
   type Kartenplan,
 } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { modulName } from '../einsatz/modulRegistry';
 import { useCsvExport } from '../components/useCsvExport';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
@@ -86,7 +88,7 @@ const schaedenSpalten = (einsatzId: number) =>
         })),
         trifft: (s, wert) => s.typ === wert,
       },
-      render: (_, s) => <Tag>{TYP_LABEL[s.typ]}</Tag>,
+      render: (_, s) => <Marke>{TYP_LABEL[s.typ]}</Marke>,
     },
     {
       title: 'Ausmaß',
@@ -100,7 +102,7 @@ const schaedenSpalten = (einsatzId: number) =>
         })),
         trifft: (s, wert) => s.ausmass === wert,
       },
-      render: (_, s) => <StatusTag darstellung={AUSMASS_META[s.ausmass]} />,
+      render: (_, s) => <Status darstellung={AUSMASS_META[s.ausmass]} />,
     },
     {
       // Gefahr und Schadensgrad in Worten (LLH-1115); gefiltert wird nach der Gefahr, wie im
@@ -128,7 +130,7 @@ const schaedenSpalten = (einsatzId: number) =>
       title: 'Status',
       key: 'status',
       render: (_, s) => (
-        <StatusTag
+        <Status
           darstellung={{
             ...STATUS_META[s.status],
             label:
@@ -408,12 +410,7 @@ export default function SchaedenPage() {
       weitere={{
         name: 'Weitere Aktionen zu den Schäden',
         eintraege: [
-          {
-            key: 'druck',
-            label: 'Drucken / als PDF',
-            ziel: schaedenDruckPfad(einsatzId, { sicht }),
-            onWahl: () => navigate(schaedenDruckPfad(einsatzId, { sicht })),
-          },
+          druckansichtNebenweg({ ziel: schaedenDruckPfad(einsatzId, { sicht }), navigate }),
           {
             key: 'csv',
             label: 'CSV exportieren',
@@ -444,7 +441,7 @@ export default function SchaedenPage() {
         wert={sicht}
         onWechsel={wechsleSicht}
         optionen={SCHAEDEN_SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
-        style={{ marginBottom: 12 }}
+        style={{ marginBottom: token.margin }}
       />
 
       {listeGescheitert ? (

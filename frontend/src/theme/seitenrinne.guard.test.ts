@@ -1,8 +1,9 @@
 /**
  * Die Seitenrinne ist an ALLEN Stellen verdrahtet (LFH-329 · B1): an den zwei
- * Geschwister-Layouts (AppLayout, EinsatzLayout), an den zwei Ladeflächen in `App.tsx` (innen im
- * Content-Rahmen) und an der angepinnten ETB-Erfassungsleiste, die die Rinne negiert und als
- * eigenen Innenrand wieder aufnimmt. Wer nur eine Stelle umstellt, verschiebt die anderen.
+ * Geschwister-Layouts (AppLayout, EinsatzLayout) und an der angepinnten ETB-Erfassungsleiste, die
+ * die Rinne negiert und als eigenen Innenrand wieder aufnimmt. Die zwei Ladeflächen in `App.tsx`
+ * sind seit LLH-1838 die Gerippe-Seite des Moduls (`EinsatzSeite`) und stehen wie jede Seite auf
+ * der Rinne des Content-Rahmens. Wer nur eine Stelle umstellt, verschiebt die anderen.
  *
  * Quelltext-Pin statt Komponententest: Vitest fährt mit `css: false`, jsdom rechnet kein Layout.
  * Die Wirkung belegt `e2e/seitenrinne.spec.ts`. Gelesen per `node:fs` (siehe Grenze 2 in
@@ -40,9 +41,15 @@ describe('Seitenrinne — die Verdrahtung (LFH-329 · B1)', () => {
     }
   });
 
-  it('auch die zwei Ladeflächen in App.tsx hängen an der Rinne', () => {
-    // Als hartes Maß addierten sie auf dem Handschirm den vollen Fükw-Rand obendrauf.
-    expect(treffer(lies(APP), /padding: 'var\(--lfh-seiten-polsterung\)'/g)).toBe(2);
+  it('die zwei Ladeflächen in App.tsx sind die Gerippe-Seite, ohne eigene Polsterung', () => {
+    // Früher eigene Flächen mit der Rinne als Polsterung (als hartes Maß addierten sie auf dem
+    // Handschirm den vollen Fükw-Rand obendrauf). Seit LLH-1838 steht dort `ModulGerippeSeite`,
+    // die wie jede Seite im Content-Rahmen steht; eine eigene Polsterung verdoppelte die Rinne.
+    const app = lies(APP);
+    expect(treffer(app, /padding: 'var\(--lfh-seiten-polsterung\)'/g)).toBe(0);
+    expect(
+      treffer(app, /fallback=\{<ModulGerippeSeite modulKey="(lagekarte|kraefteuebersicht)" \/>\}/g),
+    ).toBe(2);
   });
 
   it('keine der drei Dateien trägt mehr ein hartes Polsterungsmaß', () => {
@@ -57,7 +64,9 @@ describe('Seitenrinne — die Verdrahtung (LFH-329 · B1)', () => {
     const block = lies(INDEX_CSS).match(/\.etb-erfassung-sticky\s*\{([^}]*)\}/);
     expect(block).not.toBeNull();
     expect(block![1]).toMatch(/margin:\s*0 calc\(-1 \* var\(--lfh-seiten-polsterung\)\)/);
-    expect(block![1]).toMatch(/padding:\s*12px var\(--lfh-seiten-polsterung\) 14px/);
+    expect(block![1]).toMatch(
+      /padding:\s*var\(--lfh-luft-3\) var\(--lfh-seiten-polsterung\) var\(--lfh-luft-4\)/,
+    );
   });
 
   it('index.css nennt das alte Maß nirgends mehr — auch nicht in Prosa', () => {

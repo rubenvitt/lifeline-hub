@@ -1,0 +1,4 @@
+# Erzeugt (LLH-1978): XcodeGen schreibt Projekt und Info.plist, scripts/ios/version.sh die Version.
+/LifelineHub.xcodeproj/
+/App/Info.plist
+/App/Version.xcconfig

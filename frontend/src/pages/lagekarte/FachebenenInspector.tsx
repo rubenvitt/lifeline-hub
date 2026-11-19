@@ -10,7 +10,7 @@ import {
   type Icon,
 } from '../../icons';
 import { useState } from 'react';
-import { App, Button, Descriptions, Tag, Typography, theme } from 'antd';
+import { App, Button, Descriptions, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
@@ -20,7 +20,6 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import type { EnergieAnlagenart, FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
-import StatusTag from '../../components/StatusTag';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import {
   capSchwereVon,
@@ -41,6 +40,8 @@ import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 import FachebeneStand from './FachebeneStand';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
+import { Status } from '../../components/instrument/Status';
+import { Marke } from '../../components/instrument/Marke';
 
 interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
@@ -149,10 +150,10 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
       )}
       {sev ? (
         <span style={{ display: 'inline-block', marginBottom: token.marginSM }}>
-          <StatusTag darstellung={sev} />
+          <Status darstellung={sev} />
         </span>
       ) : schwere ? (
-        <Tag style={{ marginBottom: token.marginSM }}>{schwere}</Tag>
+        <Marke style={{ marginBottom: token.marginSM }}>{schwere}</Marke>
       ) : null}
       <Descriptions column={1}>
         {angekuendigt && (
@@ -248,7 +249,7 @@ function PegelFestlegen({
   if (index >= 0) {
     return (
       <div style={abstand} data-lfh="pegel-massgeblich">
-        <Tag>{index === 0 ? 'maßgeblicher Pegel · Leitpegel' : 'maßgeblicher Pegel'}</Tag>
+        <Marke>{index === 0 ? 'maßgeblicher Pegel · Leitpegel' : 'maßgeblicher Pegel'}</Marke>
       </div>
     );
   }
@@ -304,7 +305,7 @@ function PegelInhalt({
           }}
         >
           {wert}
-          {einheit ? ` ${einheit}` : ''} {zust ? <StatusTag darstellung={zust} /> : null}
+          {einheit ? ` ${einheit}` : ''} {zust ? <Status darstellung={zust} /> : null}
         </Typography.Text>
       ) : (
         <Typography.Paragraph type="secondary" style={{ marginBottom: token.marginSM }}>
@@ -343,7 +344,9 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   const notaufnahme = s(p.notaufnahme);
   return (
     <>
-      {kategorie && <Tag style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Tag>}
+      {kategorie && (
+        <Marke style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Marke>
+      )}
       <Descriptions column={1}>
         {s(p.adresse) && <Descriptions.Item label="Adresse">{s(p.adresse)}</Descriptions.Item>}
         {s(p.betreiber) && (
@@ -381,7 +384,7 @@ function HochwasserInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       <div style={{ marginBottom: token.marginSM }}>
-        <StatusTag darstellung={hochwasserDarstellung(p.klasse)} />
+        <Status darstellung={hochwasserDarstellung(p.klasse)} />
       </div>
       <Descriptions column={1}>
         {s(p.pgnr) && <Descriptions.Item label="Pegelnummer">{s(p.pgnr)}</Descriptions.Item>}
@@ -432,7 +435,7 @@ function OdlInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       <div style={{ marginBottom: token.marginSM }}>
-        <StatusTag darstellung={odlDarstellung(p.stufe)} />
+        <Status darstellung={odlDarstellung(p.stufe)} />
       </div>
       <Descriptions column={1}>
         <Descriptions.Item label="Ortsdosisleistung">
@@ -508,7 +511,7 @@ function LuftqualitaetInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       <div style={{ marginBottom: token.marginSM }}>
-        <StatusTag darstellung={luftqualitaetDarstellung(p.klasse)} />
+        <Status darstellung={luftqualitaetDarstellung(p.klasse)} />
       </div>
       <Descriptions column={1}>
         {s(p.leitschadstoff) && (
@@ -666,7 +669,9 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   const titel = s(p.titel);
   return (
     <>
-      {kategorie && <Tag style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Tag>}
+      {kategorie && (
+        <Marke style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Marke>
+      )}
       {/* Der `key` bindet den Fehlerzustand an die URL — jeder Kamerawechsel beginnt frisch. */}
       {bild && <WebcamStandbild key={bild} bild={bild} titel={titel} />}
       <Descriptions column={1}>

@@ -2,7 +2,7 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 330
-quellen: [src/public_api/rechner.rs, frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs, frontend/src/pages/RegistrierlisteDruckPage.tsx, frontend/src/components/aktionsSpalte.tsx]
+quellen: [src/public_api/rechner.rs, frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs, frontend/src/pages/RegistrierlisteDruckPage.tsx, frontend/src/components/aktionsSpalte.tsx, frontend/src/components/StornoBanner.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/instrument/KlappBand.tsx]
 ---
 
 ## Überblick
@@ -31,7 +31,9 @@ untergebrachten Betroffenen.
 2. Unter „Unterbringung in Zahlen“ die Summen über alle Stellen ablesen: „In Betreuung“, die
    „Kapazität“, die freien Plätze („Frei“), die „Stellen in Betrieb“ und wie viele Stellen
    „Voll/überbelegt“ sind; mit Zugriff auf „Betroffene“ auch „Davon namentlich“. Steht „Frei“ auf
-   0, ist kein gemeldeter Platz mehr frei.
+   0, ist kein gemeldeter Platz mehr frei. Ein Tipp auf „Unterbringung in Zahlen“ klappt das Band
+   ein; dann steht nur eine Zeile da, etwa „12 in Betreuung · 18 frei · 1 voll“, und die Tabelle
+   rückt nach oben. Das Gerät merkt sich die Wahl; gedruckt wird das Band immer.
 3. Die Tabelle nennt je Stelle die Belegung, die freien Plätze, den Status („vorbereitet“, „in
    Betrieb“, „geschlossen“), die Kapazität, die Art und die Zeit der letzten Meldung. Die Filter
    „Status“ und „Art“ engen die Tabelle ein.
@@ -104,11 +106,12 @@ Abgemeldete Personen tragen den Verbleib „entlassen“ und stehen nicht mehr i
 Personen „Ohne Haushalt“ lassen sich so einem Haushalt zuordnen. Dieselben Aktionen stehen auf der
 Seite der Person neben „Haushalt H-n“, ohne Haushalt dort nur „Haushalt ändern“.
 
-### Registrierliste drucken
+### Die Registrierliste drucken
 
 Für Stromausfall, Schichtübergabe und Essensausgabe gibt es die Registrierliste auf Papier.
 
-1. Unter „Registrierung“ „Registrierliste drucken“ wählen. Das geht auch ohne Schreibrecht und an
+1. Im Kopf von „Registrierung“ „Registrierliste – Druckansicht“ wählen (auf schmalen Bildschirmen
+   unter „Weitere“). Das geht auch ohne Schreibrecht und an
    einer geschlossenen Stelle.
 2. Die Druckansicht zeigt oben die Summen je Kostform mit „ohne Angabe“ und „gesamt“, darunter
    je Haushalt („H-1 · Bezugsperson · Zahl der Personen“) die hier registrierten Personen mit
@@ -199,6 +202,12 @@ arbeitet, steht unter [Einsatzdaten](einsatzdaten.md). Gespeichert werden nur di
 Felder; eine Änderung, die jemand anderes inzwischen an einem anderen Feld gespeichert hat,
 bleibt erhalten. Wer die Seite mit ungespeicherten Änderungen verlassen will, wird gefragt.
 
+Hat jemand anderes **dasselbe** Feld seit dem Öffnen geändert, fragt die App beim Speichern
+„Zwischenzeitlich geändert“ und nennt den neuen Wert: „Meine Änderung übernehmen“ speichert die
+eigene Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand, Escape lässt das Formular
+offen. Die Koordinate zählt dabei als ein Feld aus Breite und Länge. Der Status („In Betrieb
+nehmen“, „Schließen“) und „Kapazität übernehmen“ fragen nicht nach.
+
 ### Eine Meldung zurücknehmen
 
 1. An der Stelle „Verlauf“ aufklappen.
@@ -276,7 +285,9 @@ geschlossenen Stelle lassen sich keine Belegungen melden und keine Meldungen zur
 „Stornieren“ steht im Menü der Stelle, in der Tabelle wie auf ihrer Seite. Es ist nur für
 Fehlanlagen gedacht und nicht umkehrbar. Der Dialog bietet stattdessen das Schließen an. Der
 Nachweis im Einsatztagebuch bleibt. Nachforderungen für eine stornierte Stelle bleiben bestehen, verweisen aber auf
-keine Stelle mehr.
+keine Stelle mehr. Wer die Seite der Stelle gerade offen hat, behält ihren letzten Stand mit dem
+Hinweis „Storniert von … um …“ und ohne Knöpfe zum Ändern; wer sie später aufruft, findet sie
+nicht mehr.
 
 ### Einsatztagebuch
 

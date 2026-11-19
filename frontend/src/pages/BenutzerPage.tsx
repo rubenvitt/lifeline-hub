@@ -1,4 +1,4 @@
-import { Alert, App, Button, Collapse, Form, Input, Modal, Space, Typography } from 'antd';
+import { Alert, App, Button, Collapse, Form, Input, Modal, Typography } from 'antd';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -10,7 +10,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { Status, monoStil, Feld, Stapel } from '../components/instrument';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
@@ -359,7 +359,7 @@ export default function BenutzerPage() {
       // `routes/benutzer.rs` liefert ORDER BY id.
       sorter: (a, b) => a.anzeigename.localeCompare(b.anzeigename, 'de'),
       render: (t: string, b) => (
-        <Space size={4} wrap>
+        <Stapel richtung="zeile" umbruch abstand="xxs" ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{t}</span>
           <HerkunftAbzeichen herkunft={herkunft.herkunft('konto', b.id)} quelle={herkunft.quelle} />
           {herkunft.ohnePasskey(b.id) && (
@@ -367,7 +367,7 @@ export default function BenutzerPage() {
               {PASSKEY_FUER_ELW_TEXT}
             </Typography.Text>
           )}
-        </Space>
+        </Stapel>
       ),
     },
     // Die Suche liest den Rohwert der Spalte: das führende „@" ist Darstellung, gesucht wird „eva".
@@ -390,13 +390,15 @@ export default function BenutzerPage() {
       render: (_, b) => (
         // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage (Blau
         // hieße Bedienung).
-        <Space size={4} wrap>
-          {b.system_rolle === 'admin' && <StatusChip ton="neutral" wort="Admin" />}
-          {b.org_rolle === 'fuehrungskraft' && <StatusChip ton="neutral" wort="Führungskraft" />}
-          {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && (
-            <StatusChip ton="neutral" wort="Benutzer" />
+        <Stapel richtung="zeile" umbruch abstand="xxs" ausrichten="mitte">
+          {b.system_rolle === 'admin' && <Status groesse="klein" ton="neutral" wort="Admin" />}
+          {b.org_rolle === 'fuehrungskraft' && (
+            <Status groesse="klein" ton="neutral" wort="Führungskraft" />
           )}
-        </Space>
+          {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && (
+            <Status groesse="klein" ton="neutral" wort="Benutzer" />
+          )}
+        </Stapel>
       ),
     },
     {
@@ -415,9 +417,9 @@ export default function BenutzerPage() {
       onFilter: (wert, b) => b.aktiv === wert,
       render: (_, b) =>
         b.aktiv ? (
-          <StatusChip ton="normal" wort="aktiv" />
+          <Status groesse="klein" ton="normal" wort="aktiv" />
         ) : (
-          <StatusChip ton="neutral" wort="deaktiviert" />
+          <Status groesse="klein" ton="neutral" wort="deaktiviert" />
         ),
     },
     {
@@ -507,21 +509,21 @@ export default function BenutzerPage() {
           setOffen(false);
         }}
       >
-        <Form.Item
+        <Feld
           label="Anzeigename"
           name="anzeigename"
           rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }, anzeigenameRegel]}
         >
           <Input count={zeichenGrenze(ANZEIGENAME_MAX)} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Benutzername"
           name="benutzername"
           rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
         >
           <Input autoComplete="off" />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Passwort"
           name="passwort"
           rules={[
@@ -533,25 +535,25 @@ export default function BenutzerPage() {
           ]}
         >
           <Input.Password autoComplete="new-password" />
-        </Form.Item>
+        </Feld>
         {/* Bewusst ohne `forceRender` (wie `AuftragFormular`): nur wenn die eingeklappten
             Felder nicht im DOM stehen, ist „drei Felder" prüfbar. Gegenmittel am `onErfassen`
             oben. */}
         <Collapse
           ghost
-          style={{ marginInline: -8 }}
+          style={{ marginInline: 'calc(-1 * var(--lfh-luft-2))' }}
           items={[
             {
               key: 'rollen',
               label: 'Weitere Angaben',
               children: (
                 <>
-                  <Form.Item label={SYSTEM_ROLLE_FELD} name="system_rolle">
+                  <Feld label={SYSTEM_ROLLE_FELD} name="system_rolle">
                     <Select options={SYSTEM_ROLLEN} />
-                  </Form.Item>
-                  <Form.Item label={ORG_ROLLE_FELD} name="org_rolle">
+                  </Feld>
+                  <Feld label={ORG_ROLLE_FELD} name="org_rolle">
                     <Select options={ORG_ROLLEN} />
-                  </Form.Item>
+                  </Feld>
                 </>
               ),
             },
@@ -605,22 +607,22 @@ export default function BenutzerPage() {
             type="info"
             showIcon
             title={`Name und Rollen: ${VOM_HUB_TEXT}. Ein Einmalpasswort für die Anmeldung hier geht.`}
-            style={{ marginBlockEnd: 16 }}
+            style={{ marginBlockEnd: 'var(--lfh-luft-4)' }}
           />
         )}
-        <Form.Item
+        <Feld
           label="Anzeigename"
           name="anzeigename"
           rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }, anzeigenameRegel]}
         >
           <Input count={zeichenGrenze(ANZEIGENAME_MAX)} disabled={kontoVomHub(zuBearbeiten)} />
-        </Form.Item>
-        <Form.Item label={SYSTEM_ROLLE_FELD} name="system_rolle">
+        </Feld>
+        <Feld label={SYSTEM_ROLLE_FELD} name="system_rolle">
           <Select options={SYSTEM_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
-        </Form.Item>
-        <Form.Item label={ORG_ROLLE_FELD} name="org_rolle">
+        </Feld>
+        <Feld label={ORG_ROLLE_FELD} name="org_rolle">
           <Select options={ORG_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
-        </Form.Item>
+        </Feld>
         {zuBearbeiten &&
           bearbeitenRolle !== undefined &&
           bearbeitenRolle !== 'admin' &&
@@ -628,7 +630,7 @@ export default function BenutzerPage() {
             <Alert
               type="warning"
               showIcon
-              style={{ marginBlockEnd: 16 }}
+              style={{ marginBlockEnd: 'var(--lfh-luft-4)' }}
               message={warnText(zuBearbeiten)}
             />
           )}
@@ -636,13 +638,13 @@ export default function BenutzerPage() {
         <SpeicherFehler fehler={bearbeiten.error} />
         {/* Passwort vergessen (LFH-1121): eine eigene Aktion neben dem Formular, kein Feld. */}
         {zuBearbeiten && (
-          <Form.Item label="Passwort">
+          <Feld label="Passwort">
             <EinmalpasswortVergeben
               benutzer={zuBearbeiten}
               eigenesKonto={zuBearbeiten.id === angemeldeterBenutzer?.id}
               vergeben={einmalpasswort}
             />
-          </Form.Item>
+          </Feld>
         )}
       </ErfassungsModal>
 

@@ -191,7 +191,9 @@ export default function MeldeVerlauf({
               toenung={zurueck ? 'berichtigung' : undefined}
               hinweis={
                 hinweise.length > 0 ? (
-                  <span style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: 12 }}>
+                  <span
+                    style={{ display: 'inline-flex', flexWrap: 'wrap', columnGap: token.margin }}
+                  >
                     {hinweise}
                   </span>
                 ) : undefined
