@@ -21,7 +21,8 @@ herleitung:
 - MUST jeden Eintrag einzeln über das Bezugsereignis seines Objekts filtern
   (`PraesenzObjekt::bezug`), weil `LiveEvent::Praesenz` selbst ungegatet ist.
 - MUST NOT Präsenz an Gerätesitzungen oder in den Org-Strom senden.
-- MUST bei jedem Verbindungsaufbau den ganzen Stand senden, auch leer.
+- MUST bei jedem Verbindungsaufbau den nicht leeren, gefilterten Stand senden; der Client MUST
+  seinen Stand bei jedem Öffnen der Verbindung leeren.
 - MAY im Eintrag den Anzeigenamen (`von`) tragen: er ist kein sensibler Inhalt im Sinne von
   ADR-0003, denn dieselbe Tür (`EinsatzLesezugriff`) liefert ihn über die Mitgliederliste und den
   Änderungsvermerk; andere Inhalte (Werte der Angabe) MUST NOT in die Nutzlast.

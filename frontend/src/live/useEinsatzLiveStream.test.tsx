@@ -116,6 +116,32 @@ describe('useEinsatzLiveStream', () => {
     expect(praesenzStand(1)).toBeUndefined();
   });
 
+  it('leert die Präsenz bei jedem Öffnen der Verbindung: der Server schickt danach den Stand (LLH-1946)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte!;
+    quelle.emit('open');
+    quelle.emit(
+      'praesenz',
+      JSON.stringify({
+        einsatz_id: 1,
+        eintraege: [
+          { objekt: 'einsatz', felder: ['stichwort'], benutzer_id: 2, von: 'Anna', fenster: 'f' },
+        ],
+      }),
+    );
+    expect(praesenzStand(1)?.eintraege).toHaveLength(1);
+    // Neuaufbau derselben Quelle: ein leerer Stand kommt nicht, also leert das Öffnen.
+    quelle.emitError(FakeEventSource.CONNECTING);
+    quelle.emit('open');
+    expect(praesenzStand(1)).toBeUndefined();
+  });
+
   it('invalidiert einsatz-personal, einsatz-fahrzeuge & einsatz-material bei einheit-Event', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();

@@ -149,7 +149,8 @@ sequenceDiagram
   participant Hub as LiveHub (src/live)
   participant B as frontend Tab B (useEinsatzLiveStream)
   B->>BE: GET /api/einsaetze/{id}/live
-  BE-->>B: event: praesenz (Stand beim Verbinden, ohne id)
+  B->>B: onopen leert den Präsenzstand
+  BE-->>B: event: praesenz (Stand beim Verbinden, ohne id, nur wenn nicht leer)
   A->>BE: PUT /api/einsaetze/{id}/praesenz beim Öffnen, dann alle 15 s
   BE->>Hub: praesenz_setzen, verteilt nur bei Änderung
   Hub-->>B: event: praesenz (ganzer Stand, je Eintrag gefiltert)

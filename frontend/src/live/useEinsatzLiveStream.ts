@@ -93,8 +93,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     listeners.push(...orgListener(sammler));
     // Benachrichtigungen (Einsatz- und Org-Arten) gehen an die Zentrale im Layout.
     listeners.push(...benachrichtigungListener());
-    // Präsenz an Einzelangaben (LLH-1946): eigener Store, kein Cache. Jede Verbindung beginnt mit
-    // dem ganzen Stand; er ersetzt, was eine abgerissene Verbindung zuletzt kannte.
+    // Präsenz an Einzelangaben (LLH-1946): eigener Store, kein Cache.
     listeners.push(...praesenzListener(einsatzId));
 
     // Sofortmeldung: frischt nur die Meldungslisten auf, auch nach einer Eskalation (Merker
@@ -180,14 +179,23 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // Org-Strom zwischen beiden Verbindungen verloren gehen (LFH-734). Und nur die mit einem Stand
     // von vor dem Verbindungsaufbau, damit ein Kaltaufruf nichts doppelt lädt (LLH-1839).
     const orgAbgleich = () => invalidiereOrgLiveKeys(sammler);
+    // Präsenz (LLH-1946, ADR-0072): jedes Öffnen leert den Stand, bevor die Frames der neuen
+    // Verbindung kommen; ein nicht leerer Stand folgt vom Server. So bleibt nach einem Abriss kein
+    // Hinweis aus der alten Verbindung stehen.
+    const mitPraesenz =
+      <A extends unknown[]>(f: (...a: A) => void) =>
+      (...a: A) => {
+        leerePraesenz(einsatzId);
+        f(...a);
+      };
     const verbinde = (beimErstenOpen: (nachFehlversuch: boolean) => void) => {
       schliessen = oeffneLiveVerbindung({
         url: `/api/einsaetze/${einsatzId}/live`,
         listeners,
-        beiWiederaufbau: vollabgleich,
-        beiNachlieferung: orgAbgleich,
+        beiWiederaufbau: mitPraesenz(vollabgleich),
+        beiNachlieferung: mitPraesenz(orgAbgleich),
         positionsEreignis: 'position',
-        beimErstenOpen,
+        beimErstenOpen: mitPraesenz(beimErstenOpen),
         istEndzustand: einsatzUnerreichbar,
         beiEndzustand: () => {
           aufWiedergewaehrenWarten();

@@ -327,12 +327,6 @@ fn ist_position(f: &SseFrame) -> bool {
     f.event.as_deref() == Some("position") && f.id.is_some() && f.data.is_some()
 }
 
-/// Der Präsenzstand, den jeder Verbindungsaufbau bekommt (LLH-1946, ADR-0072): ohne `id:`, keine
-/// Nachlieferung aus dem Ring.
-fn ist_praesenzstand(f: &SseFrame) -> bool {
-    f.event.as_deref() == Some("praesenz") && f.id.is_none()
-}
-
 /// Öffnet den Einsatz-Strom, liest seinen Anfang und liefert die Position (LFH-922).
 async fn position_lesen(app: &axum::Router, feed: &str, cookie: &str) -> String {
     let resp = oeffnen(app, feed, cookie, None).await;
@@ -397,7 +391,7 @@ async fn neuverbinden_mit_der_position_holt_genau_das_verpasste() {
     let anfang = common::sse_anfang_lesen(still.into_body(), 300).await;
     let ereignisse: Vec<_> = sse_frames(&anfang)
         .into_iter()
-        .filter(|f| !ist_position(f) && !ist_praesenzstand(f))
+        .filter(|f| !ist_position(f))
         .filter_map(|f| f.event)
         .collect();
     assert!(ereignisse.is_empty(), "nichts nachzuliefern: {anfang:?}");
@@ -407,7 +401,7 @@ async fn neuverbinden_mit_der_position_holt_genau_das_verpasste() {
     let anfang = common::sse_anfang_lesen(wieder.into_body(), 300).await;
     let ereignisse: Vec<_> = sse_frames(&anfang)
         .into_iter()
-        .filter(|f| !ist_position(f) && !ist_praesenzstand(f))
+        .filter(|f| !ist_position(f))
         .filter_map(|f| f.event)
         .collect();
     assert_eq!(
@@ -488,7 +482,7 @@ async fn neuverbinden_nach_lebenszeichen_liefert_nichts_nach() {
     let gelesen = common::sse_lesen_fuer(&mut body, Duration::from_millis(200)).await;
     let ereignisse: Vec<_> = sse_frames(&gelesen)
         .into_iter()
-        .filter(|f| !ist_position(f) && !ist_heartbeat(f) && !ist_praesenzstand(f))
+        .filter(|f| !ist_position(f) && !ist_heartbeat(f))
         .filter_map(|f| f.event)
         .collect();
     assert!(ereignisse.is_empty(), "nichts nachzuliefern: {gelesen:?}");
