@@ -1,5 +1,5 @@
 import { IconAuge, IconBueroklammer, IconKreuz, IconWarndreieck } from '../icons';
-import { Alert, Button, Checkbox, Typography, type InputRef, type RefSelectProps } from 'antd';
+import { Alert, Button, Checkbox, type InputRef, type RefSelectProps } from 'antd';
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
@@ -17,7 +17,13 @@ import Tastenkuerzel from '../components/Tastenkuerzel';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { weiter } from '../components/useUploadFortschritt';
-import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
+import {
+  Schnellerfassungszeile,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import EtbFeldzeile, { FEHLT, TypKnopf, type ParteiRef } from './EtbFeldzeile';
 import { useFunkrufnamen } from './funkrufnamen';
@@ -261,7 +267,7 @@ export function fusszeileStil(
     columnGap: token.marginSM,
     rowGap: token.marginXS,
     marginTop: token.marginXS,
-    fontSize: 12,
+    ...schriftStil('textKlein'),
     ...(schmal ? { overflowX: 'auto', minWidth: 0 } : {}),
   };
 }
@@ -920,7 +926,9 @@ export default function Schnellerfassung({
     setTyp(t);
   };
   const praefix = berichtigungZu ? (
-    <span style={{ color: typFarbe.wort, fontSize: 13 }}>{etbTyp.berichtigung.label}</span>
+    <span style={{ ...schriftStil('text'), color: typFarbe.wort }}>
+      {etbTyp.berichtigung.label}
+    </span>
   ) : istSchmal ? (
     <TypKnopf typ={typ} gesperrt={sendet} onTyp={typWaehlen} />
   ) : undefined;
@@ -969,9 +977,9 @@ export default function Schnellerfassung({
       onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
       style={istSchmal ? { minHeight: 0, flexShrink: 0 } : { flexShrink: 0 }}
     >
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Textstufe stufe="textKlein" ton="gedaempft">
         Werte behalten
-      </Typography.Text>
+      </Textstufe>
     </Checkbox>
   ) : null;
 
@@ -990,9 +998,9 @@ export default function Schnellerfassung({
         onChange={(e) => setNurProtokollieren(!e.target.checked)}
         style={istSchmal ? { minHeight: 0 } : undefined}
       >
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           Auch in den Meldungseingang
-        </Typography.Text>
+        </Textstufe>
       </Checkbox>
       {meldungenGesperrt && (
         <span

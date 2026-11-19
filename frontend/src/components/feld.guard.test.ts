@@ -60,6 +60,12 @@ const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = 
     grund: 'Spaltenbreiten der Benutzertabelle neben ihrer Fließspalte',
   },
   'chat/KanalListe.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbSpaltenzeile.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbEintragVorschau.tsx': { anzahl: 1, grund: '2-px-Typkante der Vorschau' },
+  'etb/EtbFeldzeile.tsx': {
+    anzahl: 3,
+    grund: '6-px-Typpunkt in Menü und Typ-Knopf, 32-px-Spalte des Feldworts am Handschirm',
+  },
 };
 
 const FORM_ITEM = /<Form\.Item\b/g;

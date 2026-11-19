@@ -128,7 +128,7 @@ const punkte = (menue: HTMLElement) =>
 beforeEach(() => setzeViewportBreite(1440));
 
 describe('Spaltenzeile in kompakter Dichte', () => {
-  it('Einzeiliger Eintrag im Fükw: feste Spalten, Von → An in 13 px Textschrift, nichts unter 12 px', () => {
+  it('Einzeiliger Eintrag im Fükw: feste Spalten, Von → An in 14 px Textschrift (Stufe `text`), nichts unter 12 px', () => {
     const { container } = renderZeitachse({ eintraege: [eintrag()] });
     const z = zeileVon(container, 'eintrag-1');
     expect(z).toHaveAttribute('data-lfh-form', 'spalten');
@@ -138,9 +138,9 @@ describe('Spaltenzeile in kompakter Dichte', () => {
     expect(nr).toHaveTextContent('Nr. 1');
     expect(typ).toHaveTextContent('Meldung');
     expect(vonAn).toHaveTextContent('Sanitätszug Musterstadt → EL · Funk');
-    expect(vonAn.style.fontSize).toBe('13px');
+    expect(vonAn.style.fontSize).toBe('14px');
     // Textschrift, nicht Mono: keine Schriftfamilie der Zahlen an der Zelle.
-    expect(vonAn.style.fontFamily).toBe('');
+    expect(vonAn.style.fontFamily).not.toContain('Mono');
     expect(inhalt).toHaveTextContent('Einsatzleitwagen am Marktplatz');
     expect(vermerk).toHaveAttribute('data-lfh', 'etb-vermerk');
     expect(within(menue).getByRole('button', { name: 'Aktionen zu Eintrag 1' })).toBeVisible();
