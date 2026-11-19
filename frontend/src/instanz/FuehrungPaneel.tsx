@@ -381,7 +381,7 @@ export default function FuehrungPaneel({
         />
       </Datenfeld>
       <Datenfeld label="Epoche">
-        <span style={monoStil(13)}>{fuehrung.epoche}</span>
+        <span style={monoStil('mono')}>{fuehrung.epoche}</span>
       </Datenfeld>
       <Datenfeld label="Zuletzt">{FUEHRUNG_ART_TEXT[fuehrung.art]}</Datenfeld>
       <Datenfeld label="Bruchstelle">{fuehrung.bruch_at ? zeit(fuehrung.bruch_at) : '—'}</Datenfeld>
@@ -634,7 +634,8 @@ export default function FuehrungPaneel({
             <ListenEintragMeta
               title={
                 <span>
-                  <span style={monoStil(12)}>{v.epoche_zaehler}</span> {FUEHRUNG_ART_TEXT[v.art]}
+                  <span style={monoStil('monoKlein')}>{v.epoche_zaehler}</span>{' '}
+                  {FUEHRUNG_ART_TEXT[v.art]}
                   {' · '}
                   {v.von_name ? `${v.von_name} → ${v.nach_name}` : v.nach_name}
                 </span>
@@ -703,7 +704,7 @@ export default function FuehrungPaneel({
                   autoComplete="off"
                   maxLength={19}
                   placeholder="ABCD-EFGH-JKMN-PQRS"
-                  style={monoStil(14)}
+                  style={monoStil('monoGross')}
                 />
               </Feld>
             )}

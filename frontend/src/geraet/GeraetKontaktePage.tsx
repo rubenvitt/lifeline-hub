@@ -329,8 +329,8 @@ function KontaktZeile({
         borderBottom: `1px solid ${rollen.linie}`,
       }}
     >
-      <span style={monoStil(14, 500)}>{reg}</span>
-      <span style={{ ...monoStil(13), color: rollen.gedaempft }}>{zeit}</span>
+      <span style={monoStil('monoGross', 500)}>{reg}</span>
+      <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}>{zeit}</span>
       {anlass && <span>{anlass}</span>}
       <Status groesse="klein" ton={marke.ton} wort={marke.wort} style={{ marginLeft: 'auto' }} />
     </Flex>

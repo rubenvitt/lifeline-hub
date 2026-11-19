@@ -213,7 +213,7 @@ function SpaltenKopf({
   return (
     <h2 style={stil}>
       <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{wort(k)}</span>
-      <span data-testid="board-zahl" style={monoStil(14, 500)}>
+      <span data-testid="board-zahl" style={monoStil('monoGross', 500)}>
         {zahl}
       </span>
     </h2>

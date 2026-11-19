@@ -237,7 +237,7 @@ export default function Inspector({
             <Textstufe stufe="textKlein" ton="text2" umbruch="ueberall">
               {letzte.text}
             </Textstufe>
-            <span style={{ ...monoStil(10), color: rollen.schwach }}>{letzte.meta}</span>
+            <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{letzte.meta}</span>
           </Stapel>
         </section>
       )}

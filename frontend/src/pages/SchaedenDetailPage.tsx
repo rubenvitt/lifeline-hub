@@ -397,7 +397,7 @@ export default function SchaedenDetailPage() {
       titel={
         <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>
-            Schaden <span style={monoStil(14, 500)}>{kennung}</span>
+            Schaden <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status darstellung={STATUS_META[s.status]} />
           {s.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}

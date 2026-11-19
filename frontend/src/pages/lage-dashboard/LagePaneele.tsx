@@ -118,7 +118,7 @@ export function GefahrenmatrixPaneel({
           <div
             aria-hidden="true"
             data-lfh="gefahrenlegende-erlaeuterung"
-            style={{ ...monoStil(10), color: rollen.schwach }}
+            style={{ ...monoStil('metaKlein'), color: rollen.schwach }}
           >
             <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
           </div>
@@ -170,7 +170,7 @@ export function SichtungsPaneel({
               <Textstufe stufe="textKlein" ton="schwach">
                 Ohne Sichtung
               </Textstufe>
-              <span style={{ ...monoStil(12), color: rollen.text2 }}>{ohneSichtung}</span>
+              <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>{ohneSichtung}</span>
             </span>
             <span
               data-lfh="transport-bilanz"
@@ -179,7 +179,7 @@ export function SichtungsPaneel({
               <Textstufe stufe="textKlein" ton="schwach">
                 Unterwegs / offen / abgeschlossen
               </Textstufe>
-              <span style={{ ...monoStil(12), color: rollen.text2 }}>
+              <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
                 {versorgung.unterwegs} / {versorgung.offen} / {versorgung.abgeschlossen}
               </span>
             </span>
@@ -399,7 +399,7 @@ export function VerlaufPaneel({
             <Textstufe stufe="textKlein" ton="schwach">
               Spitze
             </Textstufe>
-            <span style={{ ...monoStil(12), color: rollen.text2 }}>
+            <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
               {verlauf.spitze.stunde} Uhr · {verlauf.spitze.gesamt}
             </span>
           </span>
@@ -460,7 +460,7 @@ export function VerlaufPaneel({
                       <span
                         aria-hidden="true"
                         style={{
-                          ...monoStil(10),
+                          ...monoStil('metaKlein'),
                           color: rollen.text2,
                           textAlign: 'center',
                           lineHeight: 1.2,
@@ -474,7 +474,7 @@ export function VerlaufPaneel({
                 <div
                   aria-hidden="true"
                   style={{
-                    ...monoStil(10),
+                    ...monoStil('metaKlein'),
                     textAlign: 'center',
                     borderTop: `1px solid ${rollen.linieStark}`,
                     paddingTop: 2,

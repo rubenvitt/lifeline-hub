@@ -121,13 +121,13 @@ function VerpflegungsplanInhalt() {
       sorter: nachText((m: VerpflegungVorlage) => `${m.folgetag ? 1 : 0}${m.beginn}`),
       render: (_, m) => (
         <span style={{ whiteSpace: 'nowrap' }}>
-          <span style={monoStil(13)}>
+          <span style={monoStil('mono')}>
             {uhrzeitOhneDatum(m.beginn, konventionen)}–{uhrzeitOhneDatum(m.ende, konventionen)}
           </span>
           {m.folgetag && (
             <Typography.Text
               type="secondary"
-              style={{ ...monoStil(12), marginInlineStart: 'var(--lfh-luft-2)' }}
+              style={{ ...monoStil('monoKlein'), marginInlineStart: 'var(--lfh-luft-2)' }}
             >
               +1 Tag
             </Typography.Text>

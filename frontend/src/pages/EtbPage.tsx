@@ -906,8 +906,8 @@ export default function EtbPage() {
           zusaetze={[
             ausserhalbHier && (
               <span key="ausserhalb">
-                Nr. <span style={monoStil(12)}>{ausserhalbHier.lfd_nr}</span> erfasst – außerhalb
-                des Filters ·{' '}
+                Nr. <span style={monoStil('monoKlein')}>{ausserhalbHier.lfd_nr}</span> erfasst –
+                außerhalb des Filters ·{' '}
                 <Button
                   type="link"
                   style={{ paddingInline: 0 }}
@@ -923,11 +923,11 @@ export default function EtbPage() {
             nachtraege.length > 0 && nachtragsGrenze && (
               <span key="nachtraege">
                 +
-                <span style={monoStil(12)}>
+                <span style={monoStil('monoKlein')}>
                   {nachtraege.length > 99 ? '99+' : nachtraege.length}
                 </span>{' '}
                 {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
-                <span style={monoStil(12)}>
+                <span style={monoStil('monoKlein')}>
                   {taktisch(lbZeit!, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
                 </span>{' '}
                 erfasst ·{' '}

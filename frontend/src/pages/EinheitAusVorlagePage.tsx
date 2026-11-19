@@ -457,7 +457,7 @@ function Baum({
             meta={
               <span>
                 {k.typ_label}
-                {k.funkrufname && <span style={monoStil(12)}> · {k.funkrufname}</span>}
+                {k.funkrufname && <span style={monoStil('monoKlein')}> · {k.funkrufname}</span>}
               </span>
             }
             koerperPolster
@@ -479,7 +479,7 @@ function Baum({
                   onWahl={onWahl}
                   beschriftung={
                     <>
-                      <span style={monoStil(14)}>{f.funkrufname}</span>
+                      <span style={monoStil('monoGross')}>{f.funkrufname}</span>
                       {f.fahrzeugtyp && (
                         <Typography.Text type="secondary"> {f.fahrzeugtyp}</Typography.Text>
                       )}
@@ -650,7 +650,9 @@ function MaterialZeile({
         style={{ flex: '1 1 auto', minWidth: 0 }}
       >
         {position.menge}× {position.bezeichnung}
-        {position.bestandsnummer && <span style={monoStil(13)}> {position.bestandsnummer}</span>}
+        {position.bestandsnummer && (
+          <span style={monoStil('mono')}> {position.bestandsnummer}</span>
+        )}
       </Checkbox>
       <Typography.Text type="secondary" data-lfh="vorlage-zustand" style={{ whiteSpace: 'nowrap' }}>
         {materialZustandWort(position)}

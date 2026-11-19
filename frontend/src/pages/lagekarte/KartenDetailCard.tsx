@@ -77,7 +77,7 @@ export default function KartenDetailCard({
             {titel}
           </Textstufe>
           {unterzeile != null && (
-            <div style={{ ...monoStil(11), color: rollen.gedaempft, overflowWrap: 'anywhere' }}>
+            <div style={{ ...monoStil('meta'), color: rollen.gedaempft, overflowWrap: 'anywhere' }}>
               {unterzeile}
             </div>
           )}

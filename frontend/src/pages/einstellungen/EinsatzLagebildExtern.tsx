@@ -297,7 +297,7 @@ export default function EinsatzLagebildExtern({
             <KopierbarerText text={link} bezeichnung="Link">
               <Typography.Text
                 data-lfh="lagebild-link-text"
-                style={{ ...monoStil(13, 400), overflowWrap: 'anywhere' }}
+                style={{ ...monoStil('mono'), overflowWrap: 'anywhere' }}
               >
                 {link}
               </Typography.Text>

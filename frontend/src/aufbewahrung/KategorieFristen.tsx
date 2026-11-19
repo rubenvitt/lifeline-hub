@@ -62,7 +62,7 @@ export function KategorieWert({
   aktiv: boolean;
 }) {
   // Zeiten immer Mono mit `tabular-nums` (frontend/AGENTS.md, Gestaltungssprache).
-  const zeitStil = monoStil(13);
+  const zeitStil = monoStil('mono');
   return (
     <Stapel abstand="xxs">
       <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">

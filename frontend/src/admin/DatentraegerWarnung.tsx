@@ -96,7 +96,7 @@ export default function DatentraegerWarnung() {
               }}
             >
               <span>{ORT[o.art]}</span>
-              <span style={{ ...monoStil(12), overflowWrap: 'anywhere' }}>{o.pfad}</span>
+              <span style={{ ...monoStil('monoKlein'), overflowWrap: 'anywhere' }}>{o.pfad}</span>
               <Status
                 groesse="klein"
                 ton={o.wert === 'unverschluesselt' ? 'alarm' : 'achtung'}

@@ -84,7 +84,7 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       );
     case 'geschlecht':
     case 'alter':
-      return <span style={{ ...monoStil(12), color: rollen.gedaempft }}>{teil.text}</span>;
+      return <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>{teil.text}</span>;
     case 'sichtung':
       return <SichtungsTag kategorie={teil.wert} style={{ marginInlineEnd: 0 }} />;
     case 'anlass':
@@ -93,30 +93,39 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       return <Textstufe title="Maßnahme">+ {MASSNAHME_WORT[teil.wert]}</Textstufe>;
     case 'entlassen':
       return (
-        <span style={{ ...monoStil(12), color: rollen.bedien }} title="Verbleib">
+        <span style={{ ...monoStil('monoKlein'), color: rollen.bedien }} title="Verbleib">
           → entlassen
         </span>
       );
     case 'uhs': {
       const a = loeseUhsAuf(teil.suche, uhsListe);
       return 'uhs' in a ? (
-        <span style={{ ...monoStil(12), color: rollen.bedien }}>→ UHS {a.uhs.bezeichnung}</span>
+        <span style={{ ...monoStil('monoKlein'), color: rollen.bedien }}>
+          → UHS {a.uhs.bezeichnung}
+        </span>
       ) : (
-        <span style={{ ...monoStil(12), color: rollen.alarmText }} title={a.problem}>
+        <span style={{ ...monoStil('monoKlein'), color: rollen.alarmText }} title={a.problem}>
           {teil.text} ?
         </span>
       );
     }
     case 'koordinate':
       return (
-        <span style={{ ...monoStil(12), color: rollen.gedaempft }} title="Fundort-Koordinate">
+        <span
+          style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}
+          title="Fundort-Koordinate"
+        >
           #{formatKoordinate(teil.lat, teil.lon)}
         </span>
       );
     case 'unerkannt':
       return (
         <span
-          style={{ ...monoStil(12), color: rollen.alarmText, textDecoration: 'line-through' }}
+          style={{
+            ...monoStil('monoKlein'),
+            color: rollen.alarmText,
+            textDecoration: 'line-through',
+          }}
           title={teil.grund}
         >
           {teil.text}

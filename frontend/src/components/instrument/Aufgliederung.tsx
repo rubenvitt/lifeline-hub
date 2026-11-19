@@ -97,7 +97,7 @@ export function Aufgliederung({ segmente, titel, hoehe = 5, legende, style }: Au
         <div
           aria-hidden="true"
           data-lfh="aufgliederung-legende"
-          style={{ ...monoStil(11), color: rollen.gedaempft }}
+          style={{ ...monoStil('meta'), color: rollen.gedaempft }}
         >
           {legendenInhalt}
         </div>
@@ -149,7 +149,7 @@ export function Balken({
         <span style={{ width: breite, background: farbe }} />
       </div>
       {label != null && (
-        <span aria-hidden="true" style={{ ...monoStil(11), color: rollen.schwach }}>
+        <span aria-hidden="true" style={{ ...monoStil('meta'), color: rollen.schwach }}>
           {label}
         </span>
       )}

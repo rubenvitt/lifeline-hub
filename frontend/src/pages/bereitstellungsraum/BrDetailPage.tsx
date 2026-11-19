@@ -555,7 +555,7 @@ export default function BrDetailPage() {
   /** „seit 1342 · 48 min“ an einer Zeile; ohne „seit“ keine Zeitangabe (keine Schätzung). */
   const seitAngabe = (seitAt: string | null | undefined) =>
     seitAt ? (
-      <span data-lfh="br-seit" style={{ ...monoStil(12), color: rollen.gedaempft }}>
+      <span data-lfh="br-seit" style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
         {seitText(zeitKurz(seitAt), wartezeitMinuten(seitAt, jetzt))}
       </span>
     ) : null;
@@ -707,13 +707,13 @@ export default function BrDetailPage() {
         e.unangemeldet && <UnangemeldetMarke />
       )}
       {einheitVon.get(e.id)?.typ_label && <Marke>{einheitVon.get(e.id)!.typ_label}</Marke>}
-      <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+      <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
         <StaerkeAnzeige
           wert={staerkeDerEinheitImRaum(e.id, einheitIdsImRaum, einheitenQuery.data)}
         />
       </span>
       {e.fahrzeuge.length > 0 && (
-        <span data-lfh="br-einheit-fahrzeuge" style={monoStil(12)}>
+        <span data-lfh="br-einheit-fahrzeuge" style={monoStil('monoKlein')}>
           {funkrufnamen(e.fahrzeuge)}
         </span>
       )}
@@ -721,7 +721,7 @@ export default function BrDetailPage() {
   );
   const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
     <>
-      <span style={monoStil(13)}>{f.funkrufname}</span>
+      <span style={monoStil('mono')}>{f.funkrufname}</span>
       {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Marke>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Marke>}
     </>
   );
@@ -950,7 +950,7 @@ export default function BrDetailPage() {
                         <div data-lfh="br-abruf">
                           <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                             <Status darstellung={brAbgerufen} />
-                            <span style={monoStil(12)}>
+                            <span style={monoStil('monoKlein')}>
                               {abrufAngabe(zeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
                             </span>
                           </Stapel>
@@ -1018,7 +1018,7 @@ export default function BrDetailPage() {
                       <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                         <span>{v.aktion.name}</span>
                         {v.aktion.daten.unangemeldet && <UnangemeldetMarke />}
-                        <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                        <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
                           {v.antrag ? 'beantragt' : 'vorgemerkt'}{' '}
                           {zeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
                         </span>

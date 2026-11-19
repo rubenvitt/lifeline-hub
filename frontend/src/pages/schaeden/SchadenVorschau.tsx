@@ -26,7 +26,9 @@ export default function SchadenVorschau({ einsatzId, id }: { einsatzId: number; 
       {(s) => (
         <Stapel abstand="md">
           <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
-            <span style={monoStil(14, 500)}>{schadenRegistrierAnzeige(s.registrier_nr)}</span>
+            <span style={monoStil('monoGross', 500)}>
+              {schadenRegistrierAnzeige(s.registrier_nr)}
+            </span>
             <Status darstellung={STATUS_META[s.status]} />
             {s.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
           </Stapel>

@@ -753,7 +753,7 @@ export default function EinsatzabschnittePage() {
               )}
               <span>{e.name}</span>
               {e.typ_label && <Marke>{e.typ_label}</Marke>}
-              <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+              <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
                 eigene <StaerkeAnzeige wert={e.ist} />
               </span>
               {e.abschnitt_id == null && e.ueber_einheit_id != null && (

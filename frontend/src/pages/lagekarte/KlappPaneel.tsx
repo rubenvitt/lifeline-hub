@@ -74,7 +74,9 @@ export function LeistenAbschnitt({ titel, meta, zeichen, kennung, children }: Ab
           {titel}
         </h2>
         <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
-          {meta != null && <span style={{ ...monoStil(11), color: rollen.schwach }}>{meta}</span>}
+          {meta != null && (
+            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
+          )}
           {zeichen != null && (
             <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
               {zeichen}
@@ -137,7 +139,9 @@ export function KlappPaneel({
         {/* Trenner für den zugänglichen Namen („Nicht verortet 45", nicht „…verortet45");
               als Flex-Kind ohne Breite unsichtbar. */}{' '}
         <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
-          {meta != null && <span style={{ ...monoStil(11), color: rollen.schwach }}>{meta}</span>}
+          {meta != null && (
+            <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{meta}</span>
+          )}
           <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
             {offen ? <IconChevronRunter size={14} /> : <IconChevronRechts size={14} />}
           </span>

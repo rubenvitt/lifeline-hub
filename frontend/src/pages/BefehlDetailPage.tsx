@@ -439,7 +439,7 @@ function BefehlDetail() {
 
         {/* Taktische DTG in der Anzeigezone: `zeitstand` ist ein UTC-Wirestring ohne
             Zonenkennung. */}
-        <Typography.Paragraph type="secondary" style={monoStil(12)}>
+        <Typography.Paragraph type="secondary" style={monoStil('monoKlein')}>
           Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
         </Typography.Paragraph>
 

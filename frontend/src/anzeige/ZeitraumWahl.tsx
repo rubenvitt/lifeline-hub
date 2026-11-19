@@ -158,7 +158,7 @@ export default function ZeitraumWahl({ von, bis, letzteLb, onWahl, kennung }: Pr
         aria-label={von || bis ? `Zeitraum ${beschriftung}` : 'Zeitraum'}
         data-lfh={kennung}
       >
-        <span style={von || bis ? monoStil(13) : undefined}>{beschriftung}</span>
+        <span style={von || bis ? monoStil('mono') : undefined}>{beschriftung}</span>
       </Button>
     </Popover>
   );

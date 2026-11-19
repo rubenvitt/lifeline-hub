@@ -120,7 +120,7 @@ function VorschlagLabel({ vorschlag }: { vorschlag: RufnameVorschlag }) {
   const { rollen } = useRollen();
   return (
     <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="baseline">
-      <span style={monoStil(13)}>{vorschlag.funkrufname}</span>
+      <span style={monoStil('mono')}>{vorschlag.funkrufname}</span>
       {vorschlag.typ && <span style={{ color: rollen.text2 }}>{vorschlag.typ}</span>}
     </Stapel>
   );

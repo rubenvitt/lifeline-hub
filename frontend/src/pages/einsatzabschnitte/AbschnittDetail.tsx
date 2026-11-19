@@ -106,7 +106,7 @@ export default function AbschnittDetail({
       etikett={etikett}
       wert={a[feld] ?? ''}
       anzeige={
-        <span style={feld === 'rufname' ? monoStil(13) : { whiteSpace: 'pre-wrap' }}>
+        <span style={feld === 'rufname' ? monoStil('mono') : { whiteSpace: 'pre-wrap' }}>
           {a[feld]}
         </span>
       }
@@ -161,7 +161,7 @@ export default function AbschnittDetail({
         <InlineAngabe<string>
           etikett="Kurzbezeichnung"
           wert={a.kurzbezeichnung ?? ''}
-          anzeige={<span style={monoStil(13)}>{a.kurzbezeichnung}</span>}
+          anzeige={<span style={monoStil('mono')}>{a.kurzbezeichnung}</span>}
           leer={isEmptyText}
           gleich={isSameText}
           darfSchreiben={darfSchreiben}

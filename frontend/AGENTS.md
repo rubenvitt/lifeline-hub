@@ -59,10 +59,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
-  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nicht. Die
-  Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue `fontSize`-Zahlen
-  verbietet `theme/schriftgroesse.guard.test.ts`; die Altlast steht in `schriftgroesse.schuld.ts`
-  und sinkt wie beim Abstandsraster.
+  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
+  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `metaKlein` 10, `meta` 11, `monoKlein`
+  12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen (ADR-0071,
+  LLH-1972). Die Stufen wachsen nicht mit der Dichte (Spec `schriftstufen`, LLH-1810). Neue
+  `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
+  Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster** (Spec `abstandsraster`, LLH-1809): Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
@@ -1613,9 +1615,10 @@ Spec `bedien-arbeitsplatz`).
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
-  „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026): fünf Felder, das fünfte ist der
-  optionale Einsatzort; ein sechstes gehört in die Kopfdaten. Die Einsatz-Vorlage steht als
-  gedämpfte Zeile unter den Feldern, kein Feld (LLH-1375): das Stichwort stellt sie ein. Ausnahme
+  „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026; LLH-1816, Entscheidung
+  19.11.2026): sechs Felder. Zuerst die Einsatz-Vorlage, weil sie das Menü des ganzen Einsatzes
+  bestimmt und das Stichwort sie einstellt (Modulzahl darunter, Vorgabe „Alle Module“); das letzte
+  ist der optionale Einsatzort; ein siebtes gehört in die Kopfdaten. Ausnahme
   „Lagemeldung erfassen“ (LLH-1921, Entscheidung 17.11.2026, Change
   `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
   Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.

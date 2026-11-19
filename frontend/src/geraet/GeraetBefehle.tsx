@@ -149,7 +149,9 @@ function BefehlKarte({
       unbearbeitet={hasEigenOffen}
       zeit={
         <>
-          <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>Stand</span>
+          <span style={{ display: 'block', ...monoStil('metaKlein'), color: rollen.schwach }}>
+            Stand
+          </span>
           <span>
             <ZeitAnzeige wert={b.zeitstand} rolle="kurz" />
           </span>
@@ -166,7 +168,7 @@ function BefehlKarte({
         {b.titel}
       </Textstufe>
       {b.freigegeben_at && (
-        <div style={{ marginTop: token.marginXS, ...monoStil(11), color: rollen.gedaempft }}>
+        <div style={{ marginTop: token.marginXS, ...monoStil('meta'), color: rollen.gedaempft }}>
           freigegeben <ZeitAnzeige wert={b.freigegeben_at} rolle="kurz" />
           {b.freigegeben_von_name ? ` von ${b.freigegeben_von_name}` : ''}
         </div>

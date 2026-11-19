@@ -432,7 +432,7 @@ export default function SchichtplanRaster({
                           : 'translateX(-50%)',
                     bottom: 2,
                     color: rollen.gedaempft,
-                    ...monoStil(11),
+                    ...monoStil('meta'),
                     whiteSpace: 'nowrap',
                   }}
                 >
@@ -572,7 +572,7 @@ export default function SchichtplanRaster({
                           background: rollen.auswahlFlaeche,
                           pointerEvents: 'none',
                           zIndex: 3,
-                          ...monoStil(11),
+                          ...monoStil('meta'),
                           color: rollen.text,
                           paddingInline: token.paddingXS,
                           whiteSpace: 'nowrap',
@@ -727,7 +727,7 @@ function BlockKachel({
         zIndex: 2,
       }}
     >
-      <span style={{ ...monoStil(11), whiteSpace: 'nowrap' }}>
+      <span style={{ ...monoStil('meta'), whiteSpace: 'nowrap' }}>
         {zeit} · {block.ampelWort}
       </span>
       <span

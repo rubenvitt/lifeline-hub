@@ -59,7 +59,7 @@ export function StatusZelle({ ton, wert, wort, hoehe = 34, style }: StatusZelleP
         minHeight: hoehe,
         background: f.grund,
         color: f.text,
-        ...monoStil(hoehe >= 30 ? 13 : 12),
+        ...monoStil(hoehe >= 30 ? 'mono' : 'monoKlein'),
         ...style,
       }}
     >

@@ -73,7 +73,7 @@ export function paneelKopfRechtsStil(token: { paddingSM: number }): CSSPropertie
 /** Das Mono-Meta im Kopf: kürzt mit Auslassung statt überzulaufen. */
 export function paneelMetaStil(rollen: Pick<Farbrollen, 'schwach'>): CSSProperties {
   return {
-    ...monoStil(11),
+    ...monoStil('meta'),
     color: rollen.schwach,
     minWidth: 0,
     overflow: 'hidden',

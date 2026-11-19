@@ -72,7 +72,7 @@ const schaedenSpalten = (einsatzId: number) =>
       suchText: (s) => schadenRegistrierAnzeige(s.registrier_nr),
       // Kein Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
       render: (_, s) => (
-        <Typography.Text strong style={monoStil(13, 500)}>
+        <Typography.Text strong style={monoStil('mono', 500)}>
           {schadenRegistrierAnzeige(s.registrier_nr)}
         </Typography.Text>
       ),

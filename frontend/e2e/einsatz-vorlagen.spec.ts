@@ -36,7 +36,7 @@ test('Einsatz mit Vorlage „MANV“: das Modulpanel zeigt „Unfallhilfsstellen
 
   const dialog = await einsatzDialogOeffnen(page);
   await dialog.getByLabel('Bezeichnung').fill(`E2E Vorlage MANV ${Date.now()}`);
-  const module = dialog.getByRole('combobox', { name: 'Module' });
+  const module = dialog.getByRole('combobox', { name: 'Vorlage' });
   await zeigtWahl(module, 'Alle Module');
   await waehleIn(module, 'MANV');
   // Die Vorlage belegt die Einsatzart vor (Startliste: „Realeinsatz“).
@@ -87,7 +87,7 @@ test('ein gekoppeltes Stichwort stellt im Anlegedialog seine Vorlage ein', async
 
     await page.goto('/einsaetze');
     const dialog = await einsatzDialogOeffnen(page);
-    const module = dialog.getByRole('combobox', { name: 'Module' });
+    const module = dialog.getByRole('combobox', { name: 'Vorlage' });
     await zeigtWahl(module, 'Alle Module');
     await dialog.getByRole('combobox', { name: 'Stichwort' }).fill(stichwort);
     await zeigtWahl(module, 'MANV');
@@ -95,4 +95,15 @@ test('ein gekoppeltes Stichwort stellt im Anlegedialog seine Vorlage ein', async
   } finally {
     await page.request.delete(`/api/stichwort-vorschlaege/${vorschlagId}`);
   }
+});
+
+test('ein Start-Stichwort bringt seine Vorlage ab Werk mit (LLH-1816)', async ({ page }) => {
+  await anmeldenAlsAdmin(page, { startseite: false });
+  await page.goto('/einsaetze');
+  const dialog = await einsatzDialogOeffnen(page);
+  const vorlage = dialog.getByRole('combobox', { name: 'Vorlage' });
+  await zeigtWahl(vorlage, 'Alle Module');
+  await dialog.getByRole('combobox', { name: 'Stichwort' }).fill('MANV15');
+  await zeigtWahl(vorlage, 'MANV');
+  await dialog.getByRole('button', { name: 'Abbrechen' }).click();
 });

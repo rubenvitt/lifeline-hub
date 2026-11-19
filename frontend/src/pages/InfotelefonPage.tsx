@@ -392,7 +392,7 @@ export default function InfotelefonPage() {
               }}
             >
               <span>{ANLIEGEN_LABEL[x.anliegen]}</span>
-              <span style={monoStil(14)}>{x.anzahl}</span>
+              <span style={monoStil('monoGross')}>{x.anzahl}</span>
             </PaneelZeile>
           </li>
         ))}

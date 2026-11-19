@@ -129,7 +129,7 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
   return (
     <Space size={token.marginSM} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <Status darstellung={besatzungsUrteil[urteil]} />
-      <span style={monoStil(12)}>
+      <span style={monoStil('monoKlein')}>
         {urteil !== 'nicht_erfasst' && (
           <>
             Ist <StaerkeAnzeige wert={ist} />
@@ -1067,7 +1067,7 @@ function FahrzeugeInhalt() {
           kennung={
             <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               {/* Funkrufname in Mono. */}
-              <span style={monoStil(13)}>{ef.funkrufname}</span>
+              <span style={monoStil('mono')}>{ef.funkrufname}</span>
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
               {ef.ist_demo && <DemoMarke />}
             </Stapel>

@@ -1126,7 +1126,7 @@ function UnterwegsSpalte({
               <Button
                 type="link"
                 style={{
-                  ...monoStil(12),
+                  ...monoStil('monoKlein'),
                   paddingInline: 0,
                   justifyContent: 'flex-start',
                   maxWidth: '100%',

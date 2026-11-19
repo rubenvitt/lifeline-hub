@@ -296,7 +296,11 @@ function OffenePunkte({
   const sprung = (modul: string, ziel: string, name: string) =>
     istKeyFreigegeben(modul, freigaben) ? { ziel, name } : undefined;
   const meta = { ...schriftStil('meta'), color: rollen.gedaempft } as const;
-  const nummerStil = { ...monoStil(12), color: rollen.gedaempft, flex: '0 0 auto' } as const;
+  const nummerStil = {
+    ...monoStil('monoKlein'),
+    color: rollen.gedaempft,
+    flex: '0 0 auto',
+  } as const;
 
   const eintragZeile = (kennung: (nr: number) => string) => (e: AbschlussEintrag) => (
     <div style={zeilenStil}>

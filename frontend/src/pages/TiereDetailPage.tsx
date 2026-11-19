@@ -521,7 +521,7 @@ export default function TiereDetailPage() {
       titel={
         <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>
-            Tier <span style={monoStil(14, 500)}>{kennung}</span>
+            Tier <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status
             groesse="klein"

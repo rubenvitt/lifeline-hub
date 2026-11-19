@@ -445,8 +445,8 @@ export default function Patientenkopf({
                     key: v.id,
                     inhalt: (
                       <>
-                        <span style={monoStil(13)}>{nummer}</span> {regionName(v.ansicht, v.region)}{' '}
-                        · {VERLETZUNG_ART_WORT[v.art]}
+                        <span style={monoStil('mono')}>{nummer}</span>{' '}
+                        {regionName(v.ansicht, v.region)} · {VERLETZUNG_ART_WORT[v.art]}
                         {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`} ·{' '}
                         <ZeitAnzeige wert={v.zeitpunkt_at} rolle="kurz" />
                       </>
