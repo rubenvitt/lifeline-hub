@@ -1,4 +1,7 @@
-/* Antippbares Kürzel (LLH-1825): sieht aus wie der Text um es herum, nur gepunktet unterstrichen. */
+/* Antippbares Kürzel (LLH-1825): sieht aus wie der Text um es herum, nur gepunktet unterstrichen.
+   Die Trefffläche ist die Textzeile, keine Staffel 30/48/72: das Kürzel steht in dichten Etiketten
+   direkt über bearbeitbaren Werten, ein größeres Feld überdeckte sie (Entscheidung 19.11.2026,
+   `frontend/AGENTS.md`, „Kürzel sind eingeführt oder erklärt“). */
 .lfh-kuerzel {
   position: relative;
   display: inline;
@@ -14,13 +17,6 @@
   text-decoration: underline dotted;
   text-underline-offset: 0.2em;
   cursor: help;
-}
-
-/* Größeres Tippfeld, ohne die Zeile höher zu machen. */
-.lfh-kuerzel::after {
-  content: '';
-  position: absolute;
-  inset: -8px;
 }
 
 .lfh-kuerzel:focus-visible {
@@ -41,9 +37,5 @@
   .lfh-kuerzel {
     text-decoration: none;
     cursor: auto;
-  }
-
-  .lfh-kuerzel::after {
-    content: none;
   }
 }

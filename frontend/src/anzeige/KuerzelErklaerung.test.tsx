@@ -86,4 +86,60 @@ describe('KuerzelErklaerung (LLH-1825)', () => {
       '//Σ',
     ]);
   });
+
+  // Review B1: ein Verweis im Fenster muss Umgebungen erreichen, die bei Verweisen schließen
+  // (Sprungpalette, `command-palette/AGENTS.md`); das Fenster selbst geht zu.
+  it('der Link im Fenster reicht seinen Klick weiter und schließt das Fenster', async () => {
+    const umgebung = vi.fn();
+    zeige(
+      <div onClick={umgebung}>
+        <StaerkeSchreibweise />
+      </div>,
+    );
+    const knopf = screen.getByRole('button', { name: STAERKE_NAME });
+    await userEvent.click(knopf);
+    await userEvent.click(await screen.findByRole('link', { name: 'Zeiten und Kürzel' }));
+    expect(umgebung).toHaveBeenCalledTimes(1);
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  // Review B2: geschlossen gehören Esc und Pfeile der Umgebung (Palette: Esc/← zurück).
+  it('geschlossen reicht der Knopf Escape und Pfeile weiter', async () => {
+    const taste = vi.fn();
+    zeige(
+      <div onKeyDown={(e) => taste(e.key)}>
+        <StaerkeSchreibweise />
+      </div>,
+    );
+    screen.getByRole('button', { name: STAERKE_NAME }).focus();
+    await userEvent.keyboard('{Escape}{ArrowLeft}');
+    expect(taste.mock.calls).toEqual([['Escape'], ['ArrowLeft']]);
+  });
+
+  it('Enter und Leertaste bleiben am Knopf (kein Sortieren im Tabellenkopf)', async () => {
+    const taste = vi.fn();
+    zeige(
+      <div onKeyDown={(e) => taste(e.key)}>
+        <StaerkeSchreibweise />
+      </div>,
+    );
+    screen.getByRole('button', { name: STAERKE_NAME }).focus();
+    await userEvent.keyboard('{Enter}');
+    expect(taste).not.toHaveBeenCalled();
+  });
+
+  // Review B8: das Fenster hängt im Portal am Ende der Seite; ohne Fokuswechsel wäre der Link erst
+  // nach der ganzen Seite erreichbar.
+  it('geöffnet liegt der Fokus auf dem Link, Escape bringt ihn zurück', async () => {
+    zeige(<StaerkeSchreibweise />);
+    const knopf = screen.getByRole('button', { name: STAERKE_NAME });
+    knopf.focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Zeiten und Kürzel' })).toHaveFocus(),
+    );
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(knopf).toHaveFocus());
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+  });
 });

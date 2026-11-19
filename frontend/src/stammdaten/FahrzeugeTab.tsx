@@ -144,6 +144,8 @@ export default function FahrzeugeTab() {
           Stärke <StaerkeSchreibweise />
         </>
       ),
+      // Klartext für Spaltenschalter und feste Kopfbreite (`etikettVon`), der Titel ist ein Knoten.
+      etikett: 'Stärke F/UF/M//Σ',
       key: 'staerke',
       // Nach der Gesamtstärke (Σ), wie sie hinter „//“ steht.
       sorter: nachZahl((f: Fahrzeug) => staerkeSumme(f.staerke)),

@@ -802,11 +802,17 @@ anwendbar), „nicht geprüft" ist keins.
   (LLH-1825, `docs/superpowers/specs/2026-11-19-f71gxt0s-kuerzel-legende-design.md`): in Komponenten
   steht sie nur über `anzeige/KuerzelErklaerung.tsx` (`StaerkeSchreibweise`, schmale Spalte
   `umbruchVorSumme`), einen Knopf ohne Knopfoptik mit Popover aus Bedeutung, Beispiel und dem Link
-  „Zeiten und Kürzel“; ein Tooltip allein trägt auf Touch nicht. Der Knopf hält seine Klicks, Zeile
-  und Tabellenkopf darum lösen nicht aus. Nie in einem Link: dort bleibt die Schreibweise Text, und
-  die Erklärung steht einmal im Kopf der Fläche (Überblick, Paneelkopf). Ausnahmen mit Grund und der
-  Wächter: `anzeige/kuerzelErklaerung.guard.test.ts`; in Leseansichten zählt der Erklär-Knopf nicht
-  als Aktion (`test/kuerzel.ts`, `aktionsKnoepfe`).
+  „Zeiten und Kürzel“; ein Tooltip allein trägt auf Touch nicht. Der Knopf hält Klicks, Enter und
+  Leertaste, Zeile und Tabellenkopf darum lösen nicht aus; Esc und Pfeile reicht er geschlossen
+  weiter, und ein Klick auf den Verweis im Fenster erreicht die Umgebung (Sprungpalette schließt).
+  Nie in einem Link oder `<label>`: dort bleibt die Schreibweise Text, und die Erklärung steht einmal
+  über den Zeilen (Überblick: `vorspann` des Paneels, nicht im Kopf-Meta, das schmal abgeschnitten
+  wird). Ein Spaltentitel als Knoten trägt `etikett` mit dem Klartext. **Die Trefffläche ist die
+  Textzeile**, eine begründete Ausnahme von der Staffel 30/48/72 (Entscheidung 19.11.2026): das
+  Kürzel steht in dichten Etiketten direkt über bearbeitbaren Werten, ein größeres Feld überdeckte
+  sie, und die Erklärung ist ein Zusatz, keine Handlung. Ausnahmen mit Grund und der Wächter (auch
+  Etiketten in `.ts`): `anzeige/kuerzelErklaerung.guard.test.ts`; in Leseansichten zählt der
+  Erklär-Knopf nicht als Aktion (`test/kuerzel.ts`, `aktionsKnoepfe`).
 
 **Tabelle und Dichte**
 

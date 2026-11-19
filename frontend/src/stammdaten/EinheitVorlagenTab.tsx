@@ -114,6 +114,8 @@ export default function EinheitVorlagenTab() {
           Soll (<StaerkeSchreibweise />)
         </>
       ),
+      // Klartext für Spaltenschalter und feste Kopfbreite (`etikettVon`), der Titel ist ein Knoten.
+      etikett: 'Soll (F/UF/M//Σ)',
       key: 'soll',
       // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
       render: (_, { vorlage }) => {

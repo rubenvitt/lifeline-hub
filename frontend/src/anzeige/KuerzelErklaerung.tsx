@@ -1,4 +1,13 @@
-import { Fragment, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react';
 import { Popover } from 'antd';
 import { Link } from 'react-router';
 import { EINGEFUEHRTE_KUERZEL, type EingefuehrtesKuerzel, type Kuerzel } from './kuerzel';
@@ -12,6 +21,9 @@ const KAPITEL_PFAD = '/hilfe/zeiten-und-kuerzel';
 function halte(e: SyntheticEvent) {
   e.stopPropagation();
 }
+
+/** Tasten, die der Knopf selbst bedient; sie lösen im Tabellenkopf sonst das Sortieren aus. */
+const KNOPF_TASTEN = new Set(['Enter', ' ']);
 
 /**
  * Ein eingeführtes Kürzel, das sich an Ort und Stelle erklärt (LLH-1825, `frontend/AGENTS.md`,
@@ -33,6 +45,15 @@ export default function KuerzelErklaerung({
   const eintrag: EingefuehrtesKuerzel = EINGEFUEHRTE_KUERZEL.find((k) => k.kuerzel === kuerzel)!;
   const [offen, setOffen] = useState(false);
   const knopf = useRef<HTMLButtonElement>(null);
+  const verweis = useRef<HTMLAnchorElement>(null);
+
+  // Das Fenster hängt im Portal am Ende der Seite; ohne diesen Schritt erreichte Tab den Verweis
+  // erst nach der ganzen Seite (Review B8).
+  useEffect(() => {
+    if (!offen) return;
+    const zeit = window.setTimeout(() => verweis.current?.focus());
+    return () => window.clearTimeout(zeit);
+  }, [offen]);
 
   const schliesse = () => {
     setOffen(false);
@@ -40,11 +61,17 @@ export default function KuerzelErklaerung({
   };
 
   const inhalt = (
-    // Der Inhalt hängt im Portal, React reicht seine Klicks trotzdem an die Vorfahren weiter.
+    // Der Inhalt hängt im Portal, React reicht seine Ereignisse trotzdem an die Vorfahren weiter.
+    // Tasten bleiben hier (sonst wählte Enter in der Sprungpalette einen Treffer). Ein Klick auf
+    // den Verweis geht weiter, damit Umgebungen, die bei Verweisen schließen, ihn sehen
+    // (`command-palette/AGENTS.md`, Review B1); das Fenster geht dabei zu.
     <div
       className="lfh-kuerzel-erklaerung"
-      onClick={halte}
-      onKeyDown={(e) => {
+      onClick={(e: MouseEvent) => {
+        if ((e.target as Element).closest('a[href]')) setOffen(false);
+        else halte(e);
+      }}
+      onKeyDown={(e: KeyboardEvent) => {
         halte(e);
         if (e.key === 'Escape') schliesse();
       }}
@@ -55,7 +82,9 @@ export default function KuerzelErklaerung({
           {eintrag.beispiel}
         </p>
       )}
-      <Link to={KAPITEL_PFAD}>Zeiten und Kürzel</Link>
+      <Link ref={verweis} to={KAPITEL_PFAD}>
+        Zeiten und Kürzel
+      </Link>
     </div>
   );
 
@@ -75,8 +104,12 @@ export default function KuerzelErklaerung({
         aria-expanded={offen}
         onClick={halte}
         onKeyDown={(e) => {
-          halte(e);
-          if (e.key === 'Escape' && offen) schliesse();
+          // Geschlossen gehören Esc und Pfeile der Umgebung (Palette: Esc/← zurück, Review B2).
+          if (KNOPF_TASTEN.has(e.key)) halte(e);
+          else if (e.key === 'Escape' && offen) {
+            halte(e);
+            schliesse();
+          }
         }}
       >
         {children ?? eintrag.kuerzel}

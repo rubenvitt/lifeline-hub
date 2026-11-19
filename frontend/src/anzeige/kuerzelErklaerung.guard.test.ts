@@ -20,23 +20,48 @@ const dateien = import.meta.glob('/src/**/*.tsx', {
   eager: true,
 }) as Record<string, string>;
 
+const tsDateien = import.meta.glob('/src/**/*.ts', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+
 const BAUSTEIN = '/src/anzeige/KuerzelErklaerung.tsx';
+
+/** In `.ts`: ein Etikett (`label`, `title`, `bezeichnung`, `etikett`) mit der nackten Schreibweise. */
+export function etikettTreffer(inhalt: string): string[] {
+  return inhalt
+    .split('\n')
+    .map((zeile) => zeile.trim())
+    .filter((zeile) =>
+      /\b(?:label|title|bezeichnung|etikett):\s*[`'"][^`'"]*(?:\$\{STAERKE_SCHREIBWEISE\}|F\/UF\/M\/\/Σ)/.test(
+        zeile,
+      ),
+    );
+}
 
 /** Stellen, an denen die Schreibweise Text bleibt, mit Grund. */
 const AUSNAHMEN: Record<string, string> = {
   '/src/pages/fuehrung/UeberblickPage.tsx':
-    'Die Abschnittszeile ist ganz ein Link (kein Knopf im Link); die Legende steht im Kopf des Paneels.',
+    'Die Abschnittszeile ist ganz ein Link (kein Knopf im Link); die Legende steht über den Zeilen.',
+  '/src/stammdaten/EinheitVorlageDetailPage.tsx':
+    'Formularetikett ist ein `<label>`; ein Knopf darin ist ungültiges HTML (Review B6).',
   '/src/geraet/LagemonitorPage.tsx':
     'Großbild ohne Bedienung (Lagemonitor, `geraet/AGENTS.md`); es gibt nichts anzutippen.',
 };
 
 export function treffer(inhalt: string): string[] {
-  return inhalt
-    .split('\n')
-    .map((zeile) => zeile.trim())
-    .filter((zeile) => /STAERKE_SCHREIBWEISE|F\/UF\/M\/\/Σ/.test(zeile))
-    .filter((zeile) => !/^import\b/.test(zeile) && !/^(\/\/|\*|\/\*|\{\/\*)/.test(zeile))
-    .filter((zeile) => !/^[A-Z_, ]*STAERKE_SCHREIBWEISE[A-Z_, ]*,?$/.test(zeile));
+  return (
+    inhalt
+      .split('\n')
+      .map((zeile) => zeile.trim())
+      .filter((zeile) => /STAERKE_SCHREIBWEISE|F\/UF\/M\/\/Σ/.test(zeile))
+      .filter((zeile) => !/^import\b/.test(zeile) && !/^(\/\/|\*|\/\*|\{\/\*)/.test(zeile))
+      .filter((zeile) => !/^[A-Z_, ]*STAERKE_SCHREIBWEISE[A-Z_, ]*,?$/.test(zeile))
+      // Der Klartext einer Spalte für Spaltenschalter und Kopfbreite (`etikett`) ist kein
+      // sichtbares Etikett der Fläche; dort steht der Titel mit dem Baustein (Review B3).
+      .filter((zeile) => !/^etikett:/.test(zeile))
+  );
 }
 
 const quellen = Object.entries(dateien).filter(
@@ -48,6 +73,15 @@ describe('Die Schreibweise der Stärke erklärt sich (LLH-1825)', () => {
     const verstoesse = quellen
       .filter(([pfad]) => !(pfad in AUSNAHMEN))
       .flatMap(([pfad, inhalt]) => treffer(inhalt).map((zeile) => `${pfad}: ${zeile}`));
+    expect(verstoesse).toEqual([]);
+  });
+
+  // Review B9: ein Etikett, das in einer `.ts` gebaut und von einer Komponente gezeigt wird
+  // (Lagekarte `RasterFeld`), trägt das Kürzel in einem eigenen Feld (`labelKuerzel`).
+  it('baut in .ts kein Etikett mit der nackten Schreibweise', () => {
+    const verstoesse = Object.entries(tsDateien)
+      .filter(([pfad]) => !/\.test\.ts$/.test(pfad) && !pfad.startsWith('/src/test/'))
+      .flatMap(([pfad, inhalt]) => etikettTreffer(inhalt).map((zeile) => `${pfad}: ${zeile}`));
     expect(verstoesse).toEqual([]);
   });
 
@@ -63,5 +97,9 @@ describe('Die Schreibweise der Stärke erklärt sich (LLH-1825)', () => {
     expect(treffer('  STAERKE_SCHREIBWEISE,')).toEqual([]);
     expect(treffer('// die Schreibweise STAERKE_SCHREIBWEISE steht einmal')).toEqual([]);
     expect(treffer('<StaerkeSchreibweise />')).toEqual([]);
+    expect(treffer("etikett: 'Stärke F/UF/M//Σ',")).toEqual([]);
+    expect(etikettTreffer('{ label: `Stärke ${STAERKE_SCHREIBWEISE}`, wert: x },')).toHaveLength(1);
+    expect(etikettTreffer("  title: 'Stärke F/UF/M//Σ',")).toHaveLength(1);
+    expect(etikettTreffer('zeilen.push(`Stärke (${STAERKE_SCHREIBWEISE}): ${t}`);')).toEqual([]);
   });
 });

@@ -922,19 +922,14 @@ export default function UeberblickPage() {
                         meta={
                           zAbschnitte === 'daten' ? (
                             // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
-                            // Die Zeilen sind Links; die Schreibweise der Stärke erklärt sich deshalb
-                            // hier im Kopf (LLH-1825, kein Knopf im Link).
-                            <>
-                              {`${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')} · Stärke `}
-                              <StaerkeSchreibweise />
-                            </>
+                            `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
                           ) : zAbschnitte === 'laden' ? (
                             <span
                               data-lfh="paneel-meta-platzhalter"
                               aria-hidden="true"
                               style={{ visibility: 'hidden' }}
                             >
-                              0 Abschnitte · 0 Einheiten · Stärke F/UF/M//Σ
+                              0 Abschnitte · 0 Einheiten
                             </span>
                           ) : undefined
                         }
@@ -973,6 +968,23 @@ export default function UeberblickPage() {
                         }
                         onNeuladen={() =>
                           nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
+                        }
+                        // Die Zeilen sind Links (kein Knopf im Link): die Schreibweise der Stärke
+                        // erklärt sich einmal über ihnen, nicht im Kopf-Meta, das schmal
+                        // abgeschnitten wird (LLH-1825, Review B4).
+                        vorspann={
+                          zeilen.length > 0 ? (
+                            <div
+                              data-lfh="abschnitt-legende"
+                              style={{
+                                ...schriftStil('meta'),
+                                color: rollen.gedaempft,
+                                paddingBlockEnd: token.marginXS,
+                              }}
+                            >
+                              Stärke <StaerkeSchreibweise />
+                            </div>
+                          ) : undefined
                         }
                         zeilen={zeilen.map((z) =>
                           abschnittGliederung(z, einsatzId, kurz, token, rollen, jetzt),

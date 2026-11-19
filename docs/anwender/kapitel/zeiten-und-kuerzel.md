@@ -61,7 +61,7 @@ eben“ bzw. „in < 1 min“. Eingaben in Dauerfeldern verstehen auch „7:30�
 Die Stärke folgt der BOS-Schreibweise „F/UF/M//Σ“. Jede Ansicht mit einer Stärke nennt diese
 Schreibweise einmal sichtbar, als Spaltenkopf, Feldbeschriftung oder Zeile über der Gliederung. Ohne
 erfasste Stärke steht „—“, nie „0/0/0//0“. Steht die Schreibweise in einer Zeile, die als Ganzes zu
-einem Abschnitt führt, etwa im Überblick, erklärt sie sich im Kopf der Liste.
+einem Abschnitt führt, etwa im Überblick, erklärt sie sich einmal über der Liste.
 
 ### Kurzbezeichnungen der Organisation
 
