@@ -203,3 +203,31 @@ async fn mitarbeit_legt_keine_kraefte_abschnitte_oder_einstellungen_an() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{methode} {pfad}: {v:?}");
     }
 }
+
+#[tokio::test]
+async fn mitarbeit_loescht_keinen_anhang_einer_fremden_chatnachricht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let uri = format!("/api/einsaetze/{einsatz}/anhaenge");
+
+    let (s, v) = multipart_post(&app, &uri, &admin, Some(("c.png", MINI_PNG)), &[]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let aid = v[0]["id"].as_i64().unwrap();
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        Some(&format!(r#"{{"inhalt":"Mit Foto","anhang_ids":[{aid}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+
+    let (s, _) = anfrage(&app, "DELETE", &format!("{uri}/{aid}"), &mit, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = anfrage(&app, "GET", &format!("{uri}/{aid}"), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "der Anhang muss bleiben");
+}

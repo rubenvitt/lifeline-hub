@@ -29,6 +29,23 @@ async fn fordere_hochladende_bei_ungebunden(
     Ok(())
 }
 
+/// Die Mitarbeit löscht nur selbst hochgeladene Anhänge — in jedem Linker-Zustand, auch wenn der
+/// Anhang an einer fremden Chat-Nachricht hängt (Design `2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit`,
+/// D4). Fremde bekommen 404 wie für einen unbekannten Anhang. Andere Rollen bleiben unberührt.
+async fn fordere_hochladende_bei_mitarbeit(
+    pool: &sqlx::SqlitePool,
+    rolle: Option<crate::einsatz::EinsatzRolle>,
+    anhang_id: i64,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    if rolle.is_some_and(|r| r.ist_mitarbeit())
+        && anhang::repo::hochgeladen_von(pool, anhang_id).await? != Some(benutzer_id)
+    {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
 /// POST /api/einsaetze/{id}/anhaenge — generischer Datei-Upload (multipart). Schreibrecht und
 /// aktiver Einsatz. Jedes Datei-Feld wird geprüft (MIME aus Endung, Größe, AV-Scan) und als
 /// BLOB gespeichert. Die Verknüpfung mit einer Chat-Nachricht entsteht beim Senden.
@@ -107,6 +124,7 @@ pub async fn loeschen(
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
+    fordere_hochladende_bei_mitarbeit(&state.pool, ctx.rolle, anhang_id, ctx.benutzer.id).await?;
     // Ein modulgebundener Anhang wird in seinem Modul entfernt (Soft-Delete mit ETB-Nachweis) oder
     // gar nicht (ETB: nur per Schwärzung). Der generische Hard-Delete umginge das → 422.
     let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
