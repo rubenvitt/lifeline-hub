@@ -184,6 +184,23 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(body!.halter_kontakt).toBeNull();
   });
 
+  it('Enter ohne Änderung schließt den Bearbeiten-Modus, ohne PATCH (LLH-1829)', async () => {
+    let aufrufe = 0;
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', () => {
+        aufrufe += 1;
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeDisabled();
+    const feld = screen.getAllByRole('textbox')[0];
+    feld.focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull());
+    expect(aufrufe).toBe(0);
+  });
+
   it('sendet beim Speichern den beim Laden gelesenen Stand als Baseline (LFH-299/F10)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, tierBasis, [

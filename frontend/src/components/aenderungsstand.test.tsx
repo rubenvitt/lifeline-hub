@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import {
   AenderungsstandProvider,
+  EnterOhneAenderung,
   gleichFuerStand,
   useAenderungsanzahl,
   useAenderungsstandMerke,
+  useAenderungsstandMerken,
   useFeldGeaendert,
 } from './aenderungsstand';
 
@@ -110,5 +112,72 @@ describe('aenderungsstand (LLH-1829)', () => {
     renderMitProviders(<Formular mitProvider={false} />);
     tippe('Name', 'B');
     expect(stand()).toBe('name:false ort:false anzahl:null');
+  });
+});
+
+describe('aenderungsstand: merken von außerhalb des Formulars (LLH-1829)', () => {
+  function Seite() {
+    const { merkeRef, merke } = useAenderungsstandMerken();
+    return (
+      <Form initialValues={{ name: 'A' }} onFinish={(werte) => merke(werte)}>
+        <AenderungsstandProvider ausgangswerte={{ name: 'A' }} merkeRef={merkeRef}>
+          <Form.Item name="name" label="Name">
+            <Input />
+          </Form.Item>
+          <Anzeige />
+          <button type="submit">Senden</button>
+        </AenderungsstandProvider>
+      </Form>
+    );
+  }
+
+  it('merke der Seite übernimmt die gesendeten Werte', async () => {
+    renderMitProviders(<Seite />);
+    tippe('Name', 'B');
+    await screen.findByText('name:true ort:false anzahl:1');
+    fireEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(await screen.findByText('name:false ort:false anzahl:0')).toBeInTheDocument();
+  });
+});
+
+describe('EnterOhneAenderung (LLH-1829)', () => {
+  function Maske({ onSchliessen }: { onSchliessen: () => void }) {
+    return (
+      <Form initialValues={{ name: 'A' }} onFinish={() => {}}>
+        <AenderungsstandProvider ausgangswerte={{ name: 'A' }}>
+          <EnterOhneAenderung onSchliessen={onSchliessen}>
+            <Form.Item name="name" label="Name">
+              <Input />
+            </Form.Item>
+            <Form.Item name="notiz" label="Notiz">
+              <Input.TextArea />
+            </Form.Item>
+          </EnterOhneAenderung>
+        </AenderungsstandProvider>
+      </Form>
+    );
+  }
+
+  it('Enter ohne Änderung schließt', () => {
+    let zu = 0;
+    renderMitProviders(<Maske onSchliessen={() => (zu += 1)} />);
+    fireEvent.keyDown(screen.getByLabelText('Name'), { key: 'Enter' });
+    expect(zu).toBe(1);
+  });
+
+  it('Enter mit Änderung schließt nicht', async () => {
+    let zu = 0;
+    renderMitProviders(<Maske onSchliessen={() => (zu += 1)} />);
+    tippe('Name', 'B');
+    await act(async () => {});
+    fireEvent.keyDown(screen.getByLabelText('Name'), { key: 'Enter' });
+    expect(zu).toBe(0);
+  });
+
+  it('Enter im Textfeld schließt nicht', () => {
+    let zu = 0;
+    renderMitProviders(<Maske onSchliessen={() => (zu += 1)} />);
+    fireEvent.keyDown(screen.getByLabelText('Notiz'), { key: 'Enter' });
+    expect(zu).toBe(0);
   });
 });

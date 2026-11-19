@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Form, Input } from 'antd';
+import { App, AutoComplete, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,6 +23,11 @@ import {
   zuUpdate,
 } from './orgEinstellungenForm';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import SpeicherKnopf from '../../components/SpeicherKnopf';
+import {
+  AenderungsstandProvider,
+  useAenderungsstandMerken,
+} from '../../components/aenderungsstand';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Feld, Formularpaneel } from '../../components/instrument';
@@ -45,6 +50,7 @@ export default function AnzeigeEinstellungen() {
   const vomHub = herkunft.istVomHub('org_einstellungen', '');
   const darf = istAdmin && !vomHub;
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“).
   const schutz = useFormularVerlassenSchutz({ aktiv: darf });
 
@@ -86,7 +92,12 @@ export default function AnzeigeEinstellungen() {
     const fassung = schutz.fassung();
     speichernMutation.mutate(
       { ...zuUpdate(einstellungen), ...normalisiereAnzeige(werte) },
-      { onSuccess: () => schutz.gespeichert(fassung) },
+      {
+        onSuccess: () => {
+          schutz.gespeichert(fassung);
+          stand.merke(werte);
+        },
+      },
     );
   }
 
@@ -114,54 +125,56 @@ export default function AnzeigeEinstellungen() {
         onFinish={speichern}
         disabled={!darf}
       >
-        <Formularpaneel titel="Darstellung">
-          <Feld label="Zeitzone" name="zeitzone">
-            <AutoComplete
-              allowClear
-              options={ZEITZONEN_OPTIONEN}
-              placeholder={mitVorgabe('Gerätezeit')}
-              showSearch={teilwortSuche}
-            />
-          </Feld>
-          <Feld label="Zeitdarstellung" name="zeitdarstellung">
-            <Select
-              allowClear
-              placeholder={mitVorgabe(ZEITDARSTELLUNG_VORGABE)}
-              options={ZEITDARSTELLUNG_OPTIONEN}
-            />
-          </Feld>
-          <Feld label="Einheiten" name="einheiten">
-            <Select allowClear placeholder={mitVorgabe('Metrisch')} options={EINHEITEN_OPTIONEN} />
-          </Feld>
-          <Feld label="Koordinatenformat" name="koordinatenformat">
-            <Select
-              allowClear
-              placeholder={mitVorgabe('WGS84 dezimal')}
-              options={KOORDINATEN_OPTIONEN}
-            />
-          </Feld>
-        </Formularpaneel>
-        <Formularpaneel titel="Ort-Vorschau">
-          <Feld
-            label="Geocoder-URL"
-            name="geocoder_url"
-            // Datenschutz-Hinweis sichtbar am Feld, nicht im Tooltip (Touch, LFH-1078). Was leer
-            // gilt, nennt der Platzhalter.
-            extra="Die Einsatz-Koordinate wird an diesen Dienst gesendet."
-          >
-            <Input placeholder={mitVorgabe('https://nominatim.openstreetmap.org')} allowClear />
-          </Feld>
-        </Formularpaneel>
-        <div {...speicherLeiste}>
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={speichernMutation.isPending}
-            disabled={!darf}
-          >
-            Speichern
-          </Button>
-        </div>
+        <AenderungsstandProvider
+          ausgangswerte={initialAnzeige(einstellungen)}
+          merkeRef={stand.merkeRef}
+        >
+          <Formularpaneel titel="Darstellung">
+            <Feld label="Zeitzone" name="zeitzone">
+              <AutoComplete
+                allowClear
+                options={ZEITZONEN_OPTIONEN}
+                placeholder={mitVorgabe('Gerätezeit')}
+                showSearch={teilwortSuche}
+              />
+            </Feld>
+            <Feld label="Zeitdarstellung" name="zeitdarstellung">
+              <Select
+                allowClear
+                placeholder={mitVorgabe(ZEITDARSTELLUNG_VORGABE)}
+                options={ZEITDARSTELLUNG_OPTIONEN}
+              />
+            </Feld>
+            <Feld label="Einheiten" name="einheiten">
+              <Select
+                allowClear
+                placeholder={mitVorgabe('Metrisch')}
+                options={EINHEITEN_OPTIONEN}
+              />
+            </Feld>
+            <Feld label="Koordinatenformat" name="koordinatenformat">
+              <Select
+                allowClear
+                placeholder={mitVorgabe('WGS84 dezimal')}
+                options={KOORDINATEN_OPTIONEN}
+              />
+            </Feld>
+          </Formularpaneel>
+          <Formularpaneel titel="Ort-Vorschau">
+            <Feld
+              label="Geocoder-URL"
+              name="geocoder_url"
+              // Datenschutz-Hinweis sichtbar am Feld, nicht im Tooltip (Touch, LFH-1078). Was leer
+              // gilt, nennt der Platzhalter.
+              extra="Die Einsatz-Koordinate wird an diesen Dienst gesendet."
+            >
+              <Input placeholder={mitVorgabe('https://nominatim.openstreetmap.org')} allowClear />
+            </Feld>
+          </Formularpaneel>
+          <div {...speicherLeiste}>
+            <SpeicherKnopf loading={speichernMutation.isPending} disabled={!darf} />
+          </div>
+        </AenderungsstandProvider>
       </Form>
     </AdminPage>
   );

@@ -165,10 +165,15 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Nur Ansicht nur System-Admin');
   });
 
-  it('mit Admin-Recht ist derselbe Knopf bedienbar', async () => {
+  it('mit Admin-Recht ist derselbe Knopf nach einer Änderung bedienbar (LLH-1829)', async () => {
+    const nutzer = userEvent.setup();
     handler(admin);
     renderRoute('/admin/stammdaten/personal/5');
-    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeDisabled();
+    expect(screen.getByText('Keine Änderungen')).toBeVisible();
+    await nutzer.type(screen.getByLabelText('Bemerkung'), 'x');
+    expect(await screen.findByText('1 Änderung')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled();
   });
 
   it('leitet eine kaputte Route-ID auf die Liste um', async () => {
@@ -195,6 +200,21 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     expect(await screen.findByRole('heading', { name: 'Anna Schmidt' })).toBeInTheDocument();
     expect(screen.getByLabelText('Telefon')).toHaveValue('0160 7654321');
     expect(screen.getByLabelText('Bemerkung')).toHaveValue('Zweite');
+  });
+
+  it('nach dem Wechsel auf einen anderen Datensatz kein Punkt (LLH-1829)', async () => {
+    const nutzer = userEvent.setup();
+    renderMitWechsel();
+    expect(await screen.findByRole('heading', { name: 'Thomas Müller' })).toBeInTheDocument();
+    await nutzer.type(screen.getByLabelText('Telefon'), '9');
+    expect(await screen.findByText('•')).toBeInTheDocument();
+
+    await nutzer.click(screen.getByRole('button', { name: 'Nächste Person' }));
+    await nutzer.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+
+    expect(await screen.findByRole('heading', { name: 'Anna Schmidt' })).toBeInTheDocument();
+    expect(screen.queryByText('•')).toBeNull();
+    expect(screen.getByText('Keine Änderungen')).toBeVisible();
   });
 });
 

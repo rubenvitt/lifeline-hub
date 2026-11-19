@@ -1,4 +1,15 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Form } from 'antd';
 import type { NamePath } from 'antd/es/form/interface';
 
@@ -46,11 +57,16 @@ function obersterName(name: NamePath): string {
   return String(Array.isArray(name) ? name[0] : name);
 }
 
+type Merken = (werte: object) => void;
+
 export function AenderungsstandProvider({
   ausgangswerte,
+  merkeRef,
   children,
 }: {
   ausgangswerte: object | undefined;
+  /** Anschluss für `useAenderungsstandMerken` der Seite, deren `onFinish` außerhalb liegt. */
+  merkeRef?: RefObject<Merken | null>;
   children: ReactNode;
 }) {
   const form = Form.useFormInstance();
@@ -60,8 +76,7 @@ export function AenderungsstandProvider({
     setAusgang(ausgangswerte as Werte);
   }
   const aktuell = Form.useWatch((werte: Werte) => werte, { form, preserve: true }) as
-    | Werte
-    | undefined;
+    Werte | undefined;
 
   const namen: string[] = [];
   if (ausgang !== undefined && aktuell !== undefined) {
@@ -76,6 +91,14 @@ export function AenderungsstandProvider({
   const merke = useCallback((werte: object) => {
     setAusgang((vorher) => ({ ...vorher, ...(werte as Werte) }));
   }, []);
+
+  useEffect(() => {
+    if (!merkeRef) return;
+    merkeRef.current = merke;
+    return () => {
+      merkeRef.current = null;
+    };
+  }, [merkeRef, merke]);
 
   return (
     <MerkeKontext.Provider value={merke}>
@@ -102,4 +125,43 @@ const KEIN_MERKEN = () => {};
 /** Übernimmt gesendete Werte als neuen Ausgangsstand; ohne Provider ohne Wirkung. */
 export function useAenderungsstandMerke(): (werte: object) => void {
   return useContext(MerkeKontext) ?? KEIN_MERKEN;
+}
+
+/**
+ * Für Seiten, deren `onFinish` außerhalb des Providers steht: `merkeRef` an den Provider reichen,
+ * `merke(gesendet)` im Erfolgszweig neben `schutz.gespeichert(fassung)` rufen.
+ */
+export function useAenderungsstandMerken(): {
+  merkeRef: RefObject<Merken | null>;
+  merke: Merken;
+} {
+  const merkeRef = useRef<Merken | null>(null);
+  const merke = useCallback((werte: object) => merkeRef.current?.(werte), []);
+  // Stabil, damit `stand` in Effekt-Abhängigkeiten stehen darf.
+  return useMemo(() => ({ merkeRef, merke }), [merke]);
+}
+
+/**
+ * Enter ohne Änderung schließt eine Bearbeitung (LLH-1829, Design-Doc „Entscheidungen aus der
+ * Gegenlese“). Der gesperrte `SpeicherKnopf` unterbindet das implizite Absenden, also trägt das
+ * ein eigener Tastenweg. Nicht im Textfeld (Zeilenumbruch), nicht auf einem Knopf (der löst
+ * selbst aus), nicht bei offener Auswahl (Enter wählt dort). Steht im `AenderungsstandProvider`.
+ */
+export function EnterOhneAenderung({
+  onSchliessen,
+  children,
+}: {
+  onSchliessen: () => void;
+  children: ReactNode;
+}) {
+  const anzahl = useAenderungsanzahl();
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter' || e.defaultPrevented || anzahl !== 0) return;
+    const ziel = e.target as HTMLElement;
+    if (ziel.tagName === 'TEXTAREA' || ziel.tagName === 'BUTTON') return;
+    if (ziel.getAttribute('aria-expanded') === 'true') return;
+    e.preventDefault();
+    onSchliessen();
+  };
+  return <div onKeyDown={onKeyDown}>{children}</div>;
 }
