@@ -1771,7 +1771,8 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   ein nackter `Link`, im Einsatz wie in der Verwaltung. Kam man per PUSH von genau diesem Pfad
   (Query zählt nicht), geht der einfache Klick per `navigate(-1)` zurück, damit Ansicht, Filter und
   Rollposition wieder stehen; das `href` trägt die vorige Adresse für Strg- und Mittelklick. Sonst
-  ist es ein Link auf das Ziel. Die Herkunft je Verlaufseintrag merkt `VerlaufMerken` im
+  ist es ein Link auf das Ziel. Ein Ziel mit Zeilenmarke, die die Liste wählt und hervorhebt (Befehl,
+  `?befehl=`), bekommt `zeilenmarke` und bleibt immer ein Link. Die Herkunft je Verlaufseintrag merkt `VerlaufMerken` im
   `BetriebsLayout` (`routing/verlaufGedaechtnis.ts`, `sessionStorage lfh:verlauf`, räumt bei jedem
   Ausgang). Andere Rückwege (nach Storno oder Löschen, „Zur Liste“ in `SeitenNichtGefunden`) bleiben
   Links: nach einer Aktion ist kein Zurück im Verlauf gemeint. Herleitung:
