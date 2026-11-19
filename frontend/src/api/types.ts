@@ -14,6 +14,8 @@ export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
 /** Antwort von `GET /api/auth/me`: der Benutzer, bei einer Gerätesitzung (LFH-892) mit `geraet`. */
 export type MeAntwort = S['MeAntwort'];
+// Bestand der Bereitschaft (LLH-1820, `GET /api/verwaltung/bereitschaft`).
+export type Bereitschaft = S['Bereitschaft'];
 
 // ============================== Gerätekopplung (LFH-892) ==============================
 export type Funktionsansicht = S['Funktionsansicht'];
