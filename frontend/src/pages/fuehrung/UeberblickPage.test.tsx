@@ -18,6 +18,7 @@ import { GLIEDERUNG_KLASSE } from '../../components/instrument';
 import UeberblickPage from './UeberblickPage';
 import { einsatzKeys } from '../../api/queryKeys';
 import { saveStartlisteAusgeblendet } from './startlisteSpeicher';
+import { pruefeKachelGrenzen } from '../../test/kachelWaechter';
 
 dayjs.extend(utc);
 
@@ -431,6 +432,15 @@ describe('UeberblickPage', () => {
     for (const weg of ['Betroffene', 'Kräfte im Einsatz', 'Einsatzdauer']) {
       expect(screen.queryByText(weg)).toBeNull();
     }
+  });
+
+  it('Wächter: jede Kachel des Überblicks steht in ihrer eigenen KachelGrenze (LLH-1958)', async () => {
+    stelleBereit(volleDaten);
+    const { container } = rendern();
+    await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent('4'));
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    // Alarmzeile und vier Paneele; die Startliste prüft ihr eigener Block.
+    pruefeKachelGrenzen(container.querySelector('[data-lfh="ueberblick"]')!, 5);
   });
 
   it('Alarmzeile „Was brennt“ steht vor den Paneelreihen (LLH-1743)', async () => {
@@ -2392,6 +2402,14 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     // Angemeldet: ohne Person räumt der Start nach der 401 den Gerätespeicher (LFH-767), samt dem
     // Ausblenden der Startliste, mitten im Test.
     server.use(meHandler(benutzerFixture({ id: 9 })));
+  });
+
+  it('Wächter: auch die Startliste steht in ihrer eigenen KachelGrenze (LLH-1958)', async () => {
+    stelleBereit(leer);
+    const { container } = rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    await screen.findByRole('region', { name: 'Einsatzabschnitte' });
+    pruefeKachelGrenzen(container.querySelector('[data-lfh="ueberblick"]')!, 6);
   });
 
   it('leerer Einsatz: fünf offene Punkte unter der Alarmzeile, vor den Paneelreihen, ohne Zahl', async () => {
