@@ -17,7 +17,6 @@ import {
   App,
   Button,
   Dropdown,
-  Flex,
   Form,
   InputNumber,
   Radio,
@@ -77,10 +76,15 @@ import {
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import {
   Augenbraue,
+  FELD_KLASSE,
+  Feld,
   Paneel,
   Segmentleiste,
+  Stapel,
   Status,
+  Textstufe,
   monoStil,
+  schriftStil,
   useRollen,
 } from '../../components/instrument';
 import {
@@ -752,8 +756,8 @@ function PlatzKarte({
           WebkitBoxOrient: 'vertical',
           WebkitLineClamp: 2,
           overflow: 'hidden',
+          ...schriftStil('textKlein'),
           lineHeight: '15px',
-          fontSize: 13,
           maxHeight: 30,
           // Silbengrenzen statt Wortbruch ohne Trennstrich (LLH-1793).
           ...WORTUMBRUCH_STIL,
@@ -1053,7 +1057,7 @@ function PersonenSpalte({
             </div>
           );
         })}
-        {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
+        {personen.length === 0 && <Textstufe ton="gedaempft">{leerText}</Textstufe>}
         {fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />}
       </div>
     </Paneel>
@@ -1137,9 +1141,9 @@ function UnterwegsSpalte({
               </Button>
               {/* Fahrzeug und Ziel aus der Kurzform des Servers („Eigentransport 1/83-1 → KH“). */}
               {p.aktueller_verbleib && (
-                <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                <Textstufe stufe="textKlein" ton="gedaempft">
                   {p.aktueller_verbleib}
-                </Typography.Text>
+                </Textstufe>
               )}
               <div
                 style={{
@@ -1172,7 +1176,7 @@ function UnterwegsSpalte({
             </div>
           );
         })}
-        {personen.length === 0 && <Typography.Text type="secondary">niemand</Typography.Text>}
+        {personen.length === 0 && <Textstufe ton="gedaempft">niemand</Textstufe>}
       </div>
     </Paneel>
   );
@@ -1917,14 +1921,20 @@ export default function Grundriss({
           Grundgröße (Raster im Backend), gestreckt höchstens das Doppelte, und keinen Platz für
           einen Satz. */}
       {platzGruende.length > 0 && (
-        <Flex vertical gap={token.marginXS} style={{ marginBottom: token.marginSM }}>
-          {platzGruende.map(({ pid, bezeichnung, grund }) => (
-            <div key={pid} data-lfh="platz-fehler">
-              {/* Der Platzname steht IN der Meldung: vorgelesen wird, wo abgelehnt wurde. */}
-              <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} kennung={bezeichnung} />
-            </div>
-          ))}
-        </Flex>
+        <div style={{ marginBottom: token.marginSM }}>
+          <Stapel abstand="xs">
+            {platzGruende.map(({ pid, bezeichnung, grund }) => (
+              <div key={pid} data-lfh="platz-fehler">
+                {/* Der Platzname steht IN der Meldung: vorgelesen wird, wo abgelehnt wurde. */}
+                <ZeilenFehler
+                  fehler={grund.fehler}
+                  fallback={grund.fallback}
+                  kennung={bezeichnung}
+                />
+              </div>
+            ))}
+          </Stapel>
+        </div>
       )}
       {/* Hülle für den Überlaufhinweis: er liegt über dem Bildlauf, nicht in ihm, sonst liefe er
           mit. */}
@@ -2201,7 +2211,7 @@ export default function Grundriss({
         onFertig={() => setZuweisenPlatz(null)}
         onAbbrechen={() => setZuweisenPlatz(null)}
       >
-        <Form.Item
+        <Feld
           label="Patient"
           name="personId"
           rules={[
@@ -2219,7 +2229,7 @@ export default function Grundriss({
             isWartend={(p) => p.aktuelle_uhs_id === uhs.id}
             wartetSeitVon={wartetSeitVon}
           />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       <PersonDetailDrawer
@@ -2264,9 +2274,9 @@ function KandidatenWahl({
   const gruppe = (titel: string, personen: readonly Person[]): ReactNode =>
     personen.length > 0 && (
       <>
-        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           {titel}
-        </Typography.Text>
+        </Textstufe>
         {personen.map((p) => {
           const seit = isWartend(p) ? wartetSeitVon(p) : null;
           return (
@@ -2358,7 +2368,6 @@ function NeuerPlatzKnopf({
   primaer?: boolean;
 }) {
   const { message } = App.useApp();
-  const { token } = theme.useToken();
   const [open, setOpen] = useState(false);
   const [typ, setTyp] = useState<PlatzTyp>('bett');
   const [menge, setMenge] = useState(1);
@@ -2387,30 +2396,40 @@ function NeuerPlatzKnopf({
     );
   }
   return (
-    <Flex vertical gap={token.marginXS} data-lfh="plaetze-anlegen">
-      <Space align="center" wrap>
-        <Select<PlatzTyp>
-          value={typ}
-          onChange={setTyp}
-          options={PLATZ_TYPEN}
-          style={{ width: 200, maxWidth: '100%' }}
-          aria-label="Platz-Typ"
+    <div data-lfh="plaetze-anlegen">
+      <Stapel abstand="xs">
+        <Space align="center" wrap>
+          <div
+            className={FELD_KLASSE}
+            style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}
+          >
+            <Select<PlatzTyp>
+              value={typ}
+              onChange={setTyp}
+              options={PLATZ_TYPEN}
+              aria-label="Platz-Typ"
+            />
+          </div>
+          <InputNumber
+            min={1}
+            max={50}
+            value={menge}
+            onChange={(v) => setMenge(v ?? 1)}
+            aria-label="Menge"
+          />
+          <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>
+            Anlegen
+          </Button>
+          <Button disabled={mut.isPending} onClick={() => umschalten(false)}>
+            Abbrechen
+          </Button>
+        </Space>
+        <SpeicherFehler
+          fehler={mut.error}
+          titel="Nicht angelegt"
+          fallback="Anlegen fehlgeschlagen"
         />
-        <InputNumber
-          min={1}
-          max={50}
-          value={menge}
-          onChange={(v) => setMenge(v ?? 1)}
-          aria-label="Menge"
-        />
-        <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>
-          Anlegen
-        </Button>
-        <Button disabled={mut.isPending} onClick={() => umschalten(false)}>
-          Abbrechen
-        </Button>
-      </Space>
-      <SpeicherFehler fehler={mut.error} titel="Nicht angelegt" fallback="Anlegen fehlgeschlagen" />
-    </Flex>
+      </Stapel>
+    </div>
   );
 }

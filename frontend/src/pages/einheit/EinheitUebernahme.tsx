@@ -6,7 +6,7 @@ import { EINSATZ_KEYS, einsatzKeys } from '../../api/queryKeys';
 import type { Einheit, Einsatzabschnitt, UebernahmeBody } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { Paneel, useRollen } from '../../components/instrument';
+import { Feld, Paneel, useRollen } from '../../components/instrument';
 import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { collectNachfahren } from './einheitAnsichtKern';
@@ -145,16 +145,16 @@ export default function EinheitUebernahme({
         onFertig={() => setOffen(false)}
         onAbbrechen={() => setOffen(false)}
       >
-        <Form.Item label="Abschnitt" name="abschnitt_id">
+        <Feld label="Abschnitt" name="abschnitt_id">
           <Select<number>
             allowClear
             placeholder="ohne Abschnitt"
             options={(abschnitte ?? []).map((a) => ({ value: a.id, label: a.name }))}
           />
-        </Form.Item>
-        <Form.Item label="Über-Einheit" name="ueber_einheit_id">
+        </Feld>
+        <Feld label="Über-Einheit" name="ueber_einheit_id">
           <Select<number> allowClear placeholder="keine" options={ueberOptionen} />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
     </>
   );
