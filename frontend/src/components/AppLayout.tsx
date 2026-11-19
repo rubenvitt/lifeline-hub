@@ -9,6 +9,7 @@ import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import AlarmZone from '../alarm/AlarmZone';
 import OrgBenachrichtigungen from '../alarm/OrgBenachrichtigungen';
+import HilfeKnopf from '../hilfe/HilfeKnopf';
 import BenutzerMenu from './BenutzerMenu';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from './rahmenOben';
 import CommandPaletteTrigger from './CommandPaletteTrigger';
@@ -261,6 +262,10 @@ export default function AppLayout() {
               <CommandPaletteTrigger />
             </div>
           )}
+          {/* Hilfe zur Seite (LLH-1824) links vom Benutzermenü, in jeder Breite. */}
+          <div style={kopfZelleStil(zellToken)}>
+            <HilfeKnopf />
+          </div>
           <div
             style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
           >
