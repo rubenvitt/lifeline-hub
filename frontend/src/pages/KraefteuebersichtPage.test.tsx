@@ -1,3 +1,4 @@
+import { modulName } from '../einsatz/modulRegistry';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -298,6 +299,8 @@ function mitEinheit() {
 async function seitenkopf() {
   return within(
     await waitFor(() => {
+      // Das Gerippe des Erstaufrufs trägt denselben Kopf (LLH-1830); gemeint ist der der Seite.
+      expect(document.querySelector('[data-testid="modul-gerippe"]')).toBeNull();
       const k = document.querySelector('[data-lfh="seitenkopf"]') as HTMLElement | null;
       expect(k).not.toBeNull();
       return k!;
@@ -347,6 +350,17 @@ describe('KraefteuebersichtPage — Seitenkopf', () => {
     await screen.findByRole('button', { name: /Drucken/i });
     expect(screen.queryByRole('button', { name: /^Einheit/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/i })).toBeNull();
+  });
+});
+
+describe('KraefteuebersichtPage — Erstaufruf (LLH-1830)', () => {
+  it('zeigt, solange der Einsatz lädt, schon den Seitenkopf mit Modulnamen', async () => {
+    vi.mocked(ladeEinsatz).mockReturnValue(new Promise(() => {}));
+    setup();
+    const gerippe = await screen.findByTestId('modul-gerippe');
+    expect(
+      within(gerippe).getByRole('heading', { level: 1, name: modulName('kraefteuebersicht') }),
+    ).toBeInTheDocument();
   });
 });
 

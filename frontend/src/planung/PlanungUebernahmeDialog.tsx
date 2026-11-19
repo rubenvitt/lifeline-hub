@@ -19,7 +19,14 @@ import {
   LEERE_WAHL,
   zaehlungMarken,
 } from '../abloesung/schichtplan/ImportVorschauAnsicht';
-import { Segmentleiste, UebungsMarke, useRollen } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  Segmentleiste,
+  Stapel,
+  Textstufe,
+  UebungsMarke,
+  useRollen,
+} from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { EINSATZART_LABELS, isUebung } from '../einsatz/einsatzart';
@@ -35,6 +42,9 @@ const ZIEL_OPTIONEN = [
   { wert: 'neu' as const, label: 'Neuer Einsatz' },
   { wert: 'einsatz' as const, label: 'Laufender Einsatz' },
 ];
+
+/** Hülle der Auswahl neben der Segmentleiste: wächst mit, darf schrumpfen, bricht ab 14rem um. */
+const WAHL_HUELLE = { flex: '1 1 14rem', minWidth: 0 } as const;
 
 /** Das Ziel aus der Wahl im Dialog; ohne gewählten laufenden Einsatz keins. */
 export function uebernahmeZiel(
@@ -212,26 +222,24 @@ export default function PlanungUebernahmeDialog({
     >
       <div data-lfh="planung-uebernahme">
         {ergebnis ? (
-          <Flex vertical gap={token.marginSM} data-lfh="uebernahme-ergebnis">
-            <Typography.Text strong>
-              {ergebnis.einsatz_neu ? 'Einsatz angelegt, Plan übernommen' : 'Plan übernommen'}
-              {nummer != null ? ` · ${nummer}` : ''}
-            </Typography.Text>
-            <Flex gap={token.marginXS} wrap>
-              {zaehlungMarken(ergebnis.zaehlung).map((m) => (
-                <Marke key={m}>{m}</Marke>
-              ))}
-            </Flex>
-            <Typography.Text type="secondary">
-              Die Planung ist jetzt schreibgeschützt.
-            </Typography.Text>
-          </Flex>
+          <div data-lfh="uebernahme-ergebnis">
+            <Stapel abstand="sm">
+              <Typography.Text strong>
+                {ergebnis.einsatz_neu ? 'Einsatz angelegt, Plan übernommen' : 'Plan übernommen'}
+                {nummer != null ? ` · ${nummer}` : ''}
+              </Typography.Text>
+              <Stapel richtung="zeile" umbruch abstand="xs">
+                {zaehlungMarken(ergebnis.zaehlung).map((m) => (
+                  <Marke key={m}>{m}</Marke>
+                ))}
+              </Stapel>
+              <Textstufe ton="gedaempft">Die Planung ist jetzt schreibgeschützt.</Textstufe>
+            </Stapel>
+          </div>
         ) : (
-          <Flex vertical gap={token.margin}>
-            <Typography.Text type="secondary">
-              Danach ist die Planung schreibgeschützt.
-            </Typography.Text>
-            <Flex gap={token.marginSM} align="center" wrap>
+          <Stapel abstand="md">
+            <Textstufe ton="gedaempft">Danach ist die Planung schreibgeschützt.</Textstufe>
+            <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
               <Segmentleiste<ZielArt>
                 beschriftung="Ziel der Übernahme"
                 wert={art}
@@ -248,57 +256,60 @@ export default function PlanungUebernahmeDialog({
                 style={{ flex: 'none' }}
               />
               {art === 'neu' ? (
-                <Select<number>
-                  aria-label="Einsatz-Vorlage"
-                  value={auswahlWert(vorlageId)}
-                  onChange={(w) => changeZiel('neu', vorlageAusWert(w), null)}
-                  disabled={laeuft}
-                  options={vorlagenOptionen(vorlagen, 'Ohne Vorlage')}
-                  style={{ flex: '1 1 14rem', minWidth: 0 }}
-                />
+                // Die Hülle trägt Breite und Wachstum (`frontend/AGENTS.md`, Bausteine, `Feld`).
+                <div className={FELD_KLASSE} style={WAHL_HUELLE}>
+                  <Select<number>
+                    aria-label="Einsatz-Vorlage"
+                    value={auswahlWert(vorlageId)}
+                    onChange={(w) => changeZiel('neu', vorlageAusWert(w), null)}
+                    disabled={laeuft}
+                    options={vorlagenOptionen(vorlagen, 'Ohne Vorlage')}
+                  />
+                </div>
               ) : laufende.length === 0 ? (
                 <Typography.Text type="secondary" data-lfh="uebernahme-kein-einsatz">
                   Kein laufender Einsatz mit Schreibrecht
                 </Typography.Text>
               ) : (
-                <Select<number>
-                  aria-label="Laufender Einsatz"
-                  // Gesucht wird im Text (`title`): das `label` einer Übung trägt die Marke und ist
-                  // kein Text mehr (LLH-1725).
-                  showSearch={{ optionFilterProp: 'title' }}
-                  placeholder="Einsatz wählen"
-                  value={einsatzId ?? undefined}
-                  onChange={(id) => changeZiel('einsatz', null, id)}
-                  disabled={laeuft}
-                  options={laufende.map((e) => {
-                    const text = [e.einsatznummer_intern, e.bezeichnung]
-                      .filter(Boolean)
-                      .join(' · ');
-                    // Eine Übung trägt die Übungsmarke (LLH-1725): hier schreibt man Daten in
-                    // den gewählten Einsatz, eine Verwechslung landete im falschen.
-                    return {
-                      value: e.id,
-                      title: text,
-                      label: isUebung(e) ? (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: token.marginSM,
-                          }}
-                        >
-                          <UebungsMarke einsatz={e} />
-                          {text}
-                        </span>
-                      ) : (
-                        text
-                      ),
-                    };
-                  })}
-                  style={{ flex: '1 1 14rem', minWidth: 0 }}
-                />
+                <div className={FELD_KLASSE} style={WAHL_HUELLE}>
+                  <Select<number>
+                    aria-label="Laufender Einsatz"
+                    // Gesucht wird im Text (`title`): das `label` einer Übung trägt die Marke und ist
+                    // kein Text mehr (LLH-1725).
+                    showSearch={{ optionFilterProp: 'title' }}
+                    placeholder="Einsatz wählen"
+                    value={einsatzId ?? undefined}
+                    onChange={(id) => changeZiel('einsatz', null, id)}
+                    disabled={laeuft}
+                    options={laufende.map((e) => {
+                      const text = [e.einsatznummer_intern, e.bezeichnung]
+                        .filter(Boolean)
+                        .join(' · ');
+                      // Eine Übung trägt die Übungsmarke (LLH-1725): hier schreibt man Daten in
+                      // den gewählten Einsatz, eine Verwechslung landete im falschen.
+                      return {
+                        value: e.id,
+                        title: text,
+                        label: isUebung(e) ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: token.marginSM,
+                            }}
+                          >
+                            <UebungsMarke einsatz={e} />
+                            {text}
+                          </span>
+                        ) : (
+                          text
+                        ),
+                      };
+                    })}
+                  />
+                </div>
               )}
-            </Flex>
+            </Stapel>
             {art === 'neu' && (
               <Typography.Text type="secondary" data-lfh="uebernahme-neu-hinweis">
                 Neuer Einsatz: {neuerEinsatzText(planung)}
@@ -326,7 +337,7 @@ export default function PlanungUebernahmeDialog({
                 />
               </Spin>
             )}
-          </Flex>
+          </Stapel>
         )}
       </div>
     </Modal>

@@ -27,8 +27,9 @@ import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { useViewport } from '../components/useViewport';
 import FilterKnopf from '../components/FilterKnopf';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { Segmentleiste, Stapel, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import type { Person, Sichtungskategorie } from '../api/types';
 import { SK_META } from '../personen/personMeta';
@@ -889,7 +890,8 @@ export default function PersonenPage() {
    * hängen an ihr. Deshalb hier ein Frühausstieg, und nur hier.
    */
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    // Kopf sofort, damit er beim Eintreffen des Einsatzes nicht nachrutscht (LLH-1830).
+    return <ModulGerippeSeite modulKey="personen" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -1022,8 +1024,13 @@ export default function PersonenPage() {
       onWechsel={(ansicht) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, ansicht }))}
     />
   );
-  /** Unter `xl` steht die Lagezahl über der Liste (LFH-963), ab `xl` in der Seitenleiste. */
-  const zeigtSichtungszeile = !mitSeitenleiste && !personenQuery.isLoading;
+  /**
+   * Unter `xl` steht die Lagezahl über der Liste (LFH-963), ab `xl` in der Seitenleiste. Ihre Zeile
+   * steht schon, während die Liste lädt, nur unsichtbar: erschiene sie erst mit den Daten, schöbe
+   * sie Liste und Seitenleiste nach unten (Layoutsprung beim Erstaufruf, LLH-1830).
+   */
+  const zeigtSichtungszeile = !mitSeitenleiste;
+  const sichtungszeileWartet = personenQuery.isLoading;
   /** Unter `md` steht die Wahlfläche nur offen da (LLH-1786). */
   const wahlenSichtbar = !istSchmal || filterOffen;
   /**
@@ -1157,7 +1164,7 @@ export default function PersonenPage() {
           csvExport.fehler != null ||
           abgleichFort.length > 0 ||
           sichtungFort.length > 0) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             <SeitenHinweise
               rechteText={einsatzRechteGrund(einsatz)}
               rechteFehlt={nurAnsicht}
@@ -1176,7 +1183,7 @@ export default function PersonenPage() {
                 fallback={g.fallback}
               />
             ))}
-          </Flex>
+          </Stapel>
         )
       }
     >
@@ -1272,13 +1279,26 @@ export default function PersonenPage() {
                 gap={token.marginSM}
                 style={{ columnGap: token.marginLG, marginBottom: token.marginSM }}
               >
-                {zeigtSichtungszeile && <Sichtungszeile alle={alle} ohneAbstand />}
+                {zeigtSichtungszeile &&
+                  (sichtungszeileWartet ? (
+                    <span aria-hidden style={{ visibility: 'hidden' }}>
+                      <Sichtungszeile alle={[]} ohneAbstand />
+                    </span>
+                  ) : (
+                    <Sichtungszeile alle={alle} ohneAbstand />
+                  ))}
                 {wahlenInLagezeile && (
-                  <Flex id={FILTERFLAECHE_ID} wrap align="center" gap={token.marginSM}>
+                  <Stapel
+                    id={FILTERFLAECHE_ID}
+                    richtung="zeile"
+                    umbruch
+                    ausrichten="mitte"
+                    abstand="sm"
+                  >
                     {istSchmal && ansichtWahl}
                     {!wahlenInListe && statusReiter}
                     {abgeschlossenSchalter}
-                  </Flex>
+                  </Stapel>
                 )}
               </Flex>
             )}
@@ -1348,21 +1368,25 @@ export default function PersonenPage() {
             )}
           </div>
           {/* Seitenleiste ab `xl` rechts, darunter unter der Liste gestapelt. Sie steht im
-              Datenzweig: über einem Ladefehler meldete sie Nullen, die niemand erhoben hat. */}
-          <aside
-            aria-label="Lagebild der Betroffenen"
-            data-lfh="betroffene-seitenleiste"
-            style={{
-              display: 'grid',
-              gap: token.margin,
-              alignContent: 'start',
-              gridTemplateColumns: mitSeitenleiste
-                ? 'minmax(0, 1fr)'
-                : `repeat(auto-fit, minmax(${Math.min(SEITENLEISTE_BREITE, 240)}px, 1fr))`,
-            }}
-          >
-            {seitenleiste}
-          </aside>
+              Datenzweig: über einem Ladefehler meldete sie Nullen, die niemand erhoben hat. Aus
+              demselben Grund erst mit den Daten; unter `xl` rutschte sie sonst mit der wachsenden
+              Liste nach unten (LLH-1830). */}
+          {!personenQuery.isLoading && (
+            <aside
+              aria-label="Lagebild der Betroffenen"
+              data-lfh="betroffene-seitenleiste"
+              style={{
+                display: 'grid',
+                gap: token.margin,
+                alignContent: 'start',
+                gridTemplateColumns: mitSeitenleiste
+                  ? 'minmax(0, 1fr)'
+                  : `repeat(auto-fit, minmax(${Math.min(SEITENLEISTE_BREITE, 240)}px, 1fr))`,
+              }}
+            >
+              {seitenleiste}
+            </aside>
+          )}
         </div>
       )}
 

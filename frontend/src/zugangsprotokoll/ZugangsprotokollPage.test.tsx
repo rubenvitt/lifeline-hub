@@ -155,8 +155,12 @@ describe('ZugangsprotokollPage', () => {
     expect(
       await within(t).findByText('Safari · iPadOS, angemeldet 101413okt26'),
     ).toBeInTheDocument();
-    expect(within(t).getByText('Org-Rolle: Keine → Führungskraft')).toBeInTheDocument();
-    expect(within(t).getByText('System-Rolle: Benutzer, Org-Rolle: Keine')).toBeInTheDocument();
+    expect(
+      within(t).getByText('Rolle in der Organisation: Keine → Führungskraft der Organisation'),
+    ).toBeInTheDocument();
+    expect(
+      within(t).getByText('Rolle in der Verwaltung: Keine, Rolle in der Organisation: Keine'),
+    ).toBeInTheDocument();
     expect(t).not.toHaveTextContent('fuehrungskraft');
     expect(t).not.toHaveTextContent('2026-10-10 12:13:34');
   });

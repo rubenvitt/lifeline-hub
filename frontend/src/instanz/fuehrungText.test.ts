@@ -245,7 +245,7 @@ describe('offeneUebernahmeTitel (LLH-1669)', () => {
 
   it('sagt im Konflikt, dass die eigene Notübernahme nicht gegriffen hat', () => {
     expect(offeneUebernahmeTitel({ von: 'ELW 1', konflikt: true }, 'notuebernahme')).toBe(
-      'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+      'Die Notübernahme dieser Instanz hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
     );
   });
 

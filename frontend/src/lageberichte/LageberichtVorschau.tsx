@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Space } from 'antd';
-import { Datenfeld, Datenraster } from '../components/instrument';
+import { Datenfeld, Datenraster, Stapel } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import { lageberichtAbfrage } from '../command-palette/datensatzAbfrage';
@@ -22,7 +21,7 @@ export default function LageberichtVorschau({ einsatzId, id }: { einsatzId: numb
   return (
     <VorschauZustand abfrage={abfrage} sorte="Der Lagebericht">
       {(b) => (
-        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <Stapel abstand="md">
           <StatusBadge
             phase={LAGEBERICHT_STATUS[b.status].phase}
             label={LAGEBERICHT_STATUS[b.status].label}
@@ -48,7 +47,7 @@ export default function LageberichtVorschau({ einsatzId, id }: { einsatzId: numb
           <div>
             <LageberichtText bericht={b} unterEbene={VORSCHAU_UNTER_EBENE} />
           </div>
-        </Space>
+        </Stapel>
       )}
     </VorschauZustand>
   );

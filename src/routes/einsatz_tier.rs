@@ -146,7 +146,7 @@ pub async fn anlegen(
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr. + Spezies) UND Response. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let tier = crate::write_retry!(&state.pool, |conn| {
+    let (tier, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let (id, _reg) = tier_repo::anlegen_tx(
             conn,
             einsatz_id,
@@ -186,9 +186,12 @@ pub async fn anlegen(
                 spezies_label
             )
         };
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(tier)
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        Ok((tier, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_tier(&state, einsatz_id, tier.id);
     Ok((StatusCode::CREATED, Json(tier)))
 }
@@ -425,7 +428,7 @@ pub async fn status_wechsel(
     };
     // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         tier_repo::setze_status_tx(
             conn,
             einsatz_id,
@@ -436,9 +439,12 @@ pub async fn status_wechsel(
             ctx.benutzer.id,
         )
         .await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(())
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        Ok(etb_id)
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_tier(&state, einsatz_id, tier_id);
     Ok(Json(
         tier_repo::laden(&state.pool, einsatz_id, tier_id).await?,
@@ -457,11 +463,14 @@ pub async fn stornieren(
     // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
     let text = format!("Tier {} storniert", registrier_anzeige(tier.registrier_nr));
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         tier_repo::storniere_tx(conn, einsatz_id, tier_id, ctx.benutzer.id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(())
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        Ok(etb_id)
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_tier(&state, einsatz_id, tier_id);
     Ok(StatusCode::NO_CONTENT)
 }

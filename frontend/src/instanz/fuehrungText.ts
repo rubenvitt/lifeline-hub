@@ -34,7 +34,7 @@ export function offeneUebernahmeTitel(
 ): string {
   if (!o.konflikt) return `Führung übernommen von ${o.von}`;
   return art === 'notuebernahme'
-    ? `Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ${o.von}`
+    ? `Die Notübernahme dieser Instanz hat am Hub nicht gegriffen, die Führung liegt bei ${o.von}`
     : `Die Führung liegt am Hub bei ${o.von}, nicht hier`;
 }
 

@@ -10,7 +10,7 @@ import {
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung, PlanungPosten } from '../api/types';
-import { monoStil, Status, useRollen } from '../components/instrument';
+import { Stapel, Status, monoStil, useRollen } from '../components/instrument';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -103,10 +103,10 @@ export default function PlanungPostenListe({
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
       render: (_, p) => (
-        <Space size={token.marginXS} wrap>
+        <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           <span style={{ overflowWrap: 'anywhere' }}>{p.bezeichnung}</span>
           {p.nicht_verfuegbar && <Status groesse="klein" ton="achtung" wort="nicht verfügbar" />}
-        </Space>
+        </Stapel>
       ),
     },
     {
@@ -126,7 +126,7 @@ export default function PlanungPostenListe({
       title: 'Schichtlänge',
       key: 'schichtlaenge',
       render: (_, p) => (
-        <span style={monoStil(12)}>
+        <span style={monoStil('monoKlein')}>
           {p.schichtlaenge_minuten != null ? dauer(p.schichtlaenge_minuten) : '—'}
         </span>
       ),
@@ -138,7 +138,7 @@ export default function PlanungPostenListe({
         const quali = qualiSollText(p.quali_soll);
         return (
           <>
-            <span style={monoStil(12)}>{p.soll_anzahl ?? '—'}</span>
+            <span style={monoStil('monoKlein')}>{p.soll_anzahl ?? '—'}</span>
             {quali ? ` · ${quali}` : null}
           </>
         );

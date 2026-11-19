@@ -14,7 +14,7 @@ import {
   sprungZiel,
   type Sprungmarke,
 } from './sprungmarken';
-import { form, schrift, type Farbrollen } from '../theme/tokens';
+import { form, schriftskala, type Farbrollen } from '../theme/tokens';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
 import { useMinutenTakt } from '../components/useMinutenTakt';
@@ -25,6 +25,7 @@ import { bringIntoView } from '../components/bringIntoView';
 import { abonniereRahmenOben } from '../components/rahmenOben';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { handleLinkKlick } from '../routing/linkModifier';
+import { schriftStil, Textstufe } from '../components/instrument';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -114,7 +115,7 @@ export function modulZeilenStil(
     borderRadius: form.radiusSteuer,
     textAlign: 'left',
     width: '100%',
-    fontSize: 13,
+    fontSize: schriftskala.text.groesse,
     cursor: zustand.gesperrt ? 'not-allowed' : 'pointer',
     background: zustand.aktiv ? farben.flaeche3 : 'transparent',
     color: zustand.gesperrt
@@ -127,9 +128,9 @@ export function modulZeilenStil(
 
 /**
  * Zweite Zeile einer Modulzeile: die Kurzbeschreibung aus der Registry (LFH-965, Spec
- * `modul-benennung`). 12 px in `schwach`, das den Textboden auf jeder Flächenstufe hält. Höchstens
- * zwei Zeilen (LLH-1734: einzeilig endete im 208 px breiten Panel fast jede in „…“), zu Lange endet
- * danach in „…“ und steht ganz im `title` des Knopfes.
+ * `modul-benennung`). Stufe `textKlein` in `schwach`, das den Textboden auf jeder Flächenstufe
+ * hält. Höchstens zwei Zeilen (LLH-1734: einzeilig endete im 208 px breiten Panel fast jede in
+ * „…“), zu Lange endet danach in „…“ und steht ganz im `title` des Knopfes.
  */
 export function modulBeschreibungStil(
   farben: Pick<Farbrollen, 'schwach'>,
@@ -139,7 +140,7 @@ export function modulBeschreibungStil(
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
-    fontSize: 12,
+    fontSize: schriftskala.textKlein.groesse,
     lineHeight: 1.35,
     whiteSpace: 'normal',
     overflow: 'hidden',
@@ -342,9 +343,7 @@ export function ModulListe({
                 title={modulZaehler.beschreibung}
                 style={{
                   flexShrink: 0,
-                  fontFamily: schrift.zahl,
-                  fontSize: 11,
-                  fontVariantNumeric: 'tabular-nums',
+                  ...schriftStil('meta'),
                   color: aktiv ? farben.text2 : farben.schwach,
                 }}
               >
@@ -533,17 +532,7 @@ export default function ModulPanel({ titel, einsatz, kleben = true, ...liste }: 
             }}
           >
             <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>
-            <span
-              style={{
-                fontFamily: schrift.zahl,
-                fontSize: 18,
-                fontWeight: 500,
-                fontVariantNumeric: 'tabular-nums',
-                color: farben.text,
-              }}
-            >
-              {dauer}
-            </span>
+            <Textstufe stufe="datenwertKlein">{dauer}</Textstufe>
           </div>
         )}
       </div>

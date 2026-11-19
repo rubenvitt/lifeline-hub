@@ -1,4 +1,4 @@
-import { Button, Form, Input, Typography } from 'antd';
+import { Button, ConfigProvider, Form, Input, Typography } from 'antd';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Ortsfeld, type OrtsfeldWert } from '../../anzeige/Ortsfeld';
 import { parseKalenderdatum } from '../../anzeige/kalenderdatum';
@@ -12,7 +12,7 @@ import {
 } from '../../api/eingabegrenzen';
 import type { Betreuungsstelle, RegistrierungEingabe } from '../../api/types';
 import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
-import { Augenbraue, useRollen } from '../../components/instrument';
+import { Augenbraue, Feld, useRollen } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { serverJetzt } from '../../offline/serveruhr';
@@ -77,6 +77,13 @@ type Spalte = (typeof SPALTEN)[number]['feld'];
 
 /** Erste Spalte: die Nummer der Person; letzte: „Entfernen“. */
 const RASTER_SPALTEN = ['auto', ...SPALTEN.map((s) => s.breite), 'auto'].join(' ');
+
+/**
+ * Die Felder der Personenzeilen stehen ohne eigenen Abstand darunter: Zeilen- und Feldabstand
+ * trägt das Raster (`rowGap`), sonst wüchse jede Zeile um antds Feldabstand. `Feld` nimmt kein
+ * `style`; der Komponententoken gilt nur für die Felder innerhalb von `Form.List`.
+ */
+const OHNE_FELDABSTAND = { components: { Form: { itemMarginBottom: 0 } } };
 
 export interface RegistrierMaskeProps {
   stelle: Pick<Betreuungsstelle, 'id' | 'bezeichnung'>;
@@ -152,7 +159,6 @@ export default function RegistrierMaske({
     );
   }
 
-  const ohneAbstand = { marginBottom: 0 };
   const titel = haushalt
     ? `Registrieren · ${haushaltKennung(haushalt.nummer)} · ${stelle.bezeichnung}`
     : `Registrieren · ${stelle.bezeichnung}`;
@@ -186,7 +192,7 @@ export default function RegistrierMaske({
           }}
         >
           {/* Personenbezogen: nie an den Geocoder (`frontend/AGENTS.md`, Ortsangaben). */}
-          <Form.Item<RegistrierWerte>
+          <Feld<RegistrierWerte>
             name="herkunft_adresse"
             label="Herkunft / Adresse"
             rules={[zeichenRegel(PERSON_ANGABE_MAX, 'Herkunft / Adresse')]}
@@ -198,14 +204,14 @@ export default function RegistrierMaske({
               aria-label="Herkunft / Adresse des Haushalts"
               count={zeichenGrenze(PERSON_ANGABE_MAX)}
             />
-          </Form.Item>
-          <Form.Item<RegistrierWerte>
+          </Feld>
+          <Feld<RegistrierWerte>
             name="kontakt"
             label="Kontakt"
             rules={[zeichenRegel(PERSON_ANGABE_MAX, 'Kontakt')]}
           >
             <Input aria-label="Kontakt des Haushalts" count={zeichenGrenze(PERSON_ANGABE_MAX)} />
-          </Form.Item>
+          </Feld>
         </div>
 
         <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
@@ -213,7 +219,7 @@ export default function RegistrierMaske({
         </Augenbraue>
         <Form.List name="personen">
           {(felder, { add, remove }) => (
-            <>
+            <ConfigProvider theme={OHNE_FELDABSTAND}>
               <div
                 style={
                   raster
@@ -243,28 +249,26 @@ export default function RegistrierMaske({
                   const nummer = index + 1;
                   const zellen = [
                     zelle(f.key, 'name', 'Nachname', (ids) => (
-                      <Form.Item
+                      <Feld
                         name={[f.name, 'name']}
                         rules={[
                           { required: true, whitespace: true, message: 'Nachname fehlt' },
                           zeichenRegel(PERSON_NAME_MAX, 'Nachname'),
                         ]}
-                        style={ohneAbstand}
                       >
                         <Input aria-labelledby={ids} count={zeichenGrenze(PERSON_NAME_MAX)} />
-                      </Form.Item>
+                      </Feld>
                     )),
                     zelle(f.key, 'vorname', 'Vorname', (ids) => (
-                      <Form.Item
+                      <Feld
                         name={[f.name, 'vorname']}
                         rules={[zeichenRegel(PERSON_NAME_MAX, 'Vorname')]}
-                        style={ohneAbstand}
                       >
                         <Input aria-labelledby={ids} count={zeichenGrenze(PERSON_NAME_MAX)} />
-                      </Form.Item>
+                      </Feld>
                     )),
                     zelle(f.key, 'geburtsdatum', 'Geburtsdatum', (ids) => (
-                      <Form.Item
+                      <Feld
                         name={[f.name, 'geburtsdatum']}
                         rules={[
                           {
@@ -275,7 +279,6 @@ export default function RegistrierMaske({
                             },
                           },
                         ]}
-                        style={ohneAbstand}
                       >
                         <Input
                           aria-labelledby={ids}
@@ -283,25 +286,25 @@ export default function RegistrierMaske({
                           inputMode="numeric"
                           style={{ fontFamily: token.fontFamilyCode }}
                         />
-                      </Form.Item>
+                      </Feld>
                     )),
                     zelle(f.key, 'geschlecht', 'Geschlecht', () => (
-                      <Form.Item name={[f.name, 'geschlecht']} style={ohneAbstand}>
+                      <Feld name={[f.name, 'geschlecht']}>
                         <GeschlechtWahl aria-label={`Geschlecht, Person ${nummer}`} />
-                      </Form.Item>
+                      </Feld>
                     )),
                     zelle(
                       f.key,
                       'kostform',
                       'Kostform',
                       () => (
-                        <Form.Item name={[f.name, 'kostform']} style={ohneAbstand}>
+                        <Feld name={[f.name, 'kostform']}>
                           <FlaechenWahl
                             optionen={KOSTFORM_OPTIONEN}
                             breite={KOSTFORM_FLAECHE}
                             aria-label={`Kostform, Person ${nummer}`}
                           />
-                        </Form.Item>
+                        </Feld>
                       ),
                       raster ? undefined : { gridColumn: '1 / -1' },
                     ),
@@ -310,18 +313,17 @@ export default function RegistrierMaske({
                       'unvertraeglichkeiten',
                       'Unverträglichkeiten',
                       (ids) => (
-                        <Form.Item
+                        <Feld
                           name={[f.name, 'unvertraeglichkeiten']}
                           rules={[
                             zeichenRegel(PERSON_UNVERTRAEGLICHKEITEN_MAX, 'Unverträglichkeiten'),
                           ]}
-                          style={ohneAbstand}
                         >
                           <Input
                             aria-labelledby={ids}
                             count={zeichenGrenze(PERSON_UNVERTRAEGLICHKEITEN_MAX)}
                           />
-                        </Form.Item>
+                        </Feld>
                       ),
                       raster ? undefined : { gridColumn: '1 / -1' },
                     ),
@@ -440,7 +442,7 @@ export default function RegistrierMaske({
                   </Typography.Text>
                 )}
               </div>
-            </>
+            </ConfigProvider>
           )}
         </Form.List>
       </div>

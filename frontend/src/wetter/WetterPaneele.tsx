@@ -27,9 +27,12 @@ import {
   Kennzahlenband,
   Paneel,
   PaneelZustand,
+  Stapel,
   Status,
+  Textstufe,
   tonVonRolle,
   monoStil,
+  schriftStil,
   useRollen,
   type PaneelDatenzustand,
 } from '../components/instrument';
@@ -105,7 +108,9 @@ function StandHinweis({
     // Nur der Zustand: der Grund und der Weg stehen einmal auf der Seite (LLH-1752).
     return (
       <div data-lfh="wetter-paneel-ohne-ort" style={polster}>
-        <span style={{ color: rollen.text2, fontSize: 12 }}>{KEIN_ORT_TEXT}</span>
+        <Textstufe stufe="textKlein" ton="text2">
+          {KEIN_ORT_TEXT}
+        </Textstufe>
       </div>
     );
   }
@@ -121,8 +126,12 @@ function StandHinweis({
           boxShadow: `inset 3px 0 0 ${rollen.achtung}`,
         }}
       >
-        <b style={{ color: rollen.achtungText, fontSize: 13 }}>{STAND_UNBEKANNT}</b>
-        <span style={{ color: rollen.text2, fontSize: 12 }}>{ausfallText}</span>
+        <b style={{ ...schriftStil('text'), fontWeight: 700, color: rollen.achtungText }}>
+          {STAND_UNBEKANNT}
+        </b>
+        <Textstufe stufe="textKlein" ton="text2">
+          {ausfallText}
+        </Textstufe>
       </div>
     );
   }
@@ -130,7 +139,12 @@ function StandHinweis({
     return (
       <div
         data-lfh="wetter-veraltet"
-        style={{ ...polster, color: rollen.achtungText, fontSize: 12, fontWeight: 600 }}
+        style={{
+          ...polster,
+          ...schriftStil('textKlein'),
+          color: rollen.achtungText,
+          fontWeight: 600,
+        }}
       >
         {stand.stand} · {VERALTET} — {veraltetGrund}
       </div>
@@ -165,14 +179,16 @@ function WarnungEintrag({
         borderBlockEnd: `1px solid ${rollen.flaeche3}`,
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginXS }}>
+      <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
         <Status groesse="klein" ton={tonVonRolle(d.rolle) ?? 'achtung'} wort={d.label} />
-        <b style={{ color: rollen.text, fontSize: 13 }}>{titelSchreibung(w.ereignis)}</b>
-      </div>
-      <span style={{ ...monoStil(12), color: rollen.text2 }}>
+        <Textstufe stufe="kartentitel">{titelSchreibung(w.ereignis)}</Textstufe>
+      </Stapel>
+      <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
         {warnZeitraum(w.beginn, w.ende, jetzt, konv)}
       </span>
-      <span style={{ color: rollen.text2, fontSize: 12 }}>{w.ueberschrift}</span>
+      <Textstufe stufe="textKlein" ton="text2">
+        {w.ueberschrift}
+      </Textstufe>
       {hatText && (
         <span>
           <Button
@@ -189,16 +205,20 @@ function WarnungEintrag({
         </span>
       )}
       {hatText && offen && (
-        <div id={textId} style={{ display: 'grid', gap: token.marginXS, fontSize: 12 }}>
-          {w.beschreibung?.trim() && <p style={{ margin: 0 }}>{w.beschreibung}</p>}
+        <Stapel id={textId} abstand="xs">
+          {w.beschreibung?.trim() && (
+            <Textstufe als="p" stufe="textKlein">
+              {w.beschreibung}
+            </Textstufe>
+          )}
           {w.handlungsempfehlung?.trim() && (
-            <p style={{ margin: 0 }}>
+            <Textstufe als="p" stufe="textKlein">
               <Augenbraue>Handlungsempfehlung</Augenbraue>
               <br />
               {w.handlungsempfehlung}
-            </p>
+            </Textstufe>
           )}
-        </div>
+        </Stapel>
       )}
     </li>
   );
@@ -270,7 +290,7 @@ export function WetterOhneOrtHinweis({
   wetter: WetterAnzeige | undefined;
   onEinsatzdaten: () => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   if (zustand !== 'daten' || wetter?.warnungen.zustand !== 'kein_ort') return null;
   return (
     <div
@@ -283,14 +303,14 @@ export function WetterOhneOrtHinweis({
         paddingInline: token.padding,
       }}
     >
-      <span style={{ color: rollen.text2 }}>{KEIN_ORT_SEITE}</span>
+      <Textstufe ton="text2">{KEIN_ORT_SEITE}</Textstufe>
       <Button onClick={onEinsatzdaten}>Einsatzort in den Einsatzdaten verorten</Button>
     </div>
   );
 }
 
 export function WarnungenPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: TeilProps) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const teil = wetter?.warnungen;
   const stand = teil ? teilStand(teil, 'warnungen', jetzt, konv) : null;
   const ort = ortName(wetter?.ort);
@@ -304,7 +324,11 @@ export function WarnungenPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: Te
     <Paneel
       titel="Warnungen (DWD)"
       meta={stand ? standMeta(stand, ort) : undefined}
-      fuss={<span style={{ color: rollen.gedaempft, fontSize: 11 }}>{QUELLENVERMERK}</span>}
+      fuss={
+        <Textstufe stufe="textKlein" ton="gedaempft">
+          {QUELLENVERMERK}
+        </Textstufe>
+      }
     >
       <PaneelZustand
         zustand={zustand}
@@ -319,9 +343,11 @@ export function WarnungenPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: Te
           (anzahl === 0 ? (
             <div
               data-lfh="wetter-keine-warnung"
-              style={{ paddingBlock: token.paddingSM, paddingInline: token.padding, fontSize: 12 }}
+              style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
             >
-              Keine gültigen Warnungen{ort ? ` für ${ort}` : ''}.
+              <Textstufe stufe="textKlein">
+                Keine gültigen Warnungen{ort ? ` für ${ort}` : ''}.
+              </Textstufe>
             </div>
           ) : (
             <>
@@ -347,9 +373,9 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
       titel="Vorhersage 24 h"
       meta={stand ? standMeta(stand) : undefined}
       fuss={
-        <span style={{ color: rollen.gedaempft, fontSize: 11 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           {[station, 'MOSMIX', QUELLENVERMERK].filter(Boolean).join(' · ')}
-        </span>
+        </Textstufe>
       }
     >
       <PaneelZustand
@@ -364,10 +390,10 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
         {stand && <StandHinweis stand={stand} />}
         {mitInhalt &&
           (stunden.length === 0 ? (
-            <div
-              style={{ paddingBlock: token.paddingSM, paddingInline: token.padding, fontSize: 12 }}
-            >
-              Keine Vorhersagewerte für die nächsten 24 Stunden.
+            <div style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}>
+              <Textstufe stufe="textKlein">
+                Keine Vorhersagewerte für die nächsten 24 Stunden.
+              </Textstufe>
             </div>
           ) : (
             <>
@@ -393,7 +419,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
                       paddingBlock: token.paddingXS,
                       paddingInline: token.padding,
                       borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-                      ...monoStil(12),
+                      ...monoStil('monoKlein'),
                       color: rollen.text2,
                     }}
                   >
@@ -429,7 +455,7 @@ function einheit(v: number | null | undefined, e: string): string | undefined {
 }
 
 function Messwerte({ a }: { a: WetterAktuell }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const von = (g: Parameters<typeof ergaenztVon>[1]) => ergaenztVon(a.ergaenzt, g);
   const richtung = himmelsrichtung(a.windrichtung_grad);
   const SymbolIcon = wetterSymbolIcon(a.symbol);
@@ -437,7 +463,11 @@ function Messwerte({ a }: { a: WetterAktuell }) {
   const wert = (text: ReactNode, herkunft: string | null) => (
     <span style={{ display: 'grid', gap: 2 }}>
       <span>{text}</span>
-      {herkunft && <span style={{ fontSize: 11, color: rollen.gedaempft }}>{herkunft}</span>}
+      {herkunft && (
+        <Textstufe stufe="textKlein" ton="gedaempft">
+          {herkunft}
+        </Textstufe>
+      )}
     </span>
   );
   return (
@@ -500,7 +530,6 @@ function Messwerte({ a }: { a: WetterAktuell }) {
 }
 
 export function AktuellPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: TeilProps) {
-  const { rollen } = useRollen();
   const teil = wetter?.aktuell;
   const stand = teil ? messStand(teil, jetzt, konv) : null;
   const daten = teil?.zustand === 'ok' ? teil.daten : null;
@@ -512,9 +541,9 @@ export function AktuellPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: Teil
         titel="Aktuelle Bedingungen"
         meta={stand ? standMeta(stand, mitInhalt ? station : null) : undefined}
         fuss={
-          <span style={{ color: rollen.gedaempft, fontSize: 11 }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             {['Messung', 'SYNOP', QUELLENVERMERK].join(' · ')}
-          </span>
+          </Textstufe>
         }
       >
         <PaneelZustand

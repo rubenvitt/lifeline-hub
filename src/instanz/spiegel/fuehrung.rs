@@ -207,6 +207,10 @@ async fn werde_fuehrer(
     Ok(())
 }
 
+/// Anfang des ETB-Eintrags einer Umnummerierung; `instanz::fuehrung::notify_wechsel` findet ihn
+/// daran nach dem Commit wieder und verteilt ihn (LLH-1976).
+pub(crate) const NUMMER_EINTRAG_ANFANG: &str = "Neue Einsatznummer ";
+
 /// Hält eine Umnummerierung beim Führungswechsel im Einsatztagebuch fest (Spec `einsatznummer`,
 /// „Eine Umnummerierung ist nachlesbar“). Der Einsatz ist hier schon eigen. Findet sich kein
 /// Konto für den Eintrag, entfällt er: Ein Führungswechsel wartet nicht darauf, anders als die
@@ -233,8 +237,8 @@ async fn add_nummer_eintrag(
         akteur,
         startwert,
         &format!(
-            "Neue Einsatznummer {neu}, bisher {alt}: Die bisherige ist an dieser Installation \
-             schon vergeben."
+            "{NUMMER_EINTRAG_ANFANG}{neu}, bisher {alt}: Die bisherige ist an dieser \
+             Installation schon vergeben."
         ),
     )
     .await?;

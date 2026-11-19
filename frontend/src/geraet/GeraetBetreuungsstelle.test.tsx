@@ -17,6 +17,7 @@ import type {
   Person,
   PersonDetail,
 } from '../api/types';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { istHier } from './GeraetBetroffenePage';
 import { freiePlaetze } from '../betreuung/betreuungText';
@@ -357,6 +358,22 @@ describe('Betreuungsstelle — Registrierliste – Druckansicht (LLH-1616)', () 
       'Muster, Max',
     );
     expect(abrufe).toEqual(['/api/einsaetze/7/betreuung/stellen/3/registrierungen/druck']);
+  });
+
+  it('gibt es die Stelle nicht (mehr) (404), steht das Muster mit dem Rückweg zur Betreuung', async () => {
+    bereit();
+    server.use(
+      http.get('/api/einsaetze/7/betreuung/stellen/3/registrierungen/druck', () =>
+        HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
+      ),
+    );
+    const router = renderApp('/geraet/7/betreuung/registrierliste/druck');
+    await erwarteNichtGefunden({
+      titel: 'Diese Betreuungsstelle gibt es nicht (mehr)',
+      knopf: 'Zur Betreuung',
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Zur Betreuung' }));
+    await waitFor(() => expect(pfad(router)).toBe('/geraet/7/betreuung'));
   });
 });
 

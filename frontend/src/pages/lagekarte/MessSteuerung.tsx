@@ -1,5 +1,5 @@
 import { Button, Card, Space } from 'antd';
-import { Segmentleiste, monoStil, useRollen } from '../../components/instrument';
+import { Segmentleiste, Stapel, monoStil, useRollen } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import EscKappe from './EscKappe';
 import { messErgebnis, type MessForm } from './messung';
@@ -44,7 +44,7 @@ export default function MessSteuerung(props: MessSteuerungProps) {
         minWidth: 'min(320px, 100%)',
       }}
     >
-      <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
+      <Stapel abstand="sm">
         <Segmentleiste<MessForm>
           optionen={FORMEN}
           wert={props.form}
@@ -58,7 +58,7 @@ export default function MessSteuerung(props: MessSteuerungProps) {
           {ergebnis.neben && (
             <span
               style={{
-                ...monoStil(12),
+                ...monoStil('monoKlein'),
                 color: rollen.gedaempft,
                 marginInlineStart: token.marginSM,
               }}
@@ -81,7 +81,7 @@ export default function MessSteuerung(props: MessSteuerungProps) {
             <EscKappe />
           </Button>
         </Space>
-      </Space>
+      </Stapel>
     </Card>
   );
 }

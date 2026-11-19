@@ -4,6 +4,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { Button, Form, Input } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
+import { AenderungsstandProvider } from '../aenderungsstand';
 import Feld, { FELD_GRENZE, FELD_KLASSE } from './Feld';
 
 function formularItem(beschriftung: string): HTMLElement {
@@ -103,5 +104,62 @@ describe('Feld (Spec `feldbreiten`)', () => {
     void (<Feld<Werte> name="beginn">x</Feld>);
     // @ts-expect-error — „begin“ ist kein Feld der Werte
     void (<Feld<Werte> name="begin">x</Feld>);
+  });
+});
+
+describe('Feld: Punkt am geänderten Feld (LLH-1829)', () => {
+  function Maske({ mitProvider = true }: { mitProvider?: boolean }) {
+    const feld = (
+      <Feld name="name" label="Name">
+        <Input />
+      </Feld>
+    );
+    return (
+      <Form initialValues={{ name: 'A' }}>
+        {mitProvider ? (
+          <AenderungsstandProvider ausgangswerte={{ name: 'A' }}>{feld}</AenderungsstandProvider>
+        ) : (
+          feld
+        )}
+      </Form>
+    );
+  }
+
+  it('trägt am Etikett einen Punkt, wenn das Feld geändert ist', async () => {
+    renderMitProviders(<Maske />);
+    expect(screen.queryByText('•')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'B' } });
+    const punkt = await screen.findByText('•');
+    expect(punkt).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByLabelText(/\(geändert\)/)).toHaveValue('B');
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: 'A' } });
+    await waitFor(() => expect(screen.queryByText('•')).toBeNull());
+    expect(screen.queryByLabelText(/\(geändert\)/)).toBeNull();
+  });
+
+  it('ohne Provider kein Punkt', () => {
+    renderMitProviders(<Maske mitProvider={false} />);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'B' } });
+    expect(screen.queryByText('•')).toBeNull();
+  });
+});
+
+describe('Feld: Prüfmeldung nennt das Etikett (LLH-1829, Review)', () => {
+  it('eine Pflichtregel ohne eigene Meldung nennt das Etikett, nicht den Feldnamen', async () => {
+    renderMitProviders(
+      <Form>
+        <Feld name="kategorie" label="Kategorie" rules={[{ required: true }]}>
+          <Input />
+        </Feld>
+        <Button htmlType="submit">Senden</Button>
+      </Form>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() =>
+      expect(document.querySelector('.ant-form-item-explain-error')).not.toBeNull(),
+    );
+    const meldung = document.querySelector('.ant-form-item-explain-error')!;
+    expect(meldung).toHaveTextContent('Kategorie');
+    expect(meldung).not.toHaveTextContent('kategorie');
   });
 });

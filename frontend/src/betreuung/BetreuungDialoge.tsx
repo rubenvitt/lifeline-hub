@@ -27,7 +27,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { sprungGesperrtText } from '../components/Sprung';
-import { SegmentFeld, Segmentleiste, type SegmentOption } from '../components/instrument';
+import { Feld, SegmentFeld, Segmentleiste, type SegmentOption } from '../components/instrument';
 import RadiusEingabe from '../components/RadiusEingabe';
 import type { GebietKreis } from './gebietZeichnen';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
@@ -337,15 +337,15 @@ export const hoechstensRegel = {
 
 function erhebungFeld(name: string, label: string) {
   return (
-    <Form.Item name={name} label={label} rules={[{ required: true }]}>
+    <Feld name={name} label={label} rules={[{ required: true }]}>
       <SegmentFeld beschriftung={label} optionen={ERHEBUNG_OPTIONEN} />
-    </Form.Item>
+    </Feld>
   );
 }
 
 function personenFeld(name: string, label: string, min: number, pflicht: boolean) {
   return (
-    <Form.Item
+    <Feld
       name={name}
       label={label}
       rules={[
@@ -353,14 +353,14 @@ function personenFeld(name: string, label: string, min: number, pflicht: boolean
         hoechstensRegel,
       ]}
     >
-      <InputNumber min={min} precision={0} style={{ width: '100%' }} />
-    </Form.Item>
+      <InputNumber min={min} precision={0} />
+    </Feld>
   );
 }
 
 function zeitpunktFeld() {
   return (
-    <Form.Item name="zeitpunkt" label="Zeitpunkt" rules={[zeitRegel]} style={{ marginBottom: 0 }}>
+    <Feld name="zeitpunkt" label="Zeitpunkt" rules={[zeitRegel]}>
       {/* Uhrzeit und Kalendertag in der Anzeigezone (LFH-692); `zeitRegel` prüft den Zeitpunkt. */}
       <ZeitpunktEingabe
         art="ereignis"
@@ -368,20 +368,20 @@ function zeitpunktFeld() {
         keineZukunftstage
         style={{ width: '100%' }}
       />
-    </Form.Item>
+    </Feld>
   );
 }
 
 function abschnittFeld(abschnitte: readonly AbschnittOption[]) {
   return (
-    <Form.Item name="abschnitt_id" label="Einsatzabschnitt">
+    <Feld name="abschnitt_id" label="Einsatzabschnitt">
       <Select
         allowClear
         placeholder="ohne Abschnitt"
         options={[...abschnitte]}
         notFoundContent="Keine Einsatzabschnitte angelegt"
       />
-    </Form.Item>
+    </Feld>
   );
 }
 
@@ -405,7 +405,7 @@ interface DialogBasis {
 // ── Evakuierungsbezirk ──────────────────────────────────────────────────────────────────
 
 /**
- * Die Gebietswahl als Formularfeld (`Form.Item` reicht `value`/`onChange` hinein). Ist die Lagekarte
+ * Die Gebietswahl als Formularfeld (`Feld` reicht `value`/`onChange` hinein). Ist die Lagekarte
  * gesperrt, steht „Fläche zeichnen“ gesperrt und nennt den Grund im Wortlaut (LFH-888) — ein
  * Tooltip allein erreichte Tablet und Handy nicht.
  */
@@ -424,7 +424,7 @@ function gebietNachAnlegen(
 }
 
 /**
- * Radius als Formularfeld: Zahl und Schnellwahl in einer umbrechenden Zeile. `Form.Item` reicht
+ * Radius als Formularfeld: Zahl und Schnellwahl in einer umbrechenden Zeile. `Feld` reicht
  * `id`, `value`/`onChange` und die ARIA-Zustände (Pflicht, Fehler, Meldung) hinein.
  */
 function RadiusFeld(props: ComponentProps<typeof RadiusEingabe>) {
@@ -501,7 +501,7 @@ export function BezirkAnlegenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         name="bezeichnung"
         label="Bezeichnung"
         // Datenschutz: die Bezeichnung steht im Einsatztagebuch.
@@ -515,25 +515,25 @@ export function BezirkAnlegenDialog({
           placeholder="z. B. Lindenstr. 1–20 oder Bezirk 3"
           count={zeichenGrenze(EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX)}
         />
-      </Form.Item>
+      </Feld>
       {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
       {erhebungFeld('plan_erhebung', 'Erhebung')}
-      <Form.Item name="gebiet" label="Gebiet auf der Lagekarte">
+      <Feld name="gebiet" label="Gebiet auf der Lagekarte">
         <GebietFeld karteGesperrt={karteGesperrt} />
-      </Form.Item>
+      </Feld>
       {gebiet === 'radius' && (
-        <Form.Item
+        <Feld
           name="radius"
           label={einsatzort ? 'Radius um den Einsatzort' : 'Radius'}
           rules={[{ required: true, message: 'Bitte einen Radius angeben' }]}
         >
           <RadiusFeld />
-        </Form.Item>
+        </Feld>
       )}
       {weitere(
         <>
           {abschnittFeld(abschnitte)}
-          <Form.Item
+          <Feld
             name="sammelstelle"
             label="Sammelstelle"
             rules={[ortZeichenRegel(EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX, 'Sammelstelle')]}
@@ -543,18 +543,17 @@ export function BezirkAnlegenDialog({
               etikett="Sammelstelle"
               count={zeichenGrenze(EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX)}
             />
-          </Form.Item>
-          <Form.Item
+          </Feld>
+          <Feld
             name="notiz"
             label="Notiz"
             rules={[zeichenRegel(EVAKUIERUNG_BEZIRK_NOTIZ_MAX, 'Notiz')]}
-            style={{ marginBottom: 0 }}
           >
             <Input.TextArea
               autoSize={{ minRows: 2 }}
               count={zeichenGrenze(EVAKUIERUNG_BEZIRK_NOTIZ_MAX)}
             />
-          </Form.Item>
+          </Feld>
         </>,
       )}
       <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht angelegt werden" />
@@ -607,12 +606,12 @@ export function RaeumungDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item name="raeumung" label="Räumungszustand" rules={[{ required: true }]}>
+      <Feld name="raeumung" label="Räumungszustand" rules={[{ required: true }]}>
         <SegmentFeld
           beschriftung="Räumungszustand"
           optionen={RAEUMUNG_FOLGE.map((r) => ({ wert: r, label: raeumungszustand[r].label }))}
         />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={fehler} titel="Räumungszustand konnte nicht gespeichert werden" />
     </ErfassungsModal>
   );
@@ -679,7 +678,7 @@ export function StelleAnlegenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
@@ -688,18 +687,18 @@ export function StelleAnlegenDialog({
         ]}
       >
         <Input count={zeichenGrenze(BETREUUNG_STELLE_BEZEICHNUNG_MAX)} />
-      </Form.Item>
-      <Form.Item name="art" label="Art" rules={[{ required: true }]}>
+      </Feld>
+      <Feld name="art" label="Art" rules={[{ required: true }]}>
         <Select options={ART_OPTIONEN} />
-      </Form.Item>
-      <Form.Item name="kapazitaet_personen" label="Kapazität (Personen)" rules={[hoechstensRegel]}>
+      </Feld>
+      <Feld name="kapazitaet_personen" label="Kapazität (Personen)" rules={[hoechstensRegel]}>
         {/* Leer: keine Kapazität, dann auch keine Zahl freier Plätze. */}
-        <InputNumber min={1} precision={0} placeholder="keine Angabe" style={{ width: '100%' }} />
-      </Form.Item>
+        <InputNumber min={1} precision={0} placeholder="keine Angabe" />
+      </Feld>
       {weitere(
         <>
           {abschnittFeld(abschnitte)}
-          <Form.Item
+          <Feld
             name="standort"
             label="Standort"
             rules={[ortZeichenRegel(BETREUUNG_STELLE_STANDORT_MAX, 'Standort')]}
@@ -709,32 +708,31 @@ export function StelleAnlegenDialog({
               etikett="Standort"
               count={zeichenGrenze(BETREUUNG_STELLE_STANDORT_MAX)}
             />
-          </Form.Item>
-          <Form.Item
+          </Feld>
+          <Feld
             name="leitung"
             label="Leitung"
             rules={[zeichenRegel(BETREUUNG_LEITUNG_MAX, 'Leitung')]}
           >
             <Input count={zeichenGrenze(BETREUUNG_LEITUNG_MAX)} />
-          </Form.Item>
-          <Form.Item
+          </Feld>
+          <Feld
             name="kontaktweg"
             label="Kontakt"
             rules={[zeichenRegel(BETREUUNG_KONTAKTWEG_MAX, 'Kontakt')]}
           >
             <Input count={zeichenGrenze(BETREUUNG_KONTAKTWEG_MAX)} />
-          </Form.Item>
-          <Form.Item
+          </Feld>
+          <Feld
             name="notiz"
             label="Notiz"
             rules={[zeichenRegel(BETREUUNG_STELLE_NOTIZ_MAX, 'Notiz')]}
-            style={{ marginBottom: 0 }}
           >
             <Input.TextArea
               autoSize={{ minRows: 2 }}
               count={zeichenGrenze(BETREUUNG_STELLE_NOTIZ_MAX)}
             />
-          </Form.Item>
+          </Feld>
         </>,
       )}
       <SpeicherFehler fehler={fehler} titel="Betreuungsstelle konnte nicht angelegt werden" />
@@ -811,10 +809,9 @@ export function StelleSchliessenDialog({
             style={{ marginBottom: token.margin }}
             title={`Die Stelle ist mit ${personenZahl(belegt)} Personen belegt.`}
           />
-          <Form.Item
+          <Feld
             name="leermeldung"
             valuePropName="checked"
-            style={{ marginBottom: 0 }}
             rules={[
               {
                 validator: (_, v) =>
@@ -829,7 +826,7 @@ export function StelleSchliessenDialog({
             ]}
           >
             <Checkbox>Alle haben die Stelle verlassen — Belegung 0 melden</Checkbox>
-          </Form.Item>
+          </Feld>
         </>
       ) : (
         <Typography.Paragraph type="secondary">Die Stelle ist leer gemeldet.</Typography.Paragraph>

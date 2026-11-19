@@ -1,6 +1,7 @@
 import { AutoComplete, Button, Col, Row, theme, type FormRule } from 'antd';
 import { VERTEILER_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
 import type { AdressatKategorie } from '../api/types';
+import { FELD_KLASSE } from '../components/instrument';
 import { Select } from '../components/Select';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { grenzeText, istZuLang, Zeichenzaehler } from '../components/zeichenGrenze';
@@ -76,7 +77,7 @@ export function ExterneEmpfaenger({
             align="top"
             style={{ marginBottom: token.marginSM }}
           >
-            <Col xs={24} sm={9}>
+            <Col xs={24} sm={9} className={FELD_KLASSE}>
               <Select<AdressatKategorie>
                 aria-label={`Kategorie externe Stelle ${nummer}`}
                 placeholder="Kategorie"
@@ -84,10 +85,9 @@ export function ExterneEmpfaenger({
                 value={zeile.kategorie}
                 onChange={(kategorie) => updateRow(index, { kategorie })}
                 disabled={disabled}
-                style={{ width: '100%' }}
               />
             </Col>
-            <Col xs={20} sm={13}>
+            <Col xs={20} sm={13} className={FELD_KLASSE}>
               <AutoComplete
                 aria-label={`Bezeichnung externe Stelle ${nummer}`}
                 aria-invalid={zuLang || undefined}
@@ -100,7 +100,6 @@ export function ExterneEmpfaenger({
                   updateRow(index, { bezeichnung: bezeichnung ?? '' })
                 }
                 disabled={disabled}
-                style={{ width: '100%' }}
               />
               <Zeichenzaehler wert={zeile.bezeichnung.trim()} max={BEZEICHNUNG_MAX} />
             </Col>

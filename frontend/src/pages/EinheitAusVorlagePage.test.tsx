@@ -16,6 +16,7 @@ import type {
   VorschauPersonal,
 } from '../api/types';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 import EinheitAusVorlagePage from './EinheitAusVorlagePage';
 
 /**
@@ -153,6 +154,10 @@ function Ort() {
 }
 
 function zeige(...abweichungen: HttpHandler[]) {
+  return zeigeAn('/einsaetze/1/einheiten/aus-vorlage/5', ...abweichungen);
+}
+
+function zeigeAn(route: string, ...abweichungen: HttpHandler[]) {
   server.use(...abweichungen, ...handlers());
   return renderMitProviders(
     <Routes>
@@ -162,7 +167,7 @@ function zeige(...abweichungen: HttpHandler[]) {
       />
       <Route path="*" element={<Ort />} />
     </Routes>,
-    { route: '/einsaetze/1/einheiten/aus-vorlage/5' },
+    { route },
   );
 }
 
@@ -373,13 +378,40 @@ describe('EinheitAusVorlagePage · Baum', () => {
     expect(screen.getByRole('button', { name: 'Einheit bilden' })).toBeDisabled();
   });
 
-  it('eine unbekannte Vorlage zeigt einen Fehler statt eines leeren Baums', async () => {
+  it('eine unbekannte Vorlage (404): „gibt es nicht (mehr)“ mit Rückweg zur Gliederung', async () => {
     zeige(
       http.get('/api/einsaetze/1/einheiten/aus-vorlage/5', () =>
-        HttpResponse.json({ error: 'Vorlage nicht gefunden' }, { status: 404 }),
+        HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
       ),
     );
-    expect(await screen.findByText('Vorlage nicht verfügbar')).toBeInTheDocument();
+    await erwarteNichtGefunden({
+      titel: 'Diese Vorlage gibt es nicht (mehr)',
+      knopf: 'Zur Gliederung',
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Zur Gliederung' }));
+    expect(await screen.findByTestId('ort')).toHaveTextContent('/einsaetze/1/einheiten');
+  });
+
+  it('eine ungültige Kennung in der Adresse zeigt dasselbe Muster', async () => {
+    zeigeAn('/einsaetze/1/einheiten/aus-vorlage/fuenf');
+    await erwarteNichtGefunden({
+      titel: 'Diese Vorlage gibt es nicht (mehr)',
+      knopf: 'Zur Gliederung',
+    });
+  });
+
+  it('ein anderer Fehler (500) bietet „Erneut abrufen“ an', async () => {
+    let fehler = true;
+    zeige(
+      http.get('/api/einsaetze/1/einheiten/aus-vorlage/5', () =>
+        fehler ? HttpResponse.json({ error: 'kaputt' }, { status: 500 }) : undefined,
+      ),
+    );
+    expect(await screen.findByText('Vorlage konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('kaputt');
+    fehler = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+    await warteAufBaum();
   });
 });
 

@@ -73,12 +73,25 @@ export function schriftStil(stufe: Schriftstufenname) {
   };
 }
 
-/** Mono in beliebiger Größe (Meta 10/11, Zeiten 12/13, Präfix 14) — Familie aus `schrift.zahl`. */
-export function monoStil(groesse: number, gewicht: 400 | 500 = 400) {
+/** Die Stufen der `schriftskala` in der Familie `zahl` (Mono). */
+export type Monostufe = {
+  [K in Schriftstufenname]: (typeof schriftskala)[K]['familie'] extends 'zahl' ? K : never;
+}[Schriftstufenname];
+
+/**
+ * Mono-Text in einer Stufe der `schriftskala` (`metaKlein` 10 · `meta` 11 · `monoKlein` 12 ·
+ * `mono` 13 · `monoGross` 14 · `datenwert*`; LLH-1972). Die Stufe liefert Größe und, ohne
+ * `gewicht`, ihr Gewicht — ihre Sperrung NICHT: wer sie will, setzt sie selbst.
+ *
+ * Eine Zahl nur aus einer Variablen (Dichte-Grundschrift `token.fontSize*`, Kartenmaße), dann
+ * mit Gewicht 400. Ein Zahl-Literal zählt `theme/schriftgroesse.guard.test.ts` als freie Größe.
+ */
+export function monoStil(groesse: Monostufe | number, gewicht?: 400 | 500) {
+  const stufe = typeof groesse === 'number' ? undefined : schriftskala[groesse];
   return {
     fontFamily: schrift.zahl,
-    fontSize: groesse,
-    fontWeight: gewicht,
+    fontSize: stufe ? stufe.groesse : (groesse as number),
+    fontWeight: gewicht ?? stufe?.gewicht ?? 400,
     fontVariantNumeric: 'tabular-nums' as const,
   };
 }

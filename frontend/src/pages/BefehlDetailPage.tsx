@@ -41,7 +41,7 @@ import {
   verteilerNamesFromForm,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
-import { Paneel, monoStil } from '../components/instrument';
+import { Feld, Paneel, Stapel, monoStil } from '../components/instrument';
 import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
@@ -383,7 +383,7 @@ function BefehlDetail() {
         breite="schmal"
         titel={befehl.titel}
         meta={
-          <Space size={token.marginSM} wrap>
+          <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             {/* Derselbe Träger wie in der Liste: Fachlabel und Phasenfarbe aus der geteilten
                 Achse. `istEntwurf` steuert die Knöpfe, nicht das Etikett. */}
             <StatusBadge
@@ -392,7 +392,7 @@ function BefehlDetail() {
             />
             <span>{v?.label ?? befehl.vorlage}</span>
             <span>v{befehl.version}</span>
-          </Space>
+          </Stapel>
         }
         breadcrumb={
           <Breadcrumb
@@ -439,7 +439,7 @@ function BefehlDetail() {
 
         {/* Taktische DTG in der Anzeigezone: `zeitstand` ist ein UTC-Wirestring ohne
             Zonenkennung. */}
-        <Typography.Paragraph type="secondary" style={monoStil(12)}>
+        <Typography.Paragraph type="secondary" style={monoStil('monoKlein')}>
           Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
         </Typography.Paragraph>
 
@@ -473,9 +473,9 @@ function BefehlDetail() {
                   // gespeist (LFH-731, LLH-1172); der Kopfblock weicht im Druck
                   // (`entwurf/dokumentEntwurf.css`).
                   <>
-                    <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+                    <Feld label="Titel" name="titel" rules={[{ required: true }]}>
                       <Input />
-                    </Form.Item>
+                    </Feld>
                     <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
                   </>
                 }

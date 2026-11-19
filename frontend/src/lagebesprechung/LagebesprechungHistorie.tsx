@@ -10,6 +10,7 @@ import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { etbPfad } from '../routing/deeplinks';
 import { linkZeilenzielStil } from '../components/linkZeilenziel';
+import { Stapel } from '../components/instrument';
 import { kuerzeEntschluss } from './lagebesprechungAbschluss';
 
 /** Ab dieser Länge steht der Entschluss gekürzt da, mit „ganz zeigen“. */
@@ -81,7 +82,7 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
           </>
         }
         description={
-          <Flex vertical gap={token.marginXXS}>
+          <Stapel abstand="xxs">
             <Entschluss text={l.entschluss} nr={l.lfd_nr} />
             <span>
               Nächste Lagebesprechung:{' '}
@@ -94,7 +95,7 @@ export default function LagebesprechungHistorie({ einsatzId }: { einsatzId: numb
             >
               ETB-Eintrag
             </Link>
-          </Flex>
+          </Stapel>
         }
       />
     </ListenEintrag>

@@ -13,7 +13,7 @@ import type {
   SchichtplanPostenWahlEingabe,
 } from '../../api/types';
 import { Select } from '../../components/Select';
-import { useRollen } from '../../components/instrument';
+import { FELD_KLASSE, Stapel, useRollen } from '../../components/instrument';
 import { Marke } from '../../components/instrument/Marke';
 
 /**
@@ -171,15 +171,17 @@ function PostenZeile({
         )}
       </span>
       <Treffer treffer={posten.treffer} />
+      {/* Die Hülle trägt die Spaltenbreite; die Auswahl füllt sie (`FELD_KLASSE`). */}
       {posten.art !== 'pause' && (
-        <Select
-          aria-label={`Ziel für ${posten.name}`}
-          value={postenWert(posten.ziel)}
-          onChange={onWahl}
-          disabled={gesperrt}
-          options={optionen}
-          style={{ flex: '1 1 14rem', minWidth: 0 }}
-        />
+        <div className={FELD_KLASSE} style={{ flex: '1 1 14rem', minWidth: 0 }}>
+          <Select
+            aria-label={`Ziel für ${posten.name}`}
+            value={postenWert(posten.ziel)}
+            onChange={onWahl}
+            disabled={gesperrt}
+            options={optionen}
+          />
+        </div>
       )}
     </Flex>
   );
@@ -214,14 +216,16 @@ function PersonZeile({
         {kennung !== '' && <Typography.Text type="secondary"> · {kennung}</Typography.Text>}
       </span>
       <Treffer treffer={person.treffer} />
-      <Select
-        aria-label={`Person für ${person.name}`}
-        value={personWert(person.ziel)}
-        onChange={onWahl}
-        disabled={gesperrt}
-        options={optionen}
-        style={{ flex: '1 1 14rem', minWidth: 0 }}
-      />
+      {/* Die Hülle trägt die Spaltenbreite; die Auswahl füllt sie (`FELD_KLASSE`). */}
+      <div className={FELD_KLASSE} style={{ flex: '1 1 14rem', minWidth: 0 }}>
+        <Select
+          aria-label={`Person für ${person.name}`}
+          value={personWert(person.ziel)}
+          onChange={onWahl}
+          disabled={gesperrt}
+          options={optionen}
+        />
+      </div>
     </Flex>
   );
 }
@@ -271,60 +275,63 @@ export function ImportVorschauAnsicht({
   gesperrt,
   onWahl,
 }: ImportVorschauAnsichtProps) {
-  const { token } = useRollen();
   return (
-    <Flex vertical gap={token.margin} data-lfh="einlesen-vorschau">
-      <Flex gap={token.marginXS} wrap data-lfh="einlesen-zaehlung">
-        {zaehlungMarken(vorschau.zaehlung).map((m) => (
-          <Marke key={m}>{m}</Marke>
-        ))}
-      </Flex>
-      <Meldungen meldungen={vorschau.meldungen} stufe="fehler" />
-      {vorschau.abschnitte_neu.length > 0 && (
-        <section aria-label="Neue Abschnitte" data-lfh="einlesen-abschnitte-neu">
-          <Typography.Title level={5}>Neue Abschnitte</Typography.Title>
-          <Flex gap={token.marginXS} wrap>
-            {vorschau.abschnitte_neu.map((name) => (
-              <Marke key={name}>{name}</Marke>
+    <div data-lfh="einlesen-vorschau">
+      <Stapel abstand="md">
+        <div data-lfh="einlesen-zaehlung">
+          <Stapel richtung="zeile" umbruch abstand="xs">
+            {zaehlungMarken(vorschau.zaehlung).map((m) => (
+              <Marke key={m}>{m}</Marke>
             ))}
-          </Flex>
-        </section>
-      )}
-      {vorschau.posten.length > 0 && (
-        <section aria-label="Posten">
-          <Typography.Title level={5}>Posten</Typography.Title>
-          {vorschau.posten.map((p) => (
-            <PostenZeile
-              key={p.schluessel}
-              posten={p}
-              vorschau={vorschau}
-              gesperrt={gesperrt}
-              onWahl={(w) =>
-                onWahl({ ...wahl, posten: { ...wahl.posten, [p.schluessel]: postenWahl(w) } })
-              }
-            />
-          ))}
-        </section>
-      )}
-      {vorschau.personen.length > 0 && (
-        <section aria-label="Personen">
-          <Typography.Title level={5}>Personen</Typography.Title>
-          {vorschau.personen.map((p) => (
-            <PersonZeile
-              key={p.schluessel}
-              person={p}
-              gesperrt={gesperrt}
-              onWahl={(w) =>
-                onWahl({
-                  ...wahl,
-                  personen: { ...wahl.personen, [p.schluessel]: personWahl(w) },
-                })
-              }
-            />
-          ))}
-        </section>
-      )}
-      <Meldungen meldungen={vorschau.meldungen} stufe="hinweis" />
-    </Flex>
+          </Stapel>
+        </div>
+        <Meldungen meldungen={vorschau.meldungen} stufe="fehler" />
+        {vorschau.abschnitte_neu.length > 0 && (
+          <section aria-label="Neue Abschnitte" data-lfh="einlesen-abschnitte-neu">
+            <Typography.Title level={5}>Neue Abschnitte</Typography.Title>
+            <Stapel richtung="zeile" umbruch abstand="xs">
+              {vorschau.abschnitte_neu.map((name) => (
+                <Marke key={name}>{name}</Marke>
+              ))}
+            </Stapel>
+          </section>
+        )}
+        {vorschau.posten.length > 0 && (
+          <section aria-label="Posten">
+            <Typography.Title level={5}>Posten</Typography.Title>
+            {vorschau.posten.map((p) => (
+              <PostenZeile
+                key={p.schluessel}
+                posten={p}
+                vorschau={vorschau}
+                gesperrt={gesperrt}
+                onWahl={(w) =>
+                  onWahl({ ...wahl, posten: { ...wahl.posten, [p.schluessel]: postenWahl(w) } })
+                }
+              />
+            ))}
+          </section>
+        )}
+        {vorschau.personen.length > 0 && (
+          <section aria-label="Personen">
+            <Typography.Title level={5}>Personen</Typography.Title>
+            {vorschau.personen.map((p) => (
+              <PersonZeile
+                key={p.schluessel}
+                person={p}
+                gesperrt={gesperrt}
+                onWahl={(w) =>
+                  onWahl({
+                    ...wahl,
+                    personen: { ...wahl.personen, [p.schluessel]: personWahl(w) },
+                  })
+                }
+              />
+            ))}
+          </section>
+        )}
+        <Meldungen meldungen={vorschau.meldungen} stufe="hinweis" />
+      </Stapel>
+    </div>
   );
 }

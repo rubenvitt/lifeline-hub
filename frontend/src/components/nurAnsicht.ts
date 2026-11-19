@@ -1,4 +1,8 @@
 import type { EinsatzAnzeige, EinsatzSpiegelAnzeige, EinsatzStatus } from '../api/types';
+import { EINSATZ_ROLLE, SYSTEM_ADMIN_DER_ORG, SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
+
+const LEITUNG = EINSATZ_ROLLE.einsatzleitung.name;
+const FUEHRUNG = EINSATZ_ROLLE.fuehrungspersonal.name;
 
 /**
  * Gründe der Zeile „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078; `frontend/AGENTS.md`,
@@ -7,17 +11,18 @@ import type { EinsatzAnzeige, EinsatzSpiegelAnzeige, EinsatzStatus } from '../ap
  * Wenige Wörter, kein Satz: was fehlt, sieht man an den gesperrten Knöpfen; der Grund muss nur
  * ohne Hover lesbar sein. Kein „die Werte stehen hier zum Nachlesen“ — das zeigt die Seite selbst.
  *
- * Rollen heißen wie in der Mitgliederverwaltung („Führungspersonal“, nicht „Führung“): wer etwa
- * die Systemrolle Führungskraft hat und im Einsatz Beobachter ist, darf sich nicht gemeint fühlen.
+ * Rollen heißen wie im Rollen-Vokabular (LLH-1818, `einsatz/rollenVokabular.ts`; „Führungspersonal“,
+ * nicht „Führung“): wer etwa Führungskraft der Organisation und im Einsatz Beobachter ist, darf
+ * sich nicht gemeint fühlen.
  */
-export const NUR_ADMIN = 'nur System-Admin';
+export const NUR_ADMIN = `nur ${SYSTEM_ROLLE.admin.name}`;
 /** Aktionen, die nur die Einsatzleitung ausführt. */
-export const NUR_LEITUNG = 'nur Einsatzleitung';
-export const NUR_LEITUNG_FUEHRUNG = 'nur Einsatzleitung und Führungspersonal';
+export const NUR_LEITUNG = `nur ${LEITUNG}`;
+export const NUR_LEITUNG_FUEHRUNG = `nur ${LEITUNG} und ${FUEHRUNG}`;
 /** Kopfdaten, Einstellungen und Führungsstelle (LFH-1066): der Admin nur der Org des Einsatzes. */
-export const NUR_LEITUNG_FUEHRUNG_ORG_ADMIN = 'nur Einsatzleitung, Führungspersonal oder Org-Admin';
+export const NUR_LEITUNG_FUEHRUNG_ORG_ADMIN = `nur ${LEITUNG}, ${FUEHRUNG} oder ${SYSTEM_ADMIN_DER_ORG}`;
 /** Fristen ändert nur der Admin der Org, der der Einsatz gehört (LFH-753) — nicht jeder Admin. */
-export const NUR_LEITUNG_ORG_ADMIN = 'nur Einsatzleitung oder Org-Admin';
+export const NUR_LEITUNG_ORG_ADMIN = `nur ${LEITUNG} oder ${SYSTEM_ADMIN_DER_ORG}`;
 export const EINSATZ_ABGESCHLOSSEN = 'Einsatz abgeschlossen';
 /**
  * Ein Modul, dessen Freigabe der Person fehlt, an dem Ort, der es braucht (LLH-1036, Einheit-Ansicht

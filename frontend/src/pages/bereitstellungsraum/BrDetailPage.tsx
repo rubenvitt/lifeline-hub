@@ -1,6 +1,6 @@
 import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { dauer } from '../../anzeige/dauer';
-import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Space, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -55,6 +55,7 @@ import {
   monoStil,
   Sammelbanner,
   sammelbannerKurz,
+  Stapel,
   useRollen,
 } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
@@ -554,7 +555,7 @@ export default function BrDetailPage() {
   /** „seit 1342 · 48 min“ an einer Zeile; ohne „seit“ keine Zeitangabe (keine Schätzung). */
   const seitAngabe = (seitAt: string | null | undefined) =>
     seitAt ? (
-      <span data-lfh="br-seit" style={{ ...monoStil(12), color: rollen.gedaempft }}>
+      <span data-lfh="br-seit" style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
         {seitText(zeitKurz(seitAt), wartezeitMinuten(seitAt, jetzt))}
       </span>
     ) : null;
@@ -706,13 +707,13 @@ export default function BrDetailPage() {
         e.unangemeldet && <UnangemeldetMarke />
       )}
       {einheitVon.get(e.id)?.typ_label && <Marke>{einheitVon.get(e.id)!.typ_label}</Marke>}
-      <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+      <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
         <StaerkeAnzeige
           wert={staerkeDerEinheitImRaum(e.id, einheitIdsImRaum, einheitenQuery.data)}
         />
       </span>
       {e.fahrzeuge.length > 0 && (
-        <span data-lfh="br-einheit-fahrzeuge" style={monoStil(12)}>
+        <span data-lfh="br-einheit-fahrzeuge" style={monoStil('monoKlein')}>
           {funkrufnamen(e.fahrzeuge)}
         </span>
       )}
@@ -720,7 +721,7 @@ export default function BrDetailPage() {
   );
   const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
     <>
-      <span style={monoStil(13)}>{f.funkrufname}</span>
+      <span style={monoStil('mono')}>{f.funkrufname}</span>
       {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Marke>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Marke>}
     </>
   );
@@ -757,7 +758,7 @@ export default function BrDetailPage() {
           kopfFehler != null ||
           ohneZeile.length > 0 ||
           austrittZurueckFehler != null) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             {veraltet && (
               <SeitenStandVeraltet
                 onWiederholen={() => {
@@ -792,7 +793,7 @@ export default function BrDetailPage() {
                 )
               );
             })}
-          </Flex>
+          </Stapel>
         )
       }
       breadcrumb={
@@ -808,9 +809,9 @@ export default function BrDetailPage() {
         )
       }
       aktionen={
-        // `size="middle"`: „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“
-        // (`frontend/AGENTS.md`, „Rot steht nicht bündig neben Neutralem“).
-        <Space wrap size="middle">
+        // „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“; den Abstand trägt
+        // die Kopfhülle als Knopfreihe (`frontend/AGENTS.md`, „Knopfreihen über `Knopfreihe`“).
+        <>
           {darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
             <Button
               type="primary"
@@ -838,7 +839,7 @@ export default function BrDetailPage() {
               )}
             </>
           )}
-        </Space>
+        </>
       }
     >
       {/* „Bearbeiten“ im Paneelkopf der Raumdaten, nicht im Seitenkopf: dort stünden im Zustand
@@ -941,18 +942,18 @@ export default function BrDetailPage() {
                       // Unter `md` stehen die zwei Knöpfe unter der Angabe (LFH-978): rechts
                       // daneben ließen sie dem Ziel auf 390 px nur ein Wort je Zeile.
                       <ListenEintrag actions={abrufAktionen(z)} gestapelt={!breit}>
-                        <Space wrap>
+                        <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                           {z.einheit
                             ? einheitAngaben(z.einheit)
                             : z.fahrzeug && fahrzeugAngaben(z.fahrzeug)}
-                        </Space>
+                        </Stapel>
                         <div data-lfh="br-abruf">
-                          <Space wrap size={token.marginXS}>
+                          <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                             <Status darstellung={brAbgerufen} />
-                            <span style={monoStil(12)}>
+                            <span style={monoStil('monoKlein')}>
                               {abrufAngabe(zeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
                             </span>
-                          </Space>
+                          </Stapel>
                         </div>
                         {zeilenGrund(z.objekt_typ, z.objekt_id)}
                       </ListenEintrag>
@@ -971,10 +972,10 @@ export default function BrDetailPage() {
               emptyText="Keine Einheiten bereitgestellt"
               renderItem={(e) => (
                 <ListenEintrag actions={bereitAktionen('einheit', e.id, e.name)}>
-                  <Space wrap>
+                  <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                     {einheitAngaben(e)}
                     {seitAngabe(e.seit_at)}
-                  </Space>
+                  </Stapel>
                   {zeilenGrund('einheit', e.id)}
                 </ListenEintrag>
               )}
@@ -989,10 +990,10 @@ export default function BrDetailPage() {
               emptyText="Keine Fahrzeuge bereitgestellt"
               renderItem={(f) => (
                 <ListenEintrag actions={bereitAktionen('fahrzeug', f.id, f.funkrufname)}>
-                  <Space wrap>
+                  <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                     {fahrzeugAngaben(f)}
                     {seitAngabe(f.seit_at)}
-                  </Space>
+                  </Stapel>
                   {zeilenGrund('fahrzeug', f.id)}
                 </ListenEintrag>
               )}
@@ -1014,14 +1015,14 @@ export default function BrDetailPage() {
                   }
                   renderItem={(v) => (
                     <ListenEintrag>
-                      <Space wrap>
+                      <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
                         <span>{v.aktion.name}</span>
                         {v.aktion.daten.unangemeldet && <UnangemeldetMarke />}
-                        <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                        <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
                           {v.antrag ? 'beantragt' : 'vorgemerkt'}{' '}
                           {zeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
                         </span>
-                      </Space>
+                      </Stapel>
                     </ListenEintrag>
                   )}
                 />

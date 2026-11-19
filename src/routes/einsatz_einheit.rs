@@ -1231,7 +1231,7 @@ async fn end_einheit(
     // F06/LFH-244 Tier-A: Auflösung (Freigaben, Hochzug, Schicht, Belegung, Endzustand) und
     // System-ETB atomar in EINER Tx. SSE erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis =
             einheit_repo::aufloesen_tx(conn, einsatz_id, eid, ctx.benutzer.id, &jetzt, art).await?;
         let text = match art {
@@ -1247,8 +1247,9 @@ async fn end_einheit(
         if !ergebnis.geloescht {
             crate::etb::repo::link_einheit_tx(conn, etb_id, eid).await?;
         }
-        Ok(ergebnis)
+        Ok((ergebnis, etb_id))
     })?;
+    super::etb_verteilen(state, einsatz_id, [etb_id]);
     notify_aufgeloest(state, einsatz_id, eid, &ergebnis).await;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1328,7 +1329,7 @@ pub async fn personal_zuordnen(
     // „Aus Einheit lösen“ (LLH-1722) prüft vorher, dass die Person frei ist, und setzt die Führung
     // in derselben Tx wieder; scheitert die, bleibt nichts geschrieben.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let zuordnung = crate::write_retry!(&state.pool, |conn| {
+    let (zuordnung, etb_id) = crate::write_retry!(&state.pool, |conn| {
         if nur_wenn_frei {
             mitglied_repo::require_personal_frei_tx(conn, einsatz_id, eid, ep_id).await?;
         }
@@ -1352,6 +1353,7 @@ pub async fn personal_zuordnen(
             )
             .await?;
         }
+        let mut etb_id = None;
         if z.is_changed {
             let fuehrung: Vec<&str> = z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
             let text = crate::einheit::etb_text_personal_eingeteilt(
@@ -1365,17 +1367,22 @@ pub async fn personal_zuordnen(
             } else {
                 text
             };
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
+            etb_id = Some(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                    .await?,
+            );
         } else if fuehrer_gesetzt {
             // Die Person stand schon wieder in der Einheit; die Führung braucht ihren eigenen
             // Eintrag, wie beim Führerwechsel über PATCH.
             let text = format!("Einheit «{}»: Einheitsführer «{}» gesetzt", einheit, z.name);
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
+            etb_id = Some(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                    .await?,
+            );
         }
-        Ok(z)
+        Ok((z, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, etb_id);
     if zuordnung.is_changed || als_fuehrer {
         let mut einheiten = vec![eid];
         einheiten.extend(zuordnung.vorher.iter().map(|(id, _)| *id));
@@ -1400,7 +1407,7 @@ pub async fn personal_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Freigabe (inkl. Führer-Leerung) + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         let person = mitglied_repo::freigeben_personal_tx(
             conn,
             einsatz_id,
@@ -1409,7 +1416,7 @@ pub async fn personal_freigeben(
             Some(ctx.benutzer.id),
         )
         .await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -1417,8 +1424,9 @@ pub async fn personal_freigeben(
             &format!("Einheit «{}»: «{}» freigegeben", einheit, person),
         )
         .await?;
-        Ok(())
+        Ok(etb_id)
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_einheit(&state, einsatz_id, eid);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
@@ -1441,13 +1449,13 @@ pub async fn fahrzeug_zuordnen(
     // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar. Das Rückgängig nach „Aus Einheit
     // lösen“ (LLH-1722) nimmt das Fahrzeug keiner anderen Einheit still weg.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let zuordnung = crate::write_retry!(&state.pool, |conn| {
+    let (zuordnung, etb_id) = crate::write_retry!(&state.pool, |conn| {
         if nur_wenn_frei {
             mitglied_repo::require_fahrzeug_frei_tx(conn, einsatz_id, eid, ef_id).await?;
         }
         let z = mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id, ctx.benutzer.id)
             .await?;
-        if z.is_changed {
+        let etb_id = if z.is_changed {
             let text = match &z.vorher {
                 Some((_, vorher)) => {
                     crate::einheit::etb_text_fahrzeug_umgehaengt(&einheit, &z.funkrufname, vorher)
@@ -1456,11 +1464,16 @@ pub async fn fahrzeug_zuordnen(
             };
             let namen: Vec<String> = z.besatzung.iter().map(|(_, n)| n.clone()).collect();
             let text = crate::einheit::etb_text_mit_besatzung(text, &namen);
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
-                .await?;
-        }
-        Ok(z)
+            Some(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        Ok((z, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, etb_id);
     if zuordnung.is_changed {
         sse_einheit(&state, einsatz_id, eid);
         if let Some((alt, _)) = &zuordnung.vorher {
@@ -1496,9 +1509,9 @@ pub async fn fahrzeug_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Freigabe + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         let fz = mitglied_repo::freigeben_fahrzeug_tx(conn, einsatz_id, eid, ef_id).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -1506,8 +1519,9 @@ pub async fn fahrzeug_freigeben(
             &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz),
         )
         .await?;
-        Ok(())
+        Ok(etb_id)
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_einheit(&state, einsatz_id, eid);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     super::einsatz_bereitstellungsraum::sse_br_der_einheit(&state, einsatz_id, eid).await;
@@ -1606,9 +1620,10 @@ pub async fn status_setzen(
     }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (beruehrt, wieder_verfuegbar) = crate::write_retry!(&state.pool, |conn| {
+    let (beruehrt, wieder_verfuegbar, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let mut beruehrt = crate::zeitachse::repo::Beruehrt::default();
         let mut wieder_verfuegbar = false;
+        let mut etb_id = None;
         if let Some(w) =
             einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
         {
@@ -1629,22 +1644,25 @@ pub async fn status_setzen(
                     beruehrt = b;
                 }
             }
-            crate::etb::system_audit_tx(
-                conn,
-                einsatz_id,
-                ctx.benutzer.id,
-                startwert,
-                &format!(
-                    "Einheit «{}»: Status «{}» → «{}»",
-                    w.name,
-                    w.vorher.as_deref().unwrap_or("—"),
-                    w.nachher.as_deref().unwrap_or("—")
-                ),
-            )
-            .await?;
+            etb_id = Some(
+                crate::etb::system_audit_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    startwert,
+                    &format!(
+                        "Einheit «{}»: Status «{}» → «{}»",
+                        w.name,
+                        w.vorher.as_deref().unwrap_or("—"),
+                        w.nachher.as_deref().unwrap_or("—")
+                    ),
+                )
+                .await?,
+            );
         }
-        Ok((beruehrt, wieder_verfuegbar))
+        Ok((beruehrt, wieder_verfuegbar, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, etb_id);
     sse_einheit(&state, einsatz_id, eid);
     // Der Fan-out hat die Zeitachse dieser Personen geschrieben; ihre Leser mit nur
     // Personalrecht erreicht `einheit` nicht (LLH-1185).

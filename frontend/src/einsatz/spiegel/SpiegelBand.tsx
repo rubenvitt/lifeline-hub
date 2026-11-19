@@ -190,14 +190,14 @@ function BandInhalt({
               style={{ color: z.endsWith('abgelehnt') ? rollen.achtungText : rollen.text2 }}
             >
               <span aria-hidden="true">· </span>
-              <span style={monoStil(12)}>{z.split(' ')[0]}</span>
+              <span style={monoStil('monoKlein')}>{z.split(' ')[0]}</span>
               {z.slice(z.indexOf(' '))}
             </span>
           ))}
           {bruch && (
             <span data-lfh="spiegel-band-bruch" style={{ color: rollen.achtungText }}>
               <span aria-hidden="true">· </span>
-              <span style={monoStil(12)}>{bruch.split(' ')[0]}</span>
+              <span style={monoStil('monoKlein')}>{bruch.split(' ')[0]}</span>
               {bruch.slice(bruch.indexOf(' '))}
             </span>
           )}
@@ -337,7 +337,7 @@ function AntragZeile({
         borderBlockStart: `1px solid ${rollen.bannerLinie}`,
       }}
     >
-      <span style={monoStil(12)}>{zeitKurz(a.erfasst_at, konventionen)}</span>
+      <span style={monoStil('monoKlein')}>{zeitKurz(a.erfasst_at, konventionen)}</span>
       <strong>{antragArtWort(a.art)}</strong>
       {daten && <span>{daten}</span>}
       <span style={{ color: abgelehnt ? rollen.achtungText : rollen.text2 }}>

@@ -2773,7 +2773,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
 
     let heic_decoder = opt.heic_decoder_verzeichnis.clone().map(Arc::new);
     let router_platz = crate::instanz::spiegel::antrag::RouterPlatz::default();
-    let router: Router = router
+    let router = router
         // Öffentliche API v1 (LLH-1653): Routen nur über `public_api::router()`, jede mit ihrem
         // Eintrag im Dokument; Body-Grenze und Fehlercode an den Routen bringt `mount` mit.
         .merge(crate::public_api::mount(crate::public_api::router()))
@@ -2804,7 +2804,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Fängt eine Handler-Panik und antwortet mit 500 + `{error}`, statt die Verbindung
         // abzureißen
         // (das hielte das Frontend für „kein Netz“).
-        .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic));
+    let router = mit_etb_waechter(router, &state);
+    let router: Router = router
         // Stammdaten-Kataloge melden schreibende Erfolge an die eigene Org (LFH-734). Außerhalb
         // von CatchPanic: nach einer Handler-Panik sieht sie dessen 500 und meldet nichts.
         // `MatchedPath` ist beim Routing gesetzt.
@@ -3014,6 +3016,24 @@ impl tower_http::trace::OnFailure<tower_http::classify::ServerErrorsFailureClass
             }
             andere => tracing::error!(klasse = %andere, latenz_ms, "response failed"),
         }
+    }
+}
+
+/// ETB-Wächter (LLH-1976, `src/AGENTS.md`, „Backend — ETB live verteilen“): AUSSERHALB von
+/// CatchPanic, damit eine Lücke in Debug und Test als Panic bis in den Test durchschlägt statt als
+/// 500 zu enden. Im Release-Build fehlt die Schicht ganz und kostet nichts.
+fn mit_etb_waechter(router: Router<AppState>, state: &AppState) -> Router<AppState> {
+    #[cfg(debug_assertions)]
+    {
+        router.layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::etb::nachlauf::waechter,
+        ))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = state;
+        router
     }
 }
 

@@ -54,7 +54,7 @@ export function zellenStile(
     : {};
   return {
     praefix: {
-      ...monoStil(14),
+      ...monoStil('monoGross'),
       display: 'flex',
       alignItems: 'center',
       flex: gestapelt ? '1 1 auto' : '0 0 auto',
@@ -66,7 +66,7 @@ export function zellenStile(
       ? { flex: '1 1 100%', minWidth: 0, display: 'flex', alignItems: 'center' }
       : { flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center' },
     hinweis: {
-      ...monoStil(11),
+      ...monoStil('meta'),
       display: 'flex',
       alignItems: 'center',
       flex: '0 0 auto',
@@ -173,7 +173,7 @@ export default function Schnellerfassungszeile({
       {hinweiszeile != null && (
         <div
           style={{
-            ...monoStil(11),
+            ...monoStil('meta'),
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',

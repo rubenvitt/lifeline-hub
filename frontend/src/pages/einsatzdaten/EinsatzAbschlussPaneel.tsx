@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import type { EinsatzAnzeige } from '../../api/types';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { Paneel, schriftStil, useRollen } from '../../components/instrument';
+import { Paneel, Stapel, Textstufe, useRollen } from '../../components/instrument';
 import {
   darfEinsatzLeiten,
   darfEinsatzWiedereroeffnen,
@@ -37,7 +37,7 @@ export default function EinsatzAbschlussPaneel({
   einsatz: EinsatzAnzeige;
   benutzer: BenutzerOrgKontext;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const [dialog, setDialog] = useState<'abschliessen' | 'wiedereroeffnen' | null>(null);
   const bis = wiedereroeffnenBis(einsatz);
   const jetzt = useJetztBisFristende(bis);
@@ -55,16 +55,17 @@ export default function EinsatzAbschlussPaneel({
   }, [dialog, passt]);
 
   if (!abgeschlossen && !darfEinsatzLeiten(einsatz)) return null;
-  const text = { ...schriftStil('text'), color: rollen.text, margin: 0 } as const;
 
   return (
     <Paneel titel="Einsatzabschluss" koerperPolster style={{ marginTop: token.marginLG }}>
       {abgeschlossen ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
-          <p data-lfh="abschluss-stand" style={text}>
-            Abgeschlossen am <ZeitAnzeige wert={einsatz.abgeschlossen_at} />
-            {einsatz.abgeschlossen_von_name && <> von {einsatz.abgeschlossen_von_name}</>}
-          </p>
+        <Stapel abstand="sm">
+          <div data-lfh="abschluss-stand">
+            <Textstufe als="p">
+              Abgeschlossen am <ZeitAnzeige wert={einsatz.abgeschlossen_at} />
+              {einsatz.abgeschlossen_von_name && <> von {einsatz.abgeschlossen_von_name}</>}
+            </Textstufe>
+          </div>
           {darfWiedereroeffnen && (
             <div
               style={{
@@ -76,15 +77,14 @@ export default function EinsatzAbschlussPaneel({
               }}
             >
               <Button onClick={() => setDialog('wiedereroeffnen')}>Einsatz wieder öffnen…</Button>
-              <span
-                data-lfh="wiedereroeffnen-bis"
-                style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
-              >
-                bis <ZeitAnzeige wert={bis} />
+              <span data-lfh="wiedereroeffnen-bis">
+                <Textstufe stufe="meta" ton="gedaempft">
+                  bis <ZeitAnzeige wert={bis} />
+                </Textstufe>
               </span>
             </div>
           )}
-        </div>
+        </Stapel>
       ) : (
         <Button danger onClick={() => setDialog('abschliessen')}>
           Einsatz abschließen…

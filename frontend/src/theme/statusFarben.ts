@@ -136,6 +136,22 @@ export const personStatus: Record<PersonStatus, StatusDarstellung> = {
   abgemeldet: { label: 'abgemeldet', rolle: 'neutral' },
 };
 
+const PERSON_STATUS_UNBEKANNT: StatusDarstellung = { rolle: 'neutral', label: 'unbekannt' };
+
+/**
+ * Darstellung des Status einer Person, auch wenn der Datensatz keinen oder einen unbekannten
+ * Status trägt (LLH-1957): dann neutral „unbekannt“. Der Server liefert ihn zwar immer, aber ein
+ * veralteter Stand im Gerät darf nicht die ganze Liste reißen: `personStatus[status]` allein war
+ * `undefined`, und die Statusmarke stürzte beim Zeichnen ab („reading 'rolle'“).
+ */
+export function personStatusDarstellung(
+  status: PersonStatus | null | undefined,
+): StatusDarstellung {
+  return status != null && Object.prototype.hasOwnProperty.call(personStatus, status)
+    ? personStatus[status]
+    : PERSON_STATUS_UNBEKANNT;
+}
+
 /**
  * Übergabe ist eine aktive Beziehung, wie Material im Einsatz oder UHS-Zuordnung. `offen` ist der
  * Eingang wie beim Auftrag und deshalb `neutral` (Spec `statusrollen`, eon26eat D3); Dringliches

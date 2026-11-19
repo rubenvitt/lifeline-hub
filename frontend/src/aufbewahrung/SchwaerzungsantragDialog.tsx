@@ -8,6 +8,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZIEL_ART } from './archivText';
+import { Feld } from '../components/instrument';
 
 /**
  * Rückfrage vor einem Löschersuchen nach Art. 17 (LFH-751, Spec `aufbewahrung-loeschersuchen`,
@@ -137,7 +138,7 @@ export default function SchwaerzungsantragDialog({
           Erwähnungen in Freitexten (Einsatztagebuch, Chat, Führungsmodule) bleiben stehen.
         </Typography.Paragraph>
       )}
-      <Form.Item
+      <Feld
         label="Aktenzeichen des Löschersuchens"
         name="aktenzeichen"
         extra="Ohne Namen; bleibt im Einsatztagebuch stehen"
@@ -147,8 +148,8 @@ export default function SchwaerzungsantragDialog({
         ]}
       >
         <Input autoComplete="off" />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label={`Zur Bestätigung „${ziel.kennung}“ eintippen`}
         name="bestaetigung"
         rules={[
@@ -161,7 +162,7 @@ export default function SchwaerzungsantragDialog({
         ]}
       >
         <Input autoComplete="off" />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={mutation.error} titel="Löschersuchen nicht erfasst" />
     </ErfassungsModal>
   );

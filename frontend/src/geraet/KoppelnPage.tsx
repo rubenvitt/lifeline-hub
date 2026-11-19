@@ -1,5 +1,6 @@
 import { Alert, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
 import { useRef, useState } from 'react';
+import { Feld } from '../components/instrument';
 import { koppeln } from '../api/geraete';
 import { ApiError, fehlerText } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -60,7 +61,7 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
       // Der Server antwortet einheitlich 401, ob der Code falsch, verbraucht oder abgelaufen ist.
       setFehler(
         e instanceof ApiError && e.status === 401
-          ? 'Dieser Code gilt nicht (mehr). Lass dir bei der Einsatzleitung einen neuen geben.'
+          ? 'Dieser Code gilt nicht (mehr). Einen neuen bei der Einsatzleitung holen.'
           : fehlerText(e, 'Das Koppeln ist fehlgeschlagen.'),
       );
       sendetRef.current = false;
@@ -101,7 +102,7 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
           initialValues={{ code: vorbelegung }}
           onFinish={einloesen}
         >
-          <Form.Item
+          <Feld
             name="code"
             label="Kopplungscode"
             extra="Von der Einsatzleitung, gilt 10 Minuten und einmal"
@@ -115,7 +116,7 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
               autoFocus={!vorbelegung}
               placeholder="ABCD-1234"
             />
-          </Form.Item>
+          </Feld>
           <Space orientation="vertical" style={{ width: '100%' }}>
             <Button type="primary" size="large" block htmlType="submit" loading={laeuft}>
               Gerät koppeln

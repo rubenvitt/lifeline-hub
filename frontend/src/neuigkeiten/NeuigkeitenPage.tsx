@@ -4,7 +4,7 @@ import { EINTRAEGE } from 'virtual:neuigkeiten';
 import type { ChangelogEintrag, Kanal } from '../../scripts/changelog-zerlegen.mjs';
 import AdminPage from '../components/AdminPage';
 import Markdown from '../components/Markdown';
-import { Paneel, Segmentleiste } from '../components/instrument';
+import { Paneel, Segmentleiste, Stapel, schriftStil } from '../components/instrument';
 import { useVersionsstand, useMarkiereGelesen } from './useVersionsstand';
 import {
   kenntVersion,
@@ -68,7 +68,7 @@ export default function NeuigkeitenPage() {
         )}
 
         {seitLetzter.length > 0 && (
-          <Paneel titel="Seit deiner letzten Version" koerperPolster>
+          <Paneel titel="Seit der zuletzt gesehenen Version" koerperPolster>
             <Eintragsliste eintraege={seitLetzter} />
           </Paneel>
         )}
@@ -120,17 +120,15 @@ function EintragAnzeige({ eintrag }: { eintrag: ChangelogEintrag }) {
 
   return (
     <article data-lfh="neuigkeit" data-version={eintrag.version}>
-      <div
-        style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginSM, alignItems: 'baseline' }}
-      >
-        <Typography.Title level={2} style={{ margin: 0, fontSize: 18 }}>
+      <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="baseline">
+        <Typography.Title level={2} style={{ margin: 0, ...schriftStil('kartentitel') }}>
           <span style={{ fontFamily: 'monospace' }}>{eintrag.version}</span>
         </Typography.Title>
         <Marke>{KANAL_TITEL[eintrag.kanal]}</Marke>
         {eintrag.datum && (
           <Typography.Text type="secondary">{datumAnzeige(eintrag.datum)}</Typography.Text>
         )}
-      </div>
+      </Stapel>
       <div style={{ marginTop: token.marginSM }}>
         <Markdown unterEbene={3}>{text}</Markdown>
       </div>

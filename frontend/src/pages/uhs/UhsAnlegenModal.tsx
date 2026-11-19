@@ -1,5 +1,6 @@
 import { Collapse, Form, Input, theme } from 'antd';
 import { useState } from 'react';
+import { Feld } from '../../components/instrument';
 import { Select } from '../../components/Select';
 import AnlegenModal, { type AnlegenModalSlot } from '../../components/AnlegenModal';
 import { legeUhsAn, type UhsEingabe } from '../../api/einsatzUhs';
@@ -21,6 +22,12 @@ function uhsEingabe({ standort, ...rest }: UhsFormular): UhsEingabe {
     ...(text != null ? { standort: text } : {}),
     ...(lat != null ? { lat, lon } : {}),
   };
+}
+
+/** Kopf der eingeklappten Angaben: nennt die Notiz, sobald etwas drinsteht. */
+function WeitereAngabenTitel() {
+  const notiz = Form.useWatch<string | undefined>('notiz');
+  return notiz?.trim() ? 'Weitere Angaben · Notiz' : 'Weitere Angaben';
 }
 
 /**
@@ -49,19 +56,19 @@ export default function UhsAnlegenModal(props: AnlegenModalSlot<Uhs>) {
       listenKey={einsatzKeys.uhs}
       initialValues={{ typ: 'behandlungsplatz' }}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}
       >
         <Input placeholder="z. B. BHP 50" />
-      </Form.Item>
-      <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
+      </Feld>
+      <Feld label="Typ" name="typ" rules={[{ required: true }]}>
         <Select options={Object.entries(uhsTyp).map(([v, d]) => ({ value: v, label: d.label }))} />
-      </Form.Item>
-      <Form.Item label="Standort (optional)" name="standort">
+      </Feld>
+      <Feld label="Standort (optional)" name="standort">
         <EinsatzOrtsfeld einsatzId={props.einsatzId} etikett="Standort" />
-      </Form.Item>
+      </Feld>
       {/* `forceRender`: Prüfung und Zurücksetzen erreichen die Notiz auch zugeklappt. */}
       <Collapse
         ghost
@@ -72,17 +79,11 @@ export default function UhsAnlegenModal(props: AnlegenModalSlot<Uhs>) {
           {
             key: 'weitere',
             forceRender: true,
-            label: (
-              <Form.Item noStyle shouldUpdate={(a, b) => a.notiz !== b.notiz}>
-                {({ getFieldValue }) =>
-                  getFieldValue('notiz')?.trim() ? 'Weitere Angaben · Notiz' : 'Weitere Angaben'
-                }
-              </Form.Item>
-            ),
+            label: <WeitereAngabenTitel />,
             children: (
-              <Form.Item label="Notiz (optional)" name="notiz">
+              <Feld label="Notiz (optional)" name="notiz">
                 <Input.TextArea rows={3} />
-              </Form.Item>
+              </Feld>
             ),
           },
         ]}

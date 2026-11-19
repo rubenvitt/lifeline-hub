@@ -574,7 +574,7 @@ pub async fn status_zuruecknehmen(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let ergebnis = disposition_repo::status_zuruecknehmen_tx(
             conn,
@@ -586,7 +586,7 @@ pub async fn status_zuruecknehmen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        crate::etb::system_audit_tx(
+        let etb_id = crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
@@ -598,8 +598,9 @@ pub async fn status_zuruecknehmen(
             ),
         )
         .await?;
-        Ok((ergebnis, anzeige))
+        Ok((ergebnis, anzeige, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     if let Some(einheit_id) = ergebnis.einheit_id {
         super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);

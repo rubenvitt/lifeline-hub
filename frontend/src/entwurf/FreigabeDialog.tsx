@@ -1,4 +1,5 @@
 import { Button, Flex, Modal, theme } from 'antd';
+import { Stapel } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 
 /**
@@ -79,10 +80,10 @@ export default function FreigabeDialog({
         </Flex>
       }
     >
-      <Flex vertical gap={token.marginSM}>
+      <Stapel abstand="sm">
         <span>{warnung}</span>
         {grund !== null && <SpeicherFehler fehler={grund.fehler} titel={grund.titel} />}
-      </Flex>
+      </Stapel>
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
-import { Button, Card, Typography } from 'antd';
-import { useRollen } from '../../components/instrument';
+import { Button, Card } from 'antd';
+import { Textstufe, useRollen } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import EscKappe from './EscKappe';
 
@@ -20,7 +20,7 @@ export default function FokusBand({
   escHebtAuf: boolean;
   onAufheben: () => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   if (name == null) return null;
   return (
     <Card
@@ -31,13 +31,13 @@ export default function FokusBand({
     >
       {/* Eine Region mit Namen: ein Vorleser findet, worauf die Karte gerade schaut. */}
       <section aria-label="Fokus" style={{ minWidth: 0, flex: '1 1 auto' }}>
-        <Typography.Text style={{ color: rollen.gedaempft, display: 'block' }}>
+        <Textstufe als="div" ton="gedaempft">
           Fokus
-        </Typography.Text>
+        </Textstufe>
         {/* Lange Namen brechen um, statt die Karte zu überdecken oder abgeschnitten zu werden. */}
-        <Typography.Text style={{ display: 'block', overflowWrap: 'anywhere' }}>
+        <Textstufe als="div" umbruch="ueberall">
           {name}
-        </Typography.Text>
+        </Textstufe>
       </section>
       <Button onClick={onAufheben} aria-keyshortcuts={escHebtAuf ? 'Escape' : undefined}>
         Fokus aufheben{escHebtAuf && <EscKappe />}

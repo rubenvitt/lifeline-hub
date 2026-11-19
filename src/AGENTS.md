@@ -33,6 +33,12 @@ Handler (`JsonBody`, LFH-1074).
   `BearbeitbaresPaneel` fragt dort nur bei ihm (`isVeraltet`); ein anderer 409 derselben Route
   (storniert, doppelte Bezeichnung) steht als Grund am Paneel. Eine neue CAS-Route nimmt
   `Veraltet`.
+- **403 der Einsatz-Lesesperre trägt einen Grund** (LLH-1819): `fordere_lesezugriff` und der
+  Org-Floor antworten `AppError::KeinLesezugriff(LeseSperre)` mit `grund` `kein_mitglied`,
+  `nachlauf_abgelaufen` oder `nicht_mehr_lesbar` (`einsatz::berechtigung::lese_sperre`).
+  `kein_mitglied` wird zuerst geprüft, damit ein Fremder nichts über gelöschte oder abgelaufene
+  Einsätze erfährt. Jeder andere 403 bleibt `Forbidden`; das Frontend liest den Grund in
+  `frontend/src/einsatz/sackgasse.ts`.
 - **CAS-Baseline beim Öffnen einfrieren**: das Sammelbearbeiten von Tier und Schaden über
   `components/useEditSitzung.ts` (gebrandete `CasBasis`; `starte` nimmt den Datensatz); Test
   braucht ein gemountetes `<Form form={form}>`.
@@ -699,6 +705,24 @@ Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzlis
 - **Katalog-Schreibrouten liegen unter einem Präfix aus `STAMMDATEN_PFADE`** (Middleware
   `stammdaten_live`); ein neuer Katalogpfad braucht einen Eintrag, Guard
   `tests/stammdaten_live_guard.rs`.
+
+## Backend — ETB live verteilen (LLH-1976)
+
+Herleitung: `docs/superpowers/specs/2026-11-19-ywhuzag7-etb-system-live-verteilen-design.md`;
+`src/etb/nachlauf.rs`.
+- **Jeder ETB-Eintrag, den eine Route oder ein Hintergrundlauf schreibt, geht nach dem Commit per
+  `LiveHub::publiziere(einsatz_id, etb_id)` hinaus**, je ID, außerhalb der `write_retry!`-Closure,
+  mit den IDs, die die Closure zurückgibt (Routen: `routes::etb_verteilen`). Ein
+  `publiziere_einsatz(…, LiveEvent::Etb)` ohne ID ersetzt das nicht.
+- **Der Wächter `etb::nachlauf` prüft das in Debug und Test**: Router-Schicht `waechter`
+  (außerhalb von `CatchPanicLayer`) und `purge_scheduler::tick_mit_rueckschrieb`. Eine Lücke ist
+  ein Panic. Eine Ausnahme nur über `nachlauf::ohne_verteilung` oder `nachlauf::ausnehmen` mit
+  Grundkonstante; heute für Demo-Import (`GRUND_DEMO`), Instanz-Spiegel (`GRUND_SPIEGEL`) und
+  Läufe, die einen Einsatz aus dem Betrieb nehmen (`GRUND_BETRIEB_VERLASSEN`: Archivieren,
+  Soft-Delete, Schwärzen des ganzen Einsatzes, Vollzug eines Einsatz-Löschersuchens). Eine neue
+  Ausnahme ist eine Entscheidung des Menschen.
+- **Ein neuer Scheduler-Lauf, der ETB schreibt, kommt unter die Klammer** (`nachlauf::klammer`).
+  Was in einem per `tokio::spawn` gestarteten Task geschieht, sieht der Wächter nicht.
 
 ## Backend — Benachrichtigungen (LLH-1207)
 

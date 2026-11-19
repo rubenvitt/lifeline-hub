@@ -10,6 +10,7 @@ import {
   type VerbleibFormWerte,
 } from './verbleibErfassungKern';
 import { Status } from '../components/instrument/Status';
+import { Feld } from '../components/instrument';
 
 /**
  * Das Feld „Rettungsmittel“ der Verbleib-Maske beim Transport (LLH-1332, Change
@@ -47,7 +48,7 @@ export default function RettungsmittelFeld({
   const suche = (t: string) => t.toLocaleLowerCase('de');
   return (
     <>
-      <Form.Item
+      <Feld
         label={
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginSM }}>
             Rettungsmittel
@@ -66,10 +67,10 @@ export default function RettungsmittelFeld({
             form.setFieldValue('einsatz_fahrzeug_id', option?.einsatzFahrzeugId ?? null)
           }
         />
-      </Form.Item>
-      <Form.Item name="einsatz_fahrzeug_id" hidden>
+      </Feld>
+      <Feld name="einsatz_fahrzeug_id" hidden>
         <input type="hidden" />
-      </Form.Item>
+      </Feld>
     </>
   );
 }

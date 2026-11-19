@@ -207,6 +207,14 @@ export function istKonflikt(e: unknown): e is ApiError {
   return e instanceof ApiError && e.status === 409;
 }
 
+/** `grund` der Einsatz-Lesesperre (403, `src/error.rs`, `LeseSperre`, LLH-1819): weder Mitglied
+ *  noch höhere Berechtigung. Ein 403 ohne `grund` gilt im Client wie dieser. */
+export const GRUND_KEIN_MITGLIED = 'kein_mitglied';
+/** `grund` der Einsatz-Lesesperre: Mitglied ohne Einsatzleitung nach der Nachlauffrist. */
+export const GRUND_NACHLAUF_ABGELAUFEN = 'nachlauf_abgelaufen';
+/** `grund` der Einsatz-Lesesperre: Löschvermerk oder abgelaufene Aufbewahrungsfrist. */
+export const GRUND_NICHT_MEHR_LESBAR = 'nicht_mehr_lesbar';
+
 /** `grund` des Sperrkonflikts (409, `src/error.rs`, `GRUND_VERALTET`, LLH-1920). */
 export const GRUND_VERALTET = 'veraltet';
 

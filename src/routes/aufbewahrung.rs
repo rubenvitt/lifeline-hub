@@ -269,7 +269,7 @@ pub async fn antrag_stellen(
         ),
     };
     let jetzt = Utc::now();
-    let id = antrag::stellen(
+    let (id, etb_id) = antrag::stellen(
         &state.pool,
         einsatz_id,
         benutzer.id,
@@ -280,6 +280,7 @@ pub async fn antrag_stellen(
         jetzt,
     )
     .await?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     let angelegt = antrag::liste(&state.pool, einsatz_id, jetzt)
         .await?
         .into_iter()
@@ -297,7 +298,9 @@ pub async fn antrag_zuruecknehmen(
 ) -> Result<Json<Vec<SchwaerzungsantragAnzeige>>, AppError> {
     archivkopf(&state, &benutzer, einsatz_id).await?;
     let jetzt = Utc::now();
-    antrag::zuruecknehmen(&state.pool, einsatz_id, antrag_id, benutzer.id, jetzt).await?;
+    let etb_id =
+        antrag::zuruecknehmen(&state.pool, einsatz_id, antrag_id, benutzer.id, jetzt).await?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     Ok(Json(antrag::liste(&state.pool, einsatz_id, jetzt).await?))
 }
 

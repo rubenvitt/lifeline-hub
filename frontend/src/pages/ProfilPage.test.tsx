@@ -23,8 +23,8 @@ const webauthnProvider = [
 function benutzerBody(totpAktiviert: boolean, passwortGesetzt = true) {
   return {
     id: 1,
-    // Bewusst nicht „Admin": der Anzeigename stünde sonst gleichlautend neben der
-    // Rollen-Beschriftung, und `getByText('Admin')` träfe beide.
+    // Bewusst nicht „System-Admin“: der Anzeigename stünde sonst gleichlautend neben der
+    // Rollen-Beschriftung, und `getByText('System-Admin')` träfe beide.
     anzeigename: 'Rita Beispiel',
     benutzername: 'admin',
     system_rolle: 'admin',
@@ -90,9 +90,8 @@ describe('ProfilPage — Kopfdaten (LFH-345)', () => {
 
     expect(await screen.findByText('Rita Beispiel')).toBeInTheDocument();
     expect(screen.getByText('admin')).toBeInTheDocument();
-    // Die Rolle als Wort, nicht als Wire-Wert. Die Schreibweise folgt `BenutzerPage` („Admin" /
-    // „Führungskraft" / „Benutzer"), damit dieselbe Rolle nicht zwei Namen trägt.
-    expect(screen.getByText('Admin')).toBeInTheDocument();
+    // Die Rolle als Wort aus dem Rollen-Vokabular (LLH-1818), nicht als Wire-Wert.
+    expect(screen.getByText('System-Admin')).toBeInTheDocument();
   });
 
   it('zeigt die Organisation', async () => {
@@ -306,7 +305,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     expect(screen.getByText(/Schlüssel zur manuellen Eingabe/)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/TOTP|Secret|2FA/);
 
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '123456');
 
     expect(await screen.findByText('Wiederherstellungscodes jetzt sichern')).toBeInTheDocument();
     expect(screen.getByText(/aaaa-1111/)).toBeInTheDocument();
@@ -346,7 +345,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '12345');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '12345');
     expect(gesendet).toEqual([]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
@@ -385,7 +384,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
-    const feld = screen.getByLabelText('Code aus deiner Authenticator-App');
+    const feld = screen.getByLabelText('Code aus der Authenticator-App');
     await userEvent.type(feld, '123456');
 
     await screen.findByText('Wiederherstellungscodes jetzt sichern');
@@ -413,7 +412,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '000000');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '000000');
 
     expect(await screen.findByText('Code ungültig')).toBeInTheDocument();
   });
@@ -443,7 +442,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     // prüft dieser Test.
     server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(true))));
 
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '123456');
 
     expect(await screen.findByText('Zweiter Faktor aktiv')).toBeInTheDocument();
     expect(screen.getByText(/CODE-1111/)).toBeInTheDocument();
@@ -578,7 +577,7 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
     );
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '123456');
     await screen.findByText('Wiederherstellungscodes jetzt sichern');
   }
 

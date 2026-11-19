@@ -37,11 +37,47 @@ describe('rollenwerte', () => {
       fontWeight: 500,
       fontVariantNumeric: 'tabular-nums',
     });
-    expect(monoStil(11)).toEqual({
+    expect(monoStil('meta')).toEqual({
       fontFamily: schrift.zahl,
       fontSize: 11,
       fontWeight: 400,
       fontVariantNumeric: 'tabular-nums',
+    });
+  });
+
+  describe('monoStil nimmt eine Mono-Stufe (LLH-1972)', () => {
+    it('liefert Größe und Gewicht der Stufe', () => {
+      expect(monoStil('mono')).toEqual({
+        fontFamily: schrift.zahl,
+        fontSize: 13,
+        fontWeight: 400,
+        fontVariantNumeric: 'tabular-nums',
+      });
+      expect(monoStil('datenwertKlein').fontWeight).toBe(500);
+    });
+
+    it('das Gewicht lässt sich überschreiben', () => {
+      expect(monoStil('monoKlein', 500)).toMatchObject({ fontSize: 12, fontWeight: 500 });
+      expect(monoStil('datenwertGross', 400).fontWeight).toBe(400);
+    });
+
+    it('übernimmt die Sperrung der Datenwert-Stufen nicht — die Umstellung bleibt pixelgleich', () => {
+      expect(monoStil('datenwertGross')).toEqual({
+        fontFamily: schrift.zahl,
+        fontSize: 40,
+        fontWeight: 500,
+        fontVariantNumeric: 'tabular-nums',
+      });
+    });
+
+    it('nimmt eine Zahl aus einer Variablen mit Gewicht 400', () => {
+      const ausDichte = 17;
+      expect(monoStil(ausDichte)).toMatchObject({ fontSize: 17, fontWeight: 400 });
+    });
+
+    it('lehnt Text-Stufen am Typ ab', () => {
+      // @ts-expect-error — `text` ist keine Mono-Stufe
+      expect(monoStil('text').fontFamily).toBe(schrift.zahl);
     });
   });
 });

@@ -5,11 +5,11 @@
  * solange sie offen ist; gespeichert wird über die Handlungen der Fläche, ein Scheitern steht IN
  * der Maske.
  */
-import { Button, Flex, Form, Input, Modal, Typography } from 'antd';
+import { Button, Form, Input, Modal, Typography } from 'antd';
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { Komponentenart, Verbindungsart } from '../../api/fernmeldeskizzeVertrag';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { useRollen } from '../../components/instrument/index';
+import { Feld, Stapel, Textstufe, useRollen } from '../../components/instrument/index';
 import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import type { Fernmeldenetz } from '../fernmeldeskizze';
@@ -91,20 +91,20 @@ export function AnlegenDialog({
       onAbbrechen={onSchliessen}
     >
       {art === 'extern' ? (
-        <Form.Item label="Art" name="stellenart" rules={[{ required: true }]}>
+        <Feld label="Art" name="stellenart" rules={[{ required: true }]}>
           <Select
             options={EXTERNE_STELLENARTEN.map((a) => ({ value: a, label: STELLENART_LABEL[a] }))}
           />
-        </Form.Item>
+        </Feld>
       ) : null}
       {art === 'komponente' ? (
-        <Form.Item label="Art" name="komponentenart" rules={[{ required: true }]}>
+        <Feld label="Art" name="komponentenart" rules={[{ required: true }]}>
           <Select
             options={KOMPONENTENARTEN.map((a) => ({ value: a, label: komponentenartWort(a) }))}
           />
-        </Form.Item>
+        </Feld>
       ) : null}
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[
@@ -115,7 +115,7 @@ export function AnlegenDialog({
         ]}
       >
         <Input />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={fehler} />
     </ErfassungsModal>
   );
@@ -166,7 +166,7 @@ export function ArtAuswahl({
   if (!radial) {
     return (
       <div role="menu" aria-label="Art der Verbindung" data-lfh="skizze-artwahl" onKeyDown={taste}>
-        <Flex vertical gap={token.marginXXS}>
+        <Stapel abstand="xxs">
           {VERBINDUNGSARTEN.map((a, i) => (
             <Button
               key={a}
@@ -178,7 +178,7 @@ export function ArtAuswahl({
               {verbindungsartWort(a)}
             </Button>
           ))}
-        </Flex>
+        </Stapel>
       </div>
     );
   }
@@ -405,9 +405,9 @@ export function VerbindenDialog({
               ))}
             </ul>
             {ziele.length === 0 ? (
-              <Typography.Paragraph style={{ color: rollen.gedaempft, margin: 0 }}>
+              <Textstufe als="p" ton="gedaempft">
                 Kein Ziel gefunden.
-              </Typography.Paragraph>
+              </Textstufe>
             ) : null}
           </>
         )}

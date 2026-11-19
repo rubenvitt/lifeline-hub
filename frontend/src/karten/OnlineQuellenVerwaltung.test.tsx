@@ -446,7 +446,7 @@ describe('OnlineQuellenVerwaltung', () => {
     // Default ist an; den Proxy-Schalter gezielt ausschalten → `proxy: false`. Er liegt unter
     // „Weitere Angaben" und ist ohne `forceRender` erst nach dem Aufklappen im Baum.
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    const proxyItem = (await within(dialog).findByText('Über Server proxen')).closest(
+    const proxyItem = (await within(dialog).findByText('Über den Server abrufen')).closest(
       '.ant-form-item',
     );
     await userEvent.click(within(proxyItem as HTMLElement).getByRole('switch'));

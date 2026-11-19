@@ -1,17 +1,5 @@
 import { useId, useState } from 'react';
-import {
-  App,
-  Button,
-  Flex,
-  Form,
-  InputNumber,
-  Popconfirm,
-  Slider,
-  Space,
-  Switch,
-  Typography,
-  Upload,
-} from 'antd';
+import { App, Button, InputNumber, Popconfirm, Slider, Switch, Upload } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   aenderePlan,
@@ -31,7 +19,7 @@ import { UPLOAD_MAX_GROESSE } from '../../api/upload';
 import type { UhsDetail } from '../../api/types';
 import { Select } from '../../components/Select';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { Paneel, useRollen } from '../../components/instrument';
+import { FELD_KLASSE, Paneel, Stapel, Textstufe, useRollen } from '../../components/instrument';
 import { IconHochladen } from '../../icons';
 
 /** Formate, die der Server als Plan annimmt (`src/uhs/plan.rs`, D3). HEIC bleibt draußen. */
@@ -109,44 +97,46 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
 
   return (
     <Paneel titel="Plan" ueberschrift="h4" koerperPolster style={{ marginBottom: token.marginSM }}>
-      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      <Stapel abstand="md">
         {/* Datenschutz- und Protokollhinweis in einer Zeile (LFH-1078: erlaubt, kurz). */}
-        <Typography.Text type="secondary">
-          Keine Patientenfotos. Übernahme wird protokolliert.
-        </Typography.Text>
+        <Textstufe ton="gedaempft">Keine Patientenfotos. Übernahme wird protokolliert.</Textstufe>
         <SpeicherFehler fehler={fehler} />
-        <Space wrap size="middle" align="end">
-          <Flex vertical gap={token.marginXS} data-lfh="plan-datei">
-            <Upload
-              accept={PLAN_ACCEPT}
-              maxCount={1}
-              showUploadList={false}
-              disabled={laeuft}
-              beforeUpload={(datei) => {
-                const gross = datei.size > UPLOAD_MAX_GROESSE;
-                setZuGross(gross);
-                if (!gross) hochladen.mutate(datei);
-                // Gesendet wird über `hinterlegePlan`, nie über antds eigenen Upload.
-                return false;
-              }}
-            >
-              <Button
-                loading={hochladen.isPending}
-                icon={
-                  <span aria-hidden="true">
-                    <IconHochladen />
-                  </span>
-                }
+        <Stapel richtung="zeile" umbruch abstand="md" ausrichten="ende">
+          <div data-lfh="plan-datei">
+            <Stapel abstand="xs">
+              <Upload
+                accept={PLAN_ACCEPT}
+                maxCount={1}
+                showUploadList={false}
+                disabled={laeuft}
+                beforeUpload={(datei) => {
+                  const gross = datei.size > UPLOAD_MAX_GROESSE;
+                  setZuGross(gross);
+                  if (!gross) hochladen.mutate(datei);
+                  // Gesendet wird über `hinterlegePlan`, nie über antds eigenen Upload.
+                  return false;
+                }}
               >
-                {plan ? 'Plan ersetzen' : 'Plan hochladen'}
-              </Button>
-            </Upload>
-            {zuGross && (
-              <Typography.Text type="danger" role="alert">
-                {`Datei ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`}
-              </Typography.Text>
-            )}
-          </Flex>
+                <Button
+                  loading={hochladen.isPending}
+                  icon={
+                    <span aria-hidden="true">
+                      <IconHochladen />
+                    </span>
+                  }
+                >
+                  {plan ? 'Plan ersetzen' : 'Plan hochladen'}
+                </Button>
+              </Upload>
+              {zuGross && (
+                <div role="alert">
+                  <Textstufe ton="alarm">
+                    {`Datei ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`}
+                  </Textstufe>
+                </div>
+              )}
+            </Stapel>
+          </div>
           <UebernahmeAuswahl
             optionen={bilder.map((a) => ({ value: a.id, label: a.dateiname }))}
             wert={auswahl}
@@ -155,7 +145,7 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
             onUebernehmen={() => auswahl != null && uebernehmen.mutate(auswahl)}
             laedt={uebernehmen.isPending}
           />
-        </Space>
+        </Stapel>
         {plan && (
           <PlanEinstellungen
             plan={plan}
@@ -168,7 +158,7 @@ export default function UhsPlanPaneel({ einsatzId, uhs }: Props) {
             onEntfernen={() => entfernen.mutate()}
           />
         )}
-      </Space>
+      </Stapel>
     </Paneel>
   );
 }
@@ -183,26 +173,28 @@ function UebernahmeAuswahl(props: {
 }) {
   const id = useId();
   return (
-    <Form.Item label="Aus Dateien übernehmen" htmlFor={id} style={{ marginBottom: 0 }}>
-      <Space>
+    <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
+      <Textstufe als="label" htmlFor={id}>
+        Aus Dateien übernehmen
+      </Textstufe>
+      <div className={FELD_KLASSE} style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}>
         <Select<number>
           id={id}
-          style={{ minWidth: 200 }}
           placeholder={props.optionen.length === 0 ? 'Keine Bilder abgelegt' : 'Bild wählen'}
           options={props.optionen}
           value={props.wert ?? undefined}
           onChange={(v) => props.onWahl(v ?? null)}
           disabled={props.gesperrt || props.optionen.length === 0}
         />
-        <Button
-          onClick={props.onUebernehmen}
-          disabled={props.gesperrt || props.wert == null}
-          loading={props.laedt}
-        >
-          Übernehmen
-        </Button>
-      </Space>
-    </Form.Item>
+      </div>
+      <Button
+        onClick={props.onUebernehmen}
+        disabled={props.gesperrt || props.wert == null}
+        loading={props.laedt}
+      >
+        Übernehmen
+      </Button>
+    </Stapel>
   );
 }
 
@@ -224,8 +216,8 @@ function PlanEinstellungen({
 }) {
   const umkehrId = useId();
   return (
-    <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Space wrap size="middle" align="end">
+    <Stapel abstand="md">
+      <Stapel richtung="zeile" umbruch abstand="md" ausrichten="ende">
         {/* `key` am Serverwert und am PATCH-Zähler: ein Live-Ereignis, Einpassen, ein Fehlschlag
             oder ein eingerastet gleicher Wert setzen das Feld neu auf. */}
         <ZahlFeld
@@ -258,7 +250,7 @@ function PlanEinstellungen({
         <Button onClick={onEinpassen} disabled={gesperrt}>
           An Plätze einpassen
         </Button>
-      </Space>
+      </Stapel>
       <Regler
         key={`h-${plan.helligkeit}-${stand}`}
         label="Helligkeit"
@@ -277,7 +269,7 @@ function PlanEinstellungen({
         gesperrt={gesperrt}
         onFertig={(kontrast) => onAendern({ kontrast })}
       />
-      <Space size="middle" align="center">
+      <Stapel richtung="zeile" abstand="md" ausrichten="mitte">
         <Switch
           id={umkehrId}
           checked={plan.nacht_umkehren}
@@ -285,20 +277,23 @@ function PlanEinstellungen({
           onChange={(nacht_umkehren) => onAendern({ nacht_umkehren })}
         />
         <label htmlFor={umkehrId}>Im Nachtbetrieb umkehren</label>
-      </Space>
-      <Popconfirm
-        title="Plan entfernen?"
-        description="Das Bild wird gelöscht; die Plätze bleiben."
-        okText="Entfernen"
-        cancelText="Abbrechen"
-        okButtonProps={{ danger: true }}
-        onConfirm={onEntfernen}
-      >
-        <Button danger disabled={gesperrt}>
-          Plan entfernen
-        </Button>
-      </Popconfirm>
-    </Space>
+      </Stapel>
+      {/* Eigener Block: der Stapel streckt seine Kinder, der Knopf bleibt so in seiner Größe. */}
+      <div>
+        <Popconfirm
+          title="Plan entfernen?"
+          description="Das Bild wird gelöscht; die Plätze bleiben."
+          okText="Entfernen"
+          cancelText="Abbrechen"
+          okButtonProps={{ danger: true }}
+          onConfirm={onEntfernen}
+        >
+          <Button danger disabled={gesperrt}>
+            Plan entfernen
+          </Button>
+        </Popconfirm>
+      </div>
+    </Stapel>
   );
 }
 
@@ -324,21 +319,25 @@ function ZahlFeld(props: {
     props.onFertig(ziel);
   };
   return (
-    <Form.Item label={props.label} htmlFor={id} style={{ marginBottom: 0 }}>
-      <InputNumber<number>
-        id={id}
-        value={entwurf}
-        min={props.min}
-        max={props.max}
-        step={10}
-        precision={0}
-        disabled={props.gesperrt}
-        onChange={setEntwurf}
-        onBlur={fertig}
-        onPressEnter={fertig}
-        style={{ width: 120 }}
-      />
-    </Form.Item>
+    <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
+      <Textstufe als="label" htmlFor={id}>
+        {props.label}
+      </Textstufe>
+      <div className={FELD_KLASSE} style={{ width: 'var(--lfh-feld-kurz)', maxWidth: '100%' }}>
+        <InputNumber<number>
+          id={id}
+          value={entwurf}
+          min={props.min}
+          max={props.max}
+          step={10}
+          precision={0}
+          disabled={props.gesperrt}
+          onChange={setEntwurf}
+          onBlur={fertig}
+          onPressEnter={fertig}
+        />
+      </div>
+    </Stapel>
   );
 }
 
@@ -354,9 +353,9 @@ function Regler(props: {
   const [stand, setStand] = useState(props.wert);
   return (
     <div>
-      <Typography.Text>
+      <Textstufe>
         {props.label} <span style={{ fontVariantNumeric: 'tabular-nums' }}>{stand} %</span>
-      </Typography.Text>
+      </Textstufe>
       <Slider
         min={props.min}
         max={props.max}

@@ -1,10 +1,10 @@
-import { Button, Flex, theme } from 'antd';
+import { Button, theme } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { ladeArchivBlock } from '../api/aufbewahrung';
 import type { ArchivAngabe } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { speichereDatei } from '../components/dateiSpeichern';
-import { Datenfeld, Datenraster, Paneel } from '../components/instrument';
+import { Datenfeld, Datenraster, Paneel, Stapel } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { formatGroesse } from '../karten/formatGroesse';
 
@@ -52,14 +52,16 @@ export default function ArchivPaneel({
           <span data-lfh="archiv-fingerabdruecke">{archiv.fingerabdruecke.join(', ')}</span>
         </Datenfeld>
       </Datenraster>
-      <Flex vertical gap={token.marginSM} style={{ marginTop: token.marginSM }}>
-        <div>
-          <Button onClick={() => laden.mutate()} loading={laden.isPending}>
-            Herunterladen
-          </Button>
-        </div>
-        <SpeicherFehler fehler={laden.error} titel="Nicht geladen" />
-      </Flex>
+      <div style={{ marginTop: token.marginSM }}>
+        <Stapel abstand="sm">
+          <div>
+            <Button onClick={() => laden.mutate()} loading={laden.isPending}>
+              Herunterladen
+            </Button>
+          </div>
+          <SpeicherFehler fehler={laden.error} titel="Nicht geladen" />
+        </Stapel>
+      </div>
     </Paneel>
   );
 }

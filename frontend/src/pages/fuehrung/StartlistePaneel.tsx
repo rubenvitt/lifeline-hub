@@ -6,6 +6,7 @@ import {
   NUR_VORLESER,
   listenZeileStil,
   schriftStil,
+  Textstufe,
   useRollen,
 } from '../../components/instrument';
 import { PANEEL_NEULADEN } from '../../components/instrument/PaneelZustand';
@@ -92,7 +93,7 @@ export default function StartlistePaneel({
   const angabe = (p: StartPunkt): ReactNode => {
     if (p.zustand === 'erledigt' && p.wert) {
       return (
-        <span style={{ minWidth: 0, overflowWrap: 'anywhere', color: rollen.text2 }}>
+        <Textstufe stufe="textKlein" ton="text2" umbruch="ueberall">
           {p.wert}
           {p.zusatz && (
             <span style={{ ...schriftStil('meta'), color: rollen.achtungText }}>
@@ -100,11 +101,15 @@ export default function StartlistePaneel({
               {p.zusatz}
             </span>
           )}
-        </span>
+        </Textstufe>
       );
     }
     if (p.grund) {
-      return <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>{p.grund}</span>;
+      return (
+        <Textstufe stufe="meta" ton="gedaempft">
+          {p.grund}
+        </Textstufe>
+      );
     }
     return null;
   };
@@ -133,7 +138,7 @@ export default function StartlistePaneel({
           alignItems: 'baseline',
           columnGap: token.paddingSM,
           rowGap: 2,
-          fontSize: 12,
+          ...schriftStil('textKlein'),
         }}
       >
         <span style={{ fontWeight: 500 }}>{p.titel}</span>

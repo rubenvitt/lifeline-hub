@@ -207,7 +207,9 @@ describe('FristPaneel', () => {
       meine_rolle: 'beobachter',
       retention_bis: '2030-10-01 10:00:00',
     });
-    expect(await screen.findByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
+    expect(
+      await screen.findByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Frist ändern' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
   });
@@ -219,7 +221,9 @@ describe('FristPaneel', () => {
       retention_bis: '2030-10-01 10:00:00',
       org_id: 2,
     });
-    expect(await screen.findByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
+    expect(
+      await screen.findByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Frist ändern' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
   });
@@ -267,7 +271,7 @@ describe('FristPaneel', () => {
     await fristSetzen(dialog, '2020-01-01 12:00');
     const rueckfrage = await rueckfrageFinden();
     expect(rueckfrage).toHaveTextContent(/sofort/);
-    expect(rueckfrage).toHaveTextContent(/auch für Sie/);
+    expect(rueckfrage).toHaveTextContent(/auch für die eigene Rolle/);
     expect(gesendet).toHaveLength(0);
   });
 

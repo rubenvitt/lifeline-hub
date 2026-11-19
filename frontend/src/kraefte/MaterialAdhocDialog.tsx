@@ -6,7 +6,7 @@ import { MATERIAL_ADHOC_TEXT_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { MaterialArt } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
-import { Segmentleiste } from '../components/instrument';
+import { Feld, Segmentleiste } from '../components/instrument';
 import { MengenFeld } from '../components/MengenFeld';
 import { Select } from '../components/Select';
 import type { buildOrtOptions } from './materialOrtWahl';
@@ -149,29 +149,26 @@ export default function MaterialAdhocDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
-        label="Bezeichnung"
-        name="bezeichnung"
-        rules={[{ required: true, whitespace: true }]}
-      >
+      <Feld label="Bezeichnung" name="bezeichnung" rules={[{ required: true, whitespace: true }]}>
         <Input placeholder="z. B. Spende-Decken" maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
+        breite="kurz"
         label="Menge"
         name="menge"
         rules={[{ required: true }]}
         extra={isGeraet ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
       >
-        <MengenFeld beschriftung="Menge" style={{ width: 120 }} disabled={isGeraet} />
-      </Form.Item>
+        <MengenFeld beschriftung="Menge" disabled={isGeraet} />
+      </Feld>
       {/* Art (LLH-1225 D6): ohne eigene Wahl zeigt sie die Vorgabe der Menge, gesendet wird,
           was steht. */}
-      <Form.Item label="Art" name="art">
+      <Feld label="Art" name="art">
         <ArtFeld vorgabe={artVorgabe(menge)} />
-      </Form.Item>
-      <Form.Item label="Kategorie" name="kategorie">
+      </Feld>
+      <Feld label="Kategorie" name="kategorie">
         <Input maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-      </Form.Item>
+      </Feld>
       <Collapse
         ghost
         items={[
@@ -181,21 +178,17 @@ export default function MaterialAdhocDialog({
             forceRender: true,
             children: (
               <>
-                <Form.Item label="Trägerorganisation" name="traegerorganisation">
+                <Feld label="Trägerorganisation" name="traegerorganisation">
                   <Input placeholder="z. B. THW" maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-                </Form.Item>
-                <Form.Item
-                  label="Bestandsnummer"
-                  name="bestandsnummer"
-                  style={ort ? { marginBottom: 0 } : undefined}
-                >
+                </Feld>
+                <Feld label="Bestandsnummer" name="bestandsnummer">
                   <Input maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-                </Form.Item>
+                </Feld>
                 {/* Ort (D7) unter „Weitere Angaben“ (Feldbudget, 1093 D12); am Ort steht er fest. */}
                 {!ort && (
-                  <Form.Item label="Ort" name="ort" style={{ marginBottom: 0 }}>
+                  <Feld label="Ort" name="ort">
                     <Select<string> options={ortOptionen} />
-                  </Form.Item>
+                  </Feld>
                 )}
               </>
             ),

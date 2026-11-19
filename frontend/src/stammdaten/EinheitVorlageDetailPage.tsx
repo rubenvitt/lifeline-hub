@@ -1,4 +1,4 @@
-import { App, Button, Col, Form, Input, Row, Switch, theme } from 'antd';
+import { App, Col, Form, Input, Row, Switch, theme } from 'antd';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,8 @@ import { Select } from '../components/Select';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, useAenderungsstandMerken } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { typVorgabe } from '../components/vorgabeText';
@@ -222,7 +224,7 @@ export default function EinheitVorlageDetailPage() {
       <AdminPage titel="Einheiten-Vorlage">
         <SeitenLeer
           titel="Einheiten-Vorlage nicht gefunden"
-          hinweis="Der Datensatz gehört zu einer anderen Organisation oder existiert nicht."
+          hinweis="Nicht gefunden: entfernt oder nicht in dieser Organisation."
           aktion={{ label: 'Zu den Einheiten-Vorlagen', pfad: einheitVorlageListPath() }}
         />
       </AdminPage>
@@ -263,6 +265,7 @@ function DetailContent({
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
   const schutz = useFormularVerlassenSchutz({ aktiv: darfBearbeiten, schluessel: vorlage.id });
   // Stand beim Öffnen, nach jedem Speichern der gespeicherte: dagegen wird verglichen.
   const [base, setBase] = useState<Head>(() => headOf(vorlage));
@@ -286,6 +289,7 @@ function DetailContent({
       onSuccess: () => {
         setBase(next);
         schutz.gespeichert(version);
+        stand.merke(values);
         message.success(`Gespeichert: ${changes.labels.join(', ')}`);
       },
     });
@@ -333,96 +337,100 @@ function DetailContent({
           initialValues={toFormValues(base)}
           onFinish={submit}
         >
-          <Formularpaneel titel="Kopf" dataUpdatedAt={dataUpdatedAt}>
-            <Row gutter={token.margin}>
-              <Col xs={24} lg={12}>
-                <Feld
-                  label="Name"
-                  name="name"
-                  rules={[
-                    { required: true, whitespace: true, message: 'Name darf nicht leer sein' },
-                  ]}
-                >
-                  <Input maxLength={EINHEIT_VORLAGE_NAME_MAX} />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Typ" name="typ_id" rules={[{ required: true, message: 'Typ wählen' }]}>
-                  <Select<number> aria-label="Typ" options={typOptions} />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Unter" name="ueber_vorlage_id">
-                  <Select<number>
-                    aria-label="Unter"
-                    allowClear
-                    placeholder="keine"
-                    options={ueberOptions}
-                  />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Funkrufname" name="funkrufname">
-                  <Input maxLength={EINHEIT_VORLAGE_FUNKRUFNAME_MAX} />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Aktiv" name="aktiv" valuePropName="checked">
-                  <Switch />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+          <AenderungsstandProvider ausgangswerte={toFormValues(base)} merkeRef={stand.merkeRef}>
+            <Formularpaneel titel="Kopf" dataUpdatedAt={dataUpdatedAt}>
+              <Row gutter={token.margin}>
+                <Col xs={24} lg={12}>
+                  <Feld
+                    label="Name"
+                    name="name"
+                    rules={[
+                      { required: true, whitespace: true, message: 'Name darf nicht leer sein' },
+                    ]}
+                  >
+                    <Input maxLength={EINHEIT_VORLAGE_NAME_MAX} />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld
+                    label="Typ"
+                    name="typ_id"
+                    rules={[{ required: true, message: 'Typ wählen' }]}
+                  >
+                    <Select<number> aria-label="Typ" options={typOptions} />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Unter" name="ueber_vorlage_id">
+                    <Select<number>
+                      aria-label="Unter"
+                      allowClear
+                      placeholder="keine"
+                      options={ueberOptions}
+                    />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Funkrufname" name="funkrufname">
+                    <Input maxLength={EINHEIT_VORLAGE_FUNKRUFNAME_MAX} />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Aktiv" name="aktiv" valuePropName="checked">
+                    <Switch />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Taktisches Zeichen">
-            <Row gutter={token.margin} align="bottom">
-              <Col xs={24} lg={10}>
-                <Feld label="Fachaufgabe" name="tz_fachaufgabe">
-                  <Select<string>
-                    aria-label="Fachaufgabe"
-                    allowClear
-                    placeholder="keine"
-                    options={FACHAUFGABE_OPTIONS}
-                  />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={10}>
-                <Feld label="Organisation" name="tz_organisation">
-                  <Select<string>
-                    aria-label="Organisation"
-                    allowClear
-                    placeholder="keine"
-                    options={ORGANISATION_OPTIONS}
-                  />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={4}>
-                <Feld label="Vorschau">
-                  <ZeichenVorschau typen={typen} />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+            <Formularpaneel titel="Taktisches Zeichen">
+              <Row gutter={token.margin} align="bottom">
+                <Col xs={24} lg={10}>
+                  <Feld label="Fachaufgabe" name="tz_fachaufgabe">
+                    <Select<string>
+                      aria-label="Fachaufgabe"
+                      allowClear
+                      placeholder="keine"
+                      options={FACHAUFGABE_OPTIONS}
+                    />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={10}>
+                  <Feld label="Organisation" name="tz_organisation">
+                    <Select<string>
+                      aria-label="Organisation"
+                      allowClear
+                      placeholder="keine"
+                      options={ORGANISATION_OPTIONS}
+                    />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={4}>
+                  <Feld label="Vorschau">
+                    <ZeichenVorschau typen={typen} />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Soll">
-            <SollField typen={typen} vorlage={vorlage} />
-          </Formularpaneel>
+            <Formularpaneel titel="Soll">
+              <SollField typen={typen} vorlage={vorlage} />
+            </Formularpaneel>
 
-          <Formularpaneel titel="Freitext">
-            <Feld
-              label="Bemerkung"
-              name="bemerkung"
-              rules={[zeichenRegel(EINHEIT_VORLAGE_BEMERKUNG_MAX, 'Bemerkung')]}
-            >
-              <Input.TextArea rows={3} count={zeichenGrenze(EINHEIT_VORLAGE_BEMERKUNG_MAX)} />
-            </Feld>
-          </Formularpaneel>
+            <Formularpaneel titel="Freitext">
+              <Feld
+                label="Bemerkung"
+                name="bemerkung"
+                rules={[zeichenRegel(EINHEIT_VORLAGE_BEMERKUNG_MAX, 'Bemerkung')]}
+              >
+                <Input.TextArea rows={3} count={zeichenGrenze(EINHEIT_VORLAGE_BEMERKUNG_MAX)} />
+              </Feld>
+            </Formularpaneel>
 
-          <div {...speicherLeiste}>
-            <Button type="primary" htmlType="submit" loading={save.isPending}>
-              Speichern
-            </Button>
-          </div>
+            <div {...speicherLeiste}>
+              <SpeicherKnopf loading={save.isPending} disabled={!darfBearbeiten} />
+            </div>
+          </AenderungsstandProvider>
         </Form>
 
         <UntereinheitenSection

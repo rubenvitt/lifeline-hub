@@ -5,9 +5,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { waehle } from '../test/auswahlListe';
+import { listeVon, waehle } from '../test/auswahlListe';
 import type { EinsatzVorlage, StichwortVorschlag } from '../api/types';
 import EinsaetzePage from './EinsaetzePage';
+import { MODUL_ANZAHL, moduleText } from '../stammdaten/einsatzVorlageModule';
 import { adminFixture } from '../test/fixtures';
 import {
   OHNE_VORLAGE,
@@ -18,8 +19,8 @@ import {
 
 /**
  * Einsatz-Vorlage im Anlegedialog (LLH-1375, Spec `einsatz-vorlagen`, „Der Anlegedialog bietet die
- * Vorlage an“): eine Zeile unter den Feldern, kein sechstes Feld; das Stichwort koppelt, die
- * Handwahl hat Vorrang, die Vorlage belegt die Einsatzart vor.
+ * Vorlage an“): seit LLH-1816 das oberste von sechs Feldern mit der Modulzahl darunter; das
+ * Stichwort koppelt, die Handwahl hat Vorrang, die Vorlage belegt die Einsatzart vor.
  */
 
 // MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests.
@@ -95,7 +96,7 @@ async function oeffneDialog() {
   await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
   const dialog = await screen.findByRole('dialog', { name: 'Neuen Einsatz anlegen' });
   // Die Zeile erscheint mit der Antwort auf die Vorlagen.
-  await within(dialog).findByRole('combobox', { name: 'Module' });
+  await within(dialog).findByRole('combobox', { name: 'Vorlage' });
   return dialog;
 }
 
@@ -111,16 +112,57 @@ async function anlegen(rumpf: { wert: Record<string, unknown> | null }) {
   return rumpf.wert!;
 }
 
-describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
-  it('steht als Zeile „Module“, Vorgabe „Alle Module“, und lässt das Feldbudget bei fünf', async () => {
+describe('Anlegedialog · Einsatz-Vorlage (LLH-1375, LLH-1816)', () => {
+  it('steht als oberstes Feld „Vorlage“ mit Vorgabe „Alle Module“ und Modulzahl; sechs Felder', async () => {
     setup();
     const dialog = await oeffneDialog();
-    expect(gewaehlt('Module')).toBe('Alle Module');
-    expect(within(dialog).getByText('Module:')).toBeInTheDocument();
-    // Kein sechstes Feld (LFH-1175): die Vorlage ist kein `Form.Item`.
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    expect(gewaehlt('Vorlage')).toBe('Alle Module');
+    const felder = dialog.querySelectorAll<HTMLElement>('.ant-form-item');
+    // Feldbudget-Ausnahme (frontend/AGENTS.md, LLH-1816): sechs Felder, die Vorlage zuerst.
+    expect(felder.length).toBe(6);
+    expect(within(felder[0]).getByRole('combobox', { name: 'Vorlage' })).toBeInTheDocument();
+    expect(
+      within(felder[0]).getByText(`${MODUL_ANZAHL} von ${MODUL_ANZAHL} Modulen`),
+    ).toBeInTheDocument();
+    // Die alte Zeile „Module:“ unter den Feldern ist weg.
+    expect(within(dialog).queryByText('Module:')).toBeNull();
     // Kein Erklärsatz zur Vorlage (LFH-1078).
     expect(within(dialog).queryByText(/blendet/)).toBeNull();
+  });
+
+  it('„Bezeichnung“ ist das Fokusziel beim Öffnen, nicht die Vorlage darüber', async () => {
+    setup();
+    await oeffneDialog();
+    // Die Erfassungs-Hülle fokussiert sonst das erste Feld, seit LLH-1816 die Vorlage; das
+    // ausdrückliche Ziel bevorzugt sie (`Erfassung.test.tsx`).
+    expect(screen.getByLabelText('Bezeichnung')).toHaveAttribute('data-erfassung-fokus');
+    expect(screen.getByRole('combobox', { name: 'Vorlage' })).not.toHaveAttribute(
+      'data-erfassung-fokus',
+    );
+  });
+
+  it('zeigt die Modulzahl der gewählten Vorlage', async () => {
+    setup();
+    const dialog = await oeffneDialog();
+    await waehle('Vorlage', 'Sanitätsdienst');
+    expect(
+      await within(dialog).findByText(moduleText(['lagebesprechung', 'tiere'])),
+    ).toBeInTheDocument();
+  });
+
+  it('das leere Stichwortfeld klappt keine Vorschläge auf, Tippen schon', async () => {
+    setup();
+    await oeffneDialog();
+    const feld = screen.getByRole('combobox', { name: 'Stichwort' });
+    await userEvent.click(feld);
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    const optionen = () =>
+      [...(listeVon('Stichwort')?.querySelectorAll('.ant-select-item-option') ?? [])].map(
+        (k) => k.textContent,
+      );
+    expect(optionen()).toEqual([]);
+    await userEvent.type(feld, 'man');
+    await waitFor(() => expect(optionen()).toEqual(['MANV15']));
   });
 
   it('ohne Vorlagen der Organisation keine Auswahl', async () => {
@@ -137,8 +179,8 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
     // Erst nach der Antwort ist die Abwesenheit eine Aussage.
     await waitFor(() => expect(beantwortet).toBe(true));
     await act(() => new Promise((r) => setTimeout(r, 50)));
-    expect(within(dialog).queryByRole('combobox', { name: 'Module' })).toBeNull();
-    expect(within(dialog).queryByText('Module:')).toBeNull();
+    expect(within(dialog).queryByRole('combobox', { name: 'Vorlage' })).toBeNull();
+    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
   });
 
   it('ohne Wahl geht kein `vorlage_id` hinaus', async () => {
@@ -152,7 +194,7 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
     const rumpf = setup();
     await oeffneDialog();
     await userEvent.type(screen.getByRole('combobox', { name: 'Stichwort' }), 'MANV15');
-    await waitFor(() => expect(gewaehlt('Module')).toBe('MANV'));
+    await waitFor(() => expect(gewaehlt('Vorlage')).toBe('MANV'));
     const gesendet = await anlegen(rumpf);
     expect(gesendet.vorlage_id).toBe(3);
     expect(gesendet.stichwort).toBe('MANV15');
@@ -163,18 +205,18 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
     await oeffneDialog();
     const feld = screen.getByRole('combobox', { name: 'Stichwort' });
     await userEvent.type(feld, 'MANV15');
-    await waitFor(() => expect(gewaehlt('Module')).toBe('MANV'));
+    await waitFor(() => expect(gewaehlt('Vorlage')).toBe('MANV'));
     await userEvent.clear(feld);
     await userEvent.type(feld, 'H1');
-    await waitFor(() => expect(gewaehlt('Module')).toBe('Alle Module'));
+    await waitFor(() => expect(gewaehlt('Vorlage')).toBe('Alle Module'));
   });
 
   it('Handwahl hat Vorrang: erst „Kleinlage“, dann „MANV15“, die Vorlage bleibt', async () => {
     const rumpf = setup();
     await oeffneDialog();
-    await waehle('Module', 'Kleinlage');
+    await waehle('Vorlage', 'Kleinlage');
     await userEvent.type(screen.getByRole('combobox', { name: 'Stichwort' }), 'MANV15');
-    expect(gewaehlt('Module')).toBe('Kleinlage');
+    expect(gewaehlt('Vorlage')).toBe('Kleinlage');
     const gesendet = await anlegen(rumpf);
     expect(gesendet.vorlage_id).toBe(1);
   });
@@ -182,10 +224,10 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
   it('auch die Handwahl „Alle Module“ hat Vorrang vor dem Stichwort', async () => {
     const rumpf = setup();
     await oeffneDialog();
-    await waehle('Module', 'Kleinlage');
-    await waehle('Module', 'Alle Module');
+    await waehle('Vorlage', 'Kleinlage');
+    await waehle('Vorlage', 'Alle Module');
     await userEvent.type(screen.getByRole('combobox', { name: 'Stichwort' }), 'MANV15');
-    expect(gewaehlt('Module')).toBe('Alle Module');
+    expect(gewaehlt('Vorlage')).toBe('Alle Module');
     const gesendet = await anlegen(rumpf);
     expect(gesendet).not.toHaveProperty('vorlage_id');
   });
@@ -194,12 +236,12 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
     const rumpf = setup();
     await oeffneDialog();
     expect(gewaehlt('Einsatzart')).toBe('Realeinsatz');
-    await waehle('Module', 'Sanitätsdienst');
+    await waehle('Vorlage', 'Sanitätsdienst');
     await waitFor(() => expect(gewaehlt('Einsatzart')).toBe('Sanitätsdienst'));
     // Zurück auf eine Vorlage ohne Einsatzart: die Startwahl des Dialogs gilt wieder.
-    await waehle('Module', 'Ohne Art');
+    await waehle('Vorlage', 'Ohne Art');
     await waitFor(() => expect(gewaehlt('Einsatzart')).toBe('Realeinsatz'));
-    await waehle('Module', 'Sanitätsdienst');
+    await waehle('Vorlage', 'Sanitätsdienst');
     const gesendet = await anlegen(rumpf);
     expect(gesendet.einsatzart).toBe('sanitaetsdienst');
     expect(gesendet.vorlage_id).toBe(2);
@@ -216,7 +258,7 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
     const rumpf = setup();
     await oeffneDialog();
     await waehle('Einsatzart', 'Übung');
-    await waehle('Module', 'Sanitätsdienst');
+    await waehle('Vorlage', 'Sanitätsdienst');
     expect(gewaehlt('Einsatzart')).toBe('Übung');
     const gesendet = await anlegen(rumpf);
     expect(gesendet.einsatzart).toBe('uebung');
@@ -227,15 +269,15 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375)', () => {
     setup();
     await oeffneDialog();
     await waehle('Einsatzart', 'Übung');
-    await waehle('Module', 'Kleinlage');
+    await waehle('Vorlage', 'Kleinlage');
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
 
     await oeffneDialog();
-    expect(gewaehlt('Module')).toBe('Alle Module');
+    expect(gewaehlt('Vorlage')).toBe('Alle Module');
     expect(gewaehlt('Einsatzart')).toBe('Realeinsatz');
     // Die Handwahl ist vergessen: das Stichwort koppelt wieder, die Einsatzart folgt.
     await userEvent.type(screen.getByRole('combobox', { name: 'Stichwort' }), 'SAN');
-    await waitFor(() => expect(gewaehlt('Module')).toBe('Sanitätsdienst'));
+    await waitFor(() => expect(gewaehlt('Vorlage')).toBe('Sanitätsdienst'));
     expect(gewaehlt('Einsatzart')).toBe('Sanitätsdienst');
   });
 });
@@ -268,20 +310,20 @@ describe('Anlegedialog · Schichtmodell der Vorlage (LLH-1313)', () => {
       await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
     ).toBeInTheDocument();
 
-    await waehle('Module', 'Sanitätsdienst');
+    await waehle('Vorlage', 'Sanitätsdienst');
     expect(
       await within(dialog).findByText('Schichtmodell: Sanitätsdienst 6 h (Vorgabe Vorlage)'),
     ).toBeInTheDocument();
-    // Weiter kein eigenes Feld (Feldbudget, LFH-1175).
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    // Das Schichtmodell ist kein eigenes Feld: sechs Felder samt Vorlage (Feldbudget, LLH-1816).
+    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(6);
 
-    await waehle('Module', 'Kleinlage');
+    await waehle('Vorlage', 'Kleinlage');
     expect(
       await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
     ).toBeInTheDocument();
 
     // Die Wahl geht nur als `vorlage_id` hinaus; das Modell rechnet der Server.
-    await waehle('Module', 'Sanitätsdienst');
+    await waehle('Vorlage', 'Sanitätsdienst');
     const body = await anlegen(rumpf);
     expect(body.vorlage_id).toBe(2);
     expect(body).not.toHaveProperty('schichtmodell_id');
@@ -297,7 +339,7 @@ describe('Anlegedialog · Schichtmodell der Vorlage (LLH-1313)', () => {
     );
     const dialog = await oeffneDialog();
     expect(within(dialog).queryByText(/^Schichtmodell:/)).toBeNull();
-    await waehle('Module', 'MANV');
+    await waehle('Vorlage', 'MANV');
     expect(
       await within(dialog).findByText('Schichtmodell: 12-h-Schicht 0600/1800 (Vorgabe Vorlage)'),
     ).toBeInTheDocument();
@@ -328,7 +370,7 @@ describe('Anlegedialog · Modell der Vorlage fehlt im Cache (LLH-1313)', () => {
     expect(
       await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
     ).toBeInTheDocument();
-    await waehle('Module', 'Sanitätsdienst');
+    await waehle('Vorlage', 'Sanitätsdienst');
     await waitFor(() => expect(within(dialog).queryByText(/^Schichtmodell:/)).toBeNull());
   });
 });

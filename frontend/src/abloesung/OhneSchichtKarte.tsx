@@ -1,6 +1,6 @@
-import { Button, Flex, Space, Typography } from 'antd';
+import { Button, Typography } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, Stapel, Textstufe, useRollen } from '../components/instrument';
 import type { OhneSchicht } from './ohneSchicht';
 
 const { Text } = Typography;
@@ -58,45 +58,41 @@ export default function OhneSchichtKarte({
           gap: 2,
         }}
       >
-        <span style={{ ...monoStil(13, 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
+        <span style={{ ...monoStil('mono', 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
           <ZeitAnzeige wert={e.eintreffen_at ?? e.beginn_at} rolle="kurz" />
         </span>
         {/* So breit wie „eingetroffen“: sonst stünde die Spalte je nach Wort verschieden breit,
             und die Namen der Zeilen fluchteten nicht. */}
-        <span style={{ ...monoStil(10), color: rollen.schwach, minWidth: '12ch' }}>
+        <span style={{ ...monoStil('metaKlein'), color: rollen.schwach, minWidth: '12ch' }}>
           {eingetroffen ? 'eingetroffen' : 'alarmiert'}
         </span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: token.paddingSM }}>
-        <Text strong style={{ fontSize: 15 }}>
-          {e.einheit_name}
-        </Text>
-        {(e.abschnitt_name || e.abloeser_fuer) && (
-          <Space
-            orientation="vertical"
-            size={2}
-            style={{ width: '100%', marginTop: token.marginXS }}
-          >
-            {e.abschnitt_name && <Text type="secondary">{e.abschnitt_name}</Text>}
-            {e.abloeser_fuer && (
-              <Text type="secondary" data-lfh="abloesung-abloeser-fuer">
-                als Ablöser geplant für {e.abloeser_fuer}
-              </Text>
-            )}
-          </Space>
-        )}
-        {darfSchreiben && !e.abloeser_fuer && (
-          <Flex justify="flex-end" style={{ marginTop: token.marginXS }}>
-            {/* Der Name beginnt mit dem sichtbaren Wortlaut (WCAG 2.5.3) und nennt die Einheit:
+        <Stapel abstand="xs">
+          <Textstufe stufe="kartentitel">{e.einheit_name}</Textstufe>
+          {(e.abschnitt_name || e.abloeser_fuer) && (
+            <Stapel abstand="xxs">
+              {e.abschnitt_name && <Text type="secondary">{e.abschnitt_name}</Text>}
+              {e.abloeser_fuer && (
+                <Text type="secondary" data-lfh="abloesung-abloeser-fuer">
+                  als Ablöser geplant für {e.abloeser_fuer}
+                </Text>
+              )}
+            </Stapel>
+          )}
+          {darfSchreiben && !e.abloeser_fuer && (
+            <Stapel richtung="zeile" verteilen="ende">
+              {/* Der Name beginnt mit dem sichtbaren Wortlaut (WCAG 2.5.3) und nennt die Einheit:
                 in der Liste stehen viele gleiche Knöpfe, der im Kopf heißt nur „Schicht beginnen“. */}
-            <Button
-              aria-label={`Schicht beginnen für ${e.einheit_name}`}
-              onClick={() => onBeginnen(e)}
-            >
-              Schicht beginnen
-            </Button>
-          </Flex>
-        )}
+              <Button
+                aria-label={`Schicht beginnen für ${e.einheit_name}`}
+                onClick={() => onBeginnen(e)}
+              >
+                Schicht beginnen
+              </Button>
+            </Stapel>
+          )}
+        </Stapel>
       </div>
     </article>
   );

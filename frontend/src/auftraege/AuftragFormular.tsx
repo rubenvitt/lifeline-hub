@@ -5,7 +5,7 @@ import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortEingabe, ortRegeln } from '../anzeige/ortsfeldFormular';
 import { serverJetzt } from '../offline/serveruhr';
-import { Paneel } from '../components/instrument';
+import { Feld, Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -158,7 +158,7 @@ function SchemaFeldInput({ feld, einsatzId }: { feld: SchemaFeld; einsatzId?: nu
   const label = FORM_LABEL[feld];
   if (feld === 'ort') {
     return (
-      <Form.Item
+      <Feld
         name="ort"
         rules={ortRegeln(AUFTRAG_BEFEHLSFELD_MAX, VALIDATION_NAME.ort)}
         label={label}
@@ -173,11 +173,11 @@ function SchemaFeldInput({ feld, einsatzId }: { feld: SchemaFeld; einsatzId?: nu
         ) : (
           <ZielText aria-label={label} />
         )}
-      </Form.Item>
+      </Feld>
     );
   }
   return (
-    <Form.Item
+    <Feld
       name={feld}
       rules={[zeichenRegel(AUFTRAG_BEFEHLSFELD_MAX, VALIDATION_NAME[feld])]}
       label={label}
@@ -187,7 +187,7 @@ function SchemaFeldInput({ feld, einsatzId }: { feld: SchemaFeld; einsatzId?: nu
       ) : (
         <Input aria-label={label} placeholder={PLACEHOLDER[feld]} count={BEFEHLSFELD_ZAEHLER} />
       )}
-    </Form.Item>
+    </Feld>
   );
 }
 
@@ -373,7 +373,7 @@ export default function AuftragFormular({
       <SchemaRow links="verbindung" rechts="sicherheit" />
       <Row gutter={token.margin}>
         <Col xs={24} sm={12}>
-          <Form.Item name="richtung" label="Richtung">
+          <Feld name="richtung" label="Richtung">
             <Select<Richtung>
               aria-label="Richtung"
               disabled={!!berichtigen}
@@ -382,40 +382,40 @@ export default function AuftragFormular({
                 { value: 'extern', label: 'Extern' },
               ]}
             />
-          </Form.Item>
+          </Feld>
         </Col>
         <Col xs={24} sm={12}>
           {/* Leer setzt der Server die Erteilzeit auf jetzt (`auftrag/eingabe.rs`). */}
-          <Form.Item name="erteiltAm" label="Erteilt am (optional)">
+          <Feld name="erteiltAm" label="Erteilt am (optional)">
             <ZeitpunktEingabe
               art="ereignis"
               style={{ width: '100%' }}
               placeholder="jetzt"
               disabled={!!berichtigen}
             />
-          </Form.Item>
+          </Feld>
         </Col>
       </Row>
       {richtung === 'extern' && (
         <Row gutter={token.margin}>
           <Col xs={24} sm={12}>
-            <Form.Item name="externKategorie" label="Externe Stelle">
+            <Feld name="externKategorie" label="Externe Stelle">
               <Select<AdressatKategorie>
                 aria-label="Externe Stelle"
                 options={EXTERN_KATEGORIE_OPTIONS}
                 disabled={empfaengerGesperrt}
               />
-            </Form.Item>
+            </Feld>
           </Col>
           <Col xs={24} sm={12}>
-            <Form.Item name="externBezeichnung" label="Bezeichnung der Stelle">
+            <Feld name="externBezeichnung" label="Bezeichnung der Stelle">
               <Input
                 aria-label="Externe Bezeichnung"
                 placeholder="z. B. Leitstelle Nord"
                 maxLength={AUFTRAG_EXTERN_BEZEICHNUNG_MAX}
                 disabled={empfaengerGesperrt}
               />
-            </Form.Item>
+            </Feld>
           </Col>
         </Row>
       )}
@@ -469,7 +469,7 @@ export default function AuftragFormular({
           und bekommt den Fokus; EIN Feld für beide Empfängersorten (Begründung an
           `FormWerte.empfaenger`). Das Komma bleibt Trennzeichen, damit „S3, Fachberater" zwei
           Empfänger ergibt. */}
-      <Form.Item
+      <Feld
         name="empfaenger"
         label="Empfänger"
         // Ein Empfänger, den das Formular nicht abbildet (Person, Fahrzeug), sperrt das Feld;
@@ -491,8 +491,8 @@ export default function AuftragFormular({
           // Bisheriges Verhalten des Auftrags: Verlassen übernimmt den Tipptext als Empfänger.
           commitSearchOnBlur
         />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         name="text"
         label="Auftrag / Was"
         rules={[
@@ -503,10 +503,10 @@ export default function AuftragFormular({
         ]}
       >
         <TextArea aria-label="Auftrag / Was" rows={2} count={zeichenGrenze(AUFTRAG_TEXT_MAX)} />
-      </Form.Item>
+      </Feld>
       <Row gutter={token.margin}>
         <Col xs={24} sm={12}>
-          <Form.Item name="prioritaet" label="Priorität">
+          <Feld name="prioritaet" label="Priorität">
             <Select<AuftragPrioritaet>
               aria-label="Priorität"
               options={[
@@ -515,12 +515,12 @@ export default function AuftragFormular({
                 { value: 'normal', label: 'Normal' },
               ]}
             />
-          </Form.Item>
+          </Feld>
         </Col>
         <Col xs={24} sm={12}>
-          <Form.Item name="frist" label="Frist (Quittung/Vollzug)">
+          <Feld name="frist" label="Frist (Quittung/Vollzug)">
             <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
-          </Form.Item>
+          </Feld>
         </Col>
       </Row>
       <Collapse

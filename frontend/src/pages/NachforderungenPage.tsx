@@ -1063,15 +1063,16 @@ export default function NachforderungenPage() {
       <DeeplinkHinweis lage={deeplinkHinweis} sache="Nachforderung" />
       {stellenOptionen.length > 0 && (
         <div style={{ marginBottom: token.margin }}>
-          <Select<number>
-            aria-label="Für Stelle"
-            allowClear
-            placeholder="Für Stelle"
-            style={{ minWidth: 200 }}
-            value={stelleFilter ?? undefined}
-            options={stellenOptionen}
-            onChange={(id) => setzeStelleFilter(id ?? null)}
-          />
+          <div style={{ display: 'inline-grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+            <Select<number>
+              aria-label="Für Stelle"
+              allowClear
+              placeholder="Für Stelle"
+              value={stelleFilter ?? undefined}
+              options={stellenOptionen}
+              onChange={(id) => setzeStelleFilter(id ?? null)}
+            />
+          </div>
         </div>
       )}
       {stelleFilter != null && (

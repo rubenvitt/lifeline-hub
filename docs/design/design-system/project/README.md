@@ -35,6 +35,7 @@ die Karten deckungsgleich.
 | Nebenangaben eines Datensatzes in einer Zeile                                                   | `MetaZeile`                                                                                                                                      | `MetaZeile`                        |
 | Text in einer Größe und Farbe                                                                   | `Textstufe` (Stufe der `schriftskala`, Ton)                                                                                                      | `Text`                             |
 | Elemente mit Abstand reihen                                                                     | `Stapel` (Rasterstufe)                                                                                                                           | `Stapel`                           |
+| Knöpfe nebeneinander (Kopf, Paneel, Dialogfuß)                                                  | `Knopfreihe` (Abstand `md`, Fuß mit `fuss`)                                                                                                      | `Knopfreihe`                       |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
 | Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
@@ -62,7 +63,7 @@ die Karten deckungsgleich.
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
 | Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
-| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` („Formularseiten“)                                                                          | `Formularlayout`, `Speicherleiste` |
+| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` + `SpeicherKnopf` („Formularseiten“)                                                        | `Formularlayout`, `Speicherleiste` |
 | Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
 | **Umschalten**                                             |                                                                                                                                                  |                                    |
 | Fläche oder Bereich darunter umschalten                                                         | `Segmentleiste rolle="tablist"` mit Reiterfläche (`role="tabpanel"`, `steuert`); führt ein Reiter auf eine andere Seite, `aktivierung="manuell"` | `Segmentleiste`                    |
@@ -93,6 +94,7 @@ die Karten deckungsgleich.
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **Textstufe (Stufen der Schriftskala und Töne)** (`components/Text/`, Gruppe Flächen)
 - **Stapel (Abstand als Rasterstufe, senkrecht und als Zeile)** (`components/Stapel/`, Gruppe Flächen)
+- **Knopfreihe (Knöpfe nebeneinander, Abstand md)** (`components/Knopfreihe/`, Gruppe Flächen)
 - **MetaZeile (Nebenangaben eines Datensatzes)** (`components/MetaZeile/`, Gruppe Daten)
 - **Status, Marke und Statusknopf (Rahmen heißt bedienbar)** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
@@ -113,7 +115,7 @@ die Karten deckungsgleich.
 - **Eingabefeld (Feld mit Breitenstufe, Pflicht mit Fehlerzeile, FeldFehler)** (`components/Eingabefeld/`, Gruppe Eingabe)
 - **Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)** (`components/Formularlayout/`, Gruppe Eingabe)
 - **Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)** (`components/Dialog/`, Gruppe Eingabe)
-- **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
+- **Speicherleiste (SpeicherKnopf, Punkt am geänderten Feld)** (`components/Speicherleiste/`, Gruppe Formular)
 - **StammdatenFeld (aus Stammdaten oder frei)** (`components/StammdatenFeld/`, Gruppe Formular)
 - **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
 - **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
@@ -168,10 +170,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
-  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nicht. Die
-  Stufen wachsen nicht mit der Dichte. Neue `fontSize`-Zahlen
-  verbietet `theme/schriftgroesse.guard.test.ts`; die Altlast steht in `schriftgroesse.schuld.ts`
-  und sinkt wie beim Abstandsraster.
+  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
+  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `metaKlein` 10, `meta` 11, `monoKlein`
+  12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen. Die Stufen wachsen nicht mit der Dichte. Neue
+  `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
+  Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster**: Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
@@ -232,8 +235,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     ist. Deshalb hängt das `<Outlet />` des Einsatzrahmens in `einsatz/ModulWechselGerippe.tsx`.
     Wechselt das Modul, steht im ersten Bild `ModulGerippeSeite` (Seitenkopf mit `modulName` und Ortspfad,
     `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
-    im selben Modul und nicht beim ersten Aufruf. Eine Seite baut kein eigenes Vorab-Gerippe für
-    den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
+    im selben Modul. Beim ersten Aufruf zeigt `ModulWechselGerippe` kein Vorab-Gerippe; lädt der
+    Einsatz dann noch, gibt die Seite in ihrem Frühausstieg selbst `ModulGerippeSeite` zurück
+    (Kopf sofort, Einsatz im Ortspfad als „…“), nie ein nacktes `SeitenSkeleton`. Was
+    erst mit den Daten kommt, reserviert seine Zeile vorher (unsichtbar, ohne Nullen) oder steht
+    unter allem, was schon steht; Nachweis: `e2e/erstaufruf-cls.spec.ts` (Erstaufruf mit langsamem
+    Server, CLS < 0,1). Eine Seite baut kein eigenes Vorab-Gerippe für den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
     Ladetext.
   - **Zwei Höhen** (`components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
@@ -297,6 +304,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
     neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
     Nachweis `e2e/fehlergrenze.spec.ts`.
+  - **Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze** (Entwurf
+    `docs/superpowers/specs/2026-11-19-ft74hjiv-fehlergrenze-je-kachel-design.md`): Auf
+    Überblick, Lagebild, Lagebild-Großbild und Lagemonitor steht jede Kachel (Alarmzeile,
+    Startliste, Paneel, Kennzahlenband, Monitorkachel) einzeln in `KachelGrenze`
+    (`components/KachelGrenze.tsx`), damit ein Wurf nur sie ersetzt und nicht über die
+    Rahmengrenze die ganze Seite. Form `paneel` mit „Neu laden“ auf Flächen mit Bedienung, Form
+    `gross` ohne Knopf auf Großbild und Lagemonitor, dort mit dem Datenstand als `neuversuch`. Wie
+    die Rahmengrenze zeigt sie nie Meldung oder Stack und meldet über `meldeClientFehler`. Sie
+    fängt nur Würfe beim Zeichnen: Abfragefehler zeigt `PaneelZustand`, ein Wurf im Rumpf der
+    Seite bleibt bei der Rahmengrenze. Wächter `pruefeKachelGrenzen` (`test/kachelWaechter.ts`)
+    in den Seitentests von Überblick, Lagebild und Lagemonitor; Nachweis
+    `components/KachelGrenze.test.tsx`.
   - **Ortsmarke in der Bedienfarbe**: die aktive
     Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
     aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
@@ -467,12 +486,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Breite (Schloss in `AppLayout.tsx`). Jede Textfarbe im Rahmen steht in
   `theme/rahmenKontrast.test.ts` und wird dort gerechnet (der Test sieht keine Verwendung, nur
   die Liste). Gilt für jede weitere dauerdunkle Fläche.
-- **Ein `<Space>` in `aktionen` nennt seinen Abstand**: ohne `size` stehen die Knöpfe
-  4 / 4 / 8 px auseinander, auch im Seitenkopf, dessen Hülle selbst `marginSM` hält. Vorgabe
-  `size={token.marginSM}` (8 / 12 / 16); Wächter `components/aktionenSpace.guard.test.ts`.
-- **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
-  `size="middle"`. Dialogfüße halten dieselbe Stufe (12/20/24 px, Leitlinie ≥ 8 / ≥ 16): der Fuß der Erfassungs-Hülle über `size="middle"`, antds
-  eigene Füße (Modal, `modal.confirm`, `Popconfirm`) über eine Regel in `index.css` mit
+- **Knopfreihen über `Knopfreihe`**: zwei oder mehr Knöpfe nebeneinander
+  stehen in `Knopfreihe` mit dem festen Abstand `md` (12 / 20 / 24 px), so steht auch Rot nie
+  bündig neben Neutralem; kein `<Space>`, kein eigener Abstand. Dialogfüße nehmen `fuss` (ab `md`
+  rechtsbündig, darunter untereinander in voller Breite). Primär steht im Kopf, im Paneel und in
+  der Zeile vorn, im Fuß hinten; die Reihe ordnet nicht um. In Tabellenzellen und Zeilen, die ihre
+  Höhe halten, `umbruch={false}`. Ein `<Space>` in `aktionen` der `EinsatzSeite` wird zum
+  Fragment, denn die Kopfhülle ist selbst eine Knopfreihe; nur eine Reihe mit Druckklasse oder
+  Hülle bleibt eine eigene `Knopfreihe` (Kräfte, Lagebericht). Bestand in
+  `components/knopfreihe.schuld.ts` (Ratsche). antds eigene Füße
+  (Modal, `modal.confirm`, `Popconfirm`) halten dieselbe Stufe über eine Regel in `index.css` mit
   `var(--ant-padding)`. **Kein Komponenten-Token `marginXS`:** jeder antd-Knopf setzt die Variable
   mit seiner `css-var-…`-Klasse zurück, die Überschreibung kommt am Knopf nie an (gemessen 7 px).
   Nachweis `e2e/dialogfuss-dichte.spec.ts`, `e2e/dokumente.spec.ts`.
@@ -659,13 +682,21 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (der Wächter erfasst sie nicht).
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
-  Modulbeschreibungen aus wenigen Fachwörtern.
+  Modulbeschreibungen aus wenigen Fachwörtern, die Darf-Zeile unter einer Rollenoption (Umfang in
+  wenigen Wörtern, keine Bedienung; „Begriffe“, Rollen-Vokabular).
 - **Erklärendes gehört in die Anwenderdokumentation** (in der App unter
   „Hilfe“): wer einen Erklärsatz entfernt, dessen Wissen sonst nirgends steht, schreibt
   es dort ins Kapitel. Regeln: `docs/anwender/AGENTS.md`.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+- **Anrede: niemand wird angesprochen** (Entscheidung 19.11.2026). Kein Du, kein Sie,
+  auch nicht in Servertexten, die bis zum Anwender durchkommen. Texte nennen die Sache („Eigene
+  Rolle“, „Code aus der Authenticator-App“) oder den Handgriff im Infinitiv („Nur bestätigen,
+  wenn …“); eine Frage ohne Pronomen ist erlaubt („Mit welchem Rufnamen ins ETB schreiben?“).
+  Dieselbe Regel gilt für die Anwenderdokumentation. Wächter:
+  `anredeText.guard.test.ts`; „Sie“ für eine Sache am Satzanfang steht dort als bewertete
+  Ausnahme.
 - **Kürzel sind eingeführt oder erklärt**: Die Oberfläche zeigt ein
   Kürzel nur, wenn es in `anzeige/kuerzel.ts` (`EINGEFUEHRTE_KUERZEL`) steht oder auf derselben
   Fläche sichtbar erklärt wird; sonst wird es ausgeschrieben („Unterabschnitte“, nicht „UA“). Ein
@@ -679,6 +710,17 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 
 ## Begriffe
 
+- **Rollen-Vokabular** (Entwurf
+  `docs/superpowers/specs/2026-11-19-zlzpieaq-rollen-vokabular-design.md`): Name und Darf-Zeile
+  jeder Rolle stehen nur in `einsatz/rollenVokabular.ts` (Rolle im Einsatz, in der Organisation,
+  in der Verwaltung, Stufe der Modulsperre). Eine Rolle heißt überall gleich: „System-Admin“ (mit
+  Bezug auf den Einsatz „System-Admin der Organisation“, nie „Org-Admin“), „Führungskraft der
+  Organisation“, ohne Rolle „Keine“ bzw. am Konto „Keine Rolle“; Felder heißen „Rolle in der
+  Verwaltung“, „Rolle in der Organisation“, „Rolle im Einsatz“. Jede Auswahl, die eine Rolle
+  vergibt, nutzt `rollenOptionen` und `rollenOptionRender` (`einsatz/rollenOption.tsx`): offen Name
+  und Darf-Zeile, geschlossen nur der Name. Darf-Zeilen höchstens 80 Zeichen. Eine neue Rolle kommt
+  zuerst ins Vokabular (der `Record` bricht sonst den Build). Wächter
+  `einsatz/rollenVokabular.guard.test.ts`.
 - **Voreingestellte Werte heißen „Vorgabe“**: nie „Default“,
   „Fallback“ oder „Standard“ im sichtbaren Text. Platzhalter nennen den Wert, der leer wirklich
   gilt; kein „Leer = …“-Satz daneben. Bausteine in `components/vorgabeText.ts`

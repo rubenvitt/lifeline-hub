@@ -118,7 +118,7 @@ export default function RufnameAbfrage({
         htmlFor={vonId}
         style={{ display: 'block', marginBottom: token.marginXXS, color: rollen.text }}
       >
-        {standard ? 'Dein Rufname für Von und An' : 'Mit welchem Rufnamen schreibst du ins ETB?'}
+        {standard ? 'Eigener Rufname für Von und An' : 'Mit welchem Rufnamen ins ETB schreiben?'}
       </label>
       <Space wrap align="center">
         {feld(vonId, von, setVon, gleich ? 'Rufname für Von und An' : 'Rufname für Von')}

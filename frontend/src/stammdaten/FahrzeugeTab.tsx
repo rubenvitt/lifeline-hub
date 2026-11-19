@@ -103,7 +103,7 @@ export default function FahrzeugeTab() {
         <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           <KennungsLink
             to={fahrzeugDetailPfad(f.id)}
-            style={{ ...monoStil(13), overflowWrap: 'anywhere' }}
+            style={{ ...monoStil('mono'), overflowWrap: 'anywhere' }}
           >
             {f.funkrufname}
           </KennungsLink>
@@ -140,7 +140,7 @@ export default function FahrzeugeTab() {
       key: 'kennzeichen',
       abBreite: 'lg',
       sorter: nachText((f: Fahrzeug) => f.kennzeichen),
-      render: (t) => (t ? <span style={monoStil(12)}>{t}</span> : '—'),
+      render: (t) => (t ? <span style={monoStil('monoKlein')}>{t}</span> : '—'),
     },
     {
       title: `Stärke ${STAERKE_SCHREIBWEISE}`,
@@ -148,7 +148,7 @@ export default function FahrzeugeTab() {
       // Nach der Gesamtstärke (Σ), wie sie hinter „//“ steht.
       sorter: nachZahl((f: Fahrzeug) => staerkeSumme(f.staerke)),
       render: (_, f) => (
-        <span style={monoStil(12)} title={f.staerke ? STAERKE_AUSGESCHRIEBEN : undefined}>
+        <span style={monoStil('monoKlein')} title={f.staerke ? STAERKE_AUSGESCHRIEBEN : undefined}>
           {staerkeText(f.staerke)}
         </span>
       ),
