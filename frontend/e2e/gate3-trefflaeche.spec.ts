@@ -1223,13 +1223,13 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
     await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
     // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (das Paneel „Personal
-    // nach Status“ zählt sie) — erst danach sagt eine Abwesenheit etwas. Ohne Filter steht in der
-    // Werkzeugzeile keine Auswahlzahl mehr (LLH-1744).
+    // nach Status“ zählt sie als Personen, LLH-1830) — erst danach sagt eine Abwesenheit etwas.
+    // Ohne Filter steht in der Werkzeugzeile keine Auswahlzahl mehr (LLH-1744).
     await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     await expect(
       page
         .getByRole('region', { name: 'Personal nach Status' })
-        .getByText(/^[1-9]\d* (Kraft|Kräfte)$/),
+        .getByText(/^[1-9]\d* (Person|Personen)$/),
     ).toBeVisible();
 
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.
