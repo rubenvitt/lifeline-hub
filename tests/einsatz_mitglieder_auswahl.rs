@@ -211,3 +211,68 @@ async fn abgeschlossener_einsatz_verweigert_die_auswahl() {
     let (status, json) = anfrage(&app, "GET", &auswahl_uri(einsatz), &leitung, None).await;
     assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
 }
+
+// ── Auswahl beim Anlegen (LLH-1820) ─────────────────────────────────────────────────────────
+// `GET /api/einsaetze/mitglied-auswahl`: dieselbe Grundmenge wie oben, aber für einen Einsatz,
+// den es noch nicht gibt — die Org der anfragenden Person, ohne sie selbst.
+
+const ANLAGE_URI: &str = "/api/einsaetze/mitglied-auswahl";
+
+#[tokio::test]
+async fn anlage_auswahl_bietet_die_org_ohne_mich() {
+    let (app, pool, admin, leitung, einsatz, leitung_id) =
+        einsatz_mit_leitung_ohne_systemrolle().await;
+    let zora = benutzer_anlegen(&app, &admin, "zorana", "keine").await;
+    let berta = benutzer_anlegen(&app, &admin, "bertha", "keine").await;
+    let inaktiv = benutzer_anlegen(&app, &admin, "irene", "keine").await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/benutzer/{inaktiv}/deaktivieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let geraet = geraetekonto_anlegen(&pool, einsatz).await;
+    let (_, fremd) = fremde_org_anlegen(&pool, "Fremd", "fritz", "fritzpw12", "keine").await;
+
+    let (status, json) = anfrage(&app, "GET", ANLAGE_URI, &leitung, None).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    // Admin (id 1) ist eine aktive Person der Org; die anfragende Führungskraft fehlt.
+    assert_eq!(kennungen(&json), vec![1, berta, zora], "{json:?}");
+    for ausgeschlossen in [leitung_id, inaktiv, geraet, fremd] {
+        assert!(
+            !kennungen(&json).contains(&ausgeschlossen),
+            "{ausgeschlossen}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn anlage_auswahl_ohne_anlegerecht_403() {
+    let (app, _pool, admin, _leitung, _einsatz, _) = einsatz_mit_leitung_ohne_systemrolle().await;
+    benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+
+    let (status, _) = anfrage(&app, "GET", ANLAGE_URI, &erika, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn auswahl_pfad_ist_kein_einsatz() {
+    let (app, _pool, _admin, leitung, einsatz, _) = einsatz_mit_leitung_ohne_systemrolle().await;
+
+    let (status, json) = anfrage(&app, "GET", ANLAGE_URI, &leitung, None).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert!(json.is_array(), "{json:?}");
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        &leitung,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+}

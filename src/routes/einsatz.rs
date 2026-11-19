@@ -1088,6 +1088,21 @@ pub async fn mitglied_auswahl(
     ))
 }
 
+/// GET /api/einsaetze/mitglied-auswahl — die Personen, die sich beim Anlegen gleich aufnehmen
+/// lassen (LLH-1820): aktive Personen der eigenen Org ohne die anfragende Person, nur Kennung und
+/// Anzeigename. Dieselbe Tür wie [`anlegen`] (`darf_einsatz_anlegen`).
+pub async fn mitglied_auswahl_anlage(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<Vec<MitgliedAuswahl>>, AppError> {
+    if !benutzer.darf_einsatz_anlegen() {
+        return Err(AppError::Forbidden);
+    }
+    Ok(Json(
+        repo::mitglied_auswahl_fuer_anlage(&state.pool, benutzer.org_id, benutzer.id).await?,
+    ))
+}
+
 /// PUT /api/einsaetze/{id}/mitglieder/{benutzer_id} — Mitglied hinzufügen oder
 /// dessen Rolle ändern. Nur Einsatzleitung, nur bei aktivem Einsatz.
 /// Schützt die letzte Einsatzleitung vor Herabstufung.

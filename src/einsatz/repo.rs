@@ -1972,15 +1972,11 @@ pub async fn mitglied_auswahl(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<MitgliedAuswahl>, AppError> {
-    let sql = format!(
-        "SELECT b.id AS benutzer_id, b.anzeigename \
-         FROM benutzer b JOIN einsatz e ON e.id = ? \
-         WHERE b.org_id = e.org_id AND b.aktiv = 1 AND {} AND {} \
-           AND NOT EXISTS (SELECT 1 FROM einsatz_mitgliedschaft m \
-                           WHERE m.einsatz_id = e.id AND m.benutzer_id = b.id) \
-         ORDER BY b.anzeigename COLLATE NOCASE, b.id",
-        crate::geraet::repo::OHNE_GERAETEKONTEN,
-        crate::instanz::spiegel::OHNE_STELLVERTRETER
+    let sql = auswahl_sql(
+        "JOIN einsatz e ON e.id = ?",
+        "b.org_id = e.org_id \
+         AND NOT EXISTS (SELECT 1 FROM einsatz_mitgliedschaft m \
+                         WHERE m.einsatz_id = e.id AND m.benutzer_id = b.id)",
     );
     Ok(
         sqlx::query_as::<_, MitgliedAuswahl>(sqlx::AssertSqlSafe(sql))
@@ -1988,6 +1984,56 @@ pub async fn mitglied_auswahl(
             .fetch_all(pool)
             .await?,
     )
+}
+
+/// Die Grundmenge jeder Personenauswahl (LFH-1141, LLH-1820): aktive Personenkonten ohne
+/// Geräte-, Stellvertreter- und Archivkonten, nach Anzeigename. `join` und `bedingung` grenzen
+/// sie auf eine Org und gegebenenfalls einen Einsatz ein; beide sind feste Texte des Aufrufers.
+fn auswahl_sql(join: &str, bedingung: &str) -> String {
+    format!(
+        "SELECT b.id AS benutzer_id, b.anzeigename \
+         FROM benutzer b {join} \
+         WHERE b.aktiv = 1 AND {} AND {} AND {bedingung} \
+         ORDER BY b.anzeigename COLLATE NOCASE, b.id",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
+    )
+}
+
+/// Die Personen, die sich beim Anlegen eines Einsatzes gleich aufnehmen lassen (LLH-1820):
+/// dieselbe Grundmenge wie [`mitglied_auswahl`], in der Org `org_id`, ohne `ohne` (die anlegende
+/// Person, die ohnehin Einsatzleitung wird).
+pub async fn mitglied_auswahl_fuer_anlage(
+    pool: &SqlitePool,
+    org_id: i64,
+    ohne: i64,
+) -> Result<Vec<MitgliedAuswahl>, AppError> {
+    let sql = auswahl_sql("", "b.org_id = ? AND b.id <> ?");
+    Ok(
+        sqlx::query_as::<_, MitgliedAuswahl>(sqlx::AssertSqlSafe(sql))
+            .bind(org_id)
+            .bind(ohne)
+            .fetch_all(pool)
+            .await?,
+    )
+}
+
+/// Ob `benutzer_id` zur Grundmenge der Auswahl in `org_id` gehört (LLH-1820): der Schreibweg beim
+/// Anlegen nimmt genau, was [`mitglied_auswahl_fuer_anlage`] anbietet.
+pub(crate) async fn ist_aufnehmbar_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    benutzer_id: i64,
+) -> Result<bool, AppError> {
+    let sql = format!(
+        "SELECT EXISTS ({})",
+        auswahl_sql("", "b.org_id = ? AND b.id = ?")
+    );
+    Ok(sqlx::query_scalar::<_, bool>(sqlx::AssertSqlSafe(sql))
+        .bind(org_id)
+        .bind(benutzer_id)
+        .fetch_one(&mut *conn)
+        .await?)
 }
 
 /// Alle Mitglieder eines Einsatzes (mit Benutzer-Klartext), sortiert nach Zuweisung.
