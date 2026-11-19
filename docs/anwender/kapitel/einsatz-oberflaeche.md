@@ -48,24 +48,27 @@ holt ihn in die Liste. Sonst ordnet er sich ein, sobald Zeiger und Fokus die Kac
 Für System-Admins und Führungskräfte der Organisation:
 
 1. In der Einsatzliste „Neuer Einsatz“ wählen.
-2. Im Dialog „Neuen Einsatz anlegen“ die „Bezeichnung“ eintragen, dazu „Stichwort“,
-   „Einsatzart“ und „Alarmzeit“. Die Alarmzeit ist mit dem jetzigen Zeitpunkt vorbelegt.
-3. Wenn bekannt, den „Einsatzort“ eintippen und mit Enter oder „Ort suchen“ suchen, dann einen
+2. Im Dialog „Neuen Einsatz anlegen“ steht oben die „Vorlage“, vorbelegt mit „Alle Module“.
+   Darunter steht, wie viele Module der neue Einsatz zeigt. Nach Bedarf eine Einsatz-Vorlage
+   wählen, etwa „MANV“. Ist das Stichwort mit einer Vorlage gekoppelt, stellt es sie selbst ein;
+   die mitgelieferten Stichworte sind es (etwa „MANV15“ mit „MANV“, „B2“ mit „Kleinlage“). Gibt
+   die Vorlage eine Einsatzart vor, steht sie unter „Einsatzart“, solange diese nicht von Hand
+   geändert wurde.
+3. Die „Bezeichnung“ eintragen, dazu „Stichwort“, „Einsatzart“ und „Alarmzeit“. Die
+   Stichwort-Vorschläge erscheinen beim Tippen. Die Alarmzeit ist mit dem jetzigen Zeitpunkt
+   vorbelegt.
+4. Wenn bekannt, den „Einsatzort“ eintippen und mit Enter oder „Ort suchen“ suchen, dann einen
    der Treffer wählen. Ein kleiner Kartenausschnitt zeigt den gewählten Ort; die Nadel lässt sich
    ziehen. Darunter steht dann der Ortsname der neuen Stelle, und „Als Adresse übernehmen“ setzt
    ihn als Einsatzort. Kann der Browser keine Karte zeichnen, steht dort „Karte auf diesem Gerät nicht
    darstellbar“, und der Ort wird trotzdem übernommen. Freier Text ohne Suche geht auch; den Punkt
    dazu setzt „Auf Karte wählen“, oder er wird später in den Einsatzdaten nachgetragen. Eine
    getippte Koordinate gilt gleich als Punkt.
-4. Nach Bedarf unter den Feldern bei „Module:“ statt „Alle Module“ eine Einsatz-Vorlage wählen,
-   etwa „MANV“. Ist das Stichwort mit einer Vorlage gekoppelt, steht sie dort schon. Gibt die
-   Vorlage eine Einsatzart vor, steht sie unter „Einsatzart“, solange diese nicht von Hand
-   geändert wurde.
 5. „Anlegen“ wählen. Die App öffnet den neuen Einsatz.
 
 Eine Einsatz-Vorlage blendet die Module aus, die sie nicht zeigt; im neuen Einsatz fehlen sie in
 der Navigation. Eine von Hand gewählte Vorlage bleibt stehen, auch wenn danach ein gekoppeltes
-Stichwort gewählt wird. Ohne Vorlage der Organisation steht keine Auswahl da. Die Vorlagen pflegt
+Stichwort gewählt wird. Ohne Vorlage der Organisation fehlt das Feld „Vorlage“. Die Vorlagen pflegt
 die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die Module unter
 „Einstellungen“ wieder einschalten (Kapitel
 [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)).
