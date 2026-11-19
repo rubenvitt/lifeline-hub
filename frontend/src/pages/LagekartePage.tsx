@@ -1903,20 +1903,17 @@ export default function LagekartePage() {
             nicht im gesicherten Stand und in keinem Kartenmodus (auch nicht beim Platzieren des
             Einsatzorts) — jeder Modus gibt die Karte frei (LFH-765). Knöpfe nur mit Schreibrecht,
             der Sprung nur in freie Einsatzdaten. */}
-        {einsatzortOhneOrt &&
-          snapshotParam == null &&
-          !exklusiverModusAktiv &&
-          einsatzDaten && (
-            <EinsatzortBand
-              adresse={einsatzDaten.einsatzort ?? null}
-              onPlatzieren={darfSchreiben ? onEinsatzortPlatzieren : undefined}
-              adressePfad={
-                darfSchreiben && !sprungGesperrt('einsatzdaten')
-                  ? einsatzdatenPfad(einsatzId, { paneel: 'einsatzort' })
-                  : undefined
-              }
-            />
-          )}
+        {einsatzortOhneOrt && snapshotParam == null && !exklusiverModusAktiv && einsatzDaten && (
+          <EinsatzortBand
+            adresse={einsatzDaten.einsatzort ?? null}
+            onPlatzieren={darfSchreiben ? onEinsatzortPlatzieren : undefined}
+            adressePfad={
+              darfSchreiben && !sprungGesperrt('einsatzdaten')
+                ? einsatzdatenPfad(einsatzId, { paneel: 'einsatzort' })
+                : undefined
+            }
+          />
+        )}
         <FokusBand
           name={fokusSicht?.name ?? null}
           escHebtAuf={abschnittFokus.escHebtAuf}

@@ -2273,9 +2273,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
     );
     // Platzieren ist ein Kartenmodus: das Modus-Band übernimmt, der Hinweis tritt zurück.
     await user.click(within(band).getByRole('button', { name: 'Auf der Karte setzen' }));
-    await waitFor(() =>
-      expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull(),
-    );
+    await waitFor(() => expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull());
   });
 
   it('zeigt mit gesetztem Einsatzort kein Einsatzort-Band', async () => {
