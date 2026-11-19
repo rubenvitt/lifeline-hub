@@ -215,7 +215,7 @@ test('Reiter „Anzeige“ am Handy im Handschuh-Betrieb, als Beobachter im abge
 /**
  * D12: fünf Helligkeitsstufen im Handschuh-Betrieb in einer Zeile, nicht überlappend, nicht über
  * die Leiste hinaus, Zielabstand ≥ 16 px (LFH-865), Höhe 72 px. Am Handy schmaler als die Staffel,
- * ab `md` (Menü 480 px) in voller Breite.
+ * ab `md` (Menü 504 px) in voller Breite.
  */
 for (const fenster of [HANDY, { width: 1024, height: 768 }]) {
   test(`Handschuh ${fenster.width} px: Helligkeit in einer Zeile mit Zielabstand`, async ({

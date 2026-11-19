@@ -212,7 +212,7 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     [390, 'kompakt', 'calc(100vw - 16px)'],
     [1024, 'kompakt', '320px'],
     [390, 'handschuh', 'calc(100vw - 16px)'],
-    [1024, 'handschuh', '480px'],
+    [1024, 'handschuh', '504px'],
   ])('Menübreite bei %i px in %s: %s (LLH-1642 D12)', async (breite, dichte, erwartet) => {
     localStorage.setItem('lifeline-hub.dichte', dichte);
     setzeViewportBreite(breite);

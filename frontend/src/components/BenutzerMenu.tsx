@@ -45,9 +45,12 @@ function initialen(name: string): string {
 const MENUE_BREITE = 320;
 /**
  * Breite ab `md` im Handschuh-Betrieb (D12): fünf Helligkeitsstufen à 72 px plus Zielabstand
- * (2 × 8 px) brauchen 440 px; mit Polsterung des Menüs 480.
+ * (2 × 8 px), Fugen und Rand brauchen 446 px. Die Gruppe „Anzeige“ rückt seit dem Steuerelement-
+ * Polster aus dem Raster (`tfabqe09`, `controlPaddingHorizontal` = 24 px im Handschuh) beidseits
+ * um 24 px ein; mit 480 px blieben jeder Stufe 69 px. 504 = 456 Leiste (vorher bei 12 px Polster)
+ * + 2 × 24 px.
  */
-const MENUE_BREITE_HANDSCHUH = 480;
+const MENUE_BREITE_HANDSCHUH = 504;
 
 /** Deckel des Etiketts am Trigger: längere Funktionen und Namen enden mit „…“. */
 const ETIKETT_DECKEL = 180;
