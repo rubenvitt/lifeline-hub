@@ -4,8 +4,10 @@ import {
   Augenbraue,
   Datenfeld,
   Datenraster,
+  Feld,
   Paneel,
   monoStil,
+  Stapel,
   useRollen,
 } from '../components/instrument';
 import { useEffect, useRef, useState } from 'react';
@@ -192,7 +194,7 @@ export default function ProfilPage() {
   return (
     // Reine Formularseite: ausdrücklich schmal.
     <AdminPage titel="Profil" breite="schmal">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <Paneel titel="Konto">
           {/* Die Organisation kommt aus einem eigenen Abruf; fällt der aus, bleibt „—".
               Benutzername in Mono: er ist eine Kennung, kein Name. */}
@@ -210,21 +212,16 @@ export default function ProfilPage() {
             Benutzermenü, hier auch außerhalb eines Einsatzes zu finden. Darunter die Gerätewahl der
             Zeitdarstellung (LLH-1053, E3), wie das Koordinatensystem am Gerät. */}
         <Paneel titel="Darstellung auf diesem Gerät" koerperPolster>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: token.marginLG,
-              maxWidth: ANZEIGE_LEISTEN_BREITE,
-            }}
-          >
-            <AnzeigeLeisten hasTitel={false} />
-            <ZeitdarstellungGeraetWahl />
+          <div style={{ maxWidth: ANZEIGE_LEISTEN_BREITE }}>
+            <Stapel abstand="lg">
+              <AnzeigeLeisten hasTitel={false} />
+              <ZeitdarstellungGeraetWahl />
+            </Stapel>
           </div>
         </Paneel>
 
         <Paneel titel="Sicherheit" koerperPolster>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
+          <Stapel abstand="lg">
             {lokalesPasswortNutzbar && (
               <section style={{ maxWidth: 480 }}>
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
@@ -383,7 +380,7 @@ export default function ProfilPage() {
                       disabled={totpLaedt}
                       requiredMark={false}
                     >
-                      <Form.Item
+                      <Feld
                         label="Code aus deiner Authenticator-App"
                         name="code"
                         rules={[{ required: true, message: 'Bitte Code eingeben' }]}
@@ -391,7 +388,7 @@ export default function ProfilPage() {
                         {/* Dasselbe Primitiv wie auf der Anmeldeseite (Ziffern-Tastatur,
                           Längengrenze, Ziffern-Optik). */}
                         <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
-                      </Form.Item>
+                      </Feld>
                       <Button type="primary" htmlType="submit" loading={totpLaedt}>
                         Bestätigen
                       </Button>
@@ -413,7 +410,7 @@ export default function ProfilPage() {
                 )}
               </section>
             )}
-          </div>
+          </Stapel>
         </Paneel>
 
         {/* Laufende Sitzungen des eigenen Kontos (LFH-1092): ein verlorenes Gerät abmelden, ohne
@@ -428,7 +425,7 @@ export default function ProfilPage() {
             alleText="Alle anderen beenden"
           />
         </Paneel>
-      </div>
+      </Stapel>
     </AdminPage>
   );
 }

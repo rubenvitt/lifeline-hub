@@ -80,7 +80,7 @@ import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
 import MaterialAusgabeModal, { type AusgabeModus } from '../kraefte/MaterialAusgabeModal';
 import MaterialMengeModal from '../kraefte/MaterialMengeModal';
 import MaterialAdhocDialog from '../kraefte/MaterialAdhocDialog';
-import { Segmentleiste } from '../components/instrument';
+import { Feld, Segmentleiste } from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus } from '../theme/statusFarben';
@@ -1330,31 +1330,32 @@ function MaterialInhalt() {
           setDisponierenOffen(false);
         }}
       >
-        <Form.Item
+        <Feld
           label="Material"
           name="material_id"
           rules={[{ required: true, message: 'Material wählen' }]}
         >
           <Select options={poolOptionen} notFoundContent={poolInhalt} />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Menge"
           name="menge"
+          breite="kurz"
           rules={[{ required: true }]}
           extra={isGeraetGewaehlt ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
         >
-          <MengenFeld beschriftung="Menge" style={{ width: 120 }} disabled={isGeraetGewaehlt} />
-        </Form.Item>
+          <MengenFeld beschriftung="Menge" disabled={isGeraetGewaehlt} />
+        </Feld>
         {/* Ort (LLH-1225 D7): dieselbe Auswahl wie die Spalte, ohne Formularnamen, damit er im
             Serienlauf stehen bleibt; der Weg hinaus setzt ihn zurück. */}
-        <Form.Item label="Ort" htmlFor="material-disponieren-ort">
+        <Feld label="Ort" htmlFor="material-disponieren-ort">
           <Select<string>
             id="material-disponieren-ort"
             value={stammOrt}
             onChange={(v) => setStammOrt(v ?? OHNE_ORT_WERT)}
             options={buildOrtOptions(ortKontext.quellen)}
           />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
 
       {/* Ad-hoc-Erfassung im geteilten Dialog (LLH-1133 D4); hier mit dem Feld „Ort“. */}

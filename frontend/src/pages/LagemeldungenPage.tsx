@@ -1,5 +1,5 @@
 import { IconPlus } from '../icons';
-import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Input, Space, Spin } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -27,7 +27,9 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
+  FELD_KLASSE,
   monoStil,
+  Stapel,
   Status,
   useRollen,
   Zeitachseneintrag,
@@ -342,10 +344,10 @@ export default function LagemeldungenPage() {
     const grund = zeilenFehler.grund(l.id);
     if (!grund) return ort ?? undefined;
     return (
-      <Flex vertical gap={token.marginXXS}>
+      <Stapel abstand="xxs">
         {ort}
         <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />
-      </Flex>
+      </Stapel>
     );
   };
 
@@ -579,14 +581,18 @@ export default function LagemeldungenPage() {
             marginBlockEnd: token.margin,
           }}
         >
-          <Input.Search
-            allowClear
-            aria-label="Suche in Lagemeldungen"
-            placeholder="Meldungstext, Absender oder Nr."
-            value={filter.suche}
-            onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
-            style={{ flex: '1 1 220px', maxWidth: 360 }}
-          />
+          <div
+            className={FELD_KLASSE}
+            style={{ flex: '1 1 220px', maxWidth: 'var(--lfh-feld-mittel)' }}
+          >
+            <Input.Search
+              allowClear
+              aria-label="Suche in Lagemeldungen"
+              placeholder="Meldungstext, Absender oder Nr."
+              value={filter.suche}
+              onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
+            />
+          </div>
           <ZeitraumWahl
             von={filter.von}
             bis={filter.bis}
@@ -597,20 +603,22 @@ export default function LagemeldungenPage() {
           {/* Keine Segmentleiste: „Ort“ und „Herkunft“ schalten keine Sicht, sie schränken die
               Achse ein und stehen als Filter neben Suche und Zeitraum (Spec `bedien-umschalten`,
               LLH-1942). */}
-          <Select
-            aria-label="Ort"
-            style={{ minWidth: 170 }}
-            options={ORT_OPTIONEN}
-            value={filter.ort}
-            onChange={(ort: Ortsfilter) => setFilter((f) => ({ ...f, ort }))}
-          />
-          <Select
-            aria-label="Herkunft"
-            style={{ minWidth: 150 }}
-            options={HERKUNFT_OPTIONEN}
-            value={filter.herkunft}
-            onChange={(herkunft: Herkunftsfilter) => setFilter((f) => ({ ...f, herkunft }))}
-          />
+          <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+            <Select
+              aria-label="Ort"
+              options={ORT_OPTIONEN}
+              value={filter.ort}
+              onChange={(ort: Ortsfilter) => setFilter((f) => ({ ...f, ort }))}
+            />
+          </div>
+          <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+            <Select
+              aria-label="Herkunft"
+              options={HERKUNFT_OPTIONEN}
+              value={filter.herkunft}
+              onChange={(herkunft: Herkunftsfilter) => setFilter((f) => ({ ...f, herkunft }))}
+            />
+          </div>
         </div>
       )}
       {nachtraege.length > 0 && letzteLb && (

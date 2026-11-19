@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Form, Modal, Popconfirm, Space } from 'antd';
+import { Alert, Button, Form, Modal, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type Key } from 'react';
@@ -19,7 +19,15 @@ import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import Datenstand from '../components/Datenstand';
-import { Paneel, useRollen } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  Feld,
+  Paneel,
+  Stapel,
+  Textstufe,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
@@ -99,7 +107,7 @@ function FuehrungsstelleModal({
       erfassenText="Speichern"
       laeuft={laeuft}
     >
-      <Form.Item
+      <Feld
         name="fuehrungsstelle"
         label="Führungsstelle"
         // EIN Wert: eine neue Wahl ersetzt die alte, statt sich daneben zu stellen.
@@ -115,7 +123,7 @@ function FuehrungsstelleModal({
           placeholder="Funktion (z. B. S2) oder Freitext"
           disabled={laeuft}
         />
-      </Form.Item>
+      </Feld>
       {fehler && <Alert type="error" title={fehler.message} showIcon />}
     </ErfassungsModal>
   );
@@ -291,36 +299,42 @@ export default function MitgliederAbschnitt({
     );
 
   const rolleFeld = (m: MitgliedAnzeige) => (
-    <Select
-      value={m.einsatz_rolle}
-      disabled={!darfVerwalten}
-      aria-label={`Rolle von ${m.anzeigename}`}
-      aria-describedby={darfVerwalten && istLetzteLeitung(m) ? grundId(m) : undefined}
-      // `minWidth` statt fester `width`: eine feste Breite drückt die Zelle am schmalen Schirm
-      // auf. Der Boden bleibt, damit „Führungspersonal" nicht abgeschnitten wird; unter `md`
-      // füllt das Feld die Zahlbreite der Spalte.
-      style={istSchmal ? { width: '100%' } : { minWidth: 170, maxWidth: '100%' }}
-      // An der letzten Einsatzleitung ist jede schwächere Rolle gesperrt (Grund unter der Aktion).
-      options={
-        istLetzteLeitung(m)
-          ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
-          : EINSATZ_ROLLE_OPTIONEN
+    // Untergrenze statt fester Breite: eine feste Breite drückt die Zelle am schmalen Schirm auf.
+    // Der Boden (Feldbreite `schmal`) bleibt, damit „Führungspersonal" nicht abgeschnitten wird;
+    // unter `md` füllt das Feld die Zahlbreite der Spalte.
+    <div
+      className={FELD_KLASSE}
+      style={
+        istSchmal ? { width: '100%' } : { minWidth: 'var(--lfh-feld-schmal)', maxWidth: '100%' }
       }
-      onChange={(rolle) => rolleWaehlen(m, rolle)}
-    />
+    >
+      <Select
+        value={m.einsatz_rolle}
+        disabled={!darfVerwalten}
+        aria-label={`Rolle von ${m.anzeigename}`}
+        aria-describedby={darfVerwalten && istLetzteLeitung(m) ? grundId(m) : undefined}
+        // An der letzten Einsatzleitung ist jede schwächere Rolle gesperrt (Grund unter der Aktion).
+        options={
+          istLetzteLeitung(m)
+            ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
+            : EINSATZ_ROLLE_OPTIONEN
+        }
+        onChange={(rolle) => rolleWaehlen(m, rolle)}
+      />
+    </div>
   );
   const aktion = (m: MitgliedAnzeige) => {
     if (!darfVerwalten) return null;
     if (istLetzteLeitung(m)) {
       return (
-        <Flex vertical gap={token.marginXXS} align="flex-start">
+        <Stapel abstand="xxs" ausrichten="start">
           <Button danger disabled aria-describedby={grundId(m)}>
             Entfernen
           </Button>
-          <span id={grundId(m)} style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+          <Textstufe id={grundId(m)} stufe="textKlein" ton="text2">
             {LETZTE_EINSATZLEITUNG_TEXT}
-          </span>
-        </Flex>
+          </Textstufe>
+        </Stapel>
       );
     }
     return (
@@ -366,7 +380,7 @@ export default function MitgliederAbschnitt({
               <div>{m.anzeigename}</div>
               <div
                 data-lfh="mitglied-fuehrungsstelle"
-                style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}
+                style={{ ...schriftStil('textKlein'), color: rollen.text2 }}
               >
                 {fuehrungsstelle(m)}
               </div>
@@ -381,10 +395,10 @@ export default function MitgliederAbschnitt({
           width: SCHMAL_ROLLE,
           ...rolleOrdnung,
           render: (_, m) => (
-            <Flex vertical gap={token.marginXS} align="flex-start">
+            <Stapel abstand="xs" ausrichten="start">
               {rolleFeld(m)}
               {aktion(m)}
-            </Flex>
+            </Stapel>
           ),
         },
       ]
@@ -424,31 +438,35 @@ export default function MitgliederAbschnitt({
     >
       {darfVerwalten && (
         <Space style={{ padding: token.padding }} wrap>
-          <Select
-            placeholder="Benutzer …"
-            aria-label="Person zum Aufnehmen"
-            autoFocus={openAuswahl}
-            defaultOpen={openAuswahl}
-            style={{ width: 200 }}
-            value={neuerBenutzer}
-            options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}
-            onChange={(v) => setNeuerBenutzer(v)}
-            // „Keine weitere Person“ nur, wenn wirklich niemand übrig ist; eine Suche ohne Treffer
-            // behält den Leerhinweis von antd.
-            notFoundContent={
-              auswahlQuery.isError
-                ? 'Personenauswahl nicht verfügbar'
-                : auswahlQuery.isSuccess && verfuegbar.length === 0
-                  ? 'Keine weitere Person der Organisation'
-                  : undefined
-            }
-          />
-          <Select
-            value={neueRolle}
-            style={{ width: 170 }}
-            options={EINSATZ_ROLLE_OPTIONEN}
-            onChange={setNeueRolle}
-          />
+          <div
+            className={FELD_KLASSE}
+            style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}
+          >
+            <Select
+              placeholder="Benutzer …"
+              aria-label="Person zum Aufnehmen"
+              autoFocus={openAuswahl}
+              defaultOpen={openAuswahl}
+              value={neuerBenutzer}
+              options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}
+              onChange={(v) => setNeuerBenutzer(v)}
+              // „Keine weitere Person“ nur, wenn wirklich niemand übrig ist; eine Suche ohne
+              // Treffer behält den Leerhinweis von antd.
+              notFoundContent={
+                auswahlQuery.isError
+                  ? 'Personenauswahl nicht verfügbar'
+                  : auswahlQuery.isSuccess && verfuegbar.length === 0
+                    ? 'Keine weitere Person der Organisation'
+                    : undefined
+              }
+            />
+          </div>
+          <div
+            className={FELD_KLASSE}
+            style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}
+          >
+            <Select value={neueRolle} options={EINSATZ_ROLLE_OPTIONEN} onChange={setNeueRolle} />
+          </div>
           <Button
             type="primary"
             disabled={neuerBenutzer == null}
