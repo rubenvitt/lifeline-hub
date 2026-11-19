@@ -23,7 +23,8 @@ wer sie abgibt, hat den Einsatz danach als Spiegel; wer sie bekommt, schreibt ih
 Die Seite „Instanzkopplung“ in der Verwaltung unter „Einstellungen“ zeigt diese Installation
 mit ihrem **Fingerabdruck**, die gekoppelten Installationen und die **Unterschriftsschlüssel**
 der Organisation. Bedienen darf sie der System-Admin; wer die Verwaltung sieht, liest mit. Einen
-Spiegel liest jedes Mitglied des Einsatzes; Anträge stellt, wer im Einsatz Schreibrecht hat.
+Spiegel liest jedes Mitglied des Einsatzes; Anträge stellt, wer im Einsatz Schreibrecht hat; Mitarbeit nur für Einträge des
+Einsatztagebuchs und Meldungen.
 
 ## Abläufe
 
@@ -551,6 +552,9 @@ Ausgenommen sind die 16 Erfassungen, die auch ohne Netz vormerkbar sind. Sie wer
 - Eintreffen an einem Bereitstellungsraum und Ausgabe in der Verpflegung.
 
 Anträge darf stellen, wer im Einsatz eine Rolle mit Schreibrecht hat, solange der Einsatz läuft.
+Mitarbeit stellt Anträge nur für Einträge des Einsatztagebuchs und Meldungen; die führende
+Installation wendet dieselben Regeln an und kann einen Antrag ablehnen (siehe
+[Rechte im Einsatz](rechte-im-einsatz.md)).
 Anhänge lassen sich an einem Antrag nicht mitschicken. Eine Maßnahme aufheben geht am Spiegel
 nicht, weil das auch ohne Netz nicht vormerkbar ist.
 
@@ -733,8 +737,9 @@ nutzen darf.
   stellen lässt (Lagekarte, Kräfte, eine stornierte Person …), lässt sich nur so erledigen; es
   ist hier gesichert, die führende Installation erfasst es bei Bedarf neu.
 
-Die Zahl im Band zählt nur, was weder gestellt noch verworfen ist. Stellen und Verwerfen
-braucht Schreibrecht im Einsatz. Ist der Abgleich beendet oder der Einsatz abgeschlossen, bleibt
+Die Zahl im Band zählt nur, was weder gestellt noch verworfen ist. Nachreichen („Als Antrag
+stellen“) und Verwerfen brauchen Schreibrecht im Einsatz; Mitarbeit sieht die Liste nur. Ist der
+Abgleich beendet oder der Einsatz abgeschlossen, bleibt
 die Liste lesbar und Verwerfen möglich; stellen lässt sich dann nichts mehr. Nach dem Löschen
 oder Schwärzen des Einsatzes ist die Liste leer.
 

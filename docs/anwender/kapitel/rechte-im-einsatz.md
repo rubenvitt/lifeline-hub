@@ -78,7 +78,7 @@ Sortierung und Filter stehen in der Adresse: ein geteilter Link öffnet die List
   - Fotos und Anhänge hochladen, nur eigene anhängen und nur eigene Uploads löschen.
 
   Alles andere bleibt zu: Meldungen bestätigen, zuweisen oder im Status ändern, Aufträge, Kräfte,
-  Abschnitte und Einstellungen. Ein Modul, das auf „Einsatzführung“ steht, bleibt der Mitarbeit
+  Abschnitte und Einstellungen. Ein Modul, das auf „Führung im Einsatz“ steht, bleibt der Mitarbeit
   verschlossen. Ohne Netz laufen die erlaubten Eingaben nach (siehe [Ohne Netz](ohne-netz.md)); am
   Spiegel einer gekoppelten Instanz beantragt Mitarbeit nur Einträge des Einsatztagebuchs und
   Meldungen, und die führende Instanz wendet dieselben Regeln an und kann einen Antrag später
