@@ -180,7 +180,8 @@ pruefe "ios: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" ios)" 
 # Lücke, und die Swift-Version ist dieselbe wie lokal.
 pruefe "ios: Swift-Kern über check-all.sh" enthaelt "$(job "$SUITEN" ios)" "run: ./scripts/check-all.sh --nur ios"
 pruefe "ios: Toolchain Pflicht" enthaelt "$(job "$SUITEN" ios)" 'IOS_SWIFT_PFLICHT: "1"'
-pruefe "ios: Swift gepinnt" enthaelt "$(job "$SUITEN" ios)" 'swift-version: "6.1.2"'
+pruefe "ios: Swift gepinnt (Image per Digest)" enthaelt "$(job "$SUITEN" ios)" 'image: swift@sha256:'
+pruefe "ios: keine Fremd-Action für Swift" fehlt "$(job "$SUITEN" ios)" 'setup-swift'
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
 pruefe "suiten.yml kennt das Label voll nicht (der Aufrufer entscheidet)" fehlt "$(code_ohne_kommentar "$SUITEN")" "'voll'"
 for datei in "$CI" "$PR"; do

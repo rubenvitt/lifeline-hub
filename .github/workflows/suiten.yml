@@ -155,7 +155,9 @@ jobs:
   # `swift test` in ios/LifelineKern über Schritt 18 von check-all.sh, unter Linux. Das App-Target
   # baut nur `ios-pruefung.yml` auf einem macOS-Runner. IOS_SWIFT_PFLICHT=1 macht eine fehlende
   # Toolchain rot statt zur Lücke. Swift in derselben Version wie lokal (Werkzeugversion 6.1 in
-  # ios/LifelineKern/Package.swift); setup-swift prüft die Signatur des Pakets von swift.org.
+  # ios/LifelineKern/Package.swift), aus dem offiziellen Image `swift` per Digest gepinnt. Keine
+  # Fremd-Action: die Freigabeliste der Actions ließ `swift-actions/setup-swift` nicht zu, und dann
+  # startet der ganze aufrufende Workflow nicht (startup_failure an PR #1483).
   ios:
     name: iOS-Kern
     concurrency:
@@ -163,11 +165,11 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    container:
+      # swift:6.1.2-noble
+      image: swift@sha256:9096456b6dd5f3dcb1f64152601de3d96f40e48ac98354fefa9ffa9abf2dd6bf
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: swift-actions/setup-swift@7ca6abe6b3b0e8b5421b88be48feee39cbf52c6a # v2.4.0
-        with:
-          swift-version: "6.1.2"
       - name: Swift-Kern
         env:
           IOS_SWIFT_PFLICHT: "1"
