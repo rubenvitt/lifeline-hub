@@ -1,5 +1,6 @@
 import type { Person } from '../api/types';
 import { hatLuecke, istAbgeschlossen } from './personenBilanz';
+import { personSichtung } from './personMeta';
 
 /**
  * Filterkette und Sichtzustand der Betroffenen-Seite als reine Funktionen. Zwei Achsen plus
@@ -122,7 +123,7 @@ export function sichtNachSprung(
 
 /** Rasterschlüssel einer Person: ihre Sichtung oder `'ohne'`. */
 export function rasterSchluessel(p: Pick<Person, 'aktuelle_sichtung'>): string {
-  return p.aktuelle_sichtung ?? 'ohne';
+  return personSichtung(p.aktuelle_sichtung) ?? 'ohne';
 }
 
 /**

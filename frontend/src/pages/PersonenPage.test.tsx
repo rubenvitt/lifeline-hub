@@ -1050,6 +1050,24 @@ describe('PersonenPage', () => {
     },
   );
 
+  it('zeichnet eine Person mit unbekannter Sichtung in Zeilen und Raster wie „ohne Sichtung“ (LLH-1998)', async () => {
+    // Nachgestellt am Stand vom 19.11.2026: `SK_META['xyz'].label` riss die Zeilenansicht
+    // („reading 'label'“), und im Raster fehlte die Person, weil es keine Spalte „xyz“ gibt.
+    const kaputt = {
+      ...person,
+      aktuelle_sichtung: 'xyz',
+      aktuelle_sichtung_at: '2026-05-27 09:30:00',
+    };
+    render(einsatzAktiv, [kaputt, unbekannt]);
+    expect(await screen.findByText('R-001')).toBeInTheDocument();
+    expect(screen.getByText('R-002')).toBeInTheDocument();
+
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Sichtungsraster' }));
+    await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' });
+    expect(boardKarten('ohne')).toContain('R-001');
+  });
+
   it('Sichtungsraster gruppiert ALLE Personen nach Sichtung, samt unverletzt und ohne Sichtung', async () => {
     const sk2 = {
       ...person,
@@ -1865,6 +1883,14 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
     await userEvent.click(within(ansicht).getByRole('radio', { name: 'Karte' }));
   }
+
+  it('zeigt eine Person mit unbekannter Sichtung als Marker „ohne Sichtung“ (LLH-1998)', async () => {
+    renderKarte([person, mitKoordinate(20, 4, { aktuelle_sichtung: 'xyz' as never })]);
+    await waehleKarte();
+    expect(
+      await screen.findByRole('button', { name: 'marker-person-20: R-004 · ohne Sichtung' }),
+    ).toBeInTheDocument();
+  });
 
   it('zeigt zwei Marker mit Registriernummer und Sichtung und nennt „3 ohne Koordinate“ (Spec-Szenario)', async () => {
     const personen = [

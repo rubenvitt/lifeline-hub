@@ -52,6 +52,7 @@ import {
   aufbewahrungZustand,
   etbTyp,
   personStatus,
+  personSichtung,
   personStatusDarstellung,
   schadenAusmass,
   schadenStatus,
@@ -133,11 +134,15 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
     key: 'sichtung',
     title: 'Sichtung',
     width: 130,
-    sorter: nachFolge(Object.keys(sichtung), (p: ArchivPerson) => p.aktuelle_sichtung),
+    sorter: nachFolge(Object.keys(sichtung), (p: ArchivPerson) =>
+      personSichtung(p.aktuelle_sichtung),
+    ),
     filters: SICHTUNG_WERTE,
-    onFilter: (w, p) => (p.aktuelle_sichtung ?? OHNE_SICHTUNG) === w,
-    render: (_, p) =>
-      p.aktuelle_sichtung ? <SichtungsTag kategorie={p.aktuelle_sichtung} /> : leer,
+    onFilter: (w, p) => (personSichtung(p.aktuelle_sichtung) ?? OHNE_SICHTUNG) === w,
+    render: (_, p) => {
+      const k = personSichtung(p.aktuelle_sichtung);
+      return k ? <SichtungsTag kategorie={k} /> : leer;
+    },
   },
   {
     key: 'verbleib',

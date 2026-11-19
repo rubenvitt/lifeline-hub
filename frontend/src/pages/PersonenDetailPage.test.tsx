@@ -237,6 +237,22 @@ describe('PersonenDetailPage — Status fehlt (LLH-1957)', () => {
 });
 
 /**
+ * Eine unbekannte Sichtung (LLH-1998): `SichtungsTag` las `sichtung['xyz'].farbe` und riss die
+ * Detailseite. Sie gilt jetzt als „ohne Sichtung“: kein Sichtungstag im Kopf.
+ */
+describe('PersonenDetailPage — unbekannte Sichtung (LLH-1998)', () => {
+  it('zeichnet die Person ohne Sichtungstag, statt abzustürzen', async () => {
+    render(einsatzAktiv, { ...detail, aktuelle_sichtung: 'xyz' } as unknown as PersonDetail);
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-lfh="status"]').length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText('Person konnte nicht geladen werden')).toBeNull();
+    expect(screen.queryByText(/reading 'farbe'/)).toBeNull();
+    expect(screen.queryByText(/SK I/)).toBeNull();
+  });
+});
+
+/**
  * Ladehoheit: beim Öffnen laufen nur Einsatz und Detail (Aufenthalt mit UHS- und Platzname
  * kommt mit dem Detail, LLH-1129); Tiere und Schäden laden mit dem Abschnitt „Bezüge“, die
  * Kandidaten und die UHS-Liste erst mit ihrem Dialog, das Zugriffs-Audit mit seinem Abschnitt.

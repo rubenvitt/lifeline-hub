@@ -7,7 +7,7 @@ import type { Person, Sichtungskategorie } from '../api/types';
 import SichtungsTag from '../components/SichtungsTag';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { Feld, Textstufe, useRollen } from '../components/instrument';
-import { SK_META } from './personMeta';
+import { SK_META, personSichtung } from './personMeta';
 import { useSaveSichtung } from './SichtungDialog';
 import SichtungsWahl, { SICHTUNGSFLAECHE_BREITE, sichtungsLuecke } from './SichtungsWahl';
 
@@ -107,7 +107,7 @@ export default function ZeilenSichtung({
   }, [offen]);
 
   const laeuft = mutation.isPending;
-  const gezeigt = laeuft ? mutation.variables.kategorie : (p.aktuelle_sichtung ?? null);
+  const gezeigt = laeuft ? mutation.variables.kategorie : personSichtung(p.aktuelle_sichtung);
   const name = gezeigt
     ? `Sichtung ${kennung} ändern, aktuell ${SK_META[gezeigt].label}`
     : `${kennung} sichten`;
