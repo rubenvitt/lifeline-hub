@@ -1580,3 +1580,123 @@ async fn beobachter_vom_alten_gegenueber_ueberschreibt_mitarbeit_nicht() {
     while abgleichen(&f, &s, 500).await > 0 {}
     assert_eq!(rolle(&s, erika_hub).await, "beobachter");
 }
+
+/// Stand einer Zeile im Log des Führers.
+async fn log_stand(pool: &SqlitePool, art: &str, schluessel: &str) -> i64 {
+    eine(
+        pool,
+        &format!(
+            "SELECT stand FROM einsatz_aenderung WHERE art = '{art}' AND schluessel = '{schluessel}'"
+        ),
+    )
+    .await
+}
+
+/// Führer mit einer Mitarbeit (Erika), einem Führungspersonal (Max) und einem ETB-Eintrag; der
+/// Spiegel ist ein älterer Stand und hat Erika als Beobachter übernommen. Liefert (Einsatz am
+/// Führer, Erika am Führer, Erika am Spiegel, Max am Führer).
+async fn mitarbeit_beim_alten_spiegel(f: &SqlitePool, s: &SqlitePool) -> (i64, i64, i64, i64) {
+    let (erika_elw, erika_hub) = gemeinsames_konto(f, s, "Erika").await;
+    let (max_elw, _) = gemeinsames_konto(f, s, "Max").await;
+    let einsatz: i64 = eine(
+        f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    exec(
+        f,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) VALUES \
+             ({einsatz}, {erika_elw}, 'mitarbeit'), ({einsatz}, {max_elw}, 'fuehrungspersonal')"
+        ),
+    )
+    .await;
+    etb(f, einsatz, 1, erika_elw).await;
+    while abgleichen(f, s, 500).await > 0 {}
+    assert_eq!(rolle(s, erika_hub).await, "beobachter");
+    (einsatz, erika_elw, erika_hub, max_elw)
+}
+
+#[tokio::test]
+async fn aufgeruestetes_gegenueber_bekommt_mitarbeit_nachgeliefert() {
+    // Beide Speicherstellen: die meldende Seite aus der Antwort, die erreichte aus der Anfrage.
+    for erreicht in [false, true] {
+        let (f, s) = zwei_seiten().await;
+        let (einsatz, erika, erika_hub, max) = mitarbeit_beim_alten_spiegel(&f, &s).await;
+        let erika_key = format!("[{einsatz},{erika}]");
+        let max_key = format!("[{einsatz},{max}]");
+        let vorher_erika = log_stand(&f, "einsatz_mitgliedschaft", &erika_key).await;
+        let vorher_max = log_stand(&f, "einsatz_mitgliedschaft", &max_key).await;
+        let vorher_einsatz = log_stand(&f, "einsatz", &einsatz.to_string()).await;
+        // Das Gegenüber ist aufgerüstet und nennt die Fähigkeit beim nächsten Melden.
+        let mut fc = f.acquire().await.unwrap();
+        if erreicht {
+            crate::instanz::repo::save_rolle_mitarbeit(&mut fc, 1, true)
+                .await
+                .unwrap();
+        } else {
+            crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+                .await
+                .unwrap();
+        }
+        drop(fc);
+        exec(
+            &s,
+            "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+        )
+        .await;
+        assert!(
+            log_stand(&f, "einsatz_mitgliedschaft", &erika_key).await > vorher_erika,
+            "die Mitarbeit steht neu im Log"
+        );
+        assert_eq!(
+            log_stand(&f, "einsatz_mitgliedschaft", &max_key).await,
+            vorher_max,
+            "andere Rollen bleiben"
+        );
+        assert_eq!(
+            log_stand(&f, "einsatz", &einsatz.to_string()).await,
+            vorher_einsatz,
+            "andere Tabellen bleiben"
+        );
+        assert_eq!(abgleichen(&f, &s, 500).await, 1);
+        assert_eq!(
+            rolle(&s, erika_hub).await,
+            "mitarbeit",
+            "erreicht={erreicht}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn zweites_melden_ohne_wechsel_liefert_nichts_nach() {
+    let (f, s) = zwei_seiten().await;
+    mitarbeit_beim_alten_spiegel(&f, &s).await;
+    let mut fc = f.acquire().await.unwrap();
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+        .await
+        .unwrap();
+    drop(fc);
+    exec(
+        &s,
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = 1",
+    )
+    .await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    let log: i64 = eine(&f, "SELECT MAX(stand) FROM einsatz_aenderung").await;
+    // Nächste Meldungen mit derselben Fähigkeit, von beiden Speicherstellen.
+    let mut fc = f.acquire().await.unwrap();
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+        .await
+        .unwrap();
+    crate::instanz::repo::save_rolle_mitarbeit(&mut fc, 1, true)
+        .await
+        .unwrap();
+    drop(fc);
+    assert_eq!(
+        eine::<i64>(&f, "SELECT MAX(stand) FROM einsatz_aenderung").await,
+        log,
+        "kein neuer Logeintrag"
+    );
+    assert_eq!(abgleichen(&f, &s, 500).await, 0, "nichts nachgeliefert");
+}

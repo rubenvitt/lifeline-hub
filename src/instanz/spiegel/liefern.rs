@@ -7,6 +7,7 @@ use super::abbildung;
 use super::katalog;
 use super::paket::{BlobAngabe, EinsatzLieferung, KontoAngabe, Zeile, ABHAENGIGE_MAX, ZEILE_MAX};
 use super::schema::{self, Schema, Tabelle, Ziel, SKIZZE_ELEMENTE};
+use crate::einsatz::EinsatzRolle;
 use crate::error::AppError;
 use crate::instanz::stammdaten::StammdatenArt;
 use serde_json::{Map, Value};
@@ -371,6 +372,55 @@ async fn konten(
     Ok(ergebnis)
 }
 
+/// Das Gegenüber einer Kopplung kennt die Einsatzrolle `mitarbeit` neu (LLH-1817, design.md D7):
+/// Bis eben bekam es jede Mitarbeit als `beobachter`, und der Abgleich liefert nur, was sich nach
+/// seinem Stand ändert. Ohne Nachlieferung bliebe dort `beobachter` stehen und käme nach einer
+/// Übernahme mit der Fähigkeit als echte Herabstufung zurück.
+///
+/// Wie beim Sprung auf Protokoll 3 (`melden`, `stammdaten_stand = 0`) einmal nachholen, aber
+/// enger: kein Stand der Kopplung auf 0 (das liefe den ganzen Einsatz neu), sondern nur die
+/// Mitgliedschaften `mitarbeit` der Einsätze, die diese Instanz für die aktiven Orgs der Kopplung
+/// führt, neu ins Log. Wie im Log-Trigger (`art::trigger_sql`): alte Logzeile weg, neue mit
+/// frischem Stand; so gehen sie im nächsten Abgleich mit dem echten Wert hinaus. Andere Tabellen
+/// und Rollen bleiben unberührt. Der Aufrufer ruft das nur beim Wechsel 0 → 1, also einmal.
+pub async fn mitarbeit_nachliefern(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+) -> Result<(), AppError> {
+    let tabelle = "einsatz_mitgliedschaft";
+    let Some(t) = schema::schema(conn).await?.tabelle(tabelle) else {
+        return Ok(());
+    };
+    let auswahl = format!(
+        "SELECT m.einsatz_id, {} FROM einsatz_mitgliedschaft m JOIN einsatz e ON e.id = m.einsatz_id \
+         WHERE m.einsatz_rolle = ? AND e.spiegel = 0 AND e.org_id IN (SELECT org_id FROM \
+         instanz_kopplung_org WHERE kopplung_id = ? AND widerrufen_at IS NULL)",
+        t.schluessel.ausdruck("m")
+    );
+    let zeilen: Vec<(i64, String)> = sqlx::query_as(sqlx::AssertSqlSafe(auswahl))
+        .bind(EinsatzRolle::Mitarbeit.as_str())
+        .bind(kopplung_id)
+        .fetch_all(&mut *conn)
+        .await?;
+    for (einsatz_id, schluessel) in zeilen {
+        sqlx::query(
+            "DELETE FROM einsatz_aenderung WHERE einsatz_id = ? AND art = ? AND schluessel = ?",
+        )
+        .bind(einsatz_id)
+        .bind(tabelle)
+        .bind(&schluessel)
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query("INSERT INTO einsatz_aenderung (einsatz_id, art, schluessel) VALUES (?, ?, ?)")
+            .bind(einsatz_id)
+            .bind(tabelle)
+            .bind(&schluessel)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(())
+}
+
 /// Ein Gegenüber ohne die Einsatzrolle `mitarbeit` lehnt sie an seinem CHECK ab: Eine
 /// Mitgliedschaft geht ihm als `beobachter` zu (LLH-1817, design.md D7). Nur der Inhalt, der
 /// hinausgeht, ändert sich; die Zeile hier und ihr Log bleiben `mitarbeit`.
@@ -379,8 +429,8 @@ fn herabstufen_fuer(a: &Absender<'_>, t: &Tabelle, daten: &mut Map<String, Value
         return;
     }
     if let Some(rolle) = daten.get_mut("einsatz_rolle") {
-        if rolle.as_str() == Some("mitarbeit") {
-            *rolle = Value::from("beobachter");
+        if rolle.as_str() == Some(EinsatzRolle::Mitarbeit.as_str()) {
+            *rolle = Value::from(EinsatzRolle::Beobachter.as_str());
         }
     }
 }

@@ -12,6 +12,7 @@ use super::liefern::{quali_ersetzen, quali_ids};
 use super::paket::{BlobAngabe, EinsatzLieferung, KontoAngabe, Zeile};
 use super::schema::{self, Tabelle, Ziel, SKIZZE_ELEMENTE};
 use super::{Freigabestufe, SpiegelKategorie};
+use crate::einsatz::EinsatzRolle;
 use crate::error::AppError;
 use crate::instanz::stammdaten::StammdatenArt;
 use serde_json::{Map, Value};
@@ -730,7 +731,9 @@ async fn behalte_mitarbeit(
             .find(|(s, _)| s == name)
             .map(|(_, w)| w.clone())
     };
-    if wert("einsatz_rolle").as_ref().and_then(Value::as_str) != Some("beobachter") {
+    if wert("einsatz_rolle").as_ref().and_then(Value::as_str)
+        != Some(EinsatzRolle::Beobachter.as_str())
+    {
         return Ok(());
     }
     let (Some(einsatz), Some(benutzer)) = (
@@ -746,12 +749,12 @@ async fn behalte_mitarbeit(
     .bind(benutzer)
     .fetch_optional(&mut *conn)
     .await?;
-    if hier.as_deref() == Some("mitarbeit") {
+    if hier.as_deref() == Some(EinsatzRolle::Mitarbeit.as_str()) {
         // Den hiesigen Wert setzen statt die Spalte wegzulassen: `upsert` legt per `INSERT … ON
         // CONFLICT` an, und SQLite prüft NOT NULL vor dem Konflikt.
         for (s, w) in werte.iter_mut() {
             if s == "einsatz_rolle" {
-                *w = Value::from("mitarbeit");
+                *w = Value::from(EinsatzRolle::Mitarbeit.as_str());
             }
         }
     }

@@ -636,30 +636,40 @@ pub async fn save_faehigkeiten(
     rolle_mitarbeit: bool,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE instanz_kopplung SET gegenueber_hinweise = ?, gegenueber_web_push = ?, \
-         gegenueber_rolle_mitarbeit = ? WHERE id = ?",
+        "UPDATE instanz_kopplung SET gegenueber_hinweise = ?, gegenueber_web_push = ? WHERE id = ?",
     )
     .bind(hinweise)
     .bind(web_push)
-    .bind(rolle_mitarbeit)
     .bind(kopplung_id)
     .execute(&mut *conn)
     .await?;
-    Ok(())
+    save_rolle_mitarbeit(conn, kopplung_id, rolle_mitarbeit).await
 }
 
-/// Erreichte Seite: ob die meldende Seite die Einsatzrolle `mitarbeit` kennt, aus ihrer Anfrage
-/// (LLH-1817, design.md D7).
+/// Ob das Gegenüber die Einsatzrolle `mitarbeit` kennt (LLH-1817, design.md D7); die erreichte
+/// Seite ruft das mit der Anfrage, die meldende über [`save_faehigkeiten`] mit der Antwort. Lernt
+/// die Kopplung die Fähigkeit neu (0 → 1), gehen die Mitarbeiten, die das Gegenüber bisher als
+/// `beobachter` bekam, einmal neu hinaus (`spiegel::liefern::mitarbeit_nachliefern`). Der
+/// Wechsel steht in der Bedingung des UPDATE: eine weitere Meldung mit 1 ändert keine Zeile und
+/// liefert nichts nach.
 pub async fn save_rolle_mitarbeit(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     rolle_mitarbeit: bool,
 ) -> Result<(), AppError> {
-    sqlx::query("UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = ? WHERE id = ?")
-        .bind(rolle_mitarbeit)
-        .bind(kopplung_id)
-        .execute(&mut *conn)
-        .await?;
+    let geaendert = sqlx::query(
+        "UPDATE instanz_kopplung SET gegenueber_rolle_mitarbeit = ? \
+         WHERE id = ? AND gegenueber_rolle_mitarbeit IS NOT ?",
+    )
+    .bind(rolle_mitarbeit)
+    .bind(kopplung_id)
+    .bind(rolle_mitarbeit)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if rolle_mitarbeit && geaendert > 0 {
+        super::spiegel::liefern::mitarbeit_nachliefern(conn, kopplung_id).await?;
+    }
     Ok(())
 }
 
