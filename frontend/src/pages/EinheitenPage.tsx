@@ -2,7 +2,7 @@ import { App, Breadcrumb, Button, Form, Input } from 'antd';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import { monoStil } from '../components/instrument';
+import { Feld, monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import {
   SeitenFehler,
@@ -439,21 +439,21 @@ export default function EinheitenPage() {
         onAbbrechen={() => setBildenOffen(false)}
       >
         {vorlagen.length > 0 && (
-          <Form.Item label="Vorlage" name="vorlage_id">
+          <Feld label="Vorlage" name="vorlage_id">
             <Select<number>
               allowClear
               showSearch={SUCHTEXT_SUCHE}
               placeholder="ohne Vorlage"
               options={vorlagenOptionen(vorlagen)}
             />
-          </Form.Item>
+          </Feld>
         )}
         {gewaehlteVorlage == null && (
           <>
-            <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+            <Feld label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
               <Input placeholder="z. B. 2. Zug" maxLength={EINHEIT_NAME_MAX} />
-            </Form.Item>
-            <Form.Item label="Typ" name="typ_id">
+            </Feld>
+            <Feld label="Typ" name="typ_id">
               <Select
                 allowClear
                 placeholder="Typ wählen"
@@ -462,7 +462,7 @@ export default function EinheitenPage() {
                 })}
                 options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
               />
-            </Form.Item>
+            </Feld>
           </>
         )}
       </ErfassungsModal>

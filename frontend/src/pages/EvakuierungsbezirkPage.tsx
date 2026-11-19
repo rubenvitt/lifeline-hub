@@ -23,7 +23,7 @@ import {
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
-import { Paneel, useRollen } from '../components/instrument';
+import { Paneel, Stapel, useRollen } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useViewport } from '../components/useViewport';
 import { modulName } from '../einsatz/modulRegistry';
@@ -171,10 +171,10 @@ export default function EvakuierungsbezirkPage() {
   return (
     <EinsatzSeite
       titel={
-        <Space wrap size={token.marginSM}>
+        <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>{`Bezirk ${bezirk.bezeichnung}`}</span>
           <Status darstellung={raeumungszustand[bezirk.raeumung]} />
-        </Space>
+        </Stapel>
       }
       dataUpdatedAt={evakuierungQuery.dataUpdatedAt}
       breadcrumb={

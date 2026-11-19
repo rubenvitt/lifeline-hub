@@ -1,6 +1,6 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Alert, App, Breadcrumb, Button, Flex, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,7 +25,14 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  Segmentleiste,
+  Stapel,
+  Textstufe,
+  useRollen,
+} from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { GewanderteGruende } from '../components/GewanderteGruende';
@@ -315,7 +322,7 @@ export default function ErinnerungenPage() {
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
         (rueckFehler != null || gewanderte.length > 0) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             <SeitenHinweise
               fehler={rueckFehler}
               fehlerTitel="Nicht wieder geöffnet"
@@ -325,7 +332,7 @@ export default function ErinnerungenPage() {
               gruende={gewanderte}
               onSchliessen={() => gewanderte.forEach((g) => kartenFehler.verwirf(g.schluessel))}
             />
-          </Flex>
+          </Stapel>
         )
       }
       breadcrumb={
@@ -411,14 +418,16 @@ export default function ErinnerungenPage() {
         offeneGruppen.length === 0 ? (
           <ErinnerungListe erinnerungen={[]} ansicht="offen" {...listenProps} />
         ) : (
-          offeneGruppen.map(({ gruppe, erinnerungen }) => (
-            <div key={gruppe} style={{ marginBottom: token.margin }}>
-              <Augenbraue als="h2" style={{ display: 'block', marginBottom: token.marginXS }}>
-                {GRUPPE_LABEL[gruppe]} ({erinnerungen.length})
-              </Augenbraue>
-              <ErinnerungListe erinnerungen={erinnerungen} ansicht="offen" {...listenProps} />
-            </div>
-          ))
+          <Stapel abstand="md">
+            {offeneGruppen.map(({ gruppe, erinnerungen }) => (
+              <Stapel key={gruppe} abstand="xs">
+                <Augenbraue als="h2">
+                  {GRUPPE_LABEL[gruppe]} ({erinnerungen.length})
+                </Augenbraue>
+                <ErinnerungListe erinnerungen={erinnerungen} ansicht="offen" {...listenProps} />
+              </Stapel>
+            ))}
+          </Stapel>
         )
       ) : (
         <>
@@ -443,17 +452,19 @@ export default function ErinnerungenPage() {
             (ohneKopf ||
               kennzahlenQuery.data == null ||
               abgeschlossene.length < kennzahlenQuery.data.abgeschlossen) && (
-              <div style={{ textAlign: 'center', marginTop: token.margin }}>
-                <Button
-                  onClick={() => void abgeschlosseneQuery.fetchNextPage()}
-                  loading={abgeschlosseneQuery.isFetchingNextPage}
-                >
-                  Ältere laden
-                </Button>
-                <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {abgeschlossene.length}
-                  {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
-                </div>
+              <div style={{ marginTop: token.margin }}>
+                <Stapel abstand="xs" ausrichten="mitte">
+                  <Button
+                    onClick={() => void abgeschlosseneQuery.fetchNextPage()}
+                    loading={abgeschlosseneQuery.isFetchingNextPage}
+                  >
+                    Ältere laden
+                  </Button>
+                  <Textstufe stufe="textKlein" ton="gedaempft">
+                    {abgeschlossene.length}
+                    {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
+                  </Textstufe>
+                </Stapel>
               </div>
             )}
         </>

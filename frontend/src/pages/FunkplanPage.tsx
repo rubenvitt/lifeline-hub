@@ -26,7 +26,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import { Paneel, PaneelZeile, Stapel, monoStil, useRollen } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
@@ -464,7 +464,7 @@ function LueckenZeile<T>({
   return (
     <PaneelZeile style={letzte ? { borderBlockEnd: 'none' } : undefined}>
       <div data-lfh="funkplan-luecke">
-        <Flex wrap align="baseline" gap={token.marginXS}>
+        <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
           <span>{titel}</span>
           {luecke.zustand === 'daten' ? (
             <span style={monoStil(14, 500)}>{luecke.treffer.length}</span>
@@ -474,7 +474,7 @@ function LueckenZeile<T>({
               <span style={{ color: rollen.gedaempft }}>{ZUSTAND_GRUND[luecke.zustand]}</span>
             </>
           )}
-        </Flex>
+        </Stapel>
         {gezeigt.length > 0 && (
           <Flex wrap align="center">
             {gezeigt.map((t) =>
@@ -1030,7 +1030,7 @@ export default function FunkplanPage() {
             {leitstelleZeigen && (
               <PaneelZeile style={gegenstelle == null ? { borderBlockEnd: 'none' } : undefined}>
                 <div data-lfh="funkplan-luecke">
-                  <Flex wrap align="baseline" gap={token.marginXS}>
+                  <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
                     {leitstelle.zustand === 'daten' ? (
                       <>
                         <span>Leitstelle: keine Verbindung erfasst</span>
@@ -1058,7 +1058,7 @@ export default function FunkplanPage() {
                         </span>
                       </>
                     )}
-                  </Flex>
+                  </Stapel>
                 </div>
               </PaneelZeile>
             )}
@@ -1068,7 +1068,7 @@ export default function FunkplanPage() {
             {gegenstelle != null && (
               <PaneelZeile style={{ borderBlockEnd: 'none' }}>
                 <div data-lfh="funkplan-luecke">
-                  <Flex wrap align="baseline" gap={token.marginXS}>
+                  <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
                     <span>{GEGENSTELLE_HINWEIS}</span>
                     <span style={monoStil(14, 500)}>—</span>
                     <span style={{ color: rollen.gedaempft }}>{gegenstelle}</span>
@@ -1078,7 +1078,7 @@ export default function FunkplanPage() {
                         auf Einsatzdaten erfassen
                       </Link>
                     )}
-                  </Flex>
+                  </Stapel>
                 </div>
               </PaneelZeile>
             )}

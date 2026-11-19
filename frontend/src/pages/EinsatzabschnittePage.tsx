@@ -40,7 +40,15 @@ import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Augenbraue, Paneel, Segmentleiste, monoStil, useRollen } from '../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  Segmentleiste,
+  Stapel,
+  Textstufe,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, einheitenImAbschnitt } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
@@ -729,7 +737,7 @@ export default function EinsatzabschnittePage() {
         dataSource={zugeordneteEinheiten}
         renderItem={(e) => (
           <ListenEintrag>
-            <Space>
+            <Stapel richtung="zeile" abstand="xs" ausrichten="mitte">
               {darfSchreiben && (
                 <DragHandle
                   daten={{
@@ -748,11 +756,11 @@ export default function EinsatzabschnittePage() {
                 eigene <StaerkeAnzeige wert={e.ist} />
               </span>
               {e.abschnitt_id == null && e.ueber_einheit_id != null && (
-                <span style={{ color: rollen.gedaempft }}>
+                <Textstufe stufe="textKlein" ton="gedaempft">
                   über {einheitName.get(e.ueber_einheit_id) ?? 'Obereinheit'}
-                </span>
+                </Textstufe>
               )}
-            </Space>
+            </Stapel>
           </ListenEintrag>
         )}
       />
@@ -960,14 +968,10 @@ export default function EinsatzabschnittePage() {
                             {wartet}
                           </Sammelbanner>
                         ) : (
-                          <span
-                            style={{
-                              alignSelf: 'center',
-                              fontSize: token.fontSizeSM,
-                              color: rollen.gedaempft,
-                            }}
-                          >
-                            {zufluss.offen ? 'Live' : 'Live pausiert'}
+                          <span style={{ alignSelf: 'center' }}>
+                            <Textstufe stufe="textKlein" ton="gedaempft">
+                              {zufluss.offen ? 'Live' : 'Live pausiert'}
+                            </Textstufe>
                           </span>
                         )}
                       </div>
