@@ -4,10 +4,6 @@
  * Stufen umstellt, senkt sie im selben Commit, bei 0 fällt der Eintrag. Neue Einträge gibt es nicht.
  */
 export const SCHULD: Readonly<Record<string, number>> = {
-  'abloesung/AbloesungKarte.tsx': 1,
-  'abloesung/OhneSchichtKarte.tsx': 1,
-  'abloesung/schichtplan/SchichtplanPersonen.tsx': 1,
-  'abloesung/schichtplan/SchichtplanRaster.tsx': 1,
   'alarm/EingaengeZahl.tsx': 1,
   'anzeige/OrtZeile.tsx': 3,
   'anzeige/StaerkeEingabe.tsx': 3,
