@@ -78,6 +78,7 @@ import {
   parseRouteId,
 } from '../routing/deeplinks';
 import { Marke } from '../components/instrument/Marke';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Einheit aus Vorlage bilden (LLH-1049, Spec `einheit-vorlagen`, „Seite zum Bilden aus der
@@ -223,7 +224,11 @@ function EinheitAusVorlage({
       items={[
         { title: <Link to="/einsaetze">Einsätze</Link> },
         { title: einsatz.bezeichnung },
-        { title: <Link to={einheitenPfad(einsatzId)}>{modulName('einheiten')}</Link> },
+        {
+          title: (
+            <ListenRueckweg to={einheitenPfad(einsatzId)}>{modulName('einheiten')}</ListenRueckweg>
+          ),
+        },
         { title: 'Aus Vorlage' },
       ]}
     />

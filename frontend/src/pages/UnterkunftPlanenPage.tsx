@@ -30,6 +30,7 @@ import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { betreuungPfad, betreuungsstellePfad, parseRouteId } from '../routing/deeplinks';
 import { Marke } from '../components/instrument/Marke';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 import { useAdressWert } from '../routing/useAdressWert';
 
 type Ansicht = 'rechner' | 'richtwerte';
@@ -213,8 +214,14 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={betreuungPfad(einsatzId)}>{modulName('betreuung')}</Link> },
-            { title: <Link to={zurueck}>{stelle.bezeichnung}</Link> },
+            {
+              title: (
+                <ListenRueckweg to={betreuungPfad(einsatzId)}>
+                  {modulName('betreuung')}
+                </ListenRueckweg>
+              ),
+            },
+            { title: <ListenRueckweg to={zurueck}>{stelle.bezeichnung}</ListenRueckweg> },
             { title: 'Unterkunft planen' },
           ]}
         />

@@ -82,6 +82,7 @@ import FahrzeugeBesatzung from './einheit/FahrzeugeBesatzung';
 import { useBesatzungErrors } from './einheit/useBesatzungErrors';
 import ZuordnenAuswahl from './einheit/ZuordnenAuswahl';
 import EinheitGliederung, { Sprungziel, useEinheitGliederung } from './einheit/EinheitGliederung';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Vollseiten-Ansicht einer Einheit (LFH-339, seit LLH-1036 Spec `einheit-ansicht`): eigene Route,
@@ -537,7 +538,7 @@ function EinheitAnsicht({
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={einheitenPfad(einsatzId)}>Einheiten</Link> },
+            { title: <ListenRueckweg to={einheitenPfad(einsatzId)}>Einheiten</ListenRueckweg> },
             { title: aktuell.name },
           ]}
         />

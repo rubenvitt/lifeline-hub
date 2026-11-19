@@ -19,6 +19,7 @@ import { etbTyp } from '../theme/statusFarben';
 import { modulName } from '../einsatz/modulRegistry';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import type { AnzeigeKonventionen } from '../anzeige/format';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /** „1 200 Einträge" — Tausender mit geschütztem Leerzeichen, Einzahl bei genau einem. */
 function umfang(anzahl: number): string {
@@ -123,7 +124,7 @@ export default function EtbDruckPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>{modulName('etb')}</Link> },
+            { title: <ListenRueckweg to={zurueck}>{modulName('etb')}</ListenRueckweg> },
             { title: 'Druckansicht' },
           ]}
         />

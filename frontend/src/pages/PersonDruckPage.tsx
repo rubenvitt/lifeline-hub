@@ -21,6 +21,7 @@ import PersonDruckBlatt from '../personen/PersonDruckBlatt';
 import { parseRouteId, personDetailPfad, personenPfad } from '../routing/deeplinks';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Druckansicht einer Person (LLH-1120, Spec `druck-dokumente`, „Druckansicht einer Person“;
@@ -90,7 +91,13 @@ export default function PersonDruckPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={personenPfad(einsatzId)}>{modulName('personen')}</Link> },
+            {
+              title: (
+                <ListenRueckweg to={personenPfad(einsatzId)}>
+                  {modulName('personen')}
+                </ListenRueckweg>
+              ),
+            },
             { title: 'Druckansicht' },
           ]}
         />
