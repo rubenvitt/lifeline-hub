@@ -214,10 +214,23 @@ export default function BenutzerMenu({
                 </Space>
               )}
             </div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {isKnapp
-                ? `@${benutzer.benutzername} · Version ${__APP_VERSION__}`
-                : `@${benutzer.benutzername}`}
+            {/* Knapp in einer Zeile und ohne Version (LLH-1818): neben der Marke „Führungskraft
+                der Organisation“ bräche der Kopf sonst um, und „Helligkeit“ läge am Handy unter dem
+                Rand. Die Version steht in der Hilfe, der volle Benutzername im Titel. */}
+            <Typography.Text
+              type="secondary"
+              title={isKnapp ? `@${benutzer.benutzername}` : undefined}
+              style={{
+                fontSize: 12,
+                ...(isKnapp && {
+                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }),
+              }}
+            >
+              @{benutzer.benutzername}
             </Typography.Text>
             {/* Die Funktion auf JEDER Breite (LFH-952, U89): am Auslöser steht sie erst ab `xl`, auf
                 Tablet und Handy war sie sonst nirgends zu sehen. */}
