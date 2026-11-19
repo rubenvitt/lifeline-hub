@@ -64,6 +64,7 @@ import { flaeche } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
 import { Stapel } from '../components/instrument';
 import Knopfreihe from '../components/instrument/Knopfreihe';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). Ein fehlender oder unbekannter
@@ -861,7 +862,7 @@ export default function PersonenDetailPage() {
             items={[
               { title: <Link to="/einsaetze">Einsätze</Link> },
               { title: einsatz.bezeichnung },
-              { title: <Link to={zurueck}>{modulName('personen')}</Link> },
+              { title: <ListenRueckweg to={zurueck}>{modulName('personen')}</ListenRueckweg> },
               { title: registrierAnzeige(p.registrier_nr) },
             ]}
           />

@@ -20,6 +20,7 @@ import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import KraftZeitachse from '../../kraefte/KraftZeitachse';
 import { einheitenPfad, einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
 import { groupLetzteBesetzung, type EinheitRechte } from './einheitAnsichtKern';
+import { ListenRueckweg } from '../../components/ListenRueckweg';
 
 /** Satz an Stelle der Kräfte, wenn die Einheit vor dem Festhalten aufgelöst wurde. */
 export const BESETZUNG_NICHT_FESTGEHALTEN =
@@ -176,7 +177,7 @@ export default function EinheitAufgeloestAnsicht({
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={einheitenPfad(einsatzId)}>Einheiten</Link> },
+            { title: <ListenRueckweg to={einheitenPfad(einsatzId)}>Einheiten</ListenRueckweg> },
             { title: einheit.name },
           ]}
         />

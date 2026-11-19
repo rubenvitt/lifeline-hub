@@ -57,6 +57,7 @@ import {
 } from '../../components/offeneBearbeitung';
 import { flaeche } from '../../theme/tokens';
 import { Status } from '../../components/instrument/Status';
+import { ListenRueckweg } from '../../components/ListenRueckweg';
 
 /**
  * Die Bereiche der Seite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
@@ -378,7 +379,7 @@ function UhsDetailInhalt() {
             items={[
               { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
               { title: <Link to={einsatzPfad(einsatzId)}>{einsatz.bezeichnung}</Link> },
-              { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
+              { title: <ListenRueckweg to={listenPfad}>Unfallhilfsstellen</ListenRueckweg> },
               { title: uhs.bezeichnung },
             ]}
           />

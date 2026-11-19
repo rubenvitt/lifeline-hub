@@ -98,6 +98,7 @@ import {
 import { zaehltasteStil, zaehltastenAbstand } from './zaehltasteStil';
 import { flaeche as flaechenMass } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /** So viele Buchungen stehen unter „Letzte Buchungen“; ältere führt ein Link zur Karte (D6). */
 const LETZTE = 10;
@@ -396,7 +397,9 @@ export default function AusgabeAnsicht() {
         items={[
           { title: <Link to="/einsaetze">Einsätze</Link> },
           { title: einsatz.bezeichnung },
-          { title: <Link to={verpflegungPfad}>{modulName('verpflegung')}</Link> },
+          {
+            title: <ListenRueckweg to={verpflegungPfad}>{modulName('verpflegung')}</ListenRueckweg>,
+          },
           { title: titel },
         ]}
       />

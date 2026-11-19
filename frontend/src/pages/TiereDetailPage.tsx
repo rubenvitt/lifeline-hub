@@ -66,6 +66,7 @@ import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { flaeche } from '../theme/tokens';
 import { Marke } from '../components/instrument/Marke';
+import { ListenRueckweg } from '../components/ListenRueckweg';
 
 /**
  * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
@@ -515,7 +516,7 @@ export default function TiereDetailPage() {
           items={[
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>Tiere</Link> },
+            { title: <ListenRueckweg to={zurueck}>Tiere</ListenRueckweg> },
             { title: kennung },
           ]}
         />
