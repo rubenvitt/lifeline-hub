@@ -73,7 +73,7 @@ Playwright.
     den Text lokal, schreibt nach `GEDAECHTNIS_ENTPRELLUNG_MS`, setzt neu auf, wenn sich der
     Parameter von außen ändert.
 
-- [ ] **Step 1: Write the failing tests** in `useAdressWert.test.tsx`. Mit `createMemoryRouter` und
+- [x] **Step 1: Write the failing tests** in `useAdressWert.test.tsx`. Mit `createMemoryRouter` und
   einer Sonde, die `useLocation().search` zeigt:
   - `setzeParam lässt fremde Parameter stehen`: `setzeParam(new URLSearchParams('meldung=7&richtung=extern'), 'richtung', undefined).toString() === 'meldung=7'`
   - `useAdressWert liest den Wert und nimmt bei Unbekanntem die Vorgabe`: `?richtung=extern` →
@@ -91,16 +91,16 @@ Playwright.
   - `useAdressSuche folgt einer fremden Änderung`: Start `?q=alt`, `router.navigate('?q=neu', { replace: true })`
     → Text `'neu'`
 
-- [ ] **Step 2: Run, expect FAIL** (`Cannot find module './useAdressWert'`):
+- [x] **Step 2: Run, expect FAIL** (`Cannot find module './useAdressWert'`):
   `mise exec -- pnpm -C frontend exec vitest run src/routing/useAdressWert.test.tsx`
 
-- [ ] **Step 3: Implement** in `routing/useAdressWert.ts`. Alle Hooks bauen auf `useSearchParams`
+- [x] **Step 3: Implement** in `routing/useAdressWert.ts`. Alle Hooks bauen auf `useSearchParams`
   und `setzeParam`. `useAdressSuche` nutzt einen Timer-Ref und vergleicht den Adresswert mit dem
   zuletzt selbst geschriebenen, um eine fremde Änderung zu erkennen.
 
-- [ ] **Step 4: Run, expect PASS** (gleiches Kommando).
+- [x] **Step 4: Run, expect PASS** (gleiches Kommando).
 
-- [ ] **Step 5: Commit** `feat: Hooks für Ansicht und Filter in der Adresse (LLH-1826)`
+- [x] **Step 5: Commit** `feat: Hooks für Ansicht und Filter in der Adresse (LLH-1826)`
 
 ### Task 2: Rollposition beim Zurück wiederherstellen
 
@@ -124,7 +124,7 @@ Playwright.
     `gefahrengebiet`, `personal`, `einheit` gesetzt ist (Liste in `rollGedaechtnis.ts`, aus dem
     Abschnitt „Deeplink-Muster“ in `frontend/AGENTS.md`).
 
-- [ ] **Step 1: Write the failing tests.** `rollGedaechtnis.test.ts`:
+- [x] **Step 1: Write the failing tests.** `rollGedaechtnis.test.ts`:
   - `merkt und liest je Schlüssel`; `hält höchstens 50 Einträge` (51. Eintrag verdrängt den ersten)
   - `arbeitet ohne sessionStorage`: `sessionStorage.setItem` wirft → `liesRolle` liefert trotzdem
     den Wert aus der Map
@@ -143,10 +143,10 @@ Playwright.
   - `ein Deeplink-Ziel hat Vorrang`: POP auf `/a?meldung=7` → kein `scrollTo(0, 1400)`.
   - `setzt history.scrollRestoration auf manual und beim Abbau zurück`.
 
-- [ ] **Step 2: Run, expect FAIL.**
+- [x] **Step 2: Run, expect FAIL.**
   `mise exec -- pnpm -C frontend exec vitest run src/routing/rollGedaechtnis.test.ts src/components/RollWiederherstellung.test.tsx`
 
-- [ ] **Step 3: Implement.** Gemerkt wird im Aufräumen eines `useLayoutEffect` auf `location.key`
+- [x] **Step 3: Implement.** Gemerkt wird im Aufräumen eines `useLayoutEffect` auf `location.key`
   (Position des verlassenen Eintrags) und bei `pagehide`. Beim POP: `liesRolle(key)`, dann ein
   `ResizeObserver` auf `document.documentElement` bis
   `scrollHeight - innerHeight >= y`; Abbruch über `wheel`, `touchstart`, `keydown`, `pointerdown`
@@ -154,10 +154,10 @@ Playwright.
   `ort: 'sessionStorage lfh:rolle'`, `entscheidung: 'jeder-ausgang'`, Grund: Rollpositionen je
   Verlaufseintrag für das Zurück (LLH-1826), ohne Inhalt, ein Ausgang braucht sie nicht.
 
-- [ ] **Step 4: Run, expect PASS** (Kommando aus Step 2, dazu
+- [x] **Step 4: Run, expect PASS** (Kommando aus Step 2, dazu
   `src/offline/geraetRaeumung.guard.test.ts`).
 
-- [ ] **Step 5: Commit** `feat: Rollposition beim Zurück wiederherstellen (LLH-1826)`
+- [x] **Step 5: Commit** `feat: Rollposition beim Zurück wiederherstellen (LLH-1826)`
 
 ### Task 3: Meldungen
 
@@ -172,17 +172,17 @@ Playwright.
 - Produces: Parameter `sicht` (`offen` Vorgabe | `abgeschlossen`), `richtung` (`alle` Vorgabe |
   `intern` | `extern`)
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `„Extern“ steht nach der Wahl in der Adresse`: Wahl → `search` enthält `richtung=extern`
   - `?richtung=extern&sicht=abgeschlossen zeigt die gewählte Sicht`: Select zeigt „Extern“, Segment
     „Abgeschlossen“ aktiv
   - `der Filter eines Einsatzes gilt nicht im anderen`: auf `/einsaetze/1/meldungen?richtung=extern`,
     navigiere zu `/einsaetze/2/meldungen` → „Alle Richtungen“
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement:** `useState` durch `useAdressWert` ersetzen. `MeldungenSchmal` bekommt
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement:** `useState` durch `useAdressWert` ersetzen. `MeldungenSchmal` bekommt
   dieselben Werte (keine zweite Wahrheit).
-- [ ] **Step 4: Run, expect PASS** (`src/pages/MeldungenPage.test.tsx`, `src/meldungen/`).
-- [ ] **Step 5: Commit** `feat: Meldungen merken Sicht und Richtung in der Adresse (LLH-1826)`
+- [x] **Step 4: Run, expect PASS** (`src/pages/MeldungenPage.test.tsx`, `src/meldungen/`).
+- [x] **Step 5: Commit** `feat: Meldungen merken Sicht und Richtung in der Adresse (LLH-1826)`
 
 ### Task 4: Aufträge und Befehle
 
@@ -197,18 +197,18 @@ Playwright.
 - Produces: Aufträge `sicht`, `richtung`, `empf`, `q`; Befehle `befehle_sicht` (Werte = die
   bestehenden Segmentwerte), `befehle_empf`, `befehle_q`
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `Aufträge: Sicht, Richtung, Empfänger und Suche stehen in der Adresse` (je ein Assert auf `search`)
   - `Befehle: Suche filtert die Aufträge nicht`: `befehle_q=Foo` → Aufträge zeigen alle
   - `Befehle: ohne befehle_sicht gilt die abgeleitete Vorgabe` (Entwurf vorhanden → „Entwürfe“)
   - `Befehle: ausdrückliche Wahl bleibt, auch wenn der letzte Entwurf freigegeben ist`:
     `?befehle_sicht=entwuerfe` mit Daten ohne Entwurf → Segment „Entwürfe“ aktiv
   - `?befehl=<id> schreibt das Segment des Befehls als befehle_sicht`
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement.** Die abgeleitete Vorgabe bleibt in `BefehlListe`, sie greift nur, wenn
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement.** Die abgeleitete Vorgabe bleibt in `BefehlListe`, sie greift nur, wenn
   `useAdressWahl` `undefined` liefert.
-- [ ] **Step 4: Run, expect PASS** (`src/auftraege/`, `src/pages/AuftraegePage*.test.tsx`).
-- [ ] **Step 5: Commit** `feat: Aufträge und Befehle merken Sicht und Filter in der Adresse (LLH-1826)`
+- [x] **Step 4: Run, expect PASS** (`src/auftraege/`, `src/pages/AuftraegePage*.test.tsx`).
+- [x] **Step 5: Commit** `feat: Aufträge und Befehle merken Sicht und Filter in der Adresse (LLH-1826)`
 
 ### Task 5: Betroffene — die Sicht ist Zustand der Adresse (D4)
 
@@ -225,7 +225,7 @@ Playwright.
 - Produces: `ansicht` (`zeilen` Vorgabe | `raster` | `karte`), `filter` (`alle` Vorgabe | …),
   `luecken=1`, `abgeschlossen=1`. Suche bleibt außerhalb der Adresse.
 
-- [ ] **Step 1: Write the failing tests:**
+- [x] **Step 1: Write the failing tests:**
   - `das Sichtungsraster steht in der Adresse`: Wahl „Raster“ → `search` enthält `ansicht=raster`
   - `?ansicht=raster bleibt nach dem Anwenden in der Adresse` (bisher geräumt)
   - `die Sprungmarke „Vermisste“ zeigt genau ihre Sicht`: Start `?ansicht=raster`, navigiere zu
@@ -233,11 +233,11 @@ Playwright.
   - `die Suche kommt nicht in die Adresse` (bestehender Test bleibt grün)
   - Bestehende Tests, die das Räumen von `filter`/`ansicht` erwarten, auf das neue Verhalten
     umschreiben.
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run, expect PASS** (`src/pages/PersonenPage*.test.tsx`, `src/personen/`,
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run, expect PASS** (`src/pages/PersonenPage*.test.tsx`, `src/personen/`,
   `src/einsatz/sprungmarken.test.ts`).
-- [ ] **Step 5: Commit** `feat: Betroffene merken Ansicht und Filter in der Adresse (LLH-1826)`
+- [x] **Step 5: Commit** `feat: Betroffene merken Ansicht und Filter in der Adresse (LLH-1826)`
 
 ### Task 6: Fahrzeuge und Einsatzabschnitte
 
@@ -252,12 +252,12 @@ Playwright.
 - Consumes: `useAdressWert` mit `FAHRZEUGE_ANSICHT_ERLAUBT` (Vorgabe `liste`) und
   `ABSCHNITTE_ANSICHT_ERLAUBT` (Vorgabe `gliederung`); beide Records exportieren.
 
-- [ ] **Step 1: Write the failing tests:** je Seite „Wahl steht in der Adresse“ und „`?ansicht=…`
+- [x] **Step 1: Write the failing tests:** je Seite „Wahl steht in der Adresse“ und „`?ansicht=…`
   bleibt nach dem Anwenden“; Tests, die das Räumen erwarten, umschreiben.
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement** (`…NachEinsatz` entfällt).
-- [ ] **Step 4: Run, expect PASS.**
-- [ ] **Step 5: Commit** `feat: Fahrzeuge und Abschnitte merken die Ansicht in der Adresse (LLH-1826)`
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement** (`…NachEinsatz` entfällt).
+- [x] **Step 4: Run, expect PASS.**
+- [x] **Step 5: Commit** `feat: Fahrzeuge und Abschnitte merken die Ansicht in der Adresse (LLH-1826)`
 
 ### Task 7: Kräfteübersicht und Lagemeldungen
 
@@ -275,12 +275,12 @@ Playwright.
 - Lagemeldungen: `ort` und `herkunft` mit dem Hook, der zum bestehenden Typ passt, `q` über
   `useAdressSuche`. Der Zeitraum (`parseLageZeitraum`) bleibt unverändert.
 
-- [ ] **Step 1: Write the failing tests:** je Filterfeld „steht nach der Wahl in der Adresse“; eine
+- [x] **Step 1: Write the failing tests:** je Filterfeld „steht nach der Wahl in der Adresse“; eine
   Adresse mit allen Feldern zeigt sie gesetzt; ein unbekannter Abschnitt wird verworfen.
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run, expect PASS.**
-- [ ] **Step 5: Commit** `feat: Kräfteübersicht und Lagemeldungen merken Filter in der Adresse (LLH-1826)`
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run, expect PASS.**
+- [x] **Step 5: Commit** `feat: Kräfteübersicht und Lagemeldungen merken Filter in der Adresse (LLH-1826)`
 
 ### Task 8: Einfache Segmente der übrigen Module und die Einsatzliste
 
@@ -299,12 +299,12 @@ Typs als Record in `routing/deeplinks.ts`):
 
 **Interfaces:** Consumes `useAdressWert`, `useAdressSuche`.
 
-- [ ] **Step 1: Write the failing tests:** je Seite ein Test „die Wahl steht in der Adresse“ und ein
+- [x] **Step 1: Write the failing tests:** je Seite ein Test „die Wahl steht in der Adresse“ und ein
   Test „eine Adresse mit dem Wert zeigt die Wahl“.
-- [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement**, Seite für Seite.
-- [ ] **Step 4: Run, expect PASS.**
-- [ ] **Step 5: Commit** `feat: übrige Module merken Sicht und Ansicht in der Adresse (LLH-1826)`
+- [x] **Step 2: Run, expect FAIL.**
+- [x] **Step 3: Implement**, Seite für Seite.
+- [x] **Step 4: Run, expect PASS.**
+- [x] **Step 5: Commit** `feat: übrige Module merken Sicht und Ansicht in der Adresse (LLH-1826)`
 
 ### Task 9: Regeln, Doku, e2e
 
@@ -323,23 +323,23 @@ Typs als Record in `routing/deeplinks.ts`):
   `docs/anwender/AGENTS.md`).
 - Create: `frontend/e2e/rueckweg.spec.ts`
 
-- [ ] **Step 1:** `scripts/adr-fuer.sh frontend/src/pages/PersonenPage.tsx frontend/src/routing/deeplinks.ts`
+- [x] **Step 1:** `scripts/adr-fuer.sh frontend/src/pages/PersonenPage.tsx frontend/src/routing/deeplinks.ts`
   ausführen. Steht dort eine ADR, die „Ansicht ist Seitenzustand“ festschreibt, anhalten und dem
   Menschen melden.
-- [ ] **Step 2: Write the e2e spec** `rueckweg.spec.ts`:
+- [x] **Step 2: Write the e2e spec** `rueckweg.spec.ts`:
   - `Meldungen „Extern“ überlebt Weg und Zurück`: Wahl „Extern“, zu ETB, `page.goBack()` →
     „Extern“ gewählt
   - `Betroffene im Raster und Rollposition 1400 überleben das Zurück`: Ansicht „Raster“ (bei zu
     wenig Demo-Daten die Zeilenansicht mit Fensterhöhe 400), `window.scrollTo(0, 1400)`, Person
     öffnen, `page.goBack()` → `ansicht=raster` in der URL und `scrollY` innerhalb ±2 px des
     gemerkten Werts
-- [ ] **Step 3: Run** `mise exec -- pnpm -C frontend exec playwright test e2e/rueckweg.spec.ts --trace off`,
+- [x] **Step 3: Run** `mise exec -- pnpm -C frontend exec playwright test e2e/rueckweg.spec.ts --trace off`,
   expect PASS (vorher `cargo build` in der Wurzel).
-- [ ] **Step 4: Regeln und Doku schreiben** (oben), `mise exec -- pnpm -C frontend exec prettier --check AGENTS.md`.
-- [ ] **Step 5: Commit** `docs: Ansicht und Filter gehören in die Adresse, Rollposition (LLH-1826)`
+- [x] **Step 4: Regeln und Doku schreiben** (oben), `mise exec -- pnpm -C frontend exec prettier --check AGENTS.md`.
+- [x] **Step 5: Commit** `docs: Ansicht und Filter gehören in die Adresse, Rollposition (LLH-1826)`
 
 ### Task 10: Gate
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` aus der Repo-Wurzel, ein Aufruf
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` aus der Repo-Wurzel, ein Aufruf
   (bei Bedarf `run_in_background`). Expected: alle Schritte grün.
-- [ ] **Step 2:** Rote Schritte beheben und je Ursache einen Commit machen.
+- [x] **Step 2:** Rote Schritte beheben und je Ursache einen Commit machen.
