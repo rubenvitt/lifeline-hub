@@ -12,8 +12,10 @@ import {
   Kennzahl,
   Kennzahlenband,
   Paneel,
+  Textstufe,
   UebungsBand,
   UebungsMarke,
+  schriftStil,
   useRollen,
 } from '../components/instrument';
 import { EINSATZART_LABELS, isUebung } from '../einsatz/einsatzart';
@@ -153,7 +155,7 @@ export default function LagebildExternPage() {
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: token.margin }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
           <Bildmarke hoehe={18} linienFarbe="var(--lfh-text)" quadratFarbe="var(--lfh-marke)" />
-          <span style={{ fontWeight: 600 }}>Lagebild</span>
+          <Textstufe stufe="seitentitel">Lagebild</Textstufe>
           {daten && (
             <span style={{ color: rollen.gedaempft }} data-lfh="extern-empfaenger">
               · für {daten.empfaenger}
@@ -180,7 +182,7 @@ export default function LagebildExternPage() {
       abfrage.isError ? (
         <Alert type="error" showIcon title="Lagebild nicht ladbar" />
       ) : (
-        <Typography.Text style={{ color: rollen.gedaempft }}>Lädt …</Typography.Text>
+        <Textstufe ton="gedaempft">Lädt …</Textstufe>
       ),
     );
   }
@@ -206,7 +208,11 @@ export default function LagebildExternPage() {
           einen Ernstfall halten. Das Band klebt beim Rollen oben, die Marke steht vor dem Namen. */}
       <UebungsBand einsatz={e} />
       <header style={{ display: 'grid', gap: token.marginXXS }}>
-        <Typography.Title level={1} style={{ margin: 0, fontSize: 24 }} data-lfh="extern-titel">
+        <Typography.Title
+          level={1}
+          style={{ margin: 0, ...schriftStil('ueberschrift') }}
+          data-lfh="extern-titel"
+        >
           {isUebung(e) && (
             <UebungsMarke
               einsatz={e}
@@ -215,11 +221,11 @@ export default function LagebildExternPage() {
           )}
           {e.bezeichnung}
         </Typography.Title>
-        <span style={{ color: rollen.gedaempft }}>
+        <Textstufe ton="gedaempft">
           {[e.stichwort, EINSATZART_LABELS[e.einsatzart], `seit ${zeit(e.begonnen_at)}`]
             .filter(Boolean)
             .join(' · ')}
-        </span>
+        </Textstufe>
         <span
           data-lfh="extern-stand"
           style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}
@@ -239,7 +245,7 @@ export default function LagebildExternPage() {
             </span>
           )}
           {daten.gueltig_bis && (
-            <span style={{ color: rollen.gedaempft }}>· gültig bis {zeit(daten.gueltig_bis)}</span>
+            <Textstufe ton="gedaempft">· gültig bis {zeit(daten.gueltig_bis)}</Textstufe>
           )}
         </span>
       </header>

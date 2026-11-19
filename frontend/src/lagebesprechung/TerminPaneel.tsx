@@ -9,7 +9,13 @@ import { setLagebesprechungTermin } from '../api/lagebesprechung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { LagebesprechungStand } from '../api/types';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { Kennzahl, Kennzahlenband, Paneel, type KennzahlZustand } from '../components/instrument';
+import {
+  Kennzahl,
+  Kennzahlenband,
+  Paneel,
+  Stapel,
+  type KennzahlZustand,
+} from '../components/instrument';
 import { schnellwahlAuswahl, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
 import { serverJetzt } from '../offline/serveruhr';
 import { lagebesprechungZustand, terminZeitpunkt } from './lagebesprechungZustand';
@@ -62,7 +68,7 @@ export default function TerminPaneel({
 
   return (
     <Paneel titel="Termin" koerperPolster style={{ marginBottom: token.margin }}>
-      <Flex vertical gap={token.margin}>
+      <Stapel abstand="md">
         <Kennzahlenband beschriftung="Termin der nächsten Lagebesprechung" spalten={2}>
           <Kennzahl
             titel="Nächste Lagebesprechung"
@@ -110,7 +116,7 @@ export default function TerminPaneel({
           />
         </Flex>
         <SpeicherFehler fehler={mutation.error} titel="Termin nicht gesetzt" />
-      </Flex>
+      </Stapel>
     </Paneel>
   );
 }

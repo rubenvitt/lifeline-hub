@@ -1,5 +1,6 @@
-import { Button, Flex, Modal, theme } from 'antd';
+import { Button, Flex, Modal } from 'antd';
 import { useAuth } from './AuthContext';
+import { Stapel } from '../components/instrument';
 import { seiteNeuLaden } from './seiteNeuLaden';
 
 /**
@@ -22,7 +23,6 @@ import { seiteNeuLaden } from './seiteNeuLaden';
  */
 export default function BenutzerKonfliktDialog() {
   const { konflikt } = useAuth();
-  const { token } = theme.useToken();
 
   if (!konflikt) return null;
   const { bisher, jetzt } = konflikt;
@@ -42,7 +42,7 @@ export default function BenutzerKonfliktDialog() {
         </Flex>
       }
     >
-      <Flex vertical gap={token.marginSM}>
+      <Stapel abstand="sm">
         <span>
           In einem anderen Tab ist jetzt <strong>{jetzt.anzeigename}</strong> angemeldet, dieser Tab
           gehörte <strong>{bisher.anzeigename}</strong>.
@@ -52,7 +52,7 @@ export default function BenutzerKonfliktDialog() {
           für {bisher.anzeigename} liegen.
         </span>
         <span>Ungesicherte Eingaben gehen verloren.</span>
-      </Flex>
+      </Stapel>
     </Modal>
   );
 }
