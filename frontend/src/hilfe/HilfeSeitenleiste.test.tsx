@@ -63,6 +63,15 @@ describe('HilfeSeitenleiste', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('liegt ohne Maske neben der Seite, die Seite bleibt bedienbar (Review)', async () => {
+    zeige('/einsaetze/5/lagekarte');
+    fireEvent.click(screen.getByRole('button', { name: 'Hilfe zu dieser Seite' }));
+    await leiste();
+    expect(document.querySelector('.lfh-hilfe-seitenleiste .ant-drawer-mask')).toBeNull();
+    fireEvent.click(screen.getByText('zum ETB'));
+    expect(await screen.findByText(titel('einsatztagebuch'))).toBeInTheDocument();
+  });
+
   it('zeigt im Reiter „Tastenkürzel“ die Sprungpalette', async () => {
     zeige('/einsaetze');
     fireEvent.click(screen.getByRole('button', { name: 'Hilfe zu dieser Seite' }));

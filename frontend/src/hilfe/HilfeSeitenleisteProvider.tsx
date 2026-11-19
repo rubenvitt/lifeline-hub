@@ -78,11 +78,16 @@ function istEingabe(ziel: EventTarget | null): boolean {
   );
 }
 
-/** Ein offener Dialog außer der eigenen Leiste (die Sprungpalette ist ein antd-Modal). */
+/**
+ * Ein offener Dialog oder Drawer außer der eigenen Leiste (die Sprungpalette ist ein antd-Modal).
+ * Gefragt wird nach dem SICHTBAREN Overlay wie in `pages/lagekarte/zeichnenEsc.ts`: antd lässt
+ * geschlossene Drawer mit `aria-modal` im Baum stehen, nur per Klasse versteckt.
+ */
 function istDialogOffen(): boolean {
-  return Array.from(document.querySelectorAll('[aria-modal="true"]')).some(
-    (el) => !el.closest(`.${LEISTE_KLASSE}`) && !el.closest('[style*="display: none"], [hidden]'),
+  const offen = document.querySelectorAll<HTMLElement>(
+    `.ant-modal-wrap, .ant-drawer-open:not(.${LEISTE_KLASSE})`,
   );
+  return Array.from(offen).some((el) => getComputedStyle(el).display !== 'none');
 }
 
 /** Rückfall, wenn der Hilfe-Chunk nicht lädt (etwa ohne Netz und ohne Service Worker). */
@@ -97,7 +102,13 @@ class LeistenFehlergrenze extends Component<
   render() {
     if (!this.state.fehler) return this.props.children;
     return (
-      <Drawer open title="Hilfe" onClose={this.props.schliesse} rootClassName={LEISTE_KLASSE}>
+      <Drawer
+        open
+        title="Hilfe"
+        onClose={this.props.schliesse}
+        rootClassName={LEISTE_KLASSE}
+        mask={false}
+      >
         <p>Hilfe ist gerade nicht verfügbar.</p>
         <Link to={hilfePfad()} onClick={this.props.schliesse}>
           Alle Kapitel
@@ -170,7 +181,13 @@ export function HilfeSeitenleisteProvider({ children }: { children: ReactNode })
         <LeistenFehlergrenze schliesse={schliesse}>
           <Suspense
             fallback={
-              <Drawer open={offen} title="Hilfe" onClose={schliesse} rootClassName={LEISTE_KLASSE}>
+              <Drawer
+                open={offen}
+                title="Hilfe"
+                onClose={schliesse}
+                rootClassName={LEISTE_KLASSE}
+                mask={false}
+              >
                 <Skeleton active paragraph={{ rows: 8 }} />
               </Drawer>
             }

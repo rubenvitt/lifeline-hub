@@ -69,6 +69,8 @@ export default function HilfeSeitenleiste() {
       placement="right"
       size={breit ? LEISTE_BREITE : '100%'}
       rootClassName={LEISTE_KLASSE}
+      // Neben der Arbeit, nicht modal: ohne Maske bleibt die Seite bedienbar (Entwurf, Anti-Ziele).
+      mask={false}
       title={kapitel.titel}
       // Den Fokus gibt der Provider zurück (auch an ein Eingabefeld nach F1).
       focusable={{ focusTriggerAfterClose: false }}

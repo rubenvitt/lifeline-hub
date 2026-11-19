@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { useAuthOptional } from '../auth/AuthContext';
 import { ladeBenutzerEinstellungen, setzeBenutzerEinstellung } from '../api/benutzerEinstellungen';
 import { globalKeys } from '../api/queryKeys';
+import type { BenutzerEinstellungen } from '../api/types';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
@@ -39,12 +40,18 @@ export default function WillkommenKarte() {
   if (benutzerId == null || geschlossen || !istWillkommenOffen(data)) return null;
 
   function schliesse() {
-    // Sofort weg; ein Fehler beim Merken kostet höchstens ein erneutes Erscheinen.
+    // Sofort weg und nur den eigenen Schlüssel im geteilten Fach ergänzen, nie den ganzen Stand
+    // ersetzen: sonst überschriebe die späte Antwort, was `useZuletztBefehle` inzwischen gemerkt
+    // hat (dort wird die Antwort aus demselben Grund verworfen). Ein Fehler kostet höchstens ein
+    // erneutes Erscheinen in einer späteren Sitzung.
+    const wert = alsBackendZeit(dayjs());
     setGeschlossen(true);
-    setzeBenutzerEinstellung(SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, alsBackendZeit(dayjs())).then(
-      (stand) => client.setQueryData(key, stand),
-      () => {},
+    client.setQueryData<BenutzerEinstellungen>(key, (alt) =>
+      alt
+        ? { ...alt, eintraege: { ...alt.eintraege, [SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN]: wert } }
+        : alt,
     );
+    setzeBenutzerEinstellung(SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, wert).catch(() => {});
   }
 
   const palette = istApplePlattform(navigator.userAgent) ? '⌘ K' : 'Strg + K';

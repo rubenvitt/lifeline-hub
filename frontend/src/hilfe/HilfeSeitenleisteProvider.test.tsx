@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { Drawer, Modal } from 'antd';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HilfeSeitenleisteProvider,
@@ -87,6 +89,42 @@ describe('HilfeSeitenleisteProvider', () => {
 
   it('bei offenem Dialog oder offener Sprungpalette passiert nichts', async () => {
     zeige('/einsaetze/5/etb', <div role="dialog" aria-modal="true" />);
+    await taste(document.body, { key: '?', shiftKey: true });
+    await taste(document.body, { key: 'F1' });
+    expect(screen.queryByTestId('leiste')).toBeNull();
+  });
+
+  it('nach einem geschlossenen anderen Drawer wirkt „?“ wieder (Review)', async () => {
+    function AndererDrawer() {
+      const [offen, setOffen] = useState(true);
+      return (
+        <Drawer open={offen} onClose={() => setOffen(false)} title="Person">
+          <button onClick={() => setOffen(false)}>zu</button>
+        </Drawer>
+      );
+    }
+    zeige('/einsaetze/5/personen', <AndererDrawer />);
+    await taste(document.body, { key: '?', shiftKey: true });
+    expect(screen.queryByTestId('leiste')).toBeNull();
+    fireEvent.click(await screen.findByText('zu'));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400));
+    });
+    await taste(document.body, { key: '?', shiftKey: true });
+    expect(await screen.findByTestId('leiste')).toBeInTheDocument();
+  });
+
+  // Dass ein GESCHLOSSENES Modal nicht mehr sperrt, zeigt nur der Browser: antd setzt das
+  // `display: none` am Rahmen erst nach der Animation, die in jsdom nicht endet (wie
+  // `pages/lagekarte/zeichnenEsc.ts`).
+  it('ein offenes antd-Modal (auch die Sprungpalette) sperrt „?“ und F1', async () => {
+    zeige(
+      '/einsaetze',
+      <Modal open footer={null} title="Rückfrage">
+        Inhalt
+      </Modal>,
+    );
+    await screen.findByText('Rückfrage');
     await taste(document.body, { key: '?', shiftKey: true });
     await taste(document.body, { key: 'F1' });
     expect(screen.queryByTestId('leiste')).toBeNull();

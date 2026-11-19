@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { neuerQueryClient } from '../test/utils';
+import { globalKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import WillkommenKarte from './WillkommenKarte';
 import { istWillkommenOffen } from './willkommen';
@@ -15,9 +16,9 @@ vi.mock('../auth/AuthContext', () => ({ useAuthOptional: () => auth.wert }));
 
 const TITEL = 'Willkommen bei Lifeline Hub';
 
-function zeige() {
+function zeige(client = neuerQueryClient()) {
   return render(
-    <QueryClientProvider client={neuerQueryClient()}>
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <WillkommenKarte />
       </MemoryRouter>
@@ -95,6 +96,32 @@ describe('WillkommenKarte', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Verstanden' }));
     await waitFor(() => expect(wert).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/));
     expect(screen.queryByText(TITEL)).toBeNull();
+  });
+
+  it('Schließen ergänzt im geteilten Fach nur den eigenen Schlüssel (Review)', async () => {
+    stand({ zuletzt_befehle: '["nav:profil"]' });
+    let antworten!: () => void;
+    const antwort = new Promise<void>((r) => (antworten = r));
+    server.use(
+      http.put('/api/benutzer-einstellungen/willkommen_geschlossen', async () => {
+        await antwort;
+        // Ein Serverstand ohne den inzwischen optimistisch gemerkten Palettenbefehl.
+        return HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } });
+      }),
+    );
+    const client = neuerQueryClient();
+    zeige(client);
+    fireEvent.click(await screen.findByRole('button', { name: 'Verstanden' }));
+    const key = globalKeys.benutzerEinstellungenVon(1);
+    // Ein anderer Schreiber desselben Fachs merkt sich etwas, während der PUT läuft.
+    client.setQueryData<{ eintraege: Record<string, string> }>(key, (alt) => ({
+      eintraege: { ...alt!.eintraege, zuletzt_befehle: '["hilfe:seite","nav:profil"]' },
+    }));
+    antworten();
+    await new Promise((r) => setTimeout(r, 50));
+    const eintraege = client.getQueryData<{ eintraege: Record<string, string> }>(key)!.eintraege;
+    expect(eintraege.zuletzt_befehle).toBe('["hilfe:seite","nav:profil"]');
+    expect(eintraege.willkommen_geschlossen).toMatch(/^\d{4}-/);
   });
 
   it('ein Fehler beim Schließen lässt die Karte trotzdem verschwinden', async () => {
