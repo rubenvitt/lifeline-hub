@@ -45,6 +45,11 @@ export default function EmpfaengerFilter({
 }
 
 /** Abschnitt bzw. Einheit aus dem Filterwert; ohne Filter beides leer. */
+/** Kann {@link parseEmpfaengerFilter} den Wert lesen? Für den Filter in der Adresse (LLH-1826). */
+export function istEmpfaengerFilter(wert: string): boolean {
+  return /^(abschnitt|einheit):[1-9]\d*$/.test(wert);
+}
+
 export function parseEmpfaengerFilter(filter: string | undefined): {
   abschnittId?: number;
   einheitId?: number;

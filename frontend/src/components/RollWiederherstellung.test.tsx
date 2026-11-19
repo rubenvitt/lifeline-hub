@@ -44,7 +44,8 @@ function starte(eintraege: string[] = ['/a']) {
   return router;
 }
 
-const rolle = (y: number) => Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
+const rolle = (y: number) =>
+  Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
 
 describe('RollWiederherstellung (LLH-1826)', () => {
   beforeEach(() => {

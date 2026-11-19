@@ -37,7 +37,15 @@ import {
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { ersetzeAuftraege, findeAuftrag } from './auftragCache';
 import AuftragErteilenDialog from './AuftragErteilenDialog';
-import EmpfaengerFilter, { parseEmpfaengerFilter } from './EmpfaengerFilter';
+import EmpfaengerFilter, { istEmpfaengerFilter, parseEmpfaengerFilter } from './EmpfaengerFilter';
+import {
+  OFFEN_ABGESCHLOSSEN_ERLAUBT,
+  RICHTUNG_ERLAUBT,
+  type OffenAbgeschlossen,
+  type RichtungFilter,
+} from '../routing/deeplinks';
+import { useAdressSuche, useAdressText, useAdressWert } from '../routing/useAdressWert';
+import { useSearchParams } from 'react-router';
 import { Select } from '../components/Select';
 import AuftragListenKarte from './AuftragListenKarte';
 import AuftragDetail from './AuftragDetail';
@@ -49,7 +57,6 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import ListeDetail, { type ListeDetailGruppen } from '../components/ListeDetail';
 import { SeitenLeer, istNichtGefunden } from '../components/SeitenZustand';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
-import { SERVER_SUCHE_ENTPRELLUNG_MS } from '../components/Datensicht';
 import ZumKopfKnopf from '../components/ZumKopfKnopf';
 import {
   LISTEN_MAX_SEITEN,
@@ -105,21 +112,21 @@ export default function AuftraegeListe({
     queryFn: () => listeEinheiten(einsatzId),
   });
 
-  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
-  const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
+  // Ansicht und Filter sind Zustand der Adresse (LLH-1826, `frontend/AGENTS.md`, „Ansicht und
+  // Filter gehören in die Adresse“). Die Befehle derselben Seite tragen `befehle_…`.
+  const [ansicht, setAnsicht] = useAdressWert('sicht', OFFEN_ABGESCHLOSSEN_ERLAUBT, 'offen');
+  const [richtungsKey, setRichtung] = useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
+  const richtungFilter = richtungsKey === 'alle' ? undefined : richtungsKey;
   // Empfänger-Filter: kodiert als "abschnitt:<id>" bzw. "einheit:<id>" (`EmpfaengerFilter`).
-  const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
+  const [empfFilter, setEmpfFilter] = useAdressText('empf', istEmpfaengerFilter);
   const { abschnittId, einheitId } = parseEmpfaengerFilter(empfFilter);
 
   // Suche am Server (`q`, oxgob5gk D9): das Feld zeigt sofort, abgefragt wird entprellt.
-  const [suchEingabe, setSuchEingabe] = useState('');
-  const [suche, setSuche] = useState('');
-  useEffect(() => {
-    const frist = setTimeout(() => setSuche(suchEingabe.trim()), SERVER_SUCHE_ENTPRELLUNG_MS);
-    return () => clearTimeout(frist);
-  }, [suchEingabe]);
+  // Das Feld hält den Text, die Adresse (`q`) den entprellten Begriff, der an den Server geht.
+  const [suchEingabe, setSuchEingabe] = useAdressSuche();
+  const [searchParams] = useSearchParams();
+  const suche = (searchParams.get('q') ?? '').trim();
 
-  const richtungsKey = richtungFilter ?? 'alle';
   const empfaengerKey = empfFilter ?? 'alle';
   const filter = useMemo(
     () => ({ richtung: richtungFilter, abschnittId, einheitId, suche }),
@@ -180,10 +187,9 @@ export default function AuftraegeListe({
   // Zählt jeden Deeplink, unabhängig vom Sprung: eine Wahl von Hand räumt den Sprung, nicht die Zahl.
   const [deeplinkNr, setDeeplinkNr] = useState(0);
   const deeplinkHinweis = useQueryParamSelektion('auftrag', offeneQuery.isSuccess, (aid) => {
-    setRichtungFilter(undefined);
+    setRichtung('alle');
     setEmpfFilter(undefined);
     setSuchEingabe('');
-    setSuche('');
     const nr = deeplinkNr + 1;
     setDeeplinkNr(nr);
     setGewaehlt(aid);
@@ -205,9 +211,14 @@ export default function AuftraegeListe({
     },
     [schliesseHinweis],
   );
-  // Ein Wechsel der Ansicht löst die Wahl (Spec `liste-detail`, „Gewähltes Objekt entfällt“).
-  const changeAnsicht = (neu: 'offen' | 'abgeschlossen') => {
+  // Ein Wechsel der Ansicht löst die Wahl (Spec `liste-detail`, „Gewähltes Objekt entfällt“). Die
+  // Ansicht steht in der Adresse und kommt erst mit der Navigation an (LLH-1826); bis dahin ruht
+  // die Vorauswahl, sonst wählte sie noch in der alten Ansicht, und die Wahl entfiele danach.
+  const [ansichtZiel, setAnsichtZiel] = useState<OffenAbgeschlossen | null>(null);
+  if (ansichtZiel !== null && ansicht === ansichtZiel) setAnsichtZiel(null);
+  const changeAnsicht = (neu: OffenAbgeschlossen) => {
     setAnsicht(neu);
+    setAnsichtZiel(neu === ansicht ? null : neu);
     select(null);
   };
   const verlinkteQuery = useQuery({
@@ -233,7 +244,7 @@ export default function AuftraegeListe({
     if (!verlinkte || angewandtNr === deeplinkNr) return;
     setAngewandtNr(deeplinkNr);
     setAnsicht(istAuftragAbgeschlossen(verlinkte) ? 'abgeschlossen' : 'offen');
-  }, [verlinkte, angewandtNr, deeplinkNr]);
+  }, [verlinkte, angewandtNr, deeplinkNr, setAnsicht]);
 
   // „Auftrag erteilen“ als Dialog mit Serie (Spec `auftraege-befehle`, „Erfassen per Dialog“).
   const [erteilenOffen, setErteilenOffen] = useState(false);
@@ -616,7 +627,7 @@ export default function AuftraegeListe({
           aria-label="Richtung"
           style={{ minWidth: 160 }}
           value={richtungFilter ?? 'alle'}
-          onChange={(v: string) => setRichtungFilter(v === 'alle' ? undefined : v)}
+          onChange={(v: RichtungFilter) => setRichtung(v)}
           options={[
             { value: 'alle', label: 'Alle Richtungen' },
             { value: 'intern', label: 'Intern' },
@@ -649,7 +660,7 @@ export default function AuftraegeListe({
         gruppen={imOffenen ? offeneGruppen : verlinktGruppen}
         fenster={!imOffenen}
         // Zeigt der Deeplink ins Leere, ist nichts gewählt (Spec `liste-detail`).
-        vorauswahl={deeplinkHinweis.unbekannt == null}
+        vorauswahl={deeplinkHinweis.unbekannt == null && ansichtZiel === null}
         ladend={listenQuery.isPending}
         fehler={
           listenQuery.isError

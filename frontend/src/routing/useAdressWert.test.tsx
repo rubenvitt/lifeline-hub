@@ -7,6 +7,7 @@ import {
   useAdressKennung,
   useAdressSchalter,
   useAdressSuche,
+  useAdressText,
   useAdressWahl,
   useAdressWert,
 } from './useAdressWert';
@@ -60,20 +61,20 @@ describe('setzeParam und liesErlaubt (LLH-1826)', () => {
 });
 
 describe('useAdressWert (LLH-1826)', () => {
-  const hook = () => useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
+  const useRichtung = () => useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
 
   it('liest den Wert und nimmt bei Unbekanntem die Vorgabe', () => {
-    starte(hook, ['/m?richtung=extern']);
+    starte(useRichtung, ['/m?richtung=extern']);
     expect(stand.wert).toBe('extern');
   });
 
   it('nimmt bei unbekanntem Wert die Vorgabe', () => {
-    starte(hook, ['/m?richtung=quer']);
+    starte(useRichtung, ['/m?richtung=quer']);
     expect(stand.wert).toBe('alle');
   });
 
   it('die Vorgabe steht nicht in der Adresse', async () => {
-    starte(hook, ['/m?meldung=7']);
+    starte(useRichtung, ['/m?meldung=7']);
     setze('extern');
     await waitFor(() => expect(stand.search).toBe('?meldung=7&richtung=extern'));
     setze('alle');
@@ -81,7 +82,7 @@ describe('useAdressWert (LLH-1826)', () => {
   });
 
   it('ein Wechsel legt keinen Verlaufseintrag an', async () => {
-    const router = starte(hook, ['/liste', '/einsaetze/1/meldungen']);
+    const router = starte(useRichtung, ['/liste', '/einsaetze/1/meldungen']);
     setze('extern');
     setze('intern');
     setze('extern');
@@ -161,11 +162,7 @@ describe('Schreiben im selben Zug (LLH-1826)', () => {
   it('zwei Setter im selben Handler überschreiben einander nicht', async () => {
     let sicht: (v: 'offen' | 'abgeschlossen') => void = () => {};
     starte(() => {
-      const [, setzeSicht] = useAdressWert(
-        'sicht',
-        { offen: true, abgeschlossen: true },
-        'offen',
-      );
+      const [, setzeSicht] = useAdressWert('sicht', { offen: true, abgeschlossen: true }, 'offen');
       sicht = setzeSicht;
       return useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
     }, ['/m']);
@@ -187,6 +184,28 @@ describe('Schreiben im selben Zug (LLH-1826)', () => {
       raeume();
       (stand.setze as (v: Richtung) => void)('alle');
     });
+    await waitFor(() => expect(stand.search).toBe(''));
+  });
+});
+
+describe('useAdressText (LLH-1826)', () => {
+  const gueltig = (w: string) => /^(abschnitt|einheit):\d+$/.test(w);
+
+  it('liest einen gültigen Text und schreibt sofort', async () => {
+    starte(() => useAdressText('empf', gueltig), ['/a?empf=abschnitt:3']);
+    expect(stand.wert).toBe('abschnitt:3');
+    setze('einheit:9');
+    await waitFor(() => expect(stand.search).toBe('?empf=einheit%3A9'));
+  });
+
+  it('verwirft einen ungültigen Text', () => {
+    starte(() => useAdressText('empf', gueltig), ['/a?empf=quatsch']);
+    expect(stand.wert).toBe(undefined);
+  });
+
+  it('undefined löscht den Parameter', async () => {
+    starte(() => useAdressText('empf', gueltig), ['/a?empf=abschnitt:3']);
+    setze(undefined);
     await waitFor(() => expect(stand.search).toBe(''));
   });
 });

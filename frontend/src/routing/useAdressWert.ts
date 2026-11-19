@@ -93,6 +93,20 @@ export function useAdressSchalter(schluessel: string): [boolean, (an: boolean) =
   return [params.get(schluessel) === '1', setze];
 }
 
+/**
+ * Ein kurzer Text ohne feste Menge (etwa `abschnitt:3` des Empfängerfilters), sofort geschrieben.
+ * `gueltig` verwirft, was die Seite nicht lesen kann. Freitext nimmt {@link useAdressSuche}.
+ */
+export function useAdressText(
+  schluessel: string,
+  gueltig: (wert: string) => boolean = () => true,
+): [string | undefined, (wert: string | undefined) => void] {
+  const [params] = useSearchParams();
+  const schreibe = useSchreibe(schluessel);
+  const wert = params.get(schluessel);
+  return [wert !== null && wert !== '' && gueltig(wert) ? wert : undefined, schreibe];
+}
+
 /** Eine Datenbank-Kennung; eine ungültige gilt als nicht gesetzt (`parseRouteId`). */
 export function useAdressKennung(
   schluessel: string,

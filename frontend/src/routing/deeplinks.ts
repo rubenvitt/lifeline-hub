@@ -1068,16 +1068,22 @@ export function parseAbschnitteAnsicht(params: URLSearchParams): AbschnitteAnsic
     : undefined;
 }
 
-/** Sicht der Meldungen, Zustand der Adresse `?sicht=` (LLH-1826); Vorgabe `offen`. */
-export type MeldungenSicht = 'offen' | 'abgeschlossen';
-export const MELDUNGEN_SICHT_ERLAUBT: Record<MeldungenSicht, true> = {
+/**
+ * Sicht „offen“/„abgeschlossen“ der Meldungen und Einzelaufträge, Zustand der Adresse `?sicht=`
+ * (LLH-1826); Vorgabe `offen`.
+ */
+export type OffenAbgeschlossen = 'offen' | 'abgeschlossen';
+export const OFFEN_ABGESCHLOSSEN_ERLAUBT: Record<OffenAbgeschlossen, true> = {
   offen: true,
   abgeschlossen: true,
 };
 
-/** Richtungsfilter der Meldungen, Zustand der Adresse `?richtung=` (LLH-1826); Vorgabe `alle`. */
-export type MeldungenRichtung = 'alle' | 'intern' | 'extern';
-export const MELDUNGEN_RICHTUNG_ERLAUBT: Record<MeldungenRichtung, true> = {
+/**
+ * Richtungsfilter der Meldungen und Einzelaufträge, Zustand der Adresse `?richtung=` (LLH-1826);
+ * Vorgabe `alle`.
+ */
+export type RichtungFilter = 'alle' | 'intern' | 'extern';
+export const RICHTUNG_ERLAUBT: Record<RichtungFilter, true> = {
   alle: true,
   intern: true,
   extern: true,

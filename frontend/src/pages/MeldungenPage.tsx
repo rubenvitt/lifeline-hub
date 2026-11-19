@@ -41,9 +41,9 @@ import EinheitUebernahme from './einheit/EinheitUebernahme';
 import { KennungsLink } from '../components/kennungsLink';
 import {
   einheitDetailPfad,
-  MELDUNGEN_RICHTUNG_ERLAUBT,
-  MELDUNGEN_SICHT_ERLAUBT,
-  type MeldungenRichtung,
+  RICHTUNG_ERLAUBT,
+  OFFEN_ABGESCHLOSSEN_ERLAUBT,
+  type RichtungFilter,
 } from '../routing/deeplinks';
 import { useAdressWert } from '../routing/useAdressWert';
 import { erfasseMeldungOfflineFaehig, erfassePersonOfflineFaehig } from '../offline/schreiben';
@@ -163,15 +163,13 @@ export default function MeldungenPage() {
 
   // Sicht und Richtung sind Zustand der Adresse (LLH-1826, `frontend/AGENTS.md`, „Ansicht und
   // Filter gehören in die Adresse“): sie überleben Weg und Zurück, die Vorgabe fehlt in der Adresse.
-  const [ansicht, setAnsicht] = useAdressWert('sicht', MELDUNGEN_SICHT_ERLAUBT, 'offen');
-  const [richtungsKey, setRichtung] = useAdressWert('richtung', MELDUNGEN_RICHTUNG_ERLAUBT, 'alle');
+  const [ansicht, setAnsicht] = useAdressWert('sicht', OFFEN_ABGESCHLOSSEN_ERLAUBT, 'offen');
+  const [richtungsKey, setRichtung] = useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
   const richtungFilter = richtungsKey === 'alle' ? undefined : richtungsKey;
-  const setRichtungFilter = (v: MeldungenRichtung | undefined) => setRichtung(v ?? 'alle');
+  const setRichtungFilter = (v: RichtungFilter | undefined) => setRichtung(v ?? 'alle');
   const richtungWaehlen = (v: string) =>
     setRichtung(
-      Object.prototype.hasOwnProperty.call(MELDUNGEN_RICHTUNG_ERLAUBT, v)
-        ? (v as MeldungenRichtung)
-        : 'alle',
+      Object.prototype.hasOwnProperty.call(RICHTUNG_ERLAUBT, v) ? (v as RichtungFilter) : 'alle',
     );
   // Ein Dialog gehört zu seinem Einsatz: die Route hat keinen `key`, nach einem Wechsel schriebe
   // er sonst mit der Meldung des vorigen Einsatzes in den neuen. Der Wechsel schließt ihn.
@@ -332,7 +330,7 @@ export default function MeldungenPage() {
     if (!verlinkte || angewandtNr === deeplinkNr) return;
     setAngewandtNr(deeplinkNr);
     setAnsicht(istErledigt(verlinkte) ? 'abgeschlossen' : 'offen');
-  }, [verlinkte, angewandtNr, deeplinkNr]);
+  }, [verlinkte, angewandtNr, deeplinkNr, setAnsicht]);
   const verlinkteAngeheftet =
     verlinkte && istErledigt(verlinkte) && !abgeschlossene.some((m) => m.id === verlinkte.id)
       ? verlinkte

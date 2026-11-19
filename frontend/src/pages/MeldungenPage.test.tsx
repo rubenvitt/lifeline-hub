@@ -1760,7 +1760,10 @@ describe('MeldungenPage — Sicht und Richtung in der Adresse (LLH-1826)', () =>
     await screen.findByText('Florian Nord 1');
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
     await waitFor(() =>
-      expect(listeMeldungen).toHaveBeenCalledWith(2, expect.not.objectContaining({ richtung: 'extern' })),
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        2,
+        expect.not.objectContaining({ richtung: 'extern' }),
+      ),
     );
     expect(screen.getByTestId('loc-search').textContent).toBe('');
   });
