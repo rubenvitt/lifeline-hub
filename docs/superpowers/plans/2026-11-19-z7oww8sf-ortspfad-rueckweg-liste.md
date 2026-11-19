@@ -35,11 +35,13 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 ### Task 1: Verlaufsgedächtnis (Speicher)
 
 **Files:**
+
 - Create: `frontend/src/routing/verlaufGedaechtnis.ts`
 - Create: `frontend/src/routing/verlaufGedaechtnis.test.ts`
 - Modify: `frontend/src/offline/geraetRaeumung.ts` (Eintrag neben `lfh:liste`, Räumer in der Liste um Z. 313)
 
 **Interfaces:**
+
 - Produces:
   - `type VorigeAdresse = { pathname: string; search: string }`
   - `merkeHerkunft(key: string, adresse: VorigeAdresse): void` (ignoriert `'default'`)
@@ -65,11 +67,13 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 ### Task 2: `VerlaufMerken` und `useVorigeAdresse`
 
 **Files:**
+
 - Create: `frontend/src/routing/VerlaufMerken.tsx`
 - Create: `frontend/src/routing/VerlaufMerken.test.tsx`
 - Modify: `frontend/src/App.tsx` (`BetriebsLayout`, vor `<Outlet />`)
 
 **Interfaces:**
+
 - Consumes: Task 1.
 - Produces: `VerlaufMerken(): null` (Komponente), `useVorigeAdresse(): VorigeAdresse | null`.
 
@@ -87,10 +91,12 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 ### Task 3: `ListenRueckweg`
 
 **Files:**
+
 - Create: `frontend/src/components/ListenRueckweg.tsx`
 - Create: `frontend/src/components/ListenRueckweg.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useVorigeAdresse` (Task 2), `handleLinkKlick` (`routing/linkModifier.ts`).
 - Produces: `ListenRueckweg(props: { to: string; children: ReactNode }): JSX.Element` — rendert immer ein `<a>`.
 
@@ -109,6 +115,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 ### Task 4: Einsatz-Detailseiten umstellen
 
 **Files (je Ortspfad-Glied zur Liste `<Link to={…}>` → `<ListenRueckweg to={…}>`):**
+
 - `pages/PersonenDetailPage.tsx:864`, `pages/TiereDetailPage.tsx:518`, `pages/SchaedenDetailPage.tsx:394`, `pages/BetreuungsstelleDetailPage.tsx:702`, `pages/uhs/UhsDetailPage.tsx:381`, `pages/bereitstellungsraum/BrDetailPage.tsx:805`, `pages/EvakuierungsbezirkPage.tsx:185`, `pages/EinsatzkraftPage.tsx:513`, `pages/BefehlDetailPage.tsx:405`, `pages/EinheitDetailPage.tsx:540`, `pages/einheit/EinheitAufgeloestAnsicht.tsx:179`, `pages/LageberichtDetailPage.tsx:394`, `verpflegung/AusgabeAnsicht.tsx:399` (Zeilen Stand `alpha`, vor dem Bearbeiten neu suchen)
 - Test: `frontend/src/pages/PersonenDetailPage.rueckweg.test.tsx`
 
@@ -123,6 +130,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 ### Task 5: Unterseiten und Verwaltung umstellen
 
 **Files:**
+
 - Unterseiten: `pages/UnterkunftPlanenPage.tsx:212-213` (beide Glieder), `pages/PersonDruckPage.tsx:93`, `pages/AuftragDruckPage.tsx:93`, `pages/personen/AufnahmePage.tsx:182-184`, `verpflegung/TagAusVorlage.tsx:186`, `pages/EinheitAusVorlagePage.tsx:226`
 - Verwaltung (`pfad` von `AdminPage`): `stammdaten/FahrzeugDetailPage.tsx:150`, `stammdaten/PersonalDetailPage.tsx:144`, `stammdaten/EinheitVorlageDetailPage.tsx:312`, `planung/PlanungPage.tsx:106`, `pages/einstellungen/AnbindungAnsicht.tsx:207`
 
@@ -133,6 +141,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 ### Task 6: Regel und Wächter
 
 **Files:**
+
 - Modify: `frontend/AGENTS.md`, Abschnitt „Deeplink-Muster“ (neuer Punkt)
 - Optional Create: `frontend/src/components/ListenRueckweg.guard.test.ts`
 
@@ -144,6 +153,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 ### Task 7: e2e-Nachweis
 
 **Files:**
+
 - Create: `frontend/e2e/ortspfad-rueckweg.spec.ts`
 
 - [ ] **Step 1:** Spec nach dem Muster der Betroffenen-Specs (`anmeldenPerApi`, Seeding per `page.request`): Einsatz mit ≥ 30 Personen, Betroffene mit Suchbegriff/Spaltenfilter in der Adresse öffnen, eine Person öffnen, Ortspfad „Betroffene“ klicken → `expect(page).toHaveURL(/q=…/)` und Filter sichtbar. Zweiter Test: Detailseite direkt öffnen → Ortspfad führt auf die nackte Liste. Rollposition nur prüfen, wenn LLH-1826 (`RollWiederherstellung`) auf dem Branch liegt.
