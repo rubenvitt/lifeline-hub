@@ -80,9 +80,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
 - Modify: `frontend/src/pages/MitgliederAbschnitt.tsx` (beide Rollen-Selects mit `rollenOptionRender`; Spaltentitel „Rolle“ → `ROLLE_IM_EINSATZ_FELD`, „Rolle · Aktion“ → „Rolle im Einsatz · Aktion“; Filter nur `label`)
 - Test: `frontend/src/pages/MitgliederAbschnitt*.test.tsx`, `einsatzRolle.test.ts`
 
-- [ ] **Step 1: Test** — offene Rollenauswahl der Aufnahmezeile zeigt „liest nur“; an der letzten Einsatzleitung bleibt die Option „Beobachter“ `aria-disabled`; Filtermenü des Kopfs enthält „Beobachter“, aber kein „liest nur“; Spaltenkopf „Rolle im Einsatz“.
-- [ ] **Step 2: rot. Step 3: umsetzen. Step 4: grün** (bestehende Tests mit Kopf „Rolle“ umstellen).
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Test** — offene Rollenauswahl der Aufnahmezeile zeigt „liest nur“; an der letzten Einsatzleitung bleibt die Option „Beobachter“ `aria-disabled`; Filtermenü des Kopfs enthält „Beobachter“, aber kein „liest nur“; Spaltenkopf „Rolle im Einsatz“.
+- [x] **Step 2: rot. Step 3: umsetzen. Step 4: grün** (bestehende Tests mit Kopf „Rolle“ umstellen).
+- [x] **Step 5: Commit.**
 
 ### Task 4: Modulsperre
 

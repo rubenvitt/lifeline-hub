@@ -25,6 +25,8 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
+import { rollenOptionRender } from '../einsatz/rollenOption';
+import { ROLLE_IM_EINSATZ_FELD } from '../einsatz/rollenVokabular';
 import { anzahl } from '../anzeige/anzahl';
 
 /** Rang einer Einsatzrolle: kleiner ist stärker. Herabstufen heißt, der Rang wächst. */
@@ -306,6 +308,7 @@ export default function MitgliederAbschnitt({
           ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
           : EINSATZ_ROLLE_OPTIONEN
       }
+      optionRender={rollenOptionRender}
       onChange={(rolle) => rolleWaehlen(m, rolle)}
     />
   );
@@ -375,7 +378,8 @@ export default function MitgliederAbschnitt({
         },
         {
           // Rolle und Aktion teilen sich eine Spalte: zwei Zahlbreiten nebeneinander ließen dem
-          // Namen bei 390 px keine 90 px.
+          // Namen bei 390 px keine 90 px. Schmal bleibt „Rolle“ ohne „im Einsatz“: der Kopf hat die
+          // Zahlbreite der Spalte, und im Reiter „Zugriff“ ist keine andere Rolle gemeint (LLH-1818).
           title: darfVerwalten ? 'Rolle · Aktion' : 'Rolle',
           key: 'rolle',
           width: SCHMAL_ROLLE,
@@ -396,7 +400,12 @@ export default function MitgliederAbschnitt({
           sorter: stelleSortierung,
           render: (_, m) => fuehrungsstelle(m),
         },
-        { title: 'Rolle', key: 'rolle', ...rolleOrdnung, render: (_, m) => rolleFeld(m) },
+        {
+          title: ROLLE_IM_EINSATZ_FELD,
+          key: 'rolle',
+          ...rolleOrdnung,
+          render: (_, m) => rolleFeld(m),
+        },
         {
           // Beschriftet: eine namenlose Spalte ist für einen Screenreader eine Zelle ohne
           // Zugehörigkeit.
@@ -446,7 +455,9 @@ export default function MitgliederAbschnitt({
           <Select
             value={neueRolle}
             style={{ width: 170 }}
+            aria-label={ROLLE_IM_EINSATZ_FELD}
             options={EINSATZ_ROLLE_OPTIONEN}
+            optionRender={rollenOptionRender}
             onChange={setNeueRolle}
           />
           <Button

@@ -9,7 +9,7 @@ import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { einsatzKeys } from '../api/queryKeys';
 import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
-import { kopfFilterWaehlen } from '../test/kopfFilter';
+import { kopfFilterWaehlen, openKopfFilter } from '../test/kopfFilter';
 import { ort, Ortsfuehler } from '../test/ortsfuehler';
 import { setzeViewportBreite } from '../test/viewport';
 
@@ -472,9 +472,10 @@ describe('MitgliederAbschnitt', () => {
       expect(knopf).toBeDisabled();
       const grund = within(lea).getByText(LETZTE_EINSATZLEITUNG_TEXT);
       expect(knopf).toHaveAttribute('aria-describedby', grund.id);
-      expect(await rollenOption('Lea', 'Beobachter')).toHaveClass(
-        'ant-select-item-option-disabled',
-      );
+      const beobachter = await rollenOption('Lea', 'Beobachter');
+      expect(beobachter).toHaveClass('ant-select-item-option-disabled');
+      // Die Darf-Zeile steht auch an der gesperrten Option (LLH-1818).
+      expect(beobachter).toHaveTextContent('liest nur');
       // Das andere Mitglied bleibt frei.
       const eva = await zeile('Eva Einsatz');
       expect(within(eva).getByRole('button', { name: 'Entfernen' })).toBeEnabled();
@@ -839,7 +840,12 @@ describe('MitgliederAbschnitt · Sortieren und Filtern (LLH-1096)', () => {
     await waitFor(() =>
       expect(ort.aktuell).toBe('/einsaetze/7/einstellungen/zugriff?sort=name%3Aauf'),
     );
-    await kopfFilterWaehlen('Rolle', ['Einsatzleitung (1)']);
+    // Der Filter nennt nur die Namen, keine Darf-Zeile (LLH-1818).
+    const menue = await openKopfFilter('Rolle im Einsatz');
+    expect(menue).toHaveTextContent('Beobachter');
+    expect(menue).not.toHaveTextContent('liest nur');
+    await userEvent.keyboard('{Escape}');
+    await kopfFilterWaehlen('Rolle im Einsatz', ['Einsatzleitung (1)']);
     await waitFor(() => expect(folge()).toEqual(['3']));
     await waitFor(() =>
       expect(ort.aktuell).toBe(
