@@ -333,7 +333,7 @@ mod tests {
         let (status, body) = sende(r#"{kaputt"#, Some("application/json")).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let json: Value = serde_json::from_str(&body).expect("Body ist JSON");
-        assert!(json["error"].as_str().unwrap().contains("gültiges JSON"));
+        assert_eq!(json["error"], EINGABE_FORMAT_TEXT);
     }
 
     #[tokio::test]
@@ -366,7 +366,7 @@ mod tests {
         let (status, body) = sende(r#"{"name":"Probe","anzahl":1}"#, None).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let json: Value = serde_json::from_str(&body).expect("Body ist JSON");
-        assert!(json["error"].as_str().unwrap().contains("Content-Type"));
+        assert_eq!(json["error"], EINGABE_FORMAT_TEXT);
     }
 
     /// Ein Body über dem `DefaultBodyLimit` ist 413 im `{error}`-Format (LFH-1074).
@@ -696,9 +696,9 @@ mod tests {
         let (status, body) = hole("/t/abc/hallo").await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let json: Value = serde_json::from_str(&body).expect("Body ist JSON");
-        assert!(
-            json["error"].as_str().unwrap().contains("Pfad-Parameter"),
-            "deutsche Envelope-Meldung erwartet, war: {json}"
+        assert_eq!(
+            json["error"], PFAD_FORMAT_TEXT,
+            "neutrale Envelope-Meldung erwartet, war: {json}"
         );
     }
 }
