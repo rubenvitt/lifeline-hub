@@ -646,6 +646,23 @@ pub async fn save_faehigkeiten(
     save_rolle_mitarbeit(conn, kopplung_id, rolle_mitarbeit).await
 }
 
+/// Die Fähigkeit `rolle_mitarbeit` des Gegenübers, frisch aus der DB (LLH-1817, design.md D7).
+/// Liefern und Übernehmen lesen sie hier statt aus einer geladenen [`KopplungZeile`]: Ein
+/// Austausch, der die Zeile vor dem Wechsel geladen hat, verbrauchte sonst die einmalige
+/// Nachlieferung mit dem alten Wert.
+pub async fn load_gegenueber_rolle_mitarbeit(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+) -> Result<bool, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT gegenueber_rolle_mitarbeit FROM instanz_kopplung WHERE id = ?")
+            .bind(kopplung_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .unwrap_or(false),
+    )
+}
+
 /// Ob das Gegenüber die Einsatzrolle `mitarbeit` kennt (LLH-1817, design.md D7); die erreichte
 /// Seite ruft das mit der Anfrage, die meldende über [`save_faehigkeiten`] mit der Antwort. Lernt
 /// die Kopplung die Fähigkeit neu (0 → 1), gehen die Mitarbeiten, die das Gegenüber bisher als

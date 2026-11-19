@@ -195,7 +195,7 @@ fn auswahl_akten(mut alle: Vec<String>, runde: usize) -> Vec<String> {
 }
 
 /// Liefert die geführten Einsätze aller aktiven Orgs ab den genannten Ständen.
-async fn liefere_alle(
+pub(super) async fn liefere_alle(
     conn: &mut SqliteConnection,
     eigen: &Identitaet,
     kopplung: &KopplungZeile,
@@ -204,6 +204,11 @@ async fn liefere_alle(
     budget: &mut Budget,
 ) -> Result<Vec<super::paket::EinsatzLieferung>, AppError> {
     let meldend = uebersetzt(kopplung);
+    // Frisch in dieser Verbindung, nicht aus `kopplung` (LLH-1817, design.md D7): Hat eine
+    // Meldung die Fähigkeit seit dem Laden der Zeile gesetzt und die Mitarbeiten neu ins Log
+    // geschrieben, gingen sie sonst als `beobachter` hinaus, und die Nachlieferung wäre verbraucht.
+    let gegenueber_mitarbeit =
+        crate::instanz::repo::load_gegenueber_rolle_mitarbeit(conn, kopplung.id).await?;
     let mut lieferungen = Vec::new();
     let mut alle = Vec::new();
     for o in orgs {
@@ -222,7 +227,7 @@ async fn liefere_alle(
             kopplung_id: kopplung.id,
             kopplung_org_id: o.id,
             meldend,
-            gegenueber_mitarbeit: kopplung.gegenueber_rolle_mitarbeit,
+            gegenueber_mitarbeit,
         };
         let wire = org_wire(eigen, kopplung, o);
         let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
@@ -254,6 +259,9 @@ async fn uebernehme_alle(
     uebernommen: &mut Uebernommen,
 ) -> Result<Vec<EinsatzStand>, AppError> {
     let meldend = uebersetzt(kopplung);
+    // Frisch wie beim Liefern: Eine eben gemeldete echte Herabstufung gilt sofort.
+    let gegenueber_mitarbeit =
+        crate::instanz::repo::load_gegenueber_rolle_mitarbeit(conn, kopplung.id).await?;
     let mut staende = Vec::new();
     // Ein Gegenüber liefert nur Einsätze, die es selbst führt: ihre Kennung beginnt mit seiner.
     let praefix = format!("{}/", kopplung.gegenueber_kennung);
@@ -276,7 +284,7 @@ async fn uebernehme_alle(
             org_id: o.org_id,
             meldend,
             vor_ort: kopplung.art() == crate::instanz::InstanzKopplungArt::VorOrt,
-            gegenueber_mitarbeit: kopplung.gegenueber_rolle_mitarbeit,
+            gegenueber_mitarbeit,
         };
         let vorher: Option<i64> =
             sqlx::query_scalar("SELECT einsatz_id FROM einsatz_spiegel WHERE fremde_kennung = ?")

@@ -1700,3 +1700,47 @@ async fn zweites_melden_ohne_wechsel_liefert_nichts_nach() {
     );
     assert_eq!(abgleichen(&f, &s, 500).await, 0, "nichts nachgeliefert");
 }
+
+/// Ein Austausch, der seine Kopplung vor dem Wechsel geladen hat, darf die Nachlieferung nicht mit
+/// der alten Fähigkeit verbrauchen: Die Lieferung liest sie frisch (LLH-1817, design.md D7).
+#[tokio::test]
+async fn nachlieferung_nutzt_das_frische_flag() {
+    let (f, s) = zwei_seiten().await;
+    let (_, erika, _, _) = mitarbeit_beim_alten_spiegel(&f, &s).await;
+    let veraltet = crate::instanz::repo::load_kopplung(&f, 1).await.unwrap();
+    assert!(!veraltet.gegenueber_rolle_mitarbeit);
+    let mut fc = f.acquire().await.unwrap();
+    crate::instanz::repo::save_faehigkeiten(&mut fc, 1, false, false, true)
+        .await
+        .unwrap();
+    drop(fc);
+    let staende: Vec<(String, i64)> =
+        sqlx::query_as("SELECT fremde_kennung, stand FROM einsatz_spiegel")
+            .fetch_all(&s)
+            .await
+            .unwrap();
+    let staende: HashMap<String, i64> = staende.into_iter().collect();
+    let eigen = crate::instanz::identitaet::load_or_create(&f)
+        .await
+        .unwrap();
+    let mut fc = f.begin().await.unwrap();
+    let orgs = crate::instanz::repo::list_orgs_aktiv(&mut fc, 1)
+        .await
+        .unwrap();
+    let mut budget = Budget::neu(1024 * 1024);
+    let lieferungen =
+        super::abgleich::liefere_alle(&mut fc, &eigen, &veraltet, &orgs, &staende, &mut budget)
+            .await
+            .unwrap();
+    fc.commit().await.unwrap();
+    let rollen: Vec<String> = lieferungen
+        .iter()
+        .flat_map(|l| &l.zeilen)
+        .filter(|z| z.art == "einsatz_mitgliedschaft")
+        .filter_map(|z| {
+            let d = z.daten.as_ref()?;
+            (d["benutzer_id"].as_i64() == Some(erika)).then(|| d["einsatz_rolle"].to_string())
+        })
+        .collect();
+    assert_eq!(rollen, ["\"mitarbeit\""]);
+}
