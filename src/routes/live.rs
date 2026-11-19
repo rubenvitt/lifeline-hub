@@ -83,6 +83,19 @@ pub async fn stream(
     // Der Lagemonitor bekommt Sofortmeldungen als Signal ohne Inhalt (LLH-1743, D7).
     let lagemonitor = ctx.geraet.as_ref().map(|g| g.ansicht)
         == Some(crate::geraet::Funktionsansicht::Lagemonitor);
+    // Präsenz an Einzelangaben (LLH-1946, Entwurf D2): eigener Teilstrom am Ring vorbei, nie an
+    // ein Gerät. Abonniert vor dem Lesen des Stands, damit keine Änderung dazwischen verloren geht.
+    let praesenz_strom = match &ctx.geraet {
+        None => {
+            let rx = state.live.abonniere_praesenz();
+            futures::StreamExt::boxed(crate::routes::support::sse_praesenz_stream(
+                state.live.praesenz_stand(einsatz_id),
+                rx,
+                erlaubt.clone(),
+            ))
+        }
+        Some(_) => futures::StreamExt::boxed(futures::stream::empty()),
+    };
     let einsatz_strom =
         crate::routes::support::sse_stream_mit_replay(replay, rx, position, move |n| {
             n.fuer_verbindung(benutzer_id, &erlaubt, lagemonitor)
@@ -99,7 +112,7 @@ pub async fn stream(
     };
     // Das Lebenszeichen nach dem Filter: es erreicht jede Verbindung, auch ein Gerät (LLH-1935).
     let stream = strom::mit_heartbeat(
-        einsatz_strom.merge(org_strom),
+        einsatz_strom.merge(org_strom).merge(praesenz_strom),
         state.live.stroeme.heartbeat(),
     );
 

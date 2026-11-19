@@ -812,6 +812,42 @@ pub fn sse_org_stream(
     })
 }
 
+/// Präsenz eines Einsatzes für eine Verbindung (LLH-1946, Entwurf D2): ohne `id:` und ohne
+/// Replay, am Ring vorbei. Zuerst der Stand beim Verbinden (`start`, nur wenn er für diese
+/// Verbindung etwas zeigt), danach jeder geänderte Stand dieses Einsatzes, gefiltert je Eintrag
+/// über das Bezugsereignis ([`crate::live::praesenz::PraesenzStand::fuer`]). Ein leerer Stand geht
+/// nur hinaus, wenn der zuletzt gesendete nicht leer war; so erfährt die Verbindung von Änderungen,
+/// die sie nicht sehen darf, nichts. `Lagged` wird übersprungen: jeder Stand ist vollständig, der
+/// nächste ersetzt ihn.
+pub fn sse_praesenz_stream(
+    start: crate::live::praesenz::PraesenzStand,
+    rx: Receiver<crate::live::praesenz::PraesenzStand>,
+    erlaubt: std::collections::HashSet<&'static str>,
+) -> impl Stream<Item = Result<Event, Infallible>> {
+    let einsatz_id = start.einsatz_id;
+    let erster = start.fuer(&erlaubt);
+    let mut zuletzt_leer = erster.eintraege.is_empty();
+    let anfang: Option<Result<Event, Infallible>> =
+        (!zuletzt_leer).then(|| Ok(praesenz_ereignis(&erster)));
+    let rest = BroadcastStream::new(rx).filter_map(move |res| {
+        let stand = res.ok().filter(|s| s.einsatz_id == einsatz_id)?;
+        let sichtbar = stand.fuer(&erlaubt);
+        let leer = sichtbar.eintraege.is_empty();
+        if leer && zuletzt_leer {
+            return None;
+        }
+        zuletzt_leer = leer;
+        Some(Ok(praesenz_ereignis(&sichtbar)))
+    });
+    tokio_stream::iter(anfang).chain(rest)
+}
+
+fn praesenz_ereignis(stand: &crate::live::praesenz::PraesenzStand) -> Event {
+    Event::default()
+        .event(LiveEvent::Praesenz.as_str())
+        .data(serde_json::to_string(stand).unwrap_or_else(|_| "{}".into()))
+}
+
 /// Liest den `Last-Event-ID`-Request-Header (roh) für den Replay-Resync (F14/LFH-263).
 /// Der Browser sendet ihn beim EventSource-Auto-Reconnect automatisch mit.
 pub fn last_event_id(headers: &HeaderMap) -> Option<String> {

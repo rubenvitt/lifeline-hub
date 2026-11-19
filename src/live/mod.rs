@@ -63,6 +63,9 @@ wire_enum! {
         /// Benachrichtigungen eines `melden`-Aufrufs (LLH-1207, design.md D2): EINE Nachricht im
         /// Ring, je Verbindung nur mit der Nutzlast ihres Nutzers ([`LiveNachricht::empfaenger`]).
         Benachrichtigung => "benachrichtigung",
+        /// Wer gerade welche Einzelangabe bearbeitet (LLH-1946): der ganze sichtbare Stand eines
+        /// Einsatzes, am Ring vorbei und ohne `id:` (`praesenz`, `routes::live`).
+        Praesenz => "praesenz",
         Lagged => "lagged",
     }
 }
@@ -212,6 +215,12 @@ impl LiveEvent {
             // Empfänger niemanden ([`LiveEvent::braucht_empfaenger`]). Das Modulrecht am Bezug
             // prüft die Empfängerauflösung (`benachrichtigung::aufloesung`), nicht dieses Gate.
             LiveEvent::Benachrichtigung => &[],
+            // Präsenz (LLH-1946, Entwurf D2): ungegatet als Variante, weil das Gate je EINTRAG
+            // greift. Jeder Eintrag teilt das Gate seines Bezugsereignisses
+            // (`praesenz::PraesenzObjekt::bezug`: Einsatz und Führungsstelle wie `einsatz`, eine
+            // Einheit wie `einheit`); `PraesenzStand::fuer` filtert je Verbindung. Läuft nie durch
+            // den Ring, nur über den eigenen Präsenz-Broadcast.
+            LiveEvent::Praesenz => &[],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.
             LiveEvent::Lagged => &[],
@@ -1016,7 +1025,13 @@ mod tests {
         ungegatet.sort_unstable();
         assert_eq!(
             ungegatet,
-            vec!["benachrichtigung", "einsatz", "lagged", "mitglieder"]
+            vec![
+                "benachrichtigung",
+                "einsatz",
+                "lagged",
+                "mitglieder",
+                "praesenz"
+            ]
         );
         let mit_empfaengern: Vec<&str> = LiveEvent::ALLE
             .iter()
@@ -1162,6 +1177,8 @@ mod tests {
             (LiveEvent::Mitglieder, &[]),
             // Empfängerfilter statt Modul-Gate (LLH-1207, Begründung an der Variante).
             (LiveEvent::Benachrichtigung, &[]),
+            // Gate je Eintrag über das Bezugsereignis (LLH-1946, Begründung an der Variante).
+            (LiveEvent::Praesenz, &[]),
             (LiveEvent::Lagged, &[]),
         ];
         for (ev, keys) in erwartet {

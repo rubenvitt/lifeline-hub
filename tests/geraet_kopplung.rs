@@ -9225,3 +9225,40 @@ async fn laptop_rueckgaengig_nach_abziehen_nennt_die_andere_uhs() {
     let (s, _) = anfrage(&app, "PUT", &kraft(nord, ""), &geraet, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
+
+/// Geräte bleiben still (LLH-1946, Entwurf D2): ein Gerätestrom bekommt keine Präsenz, auch
+/// nicht den Stand beim Verbinden; die Personensitzung daneben schon (Positivkontrolle).
+#[tokio::test]
+async fn geraetestrom_bekommt_keine_praesenz() {
+    use lifeline_hub::live::praesenz::{PraesenzEintrag, PraesenzObjekt};
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, eid, "BHP 1").await;
+    let (_, geraet) = tablet(&app, &admin, eid, uhs).await;
+    live.praesenz_setzen(
+        eid,
+        PraesenzEintrag {
+            objekt: PraesenzObjekt::Einsatz,
+            einheit_id: None,
+            felder: vec!["stichwort".into()],
+            benutzer_id: 1,
+            von: "Anna".into(),
+            fenster: "f1".into(),
+        },
+    )
+    .unwrap();
+
+    let mut ereignisse = Vec::new();
+    let mut body = live_geraet(&app, &geraet, eid).await;
+    strom_lesen(&mut body, &mut ereignisse, Duration::from_millis(400)).await;
+    assert!(
+        !ereignisse.iter().any(|e| e == "praesenz"),
+        "{ereignisse:?}"
+    );
+
+    let mut ereignisse = Vec::new();
+    let mut body = live_geraet(&app, &admin, eid).await;
+    strom_lesen(&mut body, &mut ereignisse, Duration::from_millis(400)).await;
+    assert!(ereignisse.iter().any(|e| e == "praesenz"), "{ereignisse:?}");
+}
