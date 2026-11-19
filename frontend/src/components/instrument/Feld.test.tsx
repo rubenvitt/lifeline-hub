@@ -143,3 +143,23 @@ describe('Feld: Punkt am geänderten Feld (LLH-1829)', () => {
     expect(screen.queryByText('•')).toBeNull();
   });
 });
+
+describe('Feld: Prüfmeldung nennt das Etikett (LLH-1829, Review)', () => {
+  it('eine Pflichtregel ohne eigene Meldung nennt das Etikett, nicht den Feldnamen', async () => {
+    renderMitProviders(
+      <Form>
+        <Feld name="kategorie" label="Kategorie" rules={[{ required: true }]}>
+          <Input />
+        </Feld>
+        <Button htmlType="submit">Senden</Button>
+      </Form>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() =>
+      expect(document.querySelector('.ant-form-item-explain-error')).not.toBeNull(),
+    );
+    const meldung = document.querySelector('.ant-form-item-explain-error')!;
+    expect(meldung).toHaveTextContent('Kategorie');
+    expect(meldung).not.toHaveTextContent('kategorie');
+  });
+});

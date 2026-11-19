@@ -72,6 +72,11 @@ function istSchlichtesObjekt(wert: unknown): wert is Werte {
  * Pfaden (`['kategorien', k, 'rechtsgrundlage']`) nur das geänderte Feld den Punkt.
  */
 function sammlePfade(a: unknown, b: unknown, pfad: string[], ziel: Set<string>): void {
+  // Eine Gruppe, die auf einer Seite fehlt, gilt dort als leer: sonst zählte ein getipptes und
+  // wieder geleertes Feld einer im Ausgangsstand fehlenden Gruppe als Änderung ohne Punkt.
+  const leer = (w: unknown) => w === undefined || w === null;
+  if (istSchlichtesObjekt(a) && leer(b)) return sammlePfade(a, {}, pfad, ziel);
+  if (leer(a) && istSchlichtesObjekt(b)) return sammlePfade({}, b, pfad, ziel);
   if (istSchlichtesObjekt(a) && istSchlichtesObjekt(b)) {
     for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
       sammlePfade(a[k], b[k], [...pfad, k], ziel);
@@ -156,11 +161,17 @@ export function useAenderungsstandMerke(): (werte: object) => void {
 export function useAenderungsstandMerken(): {
   merkeRef: RefObject<Merken | null>;
   merke: Merken;
+  /**
+   * `merke` des Formulars, das JETZT steht. Beim Absenden binden, wenn die Seite per `key={id}`
+   * den Datensatz wechseln kann: ein spätes Erfolgs-Callback träfe sonst den neuen Datensatz.
+   */
+  binde: () => Merken;
 } {
   const merkeRef = useRef<Merken | null>(null);
   const merke = useCallback((werte: object) => merkeRef.current?.(werte), []);
+  const binde = useCallback((): Merken => merkeRef.current ?? KEIN_MERKEN, []);
   // Stabil, damit `stand` in Effekt-Abhängigkeiten stehen darf.
-  return useMemo(() => ({ merkeRef, merke }), [merke]);
+  return useMemo(() => ({ merkeRef, merke, binde }), [merke, binde]);
 }
 
 /**

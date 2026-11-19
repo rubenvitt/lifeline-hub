@@ -55,7 +55,7 @@ function Formular({
   );
 }
 
-function tippe(etikett: string, wert: string) {
+function tippe(etikett: string | RegExp, wert: string) {
   fireEvent.change(screen.getByLabelText(etikett), { target: { value: wert } });
 }
 
@@ -187,7 +187,9 @@ describe('aenderungsstand: verschachtelte Feldnamen (LLH-1829)', () => {
     const a = useFeldGeaendert(['kategorien', 'x', 'dauer']);
     const b = useFeldGeaendert(['kategorien', 'x', 'grund']);
     const anzahl = useAenderungsanzahl();
-    return <output data-testid="nest">{`a:${String(a)} b:${String(b)} n:${String(anzahl)}`}</output>;
+    return (
+      <output data-testid="nest">{`a:${String(a)} b:${String(b)} n:${String(anzahl)}`}</output>
+    );
   }
   const ausgang = { kategorien: { x: { dauer: 10, grund: 'G' } } };
 
@@ -207,5 +209,51 @@ describe('aenderungsstand: verschachtelte Feldnamen (LLH-1829)', () => {
     );
     tippe('Grund', 'H');
     expect(await screen.findByText('a:false b:true n:1')).toBeInTheDocument();
+  });
+});
+
+describe('aenderungsstand: Befunde des Reviews (LLH-1829)', () => {
+  it('eine im Ausgangsstand fehlende Gruppe, deren Feld getippt und wieder geleert wird, zählt nicht', async () => {
+    function Zaehler() {
+      return <output data-testid="z">{`n:${String(useAenderungsanzahl())}`}</output>;
+    }
+    renderMitProviders(
+      <Form initialValues={{}}>
+        <AenderungsstandProvider ausgangswerte={{}}>
+          <Form.Item name={['kategorien', 'x', 'dauer']} label="Dauer">
+            <Input />
+          </Form.Item>
+          <Zaehler />
+        </AenderungsstandProvider>
+      </Form>,
+    );
+    tippe('Dauer', '5');
+    await screen.findByText('n:1');
+    tippe(/^Dauer/, '');
+    expect(await screen.findByText('n:0')).toBeInTheDocument();
+  });
+
+  it('ein vor dem Datensatzwechsel gebundenes merke wirkt nicht auf den neuen Datensatz', async () => {
+    let gebunden: ((w: object) => void) | null = null;
+    function Seite({ id }: { id: number }) {
+      const stand = useAenderungsstandMerken();
+      gebunden ??= stand.binde();
+      return (
+        <Form key={id} initialValues={{ name: `N${id}` }}>
+          <AenderungsstandProvider ausgangswerte={{ name: `N${id}` }} merkeRef={stand.merkeRef}>
+            <Form.Item name="name" label="Name">
+              <Input />
+            </Form.Item>
+            <Anzeige />
+          </AenderungsstandProvider>
+        </Form>
+      );
+    }
+    const { rerender } = renderMitProviders(<Seite id={1} />);
+    await screen.findByText('name:false ort:false anzahl:0');
+    rerender(<Seite id={2} />);
+    await screen.findByLabelText('Name');
+    act(() => gebunden!({ name: 'ANDERS', ort: 'Z' }));
+    expect(await screen.findByText('name:false ort:false anzahl:0')).toBeInTheDocument();
   });
 });

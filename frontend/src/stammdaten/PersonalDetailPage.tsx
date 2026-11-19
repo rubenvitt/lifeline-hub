@@ -182,10 +182,13 @@ export default function PersonalDetailPage() {
           initialValues={zuFormWerten(person)}
           onFinish={(werte) => {
             const fassung = schutz.fassung();
+            // An DIESEN Datensatz gebunden: ein Wechsel per `key={id}` während des Speicherns
+            // trägt sonst die Werte des vorigen in den Ausgangsstand des neuen (LLH-1829).
+            const merke = stand.binde();
             speichern.mutate(werte, {
               onSuccess: () => {
                 schutz.gespeichert(fassung);
-                stand.merke(werte);
+                merke(werte);
               },
             });
           }}

@@ -35,12 +35,18 @@ export default function Feld<Values = unknown>({
   breite = 'voll',
   className,
   label,
+  messageVariables,
   ...props
 }: FeldProps<Values>) {
   const grenze = FELDBREITE[breite];
   return (
     <Form.Item<Values>
       {...props}
+      // Das Etikett ist unten ein Fragment; antd setzte `${label}` in Prüfmeldungen sonst aus dem
+      // Feldnamen. Ein Text-Etikett geht deshalb ausdrücklich mit (LLH-1829, Review).
+      messageVariables={
+        typeof label === 'string' ? { label, ...messageVariables } : messageVariables
+      }
       // Ein geändertes Feld trägt den Punkt am Etikett (LLH-1829); ohne Etikett kein Punkt.
       label={
         label === undefined ? undefined : (
