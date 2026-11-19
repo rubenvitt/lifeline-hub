@@ -142,6 +142,14 @@ describe('PersonDruckPage', () => {
     }
   });
 
+  it('druckt eine Person ohne Status mit „unbekannt“, statt abzustürzen (LLH-1957)', async () => {
+    const { status: _ohne, ...ohneStatus } = person();
+    renderPage(() => HttpResponse.json(ohneStatus));
+    await fertig();
+    const dt = within(wurzel()).getByText('Status', { selector: 'dt' });
+    expect(dt.nextElementSibling).toHaveTextContent('unbekannt');
+  });
+
   it('druckt den Verbleib mit den Angaben aus LLH-1568 (Spec `verbleib-angaben`)', async () => {
     const verbleib = (teil: Record<string, unknown>) => ({
       einsatz_id: 5,
