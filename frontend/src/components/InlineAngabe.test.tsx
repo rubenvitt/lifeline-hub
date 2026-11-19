@@ -13,6 +13,7 @@ import { verschachtelteZiele } from '../test/verschachtelteZiele';
 import { ApiError } from '../api/client';
 import { InlineAngabe, OFFEN_LASSEN, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
 import { AngabeFormProvider } from './angabeForm';
+import { Select } from './Select';
 import React from 'react';
 
 /**
@@ -997,7 +998,7 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
     );
   });
 
-  it('Escape verwirft, ein Klick außerhalb schließt nicht', async () => {
+  it('Escape verwirft, ein Klick außerhalb schließt ein geändertes Feld nicht (LLH-1829)', async () => {
     const onSpeichern = vi.fn();
     renderMitProviders(
       <>
@@ -1009,6 +1010,7 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
       screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
     );
     const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    await userEvent.type(feld, 'x');
     await userEvent.click(screen.getByRole('button', { name: 'daneben' }));
     expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeInTheDocument();
     feld.focus();
@@ -1228,5 +1230,119 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
     );
     const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
     expect(screen.getByTestId('zelle-a')).toContainElement(feld);
+  });
+});
+
+describe('InlineAngabe · Nicht gespeichert (LLH-1829)', () => {
+  const HINWEIS = 'Nicht gespeichert — Enter speichert, Esc verwirft';
+
+  async function oeffne() {
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    return screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+  }
+
+  it('zeigt nach der ersten Änderung den Hinweis, vorher nicht', async () => {
+    renderMitProviders(<TextAngabe wert="ILS-1" />);
+    const feld = await oeffne();
+    expect(screen.queryByText(HINWEIS)).toBeNull();
+    await userEvent.type(feld, 'x');
+    expect(screen.getByText(HINWEIS)).toBeInTheDocument();
+  });
+
+  it('mehrzeilig nennt Strg+Enter', async () => {
+    renderMitProviders(
+      <TextAngabe
+        wert="ILS-1"
+        mehrzeilig
+        eingabe={({ feld, value, onChange }) => (
+          <Input.TextArea {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
+        )}
+      />,
+    );
+    const feld = await oeffne();
+    await userEvent.type(feld, 'x');
+    expect(
+      screen.getByText('Nicht gespeichert — Strg+Enter speichert, Esc verwirft'),
+    ).toBeInTheDocument();
+  });
+
+  it('gesperrt mit Entwurf nennt nur „Nicht gespeichert“', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
+    const feld = await oeffne();
+    await userEvent.type(feld, 'x');
+    rerender(<TextAngabe wert="ILS-1" gesperrt="Ohne Verbindung nicht änderbar" />);
+    expect(await screen.findByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(screen.queryByText(HINWEIS)).toBeNull();
+  });
+
+  it('Klick daneben schließt ein unverändertes Feld still', async () => {
+    const onSpeichern = vi.fn();
+    renderMitProviders(
+      <>
+        <TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />
+        <button type="button">daneben</button>
+      </>,
+    );
+    await oeffne();
+    await userEvent.click(screen.getByRole('button', { name: 'daneben' }));
+    await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
+    expect(onSpeichern).not.toHaveBeenCalled();
+  });
+
+  it('Klick daneben lässt ein geändertes Feld offen', async () => {
+    renderMitProviders(
+      <>
+        <TextAngabe wert="ILS-1" />
+        <button type="button">daneben</button>
+      </>,
+    );
+    const feld = await oeffne();
+    await userEvent.type(feld, 'x');
+    await userEvent.click(screen.getByRole('button', { name: 'daneben' }));
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('ILS-1x');
+    expect(screen.getByText(HINWEIS)).toBeInTheDocument();
+  });
+
+  it('Klick in die geöffnete Auswahlliste zählt als innen', async () => {
+    renderMitProviders(
+      <TextAngabe
+        wert="a"
+        anzeige="A"
+        eingabe={({ feld, value, onChange, popup }) => (
+          <Select
+            {...feld}
+            {...popup}
+            open
+            value={value}
+            onChange={(w) => onChange(w as string)}
+            options={[
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ]}
+          />
+        )}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    const option = await screen.findByTitle('B');
+    fireEvent.pointerDown(option);
+    expect(screen.getByRole('combobox', { name: 'Leitstellen-Nr.' })).toBeInTheDocument();
+  });
+
+  it('schwebend: Klick daneben schließt das unveränderte Popover', async () => {
+    renderMitProviders(
+      <>
+        <AngabeFormProvider form="schwebend">
+          <TextAngabe wert="ILS-1" />
+        </AngabeFormProvider>
+        <button type="button">daneben</button>
+      </>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await screen.findByRole('textbox', { name: 'Leitstellen-Nr.' });
+    await userEvent.click(screen.getByRole('button', { name: 'daneben' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr.' })).toBeNull(),
+    );
   });
 });
