@@ -5,6 +5,11 @@ import { describe, expect, it } from 'vitest';
 import {
   WIEDEREROEFFNEN_STUNDEN,
   darfBeantragen,
+  darfErfassungBeantragen,
+  darfImEinsatzErfassen,
+  darfMeldungKorrigieren,
+  darfNachreichenVerwerfen,
+  istMitarbeit,
   darfEinsatzWiedereroeffnen,
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
@@ -64,6 +69,74 @@ describe('darfImEinsatzSchreiben', () => {
   it('ist fail-closed bei fehlendem Einsatz', () => {
     expect(darfImEinsatzSchreiben(undefined)).toBe(false);
     expect(darfImEinsatzSchreiben(null)).toBe(false);
+  });
+});
+
+// Einsatzrolle Mitarbeit (LLH-1817): erfasst, ändert sonst nichts.
+describe('Mitarbeit (LLH-1817)', () => {
+  const spiegel = {
+    gegenstelle: 'ELW 1',
+    beendet: false,
+    antraege_ausstehend: 0,
+    antraege_abgelehnt: 0,
+    bruchstelle: 0,
+  };
+  const spiegelBeendet = { ...spiegel, beendet: true };
+  const rollen = ['einsatzleitung', 'fuehrungspersonal', 'mitarbeit', 'beobachter', null] as const;
+  const erfasst = (r: (typeof rollen)[number]) =>
+    r === 'einsatzleitung' || r === 'fuehrungspersonal' || r === 'mitarbeit';
+  const schreibt = (r: (typeof rollen)[number]) =>
+    r === 'einsatzleitung' || r === 'fuehrungspersonal';
+
+  it.each(rollen)(
+    'Rolle %s: Wahrheitstabelle für aktiv, abgeschlossen, Spiegel, Spiegel beendet',
+    (r) => {
+      expect(darfImEinsatzErfassen({ ...aktiv, meine_rolle: r })).toBe(erfasst(r));
+      expect(darfImEinsatzErfassen({ ...zu, meine_rolle: r })).toBe(false);
+      expect(darfImEinsatzErfassen({ ...aktiv, meine_rolle: r, spiegel })).toBe(false);
+      expect(darfImEinsatzErfassen({ ...aktiv, meine_rolle: r, spiegel: spiegelBeendet })).toBe(
+        false,
+      );
+
+      expect(darfErfassungBeantragen({ ...aktiv, meine_rolle: r })).toBe(erfasst(r));
+      expect(darfErfassungBeantragen({ ...zu, meine_rolle: r })).toBe(false);
+      expect(darfErfassungBeantragen({ ...aktiv, meine_rolle: r, spiegel })).toBe(erfasst(r));
+      expect(darfErfassungBeantragen({ ...aktiv, meine_rolle: r, spiegel: spiegelBeendet })).toBe(
+        false,
+      );
+
+      // Die engeren Gates bleiben für Mitarbeit zu.
+      expect(darfImEinsatzSchreiben({ ...aktiv, meine_rolle: r })).toBe(schreibt(r));
+      expect(darfBeantragen({ ...aktiv, meine_rolle: r, spiegel })).toBe(schreibt(r));
+      expect(darfNachreichenVerwerfen({ ...aktiv, meine_rolle: r })).toBe(schreibt(r));
+    },
+  );
+
+  it('erkennt Mitarbeit nur an der Rolle', () => {
+    expect(istMitarbeit({ ...aktiv, meine_rolle: 'mitarbeit' })).toBe(true);
+    expect(istMitarbeit({ ...aktiv, meine_rolle: 'fuehrungspersonal' })).toBe(false);
+    expect(istMitarbeit(undefined)).toBe(false);
+  });
+
+  it('korrigiert eine Meldung nur an der eigenen, die weder in der Lage steht noch Lagemeldung ist', () => {
+    const e = { ...aktiv, meine_rolle: 'mitarbeit' as const };
+    const eigene = { erfasst_von_id: 5, lagerelevant: false, meldungsart: 'anfrage' as const };
+    expect(darfMeldungKorrigieren(e, eigene, 5)).toBe(true);
+    expect(darfMeldungKorrigieren(e, eigene, 6)).toBe(false);
+    expect(darfMeldungKorrigieren(e, eigene, undefined)).toBe(false);
+    expect(darfMeldungKorrigieren(e, { ...eigene, lagerelevant: true }, 5)).toBe(false);
+    expect(darfMeldungKorrigieren(e, { ...eigene, meldungsart: 'lagemeldung' }, 5)).toBe(false);
+    expect(darfMeldungKorrigieren({ ...zu, meine_rolle: 'mitarbeit' }, eigene, 5)).toBe(false);
+    expect(darfMeldungKorrigieren({ ...e, spiegel }, eigene, 5)).toBe(false);
+    expect(darfMeldungKorrigieren({ ...aktiv, meine_rolle: 'beobachter' }, eigene, 5)).toBe(false);
+    // Wer schreiben darf, korrigiert jede.
+    const el = { ...aktiv, meine_rolle: 'einsatzleitung' as const };
+    expect(darfMeldungKorrigieren(el, { ...eigene, lagerelevant: true }, 6)).toBe(true);
+  });
+
+  it('ist fail-closed bei fehlendem Einsatz', () => {
+    expect(darfImEinsatzErfassen(undefined)).toBe(false);
+    expect(darfErfassungBeantragen(null)).toBe(false);
   });
 });
 

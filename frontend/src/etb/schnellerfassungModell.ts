@@ -130,19 +130,24 @@ interface SlashTreffer {
 /** Die Typen, die ein `/` am Zeilenanfang setzen kann — genau die erfassbaren. */
 export const TYP_BEFEHLE: readonly EtbTyp[] = ['meldung', 'anordnung', 'entscheidung', 'lage'];
 
+/** Die Typen der Mitarbeit (LLH-1817): Meldung und Lage; Anordnung und Entscheidung führt sie nicht. */
+export const TYP_BEFEHLE_MITARBEIT: readonly EtbTyp[] = ['meldung', 'lage'];
+
 export function filterSlashEintraege(
   filter: string,
   bausteine: EtbBaustein[],
   gesetzteFelder: MetaFeld[],
-  optionen: { typen?: boolean } = {},
+  optionen: { typen?: boolean; erlaubteTypen?: readonly EtbTyp[] } = {},
 ): SlashTreffer {
   const f = filter.trim().toLowerCase();
   const typen: SlashEintrag[] = optionen.typen
-    ? TYP_BEFEHLE.filter((t) => f === '' || t.includes(f)).map((t) => ({
-        art: 'typ',
-        key: t,
-        label: `/${t}`,
-      }))
+    ? (optionen.erlaubteTypen ?? TYP_BEFEHLE)
+        .filter((t) => f === '' || t.includes(f))
+        .map((t) => ({
+          art: 'typ',
+          key: t,
+          label: `/${t}`,
+        }))
     : [];
   const felder: SlashEintrag[] = METADATEN_FELDER.filter(
     (def) =>
@@ -247,11 +252,14 @@ export function zukunftsVerstoss(metadaten: MetadatenWerte, jetzt: dayjs.Dayjs):
  * den Text ohne den Befehl, sonst `null`. Nur exakte Typwörter: `/lagebericht` ist kein
  * Befehl und bleibt Text.
  */
-export function erkenneTypBefehl(text: string): { typ: EtbTyp; rest: string } | null {
+export function erkenneTypBefehl(
+  text: string,
+  erlaubteTypen: readonly EtbTyp[] = TYP_BEFEHLE,
+): { typ: EtbTyp; rest: string } | null {
   const treffer = /^\/([a-zäöü]+)\s/.exec(text);
   if (!treffer) return null;
   const typ = treffer[1] as EtbTyp;
-  if (!TYP_BEFEHLE.includes(typ)) return null;
+  if (!erlaubteTypen.includes(typ)) return null;
   return { typ, rest: text.slice(treffer[0].length) };
 }
 

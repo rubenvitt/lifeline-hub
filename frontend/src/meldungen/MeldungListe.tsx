@@ -17,6 +17,10 @@ interface MeldungListeProps {
   /** Einsatz-id für den Backlink auf den ausgelösten Auftrag (`/einsaetze/:id/auftraege`). */
   einsatzId: number;
   darfSchreiben?: boolean;
+  /** „Bearbeiten“ je Meldung (Mitarbeit korrigiert nur Eigenes, LLH-1817); ohne: `darfSchreiben`. */
+  darfKorrigieren?: (m: Meldung) => boolean;
+  /** Die Korrektur bietet keine Meldungsart „Lagemeldung“ an (Mitarbeit, LLH-1817). */
+  ohneLagemeldungsart?: boolean;
   mitglieder?: BearbeiterOption[];
   /** Hervorzuhebende Meldung (?meldung=-Deeplink). */
   highlightId?: number | null;
@@ -55,6 +59,8 @@ export default function MeldungListe({
   ansicht = 'offen',
   einsatzId,
   darfSchreiben,
+  darfKorrigieren,
+  ohneLagemeldungsart,
   mitglieder,
   highlightId,
   onStatus,
@@ -82,6 +88,8 @@ export default function MeldungListe({
           ansicht={ansicht}
           einsatzId={einsatzId}
           darfSchreiben={darfSchreiben}
+          darfKorrigieren={darfKorrigieren ? darfKorrigieren(m) : darfSchreiben}
+          ohneLagemeldungsart={ohneLagemeldungsart}
           mitglieder={mitglieder}
           hervorgehoben={m.id === highlightId}
           onStatus={onStatus}

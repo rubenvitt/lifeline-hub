@@ -733,6 +733,50 @@ describe('ChatPage', () => {
  * LFH-976: Unter `md` ersetzt die Kanal-Leiste die `KanalListe` — und damit deren Kopfaktion.
  * Der Knopf daneben öffnet denselben Dialog; ohne Schreibrecht fehlt er wie ab `md`.
  */
+describe('ChatPage — Mitarbeit (LLH-1817)', () => {
+  function setupMitarbeit(nachrichten: ChatNachricht[]) {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: 'mitarbeit' }),
+      ),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+      </Routes>,
+      { route: '/einsaetze/7/chat' },
+    );
+  }
+
+  it('zeigt die Eingabe, aber keinen „Kanal anlegen“', async () => {
+    setupMitarbeit([nachricht]);
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Nachricht…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
+  });
+
+  it('bietet an der eigenen Nachricht nur Bearbeiten und Löschen, nicht Heraufstufen und Bezug', async () => {
+    setupMitarbeit([nachricht]);
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen zu Nachricht von / }));
+    expect(await screen.findByRole('menuitem', { name: 'Bearbeiten' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Löschen' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Zu ETB/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Zu Auftrag/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Bezug/ })).not.toBeInTheDocument();
+  });
+
+  it('bietet an einer fremden Nachricht keine Aktion', async () => {
+    setupMitarbeit([{ ...nachricht, autor_id: 99, autor_name: 'Fremd' }]);
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Nachricht von / })).toBeNull();
+  });
+});
+
 describe('ChatPage — Kanal anlegen unter md (LFH-976)', () => {
   function setupSchmal(meineRolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung') {
     const kanaele: ChatKanal[] = [kanal];

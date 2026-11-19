@@ -12,6 +12,14 @@ export const EINSATZ_ROLLE_LABELS: Record<EinsatzRolle, string> = {
   beobachter: 'Beobachter',
 };
 
+/**
+ * Zweite Zeile einer Rolle in der Rollenwahl (LLH-1817): nur die Mitarbeit braucht sie, denn ihr
+ * Name sagt nicht, dass sie erfasst und sonst nichts ändert.
+ */
+export const EINSATZ_ROLLE_BESCHREIBUNG: Partial<Record<EinsatzRolle, string>> = {
+  mitarbeit: 'Erfasst Meldungen, Chat und ETB-Einträge, ändert sonst nichts.',
+};
+
 /** Die Rollen als `Select`-Optionen, in der Reihenfolge des `Record`. */
 export const EINSATZ_ROLLE_OPTIONEN = (Object.keys(EINSATZ_ROLLE_LABELS) as EinsatzRolle[]).map(
   (k) => ({ value: k, label: EINSATZ_ROLLE_LABELS[k] }),

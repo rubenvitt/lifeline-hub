@@ -24,7 +24,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
-import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
+import { EINSATZ_ROLLE_BESCHREIBUNG, EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
 import { anzahl } from '../anzeige/anzahl';
 
 /** Rang einer Einsatzrolle: kleiner ist stärker. Herabstufen heißt, der Rang wächst. */
@@ -34,6 +34,19 @@ const RANG: Record<EinsatzRolle, number> = {
   mitarbeit: 2,
   beobachter: 3,
 };
+
+/** Eine Rolle in der Auswahl: ihr Name, bei Mitarbeit darunter, was sie darf (LLH-1817). */
+function rolleOption(option: { value?: string | number | null; label?: unknown }) {
+  const beschreibung = EINSATZ_ROLLE_BESCHREIBUNG[option.value as EinsatzRolle];
+  return (
+    <div>
+      <div>{option.label as string}</div>
+      {beschreibung && (
+        <div style={{ fontSize: 12, whiteSpace: 'normal', opacity: 0.75 }}>{beschreibung}</div>
+      )}
+    </div>
+  );
+}
 
 /** Eine gewählte, noch nicht bestätigte Herabstufung der eigenen Rolle (LFH-966). */
 type Herabstufung = { benutzerId: number; rolle: EinsatzRolle };
@@ -307,6 +320,8 @@ export default function MitgliederAbschnitt({
           ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
           : EINSATZ_ROLLE_OPTIONEN
       }
+      optionRender={rolleOption}
+      popupMatchSelectWidth={280}
       onChange={(rolle) => rolleWaehlen(m, rolle)}
     />
   );
@@ -448,6 +463,8 @@ export default function MitgliederAbschnitt({
             value={neueRolle}
             style={{ width: 170 }}
             options={EINSATZ_ROLLE_OPTIONEN}
+            optionRender={rolleOption}
+            popupMatchSelectWidth={280}
             onChange={setNeueRolle}
           />
           <Button

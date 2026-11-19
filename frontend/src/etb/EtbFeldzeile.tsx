@@ -52,10 +52,12 @@ export function TypKnopf({
   typ,
   gesperrt,
   onTyp,
+  typen = TYPEN,
 }: {
   typ: EtbTyp;
   gesperrt: boolean;
   onTyp: (typ: EtbTyp) => void;
+  typen?: readonly EtbTyp[];
 }) {
   const { token } = useRollen();
   const farbe = etbTypFarbe(typ, token);
@@ -65,7 +67,7 @@ export function TypKnopf({
       autoFocus
       disabled={gesperrt}
       menu={{
-        items: TYPEN.map((t) => ({
+        items: typen.map((t) => ({
           key: t,
           label: (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
@@ -251,6 +253,8 @@ export interface EtbFeldzeileProps {
   /** `null` in der Berichtigung: der Typ ist dort fest. */
   typ: EtbTyp | null;
   onTyp: (typ: EtbTyp) => void;
+  /** Die wählbaren Typen (Mitarbeit: Meldung und Lage, LLH-1817); fehlt: alle vier. */
+  typen?: readonly EtbTyp[];
   metadaten: MetadatenWerte;
   wirksam: MetadatenWerte;
   ausVorgabe: (feld: 'von' | 'an') => boolean;
@@ -286,6 +290,7 @@ export interface EtbFeldzeileProps {
 export default function EtbFeldzeile({
   typ,
   onTyp,
+  typen = TYPEN,
   metadaten,
   wirksam,
   ausVorgabe,
@@ -432,7 +437,7 @@ export default function EtbFeldzeile({
           columnGap: token.marginSM,
         }}
       >
-        {typ != null && <TypKnopf typ={typ} gesperrt={gesperrt} onTyp={onTyp} />}
+        {typ != null && <TypKnopf typ={typ} gesperrt={gesperrt} onTyp={onTyp} typen={typen} />}
         {zeit}
         {partei('von')}
         {partei('an')}
@@ -461,7 +466,7 @@ export default function EtbFeldzeile({
           onWechsel={(t) => {
             if (!gesperrt) onTyp(t);
           }}
-          optionen={TYPEN.map((t) => {
+          optionen={typen.map((t) => {
             const farbe = etbTypFarbe(t, token);
             return {
               wert: t,

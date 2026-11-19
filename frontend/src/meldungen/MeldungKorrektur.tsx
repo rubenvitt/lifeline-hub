@@ -12,7 +12,12 @@ import type {
   Richtung,
 } from '../api/types';
 import { Select } from '../components/Select';
-import { MELDUNGSART_OPTIONEN, PRIORITAET_OPTIONEN, RICHTUNG_OPTIONEN } from './MeldungFormular';
+import {
+  MELDUNGSART_OPTIONEN,
+  PRIORITAET_OPTIONEN,
+  RICHTUNG_OPTIONEN,
+  ohneLagemeldung,
+} from './MeldungFormular';
 import {
   istLeer,
   korrekturAenderung,
@@ -62,6 +67,8 @@ interface Props {
   onSpeichern: (aenderung: MeldungKorrekturPatch) => Promise<unknown>;
   /** Gespeichert, ohne Änderung bestätigt oder abgebrochen: die Karte schließt die Bearbeitung. */
   onFertig: () => void;
+  /** Keine Meldungsart „Lagemeldung“ zur Wahl (Mitarbeit, LLH-1817). */
+  ohneLagemeldungsart?: boolean;
 }
 
 /**
@@ -78,6 +85,7 @@ export default function MeldungKorrektur({
   funktionsOptionen = [],
   onSpeichern,
   onFertig,
+  ohneLagemeldungsart = false,
 }: Props) {
   const { token } = theme.useToken();
   const [form] = Form.useForm<KorrekturWerte>();
@@ -126,7 +134,12 @@ export default function MeldungKorrektur({
       <Row gutter={token.marginLG}>
         <Col xs={24} sm={12}>
           <Form.Item name="meldungsart" label="Meldungsart">
-            <Select<Meldungsart> aria-label="Meldungsart" options={MELDUNGSART_OPTIONEN} />
+            <Select<Meldungsart>
+              aria-label="Meldungsart"
+              options={
+                ohneLagemeldungsart ? ohneLagemeldung(MELDUNGSART_OPTIONEN) : MELDUNGSART_OPTIONEN
+              }
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>

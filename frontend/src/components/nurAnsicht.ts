@@ -1,4 +1,5 @@
 import type { EinsatzAnzeige, EinsatzSpiegelAnzeige, EinsatzStatus } from '../api/types';
+import { istMitarbeit } from '../einsatz/schreibrecht';
 
 /**
  * Gründe der Zeile „Nur Ansicht · Grund“ (`RechteHinweis`, LFH-1078; `frontend/AGENTS.md`,
@@ -19,6 +20,8 @@ export const NUR_LEITUNG_FUEHRUNG_ORG_ADMIN = 'nur Einsatzleitung, Führungspers
 /** Fristen ändert nur der Admin der Org, der der Einsatz gehört (LFH-753) — nicht jeder Admin. */
 export const NUR_LEITUNG_ORG_ADMIN = 'nur Einsatzleitung oder Org-Admin';
 export const EINSATZ_ABGESCHLOSSEN = 'Einsatz abgeschlossen';
+/** Mitarbeit (LLH-1817) erfasst, ändert sonst nichts: der Grund an jeder Fläche, die sie sperrt. */
+export const NUR_ERFASSEN = 'Du kannst erfassen, aber nichts ändern.';
 /**
  * Ein Modul, dessen Freigabe der Person fehlt, an dem Ort, der es braucht (LLH-1036, Einheit-Ansicht
  * D5/D11): die Besatzung braucht Personal und Fahrzeuge, die Zuordnung ihr Zielmodul.
@@ -67,7 +70,9 @@ export function spiegelGrund(
  * `rollen` nennt sie für Flächen mit anderem Recht, etwa die Einsatz-Einstellungen (LLH-1675).
  */
 export function einsatzRechteGrund(
-  einsatz: EinsatzStatus | Pick<EinsatzAnzeige, 'status' | 'spiegel'>,
+  einsatz:
+    | EinsatzStatus
+    | (Pick<EinsatzAnzeige, 'status' | 'spiegel'> & Partial<Pick<EinsatzAnzeige, 'meine_rolle'>>),
   rollen: string = NUR_LEITUNG_FUEHRUNG,
 ): string {
   if (typeof einsatz !== 'string' && einsatz.spiegel != null) {
@@ -75,5 +80,6 @@ export function einsatzRechteGrund(
   }
   const status = typeof einsatz === 'string' ? einsatz : einsatz.status;
   if (status !== 'aktiv') return EINSATZ_ABGESCHLOSSEN;
+  if (typeof einsatz !== 'string' && istMitarbeit(einsatz)) return NUR_ERFASSEN;
   return rollen;
 }

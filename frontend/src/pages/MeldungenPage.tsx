@@ -7,7 +7,12 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
-import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import {
+  darfErfassungBeantragen,
+  darfImEinsatzSchreiben,
+  darfMeldungKorrigieren,
+  istMitarbeit,
+} from '../einsatz/schreibrecht';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import BeantragtListe from '../einsatz/spiegel/BeantragtListe';
 import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
@@ -181,10 +186,10 @@ export default function MeldungenPage() {
   // Schnellaktion „Meldung erfassen“ (Sprungpalette; Spec `meldungseingang`, „Das Meldungsformular
   // öffnet sich über die Adresse“): ?neu=1 klappt das Formular auf. Muster wie `TierePage`: erst
   // nach dem Laden des Einsatzes entscheiden, den Parameter immer räumen, einmal je Verlaufseintrag
-  // (`useLinkAuftrag`, LLH-1558). Das Recht ist das des Kopf-Knopfs (`darfBeantragen`).
+  // (`useLinkAuftrag`, LLH-1558). Das Recht ist das des Kopf-Knopfs (`darfErfassungBeantragen`).
   const [searchParams] = useSearchParams();
   const neuAuftrag = useLinkAuftrag();
-  const darfMeldenRoh = einsatzQuery.data != null && darfBeantragen(einsatzQuery.data);
+  const darfMeldenRoh = einsatzQuery.data != null && darfErfassungBeantragen(einsatzQuery.data);
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
     if (neuAuftrag.verbraucht()) return;
@@ -727,15 +732,20 @@ export default function MeldungenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   // „Meldung erfassen“ am Spiegel als Antrag (LLH-1492, D13); die Karten bleiben gesperrt.
-  const darfMelden = darfBeantragen(einsatz);
+  const darfMelden = darfErfassungBeantragen(einsatz);
 
   const lageSpeicherung = imEinsatz(lageMutation);
   const auftragSpeicherung = imEinsatz(auftragMutation);
   const patientSpeicherung = imEinsatz(patientMutation);
 
+  // Mitarbeit (LLH-1817) erfasst Meldungen ohne Lagemeldung und korrigiert nur eigene, die nicht in
+  // der Lage stehen; alles andere an der Karte bleibt bei `darfSchreiben`.
+  const ohneLagemeldungsart = istMitarbeit(einsatz);
   const listenProps = {
     einsatzId,
     darfSchreiben,
+    darfKorrigieren: (m: Meldung) => darfMeldungKorrigieren(einsatz, m, benutzer?.id),
+    ohneLagemeldungsart,
     mitglieder,
     highlightId: highlightMeldungId,
     onStatus,
@@ -960,6 +970,7 @@ export default function MeldungenPage() {
             abschnitte={abschnitteQuery.data}
             funktionsVorschlaege={funktionsVorschlaege}
             vorschlagsquellen={vorschlagsquellen}
+            ohneLagemeldungsart={ohneLagemeldungsart}
           />
         </Paneel>
       )}

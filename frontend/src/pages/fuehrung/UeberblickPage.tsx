@@ -16,7 +16,7 @@ import {
   modulRegistry,
   modulName,
 } from '../../einsatz/modulRegistry';
-import { darfBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfErfassungBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
   Augenbraue,
@@ -428,8 +428,8 @@ export default function UeberblickPage() {
     queryFn: () => listeEtb(einsatzId, ETB_ERSTE_LAGE),
     enabled: startlisteMoeglich && etbFrei,
   });
-  // Ein ETB-Eintrag ist am Spiegel ein Antrag (LLH-1492, D13).
-  const darfEtbErfassen = darfBeantragen(einsatz);
+  // Ein ETB-Eintrag ist am Spiegel ein Antrag (LLH-1492, D13); Mitarbeit erfasst auch (LLH-1817).
+  const darfEtbErfassen = darfErfassungBeantragen(einsatz);
   // Daten nur aus freien Quellen: der Cache eines gesperrten Moduls kann einen Altstand tragen.
   const personal = personalFrei ? personalQ.data : undefined;
   const fahrzeuge = fahrzeugeFrei ? fahrzeugeQ.data : undefined;

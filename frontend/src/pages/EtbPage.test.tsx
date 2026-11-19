@@ -15,7 +15,7 @@ import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
 import { adminFixture, freigabenFixture } from '../test/fixtures';
 import { SCHLUESSEL_ETB_STANDARD_RUFNAME } from '../etb/standardRufname';
-import { warteAufMenueFokus } from '../test/menue';
+import { offenesMenue, warteAufMenueFokus } from '../test/menue';
 import { AdresseSteht } from '../test/adresseSteht';
 
 /**
@@ -1091,6 +1091,56 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
       // Und `eintrag` ist nie in den Abruf geraten — eine Sprungmarke, kein Filter.
       expect(abrufe.every((a) => !a.includes('eintrag='))).toBe(true);
     });
+  });
+});
+
+describe('EtbPage – Mitarbeit (LLH-1817)', () => {
+  const mitarbeit = [
+    http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, meine_rolle: 'mitarbeit' })),
+  ];
+
+  it('bietet zur Erfassung genau die Typen Meldung und Lage', async () => {
+    setup('/einsaetze/7/etb', mitarbeit);
+    const leiste = await waitFor(() => {
+      const l = document.querySelector<HTMLElement>('.etb-erfassung-sticky');
+      expect(l).not.toBeNull();
+      return l!;
+    });
+    const typ = await within(leiste).findByRole('radiogroup', { name: 'Typ des Eintrags' });
+    expect(within(typ).getByRole('radio', { name: 'Meldung' })).toBeInTheDocument();
+    expect(within(typ).getByRole('radio', { name: 'Lage' })).toBeInTheDocument();
+    expect(within(typ).queryByRole('radio', { name: 'Anordnung' })).toBeNull();
+    expect(within(typ).queryByRole('radio', { name: 'Entscheidung' })).toBeNull();
+    expect(within(typ).getAllByRole('radio')).toHaveLength(2);
+  });
+
+  it('bietet „Auch in den Meldungseingang“ bei Meldung, nicht bei Lage', async () => {
+    setup('/einsaetze/7/etb', mitarbeit);
+    const typ = await screen.findByRole('radiogroup', { name: 'Typ des Eintrags' });
+    expect(await screen.findByText('Auch in den Meldungseingang')).toBeInTheDocument();
+    await userEvent.click(within(typ).getByRole('radio', { name: 'Lage' }));
+    await waitFor(() => expect(screen.queryByText('Auch in den Meldungseingang')).toBeNull());
+  });
+
+  async function menuepunkte(eintraege: unknown[]) {
+    setup('/einsaetze/7/etb', [
+      ...mitarbeit,
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json(eintraege)),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: /^Aktionen zu Eintrag/ }));
+    const menue = await waitFor(() => offenesMenue());
+    return within(menue)
+      .getAllByRole('menuitem')
+      .map((i) => i.textContent);
+  }
+
+  it('berichtigt einen eigenen Eintrag, ohne Wiedervorlage und Auftrag', async () => {
+    expect(await menuepunkte([eintrag])).toEqual(['Berichtigen', 'Verfasser: Admin']);
+  });
+
+  it('berichtigt einen fremden Eintrag nicht und bietet auch dort keine Wiedervorlage und keinen Auftrag', async () => {
+    const punkte = await menuepunkte([{ ...eintrag, erfasser_id: 99 }]);
+    expect(punkte).toEqual(['Verfasser: Admin']);
   });
 });
 

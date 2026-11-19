@@ -36,6 +36,11 @@ interface Props {
   nachrichten: ChatNachricht[];
   eigeneBenutzerId: number | null;
   darfSchreiben: boolean;
+  /**
+   * Eigene Nachricht bearbeiten und löschen (LLH-1817): darf auch Mitarbeit. Ohne Angabe gilt
+   * `darfSchreiben`; Heraufstufen, Bezug und Entfernen des Bezugs bleiben bei `darfSchreiben`.
+   */
+  darfErfassen?: boolean;
   onBearbeiten: (n: ChatNachricht) => void;
   /**
    * Löschen nach der Rückfrage. Gibt der Aufrufer ein Promise zurück (`mutateAsync`), wartet die
@@ -86,6 +91,7 @@ export default function NachrichtenStrom({
   nachrichten,
   eigeneBenutzerId,
   darfSchreiben,
+  darfErfassen = darfSchreiben,
   onBearbeiten,
   onLoeschen,
   loeschung,
@@ -168,7 +174,7 @@ export default function NachrichtenStrom({
             ...(darfSchreiben && onBezugSetzen
               ? [{ key: 'bezug' as const, label: hatBezug ? 'Bezug ändern' : 'Bezug' }]
               : []),
-            ...(eigene && darfSchreiben
+            ...(eigene && darfErfassen
               ? [
                   { key: 'edit' as const, label: 'Bearbeiten' },
                   { key: 'del' as const, label: 'Löschen', gefahr: true as const },

@@ -15,6 +15,37 @@ describe('nurAnsicht (LFH-1078)', () => {
     expect(einsatzRechteGrund('aktiv')).toBe('nur Einsatzleitung und Führungspersonal');
   });
 
+  it('sagt der Mitarbeit, dass sie erfassen, aber nichts ändern darf (LLH-1817)', () => {
+    const mitarbeit = {
+      status: 'aktiv' as const,
+      spiegel: null,
+      meine_rolle: 'mitarbeit' as const,
+    };
+    expect(einsatzRechteGrund(mitarbeit)).toBe('Du kannst erfassen, aber nichts ändern.');
+    expect(einsatzRechteGrund(mitarbeit, 'nur Einsatzleitung')).toBe(
+      'Du kannst erfassen, aber nichts ändern.',
+    );
+    // Abschluss und Spiegel gehen vor: dort gilt der Grund für jede Rolle.
+    expect(einsatzRechteGrund({ ...mitarbeit, status: 'abgeschlossen' })).toBe(
+      'Einsatz abgeschlossen',
+    );
+    expect(
+      einsatzRechteGrund({
+        ...mitarbeit,
+        spiegel: {
+          gegenstelle: 'ELW 1',
+          beendet: false,
+          antraege_ausstehend: 0,
+          antraege_abgelehnt: 0,
+          bruchstelle: 0,
+        },
+      }),
+    ).toBe('Spiegel von ELW 1');
+    expect(einsatzRechteGrund({ ...mitarbeit, meine_rolle: 'beobachter' })).toBe(
+      'nur Einsatzleitung und Führungspersonal',
+    );
+  });
+
   it('nennt am Spiegel die führende Instanz, auch im abgeschlossenen Einsatz (LLH-1492)', () => {
     const spiegel = {
       gegenstelle: 'ELW 1',

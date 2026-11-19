@@ -92,6 +92,13 @@ const MELDEWEG_OPTIONEN: { value: MeldungMeldeweg; label: string }[] = [
   { value: 'persoenlich', label: 'Persönlich' },
   { value: 'sonstige', label: 'Sonstige' },
 ];
+/** Die Arten ohne Lagemeldung: so erfasst und korrigiert die Mitarbeit (LLH-1817). */
+export function ohneLagemeldung(
+  optionen: { value: Meldungsart; label: string }[],
+): { value: Meldungsart; label: string }[] {
+  return optionen.filter((o) => o.value !== 'lagemeldung');
+}
+
 export const MELDUNGSART_OPTIONEN: { value: Meldungsart; label: string }[] = [
   { value: 'lagemeldung', label: 'Lagemeldung' },
   { value: 'sofortmeldung', label: 'Sofortmeldung' },
@@ -156,6 +163,7 @@ export default function MeldungFormular({
   einsatzId,
   vorschlagsquellen = KEINE_QUELLEN,
   dialog,
+  ohneLagemeldungsart = false,
 }: {
   senden: boolean;
   /**
@@ -197,6 +205,11 @@ export default function MeldungFormular({
    * nicht.
    */
   dialog?: { offen: boolean; titel: string; onAbbrechen: () => void };
+  /**
+   * Keine Meldungsart „Lagemeldung“ (Mitarbeit, LLH-1817): die Lage bleibt Einsatzleitung und
+   * Führungspersonal, der Server lehnt sie sonst mit 403 ab. Auch der Fast-Path dafür entfällt.
+   */
+  ohneLagemeldungsart?: boolean;
 }) {
   const { token } = theme.useToken();
   const vorgaben = useMemo<MeldungFormWerte>(
@@ -364,9 +377,11 @@ export default function MeldungFormular({
           <Button icon={<IconBlitz />} onClick={sofortVorbelegen}>
             Sofortmeldung
           </Button>
-          <Button icon={<IconPapierflieger />} onClick={lagemeldungVorbelegen}>
-            Lagemeldung an übergeordnete Stelle
-          </Button>
+          {!ohneLagemeldungsart && (
+            <Button icon={<IconPapierflieger />} onClick={lagemeldungVorbelegen}>
+              Lagemeldung an übergeordnete Stelle
+            </Button>
+          )}
         </Space>
       )}
       <Form.Item
@@ -464,7 +479,13 @@ export default function MeldungFormular({
                   </Col>
                   <Col xs={24} sm={12}>
                     <Form.Item name="meldungsart" label="Meldungsart">
-                      <Select<Meldungsart> options={MELDUNGSART_OPTIONEN} />
+                      <Select<Meldungsart>
+                        options={
+                          ohneLagemeldungsart
+                            ? ohneLagemeldung(MELDUNGSART_OPTIONEN)
+                            : MELDUNGSART_OPTIONEN
+                        }
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12}>
