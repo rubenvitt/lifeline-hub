@@ -239,6 +239,11 @@ interface SeitenSackgasseProps {
   ursache?: unknown;
   onWiederholen?: () => void;
   rueckweg?: PlatzhalterRueckweg;
+  /**
+   * Fehlendes Recht oder kein Objekt statt eines Abruffehlers (LLH-1819): keine Alarmkante, eine
+   * Sperre ist keine Gefahr (wie `einsatz/ModulGesperrt.tsx`).
+   */
+  neutral?: boolean;
 }
 
 /**
@@ -255,6 +260,7 @@ export function SeitenSackgasse({
   ursache,
   onWiederholen,
   rueckweg,
+  neutral = false,
 }: SeitenSackgasseProps) {
   const navigate = useNavigate();
   const { token: t, rollen } = useRollen();
@@ -270,7 +276,7 @@ export function SeitenSackgasse({
         maxWidth: flaeche.seiteSchmal,
         marginInline: 'auto',
         marginBlockStart: t.marginLG,
-        boxShadow: `inset 3px 0 0 0 ${rollen.alarm}`,
+        ...(!neutral && { boxShadow: `inset 3px 0 0 0 ${rollen.alarm}` }),
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: t.marginSM }}>
@@ -288,7 +294,13 @@ export function SeitenSackgasse({
               </Button>
             )}
             {rueckweg && (
-              <Button onClick={() => void navigate(rueckweg.pfad)}>{rueckweg.label}</Button>
+              // Ohne Neuversuch ist der Rückweg der eine Weg heraus und damit primär (LLH-1819).
+              <Button
+                type={onWiederholen ? 'default' : 'primary'}
+                onClick={() => void navigate(rueckweg.pfad)}
+              >
+                {rueckweg.label}
+              </Button>
             )}
           </div>
         )}

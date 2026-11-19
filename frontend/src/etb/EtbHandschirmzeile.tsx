@@ -1,7 +1,7 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import type { EtbTyp } from '../api/types';
 import { useRollen } from '../components/instrument';
-import { monoStil } from '../components/instrument/rollenwerte';
+import { monoStil, schriftStil } from '../components/instrument/rollenwerte';
 import { zeilenGrund } from '../components/instrument/Zeitachseneintrag';
 import { etbTypFarbe } from '../theme/statusFarben';
 import { EtbInhalt } from './EtbInhalt';
@@ -116,7 +116,7 @@ export default function EtbHandschirmzeile({
         )}
         <span
           data-lfh="typwort"
-          style={{ fontSize: 12, fontWeight: 600, color: farbe.wort, flex: 'none' }}
+          style={{ ...schriftStil('textKlein'), fontWeight: 600, color: farbe.wort, flex: 'none' }}
         >
           {typwort}
         </span>
@@ -131,7 +131,9 @@ export default function EtbHandschirmzeile({
           minWidth: 0,
           overflowWrap: 'anywhere',
           color: leise ? rollen.gedaempft : rollen.text,
-          ...(leise ? ({ '--etb-inhalt-groesse': '12px' } as CSSProperties) : {}),
+          ...(leise
+            ? ({ '--etb-inhalt-groesse': 'var(--lfh-typo-text-klein-groesse)' } as CSSProperties)
+            : {}),
         }}
       >
         <EtbInhalt offenErzwungen={offenErzwungen} style={{ lineHeight: '20px' }}>

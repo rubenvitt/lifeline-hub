@@ -1,8 +1,8 @@
 import { useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import type { EtbTyp } from '../api/types';
 import Fundstellen from '../components/Fundstellen';
-import { useRollen } from '../components/instrument';
-import { monoStil } from '../components/instrument/rollenwerte';
+import { Textstufe, useRollen } from '../components/instrument';
+import { monoStil, schriftStil } from '../components/instrument/rollenwerte';
 import { zeilenGrund } from '../components/instrument/Zeitachseneintrag';
 import { etbTypFarbe } from '../theme/statusFarben';
 import { EinklappHuelle, EinklappKnopf, useEinklappen } from './EtbInhalt';
@@ -25,8 +25,8 @@ import './etbSpaltenzeile.css';
  * steht ein Eintrag in festen Spalten — Zeit · Nr. · Typ · Von → An · Inhalt · Vermerk · ⋮ —, die
  * über alle Zeilen und mit dem Spaltenkopf fluchten (eine Konstante, `ETB_SPALTEN_RASTER`).
  *
- * - Von → An in Textschrift 13 px, der Meldeweg gedämpft dahinter; zu lang endet es mit Auslassung,
- *   der volle Text steht im Titel. Gleiche Seiten stehen als „Vermerk <Stelle>“.
+ * - Von → An in Textschrift 14 px (Stufe `text`), der Meldeweg gedämpft dahinter; zu lang endet
+ *   es mit Auslassung, der volle Text steht im Titel. Gleiche Seiten stehen als „Vermerk <Stelle>“.
  * - Der Verfasser hat keine Spalte: er steht im Titel der Zeile und im Zeilenmenü (die Zeitachse
  *   gibt ihn mit in die Liste des ⋮, `zeilenAktionen.ts`). So bleibt die Zeile einzeilig, auch
  *   mit langem Verfasser.
@@ -83,7 +83,7 @@ export function EtbSpaltenkopf({ klebt }: { klebt: boolean }) {
         paddingInlineStart: ETB_SPALTEN_KANTE + ETB_SPALTEN_EINZUG,
         background: rollen.kopf,
         borderBlockEnd: `1px solid ${rollen.linie}`,
-        fontSize: 12,
+        ...schriftStil('textKlein'),
         lineHeight: '16px',
         color: rollen.gedaempft,
       }}
@@ -97,7 +97,7 @@ export function EtbSpaltenkopf({ klebt }: { klebt: boolean }) {
   );
 }
 
-/** Von → An als Zelle oder Kopfteil: Textschrift 13 px, Meldeweg 12 px gedämpft, Auslassung. */
+/** Von → An als Zelle oder Kopfteil: Stufe `text`, Meldeweg `textKlein` gedämpft, Auslassung. */
 export function VonAnText({
   anzeige,
   weg,
@@ -116,7 +116,7 @@ export function VonAnText({
       style={{
         display: 'block',
         minWidth: 0,
-        fontSize: 13,
+        ...schriftStil('text'),
         lineHeight: '20px',
         color: rollen.text2,
         whiteSpace: 'nowrap',
@@ -136,10 +136,10 @@ export function VonAnText({
         </>
       )}
       {weg && (
-        <span style={{ fontSize: 12, color: rollen.gedaempft }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           {anzeige ? ' · ' : ''}
           {weg}
-        </span>
+        </Textstufe>
       )}
     </span>
   );
@@ -261,7 +261,7 @@ export default function EtbSpaltenzeile({
       <span
         data-lfh="typwort"
         style={{
-          fontSize: 12,
+          ...schriftStil('textKlein'),
           fontWeight: 600,
           lineHeight: '20px',
           color: farbe.wort,
@@ -280,7 +280,9 @@ export default function EtbSpaltenzeile({
           lineHeight: '20px',
           overflowWrap: 'anywhere',
           color: leise ? rollen.gedaempft : rollen.text,
-          ...(leise ? ({ '--etb-inhalt-groesse': '12px' } as CSSProperties) : {}),
+          ...(leise
+            ? ({ '--etb-inhalt-groesse': 'var(--lfh-typo-text-klein-groesse)' } as CSSProperties)
+            : {}),
         }}
       >
         <div className={berichtigt ? 'etb-inhalt--berichtigt' : undefined}>{inhalt}</div>
@@ -310,7 +312,7 @@ export default function EtbSpaltenzeile({
             display: 'flex',
             flexDirection: 'column',
             gap: token.marginXS,
-            fontSize: 12,
+            ...schriftStil('textKlein'),
             lineHeight: '18px',
             color: rollen.gedaempft,
           }}

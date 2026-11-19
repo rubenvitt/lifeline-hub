@@ -274,6 +274,30 @@ describe('SeitenSackgasse', () => {
 
     expect(screen.getByText('Kein Zugriff auf diesen Einsatz')).toBeInTheDocument();
   });
+
+  /** LLH-1819: ohne Neuversuch ist der Rückweg der eine Weg heraus, also primär. */
+  it('macht den Rückweg zur Primäraktion, wenn kein Neuversuch angeboten wird', () => {
+    renderMitProviders(
+      <SeitenSackgasse
+        titel="Kein Zugriff auf diesen Einsatz"
+        rueckweg={{ pfad: '/einsaetze', label: 'Zur Einsatzliste' }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Zur Einsatzliste' })).toHaveClass('ant-btn-primary');
+  });
+
+  /** LLH-1819: fehlendes Recht ist keine Störung; die Alarmkante bleibt Abruffehlern vorbehalten. */
+  it('trägt neutral keine Alarmkante, sonst schon', () => {
+    const { container, rerender } = renderMitProviders(
+      <SeitenSackgasse titel="Einsatz konnte nicht geladen werden" />,
+    );
+    const paneel = () => container.querySelector<HTMLElement>('[data-lfh="paneel"]');
+    expect(paneel()?.style.boxShadow).toContain('inset 3px');
+
+    rerender(<SeitenSackgasse titel="Kein Zugriff auf diesen Einsatz" neutral />);
+    expect(paneel()?.style.boxShadow ?? '').not.toContain('inset 3px');
+  });
 });
 
 /**
