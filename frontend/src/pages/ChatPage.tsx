@@ -63,7 +63,7 @@ import {
 } from '../chat/bezug';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { NUR_LEITUNG_FUEHRUNG_MITARBEIT, einsatzRechteGrund } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { Segmentleiste, useRollen } from '../components/instrument';
 
@@ -623,7 +623,10 @@ export default function ChatPage() {
           {/* Statt der Eingabe: „Nur Ansicht · Grund“, kein Satz (LFH-1078). */}
           {!darfErfassen && (
             <div style={{ marginTop: token.marginSM }}>
-              <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
+              <RechteHinweis
+                sichtbar
+                text={einsatzRechteGrund(einsatz, NUR_LEITUNG_FUEHRUNG_MITARBEIT)}
+              />
             </div>
           )}
         </Col>

@@ -540,7 +540,7 @@ describe('ChatPage', () => {
     );
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
     expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toHaveTextContent(
-      'Nur Ansicht nur Einsatzleitung und Führungspersonal',
+      'Nur Ansicht nur Einsatzleitung, Führungspersonal und Mitarbeit',
     );
     expect(screen.queryByText(/vorbehalten/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Nachricht…')).not.toBeInTheDocument();
@@ -854,7 +854,9 @@ describe('ChatPage — Kanal anlegen unter md (LFH-976)', () => {
     expect(screen.getByTestId('kanal-leiste')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
     // Der Grund steht am Fuß, für Leiste und Spalte gleich (M16).
-    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+    expect(
+      screen.getByText('nur Einsatzleitung, Führungspersonal und Mitarbeit'),
+    ).toBeInTheDocument();
   });
 });
 

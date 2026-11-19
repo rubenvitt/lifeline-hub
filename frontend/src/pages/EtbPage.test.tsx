@@ -891,7 +891,7 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
     // Statt „Sobald jemand mit Schreibrecht …“: „Nur Ansicht · Grund“ im Kopf (LFH-1078).
     expect(screen.queryByText(/Sobald jemand/)).toBeNull();
     expect(document.querySelector('[data-lfh="rechte-hinweis"]')).toHaveTextContent(
-      'Nur Ansicht nur Einsatzleitung und Führungspersonal',
+      'Nur Ansicht nur Einsatzleitung, Führungspersonal und Mitarbeit',
     );
   });
 
