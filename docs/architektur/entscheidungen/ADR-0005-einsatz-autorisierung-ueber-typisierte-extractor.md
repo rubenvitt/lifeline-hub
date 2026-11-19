@@ -59,13 +59,3 @@ Ein neuer Endpunkt bekommt seine Prüfung über die Signatur, der Wächter macht
 rot. Weil das Gate vor dem Body-Parse läuft, antwortet ein unberechtigter und zugleich kaputter
 Request 403 statt 400. Die Module `befehl` und `lagebericht` prüfen noch im Rumpf
 ([Risiken](../11-risiken-und-technische-schulden.md)).
-
-## Ergänzung LLH-1817
-
-Die Einsatzrolle Mitarbeit darf erfassen, aber nichts ändern. Dafür gibt es zwei weitere
-sanktionierte Gate-Typen in `src/einsatz/kontext.rs`: `EinsatzErfassungszugriff` (Org-Floor,
-Erfassungsrecht, Modul, `fordere_aktiv`) und `EinsatzErfassungsfreigabe` (Org-Floor,
-Erfassungsrecht, Modul, `fordere_lesezugriff`). Beide stehen in `SANKTIONIERTE_GATES`.
-Regel: MUST — sie stehen nur an Handlern der Positivliste im Design-Doc
-`docs/superpowers/specs/2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit-design.md`; alles andere
-bleibt hinter `EinsatzSchreibzugriff`.
