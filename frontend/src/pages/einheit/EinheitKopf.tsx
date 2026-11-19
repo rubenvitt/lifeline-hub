@@ -44,6 +44,7 @@ import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
 import { einheitStaerkeUrteil, kategorieDarstellung } from '../../theme/statusFarben';
 import { collectNachfahren } from './einheitAnsichtKern';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import type { PraesenzSchluessel } from '../../live/praesenz';
 
 /**
  * Speichert EINE Angabe der Einheit (LLH-1036, design.md D1): `etikett` nennt sie in der
@@ -132,6 +133,13 @@ export default function EinheitKopf({
   onSetHandStatus,
   nachforderungPfad,
 }: EinheitKopfProps) {
+  // Präsenz an einer Angabe der Einheit (LLH-1946).
+  const praesenz = (feld: string): PraesenzSchluessel => ({
+    einsatzId: e.einsatz_id,
+    objekt: 'einheit',
+    einheitId: e.id,
+    felder: [feld],
+  });
   // Grenzen wie der Server (Spec `eingabegrenzen`, LLH-1242): der kurze Funkrufname über
   // `maxLength`, die mehrzeilige Bemerkung mit Zähler und Prüfung, nie gekürzt
   // (`frontend/AGENTS.md`, „Freitext nie länger als der Server erlaubt“).
@@ -145,6 +153,7 @@ export default function EinheitKopf({
     <InlineAngabe<string>
       etikett={etikett}
       vermerk={e.vermerke?.[feld]}
+      praesenz={praesenz(feld)}
       wert={e[feld] ?? ''}
       anzeige={
         <span style={feld === 'funkrufname' ? monoStil('mono') : { whiteSpace: 'pre-wrap' }}>
@@ -222,6 +231,7 @@ export default function EinheitKopf({
               <InlineAngabe<string>
                 etikett="Name"
                 vermerk={e.vermerke?.name}
+                praesenz={praesenz('name')}
                 wert={e.name}
                 anzeige={e.name}
                 leer={isEmptyText}
@@ -240,12 +250,13 @@ export default function EinheitKopf({
                   />
                 )}
               />
-              <VermerkZeile vermerk={e.vermerke?.name} />
+              <VermerkZeile vermerk={e.vermerke?.name} praesenz={praesenz('name')} />
             </Datenfeld>
             <Datenfeld label="Typ">
               <InlineAngabe<number | null>
                 etikett="Typ"
                 vermerk={e.vermerke?.typ_id}
+                praesenz={praesenz('typ_id')}
                 wert={e.typ_id ?? null}
                 anzeige={e.typ_label}
                 leer={(w) => w == null}
@@ -270,7 +281,7 @@ export default function EinheitKopf({
                   />
                 )}
               />
-              <VermerkZeile vermerk={e.vermerke?.typ_id} />
+              <VermerkZeile vermerk={e.vermerke?.typ_id} praesenz={praesenz('typ_id')} />
             </Datenfeld>
             {/* Der Rufname der Einheit, nicht eines ihrer Fahrzeuge. Leer zeigt das Meldebild
                 höchstens den Rufnamen des einzigen Fahrzeugs. */}
@@ -282,12 +293,13 @@ export default function EinheitKopf({
                 false,
                 'z. B. Florian HM 12/44',
               )}
-              <VermerkZeile vermerk={e.vermerke?.funkrufname} />
+              <VermerkZeile vermerk={e.vermerke?.funkrufname} praesenz={praesenz('funkrufname')} />
             </Datenfeld>
             <Datenfeld label="Abschnitt">
               <InlineAngabe<number | null>
                 etikett="Abschnitt"
                 vermerk={e.vermerke?.abschnitt_id}
+                praesenz={praesenz('abschnitt_id')}
                 wert={e.abschnitt_id ?? null}
                 anzeige={e.abschnitt_name}
                 leer={(w) => w == null}
@@ -310,12 +322,16 @@ export default function EinheitKopf({
                   />
                 )}
               />
-              <VermerkZeile vermerk={e.vermerke?.abschnitt_id} />
+              <VermerkZeile
+                vermerk={e.vermerke?.abschnitt_id}
+                praesenz={praesenz('abschnitt_id')}
+              />
             </Datenfeld>
             <Datenfeld label="Über-Einheit">
               <InlineAngabe<number | null>
                 etikett="Über-Einheit"
                 vermerk={e.vermerke?.ueber_einheit_id}
+                praesenz={praesenz('ueber_einheit_id')}
                 wert={e.ueber_einheit_id ?? null}
                 anzeige={ueberName}
                 leer={(w) => w == null}
@@ -339,7 +355,10 @@ export default function EinheitKopf({
                   />
                 )}
               />
-              <VermerkZeile vermerk={e.vermerke?.ueber_einheit_id} />
+              <VermerkZeile
+                vermerk={e.vermerke?.ueber_einheit_id}
+                praesenz={praesenz('ueber_einheit_id')}
+              />
             </Datenfeld>
             {/* Herkunft (LLH-1383 D9): fest, nicht änderbar; ein Sprung ist keine Handlung. */}
             {e.nachforderung_id != null && (
@@ -361,6 +380,7 @@ export default function EinheitKopf({
               <InlineAngabe<number | null>
                 etikett="Einheitsführer"
                 vermerk={e.vermerke?.fuehrer_id}
+                praesenz={praesenz('fuehrer_id')}
                 wert={e.fuehrer_id ?? null}
                 anzeige={e.fuehrer_name}
                 leer={(w) => w == null}
@@ -381,7 +401,7 @@ export default function EinheitKopf({
                   />
                 )}
               />
-              <VermerkZeile vermerk={e.vermerke?.fuehrer_id} />
+              <VermerkZeile vermerk={e.vermerke?.fuehrer_id} praesenz={praesenz('fuehrer_id')} />
             </Datenfeld>
             {/* BOS-Fachsprache: Soll-Stärke (Führer / Unterführer / Mannschaft). Die drei gehen in
                 EINER Anfrage: der Server verlangt alle drei oder keinen. */}
@@ -389,6 +409,7 @@ export default function EinheitKopf({
               <InlineAngabe<Staerke | null>
                 etikett="Soll-Stärke"
                 vermerk={e.vermerke?.soll}
+                praesenz={praesenz('soll')}
                 wert={e.soll ?? null}
                 anzeige={
                   <span style={monoStil('mono')}>
@@ -420,7 +441,7 @@ export default function EinheitKopf({
                   </div>
                 )}
               />
-              <VermerkZeile vermerk={e.vermerke?.soll} />
+              <VermerkZeile vermerk={e.vermerke?.soll} praesenz={praesenz('soll')} />
             </Datenfeld>
             {/* Qualifikationssoll (LLH-1553): ohne eigenes gilt das des Typs, mit „(Vorgabe)“.
                 Leere Zeilen gehen zurück auf den Typ. */}
@@ -428,6 +449,7 @@ export default function EinheitKopf({
               <InlineAngabe<QualiSollZeile[]>
                 etikett="Qualifikationssoll"
                 vermerk={e.vermerke?.quali_soll}
+                praesenz={praesenz('quali_soll')}
                 wert={qualiSollEingabe(e.quali_soll)}
                 anzeige={
                   e.quali_soll_eigen
@@ -450,7 +472,7 @@ export default function EinheitKopf({
                   </div>
                 )}
               />
-              <VermerkZeile vermerk={e.vermerke?.quali_soll} />
+              <VermerkZeile vermerk={e.vermerke?.quali_soll} praesenz={praesenz('quali_soll')} />
             </Datenfeld>
             <Datenfeld label={`Ist (${STAERKE_SCHREIBWEISE})`}>
               <IstAnzeige
@@ -464,7 +486,7 @@ export default function EinheitKopf({
             </Datenfeld>
             <Datenfeld label="Bemerkung" breit>
               {textRow('Bemerkung', 'bemerkung', EINHEIT_BEMERKUNG_MAX, true)}
-              <VermerkZeile vermerk={e.vermerke?.bemerkung} />
+              <VermerkZeile vermerk={e.vermerke?.bemerkung} praesenz={praesenz('bemerkung')} />
             </Datenfeld>
           </Datenraster>
         </div>

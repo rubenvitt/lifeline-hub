@@ -54,6 +54,8 @@ impl PraesenzObjekt {
                 "einsatzort_koordinate",
                 "meldende_stelle",
                 "sachverhalt",
+                "anzahl_betroffene_initial",
+                "begonnen_at",
             ],
             PraesenzObjekt::Einheit => &[
                 "name",
@@ -415,6 +417,10 @@ mod tests {
         assert_eq!(PraesenzObjekt::Einsatz.bezug(), LiveEvent::Einsatz);
         assert_eq!(PraesenzObjekt::Fuehrungsstelle.bezug(), LiveEvent::Einsatz);
         assert!(PraesenzObjekt::Einsatz.felder().contains(&"leitstellen_nr"));
+        assert!(PraesenzObjekt::Einsatz.felder().contains(&"begonnen_at"));
+        assert!(PraesenzObjekt::Einsatz
+            .felder()
+            .contains(&"anzahl_betroffene_initial"));
         assert!(PraesenzObjekt::Einheit.felder().contains(&"bemerkung"));
         assert!(PraesenzObjekt::Fuehrungsstelle
             .felder()
