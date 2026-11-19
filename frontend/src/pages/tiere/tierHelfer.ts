@@ -59,6 +59,13 @@ export const TIER_STATUS: Record<TierStatus, { label: string; ton: StatusTon }> 
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */
 export type TiereSicht = 'aktiv' | 'vermisst' | 'abgeschlossen' | 'alle';
+/** Werte von `?sicht=` der Tierliste (LLH-1826); exhaustiv, Vorgabe `aktiv`. */
+export const TIERE_SICHT_ERLAUBT: Record<TiereSicht, true> = {
+  aktiv: true,
+  vermisst: true,
+  abgeschlossen: true,
+  alle: true,
+};
 
 /** Reiter der Tierliste in Bedienreihenfolge — dieselben Wörter im Kopf der Druckansicht. */
 export const TIERE_SICHTEN: readonly { key: TiereSicht; label: string }[] = [

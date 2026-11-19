@@ -60,6 +60,7 @@ import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreig
 import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { infotelefonStatus } from '../theme/statusFarben';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import { useAdressWert } from '../routing/useAdressWert';
 
 /**
  * Informationstelefon (LFH-554, Spec `stab-infotelefon`): das Protokoll der Anrufe aus der
@@ -90,6 +91,8 @@ import { zeitpunkt } from '../anzeige/zeitDarstellung';
  */
 
 type Sicht = 'alle' | 'offen';
+/** Werte von `?sicht=` (LLH-1826); exhaustiv, Vorgabe `alle`. */
+const SICHT_ERLAUBT: Record<Sicht, true> = { alle: true, offen: true };
 
 const ANLIEGEN_ID = 'infotelefon-nach-anliegen';
 
@@ -113,7 +116,8 @@ export default function InfotelefonPage() {
   const { konventionen } = useAnzeigeKonventionen();
   const freigabe = useModulFreigabe(einsatzId, MODUL);
   const frei = freigabe.zustand === 'frei';
-  const [sicht, setSicht] = useState<Sicht>('alle');
+  // Der Filter ist Zustand der Adresse (LLH-1826): er überlebt Weg und Zurück.
+  const [sicht, setSicht] = useAdressWert('sicht', SICHT_ERLAUBT, 'alle');
   const { istSchmal } = useViewport();
   const { fokusInLeiste, leistenFokus } = useFokusInLeiste();
   const [anliegenOffen, setAnliegenOffen] = useState(false);

@@ -210,6 +210,21 @@ describe('AbloesungPage (LFH-635)', () => {
     ]);
   });
 
+  /** LLH-1826: abgelöst/beendet steht neben der Ansicht in der Adresse. */
+  it('„Beendet“ steht in der Adresse, „Abgelöst“ nicht (LLH-1826)', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('radio', { name: 'Vergangen' }));
+    await userEvent.click(await screen.findByRole('radio', { name: 'Beendet' }));
+    await waitFor(() => expect(adresse.suche).toBe('?ansicht=vergangen&vergangen=beendet'));
+    await userEvent.click(screen.getByRole('radio', { name: 'Abgelöst' }));
+    await waitFor(() => expect(adresse.suche).toBe('?ansicht=vergangen'));
+  });
+
+  it('?ansicht=vergangen&vergangen=beendet zeigt die beendeten (LLH-1826)', async () => {
+    renderPage('/einsaetze/1/abloesung?ansicht=vergangen&vergangen=beendet');
+    expect(await screen.findByRole('radio', { name: 'Beendet' })).toBeChecked();
+  });
+
   it('zeigt die Schichten in Fälligkeitsordnung, überfällig mit Wort, Rand und ohne Animation', async () => {
     renderPage();
     const karten = await screen.findAllByRole('article');

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { GEDAECHTNIS_ENTPRELLUNG_MS } from '../components/listenGedaechtnis';
 import { parseRouteId } from './deeplinks';
@@ -42,16 +42,23 @@ export function liesErlaubt<T extends string>(
     : undefined;
 }
 
-/** Schreiber eines Parameters mit `replace`, verträglich mit anderen Schreibern im selben Zug. */
+/**
+ * Schreiber eines Parameters mit `replace`, verträglich mit anderen Schreibern im selben Zug.
+ * Stabil über Navigationen: Effekte, die ihn nutzen, hängen nicht an jeder Adressänderung.
+ */
 function useSchreibe(schluessel: string): (wert: string | undefined) => void {
   const aendereAdresse = useAdressAenderung();
+  const aendereRef = useRef(aendereAdresse);
+  useLayoutEffect(() => {
+    aendereRef.current = aendereAdresse;
+  });
   return useCallback(
     (wert: string | undefined) =>
-      aendereAdresse((naechste) => {
+      aendereRef.current((naechste) => {
         if (wert === undefined || wert === '') naechste.delete(schluessel);
         else naechste.set(schluessel, wert);
       }),
-    [aendereAdresse, schluessel],
+    [schluessel],
   );
 }
 

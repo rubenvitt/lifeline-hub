@@ -9,6 +9,7 @@ import {
   useListenGedaechtnis,
   type GedaechtnisSpalte,
 } from './listenGedaechtnis';
+import { useAdressWert } from '../routing/useAdressWert';
 
 /**
  * Das Gedächtnis einer Liste (LLH-1086, Spec `tabellen-sortieren-filtern`): Sortierung, Filter und
@@ -348,5 +349,35 @@ describe('useListenGedaechtnis · Suche nur in der Sitzung (LLH-1096)', () => {
       suche: 'Meier',
     });
     expect(ort.aktuell).toBe('/p?f.typ=sturm');
+  });
+});
+
+describe('useListenGedaechtnis — Schreiben im selben Zug (LLH-1826)', () => {
+  it('eine Meldung und ein Wert der Adresse im selben Zug überschreiben einander nicht', () => {
+    const ort = { aktuell: '' };
+    function Ortsfuehler() {
+      const l = useLocation();
+      ort.aktuell = `${l.pathname}${l.search}`;
+      return null;
+    }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={['/t?q=Hund']}>
+        <Ortsfuehler />
+        {children}
+      </MemoryRouter>
+    );
+    const hook = renderHook(
+      () => ({
+        gedaechtnis: useListenGedaechtnis('tiere', SPALTEN, { vorgabe: VORGABE, einsatzId: 7 }),
+        sicht: useAdressWert('sicht', { aktiv: true, alle: true }, 'aktiv'),
+      }),
+      { wrapper },
+    );
+    act(() => {
+      // Wie der Reiterwechsel der Tiere: Suche leeren, dann die Sicht setzen.
+      hook.result.current.gedaechtnis.melde({ sortierung: VORGABE, filter: {}, suche: '' });
+      hook.result.current.sicht[1]('alle');
+    });
+    expect(ort.aktuell).toBe('/t?sicht=alle');
   });
 });

@@ -103,6 +103,7 @@ import { ausgelassenSatz } from '../kraefte/ruecknahmeSatz';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 import { nachforderungName } from '../nachforderungen/nachforderungName';
 import { Marke } from '../components/instrument/Marke';
+import { useAdressWert } from '../routing/useAdressWert';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -216,6 +217,8 @@ interface StammDisposition {
 
 /** Gruppierung der Liste (LLH-1225 D4): Vorgabe Ort, die Frage des Tickets ist „was ist wo“. */
 type Gruppierung = 'ort' | 'status';
+/** Werte von `?gruppierung=` (LLH-1826); exhaustiv, Vorgabe `ort`. */
+const GRUPPIERUNG_ERLAUBT: Record<Gruppierung, true> = { ort: true, status: true };
 const GRUPPIERUNG_OPTIONEN = [
   { wert: 'ort', label: 'Nach Ort' },
   { wert: 'status', label: 'Nach Status' },
@@ -263,12 +266,11 @@ function MaterialInhalt() {
    * eine Anlieferung an einen Ort geht, und fällt erst auf dem Weg hinaus (Fertig, Abbrechen).
    */
   const [stammOrt, setStammOrt] = useState<string>(OHNE_ORT_WERT);
-  /** Gruppierung je Einsatz (D4): ein Einsatzwechsel nimmt die Wahl nicht mit. */
-  const [gruppierungWahl, setGruppierungWahl] = useState<{ einsatzId: number; wert: Gruppierung }>({
-    einsatzId,
-    wert: 'ort',
-  });
-  const gruppierung = gruppierungWahl.einsatzId === einsatzId ? gruppierungWahl.wert : 'ort';
+  /**
+   * Gruppierung als Zustand der Adresse (LLH-1826): sie überlebt Weg und Zurück, ein Einsatzwechsel
+   * nimmt sie nicht mit (D4), weil ein anderer Einsatz eine andere Adresse ist.
+   */
+  const [gruppierung, setzeGruppierung] = useAdressWert('gruppierung', GRUPPIERUNG_ERLAUBT, 'ort');
   /** Offene Rückfrage „Stornieren“ (LLH-1079): als `<Modal>` außerhalb der Zeilen-`map`. */
   const [stornoFuer, setStornoFuer] = useState<{ id: number; name: string } | null>(null);
   const isNewGestureStorno = useNewGesture(stornoFuer !== null);
@@ -1099,11 +1101,11 @@ function MaterialInhalt() {
         // `paddingXS` ließ 3 / 5 / 7 px.
         <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
           {/* Gruppierung (LLH-1225 D4): eine Segmentleiste darf im Kopf stehen
-              (`frontend/AGENTS.md`, „Nebenwege im Kopf“); je Einsatz im State, ohne Speicher. */}
+              (`frontend/AGENTS.md`, „Nebenwege im Kopf“); Zustand der Adresse (LLH-1826). */}
           <Segmentleiste<Gruppierung>
             beschriftung="Material gruppieren"
             wert={gruppierung}
-            onWechsel={(wert) => setGruppierungWahl({ einsatzId, wert })}
+            onWechsel={setzeGruppierung}
             optionen={GRUPPIERUNG_OPTIONEN}
           />
           {darfSchreiben && (

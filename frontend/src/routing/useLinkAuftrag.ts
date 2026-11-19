@@ -34,9 +34,12 @@ export function useAdressAenderung(): (aendere: (naechste: URLSearchParams) => v
   return useCallback(
     (aendere: (naechste: URLSearchParams) => void) => {
       // Klonen statt in-place mutieren: dieselbe Instanz lesen Render und andere Effekte.
-      const naechste = new URLSearchParams(ausstehend.get(location) ?? searchParams);
+      const basis = ausstehend.get(location) ?? searchParams;
+      const naechste = new URLSearchParams(basis);
       aendere(naechste);
       ausstehend.set(location, naechste);
+      // Nichts geändert: keine Navigation (ein Listenstand meldet oft denselben Stand erneut).
+      if (naechste.toString() === basis.toString()) return;
       setSearchParams(naechste, { replace: true });
     },
     [location, searchParams, setSearchParams],

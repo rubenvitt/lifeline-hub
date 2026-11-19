@@ -36,6 +36,7 @@ import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import {
   SPEZIES_META,
   TIERE_SICHTEN,
+  TIERE_SICHT_ERLAUBT,
   TIER_STATUS,
   filterTiere,
   halterNummer,
@@ -52,6 +53,7 @@ import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortEingabe } from '../anzeige/ortsfeldFormular';
 import { Marke } from '../components/instrument/Marke';
+import { useAdressWert } from '../routing/useAdressWert';
 
 /** Formularwerte: der Fundort ist ein Ortsfeld mit Text und Koordinate (LLH-1114). */
 type TierFormular = Omit<TierEingabe, 'antreff_ort' | 'antreff_lat' | 'antreff_lon'> & {
@@ -217,9 +219,10 @@ export default function TierePage() {
   const { token } = theme.useToken();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
+  // Der Reiter ist Zustand der Adresse (LLH-1826): er überlebt Weg und Zurück, ein anderer Einsatz
+  // ist eine andere Adresse.
+  const [sicht, setzeSicht] = useAdressWert('sicht', TIERE_SICHT_ERLAUBT, 'aktiv');
   const [highlight, setHighlight] = useState<{ einsatzId: number; tierId: number } | null>(null);
-  const sicht = sichtNachEinsatz[einsatzId] ?? 'aktiv';
   /**
    * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
    * Hook gehört der Seite und steht vor jedem frühen Ausstieg. Alle Achsen hängen an keinen Daten.
@@ -231,8 +234,9 @@ export default function TierePage() {
   /** Zählt Neuaufbauten der Sicht, wenn ein neues Tier sonst unter einem Kopffilter fehlte. */
   const [neuaufbau, setNeuaufbau] = useState(0);
 
+  /** Nur der Reiter des gezeigten Einsatzes steht in der Adresse. */
   const setSichtFuer = (zielEinsatzId: number, neueSicht: Sicht) => {
-    setSichtNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: neueSicht }));
+    if (zielEinsatzId === einsatzId) setzeSicht(neueSicht);
   };
   /**
    * Ein Reiterwechsel: der Suchbegriff gehört zur Menge des Reiters und fällt weg, Sortierung und

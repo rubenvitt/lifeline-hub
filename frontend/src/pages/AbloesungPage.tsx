@@ -105,6 +105,7 @@ import {
 import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { flaeche } from '../theme/tokens';
+import { useAdressWert } from '../routing/useAdressWert';
 
 const { Text } = Typography;
 
@@ -120,6 +121,8 @@ const abloesungRechteText = einsatzRechteGrund;
  */
 type Ansicht = AbloesungAnsicht;
 type Vergangen = 'abgeloest' | 'beendet';
+/** Werte von `?vergangen=` (LLH-1826); exhaustiv, Vorgabe `abgeloest`. */
+const VERGANGEN_ERLAUBT: Record<Vergangen, true> = { abgeloest: true, beendet: true };
 
 type Rhythmusziel =
   /** `vorgabe`: was bei leerem Feld gilt, schon als Platzhalter (Abschnitt vor Einsatz). */
@@ -231,7 +234,8 @@ export default function AbloesungPage() {
     if (sprungAnsicht !== ansicht) setAnsicht(sprungAnsicht);
     setSprungAnsicht(null);
   }, [sprungAnsicht, searchParams, ansicht, setAnsicht]);
-  const [vergangen, setVergangen] = useState<Vergangen>('abgeloest');
+  // Abgelöst oder beendet ist Zustand der Adresse wie die Ansicht (LLH-1826).
+  const [vergangen, setVergangen] = useAdressWert('vergangen', VERGANGEN_ERLAUBT, 'abgeloest');
   const [beginnenOffen, setBeginnenOffen] = useState(false);
   // Aus einer Zeile „Ohne Schicht“: die Einheit steht im Dialog schon gewählt.
   const [beginnenVorbelegt, setBeginnenVorbelegt] = useState<number | undefined>(undefined);
@@ -556,6 +560,7 @@ export default function AbloesungPage() {
     abgeloestQuery.isSuccess,
     beendetQuery.isSuccess,
     meldeUnbekannt,
+    setVergangen,
   ]);
   // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel).
   useEffect(() => {

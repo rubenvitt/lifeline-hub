@@ -55,6 +55,7 @@ import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
+import { useAdressSuche } from '../routing/useAdressWert';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
 interface AnlegeWerte {
@@ -315,7 +316,8 @@ function EinsaetzeInhalt() {
     // Kein `onError`-Toast (LFH-966): der Grund steht im Dialog, bis zum nächsten Absenden.
   });
 
-  const [suche, setSuche] = useState('');
+  // Die Suche steht in der Adresse (LLH-1826): sie überlebt Weg und Zurück.
+  const [suche, setSuche] = useAdressSuche();
   // Zuflussschleuse der Kacheln (LLH-1204), Erklärung unten bei `useZuflussSchleuse`.
   const zufluss = useZuflussSteuerung<EinsatzAnzeige>();
   const { nachBenutzeraktion } = zufluss;
@@ -393,11 +395,13 @@ function EinsaetzeInhalt() {
   // Fällt die Zahl aktiver Einsätze unter SUCHE_AB, während ein Suchbegriff steht (etwa nach einem
   // Refetch bei Fensterfokus), verschwindet das Suchfeld samt `allowClear`. `suche` wird dann
   // zurückgesetzt, sonst wirkte der Filter weiter — leeres Raster, kein Hinweis, kein Ausweg.
+  // Erst mit geladener Liste: ein Begriff aus der Adresse (LLH-1826) steht schon beim ersten Bild,
+  // ohne Liste ist das Feld noch verborgen und der Begriff fiele weg.
   useEffect(() => {
-    if (!sucheZeigen && suche !== '') {
+    if (!isPending && !sucheZeigen && suche !== '') {
       setSuche('');
     }
-  }, [sucheZeigen, suche]);
+  }, [isPending, sucheZeigen, suche, setSuche]);
 
   // Filtert die Suche alle aktiven Einsätze weg, ist `leer` weiterhin false (es gibt Einsätze);
   // ohne diesen Zweig stünde eine stumme Fläche da.

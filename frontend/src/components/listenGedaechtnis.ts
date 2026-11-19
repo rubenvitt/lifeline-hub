@@ -8,6 +8,7 @@ import {
   type ListenZustandAdresse,
 } from '../routing/deeplinks';
 import { sicherLesen, sicherSchreiben } from '../lib/sichererSpeicher';
+import { useAdressAenderung } from '../routing/useLinkAuftrag';
 
 /**
  * Das Gedächtnis einer Liste (LLH-1086, Spec `tabellen-sortieren-filtern`, `frontend/AGENTS.md`,
@@ -230,7 +231,7 @@ export function useListenGedaechtnis<K extends string = string>(
     sucheInAdresse?: boolean;
   } = {},
 ): ListenGedaechtnis<K> {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const vorgabe = optionen.vorgabe ?? null;
   const listenSchluessel = `${LISTE_PRAEFIX}${seite}${
     optionen.einsatzId != null ? `:${optionen.einsatzId}` : ''
@@ -266,12 +267,13 @@ export function useListenGedaechtnis<K extends string = string>(
   );
 
   // Die jüngste Adresse für den Vergleich in `melde`, ohne `melde` bei jeder Navigation neu zu bauen.
-  const aktuelleParams = useRef(searchParams);
-  aktuelleParams.current = searchParams;
   const vorgabeRef = useRef(vorgabe);
   vorgabeRef.current = vorgabe;
   const sucheInAdresseRef = useRef(sucheInAdresse);
   sucheInAdresseRef.current = sucheInAdresse;
+  const aendereAdresse = useAdressAenderung();
+  const aendereAdresseRef = useRef(aendereAdresse);
+  aendereAdresseRef.current = aendereAdresse;
 
   const aktuell = useRef(anfang.zustand);
   const melde = useCallback(
@@ -282,14 +284,18 @@ export function useListenGedaechtnis<K extends string = string>(
         listenSchluessel,
         listenZustandParams(new URLSearchParams(), adresse).toString(),
       );
-      const neu = listenZustandParams(
-        aktuelleParams.current,
-        sucheInAdresseRef.current ? adresse : { ...adresse, suche: '' },
-      );
-      if (neu.toString() === aktuelleParams.current.toString()) return;
-      setSearchParams(neu, { replace: true });
+      // Über `useAdressAenderung` (LLH-1826): ein Wert der Adresse, den die Seite im selben Zug
+      // setzt (etwa der Reiter beim Reiterwechsel), geht nicht verloren.
+      aendereAdresseRef.current((p) => {
+        const neu = listenZustandParams(
+          p,
+          sucheInAdresseRef.current ? adresse : { ...adresse, suche: '' },
+        );
+        for (const k of [...p.keys()]) p.delete(k);
+        neu.forEach((wert, k) => p.append(k, wert));
+      });
     },
-    [listenSchluessel, setSearchParams],
+    [listenSchluessel],
   );
 
   // Der Rückweg ohne Parameter: der gemerkte Stand gehört in die Adresse, damit Neuladen und Teilen

@@ -626,7 +626,10 @@ describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
       'data-hervorgehoben',
     );
     await waitFor(() =>
-      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/erinnerungen$/),
+      // Der Sprung räumt `?erinnerung=`, die Ansicht bleibt Zustand der Adresse (LLH-1826).
+      expect(screen.getByTestId('ort')).toHaveTextContent(
+        /^\/einsaetze\/1\/erinnerungen\?sicht=abgeschlossen$/,
+      ),
     );
   });
 
@@ -666,5 +669,25 @@ describe('ErinnerungenPage · Sprung ?erinnerung= (LLH-1429)', () => {
     expect(screen.queryByText('Zur Kenntnis')).not.toBeInTheDocument();
     expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
     expect(screen.getByText('Erinnerung #99 gibt es nicht (mehr)')).toBeInTheDocument();
+  });
+});
+
+/** LLH-1826: die Ansicht steht in der Adresse und überlebt Weg und Zurück. */
+describe('ErinnerungenPage — Ansicht in der Adresse (LLH-1826)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('die Wahl „Abgeschlossen“ steht in der Adresse', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('radio', { name: /^Abgeschlossen/ }));
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(
+        '/einsaetze/1/erinnerungen?sicht=abgeschlossen',
+      ),
+    );
+  });
+
+  it('?sicht=abgeschlossen zeigt die abgeschlossenen', async () => {
+    renderPage(undefined, '/einsaetze/1/erinnerungen?sicht=abgeschlossen');
+    expect(await screen.findByRole('radio', { name: /^Abgeschlossen/ })).toBeChecked();
   });
 });

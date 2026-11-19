@@ -209,3 +209,17 @@ describe('useAdressText (LLH-1826)', () => {
     await waitFor(() => expect(stand.search).toBe(''));
   });
 });
+
+describe('Stabile Setter (LLH-1826)', () => {
+  it('der Setter von useAdressWert bleibt über Navigationen derselbe', async () => {
+    const setter: unknown[] = [];
+    starte(() => {
+      const ergebnis = useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
+      if (setter[setter.length - 1] !== ergebnis[1]) setter.push(ergebnis[1]);
+      return ergebnis;
+    }, ['/m']);
+    setze('extern');
+    await waitFor(() => expect(stand.search).toBe('?richtung=extern'));
+    expect(setter).toHaveLength(1);
+  });
+});
