@@ -112,6 +112,9 @@ pub async fn importieren_tx(
             einsatzart: Some(crate::einsatz::EINSATZART_UEBUNG),
             begonnen_at: Some(&begonnen_at),
             ort: Default::default(),
+            // Bewusst ohne Einsatz-Vorlage (LLH-1816, Design-Doc D6): die Startvorlagen blenden
+            // Module aus, in denen die Demo Daten anlegt (etwa „Unwetter“ Personen und
+            // Unfallhilfsstellen); die Demo zeigt deshalb alle Module.
             vorlage_id: None,
         },
         admin_id,
