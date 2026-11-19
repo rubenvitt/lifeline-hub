@@ -79,7 +79,7 @@ test('nach einem Update: Karte, Punkt und Seite führen zum Lesestand', async ({
 
   // Die Seite öffnet mit dem Abschnitt seit der letzten Version und markiert die Version als gelesen.
   await expect(page).toHaveURL(/\/neuigkeiten$/);
-  await expect(page.getByText('Seit deiner letzten Version')).toBeVisible();
+  await expect(page.getByText('Seit der zuletzt gesehenen Version')).toBeVisible();
   await expect.poll(lesestand).toBe(health.version);
 
   // Zurück auf die Einsatzliste ist die Karte weg.

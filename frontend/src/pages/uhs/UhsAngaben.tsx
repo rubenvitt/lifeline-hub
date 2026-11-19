@@ -57,9 +57,8 @@ export default function UhsAngaben({
       name: 'soll_anzahl',
       label: 'Soll-Anzahl',
       anzeige: uhs.soll_anzahl ?? '—',
-      eingabe: (
-        <InputNumber min={1} max={UHS_SOLL_ANZAHL_MAX} precision={0} style={{ width: 120 }} />
-      ),
+      eingabe: <InputNumber min={1} max={UHS_SOLL_ANZAHL_MAX} precision={0} />,
+      breite: 'kurz',
       mono: true,
     },
     {

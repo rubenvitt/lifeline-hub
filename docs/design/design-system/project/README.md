@@ -235,8 +235,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     ist. Deshalb hängt das `<Outlet />` des Einsatzrahmens in `einsatz/ModulWechselGerippe.tsx`.
     Wechselt das Modul, steht im ersten Bild `ModulGerippeSeite` (Seitenkopf mit `modulName` und Ortspfad,
     `SeitenSkeleton verzoegert`, die Balken erst nach 120 ms), danach die Seite. Das gilt nicht
-    im selben Modul und nicht beim ersten Aufruf. Eine Seite baut kein eigenes Vorab-Gerippe für
-    den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
+    im selben Modul. Beim ersten Aufruf zeigt `ModulWechselGerippe` kein Vorab-Gerippe; lädt der
+    Einsatz dann noch, gibt die Seite in ihrem Frühausstieg selbst `ModulGerippeSeite` zurück
+    (Kopf sofort, Einsatz im Ortspfad als „…“), nie ein nacktes `SeitenSkeleton`. Was
+    erst mit den Daten kommt, reserviert seine Zeile vorher (unsichtbar, ohne Nullen) oder steht
+    unter allem, was schon steht; Nachweis: `e2e/erstaufruf-cls.spec.ts` (Erstaufruf mit langsamem
+    Server, CLS < 0,1). Eine Seite baut kein eigenes Vorab-Gerippe für den Wechsel. Ein nachgeladenes Modul nimmt `ModulGerippeSeite` als Suspense-Fallback, keinen
     Ladetext.
   - **Zwei Höhen** (`components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
@@ -686,16 +690,36 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer; neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+- **Anrede: niemand wird angesprochen** (Entscheidung 19.11.2026). Kein Du, kein Sie,
+  auch nicht in Servertexten, die bis zum Anwender durchkommen. Texte nennen die Sache („Eigene
+  Rolle“, „Code aus der Authenticator-App“) oder den Handgriff im Infinitiv („Nur bestätigen,
+  wenn …“); eine Frage ohne Pronomen ist erlaubt („Mit welchem Rufnamen ins ETB schreiben?“).
+  Dieselbe Regel gilt für die Anwenderdokumentation. Wächter:
+  `anredeText.guard.test.ts`; „Sie“ für eine Sache am Satzanfang steht dort als bewertete
+  Ausnahme.
 - **Kürzel sind eingeführt oder erklärt**: Die Oberfläche zeigt ein
   Kürzel nur, wenn es in `anzeige/kuerzel.ts` (`EINGEFUEHRTE_KUERZEL`) steht oder auf derselben
   Fläche sichtbar erklärt wird; sonst wird es ausgeschrieben („Unterabschnitte“, nicht „UA“). Ein
   neues Kürzel kommt in die Liste und in die Tabelle des Kapitels `zeiten-und-kuerzel.md`
   (`anzeige/kuerzel.test.ts` hält beide gleich). Kurzbezeichnungen der Organisation („EA 1.1“) sind
   Daten und bleiben. **Die Stärke** schreibt nur `anzeige/staerke.ts` (`staerkeText`, Wert
-  „1/2/5//8“); jede Fläche mit Stärke nennt `STAERKE_SCHREIBWEISE` („F/UF/M//Σ“) einmal sichtbar
+  „1/2/5//8“); jede Fläche mit Stärke nennt die Schreibweise „F/UF/M//Σ“ einmal sichtbar
   (Spaltenkopf, Feldetikett, Legende), der Wert trägt `STAERKE_AUSGESCHRIEBEN` als `title`
   (`StaerkeAnzeige`, `Kennzahl notizBeschreibung`). „Ges“, „Gesamt“ und eine Stärke ohne Summe gibt
-  es nicht (Wächter `anzeige/staerke.guard.test.ts`).
+  es nicht (Wächter `anzeige/staerke.guard.test.ts`). **Die Schreibweise erklärt sich auf Tippen**: in Komponenten
+  steht sie nur über `anzeige/KuerzelErklaerung.tsx` (`StaerkeSchreibweise`, schmale Spalte
+  `umbruchVorSumme`), einen Knopf ohne Knopfoptik mit Popover aus Bedeutung, Beispiel und dem Link
+  „Zeiten und Kürzel“; ein Tooltip allein trägt auf Touch nicht. Der Knopf hält Klicks, Enter und
+  Leertaste, Zeile und Tabellenkopf darum lösen nicht aus; Esc und Pfeile reicht er geschlossen
+  weiter, und ein Klick auf den Verweis im Fenster erreicht die Umgebung (Sprungpalette schließt).
+  Nie in einem Link oder `<label>`: dort bleibt die Schreibweise Text, und die Erklärung steht einmal
+  über den Zeilen (Überblick: `vorspann` des Paneels, nicht im Kopf-Meta, das schmal abgeschnitten
+  wird). Ein Spaltentitel als Knoten trägt `etikett` mit dem Klartext. **Die Trefffläche ist die
+  Textzeile**, eine begründete Ausnahme von der Staffel 30/48/72 (Entscheidung 19.11.2026): das
+  Kürzel steht in dichten Etiketten direkt über bearbeitbaren Werten, ein größeres Feld überdeckte
+  sie, und die Erklärung ist ein Zusatz, keine Handlung. Ausnahmen mit Grund und der Wächter (auch
+  Etiketten in `.ts`): `anzeige/kuerzelErklaerung.guard.test.ts`; in Leseansichten zählt der
+  Erklär-Knopf nicht als Aktion (`test/kuerzel.ts`, `aktionsKnoepfe`).
 
 ## Begriffe
 

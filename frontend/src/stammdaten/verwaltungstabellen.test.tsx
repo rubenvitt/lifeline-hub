@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -199,6 +199,23 @@ describe.each(FAELLE)('Verwaltungstabelle $name (LFH-980)', (fall) => {
     expect(eintraege.length, 'Vorbedingung: der Schalter listet Spalten').toBeGreaterThan(0);
     expect(eintraege).not.toContain(fall.status);
     expect(eintraege).not.toContain('Aktionen');
+  });
+
+  // Review LLH-1825 B3: ein Spaltentitel als Knoten braucht ein `etikett`, sonst stünde im
+  // Spaltenschalter der Schlüssel („staerke“) und der feste Kopf verlöre seine Mindestbreite.
+  it('jede Spalte trägt einen Klartext (keine Warnung des Spaltenschalters)', async () => {
+    const warnung = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      setzeViewportBreite(1024);
+      fall.render();
+      await screen.findByText(fall.zeile);
+      const spaltenWarnungen = warnung.mock.calls.filter((a) =>
+        String(a[0]).startsWith('[Spaltenschalter]'),
+      );
+      expect(spaltenWarnungen).toEqual([]);
+    } finally {
+      warnung.mockRestore();
+    }
   });
 
   it('unter md: Aktionen im Menü statt als Knöpfe, „Bearbeiten“ öffnet', async () => {

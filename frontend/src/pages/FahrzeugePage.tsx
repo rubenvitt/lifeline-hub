@@ -2,14 +2,14 @@ import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Typography, theme }
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, darfVerwaltung, isEinsatzGesperrt } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
-import { useLinkAuftrag } from '../routing/useLinkAuftrag';
+import { useAdressWertNachRueckfrage } from '../routing/useAdressWert';
 import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
@@ -37,7 +37,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { FELD_KLASSE, monoStil, Segmentleiste, Stapel, Knopfreihe } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
-  parseFahrzeugeAnsicht,
+  FAHRZEUGE_ANSICHT_ERLAUBT,
   type FahrzeugeAnsicht,
 } from '../routing/deeplinks';
 import { gibFahrzeugFrei, listeEinheiten, ordneFahrzeugZu } from '../api/einheiten';
@@ -476,29 +476,22 @@ function FahrzeugeInhalt() {
     vorgewaehlt: number[];
   } | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
-  // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
-  // mitnimmt (Muster `PersonenPage`).
-  const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, FahrzeugeAnsicht>>(
-    {},
-  );
-  const ansicht = ansichtNachEinsatz[einsatzId] ?? 'liste';
   const { istSchmal } = useViewport();
   // Am Handschirm hinter „Filter (n)“ (LLH-1786); der Zustand offen/zu ist flüchtig.
   const [filterOffen, setFilterOffen] = useState(false);
   const [listenFilterZahl, setListenFilterZahl] = useState(0);
   /** Ein Wechsel hängt die Liste samt offener Angabe aus: mit Änderung erst die Rückfrage. */
   const nachRueckfrage = useWechselNachRueckfrage();
-  const setzeAnsicht = (a: FahrzeugeAnsicht) =>
-    nachRueckfrage(() => setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a })));
+  // Die Ansicht ist Zustand der Adresse (LLH-1826): sie überlebt Weg und Zurück, ein anderer Einsatz
+  // ist eine andere Adresse. Die Sprungmarke „FMS-Tableau“ bleibt auf dem Pfad, `useBlocker` hält
+  // sie nicht an: der Hook übernimmt sie wie die Leiste erst nach der Rückfrage.
+  const [ansicht, setzeAnsicht, setzeAnsichtSofort] = useAdressWertNachRueckfrage(
+    'ansicht',
+    FAHRZEUGE_ANSICHT_ERLAUBT,
+    'liste',
+    nachRueckfrage,
+  );
 
-  // Sichtvorgabe ?ansicht= (Sprungmarke „FMS-Tableau"), apply-then-clean. Geräumt wird auch ein
-  // unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag. Über den Setter
-  // direkt (stabil, `setzeAnsicht` ist je Render neu). Einmal je Verlaufseintrag
-  // (`useLinkAuftrag`, LLH-1530): Bis der Router die Räumung committet, steht `?ansicht=` noch in
-  // `searchParams`, und ein Wechsel der Ansicht durch die Person holte die Vorgabe sonst zurück.
-  // `?fahrzeug=` räumt `useQueryParamSelektion` getrennt, beide Räumungen bauen aufeinander auf.
-  const [searchParams] = useSearchParams();
-  const ansichtAuftrag = useLinkAuftrag();
   /**
    * Sortierung, Kopffilter und Suche der Liste stehen in der Adresse (LLH-1096, Muster der
    * Schadenliste): Zurück, Neuladen und ein geteilter Link zeigen dieselbe Liste. Der Hook gehört
@@ -509,15 +502,6 @@ function FahrzeugeInhalt() {
     einsatzId,
     ausDaten: GEDAECHTNIS_AUS_DATEN,
   });
-  useEffect(() => {
-    if (!searchParams.has('ansicht')) return;
-    if (ansichtAuftrag.verbraucht()) return;
-    const vorgabe = parseFahrzeugeAnsicht(searchParams);
-    // Die Sprungmarke bleibt auf dem Pfad, `useBlocker` hält sie nicht an: wie die Leiste fragen.
-    if (vorgabe && vorgabe !== ansicht)
-      nachRueckfrage(() => setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe })));
-    ansichtAuftrag.raeume('ansicht');
-  }, [searchParams, ansichtAuftrag, einsatzId, ansicht, nachRueckfrage]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -597,7 +581,7 @@ function FahrzeugeInhalt() {
       if (!(efQuery.data ?? []).some((f) => f.id === fid)) {
         return (entlasseneQuery.data ?? []).some((f) => f.id === fid) ? undefined : false;
       }
-      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
+      setzeAnsichtSofort('liste');
       setHighlightId(fid);
     },
   );

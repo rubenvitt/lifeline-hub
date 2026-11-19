@@ -165,6 +165,17 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     ]);
   });
 
+  // LLH-1825: das Etikett erklärt die Schreibweise auf Tippen, ohne die Angabe zu öffnen.
+  it('das Etikett „Soll-Stärke (F/UF/M//Σ)“ öffnet die Erklärung, kein Eingabefeld', async () => {
+    renderKopf();
+    const knoepfe = within(kopf()).getAllByRole('button', { name: /^F\/UF\/M\/\/Σ/ });
+    expect(knoepfe).toHaveLength(2);
+    await userEvent.click(knoepfe[0]);
+    expect(await screen.findByRole('link', { name: 'Zeiten und Kürzel' })).toBeInTheDocument();
+    expect(within(kopf()).queryAllByRole('spinbutton')).toHaveLength(0);
+    expect(within(kopf()).queryAllByRole('textbox')).toHaveLength(0);
+  });
+
   it('ohne Klick steht kein Eingabefeld im Kopf', () => {
     renderKopf(einheit({ funkrufname: 'Heros 3/1', bemerkung: 'Zufahrt Nord' }));
     expect(within(kopf()).queryAllByRole('textbox')).toHaveLength(0);

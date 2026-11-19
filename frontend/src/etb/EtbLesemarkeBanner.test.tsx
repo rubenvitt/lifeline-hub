@@ -53,7 +53,7 @@ describe('EtbLesemarkeBanner', () => {
     );
     renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
 
-    expect(await screen.findByText(/^3 neue Einträge seit Ihrer letzten Sichtung/)).toBeTruthy();
+    expect(await screen.findByText(/^3 neue Einträge seit der letzten Sichtung/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'alle als gesichtet markieren' }));
 
     // Nicht „alles bis jetzt": zurück geht die Nummer, die das Banner angesagt hat.
@@ -73,7 +73,7 @@ describe('EtbLesemarkeBanner', () => {
       await screen.findByRole('button', { name: 'alle als gesichtet markieren' }),
     );
     expect(await screen.findByText('kaputt')).toBeTruthy();
-    expect(screen.getByText('2 Einträge, die Sie noch nicht gesichtet haben')).toBeTruthy();
+    expect(screen.getByText('2 noch nicht gesichtete Einträge')).toBeTruthy();
   });
 
   /** Der Grund steht am Banner, kein Toast (LFH-1077, `frontend/AGENTS.md`, Rückwege). */
@@ -134,19 +134,19 @@ describe('EtbLesemarkeBanner', () => {
       await screen.findByRole('alert');
 
       rerender(<EtbLesemarkeBanner einsatzId={8} />);
-      await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+      await screen.findByText('4 noch nicht gesichtete Einträge');
       expect(screen.queryByRole('alert')).toBeNull();
 
       // Zurück in Einsatz 7: der alte Grund ist geräumt. Erneut markieren, dann wechseln: die
       // späte Ablehnung bleibt aus 8.
       rerender(<EtbLesemarkeBanner einsatzId={7} />);
-      await screen.findByText('2 Einträge, die Sie noch nicht gesichtet haben');
+      await screen.findByText('2 noch nicht gesichtete Einträge');
       expect(screen.queryByRole('alert')).toBeNull();
       await userEvent.click(
         await screen.findByRole('button', { name: 'alle als gesichtet markieren' }),
       );
       rerender(<EtbLesemarkeBanner einsatzId={8} />);
-      await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+      await screen.findByText('4 noch nicht gesichtete Einträge');
       await act(async () => freigeben());
       await new Promise((r) => setTimeout(r, 50));
       expect(screen.queryByRole('alert')).toBeNull();
@@ -272,7 +272,7 @@ describe('EtbLesemarkeBanner – Funkprotokoll (LLH-1149)', () => {
   it('als Banner ohne Marke: kein Sprung, es gibt kein Ziel', async () => {
     stand({ neue_anzahl: 2, hoechste_lfd_nr: 5 });
     renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
-    await screen.findByText('2 Einträge, die Sie noch nicht gesichtet haben');
+    await screen.findByText('2 noch nicht gesichtete Einträge');
     expect(screen.queryByRole('button', { name: 'Zur Marke springen' })).toBeNull();
   });
 });

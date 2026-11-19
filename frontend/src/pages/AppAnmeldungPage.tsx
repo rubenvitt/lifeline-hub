@@ -87,7 +87,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
           type="warning"
           showIcon
           style={{ marginBottom: token.marginLG }}
-          title="Bestätige nur, wenn du gerade in der Lifeline-App auf „Im Browser anmelden“ gewählt hast."
+          title="Nur bestätigen, wenn gerade in der Lifeline-App „Im Browser anmelden“ gewählt wurde."
         />
         {fehler && (
           <Alert type="error" showIcon title={fehler} style={{ marginBottom: token.marginLG }} />

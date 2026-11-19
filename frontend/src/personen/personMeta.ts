@@ -106,6 +106,7 @@ export {
   sichtung as SK_META,
   personStatus as STATUS_META,
   personStatusDarstellung,
+  personSichtung,
 } from '../theme/statusFarben';
 
 /** Reihenfolge der Sichtungskategorien — Dringlichkeit zuerst, wie an der Aufnahme gesprochen.

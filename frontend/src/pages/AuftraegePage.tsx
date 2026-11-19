@@ -14,13 +14,14 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { parseAuftraegeReiter } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { modulName } from '../einsatz/modulRegistry';
+import { useAdressAenderung } from '../routing/useLinkAuftrag';
 
 export default function AuftraegePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   // Der Reiter ist Zustand der Adresse (`auftraegePfad`, `reiter`): Brotkrume und Browser-Zurück
   // aus einem Befehl landen so auf „Einsatzbefehle", nicht auf der Vorgabe.
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const reiter = parseAuftraegeReiter(searchParams);
   const reiterflaecheId = useId();
   // Welche Fläche schon einmal offen war: sie bleibt danach montiert (siehe unten).
@@ -31,17 +32,14 @@ export default function AuftraegePage() {
     befehle: besuchtListe.includes('befehle'),
   };
   const { token } = theme.useToken();
+  // Kein History-Eintrag je Reiterwechsel (`replace`): Zurück führt aus der Seite, nicht durch die
+  // Reiter. Über `useAdressAenderung` (LLH-1826), wie die Filter der Listen darunter.
+  const aendereAdresse = useAdressAenderung();
   const reiterWechseln = (neu: string) =>
-    setSearchParams(
-      (alt) => {
-        const naechste = new URLSearchParams(alt);
-        if (neu === 'befehle') naechste.set('reiter', 'befehle');
-        else naechste.delete('reiter');
-        return naechste;
-      },
-      // Kein History-Eintrag je Reiterwechsel: Zurück führt aus der Seite, nicht durch die Reiter.
-      { replace: true },
-    );
+    aendereAdresse((naechste) => {
+      if (neu === 'befehle') naechste.set('reiter', 'befehle');
+      else naechste.delete('reiter');
+    });
 
   // Grund einer abgelehnten Rücknahme aus dem Rückgängig-Toast der Einzelaufträge: die Karte ist
   // dann oft nicht mehr zu sehen, der Grund steht im Hinweis der Seite (LFH-1077).

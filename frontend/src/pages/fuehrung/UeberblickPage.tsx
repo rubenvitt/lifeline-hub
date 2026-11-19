@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { IconBericht, IconPlus } from '../../icons';
 import { useWasBrennt } from '../../lage/useWasBrennt';
@@ -960,6 +961,25 @@ export default function UeberblickPage() {
                           }
                           onNeuladen={() =>
                             nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
+                          }
+                          // Die Zeilen sind Links (kein Knopf im Link): die Schreibweise der Stärke
+                          // erklärt sich einmal über ihnen, nicht im Kopf-Meta, das schmal
+                          // abgeschnitten wird (LLH-1825, Review B4).
+                          vorspann={
+                            zeilen.length > 0 ? (
+                              <div
+                                data-lfh="abschnitt-legende"
+                                // fluchtet mit den Zeilen (`listenZeileStil`)
+                                style={{
+                                  paddingInline: token.padding,
+                                  paddingBlock: token.paddingXS,
+                                }}
+                              >
+                                <Textstufe stufe="meta" ton="gedaempft">
+                                  Stärke <StaerkeSchreibweise />
+                                </Textstufe>
+                              </div>
+                            ) : undefined
                           }
                           zeilen={zeilen.map((z) =>
                             abschnittGliederung(z, einsatzId, kurz, token, rollen, jetzt),

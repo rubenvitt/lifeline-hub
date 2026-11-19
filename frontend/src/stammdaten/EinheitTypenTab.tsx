@@ -1,7 +1,8 @@
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
 import { Input, InputNumber, type TableColumnsType } from 'antd';
 import { Feld, monoStil } from '../components/instrument';
 import { nachZahl } from '../components/katalogVergleich';
-import { STAERKE_SCHREIBWEISE, staerkeSumme } from '../anzeige/staerke';
+import { staerkeSumme } from '../anzeige/staerke';
 import { aktualisiereTyp, deaktiviereTyp, legeTypAn, listeEinheitTypen } from '../api/einheitTypen';
 import type { EinheitTyp, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -31,7 +32,11 @@ const spalten: TableColumnsType<EinheitTyp> = [
     sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
   },
   {
-    title: `Soll-Stärke (${STAERKE_SCHREIBWEISE})`,
+    title: (
+      <>
+        Soll-Stärke (<StaerkeSchreibweise />)
+      </>
+    ),
     key: 'soll',
     // Nach der Gesamtstärke (Σ); ohne Soll hinten (LLH-1096).
     sorter: nachZahl((t: EinheitTyp) => staerkeSumme(t.soll)),

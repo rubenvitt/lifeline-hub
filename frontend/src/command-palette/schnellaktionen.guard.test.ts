@@ -31,7 +31,8 @@ import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
  *  1. ER LÖST KEINE ROUTEN AUF. Dass die Datei mit dem Leser unter dem Zielpfad hängt, trägt der
  *     Literal-Pin in `befehle.test.ts` (UHS-Listenroute).
  *  2. INDIREKTION, und das ist eine FALLE: erfasst wird `X.get('<parameter>')` /
- *     `X.has('<parameter>')` mit dem Schlüssel als LITERAL. Hinter einer Konstante oder einem Helfer wird der Guard ROT, obwohl
+ *     `X.has('<parameter>')` und ein Hook `useAdress…('<parameter>', …)` (LLH-1826) mit dem
+ *     Schlüssel als LITERAL. Hinter einer Konstante oder einem Helfer wird der Guard ROT, obwohl
  *     der Deeplink funktioniert. Wer das ändern will, ändert den Scanner, nicht die Seite.
  *  3. OB DER LESER DEN PARAMETER VERWERTET; ein toter Zweig zählt mit.
  *  4. TESTDATEIEN werden gar nicht gescannt.
@@ -77,6 +78,20 @@ export function findeLeser(pfad: string, quelltext: string, parameter: string): 
         ts.isStringLiteralLike(erstes) &&
         erstes.text === parameter
       ) {
+        funde.push({
+          pfad,
+          zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
+        });
+      }
+    }
+    // Ein Hook der Adresse (`routing/useAdressWert.ts`, LLH-1826) mit dem Schlüssel als Literal.
+    if (
+      ts.isCallExpression(knoten) &&
+      ts.isIdentifier(knoten.expression) &&
+      knoten.expression.text.startsWith('useAdress')
+    ) {
+      const erstes = knoten.arguments[0];
+      if (erstes && ts.isStringLiteralLike(erstes) && erstes.text === parameter) {
         funde.push({
           pfad,
           zeile: quelle.getLineAndCharacterOfPosition(knoten.getStart(quelle)).line + 1,
@@ -147,6 +162,8 @@ const fileBase = (pfad: string): string =>
 const SEITE_MODUL: ReadonlyMap<string, string> = new Map([
   ['funkplan', 'fernmeldewesen'],
   ['kommunikationsplan', 'fernmeldewesen'],
+  // Unterseite einer Betreuungsstelle; liest seit LLH-1826 ihre Ansicht aus `?ansicht=`.
+  ['unterkunftplanen', 'betreuung'],
 ]);
 
 /**
@@ -218,6 +235,19 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
     expect(findeLeser('/src/synthetisch.ts', quelle, 'neu').map((l) => l.zeile)).toEqual([6, 7]);
     // Ein `neu`-Leser deckt keine Zeichen-Aktion und umgekehrt.
     expect(findeLeser('/src/synthetisch.ts', quelle, 'zeichnen').map((l) => l.zeile)).toEqual([9]);
+  });
+
+  /** Seit LLH-1826 liest eine Seite ihre Ansicht über die Hooks aus `routing/useAdressWert.ts`. */
+  it('zählt einen Hook der Adresse mit dem Schlüssel als Literal als Leser (LLH-1826)', () => {
+    const quelle = `
+      const [a] = useAdressWert('ansicht', ERLAUBT, 'liste');
+      const [b] = useAdressWertNachRueckfrage('ansicht', ERLAUBT, 'liste', frage);
+      const [c] = useAdressWert('sicht', ERLAUBT, 'offen');
+      const d = irgendwas('ansicht');
+    `;
+    expect(findeLeser('/src/synthetisch.ts', quelle, 'ansicht').map((l) => l.zeile)).toEqual([
+      2, 3,
+    ]);
   });
 
   it('ordnet Seiten mit anderem Namen ihrem Modul zu (LLH-1180, i6k6mzed)', () => {

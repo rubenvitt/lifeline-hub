@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/einsatzNebenzeile.ts, frontend/src/einsatz/DefaultModulRedirect.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, frontend/src/live/liveVerbindung.ts, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx, frontend/src/components/SprungZumInhalt.tsx, frontend/src/components/Fehlergrenze.tsx, frontend/src/components/KachelGrenze.tsx, frontend/src/components/SeitenZustand.tsx, frontend/src/components/DeeplinkHinweis.tsx, frontend/src/api/clientFehler.ts]
+quellen: [frontend/src/routing/useAdressWert.ts, frontend/src/components/RollWiederherstellung.tsx, frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/einsatzNebenzeile.ts, frontend/src/einsatz/DefaultModulRedirect.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, frontend/src/live/liveVerbindung.ts, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx, frontend/src/components/SprungZumInhalt.tsx, frontend/src/components/Fehlergrenze.tsx, frontend/src/components/KachelGrenze.tsx, frontend/src/components/SeitenZustand.tsx, frontend/src/components/DeeplinkHinweis.tsx, frontend/src/api/clientFehler.ts, frontend/src/hilfe/HilfeSeitenleisteProvider.tsx, frontend/src/hilfe/HilfeSeitenleiste.tsx, frontend/src/hilfe/HilfeKnopf.tsx, frontend/src/hilfe/kontextKapitel.ts, frontend/src/hilfe/tastenkuerzel.ts, frontend/src/hilfe/WillkommenKarte.tsx]
 ---
 
 ## Überblick
@@ -24,14 +24,14 @@ die Lifeline Hub bedienen.
 1. Die Einsatzliste öffnen: Sie erscheint nach der Anmeldung. Aus einem Einsatz führt „Alle
    Einsätze …“ im Menü am Einsatznamen dorthin, auf großen Monitoren auch „lifeline-hub“ links
    oben in der Kopfzeile.
-2. Die Kachel des Einsatzes wählen. Sie nennt Status, Einsatzart, die eigene Rolle („Deine
+2. Die Kachel des Einsatzes wählen. Sie nennt Status, Einsatzart, die eigene Rolle („Eigene
    Rolle: …“), den Einsatzleiter („EL …“, sonst „EL nicht erfasst“) und, soweit erfasst, Ort,
    Einsatznummer, Beginn („seit …“) und Stichwort. Eine Übung trägt statt der grauen Einsatzart
    die violette Marke „ÜBUNG“.
 
-   ![Einsatzliste unter der Kopfzeile: die Kachel „Neuer Einsatz“ und die Kachel eines laufenden Übungseinsatzes mit „Deine Rolle: Einsatzleitung“ und „EL nicht erfasst“](../bilder/einsatz-oberflaeche/einsatzliste.png)
+   ![Einsatzliste unter der Kopfzeile: die Kachel „Neuer Einsatz“ und die Kachel eines laufenden Übungseinsatzes mit „Eigene Rolle: Einsatzleitung“ und „EL nicht erfasst“](../bilder/einsatz-oberflaeche/einsatzliste.png)
 
-„Deine Rolle: Einsatzleitung“ nennt nur die eigenen Rechte im Einsatz. Wer den Einsatz führt,
+„Eigene Rolle: Einsatzleitung“ nennt nur die eigenen Rechte im Einsatz. Wer den Einsatz führt,
 steht unter „EL“; festgelegt wird er bei der Führungsstelle (siehe
 [Einsatzdaten und Führungsstelle](einsatzdaten.md)).
 
@@ -128,6 +128,25 @@ Auf schmalen Schirmen (Tablet hochkant, Telefon) stehen Kategorien und Module hi
 Ein Zeichen am Anfang der Eingabe grenzt die Suche ein: **>** nur Aktionen, **#** nur das
 Einsatztagebuch (`#42` findet Eintrag 42), **@** nur Personen und Kräfte. Auf einem Gerät mit
 Touch stehen diese Filter als Knöpfe am unteren Rand der Palette.
+
+### Hilfe zur Seite öffnen
+
+1. In der Kopfzeile das Fragezeichen „Hilfe zu dieser Seite“ wählen oder **?** drücken (außerhalb
+   eines Eingabefelds); **F1** geht auch aus einem Eingabefeld. Auf dem Handy steht „Hilfe zu
+   dieser Seite“ im Einsatz unten in der Navigation. In der Sprungpalette heißt der Befehl
+   ebenso.
+2. Rechts öffnet sich eine Seitenleiste mit dem Kapitel zur Seite, auf der man gerade arbeitet.
+   Die Seite bleibt daneben bedienbar. Wechselt man das Modul, wechselt das Kapitel mit.
+3. „In der Hilfe öffnen“ zeigt das Kapitel in der vollen Hilfe, am breiten Bildschirm mit Maus in
+   einem neuen Tab. „Alle Kapitel“ führt zur Übersicht. Ein Verweis im Text öffnet das genannte
+   Kapitel in der vollen Hilfe.
+4. Mit Tastatur zeigt der Reiter „Tastenkürzel“ die Tasten, die überall gelten, die der
+   Sprungpalette und die des aktuellen Moduls zuerst. Der Palettenbefehl „Tastenkürzel“ öffnet
+   ihn direkt. **Esc**, **?** oder das Kreuz schließen die Leiste.
+
+Beim ersten Besuch steht über der Einsatzliste eine Willkommenskarte mit den wichtigsten
+Handgriffen und dem Link „Einweisung lesen“. „Verstanden“ oder das Kreuz schließen sie für immer,
+auf jedem Gerät derselben Person.
 
 ### Aktionen einer Zeile über das Kontextmenü aufrufen
 
@@ -292,6 +311,8 @@ Von links nach rechts:
   „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung mit Wort; was dann gilt, steht in
   [Arbeiten ohne Netz](ohne-netz.md).
 - **Uhr**: die Uhrzeit des Geräts.
+- **Hilfe zu dieser Seite** (Fragezeichen) öffnet die Seitenleiste mit dem Kapitel zur Seite
+  (siehe „Hilfe zur Seite öffnen“).
 - **Benutzermenü** mit Name, Funktion im Einsatz, Profil, der Anzeige des Geräts (Darstellung,
   Bediendichte, Helligkeit), den Benachrichtigungen, den Neuigkeiten, der Hilfe und zuletzt
   „Abmelden“ mit Rückfrage.
@@ -304,7 +325,8 @@ keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 Die Kopfzeile bleibt beim Rollen oben stehen, auf jedem Gerät. Auf dem Handy trägt sie im Einsatz
 eine Zeile: „Navigation öffnen“, Statuspunkt und Name, Alarmzentrale, Verbindung und Uhr; nur im
 Handschuh-Betrieb bricht sie um, wenn die Alarmzentrale eine Störung im Wort nennt. „Suchen“
-steht dort oben in der Navigation, das Benutzermenü unten in der Navigation. Über einer Seite
+steht dort oben in der Navigation, „Hilfe zu dieser Seite“ und das Benutzermenü unten in der
+Navigation. Über einer Seite
 steht am Handy kein Ortspfad, den Einsatz nennt die Kopfzeile; auf einer Detailseite führt
 „‹ Betroffene“ (oder die jeweilige Liste) zurück. Außerhalb eines Einsatzes führt am Handy das
 Zeichen links oben zur Einsatzliste.
@@ -431,6 +453,22 @@ Auftrag oder ein Fahrzeug, den es nicht (mehr) gibt, steht über der Liste ein H
 #123 gibt es nicht (mehr)“. Die Zahl ist die Kennung aus dem Link; sie kann von der laufenden
 Nummer abweichen, die die Liste zeigt. Kein Eintrag ist dann gewählt oder hervorgehoben. Der
 Hinweis verschwindet mit ✕, mit der Wahl eines Eintrags oder mit dem nächsten Link.
+
+### Ansicht, Filter und Rollposition beim Zurück
+
+Was über einer Liste gewählt ist, steht in der Adresse der Seite: die Ansicht (etwa „Offen“ oder
+„Abgeschlossen“, „Sichtungsraster“ oder „FMS-Tableau“), Filter wie „Richtung: Extern“ und der
+Suchbegriff. Wer eine Meldung öffnet, in ein anderes Modul wechselt und mit **Zurück** im Browser
+wiederkommt, findet die Liste so vor, wie sie war, auch an derselben Stelle: Die App rollt dorthin
+zurück, sobald die Liste geladen ist. Rollt oder tippt man in diesen ersten ein, zwei Sekunden
+selbst, bleibt die Seite, wo man ist. Neuladen und ein weitergegebener Link zeigen dieselbe Ansicht
+mit denselben Filtern.
+
+Wer ein Modul über die Modulliste neu öffnet, beginnt mit der Vorgabe, etwa „Alle Richtungen“. So
+versteckt ein vergessener Filter keine Meldungen. Sortierung, Spaltenfilter und Suche einer Tabelle
+merkt sich die Sitzung dagegen auch für diesen Weg. Ein Link, der eine Ansicht nennt, etwa „Patienten“
+oder „Vermisste“ im Modulpanel, zeigt genau diese Ansicht; was er nicht nennt, steht auf der
+Vorgabe. Der Suchbegriff der Betroffenen steht nie in der Adresse, weil er einen Namen tragen kann.
 
 ### Wo das Kontextmenü gilt
 

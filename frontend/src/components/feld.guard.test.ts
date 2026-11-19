@@ -85,13 +85,7 @@ const BEREICHE = [
  * Dateien in einem Bereich, die der Wächter noch nicht prüft — je mit der Aufgabe, nach der sie
  * dazukommen. Neue Einträge gibt es nicht; eine erledigte Aufgabe streicht ihre.
  */
-const AUSGESPART: Readonly<Record<string, string>> = {
-  // `DatenfeldEingabe` klont sein Kind mit der Label-`id` und kennt noch keine Breite (LLH-2000).
-  'pages/uhs/UhsAngaben.tsx': 'LLH-2000',
-  'pages/BetreuungsstelleDetailPage.tsx': 'LLH-2000',
-  'pages/SchaedenDetailPage.tsx': 'LLH-2000',
-  'pages/TiereDetailPage.tsx': 'LLH-2000',
-};
+const AUSGESPART: Readonly<Record<string, string>> = {};
 
 /** Was eine feste Zahlbreite behalten darf, wie oft — und warum. Keine davon ist ein Eingabefeld. */
 const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = {

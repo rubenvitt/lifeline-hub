@@ -330,8 +330,8 @@ export function personenPfad(
     person?: number;
     neu?: boolean;
     /**
-     * Sichtvorgabe: die Seite übernimmt sie beim Ankommen und räumt die Parameter
-     * (apply-then-clean). Die URL trägt einen AUFTRAG, keinen gespiegelten Filter. Anspringer
+     * Die Sicht ist Zustand der Adresse (LLH-1826, `personen/usePersonenSicht.ts`): sie bleibt
+     * stehen und überlebt Weg und Zurück. Was ein Link nicht nennt, gilt als Vorgabe. Anspringer
      * sind die Sprungmarken „Patienten" und „Vermisste" (`einsatz/sprungmarken.ts`).
      */
     filter?: PersonenFilter;
@@ -1007,7 +1007,7 @@ export function einheitAusVorlagePfad(einsatzId: number, vorlageId: number): str
  */
 export type FahrzeugeAnsicht = 'liste' | 'tableau';
 
-/** `ansicht` ist ein AUFTRAG wie bei {@link personenPfad} (apply-then-clean). */
+/** `ansicht` ist Zustand der Adresse wie bei {@link personenPfad} (LLH-1826). */
 export function fahrzeugePfad(
   einsatzId: number,
   opts: { fahrzeug?: number; ansicht?: FahrzeugeAnsicht } = {},
@@ -1019,7 +1019,7 @@ export function fahrzeugePfad(
 }
 
 /** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
-const FAHRZEUGE_ANSICHT_ERLAUBT: Record<FahrzeugeAnsicht, true> = {
+export const FAHRZEUGE_ANSICHT_ERLAUBT: Record<FahrzeugeAnsicht, true> = {
   liste: true,
   tableau: true,
 };
@@ -1041,7 +1041,7 @@ export type AbschnitteAnsicht = 'gliederung' | 'organigramm';
 
 /**
  * Einsatzabschnitte; `?abschnitt=` selektiert, `?neu=1` öffnet den Entwurf eines neuen.
- * `ansicht` ist ein AUFTRAG wie bei {@link fahrzeugePfad} (apply-then-clean).
+ * `ansicht` ist Zustand der Adresse wie bei {@link fahrzeugePfad} (LLH-1826).
  */
 export function einsatzabschnittePfad(
   einsatzId: number,
@@ -1055,7 +1055,7 @@ export function einsatzabschnittePfad(
 }
 
 /** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
-const ABSCHNITTE_ANSICHT_ERLAUBT: Record<AbschnitteAnsicht, true> = {
+export const ABSCHNITTE_ANSICHT_ERLAUBT: Record<AbschnitteAnsicht, true> = {
   gliederung: true,
   organigramm: true,
 };
@@ -1067,6 +1067,27 @@ export function parseAbschnitteAnsicht(params: URLSearchParams): AbschnitteAnsic
     ? (ansicht as AbschnitteAnsicht)
     : undefined;
 }
+
+/**
+ * Sicht „offen“/„abgeschlossen“ der Meldungen und Einzelaufträge, Zustand der Adresse `?sicht=`
+ * (LLH-1826); Vorgabe `offen`.
+ */
+export type OffenAbgeschlossen = 'offen' | 'abgeschlossen';
+export const OFFEN_ABGESCHLOSSEN_ERLAUBT: Record<OffenAbgeschlossen, true> = {
+  offen: true,
+  abgeschlossen: true,
+};
+
+/**
+ * Richtungsfilter der Meldungen und Einzelaufträge, Zustand der Adresse `?richtung=` (LLH-1826);
+ * Vorgabe `alle`.
+ */
+export type RichtungFilter = 'alle' | 'intern' | 'extern';
+export const RICHTUNG_ERLAUBT: Record<RichtungFilter, true> = {
+  alle: true,
+  intern: true,
+  extern: true,
+};
 
 /** `neu` öffnet das Meldungsformular (Schnellaktion „Meldung erfassen“, Leser `MeldungenPage`). */
 export function meldungenPfad(

@@ -1057,7 +1057,7 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     const p = props({ rufname: rufnameZugriff(null) });
     renderMitProviders(<Schnellerfassung {...p} />);
     expect(
-      screen.getByRole('group', { name: 'Mit welchem Rufnamen schreibst du ins ETB?' }),
+      screen.getByRole('group', { name: 'Mit welchem Rufnamen ins ETB schreiben?' }),
     ).toBeInTheDocument();
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Pegel steigt{Enter}');
@@ -1146,7 +1146,7 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     renderMitProviders(<Schnellerfassung {...props()} />);
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Eigene Stelle ändern' }));
-    const abfrage = screen.getByRole('group', { name: 'Dein Rufname für Von und An' });
+    const abfrage = screen.getByRole('group', { name: 'Eigener Rufname für Von und An' });
     expect(abfrage).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();

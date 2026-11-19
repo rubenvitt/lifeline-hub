@@ -6,6 +6,7 @@ import { renderMitProviders } from '../../test/utils';
 import { Select } from '../Select';
 import Datenraster from './Datenraster';
 import DatenfeldEingabe from './DatenfeldEingabe';
+import { FELD_GRENZE } from './Feld';
 import { AenderungsstandProvider } from '../aenderungsstand';
 
 function Maske({ onFinish = () => {} }: { onFinish?: (werte: unknown) => void }) {
@@ -43,6 +44,27 @@ function Maske({ onFinish = () => {} }: { onFinish?: (werte: unknown) => void })
 }
 
 describe('DatenfeldEingabe', () => {
+  it('setzt die Obergrenze der Stufe an das Formularfeld, ohne Breite an der Eingabe (LLH-2000)', () => {
+    renderMitProviders(
+      <Form>
+        <Datenraster beschriftung="Daten">
+          <DatenfeldEingabe label="Anzahl" name="anzahl" breite="kurz">
+            <InputNumber />
+          </DatenfeldEingabe>
+          <DatenfeldEingabe label="Ort" name="ort">
+            <Input />
+          </DatenfeldEingabe>
+        </Datenraster>
+      </Form>,
+    );
+    const item = (name: string) =>
+      screen.getByLabelText(name).closest('.ant-form-item') as HTMLElement;
+    // Mutationsprobe: ohne die Custom Property am `Form.Item` bleibt die Stufe wirkungslos.
+    expect(item('Anzahl').style.getPropertyValue(FELD_GRENZE)).toBe('120px');
+    // Ohne Stufe keine Grenze: das Feld füllt die Zelle.
+    expect(item('Ort').style.getPropertyValue(FELD_GRENZE)).toBe('');
+  });
+
   it('benennt jede Eingabe über ihr Etikett im Begriff', () => {
     renderMitProviders(<Maske />);
     // Mutationsprobe: ohne `htmlFor` am Etikett (oder ohne die Kennung an der Eingabe) findet

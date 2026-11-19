@@ -42,7 +42,7 @@ describe('ModulGesperrt (LFH-888)', () => {
     expect(screen.getByRole('heading', { level: 1, name: /Lagemeldungen/ })).toBeInTheDocument();
     expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
     // Eine kurze Sperrzeile, kein Satz über die Einstellungen (LFH-1078).
-    expect(screen.getByText('Für deine Rolle nicht freigegeben')).toBeInTheDocument();
+    expect(screen.getByText('Für die eigene Rolle nicht freigegeben')).toBeInTheDocument();
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Einstellungen › Module/)).not.toBeInTheDocument();
   });

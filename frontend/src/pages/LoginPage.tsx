@@ -393,7 +393,7 @@ export default function LoginPage() {
               </Feld>
             ) : (
               <Feld
-                label="Code aus deiner Authenticator-App"
+                label="Code aus der Authenticator-App"
                 name="code"
                 rules={[{ required: true, message: 'Bitte Code eingeben' }]}
               >
@@ -538,7 +538,7 @@ export default function LoginPage() {
                 ohne etwas über das Konto zu verraten (LFH-946). */}
             {passwortAktiv && (
               <p className="login-hinweis">
-                Passwort vergessen? Die Administration deiner Organisation setzt es zurück.
+                Passwort vergessen? Die Administration der Organisation setzt es zurück.
               </p>
             )}
             {imBrowserAnmelden && (

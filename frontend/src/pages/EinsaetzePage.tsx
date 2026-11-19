@@ -65,8 +65,10 @@ import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../einsatz/einsatzlei
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
+import WillkommenKarte from '../hilfe/WillkommenKarte';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
+import { useAdressSuche } from '../routing/useAdressWert';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Zeitpunkt aus der `ZeitpunktEingabe`). */
 interface AnlegeWerte {
@@ -175,7 +177,7 @@ const einsatzGruppe = (e: EinsatzAnzeige) => e.status;
  * Wer keinen Einsatz sieht, ist meist in keinem Einsatz Mitglied (LLH-1819): aufnehmen kann nur
  * die Einsatzleitung des jeweiligen Einsatzes. Ohne Namen, die Liste kennt keinen Einsatz.
  */
-const HINWEIS_KEINE_EINSAETZE = 'Zu einem Einsatz nimmt dich dessen Einsatzleitung auf.';
+const HINWEIS_KEINE_EINSAETZE = 'In einen Einsatz aufnehmen kann nur dessen Einsatzleitung.';
 
 /**
  * Die Einsatzliste liegt außerhalb jedes Einsatzes: Anzeige und „Einsatz anlegen“ nehmen die
@@ -346,7 +348,8 @@ function EinsaetzeInhalt() {
     // Kein `onError`-Toast (LFH-966): der Grund steht im Dialog, bis zum nächsten Absenden.
   });
 
-  const [suche, setSuche] = useState('');
+  // Die Suche steht in der Adresse (LLH-1826): sie überlebt Weg und Zurück.
+  const [suche, setSuche] = useAdressSuche();
   // Zuflussschleuse der Kacheln (LLH-1204), Erklärung unten bei `useZuflussSchleuse`.
   const zufluss = useZuflussSteuerung<EinsatzAnzeige>();
   const { nachBenutzeraktion } = zufluss;
@@ -424,11 +427,13 @@ function EinsaetzeInhalt() {
   // Fällt die Zahl aktiver Einsätze unter SUCHE_AB, während ein Suchbegriff steht (etwa nach einem
   // Refetch bei Fensterfokus), verschwindet das Suchfeld samt `allowClear`. `suche` wird dann
   // zurückgesetzt, sonst wirkte der Filter weiter — leeres Raster, kein Hinweis, kein Ausweg.
+  // Erst mit geladener Liste: ein Begriff aus der Adresse (LLH-1826) steht schon beim ersten Bild,
+  // ohne Liste ist das Feld noch verborgen und der Begriff fiele weg.
   useEffect(() => {
-    if (!sucheZeigen && suche !== '') {
+    if (!isPending && !sucheZeigen && suche !== '') {
       setSuche('');
     }
-  }, [sucheZeigen, suche]);
+  }, [isPending, sucheZeigen, suche, setSuche]);
 
   // Filtert die Suche alle aktiven Einsätze weg, ist `leer` weiterhin false (es gibt Einsätze);
   // ohne diesen Zweig stünde eine stumme Fläche da.
@@ -503,7 +508,7 @@ function EinsaetzeInhalt() {
             )}
             {/* Mit Kontext: allein gelesen hielte man „Einsatzleitung“ für eine Eigenschaft des
                 Einsatzes, nicht für die eigene Rolle (LFH-946). */}
-            {e.meine_rolle && <Marke>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
+            {e.meine_rolle && <Marke>Eigene Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
           </Stapel>
           {/* Ort und Beginn beantworten „welcher ist meiner?". Das Icon trägt eine
               `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}
@@ -560,6 +565,8 @@ function EinsaetzeInhalt() {
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
+      {/* Willkommen vor Neuigkeiten (LLH-1824): für Erstnutzer das Wichtigere. */}
+      <WillkommenKarte />
       <NeuigkeitenHinweis />
 
       {/* Leer und anlegeberechtigt schließen sich nicht aus. Keine Primäraktion am Leerknoten:

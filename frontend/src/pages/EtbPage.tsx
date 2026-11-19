@@ -34,7 +34,8 @@ import {
   parseRouteId,
 } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
+import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import type { Speicherung } from '../components/Erfassung';
@@ -802,7 +803,8 @@ export default function EtbPage() {
   // Seitenzustand: ohne den Einsatz gibt es weder Breadcrumb noch Schreibrecht — deshalb
   // Frühausstieg. Der Listenzustand des Tagebuchs entscheidet sich unten.
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    // Kopf sofort, damit er beim Eintreffen des Einsatzes nicht nachrutscht (LLH-1830).
+    return <ModulGerippeSeite modulKey="etb" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -1245,7 +1247,7 @@ export default function EtbPage() {
             data-lfh="etb-zeitachse-rahmen"
             style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
           >
-            {/* „neu seit Ihrer letzten Sichtung" — als Linie in der Achse, wenn die Marke im
+            {/* „neu seit der letzten Sichtung" — als Linie in der Achse, wenn die Marke im
                 Fenster steht, sonst hier als Banner im Fluss; das Sammelbanner des
                 Live-Zuflusses liegt dagegen auf der Zeitachse. */}
             {!markeInAchse && (

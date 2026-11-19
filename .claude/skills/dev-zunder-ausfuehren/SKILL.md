@@ -247,17 +247,21 @@ Design-Docs eines Laufs gesammelt vorgelegt, aber auch dann gilt: kein Workflow 
 
 **Projektregeln gehen den Superpowers-Skills vor** (deren eigene Regel: Anweisungen aus
 `AGENTS.md` haben Vorrang). Für die Umsetzung heißt das: Standard ist `executing-plans`
-(Main-Loop setzt selbst um); `subagent-driven-development` nur, wenn der Mensch es wählt oder
-der Plan so lang ist, dass späte Aufgaben auf verdichtetem Kontext liefen. In beiden Fällen ist
+(Main-Loop setzt selbst um); `subagent-driven-development` nur, wenn der Plan so lang ist, dass
+späte Aufgaben auf verdichtetem Kontext liefen, oder seine Aufgaben so unabhängig und heikel
+sind, dass ein frischer Kontext je Aufgabe die Güte hebt. In beiden Fällen ist
 der Abschlussreview des Skills der Review aus „Review nach Ermessen“: er läuft nur bei einem
 Anlass von dort, als ein Agent mit `references/review-pruefliste.md`; ohne Anlass genügt die
 Selbstprüfung des Skills, im Ledger vermerkt. Unter `subagent-driven-development` entfallen die
 Reviewer je Aufgabe (keine Gegenprüfer), und jeder Implementer-Prompt trägt die Pflichtpunkte aus
 „Agenten nach Bedarf“.
 
-Den Plan legt `writing-plans` dem Menschen mit der Frage nach der Ausführungsart vor
-(`subagent-driven-development` oder `executing-plans`); das ist kein zweiter Freigabe-Halt für
-den Weg, nur die Wahl der Art. Die **Art zu arbeiten** bleibt: jede Aufgabe per
+**Die Ausführungsart wählst du selbst** (Festlegung des Users vom 19.11.2026: „du entscheidest
+selbst, ob Subagents oder nicht“). Nach `writing-plans` fragst du **nicht** nach
+`subagent-driven-development` oder `executing-plans`, auch wenn `writing-plans` diese Frage
+vorsieht. Du entscheidest nach dem Absatz oben, nennst die Wahl mit einem Satz Begründung und
+legst den Plan zur Kenntnis vor; der Mensch darf widersprechen. Einen zweiten Freigabe-Halt für
+den Weg gibt es nicht. Die **Art zu arbeiten** bleibt: jede Aufgabe per
 `superpowers:test-driven-development`, und Schritt 4 gilt unverändert.
 
 **Ablage:** Design-Docs unter `docs/superpowers/specs/YYYY-MM-DD-<kurz>-<slug>-design.md`, Pläne
