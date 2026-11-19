@@ -88,10 +88,12 @@ pub async fn stream(
     let praesenz_strom = match &ctx.geraet {
         None => {
             let rx = state.live.abonniere_praesenz();
+            let hub = state.live.clone();
             futures::StreamExt::boxed(crate::routes::support::sse_praesenz_stream(
                 state.live.praesenz_stand(einsatz_id),
                 rx,
                 erlaubt.clone(),
+                move || hub.praesenz_stand(einsatz_id),
             ))
         }
         Some(_) => futures::StreamExt::boxed(futures::stream::empty()),

@@ -488,6 +488,7 @@ impl LiveHub {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0);
+        let praesenz_tx = broadcast::channel(256).0;
         Self {
             kanaele: Arc::new(RwLock::new(Kanaele::default())),
             org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
@@ -496,8 +497,8 @@ impl LiveHub {
             sitzung_ende: broadcast::channel(256).0,
             stroeme: strom::StromZulassung::neu(grenzen),
             web_push: Arc::default(),
-            praesenz: Arc::default(),
-            praesenz_tx: broadcast::channel(256).0,
+            praesenz: Arc::new(praesenz::PraesenzSpeicher::mit_melden(praesenz_tx.clone())),
+            praesenz_tx,
         }
     }
 
@@ -508,23 +509,14 @@ impl LiveHub {
         einsatz_id: i64,
         eintrag: praesenz::PraesenzEintrag,
     ) -> Result<(), crate::error::AppError> {
-        let (geaendert, vorgaenger) =
-            self.praesenz
-                .setze_mit_vorgaenger(einsatz_id, eintrag, Instant::now())?;
-        if let Some(alt) = vorgaenger {
-            self.praesenz_verteilen(alt);
-        }
-        if geaendert {
-            self.praesenz_verteilen(einsatz_id);
-        }
+        self.praesenz
+            .setze_mit_vorgaenger(einsatz_id, eintrag, Instant::now())?;
         Ok(())
     }
 
     /// Beendet die Präsenz eines Fensters in diesem Einsatz; verteilt nur, wenn es eine gab.
-    pub fn praesenz_entfernen(&self, einsatz_id: i64, benutzer_id: i64, fenster: &str) {
-        if self.praesenz.entferne(einsatz_id, benutzer_id, fenster) {
-            self.praesenz_verteilen(einsatz_id);
-        }
+    pub fn praesenz_entfernen(&self, einsatz_id: i64, meldung: &praesenz::PraesenzEintrag) {
+        self.praesenz.entferne(einsatz_id, meldung);
     }
 
     /// Der ungefilterte Präsenzstand eines Einsatzes (für den Stand beim Verbinden).
@@ -539,14 +531,7 @@ impl LiveHub {
 
     /// Entfernt Abgelaufenes und verteilt die betroffenen Stände.
     pub fn praesenz_raeumen(&self, jetzt: Instant) {
-        for einsatz_id in self.praesenz.raeume(jetzt) {
-            self.praesenz_verteilen(einsatz_id);
-        }
-    }
-
-    fn praesenz_verteilen(&self, einsatz_id: i64) {
-        // Ohne Abonnenten ist `send` ein Fehler ohne Folgen.
-        let _ = self.praesenz_tx.send(self.praesenz.stand(einsatz_id));
+        self.praesenz.raeume(jetzt);
     }
 
     /// Startet den Aufräumtakt der Präsenz (nur im Server-Lauf, wie [`Self::starte_kanal_sweep`]).

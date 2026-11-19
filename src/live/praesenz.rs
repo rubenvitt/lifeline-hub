@@ -159,6 +159,15 @@ pub fn pruefe_meldung(
     Ok(())
 }
 
+/// Gleiche Meldung: dasselbe Fenster an denselben Angaben; der Anzeigename zählt nicht.
+fn gleiche_meldung(a: &PraesenzEintrag, b: &PraesenzEintrag) -> bool {
+    a.benutzer_id == b.benutzer_id
+        && a.fenster == b.fenster
+        && a.objekt == b.objekt
+        && a.einheit_id == b.einheit_id
+        && a.felder == b.felder
+}
+
 #[derive(Default)]
 struct Zustand {
     /// Je Einsatz die Einträge mit ihrem letzten Lebenszeichen.
@@ -195,11 +204,26 @@ impl Zustand {
     fn aufraeumen_leere(&mut self) {
         self.einsaetze.retain(|_, l| !l.is_empty());
     }
+
+    fn stand(&self, einsatz_id: i64) -> PraesenzStand {
+        PraesenzStand {
+            einsatz_id,
+            eintraege: self
+                .einsaetze
+                .get(&einsatz_id)
+                .map(|l| l.iter().map(|(e, _)| e.clone()).collect())
+                .unwrap_or_default(),
+        }
+    }
 }
 
 /// Der Präsenzspeicher eines Prozesses.
 pub struct PraesenzSpeicher {
     zustand: Mutex<Zustand>,
+    /// Ziel der geänderten Stände. Gesendet wird unter derselben Sperre, unter der der Stand sich
+    /// ändert: so überholt ein älterer Stand nie einen neueren (Review 19.11.2026, Befund 1).
+    /// `broadcast::send` blockiert nicht.
+    melden: Option<tokio::sync::broadcast::Sender<PraesenzStand>>,
     je_benutzer: usize,
     gesamt: usize,
 }
@@ -215,8 +239,25 @@ impl PraesenzSpeicher {
     pub fn mit_grenzen(je_benutzer: usize, gesamt: usize) -> Self {
         Self {
             zustand: Mutex::new(Zustand::default()),
+            melden: None,
             je_benutzer,
             gesamt,
+        }
+    }
+
+    /// Ein Speicher, der jeden geänderten Stand an `melden` sendet.
+    pub fn mit_melden(melden: tokio::sync::broadcast::Sender<PraesenzStand>) -> Self {
+        Self {
+            melden: Some(melden),
+            ..Self::default()
+        }
+    }
+
+    /// Sendet den Stand eines Einsatzes; nur unter der Sperre aufrufen.
+    fn melde(&self, z: &Zustand, einsatz_id: i64) {
+        if let Some(tx) = &self.melden {
+            // Ohne Abonnenten ist `send` ein Fehler ohne Folgen.
+            let _ = tx.send(z.stand(einsatz_id));
         }
     }
 
@@ -266,19 +307,29 @@ impl PraesenzSpeicher {
             .or_default()
             .push((eintrag, jetzt));
         z.aufraeumen_leere();
+        if let Some(alt) = vorgaenger {
+            self.melde(&z, alt);
+        }
+        if geaendert {
+            self.melde(&z, einsatz_id);
+        }
         Ok((geaendert, vorgaenger))
     }
 
-    /// Beendet den Eintrag des Fensters in diesem Einsatz. `true`, wenn es einen gab.
-    pub fn entferne(&self, einsatz_id: i64, benutzer_id: i64, fenster: &str) -> bool {
+    /// Beendet den Eintrag des Fensters in diesem Einsatz. `true`, wenn es einen gab. Beendet nur den Eintrag, der genau dieser Meldung entspricht (Fenster, Objekt, Einheit,
+    /// Felder): ein spätes DELETE eines geschlossenen Feldes beendet nicht das neu geöffnete.
+    pub fn entferne(&self, einsatz_id: i64, meldung: &PraesenzEintrag) -> bool {
         let mut z = self.zustand.lock().unwrap_or_else(|p| p.into_inner());
         let Some(liste) = z.einsaetze.get_mut(&einsatz_id) else {
             return false;
         };
         let vorher = liste.len();
-        liste.retain(|(e, _)| !(e.benutzer_id == benutzer_id && e.fenster == fenster));
+        liste.retain(|(e, _)| !gleiche_meldung(e, meldung));
         let entfernt = liste.len() != vorher;
         z.aufraeumen_leere();
+        if entfernt {
+            self.melde(&z, einsatz_id);
+        }
         entfernt
     }
 
@@ -297,20 +348,18 @@ impl PraesenzSpeicher {
         }
         z.aufraeumen_leere();
         geaendert.sort_unstable();
+        for einsatz_id in &geaendert {
+            self.melde(&z, *einsatz_id);
+        }
         geaendert
     }
 
     /// Der ganze Stand eines Einsatzes, ungefiltert.
     pub fn stand(&self, einsatz_id: i64) -> PraesenzStand {
-        let z = self.zustand.lock().unwrap_or_else(|p| p.into_inner());
-        PraesenzStand {
-            einsatz_id,
-            eintraege: z
-                .einsaetze
-                .get(&einsatz_id)
-                .map(|l| l.iter().map(|(e, _)| e.clone()).collect())
-                .unwrap_or_default(),
-        }
+        self.zustand
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .stand(einsatz_id)
     }
 }
 
@@ -381,14 +430,66 @@ mod tests {
     #[test]
     fn entfernen_ist_idempotent() {
         let s = PraesenzSpeicher::default();
-        s.setze(1, eintrag(7, "a", "leitstellen_nr"), Instant::now())
-            .unwrap();
-        assert!(s.entferne(1, 7, "a"));
-        assert!(!s.entferne(1, 7, "a"));
+        let e = eintrag(7, "a", "leitstellen_nr");
+        s.setze(1, e.clone(), Instant::now()).unwrap();
+        assert!(s.entferne(1, &e));
+        assert!(!s.entferne(1, &e));
         // Ein fremdes Konto beendet kein fremdes Fenster.
-        s.setze(1, eintrag(7, "a", "leitstellen_nr"), Instant::now())
-            .unwrap();
-        assert!(!s.entferne(1, 8, "a"));
+        s.setze(1, e.clone(), Instant::now()).unwrap();
+        assert!(!s.entferne(1, &eintrag(8, "a", "leitstellen_nr")));
+    }
+
+    /// Schließen von A und Öffnen von B im selben Fenster laufen parallel: kommt das DELETE von A
+    /// nach dem PUT von B an, bleibt B stehen (Review 19.11.2026, Befund 3).
+    #[test]
+    fn entfernen_trifft_nur_den_passenden_eintrag() {
+        let s = PraesenzSpeicher::default();
+        let b = eintrag(7, "a", "stichwort");
+        s.setze(1, b.clone(), Instant::now()).unwrap();
+        assert!(!s.entferne(1, &eintrag(7, "a", "leitstellen_nr")));
+        let einheit = PraesenzEintrag {
+            objekt: PraesenzObjekt::Einheit,
+            einheit_id: Some(3),
+            ..eintrag(7, "a", "stichwort")
+        };
+        assert!(!s.entferne(1, &einheit), "anderes Objekt");
+        assert_eq!(s.stand(1).eintraege, vec![b]);
+    }
+
+    /// Verteilte Stände kommen in der Reihenfolge der Änderungen an: der zuletzt empfangene Stand
+    /// eines Einsatzes ist sein Stand im Speicher (Review 19.11.2026, Befund 1).
+    #[test]
+    fn verteilte_staende_ueberholen_sich_nicht() {
+        let hub = crate::live::LiveHub::new();
+        let mut rx = hub.abonniere_praesenz();
+        std::thread::scope(|sc| {
+            for t in 0..8 {
+                let hub = &hub;
+                sc.spawn(move || {
+                    let e = eintrag(t, "f", "stichwort");
+                    for _ in 0..400 {
+                        hub.praesenz_setzen(1, e.clone()).unwrap();
+                        hub.praesenz_entfernen(1, &e);
+                    }
+                    if t % 2 == 0 {
+                        hub.praesenz_setzen(1, e.clone()).unwrap();
+                    }
+                });
+            }
+        });
+        let mut zuletzt = None;
+        loop {
+            match rx.try_recv() {
+                Ok(s) => zuletzt = Some(s),
+                Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            }
+        }
+        let mut erhalten = zuletzt.expect("mindestens ein Stand").eintraege;
+        let mut gespeichert = hub.praesenz_stand(1).eintraege;
+        erhalten.sort_by_key(|e| e.benutzer_id);
+        gespeichert.sort_by_key(|e| e.benutzer_id);
+        assert_eq!(erhalten, gespeichert);
     }
 
     #[test]
@@ -442,9 +543,9 @@ mod tests {
         let alt = rx.try_recv().unwrap();
         assert_eq!((alt.einsatz_id, alt.eintraege.len()), (1, 0));
         assert_eq!(rx.try_recv().unwrap().einsatz_id, 2);
-        hub.praesenz_entfernen(2, 7, "a");
+        hub.praesenz_entfernen(2, &eintrag(7, "a", "leitstellen_nr"));
         assert!(rx.try_recv().unwrap().eintraege.is_empty());
-        hub.praesenz_entfernen(2, 7, "a");
+        hub.praesenz_entfernen(2, &eintrag(7, "a", "leitstellen_nr"));
         assert!(rx.try_recv().is_err(), "nichts entfernt, nichts verteilt");
     }
 

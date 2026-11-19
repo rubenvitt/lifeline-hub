@@ -818,19 +818,24 @@ pub fn sse_org_stream(
 /// Einsatzes, gefiltert je Eintrag
 /// über das Bezugsereignis ([`crate::live::praesenz::PraesenzStand::fuer`]). Ein leerer Stand geht
 /// nur hinaus, wenn der zuletzt gesendete nicht leer war; so erfährt die Verbindung von Änderungen,
-/// die sie nicht sehen darf, nichts. `Lagged` wird übersprungen: jeder Stand ist vollständig, der
-/// nächste ersetzt ihn.
+/// die sie nicht sehen darf, nichts. Nach `Lagged` liest er den Stand über `aktuell` nach: der
+/// Kanal ist einsatzübergreifend, eine verdrängte Änderung dieses Einsatzes käme sonst nie an.
 pub fn sse_praesenz_stream(
     start: crate::live::praesenz::PraesenzStand,
     rx: Receiver<crate::live::praesenz::PraesenzStand>,
     erlaubt: std::collections::HashSet<&'static str>,
+    aktuell: impl Fn() -> crate::live::praesenz::PraesenzStand,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     let einsatz_id = start.einsatz_id;
     let erster = start.fuer(&erlaubt);
     let mut zuletzt_leer = erster.eintraege.is_empty();
     let anfang: Result<Event, Infallible> = Ok(praesenz_ereignis(&erster));
     let rest = BroadcastStream::new(rx).filter_map(move |res| {
-        let stand = res.ok().filter(|s| s.einsatz_id == einsatz_id)?;
+        let stand = match res {
+            Ok(s) if s.einsatz_id == einsatz_id => s,
+            Ok(_) => return None,
+            Err(_) => aktuell(),
+        };
         let sichtbar = stand.fuer(&erlaubt);
         let leer = sichtbar.eintraege.is_empty();
         if leer && zuletzt_leer {
@@ -1153,6 +1158,47 @@ mod tests {
     /// Filter, der alles durchlässt (für die Tests der Replay-Mechanik).
     fn alles(n: LiveNachricht) -> Option<LiveNachricht> {
         Some(n)
+    }
+
+    /// Nach `Lagged` liest der Präsenz-Teilstrom den aktuellen Stand nach (Review 19.11.2026,
+    /// Befund 2): der Kanal ist einsatzübergreifend, die verdrängte Änderung dieses Einsatzes kommt
+    /// sonst nie an.
+    #[tokio::test]
+    async fn praesenz_stream_liest_nach_lagged_den_stand_nach() {
+        use crate::live::praesenz::{PraesenzEintrag, PraesenzObjekt, PraesenzStand};
+        let stand = |einsatz_id: i64, n: usize| PraesenzStand {
+            einsatz_id,
+            eintraege: (0..n)
+                .map(|i| PraesenzEintrag {
+                    objekt: PraesenzObjekt::Einsatz,
+                    einheit_id: None,
+                    felder: vec!["stichwort".into()],
+                    benutzer_id: i as i64,
+                    von: "A".into(),
+                    fenster: "f".into(),
+                })
+                .collect(),
+        };
+        let (tx, rx) = tokio::sync::broadcast::channel(2);
+        // Die Änderung an Einsatz 1 wird von Einsatz 2 verdrängt; danach schließt der Kanal.
+        tx.send(stand(1, 1)).unwrap();
+        for _ in 0..3 {
+            tx.send(stand(2, 1)).unwrap();
+        }
+        drop(tx);
+        let frames: Vec<_> = sse_praesenz_stream(
+            stand(1, 0),
+            rx,
+            std::collections::HashSet::new(),
+            move || stand(1, 1),
+        )
+        .collect()
+        .await;
+        assert_eq!(
+            frames.len(),
+            2,
+            "Stand beim Verbinden, dann der nachgelesene Stand nach Lagged"
+        );
     }
 
     #[tokio::test]

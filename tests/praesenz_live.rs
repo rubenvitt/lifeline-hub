@@ -102,7 +102,7 @@ async fn aenderung_wird_verteilt_verlaengern_nicht() {
     let e = eintrag(PraesenzObjekt::Einsatz, None, "stichwort");
     live.praesenz_setzen(eid, e.clone()).unwrap();
     live.praesenz_setzen(eid, e).unwrap();
-    live.praesenz_entfernen(eid, 9999, "fenster-a");
+    live.praesenz_entfernen(eid, &eintrag(PraesenzObjekt::Einsatz, None, "stichwort"));
 
     let gelesen = sse_anfang_lesen(feed.into_body(), 300).await;
     let frames = praesenz_frames(&gelesen);
@@ -206,7 +206,7 @@ async fn put_setzt_und_strom_zeigt_den_namen() {
         "DELETE",
         &pfad(eid),
         &admin,
-        Some(r#"{"fenster":"tab-1"}"#),
+        Some(r#"{"objekt":"einsatz","felder":["leitstellen_nr"],"fenster":"tab-1"}"#),
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
@@ -215,7 +215,7 @@ async fn put_setzt_und_strom_zeigt_den_namen() {
         "DELETE",
         &pfad(eid),
         &admin,
-        Some(r#"{"fenster":"tab-1"}"#),
+        Some(r#"{"objekt":"einsatz","felder":["leitstellen_nr"],"fenster":"tab-1"}"#),
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "DELETE ist idempotent");

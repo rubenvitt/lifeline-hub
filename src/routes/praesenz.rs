@@ -32,11 +32,11 @@ pub struct PraesenzFeldBody {
     pub fenster: String,
 }
 
-/// DELETE auf beiden Pfaden: beendet die Präsenz des Fensters in diesem Einsatz.
-#[derive(Debug, Deserialize)]
-pub struct PraesenzEndeBody {
-    pub fenster: String,
-}
+/// DELETE auf beiden Pfaden: beendet die Präsenz des Fensters an genau diesen Angaben. Mit den
+/// Angaben, damit ein spätes DELETE eines geschlossenen Feldes nicht das neu geöffnete beendet.
+/// Den Body des PUT daneben zu schicken genügt.
+pub type PraesenzEinsatzEndeBody = PraesenzEinsatzBody;
+pub type PraesenzFeldEndeBody = PraesenzFeldBody;
 
 /// PUT /api/einsaetze/{id}/praesenz — beginnt oder verlängert die Präsenz eines Fensters an
 /// Angaben von Einsatzkopf oder Führungsstelle. 204.
@@ -65,15 +65,23 @@ pub async fn einsatz_melden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/praesenz — idempotent, 204.
+/// DELETE /api/einsaetze/{id}/praesenz — idempotent, 204; Body wie beim PUT.
 pub async fn einsatz_beenden(
     State(state): State<AppState>,
     ctx: EinsatzVerwaltungszugriff,
-    JsonBody(body): JsonBody<PraesenzEndeBody>,
+    JsonBody(body): JsonBody<PraesenzEinsatzEndeBody>,
 ) -> Result<StatusCode, AppError> {
-    state
-        .live
-        .praesenz_entfernen(ctx.einsatz.id, ctx.benutzer.id, &body.fenster);
+    state.live.praesenz_entfernen(
+        ctx.einsatz.id,
+        &PraesenzEintrag {
+            objekt: body.objekt,
+            einheit_id: None,
+            felder: body.felder,
+            benutzer_id: ctx.benutzer.id,
+            von: String::new(),
+            fenster: body.fenster,
+        },
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -103,15 +111,23 @@ pub async fn einheit_melden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/einheiten/{eid}/praesenz — idempotent, 204.
+/// DELETE /api/einsaetze/{id}/einheiten/{eid}/praesenz — idempotent, 204; Body wie beim PUT.
 pub async fn einheit_beenden(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
-    PfadParam((_id, _eid)): PfadParam<(i64, i64)>,
-    JsonBody(body): JsonBody<PraesenzEndeBody>,
+    PfadParam((_id, eid)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<PraesenzFeldEndeBody>,
 ) -> Result<StatusCode, AppError> {
-    state
-        .live
-        .praesenz_entfernen(ctx.einsatz.id, ctx.benutzer.id, &body.fenster);
+    state.live.praesenz_entfernen(
+        ctx.einsatz.id,
+        &PraesenzEintrag {
+            objekt: PraesenzObjekt::Einheit,
+            einheit_id: Some(eid),
+            felder: body.felder,
+            benutzer_id: ctx.benutzer.id,
+            von: String::new(),
+            fenster: body.fenster,
+        },
+    );
     Ok(StatusCode::NO_CONTENT)
 }
