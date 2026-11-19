@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Col, Form, Input, Row, theme } from 'antd';
+import { App, AutoComplete, Col, Form, Input, Row, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,8 @@ import { listeBenutzer } from '../api/benutzer';
 import { globalKeys } from '../api/queryKeys';
 // Wiederverwendet statt nachgebaut — siehe Kopf von `FahrzeugDetailPage`.
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, useAenderungsstandMerken } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { leerZuNull } from '../api/patchTriState';
@@ -64,6 +66,7 @@ export default function PersonalDetailPage() {
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“); `schluessel` wie `key={id}`
   // am Formular.
   const schutz = useFormularVerlassenSchutz({ aktiv: darfBearbeiten, schluessel: id });
@@ -179,90 +182,98 @@ export default function PersonalDetailPage() {
           initialValues={zuFormWerten(person)}
           onFinish={(werte) => {
             const fassung = schutz.fassung();
-            speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+            // An DIESEN Datensatz gebunden: ein Wechsel per `key={id}` während des Speicherns
+            // trägt sonst die Werte des vorigen in den Ausgangsstand des neuen (LLH-1829).
+            const merke = stand.binde();
+            speichern.mutate(werte, {
+              onSuccess: () => {
+                schutz.gespeichert(fassung);
+                merke(werte);
+              },
+            });
           }}
         >
-          <Formularpaneel titel="Identität" dataUpdatedAt={personalQuery.dataUpdatedAt}>
-            <Row gutter={token.margin}>
-              <Col xs={24} lg={12}>
-                <Feld
-                  label="Name"
-                  name="name"
-                  rules={[
-                    { required: true, whitespace: true, message: 'Name darf nicht leer sein' },
-                  ]}
-                >
-                  <Input />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Personalnummer" name="personalnummer">
-                  <Input />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Trägerorganisation" name="traegerorganisation">
-                  <AutoComplete
-                    options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
-                    allowClear
-                    placeholder="z. B. DRK Musterstadt"
-                    showSearch={teilwortSuche}
-                  />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+          <AenderungsstandProvider ausgangswerte={zuFormWerten(person)} merkeRef={stand.merkeRef}>
+            <Formularpaneel titel="Identität" dataUpdatedAt={personalQuery.dataUpdatedAt}>
+              <Row gutter={token.margin}>
+                <Col xs={24} lg={12}>
+                  <Feld
+                    label="Name"
+                    name="name"
+                    rules={[
+                      { required: true, whitespace: true, message: 'Name darf nicht leer sein' },
+                    ]}
+                  >
+                    <Input />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Personalnummer" name="personalnummer">
+                    <Input />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Trägerorganisation" name="traegerorganisation">
+                    <AutoComplete
+                      options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
+                      allowClear
+                      placeholder="z. B. DRK Musterstadt"
+                      showSearch={teilwortSuche}
+                    />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Kontakt & Konto">
-            <Row gutter={token.margin}>
-              <Col xs={24} lg={12}>
-                <Feld label="Telefon" name="telefon">
-                  <Input />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Benutzer-Konto (optional)" name="benutzer_id">
-                  <Select
-                    allowClear
-                    options={benutzerOptionen}
-                    placeholder="kein Konto verknüpft"
-                  />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+            <Formularpaneel titel="Kontakt & Konto">
+              <Row gutter={token.margin}>
+                <Col xs={24} lg={12}>
+                  <Feld label="Telefon" name="telefon">
+                    <Input />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Benutzer-Konto (optional)" name="benutzer_id">
+                    <Select
+                      allowClear
+                      options={benutzerOptionen}
+                      placeholder="kein Konto verknüpft"
+                    />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Einsatzrolle">
-            <Row gutter={token.margin}>
-              <Col xs={24} lg={12}>
-                <Feld label="Stärke-Position" name="staerke_position">
-                  <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Qualifikationen" name="qualifikation_ids">
-                  <Select
-                    mode="multiple"
-                    allowClear
-                    options={qualOptionen}
-                    placeholder="Qualifikationen wählen"
-                  />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+            <Formularpaneel titel="Einsatzrolle">
+              <Row gutter={token.margin}>
+                <Col xs={24} lg={12}>
+                  <Feld label="Stärke-Position" name="staerke_position">
+                    <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Qualifikationen" name="qualifikation_ids">
+                    <Select
+                      mode="multiple"
+                      allowClear
+                      options={qualOptionen}
+                      placeholder="Qualifikationen wählen"
+                    />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Freitext">
-            <Feld label="Bemerkung" name="bemerkung">
-              <Input.TextArea rows={3} />
-            </Feld>
-          </Formularpaneel>
+            <Formularpaneel titel="Freitext">
+              <Feld label="Bemerkung" name="bemerkung">
+                <Input.TextArea rows={3} />
+              </Feld>
+            </Formularpaneel>
 
-          <div {...speicherLeiste}>
-            <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-              Speichern
-            </Button>
-          </div>
+            <div {...speicherLeiste}>
+              <SpeicherKnopf loading={speichern.isPending} disabled={!darfBearbeiten} />
+            </div>
+          </AenderungsstandProvider>
         </Form>
       </AdminPage>
     </div>

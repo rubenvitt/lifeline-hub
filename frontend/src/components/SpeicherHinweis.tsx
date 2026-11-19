@@ -1,6 +1,7 @@
 import { Alert, Flex, theme, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import { fehlerText as apiFehlerText } from '../api/client';
+import Stapel from './instrument/Stapel';
 import { Status } from './instrument/Status';
 
 /**
@@ -102,15 +103,14 @@ export function SeitenHinweise({
   fehlerTitel,
   fehlerFallback,
 }: SeitenHinweiseProps) {
-  const { token } = theme.useToken();
   const zeigtRecht = rechteFehlt && rechteText != null;
   const zeigtFehler = fehlerText(fehler) !== null;
   if (!zeigtRecht && !zeigtFehler) return null;
   return (
-    <Flex vertical gap={token.marginSM}>
+    <Stapel abstand="sm">
       {zeigtRecht && <RechteHinweis sichtbar text={rechteText} />}
       <SpeicherFehler fehler={fehler} titel={fehlerTitel} fallback={fehlerFallback} />
-    </Flex>
+    </Stapel>
   );
 }
 

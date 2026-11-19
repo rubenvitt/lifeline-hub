@@ -85,6 +85,7 @@ async fn einfuegen(
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
+    super::nachlauf::geschrieben(id);
     Ok(id)
 }
 

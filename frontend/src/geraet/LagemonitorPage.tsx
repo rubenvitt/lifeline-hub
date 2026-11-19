@@ -45,6 +45,7 @@ import { belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import KachelGrenze from '../components/KachelGrenze';
 import { anstehendeProgrammpunkte } from '../programmpunkt/programmpunkt';
 import { countsKraefteAnUhs } from '../pages/lage-dashboard/lageVerdichtung';
 
@@ -119,6 +120,7 @@ function Kachel({
   const { rollen } = useRollen();
   return (
     <section
+      data-lfh="monitor-kachel"
       aria-label={titel}
       style={{
         background: rollen.flaeche,
@@ -296,7 +298,16 @@ function SanitaetsdienstKachel({
 /** So viele UHS passen ohne Bildlauf in die Kachel; der Rest steht als „+n weitere“. */
 const UHS_SICHTBAR = 6;
 
-function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }) {
+function Kacheln({
+  lage,
+  sk1Neu,
+  neuversuch,
+}: {
+  lage: LagemonitorAnzeige;
+  sk1Neu: boolean;
+  /** Datenstand der Lage: Eine ausgefallene Kachel versucht es damit erneut (LLH-1958). */
+  neuversuch: number;
+}) {
   const { rollen } = useRollen();
   const b = lage.betroffene;
   const san = lage.sanitaetsdienst;
@@ -321,86 +332,105 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
     .reduce((summe, u) => summe + u.kraefte, 0);
   return (
     <>
-      {san ? (
-        <SanitaetsdienstKachel san={san} b={b} sk1Neu={sk1Neu} />
-      ) : (
-        <Kachel titel="Betroffene" zusatz={sk1Neu ? 'Neu in SK I' : undefined} zusatzAlarm={sk1Neu}>
-          <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
-            <Zahl wert={b.gesamt} bezeichnung="gesamt" groesse="zahl" />
-            <Zahl wert={b.patienten} bezeichnung="Patienten" groesse="zahl" />
-            <Zahl
-              wert={b.vermisst}
-              bezeichnung="vermisst"
-              groesse="zahl"
-              farbe={b.vermisst > 0 ? rollen.achtungText : undefined}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 32 }}>
-            <Zahl
-              wert={b.sk1}
-              bezeichnung="SK I"
-              farbe={b.sk1 > 0 ? rollen.alarmText : undefined}
-              hervorgehoben={sk1Neu}
-            />
-            <Zahl wert={b.sk2} bezeichnung="SK II" />
-            <Zahl wert={b.sk3} bezeichnung="SK III" />
-            <Zahl wert={b.sk4} bezeichnung="SK IV" />
-            <Zahl wert={b.ohne} bezeichnung="ungesichtet" />
-          </div>
-        </Kachel>
-      )}
+      <KachelGrenze
+        titel={san ? 'Hilfeleistungen' : 'Betroffene'}
+        form="gross"
+        neuversuch={neuversuch}
+      >
+        {san ? (
+          <SanitaetsdienstKachel san={san} b={b} sk1Neu={sk1Neu} />
+        ) : (
+          <Kachel
+            titel="Betroffene"
+            zusatz={sk1Neu ? 'Neu in SK I' : undefined}
+            zusatzAlarm={sk1Neu}
+          >
+            <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
+              <Zahl wert={b.gesamt} bezeichnung="gesamt" groesse="zahl" />
+              <Zahl wert={b.patienten} bezeichnung="Patienten" groesse="zahl" />
+              <Zahl
+                wert={b.vermisst}
+                bezeichnung="vermisst"
+                groesse="zahl"
+                farbe={b.vermisst > 0 ? rollen.achtungText : undefined}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 32 }}>
+              <Zahl
+                wert={b.sk1}
+                bezeichnung="SK I"
+                farbe={b.sk1 > 0 ? rollen.alarmText : undefined}
+                hervorgehoben={sk1Neu}
+              />
+              <Zahl wert={b.sk2} bezeichnung="SK II" />
+              <Zahl wert={b.sk3} bezeichnung="SK III" />
+              <Zahl wert={b.sk4} bezeichnung="SK IV" />
+              <Zahl wert={b.ohne} bezeichnung="ungesichtet" />
+            </div>
+          </Kachel>
+        )}
+      </KachelGrenze>
       {/* Die Kräfte an den UHS als eine Zahl in der Titelzeile (LFH-1045): je UHS und als
           eigene Kennzahl fehlt bei 1920 × 1080 der Platz, ohne dass eine Kachel abschneidet. */}
-      <Kachel titel="Kräfte" zusatz={`${anUhs} an UHS`}>
-        <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
-          <Zahl wert={k.personal} bezeichnung="Personal" />
-          <Zahl wert={k.einheiten} bezeichnung="Einheiten" />
-          {/* Mit Summe aus der einen Formatierung (LLH-1750, Spec `lage-verdichtung`). */}
-          <Zahl
-            wert={staerkeText(s)}
-            bezeichnung={`Stärke ${STAERKE_SCHREIBWEISE}`}
-            beschreibung={STAERKE_AUSGESCHRIEBEN}
-          />
-        </div>
-      </Kachel>
+      <KachelGrenze titel="Kräfte" form="gross" neuversuch={neuversuch}>
+        <Kachel titel="Kräfte" zusatz={`${anUhs} an UHS`}>
+          <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
+            <Zahl wert={k.personal} bezeichnung="Personal" />
+            <Zahl wert={k.einheiten} bezeichnung="Einheiten" />
+            {/* Mit Summe aus der einen Formatierung (LLH-1750, Spec `lage-verdichtung`). */}
+            <Zahl
+              wert={staerkeText(s)}
+              bezeichnung={`Stärke ${STAERKE_SCHREIBWEISE}`}
+              beschreibung={STAERKE_AUSGESCHRIEBEN}
+            />
+          </div>
+        </Kachel>
+      </KachelGrenze>
       {/* Überbelegung (LLH-1746): das Wort steht in der Titelzeile, die Zahl in der Alarmrolle;
           gezählt über alle UHS, auch die unter „+n weitere“. */}
-      <Kachel
+      <KachelGrenze
         titel="Belegung der Unfallhilfsstellen"
-        zusatz={ueberbelegt > 0 ? `${ueberbelegt} überbelegt` : undefined}
-        zusatzAlarm={ueberbelegt > 0}
-        style={{ flex: '1 1 0' }}
+        form="gross"
+        neuversuch={neuversuch}
+        ersatzStil={{ flex: '1 1 0' }}
       >
-        {lage.uhs.length === 0 ? (
-          <span style={{ fontSize: grossMass(GROSS_BEZUG.text), color: rollen.gedaempft }}>
-            Keine Unfallhilfsstelle eingerichtet
-          </span>
-        ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-              gap: '8px 32px',
-            }}
-          >
-            {uhsSichtbar.map((u) => (
-              <div key={u.id} data-lfh="monitor-uhs" style={{ minWidth: 0 }}>
-                <Zahl
-                  wert={belegungText(u)}
-                  bezeichnung={u.bezeichnung}
-                  zeilen={2}
-                  hervorgehoben={istUeberbelegt(u)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-        {weitere > 0 && (
-          <span style={{ fontSize: grossMass(GROSS_BEZUG.text), color: rollen.gedaempft }}>
-            +{weitere} weitere
-          </span>
-        )}
-      </Kachel>
+        <Kachel
+          titel="Belegung der Unfallhilfsstellen"
+          zusatz={ueberbelegt > 0 ? `${ueberbelegt} überbelegt` : undefined}
+          zusatzAlarm={ueberbelegt > 0}
+          style={{ flex: '1 1 0' }}
+        >
+          {lage.uhs.length === 0 ? (
+            <span style={{ fontSize: grossMass(GROSS_BEZUG.text), color: rollen.gedaempft }}>
+              Keine Unfallhilfsstelle eingerichtet
+            </span>
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: '8px 32px',
+              }}
+            >
+              {uhsSichtbar.map((u) => (
+                <div key={u.id} data-lfh="monitor-uhs" style={{ minWidth: 0 }}>
+                  <Zahl
+                    wert={belegungText(u)}
+                    bezeichnung={u.bezeichnung}
+                    zeilen={2}
+                    hervorgehoben={istUeberbelegt(u)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {weitere > 0 && (
+            <span style={{ fontSize: grossMass(GROSS_BEZUG.text), color: rollen.gedaempft }}>
+              +{weitere} weitere
+            </span>
+          )}
+        </Kachel>
+      </KachelGrenze>
     </>
   );
 }
@@ -794,34 +824,59 @@ export default function LagemonitorPage() {
             dem Block `alarm` der Serverantwort; 28 px, ohne Bedienung. Sie steht über der Karte,
             nicht über die volle Breite: rechts behalten Betroffene, Kräfte und UHS ihre Höhe
             (entschieden 16.11.2026). Den Ausfall zählt der Server nach (LLH-1929). */}
-          <AlarmZeile
-            daten={wasBrennt(alarmAusMonitor(lage, lageQuery.isError), dayjs(jetzt))}
-            groesse="gross"
-          />
-          <Kachel titel="Lagekarte" style={{ flex: '1 1 0' }}>
-            <div style={{ flex: '1 1 0', minHeight: 0 }}>
-              <LagemonitorKarte
-                einsatzort={einsatzort}
-                uhs={lage?.uhs ?? []}
-                zonen={lage?.zonen}
-                abschnitte={lage?.abschnitte}
-              />
-            </div>
-          </Kachel>
+          <KachelGrenze titel="Was brennt" form="gross" neuversuch={lageQuery.dataUpdatedAt}>
+            <AlarmZeile
+              daten={wasBrennt(alarmAusMonitor(lage, lageQuery.isError), dayjs(jetzt))}
+              groesse="gross"
+            />
+          </KachelGrenze>
+          <KachelGrenze
+            titel="Lagekarte"
+            form="gross"
+            neuversuch={lageQuery.dataUpdatedAt}
+            ersatzStil={{ flex: '1 1 0' }}
+          >
+            <Kachel titel="Lagekarte" style={{ flex: '1 1 0' }}>
+              <div style={{ flex: '1 1 0', minHeight: 0 }}>
+                <LagemonitorKarte
+                  einsatzort={einsatzort}
+                  uhs={lage?.uhs ?? []}
+                  zonen={lage?.zonen}
+                  abschnitte={lage?.abschnitte}
+                />
+              </div>
+            </Kachel>
+          </KachelGrenze>
           {/* Meldungen und Ablauf teilen die untere Zeile; ohne anstehenden Programmpunkt nimmt
               „Meldungen“ sie allein (LLH-1570, design.md D4). */}
           <div style={{ display: 'flex', gap: 16, minWidth: 0 }}>
-            <MeldungenKachel
-              offen={lage?.sofortmeldungen_offen}
-              neu={sofortNeu}
-              allein={ablauf.length === 0}
-            />
-            {ablauf.length > 0 && <AblaufKachel punkte={ablauf} jetzt={jetzt} />}
+            <KachelGrenze
+              titel="Meldungen"
+              form="gross"
+              neuversuch={lageQuery.dataUpdatedAt}
+              ersatzStil={{ flex: ablauf.length === 0 ? '1 1 0' : '0 0 auto' }}
+            >
+              <MeldungenKachel
+                offen={lage?.sofortmeldungen_offen}
+                neu={sofortNeu}
+                allein={ablauf.length === 0}
+              />
+            </KachelGrenze>
+            {ablauf.length > 0 && (
+              <KachelGrenze
+                titel="Ablauf"
+                form="gross"
+                neuversuch={lageQuery.dataUpdatedAt}
+                ersatzStil={{ flex: '1 1 0', minWidth: 0 }}
+              >
+                <AblaufKachel punkte={ablauf} jetzt={jetzt} />
+              </KachelGrenze>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
           {lage ? (
-            <Kacheln lage={lage} sk1Neu={sk1Neu} />
+            <Kacheln lage={lage} sk1Neu={sk1Neu} neuversuch={lageQuery.dataUpdatedAt} />
           ) : (
             <Kachel titel="Lagebild">
               <span style={{ fontSize: grossMass(GROSS_BEZUG.text) }}>

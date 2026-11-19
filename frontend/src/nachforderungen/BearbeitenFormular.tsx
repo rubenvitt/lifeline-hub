@@ -29,6 +29,7 @@ import {
   mitEinsatznummer,
   type AenderungWerte,
 } from './zusage';
+import { Feld } from '../components/instrument';
 
 const PRIORITAET_OPTIONEN: { value: NachforderungPrioritaet; label: string }[] = [
   { value: 'sofort', label: 'Sofort' },
@@ -117,15 +118,14 @@ export default function BearbeitenFormular({
         speicherFehlerFallback="Speichern fehlgeschlagen"
         erfassenText="Änderung speichern"
       >
-        <Form.Item name="anzahl" label="Anzahl" rules={mengenRegeln}>
+        <Feld name="anzahl" label="Anzahl" rules={mengenRegeln}>
           <MengenFeld
             beschriftung="Anzahl"
-            style={{ width: '100%' }}
             // Eine Anforderung für eine Person gilt für genau ein Rettungsmittel (LLH-1573 D1).
             disabled={mitEinsatznummer(n)}
           />
-        </Form.Item>
-        <Form.Item name="wohin" label="Wohin">
+        </Feld>
+        <Feld name="wohin" label="Wohin">
           <AutoComplete
             aria-label="Wohin"
             options={wohinOptionen}
@@ -133,30 +133,30 @@ export default function BearbeitenFormular({
             allowClear
             maxLength={NACHFORDERUNG_ZIEL_TEXT_MAX}
           />
-        </Form.Item>
-        <Form.Item name="prioritaet" label="Priorität">
+        </Feld>
+        <Feld name="prioritaet" label="Priorität">
           <Select<NachforderungPrioritaet> aria-label="Priorität" options={PRIORITAET_OPTIONEN} />
-        </Form.Item>
-        <Form.Item name="bezeichnung" label="Details / Zweck">
+        </Feld>
+        <Feld name="bezeichnung" label="Details / Zweck">
           <Input aria-label="Details / Zweck" maxLength={NACHFORDERUNG_BEZEICHNUNG_MAX} />
-        </Form.Item>
+        </Feld>
         {mitZusage && (
           <>
             {mitEinsatznummer(n) && (
-              <Form.Item name="einsatznummer" label="Einsatznummer Leitstelle">
+              <Feld name="einsatznummer" label="Einsatznummer Leitstelle">
                 <Input aria-label="Einsatznummer Leitstelle" maxLength={EINSATZNUMMER_MAX} />
-              </Form.Item>
+              </Feld>
             )}
-            <Form.Item name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
+            <Feld name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
               <WerFeld aria-label="Wer" vorschlaege={werVorschlaege} />
-            </Form.Item>
-            <Form.Item name="eintreffen" label="Eintreffen erwartet">
+            </Feld>
+            <Feld name="eintreffen" label="Eintreffen erwartet">
               <ZeitpunktEingabe
                 art="frist"
                 aria-label="Eintreffen erwartet"
                 style={{ width: '100%' }}
               />
-            </Form.Item>
+            </Feld>
           </>
         )}
       </ErfassungsFormular>

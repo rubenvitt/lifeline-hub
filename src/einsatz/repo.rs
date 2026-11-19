@@ -1278,7 +1278,7 @@ pub(crate) async fn system_audit_tx(
     einsatz_id: i64,
     etb_startwert: i64,
     inhalt: &str,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     let Some(akteur) = ermittle_system_akteur(conn, einsatz_id).await? else {
         // Die Org steht in der Meldung: sichtbar ist die Blockade NUR im Log (eine Org ohne
         // jeden Admin hat niemanden, der die Aufbewahrungsübersicht öffnen könnte), und der
@@ -1311,8 +1311,7 @@ pub(crate) async fn system_audit_tx(
             berichtigt_eintrag_id: None,
         },
     )
-    .await?;
-    Ok(())
+    .await
 }
 
 /// IDs ABGESCHLOSSENER Einsätze, deren Aufbewahrungsfrist abgelaufen ist und die

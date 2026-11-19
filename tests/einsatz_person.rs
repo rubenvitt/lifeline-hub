@@ -7,7 +7,7 @@ mod common;
 use common::{
     anfrage, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen, login_cookie,
     person_anlegen, rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live,
-    system_etb_inhalte,
+    system_etb_inhalte, EtbLive,
 };
 
 // ---------- Cross-cutting: ETB-Leak + SSE-Payload ----------
@@ -3433,4 +3433,18 @@ async fn unbekannte_route_ist_404_ohne_grund() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(antwort.get("grund").is_none(), "{antwort}");
+}
+
+/// LLH-1976: Das Anlegen einer Person, ohne und mit Erst-Sichtung, geht mit jedem seiner
+/// System-Einträge als Ereignis `etb` hinaus.
+#[tokio::test]
+async fn person_anlegen_etb_eintraege_gehen_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut etb = EtbLive::neu(&app, &admin, e, &live).await;
+    person_anlegen(&app, &admin, e, "{}").await;
+    etb.pruefe(&app, &admin, e, "anlegen").await;
+    person_anlegen(&app, &admin, e, r#"{"sichtung":"sk2"}"#).await;
+    etb.pruefe(&app, &admin, e, "anlegen mit Sichtung").await;
 }

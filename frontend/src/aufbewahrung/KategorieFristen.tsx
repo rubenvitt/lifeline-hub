@@ -56,7 +56,7 @@ export function KategorieWert({
 }) {
   const { token } = theme.useToken();
   // Zeiten immer Mono mit `tabular-nums` (frontend/AGENTS.md, Gestaltungssprache).
-  const zeitStil = monoStil(13);
+  const zeitStil = monoStil('mono');
   return (
     <Flex vertical gap={token.marginXXS}>
       <Flex gap={token.marginXS} wrap align="center">

@@ -40,6 +40,16 @@ const VOLL = {
   geaendert_von: null,
 };
 
+/**
+ * „Speichern“ ist ohne Änderung gesperrt (LLH-1829): eine kleine Änderung an der Geocoder-URL,
+ * die die Aussage des jeweiligen Tests nicht berührt.
+ */
+async function aendereGeocoder() {
+  fireEvent.change(await screen.findByLabelText(/Geocoder-URL/i), {
+    target: { value: 'https://geo.example.org' },
+  });
+}
+
 function alsAdmin() {
   vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
 }
@@ -54,6 +64,7 @@ describe('AnzeigeEinstellungen', () => {
   it('sendet beim Speichern den VOLLEN Payload — Einsatz-Default-Felder bleiben erhalten (Vollersatz)', async () => {
     renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
+    await aendereGeocoder();
     const btn = await screen.findByRole('button', { name: 'Speichern' });
     fireEvent.click(btn);
 
@@ -78,7 +89,7 @@ describe('AnzeigeEinstellungen', () => {
         auftrag_quittierung_frist_min: 45,
         rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
-        geocoder_url: null,
+        geocoder_url: 'https://geo.example.org',
       }),
     );
   });
@@ -158,6 +169,7 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
     vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Zeitzone unbekannt'));
     renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
+    await aendereGeocoder();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     const treffer = await screen.findByText('Zeitzone unbekannt');
     expect(treffer.closest('.ant-message')).toBeNull();
@@ -169,6 +181,7 @@ describe('AnzeigeEinstellungen · Speicherfehler und Berechtigung (LFH-345)', ()
       .mockResolvedValue({ ...VOLL } as never);
     renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
 
+    await aendereGeocoder();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Zeitzone unbekannt');
 

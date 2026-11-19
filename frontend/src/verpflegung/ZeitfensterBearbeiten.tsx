@@ -151,7 +151,7 @@ export default function ZeitfensterBearbeiten({
       name: 'zeitraum',
       label: 'Zeitraum',
       anzeige: null,
-      eingabe: <ZeitraumEingabe placeholder={['Beginn', 'Ende']} style={{ width: '100%' }} />,
+      eingabe: <ZeitraumEingabe placeholder={['Beginn', 'Ende']} />,
       regeln: [ZEITRAUM_REGEL],
       breit: true,
     },

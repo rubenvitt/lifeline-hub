@@ -1,11 +1,12 @@
 import type { AdminAktion, AnmeldeEreignis, Anmeldeweg, ZugangsAngaben } from '../api/types';
 import { scopeText } from '../api/anbindungen';
 import {
-  ORG_ROLLE_FELD,
-  ORG_ROLLE_TEXT,
-  SYSTEM_ROLLE_FELD,
-  SYSTEM_ROLLE_TEXT,
-} from '../stammdaten/rechteText';
+  ORG_ROLLE,
+  ROLLE_IN_ORG_FELD,
+  ROLLE_IN_VERWALTUNG_FELD,
+  SYSTEM_ROLLE,
+  type RollenBegriff,
+} from '../einsatz/rollenVokabular';
 
 /**
  * Wortlaut des Zugangsprotokolls (LFH-1097). Exhaustive `Record`s: ein neuer Wert im Backend
@@ -118,23 +119,24 @@ export function anmeldewegText(id: string): string {
 }
 
 /**
- * Rollen der Angaben einer Zugangsänderung (LFH-1152), beschriftet wie der Benutzer-Dialog:
- * „System-Rolle: Benutzer, Org-Rolle: Keine“ bei der Anlage, „Org-Rolle: Keine → Führungskraft“
- * beim Wechsel. `undefined`, wenn die Angaben keine Rolle tragen.
+ * Rollen der Angaben einer Zugangsänderung (LFH-1152), beschriftet wie der Benutzer-Dialog aus dem
+ * Rollen-Vokabular (LLH-1818): „Rolle in der Verwaltung: Keine, Rolle in der Organisation: Keine“
+ * bei der Anlage, „Rolle in der Organisation: Keine → Führungskraft der Organisation“ beim Wechsel.
+ * `undefined`, wenn die Angaben keine Rolle tragen.
  */
 export function rollenText(a: ZugangsAngaben): string | undefined {
   const teile: string[] = [];
   const rolle = <R extends string>(
     feld: string,
-    text: Record<R, string>,
+    text: Record<R, RollenBegriff>,
     vorher: R | null | undefined,
     nachher: R | null | undefined,
   ) => {
     if (nachher == null) return;
-    teile.push(`${feld}: ${vorher == null ? '' : `${text[vorher]} → `}${text[nachher]}`);
+    teile.push(`${feld}: ${vorher == null ? '' : `${text[vorher].name} → `}${text[nachher].name}`);
   };
-  rolle(SYSTEM_ROLLE_FELD, SYSTEM_ROLLE_TEXT, a.system_rolle_vorher, a.system_rolle);
-  rolle(ORG_ROLLE_FELD, ORG_ROLLE_TEXT, a.org_rolle_vorher, a.org_rolle);
+  rolle(ROLLE_IN_VERWALTUNG_FELD, SYSTEM_ROLLE, a.system_rolle_vorher, a.system_rolle);
+  rolle(ROLLE_IN_ORG_FELD, ORG_ROLLE, a.org_rolle_vorher, a.org_rolle);
   return teile.length > 0 ? teile.join(', ') : undefined;
 }
 

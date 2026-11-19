@@ -790,7 +790,7 @@ describe('VerpflegungPage (LFH-634)', () => {
       expect(screen.getByRole('radio', { name: /vergangen/ })).not.toBeChecked();
       expect(
         within(screen.getByRole('form', { name: 'Mittag bearbeiten' })).getByLabelText(
-          'Bezeichnung',
+          /^Bezeichnung\b.*\(geändert\)$/,
         ),
       ).toHaveValue('Mittagessen');
       expect(aendereZeitfenster).not.toHaveBeenCalled();

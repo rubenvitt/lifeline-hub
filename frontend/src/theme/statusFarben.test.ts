@@ -93,6 +93,17 @@ describe('Statusfarb-Vertrag', () => {
     expect(sf.uebergabeOffen).toEqual({ rolle: 'achtung', label: 'Übergabe offen' });
   });
 
+  it('kennt einen fehlenden oder unbekannten Personenstatus als neutral „unbekannt“ (LLH-1957)', () => {
+    // Bis LLH-1779 las die Statusmarke `personStatus[status].rolle` und riss die ganze Liste mit.
+    expect(sf.personStatusDarstellung('vermisst')).toBe(sf.personStatus.vermisst);
+    for (const kaputt of [undefined, null, '', 'xyz']) {
+      expect(sf.personStatusDarstellung(kaputt as never)).toEqual({
+        rolle: 'neutral',
+        label: 'unbekannt',
+      });
+    }
+  });
+
   it('warnt bei einer Kontamination mit Wort, als Achtung, nicht als Alarm (LLH-1326, D11)', () => {
     // `alarm` kollidierte mit dem Rot von SK I; ein neutrales Wort ginge in der Zeile unter.
     expect(sf.kontamination).toEqual({ rolle: 'achtung', label: 'kontaminiert' });

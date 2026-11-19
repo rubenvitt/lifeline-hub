@@ -23,10 +23,12 @@ import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloes
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import {
+  Feld,
   Kennzahl,
   Kennzahlenband,
   Paneel,
   PaneelZustand,
+  Stapel,
   monoStil,
   useRollen,
 } from '../../components/instrument';
@@ -305,12 +307,12 @@ export default function RegistrierungPaneel({
           borderTop: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        <Link to={pfade.personDetail(einsatzId, p.id)} style={monoStil(14)}>
+        <Link to={pfade.personDetail(einsatzId, p.id)} style={monoStil('monoGross')}>
           {kennung}
         </Link>
         <span style={{ fontWeight: 600 }}>{name}</span>
         {istBezugsperson && <Typography.Text type="secondary">Bezugsperson</Typography.Text>}
-        {alterText(p, heute) && <span style={monoStil(14)}>{alterText(p, heute)}</span>}
+        {alterText(p, heute) && <span style={monoStil('monoGross')}>{alterText(p, heute)}</span>}
         <Typography.Text type="secondary">
           {p.kostform ? KOSTFORM_WORT[p.kostform] : 'Kostform ohne Angabe'}
         </Typography.Text>
@@ -382,16 +384,9 @@ export default function RegistrierungPaneel({
     const kennung = haushaltKennung(h.nummer);
     const abgemeldet = haushaltVorgemerkt.has(h.id);
     return (
-      <>
+      <Stapel abstand="xs">
         {darfSchreiben && !abgemeldet && (
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: token.marginSM,
-              marginBottom: token.marginXS,
-            }}
-          >
+          <Stapel richtung="zeile" umbruch abstand="sm">
             <Button
               disabled={sperrGrund != null}
               onClick={() => {
@@ -422,7 +417,7 @@ export default function RegistrierungPaneel({
             >
               Abmelden
             </Button>
-          </div>
+          </Stapel>
         )}
         <ul
           aria-label={`Personen in ${kennung}`}
@@ -430,7 +425,7 @@ export default function RegistrierungPaneel({
         >
           {h.personen.map((p) => personZeile(p, h, abgemeldet))}
         </ul>
-      </>
+      </Stapel>
     );
   };
 
@@ -443,7 +438,7 @@ export default function RegistrierungPaneel({
         daten ? personenWort(band ? Object.values(band).reduce((a, b) => a + b, 0) : 0) : undefined
       }
       aktion={
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+        <Stapel als="span" richtung="zeile" ausrichten="mitte" abstand="xs">
           {sperrGrund && (
             <Typography.Text id={grundId} type="secondary">
               {sperrGrund}
@@ -467,7 +462,7 @@ export default function RegistrierungPaneel({
               ]}
             />
           )}
-        </span>
+        </Stapel>
       }
     >
       {/* Vorgemerkte stehen AUSSERHALB des Zustands (Review LLH-1612): ohne Netz lädt die Liste
@@ -606,7 +601,7 @@ export default function RegistrierungPaneel({
           <Typography.Paragraph>
             {personenWort(abmelden.anzahl)} verlassen {stelle.bezeichnung}.
           </Typography.Paragraph>
-          <Form.Item
+          <Feld
             name="ziel"
             label="Ziel"
             rules={[zeichenRegel(BETREUUNG_ABMELDUNG_ZIEL_MAX, 'Ziel')]}
@@ -615,7 +610,7 @@ export default function RegistrierungPaneel({
               placeholder="z. B. zu Verwandten"
               count={zeichenGrenze(BETREUUNG_ABMELDUNG_ZIEL_MAX)}
             />
-          </Form.Item>
+          </Feld>
         </ErfassungsModal>
       )}
     </Paneel>

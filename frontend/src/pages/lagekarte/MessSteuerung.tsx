@@ -58,7 +58,7 @@ export default function MessSteuerung(props: MessSteuerungProps) {
           {ergebnis.neben && (
             <span
               style={{
-                ...monoStil(12),
+                ...monoStil('monoKlein'),
                 color: rollen.gedaempft,
                 marginInlineStart: token.marginSM,
               }}

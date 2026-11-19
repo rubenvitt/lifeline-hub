@@ -4,7 +4,7 @@ import type { BefehlKopf } from '../api/types';
 import KommKarte from '../kommunikation/KommKarte';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import { AuswahlZiel, type AuswahlZielProps } from '../components/ListeDetail';
-import { monoStil, useRollen } from '../components/instrument';
+import { Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { befehlSchemaLabel } from './befehlTexte';
 import { Quittungsstand } from './EmpfaengerQuittung';
@@ -43,7 +43,9 @@ function BefehlListenKarte({
       hervorgehoben={hervorgehoben}
       zeit={
         <>
-          <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>Stand</span>
+          <span style={{ display: 'block', ...monoStil('metaKlein'), color: rollen.schwach }}>
+            Stand
+          </span>
           <span>
             <ZeitAnzeige wert={b.zeitstand} rolle="kurz" />
           </span>
@@ -53,19 +55,17 @@ function BefehlListenKarte({
     >
       <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
         <StatusBadge phase={status.phase} label={status.label} />
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           {befehlSchemaLabel(b.vorlage)}
-        </Text>
+        </Textstufe>
       </Space>
       <AuswahlZiel {...auswahl} name={`Befehl v${b.version}: ${b.titel}`}>
-        <Text strong style={{ fontSize: 15, lineHeight: 1.4 }}>
-          {b.titel}
-        </Text>
+        <Textstufe stufe="kartentitel">{b.titel}</Textstufe>
       </AuswahlZiel>
       <Flex
         gap={token.marginSM}
         wrap
-        style={{ marginTop: token.marginXS, ...monoStil(11), color: rollen.gedaempft }}
+        style={{ marginTop: token.marginXS, ...monoStil('meta'), color: rollen.gedaempft }}
       >
         <span>{b.ersteller_name}</span>
         {b.status === 'freigegeben' && b.freigegeben_at && (
@@ -83,7 +83,7 @@ function BefehlListenKarte({
               quittiert={verteiler.filter((e) => e.quittiert_at).length}
             />
           )}
-          <Text style={{ fontSize: 13, color: rollen.text2, minWidth: 0 }} ellipsis>
+          <Text style={{ ...schriftStil('text'), color: rollen.text2, minWidth: 0 }} ellipsis>
             {verteiler.map((e) => e.snap_anzeige).join(', ')}
           </Text>
         </Flex>

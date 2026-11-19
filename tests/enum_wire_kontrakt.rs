@@ -2103,6 +2103,15 @@ fn zeilen_art_wire() {
 }
 
 #[test]
+fn lese_sperre_wire() {
+    enum_wire!(lifeline_hub::error::LeseSperre {
+        KeinMitglied => "kein_mitglied",
+        NachlaufAbgelaufen => "nachlauf_abgelaufen",
+        NichtMehrLesbar => "nicht_mehr_lesbar",
+    } in lifeline_hub::error::LeseSperre::ALLE);
+}
+
+#[test]
 fn vorschau_zustand_wire() {
     enum_wire!(lifeline_hub::einheit::aus_vorlage::VorschauZustand {
         Neu => "neu",

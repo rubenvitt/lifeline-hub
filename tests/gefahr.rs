@@ -5,7 +5,7 @@ use std::time::Duration;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, recv_until_tag, rolle_setzen,
-    setup_mit_live, system_etb_inhalte,
+    setup_mit_live, system_etb_inhalte, EtbLive,
 };
 
 fn bewertung(typ: &str, objekt: &str, warn: &str) -> String {
@@ -953,4 +953,24 @@ async fn bezeichnung_altwert_ohne_aenderung_ist_422() {
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+}
+
+/// LLH-1976: Eine Bewertung der Gefahrenmatrix geht als Ereignis `etb` hinaus.
+#[tokio::test]
+async fn bewertung_etb_geht_live_hinaus() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+    let (s, z) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+        &admin,
+        Some(&bewertung("brand", "menschen", "hoch")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    etb.pruefe(&app, &admin, einsatz, "bewerten").await;
 }

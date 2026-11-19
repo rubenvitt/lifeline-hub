@@ -18,6 +18,7 @@ import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { leseZuletztModule } from '../../einsatz/zuletztModule';
 import { FakeEventSource } from '../../test/eventSource';
+import { pruefeKachelGrenzen } from '../../test/kachelWaechter';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
@@ -364,6 +365,16 @@ function kante(el: HTMLElement): number {
   const m = (traeger?.style.boxShadow ?? '').match(/inset (\d+)px/);
   return m ? Number(m[1]) : 0;
 }
+
+describe('LageDashboardPage — Fehlergrenze je Kachel', () => {
+  it('Wächter: jede Kachel des Lagebilds steht in ihrer eigenen KachelGrenze (LLH-1958)', async () => {
+    mockEndpunkte({ personen: [person('sk1')] });
+    const { container } = render();
+    await kennzahlGeladen('Betroffene');
+    // Alarmzeile, zwei Kennzahlenbänder und drei Paneele.
+    pruefeKachelGrenzen(container.querySelector('[data-lfh="lagebild"]')!, 6);
+  });
+});
 
 describe('LageDashboardPage — Kennzahlenband', () => {
   it('sechs Plätze, Kern fest: mit festgelegtem Pegel steht er auf Platz 1', async () => {

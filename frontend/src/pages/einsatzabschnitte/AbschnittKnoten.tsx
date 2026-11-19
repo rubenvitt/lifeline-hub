@@ -35,10 +35,10 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
       <span>{abschnitt.name}</span>
       {lage && <Status darstellung={lage} />}
       {/* Zahlen in Mono, kein farbiges Etikett: Blau ist die Bedienrolle. */}
-      <span style={{ ...monoStil(12), color: token.colorText }}>
+      <span style={{ ...monoStil('monoKlein'), color: token.colorText }}>
         <StaerkeAnzeige wert={staerke} />
       </span>
-      <span style={{ ...monoStil(12), color: token.colorTextSecondary }}>
+      <span style={{ ...monoStil('monoKlein'), color: token.colorTextSecondary }}>
         {/* Was gezählt wird, steht dran (LFH-973): nur die direkt zugeordneten, der Überblick
             zählt „inkl. UA“. */}
         {anzahlEinheiten === 1 ? '1 Einheit' : `${anzahlEinheiten} Einheiten`} direkt

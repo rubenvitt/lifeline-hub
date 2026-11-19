@@ -494,7 +494,7 @@ export default function FahrzeugeBesatzung({
 
   /** Name eines Fahrzeugs, als Sprung in die Fahrzeugzeile, wenn das Modul offen ist. */
   const renderFunkrufname = (efId: number, name: string) => (
-    <span style={monoStil(13)}>
+    <span style={monoStil('mono')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: efId })}>{name}</KennungsLink>
       ) : (
@@ -635,7 +635,7 @@ export default function FahrzeugeBesatzung({
   /** Name eines Fahrzeugs: gelöst ohne Link und ohne Kontextmenü, in derselben Breite. */
   const renderFahrzeugName = (eintrag: FahrzeugEintrag, geloest: boolean) =>
     geloest ? (
-      <span style={monoStil(13)}>{eintrag.funkrufname}</span>
+      <span style={monoStil('mono')}>{eintrag.funkrufname}</span>
     ) : (
       // Eine Zeile mit Reglern trägt das Kontextmenü nur an ihrer Bezeichnung (Spec
       // `datensatz-aktionsmenue`).
@@ -686,7 +686,7 @@ export default function FahrzeugeBesatzung({
           {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
             <Status darstellung={besatzungsUrteil[f.urteil]} />
           )}
-          <span style={monoStil(12)}>{besatzungText(f)}</span>
+          <span style={monoStil('monoKlein')}>{besatzungText(f)}</span>
           {secondaryText([fremdText(f)])}
         </span>
         {renderFahrzeugActions(eintrag, { wahl: ef }, renderUebernehmen(ef), geloest)}
@@ -738,7 +738,7 @@ export default function FahrzeugeBesatzung({
           <div role="group" aria-label="Ohne Fahrzeug">
             <div style={rowStyle}>
               <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
-              <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
+              <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
                 · {kraefteText(ohne.length)}
               </span>
             </div>

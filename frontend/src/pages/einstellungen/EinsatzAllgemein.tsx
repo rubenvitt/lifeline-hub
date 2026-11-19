@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Form } from 'antd';
+import { App, AutoComplete, Form } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Select } from '../../components/Select';
@@ -27,6 +27,11 @@ import {
   type FormWerteAllgemein,
 } from './einsatzEinstellungenForm';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import SpeicherKnopf from '../../components/SpeicherKnopf';
+import {
+  AenderungsstandProvider,
+  useAenderungsstandMerken,
+} from '../../components/aenderungsstand';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { teilwortSuche } from '../../components/teilwortSuche';
@@ -47,6 +52,7 @@ export default function EinsatzAllgemein() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteAllgemein>();
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
   const daten = useEinstellungenDaten(einsatzId);
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“): die Reiter sind eigene
   // Routen, ein Wechsel baut die Sektion ab und verwürfe die Eingabe still.
@@ -102,81 +108,89 @@ export default function EinsatzAllgemein() {
         onValuesChange={schutz.geaendert}
         onFinish={(werte) => {
           const fassung = schutz.fassung();
-          speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+          speichern.mutate(werte, {
+            onSuccess: () => {
+              schutz.gespeichert(fassung);
+              stand.merke(werte);
+            },
+          });
         }}
         disabled={!daten.darfBearbeiten}
       >
-        <Formularpaneel titel="Einstieg">
-          <Feld label="Einstiegsmodul" name="standard_modul">
-            <Select
-              allowClear
-              placeholder={mitVorgabe(einstiegVorgabe)}
-              options={standardModulOptionen}
-            />
-          </Feld>
-        </Formularpaneel>
+        <AenderungsstandProvider
+          ausgangswerte={initialAllgemein(daten.einstellungen)}
+          merkeRef={stand.merkeRef}
+        >
+          <Formularpaneel titel="Einstieg">
+            <Feld label="Einstiegsmodul" name="standard_modul">
+              <Select
+                allowClear
+                placeholder={mitVorgabe(einstiegVorgabe)}
+                options={standardModulOptionen}
+              />
+            </Feld>
+          </Formularpaneel>
 
-        <Formularpaneel titel="Anzeige-Konventionen">
-          <Feld label="Zeitzone" name="zeitzone" extra={orgHinweisWert(orgDefaults?.zeitzone)}>
-            <AutoComplete
-              allowClear
-              options={ZEITZONEN_OPTIONEN}
-              placeholder={platzhalterVorgabe(orgDefaults?.zeitzone, 'Gerätezeit')}
-              showSearch={teilwortSuche}
-            />
-          </Feld>
-          <Feld
-            label="Zeitdarstellung"
-            name="zeitdarstellung"
-            extra={orgHinweisSelect(orgDefaults?.zeitdarstellung, ZEITDARSTELLUNG_OPTIONEN)}
-          >
-            <Select
-              allowClear
-              placeholder={platzhalterVorgabeSelect(
-                orgDefaults?.zeitdarstellung,
-                ZEITDARSTELLUNG_OPTIONEN,
-                ZEITDARSTELLUNG_VORGABE,
-              )}
-              options={ZEITDARSTELLUNG_OPTIONEN}
-            />
-          </Feld>
-          <Feld
-            label="Einheiten"
-            name="einheiten"
-            extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
-          >
-            <Select
-              allowClear
-              placeholder={platzhalterVorgabeSelect(
-                orgDefaults?.einheiten,
-                EINHEITEN_OPTIONEN,
-                'Metrisch',
-              )}
-              options={EINHEITEN_OPTIONEN}
-            />
-          </Feld>
-          <Feld
-            label="Koordinatenformat"
-            name="koordinatenformat"
-            extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
-          >
-            <Select
-              allowClear
-              placeholder={platzhalterVorgabeSelect(
-                orgDefaults?.koordinatenformat,
-                KOORDINATEN_OPTIONEN,
-                'WGS84 dezimal',
-              )}
-              options={KOORDINATEN_OPTIONEN}
-            />
-          </Feld>
-        </Formularpaneel>
+          <Formularpaneel titel="Anzeige-Konventionen">
+            <Feld label="Zeitzone" name="zeitzone" extra={orgHinweisWert(orgDefaults?.zeitzone)}>
+              <AutoComplete
+                allowClear
+                options={ZEITZONEN_OPTIONEN}
+                placeholder={platzhalterVorgabe(orgDefaults?.zeitzone, 'Gerätezeit')}
+                showSearch={teilwortSuche}
+              />
+            </Feld>
+            <Feld
+              label="Zeitdarstellung"
+              name="zeitdarstellung"
+              extra={orgHinweisSelect(orgDefaults?.zeitdarstellung, ZEITDARSTELLUNG_OPTIONEN)}
+            >
+              <Select
+                allowClear
+                placeholder={platzhalterVorgabeSelect(
+                  orgDefaults?.zeitdarstellung,
+                  ZEITDARSTELLUNG_OPTIONEN,
+                  ZEITDARSTELLUNG_VORGABE,
+                )}
+                options={ZEITDARSTELLUNG_OPTIONEN}
+              />
+            </Feld>
+            <Feld
+              label="Einheiten"
+              name="einheiten"
+              extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
+            >
+              <Select
+                allowClear
+                placeholder={platzhalterVorgabeSelect(
+                  orgDefaults?.einheiten,
+                  EINHEITEN_OPTIONEN,
+                  'Metrisch',
+                )}
+                options={EINHEITEN_OPTIONEN}
+              />
+            </Feld>
+            <Feld
+              label="Koordinatenformat"
+              name="koordinatenformat"
+              extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
+            >
+              <Select
+                allowClear
+                placeholder={platzhalterVorgabeSelect(
+                  orgDefaults?.koordinatenformat,
+                  KOORDINATEN_OPTIONEN,
+                  'WGS84 dezimal',
+                )}
+                options={KOORDINATEN_OPTIONEN}
+              />
+            </Feld>
+          </Formularpaneel>
 
-        <div {...speicherLeiste}>
-          <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-            Speichern
-          </Button>
-        </div>
+          <div {...speicherLeiste}>
+            <SpeicherKnopf loading={speichern.isPending} disabled={!daten.darfBearbeiten} />
+          </div>
+        </AenderungsstandProvider>
       </Form>
     </>
   );

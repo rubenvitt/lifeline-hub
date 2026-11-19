@@ -1,4 +1,5 @@
 import { Form, Typography } from 'antd';
+import { Feld } from '../components/instrument';
 import { useEffect, useRef } from 'react';
 import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
@@ -81,7 +82,8 @@ export default function MaterialHierherModal({
       {posten != null && posten.ausgegeben > 0 && (
         <Typography.Paragraph type="secondary">{mengeText(posten)}</Typography.Paragraph>
       )}
-      <Form.Item
+      <Feld
+        breite="kurz"
         label="Menge hierher"
         name="menge"
         rules={[
@@ -103,8 +105,8 @@ export default function MaterialHierherModal({
           ) : null
         }
       >
-        <MengenFeld beschriftung="Menge hierher" style={{ width: 120 }} />
-      </Form.Item>
+        <MengenFeld beschriftung="Menge hierher" />
+      </Feld>
     </ErfassungsModal>
   );
 }

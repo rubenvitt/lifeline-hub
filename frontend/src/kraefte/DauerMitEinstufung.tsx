@@ -45,7 +45,7 @@ export default function DauerMitEinstufung({
     einstufung && grenzwerte ? einstufungText(einstufung, grenzwerte, zeit) : null;
   const titel = [zusatz, begruendung].filter((t): t is string => !!t).join(' · ') || undefined;
   return (
-    <span data-lfh={lfh} title={titel} style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
+    <span data-lfh={lfh} title={titel} style={{ ...monoStil('monoKlein'), whiteSpace: 'nowrap' }}>
       {dauer(minuten)}
       {begruendung && einstufung && (
         <>

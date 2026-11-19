@@ -151,7 +151,9 @@ function BefehlKarte({
       unbearbeitet={hasEigenOffen}
       zeit={
         <>
-          <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>Stand</span>
+          <span style={{ display: 'block', ...monoStil('metaKlein'), color: rollen.schwach }}>
+            Stand
+          </span>
           <span>
             <ZeitAnzeige wert={b.zeitstand} rolle="kurz" />
           </span>
@@ -171,7 +173,7 @@ function BefehlKarte({
         <Flex
           gap={token.marginSM}
           wrap
-          style={{ marginTop: token.marginXS, ...monoStil(11), color: rollen.gedaempft }}
+          style={{ marginTop: token.marginXS, ...monoStil('meta'), color: rollen.gedaempft }}
         >
           <span>
             freigegeben <ZeitAnzeige wert={b.freigegeben_at} rolle="kurz" />

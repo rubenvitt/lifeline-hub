@@ -54,7 +54,9 @@ export default function PlanungenPage() {
     key,
     zahl: true,
     sorter: nachZahl((p: PlanungListeneintrag) => p.kennzahlen?.[key] ?? null),
-    render: (_, p) => <span style={monoStil(12)}>{p.kennzahlen ? p.kennzahlen[key] : '—'}</span>,
+    render: (_, p) => (
+      <span style={monoStil('monoKlein')}>{p.kennzahlen ? p.kennzahlen[key] : '—'}</span>
+    ),
   });
 
   const spalten: KatalogSpalte<PlanungListeneintrag>[] = [
@@ -78,7 +80,7 @@ export default function PlanungenPage() {
                 style={{ display: 'block' }}
               >
                 übernommen in{' '}
-                <span style={monoStil(12)}>
+                <span style={monoStil('monoKlein')}>
                   {p.uebernahme.einsatznummer ?? `Einsatz ${p.uebernahme.einsatz_id}`}
                 </span>
               </Typography.Text>
@@ -103,7 +105,7 @@ export default function PlanungenPage() {
       suchText: (p) =>
         `${tagUndUhrzeit(p.von, konventionen)} ${tagUndUhrzeit(p.bis, konventionen)}`,
       render: (_, p) => (
-        <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
+        <span style={{ ...monoStil('monoKlein'), whiteSpace: 'nowrap' }}>
           {tagUndUhrzeit(p.von, konventionen)}–{tagUndUhrzeit(p.bis, konventionen)}
         </span>
       ),

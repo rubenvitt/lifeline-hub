@@ -61,7 +61,7 @@ function EinheitZeile({
         <span>
           <strong>{e.name}</strong>
           {e.funkrufname && (
-            <span style={{ ...monoStil(13), color: rollen.gedaempft }}> · {e.funkrufname}</span>
+            <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}> · {e.funkrufname}</span>
           )}
           {abschnittName && <span style={{ color: rollen.gedaempft }}> · {abschnittName}</span>}
           {ueber && <span style={{ color: rollen.gedaempft }}> · über {ueber}</span>}
@@ -76,7 +76,7 @@ function EinheitZeile({
       </Flex>
       {/* Eigene Stärke wie „Zugeordnete Einheiten“ der Abschnittsseite (LLH-1744): die Zeilen
           ergeben die Stärke im Kopf, eine Untereinheit zählt nicht zusätzlich bei ihrem Zug. */}
-      <span style={monoStil(13)}>
+      <span style={monoStil('mono')}>
         eigene <StaerkeAnzeige wert={e.ist} />
       </span>
     </li>

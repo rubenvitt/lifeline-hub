@@ -50,6 +50,8 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
 import { ErfassungsModal } from '../components/Erfassung';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, EnterOhneAenderung } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { flaeche } from '../theme/tokens';
@@ -398,7 +400,7 @@ export default function SchaedenDetailPage() {
       titel={
         <Space wrap size={token.marginSM}>
           <span>
-            Schaden <span style={monoStil(14, 500)}>{kennung}</span>
+            Schaden <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status darstellung={STATUS_META[s.status]} />
           {s.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}
@@ -421,9 +423,7 @@ export default function SchaedenDetailPage() {
          * Weg; nach dem Stornieren springt die Seite selbst zurück.
          */
         aktionenPlan && (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-          // `paddingXS` ließ 3 / 5 / 7 px.
-          <Space wrap size={token.marginSM}>
+          <>
             {primaer && (
               <Button type="primary" onClick={() => fuehreKopfaktionAus(primaer)}>
                 {primaer.label}
@@ -455,7 +455,7 @@ export default function SchaedenDetailPage() {
                 if (eintrag) fuehreKopfaktionAus(eintrag);
               }}
             />
-          </Space>
+          </>
         )
       }
     >
@@ -492,33 +492,35 @@ export default function SchaedenDetailPage() {
             );
           }}
         >
-          {detailAnsicht}
-          {editFehler != null && (
-            <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
-              <SpeicherFehler fehler={editFehler} />
-            </div>
-          )}
-          {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei langer
-              Beschreibung scrollten die Knöpfe sonst aus dem Bild. */}
-          <div
-            {...speicherLeiste}
-            style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
-          >
-            {storniert ? (
-              // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
-              <Button onClick={editSitzung.beende}>Schließen</Button>
-            ) : (
-              <>
-                <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
-                  Speichern
-                </Button>
-                {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-                <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
-                  Abbrechen
-                </Button>
-              </>
-            )}
-          </div>
+          <AenderungsstandProvider ausgangswerte={sitzung.werte}>
+            <EnterOhneAenderung onSchliessen={editSitzung.beende}>
+              {detailAnsicht}
+              {editFehler != null && (
+                <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
+                  <SpeicherFehler fehler={editFehler} />
+                </div>
+              )}
+              {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei langer
+                Beschreibung scrollten die Knöpfe sonst aus dem Bild. */}
+              <div
+                {...speicherLeiste}
+                style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+              >
+                {storniert ? (
+                  // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
+                  <Button onClick={editSitzung.beende}>Schließen</Button>
+                ) : (
+                  <>
+                    <SpeicherKnopf loading={editMutation.isPending} />
+                    {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                    <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
+                      Abbrechen
+                    </Button>
+                  </>
+                )}
+              </div>
+            </EnterOhneAenderung>
+          </AenderungsstandProvider>
         </Form>
       ) : (
         detailAnsicht

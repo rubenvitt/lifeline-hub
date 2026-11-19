@@ -100,7 +100,7 @@ export default function EinheitVorlagenTab() {
         ) : (
           <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             {vorlage.fahrzeuge.map((f) => (
-              <span key={f.fahrzeug_id} style={monoStil(12)}>
+              <span key={f.fahrzeug_id} style={monoStil('monoKlein')}>
                 {f.funkrufname}
               </span>
             ))}
@@ -115,7 +115,10 @@ export default function EinheitVorlagenTab() {
         const quali = qualiSollTextVon(vorlage);
         return (
           <>
-            <span style={monoStil(12)} title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}>
+            <span
+              style={monoStil('monoKlein')}
+              title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}
+            >
               {sollText(vorlage)}
             </span>
             {quali ? ` · ${quali}` : null}

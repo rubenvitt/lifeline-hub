@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import userEvent from '@testing-library/user-event';
 import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Breadcrumb, Button, Form, Input } from 'antd';
+import { Breadcrumb, Button, Form, Input, theme } from 'antd';
 import type { EinsatzAnzeige } from '../api/types';
 import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from '../einsatz/EinsatzRahmenKontext';
 import {
@@ -83,6 +83,26 @@ describe('EinsatzSeite', () => {
     expect(container.querySelector('[data-lfh="seiten-beschreibung"]')).toHaveTextContent(
       'Betreute und vermisste Personen',
     );
+  });
+
+  it('die Kopfaktionen sind eine Knopfreihe mit Abstand md (LLH-1973)', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite
+        titel="Personal"
+        aktionen={
+          <>
+            <Button type="primary">Disponieren</Button>
+            <Button>Ad-hoc-Person</Button>
+          </>
+        }
+      >
+        <div>x</div>
+      </EinsatzSeite>,
+    );
+    const aktionen = container.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    // Nacktes `ConfigProvider`: antds Vorgabe `padding` = 16 (Stufe md), `marginSM` = 12.
+    expect(aktionen.style.gap).toBe(`${theme.getDesignToken().padding}px`);
+    expect(aktionen).toContainElement(screen.getByRole('button', { name: 'Ad-hoc-Person' }));
   });
 
   it('zeigt ein optionales Mono-Meta neben dem Titel', () => {

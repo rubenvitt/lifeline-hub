@@ -10,6 +10,14 @@ import {
 } from './nurAnsicht';
 
 describe('nurAnsicht (LFH-1078)', () => {
+  it('nennt die Rollen mit den Namen des Rollen-Vokabulars (LLH-1818)', () => {
+    expect(NUR_ADMIN).toBe('nur System-Admin');
+    expect(NUR_LEITUNG_ORG_ADMIN).toBe('nur Einsatzleitung oder System-Admin der Organisation');
+    expect(NUR_LEITUNG_FUEHRUNG_ORG_ADMIN).toBe(
+      'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation',
+    );
+  });
+
   it('nennt beim abgeschlossenen Einsatz den Abschluss, sonst die Rolle', () => {
     expect(einsatzRechteGrund('abgeschlossen')).toBe('Einsatz abgeschlossen');
     expect(einsatzRechteGrund('aktiv')).toBe('nur Einsatzleitung und Führungspersonal');
@@ -39,7 +47,7 @@ describe('nurAnsicht (LFH-1078)', () => {
       bruchstelle: 0,
     };
     expect(einsatzRechteGrund({ status: 'aktiv', spiegel: null }, NUR_LEITUNG_ORG_ADMIN)).toBe(
-      'nur Einsatzleitung oder Org-Admin',
+      'nur Einsatzleitung oder System-Admin der Organisation',
     );
     expect(einsatzRechteGrund({ status: 'aktiv', spiegel }, NUR_LEITUNG_ORG_ADMIN)).toBe(
       'Spiegel von ELW 1',
@@ -57,7 +65,8 @@ describe('nurAnsicht (LFH-1078)', () => {
       NUR_LEITUNG_FUEHRUNG_ORG_ADMIN,
       NUR_LEITUNG_ORG_ADMIN,
     ])
-      expect(grund.split(' ').length).toBeLessThanOrEqual(5);
+      // Sieben statt fünf Wörter, seit „Org-Admin“ „System-Admin der Organisation“ heißt (LLH-1818).
+      expect(grund.split(' ').length).toBeLessThanOrEqual(7);
   });
 });
 

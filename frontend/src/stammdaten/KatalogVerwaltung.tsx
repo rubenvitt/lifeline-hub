@@ -1,4 +1,4 @@
-import { Button, Form, Popconfirm, Space, type TableColumnsType } from 'antd';
+import { Button, Form, Popconfirm, type TableColumnsType } from 'antd';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
@@ -12,6 +12,7 @@ import { useAuth } from '../auth/AuthContext';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import type { StammdatenArt } from '../api/types';
 import { HerkunftAbzeichen, useStammdatenHerkunft, VomHubGesperrt } from '../instanz/herkunft';
+import Knopfreihe from '../components/instrument/Knopfreihe';
 
 export interface KatalogEintrag {
   id: number;
@@ -147,7 +148,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
             herkunftVon(eintrag) === 'vom_hub' ? (
               <VomHubGesperrt />
             ) : (
-              <Space size="middle">
+              <Knopfreihe umbruch={false}>
                 <Button onClick={() => setBearbeite(eintrag)}>Bearbeiten</Button>
                 <Popconfirm
                   title={deaktivierenFrage}
@@ -160,7 +161,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
                 >
                   <Button danger>Deaktivieren</Button>
                 </Popconfirm>
-              </Space>
+              </Knopfreihe>
             ),
         },
       ]

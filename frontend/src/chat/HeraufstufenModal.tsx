@@ -8,6 +8,7 @@ import { MODUL_MELDUNGEN_GESPERRT } from '../components/nurAnsicht';
 import { ETB_ANHAENGE_MAX } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import type { ChatNachricht, EtbTyp } from '../api/types';
+import { Feld } from '../components/instrument';
 
 /** Für die Heraufstufung zulässige ETB-Typen (Server erzwingt dieselbe Allowlist). */
 const TYP_OPTIONEN: { value: EtbTyp; label: string }[] = [
@@ -116,20 +117,20 @@ export default function HeraufstufenModal({
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}
     >
-      <Form.Item label="ETB-Typ" name="typ" rules={[{ required: true }]}>
+      <Feld label="ETB-Typ" name="typ" rules={[{ required: true }]}>
         <Select options={TYP_OPTIONEN} />
-      </Form.Item>
+      </Feld>
       {mitMeldung && meldungenFrei && (
-        <Form.Item name="in_meldungseingang" valuePropName="checked">
+        <Feld name="in_meldungseingang" valuePropName="checked">
           <Checkbox>Auch in den Meldungseingang</Checkbox>
-        </Form.Item>
+        </Feld>
       )}
       {mitMeldung && !meldungenFrei && (
         <Typography.Paragraph type="secondary">
           Nur ins ETB: {MODUL_MELDUNGEN_GESPERRT}
         </Typography.Paragraph>
       )}
-      <Form.Item
+      <Feld
         label="Text"
         name="inhalt"
         rules={[
@@ -142,9 +143,9 @@ export default function HeraufstufenModal({
           autoSize={{ minRows: 2, maxRows: 6 }}
           count={zeichenGrenze(ETB_INHALT_MAX)}
         />
-      </Form.Item>
+      </Feld>
       {anhaenge.length > 0 && (
-        <Form.Item
+        <Feld
           label="Anhänge übernehmen"
           name="anhang_ids"
           // EIN Folgesatz vor dem unumkehrbaren Schritt; wie kopiert wird, sagt die Seite nicht
@@ -175,7 +176,7 @@ export default function HeraufstufenModal({
               </Checkbox>
             ))}
           </Checkbox.Group>
-        </Form.Item>
+        </Feld>
       )}
     </ErfassungsModal>
   );

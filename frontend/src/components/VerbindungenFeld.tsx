@@ -1,10 +1,10 @@
 import type { FeldVermerk } from '../api/types';
-import { Button, Flex, Input } from 'antd';
+import { Button, Input } from 'antd';
 import { VERBINDUNGEN_MAX, VERBINDUNG_TEXT_MAX } from '../api/eingabegrenzen';
 import type { KommunikationsVerbindung, NeueVerbindung, Verbindungsmittel } from '../api/types';
 import { IconMuelleimer, IconPlus } from '../icons';
 import { InlineAngabe, type InlineEingabe } from './InlineAngabe';
-import { monoStil, useRollen } from './instrument';
+import { monoStil, Stapel, useRollen } from './instrument';
 import { kennungsLinkStil } from './kennungsLink';
 import { Select } from './Select';
 import {
@@ -45,12 +45,20 @@ export function VerbindungenListe({
   return (
     // Die Verweise sind Bedienziele: Zeile über Zeile ≥ 8 / ≥ 16 px auseinander (LFH-630,
     // `paddingSM` 8/12/16), nicht nur der Zeilenabstand des Fließtexts.
-    <Flex vertical gap={token.paddingSM}>
+    <Stapel abstand="sm">
       {verbindungen.map((v, i) => {
         const verweis = verbindungsVerweis(v.mittel, v.wert);
-        const wert = <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>{v.wert}</span>;
+        const wert = (
+          <span style={{ ...monoStil('mono'), overflowWrap: 'anywhere' }}>{v.wert}</span>
+        );
         return (
-          <Flex key={`${i}-${v.mittel}-${v.wert}`} wrap align="baseline" gap={token.marginXS}>
+          <Stapel
+            key={`${i}-${v.mittel}-${v.wert}`}
+            richtung="zeile"
+            umbruch
+            abstand="xs"
+            ausrichten="baseline"
+          >
             <span style={gedaempft}>{VERBINDUNGSMITTEL_LABEL[v.mittel]}</span>
             {verweis ? (
               <a href={verweis} style={kennungsLinkStil(token)}>
@@ -60,10 +68,10 @@ export function VerbindungenListe({
               wert
             )}
             {v.hinweis && <span style={gedaempft}>{v.hinweis}</span>}
-          </Flex>
+          </Stapel>
         );
       })}
-    </Flex>
+    </Stapel>
   );
 }
 
@@ -90,18 +98,17 @@ export function VerbindungenEingabe({
   onChange,
   popup,
 }: Pick<InlineEingabe<NeueVerbindung[]>, 'feld' | 'value' | 'onChange' | 'popup'>) {
-  const { token } = useRollen();
   const { id, autoFocus, 'aria-label': name, ...pruefMerkmale } = feld;
   const setze = (i: number, teil: Partial<NeueVerbindung>) =>
     onChange(value.map((v, j) => (j === i ? { ...v, ...teil } : v)));
   const voll = value.length >= VERBINDUNGEN_MAX;
   return (
     <div role="group" aria-label={name} {...pruefMerkmale}>
-      <Flex vertical gap={token.marginXS}>
+      <Stapel abstand="xs">
         {value.map((v, i) => {
           const nr = i + 1;
           return (
-            <Flex key={i} wrap gap={token.marginXS} align="center">
+            <Stapel key={i} richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
               <Select<Verbindungsmittel>
                 {...popup}
                 aria-label={`Mittel ${nr}`}
@@ -113,7 +120,7 @@ export function VerbindungenEingabe({
               <Input
                 {...(i === 0 ? { id, autoFocus } : {})}
                 aria-label={`Nummer oder Adresse ${nr}`}
-                style={{ flex: '1 1 160px', minWidth: 0, ...monoStil(13) }}
+                style={{ flex: '1 1 160px', minWidth: 0, ...monoStil('mono') }}
                 placeholder="z. B. 0170 1234567"
                 maxLength={VERBINDUNG_TEXT_MAX}
                 value={v.wert}
@@ -132,7 +139,7 @@ export function VerbindungenEingabe({
                 icon={<IconMuelleimer />}
                 onClick={() => onChange(value.filter((_, j) => j !== i))}
               />
-            </Flex>
+            </Stapel>
           );
         })}
         <div>
@@ -145,7 +152,7 @@ export function VerbindungenEingabe({
             Verbindung hinzufügen
           </Button>
         </div>
-      </Flex>
+      </Stapel>
     </div>
   );
 }

@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { Alert, App, Button, Form, Input, Modal, Space, Spin, Tooltip, Typography } from 'antd';
+import { Alert, App, Button, Form, Input, Modal, Spin, Tooltip, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
-import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
+import {
+  Datenfeld,
+  Knopfreihe,
+  Datenraster,
+  Paneel,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import KopierbarerText from '../components/KopierbarerText';
@@ -202,7 +209,7 @@ export default function InstanzkopplungSeite() {
       breite="schmal"
       aktionen={
         isAdmin && (
-          <Space wrap size={token.marginSM}>
+          <Knopfreihe>
             <Tooltip title={sperre}>
               <Button
                 type="primary"
@@ -236,7 +243,7 @@ export default function InstanzkopplungSeite() {
             <Button onClick={() => setEinloesenOffen(true)} data-lfh="instanz-code-einloesen">
               Code einlösen
             </Button>
-          </Space>
+          </Knopfreihe>
         )
       }
       hinweis={<SeitenHinweise rechteFehlt={!isAdmin} rechteText={NUR_ADMIN} />}
@@ -369,7 +376,7 @@ export default function InstanzkopplungSeite() {
                           >
                             {kopplungZustandZeile(k, zeit)}
                           </div>
-                          <div style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                          <div style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
                             {k.gegenueber_fingerabdruck}
                             {k.gegenueber_adresse ? ` · ${k.gegenueber_adresse}` : ''}
                           </div>
@@ -509,7 +516,7 @@ export default function InstanzkopplungSeite() {
                       description={
                         <div>
                           <div style={{ color: rollen.gedaempft }}>{schluesselZeile(s, zeit)}</div>
-                          <div style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                          <div style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
                             {s.fingerabdruck}
                           </div>
                         </div>
@@ -567,7 +574,11 @@ export default function InstanzkopplungSeite() {
           name="code"
           rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
         >
-          <Input placeholder="ABCD-EFGH-JKMN-PQRS" style={monoStil(14)} autoComplete="off" />
+          <Input
+            placeholder="ABCD-EFGH-JKMN-PQRS"
+            style={monoStil('monoGross')}
+            autoComplete="off"
+          />
         </Form.Item>
         <SpeicherFehler fehler={einloesen.error} titel="Nicht gekoppelt" />
       </ErfassungsModal>
@@ -633,7 +644,7 @@ export default function InstanzkopplungSeite() {
               ]}
               normalize={(w: string) => w.toUpperCase()}
             >
-              <Input maxLength={4} style={monoStil(14)} autoComplete="off" />
+              <Input maxLength={4} style={monoStil('monoGross')} autoComplete="off" />
             </Form.Item>
           </>
         )}
@@ -728,7 +739,7 @@ export default function InstanzkopplungSeite() {
             <p style={{ marginBlockStart: token.marginSM }}>
               Nach dem Koppeln zeigt die andere Instanz diesen Fingerabdruck. Er muss gleich sein:
             </p>
-            <span style={monoStil(13)}>{neuerCode.fingerabdruck}</span>
+            <span style={monoStil('mono')}>{neuerCode.fingerabdruck}</span>
             {neuerCode.art === 'vor_ort' && (
               <Alert
                 type="info"
@@ -933,7 +944,7 @@ function ImNetzGefunden({
                 <ListenEintragMeta
                   title={<span data-lfh="instanz-im-netz-name">{g.name || g.kennung}</span>}
                   description={
-                    <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                    <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
                       {gefundenZeile(g)}
                     </span>
                   }

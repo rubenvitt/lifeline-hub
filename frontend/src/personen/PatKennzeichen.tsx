@@ -124,25 +124,26 @@ export default function PatKennzeichen({
         <InlineAngabe<string>
           etikett="PAT-Nummer"
           wert={pat}
-          anzeige={<span style={monoStil(13)}>{`PAT ${pat}`}</span>}
+          anzeige={<span style={monoStil('mono')}>{`PAT ${pat}`}</span>}
           leer={(w) => w.trim() === ''}
           gleich={(a, b) => a.trim() === b.trim()}
           isValid={(w) => !istZuLang(w, PAT_NUMMER_MAX)}
           darfSchreiben
           onSpeichern={(w, { beimOeffnen }) => savePat(patWire(w), beimOeffnen)}
           eingabe={({ feld, value, onChange }) => (
-            <Input
-              {...feld}
-              value={value}
-              count={zeichenGrenze(PAT_NUMMER_MAX)}
-              onChange={(e) => onChange(e.target.value)}
-              style={{ width: 200 }}
-            />
+            <div style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}>
+              <Input
+                {...feld}
+                value={value}
+                count={zeichenGrenze(PAT_NUMMER_MAX)}
+                onChange={(e) => onChange(e.target.value)}
+              />
+            </div>
           )}
         />
       ) : (
         pat && (
-          <span data-lfh="pat-nummer" style={{ ...monoStil(13), color: rollen.text }}>
+          <span data-lfh="pat-nummer" style={{ ...monoStil('mono'), color: rollen.text }}>
             {`PAT ${pat}`}
           </span>
         )
@@ -158,15 +159,16 @@ export default function PatKennzeichen({
           darfSchreiben
           onSpeichern={(w, { beimOeffnen }) => saveKontamination(kontaminationWire(w), beimOeffnen)}
           eingabe={({ feld, value, onChange, popup }) => (
-            <Select<'ja' | 'nein'>
-              {...feld}
-              {...popup}
-              allowClear
-              value={value ?? undefined}
-              onChange={(w) => onChange(w ?? null)}
-              options={KONTAMINATION_OPTIONEN}
-              style={{ minWidth: 200 }}
-            />
+            <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+              <Select<'ja' | 'nein'>
+                {...feld}
+                {...popup}
+                allowClear
+                value={value ?? undefined}
+                onChange={(w) => onChange(w ?? null)}
+                options={KONTAMINATION_OPTIONEN}
+              />
+            </div>
           )}
         />
       ) : (

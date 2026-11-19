@@ -10,6 +10,7 @@ import {
   Space,
   Typography,
 } from 'antd';
+import Knopfreihe from '../components/instrument/Knopfreihe';
 import { QueryClientContext, useQuery } from '@tanstack/react-query';
 import {
   Fragment,
@@ -384,7 +385,7 @@ export default function OfflineRecoveryDrawer({
   ) => {
     const { schluessel } = zeile;
     return (
-      <Space size="middle">
+      <Knopfreihe umbruch={false}>
         <Button
           type="primary"
           loading={aktionLaeuft === `${schluessel}:retry`}
@@ -430,7 +431,7 @@ export default function OfflineRecoveryDrawer({
             Verwerfen
           </Button>
         </Popconfirm>
-      </Space>
+      </Knopfreihe>
     );
   };
   /** Verwirft einen abgelehnten Antrag am Server und lädt die Liste neu, auch nach einem 404. */
@@ -597,7 +598,7 @@ export default function OfflineRecoveryDrawer({
               antrag={a}
               fehler={zeilen.grund(zeile.schluessel)}
               aktionen={
-                <Space size="middle">
+                <Knopfreihe umbruch={false}>
                   {kopierenMoeglich && (
                     <Button onClick={() => antragKopieren(a, zeile)}>Kopieren</Button>
                   )}
@@ -619,7 +620,7 @@ export default function OfflineRecoveryDrawer({
                       Verwerfen
                     </Button>
                   </Popconfirm>
-                </Space>
+                </Knopfreihe>
               }
             />
           );

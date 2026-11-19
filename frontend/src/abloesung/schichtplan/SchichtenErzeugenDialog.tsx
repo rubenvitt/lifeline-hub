@@ -7,6 +7,7 @@ import { ZeitraumEingabe, type Zeitraum } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../../anzeige/zeitEingabe';
 import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
 import { einsatzVorgabe, mitVorgabe } from '../../components/vorgabeText';
+import { Feld } from '../../components/instrument';
 import { dauerMinuten, dauerRegel } from '../dauer';
 import type { RasterZeile } from './raster';
 import { MINDEST_MS } from './raster';
@@ -117,14 +118,14 @@ export default function SchichtenErzeugenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<ErzeugenWerte>
+      <Feld<ErzeugenWerte>
         name="posten"
         label="Posten"
         rules={[{ required: true, message: 'Bitte einen Posten wählen' }]}
       >
         <Select placeholder="Posten wählen…" options={postenOptionen} />
-      </Form.Item>
-      <Form.Item<ErzeugenWerte>
+      </Feld>
+      <Feld<ErzeugenWerte>
         name="zeit"
         label="Zeit"
         rules={[
@@ -141,8 +142,8 @@ export default function SchichtenErzeugenDialog({
         ]}
       >
         <ZeitraumEingabe art="frist" />
-      </Form.Item>
-      <Form.Item<ErzeugenWerte>
+      </Feld>
+      <Feld<ErzeugenWerte>
         name="laenge"
         label="Länge je Schicht"
         required={pflicht}
@@ -166,7 +167,7 @@ export default function SchichtenErzeugenDialog({
         ]}
       >
         <Input placeholder={laengePlatzhalter} autoComplete="off" />
-      </Form.Item>
+      </Feld>
       {konflikte.length > 0 && (
         <Alert
           type="error"
