@@ -13,6 +13,7 @@ import { ausgeblendetRaeumen, verlaufInhalt } from '../alarm/benachrichtigungGed
 import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
 import { listenGedaechtnisRaeumen } from '../components/listenGedaechtnis';
+import { rollGedaechtnisRaeumen } from '../routing/rollGedaechtnis';
 import { entwuerfeAufraeumen, entwuerfeRaeumen } from '../etb/entwuerfe/entwurfStore';
 import { clearStartlisteAusgeblendet } from '../pages/fuehrung/startlisteSpeicher';
 import { zuletztRaeumen } from '../stammdaten/zuletztVerwendet';
@@ -109,6 +110,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'jeder-ausgang',
     grund:
       'Sortierung, Spaltenfilter und Suchbegriff einer Liste für den Rückweg ohne Adressparameter (LLH-1086); ein Suchbegriff kann einen Namen tragen, die nächste Person im Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LLH-1428).',
+  },
+  {
+    ort: 'sessionStorage lfh:rolle',
+    datei: 'routing/rollGedaechtnis.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Rollposition je Verlaufseintrag für das Zurück (LLH-1826): nur Schlüssel und Pixelwerte, ohne Einsatzinhalt; ein Ausgang braucht sie nicht.',
   },
   {
     ort: 'localStorage lfh:klappband:<seite>',
@@ -314,6 +322,7 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     // Absender, Wortlaut und Titel der Eingänge im Speicher des Tabs (LLH-1737), kein Speicherort.
     verlaufInhalt: () => verlaufInhalt.clear(),
     listenGedaechtnis: listenGedaechtnisRaeumen,
+    rollGedaechtnis: rollGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
     startlisteAusgeblendet: clearStartlisteAusgeblendet,
     stammdatenfeldZuletzt: zuletztRaeumen,

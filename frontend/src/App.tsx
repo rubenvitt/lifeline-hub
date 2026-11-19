@@ -5,6 +5,7 @@ import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
+import RollWiederherstellung from './components/RollWiederherstellung';
 import SprungZumInhalt from './components/SprungZumInhalt';
 import Fehlergrenze from './components/Fehlergrenze';
 import { SeitenSkeleton } from './components/SeitenZustand';
@@ -265,6 +266,8 @@ function BetriebsLayout() {
           (nufmon70 D1, `frontend/AGENTS.md`, Rahmen, „Sprunglink zum Inhalt“). */}
       <SprungZumInhalt />
       <LiveStatusBanner benutzerId={benutzer?.id} klebend />
+      {/* Rollposition beim Zurück (LLH-1826): Stab und Einsatzrahmen, nicht die Gerätehülle. */}
+      <RollWiederherstellung />
       <Outlet />
     </>
   );
