@@ -494,6 +494,8 @@ function SollField({ typen, vorlage }: { typen: EinheitTyp[]; vorlage: EinheitVo
     <>
       {/* EIN `Feld` für das Trio: der Server prüft „alle drei oder keiner“ (Muster
           `FahrzeugDetailPage`). */}
+      {/* Das Etikett ist ein `<label>`: kein Knopf darin (LLH-1825, Review B6), die Schreibweise
+          bleibt Text. */}
       <Feld
         label={`Soll-Stärke (${STAERKE_SCHREIBWEISE})`}
         name="soll"

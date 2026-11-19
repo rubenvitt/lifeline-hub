@@ -1,4 +1,4 @@
-import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
 import { Alert, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -140,7 +140,15 @@ export default function GeraetAbschnittPage() {
               spalten={1}
             />
           </Paneel>
-          <Paneel titel="Einheiten" meta={`Stärke ${STAERKE_SCHREIBWEISE}`} koerperPolster>
+          <Paneel
+            titel="Einheiten"
+            meta={
+              <>
+                Stärke <StaerkeSchreibweise />
+              </>
+            }
+            koerperPolster
+          >
             {einheitenQuery.isError ? (
               <Alert type="error" showIcon title="Einheiten konnten nicht geladen werden" />
             ) : einheitenQuery.isLoading ? (
