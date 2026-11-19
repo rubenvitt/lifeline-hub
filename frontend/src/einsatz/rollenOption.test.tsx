@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
-import { Select } from 'antd';
+import { Select } from '../components/Select';
 import { describe, expect, it } from 'vitest';
 import { listeVon, oeffne } from '../test/auswahlListe';
 import { rollenOptionen, rollenOptionRender } from './rollenOption';

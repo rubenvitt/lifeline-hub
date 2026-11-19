@@ -244,7 +244,9 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation'),
+      await screen.findByText(
+        'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
@@ -263,7 +265,9 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation'),
+      await screen.findByText(
+        'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });

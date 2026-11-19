@@ -279,7 +279,9 @@ describe('EinsatzModule', () => {
     rendern();
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
-    expect(within(zeile).getByText('nur Einsatzleitung oder System-Admin der Organisation')).toBeInTheDocument();
+    expect(
+      within(zeile).getByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeInTheDocument();
   });
 
   // LLH-1675: Am Spiegel trägt auch jede gesperrte Zeile die führende Instanz.
@@ -302,7 +304,9 @@ describe('EinsatzModule', () => {
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
     expect(within(zeile).getByText('Spiegel von ELW 1')).toBeInTheDocument();
-    expect(within(zeile).queryByText('nur Einsatzleitung oder System-Admin der Organisation')).toBeNull();
+    expect(
+      within(zeile).queryByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeNull();
   });
 
   // `darfEinsatzLeiten` verlangt einen aktiven Einsatz; ein abgeschlossener sperrt auch die
@@ -319,7 +323,9 @@ describe('EinsatzModule', () => {
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
     expect(within(zeile).getByText('Einsatz abgeschlossen')).toBeInTheDocument();
-    expect(within(zeile).queryByText('nur Einsatzleitung oder System-Admin der Organisation')).toBeNull();
+    expect(
+      within(zeile).queryByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeNull();
   });
 
   it('zeigt bei nicht ladbaren Overrides KEINE Liste — sonst loegen die Bestandswerte', async () => {
