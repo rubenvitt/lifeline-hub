@@ -3,7 +3,8 @@ use axum::http::StatusCode;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
-    rolle_setzen, setup, stammpersonal_disponieren, system_etb_anzahl,
+    rolle_setzen, setup, setup_mit_pool_und_live, stammpersonal_disponieren, system_etb_anzahl,
+    EtbLive,
 };
 
 #[tokio::test]
@@ -2985,4 +2986,62 @@ async fn personal_zuruecknehmen_als_fuehrer() {
     let (s, j) = anfrage(&app, "PUT", &pfad(anna, "?nur_wenn_frei=1"), &admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT, "{j}");
     assert_eq!(j["error"], "Anna steht inzwischen in Einheit «Zug 2»");
+}
+
+/// LLH-1976: Jeder System-Eintrag der Einheiten geht nach dem Commit als Ereignis `etb` hinaus;
+/// `einheit` frischt das Einsatztagebuch nicht auf.
+#[tokio::test]
+async fn einheit_etb_eintraege_gehen_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    let s4 = status_id(&app, &admin, "4 – Am Einsatzort").await;
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+
+    let personal = format!("/api/einsaetze/{einsatz}/einheiten/{e}/personal/{ep}");
+    let (s, _) = anfrage(&app, "PUT", &personal, &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    etb.pruefe(&app, &admin, einsatz, "Person zuordnen").await;
+    let (s, _) = anfrage(&app, "DELETE", &personal, &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    etb.pruefe(&app, &admin, einsatz, "Person freigeben").await;
+
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    etb.pruefe(&app, &admin, einsatz, "Fahrzeug zuordnen").await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    etb.pruefe(&app, &admin, einsatz, "Fahrzeug freigeben")
+        .await;
+
+    let (s, _) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    etb.pruefe(&app, &admin, einsatz, "Handstatus setzen").await;
+
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    etb.pruefe(&app, &admin, einsatz, "auflösen").await;
 }
