@@ -3,7 +3,7 @@ import utc from 'dayjs/plugin/utc';
 import type { Person, PersonAnlass, Sichtungskategorie, VerbleibArt } from '../api/types';
 import type { AnzeigeKonventionen } from '../anzeige/format';
 import { inZone } from '../anzeige/zeitDarstellung';
-import { ANLASS_REIHE } from './personMeta';
+import { ANLASS_REIHE, personSichtung } from './personMeta';
 import { hatKoordinate } from './koordinate';
 import { nichtGeladen } from '../offline/lagebildKuerzung';
 
@@ -276,7 +276,7 @@ export function sichtungsbild(alle: readonly Pick<Person, 'aktuelle_sichtung'>[]
     SichtungsbildSchluessel,
     number
   >;
-  for (const p of alle) je[p.aktuelle_sichtung ?? 'ohne']++;
+  for (const p of alle) je[personSichtung(p.aktuelle_sichtung) ?? 'ohne']++;
   return { gesamt: alle.length, je };
 }
 

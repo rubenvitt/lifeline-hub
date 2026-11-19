@@ -27,7 +27,7 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import type { Person, Sichtungskategorie } from '../api/types';
-import { SK_META } from '../personen/personMeta';
+import { SK_META, personSichtung } from '../personen/personMeta';
 import {
   abgleichSpalten,
   nameText,
@@ -166,11 +166,12 @@ function ZuletztText({ q }: { q: ZeilenQuittung }) {
     );
   }
   const p = q.person;
+  const sk = personSichtung(p.aktuelle_sichtung);
   return (
     <>
       Zuletzt: <ZeitAnzeige wert={p.erfasst_at} rolle="kurz" /> {registrierAnzeige(p.registrier_nr)}
       {nameText(p) ? ` ${nameText(p)}` : ''}
-      {p.aktuelle_sichtung ? ` · ${SK_META[p.aktuelle_sichtung].label}` : ''}
+      {sk ? ` · ${SK_META[sk].label}` : ''}
     </>
   );
 }

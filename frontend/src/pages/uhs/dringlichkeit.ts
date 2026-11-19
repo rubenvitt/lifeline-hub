@@ -1,6 +1,11 @@
 import type { Sichtungskategorie, TransportPrioritaet, UhsBelegung } from '../../api/types';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
-import { SK_REIHE, TRANSPORT_PRIORITAET_REIHE, transportRang } from '../../personen/personMeta';
+import {
+  SK_REIHE,
+  TRANSPORT_PRIORITAET_REIHE,
+  personSichtung,
+  transportRang,
+} from '../../personen/personMeta';
 
 /**
  * Dringlichkeit in der Unfallhilfsstelle (LLH-1135): wer als Nächstes auf einen freien Platz
@@ -30,7 +35,7 @@ export interface DringlichkeitsMerkmale {
 
 /** Platz in der Reihe, 0 = ungesichtet. */
 export function dringlichkeitsRang(sichtung: Sichtungskategorie | null | undefined): number {
-  return DRINGLICHKEITS_REIHE.indexOf(sichtung ?? 'ungesichtet');
+  return DRINGLICHKEITS_REIHE.indexOf(personSichtung(sichtung) ?? 'ungesichtet');
 }
 
 /** Die Reihe der Transportpriorität steht bei den Personen (`personen/personMeta.ts`). */

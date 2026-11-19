@@ -4,7 +4,7 @@ import type { AnzeigeKonventionen } from '../anzeige/format';
 import DruckTabelle, { type DruckSpalte } from '../druck/DruckTabelle';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import { koordinatenText } from './koordinate';
-import { SK_META, personStatusDarstellung } from './personMeta';
+import { SK_META, personSichtung, personStatusDarstellung } from './personMeta';
 import { geschlechtAlter, nameText, verbleibText } from './personenSpalten';
 
 interface Props {
@@ -26,7 +26,10 @@ export default function PersonenDruckTabelle({ personen, uhsName, konventionen }
     { titel: 'Geschl./Alter', wert: (p) => geschlechtAlter(p) ?? '—' },
     {
       titel: 'Sichtung',
-      wert: (p) => (p.aktuelle_sichtung ? SK_META[p.aktuelle_sichtung].label : 'ohne Sichtung'),
+      wert: (p) => {
+        const k = personSichtung(p.aktuelle_sichtung);
+        return k ? SK_META[k].label : 'ohne Sichtung';
+      },
     },
     { titel: 'Status', wert: (p) => personStatusDarstellung(p.status).label },
     {

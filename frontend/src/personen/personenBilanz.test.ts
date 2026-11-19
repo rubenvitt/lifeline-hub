@@ -300,6 +300,17 @@ describe('versorgungsBilanz', () => {
 });
 
 describe('sichtungsbild', () => {
+  it('zählt eine unbekannte Sichtung unter „ohne“, statt sie zu verlieren (LLH-1998)', () => {
+    const bild = sichtungsbild([
+      { aktuelle_sichtung: 'sk1' },
+      { aktuelle_sichtung: 'xyz' as never },
+    ]);
+    expect(bild).toEqual({
+      gesamt: 2,
+      je: { sk1: 1, sk2: 0, sk3: 0, sk4: 0, tot: 0, unverletzt: 0, ohne: 1 },
+    });
+  });
+
   it('zählt alle Personen je Sichtung, Ungesichtete unter „ohne"', () => {
     const bild = sichtungsbild([
       { aktuelle_sichtung: 'sk1' },
