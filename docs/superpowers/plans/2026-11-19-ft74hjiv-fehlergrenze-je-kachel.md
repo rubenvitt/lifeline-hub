@@ -72,7 +72,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
   - `export const KACHELGRENZE_SELEKTOR = '[data-lfh-kachelgrenze]'`
   - Die Ersatzfläche trägt `data-lfh="kachelgrenze"`.
 
-- [ ] **Step 1: Write the failing tests.** Mocke `../api/clientFehler` per `vi.mock` mit
+- [x] **Step 1: Write the failing tests.** Mocke `../api/clientFehler` per `vi.mock` mit
   `meldeClientFehler: vi.fn(() => Promise.resolve())`. Unterdrücke `console.error` per `vi.spyOn`.
   Dazu zwei Hilfskomponenten: `Wirft`, die beim Zeichnen ein `new Error('geheim-123')` wirft, und
   `WirftImHook`, die in `useMemo` wirft. Die Tests:
@@ -91,9 +91,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
   - „ein neuer neuversuch zeichnet die Kachel neu“: Ein Kind wirft nur, solange ein äußerer Schalter
     an ist. Beim `rerender` mit Schalter aus und `neuversuch` 2 statt 1 ist der Inhalt des Kindes
     zu sehen. Bei gleichem `neuversuch` bleibt der Ersatz stehen.
-- [ ] **Step 2: Run** `cd frontend && mise exec -- pnpm exec vitest run src/components/KachelGrenze.test.tsx`
+- [x] **Step 2: Run** `cd frontend && mise exec -- pnpm exec vitest run src/components/KachelGrenze.test.tsx`
   → FAIL (Modul fehlt).
-- [ ] **Step 3: Implement `KachelGrenze`.**
+- [x] **Step 3: Implement `KachelGrenze`.**
   - State: `{ hasError: boolean; neuversuch: unknown }`.
   - `static getDerivedStateFromError()` gibt `{ hasError: true }` zurück.
   - `static getDerivedStateFromProps(props, state)` setzt `{ hasError: false, neuversuch: props.neuversuch }`,
@@ -109,8 +109,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
       (`rollen.flaeche`, Rand `rollen.linie`, Radius 8, Polster `16px 24px`). Darin der Kacheltitel
       in `grossMass(GROSS_BEZUG.titel)` und der Satz in `grossMass(GROSS_BEZUG.text)`.
   - Der Dateikopf-Kommentar verweist auf die Regel in `frontend/AGENTS.md` und auf LLH-1958.
-- [ ] **Step 4: Run** wie Step 2 → PASS.
-- [ ] **Step 5: Commit** `feat(frontend): KachelGrenze fängt den Wurf einer einzelnen Kachel (LLH-1958)`.
+- [x] **Step 4: Run** wie Step 2 → PASS.
+- [x] **Step 5: Commit** `feat(frontend): KachelGrenze fängt den Wurf einer einzelnen Kachel (LLH-1958)`.
 
 ### Task 2: Überblick und Lagebild, mit Render-Wächter
 
@@ -134,7 +134,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
     - Jede hat `closest(KACHELGRENZE_SELEKTOR)` innerhalb von `flaeche`.
     - Die Menge dieser Grenzen ist so groß wie die Zahl der Kacheln, also eins zu eins.
 
-- [ ] **Step 1: Write the failing guard tests.**
+- [x] **Step 1: Write the failing guard tests.**
   - Schreibe `pruefeKachelGrenzen` in `src/test/kachelWaechter.ts`.
   - In `UeberblickPage.test.tsx` kommt
     `it('Wächter: jede Kachel des Überblicks steht in ihrer eigenen KachelGrenze (LLH-1958)')` hinzu.
@@ -145,8 +145,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
     Startlisten-Test.
   - In `LageDashboardPage.test.tsx` kommt dasselbe für `[data-lfh="lagebild"]` mit `mindestens`
     6 hinzu: Alarmzeile, zwei Bänder und drei Paneele.
-- [ ] **Step 2: Run** beide Testdateien → die neuen `it` FAIL (keine Grenze).
-- [ ] **Step 3: Wrap.**
+- [x] **Step 2: Run** beide Testdateien → die neuen `it` FAIL (keine Grenze).
+- [x] **Step 3: Wrap.**
   - **Überblick:** Je eine `KachelGrenze` umschließt
     - `AlarmZeile` (titel „Was brennt“),
     - `StartlistePaneel` (titel „Einsatz starten“, innerhalb der Bedingung `zeigeStartliste`),
@@ -162,10 +162,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
     - `MeldungsstromPaneel`,
     - das Band „Stand“.
   - Das `Sammelbanner` bleibt ohne Grenze.
-- [ ] **Step 4: Run** beide Testdateien vollständig → PASS, auch die vorhandenen Layout-Tests.
-- [ ] **Step 5: Mutationsprobe.** Nimm im Überblick vorübergehend eine Grenze heraus. Der Wächter
+- [x] **Step 4: Run** beide Testdateien vollständig → PASS, auch die vorhandenen Layout-Tests.
+- [x] **Step 5: Mutationsprobe.** Nimm im Überblick vorübergehend eine Grenze heraus. Der Wächter
   muss rot werden. Danach machst du die Probe rückgängig.
-- [ ] **Step 6: Commit** `feat(frontend): Überblick und Lagebild fangen Würfe je Kachel (LLH-1958)`.
+- [x] **Step 6: Commit** `feat(frontend): Überblick und Lagebild fangen Würfe je Kachel (LLH-1958)`.
 
 ### Task 3: Lagebild-Großbild und Lagemonitor (Form `gross`)
 
@@ -181,13 +181,13 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
   - Die `section` der Lagemonitor-`Kachel` trägt `data-lfh="monitor-kachel"`.
   - `Kacheln` bekommt die Prop `neuversuch: number`.
 
-- [ ] **Step 1: Write the failing guard test** in `LagemonitorPage.test.tsx`:
+- [x] **Step 1: Write the failing guard test** in `LagemonitorPage.test.tsx`:
   `it('Wächter: jede Kachel des Lagemonitors steht in ihrer eigenen KachelGrenze (LLH-1958)')`.
   Es nutzt `renderApp` wie „startet auf dem Großbild …“, wartet auf die Kopfzahlen und ruft
   `pruefeKachelGrenzen(container.querySelector('main')!, 4)`. Das sind Alarmzeile, Lagekarte,
   Meldungen und mindestens eine Kachel aus `Kacheln`.
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Wrap.**
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Wrap.**
   - **Lagemonitor:** `neuversuch` ist überall `lageQuery.dataUpdatedAt`, und die Form ist
     `gross`. Eine Grenze bekommen
     - `AlarmZeile`,
@@ -202,9 +202,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
     - `VerlaufBlock` bzw. `GefahrenBlock`,
     - `SichtungsBlock`,
     - der Block „Stand“.
-- [ ] **Step 4: Run** `LagemonitorPage.test.tsx`, `LagemonitorKarte.test.tsx` und
+- [x] **Step 4: Run** `LagemonitorPage.test.tsx`, `LagemonitorKarte.test.tsx` und
   `LagebildGrossbild.test.tsx` → PASS.
-- [ ] **Step 5: Commit** `feat(frontend): Großbild und Lagemonitor fangen Würfe je Kachel ohne Knopf (LLH-1958)`.
+- [x] **Step 5: Commit** `feat(frontend): Großbild und Lagemonitor fangen Würfe je Kachel ohne Knopf (LLH-1958)`.
 
 ### Task 4: Regel und Gates
 
@@ -213,15 +213,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/ft74hjivesqlac82pjb85h3h
 - Modify: `frontend/src/geraet/AGENTS.md`: Ein Satz kommt hinzu, wenn dort Kachel- oder
   Großbildregeln stehen; vorher greppen.
 
-- [ ] **Step 1: Regel schreiben.**
+- [x] **Step 1: Regel schreiben.**
   - Wortlaut nach dem Design-Doc, Abschnitt „Regel“.
   - Sie nennt `components/KachelGrenze.tsx`, die Formen `paneel` und `gross`, die Wächter
     (`src/test/kachelWaechter.ts` und die drei `it` aus Task 2/3) und den Nachweis
     `KachelGrenze.test.tsx`.
   - Abgrenzung: Abfragefehler bleiben bei `PaneelZustand`, Würfe im Seitenrumpf bei der
     Rahmengrenze.
-- [ ] **Step 2: Run** `scripts/adr-fuer.sh frontend/src/components/KachelGrenze.tsx frontend/src/geraet/LagemonitorPage.tsx`.
+- [x] **Step 2: Run** `scripts/adr-fuer.sh frontend/src/components/KachelGrenze.tsx frontend/src/geraet/LagemonitorPage.tsx`.
   Prüfe, ob eine ADR berührt ist, und passe sonst nichts an.
-- [ ] **Step 3: Run** `./scripts/check-all.sh --geaendert --ohne-e2e` im Repo-Wurzelverzeichnis →
+- [x] **Step 3: Run** `./scripts/check-all.sh --geaendert --ohne-e2e` im Repo-Wurzelverzeichnis →
   grün. Prettier, Lint, Typen und die Vitest-Suiten des Diffs laufen dabei mit.
-- [ ] **Step 4: Commit** `docs(frontend): Regel „Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze“ (LLH-1958)`.
+- [x] **Step 4: Commit** `docs(frontend): Regel „Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze“ (LLH-1958)`.
