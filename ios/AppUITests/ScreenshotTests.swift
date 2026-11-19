@@ -9,6 +9,12 @@ import XCTest
 /// (`LifelineKern.Testzustand`): die App zeigt sie dann mit Beispieldaten, ohne Netz und ohne die
 /// gespeicherte Serverliste.
 final class ScreenshotTests: XCTestCase {
+    /// Warten auf Inhalt im Webview und auf einen Dialog darüber. Im CI laufen iPhone und iPad
+    /// nebeneinander auf einem Runner; dort brauchte schon der Start der App bis zu 117 s, und die
+    /// Beispielseite stand auf dem iPhone nach 10 s noch nicht im Webview (Lauf 44419406791).
+    /// Ein Zeitlimit ist keine Anforderung der Spec: geprüft wird, dass es erscheint.
+    let webTimeout: TimeInterval = 30
+
     override func setUp() {
         continueAfterFailure = false
     }
@@ -68,7 +74,7 @@ final class ScreenshotTests: XCTestCase {
         let app = launch("fremde-seite")
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15))
         let hinweis = element(app, "hinweis-fremde-seite")
-        XCTAssertTrue(hinweis.waitForExistence(timeout: 10))
+        XCTAssertTrue(hinweis.waitForExistence(timeout: webTimeout))
         let knopf = app.buttons["hinweis-zur-oberflaeche"]
         XCTAssertTrue(knopf.exists)
         attachScreenshot(named: "fremde-seite")
@@ -82,7 +88,7 @@ final class ScreenshotTests: XCTestCase {
     func testServerEntfernenFragtVorher() {
         let app = launch("serverliste")
         XCTAssertTrue(element(app, "serverliste").waitForExistence(timeout: 15))
-        app.staticTexts["Lager"].swipeLeft()
+        swipeRowLeft(containing: app.staticTexts["Lager"])
         let entfernen = app.buttons["Entfernen"]
         XCTAssertTrue(entfernen.waitForExistence(timeout: 5))
         entfernen.tap()
@@ -97,10 +103,11 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Lager"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["ELW 1"].exists)
 
-        // Zuletzt: auf einer Zeile ohne Wischaktionen kommt die Geste als Tippen an, und ein Tipp
-        // auf den aktiven Server führt zur Oberfläche und schließt die Liste.
-        app.staticTexts["ELW 1"].swipeLeft()
-        XCTAssertFalse(app.buttons["Entfernen"].waitForExistence(timeout: 2), "aktiver Server entfernbar")
+        // Der aktive Server bietet beim Wischen nur „Umbenennen“; dass die Aktionen überhaupt
+        // offen sind, belegt dieser Knopf.
+        swipeRowLeft(containing: app.staticTexts["ELW 1"])
+        XCTAssertTrue(app.buttons["Umbenennen"].waitForExistence(timeout: 5), "Wischaktionen nicht offen")
+        XCTAssertFalse(app.buttons["Entfernen"].exists, "aktiver Server entfernbar")
     }
 
     @MainActor
@@ -178,7 +185,7 @@ final class ScreenshotTests: XCTestCase {
         let web = app.webViews.firstMatch
         XCTAssertTrue(web.waitForExistence(timeout: 15))
         let text = web.staticTexts["Lange Berührung auf diesem Text zeigt weder Lupe noch Textmenü."]
-        XCTAssertTrue(text.waitForExistence(timeout: 10))
+        XCTAssertTrue(text.waitForExistence(timeout: webTimeout))
         // Safe Area: der Webview beginnt unter der Statusleiste, nicht am oberen Bildschirmrand.
         XCTAssertGreaterThan(web.frame.minY, 0)
         attachScreenshot(named: "web")
@@ -205,15 +212,15 @@ final class ScreenshotTests: XCTestCase {
         let web = app.webViews.firstMatch
         XCTAssertTrue(web.waitForExistence(timeout: 15))
         let knopf = web.buttons["Eintrag löschen"]
-        XCTAssertTrue(knopf.waitForExistence(timeout: 10))
+        XCTAssertTrue(knopf.waitForExistence(timeout: webTimeout))
         knopf.tap()
         let dialog = app.alerts["elw.local:8443"]
-        XCTAssertTrue(dialog.waitForExistence(timeout: 5), "kein nativer Dialog")
+        XCTAssertTrue(dialog.waitForExistence(timeout: webTimeout), "kein nativer Dialog")
         XCTAssertTrue(dialog.staticTexts["Eintrag wirklich löschen?"].exists)
         XCTAssertTrue(dialog.buttons["Abbrechen"].exists)
         attachScreenshot(named: "dialog-confirm")
         dialog.buttons["OK"].tap()
-        XCTAssertTrue(web.staticTexts["Bestätigt"].waitForExistence(timeout: 5))
+        XCTAssertTrue(web.staticTexts["Bestätigt"].waitForExistence(timeout: webTimeout))
     }
 
     @MainActor
@@ -222,6 +229,19 @@ final class ScreenshotTests: XCTestCase {
         app.launchArguments += ["-LifelineTestzustand", testzustand]
         app.launch()
         return app
+    }
+
+    /// Wischt die Zeile, in der `text` steht, nach links, über gut 250 Punkte. `swipeLeft()` auf dem
+    /// Text wischt nur über dessen eigene Breite (bei „Lager“ ein paar Punkte); das kam im CI zweimal
+    /// als Tippen an, und die App verband sich mit dem Server, statt die Aktionen zu zeigen
+    /// (Läufe 44419406791 und davor). Start rechts vom Text, noch in der Zeile.
+    @MainActor
+    private func swipeRowLeft(containing text: XCUIElement) {
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        let links = text.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
+        let start = links.withOffset(CGVector(dx: 220, dy: 0))
+        let ziel = links.withOffset(CGVector(dx: -40, dy: 0))
+        start.press(forDuration: 0.05, thenDragTo: ziel, withVelocity: .fast, thenHoldForDuration: 0)
     }
 
     @MainActor
