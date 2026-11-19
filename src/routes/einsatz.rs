@@ -606,9 +606,10 @@ pub async fn kategorie_frist_setzen(
         jetzt,
     )
     .await?;
-    if ergebnis == kat::FristErgebnis::Geaendert {
+    if let kat::FristErgebnis::Geaendert { etb_id } = ergebnis {
         kopf_geaendert(&state, id).await;
         state.live.publiziere_einsatz(id, LiveEvent::Etb);
+        super::etb_verteilen(&state, id, [etb_id]);
     }
     let einsatz = repo::laden(&state.pool, id).await?;
     let (_, geschwaerzt_at) = crate::aufbewahrung::repo::tombstones(&state.pool, id).await?;

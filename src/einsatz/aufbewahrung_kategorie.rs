@@ -180,7 +180,9 @@ pub(super) async fn fristen_beim_abschluss(
 pub enum FristErgebnis {
     /// Frist unverändert: kein Schreibvorgang, kein ETB-Eintrag.
     Unveraendert,
-    Geaendert,
+    /// Frist geändert; `etb_id` ist der System-Eintrag, den der Aufrufer nach dem Commit
+    /// verteilt (LLH-1976).
+    Geaendert { etb_id: i64 },
 }
 
 /// Eingabe für [`frist_setzen`], vom Handler normalisiert.
@@ -382,8 +384,8 @@ pub async fn frist_setzen(
             )),
             _ => audit.push_str(&format!(". Rechtsgrundlage: {rechtsgrundlage}")),
         }
-        etb_eintrag(conn, einsatz_id, erfasser_id, etb_startwert, &audit).await?;
-        Ok(FristErgebnis::Geaendert)
+        let etb_id = etb_eintrag(conn, einsatz_id, erfasser_id, etb_startwert, &audit).await?;
+        Ok(FristErgebnis::Geaendert { etb_id })
     })
 }
 

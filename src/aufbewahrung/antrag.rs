@@ -295,7 +295,7 @@ pub async fn stellen(
     aktenzeichen: &str,
     bestaetigung: &str,
     jetzt: DateTime<Utc>,
-) -> Result<i64, AppError> {
+) -> Result<(i64, i64), AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let faellig = antrag_faellig_at(jetzt);
@@ -379,7 +379,7 @@ pub async fn stellen(
              eingegangen. Schwärzung fällig am {faellig} UTC; bis dahin zurücknehmbar.",
             ziel_text(ziel.art(), &kennung)
         );
-        crate::etb::repo::anlegen_tx(
+        let etb_id = crate::etb::repo::anlegen_tx(
             &mut *conn,
             einsatz_id,
             admin_id,
@@ -387,7 +387,7 @@ pub async fn stellen(
             system_eintrag(&audit),
         )
         .await?;
-        Ok(antrag_id)
+        Ok((antrag_id, etb_id))
     })
 }
 
@@ -454,7 +454,7 @@ pub async fn zuruecknehmen(
     antrag_id: i64,
     admin_id: i64,
     jetzt: DateTime<Utc>,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     crate::write_retry!(pool, |conn| {
@@ -513,8 +513,7 @@ pub async fn zuruecknehmen(
             etb_startwert,
             system_eintrag(&audit),
         )
-        .await?;
-        Ok(())
+        .await
     })
 }
 
