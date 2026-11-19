@@ -2559,7 +2559,8 @@ describe('MaterialPage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)', 
 
     await userEvent.click(screen.getByRole('link', { name: 'Zu Einsatz 2' }));
     expect(await screen.findByRole('dialog', { name: RUECKFRAGE })).toBeInTheDocument();
-    expect(ort.aktuell).toBe('/einsaetze/1/material');
+    // Die Gruppierung steht in der Adresse (LLH-1826); der Pfad bleibt.
+    expect(ort.aktuell).toBe('/einsaetze/1/material?gruppierung=status');
   });
 
   it('Routenwechsel mit Änderung fragt nach; „Verwerfen“ verlässt die Seite', async () => {
@@ -2635,5 +2636,22 @@ describe('MaterialPage · eine offene Angabe zur Zeit (LLH-1480)', () => {
     expect(screen.getByRole('button', { name: 'Ort zu Feldbett bearbeiten' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Bemerkung zu Feldbett hinzufügen' })).toBeEnabled();
     expect(screen.queryByText(GRUND)).toBeNull();
+  });
+});
+
+/** LLH-1826: die Gruppierung steht in der Adresse und überlebt Weg und Zurück. */
+describe('MaterialPage · Gruppierung in der Adresse (LLH-1826)', () => {
+  it('„Nach Status“ steht in der Adresse, „Nach Ort“ nicht', async () => {
+    render(einsatzAktiv, [em]);
+    await screen.findByText('Wolldecke');
+    await userEvent.click(screen.getByRole('radio', { name: 'Nach Status' }));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material?gruppierung=status'));
+    await userEvent.click(screen.getByRole('radio', { name: 'Nach Ort' }));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/1/material'));
+  });
+
+  it('?gruppierung=status gruppiert nach Status', async () => {
+    render(einsatzAktiv, [em], [], {}, '/einsaetze/1/material?gruppierung=status');
+    expect(await screen.findByRole('radio', { name: 'Nach Status' })).toBeChecked();
   });
 });

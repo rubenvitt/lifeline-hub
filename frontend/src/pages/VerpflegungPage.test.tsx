@@ -219,6 +219,53 @@ describe('VerpflegungPage (LFH-634)', () => {
     ]);
   });
 
+  /** LLH-1826: die Ansicht steht in der Adresse und überlebt Weg und Zurück. */
+  describe('Ansicht in der Adresse (LLH-1826)', () => {
+    function mitAdresse(route: string) {
+      server.use(meHandler(benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Leitung' })));
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      function Seite() {
+        return (
+          <>
+            <VerpflegungPage />
+            <output data-testid="adresse">{useLocation().search}</output>
+          </>
+        );
+      }
+      const router = createMemoryRouter(
+        [{ path: '/einsaetze/:id/verpflegung', element: <Seite /> }],
+        {
+          initialEntries: [route],
+        },
+      );
+      return render(
+        <QueryClientProvider client={client}>
+          <AntApp>
+            <AuthProvider>
+              <RouterProvider router={router} />
+            </AuthProvider>
+          </AntApp>
+        </QueryClientProvider>,
+      );
+    }
+
+    it('die Wahl „vergangen“ steht in der Adresse, „laufend“ nicht', async () => {
+      mitAdresse('/einsaetze/1/verpflegung');
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('radio', { name: /vergangen/ }));
+      await waitFor(() =>
+        expect(screen.getByTestId('adresse').textContent).toBe('?ansicht=vergangen'),
+      );
+      await userEvent.click(screen.getByRole('radio', { name: /^laufend/ }));
+      await waitFor(() => expect(screen.getByTestId('adresse').textContent).toBe(''));
+    });
+
+    it('?ansicht=stellen zeigt die Stellen', async () => {
+      mitAdresse('/einsaetze/1/verpflegung?ansicht=stellen');
+      expect(await screen.findByRole('radio', { name: /^Stellen/ })).toBeChecked();
+    });
+  });
+
   describe('Anzeige im Modul', () => {
     it('trennt laufend & anstehend von vergangen; Kopf zählt alle und die Unterdeckungen', async () => {
       renderPage();

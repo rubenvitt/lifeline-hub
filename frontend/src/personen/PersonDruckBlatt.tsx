@@ -9,6 +9,7 @@ import {
   GESCHLECHT_WORT,
   MASSNAHME_WORT,
   SK_WORT,
+  personSichtung,
   personStatusDarstellung,
   gueltig,
   kurzVerbleib,
@@ -56,7 +57,7 @@ export default function PersonDruckBlatt({
     { etikett: 'Fundort', wert: p.antreff_ort },
   ]);
 
-  const k = p.aktuelle_sichtung;
+  const k = personSichtung(p.aktuelle_sichtung);
   const transport = transportText(p);
   // Der jüngste Verbleib (Detail liefert die jüngste Erfassung zuerst), mit den Angaben aus
   // LLH-1568 (Spec `verbleib-angaben`, „Anzeige in Verlauf und Druck“).

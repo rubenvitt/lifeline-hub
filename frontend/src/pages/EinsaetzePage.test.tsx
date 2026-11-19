@@ -3,7 +3,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
@@ -529,6 +529,39 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     render();
     await screen.findByText('Einsatz 1');
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  });
+
+  /** LLH-1826: die Suche steht in der Adresse und überlebt Weg und Zurück. */
+  function mitAdresse(route = '/einsaetze') {
+    function Ort() {
+      return <output data-testid="ort">{useLocation().search}</output>;
+    }
+    return renderMitProviders(
+      <>
+        <Ort />
+        <EinsaetzePage />
+      </>,
+      { route },
+    );
+  }
+  const neun = () =>
+    Array.from({ length: 9 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` }));
+
+  it('die Suche steht unter q in der Adresse (LLH-1826)', async () => {
+    mockEinsaetze(neun());
+    mitAdresse();
+    const feld = await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ });
+    await userEvent.type(feld, 'Einsatz 3');
+    await waitFor(() => expect(screen.getByTestId('ort').textContent).toBe('?q=Einsatz+3'));
+  });
+
+  it('?q= füllt das Suchfeld und filtert (LLH-1826)', async () => {
+    mockEinsaetze(neun());
+    mitAdresse('/einsaetze?q=Einsatz%203');
+    expect(await screen.findByRole('searchbox', { name: /Einsätze durchsuchen/ })).toHaveValue(
+      'Einsatz 3',
+    );
+    expect(screen.queryByText('Einsatz 4')).not.toBeInTheDocument();
   });
 
   it('die Suche filtert über Bezeichnung, Ort und Stichwort', async () => {

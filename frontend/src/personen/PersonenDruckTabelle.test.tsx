@@ -57,6 +57,11 @@ describe('PersonenDruckTabelle', () => {
     ]);
   });
 
+  it('druckt eine unbekannte Sichtung als „ohne Sichtung“, statt abzustürzen (LLH-1998)', () => {
+    rendere([{ ...basis, aktuelle_sichtung: 'xyz' } as unknown as Person]);
+    expect(within(zeilen()[0]).getByText('ohne Sichtung')).toBeInTheDocument();
+  });
+
   it('druckt einen Datensatz ohne Status mit „unbekannt“, statt abzustürzen (LLH-1957)', () => {
     rendere([{ ...basis, status: undefined } as unknown as Person]);
     expect(within(zeilen()[0]).getByText('unbekannt')).toBeInTheDocument();

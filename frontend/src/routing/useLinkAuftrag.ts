@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useSearchParams, type Location } from 'react-router';
 
 export interface LinkAuftrag {
@@ -23,6 +23,30 @@ export interface LinkAuftrag {
 const ausstehend = new WeakMap<Location, URLSearchParams>();
 
 /**
+ * Ändert die Parameter der Adresse mit `replace`, aufbauend auf dem, was andere Schreiber DESSELBEN
+ * Verlaufseintrags schon geändert haben (`ausstehend`): `setSearchParams` liest sonst den Stand des
+ * Renders, und ein zweiter Schreiber im selben Zug stellte zurück, was der erste geräumt hat
+ * (LLH-1530). Teilen sich Link-Aufträge und Werte der Adresse (`routing/useAdressWert.ts`, LLH-1826).
+ */
+export function useAdressAenderung(): (aendere: (naechste: URLSearchParams) => void) => void {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  return useCallback(
+    (aendere: (naechste: URLSearchParams) => void) => {
+      // Klonen statt in-place mutieren: dieselbe Instanz lesen Render und andere Effekte.
+      const basis = ausstehend.get(location) ?? searchParams;
+      const naechste = new URLSearchParams(basis);
+      aendere(naechste);
+      ausstehend.set(location, naechste);
+      // Nichts geändert: keine Navigation (ein Listenstand meldet oft denselben Stand erneut).
+      if (naechste.toString() === basis.toString()) return;
+      setSearchParams(naechste, { replace: true });
+    },
+    [location, searchParams, setSearchParams],
+  );
+}
+
+/**
  * Ein Link-Auftrag (`?zentrum=…`, `?platzieren=…` usw.) gilt einmal je Verlaufseintrag
  * (`location.key`).
  *
@@ -38,7 +62,7 @@ const ausstehend = new WeakMap<Location, URLSearchParams>();
  */
 export function useLinkAuftrag(): LinkAuftrag {
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const aendereAdresse = useAdressAenderung();
   const verbrauchtRef = useRef<string | null>(null);
   /*
    * StrictMode hängt eine frische Instanz zum Test einmal aus und wieder ein (nur Entwicklung, auch
@@ -57,11 +81,7 @@ export function useLinkAuftrag(): LinkAuftrag {
   return useMemo(() => {
     const weiter = (aendere: (naechste: URLSearchParams) => void) => {
       verbrauchtRef.current = location.key;
-      // Klonen statt in-place mutieren: dieselbe Instanz lesen Render und andere Effekte.
-      const naechste = new URLSearchParams(ausstehend.get(location) ?? searchParams);
-      aendere(naechste);
-      ausstehend.set(location, naechste);
-      setSearchParams(naechste, { replace: true });
+      aendereAdresse(aendere);
     };
     return {
       verbraucht: () => verbrauchtRef.current === location.key,
@@ -71,5 +91,5 @@ export function useLinkAuftrag(): LinkAuftrag {
           for (const name of namen) naechste.delete(name);
         }),
     };
-  }, [location, searchParams, setSearchParams]);
+  }, [location, aendereAdresse]);
 }

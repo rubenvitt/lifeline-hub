@@ -104,6 +104,15 @@ describe('Statusfarb-Vertrag', () => {
     }
   });
 
+  it('liest eine fehlende oder unbekannte Sichtung als „ohne Sichtung“ (LLH-1998)', () => {
+    // `sichtung['xyz']` war `undefined`, und Liste, Detail und Druck stürzten beim Zeichnen ab.
+    expect(sf.personSichtung('sk2')).toBe('sk2');
+    expect(sf.personSichtung('unverletzt')).toBe('unverletzt');
+    for (const kaputt of [undefined, null, '', 'xyz', 'ohne', 'toString']) {
+      expect(sf.personSichtung(kaputt as never)).toBeNull();
+    }
+  });
+
   it('warnt bei einer Kontamination mit Wort, als Achtung, nicht als Alarm (LLH-1326, D11)', () => {
     // `alarm` kollidierte mit dem Rot von SK I; ein neutrales Wort ginge in der Zeile unter.
     expect(sf.kontamination).toEqual({ rolle: 'achtung', label: 'kontaminiert' });

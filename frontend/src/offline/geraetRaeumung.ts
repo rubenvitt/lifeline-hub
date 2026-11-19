@@ -14,6 +14,7 @@ import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
 import { listenGedaechtnisRaeumen } from '../components/listenGedaechtnis';
 import { verlaufGedaechtnisRaeumen } from '../routing/verlaufGedaechtnis';
+import { rollGedaechtnisRaeumen } from '../routing/rollGedaechtnis';
 import { entwuerfeAufraeumen, entwuerfeRaeumen } from '../etb/entwuerfe/entwurfStore';
 import { clearStartlisteAusgeblendet } from '../pages/fuehrung/startlisteSpeicher';
 import { zuletztRaeumen } from '../stammdaten/zuletztVerwendet';
@@ -117,6 +118,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'jeder-ausgang',
     grund:
       'Vorige Adresse je Verlaufseintrag für den Rückweg im Ortspfad (LLH-1997); die Adressen tragen Filter- und Suchtexte, auch Namen, die nächste Person im Tab braucht sie nicht.',
+  },
+  {
+    ort: 'sessionStorage lfh:rolle',
+    datei: 'routing/rollGedaechtnis.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Rollposition je Verlaufseintrag für das Zurück (LLH-1826): nur Schlüssel und Pixelwerte, ohne Einsatzinhalt; ein Ausgang braucht sie nicht.',
   },
   {
     ort: 'localStorage lfh:klappband:<seite>',
@@ -323,6 +331,7 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     verlaufInhalt: () => verlaufInhalt.clear(),
     listenGedaechtnis: listenGedaechtnisRaeumen,
     verlaufGedaechtnis: verlaufGedaechtnisRaeumen,
+    rollGedaechtnis: rollGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
     startlisteAusgeblendet: clearStartlisteAusgeblendet,
     stammdatenfeldZuletzt: zuletztRaeumen,

@@ -281,17 +281,16 @@ describe('InfotelefonPage (LFH-554)', () => {
   });
 
   /**
-   * Einmal je Verlaufseintrag (LLH-1530): Bis der Router die Räumung committet, steht `?anruf=` noch
-   * in der Adresse der Seite (`AdresseSteht`). Wechselt die Person die Sicht, lädt die Liste neu
-   * (`bereit` fällt und steigt); der Sprung holt sie nicht auf „alle“ zurück.
+   * Einmal je Verlaufseintrag (LLH-1530): Wechselt die Person nach einem Sprung die Sicht, lädt die
+   * Liste neu (`bereit` fällt und steigt); der Sprung holt sie nicht auf „alle“ zurück. Die Sicht
+   * steht seit LLH-1826 in der Adresse und kommt mit demselben Commit wie die Räumung von
+   * `?anruf=`; eine festgehaltene Adresse (`AdresseSteht`) stellt das nicht mehr nach.
    */
-  it('ein hängender Router-Commit holt nach dem Sichtwechsel nicht auf „alle“ zurück (LLH-1530)', async () => {
+  it('ein Sprung holt nach dem Sichtwechsel nicht auf „alle“ zurück (LLH-1530)', async () => {
     renderMitProviders(
-      <AdresseSteht>
-        <Routes>
-          <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
-        </Routes>
-      </AdresseSteht>,
+      <Routes>
+        <Route path="/einsaetze/:id/infotelefon" element={<InfotelefonPage />} />
+      </Routes>,
       { route: '/einsaetze/1/infotelefon?anruf=1' },
     );
     await waitFor(() =>
@@ -611,5 +610,41 @@ describe('InfotelefonPage als eigenes Modul (i6k6mzed, design.md D3)', () => {
     const ortspfad = document.querySelector<HTMLElement>('.ant-breadcrumb')!;
     expect(within(ortspfad).queryByText('Stab')).toBeNull();
     expect(within(ortspfad).getByText('Informationstelefon')).toBeInTheDocument();
+  });
+});
+
+/** LLH-1826: der Filter der Anrufe steht in der Adresse und überlebt Weg und Zurück. */
+describe('InfotelefonPage · Filter in der Adresse (LLH-1826)', () => {
+  function LocationProbe() {
+    return <output data-testid="ort">{useLocation().search}</output>;
+  }
+  function setupWithLocation(route: string) {
+    return renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/infotelefon"
+          element={
+            <>
+              <InfotelefonPage />
+              <LocationProbe />
+            </>
+          }
+        />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it('„offene Rückrufe“ steht in der Adresse, „alle“ nicht', async () => {
+    setupWithLocation('/einsaetze/1/infotelefon');
+    await userEvent.click(await screen.findByRole('radio', { name: 'offene Rückrufe' }));
+    await waitFor(() => expect(screen.getByTestId('ort').textContent).toBe('?sicht=offen'));
+    await userEvent.click(screen.getByRole('radio', { name: 'alle' }));
+    await waitFor(() => expect(screen.getByTestId('ort').textContent).toBe(''));
+  });
+
+  it('?sicht=offen zeigt die offenen Rückrufe', async () => {
+    setupWithLocation('/einsaetze/1/infotelefon?sicht=offen');
+    expect(await screen.findByRole('radio', { name: 'offene Rückrufe' })).toBeChecked();
   });
 });

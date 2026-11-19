@@ -318,7 +318,10 @@ describe('BefehlListe — Liste + Detailpaneel (Spec `auftraege-befehle`)', () =
       'data-hervorgehoben',
       'true',
     );
-    await waitFor(() => expect(router.state.location.search).toBe('?reiter=befehle'));
+    // Der Sprung räumt `?befehl=` und hält das Segment des Befehls als Zustand fest (LLH-1826).
+    await waitFor(() =>
+      expect(router.state.location.search).toBe('?reiter=befehle&befehle_sicht=freigegeben'),
+    );
   });
 });
 
@@ -546,5 +549,52 @@ describe('BefehlListe — Anlegen-Dialog (LFH-796)', () => {
     await nutzer.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     const wieder = await oeffneDialog(nutzer);
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
+  });
+});
+
+/** LLH-1826: Segment, Suche und Empfänger der Befehle stehen in der Adresse (Entwurf D3a). */
+describe('BefehlListe — Zustand in der Adresse (LLH-1826)', () => {
+  const adresse = () => screen.getByTestId('suche').textContent;
+
+  it('die Wahl des Segments steht in der Adresse, auch wenn sie der Vorgabe entspricht', async () => {
+    // KETTE trägt einen Entwurf: die abgeleitete Vorgabe ist „Entwürfe“.
+    renderListe();
+    await liste('Befehlsentwürfe');
+    await userEvent.click(screen.getByRole('radio', { name: /^Freigegeben/ }));
+    await waitFor(() => expect(adresse()).toContain('befehle_sicht=freigegeben'));
+    await userEvent.click(screen.getByRole('radio', { name: /^Entwürfe/ }));
+    await waitFor(() => expect(adresse()).toContain('befehle_sicht=entwurf'));
+  });
+
+  it('eine ausdrückliche Wahl gilt, auch ohne Entwurf in den Daten', async () => {
+    vi.mocked(befehleApi.listeBefehle).mockResolvedValue(
+      KETTE.filter((b) => b.status === 'freigegeben') as never,
+    );
+    renderListe('/einsaetze/1/auftraege?reiter=befehle&befehle_sicht=entwurf');
+    expect(await screen.findByText('Keine Entwürfe')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /^Entwürfe/ })).toBeChecked();
+  });
+
+  it('die Suche steht unter befehle_q in der Adresse, nicht unter q', async () => {
+    renderListe();
+    await liste('Befehlsentwürfe');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Befehle durchsuchen' }), 'Befehl A');
+    await waitFor(() => expect(adresse()).toContain('befehle_q=Befehl+A'));
+    expect(adresse()).not.toMatch(/[?&]q=/);
+  });
+
+  it('?befehle_q=… füllt das Suchfeld', async () => {
+    renderListe('/einsaetze/1/auftraege?reiter=befehle&befehle_q=Befehl%20A');
+    expect(await screen.findByRole('textbox', { name: 'Befehle durchsuchen' })).toHaveValue(
+      'Befehl A',
+    );
+  });
+
+  it('der Empfänger steht unter befehle_empf in der Adresse', async () => {
+    renderListe();
+    await liste('Befehlsentwürfe');
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(await screen.findByTitle('EA Süd'));
+    await waitFor(() => expect(adresse()).toContain('befehle_empf=abschnitt%3A3'));
   });
 });

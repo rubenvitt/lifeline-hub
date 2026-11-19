@@ -1718,3 +1718,53 @@ describe('MeldungenPage · Übernahme an der Meldung (LLH-1075, design.md D14)',
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
   });
 });
+
+/** LLH-1826: Sicht und Richtung stehen in der Adresse und überleben Weg und Zurück. */
+describe('MeldungenPage — Sicht und Richtung in der Adresse (LLH-1826)', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    setzeOnline(true);
+    await queueLeerenFuerTests();
+    listeMeldungen.mockResolvedValue([meldung()]);
+  });
+
+  it('„Extern“ steht nach der Wahl in der Adresse', async () => {
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await waehle('Richtung', 'Extern');
+    await waitFor(() =>
+      expect(screen.getByTestId('loc-search').textContent).toBe('?richtung=extern'),
+    );
+  });
+
+  it('?richtung=extern&sicht=abgeschlossen zeigt die gewählte Sicht', async () => {
+    renderPage('/einsaetze/1/meldungen?richtung=extern&sicht=abgeschlossen');
+    await waitFor(() =>
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ richtung: 'extern' }),
+      ),
+    );
+    expect(await screen.findByRole('radio', { name: /Abgeschlossen/ })).toBeChecked();
+  });
+
+  it('die Vorgabe steht nicht in der Adresse', async () => {
+    renderPage('/einsaetze/1/meldungen?richtung=extern');
+    await screen.findByText('Florian Nord 1');
+    await waehle('Richtung', 'Alle Richtungen');
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+  });
+
+  it('der Filter eines Einsatzes gilt nicht im anderen', async () => {
+    renderPage('/einsaetze/1/meldungen?richtung=extern');
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz 2' }));
+    await waitFor(() =>
+      expect(listeMeldungen).toHaveBeenCalledWith(
+        2,
+        expect.not.objectContaining({ richtung: 'extern' }),
+      ),
+    );
+    expect(screen.getByTestId('loc-search').textContent).toBe('');
+  });
+});

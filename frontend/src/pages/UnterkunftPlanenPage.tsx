@@ -31,8 +31,11 @@ import { useOhneVerbindung } from '../offline/verbindung';
 import { betreuungPfad, betreuungsstellePfad, parseRouteId } from '../routing/deeplinks';
 import { Marke } from '../components/instrument/Marke';
 import { ListenRueckweg } from '../components/ListenRueckweg';
+import { useAdressWert } from '../routing/useAdressWert';
 
 type Ansicht = 'rechner' | 'richtwerte';
+/** Werte von `?ansicht=` (LLH-1826); exhaustiv, Vorgabe `rechner`. */
+const ANSICHT_ERLAUBT: Record<Ansicht, true> = { rechner: true, richtwerte: true };
 
 const ANSICHTEN: readonly SegmentOption<Ansicht>[] = [
   { wert: 'rechner', label: 'Rechner' },
@@ -88,7 +91,8 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
   const qc = useQueryClient();
   const ohneNetz = useOhneVerbindung();
   const freigaben = useModulFreigaben(einsatzId);
-  const [ansicht, setAnsicht] = useState<Ansicht>('rechner');
+  // Die Ansicht ist Zustand der Adresse (LLH-1826): sie überlebt Weg und Zurück.
+  const [ansicht, setAnsicht] = useAdressWert('ansicht', ANSICHT_ERLAUBT, 'rechner');
   const [eingabe, setEingabe] = useState<Eingabe>(() => leereEingabe('raeume'));
   const [dialog, setDialog] = useState(false);
   // Idempotenzschlüssel der Posten über das Schließen des Dialogs hinaus (LLH-1526).

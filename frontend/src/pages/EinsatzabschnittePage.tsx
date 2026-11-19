@@ -71,9 +71,10 @@ import { abrufZustand } from '../api/abrufZustand';
 import {
   einheitenPfad,
   lagekartePfad,
-  parseAbschnitteAnsicht,
+  ABSCHNITTE_ANSICHT_ERLAUBT,
   type AbschnitteAnsicht,
 } from '../routing/deeplinks';
+import { useAdressWert } from '../routing/useAdressWert';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SprungKnopf } from '../components/Sprung';
@@ -233,16 +234,20 @@ export default function EinsatzabschnittePage() {
   const { token, rollen } = useRollen();
   // Je Einsatz, damit ein Einsatzwechsel in derselben Instanz nicht die Ansicht des vorigen
   // mitnimmt (Muster `FahrzeugePage`).
-  const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, AbschnitteAnsicht>>(
-    {},
+  // Die Ansicht ist Zustand der Adresse (LLH-1826): sie überlebt Weg und Zurück, ein anderer Einsatz
+  // ist eine andere Adresse. `?neu=1` gewinnt: der neue Abschnitt steht in der Gliederung (Review
+  // LFH-626), auch solange der Auftrag noch auf den Einsatz wartet.
+  const [searchParams] = useSearchParams();
+  const [adressAnsicht, setzeAnsicht] = useAdressWert(
+    'ansicht',
+    ABSCHNITTE_ANSICHT_ERLAUBT,
+    'gliederung',
   );
-  const ansicht = ansichtNachEinsatz[einsatzId] ?? 'gliederung';
+  const ansicht: AbschnitteAnsicht = searchParams.get('neu') === '1' ? 'gliederung' : adressAnsicht;
   // Klappzustand des Organigramms hier, weil sein Druck im Seitenkopf steht (LLH-1836): vor dem
   // Druck alles aufklappen, im selben Zug (`useDrucken` öffnet den Dialog nach dem Commit).
   const [orgZugeklappt, setOrgZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const druckWege = useDruckNebenwege({ vorDemDruck: () => setOrgZugeklappt(new Set()) });
-  const setzeAnsicht = (a: AbschnitteAnsicht) =>
-    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -270,7 +275,7 @@ export default function EinsatzabschnittePage() {
       if (!(abschnitteQuery.data ?? []).some((a) => a.id === zid)) return false;
       setGewaehlt(zid);
       // Aus dem Organigramm: das Detail steht in der Gliederung (LFH-626, D7).
-      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
+      setzeAnsicht('gliederung');
     },
   );
 
@@ -280,9 +285,7 @@ export default function EinsatzabschnittePage() {
   // Schreibrecht. Beide Aufträge gelten einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1530): Bis
   // der Router die Räumung committet, steht der Parameter noch in `searchParams`, und ein neues
   // Recht (Einsatz lädt neu) öffnete die geschlossene Erfassung sonst ein zweites Mal.
-  const [searchParams] = useSearchParams();
   const neuAuftrag = useLinkAuftrag();
-  const ansichtAuftrag = useLinkAuftrag();
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
@@ -291,22 +294,10 @@ export default function EinsatzabschnittePage() {
     if (darfSchreibenRoh) {
       setIsAnlegenOpen(true);
       // Der neue Abschnitt steht danach gewählt in der Gliederung, nicht im Organigramm.
-      setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'gliederung' }));
+      setzeAnsicht('gliederung');
     }
     neuAuftrag.raeume('neu');
-  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh, einsatzId]);
-
-  // Sichtvorgabe ?ansicht= (LFH-626), apply-then-clean wie auf der Fahrzeugseite. Geräumt wird
-  // auch ein unbrauchbarer Wert, sonst stünde er beim Teilen des Links wieder im Auftrag.
-  useEffect(() => {
-    if (!searchParams.has('ansicht')) return;
-    if (ansichtAuftrag.verbraucht()) return;
-    // `?neu=1` gewinnt: der neue Abschnitt steht danach in der Gliederung (Review LFH-626).
-    const vorgabe =
-      searchParams.get('neu') === '1' ? undefined : parseAbschnitteAnsicht(searchParams);
-    if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
-    ansichtAuftrag.raeume('ansicht');
-  }, [searchParams, ansichtAuftrag, einsatzId]);
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh, setzeAnsicht]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });

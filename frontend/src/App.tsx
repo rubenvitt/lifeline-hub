@@ -5,6 +5,7 @@ import RequireAuth from './routes/RequireAuth';
 import { useSitzungsWache } from './auth/useSitzungsWache';
 import BenutzerKonfliktDialog from './auth/BenutzerKonfliktDialog';
 import AppLayout from './components/AppLayout';
+import RollWiederherstellung from './components/RollWiederherstellung';
 import SprungZumInhalt from './components/SprungZumInhalt';
 import Fehlergrenze from './components/Fehlergrenze';
 import { SeitenSkeleton } from './components/SeitenZustand';
@@ -269,6 +270,8 @@ function BetriebsLayout() {
       <LiveStatusBanner benutzerId={benutzer?.id} klebend />
       {/* Herkunft je Verlaufseintrag für den Rückweg im Ortspfad (LLH-1997, `ListenRueckweg`). */}
       <VerlaufMerken />
+      {/* Rollposition beim Zurück (LLH-1826): Stab und Einsatzrahmen, nicht die Gerätehülle. */}
+      <RollWiederherstellung />
       <Outlet />
     </>
   );

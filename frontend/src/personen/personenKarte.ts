@@ -1,7 +1,7 @@
 import type { GlobalToken } from 'antd';
 import type { Person, Sichtungskategorie } from '../api/types';
 import { registrierAnzeige } from '../api/einsatzPerson';
-import { rollenFarbe, sichtung } from '../theme/statusFarben';
+import { personSichtung, rollenFarbe, sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
 import type { KarteMarker } from '../pages/lagekarte/marker';
 import { SK_WORT } from './personMeta';
@@ -60,7 +60,7 @@ export function personenMarker(
       ohneKoordinate += 1;
       continue;
     }
-    const sk = p.aktuelle_sichtung ?? null;
+    const sk = personSichtung(p.aktuelle_sichtung);
     const darstellung = sk ? sichtung[sk] : null;
     const skText = darstellung ? darstellung.label : SK_WORT.ohne;
     marker.push({

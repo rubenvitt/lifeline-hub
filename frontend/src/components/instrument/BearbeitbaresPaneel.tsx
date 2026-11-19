@@ -25,6 +25,7 @@ import Datenraster, { Datenfeld } from './Datenraster';
 import DatenfeldEingabe from './DatenfeldEingabe';
 import Paneel, { paneelZeileStil, type PaneelUeberschrift } from './Paneel';
 import { useRollen } from './rollenwerte';
+import type { Feldbreite } from '../../theme/tokens';
 
 /**
  * BearbeitbaresPaneel — „Bearbeiten in der Ansicht“ (LLH-1139, `frontend/AGENTS.md`, „Bearbeiten
@@ -72,6 +73,8 @@ export interface BearbeitbaresFeld<W> {
   /** Hilfe unter der Eingabe (Vorschlag mit Herkunft). */
   hilfe?: ReactNode;
   breit?: boolean;
+  /** Obergrenze der Eingabe (`FELDBREITE`, LLH-2000); ohne Stufe füllt sie die Zelle. */
+  breite?: Feldbreite;
   mono?: boolean;
 }
 
@@ -305,6 +308,7 @@ function Innen<W extends object, P = Partial<W>>({
             name={f.name}
             rules={f.regeln}
             breit={f.breit}
+            breite={f.breite}
             hilfe={f.hilfe}
           >
             {f.eingabe}

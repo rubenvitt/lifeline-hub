@@ -156,6 +156,13 @@ describe('PersonDruckPage', () => {
     expect(dt.nextElementSibling).toHaveTextContent('unbekannt');
   });
 
+  it('druckt eine unbekannte Sichtung als „ungesichtet“, statt abzustürzen (LLH-1998)', async () => {
+    renderPage(() => HttpResponse.json({ ...person(), aktuelle_sichtung: 'xyz' }));
+    await fertig();
+    const dt = within(wurzel()).getByText('Sichtung', { selector: 'dt' });
+    expect(dt.nextElementSibling).toHaveTextContent('ungesichtet');
+  });
+
   it('druckt den Verbleib mit den Angaben aus LLH-1568 (Spec `verbleib-angaben`)', async () => {
     const verbleib = (teil: Record<string, unknown>) => ({
       einsatz_id: 5,

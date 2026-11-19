@@ -33,6 +33,7 @@ import {
   TYP_LABEL,
   geschaedigtAnzeige,
   SCHAEDEN_SICHTEN,
+  SCHAEDEN_SICHT_ERLAUBT,
   type SchaedenSicht,
 } from './schaeden/schadenHelfer';
 import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
@@ -51,6 +52,7 @@ import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
+import { useAdressWert } from '../routing/useAdressWert';
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
@@ -251,7 +253,8 @@ export default function SchaedenPage() {
   const neuAuftrag = useLinkAuftrag();
 
   const { token } = theme.useToken();
-  const [sicht, setSicht] = useState<SchaedenSicht>('offen');
+  // Der Reiter ist Zustand der Adresse (LLH-1826): er überlebt Weg und Zurück.
+  const [sicht, setSicht] = useAdressWert('sicht', SCHAEDEN_SICHT_ERLAUBT, 'offen');
   const spalten = useMemo(() => schaedenSpalten(einsatzId), [einsatzId]);
   /**
    * Sortierung, Spaltenfilter und Suche stehen in der Adresse (LLH-1086, Vorbild für den Rollout
@@ -274,7 +277,7 @@ export default function SchaedenPage() {
    * Die Sicht baut `Datensicht` neu auf (Schlüssel); Suche und Spaltenfilter nimmt sie aus dem
    * Gedächtnis mit, denn sie stehen in der Adresse und wirken am Server auf jede Statusmenge.
    */
-  const wechsleSicht = useCallback((s: SchaedenSicht) => setSicht(s), []);
+  const wechsleSicht = useCallback((s: SchaedenSicht) => setSicht(s), [setSicht]);
 
   const [erfassenOffen, setErfassenOffen] = useState(false);
 

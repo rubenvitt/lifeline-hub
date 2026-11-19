@@ -39,7 +39,13 @@ import type {
 } from '../api/types';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
 import { KennungsLink } from '../components/kennungsLink';
-import { einheitDetailPfad } from '../routing/deeplinks';
+import {
+  einheitDetailPfad,
+  RICHTUNG_ERLAUBT,
+  OFFEN_ABGESCHLOSSEN_ERLAUBT,
+  type RichtungFilter,
+} from '../routing/deeplinks';
+import { useAdressWert } from '../routing/useAdressWert';
 import { erfasseMeldungOfflineFaehig, erfassePersonOfflineFaehig } from '../offline/schreiben';
 import { ladeVersorgendeEinheiten, registrierAnzeige } from '../api/einsatzPerson';
 import PersonErfassungModal, { type AusMeldung } from '../personen/PersonErfassungModal';
@@ -157,10 +163,16 @@ export default function MeldungenPage() {
   // Empfängerfunktion der Erfassung (LLH-1214): Katalog plus lesbare Besetzung.
   const funktionsVorschlaege = useFunktionsVorschlaege(einsatzId);
 
-  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
-  const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
-  const richtungsKey = richtungFilter ?? 'alle';
-  const richtungWaehlen = (v: string) => setRichtungFilter(v === 'alle' ? undefined : v);
+  // Sicht und Richtung sind Zustand der Adresse (LLH-1826, `frontend/AGENTS.md`, „Ansicht und
+  // Filter gehören in die Adresse“): sie überleben Weg und Zurück, die Vorgabe fehlt in der Adresse.
+  const [ansicht, setAnsicht] = useAdressWert('sicht', OFFEN_ABGESCHLOSSEN_ERLAUBT, 'offen');
+  const [richtungsKey, setRichtung] = useAdressWert('richtung', RICHTUNG_ERLAUBT, 'alle');
+  const richtungFilter = richtungsKey === 'alle' ? undefined : richtungsKey;
+  const setRichtungFilter = (v: RichtungFilter | undefined) => setRichtung(v ?? 'alle');
+  const richtungWaehlen = (v: string) =>
+    setRichtung(
+      Object.prototype.hasOwnProperty.call(RICHTUNG_ERLAUBT, v) ? (v as RichtungFilter) : 'alle',
+    );
   // Ein Dialog gehört zu seinem Einsatz: die Route hat keinen `key`, nach einem Wechsel schriebe
   // er sonst mit der Meldung des vorigen Einsatzes in den neuen. Der Wechsel schließt ihn.
   const [auftragAuswahl, setAuftragAuswahl] = useState<DialogAuswahl | null>(null);
@@ -320,7 +332,7 @@ export default function MeldungenPage() {
     if (!verlinkte || angewandtNr === deeplinkNr) return;
     setAngewandtNr(deeplinkNr);
     setAnsicht(istErledigt(verlinkte) ? 'abgeschlossen' : 'offen');
-  }, [verlinkte, angewandtNr, deeplinkNr]);
+  }, [verlinkte, angewandtNr, deeplinkNr, setAnsicht]);
   const verlinkteAngeheftet =
     verlinkte && istErledigt(verlinkte) && !abgeschlossene.some((m) => m.id === verlinkte.id)
       ? verlinkte

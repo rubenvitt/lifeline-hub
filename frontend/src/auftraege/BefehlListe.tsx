@@ -11,6 +11,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { BefehlKopf } from '../api/types';
 import { NEW_SELECTABLE } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
+import { useAdressSuche, useAdressText, useAdressWahl } from '../routing/useAdressWert';
 import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -22,7 +23,7 @@ import { FELD_KLASSE, Feld, Segmentleiste, useRollen } from '../components/instr
 import BefehlListenKarte from './BefehlListenKarte';
 import BefehlDetail from './BefehlDetail';
 import { befehlSchemaLabel } from './befehlTexte';
-import EmpfaengerFilter, { matchesEmpfaenger } from './EmpfaengerFilter';
+import EmpfaengerFilter, { istEmpfaengerFilter, matchesEmpfaenger } from './EmpfaengerFilter';
 
 /**
  * Befehlsliste des Reiters „Einsatzbefehle“ im Muster „Liste + Detailpaneel“ (Spec
@@ -53,6 +54,8 @@ function trifft(b: BefehlKopf, begriff: string): boolean {
 }
 
 type BefehlStatus = BefehlKopf['status'];
+/** Exhaustiv: ein neuer Status wird hier zur Typfrage, nicht zum stillen Verwerfen. */
+const BEFEHLE_SICHT_ERLAUBT: Record<BefehlStatus, true> = { entwurf: true, freigegeben: true };
 
 const befehlSchluessel = (b: BefehlKopf) => b.id;
 
@@ -111,8 +114,10 @@ export default function BefehlListe({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
   });
-  const [suche, setSuche] = useState('');
-  const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
+  // Suche, Empfänger und Segment sind Zustand der Adresse (LLH-1826). Eigene Namen mit `befehle_`:
+  // die Aufträge stehen auf derselben Seite montiert, ihr `q` filtert hier nicht (Entwurf D3a).
+  const [suche, setSuche] = useAdressSuche('befehle_q');
+  const [empfFilter, setEmpfFilter] = useAdressText('befehle_empf', istEmpfaengerFilter);
   const gefunden = useMemo(
     () =>
       befehle.filter(
@@ -122,15 +127,20 @@ export default function BefehlListe({
   );
   /*
    * Vorgabe des Segments (design.md D5): „Entwürfe“, wenn es beim ersten Datenstand einen gibt,
-   * sonst „Freigegeben“. Danach schaltet nur die Person um.
+   * sonst „Freigegeben“. Eine Wahl der Person steht in der Adresse und geht vor; sie wird immer
+   * geschrieben, auch wenn sie gerade der Vorgabe entspricht (LLH-1826, Entwurf D3a): sonst zeigte
+   * das Zurück nach der Freigabe des letzten Entwurfs still die andere Sicht.
    */
-  const [segment, setSegment] = useState<BefehlStatus | null>(null);
+  const [segment, setSegment] = useAdressWahl('befehle_sicht', BEFEHLE_SICHT_ERLAUBT);
+  const [abgeleitet, setAbgeleitet] = useState<BefehlStatus | null>(null);
   useEffect(() => {
-    if (segment === null && befehleQuery.isSuccess) {
-      setSegment(befehleQuery.data.some((b) => b.status === 'entwurf') ? 'entwurf' : 'freigegeben');
+    if (abgeleitet === null && befehleQuery.isSuccess) {
+      setAbgeleitet(
+        befehleQuery.data.some((b) => b.status === 'entwurf') ? 'entwurf' : 'freigegeben',
+      );
     }
-  }, [segment, befehleQuery.isSuccess, befehleQuery.data]);
-  const aktivesSegment: BefehlStatus = segment ?? 'entwurf';
+  }, [abgeleitet, befehleQuery.isSuccess, befehleQuery.data]);
+  const aktivesSegment: BefehlStatus = segment ?? abgeleitet ?? 'entwurf';
   const eintraege = useMemo(
     () => gefunden.filter((b) => b.status === aktivesSegment),
     [gefunden, aktivesSegment],
@@ -165,8 +175,12 @@ export default function BefehlListe({
     },
     [schliesseHinweis],
   );
+  // Wie die Ansicht der Aufträge: bis die Adresse das neue Segment trägt, ruht die Vorauswahl.
+  const [segmentZiel, setSegmentZiel] = useState<BefehlStatus | null>(null);
+  if (segmentZiel !== null && aktivesSegment === segmentZiel) setSegmentZiel(null);
   const changeSegment = (neu: BefehlStatus) => {
     setSegment(neu);
+    setSegmentZiel(neu === aktivesSegment ? null : neu);
     select(null);
   };
   const { token } = useRollen();
@@ -258,7 +272,7 @@ export default function BefehlListe({
         gewaehlt={gewaehlt}
         onWahl={select}
         sprung={sprung}
-        vorauswahl={deeplinkHinweis.unbekannt == null}
+        vorauswahl={deeplinkHinweis.unbekannt == null && segmentZiel === null}
         ladend={befehleQuery.isPending}
         fehler={
           befehleQuery.isError

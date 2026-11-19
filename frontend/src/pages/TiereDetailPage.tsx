@@ -446,7 +446,6 @@ export default function TiereDetailPage() {
         'Geschlecht',
         <Select
           allowClear
-          style={{ minWidth: 160 }}
           placeholder="—"
           options={[
             { value: 'maennlich', label: 'männlich' },

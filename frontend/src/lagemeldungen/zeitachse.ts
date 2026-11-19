@@ -93,6 +93,15 @@ export interface LageFilter {
   suche: string;
 }
 
+/** Werte von `?ort=` (LLH-1826); exhaustiv wie die Records in `routing/deeplinks.ts`. */
+export const ORT_ERLAUBT: Record<Ortsfilter, true> = { alle: true, mit: true, ohne: true };
+/** Werte von `?herkunft=` (LLH-1826). */
+export const HERKUNFT_ERLAUBT: Record<Herkunftsfilter, true> = {
+  alle: true,
+  geraet: true,
+  uebernommen: true,
+};
+
 export const LEERER_FILTER: LageFilter = {
   ort: 'alle',
   herkunft: 'alle',

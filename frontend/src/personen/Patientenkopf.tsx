@@ -34,7 +34,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { VERLAUFSNOTIZ_MAX } from '../api/eingabegrenzen';
 import { useMinutenTakt } from '../components/useMinutenTakt';
-import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
+import { personSichtung, sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
 import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
 import {
   ANLASS_WORT,
@@ -586,7 +586,7 @@ function SichtungsAnzeige({
   onUmschalten: () => void;
 }) {
   const { token, rollen } = useRollen();
-  const k = person.aktuelle_sichtung;
+  const k = personSichtung(person.aktuelle_sichtung);
   const farbe = k ? SK_DARSTELLUNG[k].farbe : null;
   const voll = farbe ? sichtungsflaechen[farbe] : null;
   const text = k ? `${SK_DARSTELLUNG[k].label} · ${SK_WORT[k]}` : 'ungesichtet';
