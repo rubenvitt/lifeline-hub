@@ -1,6 +1,6 @@
 # Ortspfad zurück zur Liste — Implementation Plan (LLH-1997)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Der Ortspfad einer Detailseite geht per `navigate(-1)` zurück, wenn die vorige Seite seine Liste war, sonst verlinkt er wie heute auf die Liste.
 
@@ -50,7 +50,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
   - `verlaufGedaechtnisRaeumen(): void`
   - `VERLAUF_SCHLUESSEL = 'lfh:verlauf'`, `VERLAUF_HOECHSTENS = 50`
 
-- [ ] **Step 1: Failing tests** in `verlaufGedaechtnis.test.ts`:
+- [x] **Step 1: Failing tests** in `verlaufGedaechtnis.test.ts`:
   - `merkt und liest die Herkunft je Key`: `merkeHerkunft('a', {pathname:'/x', search:'?q=1'})` → `leseHerkunft('a')` gleich.
   - `merkt nichts für den Key default`: → `leseHerkunft('default') === null`.
   - `überträgt die Herkunft bei replace`: merke `a`, `uebertrageHerkunft('a','b')` → `leseHerkunft('b')` gleich; ohne Herkunft an `a` bleibt `b` `null`.
@@ -58,11 +58,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
   - `überlebt ein neues Laden des Moduls`: merken, `vi.resetModules()`, neu importieren → noch da (liegt in `sessionStorage`).
   - `arbeitet ohne Speicher weiter`: `sessionStorage.getItem/setItem` werfen lassen (`vi.spyOn(Storage.prototype, …)`) → merken/lesen ohne Wurf, Wert aus der Map.
   - `räumen leert alles`: merken, `verlaufGedaechtnisRaeumen()` → `null`, `sessionStorage.getItem('lfh:verlauf') === null`.
-- [ ] **Step 2:** `mise exec -- pnpm vitest run src/routing/verlaufGedaechtnis.test.ts` → FAIL (Modul fehlt).
-- [ ] **Step 3:** Implementieren: JSON-Liste `[key, adresse][]` im `sessionStorage`, neuer Eintrag ans Ende, Duplikat-Key vorher entfernen, vorne kürzen auf 50; die Map spiegelt immer den letzten Stand.
-- [ ] **Step 4:** Eintrag in `GERAETESPEICHER`: `ort: 'sessionStorage lfh:verlauf'`, `datei: 'routing/verlaufGedaechtnis.ts'`, `entscheidung: 'jeder-ausgang'`, `grund`: vorige Adresse je Verlaufseintrag für den Rückweg im Ortspfad (LLH-1997); Adressen tragen Filter- und Suchtexte, auch Namen. Räumer `verlaufGedaechtnis: verlaufGedaechtnisRaeumen` dazu.
-- [ ] **Step 5:** `mise exec -- pnpm vitest run src/routing/verlaufGedaechtnis.test.ts src/offline/` → PASS (inkl. `geraetRaeumung.guard.test.ts`).
-- [ ] **Step 6:** Commit `feat: Verlaufsgedächtnis merkt die vorige Adresse je Verlaufseintrag (LLH-1997)`.
+- [x] **Step 2:** `mise exec -- pnpm vitest run src/routing/verlaufGedaechtnis.test.ts` → FAIL (Modul fehlt).
+- [x] **Step 3:** Implementieren: JSON-Liste `[key, adresse][]` im `sessionStorage`, neuer Eintrag ans Ende, Duplikat-Key vorher entfernen, vorne kürzen auf 50; die Map spiegelt immer den letzten Stand.
+- [x] **Step 4:** Eintrag in `GERAETESPEICHER`: `ort: 'sessionStorage lfh:verlauf'`, `datei: 'routing/verlaufGedaechtnis.ts'`, `entscheidung: 'jeder-ausgang'`, `grund`: vorige Adresse je Verlaufseintrag für den Rückweg im Ortspfad (LLH-1997); Adressen tragen Filter- und Suchtexte, auch Namen. Räumer `verlaufGedaechtnis: verlaufGedaechtnisRaeumen` dazu.
+- [x] **Step 5:** `mise exec -- pnpm vitest run src/routing/verlaufGedaechtnis.test.ts src/offline/` → PASS (inkl. `geraetRaeumung.guard.test.ts`).
+- [x] **Step 6:** Commit `feat: Verlaufsgedächtnis merkt die vorige Adresse je Verlaufseintrag (LLH-1997)`.
 
 ### Task 2: `VerlaufMerken` und `useVorigeAdresse`
 
@@ -77,16 +77,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 - Consumes: Task 1.
 - Produces: `VerlaufMerken(): null` (Komponente), `useVorigeAdresse(): VorigeAdresse | null`.
 
-- [ ] **Step 1: Failing tests** mit `createMemoryRouter` (Routen `/liste`, `/detail/:id`), `VerlaufMerken` im Layout-Element, eine Sonde zeigt `JSON.stringify(useVorigeAdresse())`:
+- [x] **Step 1: Failing tests** mit `createMemoryRouter` (Routen `/liste`, `/detail/:id`), `VerlaufMerken` im Layout-Element, eine Sonde zeigt `JSON.stringify(useVorigeAdresse())`:
   - `PUSH merkt die vorige Adresse`: Start `/liste?f.status=offen`, `router.navigate('/detail/1')` → Sonde `{"pathname":"/liste","search":"?f.status=offen"}`.
   - `erster Eintrag hat keine Herkunft`: Start `/detail/1` → `null`.
   - `REPLACE behält die Herkunft`: wie oben, dann `router.navigate('/detail/1?reiter=b', { replace: true })` → weiter `/liste`.
   - `POP liest die Herkunft des Eintrags`: `/liste` → `/detail/1` → `/detail/2` → `router.navigate(-1)` → Sonde `/liste`.
-- [ ] **Step 2:** Test laufen lassen → FAIL.
-- [ ] **Step 3:** Implementieren: `useLocation()`, `useNavigationType()`, `useRef` mit der zuletzt gesehenen Location; in `useLayoutEffect([location.key])`: PUSH → `merkeHerkunft(location.key, {pathname, search} der Ref)`, REPLACE → `uebertrageHerkunft(ref.key, location.key)`, dann Ref aktualisieren. `useVorigeAdresse` = `leseHerkunft(useLocation().key)` (Effekt im Layout läuft vor den Effekten nicht, deshalb Lesen per `useSyncExternalStore` oder: Merken synchron im Render des Layouts über eine Ref-Prüfung `if (ref.key !== location.key)` — Wahl des Bauenden, der Test „PUSH merkt“ muss im ersten Render der Detailseite grün sein).
-- [ ] **Step 4:** In `BetriebsLayout` `<VerlaufMerken />` einhängen (Kommentar mit Verweis auf das Design-Doc).
-- [ ] **Step 5:** Tests → PASS.
-- [ ] **Step 6:** Commit `feat: Layout merkt die Herkunft jeder Seite (LLH-1997)`.
+- [x] **Step 2:** Test laufen lassen → FAIL.
+- [x] **Step 3:** Implementieren: `useLocation()`, `useNavigationType()`, `useRef` mit der zuletzt gesehenen Location; in `useLayoutEffect([location.key])`: PUSH → `merkeHerkunft(location.key, {pathname, search} der Ref)`, REPLACE → `uebertrageHerkunft(ref.key, location.key)`, dann Ref aktualisieren. `useVorigeAdresse` = `leseHerkunft(useLocation().key)` (Effekt im Layout läuft vor den Effekten nicht, deshalb Lesen per `useSyncExternalStore` oder: Merken synchron im Render des Layouts über eine Ref-Prüfung `if (ref.key !== location.key)` — Wahl des Bauenden, der Test „PUSH merkt“ muss im ersten Render der Detailseite grün sein).
+- [x] **Step 4:** In `BetriebsLayout` `<VerlaufMerken />` einhängen (Kommentar mit Verweis auf das Design-Doc).
+- [x] **Step 5:** Tests → PASS.
+- [x] **Step 6:** Commit `feat: Layout merkt die Herkunft jeder Seite (LLH-1997)`.
 
 ### Task 3: `ListenRueckweg`
 
@@ -100,17 +100,17 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 - Consumes: `useVorigeAdresse` (Task 2), `handleLinkKlick` (`routing/linkModifier.ts`).
 - Produces: `ListenRueckweg(props: { to: string; children: ReactNode }): JSX.Element` — rendert immer ein `<a>`.
 
-- [ ] **Step 1: Failing tests** (Memory-Router mit `VerlaufMerken`, Liste zeigt `useLocation().search` an):
+- [x] **Step 1: Failing tests** (Memory-Router mit `VerlaufMerken`, Liste zeigt `useLocation().search` an):
   - `von der Liste gekommen: Klick geht zurück`: `/liste?q=meier` → `/detail/1` → Klick auf „Liste“ → Liste zeigt `?q=meier`, `router.state.historyAction === 'POP'`.
   - `href trägt die Query der vorigen Liste`: → `href === '/liste?q=meier'`.
   - `direkt geöffnet: Link auf die nackte Liste`: Start `/detail/1`, Klick → `/liste`, Search leer, Aktion `PUSH`.
   - `von anderer Seite: Link`: `/liste` → `/detail/2` → `/detail/1` → Klick → PUSH auf `/liste`.
   - `Ziel mit Zeilenmarke passt über den Pfad`: `to='/liste?personal=5'`, vorher `/liste?q=x` → Klick POP, Liste `?q=x`.
   - `Strg-Klick wird nicht abgefangen`: `fireEvent.click(a, { ctrlKey: true })` → `defaultPrevented === false`, Ort unverändert.
-- [ ] **Step 2:** → FAIL.
-- [ ] **Step 3:** Implementieren: `passt = vorige && new URL(to, window.location.origin).pathname === vorige.pathname`; bei `passt` `<Link to={vorige.pathname + vorige.search} onClick={(e) => handleLinkKlick(e, () => navigate(-1))}>`, sonst `<Link to={to}>`. Kurzer Doku-Kommentar mit Verweis auf `frontend/AGENTS.md`, „Ortspfad zur Liste über `ListenRueckweg`“.
-- [ ] **Step 4:** → PASS.
-- [ ] **Step 5:** Commit `feat: ListenRueckweg geht zurück, wenn man von der Liste kam (LLH-1997)`.
+- [x] **Step 2:** → FAIL.
+- [x] **Step 3:** Implementieren: `passt = vorige && new URL(to, window.location.origin).pathname === vorige.pathname`; bei `passt` `<Link to={vorige.pathname + vorige.search} onClick={(e) => handleLinkKlick(e, () => navigate(-1))}>`, sonst `<Link to={to}>`. Kurzer Doku-Kommentar mit Verweis auf `frontend/AGENTS.md`, „Ortspfad zur Liste über `ListenRueckweg`“.
+- [x] **Step 4:** → PASS.
+- [x] **Step 5:** Commit `feat: ListenRueckweg geht zurück, wenn man von der Liste kam (LLH-1997)`.
 
 ### Task 4: Einsatz-Detailseiten umstellen
 
@@ -121,11 +121,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 
 **Interfaces:** Consumes `ListenRueckweg` (Task 3).
 
-- [ ] **Step 1: Failing Seitentest** nach dem Muster vorhandener `PersonenDetailPage`-Tests (gleiche Mocks/Wrapper): Router startet auf `personenPfad(1)` + `?q=meier`, navigiert zu `personDetailPfad(1, 7)`, Klick auf das Ortspfad-Glied „Betroffene“ → Ort ist `personenPfad(1)` mit `?q=meier`.
-- [ ] **Step 2:** → FAIL.
-- [ ] **Step 3:** Alle Stellen oben umstellen; nur das Ortspfad-Glied, keine anderen Rückwege (Storno-Knopf, `SeitenNichtGefunden`, `navigate` nach Löschen bleiben).
-- [ ] **Step 4:** `mise exec -- pnpm vitest run src/pages src/verpflegung` und `mise exec -- pnpm exec tsc -b` → PASS.
-- [ ] **Step 5:** Commit `feat: Detailseiten im Einsatz kehren über den Ortspfad zur Liste zurück (LLH-1997)`.
+- [x] **Step 1: Failing Seitentest** nach dem Muster vorhandener `PersonenDetailPage`-Tests (gleiche Mocks/Wrapper): Router startet auf `personenPfad(1)` + `?q=meier`, navigiert zu `personDetailPfad(1, 7)`, Klick auf das Ortspfad-Glied „Betroffene“ → Ort ist `personenPfad(1)` mit `?q=meier`.
+- [x] **Step 2:** → FAIL.
+- [x] **Step 3:** Alle Stellen oben umstellen; nur das Ortspfad-Glied, keine anderen Rückwege (Storno-Knopf, `SeitenNichtGefunden`, `navigate` nach Löschen bleiben).
+- [x] **Step 4:** `mise exec -- pnpm vitest run src/pages src/verpflegung` und `mise exec -- pnpm exec tsc -b` → PASS.
+- [x] **Step 5:** Commit `feat: Detailseiten im Einsatz kehren über den Ortspfad zur Liste zurück (LLH-1997)`.
 
 ### Task 5: Unterseiten und Verwaltung umstellen
 
@@ -134,9 +134,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 - Unterseiten: `pages/UnterkunftPlanenPage.tsx:212-213` (beide Glieder), `pages/PersonDruckPage.tsx:93`, `pages/AuftragDruckPage.tsx:93`, `pages/personen/AufnahmePage.tsx:182-184`, `verpflegung/TagAusVorlage.tsx:186`, `pages/EinheitAusVorlagePage.tsx:226`
 - Verwaltung (`pfad` von `AdminPage`): `stammdaten/FahrzeugDetailPage.tsx:150`, `stammdaten/PersonalDetailPage.tsx:144`, `stammdaten/EinheitVorlageDetailPage.tsx:312`, `planung/PlanungPage.tsx:106`, `pages/einstellungen/AnbindungAnsicht.tsx:207`
 
-- [ ] **Step 1:** Umstellen wie Task 4.
-- [ ] **Step 2:** Vorhandene Tests der Dateien und `tsc -b` → PASS (`ListenRueckweg` ist ein `<a>`; Tests, die `getByRole('link', …)` nutzen, bleiben gültig).
-- [ ] **Step 3:** Commit `feat: Unterseiten und Verwaltung kehren über den Ortspfad zurück (LLH-1997)`.
+- [x] **Step 1:** Umstellen wie Task 4.
+- [x] **Step 2:** Vorhandene Tests der Dateien und `tsc -b` → PASS (`ListenRueckweg` ist ein `<a>`; Tests, die `getByRole('link', …)` nutzen, bleiben gültig).
+- [x] **Step 3:** Commit `feat: Unterseiten und Verwaltung kehren über den Ortspfad zurück (LLH-1997)`.
 
 ### Task 6: Regel und Wächter
 
@@ -145,10 +145,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 - Modify: `frontend/AGENTS.md`, Abschnitt „Deeplink-Muster“ (neuer Punkt)
 - Optional Create: `frontend/src/components/ListenRueckweg.guard.test.ts`
 
-- [ ] **Step 1:** Regelpunkt **„Ortspfad zur Liste über `ListenRueckweg`“**: Ein Ortspfad-Glied auf eine Liste oder übergeordnete Seite ist `ListenRueckweg`, nie ein nackter `Link`; Herkunft aus dem Verlaufsgedächtnis (`routing/verlaufGedaechtnis.ts`, `VerlaufMerken` im `BetriebsLayout`), `navigate(-1)` nur bei passendem Pfad, sonst Link; andere Rückwege (nach Aktionen, Nicht-gefunden) bleiben Links. Herleitung: das Design-Doc.
-- [ ] **Step 2 (Wahl des Bauenden):** Wächter versuchen, der in Dateien mit `breadcrumb=`/`pfad=` innerhalb eines `items`/`pfad`-Arrays `title: <Link` meldet. Wird er an Bestand falsch rot (Glieder, die keine Rückwege sind), weglassen und im Commit sagen.
-- [ ] **Step 3:** `mise exec -- pnpm exec prettier --check AGENTS.md` → PASS.
-- [ ] **Step 4:** Commit `docs: Regel Ortspfad zur Liste über ListenRueckweg (LLH-1997)`.
+- [x] **Step 1:** Regelpunkt **„Ortspfad zur Liste über `ListenRueckweg`“**: Ein Ortspfad-Glied auf eine Liste oder übergeordnete Seite ist `ListenRueckweg`, nie ein nackter `Link`; Herkunft aus dem Verlaufsgedächtnis (`routing/verlaufGedaechtnis.ts`, `VerlaufMerken` im `BetriebsLayout`), `navigate(-1)` nur bei passendem Pfad, sonst Link; andere Rückwege (nach Aktionen, Nicht-gefunden) bleiben Links. Herleitung: das Design-Doc.
+- [x] **Step 2 (Wahl des Bauenden):** Wächter versuchen, der in Dateien mit `breadcrumb=`/`pfad=` innerhalb eines `items`/`pfad`-Arrays `title: <Link` meldet. Wird er an Bestand falsch rot (Glieder, die keine Rückwege sind), weglassen und im Commit sagen.
+- [x] **Step 3:** `mise exec -- pnpm exec prettier --check AGENTS.md` → PASS.
+- [x] **Step 4:** Commit `docs: Regel Ortspfad zur Liste über ListenRueckweg (LLH-1997)`.
 
 ### Task 7: e2e-Nachweis
 
@@ -156,12 +156,12 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/z7oww8sfepbi4g4mpa016wnn
 
 - Create: `frontend/e2e/ortspfad-rueckweg.spec.ts`
 
-- [ ] **Step 1:** Spec nach dem Muster der Betroffenen-Specs (`anmeldenPerApi`, Seeding per `page.request`): Einsatz mit ≥ 30 Personen, Betroffene mit Suchbegriff/Spaltenfilter in der Adresse öffnen, eine Person öffnen, Ortspfad „Betroffene“ klicken → `expect(page).toHaveURL(/q=…/)` und Filter sichtbar. Zweiter Test: Detailseite direkt öffnen → Ortspfad führt auf die nackte Liste. Rollposition nur prüfen, wenn LLH-1826 (`RollWiederherstellung`) auf dem Branch liegt.
-- [ ] **Step 2:** `cargo build` (Wurzel), dann `mise exec -- pnpm exec playwright test e2e/ortspfad-rueckweg.spec.ts --trace off` → PASS.
-- [ ] **Step 3:** Commit `test: e2e Rückweg über den Ortspfad (LLH-1997)`.
+- [x] **Step 1:** Spec nach dem Muster der Betroffenen-Specs (`anmeldenPerApi`, Seeding per `page.request`): Einsatz mit ≥ 30 Personen, Betroffene mit Suchbegriff/Spaltenfilter in der Adresse öffnen, eine Person öffnen, Ortspfad „Betroffene“ klicken → `expect(page).toHaveURL(/q=…/)` und Filter sichtbar. Zweiter Test: Detailseite direkt öffnen → Ortspfad führt auf die nackte Liste. Rollposition nur prüfen, wenn LLH-1826 (`RollWiederherstellung`) auf dem Branch liegt.
+- [x] **Step 2:** `cargo build` (Wurzel), dann `mise exec -- pnpm exec playwright test e2e/ortspfad-rueckweg.spec.ts --trace off` → PASS.
+- [x] **Step 3:** Commit `test: e2e Rückweg über den Ortspfad (LLH-1997)`.
 
 ### Task 8: Abschluss
 
-- [ ] `git fetch origin alpha && git merge origin/alpha` (falls LLH-1826 inzwischen da ist: Konflikt in `BetriebsLayout` auflösen, beide Bausteine behalten; Rollposition in Task 7 nachziehen).
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` (aus der Wurzel) → grün.
-- [ ] Plan abhaken, Bilder der Änderung, PR gegen `alpha`.
+- [x] `git fetch origin alpha && git merge origin/alpha` (falls LLH-1826 inzwischen da ist: Konflikt in `BetriebsLayout` auflösen, beide Bausteine behalten; Rollposition in Task 7 nachziehen).
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` (aus der Wurzel) → grün.
+- [x] Plan abhaken, Bilder der Änderung, PR gegen `alpha`.
