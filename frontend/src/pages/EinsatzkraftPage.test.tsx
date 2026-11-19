@@ -253,17 +253,14 @@ describe('EinsatzkraftPage – Gerüst (3.1)', () => {
 
   // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
   // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
-  it.each([
+  it.each<[string, string, Pick<Aufbau, 'aktiv' | 'entlassene'>]>([
     ['aktiv', '', {}],
     ['aktiv', '/personal', {}],
     ['entlassen', '/personal', { aktiv: [], entlassene: [kraft()] }],
-  ] as const)(
+  ])(
     'gescheiterter Neuabruf (%s, /api/einsaetze/7%s): Seite bleibt, Hinweis zeigt den alten Stand',
     async (_lage, unterpfad, aufbau) => {
-      const { client } = renderAnsicht('/einsaetze/7/personal/10', {
-        aktiv: aufbau.aktiv ? [...aufbau.aktiv] : undefined,
-        entlassene: aufbau.entlassene ? [...aufbau.entlassene] : undefined,
-      });
+      const { client } = renderAnsicht('/einsaetze/7/personal/10', aufbau);
       expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Lena Beispiel');
 
       server.use(
