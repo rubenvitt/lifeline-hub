@@ -38,7 +38,8 @@ import {
   parseRouteId,
 } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
+import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import type { Speicherung } from '../components/Erfassung';
@@ -806,7 +807,8 @@ export default function EtbPage() {
   // Seitenzustand: ohne den Einsatz gibt es weder Breadcrumb noch Schreibrecht — deshalb
   // Frühausstieg. Der Listenzustand des Tagebuchs entscheidet sich unten.
   if (einsatzQuery.isLoading) {
-    return <SeitenSkeleton />;
+    // Kopf sofort, damit er beim Eintreffen des Einsatzes nicht nachrutscht (LLH-1830).
+    return <ModulGerippeSeite modulKey="etb" />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -910,8 +912,8 @@ export default function EtbPage() {
           zusaetze={[
             ausserhalbHier && (
               <span key="ausserhalb">
-                Nr. <span style={monoStil(12)}>{ausserhalbHier.lfd_nr}</span> erfasst – außerhalb
-                des Filters ·{' '}
+                Nr. <span style={monoStil('monoKlein')}>{ausserhalbHier.lfd_nr}</span> erfasst –
+                außerhalb des Filters ·{' '}
                 <Button
                   type="link"
                   style={{ paddingInline: 0 }}
@@ -927,11 +929,11 @@ export default function EtbPage() {
             nachtraege.length > 0 && nachtragsGrenze && (
               <span key="nachtraege">
                 +
-                <span style={monoStil(12)}>
+                <span style={monoStil('monoKlein')}>
                   {nachtraege.length > 99 ? '99+' : nachtraege.length}
                 </span>{' '}
                 {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
-                <span style={monoStil(12)}>
+                <span style={monoStil('monoKlein')}>
                   {taktisch(lbZeit!, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
                 </span>{' '}
                 erfasst ·{' '}
@@ -1213,15 +1215,18 @@ export default function EtbPage() {
                     />
                     {/* Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
                         der Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert. */}
-                    <Select<number>
-                      aria-label="Nach Einheit filtern"
-                      placeholder="Einheit"
-                      allowClear
-                      style={{ minWidth: 160 }}
-                      value={filter.einheit_id}
-                      options={einheitOptionen}
-                      onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
-                    />
+                    {/* Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`): das Raster
+                        streckt die Auswahl, mindestens aber `schmal`. */}
+                    <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+                      <Select<number>
+                        aria-label="Nach Einheit filtern"
+                        placeholder="Einheit"
+                        allowClear
+                        value={filter.einheit_id}
+                        options={einheitOptionen}
+                        onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
+                      />
+                    </div>
                     {istSchmal && systemKnopf}
                   </>
                 }
@@ -1246,7 +1251,7 @@ export default function EtbPage() {
             data-lfh="etb-zeitachse-rahmen"
             style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
           >
-            {/* „neu seit Ihrer letzten Sichtung" — als Linie in der Achse, wenn die Marke im
+            {/* „neu seit der letzten Sichtung" — als Linie in der Achse, wenn die Marke im
                 Fenster steht, sonst hier als Banner im Fluss; das Sammelbanner des
                 Live-Zuflusses liegt dagegen auf der Zeitachse. */}
             {!markeInAchse && (

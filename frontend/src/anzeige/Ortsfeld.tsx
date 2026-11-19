@@ -13,7 +13,7 @@ import {
 } from 'react';
 import type { OrtSucheAntwort, OrtTreffer } from '../api/karteOrtSuche';
 import { useAuthOptional } from '../auth/AuthContext';
-import { useRollen } from '../components/instrument';
+import { Stapel, useRollen } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { Kartenausschnitt } from './Kartenausschnitt';
@@ -405,7 +405,7 @@ function OrtsfeldVorschau({
   value: OrtsfeldWert;
   onChange?: (wert: OrtsfeldWert) => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   const [waehlen, setWaehlen] = useState(false);
   const { formatKoordinate } = useAnzeigeKonventionen();
   const punkt = value.koordinate;
@@ -482,7 +482,7 @@ function OrtsfeldVorschau({
           }
         />
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginXS }}>
+      <Stapel richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
         {!punkt && <span style={{ color: rollen.text2 }}>Nicht verortet</span>}
         <Button onClick={() => setWaehlen(true)}>Auf Karte wählen</Button>
         {karte.eigenePosition &&
@@ -517,7 +517,7 @@ function OrtsfeldVorschau({
             {ortungsFehler}
           </span>
         )}
-      </div>
+      </Stapel>
       <KarteWaehlen
         offen={waehlen}
         etikett={karte.etikett}
@@ -619,10 +619,7 @@ function OrtsfeldTreffer({
   if (aussage) {
     const nochmal = isError || data?.zustand !== 'ok';
     return (
-      <div
-        role="status"
-        style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginXS }}
-      >
+      <Stapel role="status" richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
         {aussage}
         {nochmal && (
           <Button
@@ -635,7 +632,7 @@ function OrtsfeldTreffer({
             Erneut suchen
           </Button>
         )}
-      </div>
+      </Stapel>
     );
   }
 

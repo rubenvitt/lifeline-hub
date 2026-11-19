@@ -72,7 +72,7 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           sortWert: (b) => b.zeitpunkt_at,
           // Mono an der Aufrufstelle: `ZeitAnzeige` rendert ein Fragment.
           render: (v: string) => (
-            <span style={monoStil(12)}>
+            <span style={monoStil('monoKlein')}>
               <ZeitAnzeige wert={v} rolle="zeitpunkt" />
             </span>
           ),

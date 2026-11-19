@@ -1,5 +1,5 @@
-import { Alert, Button, Flex, Form, Input, Typography, Upload, type UploadFile } from 'antd';
-import { SegmentFeld } from '../components/instrument';
+import { Alert, Button, Form, Input, Typography, Upload, type UploadFile } from 'antd';
+import { Feld, SegmentFeld, Stapel } from '../components/instrument';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { spieleArchivEin, type ArchivEinspielenEingabe } from '../api/archivEinspielen';
@@ -125,7 +125,7 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
       <Typography.Paragraph type="secondary">
         Hält den Server kurz auf; nicht während eines laufenden Einsatzes.
       </Typography.Paragraph>
-      <Form.Item
+      <Feld
         name="block"
         label="Archivblock"
         valuePropName="fileList"
@@ -145,8 +145,8 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
             Block wählen
           </Button>
         </Upload>
-      </Form.Item>
-      <Form.Item name="schluesselArt" label="Privater Archiv-Schlüssel">
+      </Feld>
+      <Feld name="schluesselArt" label="Privater Archiv-Schlüssel">
         <SegmentFeld<'datei' | 'text'>
           beschriftung="Privater Archiv-Schlüssel"
           optionen={[
@@ -154,9 +154,9 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
             { wert: 'text', label: 'Eingefügt' },
           ]}
         />
-      </Form.Item>
+      </Feld>
       {art === 'datei' ? (
-        <Form.Item
+        <Feld
           name="schluesselDatei"
           label="Schlüsseldatei"
           valuePropName="fileList"
@@ -174,9 +174,9 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
           <Upload beforeUpload={() => false} maxCount={1}>
             <Button icon={<IconHochladen />}>Datei wählen</Button>
           </Upload>
-        </Form.Item>
+        </Feld>
       ) : (
-        <Form.Item
+        <Feld
           name="schluesselText"
           label="Schlüssel"
           rules={[
@@ -190,16 +190,16 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
             spellCheck={false}
             maxLength={ARCHIV_PRIVATSCHLUESSEL_MAX}
           />
-        </Form.Item>
+        </Feld>
       )}
-      <Form.Item
+      <Feld
         name="passphrase"
         label="Passphrase der Schlüsseldatei"
         extra="Nur bei Schutz"
         rules={[hoechstensBytes(ARCHIV_PASSPHRASE_MAX, 'Passphrase zu lang')]}
       >
         <Input.Password autoComplete="off" maxLength={ARCHIV_PASSPHRASE_MAX} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }
@@ -224,7 +224,7 @@ export function ArchivEingespieltErgebnis({ ergebnis, onSchliessen }: ErgebnisPr
         onClose={onSchliessen}
         title={`Eingespielt: ${ergebnis.einsatznummer ?? 'ohne Nr.'} · ${ergebnis.bezeichnung}`}
         description={
-          <Flex vertical gap="small">
+          <Stapel abstand="xs">
             <Typography.Text>
               Schreibgeschützt bis <ZeitAnzeige wert={ergebnis.loeschen_at} />
               {frist ? ' (Frist des Blocks)' : ''} · {ergebnis.inhalte} Inhalte
@@ -237,7 +237,7 @@ export function ArchivEingespieltErgebnis({ ergebnis, onSchliessen }: ErgebnisPr
                 Einsatz öffnen
               </Button>
             </div>
-          </Flex>
+          </Stapel>
         }
       />
     </section>

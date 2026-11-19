@@ -253,7 +253,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     expect(
       await screen.findByText('Betreuungsstelle Turnhalle Ost gespeichert'),
     ).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByLabelText('Kapazität (Personen)')).toBeNull());
+    await waitFor(() => expect(screen.queryByLabelText(/^Kapazität \(Personen\)/)).toBeNull());
   });
 
   // Feld-CAS (LLH-1945, Spec `formularseiten`, „Einzelangabe prüft auf zwischenzeitliche
@@ -298,7 +298,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     expect(
       await screen.findByText('Betreuungsstelle Turnhalle Ost gespeichert'),
     ).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByLabelText('Kapazität (Personen)')).toBeNull());
+    await waitFor(() => expect(screen.queryByLabelText(/^Kapazität \(Personen\)/)).toBeNull());
   });
 
   it('Leitung aus altem Stand: „Verwerfen und neu laden“ schreibt nichts und zeigt den frischen Stand', async () => {
@@ -320,7 +320,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Verwerfen und neu laden' }));
     // Die Sitzung endet ohne Meldung, die Ansicht zeigt den frischen Stand; kein zweiter PATCH.
     expect(await screen.findByText('Herr Meyer')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Leitung')).toBeNull();
+    expect(screen.queryByLabelText(/^Leitung/)).toBeNull();
     expect(screen.queryByText('Betreuungsstelle Turnhalle Ost gespeichert')).toBeNull();
     expect(screen.queryByText('Betreuungsstelle konnte nicht gespeichert werden')).toBeNull();
     expect(api.aendereStelle).toHaveBeenCalledTimes(1);
@@ -337,7 +337,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
     // Die Sitzung bleibt offen.
-    expect(screen.getByLabelText('Notiz')).toHaveValue('Eingang Süd');
+    expect(screen.getByLabelText(/^Notiz/)).toHaveValue('Eingang Süd');
   });
 
   it('LLH-1582: Bezeichnung, Standort und Notiz über der Grenze stehen am Feld und senden nicht', async () => {
@@ -450,13 +450,16 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.clear(await screen.findByLabelText('Leitung'));
-    await userEvent.type(screen.getByLabelText('Leitung'), 'Herr Ott');
+    await userEvent.type(screen.getByLabelText(/^Leitung/), 'Herr Ott');
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    await waitFor(() => expect(screen.queryByLabelText('Leitung')).toBeNull());
+    await waitFor(() => expect(screen.queryByLabelText(/^Leitung/)).toBeNull());
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
-    expect(await screen.findByLabelText('Leitung')).toHaveValue('Frau Schulz');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(screen.queryByLabelText('Leitung')).toBeNull());
+    const leitung = await screen.findByLabelText('Leitung');
+    expect(leitung).toHaveValue('Frau Schulz');
+    // Ohne Änderung ist „Speichern“ gesperrt; Enter schließt die Bearbeitung (LLH-1829).
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    await userEvent.type(leitung, '{Enter}');
+    await waitFor(() => expect(screen.queryByLabelText(/^Leitung/)).toBeNull());
     expect(api.aendereStelle).not.toHaveBeenCalled();
   });
 

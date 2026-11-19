@@ -12,7 +12,7 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import { Paneel, Status, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Stapel, Status, monoStil, useRollen } from '../components/instrument';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einheitStatusAnzeige, fmsEtikett } from '../kraefte/meldebildRaster';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
@@ -88,18 +88,24 @@ export default function GeraetStatusPage() {
 
   return (
     <EinsatzSeite titel="Status" dataUpdatedAt={einheitenQuery.dataUpdatedAt}>
-      <Flex vertical gap="middle">
+      <Stapel abstand="md">
         <Paneel titel={einheit.name} koerperPolster>
           <Flex align="center" gap="small" wrap data-lfh="einheit-status-aktuell">
             <Status groesse="klein" ton={s.ton} code={s.code ?? undefined} wort={s.wort} trenner />
             {einheit.status.seit && (
-              <span style={{ ...monoStil(13), color: rollen.gedaempft }}>
+              <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}>
                 seit {zeitKurz(einheit.status.seit, konventionen)}
               </span>
             )}
           </Flex>
           {s.verteilung && (
-            <div style={{ ...monoStil(12), color: rollen.gedaempft, marginTop: token.marginXXS }}>
+            <div
+              style={{
+                ...monoStil('monoKlein'),
+                color: rollen.gedaempft,
+                marginTop: token.marginXXS,
+              }}
+            >
               {s.verteilung}
             </div>
           )}
@@ -149,7 +155,7 @@ export default function GeraetStatusPage() {
             </div>
           ))}
         {fehler != null && <ZeilenFehler fehler={fehler} fallback="Status nicht gesetzt" />}
-      </Flex>
+      </Stapel>
     </EinsatzSeite>
   );
 }

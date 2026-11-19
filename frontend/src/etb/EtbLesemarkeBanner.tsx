@@ -10,7 +10,7 @@ import { etbPfad } from '../routing/deeplinks';
 import { lesemarkeLinie, lesemarkeText } from './lesemarkeModell';
 
 /**
- * „14 neue Einträge seit Ihrer letzten Sichtung um 13:04 · alle als gesichtet markieren"
+ * „14 neue Einträge seit der letzten Sichtung um 13:04 · alle als gesichtet markieren"
  * (LFH-611).
  *
  * ── ZWEI BANNER, ZWEI FRAGEN ──────────────────────────────────────────────────────────

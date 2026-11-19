@@ -7,10 +7,12 @@ import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
   Augenbraue,
+  FELD_KLASSE,
   Paneel,
   kennzahlenbandStil,
   monoStil,
   paneelZeileStil,
+  schriftStil,
   useRollen,
 } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -183,7 +185,7 @@ function TextAngabe({
       vermerk={vermerk}
       etikett={etikett}
       wert={text}
-      anzeige={mono ? <span style={monoStil(13)}>{text}</span> : text}
+      anzeige={mono ? <span style={monoStil('mono')}>{text}</span> : text}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -387,7 +389,7 @@ function KopfAngabe({
       <Augenbraue style={{ display: 'block', marginBottom: token.marginXXS }}>{etikett}</Augenbraue>
       <div
         style={{
-          ...(mono ? monoStil(15, 500) : { fontSize: 15, fontWeight: 500 }),
+          ...(mono ? monoStil(15, 500) : { ...schriftStil('kartentitel'), fontWeight: 500 }),
           color: rollen.text,
           overflowWrap: 'anywhere',
         }}
@@ -1240,7 +1242,7 @@ function RufnameAngabe({
       vermerk={vermerk}
       etikett="Rufname"
       wert={rufname ?? ''}
-      anzeige={<span style={monoStil(13)}>{rufname}</span>}
+      anzeige={<span style={monoStil('mono')}>{rufname}</span>}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -1285,6 +1287,7 @@ function RufnameInput({
   );
   return (
     <div
+      className={FELD_KLASSE}
       onKeyDownCapture={(e) => {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') navigated.current = true;
         else if (e.key === 'Enter' && !navigated.current) e.stopPropagation();
@@ -1301,7 +1304,6 @@ function RufnameInput({
           navigated.current = false;
           onChange(v ?? '');
         }}
-        style={{ width: '100%' }}
       />
     </div>
   );
@@ -1347,7 +1349,6 @@ function FahrzeugeAngabe({
           options={quelle.fahrzeuge.map((f) => ({ value: f.id, label: fahrzeugText(f) }))}
           value={value}
           onChange={(w) => onChange(w ?? [])}
-          style={{ width: '100%' }}
         />
       )}
     />
@@ -1679,7 +1680,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Einsatznummer',
-                wert: <span style={monoStil(13)}>{einsatz.einsatznummer_intern ?? '—'}</span>,
+                wert: <span style={monoStil('mono')}>{einsatz.einsatznummer_intern ?? '—'}</span>,
               },
               {
                 etikett: 'Leitstellen-Nr.',
@@ -1699,7 +1700,7 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Angelegt',
                 wert: (
-                  <span style={monoStil(13)}>
+                  <span style={monoStil('mono')}>
                     <ZeitAnzeige wert={einsatz.angelegt_at} rolle="zeitpunkt" />
                   </span>
                 ),
@@ -1791,7 +1792,9 @@ export default function EinsatzdatenPage() {
                     etikett="Anzahl Betroffene (initial)"
                     vermerk={einsatz.vermerke?.anzahl_betroffene_initial}
                     wert={einsatz.anzahl_betroffene_initial ?? null}
-                    anzeige={<span style={monoStil(13)}>{einsatz.anzahl_betroffene_initial}</span>}
+                    anzeige={
+                      <span style={monoStil('mono')}>{einsatz.anzahl_betroffene_initial}</span>
+                    }
                     leer={(n) => n === null}
                     darfSchreiben={darfBearbeiten}
                     onSpeichern={(n, { beimOeffnen }) =>
@@ -1802,14 +1805,16 @@ export default function EinsatzdatenPage() {
                       )
                     }
                     eingabe={({ feld, value, onChange }) => (
-                      <InputNumber<number>
-                        {...feld}
-                        min={0}
-                        precision={0}
-                        style={{ width: 180 }}
-                        value={value}
-                        onChange={(n) => onChange(n ?? null)}
-                      />
+                      // Feld ohne Formular (`frontend/AGENTS.md`, Bausteine, `Feld`).
+                      <div className={FELD_KLASSE} style={{ maxWidth: 'var(--lfh-feld-schmal)' }}>
+                        <InputNumber<number>
+                          {...feld}
+                          min={0}
+                          precision={0}
+                          value={value}
+                          onChange={(n) => onChange(n ?? null)}
+                        />
+                      </div>
                     )}
                   />
                 ),

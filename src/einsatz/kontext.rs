@@ -168,7 +168,9 @@ impl EinsatzKontext {
     ) -> Result<bool, AppError> {
         match self.fordere_zielmodul::<Z>(pool).await {
             Ok(()) => Ok(true),
-            Err(AppError::Forbidden | AppError::ForbiddenMit(_)) => Ok(false),
+            Err(AppError::Forbidden | AppError::ForbiddenMit(_) | AppError::KeinLesezugriff(_)) => {
+                Ok(false)
+            }
             Err(e) => Err(e),
         }
     }

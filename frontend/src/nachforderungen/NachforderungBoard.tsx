@@ -341,7 +341,7 @@ export default function NachforderungBoard({
           </span>
         )}
       </span>
-      <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+      <span data-lfh="board-zahl" style={monoStil('monoGross', 500)}>
         {sp.karten.length}
       </span>
     </h2>
@@ -373,7 +373,7 @@ export default function NachforderungBoard({
                 style={{ justifyContent: 'space-between', fontWeight: 600 }}
               >
                 <span>{stufeWort(stufe)}</span>
-                <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+                <span data-lfh="board-zahl" style={monoStil('monoGross', 500)}>
                   {sp.karten.length}
                 </span>
               </Button>
@@ -389,7 +389,7 @@ export default function NachforderungBoard({
               style={{ fontWeight: 600 }}
             >
               {stufeWort(stufe)}{' '}
-              <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+              <span data-lfh="board-zahl" style={monoStil('monoGross', 500)}>
                 {sp.karten.length}
               </span>
             </Button>

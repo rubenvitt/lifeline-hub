@@ -44,7 +44,7 @@ export function MeldungKennzahlZeile({
       {teile.map((t, i) => (
         <Fragment key={t.wort}>
           {i > 0 && ' · '}
-          <strong style={{ ...monoStil(14), color: t.farbe ?? rollen.text }}>
+          <strong style={{ ...monoStil('monoGross'), color: t.farbe ?? rollen.text }}>
             {laedt || t.wert == null ? '—' : t.wert}
           </strong>{' '}
           <span style={t.farbe ? { color: t.farbe } : undefined}>{t.wort}</span>

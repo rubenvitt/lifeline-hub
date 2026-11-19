@@ -13,7 +13,13 @@ import { postenAus } from '../betreuung/unterkunft/posten';
 import { rechne, type Eingabe } from '../betreuung/unterkunft/rechnerKern';
 import { useRechnerRichtwerte } from '../betreuung/unterkunft/useRechnerRichtwerte';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Paneel, Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
+import {
+  Paneel,
+  Segmentleiste,
+  Stapel,
+  useRollen,
+  type SegmentOption,
+} from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
@@ -188,10 +194,10 @@ function Inhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: number }
   return (
     <EinsatzSeite
       titel={
-        <Space wrap size={token.marginSM}>
+        <Stapel als="span" richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
           <span>Unterkunft planen</span>
           {quelle === 'basis' && <Marke>Basiswerte</Marke>}
-        </Space>
+        </Stapel>
       }
       meta={
         stelle.kapazitaet_personen != null

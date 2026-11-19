@@ -50,7 +50,7 @@ Fingerabdruck; stimmen beide überein, hat das richtige Gerät eingelöst.
 
 Hat ein anderer Admin die Anbindung inzwischen geändert, fragt die Seite „Zwischenzeitlich
 geändert“: „Verwerfen und neu laden“ zeigt seinen Stand, „Meine Änderung übernehmen“ speichert
-deine.
+den eigenen.
 
 ### Schlüssel wechseln
 

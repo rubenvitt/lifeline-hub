@@ -144,7 +144,9 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   ohne Bedienung; Kennzahlen mindestens 72 px, jeder Text mindestens 28 px; keine Namen und keine
   Personenkennungen, auch nicht in der Serverantwort (der Einsatzkopf kommt ohne Sachverhalt,
   meldende Stelle und Ortsangabe, `routes/einsatz.rs` `detail`); Datenstand älter als 2 Minuten
-  hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe.
+  hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe. Wirft eine Kachel, fällt nur sie
+  aus (`KachelGrenze` in Form `gross`, ohne Knopf, neuer Versuch mit dem nächsten Datenstand;
+  Regel in `frontend/AGENTS.md`, „Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze“).
   Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
   nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie, bei einem Gefahrengebiet dazu
   `gebiet`: Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, LLH-1746) und

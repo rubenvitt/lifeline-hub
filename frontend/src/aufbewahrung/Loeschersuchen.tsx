@@ -9,7 +9,7 @@ import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle
 import { nachFolge, nachText, werteAusKatalog } from '../components/katalogVergleich';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { Paneel } from '../components/instrument';
+import { Paneel, Textstufe } from '../components/instrument';
 import { schwaerzungsantragStand } from '../theme/statusFarben';
 import { ZIEL_ART } from './archivText';
 import ArchivPersonAntragDialog from './ArchivPersonAntragDialog';
@@ -234,9 +234,9 @@ export default function Loeschersuchen({
         {inhalt}
         <SpeicherFehler fehler={ruecknahme.error} titel="Rücknahme fehlgeschlagen" />
         {!wege.person && (
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+          <Textstufe als="p" stufe="textKlein" ton="gedaempft">
             Einsatz bereits geschwärzt
-          </Typography.Paragraph>
+          </Textstufe>
         )}
       </div>
       {kennungOffen && (

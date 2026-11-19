@@ -7,6 +7,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import SichtungsWahl from './SichtungsWahl';
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
+import { Feld } from '../components/instrument';
 
 export interface SichtungWerte {
   kategorie: Sichtungskategorie;
@@ -23,16 +24,16 @@ export interface SichtungWerte {
 export function SichtungFelder({ einsatzId }: { einsatzId: number }) {
   return (
     <>
-      <Form.Item
+      <Feld
         label="Kategorie"
         name="kategorie"
         rules={[{ required: true, message: 'Bitte eine Sichtungskategorie wählen' }]}
       >
         <SichtungsWahl aria-label="Sichtungskategorie" />
-      </Form.Item>
-      <Form.Item label="Kurzbegründung (optional)" name="notiz">
+      </Feld>
+      <Feld label="Kurzbegründung (optional)" name="notiz">
         <Input />
-      </Form.Item>
+      </Feld>
       <BestaetigtVonFeld einsatzId={einsatzId} />
     </>
   );

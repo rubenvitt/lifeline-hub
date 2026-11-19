@@ -32,7 +32,7 @@ import EingaengeZahl from '../alarm/EingaengeZahl';
 import HandyLeiste from '../alarm/HandyLeiste';
 import { wetterPegelPfad } from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
-import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schriftskala } from '../theme/tokens';
 import './AlarmZentrale.css';
 
 /**
@@ -463,7 +463,7 @@ export default function AlarmZentrale({
             }
             style={{
               color: alarmKnopfFarbe(sammelAuffaellig),
-              fontSize: 12,
+              fontSize: schriftskala.textKlein.groesse,
               flexShrink: 0,
             }}
           >
@@ -495,7 +495,10 @@ export default function AlarmZentrale({
           aria-disabled={desktop !== 'aus'}
           onClick={desktop === 'aus' ? desktopAktivieren : undefined}
           icon={desktopIcon}
-          style={{ color: alarmKnopfFarbe(desktopAuffaellig), fontSize: 12 }}
+          style={{
+            color: alarmKnopfFarbe(desktopAuffaellig),
+            fontSize: schriftskala.textKlein.groesse,
+          }}
         >
           {desktopWort}
         </Button>
@@ -508,7 +511,7 @@ export default function AlarmZentrale({
           onClick={() => void tonUmschalten()}
           style={{
             color: alarmKnopfFarbe(tonAuffaellig),
-            fontSize: 12,
+            fontSize: schriftskala.textKlein.groesse,
           }}
           icon={tonIcon}
         >

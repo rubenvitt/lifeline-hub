@@ -28,7 +28,7 @@ describe('RufnameAbfrage', () => {
       />,
     );
     expect(
-      screen.getByRole('group', { name: 'Mit welchem Rufnamen schreibst du ins ETB?' }),
+      screen.getByRole('group', { name: 'Mit welchem Rufnamen ins ETB schreiben?' }),
     ).toBeInTheDocument();
     const feld = screen.getByRole('combobox', { name: 'Rufname für Von und An' });
     expect(feld).toHaveValue('Florian Leitung');
@@ -164,7 +164,9 @@ describe('RufnameAbfrage', () => {
         onAbbrechen={onAbbrechen}
       />,
     );
-    expect(screen.getByRole('group', { name: 'Dein Rufname für Von und An' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Eigener Rufname für Von und An' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Empfänger wie Absender' })).not.toBeChecked();
     expect(screen.getByRole('combobox', { name: 'Rufname für Von' })).toHaveValue('ELW 1');
     expect(screen.getByRole('combobox', { name: 'Rufname für An' })).toHaveValue('Einsatzleitung');

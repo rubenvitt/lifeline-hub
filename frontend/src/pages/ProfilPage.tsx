@@ -4,8 +4,10 @@ import {
   Augenbraue,
   Datenfeld,
   Datenraster,
+  Feld,
   Paneel,
   monoStil,
+  Stapel,
   useRollen,
 } from '../components/instrument';
 import { useEffect, useRef, useState } from 'react';
@@ -20,7 +22,8 @@ import { ladeOrganisation } from '../api/organisation';
 import { globalKeys } from '../api/queryKeys';
 import { enrollFinish } from '../api/totp';
 import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from '../api/webauthn';
-import type { AuthProvider, TotpEnrollStart } from '../api/types';
+import type { AuthProvider, OrgRolle, SystemRolle, TotpEnrollStart } from '../api/types';
+import { kontoRollenNamen } from '../einsatz/rollenVokabular';
 import { useAuth } from '../auth/AuthContext';
 import PasswortAendernDialog from '../auth/PasswortAendernDialog';
 import SitzungsListe from '../auth/SitzungsListe';
@@ -39,15 +42,12 @@ interface TotpCodeWerte {
 }
 
 /**
- * Rollen-Beschriftung als Wort statt als Wire-Wert. Die Schreibweise folgt `pages/BenutzerPage.tsx`
- * („Admin" / „Führungskraft" / „Benutzer"), damit dieselbe Rolle nicht zwei Namen trägt. Bewusst
- * keine geteilte Map: ihr Platz wäre `theme`/`auth`; wer die dritte Stelle baut, zieht sie dorthin.
+ * Rollen-Beschriftung als Wort statt als Wire-Wert, aus dem Rollen-Vokabular (LLH-1818): dieselben
+ * Namen wie Benutzerverwaltung und Benutzermenü, ohne Rolle „Keine Rolle“.
  */
-function rollenText(benutzer: { system_rolle: string; org_rolle: string } | null): string {
+function rollenText(benutzer: { system_rolle: SystemRolle; org_rolle: OrgRolle } | null): string {
   if (!benutzer) return '—';
-  if (benutzer.system_rolle === 'admin') return 'Admin';
-  if (benutzer.org_rolle === 'fuehrungskraft') return 'Führungskraft';
-  return 'Benutzer';
+  return kontoRollenNamen(benutzer).join(', ');
 }
 
 /**
@@ -192,7 +192,7 @@ export default function ProfilPage() {
   return (
     // Reine Formularseite: ausdrücklich schmal.
     <AdminPage titel="Profil" breite="schmal">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <Paneel titel="Konto">
           {/* Die Organisation kommt aus einem eigenen Abruf; fällt der aus, bleibt „—".
               Benutzername in Mono: er ist eine Kennung, kein Name. */}
@@ -201,7 +201,7 @@ export default function ProfilPage() {
             <Datenfeld label="Benutzername" mono>
               {benutzer?.benutzername ?? '—'}
             </Datenfeld>
-            <Datenfeld label="Systemrolle">{rollenText(benutzer)}</Datenfeld>
+            <Datenfeld label="Rollen">{rollenText(benutzer)}</Datenfeld>
             <Datenfeld label="Organisation">{organisation?.name ?? '—'}</Datenfeld>
           </Datenraster>
         </Paneel>
@@ -210,28 +210,23 @@ export default function ProfilPage() {
             Benutzermenü, hier auch außerhalb eines Einsatzes zu finden. Darunter die Gerätewahl der
             Zeitdarstellung (LLH-1053, E3), wie das Koordinatensystem am Gerät. */}
         <Paneel titel="Darstellung auf diesem Gerät" koerperPolster>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: token.marginLG,
-              maxWidth: ANZEIGE_LEISTEN_BREITE,
-            }}
-          >
-            <AnzeigeLeisten hasTitel={false} />
-            <ZeitdarstellungGeraetWahl />
+          <div style={{ maxWidth: ANZEIGE_LEISTEN_BREITE }}>
+            <Stapel abstand="lg">
+              <AnzeigeLeisten hasTitel={false} />
+              <ZeitdarstellungGeraetWahl />
+            </Stapel>
           </div>
         </Paneel>
 
         <Paneel titel="Sicherheit" koerperPolster>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
+          <Stapel abstand="lg">
             {lokalesPasswortNutzbar && (
               <section style={{ maxWidth: 480 }}>
                 <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
                   Passwort
                 </Augenbraue>
                 <Typography.Paragraph type="secondary">
-                  Beendet alle anderen Anmeldungen deines Kontos.
+                  Beendet alle anderen Anmeldungen dieses Kontos.
                 </Typography.Paragraph>
                 <Button onClick={() => setPasswortDialogOffen(true)}>Passwort ändern</Button>
                 <PasswortAendernDialog
@@ -309,7 +304,7 @@ export default function ProfilPage() {
                             background: rollen.flaeche2,
                             padding: token.padding,
                             borderRadius: 0,
-                            ...monoStil(13),
+                            ...monoStil('mono'),
                             marginBottom: token.marginSM,
                             whiteSpace: 'pre-wrap',
                           }}
@@ -383,15 +378,15 @@ export default function ProfilPage() {
                       disabled={totpLaedt}
                       requiredMark={false}
                     >
-                      <Form.Item
-                        label="Code aus deiner Authenticator-App"
+                      <Feld
+                        label="Code aus der Authenticator-App"
                         name="code"
                         rules={[{ required: true, message: 'Bitte Code eingeben' }]}
                       >
                         {/* Dasselbe Primitiv wie auf der Anmeldeseite (Ziffern-Tastatur,
                           Längengrenze, Ziffern-Optik). */}
                         <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
-                      </Form.Item>
+                      </Feld>
                       <Button type="primary" htmlType="submit" loading={totpLaedt}>
                         Bestätigen
                       </Button>
@@ -413,7 +408,7 @@ export default function ProfilPage() {
                 )}
               </section>
             )}
-          </div>
+          </Stapel>
         </Paneel>
 
         {/* Laufende Sitzungen des eigenen Kontos (LFH-1092): ein verlorenes Gerät abmelden, ohne
@@ -428,7 +423,7 @@ export default function ProfilPage() {
             alleText="Alle anderen beenden"
           />
         </Paneel>
-      </div>
+      </Stapel>
     </AdminPage>
   );
 }

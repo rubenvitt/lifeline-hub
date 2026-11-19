@@ -18,6 +18,7 @@ import { GLIEDERUNG_KLASSE } from '../../components/instrument';
 import UeberblickPage from './UeberblickPage';
 import { einsatzKeys } from '../../api/queryKeys';
 import { saveStartlisteAusgeblendet } from './startlisteSpeicher';
+import { pruefeKachelGrenzen } from '../../test/kachelWaechter';
 
 dayjs.extend(utc);
 
@@ -433,6 +434,15 @@ describe('UeberblickPage', () => {
     }
   });
 
+  it('Wächter: jede Kachel des Überblicks steht in ihrer eigenen KachelGrenze (LLH-1958)', async () => {
+    stelleBereit(volleDaten);
+    const { container } = rendern();
+    await waitFor(() => expect(abschnittZahl('Meldungen')).toHaveTextContent('4'));
+    await waitFor(() => paneel('Einsatzabschnitte'));
+    // Alarmzeile und vier Paneele; die Startliste prüft ihr eigener Block.
+    pruefeKachelGrenzen(container.querySelector('[data-lfh="ueberblick"]')!, 5);
+  });
+
   it('Alarmzeile „Was brennt“ steht vor den Paneelreihen (LLH-1743)', async () => {
     stelleBereit({
       ...volleDaten,
@@ -574,6 +584,17 @@ describe('UeberblickPage', () => {
     expect(gebundenFarbe).not.toBe(rollenFarbe('bedien', standard));
     expect(within(p).queryByText(/Einheiten nach Status:/)).toBeNull();
     expect(within(p).getByText('1 Abschnitt · 1 Einheit')).toBeInTheDocument();
+    // LLH-1825: die Zeilen sind Links, die Schreibweise erklärt sich deshalb einmal über ihnen —
+    // nicht im Kopf-Meta, das auf schmalen Flächen abgeschnitten wird (Review B4).
+    const legende = within(p).getByRole('button', { name: /^F\/UF\/M\/\/Σ/ });
+    expect(legende.closest('[data-lfh="paneel-meta"]')).toBeNull();
+    expect(legende.closest('a')).toBeNull();
+    expect(legende.closest('[data-lfh="abschnitt-legende"]')).toHaveTextContent('Stärke F/UF/M//Σ');
+    // Die Legende fluchtet mit den Zeilen darunter, statt am Paneelrand zu kleben.
+    const ersteZeile = p.querySelector<HTMLElement>('[data-lfh="ueberblick-abschnitt"]');
+    const kasten = legende.closest<HTMLElement>('[data-lfh="abschnitt-legende"]');
+    expect(kasten?.style.paddingInline).not.toBe('');
+    expect(kasten?.style.paddingInline).toBe(ersteZeile?.style.paddingInline);
   });
 
   it('Abschnittszeile: letzte Rückmeldung im Teilbaum mit Zeit und Text (LFH-610)', async () => {
@@ -2392,6 +2413,14 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     // Angemeldet: ohne Person räumt der Start nach der 401 den Gerätespeicher (LFH-767), samt dem
     // Ausblenden der Startliste, mitten im Test.
     server.use(meHandler(benutzerFixture({ id: 9 })));
+  });
+
+  it('Wächter: auch die Startliste steht in ihrer eigenen KachelGrenze (LLH-1958)', async () => {
+    stelleBereit(leer);
+    const { container } = rendern();
+    await screen.findByRole('region', { name: 'Einsatz starten' });
+    await screen.findByRole('region', { name: 'Einsatzabschnitte' });
+    pruefeKachelGrenzen(container.querySelector('[data-lfh="ueberblick"]')!, 6);
   });
 
   it('leerer Einsatz: fünf offene Punkte unter der Alarmzeile, vor den Paneelreihen, ohne Zahl', async () => {

@@ -240,3 +240,33 @@ async fn seed_entspricht_der_startliste() {
         assert_eq!(vorlage.ausgeblendet, start.ausgeblendet());
     }
 }
+
+/// LLH-1816: Der Bootstrap findet eine Vorlage über ihren Namen, nur in der eigenen
+/// Organisation; ein unbekannter Name ist kein Fehler.
+#[tokio::test]
+async fn find_id_by_bezeichnung_tx_findet_nur_in_der_eigenen_organisation() {
+    let pool = crate::db::test_pool().await;
+    org_anlegen(&pool, 1).await;
+    org_anlegen(&pool, 2).await;
+    let manv = repo::create(&pool, 1, daten("MANV", &[])).await.unwrap();
+    let mut conn = pool.acquire().await.unwrap();
+
+    assert_eq!(
+        repo::find_id_by_bezeichnung_tx(&mut conn, 1, "MANV")
+            .await
+            .unwrap(),
+        Some(manv.id)
+    );
+    assert_eq!(
+        repo::find_id_by_bezeichnung_tx(&mut conn, 1, "Gibt es nicht")
+            .await
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        repo::find_id_by_bezeichnung_tx(&mut conn, 2, "MANV")
+            .await
+            .unwrap(),
+        None
+    );
+}

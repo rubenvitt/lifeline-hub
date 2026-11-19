@@ -203,7 +203,7 @@ export default function ArchivSchluessel() {
                     title={<span data-lfh="archiv-schluessel-titel">{s.bezeichnung}</span>}
                     description={
                       <span
-                        style={{ ...monoStil(13), color: rollen.gedaempft }}
+                        style={{ ...monoStil('mono'), color: rollen.gedaempft }}
                         data-lfh="archiv-schluessel-zustand"
                       >
                         {schluesselZustand(s, zeit)}
@@ -252,7 +252,12 @@ export default function ArchivSchluessel() {
           name="schluessel"
           rules={[{ required: true, whitespace: true, message: 'Schlüssel angeben' }]}
         >
-          <Input placeholder="age1…" spellCheck={false} autoComplete="off" style={monoStil(14)} />
+          <Input
+            placeholder="age1…"
+            spellCheck={false}
+            autoComplete="off"
+            style={monoStil('monoGross')}
+          />
         </Feld>
       </ErfassungsModal>
 
@@ -277,7 +282,9 @@ export default function ArchivSchluessel() {
         {probe?.probe && (
           <div data-lfh="archiv-schluessel-probe" style={{ marginBlockEnd: token.marginSM }}>
             <KopierbarerText text={probe.probe} bezeichnung="Probe">
-              <pre style={{ ...monoStil(12), margin: 0, overflowX: 'auto' }}>{probe.probe}</pre>
+              <pre style={{ ...monoStil('monoKlein'), margin: 0, overflowX: 'auto' }}>
+                {probe.probe}
+              </pre>
             </KopierbarerText>
           </div>
         )}
@@ -292,7 +299,7 @@ export default function ArchivSchluessel() {
             autoComplete="off"
             maxLength={8}
             placeholder="8 Ziffern"
-            style={monoStil(14)}
+            style={monoStil('monoGross')}
           />
         </Feld>
       </ErfassungsModal>
@@ -313,7 +320,9 @@ export default function ArchivSchluessel() {
         destroyOnHidden
       >
         {entfernenFuer && (
-          <p style={{ ...monoStil(14), color: rollen.gedaempft }}>{entfernenFuer.fingerabdruck}</p>
+          <p style={{ ...monoStil('monoGross'), color: rollen.gedaempft }}>
+            {entfernenFuer.fingerabdruck}
+          </p>
         )}
         {letzterGeprueft && <p>Danach archiviert der Hub keine Einsätze mehr.</p>}
         <SpeicherFehler fehler={entfernen.error} titel="Nicht entfernt" />

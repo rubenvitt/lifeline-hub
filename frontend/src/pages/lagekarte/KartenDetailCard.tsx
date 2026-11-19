@@ -1,7 +1,7 @@
 import { IconKreuz } from '../../icons';
 import { Button } from 'antd';
 import type { ReactNode } from 'react';
-import { monoStil, useRollen } from '../../components/instrument';
+import { Stapel, Textstufe, monoStil, useRollen } from '../../components/instrument';
 
 interface KartenDetailCardProps {
   /** Name des gewählten Objekts (bricht bei Bedarf um statt abzuschneiden). */
@@ -51,7 +51,7 @@ export default function KartenDetailCard({
         minWidth: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: token.marginSM }}>
+      <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
         <div
           aria-hidden="true"
           data-lfh="auswahl-kachel"
@@ -72,33 +72,16 @@ export default function KartenDetailCard({
         >
           {kachel ?? 'TZ'}
         </div>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: token.marginXS,
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              fontSize: 14,
-              fontWeight: 500,
-              lineHeight: 1.3,
-              color: rollen.text,
-              overflowWrap: 'anywhere',
-            }}
-          >
+        <Stapel abstand="xs" wachsen>
+          <Textstufe als="h3" stufe="kartentitel" umbruch="ueberall">
             {titel}
-          </h3>
+          </Textstufe>
           {unterzeile != null && (
-            <div style={{ ...monoStil(11), color: rollen.gedaempft, overflowWrap: 'anywhere' }}>
+            <div style={{ ...monoStil('meta'), color: rollen.gedaempft, overflowWrap: 'anywhere' }}>
               {unterzeile}
             </div>
           )}
-        </div>
+        </Stapel>
         {/* Kein `size` — die Trefffläche kommt aus `controlHeight`. */}
         <Button
           type="text"
@@ -110,7 +93,7 @@ export default function KartenDetailCard({
             </span>
           }
         />
-      </div>
+      </Stapel>
       {children}
     </section>
   );

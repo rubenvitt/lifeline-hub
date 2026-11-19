@@ -1,6 +1,6 @@
 import { IconPerson, IconTelefon } from '../../icons';
-import { Space, theme } from 'antd';
-import { Status, monoStil } from '../../components/instrument';
+import { theme } from 'antd';
+import { Stapel, Status, Textstufe, monoStil } from '../../components/instrument';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import { telefonVerbindungen } from '../../components/verbindungen';
@@ -31,26 +31,26 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
   const besetzt = abschnitt.leiter_id != null;
   const lage = abschnitt.lagezustand ? abschnittLagezustand[abschnitt.lagezustand] : null;
   return (
-    <Space size={token.marginXXS} wrap>
+    <Stapel als="span" richtung="zeile" umbruch ausrichten="mitte" abstand="xxs">
       <span>{abschnitt.name}</span>
       {lage && <Status darstellung={lage} />}
       {/* Zahlen in Mono, kein farbiges Etikett: Blau ist die Bedienrolle. */}
-      <span style={{ ...monoStil(12), color: token.colorText }}>
+      <span style={{ ...monoStil('monoKlein'), color: token.colorText }}>
         <StaerkeAnzeige wert={staerke} />
       </span>
-      <span style={{ ...monoStil(12), color: token.colorTextSecondary }}>
+      <span style={{ ...monoStil('monoKlein'), color: token.colorTextSecondary }}>
         {/* Was gezählt wird, steht dran (LFH-973): nur die direkt zugeordneten, der Überblick
             zählt „inkl. UA“. */}
         {anzahlEinheiten === 1 ? '1 Einheit' : `${anzahlEinheiten} Einheiten`} direkt
       </span>
       {!besetzt && <Status groesse="klein" ton="achtung" wort="ohne Leiter" />}
       {abschnitt.leiter_name && (
-        <span style={{ color: token.colorTextSecondary }}>
+        <Textstufe ton="gedaempft">
           <span aria-hidden="true">
             <IconPerson />
           </span>{' '}
           {abschnitt.leiter_name}
-        </span>
+        </Textstufe>
       )}
       {telefonVerbindungen(abschnitt.verbindungen).length > 0 && (
         <span
@@ -61,6 +61,6 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
           <IconTelefon />
         </span>
       )}
-    </Space>
+    </Stapel>
   );
 }

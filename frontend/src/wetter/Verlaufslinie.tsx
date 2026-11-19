@@ -159,7 +159,7 @@ export default function Verlaufslinie({
   };
   const abgelesen = zeiger != null ? g.punkte[zeiger] : null;
   const zeit = (t: number) => zeitKurz(new Date(t).toISOString(), konv);
-  const meta = { ...monoStil(11), color: rollen.gedaempft };
+  const meta = { ...monoStil('meta'), color: rollen.gedaempft };
   const prognoseY = prognoseCm != null ? g.yFuer(prognoseCm) : null;
   const lage = beschriftungsHoehen(g, RAND, BESCHRIFTUNG_ABSTAND);
   const prozent = (y: number) => `${(y / (HOEHE + 2 * RAND)) * 100}%`;
@@ -208,7 +208,7 @@ export default function Verlaufslinie({
                 x={2}
                 y={prognoseY < 12 ? prognoseY + 10 : prognoseY - 3}
                 fill={rollen.gedaempft}
-                style={{ fontFamily: monoStil(11).fontFamily, fontSize: 9 }}
+                style={{ fontFamily: monoStil('meta').fontFamily, fontSize: 9 }}
               >
                 Prognose {wasserstandMeter(prognoseCm)} m
               </text>

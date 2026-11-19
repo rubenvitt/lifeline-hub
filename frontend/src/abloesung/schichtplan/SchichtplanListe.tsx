@@ -103,7 +103,7 @@ export default function SchichtplanListe({
               }}
             >
               {wort != null && <span style={{ minWidth: '7em' }}>{wort}</span>}
-              <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>{zeit}</span>
+              <span style={{ ...monoStil('monoKlein'), whiteSpace: 'nowrap' }}>{zeit}</span>
               <span
                 style={{
                   flex: 1,

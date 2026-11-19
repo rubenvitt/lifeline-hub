@@ -1,4 +1,5 @@
-import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
+import { STAERKE_AUSGESCHRIEBEN } from '../anzeige/staerke';
 import { Button } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -100,7 +101,7 @@ export default function EinheitVorlagenTab() {
         ) : (
           <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             {vorlage.fahrzeuge.map((f) => (
-              <span key={f.fahrzeug_id} style={monoStil(12)}>
+              <span key={f.fahrzeug_id} style={monoStil('monoKlein')}>
                 {f.funkrufname}
               </span>
             ))}
@@ -108,14 +109,23 @@ export default function EinheitVorlagenTab() {
         ),
     },
     {
-      title: `Soll (${STAERKE_SCHREIBWEISE})`,
+      title: (
+        <>
+          Soll (<StaerkeSchreibweise />)
+        </>
+      ),
+      // Klartext für Spaltenschalter und feste Kopfbreite (`etikettVon`), der Titel ist ein Knoten.
+      etikett: 'Soll (F/UF/M//Σ)',
       key: 'soll',
       // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
       render: (_, { vorlage }) => {
         const quali = qualiSollTextVon(vorlage);
         return (
           <>
-            <span style={monoStil(12)} title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}>
+            <span
+              style={monoStil('monoKlein')}
+              title={vorlage.soll ? STAERKE_AUSGESCHRIEBEN : undefined}
+            >
               {sollText(vorlage)}
             </span>
             {quali ? ` · ${quali}` : null}

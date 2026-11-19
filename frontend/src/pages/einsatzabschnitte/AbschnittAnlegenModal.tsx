@@ -6,6 +6,7 @@ import { leerZuNull } from '../../api/patchTriState';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Einsatzabschnitt } from '../../api/types';
 import { ErfassungsModal } from '../../components/Erfassung';
+import { Feld } from '../../components/instrument';
 import { findKurzbezeichnungConflict, kurzbezeichnungVergeben } from './kurzbezeichnung';
 
 interface AnlegenValues {
@@ -76,11 +77,11 @@ export default function AbschnittAnlegenModal({
       }}
       onAbbrechen={onClose}
     >
-      <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+      <Feld label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
         <Input />
-      </Form.Item>
+      </Feld>
       {/* Eindeutig je Einsatz wie der Index (NOCASE): als Prüfung am Feld (LFH-1078). */}
-      <Form.Item
+      <Feld
         label="Kurzbezeichnung"
         name="kurzbezeichnung"
         rules={[
@@ -97,14 +98,14 @@ export default function AbschnittAnlegenModal({
         ]}
       >
         <Input maxLength={20} allowClear placeholder="z. B. EA-N" />
-      </Form.Item>
-      <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
+      </Feld>
+      <Feld label="Über-Abschnitt" name="ueber_abschnitt_id">
         <TreeSelect
           allowClear
           placeholder="oberster Abschnitt"
           treeData={abschnitte.map((a) => ({ value: a.id, title: a.name }))}
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

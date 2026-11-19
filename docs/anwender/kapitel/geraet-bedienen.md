@@ -33,8 +33,8 @@ Was die einzelnen Ansichten können, steht in [UHS-Tablet und UHS-Laptop](geraet
 
 Ist im Browser noch eine Person angemeldet, steht statt des Felds „Abmelden zum Koppeln“. Ist das
 Gerät schon gekoppelt, nennt die Seite „Gekoppelt als …. Ein neuer Code ersetzt die Kopplung.“
-Ein verbrauchter oder abgelaufener Code endet mit „Dieser Code gilt nicht (mehr). Lass dir bei
-der Einsatzleitung einen neuen geben.“
+Ein verbrauchter oder abgelaufener Code endet mit „Dieser Code gilt nicht (mehr). Einen neuen
+bei der Einsatzleitung holen.“
 
 ### Kopfzeile lesen
 

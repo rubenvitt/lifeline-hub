@@ -177,7 +177,11 @@ const TYPO_ABBILDUNG: Record<Schriftstufenname, string> = {
   textKlein: '--lfh-typo-text-klein',
   augenbraue: '--lfh-typo-augenbraue',
   railEtikett: '--lfh-typo-rail-etikett',
+  metaKlein: '--lfh-typo-meta-klein',
   meta: '--lfh-typo-meta',
+  monoKlein: '--lfh-typo-mono-klein',
+  mono: '--lfh-typo-mono',
+  monoGross: '--lfh-typo-mono-gross',
   datenwertKlein: '--lfh-typo-datenwert-klein',
   datenwert: '--lfh-typo-datenwert',
   datenwertGross: '--lfh-typo-datenwert-gross',
@@ -443,6 +447,24 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (Neuentwurf, 21.09
       [22, 500, 'zahl'],
       [32, 500, 'zahl'],
       [40, 500, 'zahl'],
+    ]);
+  });
+
+  it('pinnt die Mono-Stufen 10 bis 14 (LLH-1972)', () => {
+    expect(
+      [
+        schriftskala.metaKlein,
+        schriftskala.meta,
+        schriftskala.monoKlein,
+        schriftskala.mono,
+        schriftskala.monoGross,
+      ].map((s) => [s.groesse, s.gewicht, s.familie]),
+    ).toEqual([
+      [10, 400, 'zahl'],
+      [11, 400, 'zahl'],
+      [12, 400, 'zahl'],
+      [13, 400, 'zahl'],
+      [14, 400, 'zahl'],
     ]);
   });
 

@@ -57,7 +57,7 @@ import {
   verteilerNamesFromForm,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
-import { Paneel, monoStil } from '../components/instrument';
+import { Feld, Paneel, monoStil, Knopfreihe } from '../components/instrument';
 import './lageberichtPrint.css';
 import { flaeche } from '../theme/tokens';
 
@@ -236,9 +236,9 @@ function LageberichtDetail() {
             feld={a.schluessel}
             onGeaendert={markiereGeaendert}
           />
-          <Form.Item name={standFeld(a.schluessel)} noStyle>
+          <Feld name={standFeld(a.schluessel)} noStyle>
             <UebernahmeStand grenze={standGrenze} />
-          </Form.Item>
+          </Feld>
         </>
       ) : null;
     },
@@ -404,9 +404,7 @@ function LageberichtDetail() {
         }}
         aktionen={
           <div className="lagebericht-no-print">
-            {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 8 / 12 / 16 px, antds
-                Vorgabe `paddingXS` ließ 3 / 5 / 7 px. */}
-            <Space wrap size={token.marginSM}>
+            <Knopfreihe>
               {!istEntwurf && darfSchreiben && (
                 <Button
                   onClick={() => fortschreibenMutation.mutate()}
@@ -442,7 +440,7 @@ function LageberichtDetail() {
                   </Button>
                 </>
               )}
-            </Space>
+            </Knopfreihe>
           </div>
         }
       >
@@ -465,7 +463,7 @@ function LageberichtDetail() {
             Uhrzeiten für denselben Wert. Der Lesezweig rendert über `ZeitAnzeige` in der
             taktischen DTG und der Anzeigezone (der Wirestring ist UTC ohne Zonenkennung). */}
         {!schreibtEntwurf && (
-          <Typography.Paragraph type="secondary" style={monoStil(12)}>
+          <Typography.Paragraph type="secondary" style={monoStil('monoKlein')}>
             Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
           </Typography.Paragraph>
         )}
@@ -517,20 +515,20 @@ function LageberichtDetail() {
                   // Feldern gespeist (LFH-731, LLH-1172); der Kopfblock weicht im Druck
                   // (`entwurf/dokumentEntwurf.css`).
                   <>
-                    <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+                    <Feld label="Titel" name="titel" rules={[{ required: true }]}>
                       <Input />
-                    </Form.Item>
+                    </Feld>
                     {/* Feld in der Anzeigezone, Wire in UTC — frontend/AGENTS.md, „Zeiteingabe
                         in der Anzeigezone“. Nicht löschbar: `zeitstand` ist serverseitig nicht
                         nullbar, ein leeres Feld würde beim Speichern weggelassen und zeigte
                         dauerhaft etwas anderes als die DB. */}
-                    <Form.Item label="Zeitstand" name="zeitstand">
+                    <Feld label="Zeitstand" name="zeitstand">
                       <ZeitpunktEingabe
                         art="ereignis"
                         allowClear={false}
                         style={{ width: '100%' }}
                       />
-                    </Form.Item>
+                    </Feld>
                     <VerteilerField
                       sources={verteilerQuellen}
                       ohneDruckKlasse="lagebericht-no-print"

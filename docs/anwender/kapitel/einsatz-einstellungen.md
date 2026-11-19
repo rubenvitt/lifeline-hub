@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzGrenzwerte.tsx, frontend/src/abloesung/GrenzwerteModal.tsx, frontend/src/abloesung/grenzwerte.ts, src/routes/abloesung_schichtplan.rs, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, frontend/src/pages/einstellungen/EinsatzBenachrichtigungen.tsx, frontend/src/pages/einstellungen/EinsatzUnterkunft.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/routes/unterkunft_richtwerte.rs, src/benachrichtigung/vorgabe.rs, src/benachrichtigung/aufloesung.rs, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzGrenzwerte.tsx, frontend/src/abloesung/GrenzwerteModal.tsx, frontend/src/abloesung/grenzwerte.ts, src/routes/abloesung_schichtplan.rs, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, frontend/src/pages/einstellungen/EinsatzBenachrichtigungen.tsx, frontend/src/pages/einstellungen/EinsatzUnterkunft.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/routes/unterkunft_richtwerte.rs, src/benachrichtigung/vorgabe.rs, src/benachrichtigung/aufloesung.rs, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/rollenVokabular.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -158,7 +158,8 @@ Für die Einsatzleitung:
 1. Den Reiter „Module“ öffnen.
 2. Unter „Modul filtern“ einen Teil des Modulnamens eintippen.
 3. In der Zeile des Moduls „Sichtbar“ ausschalten, um es auszublenden, oder unter „Benötigte
-   Rolle“ „Führung im Einsatz“, „Führungskraft der Organisation“ oder „Admin“ wählen.
+   Rolle“ „Führung im Einsatz“, „Führungskraft der Organisation“ oder „System-Admin“ wählen.
+   Aufgeklappt steht unter jeder Stufe, wer das Modul öffnet.
 
    ![Liste „Modul-Sichtbarkeit & Berechtigungen“, gefiltert auf „Lage“: Lagebild von der Organisation ausgeblendet, Lageberichte im Einsatz ausgeblendet, Lagemeldungen nur für die Führung im Einsatz](../bilder/einsatz-einstellungen/module.png)
 
@@ -269,7 +270,7 @@ führt.
 - **„Führungskraft der Organisation“** lässt nur Führungskräfte der Organisation und
   System-Admins in das Modul. Gemeint ist die Rolle in der Organisation, nicht die im Einsatz:
   Einsatzleitung und Führungspersonal ohne diese Organisationsrolle bleiben draußen.
-- **„Admin“** lässt nur System-Admins in das Modul.
+- **„System-Admin“** lässt nur System-Admins in das Modul.
 - **„Frei (alle)“** schränkt nichts ein; es gelten die Rollen im Einsatz.
 
 Ohne eigenen Wert im Einsatz folgen „Sichtbar“ und „Benötigte Rolle“ den „Modulen für alle

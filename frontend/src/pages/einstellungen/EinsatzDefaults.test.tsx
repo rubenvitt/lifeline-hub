@@ -49,6 +49,14 @@ const VOLL = {
   geaendert_von: null,
 };
 
+/**
+ * „Speichern“ ist ohne Änderung gesperrt (LLH-1829): eine kleine Änderung am ETB-Präfix, die die
+ * Aussage des jeweiligen Tests nicht berührt.
+ */
+async function aenderePraefixEtb() {
+  fireEvent.change(await screen.findByLabelText(/^Präfix ETB/), { target: { value: 'EB2-' } });
+}
+
 function alsAdmin() {
   vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
 }
@@ -65,6 +73,7 @@ describe('EinsatzDefaults', () => {
   it('sendet beim Speichern den VOLLEN Payload — Anzeige-Felder bleiben erhalten (Vollersatz)', async () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
@@ -78,7 +87,7 @@ describe('EinsatzDefaults', () => {
         retention_dauer_tage: 90,
         skelett_dauer_tage: null,
         nachbereitung_tage: 30,
-        etb_nummer_praefix: 'EB-',
+        etb_nummer_praefix: 'EB2-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
         einsatz_nummer_praefix: 'WF-',
@@ -149,7 +158,7 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     await userEvent.type(await screen.findByLabelText('Dauer Personenauskunft (Tage)'), '0');
     await userEvent.type(
-      screen.getByLabelText('Rechtsgrundlage Personenauskunft'),
+      screen.getByLabelText(/^Rechtsgrundlage Personenauskunft/),
       ' § 46 Abs. 5 BHKG NRW ',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -244,6 +253,7 @@ describe('EinsatzDefaults', () => {
     client.setQueryData(['einsatz-meldungen', 7, 'intern'], []);
     renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
@@ -323,7 +333,7 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(client.getQueryState(['einsatz-modul-freigaben', 7])?.isInvalidated).toBe(true),
@@ -342,7 +352,7 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(client.getQueryState(['einsatz-modul-vorgaben', 7])?.isInvalidated).toBe(true),
@@ -359,7 +369,7 @@ describe('EinsatzDefaults', () => {
 
     const etbSelect = await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' });
     fireEvent.mouseDown(etbSelect);
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', {
@@ -375,13 +385,17 @@ describe('EinsatzDefaults', () => {
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
     // Dieselben vier Stufen wie im Einsatz, in derselben Reihenfolge (`ROLLEN_OPTIONEN`).
     await screen.findByText('Führung im Einsatz');
-    const optionen = [...document.querySelectorAll('.ant-select-item-option-content')];
-    expect(optionen.map((o) => o.textContent)).toEqual([
+    const optionen = [...document.querySelectorAll('.ant-select-item-option')];
+    expect(optionen.map((o) => o.getAttribute('title'))).toEqual([
       'Frei (alle)',
       'Führung im Einsatz',
       'Führungskraft der Organisation',
-      'Admin',
+      'System-Admin',
     ]);
+    // Unter jedem Namen steht, wer das Modul öffnet (LLH-1818).
+    expect(optionen[1]).toHaveTextContent(
+      'Einsatzleitung, Führungspersonal, Führungskraft der Organisation, System-Admin',
+    );
     fireEvent.click(await screen.findByText('Führung im Einsatz'));
 
     await waitFor(() =>
@@ -399,7 +413,7 @@ describe('EinsatzDefaults', () => {
       fireEvent.mouseDown(
         await screen.findByRole('combobox', { name: `Benötigte Rolle: ${modul}` }),
       );
-      const optionen = await screen.findAllByText('Admin');
+      const optionen = await screen.findAllByText('System-Admin');
       fireEvent.click(optionen[optionen.length - 1]);
       await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledTimes(i + 1));
     }
@@ -436,7 +450,7 @@ describe('EinsatzDefaults', () => {
     expect([container.textContent, ...platzhalter].join(' ')).not.toMatch(/Default|Fallback/);
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
     expect(await screen.findByText('Modul-Vorgabe gespeichert')).toBeInTheDocument();
   });
@@ -488,7 +502,7 @@ describe('EinsatzDefaults', () => {
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeChecked();
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
 
     await waitFor(() =>
@@ -530,7 +544,7 @@ describe('EinsatzDefaults', () => {
       ).not.toBeDisabled(),
     );
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
     await waitFor(() =>
       expect(setzeOrgModulEinstellung).toHaveBeenLastCalledWith('lagebesprechung', {
@@ -606,6 +620,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     const treffer = await screen.findByText('Startwert zu groß');
     expect(treffer.closest('.ant-message')).toBeNull();
@@ -618,6 +633,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
       .mockResolvedValue({ ...VOLL } as never);
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Startwert zu groß');
 
@@ -653,12 +669,13 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     vi.mocked(setzeOrgModulEinstellung).mockRejectedValue(new ApiError(409, 'Modul gesperrt'));
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Startwert zu groß');
 
     const etb = screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' });
     fireEvent.mouseDown(etb);
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     // Beide stehen, nebeneinander.
     expect(await screen.findByText('Modul gesperrt')).toBeInTheDocument();

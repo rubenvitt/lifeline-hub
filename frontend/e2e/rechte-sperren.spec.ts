@@ -196,7 +196,7 @@ test('LFH-966 Benutzerverwaltung: eigenes Konto gesperrt, ein anderes ohne Rück
   );
   await expect(
     eigenesMenue.getByRole('menuitem', {
-      name: /^Deaktivieren gesperrt: (eigenes Konto|letzter aktiver Admin)$/,
+      name: /^Deaktivieren gesperrt: (eigenes Konto|letzter aktiver System-Admin)$/,
     }),
   ).toHaveAttribute('aria-disabled', 'true');
   await page.keyboard.press('Escape');

@@ -674,8 +674,8 @@ ebenso; Bestätigen lehnt er dann ab.
 Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit der nächsten
 Meldung an und zeigt sie im Verlauf. Erklären zwei ELW ohne Verbindung beide eine Notübernahme
 gegen denselben Hub, behält der Hub die zuerst gemeldete. Der andere ELW zeigt nach seiner
-nächsten Meldung das Hinweisband „Deine Notübernahme hat am Hub nicht gegriffen, die Führung
-liegt bei …“ (war seine Führung keine Notübernahme: „Die Führung liegt am Hub bei …, nicht hier“),
+nächsten Meldung das Hinweisband „Die Notübernahme dieser Instanz hat am Hub nicht gegriffen,
+die Führung liegt bei …“ (war seine Führung keine Notübernahme: „Die Führung liegt am Hub bei …, nicht hier“),
 und seine Einsatzleitung bekommt die Benachrichtigung „Führung übernommen“. Bis
 jemand „Übernahme bestätigen“ wählt, schreibt er weiter; widersprechen lässt sich hier nicht,
 denn der Hub nähme den Widerspruch nicht an. Mit dem Bestätigen wird der Einsatz dort zum

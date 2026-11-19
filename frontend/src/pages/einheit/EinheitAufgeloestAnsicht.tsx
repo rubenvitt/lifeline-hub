@@ -11,6 +11,8 @@ import {
   Datenraster,
   monoStil,
   Paneel,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -32,6 +34,8 @@ interface EinheitAufgeloestAnsichtProps {
   rechte: Pick<EinheitRechte, 'hasPersonalLink' | 'hasFahrzeugLink'>;
   /** `dataUpdatedAt` der Liste der aufgelösten Einheiten. */
   stand: number;
+  /** Hinweis über der Seite, etwa ein gescheiterter Neuabruf (LLH-1975). */
+  hinweis?: ReactNode;
 }
 
 /**
@@ -49,6 +53,7 @@ export default function EinheitAufgeloestAnsicht({
   einheit,
   rechte,
   stand,
+  hinweis,
 }: EinheitAufgeloestAnsichtProps) {
   const { token, rollen } = useRollen();
   const { zeitKurz } = useAnzeigeKonventionen();
@@ -63,9 +68,15 @@ export default function EinheitAufgeloestAnsicht({
     minHeight: token.controlHeight,
   } as const;
   const nebentext = (text: string | null | undefined) =>
-    text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
+    text ? (
+      <Textstufe stufe="textKlein" ton="gedaempft">
+        {text}
+      </Textstufe>
+    ) : null;
   const leer = (text: string) => (
-    <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{text}</span>
+    <Textstufe stufe="textKlein" ton="gedaempft">
+      {text}
+    </Textstufe>
   );
 
   const person = (p: LetztePerson) => (
@@ -78,7 +89,7 @@ export default function EinheitAufgeloestAnsicht({
         )}
       </span>
       {p.ist_fuehrer && (
-        <span style={{ ...monoStil(11), color: rollen.text2 }} title="Einheitsführer">
+        <span style={{ ...monoStil('meta'), color: rollen.text2 }} title="Einheitsführer">
           EF
         </span>
       )}
@@ -92,7 +103,7 @@ export default function EinheitAufgeloestAnsicht({
       </ul>
     );
   const fahrzeug = (f: LetztesFahrzeug) => (
-    <span style={monoStil(13)}>
+    <span style={monoStil('mono')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: f.ef_id })}>
           {f.funkrufname}
@@ -133,7 +144,7 @@ export default function EinheitAufgeloestAnsicht({
             <div role="group" aria-label="Ohne Fahrzeug">
               {fahrzeuge.length > 0 && (
                 <div style={zeile}>
-                  <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
+                  <Augenbraue>Ohne Fahrzeug</Augenbraue>
                 </div>
               )}
               {personen(ohneFahrzeug)}
@@ -148,7 +159,7 @@ export default function EinheitAufgeloestAnsicht({
               {besetzung.material.map((m) => (
                 <li key={m.em_id} data-lfh="aufgeloest-material" style={zeile}>
                   {m.bezeichnung}
-                  <span style={monoStil(13)}>×{m.menge}</span>
+                  <span style={monoStil('mono')}>×{m.menge}</span>
                 </li>
               ))}
             </ul>
@@ -178,8 +189,10 @@ export default function EinheitAufgeloestAnsicht({
         </>
       }
       dataUpdatedAt={stand}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={hinweis ?? undefined}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <Paneel titel="Kopfdaten">
           <Datenraster beschriftung="Kopfdaten">
             <Datenfeld label="Aufgelöst" mono>
@@ -209,7 +222,7 @@ export default function EinheitAufgeloestAnsicht({
             lesend
           />
         </Paneel>
-      </div>
+      </Stapel>
     </EinsatzSeite>
   );
 }

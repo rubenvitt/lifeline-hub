@@ -105,7 +105,7 @@ function ArtenAuswahl({
             return (
               <Checkbox key={a} value={a} disabled={grund != null} data-lfh={`webhook-art-${a}`}>
                 {ART_TEXT[a]}{' '}
-                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{a}</span>
+                <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{a}</span>
                 {grund && <span style={{ color: rollen.gedaempft }}>{` · ${grund}`}</span>}
               </Checkbox>
             );
@@ -552,15 +552,15 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
           <PaneelZeile key={`${v.at}-${i}`}>
             <div data-lfh="webhook-versuch">
               <Stapel richtung="zeile" umbruch abstand="md" ausrichten="baseline">
-                <span style={monoStil(12)}>{zeitKurz(v.at, konv)}</span>
-                <span style={monoStil(12)}>
+                <span style={monoStil('monoKlein')}>{zeitKurz(v.at, konv)}</span>
+                <span style={monoStil('monoKlein')}>
                   {v.test ? 'Test' : v.ereignis_id != null ? `#${v.ereignis_id}` : '—'}
                 </span>
                 <span style={{ color: v.erfolg ? rollen.text : rollen.achtungText }}>
                   {versuchText(v)}
                 </span>
                 <span
-                  style={{ ...monoStil(12), color: rollen.gedaempft }}
+                  style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}
                 >{`${v.dauer_ms} ms`}</span>
               </Stapel>
             </div>

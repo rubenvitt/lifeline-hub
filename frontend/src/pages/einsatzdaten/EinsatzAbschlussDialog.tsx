@@ -24,6 +24,8 @@ import {
   monoStil,
   type PaneelDatenzustand,
   schriftStil,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../../components/instrument';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
@@ -145,7 +147,7 @@ export default function EinsatzAbschlussDialog({
   einsatz: EinsatzKopf;
   onSchliessen: () => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm<AbschlussWerte>();
@@ -187,8 +189,6 @@ export default function EinsatzAbschlussDialog({
   const ohneNetzUngeladen =
     daten == null && pruefung.isPending && pruefung.fetchStatus === 'paused';
 
-  const absatz = { ...schriftStil('text'), color: rollen.text, margin: 0 } as const;
-
   return (
     <ErfassungsModal<AbschlussWerte>
       offen
@@ -210,71 +210,72 @@ export default function EinsatzAbschlussDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <div
-        data-lfh="abschluss-dialog"
-        style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
-      >
-        <Datenraster spalten={2} beschriftung="Einsatz">
-          <Datenfeld label="Bezeichnung">{einsatz.bezeichnung}</Datenfeld>
-          {hatNummer && (
-            <Datenfeld label="Einsatznummer" mono>
-              {einsatz.einsatznummer_intern}
-            </Datenfeld>
-          )}
-        </Datenraster>
+      <div data-lfh="abschluss-dialog">
+        <Stapel abstand="sm">
+          <Datenraster spalten={2} beschriftung="Einsatz">
+            <Datenfeld label="Bezeichnung">{einsatz.bezeichnung}</Datenfeld>
+            {hatNummer && (
+              <Datenfeld label="Einsatznummer" mono>
+                {einsatz.einsatznummer_intern}
+              </Datenfeld>
+            )}
+          </Datenraster>
 
-        <section aria-labelledby={offenId} data-lfh="abschluss-offen">
-          <Augenbraue als="h3" id={offenId}>
-            Noch offen
-          </Augenbraue>
-          {ohneNetzUngeladen ? (
-            <div
-              data-lfh="abschluss-offen-offline"
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: token.marginSM,
-                padding: token.padding,
-              }}
-            >
-              <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
-                {PRUEFUNG_OHNE_NETZ}
-              </span>
-              <Button onClick={() => void pruefung.refetch()}>{PANEEL_NEULADEN}</Button>
-            </div>
-          ) : (
-            <PaneelZustand
-              zustand={zustand}
-              titel="Noch offen"
-              leerText="Nichts offen"
-              onNeuladen={() => void pruefung.refetch()}
-            >
-              {daten && (
-                <OffenePunkte einsatzId={einsatz.id} pruefung={daten} freigaben={freigaben} />
-              )}
-            </PaneelZustand>
-          )}
-        </section>
+          <section aria-labelledby={offenId} data-lfh="abschluss-offen">
+            <Augenbraue als="h3" id={offenId}>
+              Noch offen
+            </Augenbraue>
+            {ohneNetzUngeladen ? (
+              <div
+                data-lfh="abschluss-offen-offline"
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: token.marginSM,
+                  padding: token.padding,
+                }}
+              >
+                <Textstufe stufe="meta" ton="gedaempft">
+                  {PRUEFUNG_OHNE_NETZ}
+                </Textstufe>
+                <Button onClick={() => void pruefung.refetch()}>{PANEEL_NEULADEN}</Button>
+              </div>
+            ) : (
+              <PaneelZustand
+                zustand={zustand}
+                titel="Noch offen"
+                leerText="Nichts offen"
+                onNeuladen={() => void pruefung.refetch()}
+              >
+                {daten && (
+                  <OffenePunkte einsatzId={einsatz.id} pruefung={daten} freigaben={freigaben} />
+                )}
+              </PaneelZustand>
+            )}
+          </section>
 
-        {/* Beide Sätze in einem Absatz: der Dialog bleibt mit allen Gruppen in der Höhe eines
+          {/* Beide Sätze in einem Absatz: der Dialog bleibt mit allen Gruppen in der Höhe eines
             Führungsplatzes (1440 × 900). */}
-        <p style={absatz}>
-          <span data-lfh="abschluss-kraefte-satz">{KRAEFTE_SATZ}</span>{' '}
-          <span data-lfh="abschluss-kopplung-satz">{KOPPLUNG_SATZ}</span>
-        </p>
+          <Textstufe als="p">
+            <span data-lfh="abschluss-kraefte-satz">{KRAEFTE_SATZ}</span>{' '}
+            <span data-lfh="abschluss-kopplung-satz">{KOPPLUNG_SATZ}</span>
+          </Textstufe>
 
-        <Form.Item
-          label={
-            hatNummer
-              ? 'Zur Bestätigung Einsatznummer oder Bezeichnung eintippen'
-              : 'Zur Bestätigung Bezeichnung eintippen'
-          }
-          name="bestaetigung"
-          style={{ marginBottom: 0 }}
-        >
-          <Input autoComplete="off" spellCheck={false} />
-        </Form.Item>
+          {/* Letztes Feld des Dialogs: ohne Feldabstand darunter. `Feld` kennt das noch nicht
+              (Folgeaufgabe zu LLH-1971), deshalb hier noch `Form.Item`. */}
+          <Form.Item
+            label={
+              hatNummer
+                ? 'Zur Bestätigung Einsatznummer oder Bezeichnung eintippen'
+                : 'Zur Bestätigung Bezeichnung eintippen'
+            }
+            name="bestaetigung"
+            style={{ marginBottom: 0 }}
+          >
+            <Input autoComplete="off" spellCheck={false} />
+          </Form.Item>
+        </Stapel>
       </div>
     </ErfassungsModal>
   );
@@ -295,7 +296,11 @@ function OffenePunkte({
   const sprung = (modul: string, ziel: string, name: string) =>
     istKeyFreigegeben(modul, freigaben) ? { ziel, name } : undefined;
   const meta = { ...schriftStil('meta'), color: rollen.gedaempft } as const;
-  const nummerStil = { ...monoStil(12), color: rollen.gedaempft, flex: '0 0 auto' } as const;
+  const nummerStil = {
+    ...monoStil('monoKlein'),
+    color: rollen.gedaempft,
+    flex: '0 0 auto',
+  } as const;
 
   const eintragZeile = (kennung: (nr: number) => string) => (e: AbschlussEintrag) => (
     <div style={zeilenStil}>

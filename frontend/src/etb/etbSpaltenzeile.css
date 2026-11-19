@@ -1,7 +1,7 @@
 /*
  * Leseansicht des ETB (Change `kwc2yszv-etb-neuentwurf`, design.md D1, Spec
  * `etb-zeitachse-darstellung`): Spaltenzeile, Spaltenkopf, Handschirm-Zeile, eingeklappter Inhalt.
- * Maße aus dem Entwurf `docs/design/2026-11-12-etb/Main.dc.html` (Zeit 15, Inhalt 14, Von → An 13,
+ * Maße aus dem Entwurf `docs/design/2026-11-12-etb/Main.dc.html` (Zeit 15, Inhalt 14, Von → An 13 — gesetzt in der Stufe `text`, 14 —,
  * Typ und Vermerk 12 px; nichts darunter). Spaltenspuren: `etb/etbSpalten.ts`.
  */
 
@@ -33,7 +33,7 @@
    (`components/Markdown.css`). Ein Systemeintrag setzt `--etb-inhalt-groesse` auf 12 px (leise). */
 .etb-spaltenzeile .etb-inhalt,
 .etb-handschirmzeile .etb-inhalt {
-  font-size: var(--etb-inhalt-groesse, 14px);
+  font-size: var(--etb-inhalt-groesse, var(--lfh-typo-text-groesse));
   line-height: 20px;
 }
 
@@ -80,7 +80,7 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--lfh-typo-text-klein-groesse);
   color: var(--lfh-bedien-text);
   cursor: pointer;
   white-space: nowrap;
@@ -98,7 +98,7 @@
   gap: var(--lfh-luft-2);
   min-width: 0;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--lfh-typo-text-klein-groesse);
   color: var(--lfh-gedaempft);
 }
 

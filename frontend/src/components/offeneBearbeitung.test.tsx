@@ -201,7 +201,10 @@ describe('offene Bearbeitung · eine zur Zeit', () => {
     const user = userEvent.setup();
     rendern();
     await user.click(screen.getByRole('button', { name: 'Vorname bearbeiten' }));
-    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    // Per Tastatur geöffnet: ein Klick wäre ein Klick daneben und schlösse das unveränderte
+    // Vorname-Feld schon jetzt (LLH-1829).
+    screen.getByRole('button', { name: 'Name eintragen' }).focus();
+    await user.keyboard('{Enter}');
     expect(screen.getByRole('textbox', { name: 'Vorname' })).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'M');
     expect(screen.queryByRole('textbox', { name: 'Vorname' })).toBeNull();

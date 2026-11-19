@@ -14,6 +14,7 @@ import type {
   VerpflegungsstellePatch,
 } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
+import { Feld } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
@@ -153,7 +154,7 @@ export function StelleDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<StelleWerte>
+      <Feld<StelleWerte>
         name="bezeichnung"
         label="Bezeichnung"
         rules={[
@@ -165,21 +166,21 @@ export function StelleDialog({
           placeholder="z. B. Feldküche BR Sportplatz"
           count={zeichenGrenze(VERPFLEGUNG_STELLE_BEZEICHNUNG_MAX)}
         />
-      </Form.Item>
-      <Form.Item<StelleWerte>
+      </Feld>
+      <Feld<StelleWerte>
         name="art"
         label="Art"
         rules={[{ required: true, message: 'Bitte eine Art wählen' }]}
       >
         <Select options={ART_OPTIONEN} />
-      </Form.Item>
-      <Form.Item<StelleWerte> name="standort" label="Standort" rules={[standortRegel]}>
+      </Feld>
+      <Feld<StelleWerte> name="standort" label="Standort" rules={[standortRegel]}>
         <EinsatzOrtsfeld
           einsatzId={einsatzId}
           etikett="Standort"
           count={zeichenGrenze(VERPFLEGUNG_STANDORT_MAX)}
         />
-      </Form.Item>
+      </Feld>
       {hasAbschnitte && (
         // `forceRender` ist TRAGEND: sonst fehlt der Abschnitt in `onFinish`.
         <Collapse
@@ -190,18 +191,14 @@ export function StelleDialog({
               label: ['Weitere Angaben', abschnittName].filter(Boolean).join(' · '),
               forceRender: true,
               children: (
-                <Form.Item<StelleWerte>
-                  name="abschnitt_id"
-                  label="Einsatzabschnitt"
-                  style={{ marginBottom: 0 }}
-                >
+                <Feld<StelleWerte> name="abschnitt_id" label="Einsatzabschnitt">
                   <Select
                     allowClear
                     placeholder="ohne Abschnitt"
                     options={[...abschnitte]}
                     notFoundContent="Keine Einsatzabschnitte angelegt"
                   />
-                </Form.Item>
+                </Feld>
               ),
             },
           ]}

@@ -9,7 +9,7 @@ import {
 import { useState } from 'react';
 import { Button, Dropdown, Input, Modal, Radio, Space, Typography } from 'antd';
 import { Select } from '../../components/Select';
-import { useRollen } from '../../components/instrument';
+import { Stapel, Textstufe, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import type { KartenAnsicht } from '../../api/types';
 
@@ -156,11 +156,11 @@ export default function AnsichtSwitcher({
 
   return (
     // Kein Außenabstand: die Polsterung des Paneels „Kartenansicht" trägt den Abstand.
-    <div>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+    <Stapel abstand="xs">
+      <Textstufe stufe="textKlein" ton="gedaempft">
         Ansicht
-      </Typography.Text>
-      <Space.Compact block style={{ marginTop: token.marginXS }}>
+      </Textstufe>
+      <Space.Compact block>
         <Select<number>
           style={{ flex: 1 }}
           value={aktive?.id}
@@ -204,7 +204,7 @@ export default function AnsichtSwitcher({
         onCancel={schliesseName}
         destroyOnHidden
       >
-        <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
+        <Stapel abstand="sm">
           <Input
             autoFocus
             placeholder="Name der Ansicht"
@@ -213,7 +213,7 @@ export default function AnsichtSwitcher({
             onPressEnter={bestaetigeName}
             aria-label="Ansichts-Name"
           />
-          {/* Nur mit Grund: ein leeres Kind hielte in `Space` trotzdem seinen Abstand. */}
+          {/* Nur mit Grund: ein leeres Kind hielte im Stapel trotzdem seinen Abstand. */}
           {dialogFehler != null &&
             (nameDialog?.modus === 'neu' ? (
               <SpeicherFehler
@@ -224,7 +224,7 @@ export default function AnsichtSwitcher({
             ) : (
               <SpeicherFehler fehler={dialogFehler} />
             ))}
-        </Space>
+        </Stapel>
       </Modal>
 
       <Modal
@@ -248,10 +248,10 @@ export default function AnsichtSwitcher({
           value={objektBehandlung}
           onChange={(e) => setObjektBehandlung(e.target.value)}
         >
-          <Space orientation="vertical">
+          <Stapel abstand="xs">
             <Radio value="freigeben">Auf allen Ansichten sichtbar machen (empfohlen)</Radio>
             <Radio value="loeschen">Mitlöschen</Radio>
-          </Space>
+          </Stapel>
         </Radio.Group>
         {dialogFehler != null && (
           <div style={{ marginTop: token.marginSM }}>
@@ -263,6 +263,6 @@ export default function AnsichtSwitcher({
           </div>
         )}
       </Modal>
-    </div>
+    </Stapel>
   );
 }

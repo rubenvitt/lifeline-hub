@@ -4,7 +4,7 @@ import { oeffneEinsatzWieder } from '../../api/einsaetze';
 import { ETB_INHALT_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { ErfassungsModal } from '../../components/Erfassung';
-import { schriftStil, useRollen } from '../../components/instrument';
+import { Feld, schriftStil, useRollen } from '../../components/instrument';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import { SOFORT_ODER_NIE } from './EinsatzAbschlussDialog';
 
@@ -75,7 +75,7 @@ export default function EinsatzWiedereroeffnenDialog({
       >
         {WIEDEREROEFFNEN_SATZ}
       </p>
-      <Form.Item
+      <Feld
         label="Grund"
         name="grund"
         rules={[
@@ -84,7 +84,7 @@ export default function EinsatzWiedereroeffnenDialog({
         ]}
       >
         <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

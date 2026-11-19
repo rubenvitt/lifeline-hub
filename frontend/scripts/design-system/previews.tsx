@@ -66,6 +66,7 @@ import {
   Segmentleiste,
   Marke,
   Stapel,
+  Knopfreihe,
   Status,
   StatusBlock,
   StatusKnopf,
@@ -88,6 +89,8 @@ import { VerbindungenAngabe } from '../../src/components/VerbindungenFeld';
 import type { KommunikationsVerbindung } from '../../src/api/types';
 import { OffeneBearbeitungProvider } from '../../src/components/offeneBearbeitung';
 import { useSpeicherLeiste } from '../../src/components/speicherLeiste';
+import SpeicherKnopf from '../../src/components/SpeicherKnopf';
+import { AenderungsstandProvider } from '../../src/components/aenderungsstand';
 import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
 import { VORLAGEN } from '../../src/befehle/vorlagen';
 import StammdatenFeld, { type Vorschlagsquelle } from '../../src/components/StammdatenFeld';
@@ -269,20 +272,31 @@ function BearbeitbaresPaneelBeispiel() {
   return <RouterProvider router={router} />;
 }
 
+/**
+ * Speicherleiste mit `SpeicherKnopf` (LLH-1829): oben ein geändertes Feld (Punkt am Etikett,
+ * „1 Änderung“, Knopf bedienbar), unten dasselbe ohne Änderung (gesperrt, „Keine Änderungen“).
+ */
 function SpeicherleisteBeispiel() {
   const leiste = useSpeicherLeiste({ hasAbbrechen: true });
-  return (
+  const leiste2 = useSpeicherLeiste({ hasAbbrechen: true });
+  const beispiel = (ausgang: string, l: typeof leiste) => (
     <Form layout="vertical" initialValues={{ bezeichnung: 'Bereitstellungsraum Nord' }}>
-      <Form.Item label="Bezeichnung" name="bezeichnung">
-        <Input />
-      </Form.Item>
-      <div {...leiste}>
-        <Button type="primary" htmlType="submit">
-          Speichern
-        </Button>
-        <Button>Abbrechen</Button>
-      </div>
+      <AenderungsstandProvider ausgangswerte={{ bezeichnung: ausgang }}>
+        <Feld label="Bezeichnung" name="bezeichnung">
+          <Input />
+        </Feld>
+        <div {...l}>
+          <SpeicherKnopf />
+          <Button>Abbrechen</Button>
+        </div>
+      </AenderungsstandProvider>
     </Form>
+  );
+  return (
+    <Stapel abstand="lg">
+      {beispiel('Bereitstellungsraum', leiste)}
+      {beispiel('Bereitstellungsraum Nord', leiste2)}
+    </Stapel>
   );
 }
 
@@ -1580,6 +1594,37 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     },
   },
   {
+    name: 'Knopfreihe',
+    title: 'Knopfreihe (Knöpfe nebeneinander, Abstand md)',
+    group: 'Flächen',
+    height: 260,
+    source: 'components/instrument/Knopfreihe.tsx',
+    content: () => (
+      <Stapel abstand="lg">
+        <Stapel abstand="xs">
+          <Textstufe stufe="meta" ton="schwach">
+            Kopf, Paneel, Zeile: Primär vorn
+          </Textstufe>
+          <Knopfreihe>
+            <Button type="primary">Personal disponieren</Button>
+            <Button>Ad-hoc-Person</Button>
+          </Knopfreihe>
+        </Stapel>
+        <Stapel abstand="xs">
+          <Textstufe stufe="meta" ton="schwach">
+            fuss: rechtsbündig, Primär hinten
+          </Textstufe>
+          <Knopfreihe fuss>
+            <Button>Abbrechen</Button>
+            <Button type="primary" danger>
+              Abschnitt auflösen
+            </Button>
+          </Knopfreihe>
+        </Stapel>
+      </Stapel>
+    ),
+  },
+  {
     name: 'MetaZeile',
     title: 'MetaZeile (Nebenangaben eines Datensatzes)',
     group: 'Daten',
@@ -2095,9 +2140,9 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'Speicherleiste',
-    title: 'Speicherleiste',
+    title: 'Speicherleiste (SpeicherKnopf, Punkt am geänderten Feld)',
     group: 'Formular',
-    height: 371,
+    height: 520,
     source: 'components/speicherLeiste.ts',
     docAnchor: 'export function speicherLeisteStil',
     content: () => <SpeicherleisteBeispiel />,

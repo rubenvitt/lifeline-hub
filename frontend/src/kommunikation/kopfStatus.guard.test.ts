@@ -33,14 +33,22 @@ const KOEPFE = [
  * Guard nicht aus dem falschen Grund rot färbt. Findet der Schnitt den Anker nicht, WIRFT er:
  * eine leere Menge machte jede Abwesenheits-Aussage trivial wahr.
  *
- * BLINDFLECK: ein verschachteltes `<Space>` in der Gruppe schließt den Schnitt zu früh. Davor
+ * BLINDFLECK: ein verschachteltes `<Space>`/`<Stapel>` in der Gruppe schließt den Schnitt zu früh. Davor
  * fällt es laut auf, dahinter bliebe ein `<Tag color=…>` unsichtbar; heute trägt der Kopf kein
  * zweites `Space`.
  */
 function etikettengruppe(inhalt: string, datei: string): string {
-  const auf = inhalt.indexOf('<Space size={token.marginSM} wrap');
-  if (auf === -1) throw new Error(`${datei}: keine Etikettengruppe im Kopf gefunden`);
-  const zu = inhalt.indexOf('</Space>', auf);
+  // Zwei Formen: `Space` (Bestand) oder `Stapel` als umbrechende Zeile (LLH-1971).
+  const anker = [
+    ['<Space size={token.marginSM} wrap', '</Space>'],
+    ['<Stapel richtung="zeile" umbruch', '</Stapel>'],
+  ] as const;
+  const treffer = anker
+    .map(([offen, schluss]) => ({ auf: inhalt.indexOf(offen), schluss }))
+    .find(({ auf }) => auf !== -1);
+  if (!treffer) throw new Error(`${datei}: keine Etikettengruppe im Kopf gefunden`);
+  const { auf, schluss } = treffer;
+  const zu = inhalt.indexOf(schluss, auf);
   if (zu === -1) throw new Error(`${datei}: Etikettengruppe nicht geschlossen`);
   return inhalt.slice(auf, zu);
 }

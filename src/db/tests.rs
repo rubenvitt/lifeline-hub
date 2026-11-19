@@ -14667,3 +14667,95 @@ async fn migration_stab_presse_entfernen_loescht_tabellen_und_spalte() {
         .unwrap();
     eprintln!("SQLite {version}");
 }
+
+/// LLH-1816 (Design-Doc D2): Die Migration koppelt die Start-Stichworte bestehender
+/// Organisationen nur, wo nichts entschieden ist: exakter Starttext, noch ohne Vorlage, Vorlage
+/// mit dem Startnamen in derselben Organisation, kein vom Hub verteilter Vorschlag.
+#[tokio::test]
+async fn migration_0357_koppelt_start_stichworte_behutsam() {
+    // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+    const VERSION: i64 = 357;
+    let pool = pool_bis(
+        SqliteConnectOptions::new().filename(":memory:"),
+        VERSION - 1,
+    )
+    .await;
+    // Die Herkunftszeile braucht keine echte Instanzkopplung.
+    sqlx::query("PRAGMA foreign_keys = OFF")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'A'), (2, 'B')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    async fn vorlage(pool: &SqlitePool, org: i64, name: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_vorlage (org_id, bezeichnung) VALUES (?, ?) RETURNING id",
+        )
+        .bind(org)
+        .bind(name)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+    async fn vorschlag(pool: &SqlitePool, org: i64, text: &str, vorlage: Option<i64>) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_stichwort_vorschlag (org_id, text, vorlage_id) \
+             VALUES (?, ?, ?) RETURNING id",
+        )
+        .bind(org)
+        .bind(text)
+        .bind(vorlage)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+    let manv_a = vorlage(&pool, 1, "MANV").await;
+    let klein_a = vorlage(&pool, 1, "Kleinlage").await;
+    let manv_b = vorlage(&pool, 2, "MANV").await;
+    let manv15 = vorschlag(&pool, 1, "MANV15", None).await;
+    let b2 = vorschlag(&pool, 1, "B2", None).await;
+    let b3_hand = vorschlag(&pool, 1, "B3", Some(manv_a)).await;
+    let uebung = vorschlag(&pool, 1, "Übung", None).await;
+    let h1 = vorschlag(&pool, 1, "H1", None).await;
+    let b4_ohne_vorlage = vorschlag(&pool, 1, "B4", None).await;
+    let manv7_hub = vorschlag(&pool, 1, "MANV7", None).await;
+    sqlx::query(
+        "INSERT INTO stammdaten_herkunft \
+           (kopplung_org_id, org_id, art, fremder_schluessel, lokaler_schluessel) \
+         VALUES (1, 1, 'stichwort_vorschlag', 'x', CAST(? AS TEXT))",
+    )
+    .bind(manv7_hub)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let manv50_b = vorschlag(&pool, 2, "MANV50", None).await;
+
+    migriere_bis(&pool, VERSION).await;
+
+    let kopplung = |id: i64| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, Option<i64>>(
+                "SELECT vorlage_id FROM einsatz_stichwort_vorschlag WHERE id = ?",
+            )
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    assert_eq!(kopplung(manv15).await, Some(manv_a));
+    assert_eq!(kopplung(b2).await, Some(klein_a));
+    assert_eq!(kopplung(b3_hand).await, Some(manv_a), "Handkopplung bleibt");
+    assert_eq!(kopplung(uebung).await, None, "Übung bleibt ohne Vorlage");
+    assert_eq!(kopplung(h1).await, None, "kein Starttext");
+    assert_eq!(kopplung(b4_ohne_vorlage).await, None, "Vorlage fehlt");
+    assert_eq!(kopplung(manv7_hub).await, None, "Hub-Zeile bleibt");
+    assert_eq!(
+        kopplung(manv50_b).await,
+        Some(manv_b),
+        "nur eigene Organisation"
+    );
+}

@@ -14,7 +14,7 @@ import type {
   SchichtplanHelferBody,
 } from '../../api/types';
 import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
-import { Datenfeld, Datenraster, monoStil, useRollen } from '../../components/instrument';
+import { Datenfeld, Datenraster, Feld, monoStil, useRollen } from '../../components/instrument';
 import { MODUL_PERSONAL_GESPERRT } from '../../components/nurAnsicht';
 import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
 import { nachText, werteAus } from '../../components/katalogVergleich';
@@ -120,20 +120,20 @@ function HelferDialog({
           {helfer.herkunft && <Datenfeld label="Herkunft">{helfer.herkunft}</Datenfeld>}
         </Datenraster>
       )}
-      <Form.Item<HelferWerte>
+      <Feld<HelferWerte>
         label="Name"
         name="name"
         rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
       >
         <Input maxLength={SCHICHTPLAN_HELFER_TEXT_MAX} />
-      </Form.Item>
-      <Form.Item<HelferWerte> label="Organisation" name="organisation">
+      </Feld>
+      <Feld<HelferWerte> label="Organisation" name="organisation">
         <Input placeholder="z. B. DLRG" maxLength={SCHICHTPLAN_HELFER_TEXT_MAX} />
-      </Form.Item>
-      <Form.Item<HelferWerte> label="Telefon" name="telefon">
+      </Feld>
+      <Feld<HelferWerte> label="Telefon" name="telefon">
         <Input maxLength={SCHICHTPLAN_HELFER_TELEFON_MAX} inputMode="tel" />
-      </Form.Item>
-      <Form.Item<HelferWerte>
+      </Feld>
+      <Feld<HelferWerte>
         label="Qualifikationen"
         name="qualifikationen"
         rules={[
@@ -152,7 +152,7 @@ function HelferDialog({
           loading={qualiQuery.isLoading}
           options={(qualiQuery.data ?? []).map((q) => ({ value: q.id, label: q.label }))}
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }
@@ -289,7 +289,7 @@ export default function HelferListe({
             suchText: (h: SchichtplanHelfer) => h.kennung,
             sorter: nachText((h: SchichtplanHelfer) => h.kennung),
             render: (_: unknown, h: SchichtplanHelfer) =>
-              h.kennung ? <span style={monoStil(13)}>{h.kennung}</span> : '—',
+              h.kennung ? <span style={monoStil('mono')}>{h.kennung}</span> : '—',
           } satisfies KatalogSpalte<SchichtplanHelfer>,
         ]
       : []),

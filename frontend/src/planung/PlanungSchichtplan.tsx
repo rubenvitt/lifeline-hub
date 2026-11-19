@@ -133,13 +133,15 @@ export default function PlanungSchichtplan({
           style={{ flex: 'none' }}
         />
       ) : (
-        <Select<string>
-          aria-label="Zeitspanne"
-          value={wahl}
-          onChange={setWahl}
-          options={spannenOptionen.map((o) => ({ value: o.wert, label: o.label }))}
-          style={{ minWidth: 160 }}
-        />
+        // Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite.
+        <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+          <Select<string>
+            aria-label="Zeitspanne"
+            value={wahl}
+            onChange={setWahl}
+            options={spannenOptionen.map((o) => ({ value: o.wert, label: o.label }))}
+          />
+        </div>
       ),
     canWrite: !readOnly,
     isErzeugenDisabled: planung.posten.length === 0,

@@ -84,7 +84,7 @@ for (const breite of [1280, 390]) {
     await wechsleZu(page, konto);
     await page.goto(etbPfad(b));
     await insFeld();
-    const abfrage = page.getByRole('group', { name: 'Mit welchem Rufnamen schreibst du ins ETB?' });
+    const abfrage = page.getByRole('group', { name: 'Mit welchem Rufnamen ins ETB schreiben?' });
     await expect(
       abfrage.getByRole('combobox', { name: 'Rufname für Von und An', exact: true }),
     ).toHaveValue('Florian B');

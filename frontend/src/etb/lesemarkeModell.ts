@@ -11,7 +11,7 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
  * markieren" keinen Stand, den es zurückschicken könnte.
  *
  * Ohne Marke nennt der Satz KEINE Sichtung — die Person hat das Tagebuch nie als gesichtet
- * markiert, und „seit Ihrer letzten Sichtung" behauptete einen Zeitpunkt, den es nicht gibt.
+ * markiert, und „seit der letzten Sichtung" behauptete einen Zeitpunkt, den es nicht gibt.
  *
  * Die Zeit ist die Rolle „kurz“ des Formatkerns (LLH-1061): heute „um 1304“, sonst mit Tag
  * („212230“ bzw. „21.09. 22:30“); „heute" bestimmt `zeitKurz` in derselben Zone wie die Uhrzeit.
@@ -21,9 +21,7 @@ export function lesemarkeText(marke: EtbLesemarke, konv: AnzeigeKonventionen): s
   if (n <= 0 || marke.hoechste_lfd_nr == null) return null;
 
   if (!marke.gesichtet_at) {
-    return n === 1
-      ? '1 Eintrag, den Sie noch nicht gesichtet haben'
-      : `${n} Einträge, die Sie noch nicht gesichtet haben`;
+    return n === 1 ? '1 noch nicht gesichteter Eintrag' : `${n} noch nicht gesichtete Einträge`;
   }
 
   const menge = n === 1 ? '1 neuer Eintrag' : `${n} neue Einträge`;
@@ -31,7 +29,7 @@ export function lesemarkeText(marke: EtbLesemarke, konv: AnzeigeKonventionen): s
   const heute = inZone(new Date().toISOString(), konv);
   const kurz = zeitKurz(marke.gesichtet_at, konv);
   const wann = d.isSame(heute, 'day') ? `um ${kurz}` : kurz;
-  return `${menge} seit Ihrer letzten Sichtung ${wann}`;
+  return `${menge} seit der letzten Sichtung ${wann}`;
 }
 
 /**

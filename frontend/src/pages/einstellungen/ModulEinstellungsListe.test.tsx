@@ -63,7 +63,7 @@ describe('ModulEinstellungsListe', () => {
     renderMitProviders(<ModulEinstellungsListe {...props} />);
 
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() => expect(props.aufRolle).toHaveBeenCalledWith('etb', 'admin'));
   });

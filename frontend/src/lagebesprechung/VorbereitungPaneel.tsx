@@ -8,7 +8,7 @@ import type { AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
 import type { EinsatzAnzeige, LagebesprechungStand, ModulFreigaben } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import { Paneel, PaneelZeile, Textstufe, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -43,7 +43,7 @@ export default function VorbereitungPaneel({
   besprechungZustand,
   besprechungStand,
 }: Props) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
   const ohneNetz = useOhneVerbindung();
   const navigate = useNavigate();
@@ -142,12 +142,12 @@ export default function VorbereitungPaneel({
               {z.wert}
             </span>
             {/* Quelle unter der Bezeichnung, Notiz unter dem Wert. */}
-            <span style={{ color: rollen.gedaempft, fontSize: token.fontSizeSM }}>
+            <Textstufe stufe="textKlein" ton="gedaempft">
               Quelle: {z.quelle}
-            </span>
-            <span style={{ color: rollen.gedaempft, fontSize: token.fontSizeSM }}>
+            </Textstufe>
+            <Textstufe stufe="textKlein" ton="gedaempft">
               {z.notiz ?? ''}
-            </span>
+            </Textstufe>
           </div>
         </PaneelZeile>
       ))}

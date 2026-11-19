@@ -1,6 +1,6 @@
 import { Button, Card, Space, Switch, Typography } from 'antd';
 import { Select } from '../../components/Select';
-import { monoStil, useRollen } from '../../components/instrument';
+import { Stapel, Textstufe, monoStil, useRollen } from '../../components/instrument';
 import RadiusEingabe from '../../components/RadiusEingabe';
 import type { ZoneTyp } from '../../api/types';
 import EscKappe from './EscKappe';
@@ -91,28 +91,30 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
         minWidth: 'min(320px, 100%)',
       }}
     >
-      <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
-        <div style={zeile}>
+      <Stapel abstand="sm">
+        <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte">
           <Typography.Text strong>
             {props.bezirk != null ? `Bezirk ${props.bezirk} · Kreis` : 'Kreis'}
           </Typography.Text>
           {props.bezirk != null ? null : bearbeiten ? (
-            <Typography.Text>{zoneTypLabel(props.typ)}</Typography.Text>
+            <Textstufe>{zoneTypLabel(props.typ)}</Textstufe>
           ) : (
-            <Select<ZoneTyp>
-              aria-label="Art"
-              value={props.typ}
-              disabled={sperre}
-              style={{ minWidth: 168 }}
-              options={KREIS_TYPEN.map((t) => ({ value: t.typ, label: t.label }))}
-              onChange={(typ) =>
-                props.onTyp(typ, typ === 'freie_skizze' ? FREIE_SKIZZE_VORGABEFARBE : undefined)
-              }
-            />
+            // Mindestbreite über die Hülle; das Raster streckt die Auswahl auf ihre Breite.
+            <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+              <Select<ZoneTyp>
+                aria-label="Art"
+                value={props.typ}
+                disabled={sperre}
+                options={KREIS_TYPEN.map((t) => ({ value: t.typ, label: t.label }))}
+                onChange={(typ) =>
+                  props.onTyp(typ, typ === 'freie_skizze' ? FREIE_SKIZZE_VORGABEFARBE : undefined)
+                }
+              />
+            </div>
           )}
-        </div>
+        </Stapel>
         <div style={zeile} data-lfh="kreis-mitte">
-          <Typography.Text type="secondary">Mitte</Typography.Text>
+          <Textstufe ton="gedaempft">Mitte</Textstufe>
           <Typography.Text style={{ ...monoStil(token.fontSize), color: rollen.text }}>
             {props.mitte && props.mitteText ? props.mitteText : '—'}
           </Typography.Text>
@@ -138,17 +140,15 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
           />
         </div>
         {props.onSerieWechsel && (
-          <Space>
+          <Stapel richtung="zeile" abstand="xs" ausrichten="mitte">
             <Switch
               checked={!!props.serie}
               onChange={props.onSerieWechsel}
               aria-label="Weitere zeichnen"
             />
-            <Typography.Text>Weitere zeichnen</Typography.Text>
-            {gespeichert > 0 && (
-              <Typography.Text type="secondary">{gespeichert} gespeichert</Typography.Text>
-            )}
-          </Space>
+            <Textstufe>Weitere zeichnen</Textstufe>
+            {gespeichert > 0 && <Textstufe ton="gedaempft">{gespeichert} gespeichert</Textstufe>}
+          </Stapel>
         )}
         <Space wrap>
           <Button type="primary" disabled={!bereit} loading={sperre} onClick={props.onUebernehmen}>
@@ -156,7 +156,7 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
           </Button>
           {beenden}
         </Space>
-      </Space>
+      </Stapel>
     </Card>
   );
 }

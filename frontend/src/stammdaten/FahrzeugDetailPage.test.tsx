@@ -169,7 +169,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     renderRoute('/admin/stammdaten/fahrzeuge/7');
 
     await nutzer.clear(await screen.findByLabelText('OPTA'));
-    await nutzer.type(screen.getByLabelText('OPTA'), 'FL MUS 02');
+    await nutzer.type(screen.getByLabelText(/^OPTA/), 'FL MUS 02');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
@@ -202,6 +202,8 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
   it('mit Admin-Recht ist derselbe Knopf bedienbar', async () => {
     handler(admin);
     renderRoute('/admin/stammdaten/fahrzeuge/7');
+    // Ohne Änderung ist „Speichern“ gesperrt (LLH-1829); bedienbar heißt: nach einer Änderung.
+    await userEvent.type(await screen.findByLabelText('Bemerkung'), ' neu');
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeEnabled();
   });
 
@@ -229,7 +231,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     const { client } = renderRoute('/admin/stammdaten/fahrzeuge/7');
 
     await nutzer.clear(await screen.findByLabelText('Bemerkung'));
-    await nutzer.type(screen.getByLabelText('Bemerkung'), 'Mein Entwurf');
+    await nutzer.type(screen.getByLabelText(/^Bemerkung/), 'Mein Entwurf');
 
     await act(async () => {
       await client.invalidateQueries({ queryKey: globalKeys.fahrzeugeListe('alle') });
@@ -242,7 +244,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     expect(await screen.findByRole('heading', { name: 'Florian 9' })).toBeInTheDocument();
     expect(abrufe).toBe(2);
 
-    expect(screen.getByLabelText('Bemerkung')).toHaveValue('Mein Entwurf');
+    expect(screen.getByLabelText(/^Bemerkung/)).toHaveValue('Mein Entwurf');
   });
 
   it('leitet eine kaputte Route-ID auf die Liste um, statt einen leeren Datensatz zu zeigen', async () => {
@@ -290,7 +292,7 @@ describe('FahrzeugDetailPage — Verlassen-Schutz (LFH-979)', () => {
     await nutzer.click(screen.getByRole('link', { name: 'Fahrzeuge' }));
     const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await nutzer.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
-    expect(screen.getByLabelText('Kennzeichen')).toHaveValue('XX-CD 2');
+    expect(screen.getByLabelText(/^Kennzeichen/)).toHaveValue('XX-CD 2');
 
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
     await screen.findByText('Fahrzeug gespeichert');

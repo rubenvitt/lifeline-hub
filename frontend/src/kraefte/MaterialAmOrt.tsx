@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { setzeMaterialStatus, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
-import { monoStil, useRollen } from '../components/instrument';
+import { FELD_KLASSE, Stapel, monoStil, useRollen } from '../components/instrument';
 import type { WeitereAktionen } from '../components/Datensicht';
 import { KennungsLink } from '../components/kennungsLink';
 import { MODUL_MATERIAL_GESPERRT } from '../components/nurAnsicht';
@@ -106,14 +106,16 @@ function loesenName(bezeichnung: string, loesenText: string): string {
 }
 
 /**
- * Die Auswahl füllt ihre Zeile bis 420 px (schmal die ganze Breite), ein Grund daneben bricht
- * darunter. Ihre Einträge brechen um statt abzuschneiden: der Ort steht am Ende des Etiketts
+ * Die Auswahl füllt ihre Zeile bis zur Feldstufe `mittel` (schmal die ganze Breite), ein Grund
+ * daneben bricht darunter. Ihre Einträge brechen um statt abzuschneiden: der Ort steht am Ende des Etiketts
  * („Wolldecke · 30 von 50 übrig · Staffel A“) und unterscheidet gleichnamige Posten
  * (Prüfliste Teil II).
  */
-const AUSWAHL_STIL = { flex: '1 1 240px', maxWidth: 420, minWidth: 0 } as const;
-const auswahlZeile = (gap: number) =>
-  ({ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap }) as const;
+const AUSWAHL_HUELLE = {
+  flex: '1 1 240px',
+  maxWidth: 'var(--lfh-feld-mittel)',
+  minWidth: 0,
+} as const;
 const wrapLabel = (o: { label?: ReactNode }) => (
   <span style={{ whiteSpace: 'normal' }}>{o.label}</span>
 );
@@ -325,7 +327,7 @@ export default function MaterialAmOrt({
           {showKopfzahl && (
             <span
               data-testid="material-am-ort-kopf"
-              style={{ ...monoStil(12), color: rollen.gedaempft }}
+              style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}
             >
               {materialKopfzahl(posten)}
             </span>
@@ -390,7 +392,7 @@ export default function MaterialAmOrt({
               <span {...(isGeloest ? {} : kontext.ausloeser(p))}>{p.bezeichnung}</span>
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
               {/* Eine Zahl bricht nicht um. */}
-              <span style={{ ...monoStil(13), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
+              <span style={{ ...monoStil('mono'), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
               {/* Statuswahl und „Rückgängig“ teilen ein Gitterfeld (LLH-1722, Spec `material-am-ort`):
                   der Rückweg steht in der gehaltenen Zeile, aber nie an der Stelle des Lösen-Knopfs,
                   den ein zweiter Tipp träfe. */}
@@ -509,22 +511,23 @@ export default function MaterialAmOrt({
       {darfSchreiben && (
         <div style={{ marginTop: token.marginSM }}>
           {sperre != null || !angebot ? (
-            <div style={auswahlZeile(token.marginXS)}>
-              <Select
-                style={AUSWAHL_STIL}
-                placeholder="Material zuordnen …"
-                aria-label="Material zuordnen"
-                value={null}
-                disabled
-                aria-describedby={sperre ? grundId : undefined}
-              />
+            <Stapel richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
+              <div className={FELD_KLASSE} style={AUSWAHL_HUELLE}>
+                <Select
+                  placeholder="Material zuordnen …"
+                  aria-label="Material zuordnen"
+                  value={null}
+                  disabled
+                  aria-describedby={sperre ? grundId : undefined}
+                />
+              </div>
               {erfassenKnopf}
               {sperre && (
                 <Typography.Text type="secondary" id={grundId}>
                   {sperre}
                 </Typography.Text>
               )}
-            </div>
+            </Stapel>
           ) : (
             <ZuordnenAuswahl
               einsatzId={einsatzId}
@@ -609,7 +612,6 @@ function ZuordnenAuswahl({
   erfassen,
 }: ZuordnenAuswahlProps) {
   const grundId = useId();
-  const { token } = useRollen();
   const { kontext } = useMaterialOrtKontext(einsatzId, false, angebot.data);
   const materialGesperrt = useSprungSperre(einsatzId)('material');
   const optionen = useMemo(
@@ -621,25 +623,26 @@ function ZuordnenAuswahl({
   const fehler = angebot.data === undefined && angebot.isError;
   const leer = angebot.data !== undefined && optionen.length === 0;
   return (
-    <div style={auswahlZeile(token.marginXS)}>
-      <Select<string>
-        style={AUSWAHL_STIL}
-        placeholder="Material zuordnen …"
-        aria-label="Material zuordnen"
-        value={null}
-        loading={laeuft || angebot.data === undefined}
-        disabled={fehler || leer}
-        aria-describedby={fehler || leer ? grundId : undefined}
-        options={optionen}
-        optionRender={wrapLabel}
-        onSelect={(wert) => {
-          const p = angebot.data?.find((x) => String(x.id) === wert);
-          if (!p) return;
-          // Ohne Leserecht am bisherigen Ort hieße die Ergebniszeile sonst „…, zugeordnet 30“.
-          const bisher = ortText(ortVon(p), kontext.namen);
-          onWaehlen(p, bisher === ZUGEORDNET ? 'am bisherigen Ort' : bisher);
-        }}
-      />
+    <Stapel richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
+      <div className={FELD_KLASSE} style={AUSWAHL_HUELLE}>
+        <Select<string>
+          placeholder="Material zuordnen …"
+          aria-label="Material zuordnen"
+          value={null}
+          loading={laeuft || angebot.data === undefined}
+          disabled={fehler || leer}
+          aria-describedby={fehler || leer ? grundId : undefined}
+          options={optionen}
+          optionRender={wrapLabel}
+          onSelect={(wert) => {
+            const p = angebot.data?.find((x) => String(x.id) === wert);
+            if (!p) return;
+            // Ohne Leserecht am bisherigen Ort hieße die Ergebniszeile sonst „…, zugeordnet 30“.
+            const bisher = ortText(ortVon(p), kontext.namen);
+            onWaehlen(p, bisher === ZUGEORDNET ? 'am bisherigen Ort' : bisher);
+          }}
+        />
+      </div>
       {erfassen}
       {fehler && (
         <Typography.Text type="danger" id={grundId}>
@@ -660,6 +663,6 @@ function ZuordnenAuswahl({
           )}
         </Typography.Text>
       )}
-    </div>
+    </Stapel>
   );
 }

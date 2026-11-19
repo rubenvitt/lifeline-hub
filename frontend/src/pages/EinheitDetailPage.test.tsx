@@ -1,3 +1,4 @@
+import { ganzerText } from '../test/kuerzel';
 import { describe, expect, it } from 'vitest';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import { delay, http, HttpResponse, type HttpHandler } from 'msw';
@@ -420,7 +421,7 @@ describe('EinheitDetailPage · die Route selbst', () => {
   it('trägt das Stärke-Etikett in BOS-Fachsprache', async () => {
     server.use(...handlers());
     rendere();
-    expect(await screen.findByText('Soll-Stärke (F/UF/M//Σ)')).toBeInTheDocument();
+    expect(await screen.findByText(ganzerText('Soll-Stärke (F/UF/M//Σ)'))).toBeInTheDocument();
     // Keine Eingaberegel als Satz: die Summe zeigt `StaerkeEingabe` live (LFH-1078).
     expect(screen.queryByText(/alle drei Werte/)).not.toBeInTheDocument();
   });
@@ -547,6 +548,44 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
     expect(await screen.findByRole('heading', { name: 'Florian 1', level: 1 })).toBeInTheDocument();
+  });
+
+  it('gescheiterter Neuabruf des Einsatzes: die aufgelöste Einheit bleibt, Hinweis zeigt den alten Stand (LLH-1975)', async () => {
+    const { handler } = mitAufgeloesten([aufgeloest]);
+    server.use(handler, ...handlers());
+    const { client } = rendere('/einsaetze/1/einheiten/20');
+    await screen.findByRole('heading', { name: 'Florian 1', level: 1 });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    );
+    await act(() => client.refetchQueries({ queryKey: einsatzKeys.einsatz(1) }));
+
+    expect(
+      await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Florian 1', level: 1 })).toBeInTheDocument();
+    expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+  });
+
+  it('gescheiterte Gliederung mit altem Stand ohne die Einheit: Fehlerseite statt „gibt es nicht (mehr)“ (LLH-1975)', async () => {
+    const client = neuerQueryClient();
+    client.setQueryDefaults(einsatzKeys.einheiten(1), { gcTime: Infinity });
+    client.setQueryData(einsatzKeys.einheiten(1), einheiten);
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+      ...handlers(),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einheiten/:einheitId" element={<EinheitDetailPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einheiten/20', client },
+    );
+    expect(await screen.findByText('Gliederung konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
   });
 
   it('eine aktive Einheit fragt die aufgelösten nicht ab', async () => {
@@ -807,6 +846,38 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
 });
 
 describe('EinheitDetailPage · Datenzustände', () => {
+  // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
+  // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
+  it.each(['', '/einheiten'] as const)(
+    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite bleibt, Hinweis zeigt den alten Stand',
+    async (unterpfad) => {
+      const { client } = zeige();
+      await screen.findByRole('heading', { name: '1. Zug', level: 1 });
+
+      server.use(
+        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        ),
+      );
+      await act(() => client.refetchQueries());
+
+      expect(
+        await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '1. Zug', level: 1 })).toBeInTheDocument();
+      expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
+      expect(screen.queryByText('Gliederung konnte nicht geladen werden')).toBeNull();
+    },
+  );
+
+  it('gescheiterter Erstabruf des Einsatzes zeigt weiter die Fehlerseite', async () => {
+    zeige(
+      http.get('/api/einsaetze/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    );
+    expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+  });
+
   it('gescheiterter Typkatalog: das Auswahlfeld nennt den Ausfall', async () => {
     zeige(http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })));
     await userEvent.click(await screen.findByRole('button', { name: 'Typ bearbeiten' }));

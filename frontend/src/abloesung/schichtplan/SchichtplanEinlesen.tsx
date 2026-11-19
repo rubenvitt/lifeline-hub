@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Modal, Spin, Typography, Upload } from 'antd';
+import { Alert, Button, Modal, Spin, Typography, Upload } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 import { SCHICHTPLAN_DATEI_MAX_BYTES } from '../../api/eingabegrenzen';
@@ -6,7 +6,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { schichtplanEinlesen, schichtplanEinlesenVorschau } from '../../api/schichtplan';
 import type { SchichtplanEntscheidungenEingabe, SchichtplanImportErgebnis } from '../../api/types';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { useRollen } from '../../components/instrument';
+import { Stapel } from '../../components/instrument';
 import { IconHochladen } from '../../icons';
 import { ImportVorschauAnsicht, LEERE_WAHL, zaehlungMarken } from './ImportVorschauAnsicht';
 import { Marke } from '../../components/instrument/Marke';
@@ -30,7 +30,6 @@ interface SchichtplanEinlesenProps {
 /** Knopf „Schichtplan einlesen“ mit seinem Dialog. */
 export default function SchichtplanEinlesen({ einsatzId }: SchichtplanEinlesenProps) {
   const qc = useQueryClient();
-  const { token } = useRollen();
   const grundId = useId();
   const [offen, setOffen] = useState(false);
   const [datei, setDatei] = useState<File | null>(null);
@@ -96,7 +95,7 @@ export default function SchichtplanEinlesen({ einsatzId }: SchichtplanEinlesenPr
       Schließen
     </Button>
   ) : (
-    <Flex gap={token.marginSM} justify="end" align="center" wrap>
+    <Stapel richtung="zeile" umbruch abstand="sm" verteilen="ende" ausrichten="mitte">
       {sperrGrund != null && (
         <Typography.Text type="secondary" id={grundId} data-lfh="einlesen-gesperrt">
           {sperrGrund}
@@ -114,7 +113,7 @@ export default function SchichtplanEinlesen({ einsatzId }: SchichtplanEinlesenPr
       >
         Übernehmen
       </Button>
-    </Flex>
+    </Stapel>
   );
 
   return (
@@ -141,19 +140,21 @@ export default function SchichtplanEinlesen({ einsatzId }: SchichtplanEinlesenPr
       >
         <div data-lfh="schichtplan-einlesen">
           {ergebnis ? (
-            <Flex vertical gap={token.marginSM} data-lfh="einlesen-ergebnis">
-              <Typography.Text strong>
-                {ergebnis.zaehlung.aenderungen === 0 ? 'Nichts geändert' : 'Übernommen'}
-              </Typography.Text>
-              <Flex gap={token.marginXS} wrap>
-                {zaehlungMarken(ergebnis.zaehlung).map((m) => (
-                  <Marke key={m}>{m}</Marke>
-                ))}
-              </Flex>
-            </Flex>
+            <div data-lfh="einlesen-ergebnis">
+              <Stapel abstand="sm">
+                <Typography.Text strong>
+                  {ergebnis.zaehlung.aenderungen === 0 ? 'Nichts geändert' : 'Übernommen'}
+                </Typography.Text>
+                <Stapel richtung="zeile" umbruch abstand="xs">
+                  {zaehlungMarken(ergebnis.zaehlung).map((m) => (
+                    <Marke key={m}>{m}</Marke>
+                  ))}
+                </Stapel>
+              </Stapel>
+            </div>
           ) : (
-            <Flex vertical gap={token.margin}>
-              <Flex gap={token.marginSM} align="center" wrap>
+            <Stapel abstand="md">
+              <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
                 <Upload
                   accept={ACCEPT}
                   showUploadList={false}
@@ -187,7 +188,7 @@ export default function SchichtplanEinlesen({ einsatzId }: SchichtplanEinlesenPr
                     Excel
                   </a>
                 </Typography.Text>
-              </Flex>
+              </Stapel>
               {dateiFehler != null && <Alert type="error" showIcon title={dateiFehler} />}
               <SpeicherFehler fehler={vorschauMut.error} titel="Datei nicht gelesen" />
               <SpeicherFehler fehler={uebernehmenMut.error} titel="Nicht übernommen" />
@@ -202,7 +203,7 @@ export default function SchichtplanEinlesen({ einsatzId }: SchichtplanEinlesenPr
                   />
                 </Spin>
               )}
-            </Flex>
+            </Stapel>
           )}
         </div>
       </Modal>

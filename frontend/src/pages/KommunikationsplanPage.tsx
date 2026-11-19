@@ -38,7 +38,14 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { NUR_VORLESER, Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import {
+  NUR_VORLESER,
+  Paneel,
+  PaneelZeile,
+  Stapel,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -157,7 +164,7 @@ function StelleZelle({ zeile: p }: { zeile: PlanZeile }) {
       {z.kanaele.length > 0 && (
         <Flex wrap data-lfh="stelle-kanaele" gap={token.marginXS}>
           {z.kanaele.map((k) => (
-            <span key={k} style={monoStil(12)}>
+            <span key={k} style={monoStil('monoKlein')}>
               <Gedaempft>{k}</Gedaempft>
             </span>
           ))}
@@ -171,26 +178,30 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
   const { token } = useRollen();
   if (verbindungen.length === 0) return <Gedaempft>—</Gedaempft>;
   return (
-    <Flex vertical gap={token.marginXXS}>
+    <Stapel abstand="xxs">
       {verbindungen.map((v) => (
-        <Flex key={v.schluessel} wrap align="baseline" gap={token.marginXS}>
+        <Stapel key={v.schluessel} richtung="zeile" umbruch abstand="xs" ausrichten="baseline">
           {v.mittelLabel && <Gedaempft>{v.mittelLabel}</Gedaempft>}
           {v.wert &&
             (v.verweis ? (
               // Ein Bedienziel wie die Zeilenziele des Stabs: Höhe aus `controlHeight` (Gate 3).
               <a
                 href={v.verweis}
-                style={{ ...linkZeilenzielStil(token), ...monoStil(14), overflowWrap: 'anywhere' }}
+                style={{
+                  ...linkZeilenzielStil(token),
+                  ...monoStil('monoGross'),
+                  overflowWrap: 'anywhere',
+                }}
               >
                 {v.wert}
               </a>
             ) : (
-              <span style={{ ...monoStil(14), overflowWrap: 'anywhere' }}>{v.wert}</span>
+              <span style={{ ...monoStil('monoGross'), overflowWrap: 'anywhere' }}>{v.wert}</span>
             ))}
           {v.hinweis && <Gedaempft>{v.hinweis}</Gedaempft>}
-        </Flex>
+        </Stapel>
       ))}
-    </Flex>
+    </Stapel>
   );
 }
 
@@ -717,7 +728,7 @@ export default function KommunikationsplanPage() {
                   ) : (
                     <>
                       <span>Leitstelle</span>
-                      <span style={monoStil(14, 500)}>—</span>
+                      <span style={monoStil('monoGross', 500)}>—</span>
                       {/* Ohne Stellen fehlt alles; sonst fehlt nur die Skizze (Spec-Delta). */}
                       <Gedaempft>
                         {stellen.zustand !== 'daten'

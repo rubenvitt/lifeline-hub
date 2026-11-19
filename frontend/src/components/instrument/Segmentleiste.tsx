@@ -284,7 +284,7 @@ export default function Segmentleiste<W extends string | number>({
             )}
             {o.label}
             {mitZahl && (
-              <span data-lfh="segment-zahl" style={monoStil(12)}>
+              <span data-lfh="segment-zahl" style={monoStil('monoKlein')}>
                 {o.zahl}
               </span>
             )}
@@ -459,7 +459,7 @@ export function SegmentUmschalter({
             />
           )}
           {label}
-          {zahl != null && <span style={monoStil(11)}>{zahl}</span>}
+          {zahl != null && <span style={monoStil('meta')}>{zahl}</span>}
         </button>
       </span>
     </div>

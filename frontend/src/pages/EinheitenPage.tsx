@@ -2,7 +2,7 @@ import { App, Breadcrumb, Button, Form, Input } from 'antd';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import { monoStil } from '../components/instrument';
+import { Feld, monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import {
   SeitenFehler,
@@ -98,7 +98,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       // neben der Farbe (WCAG 1.4.1). „Soll erfüllt“ bliebe ein Grün-Teppich.
       render: (_t, z) => (
         <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <span style={monoStil(12)}>{staerkeText(z.ist)}</span>
+          <span style={monoStil('monoKlein')}>{staerkeText(z.ist)}</span>
           {z.urteil === 'unterbesetzt' && (
             // `umbrechen` nimmt antds Außenrand rechts (8 px) weg: er verbreiterte die Spalte.
             <Status darstellung={einheitStaerkeUrteil.unterbesetzt} umbrechen />
@@ -110,7 +110,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       title: 'Soll',
       key: 'soll',
       width: 88,
-      render: (_t, z) => <span style={monoStil(12)}>{staerkeText(z.soll)}</span>,
+      render: (_t, z) => <span style={monoStil('monoKlein')}>{staerkeText(z.soll)}</span>,
     },
     {
       title: 'Abschnitt',
@@ -128,7 +128,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       // 11-|1“ läse sich als zwei Fahrzeuge), nur zwischen den Namen.
       render: (_t, z) =>
         z.fahrzeuge.length > 0 ? (
-          <span data-lfh="einheit-fahrzeuge" style={monoStil(12)}>
+          <span data-lfh="einheit-fahrzeuge" style={monoStil('monoKlein')}>
             {z.fahrzeuge.length} ·{' '}
             {z.fahrzeuge.map((f, i) => (
               <Fragment key={`${i}-${f}`}>
@@ -439,21 +439,21 @@ export default function EinheitenPage() {
         onAbbrechen={() => setBildenOffen(false)}
       >
         {vorlagen.length > 0 && (
-          <Form.Item label="Vorlage" name="vorlage_id">
+          <Feld label="Vorlage" name="vorlage_id">
             <Select<number>
               allowClear
               showSearch={SUCHTEXT_SUCHE}
               placeholder="ohne Vorlage"
               options={vorlagenOptionen(vorlagen)}
             />
-          </Form.Item>
+          </Feld>
         )}
         {gewaehlteVorlage == null && (
           <>
-            <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
+            <Feld label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
               <Input placeholder="z. B. 2. Zug" maxLength={EINHEIT_NAME_MAX} />
-            </Form.Item>
-            <Form.Item label="Typ" name="typ_id">
+            </Feld>
+            <Feld label="Typ" name="typ_id">
               <Select
                 allowClear
                 placeholder="Typ wählen"
@@ -462,7 +462,7 @@ export default function EinheitenPage() {
                 })}
                 options={(typenQuery.data ?? []).map((t) => ({ value: t.id, label: t.label }))}
               />
-            </Form.Item>
+            </Feld>
           </>
         )}
       </ErfassungsModal>

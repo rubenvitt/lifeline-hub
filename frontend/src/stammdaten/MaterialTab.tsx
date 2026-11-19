@@ -122,7 +122,7 @@ export default function MaterialTab() {
       dataIndex: 'bestandsnummer',
       key: 'bestandsnummer',
       sorter: nachText((m: Material) => m.bestandsnummer),
-      render: (t) => (t ? <span style={monoStil(13)}>{t}</span> : '—'),
+      render: (t) => (t ? <span style={monoStil('mono')}>{t}</span> : '—'),
     },
     {
       title: 'Träger',

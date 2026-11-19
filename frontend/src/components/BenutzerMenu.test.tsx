@@ -272,7 +272,7 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
   /*
    * LLH-1730 löst D11 (LLH-1642) ab: „Profil“ und „Abmelden“ stehen in KEINER Dichte mehr
    * nebeneinander, Profil hat die volle Zeile. Der knappe Kopf im Handschuh-Betrieb bleibt (Rollen
-   * neben dem Namen, Benutzername und Version in einer Zeile), Gegenprobe `komfortabel`.
+   * neben dem Namen, darunter der Benutzername ohne Version), Gegenprobe `komfortabel`.
    */
   it.each([
     ['handschuh', true],
@@ -292,10 +292,16 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     expect(eintraege.indexOf(profil)).toBe(0);
     const kopf = screen.getByTestId('benutzermenue-kopf');
     expect(kopf.textContent).toContain(`@${benutzer.benutzername}`);
-    expect(
-      within(kopf).queryByText(`@${benutzer.benutzername} · Version ${__APP_VERSION__}`),
-    ).toEqual(knapp ? expect.anything() : null);
-    expect(within(kopf).getAllByText(new RegExp(`Version ${__APP_VERSION__}`))).toHaveLength(1);
+    // Knapp ohne Version (LLH-1818): die Marke „Führungskraft der Organisation“ bräche den Kopf
+    // sonst um eine Zeile, und „Helligkeit“ läge am Handy unter dem Rand. Die Version steht in
+    // der Hilfe.
+    expect(within(kopf).queryAllByText(new RegExp(`Version ${__APP_VERSION__}`))).toHaveLength(
+      knapp ? 0 : 1,
+    );
+    // Knapp in einer Zeile: ein langer Benutzername endet mit „…“ und steht ganz im Titel.
+    const zeile = within(kopf).getByText(`@${benutzer.benutzername}`).parentElement!;
+    expect(zeile.style.whiteSpace).toBe(knapp ? 'nowrap' : '');
+    expect(zeile.getAttribute('title')).toBe(knapp ? `@${benutzer.benutzername}` : null);
   });
 
   it('der Menükopf nennt die Funktion auch unter xl', async () => {

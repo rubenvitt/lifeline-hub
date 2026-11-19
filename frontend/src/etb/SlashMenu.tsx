@@ -1,4 +1,4 @@
-import { Typography, theme } from 'antd';
+import { theme } from 'antd';
 import {
   forwardRef,
   useEffect,
@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { schriftStil } from '../components/instrument';
 import type { EtbBaustein, EtbTyp } from '../api/types';
 import { filterSlashEintraege, type MetaFeld, type SlashEintrag } from './schnellerfassungModell';
 
@@ -177,16 +178,16 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
           Mindesthöhe bekommt sie NICHT. Das ist dieselbe Trennlinie, die der
           Dichte-Guard zwischen interaktiven Elementen und Flächen wie `Card` zieht.
         */}
-        <Typography.Text
-          type="secondary"
+        <span
           style={{
-            fontSize: 11,
+            ...schriftStil('textKlein'),
+            color: token.colorTextSecondary,
             padding: `${token.paddingXS}px ${token.padding}px`,
             display: 'block',
           }}
         >
           {titel}
-        </Typography.Text>
+        </span>
         {eintraege.map((e, i) => {
           const idx = offset + i;
           return (
@@ -224,9 +225,9 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
                 <small
                   style={{
                     marginInlineStart: token.marginXS,
+                    ...schriftStil('textKlein'),
                     color: token.colorTextSecondary,
                     fontFamily: token.fontFamilyCode,
-                    fontSize: 12,
                   }}
                 >
                   {e.hinweis}

@@ -159,10 +159,27 @@ pub async fn fordere_enabled(pool: &SqlitePool) -> Result<(), AppError> {
 /// `einsatzliste`) und einen Vollabgleich (`lagged`). Der Wechsel kann am Einsatz geschrieben haben,
 /// ohne dass der Aufrufer es erfährt: Wird ein Spiegel eigen und ist seine Nummer hier belegt,
 /// steht danach ein Systemeintrag im ETB (LLH-1703). `lagged` lässt offene Schirme alles neu
-/// laden, wie nach jeder Lieferung im Abgleich (`spiegel::abgleich::melde_live`).
+/// laden, wie nach jeder Lieferung im Abgleich (`spiegel::abgleich::melde_live`). Den Eintrag selbst
+/// verteilt sie mit seiner ID (`src/AGENTS.md`, „Backend — ETB live verteilen“, LLH-1976): der
+/// Aufrufer kennt ihn nicht, also der jüngste Umnummerierungs-Eintrag des Einsatzes. Kommt er bei
+/// einem späteren Wechsel noch einmal, ersetzt der Schirm nur, was er schon hat.
 pub async fn notify_wechsel(pool: &SqlitePool, live: &crate::live::LiveHub, einsatz_id: i64) {
+    use crate::instanz::spiegel::fuehrung::NUMMER_EINTRAG_ANFANG;
     crate::live::org::kopf_melden(pool, live, einsatz_id, &[]).await;
     live.publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Lagged);
+    let nummer_eintrag: Result<Option<i64>, sqlx::Error> = sqlx::query_scalar(
+        "SELECT MAX(id) FROM etb_eintrag WHERE einsatz_id = ? AND substr(inhalt, 1, ?) = ?",
+    )
+    .bind(einsatz_id)
+    .bind(NUMMER_EINTRAG_ANFANG.chars().count() as i64)
+    .bind(NUMMER_EINTRAG_ANFANG)
+    .fetch_one(pool)
+    .await;
+    match nummer_eintrag {
+        Ok(Some(etb_id)) => live.publiziere(einsatz_id, etb_id),
+        Ok(None) => {}
+        Err(e) => tracing::warn!(einsatz_id, error = %e, "Umnummerierungs-Eintrag nicht lesbar"),
+    }
 }
 
 /// Schreibt beim Start den Schalter. An: die Akten entscheiden, Spiegel folgen ihnen. Aus: es

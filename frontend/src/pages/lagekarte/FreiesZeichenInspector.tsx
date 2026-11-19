@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Space } from 'antd';
+import { Button, Popconfirm } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { parseAnySpec, serializeAnySpec } from '@einsatzzeichen/core/exact';
 import type {
@@ -14,7 +14,7 @@ import FreiesZeichenPicker, {
   type ZeichenEntwurf,
 } from './FreiesZeichenPicker';
 import AnsichtZuordnung from './AnsichtZuordnung';
-import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
+import { Datenfeld, Datenraster, Stapel, useRollen } from '../../components/instrument';
 import {
   ALT_FELDER,
   altform,
@@ -193,7 +193,7 @@ export default function FreiesZeichenInspector({
       onSchliessen={onSchliessen}
     >
       {darfSchreiben ? (
-        <Space orientation="vertical" style={{ width: '100%' }}>
+        <Stapel abstand="xs">
           {/* Entprellt: im Raster meldet jeder Pfeilschritt eine Auswahl. `autoFokus` aus: der
               Inspector hängt beim Marker-Klick ein und nähme sonst der Karte die Tastatur. */}
           <FreiesZeichenPicker
@@ -228,7 +228,7 @@ export default function FreiesZeichenInspector({
               Löschen
             </Button>
           </Popconfirm>
-        </Space>
+        </Stapel>
       ) : (
         <Datenraster spalten={1} beschriftung="Zeichen">
           {zeichenTeile(bild.spec).map((t, i) => (

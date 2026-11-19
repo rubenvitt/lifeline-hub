@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Form, Modal, Popconfirm, Space } from 'antd';
+import { Alert, Button, Form, Modal, Popconfirm, Space } from 'antd';
 import { Select } from '../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type Key } from 'react';
@@ -19,12 +19,22 @@ import { useViewport } from '../components/useViewport';
 import { nachText, nachZahl } from '../components/katalogVergleich';
 import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import Datenstand from '../components/Datenstand';
-import { Paneel, Textstufe, useRollen } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  Feld,
+  Paneel,
+  Stapel,
+  Textstufe,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
-import { EINSATZ_ROLLE_BESCHREIBUNG, EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
+import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
+import { ROLLEN_LISTE_SCHMAL, rollenOptionRender } from '../einsatz/rollenOption';
+import { ROLLE_IM_EINSATZ_FELD } from '../einsatz/rollenVokabular';
 import { anzahl } from '../anzeige/anzahl';
 
 /** Rang einer Einsatzrolle: kleiner ist stärker. Herabstufen heißt, der Rang wächst. */
@@ -34,23 +44,6 @@ const RANG: Record<EinsatzRolle, number> = {
   mitarbeit: 2,
   beobachter: 3,
 };
-
-/** Eine Rolle in der Auswahl: ihr Name, bei Mitarbeit darunter, was sie darf (LLH-1817). */
-function rolleOption(option: { value?: string | number | null; label?: unknown }) {
-  const beschreibung = EINSATZ_ROLLE_BESCHREIBUNG[option.value as EinsatzRolle];
-  return (
-    <div>
-      <div>{option.label as string}</div>
-      {beschreibung && (
-        <div style={{ whiteSpace: 'normal' }}>
-          <Textstufe stufe="textKlein" ton="gedaempft">
-            {beschreibung}
-          </Textstufe>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /** Eine gewählte, noch nicht bestätigte Herabstufung der eigenen Rolle (LFH-966). */
 type Herabstufung = { benutzerId: number; rolle: EinsatzRolle };
@@ -117,7 +110,7 @@ function FuehrungsstelleModal({
       erfassenText="Speichern"
       laeuft={laeuft}
     >
-      <Form.Item
+      <Feld
         name="fuehrungsstelle"
         label="Führungsstelle"
         // EIN Wert: eine neue Wahl ersetzt die alte, statt sich daneben zu stellen.
@@ -133,7 +126,7 @@ function FuehrungsstelleModal({
           placeholder="Funktion (z. B. S2) oder Freitext"
           disabled={laeuft}
         />
-      </Form.Item>
+      </Feld>
       {fehler && <Alert type="error" title={fehler.message} showIcon />}
     </ErfassungsModal>
   );
@@ -309,38 +302,44 @@ export default function MitgliederAbschnitt({
     );
 
   const rolleFeld = (m: MitgliedAnzeige) => (
-    <Select
-      value={m.einsatz_rolle}
-      disabled={!darfVerwalten}
-      aria-label={`Rolle von ${m.anzeigename}`}
-      aria-describedby={darfVerwalten && istLetzteLeitung(m) ? grundId(m) : undefined}
-      // `minWidth` statt fester `width`: eine feste Breite drückt die Zelle am schmalen Schirm
-      // auf. Der Boden bleibt, damit „Führungspersonal" nicht abgeschnitten wird; unter `md`
-      // füllt das Feld die Zahlbreite der Spalte.
-      style={istSchmal ? { width: '100%' } : { minWidth: 170, maxWidth: '100%' }}
-      // An der letzten Einsatzleitung ist jede schwächere Rolle gesperrt (Grund unter der Aktion).
-      options={
-        istLetzteLeitung(m)
-          ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
-          : EINSATZ_ROLLE_OPTIONEN
+    // Untergrenze statt fester Breite: eine feste Breite drückt die Zelle am schmalen Schirm auf.
+    // Der Boden (Feldbreite `schmal`) bleibt, damit „Führungspersonal" nicht abgeschnitten wird;
+    // unter `md` füllt das Feld die Zahlbreite der Spalte.
+    <div
+      className={FELD_KLASSE}
+      style={
+        istSchmal ? { width: '100%' } : { minWidth: 'var(--lfh-feld-schmal)', maxWidth: '100%' }
       }
-      optionRender={rolleOption}
-      popupMatchSelectWidth={280}
-      onChange={(rolle) => rolleWaehlen(m, rolle)}
-    />
+    >
+      <Select
+        value={m.einsatz_rolle}
+        disabled={!darfVerwalten}
+        aria-label={`Rolle von ${m.anzeigename}`}
+        aria-describedby={darfVerwalten && istLetzteLeitung(m) ? grundId(m) : undefined}
+        // An der letzten Einsatzleitung ist jede schwächere Rolle gesperrt (Grund unter der Aktion).
+        options={
+          istLetzteLeitung(m)
+            ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
+            : EINSATZ_ROLLE_OPTIONEN
+        }
+        optionRender={rollenOptionRender}
+        {...ROLLEN_LISTE_SCHMAL}
+        onChange={(rolle) => rolleWaehlen(m, rolle)}
+      />
+    </div>
   );
   const aktion = (m: MitgliedAnzeige) => {
     if (!darfVerwalten) return null;
     if (istLetzteLeitung(m)) {
       return (
-        <Flex vertical gap={token.marginXXS} align="flex-start">
+        <Stapel abstand="xxs" ausrichten="start">
           <Button danger disabled aria-describedby={grundId(m)}>
             Entfernen
           </Button>
-          <span id={grundId(m)} style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+          <Textstufe id={grundId(m)} stufe="textKlein" ton="text2">
             {LETZTE_EINSATZLEITUNG_TEXT}
-          </span>
-        </Flex>
+          </Textstufe>
+        </Stapel>
       );
     }
     return (
@@ -386,7 +385,7 @@ export default function MitgliederAbschnitt({
               <div>{m.anzeigename}</div>
               <div
                 data-lfh="mitglied-fuehrungsstelle"
-                style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}
+                style={{ ...schriftStil('textKlein'), color: rollen.text2 }}
               >
                 {fuehrungsstelle(m)}
               </div>
@@ -395,16 +394,17 @@ export default function MitgliederAbschnitt({
         },
         {
           // Rolle und Aktion teilen sich eine Spalte: zwei Zahlbreiten nebeneinander ließen dem
-          // Namen bei 390 px keine 90 px.
+          // Namen bei 390 px keine 90 px. Schmal bleibt „Rolle“ ohne „im Einsatz“: der Kopf hat die
+          // Zahlbreite der Spalte, und im Reiter „Zugriff“ ist keine andere Rolle gemeint (LLH-1818).
           title: darfVerwalten ? 'Rolle · Aktion' : 'Rolle',
           key: 'rolle',
           width: SCHMAL_ROLLE,
           ...rolleOrdnung,
           render: (_, m) => (
-            <Flex vertical gap={token.marginXS} align="flex-start">
+            <Stapel abstand="xs" ausrichten="start">
               {rolleFeld(m)}
               {aktion(m)}
-            </Flex>
+            </Stapel>
           ),
         },
       ]
@@ -416,7 +416,12 @@ export default function MitgliederAbschnitt({
           sorter: stelleSortierung,
           render: (_, m) => fuehrungsstelle(m),
         },
-        { title: 'Rolle', key: 'rolle', ...rolleOrdnung, render: (_, m) => rolleFeld(m) },
+        {
+          title: ROLLE_IM_EINSATZ_FELD,
+          key: 'rolle',
+          ...rolleOrdnung,
+          render: (_, m) => rolleFeld(m),
+        },
         {
           // Beschriftet: eine namenlose Spalte ist für einen Screenreader eine Zelle ohne
           // Zugehörigkeit.
@@ -444,33 +449,42 @@ export default function MitgliederAbschnitt({
     >
       {darfVerwalten && (
         <Space style={{ padding: token.padding }} wrap>
-          <Select
-            placeholder="Benutzer …"
-            aria-label="Person zum Aufnehmen"
-            autoFocus={openAuswahl}
-            defaultOpen={openAuswahl}
-            style={{ width: 200 }}
-            value={neuerBenutzer}
-            options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}
-            onChange={(v) => setNeuerBenutzer(v)}
-            // „Keine weitere Person“ nur, wenn wirklich niemand übrig ist; eine Suche ohne Treffer
-            // behält den Leerhinweis von antd.
-            notFoundContent={
-              auswahlQuery.isError
-                ? 'Personenauswahl nicht verfügbar'
-                : auswahlQuery.isSuccess && verfuegbar.length === 0
-                  ? 'Keine weitere Person der Organisation'
-                  : undefined
-            }
-          />
-          <Select
-            value={neueRolle}
-            style={{ width: 170 }}
-            options={EINSATZ_ROLLE_OPTIONEN}
-            optionRender={rolleOption}
-            popupMatchSelectWidth={280}
-            onChange={setNeueRolle}
-          />
+          <div
+            className={FELD_KLASSE}
+            style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}
+          >
+            <Select
+              placeholder="Benutzer …"
+              aria-label="Person zum Aufnehmen"
+              autoFocus={openAuswahl}
+              defaultOpen={openAuswahl}
+              value={neuerBenutzer}
+              options={verfuegbar.map((p) => ({ value: p.benutzer_id, label: p.anzeigename }))}
+              onChange={(v) => setNeuerBenutzer(v)}
+              // „Keine weitere Person“ nur, wenn wirklich niemand übrig ist; eine Suche ohne
+              // Treffer behält den Leerhinweis von antd.
+              notFoundContent={
+                auswahlQuery.isError
+                  ? 'Personenauswahl nicht verfügbar'
+                  : auswahlQuery.isSuccess && verfuegbar.length === 0
+                    ? 'Keine weitere Person der Organisation'
+                    : undefined
+              }
+            />
+          </div>
+          <div
+            className={FELD_KLASSE}
+            style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}
+          >
+            <Select
+              value={neueRolle}
+              aria-label={ROLLE_IM_EINSATZ_FELD}
+              options={EINSATZ_ROLLE_OPTIONEN}
+              optionRender={rollenOptionRender}
+              {...ROLLEN_LISTE_SCHMAL}
+              onChange={setNeueRolle}
+            />
+          </div>
           <Button
             type="primary"
             disabled={neuerBenutzer == null}

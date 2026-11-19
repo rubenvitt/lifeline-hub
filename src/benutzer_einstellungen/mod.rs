@@ -41,6 +41,11 @@ pub const SCHLUESSEL_BENACHRICHTIGUNGEN_AUS: &str = "benachrichtigungen_aus";
 /// Client (`command-palette/schnellaktionZaehler.ts`).
 pub const SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER: &str = "schnellaktionen_zaehler";
 
+/// Zeitpunkt, zu dem die Willkommenskarte der Einsatzliste geschlossen wurde (LLH-1824); Wert ist
+/// ein UTC-Zeitpunkt im Format `zeit::FORMAT` als Text. Opak: gelesen wird er nur im Client
+/// (`frontend/src/hilfe/willkommen.ts`), dort zählt allein, ob er da ist.
+pub const SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN: &str = "willkommen_geschlossen";
+
 /// Der gesamte gültige Schlüsselraum. Eine neue Präferenz wird hier eingetragen —
 /// die Tabelle bleibt unangetastet.
 pub const BEKANNTE_SCHLUESSEL: &[&str] = &[
@@ -48,6 +53,7 @@ pub const BEKANNTE_SCHLUESSEL: &[&str] = &[
     SCHLUESSEL_ETB_STANDARD_RUFNAME,
     SCHLUESSEL_BENACHRICHTIGUNGEN_AUS,
     SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER,
+    SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN,
 ];
 
 /// Obergrenze für einen Wert in **Zeichen** (nicht Bytes, sonst hinge sie an der Kodierung).
@@ -152,6 +158,17 @@ mod tests {
         assert_eq!(
             pruefe_wert(SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER, "{\"aktion:etb\":3}").unwrap(),
             "{\"aktion:etb\":3}"
+        );
+    }
+
+    #[test]
+    fn willkommen_geschlossen_ist_ein_gueltiger_opaker_schluessel() {
+        assert!(ist_gueltiger_schluessel(SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN));
+        assert_eq!(SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, "willkommen_geschlossen");
+        // Opak: der Zeitpunkt des Schließens wird nicht geprüft, nur gespeichert.
+        assert_eq!(
+            pruefe_wert("willkommen_geschlossen", "2026-11-19 09:00:00").unwrap(),
+            "2026-11-19 09:00:00"
         );
     }
 

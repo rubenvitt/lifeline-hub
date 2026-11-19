@@ -77,14 +77,14 @@ export default function Filterhinweis({
         {mitZahl && (
           <span style={{ flex: '0 1 auto', minWidth: 0 }}>
             <span aria-hidden="true">· </span>
-            <span style={monoStil(12)}>{treffer}</span> von{' '}
-            <span style={monoStil(12)}>{gesamt}</span> {dinge} sichtbar
+            <span style={monoStil('monoKlein')}>{treffer}</span> von{' '}
+            <span style={monoStil('monoKlein')}>{gesamt}</span> {dinge} sichtbar
           </span>
         )}
         <span
           title={merkmalText}
           style={{
-            ...monoStil(12),
+            ...monoStil('monoKlein'),
             flex: '1 1 8em',
             minWidth: 0,
             overflow: 'hidden',

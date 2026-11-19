@@ -136,7 +136,7 @@ export default function ExterneStellenTab() {
       key: 'rufnummer',
       abBreite: 'lg',
       sorter: nachText((s: ExterneStelle) => s.rufnummer),
-      render: (r?: string) => (r ? <span style={monoStil(12, 500)}>{r}</span> : '—'),
+      render: (r?: string) => (r ? <span style={monoStil('monoKlein', 500)}>{r}</span> : '—'),
     },
     {
       title: 'Funkrufname',
@@ -144,7 +144,7 @@ export default function ExterneStellenTab() {
       key: 'funkrufname',
       abBreite: 'lg',
       sorter: nachText((s: ExterneStelle) => s.funkrufname),
-      render: (f?: string) => (f ? <span style={monoStil(12, 500)}>{f}</span> : '—'),
+      render: (f?: string) => (f ? <span style={monoStil('monoKlein', 500)}>{f}</span> : '—'),
     },
     {
       title: 'Aktiv',

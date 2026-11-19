@@ -35,11 +35,13 @@ describe('NeuigkeitenPage', () => {
     expect(screen.getByText(EINTRAEGE[EINTRAEGE.length - 1].version)).toBeInTheDocument();
   });
 
-  it('zeigt den Abschnitt „Seit deiner letzten Version“ mit den Versionen seit der letzten', async () => {
+  it('zeigt den Abschnitt „Seit der zuletzt gesehenen Version“ mit den Versionen seit der letzten', async () => {
     server.use(...versionsstand(ZULETZT));
     renderMitProviders(<NeuigkeitenPage />);
 
-    const abschnitt = (await screen.findByText('Seit deiner letzten Version')).closest('section')!;
+    const abschnitt = (await screen.findByText('Seit der zuletzt gesehenen Version')).closest(
+      'section',
+    )!;
     const neu = EINTRAEGE.slice(0, 2).map((e) => e.version);
     for (const version of neu) {
       expect(within(abschnitt).getByText(version)).toBeInTheDocument();
@@ -51,7 +53,7 @@ describe('NeuigkeitenPage', () => {
     renderMitProviders(<NeuigkeitenPage />);
 
     await screen.findByText(LAUFEND);
-    expect(screen.queryByText('Seit deiner letzten Version')).not.toBeInTheDocument();
+    expect(screen.queryByText('Seit der zuletzt gesehenen Version')).not.toBeInTheDocument();
   });
 
   it('erklärt einen leeren Beta-Kanal statt eine leere Liste zu zeigen', async () => {

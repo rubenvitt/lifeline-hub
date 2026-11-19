@@ -1,3 +1,4 @@
+import { ganzerText } from '../test/kuerzel';
 import { describe, expect, it } from 'vitest';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import { delay, http, HttpResponse } from 'msw';
@@ -539,8 +540,8 @@ describe('EinheitenPage', () => {
         expect(v).not.toBeNull();
         return v as HTMLElement;
       });
-      expect(screen.getAllByText('Stärke F/UF/M//Σ')).toEqual([
-        within(verdichtung).getByText('Stärke F/UF/M//Σ'),
+      expect(screen.getAllByText(ganzerText('Stärke F/UF/M//Σ'))).toEqual([
+        within(verdichtung).getByText(ganzerText('Stärke F/UF/M//Σ')),
       ]);
     });
   });

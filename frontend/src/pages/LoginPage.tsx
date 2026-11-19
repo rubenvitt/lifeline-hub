@@ -25,6 +25,7 @@ import {
 } from '../huelle/faehigkeiten';
 import { Bildmarke } from '../marke/Bildmarke';
 import { Marke } from '../components/instrument/Marke';
+import { Feld } from '../components/instrument';
 import './LoginPage.css';
 
 interface FormWerte {
@@ -377,7 +378,7 @@ export default function LoginPage() {
             requiredMark={false}
           >
             {recoveryModus ? (
-              <Form.Item
+              <Feld
                 label="Wiederherstellungscode"
                 name="code"
                 rules={[{ required: true, message: 'Bitte Wiederherstellungscode eingeben' }]}
@@ -389,17 +390,17 @@ export default function LoginPage() {
                   spellCheck={false}
                   placeholder="xxxx-xxxx-xxxx-xxxx-xxxx"
                 />
-              </Form.Item>
+              </Feld>
             ) : (
-              <Form.Item
-                label="Code aus deiner Authenticator-App"
+              <Feld
+                label="Code aus der Authenticator-App"
                 name="code"
                 rules={[{ required: true, message: 'Bitte Code eingeben' }]}
               >
                 {/* Das geteilte OTP-Primitiv (auch auf der Profilseite). Sechs Ziffern senden
                     ab, der Knopf darunter bleibt der Rückfallweg. */}
                 <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
-              </Form.Item>
+              </Feld>
             )}
             <Button
               className="login-absenden"
@@ -479,7 +480,7 @@ export default function LoginPage() {
                 requiredMark={false}
               >
                 {passwortAktiv && (
-                  <Form.Item
+                  <Feld
                     label="Benutzername"
                     name="benutzername"
                     rules={[
@@ -496,16 +497,16 @@ export default function LoginPage() {
                       autoCorrect="off"
                       spellCheck={false}
                     />
-                  </Form.Item>
+                  </Feld>
                 )}
                 {passwortAktiv && (
-                  <Form.Item
+                  <Feld
                     label="Passwort"
                     name="passwort"
                     rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
                   >
                     <Input.Password size="large" autoComplete="current-password" />
-                  </Form.Item>
+                  </Feld>
                 )}
                 {passwortAktiv && (
                   <Button
@@ -537,7 +538,7 @@ export default function LoginPage() {
                 ohne etwas über das Konto zu verraten (LFH-946). */}
             {passwortAktiv && (
               <p className="login-hinweis">
-                Passwort vergessen? Die Administration deiner Organisation setzt es zurück.
+                Passwort vergessen? Die Administration der Organisation setzt es zurück.
               </p>
             )}
             {imBrowserAnmelden && (

@@ -1,5 +1,5 @@
 import { Button, Card, Typography } from 'antd';
-import { monoStil, useRollen } from '../../components/instrument';
+import { Textstufe, monoStil, useRollen } from '../../components/instrument';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import { bandStil } from './KartenFuss';
 
@@ -16,7 +16,7 @@ export default function SuchnadelBand({
   ort: GefundenerOrt | null;
   onEntfernen: () => void;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   if (!ort) return null;
   return (
     <Card
@@ -27,9 +27,9 @@ export default function SuchnadelBand({
     >
       {/* Eine Region mit Namen: ein Vorleser findet das Ziel der letzten Suche wieder. */}
       <section aria-label="Suchnadel" style={{ minWidth: 0, flex: '1 1 auto' }}>
-        <Typography.Text style={{ color: rollen.gedaempft, display: 'block' }}>
+        <Textstufe als="div" ton="gedaempft">
           Suchnadel
-        </Typography.Text>
+        </Textstufe>
         {/* Lange Adressen brechen um, statt die Karte zu überdecken oder abgeschnitten zu werden. */}
         <Typography.Text
           style={{

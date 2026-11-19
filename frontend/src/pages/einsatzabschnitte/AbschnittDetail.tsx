@@ -1,4 +1,4 @@
-import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { useRef, useState } from 'react';
 import { Input } from 'antd';
 import { ApiError } from '../../api/client';
@@ -12,6 +12,8 @@ import {
   Datenfeld,
   Datenraster,
   Segmentleiste,
+  Stapel,
+  Textstufe,
   monoStil,
   useRollen,
   type SegmentOption,
@@ -104,7 +106,7 @@ export default function AbschnittDetail({
       etikett={etikett}
       wert={a[feld] ?? ''}
       anzeige={
-        <span style={feld === 'rufname' ? monoStil(13) : { whiteSpace: 'pre-wrap' }}>
+        <span style={feld === 'rufname' ? monoStil('mono') : { whiteSpace: 'pre-wrap' }}>
           {a[feld]}
         </span>
       }
@@ -159,7 +161,7 @@ export default function AbschnittDetail({
         <InlineAngabe<string>
           etikett="Kurzbezeichnung"
           wert={a.kurzbezeichnung ?? ''}
-          anzeige={<span style={monoStil(13)}>{a.kurzbezeichnung}</span>}
+          anzeige={<span style={monoStil('mono')}>{a.kurzbezeichnung}</span>}
           leer={isEmptyText}
           gleich={isSameText}
           darfSchreiben={darfSchreiben}
@@ -252,10 +254,24 @@ export default function AbschnittDetail({
         />
       </Datenfeld>
       <Datenfeld label="Bemerkung">{textRow('Bemerkung', 'bemerkung', true)}</Datenfeld>
-      <Datenfeld label={`Stärke (${STAERKE_SCHREIBWEISE})`} mono>
+      <Datenfeld
+        label={
+          <>
+            Stärke (<StaerkeSchreibweise />)
+          </>
+        }
+        mono
+      >
         <StaerkeAnzeige wert={staerken.eigene} />
       </Datenfeld>
-      <Datenfeld label={`Stärke inkl. Unterabschnitte (${STAERKE_SCHREIBWEISE})`} mono>
+      <Datenfeld
+        label={
+          <>
+            Stärke inkl. Unterabschnitte (<StaerkeSchreibweise />)
+          </>
+        }
+        mono
+      >
         <StaerkeAnzeige wert={staerken.inklUnter} />
       </Datenfeld>
     </Datenraster>
@@ -286,7 +302,7 @@ function LagezustandSelect({
   darfSchreiben: boolean;
   onPatch: AbschnittPatchHandler;
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const [pending, setPending] = useState<LagezustandValue | null>(null);
   const [error, setError] = useState<unknown>(null);
   const isSendingRef = useRef(false);
@@ -297,7 +313,7 @@ function LagezustandSelect({
     return value ? (
       <Status darstellung={abschnittLagezustand[value]} />
     ) : (
-      <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
+      <Textstufe ton="gedaempft">nicht beurteilt</Textstufe>
     );
   }
 
@@ -342,15 +358,8 @@ function LagezustandSelect({
   }
 
   return (
-    // `flex-start`: gestreckt zöge die Leiste (`inline-flex`) ihren Fugengrund über die ganze Zeile.
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: token.marginXS,
-      }}
-    >
+    // `start`: gestreckt zöge die Leiste (`inline-flex`) ihren Fugengrund über die ganze Zeile.
+    <Stapel abstand="xs" ausrichten="start">
       <Segmentleiste<LagezustandValue>
         beschriftung="Lagezustand"
         optionen={options}
@@ -358,6 +367,6 @@ function LagezustandSelect({
         onWechsel={(w) => void select(w)}
       />
       <ZeilenFehler fehler={error} />
-    </div>
+    </Stapel>
   );
 }

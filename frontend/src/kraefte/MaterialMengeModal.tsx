@@ -1,4 +1,5 @@
 import { Form } from 'antd';
+import { Feld } from '../components/instrument';
 import { useEffect, useRef } from 'react';
 import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
@@ -63,7 +64,8 @@ export default function MaterialMengeModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
+        breite="kurz"
         label="Menge"
         name="menge"
         rules={[
@@ -76,8 +78,8 @@ export default function MaterialMengeModal({
           },
         ]}
       >
-        <MengenFeld beschriftung="Menge" style={{ width: 120 }} />
-      </Form.Item>
+        <MengenFeld beschriftung="Menge" />
+      </Feld>
     </ErfassungsModal>
   );
 }

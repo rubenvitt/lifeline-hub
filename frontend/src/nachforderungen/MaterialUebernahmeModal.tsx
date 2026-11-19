@@ -4,7 +4,7 @@ import type { EinsatzMaterial, MaterialArt, Nachforderung } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
 import { Select } from '../components/Select';
-import { Segmentleiste } from '../components/instrument';
+import { Feld, Segmentleiste } from '../components/instrument';
 import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
 import { buildOrtOptions } from '../kraefte/materialOrtWahl';
 import { ART_OPTIONEN, OHNE_ORT_WERT } from '../kraefte/materialPosten';
@@ -148,20 +148,21 @@ export default function MaterialUebernahmeModal({
       {nachforderung?.bezeichnung && (
         <Typography.Paragraph type="secondary">{nachforderung.bezeichnung}</Typography.Paragraph>
       )}
-      <Form.Item label="Art" name="art">
+      <Feld label="Art" name="art">
         <ArtFeld />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
+        breite="kurz"
         label="Menge"
         name="menge"
         rules={[{ required: true }]}
         extra={isGeraet ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
       >
-        <MengenFeld beschriftung="Menge" style={{ width: 120 }} disabled={isGeraet} />
-      </Form.Item>
-      <Form.Item label="Ort" name="ort" style={{ marginBottom: 0 }}>
+        <MengenFeld beschriftung="Menge" disabled={isGeraet} />
+      </Feld>
+      <Feld label="Ort" name="ort">
         <OrtFeld einsatzId={einsatzId} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

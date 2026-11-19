@@ -469,15 +469,20 @@ pub async fn status_wechsel(
     // nach dem Commit (Reinheits-Kontrakt).
     let etb_text = crate::bereitstellungsraum::etb_text_status(&vorher.bezeichnung, &body.status);
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let nachher = crate::write_retry!(&state.pool, |conn| {
+    let (nachher, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let nachher =
             br_repo::setze_status_tx(conn, einsatz_id, br_id, &body.status, ctx.benutzer.id)
                 .await?;
-        if let Some(text) = &etb_text {
-            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, text).await?;
-        }
-        Ok(nachher)
+        let etb_id = match &etb_text {
+            Some(text) => Some(
+                crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, text)
+                    .await?,
+            ),
+            None => None,
+        };
+        Ok((nachher, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, etb_id);
     sse_br(&state, einsatz_id, br_id);
     Ok(Json(nachher))
 }

@@ -7,7 +7,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { uhrzeit } from '../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { FELD_KLASSE, Segmentleiste, schriftStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { serverJetzt } from '../offline/serveruhr';
@@ -133,7 +133,7 @@ function Beschriftet({
       <span
         aria-hidden="true"
         style={{
-          fontSize: 12,
+          ...schriftStil('textKlein'),
           color: rollen.text2,
           flex: '0 0 auto',
           ...(schmal ? { width: 32 } : {}),
@@ -363,39 +363,43 @@ export default function EtbFeldzeile({
 
   const meldeweg = (
     <Beschriftet label="Weg" schmal={schmal}>
-      <Select<MeldeWeg>
-        ref={refs.meldeweg}
-        aria-label="Meldeweg"
-        disabled={gesperrt}
-        allowClear
-        placeholder="–"
-        style={{ width: schmal ? '100%' : 120 }}
-        options={MELDEWEG_OPTIONEN}
-        value={metadaten.meldeweg ?? null}
-        onChange={(v) => onFeld('meldeweg', v ?? undefined)}
-        onSelect={() => onFertig()}
-      />
+      {/* Breite über die Hülle (Feldstufe `kurz`); `FELD_KLASSE` streckt die Auswahl auf sie. */}
+      <span className={FELD_KLASSE} style={{ width: schmal ? '100%' : 'var(--lfh-feld-kurz)' }}>
+        <Select<MeldeWeg>
+          ref={refs.meldeweg}
+          aria-label="Meldeweg"
+          disabled={gesperrt}
+          allowClear
+          placeholder="–"
+          options={MELDEWEG_OPTIONEN}
+          value={metadaten.meldeweg ?? null}
+          onChange={(v) => onFeld('meldeweg', v ?? undefined)}
+          onSelect={() => onFertig()}
+        />
+      </span>
     </Beschriftet>
   );
 
   const veranlassung = (veranlassungOffen || metadaten.veranlassung) && (
     <Beschriftet label="Veranlassung" schmal={schmal}>
-      <Input
-        ref={refs.veranlassung}
-        aria-label="Veranlassung"
-        disabled={gesperrt}
-        maxLength={ETB_PARTEI_MAX}
-        style={{ width: schmal ? '100%' : 220 }}
-        value={metadaten.veranlassung ?? ''}
-        onChange={(e) => onFeld('veranlassung', e.target.value || undefined)}
-        onPressEnter={() => onFertig()}
-        onBlur={(e) => {
-          if (!e.target.value.trim()) {
-            onFeld('veranlassung', undefined);
-            onVeranlassungSchliessen();
-          }
-        }}
-      />
+      {/* Breite über die Hülle (Feldstufe `schmal`). */}
+      <span className={FELD_KLASSE} style={{ width: schmal ? '100%' : 'var(--lfh-feld-schmal)' }}>
+        <Input
+          ref={refs.veranlassung}
+          aria-label="Veranlassung"
+          disabled={gesperrt}
+          maxLength={ETB_PARTEI_MAX}
+          value={metadaten.veranlassung ?? ''}
+          onChange={(e) => onFeld('veranlassung', e.target.value || undefined)}
+          onPressEnter={() => onFertig()}
+          onBlur={(e) => {
+            if (!e.target.value.trim()) {
+              onFeld('veranlassung', undefined);
+              onVeranlassungSchliessen();
+            }
+          }}
+        />
+      </span>
     </Beschriftet>
   );
 

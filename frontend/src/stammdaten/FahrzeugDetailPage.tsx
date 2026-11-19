@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Col, Form, Input, InputNumber, Row, Switch, theme } from 'antd';
+import { App, AutoComplete, Col, Form, Input, InputNumber, Row, Switch, theme } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,8 @@ import { globalKeys } from '../api/queryKeys';
 // Die Speicherleiste wird WIEDERVERWENDET, nicht nachgebaut: `speicherLeiste` ist die eine
 // Stelle, an der „sticky am unteren Rand, im Formular" begründet und geprüft ist.
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, useAenderungsstandMerken } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { leerZuNull } from '../api/patchTriState';
@@ -73,6 +75,7 @@ export default function FahrzeugDetailPage() {
   const { message } = App.useApp();
   const { token } = theme.useToken();
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“); `schluessel` wie `key={id}`
   // am Formular.
   const schutz = useFormularVerlassenSchutz({ aktiv: darfBearbeiten, schluessel: id });
@@ -123,7 +126,7 @@ export default function FahrzeugDetailPage() {
       <AdminPage titel="Fahrzeug">
         <SeitenLeer
           titel="Fahrzeug nicht gefunden"
-          hinweis="Der Datensatz wurde entfernt oder gehört zu einer anderen Organisation."
+          hinweis="Nicht gefunden: entfernt oder nicht in dieser Organisation."
           aktion={{ label: 'Zur Fahrzeugliste', pfad: fahrzeugListePfad() }}
         />
       </AdminPage>
@@ -150,7 +153,7 @@ export default function FahrzeugDetailPage() {
         breite="schmal"
         titel={
           <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
-            <span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>
+            <span style={monoStil('monoGross', 500)}>{fahrzeug.funkrufname}</span>
             {fahrzeug.ist_demo && <DemoMarke />}
           </Stapel>
         }
@@ -189,117 +192,125 @@ export default function FahrzeugDetailPage() {
           initialValues={zuFormWerten(fahrzeug)}
           onFinish={(werte) => {
             const fassung = schutz.fassung();
-            speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+            // An DIESEN Datensatz gebunden: ein Wechsel per `key={id}` während des Speicherns
+            // trägt sonst die Werte des vorigen in den Ausgangsstand des neuen (LLH-1829).
+            const merke = stand.binde();
+            speichern.mutate(werte, {
+              onSuccess: () => {
+                schutz.gespeichert(fassung);
+                merke(werte);
+              },
+            });
           }}
         >
-          <Formularpaneel titel="Identität" dataUpdatedAt={fahrzeugeQuery.dataUpdatedAt}>
-            <Row gutter={token.margin}>
-              <Col xs={24} lg={12}>
-                <Feld
-                  label="Funkrufname"
-                  name="funkrufname"
-                  rules={[
-                    {
-                      required: true,
-                      whitespace: true,
-                      message: 'Funkrufname darf nicht leer sein',
-                    },
-                  ]}
-                >
-                  <Input />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Fahrzeugtyp" name="fahrzeugtyp">
-                  <AutoComplete
-                    options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
-                    allowClear
-                    placeholder="z. B. LF 20, RTW"
-                    showSearch={teilwortSuche}
-                  />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Trägerorganisation" name="traegerorganisation">
-                  <AutoComplete
-                    options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
-                    allowClear
-                    placeholder="z. B. Feuerwehr Musterstadt"
-                    showSearch={teilwortSuche}
-                  />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Kennzeichen" name="kennzeichen">
-                  <Input />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="OPTA" name="opta">
-                  <Input />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Standort" name="standort">
-                  <AutoComplete
-                    options={vorschlaege.standort.map((t) => ({ value: t }))}
-                    allowClear
-                    placeholder="z. B. Wache Mitte"
-                    showSearch={teilwortSuche}
-                  />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+          <AenderungsstandProvider ausgangswerte={zuFormWerten(fahrzeug)} merkeRef={stand.merkeRef}>
+            <Formularpaneel titel="Identität" dataUpdatedAt={fahrzeugeQuery.dataUpdatedAt}>
+              <Row gutter={token.margin}>
+                <Col xs={24} lg={12}>
+                  <Feld
+                    label="Funkrufname"
+                    name="funkrufname"
+                    rules={[
+                      {
+                        required: true,
+                        whitespace: true,
+                        message: 'Funkrufname darf nicht leer sein',
+                      },
+                    ]}
+                  >
+                    <Input />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Fahrzeugtyp" name="fahrzeugtyp">
+                    <AutoComplete
+                      options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
+                      allowClear
+                      placeholder="z. B. LF 20, RTW"
+                      showSearch={teilwortSuche}
+                    />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Trägerorganisation" name="traegerorganisation">
+                    <AutoComplete
+                      options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
+                      allowClear
+                      placeholder="z. B. Feuerwehr Musterstadt"
+                      showSearch={teilwortSuche}
+                    />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Kennzeichen" name="kennzeichen">
+                    <Input />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="OPTA" name="opta">
+                    <Input />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Standort" name="standort">
+                    <AutoComplete
+                      options={vorschlaege.standort.map((t) => ({ value: t }))}
+                      allowClear
+                      placeholder="z. B. Wache Mitte"
+                      showSearch={teilwortSuche}
+                    />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Funk & Sonderrechte">
-            <Row gutter={token.margin}>
-              <Col xs={24} lg={12}>
-                <Feld label="FMS-ISSI" name="fms_issi">
-                  <Input />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                <Feld label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
-                  <Switch />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+            <Formularpaneel titel="Funk & Sonderrechte">
+              <Row gutter={token.margin}>
+                <Col xs={24} lg={12}>
+                  <Feld label="FMS-ISSI" name="fms_issi">
+                    <Input />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Feld label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
+                    <Switch />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Kapazität">
-            <Row gutter={token.margin}>
-              <Col xs={24} lg={12}>
-                <Feld label="Tragenkapazität" name="tragenkapazitaet" breite="schmal">
-                  <InputNumber min={0} />
-                </Feld>
-              </Col>
-              <Col xs={24} lg={12}>
-                {/* EIN `Feld` für das ganze F/UF/M-Trio — nicht drei. Das Backend prüft die Stärke gegen
+            <Formularpaneel titel="Kapazität">
+              <Row gutter={token.margin}>
+                <Col xs={24} lg={12}>
+                  <Feld label="Tragenkapazität" name="tragenkapazitaet" breite="schmal">
+                    <InputNumber min={0} />
+                  </Feld>
+                </Col>
+                <Col xs={24} lg={12}>
+                  {/* EIN `Feld` für das ganze F/UF/M-Trio — nicht drei. Das Backend prüft die Stärke gegen
                    den EFFEKTIVZUSTAND (Mehrspalten-CHECK „alle drei oder keiner"); verteilt und teilweise
                    gesendet entstünde eine Kombination, die der CHECK ablehnt. Die Regel setzt
                    `StaerkeEingabe` selbst durch (leere Felder zählen als 0), kein Satz am Label. */}
-                <Feld label="Soll-Stärke" name="staerke">
-                  <StaerkeEingabe />
-                </Feld>
-              </Col>
-            </Row>
-          </Formularpaneel>
+                  <Feld label="Soll-Stärke" name="staerke">
+                    <StaerkeEingabe />
+                  </Feld>
+                </Col>
+              </Row>
+            </Formularpaneel>
 
-          <Formularpaneel titel="Freitext">
-            <Feld label="Bemerkung" name="bemerkung">
-              <Input.TextArea rows={3} />
-            </Feld>
-          </Formularpaneel>
+            <Formularpaneel titel="Freitext">
+              <Feld label="Bemerkung" name="bemerkung">
+                <Input.TextArea rows={3} />
+              </Feld>
+            </Formularpaneel>
 
-          {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf `htmlType="submit"`, und
+            {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf `htmlType="submit"`, und
              Enter sendet über die eingebaute Formularübermittlung ab. Ein Knopf im Kopf-Slot von
              `AdminPage` läge außerhalb des Formulars. */}
-          <div {...speicherLeiste}>
-            <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-              Speichern
-            </Button>
-          </div>
+            <div {...speicherLeiste}>
+              <SpeicherKnopf loading={speichern.isPending} disabled={!darfBearbeiten} />
+            </div>
+          </AenderungsstandProvider>
         </Form>
       </AdminPage>
     </div>

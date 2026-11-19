@@ -6,7 +6,7 @@ import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Paneel } from '../components/instrument';
+import { Feld, FELD_KLASSE, Paneel, Stapel } from '../components/instrument';
 import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
 import { KONTEXT_FUNKRUFNAME, merkeZuletzt } from '../stammdaten/zuletztVerwendet';
 import { Select } from '../components/Select';
@@ -384,7 +384,7 @@ export default function MeldungFormular({
           )}
         </Space>
       )}
-      <Form.Item
+      <Feld
         name="inhalt"
         label="Inhalt / Wortlaut"
         rules={[
@@ -400,12 +400,12 @@ export default function MeldungFormular({
           rows={3}
           count={zeichenGrenze(ETB_INHALT_MAX)}
         />
-      </Form.Item>
+      </Feld>
       <Row gutter={token.marginLG}>
         <Col
           {...(dialog ? EINSPALTIG : { xs: 24, sm: 12, lg: funktionsOptionen.length > 0 ? 8 : 12 })}
         >
-          <Form.Item
+          <Feld
             name="absender"
             label="Absender (Funkrufname/Stelle)"
             rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
@@ -416,11 +416,11 @@ export default function MeldungFormular({
               maxLength={ETB_PARTEI_MAX}
               quellen={vorschlagsquellen}
             />
-          </Form.Item>
+          </Feld>
         </Col>
         {funktionsOptionen.length > 0 && (
           <Col {...(dialog ? EINSPALTIG : { xs: 24, sm: 12, lg: 8 })}>
-            <Form.Item name="empfaenger_funktion" label="Empfängerfunktion">
+            <Feld name="empfaenger_funktion" label="Empfängerfunktion">
               <Select<Fuehrungsfunktion>
                 aria-label="Empfängerfunktion"
                 allowClear
@@ -428,20 +428,20 @@ export default function MeldungFormular({
                 options={funktionsOptionen}
                 onChange={funktionGewaehlt}
               />
-            </Form.Item>
+            </Feld>
           </Col>
         )}
         <Col
           {...(dialog ? EINSPALTIG : { xs: 24, sm: 12, lg: funktionsOptionen.length > 0 ? 8 : 12 })}
         >
-          <Form.Item name="empfaenger" label="Empfänger / Adressat">
+          <Feld name="empfaenger" label="Empfänger / Adressat">
             <StammdatenFeld
               nurText
               placeholder="z. B. ELW 1, S3"
               maxLength={ETB_PARTEI_MAX}
               quellen={vorschlagsquellen}
             />
-          </Form.Item>
+          </Feld>
         </Col>
       </Row>
       {/* Feldbudget (LFH-974): eingeklappt drei Felder. `forceRender`, damit Vorbelegung, Übernahme
@@ -461,7 +461,7 @@ export default function MeldungFormular({
                 <Row gutter={token.marginLG}>
                   {vonOptionen.length > 0 && (
                     <Col xs={24} sm={12}>
-                      <Form.Item name="von" label="Von Einheit / Abschnitt">
+                      <Feld name="von" label="Von Einheit / Abschnitt">
                         <Select<string>
                           aria-label="Von Einheit / Abschnitt"
                           allowClear
@@ -469,16 +469,16 @@ export default function MeldungFormular({
                           options={vonOptionen}
                           onChange={vonGewaehlt}
                         />
-                      </Form.Item>
+                      </Feld>
                     </Col>
                   )}
                   <Col xs={24} sm={12}>
-                    <Form.Item name="meldeweg" label="Meldeweg">
+                    <Feld name="meldeweg" label="Meldeweg">
                       <Select<MeldungMeldeweg> options={MELDEWEG_OPTIONEN} />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="meldungsart" label="Meldungsart">
+                    <Feld name="meldungsart" label="Meldungsart">
                       <Select<Meldungsart>
                         options={
                           ohneLagemeldungsart
@@ -486,26 +486,26 @@ export default function MeldungFormular({
                             : MELDUNGSART_OPTIONEN
                         }
                       />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="prioritaet" label="Priorität">
+                    <Feld name="prioritaet" label="Priorität">
                       <Select<MeldungPrioritaet> options={PRIORITAET_OPTIONEN} />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="richtung" label="Richtung">
+                    <Feld name="richtung" label="Richtung">
                       <Select<Richtung> aria-label="Richtung" options={RICHTUNG_OPTIONEN} />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="ereigniszeit" label="Zeitpunkt des Ereignisses">
+                    <Feld name="ereigniszeit" label="Zeitpunkt des Ereignisses">
                       <ZeitpunktEingabe
                         art="ereignis"
                         style={{ width: '100%' }}
                         placeholder="jetzt"
                       />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                 </Row>
                 {/* Eine Lagemeldung steht mit Ort auf der Lagekarte (LLH-1031); versetzen lässt sie
@@ -517,37 +517,47 @@ export default function MeldungFormular({
                     einsatzId={einsatzId}
                   />
                 )}
-                <Form.Item label="Bestätigung erforderlich (Sofortmeldung)">
-                  {/* Flex statt `Space`: nur so trägt die Grundbreite des Fristfelds. */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: token.marginSM }}>
-                    <Form.Item name="bestaetigung_pflicht" valuePropName="checked" noStyle>
+                <Feld label="Bestätigung erforderlich (Sofortmeldung)">
+                  {/* Stapel statt `Space`: nur so trägt die Grundbreite des Fristfelds. */}
+                  <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
+                    <Feld name="bestaetigung_pflicht" valuePropName="checked" noStyle>
                       <Switch aria-label="Bestätigung erforderlich" />
-                    </Form.Item>
+                    </Feld>
                     {bestaetigungPflicht && (
-                      <Form.Item
-                        name="frist_min"
-                        noStyle
-                        // Der Server nimmt 1 bis 10080 Minuten an, wie bei den Default-Fristen.
-                        // Als Regel statt `min`/`max` am Feld: das klemmte still, statt den Wert
-                        // stehen zu lassen.
-                        rules={[
-                          { type: 'integer', min: 1, message: 'Frist mindestens 1 Min' },
-                          { type: 'integer', max: 10080, message: 'Frist höchstens 10080 Min' },
-                        ]}
+                      // Antds Vorgabebreite (90 px) schnitt den Platzhalter neben „Min“ zu
+                      // „Frist (…“ ab (LFH-1151). Die Hülle trägt bis `schmal`, am schmalen
+                      // Schirm schmaler; das Zahlfeld füllt sie.
+                      <div
+                        className={FELD_KLASSE}
+                        style={{
+                          flexGrow: 0,
+                          flexShrink: 1,
+                          flexBasis: 'var(--lfh-feld-schmal)',
+                          minWidth: 0,
+                        }}
                       >
-                        <InputNumber
-                          precision={0}
-                          suffix="Min"
-                          placeholder="Frist (Vorgabe)"
-                          aria-label="Bestätigungsfrist in Minuten"
-                          // Antds Vorgabebreite (90 px) schnitt den Platzhalter neben „Min“ zu
-                          // „Frist (…“ ab (LFH-1151). Bis 200 px, am schmalen Schirm schmaler.
-                          style={{ flex: '0 1 200px', minWidth: 0 }}
-                        />
-                      </Form.Item>
+                        <Feld
+                          name="frist_min"
+                          noStyle
+                          // Der Server nimmt 1 bis 10080 Minuten an, wie bei den Default-Fristen.
+                          // Als Regel statt `min`/`max` am Feld: das klemmte still, statt den Wert
+                          // stehen zu lassen.
+                          rules={[
+                            { type: 'integer', min: 1, message: 'Frist mindestens 1 Min' },
+                            { type: 'integer', max: 10080, message: 'Frist höchstens 10080 Min' },
+                          ]}
+                        >
+                          <InputNumber
+                            precision={0}
+                            suffix="Min"
+                            placeholder="Frist (Vorgabe)"
+                            aria-label="Bestätigungsfrist in Minuten"
+                          />
+                        </Feld>
+                      </div>
                     )}
-                  </div>
-                </Form.Item>
+                  </Stapel>
+                </Feld>
               </>
             ),
           },

@@ -83,6 +83,7 @@ import {
   Sammelbanner,
   sammelbannerKurz,
   Segmentleiste,
+  Stapel,
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
@@ -1091,12 +1092,12 @@ export default function AbloesungPage() {
             ) : (
               vorgaben.map((v) => (
                 <PaneelZeile key={v.abschnitt_id}>
-                  <Flex
-                    justify="space-between"
-                    align="center"
-                    gap={token.marginXS}
-                    wrap
-                    style={{ width: '100%' }}
+                  <Stapel
+                    richtung="zeile"
+                    umbruch
+                    abstand="xs"
+                    ausrichten="mitte"
+                    verteilen="between"
                   >
                     <span>
                       <Text strong>{v.abschnitt_name}</Text>{' '}
@@ -1118,7 +1119,7 @@ export default function AbloesungPage() {
                         }}
                       />
                     )}
-                  </Flex>
+                  </Stapel>
                 </PaneelZeile>
               ))
             )}

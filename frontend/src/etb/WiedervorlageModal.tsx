@@ -8,6 +8,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { legeErinnerungAn } from '../api/erinnerungen';
 import { einsatzKeys } from '../api/queryKeys';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
+import { Feld } from '../components/instrument';
 import { serverJetzt } from '../offline/serveruhr';
 import { SCHNELLWAHL_TERMIN, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -134,16 +135,16 @@ export default function WiedervorlageModal({
           : undefined
       }
     >
-      <Form.Item
+      <Feld
         label="Titel"
         name="titel"
         rules={[{ required: true, message: 'Titel ist erforderlich' }]}
       >
         <Input />
-      </Form.Item>
-      <Form.Item label="Fällig am" required style={{ marginBottom: token.margin }}>
+      </Feld>
+      <Feld label="Fällig am" required>
         {/*
-          Die Schnellwahl steht ÜBER dem Feld, in demselben `Form.Item`: sie ist eine
+          Die Schnellwahl steht ÜBER dem Feld, in demselben `Feld`: sie ist eine
           Vorbelegung desselben Wertes, kein eigenes Feld — das Budget bleibt bei drei
           (LFH-19). Das Zeitfeld darunter trägt weiter den freien Fall.
         */}
@@ -174,17 +175,17 @@ export default function WiedervorlageModal({
             </Button>
           )}
         </Space>
-        <Form.Item
+        <Feld
           name="faellig"
           noStyle
           rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
         >
           <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
-        </Form.Item>
-      </Form.Item>
-      <Form.Item label="Beschreibung (optional)" name="beschreibung">
+        </Feld>
+      </Feld>
+      <Feld label="Beschreibung (optional)" name="beschreibung">
         <TextArea rows={2} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

@@ -572,3 +572,46 @@ async fn personen_antrag_bis_zum_vollzug() {
     let (_, liste) = anfrage(&l.app, "GET", &antraege_uri(l.einsatz), &l.admin, None).await;
     assert_eq!(liste[0]["stand"], "vollzogen");
 }
+
+/// LLH-1976: Stellen und Zurücknehmen eines Löschersuchens gehen mit ihrem System-Eintrag als
+/// Ereignis `etb` hinaus.
+#[tokio::test]
+async fn antrag_etb_eintraege_gehen_live_hinaus() {
+    let (app, _pool, live) = common::setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, einsatz, r#"{"name":"Mustermann"}"#).await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut etb = common::EtbLive::neu(&app, &admin, einsatz, &live).await;
+    let uri = antraege_uri(einsatz);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &uri,
+        &admin,
+        Some(&personen_antrag(person, "R-001")),
+    )
+    .await;
+    assert!(s.is_success(), "{s}: {v}");
+    etb.pruefe(&app, &admin, einsatz, "Antrag stellen").await;
+    let aid = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("{uri}/{aid}/zuruecknehmen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    etb.pruefe(&app, &admin, einsatz, "Antrag zurücknehmen")
+        .await;
+}

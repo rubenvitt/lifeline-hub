@@ -1,5 +1,5 @@
-import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { Alert, Flex, Spin } from 'antd';
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
+import { Alert, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -9,7 +9,7 @@ import type { Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Paneel, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Stapel, monoStil, useRollen } from '../components/instrument';
 import { abschnittDerEinheit } from '../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../kraefte/meldebildRaster';
 import AbschnittDaten from '../pages/einsatzabschnitte/AbschnittDaten';
@@ -57,11 +57,11 @@ function EinheitZeile({
         borderBottom: `1px solid ${rollen.linie}`,
       }}
     >
-      <Flex justify="space-between" align="center" gap={token.marginSM} wrap>
+      <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte" verteilen="between">
         <span>
           <strong>{e.name}</strong>
           {e.funkrufname && (
-            <span style={{ ...monoStil(13), color: rollen.gedaempft }}> · {e.funkrufname}</span>
+            <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}> · {e.funkrufname}</span>
           )}
           {abschnittName && <span style={{ color: rollen.gedaempft }}> · {abschnittName}</span>}
           {ueber && <span style={{ color: rollen.gedaempft }}> · über {ueber}</span>}
@@ -73,10 +73,10 @@ function EinheitZeile({
           }}
           farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
         />
-      </Flex>
+      </Stapel>
       {/* Eigene Stärke wie „Zugeordnete Einheiten“ der Abschnittsseite (LLH-1744): die Zeilen
           ergeben die Stärke im Kopf, eine Untereinheit zählt nicht zusätzlich bei ihrem Zug. */}
-      <span style={monoStil(13)}>
+      <span style={monoStil('mono')}>
         eigene <StaerkeAnzeige wert={e.ist} />
       </span>
     </li>
@@ -90,7 +90,6 @@ function EinheitZeile({
  * zugeschnitten; die Seite zeigt es nur.
  */
 export default function GeraetAbschnittPage() {
-  const { token } = useRollen();
   const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const abschnittId = geraet?.stelle_id ?? null;
@@ -132,7 +131,7 @@ export default function GeraetAbschnittPage() {
       ) : !abschnitt ? (
         <Alert type="warning" showIcon title="Abschnitt nicht mehr vorhanden" />
       ) : (
-        <Flex vertical gap={token.margin}>
+        <Stapel abstand="md">
           <Paneel titel="Abschnitt" koerperPolster>
             <AbschnittDaten
               abschnitt={abschnitt}
@@ -141,7 +140,15 @@ export default function GeraetAbschnittPage() {
               spalten={1}
             />
           </Paneel>
-          <Paneel titel="Einheiten" meta={`Stärke ${STAERKE_SCHREIBWEISE}`} koerperPolster>
+          <Paneel
+            titel="Einheiten"
+            meta={
+              <>
+                Stärke <StaerkeSchreibweise />
+              </>
+            }
+            koerperPolster
+          >
             {einheitenQuery.isError ? (
               <Alert type="error" showIcon title="Einheiten konnten nicht geladen werden" />
             ) : einheitenQuery.isLoading ? (
@@ -165,7 +172,7 @@ export default function GeraetAbschnittPage() {
               </ul>
             )}
           </Paneel>
-        </Flex>
+        </Stapel>
       )}
     </EinsatzSeite>
   );

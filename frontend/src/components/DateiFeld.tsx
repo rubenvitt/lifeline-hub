@@ -1,6 +1,7 @@
 import { IconHochladen } from '../icons';
-import { Button, Form, Upload, type UploadFile } from 'antd';
+import { Button, Upload, type UploadFile } from 'antd';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
+import Feld from './instrument/Feld';
 
 /** Wortgleich mit der Server-Absage (`src/anhang/mod.rs`, `pruefe_groesse`): eine Absage, ein
  *  Wortlaut — gleich, ob der Dialog sie vorab gibt oder der Server. */
@@ -28,7 +29,8 @@ interface Props {
  */
 export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props) {
   return (
-    <Form.Item
+    <Feld
+      breite="voll"
       name={name}
       label="Datei"
       valuePropName="fileList"
@@ -71,6 +73,6 @@ export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props
           Datei wählen
         </Button>
       </Upload>
-    </Form.Item>
+    </Feld>
   );
 }

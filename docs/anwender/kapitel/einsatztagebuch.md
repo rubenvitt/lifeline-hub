@@ -315,7 +315,7 @@ lesende ([Einheiten](einheiten.md)).
 
 Nennt ein automatischer Eintrag eine Zeit, etwa „benötigt bis 211530okt26“ oder den Zeitraum einer
 Verpflegung „241200sep26–1330“, steht sie in der Zeitdarstellung des Einsatzes bzw. der
-Organisation, nicht in der Wahl an deinem Gerät: der Eintrag ist für alle derselbe. Ältere Einträge
+Organisation, nicht in der Wahl am eigenen Gerät: der Eintrag ist für alle derselbe. Ältere Einträge
 behalten die Schreibweise, mit der sie geschrieben wurden.
 
 Systemeinträge sind beim Öffnen ausgeblendet; „System“ in der Filterleiste blendet sie ein

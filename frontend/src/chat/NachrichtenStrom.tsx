@@ -314,7 +314,7 @@ export default function NachrichtenStrom({
                   <Space size="small">
                     <Typography.Text strong>{n.autor_name}</Typography.Text>
                     <Tooltip title={zeitpunkt(n.erstellt_at)}>
-                      <Typography.Text type="secondary" style={monoStil(12)}>
+                      <Typography.Text type="secondary" style={monoStil('monoKlein')}>
                         {zeitKurz(n.erstellt_at)}
                       </Typography.Text>
                     </Tooltip>
