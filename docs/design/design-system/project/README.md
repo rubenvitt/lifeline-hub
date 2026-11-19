@@ -297,6 +297,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
     neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
     Nachweis `e2e/fehlergrenze.spec.ts`.
+  - **Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze** (Entwurf
+    `docs/superpowers/specs/2026-11-19-ft74hjiv-fehlergrenze-je-kachel-design.md`): Auf
+    Überblick, Lagebild, Lagebild-Großbild und Lagemonitor steht jede Kachel (Alarmzeile,
+    Startliste, Paneel, Kennzahlenband, Monitorkachel) einzeln in `KachelGrenze`
+    (`components/KachelGrenze.tsx`), damit ein Wurf nur sie ersetzt und nicht über die
+    Rahmengrenze die ganze Seite. Form `paneel` mit „Neu laden“ auf Flächen mit Bedienung, Form
+    `gross` ohne Knopf auf Großbild und Lagemonitor, dort mit dem Datenstand als `neuversuch`. Wie
+    die Rahmengrenze zeigt sie nie Meldung oder Stack und meldet über `meldeClientFehler`. Sie
+    fängt nur Würfe beim Zeichnen: Abfragefehler zeigt `PaneelZustand`, ein Wurf im Rumpf der
+    Seite bleibt bei der Rahmengrenze. Wächter `pruefeKachelGrenzen` (`test/kachelWaechter.ts`)
+    in den Seitentests von Überblick, Lagebild und Lagemonitor; Nachweis
+    `components/KachelGrenze.test.tsx`.
   - **Ortsmarke in der Bedienfarbe**: die aktive
     Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
     aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
