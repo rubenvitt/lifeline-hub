@@ -435,6 +435,19 @@ pub async fn vormerken(
     kategorie: Datenkategorie,
     jetzt: &str,
 ) -> Result<bool, AppError> {
+    Ok(vormerken_mit_etb(pool, einsatz_id, kategorie, jetzt)
+        .await?
+        .is_some())
+}
+
+/// Wie [`vormerken`], liefert die Kennung des ETB-Eintrags, den der Löschlauf nach dem Commit
+/// verteilt (LLH-1976); `None` = nichts vorgemerkt.
+pub async fn vormerken_mit_etb(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    kategorie: Datenkategorie,
+    jetzt: &str,
+) -> Result<Option<i64>, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
@@ -461,7 +474,7 @@ pub async fn vormerken(
     .fetch_optional(&mut *tx)
     .await?;
     let Some(karenz_beginn) = karenz_beginn else {
-        return Ok(false);
+        return Ok(None);
     };
     let rechtsgrundlage: String = sqlx::query_scalar(
         "SELECT rechtsgrundlage FROM einsatz_aufbewahrung_kategorie \
@@ -485,9 +498,9 @@ pub async fn vormerken(
          sperrt den Einsatz nicht (Rechtsgrundlage: {rechtsgrundlage})",
         kategorie.bezeichnung()
     );
-    system_audit_tx(&mut tx, einsatz_id, etb_startwert, &inhalt).await?;
+    let etb_id = system_audit_tx(&mut tx, einsatz_id, etb_startwert, &inhalt).await?;
     tx.commit().await?;
-    Ok(true)
+    Ok(Some(etb_id))
 }
 
 /// Vorgemerkte, noch nicht geschwärzte Kategorien (Phase-K2-Kandidaten) als
@@ -526,6 +539,19 @@ pub async fn schwaerzen(
     kategorie: Datenkategorie,
     jetzt: DateTime<Utc>,
 ) -> Result<bool, AppError> {
+    Ok(schwaerzen_mit_etb(pool, einsatz_id, kategorie, jetzt)
+        .await?
+        .is_some())
+}
+
+/// Wie [`schwaerzen`], liefert die Kennung des ETB-Eintrags, den der Löschlauf nach dem Commit
+/// verteilt (LLH-1976); `None` = nichts zu tun.
+pub async fn schwaerzen_mit_etb(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    kategorie: Datenkategorie,
+    jetzt: DateTime<Utc>,
+) -> Result<Option<i64>, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let mut tx = pool.begin().await?;
@@ -544,7 +570,7 @@ pub async fn schwaerzen(
     .execute(&mut *tx)
     .await?;
     if res.rows_affected() == 0 {
-        return Ok(false);
+        return Ok(None);
     }
 
     scrubbe_aus_registry(&mut tx, einsatz_id, Umfang::Kategorie(kategorie)).await?;
@@ -610,7 +636,7 @@ pub async fn schwaerzen(
         ". Die Schwärzung der Kategorie sperrt den Einsatz nicht; das ETB im Wortlaut, \
          Registriernummern sowie Sichtungs- und Statuskategorien bleiben erhalten.",
     );
-    system_audit_tx(&mut tx, einsatz_id, etb_startwert, &inhalt).await?;
+    let etb_id = system_audit_tx(&mut tx, einsatz_id, etb_startwert, &inhalt).await?;
     tx.commit().await?;
     tracing::warn!(
         einsatz_id,
@@ -622,7 +648,7 @@ pub async fn schwaerzen(
     if kategorie == Datenkategorie::Anhaenge {
         super::schwaerzung_nachlauf::nachlaufen(pool, einsatz_id).await;
     }
-    Ok(true)
+    Ok(Some(etb_id))
 }
 
 /// Aufbewahrung einer Datenkategorie am Einsatz (Spec „Zustand je Kategorie“, design.md D7).

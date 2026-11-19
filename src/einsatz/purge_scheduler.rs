@@ -210,12 +210,13 @@ async fn tick_rumpf(
                     kategorie = k.as_str(),
                     "Purge Phase K1: Datenkategorie vorgemerkt (Frist abgelaufen)"
                 );
-                match kategorie::vormerken(pool, id, k, &jetzt_s).await {
-                    Ok(true) => {
+                match kategorie::vormerken_mit_etb(pool, id, k, &jetzt_s).await {
+                    Ok(Some(etb_id)) => {
                         anzahl += 1;
-                        live.publiziere_einsatz(id, LiveEvent::Etb);
+                        // Mit Kennung (LLH-1976): frischt das ETB auf wie die Listenmeldung.
+                        live.publiziere(id, etb_id);
                     }
-                    Ok(false) => {}
+                    Ok(None) => {}
                     Err(e) => tracing::error!(
                         einsatz_id = id,
                         kategorie = k.as_str(),
@@ -239,24 +240,25 @@ async fn tick_rumpf(
                     kategorie = k.as_str(),
                     "Purge Phase K2: Schwärzung einer Datenkategorie (irreversibel)"
                 );
-                match kategorie::schwaerzen(pool, id, k, jetzt).await {
-                    Ok(true) => {
+                match kategorie::schwaerzen_mit_etb(pool, id, k, jetzt).await {
+                    Ok(Some(etb_id)) => {
                         anzahl += 1;
                         geschwaerzt += 1;
-                        // Offene Clients laden neu und tragen keinen Altstand weiter (design.md D5).
+                        // Offene Clients laden neu und tragen keinen Altstand weiter (design.md D5);
+                        // das ETB über den Eintrag mit Kennung (LLH-1976).
                         for event in [
                             LiveEvent::Person,
                             LiveEvent::Dokument,
                             LiveEvent::Schaden,
                             LiveEvent::Chat,
-                            LiveEvent::Etb,
                         ] {
                             live.publiziere_einsatz(id, event);
                         }
+                        live.publiziere(id, etb_id);
                         // `teilschwaerzungen` steigt: Geräte verwerfen ihre älteren Stände (LFH-996).
                         crate::live::org::kopf_melden(pool, live, id, &[]).await;
                     }
-                    Ok(false) => {}
+                    Ok(None) => {}
                     Err(e) => tracing::error!(
                         einsatz_id = id,
                         kategorie = k.as_str(),

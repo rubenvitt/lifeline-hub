@@ -130,6 +130,19 @@ pub async fn ohne_verteilung<F: Future>(grund: &'static str, fut: F) -> F::Outpu
     }
 }
 
+/// Nimmt einen schon geschriebenen Eintrag vom Wächter aus, wenn erst das Ergebnis eines Laufs
+/// zeigt, dass er nicht verteilt wird (Vollzug eines Einsatz-Löschersuchens). Wie
+/// [`ohne_verteilung`] steht der Grund im Code.
+pub fn ausnehmen(grund: &'static str, etb_id: i64) {
+    let _ = grund;
+    #[cfg(debug_assertions)]
+    let _ = aktiv::SAMMLER.try_with(|s| {
+        s.borrow_mut().ausgenommen.insert(etb_id);
+    });
+    #[cfg(not(debug_assertions))]
+    let _ = etb_id;
+}
+
 /// Merkt einen frisch eingefügten ETB-Eintrag vor (aus `repo::einfuegen`).
 pub(crate) fn geschrieben(etb_id: i64) {
     #[cfg(debug_assertions)]
