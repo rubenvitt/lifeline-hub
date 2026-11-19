@@ -52,6 +52,13 @@ export default function ModulGesperrt({
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
+  // Sperrzeile und Ansprechpartner: Stufe textKlein, keine freie Schriftgröße (Spec `schriftstufen`).
+  const sperrzeile = {
+    margin: 0,
+    ...schriftStil('textKlein'),
+    lineHeight: 1.5,
+    color: rollen.text2,
+  };
   return (
     <div
       style={{
@@ -81,16 +88,12 @@ export default function ModulGesperrt({
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
           {/* Eine Sperrzeile (LFH-1078, Spec `modul-freigabe`): Modul und Grund stehen schon in h1 und
              Paneeltitel. Wo die Freigaben liegen, zeigt der Knopf statt eines Satzes. */}
-          <p style={{ margin: 0, ...schriftStil('text'), color: rollen.text2 }}>
+          <p style={sperrzeile}>
             {ausgeblendet ? 'In diesem Einsatz ausgeblendet' : 'Für deine Rolle nicht freigegeben'}
           </p>
           {/* Wen man fragt (LLH-1819). Wer die Freigaben selbst verwaltet, hat den Knopf statt
              eines Namens. */}
-          {!freigabenPfad && (
-            <p style={{ margin: 0, ...schriftStil('text'), color: rollen.text2 }}>
-              {ansprechpartnerZeile(einsatzleitung)}
-            </p>
-          )}
+          {!freigabenPfad && <p style={sperrzeile}>{ansprechpartnerZeile(einsatzleitung)}</p>}
           {(rueckweg || freigabenPfad) && (
             <Space wrap>
               {rueckweg && (
