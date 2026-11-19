@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import RollWiederherstellung from './RollWiederherstellung';
-import { ROLL_FRIST_MS, rollGedaechtnisRaeumen } from '../routing/rollGedaechtnis';
+import { merkeRolle, ROLL_FRIST_MS, rollGedaechtnisRaeumen } from '../routing/rollGedaechtnis';
 
 /** Ein `ResizeObserver`, dessen Rückrufe der Test selbst auslöst. */
 const beobachter: Array<() => void> = [];
@@ -25,7 +26,7 @@ const wachse = (hoehe: number) => {
 let hoehe_ = 800;
 let scrollTo: ReturnType<typeof vi.fn>;
 
-function starte(eintraege: string[] = ['/a']) {
+function starte(eintraege: string[] = ['/a'], { strict = false }: { strict?: boolean } = {}) {
   const router = createMemoryRouter(
     [
       {
@@ -40,12 +41,26 @@ function starte(eintraege: string[] = ['/a']) {
     ],
     { initialEntries: eintraege, initialIndex: eintraege.length - 1 },
   );
-  render(<RouterProvider router={router} />);
+  render(
+    strict ? (
+      <StrictMode>
+        <RouterProvider router={router} />
+      </StrictMode>
+    ) : (
+      <RouterProvider router={router} />
+    ),
+  );
   return router;
 }
 
-const rolle = (y: number) =>
+/**
+ * Setzt die Position wie der Browser, mit Scroll-Ereignis. `ohneEreignis` stellt das Klemmen der
+ * Position nach, das der Browser beim Zeichnen einer kürzeren Seite still vornimmt.
+ */
+const rolle = (y: number, { ohneEreignis = false }: { ohneEreignis?: boolean } = {}) => {
   Object.defineProperty(window, 'scrollY', { value: y, configurable: true });
+  if (!ohneEreignis) window.dispatchEvent(new Event('scroll'));
+};
 
 describe('RollWiederherstellung (LLH-1826)', () => {
   beforeEach(() => {
@@ -136,5 +151,108 @@ describe('RollWiederherstellung (LLH-1826)', () => {
     expect(history.scrollRestoration).toBe('manual');
     act(() => router.dispose());
     document.body.innerHTML = '';
+  });
+
+  it('eine Adressänderung per replace nach dem Rollen verliert die Position nicht', async () => {
+    const router = starte(['/a']);
+    rolle(1400);
+    await act(() => router.navigate('/a?richtung=extern', { replace: true }));
+    // Die neue, kürzere Seite klemmt die Position, bevor das Aufräumen läuft (kein Scroll-Ereignis).
+    rolle(300, { ohneEreignis: true });
+    await act(() => router.navigate('/b'));
+    hoehe_ = 3000;
+    scrollTo.mockClear();
+    await act(() => router.navigate(-1));
+    expect(scrollTo).toHaveBeenCalledWith(0, 1400);
+  });
+
+  it('eine laufende Wiederherstellung übersteht eine Adressänderung per replace', async () => {
+    const router = await hinUndZurueck();
+    await act(() => router.navigate('/a?richtung=extern', { replace: true }));
+    wachse(3000);
+    expect(scrollTo).toHaveBeenCalledWith(0, 1400);
+  });
+
+  it('der Schlüssel „default“ eines frischen Ladens gilt nur für dieselbe Adresse', async () => {
+    hoehe_ = 3000;
+    const erster = starte(['/a']);
+    rolle(1400);
+    await act(() => erster.navigate('/b'));
+    act(() => erster.dispose());
+    document.body.innerHTML = '';
+    scrollTo.mockClear();
+    // Später im selben Tab: eine andere Adresse frisch geladen, wieder mit dem Schlüssel „default“.
+    starte(['/c']);
+    expect(scrollTo).not.toHaveBeenCalledWith(0, 1400);
+  });
+
+  it('ein Scroll-Ereignis, während die nächste Seite noch lädt, zählt nicht für die alte', async () => {
+    let freigeben: () => void = () => {};
+    const router = createMemoryRouter(
+      [
+        {
+          element: (
+            <>
+              <RollWiederherstellung />
+              <Outlet />
+            </>
+          ),
+          children: [
+            {
+              path: '/b',
+              loader: () =>
+                new Promise<null>((r) => {
+                  freigeben = () => r(null);
+                }),
+              element: null,
+            },
+            { path: '*', element: null },
+          ],
+        },
+      ],
+      { initialEntries: ['/a'] },
+    );
+    render(<RouterProvider router={router} />);
+    rolle(1400);
+    let weg: Promise<void> = Promise.resolve();
+    act(() => {
+      weg = router.navigate('/b');
+    });
+    // Ein Ladegerippe der alten Adresse ist kürzer: der Browser klemmt und meldet ein Ereignis.
+    rolle(300);
+    await act(async () => {
+      freigeben();
+      await weg;
+    });
+    hoehe_ = 3000;
+    scrollTo.mockClear();
+    await act(() => router.navigate(-1));
+    expect(scrollTo).toHaveBeenCalledWith(0, 1400);
+  });
+
+  it('unter StrictMode überschreibt der Probeabbau die gemerkte Position nicht', () => {
+    // Wie ein Neuladen beim Zurück: der Eintrag trägt seinen Schlüssel, die Position ist gemerkt.
+    merkeRolle('k1', 1400);
+    const router = createMemoryRouter(
+      [
+        {
+          element: (
+            <>
+              <RollWiederherstellung />
+              <Outlet />
+            </>
+          ),
+          children: [{ path: '*', element: null }],
+        },
+      ],
+      { initialEntries: [{ pathname: '/a', key: 'k1' }] },
+    );
+    render(
+      <StrictMode>
+        <RouterProvider router={router} />
+      </StrictMode>,
+    );
+    wachse(3000);
+    expect(scrollTo).toHaveBeenCalledWith(0, 1400);
   });
 });

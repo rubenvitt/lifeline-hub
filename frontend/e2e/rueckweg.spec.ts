@@ -46,23 +46,41 @@ test.describe('Rückweg (LLH-1826)', () => {
     await page.getByRole('combobox', { name: 'Richtung' }).click();
     await page.getByTitle('Extern', { exact: true }).click();
     await expect(page).toHaveURL(/[?&]richtung=extern/);
+    // Die Seite hat die Adresse übernommen (die Wahl kommt aus ihr), erst dann rollen.
+    const richtung = page.locator('.ant-select', {
+      has: page.getByRole('combobox', { name: 'Richtung' }),
+    });
+    await expect(richtung).toContainText('Extern');
+    await expect(page.getByText('Lage 0: ruhig, keine Veränderung.')).toBeVisible();
 
     await page.evaluate(() => window.scrollTo(0, 1400));
     await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(1400);
+    // Welche Meldung oben im Bild steht und wo: das soll nach dem Zurück wieder so sein. Ändert
+    // sich beim Laden die Höhe über der Liste, regelt der Browser die Pixelzahl nach (Scroll
+    // Anchoring) und hält denselben Inhalt im Bild; gemessen wird deshalb der Inhalt.
+    const obenImBild = () =>
+      page.evaluate(() => {
+        const karten = [...document.querySelectorAll<HTMLElement>('[data-meldung-id]')];
+        const erste = karten.find((k) => k.getBoundingClientRect().bottom > 0);
+        return erste
+          ? { id: erste.dataset.meldungId, oben: Math.round(erste.getBoundingClientRect().top) }
+          : null;
+      });
+    const vorher = await obenImBild();
+    expect(vorher).not.toBeNull();
 
     // Weg innerhalb der App (Kategorie „Führung“ in der Rail), Zurück über den Browser.
-    await page.getByRole('link', { name: 'Führung', exact: true }).click();
-    await expect(page).not.toHaveURL(/\/meldungen/);
+    // Weg über ein neues Laden (Link von außen, Lesezeichen): beim Zurück lädt die Seite neu, und
+    // die Liste kommt erst mit den Daten; der Browser allein landete dann oben.
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await expect(page.getByRole('heading', { name: 'ETB', level: 1 })).toBeVisible();
     await page.goBack();
 
     await expect(page).toHaveURL(/[?&]richtung=extern/);
-    await expect(
-      page.locator('.ant-select', { has: page.getByRole('combobox', { name: 'Richtung' }) }),
-    ).toContainText('Extern');
-    await expect
-      .poll(() => page.evaluate(() => Math.round(window.scrollY)), { timeout: 5_000 })
-      .toBeGreaterThanOrEqual(1398);
-    expect(await page.evaluate(() => Math.round(window.scrollY))).toBeLessThanOrEqual(1402);
+    await expect(richtung).toContainText('Extern');
+    await expect.poll(obenImBild, { timeout: 5_000 }).toEqual(vorher);
+    // Gegenaussage: ohne Wiederherstellung stünde die Seite oben.
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
   });
 
   test('Betroffene im Sichtungsraster überleben Weg und Zurück', async ({ page }) => {

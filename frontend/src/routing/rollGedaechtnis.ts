@@ -65,6 +65,18 @@ export function merkeRolle(key: string, y: number): void {
   }
 }
 
+/** Entfernt einen Eintrag, etwa den toten Schlüssel nach einer Adressänderung per replace. */
+export function loescheRolle(key: string): void {
+  const eintraege = lies();
+  if (!eintraege.delete(key)) return;
+  ersatz = eintraege;
+  try {
+    globalThis.sessionStorage?.setItem(SCHLUESSEL, JSON.stringify([...eintraege]));
+  } catch {
+    /* sessionStorage gesperrt: die Map trägt die Sitzung */
+  }
+}
+
 export function liesRolle(key: string): number | undefined {
   return lies().get(key);
 }
