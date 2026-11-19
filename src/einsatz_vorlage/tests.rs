@@ -241,7 +241,7 @@ async fn seed_entspricht_der_startliste() {
     }
 }
 
-/// LLH-1816: Bootstrap und Demo finden eine Vorlage über ihren Namen, nur in der eigenen
+/// LLH-1816: Der Bootstrap findet eine Vorlage über ihren Namen, nur in der eigenen
 /// Organisation; ein unbekannter Name ist kein Fehler.
 #[tokio::test]
 async fn find_id_by_bezeichnung_tx_findet_nur_in_der_eigenen_organisation() {

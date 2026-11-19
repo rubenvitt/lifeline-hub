@@ -693,7 +693,9 @@ function EinsaetzeInhalt() {
           name="bezeichnung"
           rules={[{ required: true, message: 'Bitte Bezeichnung eingeben' }]}
         >
-          <Input />
+          {/* Ausdrückliches Fokusziel: sonst fokussiert die Erfassungs-Hülle die Vorlage darüber
+              (LLH-1816, Design-Doc D3). */}
+          <Input data-erfassung-fokus="" />
         </Form.Item>
         <Form.Item label="Stichwort" name="stichwort">
           <AutoComplete

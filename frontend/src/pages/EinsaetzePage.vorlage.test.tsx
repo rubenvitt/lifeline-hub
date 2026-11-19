@@ -130,6 +130,17 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375, LLH-1816)', () => {
     expect(within(dialog).queryByText(/blendet/)).toBeNull();
   });
 
+  it('„Bezeichnung“ ist das Fokusziel beim Öffnen, nicht die Vorlage darüber', async () => {
+    setup();
+    await oeffneDialog();
+    // Die Erfassungs-Hülle fokussiert sonst das erste Feld, seit LLH-1816 die Vorlage; das
+    // ausdrückliche Ziel bevorzugt sie (`Erfassung.test.tsx`).
+    expect(screen.getByLabelText('Bezeichnung')).toHaveAttribute('data-erfassung-fokus');
+    expect(screen.getByRole('combobox', { name: 'Vorlage' })).not.toHaveAttribute(
+      'data-erfassung-fokus',
+    );
+  });
+
   it('zeigt die Modulzahl der gewählten Vorlage', async () => {
     setup();
     const dialog = await oeffneDialog();

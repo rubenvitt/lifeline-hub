@@ -298,8 +298,8 @@ pub async fn load_for_anlage_tx(
         .ok_or_else(|| AppError::Validation("Unbekannte Einsatz-Vorlage".into()))
 }
 
-/// Die Vorlage der Organisation mit genau dieser Bezeichnung (LLH-1816): Bootstrap und
-/// Demo-Import koppeln über den Namen der Startliste. Ein unbekannter Name ist kein Fehler, die
+/// Die Vorlage der Organisation mit genau dieser Bezeichnung (LLH-1816): Der Bootstrap
+/// koppelt die Start-Stichworte über den Namen der Startliste. Ein unbekannter Name ist kein Fehler, die
 /// Organisation darf ihre Vorlagen umbenennen oder löschen.
 pub async fn find_id_by_bezeichnung_tx(
     conn: &mut SqliteConnection,
