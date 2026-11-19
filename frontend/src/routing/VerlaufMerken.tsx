@@ -1,7 +1,9 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { useLocation, useNavigationType, type Location } from 'react-router';
 import {
+  abonniereHerkunft,
   leseHerkunft,
+  meldeHerkunft,
   merkeHerkunft,
   uebertrageHerkunft,
   type VorigeAdresse,
@@ -21,7 +23,9 @@ import {
  * zieht dagegen erst der Layout-Effekt nach, also nur für ein Bild, das wirklich auf dem Schirm
  * steht: der Router navigiert in einer Transition, und ein verworfenes Rendern darf der noch
  * sichtbaren Seite keine Herkunft unterschieben (Review LLH-1997). So ist jedes Schreiben
- * idempotent, auch das doppelte Rendern unter StrictMode.
+ * idempotent, auch das doppelte Rendern unter StrictMode. Hat eine Seite schon vorher gezeichnet
+ * (sie steht nicht immer hinter dem Layout im selben Durchlauf), meldet der Layout-Effekt die
+ * Herkunft nach, und `useVorigeAdresse` zeichnet neu.
  */
 export function VerlaufMerken(): null {
   const location = useLocation();
@@ -37,11 +41,13 @@ export function VerlaufMerken(): null {
   }
   useLayoutEffect(() => {
     zuletzt.current = location;
+    meldeHerkunft();
   }, [location]);
   return null;
 }
 
 /** Die Adresse, von der aus die aktuelle Seite betreten wurde, oder `null`. */
 export function useVorigeAdresse(): VorigeAdresse | null {
-  return leseHerkunft(useLocation().key);
+  const { key } = useLocation();
+  return useSyncExternalStore(abonniereHerkunft, () => leseHerkunft(key));
 }

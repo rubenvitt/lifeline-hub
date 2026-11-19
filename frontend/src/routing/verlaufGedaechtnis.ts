@@ -57,9 +57,29 @@ function sichere(): void {
   }
 }
 
+const zuhoerer = new Set<() => void>();
+
+/** Für `useSyncExternalStore`: wer liest, erfährt von jeder späteren Herkunft. */
+export function abonniereHerkunft(zuhoererNeu: () => void): () => void {
+  zuhoerer.add(zuhoererNeu);
+  return () => zuhoerer.delete(zuhoererNeu);
+}
+
+/**
+ * Meldet geschriebene Herkünfte an die Leser. Nicht aus `merkeHerkunft` selbst, weil das im
+ * Render läuft (`VerlaufMerken`) und ein Update anderer Komponenten dort verboten ist; der
+ * Layout-Effekt von `VerlaufMerken` ruft es.
+ */
+export function meldeHerkunft(): void {
+  zuhoerer.forEach((z) => z());
+}
+
 /** Merkt die Herkunft eines per PUSH betretenen Eintrags; ältere fallen über 50 heraus. */
 export function merkeHerkunft(key: string, adresse: VorigeAdresse): void {
   if (key === ERSTER_KEY) return;
+  const bisher = leseHerkunft(key);
+  // Gleiche Herkunft, gleiches Objekt: der Schnappschuss der Leser bleibt stabil.
+  if (bisher && bisher.pathname === adresse.pathname && bisher.search === adresse.search) return;
   zeilen = zeilen.filter(([k]) => k !== key);
   zeilen.push([key, { pathname: adresse.pathname, search: adresse.search }]);
   if (zeilen.length > VERLAUF_HOECHSTENS) zeilen = zeilen.slice(-VERLAUF_HOECHSTENS);

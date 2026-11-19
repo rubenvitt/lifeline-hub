@@ -64,3 +64,35 @@ describe('VerlaufMerken', () => {
     expect(herkunft()).toEqual({ pathname: '/liste', search: '' });
   });
 });
+
+describe('useVorigeAdresse vor VerlaufMerken im Baum', () => {
+  beforeEach(() => {
+    verlaufGedaechtnisRaeumen();
+  });
+
+  it('zeichnet neu, sobald die Herkunft nach dem eigenen Rendern geschrieben ist', async () => {
+    // Die Seite kann zeichnen, bevor das Layout die Herkunft schreibt (LLH-1997, e2e nach dem
+    // Merge von LLH-1826); dann muss sie davon erfahren.
+    const router = createMemoryRouter(
+      [
+        {
+          element: (
+            <>
+              <Sonde />
+              <VerlaufMerken />
+              <Outlet />
+            </>
+          ),
+          children: [
+            { path: '/liste', element: null },
+            { path: '/detail/:id', element: null },
+          ],
+        },
+      ],
+      { initialEntries: ['/liste?q=1'] },
+    );
+    render(<RouterProvider router={router} />);
+    await act(() => router.navigate('/detail/1'));
+    expect(herkunft()).toEqual({ pathname: '/liste', search: '?q=1' });
+  });
+});
