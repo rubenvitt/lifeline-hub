@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { IconBericht, IconPlus } from '../../icons';
 import { useWasBrennt } from '../../lage/useWasBrennt';
@@ -921,14 +922,19 @@ export default function UeberblickPage() {
                         meta={
                           zAbschnitte === 'daten' ? (
                             // Einzahl und Mehrzahl richtig (LFH-973): „1 Abschnitt“, nicht „1 Abschnitte“.
-                            `${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')}`
+                            // Die Zeilen sind Links; die Schreibweise der Stärke erklärt sich deshalb
+                            // hier im Kopf (LLH-1825, kein Knopf im Link).
+                            <>
+                              {`${anzahlWort(abschnitte?.length ?? 0, 'Abschnitt', 'Abschnitte')} · ${anzahlWort(einheiten?.length ?? 0, 'Einheit', 'Einheiten')} · Stärke `}
+                              <StaerkeSchreibweise />
+                            </>
                           ) : zAbschnitte === 'laden' ? (
                             <span
                               data-lfh="paneel-meta-platzhalter"
                               aria-hidden="true"
                               style={{ visibility: 'hidden' }}
                             >
-                              0 Abschnitte · 0 Einheiten
+                              0 Abschnitte · 0 Einheiten · Stärke F/UF/M//Σ
                             </span>
                           ) : undefined
                         }

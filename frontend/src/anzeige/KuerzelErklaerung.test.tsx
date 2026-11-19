@@ -74,4 +74,16 @@ describe('KuerzelErklaerung (LLH-1825)', () => {
     const knopf = screen.getByRole('button', { name: STAERKE_NAME });
     expect(knopf).toHaveTextContent('F/UF/M · //Σ');
   });
+
+  // Schmale Spalten (Druckblatt des Meldebilds): Umbruch nur vor der Summe, nie an jedem Strich.
+  it('umbruchVorSumme bricht nur vor „//Σ“', () => {
+    zeige(<StaerkeSchreibweise umbruchVorSumme />);
+    const knopf = screen.getByRole('button', { name: STAERKE_NAME });
+    expect(knopf).toHaveTextContent('F/UF/M//Σ');
+    expect(knopf.querySelectorAll('wbr')).toHaveLength(1);
+    expect([...knopf.querySelectorAll('span')].map((t) => t.textContent)).toEqual([
+      'F/UF/M',
+      '//Σ',
+    ]);
+  });
 });

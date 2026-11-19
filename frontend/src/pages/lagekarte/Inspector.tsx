@@ -1,3 +1,4 @@
+import KuerzelErklaerung from '../../anzeige/KuerzelErklaerung';
 import { Button, Popconfirm, Space, Typography } from 'antd';
 import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
@@ -128,7 +129,15 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
   const ton = feld.rolle ? tonVonRolle(feld.rolle) : null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}>
-      <Augenbraue als="dt">{feld.label}</Augenbraue>
+      <Augenbraue als="dt">
+        {feld.label}
+        {feld.labelKuerzel && (
+          <>
+            {' '}
+            <KuerzelErklaerung kuerzel={feld.labelKuerzel} />
+          </>
+        )}
+      </Augenbraue>
       <dd style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
         {ton ? (
           <Status groesse="klein" ton={ton} wort={feld.wert} />

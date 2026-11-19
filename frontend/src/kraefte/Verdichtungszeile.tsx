@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
 import { Space } from 'antd';
 import { Fragment } from 'react';
 import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
@@ -11,7 +12,7 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { statusKategorie, type Statusrolle } from '../theme/statusFarben';
 import { statusFlaeche, tonVonRolle } from '../components/instrument/statusFlaeche';
 import { useRollen } from '../components/instrument';
-import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, staerkeText } from '../anzeige/staerke';
 import { verdichte } from './kraeftebild';
 
 /**
@@ -152,7 +153,9 @@ export default function Verdichtungszeile({
   const glieder = (
     <>
       {/* Die Schreibweise steht dabei (LLH-1750, Spec `lage-verdichtung`). */}
-      <span style={{ color: token.colorTextSecondary }}>Stärke {STAERKE_SCHREIBWEISE}</span>
+      <span style={{ color: token.colorTextSecondary }}>
+        Stärke <StaerkeSchreibweise />
+      </span>
       {/* Ohne Personal ist die Stärke unbekannt: „—“, nie „0/0/0//0“ (keine erfundenen Daten). */}
       <strong title={personalFrei === false || laedt ? undefined : STAERKE_AUSGESCHRIEBEN}>
         {personalFrei === false ? '—' : staerkeText(v.staerke)}

@@ -1,7 +1,8 @@
-import { useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
+import { Fragment, useRef, useState, type ReactNode, type SyntheticEvent } from 'react';
 import { Popover } from 'antd';
 import { Link } from 'react-router';
 import { EINGEFUEHRTE_KUERZEL, type EingefuehrtesKuerzel, type Kuerzel } from './kuerzel';
+import { STAERKE_SCHREIBWEISE } from './staerke';
 import './KuerzelErklaerung.css';
 
 /** Das Kapitel, in dem jedes eingeführte Kürzel steht (`docs/anwender/kapitel/zeiten-und-kuerzel.md`). */
@@ -84,7 +85,25 @@ export default function KuerzelErklaerung({
   );
 }
 
-/** Die Schreibweise der Stärke „F/UF/M//Σ“, antippbar erklärt (`STAERKE_SCHREIBWEISE`). */
-export function StaerkeSchreibweise({ children }: { children?: ReactNode }) {
-  return <KuerzelErklaerung kuerzel="F/UF/M//Σ">{children}</KuerzelErklaerung>;
+/**
+ * Die Schreibweise der Stärke „F/UF/M//Σ“, antippbar erklärt (`STAERKE_SCHREIBWEISE`).
+ * `umbruchVorSumme`: in schmalen Spalten bricht sie nur vor der Summe („F/UF/M“ · „//Σ“), nicht an
+ * jedem Strich (`e2e/meldebild-druck.spec.ts`, „kein Kopf bricht im Wort“).
+ */
+export function StaerkeSchreibweise({
+  children,
+  umbruchVorSumme = false,
+}: {
+  children?: ReactNode;
+  umbruchVorSumme?: boolean;
+}) {
+  const text = umbruchVorSumme
+    ? STAERKE_SCHREIBWEISE.split(/(?=\/\/)/).map((teil, i) => (
+        <Fragment key={teil}>
+          {i > 0 && <wbr />}
+          <span style={{ whiteSpace: 'nowrap' }}>{teil}</span>
+        </Fragment>
+      ))
+    : children;
+  return <KuerzelErklaerung kuerzel="F/UF/M//Σ">{text}</KuerzelErklaerung>;
 }

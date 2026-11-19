@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { Button, Space } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
@@ -12,7 +13,7 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
-import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, staerkeText } from '../../anzeige/staerke';
 import { monoStil, schriftStil, Status, useRollen } from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
@@ -550,7 +551,7 @@ export default function Organigramm({
           marginBlockEnd: token.marginXS,
         }}
       >
-        Stärke {STAERKE_SCHREIBWEISE}
+        Stärke <StaerkeSchreibweise />
       </div>
       {uebernehmen.error != null && (
         <div className="organigramm-no-print" style={{ marginBlockEnd: token.margin }}>

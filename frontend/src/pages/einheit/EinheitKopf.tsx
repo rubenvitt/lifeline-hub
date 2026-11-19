@@ -1,4 +1,4 @@
-import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { useState } from 'react';
 import { Input } from 'antd';
 import { useQuery } from '@tanstack/react-query';
@@ -392,7 +392,13 @@ export default function EinheitKopf({
             </Datenfeld>
             {/* BOS-Fachsprache: Soll-Stärke (Führer / Unterführer / Mannschaft). Die drei gehen in
                 EINER Anfrage: der Server verlangt alle drei oder keinen. */}
-            <Datenfeld label={`Soll-Stärke (${STAERKE_SCHREIBWEISE})`}>
+            <Datenfeld
+              label={
+                <>
+                  Soll-Stärke (<StaerkeSchreibweise />)
+                </>
+              }
+            >
               <InlineAngabe<Staerke | null>
                 etikett="Soll-Stärke"
                 vermerk={e.vermerke?.soll}
@@ -459,7 +465,13 @@ export default function EinheitKopf({
               />
               <VermerkZeile vermerk={e.vermerke?.quali_soll} />
             </Datenfeld>
-            <Datenfeld label={`Ist (${STAERKE_SCHREIBWEISE})`}>
+            <Datenfeld
+              label={
+                <>
+                  Ist (<StaerkeSchreibweise />)
+                </>
+              }
+            >
               <IstAnzeige
                 ist={e.ist}
                 kumuliert={hasUntereinheiten ? e.ist_kumuliert : null}

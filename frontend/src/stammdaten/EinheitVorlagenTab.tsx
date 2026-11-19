@@ -1,4 +1,5 @@
-import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
+import { STAERKE_AUSGESCHRIEBEN } from '../anzeige/staerke';
 import { Button } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -108,7 +109,11 @@ export default function EinheitVorlagenTab() {
         ),
     },
     {
-      title: `Soll (${STAERKE_SCHREIBWEISE})`,
+      title: (
+        <>
+          Soll (<StaerkeSchreibweise />)
+        </>
+      ),
       key: 'soll',
       // Das Qualifikationssoll folgt in Satzschrift (LLH-1553).
       render: (_, { vorlage }) => {

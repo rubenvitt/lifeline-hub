@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
 import { Button } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
@@ -27,12 +28,7 @@ import {
   useDienststatusMutation,
   type DienststatusOptionen,
 } from './dienststatus';
-import {
-  STAERKE_AUSGESCHRIEBEN,
-  STAERKE_SCHREIBWEISE,
-  staerkeSumme,
-  staerkeText,
-} from '../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, staerkeSumme, staerkeText } from '../anzeige/staerke';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
 
@@ -143,7 +139,11 @@ export default function FahrzeugeTab() {
       render: (t) => (t ? <span style={monoStil(12)}>{t}</span> : '—'),
     },
     {
-      title: `Stärke ${STAERKE_SCHREIBWEISE}`,
+      title: (
+        <>
+          Stärke <StaerkeSchreibweise />
+        </>
+      ),
       key: 'staerke',
       // Nach der Gesamtstärke (Σ), wie sie hinter „//“ steht.
       sorter: nachZahl((f: Fahrzeug) => staerkeSumme(f.staerke)),
