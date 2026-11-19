@@ -1361,6 +1361,35 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(screen.queryByRole('button', { name: 'Modulfreigaben öffnen' })).not.toBeInTheDocument();
   });
 
+  /** LLH-1819: wer nicht selbst freigibt, erfährt, wen er fragt — nur die Einsatzleitung. */
+  it('ohne Verwaltungsrecht nennt der Hinweis die Einsatzleitung beim Namen', async () => {
+    const mitglied = (anzeigename: string, einsatz_rolle: string, benutzer_id: number) => ({
+      benutzer_id,
+      anzeigename,
+      benutzername: anzeigename.toLowerCase(),
+      einsatz_rolle,
+      zugewiesen_at: '2026-11-19 08:00:00',
+    });
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () =>
+        HttpResponse.json([
+          mitglied('Anna Muster', 'einsatzleitung', 1),
+          mitglied('Fritz Fuehrung', 'fuehrungspersonal', 2),
+        ]),
+      ),
+    );
+    setupWaechter(
+      '/einsaetze/7/lagemeldungen',
+      freigabenFixture({ lagemeldungen: { zugriff: false } }),
+      {},
+      { benutzer: benutzerFixture({ anzeigename: 'Helfer' }), rolle: 'fuehrungspersonal' },
+    );
+    expect(
+      await screen.findByText('Freigabe erteilt die Einsatzleitung: Anna Muster'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Fritz Fuehrung/)).not.toBeInTheDocument();
+  });
+
   it('Rückweg: das freie Standardmodul, sonst der Überblick', async () => {
     setupWaechter(
       '/einsaetze/7/lagemeldungen',

@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
+import {
+  ladeEinsatz,
+  ladeEinstellungen,
+  ladeMitglieder,
+  ladeModulFreigaben,
+} from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -891,6 +896,17 @@ function GesperrtesModul({
     queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
+  // Wen man fragt (LLH-1819): die Mitglieder mit Rolle Einsatzleitung. Nur wer nicht selbst
+  // freigibt, braucht sie. Scheitert der Abruf (etwa ein gekoppeltes Gerät ohne Zugang zur Route),
+  // steht der Satz ohne Namen.
+  const mitgliederQuery = useQuery({
+    queryKey: einsatzKeys.mitglieder(einsatzId),
+    queryFn: () => ladeMitglieder(einsatzId),
+    enabled: !darfFreigabenVerwalten,
+  });
+  const einsatzleitung = mitgliederQuery.data
+    ?.filter((m) => m.einsatz_rolle === 'einsatzleitung')
+    .map((m) => m.anzeigename);
   const ziel = freiesRueckwegModul(freigaben, data?.standard_modul);
   return (
     <ModulGesperrt
@@ -907,6 +923,7 @@ function GesperrtesModul({
       freigabenPfad={
         darfFreigabenVerwalten ? einsatzEinstellungenPfad(einsatzId, 'module') : undefined
       }
+      einsatzleitung={einsatzleitung}
     />
   );
 }
