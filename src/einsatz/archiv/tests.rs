@@ -594,3 +594,23 @@ fn zwischendatei_ueberschreibt_und_loescht_keinen_vorhandenen_pfad() {
     assert!(bauen::Zwischendatei::anlegen(pfad.clone()).is_err());
     assert_eq!(std::fs::read(&pfad).unwrap(), b"fremd");
 }
+
+/// LLH-1976 (`src/AGENTS.md`, „Backend — ETB live verteilen“): der Eintrag am Skelett geht nach
+/// dem Commit mit seiner ID hinaus; das Skelett bleibt lesbar.
+#[tokio::test]
+async fn abgelaufener_block_verteilt_seinen_etb_eintrag() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    schluessel(&pool).await;
+    let id = einsatz(&pool, leit).await;
+    frist(&pool, id, K::Personenauskunft, 60).await;
+    assert!(archivieren(&pool, id, Utc::now()).await.unwrap());
+    let spaeter = crate::zeit::formatiere_utc(Utc::now() + chrono::Duration::days(61));
+    let (anzahl, luecken) = crate::etb::nachlauf::klammer(
+        &pool,
+        abgelaufene_bloecke_loeschen(&pool, &spaeter),
+    )
+    .await;
+    assert_eq!(anzahl.unwrap(), 1);
+    assert!(luecken.is_empty(), "{}", crate::etb::nachlauf::melde(&luecken));
+}
