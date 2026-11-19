@@ -78,14 +78,18 @@ async fn neuer_strom_bekommt_stand_beim_verbinden() {
     assert!(frames[0].1.contains("Anna Präsent"), "{gelesen:?}");
 }
 
+/// Auch ein leerer Stand geht beim Verbinden hinaus: er ersetzt im Client, was eine abgerissene
+/// Verbindung zuletzt kannte (kein Geisterhinweis nach dem Neuaufbau).
 #[tokio::test]
-async fn ohne_praesenz_kein_frame_beim_verbinden() {
+async fn leerer_stand_geht_beim_verbinden_hinaus() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen_mit(&app, &admin, "Lage").await;
     let feed = live_oeffnen(&app, &admin, eid).await;
     let gelesen = sse_anfang_lesen(feed.into_body(), 300).await;
-    assert!(praesenz_frames(&gelesen).is_empty(), "{gelesen:?}");
+    let frames = praesenz_frames(&gelesen);
+    assert_eq!(frames.len(), 1, "{gelesen:?}");
+    assert!(frames[0].1.contains(r#""eintraege":[]"#), "{gelesen:?}");
 }
 
 #[tokio::test]
@@ -104,11 +108,11 @@ async fn aenderung_wird_verteilt_verlaengern_nicht() {
     let frames = praesenz_frames(&gelesen);
     assert_eq!(
         frames.len(),
-        2,
-        "Beginn und Ende, kein Verlängern: {gelesen:?}"
+        3,
+        "Stand beim Verbinden, Beginn und Ende, kein Verlängern: {gelesen:?}"
     );
-    assert!(frames[0].1.contains("stichwort"));
-    assert!(frames[1].1.contains(r#""eintraege":[]"#), "{gelesen:?}");
+    assert!(frames[1].1.contains("stichwort"));
+    assert!(frames[2].1.contains(r#""eintraege":[]"#), "{gelesen:?}");
 }
 
 #[tokio::test]
@@ -121,7 +125,13 @@ async fn fremder_einsatz_erscheint_nicht() {
     live.praesenz_setzen(anderer, eintrag(PraesenzObjekt::Einsatz, None, "stichwort"))
         .unwrap();
     let gelesen = sse_anfang_lesen(feed.into_body(), 300).await;
-    assert!(praesenz_frames(&gelesen).is_empty(), "{gelesen:?}");
+    let frames = praesenz_frames(&gelesen);
+    assert_eq!(
+        frames.len(),
+        1,
+        "nur der leere Stand beim Verbinden: {gelesen:?}"
+    );
+    assert!(!gelesen.contains("stichwort"), "{gelesen:?}");
 }
 
 /// Ohne die Module, die eine Einheit offenlegen (`einheiten`, `lagekarte`, `verpflegung`), sieht
@@ -156,10 +166,11 @@ async fn ohne_einheiten_kein_einheit_eintrag() {
     let frames = praesenz_frames(&gelesen);
     assert_eq!(
         frames.len(),
-        1,
-        "nur der Stand mit dem Einsatz-Eintrag: {gelesen:?}"
+        2,
+        "leerer Stand beim Verbinden, dann der mit dem Einsatz-Eintrag: {gelesen:?}"
     );
-    assert!(frames[0].1.contains("stichwort"));
+    assert!(frames[0].1.contains(r#""eintraege":[]"#), "{gelesen:?}");
+    assert!(frames[1].1.contains("stichwort"));
     assert!(!gelesen.contains("bemerkung"), "{gelesen:?}");
     assert!(!gelesen.contains(r#""einheit""#), "{gelesen:?}");
 }
@@ -211,11 +222,11 @@ async fn put_setzt_und_strom_zeigt_den_namen() {
 
     let gelesen = sse_anfang_lesen(feed.into_body(), 300).await;
     let frames = praesenz_frames(&gelesen);
-    assert_eq!(frames.len(), 2, "{gelesen:?}");
-    assert!(frames[0].1.contains("leitstellen_nr"), "{gelesen:?}");
-    assert!(frames[0].1.contains(r#""fenster":"tab-1""#), "{gelesen:?}");
-    assert!(frames[0].1.contains(r#""von":""#), "{gelesen:?}");
-    assert!(frames[1].1.contains(r#""eintraege":[]"#), "{gelesen:?}");
+    assert_eq!(frames.len(), 3, "{gelesen:?}");
+    assert!(frames[1].1.contains("leitstellen_nr"), "{gelesen:?}");
+    assert!(frames[1].1.contains(r#""fenster":"tab-1""#), "{gelesen:?}");
+    assert!(frames[1].1.contains(r#""von":""#), "{gelesen:?}");
+    assert!(frames[2].1.contains(r#""eintraege":[]"#), "{gelesen:?}");
 }
 
 #[tokio::test]

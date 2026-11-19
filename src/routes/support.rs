@@ -813,8 +813,9 @@ pub fn sse_org_stream(
 }
 
 /// Präsenz eines Einsatzes für eine Verbindung (LLH-1946, Entwurf D2): ohne `id:` und ohne
-/// Replay, am Ring vorbei. Zuerst der Stand beim Verbinden (`start`, nur wenn er für diese
-/// Verbindung etwas zeigt), danach jeder geänderte Stand dieses Einsatzes, gefiltert je Eintrag
+/// Replay, am Ring vorbei. Zuerst der Stand beim Verbinden (`start`, immer, auch leer: er ersetzt im
+/// Client, was eine abgerissene Verbindung zuletzt kannte), danach jeder geänderte Stand dieses
+/// Einsatzes, gefiltert je Eintrag
 /// über das Bezugsereignis ([`crate::live::praesenz::PraesenzStand::fuer`]). Ein leerer Stand geht
 /// nur hinaus, wenn der zuletzt gesendete nicht leer war; so erfährt die Verbindung von Änderungen,
 /// die sie nicht sehen darf, nichts. `Lagged` wird übersprungen: jeder Stand ist vollständig, der
@@ -827,8 +828,7 @@ pub fn sse_praesenz_stream(
     let einsatz_id = start.einsatz_id;
     let erster = start.fuer(&erlaubt);
     let mut zuletzt_leer = erster.eintraege.is_empty();
-    let anfang: Option<Result<Event, Infallible>> =
-        (!zuletzt_leer).then(|| Ok(praesenz_ereignis(&erster)));
+    let anfang: Result<Event, Infallible> = Ok(praesenz_ereignis(&erster));
     let rest = BroadcastStream::new(rx).filter_map(move |res| {
         let stand = res.ok().filter(|s| s.einsatz_id == einsatz_id)?;
         let sichtbar = stand.fuer(&erlaubt);
@@ -839,7 +839,7 @@ pub fn sse_praesenz_stream(
         zuletzt_leer = leer;
         Some(Ok(praesenz_ereignis(&sichtbar)))
     });
-    tokio_stream::iter(anfang).chain(rest)
+    tokio_stream::once(anfang).chain(rest)
 }
 
 fn praesenz_ereignis(stand: &crate::live::praesenz::PraesenzStand) -> Event {
