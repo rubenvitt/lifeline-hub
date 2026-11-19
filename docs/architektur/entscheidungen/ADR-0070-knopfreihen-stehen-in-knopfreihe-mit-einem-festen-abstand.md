@@ -17,8 +17,9 @@ herleitung:
 
 ## Regeln
 
-- MUST: Zwei oder mehr Knöpfe nebeneinander stehen in `Knopfreihe`, Dialogfüße mit `fuss`;
-  Regel: `frontend/AGENTS.md`, „Aktionen“, „Knopfreihen über `Knopfreihe`“.
+- MUST: Eine neue oder umgestellte Reihe aus zwei oder mehr Knöpfen steht in `Knopfreihe`,
+  Dialogfüße mit `fuss`; der Bestand aus `<Space>` steht in der Schuldliste. Regel:
+  `frontend/AGENTS.md`, „Aktionen“, „Knopfreihen über `Knopfreihe`“.
 - MUST: `Knopfreihe` setzt als Abstand die Rasterstufe `md` der aktiven Dichte.
 - MUST NOT: `Knopfreihe` nimmt ein `style`-Prop oder einen Abstand an.
 - MUST NOT: `Knopfreihe` ordnet ihre Kinder um.

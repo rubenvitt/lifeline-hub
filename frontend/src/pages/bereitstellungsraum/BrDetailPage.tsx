@@ -808,8 +808,8 @@ export default function BrDetailPage() {
         )
       }
       aktionen={
-        // `size="middle"`: „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“
-        // (`frontend/AGENTS.md`, „Rot steht nicht bündig neben Neutralem“).
+        // „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“; den Abstand trägt
+        // die Kopfhülle als Knopfreihe (`frontend/AGENTS.md`, „Knopfreihen über `Knopfreihe`“).
         <>
           {darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
             <Button

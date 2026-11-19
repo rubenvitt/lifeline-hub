@@ -516,7 +516,7 @@ export default function PersonenDetailPage() {
                         verticalAlign: 'middle',
                       }}
                     >
-                      <Knopfreihe>
+                      <Knopfreihe umbruch={false}>
                         <Button
                           type="primary"
                           disabled={!darfEinsatzLeiten(einsatz)}

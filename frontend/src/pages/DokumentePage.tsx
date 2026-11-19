@@ -189,7 +189,7 @@ const dokumentSpalten = (
             width: 100,
             immerSichtbar: true,
             render: (_: unknown, d: Dokument) => (
-              <Knopfreihe>
+              <Knopfreihe umbruch={false}>
                 <Button
                   type="text"
                   icon={<IconStift />}

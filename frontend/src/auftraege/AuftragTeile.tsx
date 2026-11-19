@@ -426,8 +426,7 @@ export function AuftragHandlungen({
       )}
       {aktionen.length + weitere.length > 0 && (
         <Flex justify={ausrichtung} style={{ marginTop: token.marginSM }}>
-          {/* `middle`: Rot steht nicht bündig neben Neutralem (LFH-363). Der Abstands-Guard sieht
-             diese gespreizte Reihe nicht und führt die Teile unter BEWERTET_OHNE_SCANNER_DECKUNG. */}
+          {/* Rot steht nicht bündig neben Neutralem (LFH-363): den Abstand `md` trägt die Knopfreihe. */}
           <Knopfreihe>
             {aktionen}
             {buendeln ? (

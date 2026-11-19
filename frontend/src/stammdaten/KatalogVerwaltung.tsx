@@ -148,7 +148,7 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
             herkunftVon(eintrag) === 'vom_hub' ? (
               <VomHubGesperrt />
             ) : (
-              <Knopfreihe>
+              <Knopfreihe umbruch={false}>
                 <Button onClick={() => setBearbeite(eintrag)}>Bearbeiten</Button>
                 <Popconfirm
                   title={deaktivierenFrage}

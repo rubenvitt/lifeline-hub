@@ -473,8 +473,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   stehen in `Knopfreihe` mit dem festen Abstand `md` (12 / 20 / 24 px), so steht auch Rot nie
   bündig neben Neutralem; kein `<Space>`, kein eigener Abstand. Dialogfüße nehmen `fuss` (ab `md`
   rechtsbündig, darunter untereinander in voller Breite). Primär steht im Kopf, im Paneel und in
-  der Zeile vorn, im Fuß hinten; die Reihe ordnet nicht um. Ein `<Space>` in `aktionen` der
-  `EinsatzSeite` wird zum Fragment, denn die Kopfhülle ist selbst eine Knopfreihe. Bestand in
+  der Zeile vorn, im Fuß hinten; die Reihe ordnet nicht um. In Tabellenzellen und Zeilen, die ihre
+  Höhe halten, `umbruch={false}`. Ein `<Space>` in `aktionen` der `EinsatzSeite` wird zum
+  Fragment, denn die Kopfhülle ist selbst eine Knopfreihe; nur eine Reihe mit Druckklasse oder
+  Hülle bleibt eine eigene `Knopfreihe` (Kräfte, Lagebericht). Bestand in
   `components/knopfreihe.schuld.ts` (Ratsche). antds eigene Füße
   (Modal, `modal.confirm`, `Popconfirm`) halten dieselbe Stufe über eine Regel in `index.css` mit
   `var(--ant-padding)`. **Kein Komponenten-Token `marginXS`:** jeder antd-Knopf setzt die Variable

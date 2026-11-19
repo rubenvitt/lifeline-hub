@@ -142,7 +142,7 @@ export default function EtbBausteineTab() {
               herkunft.istVomHub('etb_baustein', b.id) ? (
                 <VomHubGesperrt />
               ) : (
-                <Knopfreihe>
+                <Knopfreihe umbruch={false}>
                   <Button
                     onClick={() => {
                       setBearbeite(b);

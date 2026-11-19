@@ -155,7 +155,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
         const laeuft = mutation.isPending && mutation.variables?.id === t.id;
         const inDienst = t.dienststatus === 'in_dienst';
         return (
-          <Knopfreihe>
+          <Knopfreihe umbruch={false}>
             <Button disabled={laeuft} onClick={() => onBearbeiten(t)}>
               Bearbeiten
             </Button>

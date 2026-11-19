@@ -385,7 +385,7 @@ export default function OfflineRecoveryDrawer({
   ) => {
     const { schluessel } = zeile;
     return (
-      <Knopfreihe>
+      <Knopfreihe umbruch={false}>
         <Button
           type="primary"
           loading={aktionLaeuft === `${schluessel}:retry`}
@@ -598,7 +598,7 @@ export default function OfflineRecoveryDrawer({
               antrag={a}
               fehler={zeilen.grund(zeile.schluessel)}
               aktionen={
-                <Knopfreihe>
+                <Knopfreihe umbruch={false}>
                   {kopierenMoeglich && (
                     <Button onClick={() => antragKopieren(a, zeile)}>Kopieren</Button>
                   )}

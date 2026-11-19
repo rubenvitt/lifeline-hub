@@ -88,17 +88,19 @@ function tagEnde(text: string, start: number): number {
 }
 
 /**
- * Zeilen aller waagerechten `<Space>`, die zwei oder mehr Knöpfe als UNMITTELBARE Kinder tragen
- * (Stack je umschließendem `<Space>`).
+ * Zeilen aller waagerechten `<Space>`, die zwei oder mehr Knöpfe tragen. Ein Knopf zählt für den
+ * nächsten umschließenden `<Space>` bzw. `<Space.Compact>` (Stack), auch wenn ein anderes Element
+ * dazwischen steht; `Space.Compact` selbst zählt nie (verbundene Knöpfe, keine Reihe).
  */
 export function knopfreihenIn(quelltext: string): number[] {
   const text = ohneKommentare(quelltext);
   const offen: { zeile: number; knoepfe: number; zaehlt: boolean }[] = [];
   const fertig: number[] = [];
-  const muster = /<Space(?=[\s/>{])|<\/Space>|<Button(?=[\s/>{])|<StatusWahl(?=[\s/>{<])/g;
+  const muster =
+    /<Space\.Compact(?=[\s/>{])|<\/Space\.Compact>|<Space(?=[\s/>{])|<\/Space>|<Button(?=[\s/>{])|<StatusWahl(?=[\s/>{<])/g;
   for (const treffer of text.matchAll(muster)) {
     const start = treffer.index;
-    if (treffer[0] === '</Space>') {
+    if (treffer[0] === '</Space>' || treffer[0] === '</Space.Compact>') {
       const reihe = offen.pop();
       if (reihe && reihe.zaehlt && reihe.knoepfe >= 2) fertig.push(reihe.zeile);
       continue;
@@ -106,7 +108,8 @@ export function knopfreihenIn(quelltext: string): number[] {
     const ende = tagEnde(text, start);
     if (ende === -1) continue;
     const tag = text.slice(start, ende + 1);
-    if (treffer[0] !== '<Space') {
+    const istSpace = treffer[0] === '<Space' || treffer[0] === '<Space.Compact';
+    if (!istSpace) {
       const innerste = offen[offen.length - 1];
       if (innerste) innerste.knoepfe += 1;
       continue;
@@ -115,7 +118,9 @@ export function knopfreihenIn(quelltext: string): number[] {
     offen.push({
       zeile: text.slice(0, start).split('\n').length,
       knoepfe: 0,
-      zaehlt: !/\b(?:orientation|direction)\s*=\s*\{?\s*["']vertical["']/.test(tag),
+      zaehlt:
+        treffer[0] === '<Space' &&
+        !/\b(?:orientation|direction)\s*=\s*\{?\s*["']vertical["']/.test(tag),
     });
   }
   return fertig.sort((a, b) => a - b);
@@ -181,6 +186,12 @@ describe('Knopfreihen-Wächter (LLH-1973)', () => {
       expect(
         knopfreihenIn('<Space.Compact><Button>A</Button><Button>B</Button></Space.Compact>'),
       ).toEqual([]);
+    });
+
+    it('zählt Knöpfe in einem Space.Compact innerhalb eines Space nicht als Reihe', () => {
+      const quelle =
+        '<Space wrap><Space.Compact><Button>A</Button><Button>B</Button></Space.Compact></Space>';
+      expect(knopfreihenIn(quelle)).toEqual([]);
     });
 
     it('zählt je unmittelbar umschließendem Space', () => {

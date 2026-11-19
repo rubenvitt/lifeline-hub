@@ -115,6 +115,28 @@ describe('Knopfreihe (LLH-1973, ein Abstand `md`)', () => {
     expect(reihe().children).toHaveLength(1);
   });
 
+  it('bricht mit umbruch={false} nicht um (Tabellenzelle, Zeilenhöhe hält)', () => {
+    mitDichte(
+      'handschuh',
+      <Knopfreihe umbruch={false}>
+        <Button>A</Button>
+        <Button>B</Button>
+      </Knopfreihe>,
+    );
+    expect(reihe()).toHaveStyle({ flexWrap: 'nowrap', flexDirection: 'row' });
+  });
+
+  it('rendert nichts, wenn kein Kind bleibt', () => {
+    const { container } = mitDichte(
+      'kompakt',
+      <Knopfreihe data-lfh="leer">
+        {false}
+        {null}
+      </Knopfreihe>,
+    );
+    expect(container.querySelector('[data-lfh="leer"]')).toBeNull();
+  });
+
   it('reicht data-lfh, className, aria-label und ref durch', () => {
     const ref = createRef<HTMLDivElement>();
     mitDichte(

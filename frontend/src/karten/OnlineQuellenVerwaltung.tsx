@@ -147,7 +147,7 @@ export default function OnlineQuellenVerwaltung() {
               const grund = zeilen.grund(q.id);
               return (
                 <Stapel abstand="xxs" ausrichten="start">
-                  <Knopfreihe>
+                  <Knopfreihe umbruch={false}>
                     <Button
                       onClick={() => {
                         zeilen.beginne(q.id);

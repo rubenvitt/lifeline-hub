@@ -343,7 +343,7 @@ export default function OfflineKartenVerwaltung() {
               const grund = zeilen.grund(k.id);
               return (
                 <Stapel abstand="xxs" ausrichten="start">
-                  <Knopfreihe>
+                  <Knopfreihe umbruch={false}>
                     {k.status === 'bereit' && k.aktualisierbar && !laeuft && !phase && (
                       <Button
                         aria-label={`Jetzt aktualisieren: ${k.name}`}

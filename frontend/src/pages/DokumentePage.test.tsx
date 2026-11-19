@@ -323,6 +323,8 @@ describe('DokumentePage', () => {
     const reihe = knopf.closest<HTMLElement>('div[style*="gap"]')!;
     expect(reihe).toContainElement(entfernen);
     expect(reihe.style.gap).toBe(`${theme.getDesignToken().padding}px`);
+    // In der Tabellenzelle bricht die Reihe nicht um, sonst verdoppelte sich die Zeilenhöhe.
+    expect(reihe.style.flexWrap).toBe('nowrap');
     await userEvent.click(knopf);
 
     const d = await dialogBearbeiten();

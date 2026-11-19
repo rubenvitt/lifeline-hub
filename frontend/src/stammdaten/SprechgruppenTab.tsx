@@ -225,7 +225,7 @@ export default function SprechgruppenTab() {
                 // Unter `md` passen zwei Knöpfe neben Kennung und Status nicht in 390 px.
                 <ZeilenMenueAusloeser menue={zeilenMenue} zeile={sg} />
               ) : (
-                <Knopfreihe>
+                <Knopfreihe umbruch={false}>
                   <Button onClick={() => bearbeiten(sg)}>Bearbeiten</Button>
                   {sg.aktiv && (
                     <Button danger onClick={() => setZuDeaktivieren(sg)}>
