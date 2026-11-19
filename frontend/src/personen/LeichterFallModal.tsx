@@ -17,7 +17,7 @@ import { ortFelder, ortRegeln } from '../anzeige/ortsfeldFormular';
 import { ErfassungsModal, type Nebenaktion, type Speicherung } from '../components/Erfassung';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import { Select } from '../components/Select';
-import { useRollen } from '../components/instrument';
+import { Feld, Stapel } from '../components/instrument';
 import { useFormularEingehaengt } from '../components/useFormularEingehaengt';
 import {
   liesErfassungsSitzungswert,
@@ -210,7 +210,6 @@ export default function LeichterFallModal({
   speicherung,
 }: Props) {
   const [form] = Form.useForm<LeichterFallWerte>();
-  const { token } = useRollen();
   const formular = useFormularEingehaengt();
   const geladen = useRef<string | null>(null);
   const mitWahl = stelle == null;
@@ -350,18 +349,18 @@ export default function LeichterFallModal({
       }
     >
       <FormularEingehaengt onWechsel={formular.melde} />
-      <Form.Item label="Anlass" name="anlass" rules={[{ required: true, message: 'Anlass fehlt' }]}>
+      <Feld label="Anlass" name="anlass" rules={[{ required: true, message: 'Anlass fehlt' }]}>
         <AnlassWahl />
-      </Form.Item>
-      <Form.Item label="Maßnahmen" name="massnahmen">
+      </Feld>
+      <Feld label="Maßnahmen" name="massnahmen">
         <FlaechenMehrfachWahl<MassnahmeArt>
           aria-label="Maßnahmen"
           optionen={MASSNAHMEN_OPTIONEN}
           max={LEICHTE_MASSNAHMEN_MAX}
         />
-      </Form.Item>
+      </Feld>
       {einheitStelle && einheitStelle.uhsZiele.length > 1 && (
-        <Form.Item label="UHS" name="ziel_uhs">
+        <Feld label="UHS" name="ziel_uhs">
           <FlaechenWahl<string>
             aria-label="UHS"
             optionen={einheitStelle.uhsZiele.map((u) => ({
@@ -369,10 +368,10 @@ export default function LeichterFallModal({
               label: u.bezeichnung,
             }))}
           />
-        </Form.Item>
+        </Feld>
       )}
       {mitWahl && (
-        <Form.Item label="Versorgt von" name="versorgt_von">
+        <Feld label="Versorgt von" name="versorgt_von">
           <Select
             allowClear
             showSearch
@@ -384,22 +383,18 @@ export default function LeichterFallModal({
               if (ort) form.setFieldValue('antreff_ort', ort);
             }}
           />
-        </Form.Item>
+        </Feld>
       )}
       {mitWahl ? (
-        <Form.Item
-          label="Fundort"
-          name="antreff_ort"
-          rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}
-        >
+        <Feld label="Fundort" name="antreff_ort" rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}>
           <EinsatzOrtsfeld
             einsatzId={einsatzId}
             etikett="Fundort"
             count={zeichenGrenze(PERSON_ANGABE_MAX)}
           />
-        </Form.Item>
+        </Feld>
       ) : (
-        <Form.Item
+        <Feld
           label="Fundort"
           name="antreff_ort"
           rules={ortRegeln(PERSON_ANGABE_MAX, 'Fundort')}
@@ -407,28 +402,27 @@ export default function LeichterFallModal({
           normalize={(text: string) => fundortAusText(text)}
         >
           <Input count={zeichenGrenze(PERSON_ANGABE_MAX)} />
-        </Form.Item>
+        </Feld>
       )}
       {einheitStelle && (
-        <Form.Item label="Standort" name="standort">
+        <Feld label="Standort" name="standort">
           <StandortFeld sofort />
-        </Form.Item>
+        </Feld>
       )}
       {/* Am Handy ohne Namen und Alter (F6, K5): sie ergänzen UHS oder Einsatzleitung. */}
       {!einheitStelle && (
-        <div style={{ display: 'flex', gap: token.margin, flexWrap: 'wrap' }}>
-          <Form.Item
-            label="Name"
-            name="name"
-            rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}
-            style={{ flex: '1 1 200px' }}
-          >
-            <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
-          </Form.Item>
-          <Form.Item label="Alter" name="alter_geschaetzt">
-            <InputNumber min={0} max={120} style={{ width: 120 }} />
-          </Form.Item>
-        </div>
+        <Stapel richtung="zeile" umbruch abstand="md">
+          <div style={{ flex: '1 1 var(--lfh-feld-schmal)' }}>
+            <Feld label="Name" name="name" rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}>
+              <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
+            </Feld>
+          </div>
+          <div style={{ flex: '0 1 var(--lfh-feld-kurz)' }}>
+            <Feld label="Alter" name="alter_geschaetzt" breite="kurz">
+              <InputNumber min={0} max={120} />
+            </Feld>
+          </div>
+        </Stapel>
       )}
     </ErfassungsModal>
   );
