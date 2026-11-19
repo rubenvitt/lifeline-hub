@@ -160,6 +160,12 @@ const einsatzSchluessel = (e: EinsatzAnzeige) => e.id;
 const einsatzGruppe = (e: EinsatzAnzeige) => e.status;
 
 /**
+ * Wer keinen Einsatz sieht, ist meist in keinem Einsatz Mitglied (LLH-1819): aufnehmen kann nur
+ * die Einsatzleitung des jeweiligen Einsatzes. Ohne Namen, die Liste kennt keinen Einsatz.
+ */
+const HINWEIS_KEINE_EINSAETZE = 'Zu einem Einsatz nimmt dich dessen Einsatzleitung auf.';
+
+/**
  * Die Einsatzliste liegt außerhalb jedes Einsatzes: Anzeige und „Einsatz anlegen“ nehmen die
  * Zeitzone der Organisation (LFH-692, Spec `zeiteingabe`, „Zone außerhalb eines Einsatzes“).
  */
@@ -536,7 +542,7 @@ function EinsaetzeInhalt() {
           beschrifteter Knopf machte jede Abfrage darauf mehrdeutig. */}
       {!isPending && leer && (
         <div style={{ marginBottom: token.marginLG }}>
-          <SeitenLeer titel="Keine Einsätze" />
+          <SeitenLeer titel="Keine Einsätze" hinweis={HINWEIS_KEINE_EINSAETZE} />
         </div>
       )}
 

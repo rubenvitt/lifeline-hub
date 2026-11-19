@@ -33,6 +33,12 @@ Handler (`JsonBody`, LFH-1074).
   `BearbeitbaresPaneel` fragt dort nur bei ihm (`isVeraltet`); ein anderer 409 derselben Route
   (storniert, doppelte Bezeichnung) steht als Grund am Paneel. Eine neue CAS-Route nimmt
   `Veraltet`.
+- **403 der Einsatz-Lesesperre trägt einen Grund** (LLH-1819): `fordere_lesezugriff` und der
+  Org-Floor antworten `AppError::KeinLesezugriff(LeseSperre)` mit `grund` `kein_mitglied`,
+  `nachlauf_abgelaufen` oder `nicht_mehr_lesbar` (`einsatz::berechtigung::lese_sperre`).
+  `kein_mitglied` wird zuerst geprüft, damit ein Fremder nichts über gelöschte oder abgelaufene
+  Einsätze erfährt. Jeder andere 403 bleibt `Forbidden`; das Frontend liest den Grund in
+  `frontend/src/einsatz/sackgasse.ts`.
 - **CAS-Baseline beim Öffnen einfrieren**: das Sammelbearbeiten von Tier und Schaden über
   `components/useEditSitzung.ts` (gebrandete `CasBasis`; `starte` nimmt den Datensatz); Test
   braucht ein gemountetes `<Form form={form}>`.
