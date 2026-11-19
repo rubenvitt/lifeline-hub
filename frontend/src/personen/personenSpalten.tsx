@@ -23,6 +23,7 @@ import {
   SK_REIHE,
   SK_WORT,
   STATUS_META,
+  personStatusDarstellung,
   TRANSPORT_ART_WORT,
   transportRang,
 } from './personMeta';
@@ -613,7 +614,7 @@ export function personenSpalten(
       width: 118,
       sortWert: (p) => STATUS_FOLGE.indexOf(p.status),
       filter: { werte: STATUS_WERTE, trifft: (p, w) => p.status === w, ohneKartenfeld: true },
-      render: (_, p) => <Status darstellung={STATUS_META[p.status]} />,
+      render: (_, p) => <Status darstellung={personStatusDarstellung(p.status)} />,
     },
     {
       title: 'Fundort',
@@ -769,7 +770,7 @@ type KartenPlanZweig<T, K extends string> = Extract<Kartenplan<T, K>, { art: 'pl
 export const personenKarte = (einsatzId: number): KartenPlanZweig<Person, PersonenSpaltenKey> => ({
   art: 'plan',
   titel: { spalte: 'reg', ziel: (p) => personDetailPfad(einsatzId, p.id) },
-  status: (p) => STATUS_META[p.status],
+  status: (p) => personStatusDarstellung(p.status),
   sekundaer: ['person', 'sk', 'seit'],
 });
 

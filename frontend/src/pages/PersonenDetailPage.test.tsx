@@ -216,6 +216,27 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 });
 
 /**
+ * Ein Datensatz ohne oder mit unbekanntem Status (LLH-1957): nachgestellt in der Liste, auf der
+ * Detailseite rissen Statusmarke und Statusmenü (`naechsteStatus(...).map`) dieselbe Seite.
+ */
+describe('PersonenDetailPage — Status fehlt (LLH-1957)', () => {
+  it.each([
+    ['ohne Status', undefined],
+    ['mit unbekanntem Status', 'xyz'],
+  ])('zeichnet die Person %s mit „unbekannt“ und ohne Statuswechsel', async (_fall, status) => {
+    render(einsatzAktiv, { ...detail, status } as unknown as PersonDetail);
+    await waitFor(() =>
+      expect(
+        Array.from(document.querySelectorAll('[data-lfh="status"]')).map((m) => m.textContent),
+      ).toContain('unbekannt'),
+    );
+    const menue = await oeffneKopfmenue();
+    expect(within(menue).queryByText(/setzen/)).toBeNull();
+    expect(within(menue).getByText('Stornieren')).toBeInTheDocument();
+  });
+});
+
+/**
  * Ladehoheit: beim Öffnen laufen nur Einsatz und Detail (Aufenthalt mit UHS- und Platzname
  * kommt mit dem Detail, LLH-1129); Tiere und Schäden laden mit dem Abschnitt „Bezüge“, die
  * Kandidaten und die UHS-Liste erst mit ihrem Dialog, das Zugriffs-Audit mit seinem Abschnitt.

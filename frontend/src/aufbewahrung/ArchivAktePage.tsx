@@ -50,6 +50,7 @@ import {
   aufbewahrungZustand,
   etbTyp,
   personStatus,
+  personStatusDarstellung,
   schadenAusmass,
   schadenStatus,
   sichtung,
@@ -124,7 +125,7 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
     sorter: nachFolge(Object.keys(personStatus), (p: ArchivPerson) => p.status),
     filters: werteAusKatalog(personStatus),
     onFilter: (w, p) => p.status === w,
-    render: (_, p) => <Status darstellung={personStatus[p.status]} />,
+    render: (_, p) => <Status darstellung={personStatusDarstellung(p.status)} />,
   },
   {
     key: 'sichtung',

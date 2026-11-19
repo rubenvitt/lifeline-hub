@@ -1031,6 +1031,25 @@ describe('PersonenPage', () => {
     await waitFor(() => expect(regFolge()).toHaveLength(3));
   });
 
+  it.each([
+    ['ohne Status', undefined],
+    ['mit unbekanntem Status', 'xyz'],
+  ])(
+    'zeichnet eine Person %s als „unbekannt“, ohne Absturz der Liste (LLH-1957)',
+    async (_fall, status) => {
+      // Nachgestellt am Stand vom 12.11.2026: `StatusTag` las `STATUS_META[status].rolle`, und
+      // „Cannot read properties of undefined (reading 'rolle')“ ersetzte die ganze Liste.
+      const kaputt = { ...person, status };
+      render(einsatzAktiv, [kaputt, unbekannt]);
+      expect(await screen.findByText('R-001')).toBeInTheDocument();
+      const marken = Array.from(document.querySelectorAll('[data-lfh="status"]')).map(
+        (m) => m.textContent,
+      );
+      expect(marken).toContain('unbekannt');
+      expect(marken).toContain('vermisst');
+    },
+  );
+
   it('Sichtungsraster gruppiert ALLE Personen nach Sichtung, samt unverletzt und ohne Sichtung', async () => {
     const sk2 = {
       ...person,

@@ -44,7 +44,7 @@ import {
 import { listeUhs, aenderePersonBelegung, nimmUhsAustrittZurueck } from '../api/einsatzUhs';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META } from '../personen/personMeta';
+import { STATUS_META, personStatusDarstellung } from '../personen/personMeta';
 import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -74,8 +74,11 @@ import { registrierNummer } from '../anzeige/registrierNummer';
 import { flaeche } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
 
-/** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
-function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
+/**
+ * Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). Ein fehlender oder unbekannter
+ * Status (LLH-1957) hat keinen Weg; der Server lehnt ihn ohnehin ab.
+ */
+function naechsteStatus(aktuell: PersonStatus | null | undefined): PersonStatus[] {
   switch (aktuell) {
     case 'erfasst':
       return ['vermisst', 'betroffen', 'verstorben', 'abgemeldet'];
@@ -86,6 +89,8 @@ function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
     case 'verstorben':
     case 'abgemeldet':
       return ['erfasst', 'vermisst', 'betroffen'];
+    default:
+      return [];
   }
 }
 
@@ -458,7 +463,7 @@ export default function PersonenDetailPage() {
             <Alert
               type="warning"
               showIcon
-              title={`Sichtung „tot“, Status noch „${STATUS_META[person.status].label}“`}
+              title={`Sichtung „tot“, Status noch „${personStatusDarstellung(person.status).label}“`}
               action={
                 <Button
                   loading={
@@ -848,7 +853,7 @@ export default function PersonenDetailPage() {
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
-          <Status darstellung={STATUS_META[p.status]} />
+          <Status darstellung={personStatusDarstellung(p.status)} />
           {p.aktuelle_sichtung && <SichtungsTag kategorie={p.aktuelle_sichtung} />}
           {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
         </Space>
