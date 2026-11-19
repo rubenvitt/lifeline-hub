@@ -1,0 +1,81 @@
+import { expect, test, type Page } from '@playwright/test';
+import { kopfFilterWaehlen } from './kopffilter-kern';
+import { anmeldenAlsAdmin } from './rollen-kern';
+
+/**
+ * Rückweg über den Ortspfad (LLH-1997, `frontend/AGENTS.md`, Deeplink-Muster, „Ortspfad zur Liste
+ * über `ListenRueckweg`“), an der Vorbildseite Schäden (Filter in der Adresse, LLH-1086).
+ *
+ * Kam man von der Liste, ist der Ortspfad ein Schritt zurück im Verlauf: die Liste steht mit ihrem
+ * Filter wieder da, und der Verlauf wächst nicht (`history.state.idx` wie vor dem Öffnen). Der
+ * Rückweg aus der Sitzung (`listenGedaechtnis`) könnte den Filter auch herstellen, deshalb prüft
+ * die Spec den Verlaufsindex, nicht nur die Adresse. Direkt geöffnet führt der Ortspfad per PUSH
+ * auf die Liste.
+ */
+
+async function einsatzMitSchaeden(page: Page): Promise<string> {
+  const r = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E Ortspfad ${Date.now()}` },
+  });
+  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBe(true);
+  const einsatzId = String(((await r.json()) as { id: number }).id);
+  for (const s of [
+    { ausmass: 'gering', ort: 'Bachstraße 1' },
+    { ausmass: 'gross', ort: 'Deichweg 2' },
+  ]) {
+    const a = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+      data: { typ: 'sachschaden', ...s },
+    });
+    expect(a.ok(), `POST schaeden: ${a.status()} ${await a.text()}`).toBe(true);
+  }
+  return einsatzId;
+}
+
+const verlaufsIndex = (page: Page) =>
+  page.evaluate(() => (window.history.state as { idx?: number } | null)?.idx ?? -1);
+
+const ortspfadZurListe = (page: Page) =>
+  page.locator('.lfh-seitenkopf__pfad').getByRole('link', { name: 'Schäden' });
+
+test.describe('Ortspfad der Detailseite', () => {
+  test.setTimeout(90_000);
+
+  test('führt zurück auf die gefilterte Liste, von der man kam', async ({ page }) => {
+    await anmeldenAlsAdmin(page, { startseite: false });
+    const einsatzId = await einsatzMitSchaeden(page);
+    await page.goto(`/einsaetze/${einsatzId}/schaeden`);
+    await kopfFilterWaehlen(page, 'Ausmaß', ['groß']);
+    await expect(page).toHaveURL(/[?&]f\.ausmass=gross(&|$)/);
+    await expect(page.getByText('Bachstraße 1')).toHaveCount(0);
+    const indexListe = await verlaufsIndex(page);
+
+    await page.getByText('Deichweg 2').click();
+    await expect(page).toHaveURL(/\/schaeden\/\d+$/);
+    await expect(ortspfadZurListe(page)).toHaveAttribute('href', /f\.ausmass=gross/);
+
+    await ortspfadZurListe(page).click();
+    await expect(page).toHaveURL(/\/schaeden\?.*f\.ausmass=gross/);
+    await expect(page.getByText('Deichweg 2')).toBeVisible();
+    await expect(page.getByText('Bachstraße 1')).toHaveCount(0);
+    expect(await verlaufsIndex(page)).toBe(indexListe);
+  });
+
+  test('führt direkt geöffnet auf die Liste mit ihrer Vorgabe', async ({ page }) => {
+    await anmeldenAlsAdmin(page, { startseite: false });
+    const einsatzId = await einsatzMitSchaeden(page);
+    const liste = await page.request.get(`/api/einsaetze/${einsatzId}/schaeden`);
+    const [erster] = (await liste.json()) as { id: number }[];
+
+    await page.goto(`/einsaetze/${einsatzId}/schaeden/${erster.id}`);
+    const indexDetail = await verlaufsIndex(page);
+    await expect(ortspfadZurListe(page)).toHaveAttribute(
+      'href',
+      `/einsaetze/${einsatzId}/schaeden`,
+    );
+
+    await ortspfadZurListe(page).click();
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/schaeden$`));
+    await expect(page.getByText('Bachstraße 1')).toBeVisible();
+    expect(await verlaufsIndex(page)).toBe(indexDetail + 1);
+  });
+});
