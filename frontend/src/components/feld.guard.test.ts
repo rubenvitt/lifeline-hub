@@ -85,14 +85,7 @@ const BEREICHE = [
  * Dateien in einem Bereich, die der Wächter noch nicht prüft — je mit der Aufgabe, nach der sie
  * dazukommen. Neue Einträge gibt es nicht; eine erledigte Aufgabe streicht ihre.
  */
-const AUSGESPART: Readonly<Record<string, string>> = {
-  // `Feld` kennt noch keinen Weg ohne Feldabstand und mit Flex-Anteil (LLH-1999).
-  'infotelefon/AnrufErfassung.tsx': 'LLH-1999',
-  'entwurf/DokumentEntwurf.tsx': 'LLH-1999',
-  'lagebesprechung/LagebesprechungModal.tsx': 'LLH-1999',
-  'pages/bereitstellungsraum/EintreffenDialog.tsx': 'LLH-1999',
-  'pages/einsatzdaten/EinsatzAbschlussDialog.tsx': 'LLH-1999',
-};
+const AUSGESPART: Readonly<Record<string, string>> = {};
 
 /** Was eine feste Zahlbreite behalten darf, wie oft — und warum. Keine davon ist ein Eingabefeld. */
 const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = {

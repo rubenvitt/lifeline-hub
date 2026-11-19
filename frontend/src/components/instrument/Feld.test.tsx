@@ -42,6 +42,49 @@ describe('Feld (Spec `feldbreiten`)', () => {
     expect(formularItem('Bemerkung').style.getPropertyValue(FELD_GRENZE)).toBe('');
   });
 
+  it('hat ohne Angabe den Feldabstand und keinen Flex-Anteil', () => {
+    renderMitProviders(
+      <Form>
+        <Feld name="wert" label="Wert">
+          <Input />
+        </Feld>
+      </Form>,
+    );
+    const item = formularItem('Wert');
+    expect(item.style.marginBottom).toBe('');
+    expect(item.style.flex).toBe('');
+  });
+
+  it('lässt mit `abstand="ohne"` den Feldabstand darunter weg', () => {
+    renderMitProviders(
+      <Form>
+        <Feld name="wert" label="Wert" abstand="ohne">
+          <Input />
+        </Feld>
+      </Form>,
+    );
+    expect(formularItem('Wert').style.marginBottom).toBe('0px');
+  });
+
+  it.each([
+    ['kurz', '1 1 120px'],
+    ['schmal', '1 1 200px'],
+    ['mittel', '1 1 320px'],
+    ['voll', '1 1 0px'],
+  ] as const)('nimmt in einer Feldzeile mit `zeile="%s"` den Anteil %s', (zeile, flex) => {
+    renderMitProviders(
+      <Form>
+        <Feld name="wert" label="Wert" zeile={zeile}>
+          <Input />
+        </Feld>
+      </Form>,
+    );
+    const item = formularItem('Wert');
+    expect(item.style.flex).toBe(flex);
+    // Ohne `minWidth: 0` schrumpft ein Flex-Kind nicht unter die Breite seines Inhalts.
+    expect(item.style.minWidth).toBe('0px');
+  });
+
   it('trägt die Klasse, mit der InputNumber und Datumsfelder die Breite füllen', () => {
     renderMitProviders(
       <Form>

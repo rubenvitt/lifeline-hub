@@ -103,7 +103,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten) ·
   `Textstufe` (Stufe und Ton, kein `style`) · `Stapel` (Abstand als Rasterstufe) · `Knopfreihe` (Knöpfe nebeneinander, Abstand `md`, „Aktionen“) · `MetaZeile`
   (Angaben mit „·“, leere Teile fallen weg, `Teil mono` für Zahlen) · `Feld` (`Form.Item` mit
-  `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`). Im
+  `breite` `kurz`·`schmal`·`mittel`·`voll` = 120·200·320·ganz, fluid; Spec `feldbreiten`;
+  Felder einer Zeile und das letzte Feld eines Dialogs: `abstand="ohne"` statt `marginBottom: 0`,
+  `zeile` mit derselben Stufe als Flex-Basis statt `flex`, LLH-1999). Im
   Verwaltungsteil, auf den Einsatzseiten unter `pages/` samt Fach- und Restbereichen (LLH-1971),
   in ETB, Aufträgen, Meldungen, Nachforderungen, Lageberichten, Erinnerungen und Chat (LLH-1969)
   sowie in Personen, Betreuung, Verpflegung, Kräfte und Ablösung (LLH-1970; Liste `BEREICHE`)
