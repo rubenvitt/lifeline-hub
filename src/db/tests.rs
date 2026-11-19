@@ -6959,14 +6959,14 @@ async fn migration_0208_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema() {
     assert_eq!((ziel, anzeige.as_deref()), (None, Some("EA Deich")));
 }
 
-// --- LLH-1817: Einsatzrolle Mitarbeit (0357) ---
+// --- LLH-1817: Einsatzrolle Mitarbeit (0358) ---
 
 /// Der Neubau von `einsatz_mitgliedschaft` übernimmt den Bestand samt Führungsstelle und
 /// -funktion, nimmt `mitarbeit` in den Rollen-CHECK auf, lehnt Unbekanntes weiter ab und legt
 /// Index sowie die sechs Spiegel-Trigger neu an.
 #[tokio::test]
-async fn migration_0357_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema() {
-    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 356).await;
+async fn migration_0358_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 357).await;
     let (e, b) = bild_grundlage(&pool).await;
     sqlx::query(
         "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
@@ -6989,7 +6989,7 @@ async fn migration_0357_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema(
     let vorher = lesen().await.unwrap();
     assert_eq!(vorher.len(), 1);
 
-    migriere_bis(&pool, 357).await;
+    migriere_bis(&pool, 358).await;
 
     assert_eq!(lesen().await.unwrap(), vorher, "Bestand unverändert");
     let reste: i64 = sqlx::query_scalar(

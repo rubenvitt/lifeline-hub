@@ -38,7 +38,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/yd9hmb6c5q32st2ddrz7gybq
 
 **Files:**
 - Modify: `src/einsatz/mod.rs:83-117` (Enum, Prädikate, Tests bei `:498`)
-- Create: `migrations/0357_einsatz_rolle_mitarbeit.sql`
+- Create: `migrations/0358_einsatz_rolle_mitarbeit.sql`
 - Modify: `src/db/` Testmodul mit Migrationsprüfungen (Muster `migration_0208_br_belegung_neubau_erhaelt_zeilen_sequenz_und_schema`)
 - Modify: `tests/enum_wire_kontrakt.rs`
 - Modify: `frontend/src/einsatz/einsatzRolle.ts`, `frontend/src/pages/MitgliederAbschnitt.tsx:33` (Rangfolge), generierte Typen
@@ -65,9 +65,9 @@ fn mitarbeit_erfasst_aber_schreibt_nicht_und_fuehrt_nicht() {
 
 - [ ] **Step 2:** `cargo test --lib einsatz::tests::mitarbeit` → FAIL (Variante fehlt).
 - [ ] **Step 3:** Variante `Mitarbeit => "mitarbeit"` im `wire_enum!` zwischen `Fuehrungspersonal` und `Beobachter`; `darf_erfassen` = `!matches!(self, Beobachter)`; `ist_mitarbeit`. Compiler-Fehler an allen `match`-Stellen beheben (Mitarbeit wie Beobachter behandeln, wo es um Führung oder Schreiben geht).
-- [ ] **Step 4: Failing Migrationstest** `migration_0357_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema`: legt vor 0357 eine Mitgliedschaft mit `fuehrungsstelle` und `fuehrungsfunktion = 's2'` an, spielt 0357 ein und prüft: Zeile unverändert; `INSERT … 'mitarbeit'` gelingt; `INSERT … 'unsinn'` scheitert; `sqlite_master` enthält `idx_mitgliedschaft_benutzer` und die sechs Trigger `einsatz_mitgliedschaft_spiegellog_{i,u,d}`, `einsatz_mitgliedschaft_spiegelschutz_{i,u,d}`; ein INSERT schreibt eine Zeile in `einsatz_aenderung`.
+- [ ] **Step 4: Failing Migrationstest** `migration_0358_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema`: legt vor 0358 eine Mitgliedschaft mit `fuehrungsstelle` und `fuehrungsfunktion = 's2'` an, spielt 0358 ein und prüft: Zeile unverändert; `INSERT … 'mitarbeit'` gelingt; `INSERT … 'unsinn'` scheitert; `sqlite_master` enthält `idx_mitgliedschaft_benutzer` und die sechs Trigger `einsatz_mitgliedschaft_spiegellog_{i,u,d}`, `einsatz_mitgliedschaft_spiegelschutz_{i,u,d}`; ein INSERT schreibt eine Zeile in `einsatz_aenderung`.
 - [ ] **Step 5:** Migration schreiben: `CREATE TABLE einsatz_mitgliedschaft_neu` mit allen Spalten aus 0003 + `fuehrungsstelle TEXT` (0100) + `fuehrungsfunktion` mit dem CHECK aus 0128, CHECK `einsatz_rolle IN ('einsatzleitung','fuehrungspersonal','mitarbeit','beobachter')`; Daten kopieren; DROP; RENAME; Index und die sechs Trigger wörtlich aus `0314_einsatz_spiegel.sql:187-202`. Kopfkommentar nach Muster 0208 (Blatt: `grep -l "REFERENCES einsatz_mitgliedschaft" migrations` ist leer).
-- [ ] **Step 6:** `cargo test migration_0357` und `cargo test --lib einsatz::` → PASS.
+- [ ] **Step 6:** `cargo test migration_0358` und `cargo test --lib einsatz::` → PASS.
 - [ ] **Step 7:** `tests/enum_wire_kontrakt.rs` um `mitarbeit` ergänzen; `scripts/check-typ-codegen.sh` laufen lassen; `EINSATZ_ROLLE_LABELS` um `mitarbeit: 'Mitarbeit'` in der Reihenfolge Einsatzleitung, Führungspersonal, Mitarbeit, Beobachter; Rangfolge in `MitgliederAbschnitt.tsx` (`mitarbeit: 2, beobachter: 3`). `einsatzRolle.test.ts` prüft die Reihenfolge der Optionen.
 - [ ] **Step 8:** `cargo test --test enum_wire_kontrakt`, `mise exec -- pnpm --dir frontend test einsatzRolle` und `mise exec -- pnpm --dir frontend typecheck` → PASS.
 - [ ] **Step 9: Commit** `feat(einsatz): Einsatzrolle Mitarbeit mit Wire-Wert und Tabellenumbau`
@@ -183,7 +183,7 @@ fn mitarbeit_erfasst_aber_schreibt_nicht_und_fuehrt_nicht() {
 ### Task 7: Instanzkopplung — Fähigkeit und Herabstufen
 
 **Files:**
-- Create: `migrations/0358_kopplung_rolle_mitarbeit.sql` (`ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_rolle_mitarbeit INTEGER NOT NULL DEFAULT 0`)
+- Create: `migrations/0359_kopplung_rolle_mitarbeit.sql` (`ALTER TABLE instanz_kopplung ADD COLUMN gegenueber_rolle_mitarbeit INTEGER NOT NULL DEFAULT 0`)
 - Modify: `src/instanz/repo.rs` (`KopplungZeile` `:13`, `save_faehigkeiten` `:627`)
 - Modify: `src/instanz/melden.rs` (`MeldenAnfrage` `:101`, `MeldenAntwort` `:168`, Speichern `:892`, Bau der Anfrage `:799`, Antwort `:1696`, Annahme in `handle_meldung` `:1274`)
 - Modify: `src/instanz/spiegel/liefern.rs` (`Absender` `:19`, `baue_zeile` `:372`)

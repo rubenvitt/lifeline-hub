@@ -7,7 +7,7 @@
 -- Schema = 0003 + fuehrungsstelle (0100) + fuehrungsfunktion (0128, CHECK unverändert), nur der
 -- einsatz_rolle-CHECK nimmt 'mitarbeit' auf. Index aus 0003 und die sechs Spiegel-Trigger
 -- (Protokoll und Schutz, 0314) fallen mit dem DROP und werden wortgleich neu angelegt.
--- Abgesichert von db::tests::migration_0357_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema.
+-- Abgesichert von db::tests::migration_0358_mitgliedschaft_neubau_erhaelt_zeilen_trigger_und_schema.
 
 CREATE TABLE einsatz_mitgliedschaft_neu (
     einsatz_id        INTEGER NOT NULL REFERENCES einsatz(id) ON DELETE CASCADE,

@@ -655,7 +655,7 @@ Herleitung in
     Suchers statt Multicast).
 - **Fähigkeit `rolle_mitarbeit` (LLH-1817)** steht im Melden beider Seiten
   (`melden::MeldenAnfrage`, `MeldenAntwort`) und in `instanz_kopplung.gegenueber_rolle_mitarbeit`
-  (Migration 0358). Ein Gegenüber ohne sie bekommt `mitarbeit` als `beobachter`; ein eingehendes
+  (Migration 0359). Ein Gegenüber ohne sie bekommt `mitarbeit` als `beobachter`; ein eingehendes
   `beobachter` eines solchen Gegenübers überschreibt ein lokales `mitarbeit` nicht; kippt die
   Fähigkeit von 0 auf 1, gehen die Mitgliedschaften mit `mitarbeit` einmal neu hinaus.
 - Nachweis: `tests/instanz_kopplung.rs` (zwei Instanzen auf Loopback).
