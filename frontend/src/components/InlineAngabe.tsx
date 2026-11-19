@@ -52,8 +52,8 @@ import { vermerkKurz } from './feldVermerk';
  * wird nur ausdrücklich: Enter, Strg/⌘+Enter im Textfeld, oder „Speichern".
  *
  * **Ungespeichertes ist sichtbar (LLH-1829).** Ab der ersten Änderung steht im Feld „Nicht
- * gespeichert — Enter speichert, Esc verwirft“ (mehrzeilig Strg+Enter; gesperrt nur „Nicht
- * gespeichert“) und eine Achtungskante. Ein Klick daneben schließt ein unverändertes Feld still;
+ * gespeichert“ und eine Achtungskante (ohne Tastenerklärung, Regel „Text erklärt nie die
+ * Bedienung“). Ein Klick daneben schließt ein unverändertes Feld still;
  * ein geändertes bleibt offen, gespeichert wird es dadurch nicht.
  *
  * ── FELDWEISE BEARBEITUNG IN EINER ANSICHT (LLH-1103) ──────────────────────────────────
@@ -670,11 +670,9 @@ export function InlineAngabe<T>({
   ) : null;
 
   // „Nicht gespeichert“ ab der ersten Änderung (LLH-1829, Design-Doc „Offenes Inline-Feld“).
-  // Schreibgeschützt (LLH-1832) gibt es nichts mehr zu speichern; gesperrt sendet Enter nicht.
+  // Schreibgeschützt (LLH-1832) gibt es nichts mehr zu speichern. Ohne Tastenerklärung: Speichern
+  // und Abbrechen stehen darunter (`frontend/AGENTS.md`, „Text erklärt nie die Bedienung“).
   const ungespeichert = entwurfGeaendert && !schreibschutz;
-  const ungespeichertText = isGesperrt
-    ? 'Nicht gespeichert'
-    : `Nicht gespeichert — ${mehrzeilig ? 'Strg+Enter' : 'Enter'} speichert, Esc verwirft`;
 
   const formular = (
     <form
@@ -732,7 +730,7 @@ export function InlineAngabe<T>({
       {ungespeichert ? (
         // `aria-live` statt `role="status"`: der Hinweis „Inzwischen geändert“ trägt die Rolle schon.
         <div aria-live="polite" style={{ color: rollen.achtungText }}>
-          {ungespeichertText}
+          Nicht gespeichert
         </div>
       ) : null}
       {sperrHinweis}

@@ -148,6 +148,13 @@ Karte für `SpeicherKnopf`, und `pnpm design-system` läuft (Regel „Größere 
 - **Gesperrtes Inline-Feld mit Entwurf** (LLH-1468/1480): dort steht nur „Nicht gespeichert“
   neben dem Sperrgrund, ohne „Enter speichert“, weil Enter dann nicht sendet.
 
+## Abweichung bei der Umsetzung (19.11.2026)
+
+Der abgestimmte Hinweis „Nicht gespeichert — Enter speichert, Esc verwirft“ verstößt gegen die
+Bedien-Leitlinie „Text erklärt nie die Bedienung“ (LFH-1078, Wächter
+`erklaertext.guard.test.ts`). Umgesetzt ist deshalb nur „Nicht gespeichert“ (auch mehrzeilig und
+gesperrt); Speichern und Abbrechen stehen direkt darunter. Zur Rückfrage an den Menschen gemeldet.
+
 ## Dem Builder überlassen
 
 - Name und genaue Signatur des Hooks; ob Provider oder Kontextwert.

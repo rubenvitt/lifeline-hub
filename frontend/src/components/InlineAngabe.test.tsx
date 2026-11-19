@@ -1234,7 +1234,7 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
 });
 
 describe('InlineAngabe · Nicht gespeichert (LLH-1829)', () => {
-  const HINWEIS = 'Nicht gespeichert — Enter speichert, Esc verwirft';
+  const HINWEIS = 'Nicht gespeichert';
 
   async function oeffne() {
     await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
@@ -1249,7 +1249,7 @@ describe('InlineAngabe · Nicht gespeichert (LLH-1829)', () => {
     expect(screen.getByText(HINWEIS)).toBeInTheDocument();
   });
 
-  it('mehrzeilig nennt Strg+Enter', async () => {
+  it('mehrzeilig ebenso, ohne Tastenerklärung', async () => {
     renderMitProviders(
       <TextAngabe
         wert="ILS-1"
@@ -1261,18 +1261,17 @@ describe('InlineAngabe · Nicht gespeichert (LLH-1829)', () => {
     );
     const feld = await oeffne();
     await userEvent.type(feld, 'x');
-    expect(
-      screen.getByText('Nicht gespeichert — Strg+Enter speichert, Esc verwirft'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(HINWEIS)).toBeInTheDocument();
+    expect(screen.queryByText(/Enter/)).toBeNull();
   });
 
-  it('gesperrt mit Entwurf nennt nur „Nicht gespeichert“', async () => {
+  it('gesperrt mit Entwurf bleibt der Hinweis stehen', async () => {
     const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
     const feld = await oeffne();
     await userEvent.type(feld, 'x');
     rerender(<TextAngabe wert="ILS-1" gesperrt="Ohne Verbindung nicht änderbar" />);
-    expect(await screen.findByText('Nicht gespeichert')).toBeInTheDocument();
-    expect(screen.queryByText(HINWEIS)).toBeNull();
+    expect(await screen.findByText(HINWEIS)).toBeInTheDocument();
+    expect(screen.getByText('Ohne Verbindung nicht änderbar')).toBeInTheDocument();
   });
 
   it('Klick daneben schließt ein unverändertes Feld still', async () => {

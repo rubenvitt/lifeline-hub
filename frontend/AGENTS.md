@@ -1452,8 +1452,9 @@ und `pages/personen/`.
   Änderungen“ bzw. „N Änderungen“; wer das `<Form>` sperrt, reicht `disabled` mit. Enter ohne
   Änderung schließt eine Bearbeitung (`EnterOhneAenderung`). Wächter
   `components/speicherKnopf.guard.test.ts`: jede Datei mit `useSpeicherLeiste` nutzt beides. Eine
-  offene `InlineAngabe` zeigt ab der ersten Änderung „Nicht gespeichert — Enter speichert, Esc
-  verwirft“ mit Achtungskante; ein Klick daneben schließt sie nur unverändert (still).
+  offene `InlineAngabe` zeigt ab der ersten Änderung „Nicht gespeichert“ mit Achtungskante (ohne
+  Tastenerklärung, „Text erklärt nie die Bedienung“); ein Klick daneben schließt sie nur
+  unverändert (still).
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
