@@ -206,17 +206,14 @@ Wiederherstellung unterbleibt, wenn die Adresse einen der Deeplink-Parameter aus
 - e2e (eine Spec): Meldungen „Extern“ und Betroffene „Raster“, rollen, weg, Browser-Zurück. Sicht
   und Rollposition stehen wieder (die Zahlen 1400 und 0 aus der Aufgabe).
 
-## Offen zur Freigabe
+## Entschieden am Freigabe-Checkpoint (19.11.2026)
 
-1. **Rückweg über den Ortspfad.** Der Ortspfad einer Detailseite (etwa Person → „Betroffene“)
-   verlinkt heute auf die nackte Liste. Mit A1 landet er dort ungefiltert und oben. Vorschlag:
-   außerhalb dieser Aufgabe lassen und als Folgeaufgabe führen. Die Aufgabe sagt „Zurück“, und
-   der Browser-Weg trägt beides. Alternative in diesem PR: Der Link zur Detailseite trägt die
-   Listenadresse im History-State (`von`, wie die Hilfe), und der Ortspfad geht per `navigate(-1)`
-   zurück, wenn der vorige Eintrag genau diese Liste ist. Das stellt auch die Rollposition wieder
-   her.
-2. **Parameternamen** wie in D3 (deutsch, kurz, Werte wie in der Oberfläche). Ein Einwand vor dem
-   Plan ist billiger als danach.
+1. **Rückweg über den Ortspfad** bleibt außerhalb dieser Aufgabe und wird als Folgeaufgabe
+   LLH-1997 geführt (History-State `von`, `navigate(-1)`). Der Browser-Zurück trägt hier Filter
+   und Rollposition.
+2. **Sprungmarken** zeigen genau ihre Sicht (D4). Wer im Raster steht und „Vermisste“ wählt,
+   sieht danach die Zeilen mit dem Filter „Vermisste“. Das Zusammenführen entfällt.
+3. **Parameternamen** wie in D3 und D3a.
 
 ## Dem Plan überlassen
 
