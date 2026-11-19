@@ -110,51 +110,50 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   `## Notizen`-Abschnitte bleiben stehen.
 - **Nie `delete_task`** (nicht rückgängig zu machen) — stattdessen `dropped`.
 
-## Planung und Ausführung — OpenSpec und Superpowers (LFH-588)
+## Planung und Ausführung — Superpowers (LLH-1967)
 
-- **OpenSpec** (`/opsx:*`) besitzt den **Änderungszyklus** (klären, entwerfen, Spec und
-  Aufgabenschnitt, abarbeiten, archivieren), **Superpowers** (`superpowers:*`) die
-  **Arbeitsdisziplin** (Worktree, Debugging, TDD, Verifikation, Review, Branch-Abschluss).
-  OpenSpec löst Superpowers nicht ab.
-- `explore`, `propose`, `update`, `sync`, `archive` fassen keinen Projektcode an;
-  **`/opsx:apply` setzt um**. Dispatches: `superpowers:brainstorming` → `/opsx:explore`,
-  `superpowers:writing-plans` → `/opsx:propose`, `superpowers:executing-plans` → `/opsx:apply`.
-  Bei Superpowers bleiben `using-git-worktrees`, `systematic-debugging`,
-  `test-driven-development`, `verification-before-completion`, `finishing-a-development-branch`.
-- **`/opsx:apply` bringt keine Disziplin mit:** jede Aufgabe per `test-driven-development`, vor
-  jedem „fertig" `verification-before-completion`.
+- **Superpowers** (`superpowers:*`, Plugin in `.claude/settings.json`) besitzt den
+  **Änderungszyklus** (klären und entwerfen mit `brainstorming`, Aufgabenschnitt mit
+  `writing-plans`, abarbeiten mit `subagent-driven-development` oder `executing-plans`) und die
+  **Arbeitsdisziplin** (`using-git-worktrees`, `systematic-debugging`,
+  `test-driven-development`, `verification-before-completion`,
+  `finishing-a-development-branch`). Die Zunder-Skills legen Board-Spur und Routen darüber.
+  Entscheidung: ADR-0069 (löst ADR-0013 ab, 18.11.2026).
+- **OpenSpec ist eingefrorenes Archiv:** `openspec/changes/archive/` und `openspec/specs/`
+  bleiben lesbar, weil Code, ADRs und Migrationen darauf verweisen; nichts Neues darunter, kein
+  Werkzeug. Wächter: `scripts/check-openspec-eingefroren.sh` (Schritt 13 von `check-all.sh`,
+  Bündel `schnell`).
+- **Umsetzung bringt die Disziplin mit:** jede Aufgabe eines Plans per
+  `test-driven-development`, vor jedem „fertig" `verification-before-completion`.
 - **Review nach Ermessen, Warten ohne Wecken** (17.11.2026, Specs `review-vor-dem-pr`,
   `warten-ohne-wecken`): der Agent entscheidet am Diff, ob ein Review nötig ist, und startet ihn
   selbst; geweckt wird nur, wenn etwas zu tun ist. Ablauf: `dev-zunder-ausfuehren`.
 - **Mit dem Menschen** (08.11.2026): vor dem ersten Code den Lösungsweg gemeinsam ausarbeiten
   (außer `trivial`), am Ende Bilder der Änderung in PR und Meldung. Ablauf:
   `dev-zunder-ausfuehren`, „Gemeinsam ausarbeiten, bevor Code entsteht“ und „Bilder der Änderung“.
-- **Pflicht-Checkpoint:** `/opsx:propose` hält nach den Artefakten an (kein Fehlschlag) —
-  vorlegen (Aufgabe auf `blocked`), Freigabe abwarten, dann `in_progress` und `/opsx:apply`.
+- **Pflicht-Checkpoint:** nach dem Design-Doc aus `brainstorming` anhalten — vorlegen (Aufgabe
+  auf `blocked`), Freigabe abwarten, dann `in_progress` und `writing-plans`.
 - **Entwurfs-Hoheit** (LFH-589, Spec `entwurfs-hoheit`,
   `openspec/changes/archive/2026-09-30-lfh-589-entwurfs-hoheit-orchestrierung/design.md`):
-  Workflows besitzen die Menge (Scope-Scan, Judge-Panel als Zulieferer), OpenSpec den einzelnen
-  Task. Eine Change entsteht **genau** auf der Route `entwurf` (E1 Entscheidung · E2 Regel ·
-  E3 mehr als ein Subsystem, nicht bei einem Bugfix, der Bestehendes wiederherstellt, oder
-  einer reinen Textkorrektur; Liste in
-  `dev-zunder-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein
-  Workflow ruft `/opsx:*` oder schreibt unter `openspec/changes/`.**
-- **Vier Ablageorte, keine Überschneidung:** `openspec/changes/<name>/` (laufende Änderung, hier
-  landet Neues) · `openspec/changes/archive/` (nach `/opsx:archive`) · `openspec/specs/`
-  (Fähigkeits-Specs, SHALL/MUST, über `/opsx:sync`/`/opsx:archive`) · `docs/superpowers/`
-  (Herleitungen und Messprotokolle, **eingefrorenes Archiv**, wird nicht nach OpenSpec migriert).
-  Wer dort etwas verschiebt, greppt zuerst die Verweise (sie brechen still).
-- **Archiviert wird vor dem Merge, im selben Branch** (Entscheidung 30.09.2026): ist die
-  `tasks.md` abgehakt, `/opsx:archive` samt Spec-Sync und Verweisen, dann erst der PR — kein
-  Archiv-PR danach. Wächter: `scripts/check-openspec-archiv.sh` (Schritt 13 von `check-all.sh`,
-  Bündel `schnell`) macht eine aktive Change ohne offenes Kästchen rot.
+  Workflows besitzen die Menge (Scope-Scan, Judge-Panel als Zulieferer), der Main-Loop den
+  einzelnen Entwurf. Design-Doc und Plan entstehen **genau** auf der Route `entwurf`
+  (E1 Entscheidung · E2 Regel · E3 mehr als ein Subsystem, nicht bei einem Bugfix, der
+  Bestehendes wiederherstellt, oder einer reinen Textkorrektur; Liste in
+  `dev-zunder-ausfuehren`, Schritt 3), nie bei `trivial`/`klar`/`bug-unklar`. **Kein Workflow
+  ruft `brainstorming` oder `writing-plans` oder schreibt unter `docs/superpowers/`.**
+- **Ablage:** Design-Docs unter `docs/superpowers/specs/YYYY-MM-DD-<kurz>-<slug>-design.md`,
+  Pläne unter `docs/superpowers/plans/YYYY-MM-DD-<kurz>-<slug>.md`, beide committet; die
+  Zunder-Aufgabe trägt den Plan-Pfad in `plan`. Einen Archivschritt gibt es nicht. Neue
+  verbindliche Regeln stehen in der Bereichs-`AGENTS.md` oder einer ADR, nicht in
+  `openspec/specs/`. Wer unter `docs/superpowers/` oder `openspec/` etwas verschiebt, greppt
+  zuerst die Verweise (sie brechen still).
 - **Ein Plan allein bekommt keinen PR** (Entscheidung 30.09.2026), außer der Mensch wünscht es
-  ausdrücklich. Ablauf in EINEM Branch: Plan (`/opsx:propose`) → Commit → Freigabe →
-  `/opsx:apply` → `/opsx:archive` → erst dann der PR, mit Plan, Umsetzung und Archiv zusammen.
-  Den Branch zu pushen, um den Stand zu sichern, ist erlaubt; der PR wartet auf die Umsetzung —
-  auch wenn die Umgebung (etwa eine Cloud-Sitzung) nach jedem Push einen PR verlangt.
-- Skills und OpenSpec-Befehle liegen nur unter `.claude/`; Codex ist entfernt (LFH-853). Bei
-  `openspec init`/`openspec update` nur das Werkzeug Claude Code wählen, keinen `.agents/`-Spiegel.
+  ausdrücklich. Ablauf in EINEM Branch: Design-Doc → Commit → Freigabe → Plan → Umsetzung → erst
+  dann der PR, mit Entwurf, Plan und Umsetzung zusammen. Den Branch zu pushen, um den Stand zu
+  sichern, ist erlaubt; der PR wartet auf die Umsetzung — auch wenn die Umgebung (etwa eine
+  Cloud-Sitzung) nach jedem Push einen PR verlangt.
+- Eigene Skills liegen nur unter `.claude/skills/`; Superpowers kommt als Plugin, nicht als
+  Kopie. Codex ist entfernt (LFH-853).
 
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 

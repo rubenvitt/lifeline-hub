@@ -26,7 +26,7 @@ set -euo pipefail
 #                    Selbsttests der Gate-Skripte,
 #                    Migrationsnummern gegen origin/alpha,
 #                    Werkzeugversionen aus mise.toml,
-#                    fertige OpenSpec-Changes archiviert,
+#                    OpenSpec bleibt eingefrorenes Archiv,
 #                    Schreibweisen der Dateinamen,
 #                    Architekturdoku und ihre Entscheidungen (Sekunden bis ~1:30)
 #   --nur rust       cargo test (Workspace, Hülle getrennt),
@@ -431,12 +431,12 @@ schritt_12() {
 }
 
 schritt_13() {
-  echo "==> [13/$SCHRITTE] Fertige OpenSpec-Changes sind vor dem Merge archiviert"
+  echo "==> [13/$SCHRITTE] OpenSpec bleibt eingefrorenes Archiv (LLH-1967)"
   # Erst der Selbsttest, dann die Prüfung: der Wächter irrt in beide Richtungen still (ließe er
-  # eine fertige Change durch, bliebe ihr Spec-Sync aus; schlüge er auf eine laufende an, würde
-  # er abgeschaltet).
-  "$ROOT/scripts/check-openspec-archiv.test.sh"
-  "$ROOT/scripts/check-openspec-archiv.sh"
+  # eine neue Change durch, wüchse ein zweiter Planungsort neben docs/superpowers/; schlüge er auf
+  # das Archiv an, würde er abgeschaltet).
+  "$ROOT/scripts/check-openspec-eingefroren.test.sh"
+  "$ROOT/scripts/check-openspec-eingefroren.sh"
 }
 
 schritt_14() {

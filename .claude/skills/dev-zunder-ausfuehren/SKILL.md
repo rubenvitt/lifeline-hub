@@ -14,18 +14,17 @@ Entscheidungen** — Workspace (Branch/Worktree), Komplexitäts-Routing, Reservi
 reimplementieren. Subagents und Workflows startest du dabei nach eigenem Ermessen (Abschnitt
 „Agenten nach Bedarf“).
 
-**Zwei Quellen, die ineinandergreifen:** **OpenSpec** (`/opsx:*`) besitzt den
-**Änderungszyklus** — klären, entwerfen, Spec und Aufgabenschnitt, Aufgabenliste abarbeiten,
-archivieren. **Superpowers** (`superpowers:*`) besitzt die **Arbeitsdisziplin** — Worktree,
-Debugging, TDD, Verifikation, Review, Branch-Abschluss.
+**Eine Quelle für Zyklus und Disziplin: Superpowers** (`superpowers:*`, seit 18.11.2026,
+LLH-1967, ADR-0069). Es besitzt den **Änderungszyklus** — klären (`brainstorming`), entwerfen
+(Design-Doc aus `brainstorming`), Aufgabenschnitt (`writing-plans`), abarbeiten
+(`subagent-driven-development` oder `executing-plans`) — und die **Arbeitsdisziplin** —
+Worktree, Debugging, TDD, Verifikation, Review, Branch-Abschluss. Dieser Skill legt die
+Zunder-Spur darüber. OpenSpec (`openspec/`) ist eingefrorenes Archiv: lesen ja, nichts Neues
+anlegen (Wächter: Schritt 13 von `check-all.sh`).
 
-Die *planning boundary* gilt für **fünf** der sechs OpenSpec-Workflows (`explore`, `propose`,
-`update`, `sync`, `archive`): sie fassen keinen Projektcode an. **`/opsx:apply` ist die
-Ausnahme** — es setzt um („Implement tasks from an OpenSpec change"). Es bringt dabei aber
-**keine eigene Arbeitsdisziplin** mit: weder TDD noch Review stehen in seinem Skill. *Wie*
-eine einzelne Aufgabe entsteht, sagt weiterhin `superpowers:test-driven-development`, und vor
-„fertig" stehen unverändert Schritt 4 unten. Wer `/opsx:apply` als Ersatz dafür liest,
-verliert die Zusicherung, ohne dass ein Test rot wird.
+`brainstorming` und `writing-plans` fassen keinen Projektcode an. Umgesetzt wird erst mit
+`subagent-driven-development` oder `executing-plans`, und dort jede Aufgabe per
+`superpowers:test-driven-development`; vor „fertig" stehen unverändert Schritt 4 unten.
 
 ## Wann benutzen
 
@@ -54,7 +53,7 @@ auch dann recht, wenn er den Main-Loop von breitem Lesen entlastet. Herleitung:
 | Scope über mehr als ein Subsystem oder mehrere Subtasks | Was ein Grep oder ein Read beantwortet |
 | Ein Review, wenn der Diff einen Anlass aus „Review nach Ermessen“ trifft | Route `trivial` |
 | Ursachensuche über viel unbekannten Code (`bug-unklar`) | Alles Interaktive: Checkpoint, Rückfrage, Freigabe |
-| Unabhängige Subtasks im autonomen Modus (`dev-zunder-orchestrieren`, Phase 3) | `/opsx:*`, TDD-Zyklus des Main-Loops |
+| Unabhängige Subtasks im autonomen Modus (`dev-zunder-orchestrieren`, Phase 3) | `brainstorming`, `writing-plans`, TDD-Zyklus des Main-Loops |
 | Gegenlesen eines Entwurfs | Ein Review ohne Anlass aus „Review nach Ermessen“ |
 
 **Agent oder Workflow:** Für einen bis drei unabhängige Jobs das Agent-Tool (kein Skript,
@@ -65,8 +64,9 @@ Der Größenrichtwert der Umgebung für Workflows gilt weiter.
 **Jeder Worker-Prompt bringt mit**, denn Worker sehen weder Systemprompt noch Skill:
 
 - Keine `mcp__hearthbot__`-Tools: nur der Main-Loop spricht mit dem Menschen.
-- Kein `/opsx:*` und nichts unter `openspec/changes/` anlegen oder ändern (Ausnahme: der autonome
-  Dev-Agent hakt Aufgaben einer freigegebenen Change ab).
+- Kein `brainstorming`, kein `writing-plans`, kein Design-Doc und kein Plan unter
+  `docs/superpowers/` anlegen oder ändern (Ausnahme: der autonome Dev-Agent hakt Aufgaben eines
+  freigegebenen Plans ab). Nichts unter `openspec/` anlegen.
 - Kein Push, kein PR, kein Zunder-Aufruf (Status, Felder, Reservierung) — das bleibt beim
   Main-Loop.
 - Bei einer Frage, die nur der Mensch beantworten kann: abbrechen und den Blocker strukturiert
@@ -87,11 +87,11 @@ sagt, **wann** welcher Status gilt; `dev-zunder-orchestrieren` verweist hierher.
 |---|---|---|
 | Arbeit beginnt (Schritt 1, nach `claim_task`) | `in_progress` | — |
 | Branch steht (Schritt 2) | — | `branch` |
-| Route gewählt (Schritt 3) | — | `plan`: Route, bei `entwurf` der Change-Name |
+| Route gewählt (Schritt 3) | — | `plan`: Route, bei `entwurf` der Pfad des Design-Docs |
 | Lösungsweg liegt zur Abstimmung vor („Gemeinsam ausarbeiten“) | `blocked` | Kommentar: was zur Entscheidung steht |
 | Mensch stimmt dem Lösungsweg zu | `in_progress` | `plan`: der abgestimmte Weg |
-| Change liegt zur Freigabe vor (Route `entwurf`) | `blocked` | `plan`: „Change `<name>` wartet auf Freigabe“ |
-| Freigabe erteilt, `/opsx:apply` beginnt | `in_progress` | `plan` nachziehen |
+| Design-Doc liegt zur Freigabe vor (Route `entwurf`) | `blocked` | `plan`: „Entwurf `<pfad>` wartet auf Freigabe“ |
+| Freigabe erteilt, `writing-plans` beginnt | `in_progress` | `plan`: Pfad des Plans, sobald er steht |
 | PR gegen `alpha` offen (Schritt 4) | `review` | `pr_url` |
 | PR gemergt | `done` | — |
 | Task wird verworfen | `dropped` | Kommentar: Grund |
@@ -124,7 +124,7 @@ Titel oder einer alten Kennung `LFH-<n>` erst per `search` die Aufgabe finden (V
 `AGENTS.md`, Abschnitt „Zunder“). Daraus ziehen:
 
 - **`id`** — für Zunder-Link und Commit-Referenz; **`<kurz>`** = die ersten 8 Zeichen der ID,
-  für Branch- und Change-Namen
+  für Branch-Namen und die Dateinamen von Design-Doc und Plan
 - **Titel + Beschreibung** — für Slug, Typ und Komplexität
 - **`status`, `branch`, `pr_url`, `plan`** — wo die Arbeit steht (Merge nachtragen, s. o.)
 - **Conventional-Typ** aus `type` (`bug` → `fix`) und Inhalt ableiten: `feat` / `fix` /
@@ -180,8 +180,8 @@ nach eigener Empfehlung losbauen, auch wenn der Weg klar scheint.
 - **Währenddessen** steht der Task auf `blocked` (Tabelle „Board-Status mitführen“). Erst mit
   der Zustimmung zurück auf `in_progress`, der abgestimmte Weg kommt in `plan`. Eine Rückfrage
   oder ein anderer Wunsch lässt ihn auf `blocked`, bis ihr euch einig seid.
-- **Route `entwurf`:** Die Abstimmung liegt **vor** `/opsx:propose`, damit die Change schon den
-  gemeinsamen Weg beschreibt. Der Freigabe-Checkpoint danach bleibt unverändert Pflicht.
+- **Route `entwurf`:** Die Abstimmung **ist** das Gespräch in `superpowers:brainstorming`; das
+  Design-Doc hält den gemeinsamen Weg fest. Der Freigabe-Checkpoint danach bleibt Pflicht.
 - **Ändert sich der Weg beim Bauen** (neue Variante, verworfene Annahme, größerer Schnitt),
   wieder vorlegen, bevor du ihn verlässt. Kleinigkeiten innerhalb des abgestimmten Wegs nicht.
 - **Ruft `dev-zunder-orchestrieren` auf,** zählt dessen Phase-1-Checkpoint als diese
@@ -199,16 +199,16 @@ Spalte „Route“ ist der Schlüssel, den auch die Scope-Map von `dev-zunder-or
 | Route | Komplexität | Skill |
 |---|---|---|
 | `trivial` | Trivial (Typo, Text/Copy-Change) | Direkt, kein Sub-Skill |
-| `unklar` | Anforderung unklar | **`/opsx:explore`** zuerst, danach neu routen |
+| `unklar` | Anforderung unklar | **`superpowers:brainstorming`** zum Klären, danach neu routen |
 | `bug-unklar` | Bug, Ursache unklar | **`superpowers:systematic-debugging`** |
 | `klar` | Feature/Bugfix, klare Spec | **`superpowers:test-driven-development`** |
-| `entwurf` | Entwurf nötig (E1–E3, s. u.) | **`/opsx:propose`** → ⟨Checkpoint, `blocked`⟩ → **`/opsx:apply`** |
+| `entwurf` | Entwurf nötig (E1–E3, s. u.) | **`superpowers:brainstorming`** → Design-Doc → ⟨Checkpoint, `blocked`⟩ → **`superpowers:writing-plans`** → **`superpowers:subagent-driven-development`** oder **`superpowers:executing-plans`** |
 
-Vor TDD, Fix oder `/opsx:propose` steht auf allen Routen außer `trivial` die Abstimmung aus
+Vor TDD, Fix oder Design-Doc steht auf allen Routen außer `trivial` die Abstimmung aus
 „Gemeinsam ausarbeiten, bevor Code entsteht“.
 
-**Wann eine OpenSpec-Change entsteht — genau auf der Route `entwurf`** (LFH-589, Spec
-`entwurfs-hoheit`). Die Route `entwurf` gilt, sobald **mindestens einer** dieser Gründe
+**Wann ein Entwurf (Design-Doc und Plan) entsteht — genau auf der Route `entwurf`** (LFH-589,
+Spec `entwurfs-hoheit`, im Archiv). Die Route `entwurf` gilt, sobald **mindestens einer** dieser Gründe
 zutrifft, und geht dann den übrigen Zeilen vor:
 
 - **E1 Entscheidung:** Es gibt mehr als einen vertretbaren Weg, und die Wahl soll begründet
@@ -224,34 +224,47 @@ zutrifft, und geht dann den übrigen Zeilen vor:
   wiederherstellt, und eine reine Text- oder Tippfehlerkorrektur lösen E3 nicht aus, auch wenn
   sie über mehrere Subsysteme reichen.
 
-Auf den Routen `trivial`, `bug-unklar` und `klar` entsteht **ausdrücklich keine** Change. Das
-gilt auch, wenn mehrere Dateien berührt sind. `unklar` entscheidet noch nichts: erst
-`/opsx:explore`, danach neu routen. Führt `bug-unklar` nach dem Finden der Ursache auf E1 oder
-E2, wechselt der Task auf `entwurf`. Dann `/opsx:propose` im Main-Loop, und der Freigabe-Checkpoint
-gilt wie auf jeder Route `entwurf`: `/opsx:apply` erst nach Freigabe.
+Auf den Routen `trivial`, `bug-unklar` und `klar` entsteht **ausdrücklich kein** Design-Doc und
+kein Plan. Das gilt auch, wenn mehrere Dateien berührt sind. `unklar` entscheidet noch nichts:
+erst `brainstorming` klärt, danach neu routen. Führt `bug-unklar` nach dem Finden der Ursache auf
+E1 oder E2, wechselt der Task auf `entwurf`. Dann `brainstorming` im Main-Loop bis zum Design-Doc,
+und der Freigabe-Checkpoint gilt wie auf jeder Route `entwurf`: `writing-plans` erst nach
+Freigabe.
 
 **Aufruf durch `dev-zunder-orchestrieren`:** Dann schätzt dieser Skill die Route **nicht**
 selbst. Es gilt die am Phase-1-Checkpoint bestätigte `route` der Scope-Map. Liegt für den Task
-schon eine in Phase 2 freigegebene Change vor, steigt er direkt bei `/opsx:apply` ein, ohne
-zweites `/opsx:propose`. Ein in Phase 1 geklärter `unklar`-Task bekommt kein zweites
-`/opsx:explore`. Einzige Ausnahme ist der Wechsel `bug-unklar` → `entwurf` oben.
+schon ein in Phase 2 freigegebenes Design-Doc vor, steigt er direkt bei `writing-plans` ein
+(oder, steht der Plan schon, bei der Umsetzung), ohne zweites `brainstorming`. Ein in Phase 1
+geklärter `unklar`-Task bekommt kein zweites `brainstorming`. Einzige Ausnahme ist der Wechsel
+`bug-unklar` → `entwurf` oben.
 
-**Der Checkpoint auf der Route `entwurf` ist Pflicht, kein Stilmittel.** `/opsx:propose` trägt
-die *planning boundary*: es erzeugt `proposal.md`, Delta-Spec, `design.md` und `tasks.md`
-und **hält dann an** — „Do not start implementation in the same response, even if the initial
-request asks for it. Wait for a new user request after the artifacts are presented; then
-start the apply workflow." Der Stopp ist das erwartete Verhalten und **kein Fehler**: nicht
-umgehen, nicht im selben Zug weiterimplementieren. Die Artefakte dem Menschen vorlegen, der Task steht
-dabei auf `blocked`; **erst mit seiner Freigabe** zurück auf `in_progress` und `/opsx:apply`.
-(Dieselbe Reihenfolge wie in `dev-zunder-orchestrieren`, Phase 2. Dort werden mehrere Changes
-eines Laufs gesammelt vorgelegt, aber auch dann gilt: kein Workflow ruft `/opsx:*`.)
+**Der Checkpoint auf der Route `entwurf` ist Pflicht, kein Stilmittel.** `brainstorming` trägt
+ihn selbst (HARD-GATE: nichts wird gebaut, bevor der Mensch das Design-Doc freigibt). Das
+Design-Doc dem Menschen vorlegen, der Task steht dabei auf `blocked`; **erst mit seiner Freigabe**
+zurück auf `in_progress` und `writing-plans`. Nicht umgehen, nicht im selben Zug weiterbauen.
+(Dieselbe Reihenfolge wie in `dev-zunder-orchestrieren`, Phase 2. Dort werden mehrere
+Design-Docs eines Laufs gesammelt vorgelegt, aber auch dann gilt: kein Workflow schreibt sie.)
 
-`/opsx:apply` arbeitet die `tasks.md` ab — die **Art zu arbeiten** bleibt davon unberührt:
-Aufgaben mit klarer Spec entstehen weiter per `superpowers:test-driven-development`, und
-Schritt 4 gilt unverändert.
+**Projektregeln gehen den Superpowers-Skills vor** (deren eigene Regel: Anweisungen aus
+`AGENTS.md` haben Vorrang). Für die Umsetzung heißt das: Standard ist `executing-plans`
+(Main-Loop setzt selbst um); `subagent-driven-development` nur, wenn der Mensch es wählt oder
+der Plan so lang ist, dass späte Aufgaben auf verdichtetem Kontext liefen. In beiden Fällen ist
+der Abschlussreview des Skills der Review aus „Review nach Ermessen“: er läuft nur bei einem
+Anlass von dort, als ein Agent mit `references/review-pruefliste.md`; ohne Anlass genügt die
+Selbstprüfung des Skills, im Ledger vermerkt. Unter `subagent-driven-development` entfallen die
+Reviewer je Aufgabe (keine Gegenprüfer), und jeder Implementer-Prompt trägt die Pflichtpunkte aus
+„Agenten nach Bedarf“.
 
-Die Planungsartefakte landen in **`openspec/changes/<name>/`**. `docs/superpowers/plans/`
-ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
+Den Plan legt `writing-plans` dem Menschen mit der Frage nach der Ausführungsart vor
+(`subagent-driven-development` oder `executing-plans`); das ist kein zweiter Freigabe-Halt für
+den Weg, nur die Wahl der Art. Die **Art zu arbeiten** bleibt: jede Aufgabe per
+`superpowers:test-driven-development`, und Schritt 4 gilt unverändert.
+
+**Ablage:** Design-Docs unter `docs/superpowers/specs/YYYY-MM-DD-<kurz>-<slug>-design.md`, Pläne
+unter `docs/superpowers/plans/YYYY-MM-DD-<kurz>-<slug>.md` (`<kurz>` wie im Branch-Namen,
+`AGENTS.md`, „Zunder“). Beide werden committet und bleiben liegen; einen Archivschritt gibt es
+nicht. Neue verbindliche Regeln stehen in der Bereichs-`AGENTS.md` oder einer ADR, nicht in
+`openspec/specs/` (eingefroren).
 
 ## Schritt 4: Abschluss
 
@@ -259,16 +272,10 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - **Review nach Ermessen** (Abschnitt unten): prüfen, ob der Diff einen Anlass trifft; wenn ja,
   den Review selbst starten, er darf parallel zu den Gates laufen
 - Gates, CI und Merge abwarten nach „Warten ohne Wecken“ (Abschnitt unten)
-- **OpenSpec-Change archivieren, BEVOR der PR entsteht** (Entscheidung 30.09.2026): Ist die
-  `tasks.md` der Change abgehakt, läuft **`/opsx:archive <name>` im selben Branch** — Spec-Sync
-  nach `openspec/specs/`, Verschieben nach `openspec/changes/archive/<datum>-<name>/`, Verweise
-  auf den alten Pfad (`AGENTS.md`-Dateien, `.claude/`, Code-Kommentare, `docs/`) im selben Commit
-  nachziehen. Nicht
-  „nach dem Merge“: das braucht einen zweiten PR, und der bleibt aus (am 30.09.2026 lagen zwölf
-  umgesetzte Changes aktiv). Schritt 13 von `check-all.sh` (`scripts/check-openspec-archiv.sh`)
-  macht eine abgehakte, nicht archivierte Change rot. Kästchen wie „`check-all.sh` grün“ belegt
-  der lokale Lauf `./scripts/check-all.sh --geaendert --ohne-e2e` (unten); was erst die CI des PRs
-  zeigt, wird mit Verweis auf diesen Lauf abgehakt, nicht offen gelassen.
+- **Route `entwurf`: Plan vollständig abgehakt, bevor der PR entsteht.** Design-Doc, Plan und
+  Umsetzung gehen zusammen in einen PR. Kästchen wie „`check-all.sh` grün“ belegt der lokale Lauf
+  `./scripts/check-all.sh --geaendert --ohne-e2e` (unten); was erst die CI des PRs zeigt, wird mit
+  Verweis auf diesen Lauf abgehakt, nicht offen gelassen.
 - **Bilder der Änderung** in PR-Beschreibung und Meldung an den Menschen (Abschnitt „Bilder der
   Änderung“ unten)
 - Commit-Body und PR-Beschreibung tragen die Zeile
@@ -314,7 +321,7 @@ in jedem PR. Mechanik: `scripts/AGENTS.md`, „Stau-Wächter“.
   dem Fix. Das Label belegt den Fix: der Wächter und die übrigen PRs erkennen ihn daran, und der
   Auftrag wandert nicht nach einer Stunde weiter, während du auf die Antwort des Menschen
   wartest (Entscheidung 12.11.2026). Dann den Fix in diesem PR bauen, nicht im eigenen. Er stellt
-  Bestehendes wieder her: Route `bug-unklar` bzw. `klar`, keine Change. Die Abstimmung aus
+  Bestehendes wieder her: Route `bug-unklar` bzw. `klar`, kein Entwurf. Die Abstimmung aus
   „Gemeinsam ausarbeiten“ gilt auch hier; leg Ursache und Fix knapp in einer Nachricht vor, weil
   alle PRs warten.
 - **Dein Auftrag ist weitergewandert** (der Hinweis zeigt jetzt „`alpha` ist rot“): Hast du den
@@ -349,7 +356,7 @@ fragen (Spec `review-vor-dem-pr`, Herleitung:
 **Form:** ein Agent (Agent-Tool) mit frischem Kontext, nie der Main-Loop selbst, kein Workflow,
 keine Gegenprüfer. Er bekommt nicht, warum der Code so gebaut wurde, sondern: Diff
 `git diff origin/alpha...HEAD`, die geltenden `AGENTS.md`, die zutreffenden Klassen aus
-`references/review-pruefliste.md`, bei einer Change deren Delta-Spec, dazu die Pflichtpunkte
+`references/review-pruefliste.md`, auf der Route `entwurf` Design-Doc und Plan, dazu die Pflichtpunkte
 jedes Worker-Prompts (Abschnitt „Agenten nach Bedarf“). Er liefert je Befund Datei, Zeile und den
 konkreten Fall und ändert nichts. Jeden Befund prüfst du selbst kurz an der Stelle; bestätigte
 behebst du mit eigenem Commit, mehrere vertretbare Auswege mit Wirkung für Anwender gehen an den
@@ -447,7 +454,7 @@ hier** — der Orchestrator sammelt Bediensicht/Klickweg je Subtask ein und gibt
 - Worktree-/Branch-Logik **nicht** selbst bauen — an `using-git-worktrees` delegieren.
 - Einen Branch mit fremder Arbeit **nicht** umbenennen oder zurücksetzen — dann neuer Worktree.
 - Komplexität nicht überspringen — auch „kleine" Features brauchen TDD.
-- Keine Agents für Interaktives, `/opsx:*` oder Triviales, und kein Worker-Prompt ohne die
+- Keine Agents für Interaktives, `brainstorming`/`writing-plans` oder Triviales, und kein Worker-Prompt ohne die
   Pflichtpunkte aus „Agenten nach Bedarf“.
 - Keinen Review ohne Anlass aus „Review nach Ermessen“, keinen Review-Workflow, keine
   Gegenprüfer-Agenten; den Review nicht selbst im Main-Loop machen.

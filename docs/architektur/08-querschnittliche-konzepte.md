@@ -5,7 +5,8 @@ Stand: 18.11.2026 (Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und C
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
 sind die `AGENTS.md`-Dateien (Tabelle in der [Wurzel-`AGENTS.md`](../../AGENTS.md)), die
-Fähigkeits-Specs unter `openspec/specs/` und die Archiv-Designs. Bausteinnamen wie in der
+Fähigkeits-Specs unter `openspec/specs/` (eingefroren, ADR-0069), die Design-Docs unter
+`docs/superpowers/specs/` und die Archiv-Designs. Bausteinnamen wie in der
 [Bausteinsicht](05-bausteinsicht.md).
 
 ## 8.1 Organisation als Mandant
