@@ -4,7 +4,7 @@ import { meldeClientFehler } from '../api/clientFehler';
 import { GROSS_BEZUG, grossMass } from './grossbild/grossMass';
 import { IM_RASTER } from './instrument/DashboardPaneel';
 import Paneel from './instrument/Paneel';
-import { useRollen } from './instrument/rollenwerte';
+import { schriftStil, useRollen } from './instrument/rollenwerte';
 
 /**
  * Fehlergrenze je Kachel (LLH-1958; Regel „Jede Kachel einer Lagefläche hat ihre eigene
@@ -100,11 +100,12 @@ function KachelErsatz({
           border: `1px solid ${rollen.linie}`,
           boxShadow: `inset 3px 0 0 0 ${rollen.alarm}`,
           borderRadius: 8,
-          padding: '16px 24px',
+          // Polster und Fuge wie die Kachel des Lagemonitors, aus dem Raster.
+          padding: `${t.padding}px ${t.paddingLG}px`,
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: 8,
+          gap: t.marginXS,
           ...stil,
         }}
       >
@@ -128,10 +129,10 @@ function KachelErsatz({
         data-lfh="kachelgrenze"
         style={{ display: 'flex', flexDirection: 'column', gap: t.marginXS }}
       >
-        <div style={{ fontSize: 14, fontWeight: 600, color: rollen.text }}>
+        <div style={{ ...schriftStil('seitentitel'), color: rollen.text }}>
           {KACHELGRENZE_TITEL}
         </div>
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
+        <p style={{ margin: 0, ...schriftStil('text'), lineHeight: 1.5, color: rollen.text2 }}>
           Der Fehler wurde gemeldet.
         </p>
         <div>
