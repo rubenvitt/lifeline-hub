@@ -330,8 +330,8 @@ export function personenPfad(
     person?: number;
     neu?: boolean;
     /**
-     * Sichtvorgabe: die Seite übernimmt sie beim Ankommen und räumt die Parameter
-     * (apply-then-clean). Die URL trägt einen AUFTRAG, keinen gespiegelten Filter. Anspringer
+     * Die Sicht ist Zustand der Adresse (LLH-1826, `personen/usePersonenSicht.ts`): sie bleibt
+     * stehen und überlebt Weg und Zurück. Was ein Link nicht nennt, gilt als Vorgabe. Anspringer
      * sind die Sprungmarken „Patienten" und „Vermisste" (`einsatz/sprungmarken.ts`).
      */
     filter?: PersonenFilter;
