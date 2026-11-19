@@ -10,7 +10,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Filter wieder da, und der Verlauf wächst nicht (`history.state.idx` wie vor dem Öffnen). Der
  * Rückweg aus der Sitzung (`listenGedaechtnis`) könnte den Filter auch herstellen, deshalb prüft
  * die Spec den Verlaufsindex, nicht nur die Adresse. Direkt geöffnet führt der Ortspfad per PUSH
- * auf die Liste.
+ * auf die Liste. Die Rollposition stellt beim Zurück `RollWiederherstellung` her (LLH-1826).
  */
 
 async function einsatzMitSchaeden(page: Page): Promise<string> {
@@ -77,5 +77,28 @@ test.describe('Ortspfad der Detailseite', () => {
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/schaeden$`));
     await expect(page.getByText('Bachstraße 1')).toBeVisible();
     expect(await verlaufsIndex(page)).toBe(indexDetail + 1);
+  });
+
+  test('stellt nach dem Zurück auch die Rollposition wieder her', async ({ page }) => {
+    await anmeldenAlsAdmin(page, { startseite: false });
+    const einsatzId = await einsatzMitSchaeden(page);
+    for (let i = 0; i < 40; i++) {
+      const a = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+        data: { typ: 'sachschaden', ausmass: 'gross', ort: `Uferweg ${i + 10}` },
+      });
+      expect(a.ok(), `POST schaeden: ${a.status()}`).toBe(true);
+    }
+    await page.goto(`/einsaetze/${einsatzId}/schaeden?f.ausmass=gross`);
+    await expect(page.getByText('Uferweg 49')).toBeVisible();
+    await page.mouse.wheel(0, 900);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(400);
+    const gerollt = await page.evaluate(() => window.scrollY);
+
+    const zeile = page.locator('.ant-table-tbody tr[data-row-key]').nth(25);
+    await zeile.click();
+    await expect(page).toHaveURL(/\/schaeden\/\d+$/);
+    await ortspfadZurListe(page).click();
+    await expect(page).toHaveURL(/f\.ausmass=gross/);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(gerollt - 40);
   });
 });
