@@ -1,4 +1,4 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Typography } from 'antd';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -7,7 +7,12 @@ import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+} from '../components/SeitenZustand';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import AuftragDruckBlatt from '../auftraege/AuftragDruckBlatt';
@@ -23,8 +28,9 @@ import { zeitpunkt } from '../anzeige/zeitDarstellung';
  *
  * Schnappschuss: `einsatzKeys.auftragDruck` ist nicht live (`NICHT_LIVE_KEYS`). Eine Quittung an
  * einem anderen Gerät ändert das offene Blatt nicht; „Neu laden“ holt den neuen Stand. „Drucken“
- * ist gesperrt, bis der Auftrag da ist. Nicht gefunden (404) und kein Zugriff (403) stehen als
- * solche da, ohne Druckknopf.
+ * ist gesperrt, bis der Auftrag da ist. Kein Zugriff (403) steht als solcher da, ohne Druckknopf.
+ * Einen Auftrag, den es nicht (mehr) gibt (404 oder ungültige Kennung in der Adresse), ersetzt die
+ * ganze Druckansicht durch `SeitenNichtGefunden` mit dem Rückweg zur Liste (LLH-1960).
  */
 export default function AuftragDruckPage() {
   const { id, auftragId: auftragIdParam } = useParams();
@@ -50,7 +56,15 @@ export default function AuftragDruckPage() {
     retry: false,
   });
 
-  if (auftragId == null) return <Navigate to={auftraegePfad(einsatzId)} replace />;
+  // Keine stille Weiterleitung: die Adresse bleibt stehen.
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diesen Auftrag gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zu den Aufträgen', pfad: auftraegePfad(einsatzId) }}
+    />
+  );
+  if (auftragId == null) return nichtGefunden;
+  if (istNichtGefunden(druckQuery.error)) return nichtGefunden;
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -62,7 +76,7 @@ export default function AuftragDruckPage() {
   }
   const einsatz = einsatzQuery.data;
   const status = druckQuery.error instanceof ApiError ? druckQuery.error.status : null;
-  const isOhneDruck = status === 403 || status === 404;
+  const isOhneDruck = status === 403;
   const auftrag = druckQuery.data;
   const modul = modulName('auftraege');
   const zurueck = auftraegePfad(einsatzId, { auftrag: auftragId });
@@ -105,9 +119,7 @@ export default function AuftragDruckPage() {
         </>
       }
     >
-      {status === 404 ? (
-        <Alert type="info" showIcon title="Auftrag nicht gefunden" />
-      ) : status === 403 ? (
+      {status === 403 ? (
         <Alert
           type="info"
           showIcon
@@ -115,11 +127,11 @@ export default function AuftragDruckPage() {
           description="Modul gesperrt oder Aufbewahrungsfrist abgelaufen"
         />
       ) : druckQuery.isError ? (
-        <Alert
-          type="error"
-          showIcon
-          title="Der Auftrag konnte nicht geladen werden"
-          action={<Button onClick={() => void druckQuery.refetch()}>Erneut laden</Button>}
+        <SeitenFehler
+          text="Der Auftrag konnte nicht geladen werden"
+          ursache={druckQuery.error}
+          laedt={druckQuery.isFetching}
+          onWiederholen={() => void druckQuery.refetch()}
         />
       ) : !auftrag || druckQuery.isFetching ? (
         <Typography.Text role="status" aria-live="polite">

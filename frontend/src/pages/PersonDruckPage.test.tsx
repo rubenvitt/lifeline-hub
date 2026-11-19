@@ -6,6 +6,7 @@ import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { EINSATZ_KEYS } from '../api/queryKeys';
 import type { PersonDetail } from '../api/types';
+import { erwarteNichtGefunden, NICHT_GEFUNDEN_BODY } from '../test/nichtGefunden';
 import PersonDruckPage from './PersonDruckPage';
 
 /**
@@ -84,7 +85,11 @@ function person(teil: Partial<PersonDetail> = {}): PersonDetail {
   } as PersonDetail;
 }
 
-function renderPage(antwort: () => Response | Promise<Response>, client = neuerQueryClient()) {
+function renderPage(
+  antwort: () => Response | Promise<Response>,
+  client = neuerQueryClient(),
+  route = '/einsaetze/5/personen/10/druck',
+) {
   const abrufe = { druck: 0, detail: 0 };
   server.use(
     http.get('/api/einsaetze/5', () => HttpResponse.json(EINSATZ)),
@@ -101,8 +106,9 @@ function renderPage(antwort: () => Response | Promise<Response>, client = neuerQ
     <Routes>
       <Route path="/einsaetze/:id/personen/:personId/druck" element={<PersonDruckPage />} />
       <Route path="/einsaetze/:id/personen/:personId" element={<div>Detail</div>} />
+      <Route path="/einsaetze/:id/personen" element={<div>Personenliste</div>} />
     </Routes>,
-    { route: '/einsaetze/5/personen/10/druck', client },
+    { route, client },
   );
   return abrufe;
 }
@@ -234,11 +240,41 @@ describe('PersonDruckPage', () => {
     expect(abrufe.druck).toBe(2);
   });
 
-  it('unbekannte Person: „nicht gefunden“, kein Druck', async () => {
-    renderPage(() => HttpResponse.json({ error: 'Person nicht gefunden' }, { status: 404 }));
-    expect(await screen.findByText('Person nicht gefunden')).toBeInTheDocument();
+  it('unbekannte Person (404): „gibt es nicht (mehr)“ statt der Druckansicht, Rückweg zur Liste', async () => {
+    renderPage(() => HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }));
     expect(screen.queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Neu laden' })).toBeNull();
-    expect(document.querySelector('[data-lfh="druckwurzel"]')).toBeNull();
+    await erwarteNichtGefunden({
+      titel: 'Diese Person gibt es nicht (mehr)',
+      knopf: 'Zu den Betroffenen',
+      liste: 'Personenliste',
+    });
+  });
+
+  it('ungültige Kennung in der Adresse: dasselbe Muster, keine stille Weiterleitung', async () => {
+    const abrufe = renderPage(
+      () => HttpResponse.json(person()),
+      undefined,
+      '/einsaetze/5/personen/abc/druck',
+    );
+    await erwarteNichtGefunden({
+      titel: 'Diese Person gibt es nicht (mehr)',
+      knopf: 'Zu den Betroffenen',
+    });
+    expect(screen.queryByText('Personenliste')).toBeNull();
+    expect(abrufe.druck).toBe(0);
+  });
+
+  it('anderer Fehler (500): Fehlerbanner mit „Erneut abrufen“, kein Druck', async () => {
+    let fehler = true;
+    renderPage(() =>
+      fehler
+        ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+        : HttpResponse.json(person()),
+    );
+    expect(await screen.findByText('Die Person konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('kaputt');
+    fehler = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut abrufen' }));
+    await waitFor(() => expect(document.querySelector('[data-lfh="druckwurzel"]')).not.toBeNull());
   });
 });
