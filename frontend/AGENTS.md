@@ -799,7 +799,8 @@ anwendbar), „nicht geprüft" ist keins.
   (LFH-1078; der Wächter erfasst sie nicht).
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
-  Modulbeschreibungen aus wenigen Fachwörtern.
+  Modulbeschreibungen aus wenigen Fachwörtern, die Darf-Zeile unter einer Rollenoption (Umfang in
+  wenigen Wörtern, keine Bedienung; „Begriffe“, Rollen-Vokabular).
 - **Erklärendes gehört in die Anwenderdokumentation** (`docs/anwender/`, in der App unter
   „Hilfe“, LFH-1096): wer einen Erklärsatz entfernt, dessen Wissen sonst nirgends steht, schreibt
   es dort ins Kapitel. Regeln: `docs/anwender/AGENTS.md`.
@@ -968,6 +969,17 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Begriffe**
 
+- **Rollen-Vokabular** (LLH-1818, Entwurf
+  `docs/superpowers/specs/2026-11-19-zlzpieaq-rollen-vokabular-design.md`): Name und Darf-Zeile
+  jeder Rolle stehen nur in `einsatz/rollenVokabular.ts` (Rolle im Einsatz, in der Organisation,
+  in der Verwaltung, Stufe der Modulsperre). Eine Rolle heißt überall gleich: „System-Admin“ (mit
+  Bezug auf den Einsatz „System-Admin der Organisation“, nie „Org-Admin“), „Führungskraft der
+  Organisation“, ohne Rolle „Keine“ bzw. am Konto „Keine Rolle“; Felder heißen „Rolle in der
+  Verwaltung“, „Rolle in der Organisation“, „Rolle im Einsatz“. Jede Auswahl, die eine Rolle
+  vergibt, nutzt `rollenOptionen` und `rollenOptionRender` (`einsatz/rollenOption.tsx`): offen Name
+  und Darf-Zeile, geschlossen nur der Name. Darf-Zeilen höchstens 80 Zeichen. Eine neue Rolle kommt
+  zuerst ins Vokabular (der `Record` bricht sonst den Build). Wächter
+  `einsatz/rollenVokabular.guard.test.ts`.
 - **Voreingestellte Werte heißen „Vorgabe“** (LFH-944, Spec `bedien-begriffe`): nie „Default“,
   „Fallback“ oder „Standard“ im sichtbaren Text. Platzhalter nennen den Wert, der leer wirklich
   gilt; kein „Leer = …“-Satz daneben (LFH-1078). Bausteine in `components/vorgabeText.ts`

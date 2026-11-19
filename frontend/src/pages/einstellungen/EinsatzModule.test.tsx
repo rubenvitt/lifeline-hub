@@ -126,7 +126,7 @@ describe('EinsatzModule', () => {
     rendern();
 
     fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }));
-    fireEvent.click(await screen.findByText('Admin'));
+    fireEvent.click(await screen.findByText('System-Admin'));
 
     await waitFor(() =>
       expect(setzeModulOverride).toHaveBeenCalledWith(1, 'etb', {
@@ -198,7 +198,7 @@ describe('EinsatzModule', () => {
 
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
-        'Nur Ansicht nur Einsatzleitung oder Org-Admin',
+        'Nur Ansicht nur Einsatzleitung oder System-Admin der Organisation',
       ),
     );
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
@@ -243,7 +243,7 @@ describe('EinsatzModule', () => {
     rendern();
 
     expect(await screen.findByRole('switch', { name: 'Sichtbar: ETB' })).toBeEnabled();
-    expect(screen.queryByText('nur Einsatzleitung oder Org-Admin')).toBeNull();
+    expect(screen.queryByText('nur Einsatzleitung oder System-Admin der Organisation')).toBeNull();
   });
 
   it('sperrt den Admin einer fremden Org ohne Mitgliedschaft', async () => {
@@ -260,7 +260,7 @@ describe('EinsatzModule', () => {
 
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="rechte-hinweis"]')?.textContent).toBe(
-        'Nur Ansicht nur Einsatzleitung oder Org-Admin',
+        'Nur Ansicht nur Einsatzleitung oder System-Admin der Organisation',
       ),
     );
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
@@ -279,7 +279,9 @@ describe('EinsatzModule', () => {
     rendern();
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
-    expect(within(zeile).getByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
+    expect(
+      within(zeile).getByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeInTheDocument();
   });
 
   // LLH-1675: Am Spiegel trägt auch jede gesperrte Zeile die führende Instanz.
@@ -302,7 +304,9 @@ describe('EinsatzModule', () => {
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
     expect(within(zeile).getByText('Spiegel von ELW 1')).toBeInTheDocument();
-    expect(within(zeile).queryByText('nur Einsatzleitung oder Org-Admin')).toBeNull();
+    expect(
+      within(zeile).queryByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeNull();
   });
 
   // `darfEinsatzLeiten` verlangt einen aktiven Einsatz; ein abgeschlossener sperrt auch die
@@ -319,7 +323,9 @@ describe('EinsatzModule', () => {
 
     const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
     expect(within(zeile).getByText('Einsatz abgeschlossen')).toBeInTheDocument();
-    expect(within(zeile).queryByText('nur Einsatzleitung oder Org-Admin')).toBeNull();
+    expect(
+      within(zeile).queryByText('nur Einsatzleitung oder System-Admin der Organisation'),
+    ).toBeNull();
   });
 
   it('zeigt bei nicht ladbaren Overrides KEINE Liste — sonst loegen die Bestandswerte', async () => {
@@ -516,7 +522,7 @@ describe('EinsatzModule · Herkunft der Sichtbarkeit (LLH-1179)', () => {
       expect(screen.getByRole('switch', { name: 'Sichtbar: Lagebesprechung' })).not.toBeChecked(),
     );
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Benötigte Rolle: Lagebesprechung' }));
-    const optionen = await screen.findAllByText('Admin');
+    const optionen = await screen.findAllByText('System-Admin');
     fireEvent.click(optionen[optionen.length - 1]);
 
     await waitFor(() =>

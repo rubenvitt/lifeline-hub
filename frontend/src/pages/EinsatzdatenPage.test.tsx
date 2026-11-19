@@ -345,7 +345,9 @@ describe('EinsatzdatenPage', () => {
   it('LFH-1066: sperrt den Admin einer fremden Org und nennt den Grund', async () => {
     setup({ einsatz: { meine_rolle: null }, benutzer: { ...admin, org_id: 2 } });
     expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
+      await screen.findByText(
+        'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /eintragen$|bearbeiten$/ })).toBeNull();
     const fs = within(await screen.findByRole('region', { name: 'Eigene Führungsstelle' }));
@@ -357,7 +359,9 @@ describe('EinsatzdatenPage', () => {
     expect(await screen.findByRole('button', { name: 'Bezeichnung bearbeiten' })).toBeVisible();
     const fs = within(await screen.findByRole('region', { name: 'Eigene Führungsstelle' }));
     expect(await fs.findByRole('button', { name: 'Rufname eintragen' })).toBeInTheDocument();
-    expect(screen.queryByText('nur Einsatzleitung, Führungspersonal oder Org-Admin')).toBeNull();
+    expect(
+      screen.queryByText('nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation'),
+    ).toBeNull();
   });
 
   it('LFH-1066: ein Admin einer fremden Org als Führungspersonal bearbeitet weiter', async () => {

@@ -261,7 +261,9 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
+      await screen.findByText(
+        'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
@@ -280,7 +282,9 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(
-      await screen.findByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
+      await screen.findByText(
+        'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
@@ -300,7 +304,7 @@ describe('EinsatzAllgemein', () => {
     await aendereZeitzone();
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeEnabled();
     expect(
-      screen.queryByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
+      screen.queryByText('nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation'),
     ).not.toBeInTheDocument();
   });
 

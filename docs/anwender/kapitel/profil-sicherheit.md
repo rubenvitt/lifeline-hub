@@ -18,7 +18,7 @@ Betrieb der Instanz anbietet.
 
 1. Oben rechts das „Benutzermenü“ öffnen und „Profil“ wählen. In der Sprungpalette führt
    „Profil“ ebenfalls dorthin.
-2. Unter „Konto“ stehen Anzeigename, Benutzername, Systemrolle und Organisation.
+2. Unter „Konto“ stehen Anzeigename, Benutzername, „Rollen“ und Organisation.
 
    ![Profilseite mit den Abschnitten „Konto“, „Sicherheit“ mit Passwort und zweitem Faktor sowie „Anmeldungen“](../bilder/profil-sicherheit/profil.png)
 
