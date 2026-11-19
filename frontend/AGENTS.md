@@ -456,9 +456,13 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
   blockierende Aktion, ≤ ~3 Felder. **Inline/Expander**: Zusatz ohne Seitenwechsel.
   **Drawer**: nur Quick-View (read-only, `PersonDetailDrawer`), nie zum Anlegen (LLH-1921); Tabs,
   großer Edit-Modus oder > ~480 px → eigene Route.
-- **Einzige Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
+- **Erste Ausnahme: der Navigations-Drawer** unter `lg` (`einsatz/EinsatzLayout.tsx` +
   `einsatz/ModulAkkordeon.tsx`): Navigation, keine Entität, schließt beim Modulklick, Inhalt erst
-  beim Öffnen (kein `forceRender`). Ein zweiter braucht eine eigene Entscheidung.
+  beim Öffnen (kein `forceRender`). Ein weiterer braucht eine eigene Entscheidung.
+- **Zweite Ausnahme: die Hilfe-Seitenleiste** (`hilfe/HilfeSeitenleiste.tsx`, LLH-1824, Entwurf
+  `docs/superpowers/specs/2026-11-19-col12d3y-hilfe-mit-kontext-design.md`): Nachschlagen neben
+  der Arbeit, nur lesen, zwei Reiter als `Segmentleiste rolle="tablist"`, 480 px (unter `lg` und
+  bei Berührung volle Breite). Die volle Hilfe bleibt die Route `/hilfe/<kapitel>`.
 - **Liste + Detailpaneel** (`components/ListeDetail.tsx`, Spec `liste-detail`, Herleitung
   `openspec/changes/archive/2026-10-12-oxgob5gk-auftraege-befehle-angleichen/design.md`): wenn
   Objekte je Stück gelesen und kurz behandelt werden (quittieren, freigeben) und man oft zwischen ihnen wechselt.
