@@ -674,7 +674,7 @@ export function AusgabeDialog({
         )
       )}
       <Feld<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
-        <ZeitpunktEingabe art="ereignis" placeholder="jetzt" />
+        <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
       </Feld>
       {eingeklappt(
         ['Weitere Angaben', ...abweichungen].join(' · '),

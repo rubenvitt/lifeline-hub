@@ -198,6 +198,8 @@ function TagAusVorlageInhalt({
           allowClear={false}
           value={tagWert}
           onChange={(z) => z && onTag(tagInZone(z, zone))}
+          // Volle Breite schaltet `Space.Compact block` (ZeitpunktEingabe), keine feste Breite.
+          style={{ width: '100%' }}
         />
       </Feld>
     </Form>
