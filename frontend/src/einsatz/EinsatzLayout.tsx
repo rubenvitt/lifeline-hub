@@ -60,6 +60,7 @@ import {
   kopfZelleStil,
 } from '../components/Kopfleiste';
 import { SeitenSackgasse, SeitenSkeleton } from '../components/SeitenZustand';
+import { sackgasseBeiFehler } from './sackgasse';
 import { useViewport } from '../components/useViewport';
 import { useDokumentTitel } from '../components/useDokumentTitel';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
@@ -428,12 +429,16 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
    * Sackgasse steht wie vorher.
    */
   if (einsatzQuery.isError) {
+    // Fehlendes Recht und „gibt es nicht“ bieten keinen Neuversuch; der 403 nennt, wer den
+    // Zugriff vergibt (LLH-1819, `sackgasse.ts`).
+    const lage = sackgasseBeiFehler(einsatzQuery.error);
     return (
       <main {...sprungzielInhalt}>
         <SeitenSackgasse
-          titel="Einsatz konnte nicht geladen werden"
-          ursache={einsatzQuery.error}
-          onWiederholen={() => void einsatzQuery.refetch()}
+          titel={lage.titel}
+          hinweis={lage.hinweis}
+          neutral={lage.gesperrt}
+          onWiederholen={lage.wiederholbar ? () => void einsatzQuery.refetch() : undefined}
           rueckweg={{ pfad: einsaetzePfad(), label: 'Zur Einsatzliste' }}
         />
       </main>

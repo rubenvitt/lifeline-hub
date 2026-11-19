@@ -98,7 +98,7 @@ function pfad(): string {
  */
 function setup(
   freigaben: ModulFreigaben = freigabenFixture(),
-  fehler: { einsatz?: boolean; freigaben?: boolean } = {},
+  fehler: { einsatz?: boolean; einsatzVerweigert?: boolean; freigaben?: boolean } = {},
   aktuellerBenutzer: typeof admin = admin,
   route: string = '/einsaetze/7/etb',
 ) {
@@ -106,7 +106,14 @@ function setup(
     meHandler(aktuellerBenutzer),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () =>
-      fehler.einsatz ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(einsatz),
+      fehler.einsatzVerweigert
+        ? HttpResponse.json(
+            { error: 'Keine Berechtigung', grund: 'kein_mitglied' },
+            { status: 403 },
+          )
+        : fehler.einsatz
+          ? new HttpResponse(null, { status: 500 })
+          : HttpResponse.json(einsatz),
     ),
     http.get('/api/einsaetze/7/modul-freigaben', () =>
       fehler.freigaben ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(freigaben),
@@ -327,6 +334,21 @@ describe('EinsatzLayout', () => {
     expect(screen.getByRole('button', { name: 'Zur Einsatzliste' })).toBeInTheDocument();
     expect(screen.queryByText('ETB-Inhalt')).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Kategorien' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * LLH-1819: ohne Recht hilft kein Neuversuch. Die Sackgasse sagt, wer den Zugriff vergibt (ohne
+   * Namen), und der Rückweg ist der eine Knopf.
+   */
+  it('bei 403 nennt die Sackgasse die Einsatzleitung und bietet kein „Erneut abrufen“', async () => {
+    setup({}, { einsatzVerweigert: true });
+    expect(await screen.findByText('Kein Zugriff auf diesen Einsatz')).toBeInTheDocument();
+    expect(
+      screen.getByText('Zugriff vergibt die Einsatzleitung dieses Einsatzes.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zur Einsatzliste' })).toBeInTheDocument();
+    expect(screen.queryByText('Keine Berechtigung')).not.toBeInTheDocument();
   });
 
   /**
