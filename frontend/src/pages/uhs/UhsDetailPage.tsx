@@ -385,7 +385,7 @@ function UhsDetailInhalt() {
         )
       }
       aktionen={
-        <Space wrap size="middle">
+        <>
           {/* Die Zustände schließen sich aus; die Dev-Warnung des Primitivs zählt die
               Primäraktionen, der Test prüft beide Zustände. */}
           {!schreibgeschuetzt && uhs.status === 'aktiv' && (
@@ -438,7 +438,7 @@ function UhsDetailInhalt() {
               onWahl={(key) => setFrage(key === 'aufloesen' ? 'aufloesen' : 'stornieren')}
             />
           )}
-        </Space>
+        </>
       }
       // Die Leiste gehört zum Kopf, den der Fensterrahmen misst: so steht sie bei 1440 × 900 ohne
       // Bildlauf über dem Grundriss, und jeder Bereich behält die Mindesthöhe. Ein einzelner

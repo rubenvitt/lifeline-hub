@@ -6,7 +6,7 @@ import {
   KEINE_BERECHTIGUNG,
   modulName,
 } from '../einsatz/modulRegistry';
-import { Breadcrumb, Button, Checkbox, Input, Popover, Space, theme } from 'antd';
+import { Breadcrumb, Button, Checkbox, Input, Popover, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
@@ -107,7 +107,14 @@ import {
   toHerausgenommenesMaterial,
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Status, StatusZelle, monoStil, useRollen, KlappBand } from '../components/instrument';
+import {
+  Status,
+  StatusZelle,
+  monoStil,
+  useRollen,
+  KlappBand,
+  Knopfreihe,
+} from '../components/instrument';
 import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
@@ -1522,9 +1529,7 @@ export default function KraefteuebersichtPage() {
         dataUpdatedAt={datenstand}
         weitere={{ name: 'Weitere Aktionen zum Meldebild', eintraege: nebenwege }}
         aktionen={
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-          // `paddingXS` ließ 3 / 5 / 7 px.
-          <Space className="kraefte-no-print" wrap size={token.marginSM}>
+          <Knopfreihe className="kraefte-no-print">
             {/* Sekundär: der Abschnitt-Filter. Er wirkt wie alle Filter außerhalb des Primitivs
                 auf die Rohlisten. */}
             <Select
@@ -1559,7 +1564,7 @@ export default function KraefteuebersichtPage() {
                 Einheit
               </Button>
             )}
-          </Space>
+          </Knopfreihe>
         }
       >
         {/* ── Druckkopf ── Einsatz, Stand, druckende Person und Auswahl — ohne sie ist ein

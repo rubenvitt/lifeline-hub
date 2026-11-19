@@ -541,7 +541,7 @@ export default function TiereDetailPage() {
          * Liste“-Knopf gibt es nicht: die Brotkrume trägt denselben Weg.
          */
         plan && (
-          <Space wrap size="middle">
+          <>
             <Button
               type="primary"
               loading={laeuftStatus(plan.primaer)}
@@ -559,7 +559,7 @@ export default function TiereDetailPage() {
                 if (aktion) fuehreAus(aktion);
               }}
             />
-          </Space>
+          </>
         )
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.

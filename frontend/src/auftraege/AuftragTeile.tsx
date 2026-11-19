@@ -4,7 +4,14 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Status, Textstufe, monoStil, schriftStil, useRollen } from '../components/instrument';
+import {
+  Knopfreihe,
+  Status,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -426,9 +433,8 @@ export function AuftragHandlungen({
       )}
       {aktionen.length + weitere.length > 0 && (
         <Flex justify={ausrichtung} style={{ marginTop: token.marginSM }}>
-          {/* `middle`: Rot steht nicht bündig neben Neutralem (LFH-363). Der Abstands-Guard sieht
-             diese gespreizte Reihe nicht und führt die Teile unter BEWERTET_OHNE_SCANNER_DECKUNG. */}
-          <Space size="middle" wrap>
+          {/* Rot steht nicht bündig neben Neutralem (LFH-363): den Abstand `md` trägt die Knopfreihe. */}
+          <Knopfreihe>
             {aktionen}
             {buendeln ? (
               <MenueAusloeser
@@ -448,7 +454,7 @@ export function AuftragHandlungen({
                 </Button>
               ))
             )}
-          </Space>
+          </Knopfreihe>
         </Flex>
       )}
     </>

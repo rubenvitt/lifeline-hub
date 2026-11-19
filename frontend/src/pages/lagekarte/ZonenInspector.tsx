@@ -16,7 +16,13 @@ import type {
 import { gefahrengebietName } from '../../api/gefahren';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
-import { Augenbraue, Datenfeld, Datenraster, monoStil } from '../../components/instrument';
+import {
+  Augenbraue,
+  Knopfreihe,
+  Datenfeld,
+  Datenraster,
+  monoStil,
+} from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
 import { formatRadius, kreisAusZone, parseGeometry, geoKennzahlen, radiusGueltig } from './geo';
 import { KREIS_RADIUS_M_MAX, ZONE_LABEL_MAX, ZONE_NOTIZ_MAX } from '../../api/eingabegrenzen';
@@ -395,7 +401,7 @@ export default function ZonenInspector({
         {/* Bearbeiten an der Karte (LLH-1344): beide Wege starten einen Kartenmodus und schließen
             den Inspector; danach steht die Zone wieder hier. */}
         {darfSchreiben && (onPunkteBearbeiten || (kreis && onMitteVerschieben)) && (
-          <Space wrap data-lfh="zone-bearbeiten">
+          <Knopfreihe data-lfh="zone-bearbeiten">
             {kreis && onMitteVerschieben && (
               <Button disabled={gesperrt} onClick={onMitteVerschieben}>
                 Mitte verschieben
@@ -406,7 +412,7 @@ export default function ZonenInspector({
                 Punkte bearbeiten
               </Button>
             )}
-          </Space>
+          </Knopfreihe>
         )}
 
         <Input
@@ -582,9 +588,8 @@ export default function ZonenInspector({
         )}
       </Space>
       {/* Rückfrage in jedem Fall: die Zone wird hart gelöscht. Die Warnstufen entscheiden nur
-          über den Hinweis. Abgesetzt unter der Reihe um `token.padding` (= `size="middle"`): die
-          neutralen Knöpfe darin (Gefahrenmatrix, Sprung ins Fachmodul) sind keine Nachbarn
-          (`aktionsabstand.guard.test.ts`, `OHNE_NACHBARSCHAFT`). */}
+          über den Hinweis. Abgesetzt unter der Reihe um `token.padding` (Stufe `md`): die
+          neutralen Knöpfe darin (Gefahrenmatrix, Sprung ins Fachmodul) sind keine Nachbarn. */}
       {darfSchreiben && (
         <div style={{ marginTop: token.padding }}>
           <Popconfirm

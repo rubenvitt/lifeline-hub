@@ -12,6 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { App, Button, Empty, Modal, Radio, Space, Spin, theme } from 'antd';
+import Knopfreihe from '../../components/instrument/Knopfreihe';
 import dayjs from 'dayjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
@@ -205,7 +206,7 @@ export default function LageplanAnlageDialog({
       mask={{ closable: !laeuft }}
       keyboard={!laeuft}
       footer={
-        <Space>
+        <Knopfreihe fuss>
           <Button onClick={abbrechen} disabled={laeuft}>
             Abbrechen
           </Button>
@@ -219,7 +220,7 @@ export default function LageplanAnlageDialog({
           >
             Anfügen
           </Button>
-        </Space>
+        </Knopfreihe>
       }
     >
       {laedt ? (
