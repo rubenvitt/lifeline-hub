@@ -1,6 +1,6 @@
 import { theme } from 'antd';
 import type { ReactNode } from 'react';
-import { rahmenFarben, schrift } from '../theme/tokens';
+import { rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import { eingaengeZahlText } from './eingaenge';
 
 /**
@@ -36,7 +36,7 @@ export default function EingaengeZahl({ zahl, children }: { zahl: number; childr
             color: rahmenFarben.grund,
             fontFamily: schrift.zahl,
             fontVariantNumeric: 'tabular-nums',
-            fontSize: 10,
+            fontSize: schriftskala.meta.groesse,
             fontWeight: 700,
             lineHeight: '16px',
             textAlign: 'center',

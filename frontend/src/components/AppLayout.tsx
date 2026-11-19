@@ -6,7 +6,7 @@ import { Link, Outlet, useLocation } from 'react-router';
 import { useEinsatzRueckweg } from '../einsatz/einsatzRueckweg';
 import { useAuth } from '../auth/AuthContext';
 import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
-import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schriftskala } from '../theme/tokens';
 import AlarmZone from '../alarm/AlarmZone';
 import OrgBenachrichtigungen from '../alarm/OrgBenachrichtigungen';
 import BenutzerMenu from './BenutzerMenu';
@@ -82,7 +82,7 @@ function GlobalLink({
           // freie Link (`gedaempft`). Die Tag-Schwelle gilt für bedienbaren Text, nicht für
           // Gesperrtes (LFH-434); deshalb steht das Schloss daneben.
           color: rahmenFarben.gesperrt,
-          fontSize: 12,
+          fontSize: schriftskala.textKlein.groesse,
           cursor: 'not-allowed',
           display: 'inline-flex',
           alignItems: 'center',
@@ -175,7 +175,7 @@ export default function AppLayout() {
   // Nachtrolle, weil die Leiste in beiden Modi dunkel ist.
   const linkStil: CSSProperties = {
     color: rahmenFarben.gedaempft,
-    fontSize: 12,
+    fontSize: schriftskala.textKlein.groesse,
     display: 'inline-flex',
     alignItems: 'center',
     flexShrink: 0,

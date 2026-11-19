@@ -12,6 +12,7 @@ import {
 import Markdown, { type UnterEbene } from './Markdown';
 import { zeichenGrenze } from './zeichenGrenze';
 import './MarkdownEditor.css';
+import './MarkdownEditorDruck.css';
 
 /** Ref-Typ des inneren antd Input.TextArea (hat `resizableTextArea.textArea`). */
 export type TextAreaRef = GetRef<typeof Input.TextArea>;

@@ -62,7 +62,11 @@ function kernId(b: Befehl): string {
  * und eine mitwachsende Polsterung bräche die Fußzeile in `komfortabel` auf zwei Zeilen. Ein-Zeichen-
  * Tasten (↵, →, >, #, @) werden gleich breite Quadrate, damit die Legende nicht flattert.
  */
-const tasteStil = { padding: '0 var(--lfh-luft-1)', fontSize: 11, lineHeight: '16px' } as const;
+const tasteStil = {
+  padding: '0 var(--lfh-luft-1)',
+  fontSize: schriftskala.meta.groesse,
+  lineHeight: '16px',
+} as const;
 /** Label und Nebenzeile enden einzeilig in „…“. */
 const einzeilig = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
 const tasteQuadrat = { ...tasteStil, minWidth: 18, justifyContent: 'center' } as const;
@@ -661,10 +665,16 @@ export function CommandPalette({
               setSuche(e.target.value);
             }}
             onKeyDown={aufTaste}
-            // 16 px: kleiner zoomt iOS beim Fokus die Seite. KEIN eigener Fokusrahmen: die Palette
-            // hat genau dieses eine Feld, ihr Rahmen in Bedienfarbe und die Schreibmarke zeigen den
-            // Fokus; ein zweiter Kasten in der Kopfzeile wäre Kasten im Kasten.
-            style={{ flex: 1, padding: 0, fontSize: 16, outline: 'none', boxShadow: 'none' }}
+            // KEIN eigener Fokusrahmen: die Palette hat genau dieses eine Feld, ihr Rahmen in
+            // Bedienfarbe und die Schreibmarke zeigen den Fokus; ein zweiter Kasten in der
+            // Kopfzeile wäre Kasten im Kasten.
+            style={{
+              flex: 1,
+              padding: 0,
+              fontSize: schriftskala.text.groesse,
+              outline: 'none',
+              boxShadow: 'none',
+            }}
           />
           {/*
            * Die Modusanzeige: solange ein Präfix steht, nennt sie ihn; ohne sie wäre ein Filter, der

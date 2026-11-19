@@ -24,10 +24,12 @@ import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD, hilfePfad } from '../routing/deepl
 import { useAuth } from '../auth/AuthContext';
 import { useAbmeldenRueckfrage } from '../auth/AbmeldenRueckfrage';
 import { useDichte } from '../theme/ThemeModeProvider';
-import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schriftskala } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
 import { useViewport } from './useViewport';
 import { Marke } from './instrument/Marke';
+import MetaZeile from './instrument/MetaZeile';
+import { schriftStil } from './instrument/rollenwerte';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
 function initialen(name: string): string {
@@ -211,7 +213,10 @@ export default function BenutzerMenu({
                 rowGap: token.marginXS,
               }}
             >
-              <Typography.Text strong style={{ fontSize: 14, lineHeight: 1.3 }}>
+              <Typography.Text
+                strong
+                style={{ fontSize: schriftskala.text.groesse, lineHeight: 1.3 }}
+              >
                 {benutzer.anzeigename}
               </Typography.Text>
               {isKnapp && rollenTags.length > 0 && (
@@ -220,11 +225,10 @@ export default function BenutzerMenu({
                 </Space>
               )}
             </div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {isKnapp
-                ? `@${benutzer.benutzername} · Version ${__APP_VERSION__}`
-                : `@${benutzer.benutzername}`}
-            </Typography.Text>
+            <MetaZeile>
+              <MetaZeile.Teil>@{benutzer.benutzername}</MetaZeile.Teil>
+              {isKnapp && <MetaZeile.Teil>Version {__APP_VERSION__}</MetaZeile.Teil>}
+            </MetaZeile>
             {/* Die Funktion auf JEDER Breite (LFH-952, U89): am Auslöser steht sie erst ab `xl`, auf
                 Tablet und Handy war sie sonst nirgends zu sehen. */}
             {funktion && (
@@ -232,7 +236,7 @@ export default function BenutzerMenu({
                 data-lfh="benutzermenue-funktion"
                 style={{
                   display: 'block',
-                  fontSize: 12,
+                  fontSize: schriftskala.textKlein.groesse,
                   marginTop: token.marginXS,
                 }}
               >
@@ -249,7 +253,11 @@ export default function BenutzerMenu({
             {!isKnapp && (
               <Typography.Text
                 type="secondary"
-                style={{ display: 'block', fontSize: 11, marginTop: token.marginSM }}
+                style={{
+                  display: 'block',
+                  fontSize: schriftskala.textKlein.groesse,
+                  marginTop: token.marginSM,
+                }}
               >
                 Version {__APP_VERSION__}
               </Typography.Text>
@@ -361,8 +369,7 @@ export default function BenutzerMenu({
               justifyContent: 'center',
               background: rahmenFarben.aktiv,
               color: farbenDunkel.text2,
-              fontFamily: schrift.zahl,
-              fontSize: 10,
+              ...schriftStil('meta'),
             }}
           >
             {initialen(benutzer.anzeigename)}
@@ -398,12 +405,12 @@ export default function BenutzerMenu({
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
-                  fontSize: 12,
+                  fontSize: schriftskala.textKlein.groesse,
                 }}
               >
                 {funktion ?? benutzer.anzeigename}
               </span>
-              <IconChevronRunter style={{ fontSize: 10, opacity: 0.65 }} />
+              <IconChevronRunter size={10} style={{ opacity: 0.65 }} />
             </>
           )}
         </Button>

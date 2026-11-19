@@ -1,4 +1,4 @@
-import { Typography, theme } from 'antd';
+import { Typography } from 'antd';
 import type { ReactNode } from 'react';
 import {
   formatFlaeche,
@@ -6,6 +6,7 @@ import {
   type GeoKennzahlen as GeoKennzahlenWerte,
 } from '../pages/lagekarte/geo';
 import { schrift } from '../theme/tokens';
+import Stapel from './instrument/Stapel';
 
 interface KennzahlZeileProps {
   /** Beschriftung links, in der gedämpften Metadaten-Stimme. */
@@ -24,23 +25,15 @@ interface KennzahlZeileProps {
  * **selben** Layout beisteuern kann.
  */
 export function KennzahlZeile({ label, wert, zahl = true }: KennzahlZeileProps) {
-  const { token } = theme.useToken();
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: token.marginSM,
-      }}
-    >
+    <Stapel richtung="zeile" abstand="sm" ausrichten="mitte" verteilen="between">
       <Typography.Text type="secondary">{label}</Typography.Text>
       <Typography.Text
         style={zahl ? { fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' } : undefined}
       >
         {wert}
       </Typography.Text>
-    </div>
+    </Stapel>
   );
 }
 
@@ -69,14 +62,13 @@ interface GeoKennzahlenProps {
  * Ohne Kennzahlen und ohne Zusatz rendert die Komponente nichts.
  */
 export default function GeoKennzahlen({ kennzahlen, zusatz }: GeoKennzahlenProps) {
-  const { token } = theme.useToken();
   const hatGeo =
     kennzahlen != null &&
     (kennzahlen.flaecheM2 != null || kennzahlen.umfangM != null || kennzahlen.laengeM != null);
   if (!hatGeo && !zusatz) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
+    <Stapel abstand="xxs">
       {kennzahlen?.flaecheM2 != null && (
         <KennzahlZeile label="Fläche" wert={formatFlaeche(kennzahlen.flaecheM2)} />
       )}
@@ -87,6 +79,6 @@ export default function GeoKennzahlen({ kennzahlen, zusatz }: GeoKennzahlenProps
         <KennzahlZeile label="Länge" wert={formatLaenge(kennzahlen.laengeM)} />
       )}
       {zusatz}
-    </div>
+    </Stapel>
   );
 }

@@ -25,6 +25,7 @@ import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
 import Filterhinweis from './instrument/Filterhinweis';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
+import Stapel from './instrument/Stapel';
 import { zielEinzug } from './instrument/zielEinzug';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import { MenueAusloeser, type MenueEintrag } from './MenueAusloeser';
@@ -2640,7 +2641,7 @@ export default function Datensicht<T extends object, const K extends string>(
           // Inhalts; die Leitlinie verlangt ≥ 8 / ≥ 16 px (Prüfliste LLH-1093, Kriterium 2).
           style={karte.gestapelt ? { rowGap: token.padding } : undefined}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
+          <Stapel abstand="xxs">
             <div
               style={{
                 display: 'flex',
@@ -2701,7 +2702,7 @@ export default function Datensicht<T extends object, const K extends string>(
             )}
             {aufklappen && <div>{aufklappAusloeser(zeile, true)}</div>}
             {fehlerZeile}
-          </div>
+          </Stapel>
         </ListenEintrag>
         {/* Der Bereich steht UNTER der Karte in voller Breite, sonst zöge er die Aktionsleiste von
             `ListenEintrag` in die Mitte und nähme ihr bei 390 px die Breite. */}
