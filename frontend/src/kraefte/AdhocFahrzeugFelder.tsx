@@ -1,4 +1,5 @@
 import { Collapse, Form, Input, Space, Typography, theme } from 'antd';
+import { Feld } from '../components/instrument';
 import { FAHRZEUG_ADHOC_TEXT_MAX } from '../api/eingabegrenzen';
 import type { AdhocEingabe } from '../api/einsatzFahrzeuge';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
@@ -57,7 +58,7 @@ export default function AdhocFahrzeugFelder({
   const werte = Form.useWatch([], form) as Partial<AdhocEingabe> | undefined;
   const sichtbar = felder.filter((f) => !weitere.includes(f));
   const feld = (f: AdhocFeld) => (
-    <Form.Item
+    <Feld
       key={f}
       label={ETIKETT[f]}
       name={f}
@@ -67,7 +68,7 @@ export default function AdhocFahrzeugFelder({
       ]}
     >
       <Input placeholder={PLATZHALTER[f]} count={zeichenGrenze(FAHRZEUG_ADHOC_TEXT_MAX)} />
-    </Form.Item>
+    </Feld>
   );
   const gesetzt = weitere
     .map((f) => [f, werte?.[f]?.trim()] as const)

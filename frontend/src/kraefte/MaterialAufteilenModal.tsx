@@ -1,4 +1,5 @@
 import { Form, Typography } from 'antd';
+import { Feld } from '../components/instrument';
 import { useEffect } from 'react';
 import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
@@ -108,7 +109,8 @@ export default function MaterialAufteilenModal({
           {mengeText({ art: 'verbrauchsgut', menge, ausgegeben: posten.ausgegeben })}
         </Typography.Paragraph>
       )}
-      <Form.Item
+      <Feld
+        breite="kurz"
         label="Menge abteilen"
         name="menge"
         rules={[
@@ -128,11 +130,11 @@ export default function MaterialAufteilenModal({
           ) : null
         }
       >
-        <MengenFeld beschriftung="Menge abteilen" style={{ width: 120 }} />
-      </Form.Item>
-      <Form.Item label="Ort" name="ort" extra="Ort des abgeteilten Teils">
+        <MengenFeld beschriftung="Menge abteilen" />
+      </Feld>
+      <Feld label="Ort" name="ort" extra="Ort des abgeteilten Teils">
         <Select<string> options={ortOptionen} popupMatchSelectWidth={false} />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }
