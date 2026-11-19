@@ -18,7 +18,7 @@ angemeldet wird.
 
 #### Scenario: Bestätigung mit bestehender Sitzung
 - **WHEN** eine im Browser angemeldete Person die Bestätigungsseite mit gültiger `challenge` öffnet
-- **THEN** zeigt die Seite „In der Mac-App anmelden als <Anzeigename>“ und fordert noch keinen Code an
+- **THEN** zeigt die Seite „In der Lifeline-App anmelden als <Anzeigename>“ und fordert noch keinen Code an
 
 #### Scenario: Ohne Sitzung
 - **WHEN** jemand ohne Sitzung die Bestätigungsseite öffnet
@@ -98,5 +98,5 @@ unberührt bleiben.
 - **THEN** steht in `auth_audit` ein `login_ok` mit dem Anbieter `systembrowser` und dem Benutzer
 
 #### Scenario: Browsersitzung bleibt
-- **WHEN** die Mac-App den Code eingelöst hat
-- **THEN** ist die Person im Browser weiterhin angemeldet, und die Mac-App hat eine eigene Sitzung
+- **WHEN** die App (Mac oder iOS) den Code eingelöst hat
+- **THEN** ist die Person im Browser weiterhin angemeldet, und die App hat eine eigene Sitzung

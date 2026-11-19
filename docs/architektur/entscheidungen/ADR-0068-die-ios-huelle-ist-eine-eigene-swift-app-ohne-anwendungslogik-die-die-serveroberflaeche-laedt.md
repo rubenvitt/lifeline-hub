@@ -6,7 +6,7 @@ datum: 2026-11-18
 gilt_fuer:
   - ios/**
 herleitung:
-  - openspec/changes/t39ltxxi-ios-huelle/design.md
+  - openspec/changes/archive/2026-11-19-t39ltxxi-ios-huelle/design.md
   - Zunder LLH-1978 (Brainstorming mit Ruben am 18.11.2026)
 ---
 

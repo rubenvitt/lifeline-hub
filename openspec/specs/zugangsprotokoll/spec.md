@@ -11,7 +11,7 @@ Anmeldeweg einer Sitzung und Zeiten in den Konventionen der Organisation.
 
 Das Zugangsprotokoll SHALL jeden Anmeldeweg, den der Server in die Anmeldespur schreibt, mit
 einem Klartext zeigen und MUST NOT eine interne Kennung zeigen. Die Bezeichnungen sind:
-Passwort, SSO, Passkey, Entwicklung, Zweiter Faktor, Gerätecode, Mac-App. Ein unbekannter
+Passwort, SSO, Passkey, Entwicklung, Zweiter Faktor, Gerätecode, Lifeline-App. Ein unbekannter
 Anmeldeweg erscheint als „—“.
 
 #### Scenario: Anmeldung mit zweitem Faktor
@@ -27,8 +27,8 @@ Anmeldeweg erscheint als „—“.
 
 #### Scenario: Anmeldung in der Mac-App
 
-- **WHEN** sich die Mac-App über den Systembrowser anmeldet
-- **THEN** steht beim Eintrag der Anmeldeweg „Mac-App“
+- **WHEN** sich die Mac- oder iOS-App über den Systembrowser anmeldet
+- **THEN** steht beim Eintrag der Anmeldeweg „Lifeline-App“
 
 #### Scenario: Neuer Anmeldeweg ohne Klartext
 
