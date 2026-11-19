@@ -523,8 +523,13 @@ export function InlineAngabe<T>({
   useEffect(() => {
     if (!bearbeitet || praesenzText === null || ohneNetz) return;
     const s = JSON.parse(praesenzText) as PraesenzSchluessel;
-    void meldePraesenz(s);
-    const takt = window.setInterval(() => void meldePraesenz(s), PRAESENZ_TAKT_MS);
+    // Lehnt der Server die Meldung ab (412, 403, 404), hört der Takt auf (Entwurf D5).
+    const melden = () =>
+      void meldePraesenz(s).then((weiter) => {
+        if (!weiter) window.clearInterval(takt);
+      });
+    const takt = window.setInterval(melden, PRAESENZ_TAKT_MS);
+    melden();
     let beendet = false;
     const verlassen = () => {
       beendet = true;

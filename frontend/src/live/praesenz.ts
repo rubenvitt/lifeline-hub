@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
-import { apiSend, apiSendKeepalive } from '../api/client';
+import { ApiError, apiSend, apiSendKeepalive } from '../api/client';
 import type { PraesenzObjekt, PraesenzStand } from '../api/types';
 import { useAuthOptional } from '../auth/AuthContext';
+import { useOhneVerbindung } from '../offline/verbindung';
 
 /**
  * Präsenz an Einzelangaben (LLH-1946, Entwurf
@@ -97,14 +98,18 @@ function abonnieren(h: () => void): () => void {
   return () => hoerer.delete(h);
 }
 
-/** Hook zu {@link praesenzAnderer} mit dem angemeldeten Benutzer. */
+/**
+ * Hook zu {@link praesenzAnderer} mit dem angemeldeten Benutzer. Ohne Verbindung nichts: der Stand
+ * ist dann nicht mehr verlässlich (Entwurf D5, „ein Abbruch leert den Stand“).
+ */
 export function usePraesenzAnderer(
   s: PraesenzSchluessel | undefined,
   feld?: string,
 ): { andere: string[]; du: boolean } {
   const benutzerId = useAuthOptional()?.benutzer?.id;
+  const ohneNetz = useOhneVerbindung();
   const stand = useSyncExternalStore(abonnieren, () => (s ? staende.get(s.einsatzId) : undefined));
-  if (!s) return KEINE;
+  if (!s || ohneNetz) return KEINE;
   return praesenzAnderer(stand, s, feld, benutzerId);
 }
 
@@ -133,22 +138,30 @@ function pfad(s: PraesenzSchluessel): string {
     : `/api/einsaetze/${s.einsatzId}/praesenz`;
 }
 
-/** Beginnt oder verlängert die Präsenz dieses Fensters. Fehler bleiben still. */
-export async function meldePraesenz(s: PraesenzSchluessel): Promise<void> {
-  const body =
-    s.objekt === 'einheit'
-      ? { felder: s.felder, fenster: FENSTER_ID }
-      : { objekt: s.objekt, felder: s.felder, fenster: FENSTER_ID };
+function meldung(s: PraesenzSchluessel) {
+  return s.objekt === 'einheit'
+    ? { felder: s.felder, fenster: FENSTER_ID }
+    : { objekt: s.objekt, felder: s.felder, fenster: FENSTER_ID };
+}
+
+/**
+ * Beginnt oder verlängert die Präsenz dieses Fensters. `false`, wenn der Server die Meldung
+ * ablehnt (412 anderes Konto, 403 ohne Recht, 404 weg, 400/409): dann hört der Takt auf
+ * (Entwurf D5). Ein Netzfehler zählt nicht, der nächste Takt versucht es wieder. Still: Präsenz ist
+ * ein Hinweis, ein Fehler ändert an der Eingabe nichts.
+ */
+export async function meldePraesenz(s: PraesenzSchluessel): Promise<boolean> {
   try {
-    await apiSend<void>(pfad(s), 'PUT', body);
-  } catch {
-    /* Präsenz ist ein Hinweis; ein Fehler ändert an der Eingabe nichts. */
+    await apiSend<void>(pfad(s), 'PUT', meldung(s));
+    return true;
+  } catch (e) {
+    return !(e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 429);
   }
 }
 
 /** Beendet die Präsenz dieses Fensters; `beimVerlassen` überlebt das Ende der Seite. */
 export function beendePraesenz(s: PraesenzSchluessel, beimVerlassen = false): void {
-  const body = { fenster: FENSTER_ID };
+  const body = meldung(s);
   const senden = beimVerlassen
     ? apiSendKeepalive(pfad(s), body, 'DELETE')
     : apiSend<void>(pfad(s), 'DELETE', body);

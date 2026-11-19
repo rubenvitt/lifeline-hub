@@ -70,7 +70,7 @@ let beende: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   ohneNetz = false;
-  melde = vi.spyOn(praesenz, 'meldePraesenz').mockResolvedValue(undefined);
+  melde = vi.spyOn(praesenz, 'meldePraesenz').mockResolvedValue(true);
   beende = vi.spyOn(praesenz, 'beendePraesenz').mockReturnValue(undefined);
 });
 
@@ -115,6 +115,19 @@ describe('InlineAngabe · Präsenz melden', () => {
       window.dispatchEvent(new Event('pagehide'));
     });
     expect(beende).toHaveBeenCalledWith(schluessel, true);
+  });
+
+  it('hört auf zu melden, wenn der Server die Meldung ablehnt', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    melde.mockResolvedValue(false);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderMitProviders(<TextAngabe praesenz={schluessel} />);
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    expect(melde).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+    expect(melde).toHaveBeenCalledTimes(1);
   });
 
   it('sendet ohne Netz nichts', async () => {
@@ -162,6 +175,13 @@ describe('InlineAngabe · Präsenz zeigen', () => {
     expect(document.querySelector('[data-lfh="feld-praesenz"]')).toHaveTextContent(
       'Wird gerade bearbeitet von Anna',
     );
+  });
+
+  it('ohne Netz kein Hinweis: der Stand ist dann nicht mehr verlässlich', () => {
+    ohneNetz = true;
+    renderMitProviders(<TextAngabe praesenz={schluessel} />);
+    fremdeBearbeitung();
+    expect(document.querySelector('[data-lfh="feld-praesenz"]')).toBeNull();
   });
 
   it('ohne fremde Bearbeitung kein Hinweis', () => {

@@ -1,6 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiError, apiSend, apiSendKeepalive } from '../api/client';
 import type { PraesenzStand } from '../api/types';
 import {
+  beendePraesenz,
+  meldePraesenz,
   FENSTER_ID,
   leerePraesenz,
   praesenzAnderer,
@@ -9,6 +12,12 @@ import {
   praesenzStand,
   type PraesenzSchluessel,
 } from './praesenz';
+
+vi.mock('../api/client', async (original) => ({
+  ...(await original<typeof import('../api/client')>()),
+  apiSend: vi.fn(),
+  apiSendKeepalive: vi.fn(),
+}));
 
 const ICH = 7;
 
@@ -112,5 +121,44 @@ describe('Store und Listener', () => {
     const [[, listener]] = praesenzListener(1);
     listener(new MessageEvent('praesenz', { data: '{kaputt' }));
     expect(praesenzStand(1)).toBeUndefined();
+  });
+});
+
+describe('melden und beenden', () => {
+  it('meldet weiter, solange der Server annimmt oder das Netz wackelt', async () => {
+    vi.mocked(apiSend).mockResolvedValueOnce(undefined);
+    await expect(meldePraesenz(leitstelle)).resolves.toBe(true);
+    vi.mocked(apiSend).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(meldePraesenz(leitstelle)).resolves.toBe(true);
+  });
+
+  it('hört bei 412, 403 und 404 auf (Spec D5: ein 412 beendet die Präsenz)', async () => {
+    for (const status of [412, 403, 404]) {
+      vi.mocked(apiSend).mockRejectedValueOnce(new ApiError(status, 'x'));
+      await expect(meldePraesenz(leitstelle)).resolves.toBe(false);
+    }
+  });
+
+  it('beendet mit denselben Angaben wie die Meldung', () => {
+    vi.mocked(apiSend).mockResolvedValue(undefined);
+    vi.mocked(apiSendKeepalive).mockResolvedValue(undefined);
+    beendePraesenz(leitstelle);
+    expect(apiSend).toHaveBeenLastCalledWith('/api/einsaetze/1/praesenz', 'DELETE', {
+      objekt: 'einsatz',
+      felder: ['leitstellen_nr'],
+      fenster: FENSTER_ID,
+    });
+    const einheit: PraesenzSchluessel = {
+      einsatzId: 1,
+      objekt: 'einheit',
+      einheitId: 5,
+      felder: ['bemerkung'],
+    };
+    beendePraesenz(einheit, true);
+    expect(apiSendKeepalive).toHaveBeenLastCalledWith(
+      '/api/einsaetze/1/einheiten/5/praesenz',
+      { felder: ['bemerkung'], fenster: FENSTER_ID },
+      'DELETE',
+    );
   });
 });
