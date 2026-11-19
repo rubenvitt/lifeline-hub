@@ -5,12 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
 import { einsatzPfad } from '../routing/deeplinks';
-import { farbenDunkel } from '../theme/tokens';
+import { farbenDunkel, schriftskala } from '../theme/tokens';
 import { einsatzNebenzeile } from './einsatzNebenzeile';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { isUebung } from './einsatzart';
 import { modulAusPfad } from './modulRegistry';
-import { UebungsMarke } from '../components/instrument';
+import { schriftStil, Stapel, UebungsMarke } from '../components/instrument';
 import { useModusFarben } from '../components/rahmenStil';
 
 /**
@@ -28,10 +28,11 @@ import { useModusFarben } from '../components/rahmenStil';
  * `overflow` nicht. Der volle Name bleibt am `title` lesbar und bleibt TEXTINHALT — in einem
  * `aria-label` kippte der zugängliche Name, an dem Tests und die Kommandopalette hängen.
  *
- * DER NAME HAT VORRANG (LLH-1726, Spec `kopfleiste`): 16 px in jeder Dichte, und der Kopf gibt ihm
- * seine Eigenbreite, bevor die Suche mehr als ihre Lupe bekommt (Raster in `EinsatzLayout`). Dafür
- * misst der Text zweierlei: als Eigenbreite den ganzen Namen in einer Zeile, als Mindestbreite ein
- * Zeichen (`overflow-wrap: anywhere`). Sichtbar bleibt eine Zeile mit „…“ (`line-clamp: 1`).
+ * DER NAME HAT VORRANG (LLH-1726, Spec `kopfleiste`): Stufe `kartentitel` in jeder Dichte, und
+ * der Kopf gibt ihm seine Eigenbreite, bevor die Suche mehr als ihre Lupe bekommt (Raster in
+ * `EinsatzLayout`). Dafür misst der Text zweierlei: als Eigenbreite den ganzen Namen in einer
+ * Zeile, als Mindestbreite ein Zeichen (`overflow-wrap: anywhere`). Sichtbar bleibt eine Zeile mit
+ * „…“ (`line-clamp: 1`).
  */
 export default function EinsatzSwitcher({
   aktuellId,
@@ -62,10 +63,10 @@ export default function EinsatzSwitcher({
       const neben = einsatzNebenzeile(e, konventionen);
       // Eine Übung trägt die Übungsmarke vor dem Namen (LLH-1725, Spec `uebungsmarke`).
       const name = isUebung(e) ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginSM }}>
+        <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
           <UebungsMarke einsatz={e} />
           <span>{e.bezeichnung}</span>
-        </span>
+        </Stapel>
       ) : (
         e.bezeichnung
       );
@@ -74,7 +75,10 @@ export default function EinsatzSwitcher({
         label: neben ? (
           <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
             <span>{name}</span>
-            <span data-lfh="wechsler-nebenzeile" style={{ fontSize: 12, color: farben.gedaempft }}>
+            <span
+              data-lfh="wechsler-nebenzeile"
+              style={{ fontSize: schriftskala.textKlein.groesse, color: farben.gedaempft }}
+            >
               {neben}
             </span>
           </span>
@@ -104,9 +108,8 @@ export default function EinsatzSwitcher({
         title={aktuellName}
         // Farbe aus der NACHTrolle, nicht der Modus-Token: die Kommandoleiste ist in beiden Modi dunkel.
         style={{
+          ...schriftStil('kartentitel'),
           color: farbenDunkel.text2,
-          fontWeight: 500,
-          fontSize: 16,
           maxWidth: '100%',
           // Auch ein kurzer Name wie „A“ hält den Handschuh-Boden (LFH-460).
           minWidth: token.controlHeight,

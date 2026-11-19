@@ -1,8 +1,10 @@
-import { Button, Space } from 'antd';
+import { Button } from 'antd';
 import { useNavigate } from 'react-router';
 import { IconSchloss } from '../icons';
 import Paneel from '../components/instrument/Paneel';
 import { schriftStil, useRollen } from '../components/instrument/rollenwerte';
+import Stapel from '../components/instrument/Stapel';
+import Textstufe from '../components/instrument/Textstufe';
 import type { PlatzhalterRueckweg } from '../components/Platzhalter';
 import { flaeche } from '../theme/tokens';
 import { KEINE_BERECHTIGUNG, type ModulEintrag } from './modulRegistry';
@@ -52,13 +54,6 @@ export default function ModulGesperrt({
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
-  // Sperrzeile und Ansprechpartner: Stufe textKlein, keine freie Schriftgröße (Spec `schriftstufen`).
-  const sperrzeile = {
-    margin: 0,
-    ...schriftStil('textKlein'),
-    lineHeight: 1.5,
-    color: rollen.text2,
-  };
   return (
     <div
       style={{
@@ -85,17 +80,21 @@ export default function ModulGesperrt({
         {modul.label}
       </h1>
       <Paneel titel={KEINE_BERECHTIGUNG} koerperPolster>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+        <Stapel abstand="sm">
           {/* Eine Sperrzeile (LFH-1078, Spec `modul-freigabe`): Modul und Grund stehen schon in h1 und
              Paneeltitel. Wo die Freigaben liegen, zeigt der Knopf statt eines Satzes. */}
-          <p style={sperrzeile}>
+          <Textstufe als="p" stufe="textKlein" ton="text2">
             {ausgeblendet ? 'In diesem Einsatz ausgeblendet' : 'Für deine Rolle nicht freigegeben'}
-          </p>
+          </Textstufe>
           {/* Wen man fragt (LLH-1819). Wer die Freigaben selbst verwaltet, hat den Knopf statt
              eines Namens. */}
-          {!freigabenPfad && <p style={sperrzeile}>{ansprechpartnerZeile(einsatzleitung)}</p>}
+          {!freigabenPfad && (
+            <Textstufe als="p" stufe="textKlein" ton="text2">
+              {ansprechpartnerZeile(einsatzleitung)}
+            </Textstufe>
+          )}
           {(rueckweg || freigabenPfad) && (
-            <Space wrap>
+            <Stapel richtung="zeile" umbruch abstand="xs">
               {rueckweg && (
                 <Button type="primary" onClick={() => void navigate(rueckweg.pfad)}>
                   {rueckweg.label}
@@ -104,9 +103,9 @@ export default function ModulGesperrt({
               {freigabenPfad && (
                 <Button onClick={() => void navigate(freigabenPfad)}>Modulfreigaben öffnen</Button>
               )}
-            </Space>
+            </Stapel>
           )}
-        </div>
+        </Stapel>
       </Paneel>
     </div>
   );

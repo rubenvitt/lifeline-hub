@@ -14,7 +14,7 @@ import { useMinutenTakt } from './useMinutenTakt';
 import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
-import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 
 /**
  * Bausteine der Kommandoleiste (`shell.dc.html`) — geteilt von der Ebene-1-Shell (`AppLayout`)
@@ -177,7 +177,7 @@ export function wortmarkeStil(token: { controlHeight: number; paddingXS: number 
     minHeight: token.controlHeight,
     padding: `${token.paddingXS}px 0`,
     fontFamily: schrift.zahl,
-    fontSize: 12,
+    fontSize: schriftskala.textKlein.groesse,
     fontWeight: 500,
     letterSpacing: '0.02em',
     color: rahmenFarben.gedaempft,
@@ -224,7 +224,7 @@ export function Uhr({
         aria-label={`Uhrzeit ${text}`}
         style={{
           fontFamily: schrift.zahl,
-          fontSize: 14,
+          fontSize: schriftskala.text.groesse,
           fontWeight: 500,
           letterSpacing: '0.04em',
           fontVariantNumeric: 'tabular-nums',
@@ -406,7 +406,14 @@ export function SyncAnzeige({
       </span>
       {syncZeigtWort(zustand, kompakt) && (
         // Nur Störungen tragen ein Wort, also färbt es mit: dann soll es auffallen.
-        <span aria-hidden="true" style={{ fontFamily: schrift.zahl, fontSize: 11, color: d.farbe }}>
+        <span
+          aria-hidden="true"
+          style={{
+            fontFamily: schrift.zahl,
+            fontSize: schriftskala.meta.groesse,
+            color: d.farbe,
+          }}
+        >
           {wort}
         </span>
       )}

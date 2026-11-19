@@ -193,7 +193,7 @@ export function Ortspfad({
         ),
       }}
       theme={{
-        token: { fontSize: 12 },
+        token: { fontSize: schriftskala.textKlein.groesse },
         components: {
           Breadcrumb: {
             itemColor: farben.schwach,
@@ -233,7 +233,7 @@ export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | unde
         display: 'inline-flex',
         alignItems: 'center',
         gap: token.marginSM,
-        fontSize: 12,
+        fontSize: schriftskala.textKlein.groesse,
         color: farben.gedaempft,
         whiteSpace: 'nowrap',
       }}
