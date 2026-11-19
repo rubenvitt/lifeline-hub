@@ -2,7 +2,7 @@ import { IconPersonPlus } from '../../icons';
 import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
-import { Alert, App, Breadcrumb, Button, Flex, Modal, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Modal, Spin } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useId, useState } from 'react';
@@ -385,7 +385,7 @@ function UhsDetailInhalt() {
         )
       }
       aktionen={
-        <Space wrap size="middle">
+        <>
           {/* Die Zustände schließen sich aus; die Dev-Warnung des Primitivs zählt die
               Primäraktionen, der Test prüft beide Zustände. */}
           {!schreibgeschuetzt && uhs.status === 'aktiv' && (
@@ -438,7 +438,7 @@ function UhsDetailInhalt() {
               onWahl={(key) => setFrage(key === 'aufloesen' ? 'aufloesen' : 'stornieren')}
             />
           )}
-        </Space>
+        </>
       }
       // Die Leiste gehört zum Kopf, den der Fensterrahmen misst: so steht sie bei 1440 × 900 ohne
       // Bildlauf über dem Grundriss, und jeder Bereich behält die Mindesthöhe. Ein einzelner

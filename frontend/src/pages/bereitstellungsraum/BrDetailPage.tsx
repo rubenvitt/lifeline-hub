@@ -809,9 +809,9 @@ export default function BrDetailPage() {
         )
       }
       aktionen={
-        // `size="middle"`: „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“
-        // (`frontend/AGENTS.md`, „Rot steht nicht bündig neben Neutralem“).
-        <Space wrap size="middle">
+        // „Stornieren“ (rot) steht im Zustand „geplant“ neben „In Betrieb nehmen“; den Abstand trägt
+        // die Kopfhülle als Knopfreihe (`frontend/AGENTS.md`, „Knopfreihen über `Knopfreihe`“).
+        <>
           {darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
             <Button
               type="primary"
@@ -839,7 +839,7 @@ export default function BrDetailPage() {
               )}
             </>
           )}
-        </Space>
+        </>
       }
     >
       {/* „Bearbeiten“ im Paneelkopf der Raumdaten, nicht im Seitenkopf: dort stünden im Zustand

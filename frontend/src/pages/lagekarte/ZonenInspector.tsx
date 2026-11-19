@@ -1,4 +1,4 @@
-import { Button, Input, InputNumber, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Input, InputNumber, Popconfirm, Typography, theme } from 'antd';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Select } from '../../components/Select';
@@ -23,6 +23,7 @@ import {
   FELD_KLASSE,
   Stapel,
   Textstufe,
+  Knopfreihe,
   monoStil,
 } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
@@ -383,7 +384,7 @@ export default function ZonenInspector({
         {/* Bearbeiten an der Karte (LLH-1344): beide Wege starten einen Kartenmodus und schließen
             den Inspector; danach steht die Zone wieder hier. */}
         {darfSchreiben && (onPunkteBearbeiten || (kreis && onMitteVerschieben)) && (
-          <Space wrap data-lfh="zone-bearbeiten">
+          <Knopfreihe data-lfh="zone-bearbeiten">
             {kreis && onMitteVerschieben && (
               <Button disabled={gesperrt} onClick={onMitteVerschieben}>
                 Mitte verschieben
@@ -394,7 +395,7 @@ export default function ZonenInspector({
                 Punkte bearbeiten
               </Button>
             )}
-          </Space>
+          </Knopfreihe>
         )}
 
         <Input
@@ -566,9 +567,8 @@ export default function ZonenInspector({
         )}
       </Stapel>
       {/* Rückfrage in jedem Fall: die Zone wird hart gelöscht. Die Warnstufen entscheiden nur
-          über den Hinweis. Abgesetzt unter der Reihe um `token.padding` (= `size="middle"`): die
-          neutralen Knöpfe darin (Gefahrenmatrix, Sprung ins Fachmodul) sind keine Nachbarn
-          (`aktionsabstand.guard.test.ts`, `OHNE_NACHBARSCHAFT`). */}
+          über den Hinweis. Abgesetzt unter der Reihe um `token.padding` (Stufe `md`): die
+          neutralen Knöpfe darin (Gefahrenmatrix, Sprung ins Fachmodul) sind keine Nachbarn. */}
       {darfSchreiben && (
         <div style={{ marginTop: token.padding }}>
           <Popconfirm

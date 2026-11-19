@@ -1,5 +1,5 @@
 import { useSprungSperre } from '../einsatz/useSprungSperre';
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, theme } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Spin } from 'antd';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
@@ -113,7 +113,6 @@ const KOPFAKTIONEN: Record<SchadenStatus, { primaer: Kopfaktion | null; weitere:
 export default function SchaedenDetailPage() {
   const { id, schadenId: schadenIdParam } = useParams();
   const einsatzId = Number(id);
-  const { token } = theme.useToken();
   // Verortungsauftrag nur in eine freie Lagekarte (LFH-888, design.md D4).
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const schadenId = Number(schadenIdParam);
@@ -421,9 +420,7 @@ export default function SchaedenDetailPage() {
          * Weg; nach dem Stornieren springt die Seite selbst zurück.
          */
         aktionenPlan && (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-          // `paddingXS` ließ 3 / 5 / 7 px.
-          <Space wrap size={token.marginSM}>
+          <>
             {primaer && (
               <Button type="primary" onClick={() => fuehreKopfaktionAus(primaer)}>
                 {primaer.label}
@@ -455,7 +452,7 @@ export default function SchaedenDetailPage() {
                 if (eintrag) fuehreKopfaktionAus(eintrag);
               }}
             />
-          </Space>
+          </>
         )
       }
     >

@@ -57,7 +57,7 @@ import {
   verteilerNamesFromForm,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
-import { Feld, Paneel, monoStil } from '../components/instrument';
+import { Feld, Paneel, monoStil, Knopfreihe } from '../components/instrument';
 import './lageberichtPrint.css';
 import { flaeche } from '../theme/tokens';
 
@@ -404,9 +404,7 @@ function LageberichtDetail() {
         }}
         aktionen={
           <div className="lagebericht-no-print">
-            {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 8 / 12 / 16 px, antds
-                Vorgabe `paddingXS` ließ 3 / 5 / 7 px. */}
-            <Space wrap size={token.marginSM}>
+            <Knopfreihe>
               {!istEntwurf && darfSchreiben && (
                 <Button
                   onClick={() => fortschreibenMutation.mutate()}
@@ -442,7 +440,7 @@ function LageberichtDetail() {
                   </Button>
                 </>
               )}
-            </Space>
+            </Knopfreihe>
           </div>
         }
       >

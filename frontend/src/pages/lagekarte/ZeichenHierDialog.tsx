@@ -11,7 +11,8 @@
  * das nächste „Setzen“ ebenso (react-query räumt `error` beim Übergang nach `pending`).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Modal, Space, theme } from 'antd';
+import { Button, Modal, theme } from 'antd';
+import Knopfreihe from '../../components/instrument/Knopfreihe';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import type { Speicherung } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -76,7 +77,7 @@ export default function ZeichenHierDialog({
       mask={{ closable: !laeuft }}
       keyboard={!laeuft}
       footer={
-        <Space>
+        <Knopfreihe fuss>
           <Button onClick={abbrechen} disabled={laeuft}>
             Abbrechen
           </Button>
@@ -91,7 +92,7 @@ export default function ZeichenHierDialog({
           >
             Setzen
           </Button>
-        </Space>
+        </Knopfreihe>
       }
     >
       <FreiesZeichenPicker

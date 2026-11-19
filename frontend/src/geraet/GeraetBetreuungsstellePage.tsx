@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Alert, App, Button, Space, Spin, Typography, theme } from 'antd';
+import { Alert, App, Button, Spin, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ladeBetreuung } from '../api/betreuung';
@@ -129,7 +129,7 @@ export default function GeraetBetreuungsstellePage() {
         darfErfassen &&
         stelle &&
         stelle.status !== 'geschlossen' && (
-          <Space size="middle" wrap>
+          <>
             <Button
               type="primary"
               disabled={namentlichGefuehrt}
@@ -144,7 +144,7 @@ export default function GeraetBetreuungsstellePage() {
                 {NAMENTLICH_SPERRE}
               </Typography.Text>
             )}
-          </Space>
+          </>
         )
       }
     >

@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -314,12 +315,16 @@ describe('DokumentePage', () => {
     rendere(einsatzAktiv, [dokument()]);
     const knopf = await screen.findByRole('button', { name: 'Dokument Lageplan Nord bearbeiten' });
     expect(knopf).not.toHaveClass('ant-btn-dangerous');
-    // „Rot steht nicht bündig neben Neutralem": beide Knöpfe in einem Space mit Abstand.
+    // „Rot steht nicht bündig neben Neutralem": beide Knöpfe in einer Knopfreihe (Abstand md).
     const zelle = knopf.closest('td')!;
-    expect(
-      within(zelle).getByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
-    ).toBeInTheDocument();
-    expect(zelle.querySelector('.ant-space-gap-col-middle, .ant-space-middle')).not.toBeNull();
+    const entfernen = within(zelle).getByRole('button', {
+      name: 'Dokument Lageplan Nord entfernen',
+    });
+    const reihe = knopf.closest<HTMLElement>('div[style*="gap"]')!;
+    expect(reihe).toContainElement(entfernen);
+    expect(reihe.style.gap).toBe(`${theme.getDesignToken().padding}px`);
+    // In der Tabellenzelle bricht die Reihe nicht um, sonst verdoppelte sich die Zeilenhöhe.
+    expect(reihe.style.flexWrap).toBe('nowrap');
     await userEvent.click(knopf);
 
     const d = await dialogBearbeiten();

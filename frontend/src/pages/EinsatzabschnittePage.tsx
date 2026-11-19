@@ -1,5 +1,5 @@
 import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { App, Breadcrumb, Button, Modal, Space, Tree, type TreeDataNode } from 'antd';
+import { App, Breadcrumb, Button, Modal, Tree, type TreeDataNode } from 'antd';
 import {
   DndContext,
   DragOverlay,
@@ -46,6 +46,7 @@ import {
   Segmentleiste,
   Stapel,
   Textstufe,
+  Knopfreihe,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -801,9 +802,7 @@ export default function EinsatzabschnittePage() {
         />
       }
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
           <Segmentleiste<AbschnitteAnsicht>
             beschriftung="Ansicht"
@@ -816,7 +815,7 @@ export default function EinsatzabschnittePage() {
               Abschnitt anlegen
             </Button>
           )}
-        </Space>
+        </>
       }
       hinweis={
         // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei. Das Rückgängig aus
@@ -1110,7 +1109,7 @@ export default function EinsatzabschnittePage() {
         afterClose={focusAbschnitt}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureAufloesen()) setAufloesenFuer(null);
@@ -1129,7 +1128,7 @@ export default function EinsatzabschnittePage() {
             >
               Abschnitt auflösen
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.
