@@ -1,9 +1,11 @@
-import { Button, InputNumber, Space, theme } from 'antd';
+import type { CSSProperties } from 'react';
+import { Button, InputNumber } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { QUALI_SOLL_ANZAHL_MAX, QUALI_SOLL_MAX } from '../api/eingabegrenzen';
 import { listeQualifikationen } from '../api/qualifikationen';
 import { globalKeys } from '../api/queryKeys';
 import type { QualiSollEingabe, QualiSollEintrag } from '../api/types';
+import { FELD_KLASSE, Stapel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { IconMuelleimer, IconPlus } from '../icons';
 
@@ -23,6 +25,10 @@ export function vollstaendig(zeilen: readonly QualiSollZeile[] | undefined): Qua
 }
 
 const KEINE: QualiSollZeile[] = [];
+
+/** Hüllen der Eingaben einer Zeile: Breiten als Feldstufe (Spec `feldbreiten`). */
+const AUSWAHL_HUELLE: CSSProperties = { display: 'grid', minWidth: 'var(--lfh-feld-schmal)' };
+const ANZAHL_HUELLE: CSSProperties = { width: 'var(--lfh-feld-kurz)' };
 
 /**
  * Qualifikationssoll als Zeilen „Qualifikation · Anzahl“ (LLH-1553, design.md D6), kontrolliert
@@ -50,7 +56,6 @@ export default function QualiSollFeld({
   id?: string;
   'aria-label'?: string;
 }) {
-  const { token } = theme.useToken();
   const katalog = useQuery({
     queryKey: globalKeys.qualifikationen(),
     queryFn: listeQualifikationen,
@@ -66,39 +71,42 @@ export default function QualiSollFeld({
     onChange?.(value.map((z, i) => (i === index ? { ...z, ...aenderung } : z)));
 
   return (
-    <div id={id} role={ariaLabel ? 'group' : undefined} aria-label={ariaLabel}>
+    <Stapel
+      abstand="sm"
+      ausrichten="start"
+      id={id}
+      role={ariaLabel ? 'group' : undefined}
+      aria-label={ariaLabel}
+    >
       {value.map((zeile, index) => {
         const nummer = index + 1;
         const vergeben = new Set(
           value.filter((_, i) => i !== index).map((z) => z.qualifikation_id),
         );
         return (
-          <Space
-            key={index}
-            align="start"
-            style={{ display: 'flex', marginBottom: token.marginSM }}
-            wrap
-          >
-            <Select<number>
-              aria-label={`Qualifikation ${nummer}`}
-              placeholder="Qualifikation"
-              loading={katalog.isLoading}
-              options={alle.filter((o) => !vergeben.has(o.value))}
-              value={zeile.qualifikation_id}
-              onChange={(qualifikation_id) => aendere(index, { qualifikation_id })}
-              disabled={disabled}
-              style={{ minWidth: 200 }}
-            />
-            <InputNumber
-              aria-label={`Anzahl ${nummer}`}
-              min={1}
-              max={QUALI_SOLL_ANZAHL_MAX}
-              precision={0}
-              value={zeile.anzahl}
-              onChange={(anzahl) => aendere(index, { anzahl })}
-              disabled={disabled}
-              style={{ width: 88 }}
-            />
+          <Stapel key={index} richtung="zeile" umbruch ausrichten="start" abstand="xs">
+            <div style={AUSWAHL_HUELLE}>
+              <Select<number>
+                aria-label={`Qualifikation ${nummer}`}
+                placeholder="Qualifikation"
+                loading={katalog.isLoading}
+                options={alle.filter((o) => !vergeben.has(o.value))}
+                value={zeile.qualifikation_id}
+                onChange={(qualifikation_id) => aendere(index, { qualifikation_id })}
+                disabled={disabled}
+              />
+            </div>
+            <div className={FELD_KLASSE} style={ANZAHL_HUELLE}>
+              <InputNumber
+                aria-label={`Anzahl ${nummer}`}
+                min={1}
+                max={QUALI_SOLL_ANZAHL_MAX}
+                precision={0}
+                value={zeile.anzahl}
+                onChange={(anzahl) => aendere(index, { anzahl })}
+                disabled={disabled}
+              />
+            </div>
             <Button
               type="text"
               danger
@@ -107,7 +115,7 @@ export default function QualiSollFeld({
               onClick={() => onChange?.(value.filter((_, i) => i !== index))}
               disabled={disabled}
             />
-          </Space>
+          </Stapel>
         );
       })}
       <Button
@@ -117,6 +125,6 @@ export default function QualiSollFeld({
       >
         Qualifikation fordern
       </Button>
-    </div>
+    </Stapel>
   );
 }

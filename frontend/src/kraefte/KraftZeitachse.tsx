@@ -25,8 +25,10 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { ZEITACHSE_GRUND_MAX, ZEITACHSE_NOTIZ_MAX } from '../api/eingabegrenzen';
 import {
+  Feld,
   PaneelZustand,
   Sammelbanner,
+  Stapel,
   Zeitachseneintrag,
   monoStil,
   useRollen,
@@ -331,10 +333,10 @@ export default function KraftZeitachse({
       >
         <DauerZeile dauern={dauern} zeit={zeit} />
         {!lesend && (
-          <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: token.paddingXS }}>
+          <Stapel als="span" richtung="zeile" umbruch abstand="xs">
             {nachtragKnopf}
             {periodeKnopf}
-          </span>
+          </Stapel>
         )}
       </div>
       <PaneelZustand
@@ -463,7 +465,7 @@ export default function KraftZeitachse({
         onFertig={() => setNachtragOffen(false)}
         onAbbrechen={() => setNachtragOffen(false)}
       >
-        <Form.Item<NachtragWerte>
+        <Feld<NachtragWerte>
           name="art"
           label="Ereignis"
           rules={[{ required: true, message: 'Bitte ein Ereignis wählen' }]}
@@ -472,22 +474,22 @@ export default function KraftZeitachse({
             placeholder="Ereignis wählen…"
             options={NACHTRAG_ARTEN.map((a) => ({ value: a, label: ART_WORT[a] }))}
           />
-        </Form.Item>
-        <Form.Item<NachtragWerte>
+        </Feld>
+        <Feld<NachtragWerte>
           name="zeitpunkt"
           label="Zeitpunkt"
           rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
         >
           {/* Zeit und Kalendertag in der Anzeigezone (LFH-692, `keineZukunftstage`). */}
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
-        </Form.Item>
-        <Form.Item<NachtragWerte>
+        </Feld>
+        <Feld<NachtragWerte>
           name="notiz"
           label="Notiz (optional)"
           rules={[zeichenRegel(ZEITACHSE_NOTIZ_MAX, 'Notiz')]}
         >
           <Input placeholder="z. B. per Funk gemeldet" count={zeichenGrenze(ZEITACHSE_NOTIZ_MAX)} />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={nachtrag.error} titel="Nicht nachgetragen" />
       </ErfassungsModal>
 
@@ -508,10 +510,10 @@ export default function KraftZeitachse({
         onFertig={() => setPeriodeOffen(false)}
         onAbbrechen={() => setPeriodeOffen(false)}
       >
-        <Form.Item<PeriodeWerte> name="alarmierung" label="Alarmierung">
+        <Feld<PeriodeWerte> name="alarmierung" label="Alarmierung">
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
-        </Form.Item>
-        <Form.Item<PeriodeWerte>
+        </Feld>
+        <Feld<PeriodeWerte>
           name="eintreffen"
           label="Eintreffen"
           dependencies={['alarmierung']}
@@ -525,15 +527,15 @@ export default function KraftZeitachse({
           ]}
         >
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
-        </Form.Item>
-        <Form.Item<PeriodeWerte>
+        </Feld>
+        <Feld<PeriodeWerte>
           name="entlassung"
           label="Entlassung"
           rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
         >
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
-        </Form.Item>
-        <Form.Item<PeriodeWerte>
+        </Feld>
+        <Feld<PeriodeWerte>
           name="notiz"
           label="Notiz (optional)"
           rules={[zeichenRegel(ZEITACHSE_NOTIZ_MAX, 'Notiz')]}
@@ -542,7 +544,7 @@ export default function KraftZeitachse({
             placeholder="z. B. aus dem Funkprotokoll"
             count={zeichenGrenze(ZEITACHSE_NOTIZ_MAX)}
           />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={periode.error} titel="Nicht nachgetragen" />
       </ErfassungsModal>
 
@@ -565,14 +567,14 @@ export default function KraftZeitachse({
         <Typography.Paragraph>
           {berichtige && `${ART_WORT[berichtige.art]} ${zeit(berichtige.zeitpunkt_at)}`}
         </Typography.Paragraph>
-        <Form.Item<BerichtigWerte>
+        <Feld<BerichtigWerte>
           name="zeitpunkt"
           label="Zeitpunkt"
           rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
         >
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
-        </Form.Item>
-        <Form.Item<BerichtigWerte>
+        </Feld>
+        <Feld<BerichtigWerte>
           name="grund"
           label="Grund"
           rules={[
@@ -581,7 +583,7 @@ export default function KraftZeitachse({
           ]}
         >
           <Input placeholder="z. B. Zeit verwechselt" count={zeichenGrenze(ZEITACHSE_GRUND_MAX)} />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={berichtigung.error} titel="Nicht berichtigt" />
       </ErfassungsModal>
 
@@ -604,7 +606,7 @@ export default function KraftZeitachse({
           {art === 'einheit' ? ', samt der Einträge ihrer Personen,' : ''} und bleibt
           durchgestrichen sichtbar.
         </Typography.Paragraph>
-        <Form.Item<StreichWerte>
+        <Feld<StreichWerte>
           name="grund"
           label="Grund"
           rules={[
@@ -613,7 +615,7 @@ export default function KraftZeitachse({
           ]}
         >
           <Input placeholder="z. B. Zeit verwechselt" count={zeichenGrenze(ZEITACHSE_GRUND_MAX)} />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={streichung.error} titel="Nicht gestrichen" />
       </ErfassungsModal>
     </div>

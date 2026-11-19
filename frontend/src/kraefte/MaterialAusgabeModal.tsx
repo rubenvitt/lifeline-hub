@@ -1,4 +1,5 @@
 import { Form, Typography } from 'antd';
+import { Feld } from '../components/instrument';
 import { useState } from 'react';
 import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
@@ -100,7 +101,8 @@ export default function MaterialAusgabeModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
+        breite="kurz"
         label={wort.feld}
         name="menge"
         rules={[
@@ -121,8 +123,8 @@ export default function MaterialAusgabeModal({
           ) : null
         }
       >
-        <MengenFeld beschriftung={wort.feld} style={{ width: 120 }} />
-      </Form.Item>
+        <MengenFeld beschriftung={wort.feld} />
+      </Feld>
     </ErfassungsModal>
   );
 }

@@ -1,6 +1,6 @@
 import { dauer } from '../anzeige/dauer';
 import { Checkbox, Collapse, Form, Input, Typography, theme, type FormInstance } from 'antd';
-import { SegmentFeld } from '../components/instrument';
+import { Feld, SegmentFeld, Stapel } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -76,7 +76,7 @@ const RHYTHMUS_MIN_MINUTEN = 30;
  * Prüfung selbst trägt `dauerRegel`, auch für ein leeres Pflichtfeld.
  */
 const rhythmusField = (platzhalter: string | undefined, pflicht: boolean) => (
-  <Form.Item
+  <Feld
     name="rhythmus"
     label="Rhythmus"
     required={pflicht}
@@ -90,7 +90,7 @@ const rhythmusField = (platzhalter: string | undefined, pflicht: boolean) => (
     ]}
   >
     <Input placeholder={platzhalter} autoComplete="off" />
-  </Form.Item>
+  </Feld>
 );
 
 // ── Schicht beginnen ──────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ export function SchichtBeginnenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<BeginnWerte>
+      <Feld<BeginnWerte>
         name="einheit_id"
         label="Einheit"
         rules={[{ required: true, message: 'Bitte eine Einheit auswählen' }]}
@@ -182,14 +182,14 @@ export function SchichtBeginnenDialog({
           options={einheiten}
           notFoundContent="Alle Einheiten haben bereits eine laufende Schicht"
         />
-      </Form.Item>
-      <Form.Item<BeginnWerte> name="beginn" label="Im Einsatz seit">
+      </Feld>
+      <Feld<BeginnWerte> name="beginn" label="Im Einsatz seit">
         <ZeitpunktEingabe
           art="ereignis"
           placeholder={beginnPlatzhalter}
           style={{ width: '100%' }}
         />
-      </Form.Item>
+      </Feld>
       {/* Vor der Wahl der Einheit gibt es keinen Abschnitt, dessen Vorgabe gälte, und keine
           Pflicht (LFH-948). Rangfolge wie im Server: Abschnitt vor Einsatz (LLH-1122). Ohne
           beide zeigt die Pflichtmarke, dass ein Wert fehlt. */}
@@ -359,7 +359,6 @@ function BesatzungFelder({
   verteilung,
   pflicht,
 }: BesatzungFelderProps) {
-  const { token } = theme.useToken();
   const ids = (Form.useWatch('besatzung_ids', form) as number[] | undefined) ?? [];
   const werte = Form.useWatch('verteilung', form) as Verteilung | undefined;
   const name = new Map(personen.map((p) => [p.value, p.name]));
@@ -380,7 +379,7 @@ function BesatzungFelder({
             ? bisherigeBesatzung.join(', ')
             : 'keine'}
       </Typography.Paragraph>
-      <Form.Item<BesatzungWerte>
+      <Feld<BesatzungWerte>
         name="besatzung_ids"
         label="Neue Besatzung"
         rules={pflicht ? [{ required: true, message: 'Bitte die neue Besatzung auswählen' }] : []}
@@ -392,7 +391,7 @@ function BesatzungFelder({
           placeholder={pflicht ? 'Personen auswählen…' : 'keine geplant'}
           options={personen}
         />
-      </Form.Item>
+      </Feld>
       {schicht && verteilung && ids.length > 0 && (
         <Collapse
           ghost
@@ -405,31 +404,34 @@ function BesatzungFelder({
               children: ids.map((id) => {
                 const person = name.get(id) ?? String(id);
                 return (
-                  <Form.Item key={id} label={person} style={{ marginBottom: token.marginSM }}>
-                    <div style={{ display: 'flex', gap: token.marginSM }}>
+                  <Feld key={id} label={person}>
+                    {/* Je Auswahl eine wachsende Spalte: beide teilen sich die Zeile. */}
+                    <Stapel richtung="zeile" abstand="sm">
                       {verteilung.einheiten.length > 1 && (
-                        <Form.Item name={['verteilung', String(id), 'einheit_id']} noStyle>
-                          <Select
-                            aria-label={`Einheit für ${person}`}
-                            placeholder={schicht.einheit_name}
-                            options={verteilung.einheiten}
-                            style={{ flex: 1, minWidth: 0 }}
-                          />
-                        </Form.Item>
+                        <Stapel wachsen>
+                          <Feld name={['verteilung', String(id), 'einheit_id']} noStyle>
+                            <Select
+                              aria-label={`Einheit für ${person}`}
+                              placeholder={schicht.einheit_name}
+                              options={verteilung.einheiten}
+                            />
+                          </Feld>
+                        </Stapel>
                       )}
                       {verteilung.fahrzeuge.length > 0 && (
-                        <Form.Item name={['verteilung', String(id), 'fahrzeug_id']} noStyle>
-                          <Select
-                            aria-label={`Fahrzeug für ${person}`}
-                            allowClear
-                            placeholder="Fahrzeug wie bisher"
-                            options={verteilung.fahrzeuge}
-                            style={{ flex: 1, minWidth: 0 }}
-                          />
-                        </Form.Item>
+                        <Stapel wachsen>
+                          <Feld name={['verteilung', String(id), 'fahrzeug_id']} noStyle>
+                            <Select
+                              aria-label={`Fahrzeug für ${person}`}
+                              allowClear
+                              placeholder="Fahrzeug wie bisher"
+                              options={verteilung.fahrzeuge}
+                            />
+                          </Feld>
+                        </Stapel>
                       )}
-                    </div>
-                  </Form.Item>
+                    </Stapel>
+                  </Feld>
                 );
               }),
             },
@@ -604,7 +606,7 @@ export function VollzugDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<VollzugWerte> name="art" label="Art">
+      <Feld<VollzugWerte> name="art" label="Art">
         <SegmentFeld<VollzugArt>
           beschriftung="Art"
           onWahl={() => setArtGewaehlt(true)}
@@ -615,7 +617,7 @@ export function VollzugDialog({
             gesperrt: o.value === 'besatzung' ? besatzungGesperrt : undefined,
           }))}
         />
-      </Form.Item>
+      </Feld>
       {artGrund != null && (
         <Typography.Text type="secondary" id={artGrundId} data-lfh="vollzug-besatzung-gesperrt">
           {artGrund}
@@ -639,7 +641,7 @@ export function VollzugDialog({
         />
       ) : (
         <>
-          <Form.Item<VollzugWerte> name="abloeser_ids" label="Ablösende Einheiten">
+          <Feld<VollzugWerte> name="abloeser_ids" label="Ablösende Einheiten">
             <Select
               mode="multiple"
               allowClear
@@ -648,7 +650,7 @@ export function VollzugDialog({
               aria-describedby={einheitenGesperrt != null ? abloeserGrundId : undefined}
               options={einheiten}
             />
-          </Form.Item>
+          </Feld>
           {einheitenGesperrt != null && (
             <Typography.Text
               type="secondary"
@@ -660,32 +662,32 @@ export function VollzugDialog({
           )}
         </>
       )}
-      <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt">
+      <Feld<VollzugWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
-      </Form.Item>
+      </Feld>
       {art === 'einheit' && (
         <>
           {abschnittName != null && (
-            <Form.Item<VollzugWerte> name="abschnitt_uebergeben" valuePropName="checked">
+            <Feld<VollzugWerte> name="abschnitt_uebergeben" valuePropName="checked">
               <Checkbox
                 disabled={uebergabeGesperrt != null}
                 aria-describedby={uebergabeGesperrt != null ? grundId : undefined}
               >
                 Abschnitt übergeben ({abschnittName})
               </Checkbox>
-            </Form.Item>
+            </Feld>
           )}
           {abschnittName != null && uebergabeGesperrt != null && (
             <Typography.Text type="secondary" id={grundId} data-lfh="vollzug-uebergabe-gesperrt">
               {uebergabeGesperrt}
             </Typography.Text>
           )}
-          <Form.Item<VollzugWerte> name="verbleib" label="Danach">
+          <Feld<VollzugWerte> name="verbleib" label="Danach">
             <Select
               aria-describedby={raumGesperrt != null ? raumGrundId : undefined}
               options={verbleibOptionen(raeume, raumGesperrt != null)}
             />
-          </Form.Item>
+          </Feld>
           {raumGesperrt != null && (
             <Typography.Text type="secondary" id={raumGrundId} data-lfh="vollzug-raum-gesperrt">
               {raumGesperrt}
@@ -814,7 +816,7 @@ export function AbloeserDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<AbloeserWerte> name="art" label="Art">
+      <Feld<AbloeserWerte> name="art" label="Art">
         <SegmentFeld<AbloesungArt>
           beschriftung="Art"
           beschreibungId={artGrund != null ? artGrundId : gesperrt ? abloeserGrundId : undefined}
@@ -824,7 +826,7 @@ export function AbloeserDialog({
             gesperrt: o.value === 'besatzung' ? besatzungGesperrt : undefined,
           }))}
         />
-      </Form.Item>
+      </Feld>
       {artGrund != null && (
         <Typography.Text type="secondary" id={artGrundId} data-lfh="planung-besatzung-gesperrt">
           {artGrund}
@@ -841,7 +843,7 @@ export function AbloeserDialog({
         />
       ) : (
         <>
-          <Form.Item<AbloeserWerte> name="abloeser_ids" label="Ablösende Einheiten">
+          <Feld<AbloeserWerte> name="abloeser_ids" label="Ablösende Einheiten">
             <Select
               mode="multiple"
               allowClear
@@ -850,7 +852,7 @@ export function AbloeserDialog({
               aria-describedby={einheitenGesperrt != null ? abloeserGrundId : undefined}
               options={einheiten}
             />
-          </Form.Item>
+          </Feld>
           {einheitenGesperrt != null && (
             <Typography.Text
               type="secondary"

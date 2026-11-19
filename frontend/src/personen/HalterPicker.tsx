@@ -116,7 +116,6 @@ export default function HalterPicker({ einsatzId, id, value = null, onChange }: 
       id={id}
       allowClear
       placeholder="Betroffene Person (R-Nr.) oder externer Kontakt …"
-      style={{ width: '100%' }}
       value={aktuellerKey}
       // Anzeige-Label aus dem Wert ableiten (extern hat keine bleibende Option nach Such-Reset).
       labelRender={() => aktuellesLabel ?? ''}
