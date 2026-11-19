@@ -66,8 +66,8 @@ fn bereinige(feld: Option<String>) -> Option<String> {
 
 /// POST /api/einsaetze/{id}/etb — neuen ETB-Eintrag erfassen.
 /// Nur Erfassungsberechtigte (Einsatzleitung/Führungspersonal; die Mitarbeit nur Meldung, Lage
-/// und eigene Berichtigungen, LLH-1817), nur bei aktivem Einsatz. Der Server vergibt `lfd_nr` und `received_at` und broadcastet den
-/// fertigen Eintrag an alle SSE-Abonnenten.
+/// und eigene Berichtigungen, LLH-1817), nur bei aktivem Einsatz. Der Server vergibt `lfd_nr`
+/// und `received_at` und broadcastet den fertigen Eintrag an alle SSE-Abonnenten.
 pub async fn erfassen(
     State(state): State<AppState>,
     ctx: EinsatzErfassungsfreigabe<Etb>,

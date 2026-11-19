@@ -30,8 +30,9 @@ async fn fordere_hochladende_bei_ungebunden(
 }
 
 /// Die Mitarbeit löscht nur selbst hochgeladene Anhänge — in jedem Linker-Zustand, auch wenn der
-/// Anhang an einer fremden Chat-Nachricht hängt (Design `2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit`,
-/// D4). Fremde bekommen 404 wie für einen unbekannten Anhang. Andere Rollen bleiben unberührt.
+/// Anhang an einer fremden Chat-Nachricht hängt (Design
+/// `2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit`, D4). Fremde bekommen 404 wie für einen
+/// unbekannten Anhang. Andere Rollen bleiben unberührt.
 async fn fordere_hochladende_bei_mitarbeit(
     pool: &sqlx::SqlitePool,
     rolle: Option<crate::einsatz::EinsatzRolle>,

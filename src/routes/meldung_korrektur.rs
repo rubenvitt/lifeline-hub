@@ -122,9 +122,10 @@ impl MeldungAenderung {
 }
 
 /// PATCH /api/einsaetze/{id}/meldungen/{mid} — Art, Priorität, Richtung, Von-Bezug, Empfänger,
-/// Empfängerfunktion und Lage-Angaben korrigieren (Erfassungsrecht, Freigabe Meldungen, aktiver Einsatz). Fremde
-/// Meldung 404. Gekoppelte Geräte erreichen die Route nicht (keine Routenliste, D10). Antwortet
-/// mit dem Stand; ohne wirksame Änderung ohne ETB-Eintrag und ohne Live-Ereignis.
+/// Empfängerfunktion und Lage-Angaben korrigieren (Erfassungsrecht, Freigabe Meldungen,
+/// aktiver Einsatz). Fremde Meldung 404. Gekoppelte Geräte erreichen die Route nicht (keine
+/// Routenliste, D10). Antwortet mit dem Stand; ohne wirksame Änderung ohne ETB-Eintrag und ohne
+/// Live-Ereignis.
 pub async fn korrigieren(
     State(state): State<AppState>,
     ctx: EinsatzErfassungszugriff<Meldungen>,

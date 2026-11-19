@@ -672,12 +672,14 @@ sie stehen nur dort.
   `docs/superpowers/specs/2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit-design.md` (D3); ein
   Handler kommt erst dazu, wenn dieses Dokument es nennt. Ein bloßes Lockern am Handler ist keine
   Entscheidung.
-- **`darf_schreiben()` bleibt für Mitarbeit falsch.** Jeder Weg, der Schreibrecht prüft
-  (Benachrichtigungen, Zuweisungen, Auflösung von Funktionen), schließt sie damit aus; nur das
+- **Weil `darf_schreiben()` für Mitarbeit falsch bleibt**, schließt jeder Weg, der Schreibrecht
+  prüft (Benachrichtigungen, Zuweisungen, Auflösung von Funktionen), sie aus; nur das
   Erfassungs-Gate lässt sie ein.
 - **Eigen-Prüfungen stehen im Handler, direkt nach dem Gate** (nur eigene Meldung, Typ des
   ETB-Eintrags, nur eigene Anhänge); für Einsatzleitung und Führungspersonal ändern sie nichts.
-  Fremdes Objekt 404, verbotene Handlung am eigenen 403 („Statuscode-Konvention“).
+  Statuscodes (design.md D3): Meldung korrigieren und Anhang löschen an fremdem Objekt 404;
+  ETB-Berichtigung eines fremden Eintrags und ein fremder Anhang in `anhang_ids` 403, ebenso
+  jede verbotene Handlung am eigenen Objekt (Lagemeldung, ETB-Typ, Meldung in der Lage).
 - **Am Spiegel gilt die Positivliste für Anträge** (`instanz/spiegel/antrag.rs`): nur ETB-Eintrag
   und Meldung; die führende Instanz prüft dieselben Regeln neu.
 
