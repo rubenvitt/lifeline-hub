@@ -144,7 +144,7 @@ MUST die Meldung beim Text der Benachrichtigung bleiben.
 ### Requirement: Schalter je Gerät
 
 Die Seite „Benachrichtigungen“ SHALL einen Schalter für Push auf diesem Gerät zeigen, wenn der
-Server Push anbietet und der Browser es kann. In der Desktop-App MUST der Schalter fehlen.
+Server Push anbietet und der Browser es kann. In jeder App-Hülle (Desktop-App und iOS-App) MUST der Schalter fehlen.
 Hat der Nutzer Push eingeschaltet, MUST das Frontend das Abo nach einer neuen Anmeldung auf
 diesem Gerät von selbst wieder anmelden.
 
@@ -154,6 +154,10 @@ diesem Gerät von selbst wieder anmelden.
 
 #### Scenario: iPhone im Browser
 - **WHEN** Person A die Seite in Safari auf dem iPhone öffnet, ohne die App installiert zu haben
+- **THEN** zeigt die Seite keinen Push-Schalter
+
+#### Scenario: iOS-App
+- **WHEN** Person A die Seite „Benachrichtigungen“ in der iOS-App öffnet
 - **THEN** zeigt die Seite keinen Push-Schalter
 
 ### Requirement: Ein gekoppelter ELW pusht über den Hub

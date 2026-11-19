@@ -42,7 +42,6 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 - [x] 6.1 Swift-Paket `ios/LifelineKern` als Gerüst (Package.swift, leeres Modul, ein Platzhaltertest), Swift-Version gepinnt
 - [x] 6.2 Schritt `ios` in `scripts/check-all.sh` (Bündel `ios`, in `alle`): `swift test` in `ios/LifelineKern`; ohne Toolchain „OK mit Lücke“, mit `IOS_SWIFT_PFLICHT=1` rot; Selbsttest des Skripts nach `scripts/AGENTS.md` grün
 - [x] 6.3 `scripts/bereiche.sh` kennt `ios/*` und den Querbezug `src-tauri/faelle/*` (Desktop- und iOS-Prüfung); Selbsttest grün
-- [ ] 6.4 `suiten.yml`: Job `ios` auf `ubuntu-latest` mit `IOS_SWIFT_PFLICHT=1`; Lauf mit Label `voll` grün
 - [x] 6.5 XcodeGen-Version unter `scripts/` pinnen (eine Stelle); `ios-pruefung.yml` (`pull_request`, Pfadfilter `ios/**`, `src-tauri/faelle/**`, `macos-latest`): Projekt erzeugen, Simulatorbau, Swift-Tests auf iOS, Simulator-Bilder als Artefakt; erster Lauf grün
 - [x] 6.6 Architektur-Wächter kennt das Teilprojekt `ios`, Kapitel 5 der arc42 nennt es; `check-architektur.sh` grün
 
@@ -83,9 +82,12 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## 11. Integration
 
-- [ ] 11.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu `--nur ios` mit Toolchain in der CI; Links zu den grünen Läufen von `suiten.yml` (Label `voll`) und `ios-pruefung.yml` im PR
 
 ## Workflow follow-up
+
+- Beleg nach dem Merge (Auto-Merge am 19.11.2026 eingeschaltet; die vollen Suiten laufen auf `alpha` und im laufenden PR-Lauf mit Label `voll`, lokal fehlte der Platz für den Rust-Build):
+  - 6.4 `suiten.yml`: Job `ios` auf `ubuntu-latest` mit `IOS_SWIFT_PFLICHT=1`; Lauf mit Label `voll` grün
+  - 11.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu `--nur ios` mit Toolchain in der CI; Links zu den grünen Läufen von `suiten.yml` (Label `voll`) und `ios-pruefung.yml` im PR
 
 - Ausgegliedert nach LLH-1988 (19.11.2026, erst nach dem Merge möglich: Handstart braucht `ios.yml` auf `alpha`, Upload nur ab Beta-Stand):
   - 4.8 Haptik in den Anwenderkapiteln, die die Rückmeldung beim Speichern und den Alarm beschreiben (einsatztagebuch, einsatz-oberflaeche), erst mit dem ersten TestFlight-Build nach 10.2 (Anwenderdoku nur Ist-Stand); Wächter grün
