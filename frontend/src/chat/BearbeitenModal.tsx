@@ -4,6 +4,7 @@ import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { useEffect } from 'react';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import type { ChatNachricht } from '../api/types';
+import { Feld } from '../components/instrument';
 
 interface FormWerte {
   inhalt: string;
@@ -54,7 +55,7 @@ export default function BearbeitenModal({
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}
     >
-      <Form.Item
+      <Feld
         label="Text"
         name="inhalt"
         rules={[
@@ -66,7 +67,7 @@ export default function BearbeitenModal({
           autoSize={{ minRows: 2, maxRows: 6 }}
           count={zeichenGrenze(ETB_INHALT_MAX)}
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

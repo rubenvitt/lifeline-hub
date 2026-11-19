@@ -56,8 +56,6 @@ export const SCHULD: Readonly<Record<string, number>> = {
   'geraet/KopplungBeendetPage.tsx': 1,
   'kraefte/FmsTableau.tsx': 2,
   'kraefte/KraeftebaumZelle.tsx': 2,
-  'meldungen/MeldungKarte.tsx': 5,
-  'nachforderungen/NachforderungKarte.tsx': 11,
   'neuigkeiten/NeuigkeitenPage.tsx': 1,
   'pages/AppAnmeldungPage.tsx': 1,
   'pages/EinsaetzePage.css': 1,

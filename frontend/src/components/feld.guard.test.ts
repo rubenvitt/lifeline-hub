@@ -59,6 +59,7 @@ const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = 
     anzahl: 2,
     grund: 'Spaltenbreiten der Benutzertabelle neben ihrer Fließspalte',
   },
+  'chat/KanalListe.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
 };
 
 const FORM_ITEM = /<Form\.Item\b/g;
