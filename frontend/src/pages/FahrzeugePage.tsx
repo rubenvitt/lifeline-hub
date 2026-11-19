@@ -34,7 +34,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } 
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { monoStil, Segmentleiste } from '../components/instrument';
+import { Knopfreihe, monoStil, Segmentleiste } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   parseFahrzeugeAnsicht,
@@ -1564,7 +1564,7 @@ function FahrzeugeInhalt() {
         }}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureStorno()) setStornoFuer(null);
@@ -1582,7 +1582,7 @@ function FahrzeugeInhalt() {
             >
               Stornieren
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Das Fahrzeug erscheint danach in keiner Liste und keinem Nachweis.

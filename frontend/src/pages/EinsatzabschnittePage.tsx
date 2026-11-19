@@ -40,7 +40,14 @@ import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Augenbraue, Paneel, Segmentleiste, monoStil, useRollen } from '../components/instrument';
+import {
+  Augenbraue,
+  Knopfreihe,
+  Paneel,
+  Segmentleiste,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, einheitenImAbschnitt } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
@@ -1104,7 +1111,7 @@ export default function EinsatzabschnittePage() {
         afterClose={focusAbschnitt}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureAufloesen()) setAufloesenFuer(null);
@@ -1123,7 +1130,7 @@ export default function EinsatzabschnittePage() {
             >
               Abschnitt auflösen
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.

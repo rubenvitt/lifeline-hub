@@ -10,7 +10,8 @@
  * Raster (Muster `ZeichenHierDialog`).
  */
 import { useState } from 'react';
-import { Button, Modal, Space } from 'antd';
+import { Button, Modal } from 'antd';
+import Knopfreihe from '../../components/instrument/Knopfreihe';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
 import { START_ZEICHEN_SPEC } from './zeichenWahl';
@@ -38,7 +39,7 @@ export default function ZeichenWahlDialog({ offen, quelle, onPlatzieren, onAbbre
       onCancel={onAbbrechen}
       destroyOnHidden
       footer={
-        <Space>
+        <Knopfreihe fuss>
           <Button onClick={onAbbrechen}>Abbrechen</Button>
           {/* Ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl) gesperrt. */}
           <Button
@@ -50,7 +51,7 @@ export default function ZeichenWahlDialog({ offen, quelle, onPlatzieren, onAbbre
           >
             Platzieren
           </Button>
-        </Space>
+        </Knopfreihe>
       }
     >
       {/* Enter im Picker nimmt denselben Weg wie der Knopf — mit der mitgebrachten Spec, weil

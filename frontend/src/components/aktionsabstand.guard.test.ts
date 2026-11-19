@@ -57,7 +57,6 @@ const MIT_NACHBARSCHAFT = [
   'stammdaten/KatalogVerwaltung.tsx',
   // Fuß der Rückfrage „Abschnitt … auflösen?“: Abbrechen neben dem roten „Abschnitt auflösen“
   // (LFH-1212); „Auflösen“ selbst steht im Menü „Weitere Aktionen“.
-  'pages/EinsatzabschnittePage.tsx',
   // Dokumentenablage (LFH-656): „Bearbeiten“ neben „Entfernen“ (`danger`) in der Aktionsspalte.
   // Im Kartenzweig steht Entfernen im Menü; dessen Trenner prüft `Datensicht`.
   'pages/DokumentePage.tsx',
@@ -79,7 +78,6 @@ const MIT_NACHBARSCHAFT = [
   // ── Fuß der Erfassungs-Hülle (LFH-653) ───────────────────────────────────
   // Der Primärknopf trägt `danger={unumkehrbar}` und steht neben „Abbrechen" (und im Serienmodus
   // „Speichern und nächste"). Der Fuß jeder Erfassungsmaske hängt an dieser einen Reihe.
-  'components/Erfassung.tsx',
   // ── Übernahme einer unangemeldeten Einheit (LLH-1075) ───────────────────
   // „Übernehmen“ neben dem roten „Abweisen“, in der Einheit-Ansicht und an der Meldung.
   'pages/einheit/EinheitUebernahme.tsx',

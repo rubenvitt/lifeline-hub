@@ -80,7 +80,7 @@ import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
 import MaterialAusgabeModal, { type AusgabeModus } from '../kraefte/MaterialAusgabeModal';
 import MaterialMengeModal from '../kraefte/MaterialMengeModal';
 import MaterialAdhocDialog from '../kraefte/MaterialAdhocDialog';
-import { Segmentleiste } from '../components/instrument';
+import { Knopfreihe, Segmentleiste } from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus } from '../theme/statusFarben';
@@ -1222,7 +1222,7 @@ function MaterialInhalt() {
         }}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureStorno()) setStornoFuer(null);
@@ -1240,7 +1240,7 @@ function MaterialInhalt() {
             >
               Stornieren
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Das Material erscheint danach in keiner Liste und keinem Nachweis.
