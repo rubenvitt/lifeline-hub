@@ -2,7 +2,7 @@
 titel: Rechte im Einsatz
 gruppen: [fuehrung, administration]
 reihenfolge: 40
-quellen: [src/einsatz/berechtigung.rs, frontend/src/einsatz/rollenVokabular.ts, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs, src/fuehrung/aufloesung.rs, src/benachrichtigung/aufloesung.rs, src/einsatz/funktion.rs, frontend/src/fuehrung/besetzungAusMitgliedern.ts]
+quellen: [src/einsatz/berechtigung.rs, frontend/src/einsatz/rollenVokabular.ts, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs, src/fuehrung/aufloesung.rs, src/benachrichtigung/aufloesung.rs, src/einsatz/funktion.rs, frontend/src/fuehrung/besetzungAusMitgliedern.ts, frontend/src/einsatz/sackgasse.ts, frontend/src/einsatz/ModulGesperrt.tsx]
 ---
 
 ## Überblick
@@ -125,6 +125,22 @@ entfernt ihn als Mitglied.
   diesem Einsatz.
 
 Wo ein Recht fehlt, steht die Seite auf „Nur Ansicht“ und nennt, wer schreiben darf.
+
+### Wenn der Zugriff fehlt
+
+Die App sagt an jeder Stelle, wer den Zugriff vergibt:
+
+- Ist man in keinem Einsatz Mitglied, steht in der Einsatzliste unter „Keine Einsätze“: „Zu einem
+  Einsatz nimmt dich dessen Einsatzleitung auf.“
+- Öffnet man einen Einsatz über einen Link, ohne Mitglied zu sein, steht dort „Kein Zugriff auf
+  diesen Einsatz · Zugriff vergibt die Einsatzleitung dieses Einsatzes.“ Einen Namen nennt die
+  Seite hier nicht, weil die Person den Einsatz nicht sehen darf. Der einzige Knopf führt zur
+  Einsatzliste.
+- Ist die Lesefrist nach dem Abschluss oder die Aufbewahrungsfrist abgelaufen, steht dort
+  „Einsatz nicht mehr einsehbar“ mit dem Grund.
+- Ist ein Modul für die eigene Rolle gesperrt oder ausgeblendet, nennt der Hinweis die
+  Einsatzleitung mit Namen: „Freigabe erteilt die Einsatzleitung: …“. Wer die Modulfreigaben
+  selbst verwaltet, sieht stattdessen „Modulfreigaben öffnen“.
 
 ### Abgeschlossener Einsatz
 

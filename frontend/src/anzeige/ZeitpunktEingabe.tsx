@@ -33,7 +33,7 @@ import {
   type RefObject,
   type Ref,
 } from 'react';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, Stapel, useRollen } from '../components/instrument';
 import { useViewport, type AbBreitePunkt } from '../components/useViewport';
 import { IconKalender } from '../icons';
 import { serverJetzt } from '../offline/serveruhr';
@@ -345,7 +345,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
       id={hinweisId}
       aria-live="polite"
       style={{
-        ...(grund ? {} : monoStil(12)),
+        ...(grund ? {} : monoStil('monoKlein')),
         color: grund ? rollen.alarmText : rollen.gedaempft,
       }}
     >
@@ -398,11 +398,11 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         value={text ?? anzeige}
         prefix={
           z.zonenHinweis ? (
-            <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{z.zonenHinweis}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{z.zonenHinweis}</span>
           ) : undefined
         }
         suffix={suffix}
-        style={{ ...monoStil(14) }}
+        style={{ ...monoStil('monoGross') }}
         onFocus={(e) => {
           e.target.select();
           onFocus?.(e);
@@ -470,10 +470,11 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
 
   if (!schnellwahl) return feld;
   return (
-    <Space direction="vertical" size="small" style={{ width: style?.width }}>
+    // `start`: Feld und Knöpfe behalten ihre Breite; die Breite des Felds kommt über `style`.
+    <Stapel abstand="xs" ausrichten="start">
       {feld}
       <ZeitSchnellwahlKnoepfe art={art} disabled={disabled} onWahl={ausWahl} />
-    </Space>
+    </Stapel>
   );
 }
 

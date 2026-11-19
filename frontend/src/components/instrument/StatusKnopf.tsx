@@ -104,7 +104,7 @@ export const StatusKnopf = forwardRef<HTMLButtonElement, StatusKnopfProps>(funct
           ...style,
         }}
       >
-        <span style={{ ...monoStil(40, 500), letterSpacing: '-0.02em', lineHeight: 1 }}>
+        <span style={{ ...monoStil('datenwertGross'), letterSpacing: '-0.02em', lineHeight: 1 }}>
           {code ?? '—'}
         </span>
         <span
@@ -144,7 +144,7 @@ export const StatusKnopf = forwardRef<HTMLButtonElement, StatusKnopfProps>(funct
     >
       {zeichen}
       {punkt}
-      {code != null && <span style={monoStil(14, 500)}>{code}</span>}
+      {code != null && <span style={monoStil('monoGross', 500)}>{code}</span>}
       <span>{wort}</span>
       {pfeil}
     </Button>
@@ -186,7 +186,7 @@ export function StatusBlock({
         boxSizing: 'border-box',
       }}
     >
-      <span style={{ ...monoStil(40, 500), letterSpacing: '-0.02em', lineHeight: 1 }}>
+      <span style={{ ...monoStil('datenwertGross'), letterSpacing: '-0.02em', lineHeight: 1 }}>
         {code ?? '—'}
       </span>
       <span

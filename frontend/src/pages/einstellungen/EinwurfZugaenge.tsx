@@ -166,14 +166,18 @@ function AdresseDialog({
             <KopierbarerText text={adresse} bezeichnung="Adresse">
               <span
                 data-lfh="einwurf-adresse-text"
-                style={{ ...monoStil(13, 500), wordBreak: 'break-all' }}
+                style={{ ...monoStil('mono', 500), wordBreak: 'break-all' }}
               >
                 {adresse}
               </span>
             </KopierbarerText>
             <KopierbarerText text={neu.schluessel} bezeichnung="Schlüssel">
               <span
-                style={{ ...monoStil(12, 500), color: rollen.gedaempft, wordBreak: 'break-all' }}
+                style={{
+                  ...monoStil('monoKlein', 500),
+                  color: rollen.gedaempft,
+                  wordBreak: 'break-all',
+                }}
               >
                 {neu.schluessel}
               </span>
@@ -501,7 +505,7 @@ export default function EinwurfZugaenge() {
               {EINWURF_ZWECKE.map((s) => (
                 <Radio key={s} value={s}>
                   {SCOPE_TEXT[s]}{' '}
-                  <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+                  <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{s}</span>
                 </Radio>
               ))}
             </Stapel>

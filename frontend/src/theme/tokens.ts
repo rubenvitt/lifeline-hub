@@ -847,8 +847,17 @@ export const schriftskala = {
   augenbraue: { groesse: 10, gewicht: 600, familie: 'text', sperrung: '0.14em', versal: true },
   /** Etikett unter dem Rail-Icon: 9 px Versalien. */
   railEtikett: { groesse: 9, gewicht: 500, familie: 'text', sperrung: '0.06em', versal: true },
+  /** Kleine Mono-Meta: Unterzeilen wie „Stand“, der Weg in der Zeitachse (LLH-1972). */
+  metaKlein: { groesse: 10, gewicht: 400, familie: 'zahl' },
   /** Mono-Meta: Zeiten, Nummern, Zähler neben Text. */
   meta: { groesse: 11, gewicht: 400, familie: 'zahl' },
+  /** Mono neben `textKlein`: Zähler und Zeiten in dichten Zeilen (LLH-1972). */
+  monoKlein: { groesse: 12, gewicht: 400, familie: 'zahl' },
+  /** Mono neben `text`: Funkrufname, PAT, „seit …“. JetBrains Mono 13 steht optisch wie
+   *  Archivo 14 — die einzige 13-px-Stufe (LLH-1972). */
+  mono: { groesse: 13, gewicht: 400, familie: 'zahl' },
+  /** Große Mono: Kennungen (Schaden-Nr., Registriernummer), Code-Eingaben (LLH-1972). */
+  monoGross: { groesse: 14, gewicht: 400, familie: 'zahl' },
   /** Datenwert in Paneelzeilen und Kennzahlenbändern. */
   datenwertKlein: { groesse: 22, gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
   /** Datenwert einer Kennzahl-Kachel. */

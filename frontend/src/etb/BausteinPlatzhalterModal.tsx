@@ -1,8 +1,9 @@
 // src/etb/BausteinPlatzhalterModal.tsx
-import { Button, Form, Input, Modal, Space, theme } from 'antd';
+import { Button, Form, Input, Modal } from 'antd';
 import { useEffect } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { EtbBaustein, EinsatzAnzeige } from '../api/types';
+import { Feld, Stapel } from '../components/instrument';
 import { ermittlePlatzhalter, setzeBausteinEin, type BausteinFelder } from './bausteinEinsetzen';
 
 interface Props {
@@ -21,7 +22,6 @@ export default function BausteinPlatzhalterModal({
   onEinsetzen,
   onAbbrechenAll,
 }: Props) {
-  const { token } = theme.useToken();
   const [form] = Form.useForm<Record<string, string>>();
   // `{datum}`/`{uhrzeit}` in der Anzeigezone (LFH-692) und der wirksamen Darstellung (LLH-1061).
   const { konventionen } = useAnzeigeKonventionen();
@@ -63,16 +63,19 @@ export default function BausteinPlatzhalterModal({
       destroyOnHidden
     >
       <Form<Record<string, string>> form={form} layout="vertical" onFinish={anwenden}>
-        <Space orientation="vertical" style={{ width: '100%' }}>
+        <Stapel abstand="xs">
           {offenePlatzhalter.map((name, index) => (
-            <Form.Item key={name} name={name} label={name} style={{ marginBottom: token.marginSM }}>
+            <Feld key={name} name={name} label={name}>
               <Input aria-label={name} autoFocus={index === 0} />
-            </Form.Item>
+            </Feld>
           ))}
-          <Button type="primary" htmlType="submit">
-            Einsetzen
-          </Button>
-        </Space>
+          {/* Eigene Hülle: im Stapel würde der Knopf sonst auf die ganze Breite gestreckt. */}
+          <div>
+            <Button type="primary" htmlType="submit">
+              Einsetzen
+            </Button>
+          </div>
+        </Stapel>
       </Form>
     </Modal>
   );

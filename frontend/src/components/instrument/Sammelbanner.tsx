@@ -89,7 +89,10 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
           <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
             <IconPfeilRunter />
           </span>
-          <span data-lfh="sammelbanner-kurz" style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
+          <span
+            data-lfh="sammelbanner-kurz"
+            style={{ ...monoStil('monoKlein'), whiteSpace: 'nowrap' }}
+          >
             {kurz}
           </span>
         </Button>
@@ -123,7 +126,7 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
         <Button
           type="link"
           onClick={aktion.onKlick}
-          style={{ ...monoStil(11), paddingInline: token.paddingXS }}
+          style={{ ...monoStil('meta'), paddingInline: token.paddingXS }}
         >
           {aktion.label}
         </Button>

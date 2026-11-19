@@ -2,7 +2,7 @@ import { IconLupe } from '../icons';
 import type { CSSProperties } from 'react';
 import { Button, theme } from 'antd';
 import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
-import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schriftskala } from '../theme/tokens';
 import Tastenkuerzel from './Tastenkuerzel';
 import { useViewport } from './useViewport';
 import './CommandPaletteTrigger.css';
@@ -61,7 +61,7 @@ export function suchfeldStil(token: {
     background: rahmenFarben.feld,
     border: `1px solid ${farbenDunkel.linieStark}`,
     color: rahmenFarben.gedaempft,
-    fontSize: 13,
+    fontSize: schriftskala.textKlein.groesse,
     textAlign: 'left',
     boxShadow: 'none',
   };

@@ -376,7 +376,7 @@ export default function BenutzerPage() {
       mindestBreite: 160,
       abBreite: 'md',
       // Kennung in Mono.
-      render: (t) => <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>@{t}</span>,
+      render: (t) => <span style={{ ...monoStil('mono'), overflowWrap: 'anywhere' }}>@{t}</span>,
     },
     {
       title: 'Rollen',

@@ -299,9 +299,9 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
       knapp ? 0 : 1,
     );
     // Knapp in einer Zeile: ein langer Benutzername endet mit „…“ und steht ganz im Titel.
-    const name = within(kopf).getByText(`@${benutzer.benutzername}`);
-    expect(name.style.whiteSpace).toBe(knapp ? 'nowrap' : '');
-    expect(name.getAttribute('title')).toBe(knapp ? `@${benutzer.benutzername}` : null);
+    const zeile = within(kopf).getByText(`@${benutzer.benutzername}`).parentElement!;
+    expect(zeile.style.whiteSpace).toBe(knapp ? 'nowrap' : '');
+    expect(zeile.getAttribute('title')).toBe(knapp ? `@${benutzer.benutzername}` : null);
   });
 
   it('der Menükopf nennt die Funktion auch unter xl', async () => {

@@ -307,7 +307,7 @@ export default function ProfilPage() {
                             background: rollen.flaeche2,
                             padding: token.padding,
                             borderRadius: 0,
-                            ...monoStil(13),
+                            ...monoStil('mono'),
                             marginBottom: token.marginSM,
                             whiteSpace: 'pre-wrap',
                           }}

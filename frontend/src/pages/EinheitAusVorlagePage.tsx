@@ -24,7 +24,13 @@ import { Paneel, monoStil, useRollen, zielEinzug } from '../components/instrumen
 import type { PaneelUeberschrift } from '../components/instrument/Paneel';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
-import { SeitenFehler, SeitenSkeleton, nichtGefundenInhalt } from '../components/SeitenZustand';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+  nichtGefundenInhalt,
+} from '../components/SeitenZustand';
 import { RechteHinweis, ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
@@ -213,13 +219,24 @@ function EinheitAusVorlage({
       ]}
     />
   );
-  if (vorlageId == null || vorschauQuery.isError || !vorschau) {
+  // Eine Vorlage, die es nicht (mehr) gibt: unlesbare Kennung oder 404 (LLH-1960). Das Muster aus
+  // `SeitenNichtGefunden`, ohne „Erneut abrufen“; der Weg zu „Aus Vorlage“ beginnt in der Gliederung.
+  if (vorlageId == null || istNichtGefunden(vorschauQuery.error)) {
+    return (
+      <SeitenNichtGefunden
+        titel="Diese Vorlage gibt es nicht (mehr)"
+        rueckweg={{ label: 'Zur Gliederung', pfad: einheitenPfad(einsatzId) }}
+      />
+    );
+  }
+  if (vorschauQuery.isError || !vorschau) {
     return (
       <EinsatzSeite breadcrumb={breadcrumb} titel={titel} breite="schmal">
         <SeitenFehler
-          text="Vorlage nicht verfügbar"
+          text="Vorlage konnte nicht geladen werden"
           ursache={vorschauQuery.error}
-          onWiederholen={vorlageId == null ? undefined : () => void vorschauQuery.refetch()}
+          laedt={vorschauQuery.isFetching}
+          onWiederholen={() => void vorschauQuery.refetch()}
         />
       </EinsatzSeite>
     );
@@ -431,7 +448,7 @@ function Baum({
             meta={
               <span>
                 {k.typ_label}
-                {k.funkrufname && <span style={monoStil(12)}> · {k.funkrufname}</span>}
+                {k.funkrufname && <span style={monoStil('monoKlein')}> · {k.funkrufname}</span>}
               </span>
             }
             koerperPolster
@@ -453,7 +470,7 @@ function Baum({
                   onWahl={onWahl}
                   beschriftung={
                     <>
-                      <span style={monoStil(14)}>{f.funkrufname}</span>
+                      <span style={monoStil('monoGross')}>{f.funkrufname}</span>
                       {f.fahrzeugtyp && (
                         <Typography.Text type="secondary"> {f.fahrzeugtyp}</Typography.Text>
                       )}
@@ -624,7 +641,9 @@ function MaterialZeile({
         style={{ flex: '1 1 auto', minWidth: 0 }}
       >
         {position.menge}× {position.bezeichnung}
-        {position.bestandsnummer && <span style={monoStil(13)}> {position.bestandsnummer}</span>}
+        {position.bestandsnummer && (
+          <span style={monoStil('mono')}> {position.bestandsnummer}</span>
+        )}
       </Checkbox>
       <Typography.Text type="secondary" data-lfh="vorlage-zustand" style={{ whiteSpace: 'nowrap' }}>
         {materialZustandWort(position)}

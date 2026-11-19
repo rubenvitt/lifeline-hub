@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Flex, Form, Popconfirm, Spin, Typography, theme } from 'antd';
+import { Alert, Button, Checkbox, Form, Popconfirm, Spin, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -18,6 +18,7 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { Feld, Stapel } from '../../components/instrument';
 import { eingabeSchluessel } from './schichtplanZeilen';
 
 /**
@@ -187,7 +188,7 @@ export default function SchichtplanWechselDialog({
           {art === 'uhs' && (
             <>
               {kommen.length > 0 && (
-                <Form.Item<WechselWerte> name="kommen" label="Kommt">
+                <Feld<WechselWerte> name="kommen" label="Kommt">
                   <Checkbox.Group
                     style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
                     options={kommen.map((k) => ({
@@ -195,10 +196,10 @@ export default function SchichtplanWechselDialog({
                       label: `${k.person.name}${kommtZusatz(k.person)}`,
                     }))}
                   />
-                </Form.Item>
+                </Feld>
               )}
               {vorlage.gehen.length > 0 && (
-                <Form.Item<WechselWerte> name="gehen" label="Geht">
+                <Feld<WechselWerte> name="gehen" label="Geht">
                   <Checkbox.Group
                     style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
                     options={vorlage.gehen.flatMap((p) =>
@@ -207,7 +208,7 @@ export default function SchichtplanWechselDialog({
                         : [],
                     )}
                   />
-                </Form.Item>
+                </Feld>
               )}
               <Namen
                 titel="Bleibt"
@@ -252,7 +253,14 @@ export default function SchichtplanWechselDialog({
                 Vollzogen
               </Typography.Text>
               {vorlage.wechsel.map((w) => (
-                <Flex key={w.id} align="center" justify="space-between" gap={token.marginSM} wrap>
+                <Stapel
+                  key={w.id}
+                  richtung="zeile"
+                  umbruch
+                  abstand="sm"
+                  ausrichten="mitte"
+                  verteilen="between"
+                >
                   <Typography.Text>
                     {ART_WORT[w.art]} · {zeit(w.vollzogen_at)}
                   </Typography.Text>
@@ -264,7 +272,7 @@ export default function SchichtplanWechselDialog({
                   >
                     <Button loading={zurueckMut.isPending}>Zurücknehmen</Button>
                   </Popconfirm>
-                </Flex>
+                </Stapel>
               ))}
               {zurueckMut.error != null && (
                 <SpeicherFehler fehler={zurueckMut.error} titel="Nicht zurückgenommen" />

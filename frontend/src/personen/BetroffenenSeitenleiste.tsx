@@ -5,7 +5,10 @@ import {
   Aufgliederung,
   Paneel,
   PaneelZeile,
+  Stapel,
+  Textstufe,
   monoStil,
+  schriftStil,
   useRollen,
   type Segment,
 } from '../components/instrument';
@@ -122,13 +125,15 @@ export default function BetroffenenSeitenleiste({
             gap: token.margin,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: token.marginSM }}>
-            <span data-lfh="summe" style={{ ...monoStil(40, 500), lineHeight: 1 }}>
+          <Stapel richtung="zeile" ausrichten="baseline" abstand="sm">
+            <span data-lfh="summe" style={{ ...monoStil('datenwertGross'), lineHeight: 1 }}>
               {bild.gesamt}
             </span>
             {/* „gesamt“, nicht „erfasst“: „erfasst“ ist ein Personenstatus (LFH-963). */}
-            <span style={{ fontSize: 11, color: rollen.schwach }}>gesamt</span>
-          </div>
+            <Textstufe stufe="textKlein" ton="schwach">
+              gesamt
+            </Textstufe>
+          </Stapel>
           <Aufgliederung
             segmente={segmente}
             titel="Betroffene nach Sichtung"
@@ -148,10 +153,12 @@ export default function BetroffenenSeitenleiste({
             {SICHTUNGSBILD_REIHE.map((k) => (
               <li key={k} data-sichtung-zeile={k} style={zeile}>
                 <Farbfeld k={k} groesse={8} />
-                <span style={{ ...monoStil(12), color: rollen.text2, width: 72 }}>
+                <span style={{ ...monoStil('monoKlein'), color: rollen.text2, width: 72 }}>
                   {kuerzel(k)}
                 </span>
-                <span style={{ flex: 1, fontSize: 11, color: rollen.schwach }}>{SK_WORT[k]}</span>
+                <span style={{ flex: 1, ...schriftStil('textKlein'), color: rollen.schwach }}>
+                  {SK_WORT[k]}
+                </span>
                 <span style={{ ...monoStil(15), color: rollen.text }}>{bild.je[k]}</span>
               </li>
             ))}
@@ -172,13 +179,16 @@ export default function BetroffenenSeitenleiste({
                 }}
               >
                 <span
-                  style={{ fontSize: 12, color: v.offen ? rollen.achtungText : rollen.gedaempft }}
+                  style={{
+                    ...schriftStil('textKlein'),
+                    color: v.offen ? rollen.achtungText : rollen.gedaempft,
+                  }}
                 >
                   {v.label}
                 </span>
                 <span
                   style={{
-                    ...monoStil(14),
+                    ...monoStil('monoGross'),
                     color: v.offen && v.wert > 0 ? rollen.achtungText : rollen.text,
                   }}
                 >
@@ -203,10 +213,10 @@ export default function BetroffenenSeitenleiste({
                     gap: token.marginSM,
                   }}
                 >
-                  <span style={{ fontSize: 12, color: rollen.gedaempft }}>
+                  <Textstufe stufe="textKlein" ton="gedaempft">
                     {einheitText(k.name, k.abschnitt)}
-                  </span>
-                  <span style={{ ...monoStil(14), color: rollen.text }}>{k.wert}</span>
+                  </Textstufe>
+                  <span style={{ ...monoStil('monoGross'), color: rollen.text }}>{k.wert}</span>
                 </PaneelZeile>
               </li>
             ))}
@@ -225,7 +235,12 @@ export default function BetroffenenSeitenleiste({
         >
           <p
             data-lfh="offene-felder"
-            style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}
+            style={{
+              margin: 0,
+              ...schriftStil('textKlein'),
+              lineHeight: 1.5,
+              color: rollen.gedaempft,
+            }}
           >
             {offeneFelderText(offen)}
           </p>

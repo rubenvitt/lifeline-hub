@@ -12,7 +12,9 @@ import {
 } from '../routing/deeplinks';
 import { flaeche } from '../theme/tokens';
 import Paneel from './instrument/Paneel';
-import { schriftStil, useRollen } from './instrument/rollenwerte';
+import { useRollen } from './instrument/rollenwerte';
+import Stapel from './instrument/Stapel';
+import Textstufe from './instrument/Textstufe';
 
 /**
  * Fehlergrenze je Rahmen (LLH-1822, Change `a12ms7g9-seitenzustaende`, D1/D2; Spec
@@ -78,25 +80,18 @@ function FehlerPaneel({ satz, ausweg }: { satz: string; ausweg: ReactNode }) {
         data-lfh="fehlergrenze"
         style={{ display: 'flex', flexDirection: 'column', gap: t.marginSM }}
       >
-        <div style={{ ...schriftStil('seitentitel'), color: rollen.text }}>
+        <Textstufe stufe="seitentitel" als="div">
           {FEHLERGRENZE_TITEL}
-        </div>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: rollen.text2,
-          }}
-        >
+        </Textstufe>
+        <Textstufe ton="text2" als="p">
           {satz}
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.marginSM }}>
+        </Textstufe>
+        <Stapel richtung="zeile" umbruch abstand="sm">
           <Button type="primary" onClick={() => window.location.reload()}>
             Neu laden
           </Button>
           {ausweg}
-        </div>
+        </Stapel>
       </div>
     </Paneel>
   );

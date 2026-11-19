@@ -142,7 +142,7 @@ function OrganigrammKopf({
         {einsatzleiter.art === 'erfasst' ? (
           <>
             <div style={{ overflowWrap: 'anywhere' }}>{einsatzleiter.name}</div>
-            <div style={{ ...monoStil(12, 500), color: rollen.gedaempft }}>
+            <div style={{ ...monoStil('monoKlein', 500), color: rollen.gedaempft }}>
               {einsatzleiter.nichtMehrDisponiert && <span>nicht mehr disponiert · </span>}
               <span>{`seit ${zeitKurz(einsatzleiter.seit, konventionen)}`}</span>
             </div>
@@ -270,7 +270,7 @@ function Stabsstelle({
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {zeilen.map((z) => (
           <li key={z.kuerzel} style={{ display: 'flex', gap: token.marginXS }}>
-            <span style={monoStil(12, 500)}>{z.kuerzel}</span>
+            <span style={monoStil('monoKlein', 500)}>{z.kuerzel}</span>
             <span style={{ overflowWrap: 'anywhere' }}>{z.namen}</span>
           </li>
         ))}
@@ -293,7 +293,7 @@ function KnotenInhalt({
     knoten.art === 'abschnitt'
       ? einsatzabschnittePfad(einsatzId, { abschnitt: knoten.id })
       : einheitDetailPfad(einsatzId, knoten.id);
-  const meta: CSSProperties = { ...monoStil(12), overflowWrap: 'anywhere' };
+  const meta: CSSProperties = { ...monoStil('monoKlein'), overflowWrap: 'anywhere' };
   // Dieselbe Prüfung wie in `EinsatzZeichen` (rendert dort `null`): hier entscheidet sie, ob der
   // Platz überhaupt entsteht.
   const darstellbar = fachobjektZeichen(knoten.tz) != null;

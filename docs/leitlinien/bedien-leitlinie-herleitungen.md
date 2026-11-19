@@ -21,14 +21,14 @@ UHS-Platzkarte (`pages/uhs/Grundriss.tsx`; die zwei `Card`-Angaben derselben Dat
 korrekt nicht mit). Das `InputNumber` in `pages/MaterialPage.tsx` (B5i) ist gefallen, weil
 C4 die Datei ohnehin anfasste. **Damit ist LFH-333/B5 bis auf die begründete Ausnahme
 abgetragen.** Wer eine Zeile aus `OFFEN` streicht, tut es im **selben** Commit wie den Fix
-und prüft `aktionsabstand.guard.test.ts` mit.
+und prüft `aktionsabstand.guard.test.ts` mit (seit LLH-1973 entfernt, den Abstand trägt `Knopfreihe`).
 **Eine Klein-Angabe abzubauen kann eine Regel aufwerfen, die vorher keine war** (gemessen in
 LFH-370): solange die vier Knöpfe der Aktionsreihen in `SchaedenDetailPage`/`TiereDetailPage`
 klein waren, war die Frage nach dem Abstand zum `danger`-Knopf nicht gestellt. Mit der Staffel
 wächst „Stornieren" auf bis zu 72 px und steht bündig neben drei gleich hohen neutralen
 Aktionen — beide Dateien mussten im selben Commit in den Bereich von
-`components/aktionsabstand.guard.test.ts`. Wer eine Zeile aus `OFFEN` streicht, prüft den
-zweiten Guard mit.
+`components/aktionsabstand.guard.test.ts` (seit LLH-1973 entfernt, ADR-0070). Wer eine Zeile aus
+`OFFEN` streicht, prüft den zweiten Guard mit.
 **Eine Ausnahme war geprüft und dauerhaft, seit LFH-359/LFH-379 ist sie eine Form je Stufe**: die
 vier Knöpfe der UHS-Platzkarte hängen an der festen Kartengröße (140 × 116, gebunden an
 `SCHRITT_X = 160`/`SCHRITT_Y = 120` aus `raster_position`). Der Innenraum von 100 px trägt in **keiner**
@@ -227,7 +227,8 @@ Intensitäten teilen, ist der **zweite Kanal Pflicht, nicht Kür** — `Flaechen
 steht im Auslöser, das Stufenwort im zugänglichen Namen. Ihr **Kontrast** ist eine begründete
 Setzung und kein Messwert (jsdom rechnet keine Farbmischung): der Nachweis steht offen und
 gehört in den Playwright-Topf von **LFH-370/B5j**, der ihn heute noch nicht führt.
-**Rot steht auch nicht bündig neben Neutralem** (LFH-363): eine `<Space>`-Aktionsreihe mit
+**Rot steht auch nicht bündig neben Neutralem** (LFH-363; seit LLH-1973 trägt das der Baustein
+`Knopfreihe` mit festem Abstand `md`, der Wächter unten ist entfernt, ADR-0070): eine `<Space>`-Aktionsreihe mit
 einem `danger`-Knopf und mindestens einer weiteren Aktion trägt `size="middle"`. Der
 Vorgabewert ist hier **nicht** antds 8 px — antd mappt `spaceGapSmallSize` auf `paddingXS`,
 und das steht auf `abstand.xs` = 3/5/7 px je Stufe; `middle` führt auf `abstand.md` =

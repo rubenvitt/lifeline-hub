@@ -438,15 +438,16 @@ function PersonendatenInhalt({
         zuWire={(w) => w ?? null}
         text={(w) => (w ? (GESCHLECHT_WORT[w as keyof typeof GESCHLECHT_WORT] ?? w) : '')}
         eingabe={({ feld: f, popup, value, onChange }) => (
-          <Select<string>
-            {...f}
-            {...popup}
-            allowClear
-            value={value ?? undefined}
-            options={GESCHLECHT_OPTIONEN}
-            onChange={(w) => onChange(w ?? null)}
-            style={{ minWidth: 200 }}
-          />
+          <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+            <Select<string>
+              {...f}
+              {...popup}
+              allowClear
+              value={value ?? undefined}
+              options={GESCHLECHT_OPTIONEN}
+              onChange={(w) => onChange(w ?? null)}
+            />
+          </div>
         )}
       />
     ),
@@ -468,15 +469,16 @@ function PersonendatenInhalt({
         zuWire={(w) => w ?? null}
         text={(w) => (w ? KOSTFORM_WORT[w] : '')}
         eingabe={({ feld: f, popup, value, onChange }) => (
-          <Select<PersonKostform>
-            {...f}
-            {...popup}
-            allowClear
-            value={value ?? undefined}
-            options={KOSTFORM_OPTIONEN}
-            onChange={(w) => onChange(w ?? null)}
-            style={{ minWidth: 220 }}
-          />
+          <div style={{ display: 'grid', minWidth: 'var(--lfh-feld-schmal)' }}>
+            <Select<PersonKostform>
+              {...f}
+              {...popup}
+              allowClear
+              value={value ?? undefined}
+              options={KOSTFORM_OPTIONEN}
+              onChange={(w) => onChange(w ?? null)}
+            />
+          </div>
         )}
       />
     ),
@@ -508,14 +510,16 @@ function PersonendatenInhalt({
         }}
         text={(w) => formatKalenderdatum(w)}
         eingabe={({ feld: f, value, onChange }) => (
-          <Input
-            {...f}
-            value={value}
-            placeholder="TT.MM.JJJJ"
-            inputMode="numeric"
-            style={{ fontFamily: token.fontFamilyCode, maxWidth: 200 }}
-            onChange={(e) => onChange(e.target.value)}
-          />
+          <div style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}>
+            <Input
+              {...f}
+              value={value}
+              placeholder="TT.MM.JJJJ"
+              inputMode="numeric"
+              style={{ fontFamily: token.fontFamilyCode }}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          </div>
         )}
       />
     ),

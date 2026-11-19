@@ -16,7 +16,12 @@ import {
   Typography,
 } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
-import { istNichtGefunden, SeitenFehler, SeitenNichtGefunden } from '../components/SeitenZustand';
+import {
+  istNichtGefunden,
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,7 +44,7 @@ import {
 import { listeUhs, aenderePersonBelegung, nimmUhsAustrittZurueck } from '../api/einsatzUhs';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META } from '../personen/personMeta';
+import { STATUS_META, personStatusDarstellung } from '../personen/personMeta';
 import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
@@ -68,9 +73,13 @@ import {
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { flaeche } from '../theme/tokens';
 import { Status } from '../components/instrument/Status';
+import Knopfreihe from '../components/instrument/Knopfreihe';
 
-/** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
-function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
+/**
+ * Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). Ein fehlender oder unbekannter
+ * Status (LLH-1957) hat keinen Weg; der Server lehnt ihn ohnehin ab.
+ */
+function naechsteStatus(aktuell: PersonStatus | null | undefined): PersonStatus[] {
   switch (aktuell) {
     case 'erfasst':
       return ['vermisst', 'betroffen', 'verstorben', 'abgemeldet'];
@@ -81,6 +90,8 @@ function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
     case 'verstorben':
     case 'abgemeldet':
       return ['erfasst', 'vermisst', 'betroffen'];
+    default:
+      return [];
   }
 }
 
@@ -402,7 +413,10 @@ export default function PersonenDetailPage() {
       </div>
     );
   }
-  if (einsatzQuery.isError || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1975, wie LLH-1947): React Query setzt `error` auch, wenn
+  // nur ein Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher
+  // liegt. Dann bleibt die Seite stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
@@ -411,7 +425,7 @@ export default function PersonenDetailPage() {
   if (istNichtGefunden(detailQuery.error)) return nichtGefunden;
   // Ein anderer Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den
   // neuen Versuch an.
-  if (detailQuery.isError || !detailQuery.data) {
+  if (!detailQuery.data) {
     return (
       <SeitenFehler
         text="Person konnte nicht geladen werden"
@@ -420,6 +434,7 @@ export default function PersonenDetailPage() {
       />
     );
   }
+  const veraltet = einsatzQuery.isError || detailQuery.isError;
   // Meldet der Stand einen Storno, den das (nicht live geladene) Detail noch nicht kennt, gilt die
   // Person ab sofort als storniert: alle Sperren der Seite lesen `storniert_at` (LLH-1832).
   const stand = standQuery.data;
@@ -449,7 +464,7 @@ export default function PersonenDetailPage() {
             <Alert
               type="warning"
               showIcon
-              title={`Sichtung „tot“, Status noch „${STATUS_META[person.status].label}“`}
+              title={`Sichtung „tot“, Status noch „${personStatusDarstellung(person.status).label}“`}
               action={
                 <Button
                   loading={
@@ -506,38 +521,46 @@ export default function PersonenDetailPage() {
                     )}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
-                    /* `size="middle"`: „Verwerfen" ist `danger` und stünde sonst bündig neben
-                       „Bestätigen". */
-                    <Space size="middle" style={{ marginLeft: token.margin }}>
-                      <Button
-                        type="primary"
-                        disabled={!darfEinsatzLeiten(einsatz)}
-                        onClick={() =>
-                          abgleichEntscheidenMutation.mutate({
-                            vermisstId: person.id,
-                            abgleichId: a.id,
-                            entscheidung: 'bestaetigt',
-                            person: personSchluessel,
-                          })
-                        }
-                      >
-                        Bestätigen
-                      </Button>
-                      <Button
-                        danger
-                        disabled={!darfEinsatzLeiten(einsatz)}
-                        onClick={() =>
-                          abgleichEntscheidenMutation.mutate({
-                            vermisstId: person.id,
-                            abgleichId: a.id,
-                            entscheidung: 'verworfen',
-                            person: personSchluessel,
-                          })
-                        }
-                      >
-                        Verwerfen
-                      </Button>
-                    </Space>
+                    /* Inline hinter der Kennung, darum die Hülle; den Abstand zwischen
+                       „Bestätigen" und dem roten „Verwerfen" setzt die Knopfreihe. */
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        marginLeft: token.margin,
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      <Knopfreihe umbruch={false}>
+                        <Button
+                          type="primary"
+                          disabled={!darfEinsatzLeiten(einsatz)}
+                          onClick={() =>
+                            abgleichEntscheidenMutation.mutate({
+                              vermisstId: person.id,
+                              abgleichId: a.id,
+                              entscheidung: 'bestaetigt',
+                              person: personSchluessel,
+                            })
+                          }
+                        >
+                          Bestätigen
+                        </Button>
+                        <Button
+                          danger
+                          disabled={!darfEinsatzLeiten(einsatz)}
+                          onClick={() =>
+                            abgleichEntscheidenMutation.mutate({
+                              vermisstId: person.id,
+                              abgleichId: a.id,
+                              entscheidung: 'verworfen',
+                              person: personSchluessel,
+                            })
+                          }
+                        >
+                          Verwerfen
+                        </Button>
+                      </Knopfreihe>
+                    </div>
                   )}
                   {abgleichFehler.grund(a.id) && (
                     <div>{zeilenGrund(abgleichFehler.grund(a.id))}</div>
@@ -759,9 +782,7 @@ export default function PersonenDetailPage() {
   const aufenthaltAktionen = aufenthaltBedienbar && (
     <>
       {p.aktuelle_uhs_id != null ? (
-        // `size="middle"`: eine Aktionsreihe mit einem `danger`-Knopf und weiterer Aktion trägt
-        // mindestens `token.marginSM` Abstand.
-        <Space wrap size="middle">
+        <Knopfreihe>
           <Button onClick={() => setUhsModalOffen(true)}>Verlegen</Button>
           <Button
             danger
@@ -775,7 +796,7 @@ export default function PersonenDetailPage() {
           >
             Austragen
           </Button>
-        </Space>
+        </Knopfreihe>
       ) : (
         !p.aktueller_verbleib && (
           <Button onClick={() => setUhsModalOffen(true)}>In UHS aufnehmen</Button>
@@ -802,8 +823,16 @@ export default function PersonenDetailPage() {
     <EinsatzSeite
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (p.storniert_at != null || seitenGruende.length > 0) && (
+        (veraltet || p.storniert_at != null || seitenGruende.length > 0) && (
           <Flex vertical gap={token.marginSM}>
+            {veraltet && (
+              <SeitenStandVeraltet
+                onWiederholen={() => {
+                  if (einsatzQuery.isError) void einsatzQuery.refetch();
+                  if (detailQuery.isError) void detailQuery.refetch();
+                }}
+              />
+            )}
             <StornoBanner stand={p} />
             {seitenGruende.map((g) => (
               <SpeicherFehler
@@ -831,7 +860,7 @@ export default function PersonenDetailPage() {
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
-          <Status darstellung={STATUS_META[p.status]} />
+          <Status darstellung={personStatusDarstellung(p.status)} />
           {p.aktuelle_sichtung && <SichtungsTag kategorie={p.aktuelle_sichtung} />}
           {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
         </Space>

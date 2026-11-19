@@ -2,7 +2,7 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/live/liveVerbindung.ts, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/einsatz/ausfall.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/components/KachelGrenze.tsx, frontend/src/live/liveVerbindung.ts, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/einsatz/ausfall.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
 ---
 
 ## Überblick
@@ -97,6 +97,10 @@ Der Monitor holt das Lagebild alle 30 Sekunden neu; eine neue Sofortmeldung meld
 sofort, ohne Inhalt, und er holt das Lagebild dann gleich. Ist der Stand älter als zwei Minuten, steht
 in der Statusleiste hervorgehoben „Veraltet · Stand …“. Dann zuerst die Verbindung prüfen; „Neu
 laden“ im Gerätemenü baut die Seite neu auf.
+
+Kann eine einzelne Kachel nicht angezeigt werden, steht an ihrer Stelle „Diese Kachel konnte
+nicht angezeigt werden.“ Die übrigen Kacheln zeigen weiter die Lage. Der Fehler geht als Bericht an
+den Server, und mit dem nächsten Abruf versucht der Monitor die Kachel von selbst erneut.
 
 ### Offene Sofortmeldungen und neue Dringlichkeit
 

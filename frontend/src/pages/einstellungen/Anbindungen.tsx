@@ -245,7 +245,9 @@ export default function Anbindungen() {
                                 {z.fingerabdruck ? (
                                   <>
                                     Schlüssel{' '}
-                                    <span style={monoStil(12, 500)}>{z.fingerabdruck}</span>
+                                    <span style={monoStil('monoKlein', 500)}>
+                                      {z.fingerabdruck}
+                                    </span>
                                   </>
                                 ) : widerrufenAm ? (
                                   'ohne Schlüssel'
@@ -255,7 +257,9 @@ export default function Anbindungen() {
                                 {z.fingerabdruck_neu && (
                                   <>
                                     {' · neuer Schlüssel '}
-                                    <span style={monoStil(12, 500)}>{z.fingerabdruck_neu}</span>
+                                    <span style={monoStil('monoKlein', 500)}>
+                                      {z.fingerabdruck_neu}
+                                    </span>
                                     {', gilt ab der ersten Anfrage damit'}
                                   </>
                                 )}
@@ -338,7 +342,7 @@ export default function Anbindungen() {
               {SCOPES.map((s) => (
                 <Checkbox key={s} value={s}>
                   {SCOPE_TEXT[s]}{' '}
-                  <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+                  <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{s}</span>
                 </Checkbox>
               ))}
             </Stapel>
