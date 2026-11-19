@@ -14,7 +14,6 @@ export const SCHULD: Readonly<Record<string, number>> = {
   'auftraege/BefehlDetail.tsx': 1,
   'auftraege/BefehlListenKarte.tsx': 3,
   'auftraege/EmpfaengerQuittung.tsx': 3,
-  'betreuung/MeldeVerlauf.tsx': 2,
   'command-palette/CommandPalette.tsx': 2,
   'components/AppLayout.tsx': 2,
   'components/BenutzerMenu.tsx': 7,
