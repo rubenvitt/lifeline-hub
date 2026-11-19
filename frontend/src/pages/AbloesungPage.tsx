@@ -106,6 +106,7 @@ import { deeplinkStand, useQueryParamSelektion } from '../routing/useQueryParamS
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { flaeche } from '../theme/tokens';
 import { useAdressWert } from '../routing/useAdressWert';
+import { useAdressAenderung } from '../routing/useLinkAuftrag';
 
 const { Text } = Typography;
 
@@ -204,7 +205,7 @@ export default function AbloesungPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const location = useLocation();
   // Ohne Parameter die Vorgabe der Seite: im Sanitätsdienst (Einsatz-Vorlage „Sanitätsdienst“)
   // der Schichtplan, sonst die laufenden Schichten (LLH-1554). Die Seite zeigt erst mit dem
@@ -212,18 +213,16 @@ export default function AbloesungPage() {
   const vorgabeAnsicht: Ansicht =
     einsatzQuery.data?.einsatzart === 'sanitaetsdienst' ? 'plan' : 'laufend';
   const ansicht: Ansicht = parseAbloesungAnsicht(searchParams) ?? vorgabeAnsicht;
+  // Über `useAdressAenderung` (LLH-1826): baut auf anderen Schreibern im selben Zug auf
+  // (`vergangen`, die Räumung von `?schicht=`), statt vom Stand des Renders zu schreiben.
+  const aendereAdresse = useAdressAenderung();
   const setAnsicht = useCallback(
     (a: Ansicht) =>
-      setSearchParams(
-        (p) => {
-          const n = new URLSearchParams(p);
-          if (a === vorgabeAnsicht) n.delete('ansicht');
-          else n.set('ansicht', a);
-          return n;
-        },
-        { replace: true },
-      ),
-    [setSearchParams, vorgabeAnsicht],
+      aendereAdresse((n) => {
+        if (a === vorgabeAnsicht) n.delete('ansicht');
+        else n.set('ansicht', a);
+      }),
+    [aendereAdresse, vorgabeAnsicht],
   );
   // Ein Sprung `?schicht=` wählt die Ansicht erst, wenn sein Parameter geräumt ist: das Räumen
   // (`useQueryParamSelektion`) schreibt die Adresse aus demselben Stand und überschriebe sonst

@@ -140,6 +140,23 @@ describe('useAdressSuche (LLH-1826)', () => {
     expect(stand.search).toBe('?q=Bra');
   });
 
+  it('Leeren wirkt sofort, ohne Entprellung', async () => {
+    starte(() => useAdressSuche(), ['/a?q=alt']);
+    setze('');
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(stand.search).toBe('');
+    expect(stand.wert).toBe('');
+  });
+
+  it('ein ausstehender Begriff landet nicht in einer anderen Adresse', async () => {
+    const router = starte(() => useAdressSuche(), ['/a']);
+    setze('abc');
+    await act(() => router.navigate('/b'));
+    await act(() => vi.advanceTimersByTimeAsync(GEDAECHTNIS_ENTPRELLUNG_MS));
+    expect(stand.pathname).toBe('/b');
+    expect(stand.search).toBe('');
+  });
+
   it('folgt einer fremden Änderung', async () => {
     const router = starte(() => useAdressSuche(), ['/a?q=alt']);
     expect(stand.wert).toBe('alt');

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { GEDAECHTNIS_ENTPRELLUNG_MS } from '../components/listenGedaechtnis';
 import { parseRouteId } from './deeplinks';
 import { useAdressAenderung } from './useLinkAuftrag';
@@ -154,10 +154,35 @@ export function useAdressSuche(schluessel = 'q'): [string, (text: string) => voi
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
+  // Ein anderer Verlaufseintrag (Link, Zurück, anderer Einsatz auf derselben Route) verwirft einen
+  // noch nicht geschriebenen Begriff: er gehörte zur vorigen Adresse. Eine eigene Änderung per
+  // `replace` (ein Filter daneben) lässt ihn stehen.
+  const location = useLocation();
+  const navigationType = useNavigationType();
+  const vorigerEintrag = useRef(location.key);
+  useEffect(() => {
+    if (location.key === vorigerEintrag.current) return;
+    vorigerEintrag.current = location.key;
+    if (navigationType === 'REPLACE') return;
+    clearTimeout(timer.current);
+    timer.current = undefined;
+    geschrieben.current = adresse;
+    setText(adresse);
+    // Getaktet über den Eintrag; Adresse und Art gelten zu diesem Zeitpunkt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
   const setze = useCallback(
     (neu: string) => {
       setText(neu);
       clearTimeout(timer.current);
+      if (neu === '') {
+        // Leeren wirkt sofort (Zurücksetzen, ✕ im Feld): ein Weggehen danach brächte den Begriff
+        // sonst mit dem Zurück wieder.
+        geschrieben.current = '';
+        schreibe(undefined);
+        return;
+      }
       timer.current = setTimeout(() => {
         geschrieben.current = neu;
         schreibe(neu);

@@ -1674,8 +1674,8 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   `useAdressWertNachRueckfrage` für eine Ansicht, deren Wechsel eine offene Bearbeitung aushängt).
   Geschrieben mit `replace`, die Vorgabe fehlt in der Adresse, ein unbekannter Wert gilt als
   Vorgabe. **Kein Sitzungsspeicher** dafür: ein Neueinstieg über das Modulmenü beginnt mit der
-  Vorgabe, damit ein vergessener Filter nichts versteckt (nur Sortierung und Spaltenfilter merkt
-  das Listengedächtnis). Kein `useState` für eine solche Wahl, auch nicht je Einsatz
+  Vorgabe, damit ein vergessener Filter nichts versteckt (nur Sortierung, Spaltenfilter und die
+  Suche einer Tabelle mit `useListenGedaechtnis` merkt die Sitzung, LLH-1086). Kein `useState` für eine solche Wahl, auch nicht je Einsatz
   (`…NachEinsatz`): ein anderer Einsatz ist eine andere Adresse. Ausgenommen: die Personensuche
   (Namen), Aufklappzustände, die Gerätehülle für die Rollposition. Mehrere Schreiber im selben Zug
   (Link-Aufträge, Listengedächtnis, Werte) gehen über `useAdressAenderung`
@@ -1692,7 +1692,7 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   merkt die Position je `location.key` (`routing/rollGedaechtnis.ts`, `sessionStorage`), stellt sie
   beim POP wieder her, sobald die Seite hoch genug ist (höchstens `ROLL_FRIST_MS`), gibt bei eigener
   Eingabe auf und hält still, wenn die Adresse ein Deeplink-Ziel trägt (`traegtZiel`; ein neuer
-  Deeplink-Parameter gehört in dessen Liste). PUSH beginnt oben, REPLACE rollt nicht.
+  Deeplink-Parameter gehört in `ZIEL_PARAMETER`; ein Filter trägt nie den Namen eines Ziels, Wächter `routing/rollGedaechtnis.guard.test.ts`). PUSH beginnt oben, REPLACE rollt nicht.
 - **Zeit in der URL** ist UTC ohne Zone (`dayjs(s)` läse Ortszeit) — Umkehr in `anzeige/zeitEingabe.ts`
   mit eigenem Test. Kodierung per Round-Trip durch `URLSearchParams` prüfen.
 - Filterleiste nur bei **fremder** Änderung neu aufsetzen (nach der Navigation); entprellt wird

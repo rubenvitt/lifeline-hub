@@ -2316,13 +2316,13 @@ describe('KraefteuebersichtPage — Filter in der Adresse (LLH-1826)', () => {
     mitEinheit();
     setupMit();
     await waehleAbschnitt('Abschnitt Nord');
-    await waitFor(() => expect(ort()).toBe(`?abschnitt=${ABSCHNITT_A1.id}`));
+    await waitFor(() => expect(ort()).toBe(`?filter_abschnitt=${ABSCHNITT_A1.id}`));
   });
 
   it('eine Adresse mit Abschnitt, Suche und Schalter zeigt den Filter gesetzt', async () => {
     mitEinheit();
     setupMit(
-      `/einsaetze/1/kraefteuebersicht?abschnitt=${ABSCHNITT_A1.id}&q=Florian&ohne_auftrag=1`,
+      `/einsaetze/1/kraefteuebersicht?filter_abschnitt=${ABSCHNITT_A1.id}&q=Florian&ohne_auftrag=1`,
     );
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="meldebild-werkzeuge"]')).not.toBeNull(),
@@ -2339,14 +2339,22 @@ describe('KraefteuebersichtPage — Filter in der Adresse (LLH-1826)', () => {
 
   it('„Filter zurücksetzen“ leert die Adresse', async () => {
     mitEinheit();
-    setupMit(`/einsaetze/1/kraefteuebersicht?abschnitt=${ABSCHNITT_A1.id}&ohne_auftrag=1`);
+    setupMit(`/einsaetze/1/kraefteuebersicht?filter_abschnitt=${ABSCHNITT_A1.id}&ohne_auftrag=1`);
     fireEvent.click(await screen.findByRole('button', { name: 'Filter zurücksetzen' }));
     await waitFor(() => expect(ort()).toBe(''));
   });
 
+  it('ein Abschnitt, den es im Einsatz nicht gibt, filtert nicht (Entwurf D3)', async () => {
+    mitEinheit();
+    setupMit('/einsaetze/1/kraefteuebersicht?filter_abschnitt=999');
+    expect(await (await seitenkopf()).findByText(/1 Einheit/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Abschnitt:/)).toBeNull();
+    expect(screen.queryByText(/von \d+ Kräften/)).toBeNull();
+  });
+
   it('ein unbekannter Abschnitt wird verworfen', async () => {
     mitEinheit();
-    setupMit('/einsaetze/1/kraefteuebersicht?abschnitt=abc');
+    setupMit('/einsaetze/1/kraefteuebersicht?filter_abschnitt=abc');
     await (await seitenkopf()).findByText(/1 Einheit/);
     expect(screen.queryByText(/^Abschnitt:/)).toBeNull();
   });

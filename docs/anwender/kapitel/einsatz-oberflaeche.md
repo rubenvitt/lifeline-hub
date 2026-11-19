@@ -436,8 +436,8 @@ selbst, bleibt die Seite, wo man ist. Neuladen und ein weitergegebener Link zeig
 mit denselben Filtern.
 
 Wer ein Modul über die Modulliste neu öffnet, beginnt mit der Vorgabe, etwa „Alle Richtungen“. So
-versteckt ein vergessener Filter keine Meldungen. Sortierung und Spaltenfilter einer Tabelle merkt
-sich die Sitzung dagegen auch für diesen Weg. Ein Link, der eine Ansicht nennt, etwa „Patienten“
+versteckt ein vergessener Filter keine Meldungen. Sortierung, Spaltenfilter und Suche einer Tabelle
+merkt sich die Sitzung dagegen auch für diesen Weg. Ein Link, der eine Ansicht nennt, etwa „Patienten“
 oder „Vermisste“ im Modulpanel, zeigt genau diese Ansicht; was er nicht nennt, steht auf der
 Vorgabe. Der Suchbegriff der Betroffenen steht nie in der Adresse, weil er einen Namen tragen kann.
 

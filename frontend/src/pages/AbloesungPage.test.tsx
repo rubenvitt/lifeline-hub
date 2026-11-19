@@ -1838,6 +1838,15 @@ describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-11
     const karte = await screen.findByRole('article', { name: 'Schicht Florian 8' });
     await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
     expect(screen.getByRole('radio', { name: 'Beendet' })).toBeChecked();
+    // Ansicht und „beendet“ stehen beide in der Adresse, `?schicht=` ist geräumt (LLH-1826).
+    await waitFor(() => {
+      const p = new URLSearchParams(adresse.suche);
+      expect([p.get('ansicht'), p.get('vergangen'), p.has('schicht')]).toEqual([
+        'vergangen',
+        'beendet',
+        false,
+      ]);
+    });
   });
 
   it('eine unbekannte Schicht ändert die Ansicht nicht und zeigt den Hinweis (LLH-1827)', async () => {

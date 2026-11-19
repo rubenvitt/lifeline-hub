@@ -41,7 +41,6 @@ export const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlu
 /** Statussicht der Schäden-Liste: ein Status oder „alle" (kein Filter). */
 export type SchaedenSicht = SchadenStatus | 'alle';
 
-/** Reiter der Schäden-Liste in Bedienreihenfolge — dieselben Wörter im Kopf der Druckansicht. */
 /** Werte von `?sicht=` der Schadenliste (LLH-1826); exhaustiv, Vorgabe `offen`. */
 export const SCHAEDEN_SICHT_ERLAUBT: Record<SchaedenSicht, true> = {
   offen: true,
@@ -50,6 +49,7 @@ export const SCHAEDEN_SICHT_ERLAUBT: Record<SchaedenSicht, true> = {
   alle: true,
 };
 
+/** Reiter der Schäden-Liste in Bedienreihenfolge — dieselben Wörter im Kopf der Druckansicht. */
 export const SCHAEDEN_SICHTEN: readonly { key: SchaedenSicht; label: string }[] = [
   { key: 'offen', label: 'Offen' },
   { key: 'uebergeben', label: 'Übergeben' },

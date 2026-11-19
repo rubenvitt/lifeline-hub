@@ -13,9 +13,10 @@ export const ROLL_FRIST_MS = 2000;
 
 /**
  * Deeplink-Parameter, mit denen eine Seite selbst ein Ziel ansteuert (`frontend/AGENTS.md`,
- * „Deeplink-Muster“); dann hält die Wiederherstellung still.
+ * „Deeplink-Muster“); dann hält die Wiederherstellung still. Vollständigkeit und Abstand zu den
+ * Filtern hält `rollGedaechtnis.guard.test.ts`.
  */
-const ZIEL_PARAMETER = [
+export const ZIEL_PARAMETER = [
   'meldung',
   'auftrag',
   'befehl',
@@ -26,6 +27,12 @@ const ZIEL_PARAMETER = [
   'gefahrengebiet',
   'personal',
   'einheit',
+  'anruf',
+  'schicht',
+  'material',
+  'nachforderung',
+  'person',
+  'uhs',
 ] as const;
 
 let ersatz = new Map<string, number>();
