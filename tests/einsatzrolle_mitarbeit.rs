@@ -644,6 +644,68 @@ async fn mitarbeit_berichtigt_fremden_eintrag_nicht() {
     assert_eq!(etb_anzahl(&pool, einsatz).await, vorher);
 }
 
+/// Wie beim Korrigieren der Meldung (Task 4): steht die Meldung zum eigenen ETB-Eintrag in der
+/// Lage oder ist sie eine Lagemeldung, berichtigt die Mitarbeit den Eintrag nicht (403).
+#[tokio::test]
+async fn mitarbeit_berichtigt_etb_eintrag_einer_meldung_in_der_lage_nicht() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (s, m) = meldung_senden(&app, einsatz, &mit, serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    let mid = m["id"].as_i64().unwrap();
+    let eid: i64 = sqlx::query_scalar("SELECT id FROM etb_eintrag WHERE meldung_id = ?")
+        .bind(mid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    // Außerhalb der Lage ist der eigene Eintrag berichtigbar …
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": eid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+
+    // … in der Lage nicht mehr.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let vorher = etb_anzahl(&pool, einsatz).await;
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": eid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+    assert_eq!(etb_anzahl(&pool, einsatz).await, vorher);
+
+    // Die Einsatzleitung berichtigt ihn weiterhin.
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &admin,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": eid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+}
+
 /// Gibt demselben Benutzer (Cookie `cookie`) in einem weiteren Einsatz die Rolle Mitarbeit.
 async fn mitarbeit_anlegen_in(app: &axum::Router, admin: &str, einsatz: i64, _cookie: &str) {
     let (s, v) = anfrage(app, "GET", "/api/benutzer", admin, None).await;

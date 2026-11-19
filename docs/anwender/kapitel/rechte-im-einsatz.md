@@ -78,7 +78,8 @@ Modulen, Kopfdaten und Einstellungen; „Mitarbeit“ erfasst Meldungen, Chat un
   - Im Chat schreiben sowie eigene Nachrichten bearbeiten und löschen; Kanäle anlegen, einen Bezug
     setzen und Heraufstufen bleiben zu.
   - Im Einsatztagebuch Einträge der Typen Meldung und Lage erfassen (die Lage nicht „in den
-    Meldungseingang“) und eigene Einträge berichtigen.
+    Meldungseingang“) und eigene Einträge berichtigen, solange die Meldung dazu nicht in der Lage
+    steht und keine Lagemeldung ist.
   - Fotos und Anhänge hochladen, nur eigene anhängen und nur eigene Uploads löschen.
 
   Alles andere bleibt zu: Meldungen bestätigen, zuweisen oder im Status ändern, Aufträge, Kräfte,

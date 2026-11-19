@@ -171,6 +171,34 @@ pub async fn fordere_eigenen_eintrag(
     treffer.map(|_| ()).ok_or(AppError::Forbidden)
 }
 
+/// Die Lage bleibt der Einsatzleitung (wie beim Korrigieren der Meldung,
+/// `routes::meldung_korrektur::korrigieren`): gehört zum Eintrag eine Meldung, die in der Lage
+/// steht oder eine Lagemeldung ist, berichtigt die Mitarbeit ihn nicht; sonst 403. Die Meldung
+/// hängt in beiden Richtungen am Eintrag (`etb_eintrag.meldung_id`, `meldung.etb_meldung_id`).
+pub async fn fordere_eintrag_ausserhalb_der_lage(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    eintrag_id: i64,
+) -> Result<(), AppError> {
+    let in_der_lage: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM meldung m \
+         WHERE m.einsatz_id = ? \
+           AND (m.lagerelevant = 1 OR m.meldungsart = ?) \
+           AND (m.etb_meldung_id = ? \
+                OR m.id = (SELECT e.meldung_id FROM etb_eintrag e WHERE e.id = ?))",
+    )
+    .bind(einsatz_id)
+    .bind(crate::meldung::ART_LAGEMELDUNG)
+    .bind(eintrag_id)
+    .bind(eintrag_id)
+    .fetch_optional(pool)
+    .await?;
+    match in_der_lage {
+        Some(_) => Err(AppError::Forbidden),
+        None => Ok(()),
+    }
+}
+
 /// Die Mitarbeit hängt nur Dateien an, die sie selbst hochgeladen hat (`hochgeladen_von`) und die
 /// zu diesem Einsatz gehören; sonst 403 (design.md D3). Ob eine Datei schon gebunden ist, prüft
 /// danach das Repository in der Transaktion des Inserts.
