@@ -21,11 +21,11 @@ describe('EINSATZ_ROLLE_LABELS', () => {
     expect(EINSATZ_ROLLE_LABELS.fuehrungspersonal).toBe('Führungspersonal');
   });
 
-  it('leitet die Optionen aus der Tabelle ab', () => {
+  it('leitet die Optionen samt Darf-Zeile aus dem Vokabular ab', () => {
     expect(EINSATZ_ROLLE_OPTIONEN).toEqual([
-      { value: 'einsatzleitung', label: 'Einsatzleitung' },
-      { value: 'fuehrungspersonal', label: 'Führungspersonal' },
-      { value: 'beobachter', label: 'Beobachter' },
+      expect.objectContaining({ value: 'einsatzleitung', label: 'Einsatzleitung' }),
+      expect.objectContaining({ value: 'fuehrungspersonal', label: 'Führungspersonal' }),
+      { value: 'beobachter', label: 'Beobachter', darf: 'liest nur' },
     ]);
   });
 });

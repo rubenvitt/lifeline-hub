@@ -22,7 +22,8 @@ import { ladeOrganisation } from '../api/organisation';
 import { globalKeys } from '../api/queryKeys';
 import { enrollFinish } from '../api/totp';
 import { webauthnRegistrierungAbschliessen, webauthnRegistrierungStarten } from '../api/webauthn';
-import type { AuthProvider, TotpEnrollStart } from '../api/types';
+import type { AuthProvider, OrgRolle, SystemRolle, TotpEnrollStart } from '../api/types';
+import { kontoRollenNamen } from '../einsatz/rollenVokabular';
 import { useAuth } from '../auth/AuthContext';
 import PasswortAendernDialog from '../auth/PasswortAendernDialog';
 import SitzungsListe from '../auth/SitzungsListe';
@@ -41,15 +42,12 @@ interface TotpCodeWerte {
 }
 
 /**
- * Rollen-Beschriftung als Wort statt als Wire-Wert. Die Schreibweise folgt `pages/BenutzerPage.tsx`
- * („Admin" / „Führungskraft" / „Benutzer"), damit dieselbe Rolle nicht zwei Namen trägt. Bewusst
- * keine geteilte Map: ihr Platz wäre `theme`/`auth`; wer die dritte Stelle baut, zieht sie dorthin.
+ * Rollen-Beschriftung als Wort statt als Wire-Wert, aus dem Rollen-Vokabular (LLH-1818): dieselben
+ * Namen wie Benutzerverwaltung und Benutzermenü, ohne Rolle „Keine Rolle“.
  */
-function rollenText(benutzer: { system_rolle: string; org_rolle: string } | null): string {
+function rollenText(benutzer: { system_rolle: SystemRolle; org_rolle: OrgRolle } | null): string {
   if (!benutzer) return '—';
-  if (benutzer.system_rolle === 'admin') return 'Admin';
-  if (benutzer.org_rolle === 'fuehrungskraft') return 'Führungskraft';
-  return 'Benutzer';
+  return kontoRollenNamen(benutzer).join(', ');
 }
 
 /**
@@ -203,7 +201,7 @@ export default function ProfilPage() {
             <Datenfeld label="Benutzername" mono>
               {benutzer?.benutzername ?? '—'}
             </Datenfeld>
-            <Datenfeld label="Systemrolle">{rollenText(benutzer)}</Datenfeld>
+            <Datenfeld label="Rollen">{rollenText(benutzer)}</Datenfeld>
             <Datenfeld label="Organisation">{organisation?.name ?? '—'}</Datenfeld>
           </Datenraster>
         </Paneel>

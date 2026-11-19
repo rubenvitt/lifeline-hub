@@ -156,7 +156,9 @@ describe('UhsAngaben · Speichern', () => {
     const rumpfe = mitschnitt();
     zeige();
     await oeffne();
-    await userEvent.click(within(paneel()).getByRole('button', { name: 'Speichern' }));
+    // Ohne Änderung ist „Speichern“ gesperrt; Enter schließt das Paneel (LLH-1829).
+    expect(within(paneel()).getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    await userEvent.type(within(paneel()).getByLabelText('Bezeichnung'), '{Enter}');
     expect(await screen.findByRole('button', { name: 'Angaben bearbeiten' })).toBeInTheDocument();
     expect(rumpfe).toEqual([]);
   });

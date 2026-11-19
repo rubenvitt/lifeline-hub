@@ -13,7 +13,6 @@ export const KNOPFREIHE_SCHULD: Readonly<Record<string, number>> = {
   'components/InlineAngabe.tsx': 1,
   'components/SprechgruppenPicker.tsx': 1,
   'components/druck/DruckKnopf.tsx': 1,
-  'einsatz/ModulGesperrt.tsx': 1,
   'etb/RufnameAbfrage.tsx': 1,
   'etb/WiedervorlageModal.tsx': 1,
   'instanz/FuehrungPaneel.tsx': 3,

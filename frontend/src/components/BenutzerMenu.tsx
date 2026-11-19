@@ -28,8 +28,10 @@ import { farbenDunkel, rahmenFarben, schriftskala } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
 import { useViewport } from './useViewport';
 import { Marke } from './instrument/Marke';
+import { KEINE_ROLLE, kontoRollenNamen } from '../einsatz/rollenVokabular';
 import MetaZeile from './instrument/MetaZeile';
 import { schriftStil } from './instrument/rollenwerte';
+import Textstufe from './instrument/Textstufe';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
 function initialen(name: string): string {
@@ -162,21 +164,14 @@ export default function BenutzerMenu({
 
   if (!benutzer) return null;
 
-  const rollenTags = [];
-  if (benutzer.system_rolle === 'admin') {
-    rollenTags.push(
-      <Marke key="admin" style={{ marginInlineEnd: 0 }}>
-        Admin
-      </Marke>,
-    );
-  }
-  if (benutzer.org_rolle === 'fuehrungskraft') {
-    rollenTags.push(
-      <Marke key="fk" style={{ marginInlineEnd: 0 }}>
-        Führungskraft
-      </Marke>,
-    );
-  }
+  // Rollen aus dem Rollen-Vokabular (LLH-1818); ohne Rolle keine Marke.
+  const rollenTags = kontoRollenNamen(benutzer)
+    .filter((name) => name !== KEINE_ROLLE)
+    .map((name) => (
+      <Marke key={name} style={{ marginInlineEnd: 0 }}>
+        {name}
+      </Marke>
+    ));
 
   const items: MenuProps['items'] = [
     {
@@ -225,10 +220,23 @@ export default function BenutzerMenu({
                 </Space>
               )}
             </div>
-            <MetaZeile>
-              <MetaZeile.Teil>@{benutzer.benutzername}</MetaZeile.Teil>
-              {isKnapp && <MetaZeile.Teil>Version {__APP_VERSION__}</MetaZeile.Teil>}
-            </MetaZeile>
+            {/* Knapp in einer Zeile und ohne Version (LLH-1818): neben der Marke „Führungskraft
+                der Organisation“ bräche der Kopf sonst um, und „Helligkeit“ läge am Handy unter dem
+                Rand. Die Version steht in der Hilfe, der volle Benutzername im Titel. */}
+            {isKnapp ? (
+              <div
+                title={`@${benutzer.benutzername}`}
+                style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              >
+                <Textstufe stufe="textKlein" ton="schwach">
+                  @{benutzer.benutzername}
+                </Textstufe>
+              </div>
+            ) : (
+              <MetaZeile>
+                <MetaZeile.Teil>@{benutzer.benutzername}</MetaZeile.Teil>
+              </MetaZeile>
+            )}
             {/* Die Funktion auf JEDER Breite (LFH-952, U89): am Auslöser steht sie erst ab `xl`, auf
                 Tablet und Handy war sie sonst nirgends zu sehen. */}
             {funktion && (

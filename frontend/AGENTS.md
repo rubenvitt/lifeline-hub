@@ -443,7 +443,7 @@ die Karten deckungsgleich (Spec `design-system-artifact`, LLH-1807).
 | Ort eingeben                                                                                    | `Ortsfeld`                                                                                                                                       | `Ortsfeld`                         |
 | Wert aus Stammdaten oder frei                                                                   | `StammdatenFeld`                                                                                                                                 | `StammdatenFeld`                   |
 | Sichtung wählen                                                                                 | `SichtungsWahl`                                                                                                                                  | `SichtungsWahl`                    |
-| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` („Formularseiten“)                                                                          | `Formularlayout`, `Speicherleiste` |
+| Formularseite mit Feldgruppen                                                                   | `Formularpaneel`, Speichern über `useSpeicherLeiste` + `SpeicherKnopf` („Formularseiten“)                                                        | `Formularlayout`, `Speicherleiste` |
 | Gegliedertes Dokument                                                                           | `DokumentEntwurf`                                                                                                                                | `DokumentEntwurf`                  |
 | **Umschalten** (Spec `bedien-umschalten`, LLH-1808)                                             |                                                                                                                                                  |                                    |
 | Fläche oder Bereich darunter umschalten                                                         | `Segmentleiste rolle="tablist"` mit Reiterfläche (`role="tabpanel"`, `steuert`); führt ein Reiter auf eine andere Seite, `aktivierung="manuell"` | `Segmentleiste`                    |
@@ -529,7 +529,8 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    „Verwerfen“ und Escape lassen die Handlung verfallen. Ohne Altwert bleiben Knöpfe und Dialoge,
    die einen festen oder errechneten Wert setzen (Status, Lagezustand, „Kapazität übernehmen“).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
-   `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
+   `SpeicherFehler` am Paneel. Enter speichert (ohne Änderung schließt es, LLH-1829), Escape
+   bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
 6. **Jede bearbeitbare Detailansicht hat eine Item-Route** („Deeplink-Muster“).
 7. **Nach dem Anlegen springt die Seite in die neue Ansicht** (Vorbild Befehl), nicht zurück in
@@ -799,7 +800,8 @@ anwendbar), „nicht geprüft" ist keins.
   (LFH-1078; der Wächter erfasst sie nicht).
 - Erlaubt: Fehlermeldungen, Zustände („Offline vorgemerkt“, „Update lädt“), **ein** kurzer Satz
   zur Folge vor einem unumkehrbaren Schritt, Datenschutz-Hinweise („Zugriff wird protokolliert“),
-  Modulbeschreibungen aus wenigen Fachwörtern.
+  Modulbeschreibungen aus wenigen Fachwörtern, die Darf-Zeile unter einer Rollenoption (Umfang in
+  wenigen Wörtern, keine Bedienung; „Begriffe“, Rollen-Vokabular).
 - **Erklärendes gehört in die Anwenderdokumentation** (`docs/anwender/`, in der App unter
   „Hilfe“, LFH-1096): wer einen Erklärsatz entfernt, dessen Wissen sonst nirgends steht, schreibt
   es dort ins Kapitel. Regeln: `docs/anwender/AGENTS.md`.
@@ -968,6 +970,17 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Begriffe**
 
+- **Rollen-Vokabular** (LLH-1818, Entwurf
+  `docs/superpowers/specs/2026-11-19-zlzpieaq-rollen-vokabular-design.md`): Name und Darf-Zeile
+  jeder Rolle stehen nur in `einsatz/rollenVokabular.ts` (Rolle im Einsatz, in der Organisation,
+  in der Verwaltung, Stufe der Modulsperre). Eine Rolle heißt überall gleich: „System-Admin“ (mit
+  Bezug auf den Einsatz „System-Admin der Organisation“, nie „Org-Admin“), „Führungskraft der
+  Organisation“, ohne Rolle „Keine“ bzw. am Konto „Keine Rolle“; Felder heißen „Rolle in der
+  Verwaltung“, „Rolle in der Organisation“, „Rolle im Einsatz“. Jede Auswahl, die eine Rolle
+  vergibt, nutzt `rollenOptionen` und `rollenOptionRender` (`einsatz/rollenOption.tsx`): offen Name
+  und Darf-Zeile, geschlossen nur der Name. Darf-Zeilen höchstens 80 Zeichen. Eine neue Rolle kommt
+  zuerst ins Vokabular (der `Record` bricht sonst den Build). Wächter
+  `einsatz/rollenVokabular.guard.test.ts`.
 - **Voreingestellte Werte heißen „Vorgabe“** (LFH-944, Spec `bedien-begriffe`): nie „Default“,
   „Fallback“ oder „Standard“ im sichtbaren Text. Platzhalter nennen den Wert, der leer wirklich
   gilt; kein „Leer = …“-Satz daneben (LFH-1078). Bausteine in `components/vorgabeText.ts`
@@ -1462,6 +1475,19 @@ und `pages/personen/`.
   gilt stattdessen „höchstens eine offene Bearbeitung je Seite“ (LLH-1139, „Bearbeiten in der
   Ansicht“ unter der UI-Form-Leitlinie): ein Paneel mit eigenem Fuß ist dort kein zweiter
   Speicherweg.
+- **Ungespeichertes ist sichtbar** (LLH-1829, Design-Doc
+  `docs/superpowers/specs/2026-11-19-l1flywem-speichermodelle-kennzeichnen-design.md`): ein Feld,
+  das vom geladenen bzw. zuletzt gespeicherten Stand abweicht, trägt am Etikett einen Punkt „•“
+  (`GeaendertPunkt` in `Feld` und `DatenfeldEingabe`, für Vorleser „(geändert)“), gerechnet von
+  `components/aenderungsstand.tsx` (`AenderungsstandProvider` INNERHALB des `<Form>`, nie
+  `isFieldsTouched`; nach Erfolg `merke(gesendet)` über `useAenderungsstandMerken`). „Speichern“
+  steht nur als `components/SpeicherKnopf.tsx`: ohne Änderung gesperrt, daneben „Keine
+  Änderungen“ bzw. „N Änderungen“; wer das `<Form>` sperrt, reicht `disabled` mit. Enter ohne
+  Änderung schließt eine Bearbeitung (`EnterOhneAenderung`). Wächter
+  `components/speicherKnopf.guard.test.ts`: jede Datei mit `useSpeicherLeiste` nutzt beides. Eine
+  offene `InlineAngabe` zeigt ab der ersten Änderung „Nicht gespeichert“ mit Achtungskante (ohne
+  Tastenerklärung, „Text erklärt nie die Bedienung“); ein Klick daneben schließt sie nur
+  unverändert (still).
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei

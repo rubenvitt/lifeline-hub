@@ -60,6 +60,8 @@ import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
 import { ErfassungsModal } from '../components/Erfassung';
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, EnterOhneAenderung } from '../components/aenderungsstand';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { flaeche } from '../theme/tokens';
@@ -612,33 +614,35 @@ export default function TiereDetailPage() {
               );
             }}
           >
-            {detailAnsicht}
-            {editFehler != null && (
-              <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
-                <SpeicherFehler fehler={editFehler} />
-              </div>
-            )}
-            {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
-                Feldern scrollten die Knöpfe sonst aus dem Bild. */}
-            <div
-              {...speicherLeiste}
-              style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
-            >
-              {storniert ? (
-                // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
-                <Button onClick={editSitzung.beende}>Schließen</Button>
-              ) : (
-                <>
-                  <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
-                    Speichern
-                  </Button>
-                  {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-                  <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
-                    Abbrechen
-                  </Button>
-                </>
-              )}
-            </div>
+            <AenderungsstandProvider ausgangswerte={sitzung.werte}>
+              <EnterOhneAenderung onSchliessen={editSitzung.beende}>
+                {detailAnsicht}
+                {editFehler != null && (
+                  <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
+                    <SpeicherFehler fehler={editFehler} />
+                  </div>
+                )}
+                {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
+                  Feldern scrollten die Knöpfe sonst aus dem Bild. */}
+                <div
+                  {...speicherLeiste}
+                  style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+                >
+                  {storniert ? (
+                    // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
+                    <Button onClick={editSitzung.beende}>Schließen</Button>
+                  ) : (
+                    <>
+                      <SpeicherKnopf loading={editMutation.isPending} />
+                      {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                      <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
+                        Abbrechen
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </EnterOhneAenderung>
+            </AenderungsstandProvider>
           </Form>
         ) : (
           detailAnsicht

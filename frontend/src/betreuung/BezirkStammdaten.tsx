@@ -9,6 +9,8 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { Datenfeld, DatenfeldEingabe, Datenraster, Paneel } from '../components/instrument';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, EnterOhneAenderung } from '../components/aenderungsstand';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import {
   EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX,
@@ -181,26 +183,31 @@ export default function BezirkStammdaten({
     </Datenraster>
   );
 
+  // Stand beim Öffnen: Startwerte des Formulars und Ausgangsstand des Punkts (LLH-1829).
+  const startwerte: Partial<BezirkWerte> | undefined = beimOeffnen
+    ? {
+        bezeichnung: beimOeffnen.bezeichnung,
+        plan_personen: beimOeffnen.plan_personen,
+        plan_erhebung: beimOeffnen.plan_erhebung,
+        abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
+        // Eine gespeicherte Koordinate steht als Kartenpunkt im Feld: eine Textkorrektur behält
+        // sie (LLH-1121, design.md D3).
+        sammelstelle: ortsfeldAusGespeichert(
+          beimOeffnen.sammelstelle,
+          beimOeffnen.sammelstelle_lat,
+          beimOeffnen.sammelstelle_lon,
+        ),
+        notiz: beimOeffnen.notiz ?? undefined,
+      }
+    : undefined;
+
   return (
     <Paneel titel="Stammdaten" koerperPolster>
       <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       {beimOeffnen ? (
         <Form<BezirkWerte>
           form={form}
-          initialValues={{
-            bezeichnung: beimOeffnen.bezeichnung,
-            plan_personen: beimOeffnen.plan_personen,
-            plan_erhebung: beimOeffnen.plan_erhebung,
-            abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
-            // Eine gespeicherte Koordinate steht als Kartenpunkt im Feld: eine Textkorrektur behält
-            // sie (LLH-1121, design.md D3).
-            sammelstelle: ortsfeldAusGespeichert(
-              beimOeffnen.sammelstelle,
-              beimOeffnen.sammelstelle_lat,
-              beimOeffnen.sammelstelle_lon,
-            ),
-            notiz: beimOeffnen.notiz ?? undefined,
-          }}
+          initialValues={startwerte}
           onValuesChange={schutz.geaendert}
           // Nach gescheiterter Prüfung steht der Fokus im ersten Feld mit Meldung (LLH-1101).
           scrollToFirstError={{ focus: true }}
@@ -221,21 +228,26 @@ export default function BezirkStammdaten({
             );
           }}
         >
-          {raster}
-          {fehler != null && (
-            <div style={{ marginTop: token.marginLG }}>
-              <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht gespeichert werden" />
-            </div>
-          )}
-          <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: token.marginLG }}>
-            <Button type="primary" htmlType="submit" loading={laeuft}>
-              Speichern
-            </Button>
-            {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-            <Button disabled={laeuft} onClick={onBeenden}>
-              Abbrechen
-            </Button>
-          </div>
+          <AenderungsstandProvider ausgangswerte={startwerte}>
+            <EnterOhneAenderung onSchliessen={onBeenden}>
+              {raster}
+              {fehler != null && (
+                <div style={{ marginTop: token.marginLG }}>
+                  <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht gespeichert werden" />
+                </div>
+              )}
+              <div
+                {...speicherLeiste}
+                style={{ ...speicherLeiste.style, marginTop: token.marginLG }}
+              >
+                <SpeicherKnopf loading={laeuft} />
+                {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                <Button disabled={laeuft} onClick={onBeenden}>
+                  Abbrechen
+                </Button>
+              </div>
+            </EnterOhneAenderung>
+          </AenderungsstandProvider>
         </Form>
       ) : (
         raster

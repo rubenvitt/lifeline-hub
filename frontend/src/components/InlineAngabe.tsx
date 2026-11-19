@@ -51,6 +51,11 @@ import { vermerkKurz } from './feldVermerk';
  * darin verlässt die Eingabe, und ein Blur-Speichern schriebe einen halben Zeitpunkt. Gespeichert
  * wird nur ausdrücklich: Enter, Strg/⌘+Enter im Textfeld, oder „Speichern".
  *
+ * **Ungespeichertes ist sichtbar (LLH-1829).** Ab der ersten Änderung steht im Feld „Nicht
+ * gespeichert“ und eine Achtungskante (ohne Tastenerklärung, Regel „Text erklärt nie die
+ * Bedienung“). Ein Klick daneben schließt ein unverändertes Feld still;
+ * ein geändertes bleibt offen, gespeichert wird es dadurch nicht.
+ *
  * ── FELDWEISE BEARBEITUNG IN EINER ANSICHT (LLH-1103) ──────────────────────────────────
  *
  * Für die Personendaten (Change `f8218h1i-personendaten-feldweise`, design.md D3) kamen vier
@@ -397,6 +402,30 @@ export function InlineAngabe<T>({
   useEffect(() => () => fristRaeumenRef.current?.(), []);
   const popoverInhaltRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLSpanElement>(null);
+  /*
+   * Klick daneben (LLH-1829): ein unverändertes Feld schließt still, ein geändertes bleibt offen und
+   * zeigt „Nicht gespeichert“. „Innen“ markiert das Formular per `onPointerDownCapture`: React-
+   * Ereignisse laufen durch Portale, so zählt auch ein Klick in Kalender oder Auswahlliste. Der Hörer
+   * am Dokument kommt danach (React hört an der Wurzel darunter). Den Fokus zieht das Schließen
+   * nicht zurück: er gehört dem, was angeklickt wurde.
+   */
+  const innenRef = useRef(false);
+  useEffect(() => {
+    if (!bearbeitet) return;
+    const beimZeigerdruck = (e: PointerEvent) => {
+      if (innenRef.current) {
+        innenRef.current = false;
+        return;
+      }
+      if (e.target instanceof Node && anchorRef.current?.contains(e.target)) return;
+      if (geaendertRef.current) return;
+      popupOffenRef.current = false;
+      setFehler(null);
+      setBearbeitet(false);
+    };
+    document.addEventListener('pointerdown', beimZeigerdruck);
+    return () => document.removeEventListener('pointerdown', beimZeigerdruck);
+  }, [bearbeitet]);
   useLayoutEffect(() => {
     if (bearbeitet || fokusZurAnzeigeRef.current === 0) return;
     if (performance.now() > fokusZurAnzeigeRef.current) {
@@ -640,6 +669,11 @@ export function InlineAngabe<T>({
     </div>
   ) : null;
 
+  // „Nicht gespeichert“ ab der ersten Änderung (LLH-1829, Design-Doc „Offenes Inline-Feld“).
+  // Schreibgeschützt (LLH-1832) gibt es nichts mehr zu speichern. Ohne Tastenerklärung: Speichern
+  // und Abbrechen stehen darunter (`frontend/AGENTS.md`, „Text erklärt nie die Bedienung“).
+  const ungespeichert = entwurfGeaendert && !schreibschutz;
+
   const formular = (
     <form
       onSubmit={(e) => {
@@ -648,7 +682,22 @@ export function InlineAngabe<T>({
       }}
       onKeyDownCapture={tastenVorab}
       onKeyDown={tasten}
-      style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}
+      onPointerDownCapture={() => {
+        innenRef.current = true;
+      }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: token.marginXS,
+        minWidth: 0,
+        // Ungespeichert sichtbar (LLH-1829): Achtungskante, solange ein Entwurf offen ist.
+        ...(ungespeichert
+          ? {
+              borderInlineStart: `2px solid ${rollen.achtung}`,
+              paddingInlineStart: 'var(--lfh-luft-1)',
+            }
+          : {}),
+      }}
     >
       {eingabe({
         feld: {
@@ -678,6 +727,12 @@ export function InlineAngabe<T>({
         </div>
       ) : null}
       <SpeicherFehler fehler={fehler} />
+      {ungespeichert ? (
+        // `aria-live` statt `role="status"`: der Hinweis „Inzwischen geändert“ trägt die Rolle schon.
+        <div aria-live="polite" style={{ color: rollen.achtungText }}>
+          Nicht gespeichert
+        </div>
+      ) : null}
       {sperrHinweis}
       {/* Abstand der Dialogfüße (frontend/AGENTS.md, „Rot steht nicht bündig neben Neutralem“). */}
       <Space wrap size="middle">

@@ -33,6 +33,8 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { LETZTE_EINSATZLEITUNG_TEXT } from '../stammdaten/rechteText';
 import { EINSATZ_ROLLE_OPTIONEN } from '../einsatz/einsatzRolle';
+import { ROLLEN_LISTE_SCHMAL, rollenOptionRender } from '../einsatz/rollenOption';
+import { ROLLE_IM_EINSATZ_FELD } from '../einsatz/rollenVokabular';
 import { anzahl } from '../anzeige/anzahl';
 
 /** Rang einer Einsatzrolle: kleiner ist stärker. Herabstufen heißt, der Rang wächst. */
@@ -319,6 +321,8 @@ export default function MitgliederAbschnitt({
             ? EINSATZ_ROLLE_OPTIONEN.map((r) => ({ ...r, disabled: r.value !== 'einsatzleitung' }))
             : EINSATZ_ROLLE_OPTIONEN
         }
+        optionRender={rollenOptionRender}
+        {...ROLLEN_LISTE_SCHMAL}
         onChange={(rolle) => rolleWaehlen(m, rolle)}
       />
     </div>
@@ -389,7 +393,8 @@ export default function MitgliederAbschnitt({
         },
         {
           // Rolle und Aktion teilen sich eine Spalte: zwei Zahlbreiten nebeneinander ließen dem
-          // Namen bei 390 px keine 90 px.
+          // Namen bei 390 px keine 90 px. Schmal bleibt „Rolle“ ohne „im Einsatz“: der Kopf hat die
+          // Zahlbreite der Spalte, und im Reiter „Zugriff“ ist keine andere Rolle gemeint (LLH-1818).
           title: darfVerwalten ? 'Rolle · Aktion' : 'Rolle',
           key: 'rolle',
           width: SCHMAL_ROLLE,
@@ -410,7 +415,12 @@ export default function MitgliederAbschnitt({
           sorter: stelleSortierung,
           render: (_, m) => fuehrungsstelle(m),
         },
-        { title: 'Rolle', key: 'rolle', ...rolleOrdnung, render: (_, m) => rolleFeld(m) },
+        {
+          title: ROLLE_IM_EINSATZ_FELD,
+          key: 'rolle',
+          ...rolleOrdnung,
+          render: (_, m) => rolleFeld(m),
+        },
         {
           // Beschriftet: eine namenlose Spalte ist für einen Screenreader eine Zelle ohne
           // Zugehörigkeit.
@@ -465,7 +475,14 @@ export default function MitgliederAbschnitt({
             className={FELD_KLASSE}
             style={{ width: 'var(--lfh-feld-schmal)', maxWidth: '100%' }}
           >
-            <Select value={neueRolle} options={EINSATZ_ROLLE_OPTIONEN} onChange={setNeueRolle} />
+            <Select
+              value={neueRolle}
+              aria-label={ROLLE_IM_EINSATZ_FELD}
+              options={EINSATZ_ROLLE_OPTIONEN}
+              optionRender={rollenOptionRender}
+              {...ROLLEN_LISTE_SCHMAL}
+              onChange={setNeueRolle}
+            />
           </div>
           <Button
             type="primary"

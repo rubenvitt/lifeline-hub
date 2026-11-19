@@ -87,6 +87,8 @@ import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
+import SpeicherKnopf from '../components/SpeicherKnopf';
+import { AenderungsstandProvider, EnterOhneAenderung } from '../components/aenderungsstand';
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -787,34 +789,36 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
                 );
               }}
             >
-              {stammdaten}
-              {speichernMut.error != null && (
-                <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
-                  <SpeicherFehler
-                    fehler={speichernMut.error}
-                    titel="Betreuungsstelle konnte nicht gespeichert werden"
-                  />
-                </div>
-              )}
-              <div
-                {...speicherLeiste}
-                style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
-              >
-                {storniert ? (
-                  // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
-                  <Button onClick={() => setSitzung(null)}>Schließen</Button>
-                ) : (
-                  <>
-                    <Button type="primary" htmlType="submit" loading={speichernMut.isPending}>
-                      Speichern
-                    </Button>
-                    {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-                    <Button disabled={speichernMut.isPending} onClick={() => setSitzung(null)}>
-                      Abbrechen
-                    </Button>
-                  </>
-                )}
-              </div>
+              <AenderungsstandProvider ausgangswerte={sitzung.werte}>
+                <EnterOhneAenderung onSchliessen={() => setSitzung(null)}>
+                  {stammdaten}
+                  {speichernMut.error != null && (
+                    <div style={{ marginTop: 'var(--lfh-luft-4)' }}>
+                      <SpeicherFehler
+                        fehler={speichernMut.error}
+                        titel="Betreuungsstelle konnte nicht gespeichert werden"
+                      />
+                    </div>
+                  )}
+                  <div
+                    {...speicherLeiste}
+                    style={{ ...speicherLeiste.style, marginTop: 'var(--lfh-luft-4)' }}
+                  >
+                    {storniert ? (
+                      // Storniert (LLH-1832): nichts mehr zu speichern, der Entwurf bleibt lesbar.
+                      <Button onClick={() => setSitzung(null)}>Schließen</Button>
+                    ) : (
+                      <>
+                        <SpeicherKnopf loading={speichernMut.isPending} />
+                        {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
+                        <Button disabled={speichernMut.isPending} onClick={() => setSitzung(null)}>
+                          Abbrechen
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </EnterOhneAenderung>
+              </AenderungsstandProvider>
             </Form>
           ) : (
             stammdaten

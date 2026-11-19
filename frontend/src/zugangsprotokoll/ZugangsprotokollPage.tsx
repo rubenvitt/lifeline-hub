@@ -28,6 +28,7 @@ import { OrgAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
@@ -191,8 +192,8 @@ const aenderungsSpalten = spaltenFuer<Zugangsaenderung>()([
   },
   {
     key: 'admin',
-    title: 'Admin',
-    etikett: 'Admin',
+    title: SYSTEM_ROLLE.admin.name,
+    etikett: SYSTEM_ROLLE.admin.name,
     width: 160,
     render: (_, e) => e.akteur_name ?? leer,
   },

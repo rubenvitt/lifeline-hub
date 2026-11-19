@@ -1,5 +1,5 @@
-import type { OrgRolle, SystemRolle } from '../api/types';
 import { NUR_ADMIN } from '../components/nurAnsicht';
+import { SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
 
 /**
  * EIN Grund für alle Verwaltungssektionen (LFH-346, Befund M45): wer ohne Admin-Rolle eine
@@ -28,23 +28,7 @@ export const LETZTE_EINSATZLEITUNG_TEXT = 'Gesperrt: letzte Einsatzleitung';
 /** Das eigene Konto — Deaktivieren beendete die eigene Sitzung. */
 export const EIGENES_KONTO = 'eigenes Konto';
 /** Der letzte aktive Admin (Server: 409, `routes/benutzer.rs`). */
-export const LETZTER_ADMIN = 'letzter aktiver Admin';
-
-/**
- * Rollen, wie der Benutzer-Dialog sie benennt (LFH-1152): eine Quelle für Dialog und
- * Zugangsprotokoll, damit „keiner“ oder „fuehrungskraft“ nirgends roh erscheint. Der Dialog hängt
- * bei der Führungskraft ihren Hinweis an.
- */
-export const SYSTEM_ROLLE_FELD = 'System-Rolle';
-export const ORG_ROLLE_FELD = 'Org-Rolle';
-export const SYSTEM_ROLLE_TEXT: Record<SystemRolle, string> = {
-  keiner: 'Benutzer',
-  admin: 'Admin',
-};
-export const ORG_ROLLE_TEXT: Record<OrgRolle, string> = {
-  keine: 'Keine',
-  fuehrungskraft: 'Führungskraft',
-};
+export const LETZTER_ADMIN = `letzter aktiver ${SYSTEM_ROLLE.admin.name}`;
 
 /**
  * „Einmalpasswort vergeben“ im Bearbeiten-Dialog (LFH-1121): der Server lehnt das eigene Konto

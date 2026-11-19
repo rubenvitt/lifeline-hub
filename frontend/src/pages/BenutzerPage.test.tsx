@@ -10,6 +10,7 @@ import BenutzerPage from './BenutzerPage';
 import { globalKeys } from '../api/queryKeys';
 import { ANZEIGENAME_MAX } from '../api/eingabegrenzen';
 import { adminFixture } from '../test/fixtures';
+import { listeVon, oeffne, waehle as waehleOption } from '../test/auswahlListe';
 import { warteAufMenueFokus } from '../test/menue';
 import { eintraegeVon, oeffneKontextmenue, trennerVon } from '../test/kontextmenue';
 import {
@@ -692,8 +693,8 @@ describe('BenutzerPage', () => {
     expect(within(ersterDialog).getByLabelText('Anzeigename')).toHaveValue('Eva');
     // Der gewählte Wert eines antd-`Select` steht im sichtbaren Auswahl-Element, nicht
     // im `<input>` — der zugängliche Name der Combobox ist die Feldbeschriftung.
-    expect(within(ersterDialog).getByText('Admin')).toBeInTheDocument();
-    expect(within(ersterDialog).getByText(/Führungskraft/)).toBeInTheDocument();
+    expect(within(ersterDialog).getByText('System-Admin')).toBeInTheDocument();
+    expect(within(ersterDialog).getByText('Führungskraft der Organisation')).toBeInTheDocument();
     await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Abbrechen' }));
 
     await waehle('Ben', 'Bearbeiten');
@@ -701,9 +702,9 @@ describe('BenutzerPage', () => {
     await waitFor(() =>
       expect(within(zweiterDialog).getByLabelText('Anzeigename')).toHaveValue('Ben'),
     );
-    expect(within(zweiterDialog).getByText('Benutzer')).toBeInTheDocument();
-    expect(within(zweiterDialog).getByText('Keine')).toBeInTheDocument();
-    expect(within(zweiterDialog).queryByText('Admin')).toBeNull();
+    // Beide Rollenfelder heißen ohne Rolle „Keine“ (LLH-1818).
+    expect(within(zweiterDialog).getAllByText('Keine')).toHaveLength(2);
+    expect(within(zweiterDialog).queryByText('System-Admin')).toBeNull();
     expect(within(zweiterDialog).queryByText(/Führungskraft/)).toBeNull();
   });
 
@@ -807,10 +808,13 @@ describe('BenutzerPage', () => {
     await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
     const dialog = screen.getByRole('dialog', { name: 'Neuen Benutzer anlegen' });
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    await userEvent.click(await within(dialog).findByLabelText('Org-Rolle'));
-    // Die Optionsliste hängt im Portal, nicht im Dialog; gegriffen wird der echte Options-Knoten
-    // (antd hört auf dessen Klick).
-    await userEvent.click(await screen.findByText('Führungskraft (darf Einsätze anlegen)'));
+    expect(within(dialog).getByLabelText('Rolle in der Verwaltung')).toBeInTheDocument();
+    await oeffne('Rolle in der Organisation');
+    // Aufgeklappt steht unter dem Namen, was die Rolle darf (LLH-1818).
+    expect(listeVon('Rolle in der Organisation')).toHaveTextContent(
+      'legt Einsätze an, liest jeden Einsatz der Organisation',
+    );
+    await waehleOption('Rolle in der Organisation', 'Führungskraft der Organisation');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
 
     await waitFor(() => expect(rumpf).not.toBeNull());
@@ -1009,8 +1013,7 @@ describe('BenutzerPage', () => {
       await waehle('Eva', 'Bearbeiten');
       const dialog = await screen.findByRole('dialog', { name: 'Benutzer bearbeiten' });
       expect(within(dialog).queryByText(/neu aufgebaut werden/)).toBeNull();
-      await userEvent.click(within(dialog).getByLabelText('System-Rolle'));
-      await userEvent.click(await screen.findByTitle('Benutzer'));
+      await waehleOption('Rolle in der Verwaltung', 'Keine');
       expect(await within(dialog).findByText(/neu aufgebaut werden/)).toBeInTheDocument();
     });
 

@@ -4,6 +4,8 @@ import type {
   Koordinatenformat,
   Zeitdarstellung,
 } from '../../api/types';
+import { rollenOptionen } from '../../einsatz/rollenOption';
+import { MODUL_STUFE } from '../../einsatz/rollenVokabular';
 
 /**
  * Auswahllisten der Einstellungsseiten. Der Platzhalter der Selects bleibt an der Aufrufstelle und
@@ -15,14 +17,13 @@ import type {
 /**
  * Benötigte Rolle eines Moduls, von offen nach eng; '' = frei (für alle sichtbaren). „Führung im
  * Einsatz“ zählt die Rolle im Einsatz mit, „Führungskraft der Organisation“ nur die Org-Rolle
- * (Spec `modul-freigabe`, LFH-1150).
+ * (Spec `modul-freigabe`, LFH-1150). Namen und Darf-Zeilen aus dem Rollen-Vokabular (LLH-1818).
  */
-export const ROLLEN_OPTIONEN: { value: BenoetigteRolle | ''; label: string }[] = [
-  { value: '', label: 'Frei (alle)' },
-  { value: 'einsatzfuehrung', label: 'Führung im Einsatz' },
-  { value: 'fuehrungskraft', label: 'Führungskraft der Organisation' },
-  { value: 'admin', label: 'Admin' },
-];
+export const ROLLEN_OPTIONEN: { value: BenoetigteRolle | ''; label: string; darf: string }[] =
+  rollenOptionen(MODUL_STUFE, ['frei', 'einsatzfuehrung', 'fuehrungskraft', 'admin']).map((o) => ({
+    ...o,
+    value: o.value === 'frei' ? '' : o.value,
+  }));
 
 /** Der Name einer gesetzten Stufe aus `ROLLEN_OPTIONEN`; `undefined` für frei oder unbekannt. */
 export function rollenName(rolle: string | null | undefined): string | undefined {

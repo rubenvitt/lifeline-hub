@@ -30,6 +30,7 @@ import { Knopfreihe, useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import {
+  einsatzdatenPfad,
   evakuierungsbezirkPfad,
   gefahrenPfad,
   parseKartenzentrum,
@@ -89,6 +90,7 @@ import {
 } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import SuchnadelBand from './lagekarte/SuchnadelBand';
+import EinsatzortBand from './lagekarte/EinsatzortBand';
 import FokusBand from './lagekarte/FokusBand';
 import { useAbschnittFokus } from './lagekarte/useAbschnittFokus';
 import { daempfeFlaechen, daempfeMarker } from './lagekarte/abschnittFokus';
@@ -1894,6 +1896,21 @@ export default function LagekartePage() {
           onBeenden={onMessenBeenden}
         />
         <SuchnadelBand ort={suchnadel} onEntfernen={() => setSuchnadel(null)} />
+        {/* Ohne Punkt nennt die Karte den fehlenden Einsatzort (LLH-1953): nur live und geladen,
+            nicht im gesicherten Stand und in keinem Kartenmodus (auch nicht beim Platzieren des
+            Einsatzorts) — jeder Modus gibt die Karte frei (LFH-765). Knöpfe nur mit Schreibrecht,
+            der Sprung nur in freie Einsatzdaten. */}
+        {einsatzortOhneOrt && snapshotParam == null && !exklusiverModusAktiv && einsatzDaten && (
+          <EinsatzortBand
+            adresse={einsatzDaten.einsatzort ?? null}
+            onPlatzieren={darfSchreiben ? onEinsatzortPlatzieren : undefined}
+            adressePfad={
+              darfSchreiben && !sprungGesperrt('einsatzdaten')
+                ? einsatzdatenPfad(einsatzId, { paneel: 'einsatzort' })
+                : undefined
+            }
+          />
+        )}
         <FokusBand
           name={fokusSicht?.name ?? null}
           escHebtAuf={abschnittFokus.escHebtAuf}
