@@ -31,7 +31,6 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 - [x] 4.5 Haptik beim neu eingehenden Alarm der Stufe `alarm` (`warning`), nicht beim Nachspielen, nicht bei Stummschaltung; Tests
 - [x] 4.6 Haptik in der Segmentleiste (`selection`, einmal je Wechsel, zentral); Test
 - [x] 4.7 Test: Push-Schalter fehlt bei `platform: 'ios'`; Test: Start ohne `navigator.serviceWorker` (Registrierung, Alarm, Web Push) bleibt still und meldet keinen Client-Fehler
-- [ ] 4.8 Haptik in den Anwenderkapiteln, die die Rückmeldung beim Speichern und den Alarm beschreiben (einsatztagebuch, einsatz-oberflaeche), erst mit dem ersten TestFlight-Build nach 10.2 (Anwenderdoku nur Ist-Stand); Wächter grün
 
 ## 5. Gemeinsame Fälle der Hüllen
 
@@ -75,20 +74,23 @@ Linux-Container nicht bauen: Belege für Swift sind grüne Läufe der CI (Linux-
 
 ## 9. Auslieferung
 
-- [ ] 9.1 `ios.yml` (`workflow_call` und `workflow_dispatch`): Versionsskript, Archiv, automatische Signierung per API-Schlüssel, Upload zu TestFlight; `artefakte.yml` ruft ihn nach `freigeben` nur für Tags der Kanäle `beta` und `main`, ohne das Release aufzuhalten; actionlint grün
+- [x] 9.1 `ios.yml` (`workflow_call` und `workflow_dispatch`): Versionsskript, Archiv, automatische Signierung per API-Schlüssel, Upload zu TestFlight; `artefakte.yml` ruft ihn nach `freigeben` nur für Tags der Kanäle `beta` und `main`, ohne das Release aufzuhalten; actionlint grün — der erste echte Upload ist LLH-1988 (Handstart erst nach dem Merge möglich)
 - [x] 9.2 arc42 Kapitel 7 (Verteilung), 8 (Hüllen-Vertrag) und 11 (Risiken) nachziehen; Wächter der Architekturdoku grün
 
 ## 10. Übergaben an Ruben und Abnahme
 
-- [ ] 10.1 Ruben: Bundle-ID registrieren, App in App Store Connect anlegen, API-Schlüssel (Rolle Admin, falls die Cloud-Signierung mit App Manager scheitert, siehe docs/betrieb/ios-app.md) als Secrets (`APP_STORE_CONNECT_*`) hinterlegen; Aufgabe bis dahin `blocked`
-- [ ] 10.2 Handstart von `ios.yml` auf einem Beta-Stand lädt einen Build zu TestFlight; Link zum grünen Lauf im Kommentar
-- [ ] 10.3 Ruben prüft auf iPhone und iPad: Onboarding mit `elw.local` (CA-Profil), zwei Server mit getrennten Sitzungen, Anmeldung im Browser mit Passkey, Haptik beim ETB-Eintrag (iPhone), Alarm mit Meldung bei offener App, CSV-Export, Drucken; Ergebnis im Kommentar
+- [x] 10.1 Ruben: Bundle-ID registrieren, App in App Store Connect anlegen, API-Schlüssel (Rolle Admin, falls die Cloud-Signierung mit App Manager scheitert, siehe docs/betrieb/ios-app.md) als Secrets (`APP_STORE_CONNECT_*`) hinterlegen; Aufgabe bis dahin `blocked` — erledigt 19.11.2026: App-ID 6836662616, Schlüssel „Lifeline Hub CI“ (83FQR239VV, Administrator:in), drei Secrets gesetzt, .p8 in 1Password
 
 ## 11. Integration
 
 - [ ] 11.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu `--nur ios` mit Toolchain in der CI; Links zu den grünen Läufen von `suiten.yml` (Label `voll`) und `ios-pruefung.yml` im PR
 
 ## Workflow follow-up
+
+- Ausgegliedert nach LLH-1988 (19.11.2026, erst nach dem Merge möglich: Handstart braucht `ios.yml` auf `alpha`, Upload nur ab Beta-Stand):
+  - 4.8 Haptik in den Anwenderkapiteln, die die Rückmeldung beim Speichern und den Alarm beschreiben (einsatztagebuch, einsatz-oberflaeche), erst mit dem ersten TestFlight-Build nach 10.2 (Anwenderdoku nur Ist-Stand); Wächter grün
+  - 10.2 Handstart von `ios.yml` auf einem Beta-Stand lädt einen Build zu TestFlight; Link zum grünen Lauf im Kommentar
+  - 10.3 Ruben prüft auf iPhone und iPad: Onboarding mit `elw.local` (CA-Profil), zwei Server mit getrennten Sitzungen, Anmeldung im Browser mit Passkey, Haptik beim ETB-Eintrag (iPhone), Alarm mit Meldung bei offener App, CSV-Export, Drucken; Ergebnis im Kommentar
 
 - Folgeaufgaben (angelegt 18.11.2026): LLH-1980 Start ohne Server (D5, im Blick behalten), LLH-1981 APNs, LLH-1982 Desktop-Hülle nutzt `/api/shell`, LLH-1979 API-Routen englisch.
 - `/opsx:archive` samt Spec-Sync vor dem PR, dann PR gegen `alpha` mit Bildern der Änderung (Simulator-Artefakte).
