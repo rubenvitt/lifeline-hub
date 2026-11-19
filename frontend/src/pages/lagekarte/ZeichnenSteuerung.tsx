@@ -1,6 +1,6 @@
 import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
 import { Button, Card, Space, Switch, Typography } from 'antd';
-import { monoStil, useRollen } from '../../components/instrument';
+import { Stapel, Textstufe, monoStil, useRollen } from '../../components/instrument';
 import EscKappe from './EscKappe';
 import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
@@ -84,17 +84,15 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // Der Serien-Schalter steht in beiden Phasen: vor dem Zeichnen ist er die Ansage, danach die
   // letzte Gelegenheit, sie vor dem Speichern zu widerrufen.
   const serienZeile = props.onSerieWechsel && (
-    <Space>
+    <Stapel richtung="zeile" abstand="xs" ausrichten="mitte">
       <Switch
         checked={!!props.serie}
         onChange={props.onSerieWechsel}
         aria-label="Weitere zeichnen"
       />
-      <Typography.Text>Weitere zeichnen</Typography.Text>
-      {gespeichert > 0 && (
-        <Typography.Text type="secondary">{gespeichert} gespeichert</Typography.Text>
-      )}
-    </Space>
+      <Textstufe>Weitere zeichnen</Textstufe>
+      {gespeichert > 0 && <Textstufe ton="gedaempft">{gespeichert} gespeichert</Textstufe>}
+    </Stapel>
   );
   // „Abbrechen" verwirft nur einen Entwurf; ab der ersten gespeicherten Zone heißt Beenden
   // „Fertig", weil das Gespeicherte bleibt.
@@ -125,18 +123,10 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         minWidth: 'min(320px, 100%)',
       }}
     >
-      <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
+      <Stapel abstand="sm">
         {/* Titel und Punktzähler teilen eine Zeile: jede Zeile mehr hebt den Fuß auf dem
             Handschirm über die Karte. */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            alignItems: 'baseline',
-            gap: token.marginXS,
-          }}
-        >
+        <Stapel richtung="zeile" umbruch verteilen="between" ausrichten="baseline" abstand="xs">
           <Typography.Text strong>{props.titel}</Typography.Text>
           {(zuViele || (!bestaetigen && props.punkte != null)) && (
             <span
@@ -155,7 +145,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               {zuVieleHinweis}
             </span>
           )}
-        </div>
+        </Stapel>
         {bestaetigen ? (
           <>
             {serienZeile}
@@ -204,7 +194,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
             </Space>
           </>
         )}
-      </Space>
+      </Stapel>
     </Card>
   );
 }

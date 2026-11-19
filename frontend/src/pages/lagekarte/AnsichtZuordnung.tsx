@@ -2,6 +2,7 @@ import { theme } from 'antd';
 import { useId } from 'react';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
+import { FELD_KLASSE } from '../../components/instrument';
 import type { KartenAnsicht } from '../../api/types';
 
 interface AnsichtZuordnungProps {
@@ -30,12 +31,11 @@ export default function AnsichtZuordnung({
   const id = useId();
   if (ansichten.length <= 1) return null;
   return (
-    <div style={{ marginTop: token.marginXS }}>
+    <div className={FELD_KLASSE} style={{ marginTop: token.marginXS }}>
       {/* Das FeldLabel trägt den Namen; „Sichtbar auf" ist zugleich der Accessible Name. */}
       <FeldLabel text="Sichtbar auf" htmlFor={id}>
         <Select<number>
           id={id}
-          style={{ width: '100%' }}
           value={wert ?? ALLE}
           disabled={disabled}
           onChange={(v) => onChange(v === ALLE ? null : v)}

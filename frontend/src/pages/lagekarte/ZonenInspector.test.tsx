@@ -355,16 +355,15 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     expect(screen.queryByText('Länge')).not.toBeInTheDocument();
   });
 
-  it('hinterlässt ohne Kennzahlen keine leere Space-Zeile', () => {
-    // antds `Space` filtert `false`/`null` als Kind heraus, wickelt aber eine Komponente, die null
-    // rendert, trotzdem in ein `.ant-space-item` — ein unbedingtes `<GeoKennzahlen>` erzeugte eine
-    // sichtbare Lücke. Die Bedingung gehört an die Aufrufstelle.
+  it('hinterlässt ohne Kennzahlen keine leere Zeile im Stapel', () => {
+    // Ohne Kennzahlen steht kein Kind für sie im Stapel der Felder (er trägt `FELD_KLASSE`): eine
+    // leere Hülle hielte dort ihren Abstand. Die Bedingung gehört an die Aufrufstelle.
     const { container: ohne } = renderInspector({
       zone: { ...basisZone, gefahrengebiet_id: null },
       gebiete: [],
     });
     const { container: mit } = renderInspector({ zone: polygonZone, gebiete: [] });
-    const zaehle = (c: HTMLElement) => c.querySelectorAll('.ant-space-item').length;
+    const zaehle = (c: HTMLElement) => c.querySelector('.lfh-formfeld')!.children.length;
     expect(zaehle(ohne)).toBe(zaehle(mit) - 1);
   });
 });

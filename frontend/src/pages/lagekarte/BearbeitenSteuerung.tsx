@@ -1,6 +1,6 @@
 import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
 import { Button, Card, Space, Typography } from 'antd';
-import { monoStil, useRollen } from '../../components/instrument';
+import { Stapel, monoStil, useRollen } from '../../components/instrument';
 import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
 import EscKappe from './EscKappe';
@@ -57,21 +57,13 @@ export default function BearbeitenSteuerung(props: BearbeitenSteuerungProps) {
         minWidth: 'min(320px, 100%)',
       }}
     >
-      <Space orientation="vertical" size={token.marginSM} style={{ width: '100%' }}>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            alignItems: 'baseline',
-            gap: token.marginXS,
-          }}
-        >
+      <Stapel abstand="sm">
+        <Stapel richtung="zeile" umbruch verteilen="between" ausrichten="baseline" abstand="xs">
           <Typography.Text strong>{props.titel}</Typography.Text>
           <Typography.Text data-lfh="bearbeiten-punkte" style={monoStil(token.fontSize)}>
             {props.punkte === 1 ? '1 Punkt' : `${grenzeText(props.punkte)} Punkte`}
           </Typography.Text>
-        </div>
+        </Stapel>
         {zuViele && (
           <Typography.Text
             style={{
@@ -123,7 +115,7 @@ export default function BearbeitenSteuerung(props: BearbeitenSteuerungProps) {
             Abbrechen{escBeendet && <EscKappe />}
           </Button>
         </Space>
-      </Space>
+      </Stapel>
     </Card>
   );
 }

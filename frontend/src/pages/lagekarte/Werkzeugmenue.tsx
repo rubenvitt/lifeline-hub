@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import { Button, Tooltip, Typography } from 'antd';
-import { Augenbraue, useRollen, zielEinzug } from '../../components/instrument';
+import { Button, Tooltip } from 'antd';
+import { Augenbraue, Textstufe, useRollen, zielEinzug } from '../../components/instrument';
 import type { FreiesZeichenUpdate } from '../../api/types';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 import { KACHEL_BILD, ZeichenAufPlatte, kachelFarben, kachelStil } from './FreiesZeichenPicker';
@@ -178,7 +178,7 @@ export default function Werkzeugmenue({
         </Augenbraue>
         {zeichenLaeuft ? (
           // Bedient wird das laufende Zeichen im Modus-Band bzw. im Fuß (LLH-1028).
-          <Typography.Text type="secondary">wird platziert</Typography.Text>
+          <Textstufe ton="gedaempft">wird platziert</Textstufe>
         ) : (
           <>
             {zuletzt.length > 0 && (
