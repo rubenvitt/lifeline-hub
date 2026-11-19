@@ -80,7 +80,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - `pub async fn bereitschaft(State, Benutzer) -> Result<Json<Bereitschaft>, AppError>`
   - TS-Typ `components['schemas']['Bereitschaft']`
 
-- [ ] **Step 1: Die Tests schreiben, die scheitern sollen.** Hilfen aus `tests/common`
+- [x] **Step 1: Die Tests schreiben, die scheitern sollen.** Hilfen aus `tests/common`
   (`setup_mit_pool`, `login_cookie`, `benutzer_anlegen`, `fremde_org_anlegen`, `anfrage`).
   Fahrzeuge, Personal und Vorlagen über ihre bestehenden POST-Routen anlegen; ein
   `dienststatus = 'ausser_dienst'` und eine Vorlage mit `aktiv = 0` direkt per SQL.
@@ -100,10 +100,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
     - Aufbau: `POST /api/demo-daten/starkregen` als Admin (Weg wie in `tests/demo_daten.rs`).
     - Erwartet: `fahrzeuge == 0`, `fahrzeuge_demo > 0`, `personal == 0`, `personal_demo > 0`.
 
-- [ ] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
+- [x] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
   `cargo test --test verwaltung_bereitschaft`, erwartet: FAIL, die Route gibt 404.
 
-- [ ] **Step 3: `bereitschaft` umsetzen.**
+- [x] **Step 3: `bereitschaft` umsetzen.**
   - Gate: `benutzer.darf_admin_bereich()`, sonst `AppError::Forbidden`.
   - Eine `SELECT` mit acht Unterabfragen, alle gebunden an `benutzer.org_id`.
   - Benutzer wie `routes::benutzer::liste` mit `aktiv = 1` (Alias `b`).
@@ -113,11 +113,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - Route in `app.rs` eintragen, Pfad und Schema in `api_doc.rs`.
   - Kopfkommentar mit Verweis auf das Design-Doc.
 
-- [ ] **Step 4: Prüfen, dass die Tests durchlaufen.**
+- [x] **Step 4: Prüfen, dass die Tests durchlaufen.**
   `cargo test --test verwaltung_bereitschaft`, erwartet: PASS. Danach
   `scripts/check-typ-codegen.sh`, erwartet: exit 0, die generierten Dateien sind aktualisiert.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
   `feat(verwaltung): Bestand der Bereitschaft zählen (LLH-1820)`, mit Zunder-Zeile.
 
 ### Task 2: Auswahl beim Anlegen `GET /api/einsaetze/mitglied-auswahl`
@@ -140,7 +140,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
     über dieselbe Grundmenge. Task 3 braucht sie.
   - Handler `routes::einsatz::mitglied_auswahl_anlage`
 
-- [ ] **Step 1: Die Tests schreiben, die scheitern sollen.**
+- [x] **Step 1: Die Tests schreiben, die scheitern sollen.**
   - `anlage_auswahl_bietet_die_org_ohne_mich`: Eine Führungskraft ohne Systemrolle bekommt die
     aktiven Personen der Org ohne sich selbst. Kein deaktiviertes Konto, kein Gerätekonto, keine
     fremde Org.
@@ -150,23 +150,23 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - Die bestehenden Tests der Datei bleiben unverändert grün. Sie sichern den Umbau von
     `mitglied_auswahl` ab.
 
-- [ ] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
+- [x] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
   `cargo test --test einsatz_mitglieder_auswahl`, erwartet: die neuen FAIL, die alten PASS.
 
-- [ ] **Step 3: Umsetzen.**
+- [x] **Step 3: Umsetzen.**
   - `mitglied_auswahl` (pro Einsatz) nutzt `auswahl_sql` mit der bisherigen Bedingung für
     Mitgliedschaft und Org des Einsatzes.
   - `mitglied_auswahl_fuer_anlage` nutzt `b.org_id = ? AND b.id <> ?`.
   - Gate im Handler: `darf_einsatz_anlegen()`, sonst 403.
 
-- [ ] **Step 4: Prüfen, dass die Tests durchlaufen.**
+- [x] **Step 4: Prüfen, dass die Tests durchlaufen.**
   - `cargo test --test einsatz_mitglieder_auswahl --test einsatz_kontext_guard`, erwartet: PASS.
   - Meldet der Wächter die neue Route, gilt die Ausweichadresse
     `/api/einsatz-anlage/mitglied-auswahl` aus dem Design-Doc. Dann auch den Test darauf
     umstellen.
   - Danach `scripts/check-typ-codegen.sh`.
 
-- [ ] **Step 5: Commit.** `feat(einsatz): Personenauswahl schon beim Anlegen (LLH-1820)`
+- [x] **Step 5: Commit.** `feat(einsatz): Personenauswahl schon beim Anlegen (LLH-1820)`
 
 ### Task 3: `POST /api/einsaetze` mit `mitglieder`
 
@@ -186,7 +186,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - `async fn mitglieder_aufnehmen_tx(conn, einsatz_id: i64, org_id: i64, mitglieder: &[(i64, EinsatzRolle)]) -> Result<(), AppError>`
   - Konstante `MITGLIEDER_MAX: usize = 500`
 
-- [ ] **Step 1: Die Tests schreiben, die scheitern sollen.**
+- [x] **Step 1: Die Tests schreiben, die scheitern sollen.**
   - `mitglieder_kommen_mit_dem_einsatz`
     - Aufbau: Eine Führungskraft legt mit zwei Personen an, Rollen `fuehrungspersonal` und
       `beobachter`.
@@ -212,11 +212,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - `fremde_und_inaktive_melden_gleich`: Der Fehlertext bei einer fremden und bei einer
     deaktivierten Person ist bis auf die Kennung gleich.
 
-- [ ] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
+- [x] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
   `cargo test --test einsatz_anlegen_mitglieder`, erwartet: FAIL. Mitglieder werden heute
   ignoriert, Einsätze entstehen trotz Fehlern.
 
-- [ ] **Step 3: Umsetzen.**
+- [x] **Step 3: Umsetzen.**
   - Im Handler, vor jedem Schreiben:
     - Länge gegen `MITGLIEDER_MAX` prüfen;
     - Rolle per `EinsatzRolle::parse` prüfen;
@@ -239,11 +239,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - Das Frontend-Interface `NeuerEinsatz` (`frontend/src/api/einsaetze.ts:32`) bekommt
     `mitglieder?: { benutzer_id: number; rolle: EinsatzRolle }[]`.
 
-- [ ] **Step 4: Prüfen, dass die Tests durchlaufen.**
+- [x] **Step 4: Prüfen, dass die Tests durchlaufen.**
   - `cargo test --test einsatz_anlegen_mitglieder --test benachrichtigung_org`, erwartet: PASS.
   - Dann `scripts/check-typ-codegen.sh`.
 
-- [ ] **Step 5: Commit.** `feat(einsatz): Mitglieder atomar beim Anlegen aufnehmen (LLH-1820)`
+- [x] **Step 5: Commit.** `feat(einsatz): Mitglieder atomar beim Anlegen aufnehmen (LLH-1820)`
 
 ### Task 4: Wertung `admin/bereitschaft.ts`
 
@@ -260,7 +260,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - Labels und Reihenfolge der Zeilen: Benutzer, Fahrzeuge, Personal, Einheiten-Vorlagen,
     Einsatz-Vorlagen.
 
-- [ ] **Step 1: Die Tests schreiben, die scheitern sollen** (Tabellentest):
+- [x] **Step 1: Die Tests schreiben, die scheitern sollen** (Tabellentest):
 
   | Eingabe (gekürzt) | `fehlt` | `satz` | Zustände |
   | --- | --- | --- | --- |
@@ -269,18 +269,18 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   | benutzer 2, fahrzeuge 0, personal 0, fahrzeuge_demo 5, personal_demo 9 (`nur_demo_ist_nicht_bereit`) | `['Fahrzeuge oder Personal']` | „Für einen Einsatz fehlt: Fahrzeuge oder Personal.“ | Demo-Zahlen in `demo` |
   | alles ≥ 2 | `[]` | „Bereit für einen Einsatz.“ | alle vorhanden |
 
-- [ ] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
+- [x] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
   `mise exec -- pnpm -C frontend exec vitest run src/admin/bereitschaft.test.ts`, erwartet: FAIL.
 
-- [ ] **Step 3: `bewerteBereitschaft` umsetzen.**
+- [x] **Step 3: `bewerteBereitschaft` umsetzen.**
   - Pflicht: `benutzer >= 2`; `fahrzeuge + personal >= 1`. Fehlt der zweite Punkt, stehen
     Fahrzeuge **und** Personal auf `fehlt`.
   - Sonst ist von beiden der mit 0 `empfohlen`.
   - Vorlagen sind `empfohlen` bei 0, sonst `vorhanden`.
 
-- [ ] **Step 4: Prüfen, dass die Tests durchlaufen.** Gleiches Kommando, erwartet: PASS.
+- [x] **Step 4: Prüfen, dass die Tests durchlaufen.** Gleiches Kommando, erwartet: PASS.
 
-- [ ] **Step 5: Commit.** `feat(verwaltung): Wertung der Bereitschaft (LLH-1820)`
+- [x] **Step 5: Commit.** `feat(verwaltung): Wertung der Bereitschaft (LLH-1820)`
 
 ### Task 5: Entwurf der Übersicht mit `/design`
 
@@ -288,7 +288,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
 - Create: `docs/design/2026-11-19-verwaltung-uebersicht/` (Ergebnis des Design-Artifacts,
   Inline-Styles maßgeblich, wie `docs/design/2026-11-12-anbindungen/`)
 
-- [ ] **Step 1: Entwurf anlegen.**
+- [x] **Step 1: Entwurf anlegen.**
   - Artifact-Typ „Design“ auf Grundlage des Design Systems „Lifeline Hub“, Adresse in
     `docs/design/design-system/ARTIFACT.md` (`frontend/AGENTS.md`, „Größere UI-Entwürfe über das
     Design System“).
@@ -299,7 +299,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
     - Satz als Hinweis mit Ton `achtung` bzw. neutral;
     - `Paneel`/`PaneelZeile` mit `Kennzahl`, `Status` und Sprung „… ↗“;
     - `SeitenSkeleton`/`SeitenFehler`.
-- [ ] **Step 2: Ablegen und committen.** `docs(design): Entwurf Verwaltungs-Übersicht (LLH-1820)`
+- [x] **Step 2: Ablegen und committen.** `docs(design): Entwurf Verwaltungs-Übersicht (LLH-1820)`
 
 ### Task 6: Seite „Übersicht“ und Einstieg `/admin`
 
@@ -328,7 +328,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
 - Consumes: `bewerteBereitschaft` (Task 4), `components['schemas']['Bereitschaft']`
 - Produces: `adminUebersichtPfad(): string` und `defaultAdminPfad() === '/admin/uebersicht'`
 
-- [ ] **Step 1: Die Tests schreiben, die scheitern sollen.**
+- [x] **Step 1: Die Tests schreiben, die scheitern sollen.**
   - `adminNav.test.tsx`: `expect(defaultAdminPfad()).toBe('/admin/uebersicht')`.
   - `BereitschaftUebersicht.test.tsx` mit gemocktem `loadBereitschaft`:
     - `zeigt_satz_und_fuenf_zeilen`: Satz „Für einen Einsatz fehlt: weitere Benutzer.“ und
@@ -342,19 +342,19 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - `queryKeys.guard.test.ts` muss mit dem neuen Key grün sein. Ihn nicht anfassen, nur
     ausführen.
 
-- [ ] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
+- [x] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
   `mise exec -- pnpm -C frontend exec vitest run src/admin`, erwartet: FAIL.
 
-- [ ] **Step 3: Seite, Navigation und Route nach dem Entwurf aus Task 5 umsetzen.**
+- [x] **Step 3: Seite, Navigation und Route nach dem Entwurf aus Task 5 umsetzen.**
   - Die Sprungziele nach dem Design-Doc, Abschnitt „Seite“.
   - Dann die Tests mit altem Literal anpassen.
 
-- [ ] **Step 4: Prüfen, dass die Tests durchlaufen.**
+- [x] **Step 4: Prüfen, dass die Tests durchlaufen.**
   `mise exec -- pnpm -C frontend exec vitest run`, `mise exec -- pnpm -C frontend lint`,
   `mise exec -- pnpm -C frontend typecheck` (Skriptname aus `frontend/package.json`). Erwartet:
   alles grün.
 
-- [ ] **Step 5: Commit.** `feat(verwaltung): Übersicht als Einstieg der Verwaltung (LLH-1820)`
+- [x] **Step 5: Commit.** `feat(verwaltung): Übersicht als Einstieg der Verwaltung (LLH-1820)`
 
 ### Task 7: Teil „Mitglieder“ im Dialog „Neuen Einsatz anlegen“
 
@@ -379,7 +379,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   (Task 3), `EINSATZ_ROLLE_OPTIONEN` (`frontend/src/einsatz/einsatzRolle.ts`)
 - Produces: Formularfeld `mitglieder: { benutzer_id: number; rolle: EinsatzRolle }[]`
 
-- [ ] **Step 1: Die Tests schreiben, die scheitern sollen.**
+- [x] **Step 1: Die Tests schreiben, die scheitern sollen.**
   - `kopf_nennt_die_wahl`: zuerst „nur du (Einsatzleitung)“, nach zwei Personen „du + 2
     Personen“, nach einer „du + 1 Person“.
   - `vorgabe_fuehrungspersonal_je_person_aenderbar`: Eine neu gewählte Person steht auf
@@ -393,10 +393,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - `serverablehnung_in_fehlerzeile`: Ein 400 mit „Mitglieder: Anna Beispiel kann nicht
     aufgenommen werden.“ erscheint in der Fehlerzeile des Dialogs.
 
-- [ ] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
+- [x] **Step 2: Die Tests laufen lassen und das Scheitern sehen.**
   `mise exec -- pnpm -C frontend exec vitest run src/pages`, erwartet: FAIL.
 
-- [ ] **Step 3: Umsetzen.**
+- [x] **Step 3: Umsetzen.**
   - Klappteil mit `forceRender`.
   - `Select mode="multiple" showSearch` über die Auswahl.
   - Je Person eine Zeile mit Rollen-`Select` (`SegmentFeld`, wenn die Bausteinwahl es für drei
@@ -405,10 +405,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - Doppelte Wahl ist durch das Multiple-Select ausgeschlossen. Eine Person ohne Rolle löst eine
     Formularprüfung aus, die den Teil über `onPruefungGescheitert` öffnet.
 
-- [ ] **Step 4: Prüfen, dass die Tests durchlaufen.**
+- [x] **Step 4: Prüfen, dass die Tests durchlaufen.**
   `mise exec -- pnpm -C frontend exec vitest run`, lint, typecheck, erwartet: grün.
 
-- [ ] **Step 5: Commit.** `feat(einsatz): Mitglieder schon im Anlegedialog wählen (LLH-1820)`
+- [x] **Step 5: Commit.** `feat(einsatz): Mitglieder schon im Anlegedialog wählen (LLH-1820)`
 
 ### Task 8: Regeln und Doku nachziehen
 
