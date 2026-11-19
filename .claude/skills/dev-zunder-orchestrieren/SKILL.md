@@ -1,6 +1,6 @@
 ---
 name: dev-zunder-orchestrieren
-description: Use as the primary entry point whenever the user wants to implement, pick up, "umsetzen", or work through a task from the Lifeline-Hub Zunder Entwicklungsboard (project "Dev: Lifeline-Hub") — including epics/parent tasks with subtasks, and any request phrased "mit subagents", "ultracode", "als Workflow", "automode", or "mach alle Subtasks". This skill orchestrates the whole task (and its subtasks) with fan-out via Workflow or subagents, started at its own discretion without opt-in (scope scan, design-option judging, review), OpenSpec changes per task in the main loop, and human checkpoints in between. It supersedes and internally invokes dev-zunder-ausfuehren for per-(sub)task execution. NOT for capturing/creating new tasks — that's zunder-task-anlegen.
+description: Use as the primary entry point whenever the user wants to implement, pick up, "umsetzen", or work through a task from the Lifeline-Hub Zunder Entwicklungsboard (project "Dev: Lifeline-Hub") — including epics/parent tasks with subtasks, and any request phrased "mit subagents", "ultracode", "als Workflow", "automode", or "mach alle Subtasks". This skill orchestrates the whole task (and its subtasks) with fan-out via Workflow or subagents, started at its own discretion without opt-in (scope scan, design-option judging, review), Superpowers design docs and plans per task in the main loop, and human checkpoints in between. It supersedes and internally invokes dev-zunder-ausfuehren for per-(sub)task execution. NOT for capturing/creating new tasks — that's zunder-task-anlegen.
 ---
 
 # Zunder-Aufgabe umsetzen — Orchestrierung (Lifeline Hub)
@@ -30,7 +30,7 @@ Lauf fragen.** Daraus folgt die ganze Architektur:
 nicht (Festlegung des Users, 04.10.2026; Regeln, Abwägung Agent oder Workflow und Pflichtinhalt
 jedes Worker-Prompts in `dev-zunder-ausfuehren`, Abschnitt „Agenten nach Bedarf“). Fan-out
 lohnt sich für Scope, Entwurfsbewertung und Review (den Entwurf selbst schreibt
-`/opsx:propose` im Main-Loop, s. „Entwurfs-Hoheit“) — nicht dafür, jede einzelne
+`superpowers:brainstorming` im Main-Loop, s. „Entwurfs-Hoheit“) — nicht dafür, jede einzelne
 Subtask-Code-Änderung in einen Workflow zu wickeln (das ist Zeremonie). Die
 Ausnahme ist der autonome Dev-Modus (s. Phase 3), der bewusst worktree-isolierte Agents
 fan-out.
@@ -43,8 +43,8 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 | Phase | Wer | Werkzeug | Checkpoint? |
 |---|---|---|---|
 | 0 Laden & Statuskontext | Main-Loop | Zunder-Connector, ggf. Worktree | — |
-| 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`/opsx:explore` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, Pflicht: Lösungsweg gemeinsam ausarbeiten** |
-| 2 Entwurf | **Main-Loop** (`/opsx:propose` je Task auf `entwurf`), optional Judge-Panel (**Workflow** oder Subagents) als Zulieferer | eine Change je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Changes** |
+| 1 Scope/Verstehen | **Fan-out** (Workflow oder Subagents) + Main-Loop (`brainstorming` bei `unklar`) | parallele Reader über Subtasks/Subsysteme → Scope-Map mit `route` | **ja, Pflicht: Lösungsweg gemeinsam ausarbeiten** |
+| 2 Entwurf | **Main-Loop** (`brainstorming` je Task auf `entwurf`), optional Judge-Panel (**Workflow** oder Subagents) als Zulieferer | ein Design-Doc je Task (bzw. je geteilter Fähigkeit) | **ja, Pflicht: Freigabe der Design-Docs** |
 | 3 Dev (umsetzen) | Main-Loop **oder** Workflow | Moduswahl: sequenziell-interaktiv vs. autonom | nur bei Blocker |
 | 4 Review | nach Ermessen: ein Agent (bei sehr großem Diff zwei) | Prüfliste, Befunde zurück in Phase 3 | — |
 | 5 Abschluss & Status | Main-Loop | Merge, Board-Status | — |
@@ -52,22 +52,24 @@ Abschluss), damit der Mehrphasen-Lauf nachvollziehbar bleibt.
 Konkrete, adaptierbare Workflow-Skripte für Phase 1/2 stehen in
 `references/workflow-bausteine.md` — von dort kopieren und anpassen, nicht neu erfinden.
 
-## Entwurfs-Hoheit: der Workflow besitzt die Menge, OpenSpec den Datensatz (LFH-589)
+## Entwurfs-Hoheit: der Workflow besitzt die Menge, der Main-Loop den Entwurf (LFH-589)
 
-Scope und Entwurf beantworten der Workflow und OpenSpec, aber **nie beide dieselbe Frage**
-(Spec `entwurfs-hoheit`, Herleitung in der archivierten Change
-`lfh-589-entwurfs-hoheit-orchestrierung`, `design.md`):
+Scope und Entwurf beantworten der Workflow und der Main-Loop, aber **nie beide dieselbe Frage**
+(Spec `entwurfs-hoheit` und Herleitung `lfh-589-entwurfs-hoheit-orchestrierung` im
+OpenSpec-Archiv; seit LLH-1967 mit Superpowers statt OpenSpec):
 
 - **Workflow = die Menge.** Er liest und bewertet parallel über viele Subtasks: den Scope-Scan
-  (Phase 1) und das Judge-Panel (Phase 2, nur Zulieferer). Er schreibt keine Datei unter
-  `openspec/changes/` und ruft kein `/opsx:*`. Dasselbe gilt, wenn Subagents statt eines
-  Workflows den Fan-out tragen.
-- **OpenSpec = der einzelne Datensatz.** Er entwirft einen Task als Change
-  (`/opsx:propose`), klärt eine unklare Anforderung (`/opsx:explore`) und setzt nach Freigabe um
-  (`/opsx:apply`). Alle drei laufen **im Main-Loop**, weil sie den Menschen brauchen.
-- **Ob ein Task eine Change bekommt**, entscheidet allein seine Route: Change genau bei
-  `entwurf` (Gründe E1–E3 in `dev-zunder-ausfuehren`, Schritt 3), ausdrücklich keine bei
-  `trivial`, `bug-unklar` und `klar`.
+  (Phase 1) und das Judge-Panel (Phase 2, nur Zulieferer). Er schreibt kein Design-Doc und
+  keinen Plan unter `docs/superpowers/` und ruft weder `brainstorming` noch `writing-plans`.
+  Dasselbe gilt, wenn Subagents statt eines Workflows den Fan-out tragen.
+- **Main-Loop = der einzelne Entwurf.** Er klärt eine unklare Anforderung und entwirft einen
+  Task in `superpowers:brainstorming` (Design-Doc), schneidet ihn nach Freigabe mit
+  `superpowers:writing-plans` und setzt ihn mit `subagent-driven-development` oder
+  `executing-plans` um. `brainstorming` und `writing-plans` laufen **im Main-Loop**, weil sie
+  den Menschen brauchen.
+- **Ob ein Task einen Entwurf bekommt**, entscheidet allein seine Route: Design-Doc und Plan
+  genau bei `entwurf` (Gründe E1–E3 in `dev-zunder-ausfuehren`, Schritt 3), ausdrücklich keine
+  bei `trivial`, `bug-unklar` und `klar`.
 
 ## Phase 0 — Laden & Statuskontext
 
@@ -91,18 +93,19 @@ Task mehrdeutig oder keine Subtasks auffindbar → kurz beim User rückfragen, n
 **Mechanismus: der Scope-Fan-out**, als Workflow oder als parallel gestartete Subagents. Er lässt
 pro Subtask (und pro berührtem Subsystem) einen
 Reader-Agent parallel laufen: was berührt der Subtask, welche Files, welche Abhängigkeiten zu
-anderen Subtasks, welche offenen Fragen, welche Fähigkeiten unter `openspec/specs/` er ändert
-oder neu anlegt (`faehigkeiten`; bloßes Berühren zählt nicht). Jeder
+anderen Subtasks, welche offenen Fragen, welche Fähigkeiten er ändert oder neu anlegt
+(`faehigkeiten`: Spec unter `openspec/specs/` oder Regel einer Bereichs-`AGENTS.md`; bloßes
+Berühren zählt nicht). Jeder
 Reader **schlägt eine Route vor** (`trivial` · `klar` · `bug-unklar` · `unklar` · `entwurf`,
 bei `entwurf` mit den zutreffenden Gründen E1–E3). Ergebnis ist eine **strukturierte Map**
-(Skelett in `references/workflow-bausteine.md` → „Scope-Fan-out“). `/opsx:explore` läuft hier
+(Skelett in `references/workflow-bausteine.md` → „Scope-Fan-out“). `brainstorming` läuft hier
 **nicht** im Workflow oder Subagent, denn es ist ein Gespräch.
 
 **Erkennungsmerkmal: das Feld `route` je Map-Eintrag.**
 
-- `route: unklar` → für **diesen** Task im Main-Loop `/opsx:explore`, danach neu routen. Die
-  anderen Tasks behalten ihre Route.
-- Jede andere Route → kein `/opsx:explore`.
+- `route: unklar` → für **diesen** Task im Main-Loop `brainstorming` zum Klären, danach neu
+  routen. Die anderen Tasks behalten ihre Route.
+- Jede andere Route → kein Klärgespräch in Phase 1.
 
 **Checkpoint — Pflicht (08.11.2026).** Die Route ist ein Vorschlag des Readers, also bestätigst
 oder korrigierst du sie hier. E3 prüfst du an den Pfaden der Map nach. Dann legst du die Map
@@ -118,45 +121,49 @@ nichts).
 **Status:** `in_progress`, Route in `plan`; am Checkpoint `blocked`, erst mit der Zustimmung zurück
 auf `in_progress` (`dev-zunder-ausfuehren`, „Board-Status mitführen“).
 
-## Phase 2 — Entwurf (Main-Loop mit `/opsx:propose`)
+## Phase 2 — Entwurf (Main-Loop mit `brainstorming`)
 
-**Mechanismus: `/opsx:propose` im Main-Loop, je Task mit `route: entwurf`.** Tasks auf
-`trivial`, `klar` oder `bug-unklar` bekommen in Phase 2 **keinen** Planungsschritt und keine
-Change. Sie gehen direkt in Phase 3 (TDD bzw. Debugging über `dev-zunder-ausfuehren`). Einen
-Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Change ist der Plan.
+**Mechanismus: `superpowers:brainstorming` im Main-Loop, je Task mit `route: entwurf`, bis zum
+Design-Doc.** Tasks auf `trivial`, `klar` oder `bug-unklar` bekommen in Phase 2 **keinen**
+Planungsschritt und kein Design-Doc. Sie gehen direkt in Phase 3 (TDD bzw. Debugging über
+`dev-zunder-ausfuehren`). Den Plan schreibt `writing-plans` erst nach der Freigabe, zu Beginn
+von Phase 3; einen Plan-Workflow „je Subtask“ gibt es nicht.
 
 **Erkennungsmerkmal:** Phase 2 läuft genau für die Map-Einträge mit bestätigter Route
 `entwurf`. Gibt es keinen, entfällt Phase 2.
 
-**Schnittstelle Scope-Map → Proposal:**
+**Schnittstelle Scope-Map → Design-Doc:**
 
-- **Name:** `<kurz>-<slug>`, z. B. `a1b2c3d4-status-filter-einheiten` (`<kurz>` = erste 8
-  Zeichen der ID).
-- **Eingabe:** Der Map-Eintrag geht als Argument an `/opsx:propose`: Zusammenfassung, Files,
-  Entwurfsgründe und die am Phase-1-Checkpoint beantworteten Fragen. `/opsx:propose` nimmt ihn
-  als Ausgangspunkt und liest die Stellen trotzdem selbst.
-- **Eine Change je Task.** Nennen zwei oder mehr Subtasks **auf `entwurf`** desselben Parents
-  dieselbe Fähigkeit (`faehigkeiten` der Map: gleicher Pfad unter `openspec/specs/` oder
-  dieselbe neue Fähigkeit), gibt es **eine** gemeinsame Change mit dem `<kurz>` des
-  Parents. Ihre `tasks.md` gliedert nach Subtask samt `<kurz>`. Ein Subtask auf einer
-  anderen Route bleibt ohne Change, auch wenn er dieselbe Fähigkeit nennt.
+- **Name:** `docs/superpowers/specs/YYYY-MM-DD-<kurz>-<slug>-design.md`, z. B.
+  `2026-11-20-a1b2c3d4-status-filter-einheiten-design.md` (`<kurz>` = erste 8 Zeichen der ID);
+  der Plan später gleich benannt unter `docs/superpowers/plans/` ohne `-design`.
+- **Eingabe:** Der Map-Eintrag ist der Ausgangspunkt für `brainstorming`: Zusammenfassung, Files,
+  Entwurfsgründe und die am Phase-1-Checkpoint beantworteten Fragen. Was dort geklärt ist, fragt
+  `brainstorming` nicht erneut ab („Look Before You Ask“); es liest die Stellen trotzdem selbst.
+- **Ein Design-Doc je Task.** Nennen zwei oder mehr Subtasks **auf `entwurf`** desselben Parents
+  dieselbe Fähigkeit (`faehigkeiten` der Map), gibt es **ein** gemeinsames Design-Doc und einen
+  gemeinsamen Plan mit dem `<kurz>` des Parents. Der Plan gliedert seine Aufgaben nach Subtask
+  samt `<kurz>`. Ein Subtask auf einer anderen Route bleibt ohne Entwurf, auch wenn er dieselbe
+  Fähigkeit nennt.
 
 **Judge-Panel nur als Zulieferer.** Ist der Lösungsraum weit (E1 mit mehr als zwei ernsthaften
 Wegen), bewertet vorher ein Workflow oder eine Handvoll Subagents konkurrierende Entwürfe
 (Skelett: `references/workflow-bausteine.md` → „Design-Judge-Panel“). Das Panel liest nur. Den Sieger
-übergibst du `/opsx:propose` als Entscheidung, die übrigen als verworfene Alternativen, und
-beides landet in `design.md`. Zwischen Panel und Proposal hältst du **nicht** an, solange der
+nimmst du in `brainstorming` als Empfehlung, die übrigen als verworfene Alternativen, und
+beides landet im Abschnitt „Ansätze“ des Design-Docs. Zwischen Panel und Design-Doc hältst du
+**nicht** an, solange der
 Sieger dem in Phase 1 abgestimmten Weg folgt; weicht er davon ab, legst du die Abweichung vorher
 erneut vor. Die Wahl
-trifft der Mensch am Freigabe-Checkpoint, und will er einen anderen Weg, läuft `/opsx:update`.
+trifft der Mensch am Freigabe-Checkpoint, und will er einen anderen Weg, überarbeitest du das
+Design-Doc im Main-Loop und legst es erneut vor.
 
 **Größere UI:** Regel und Pflichten (Entwurf mit `/design`, Design System neu erzeugen und nach
 dem Merge veröffentlichen): `frontend/AGENTS.md`, „Größere UI-Entwürfe über das Design System“.
 
-**Checkpoint — Pflicht (LFH-588).** Nach den `/opsx:propose`-Läufen hältst du an und legst
-**alle Changes des Laufs gesammelt** vor, samt offenen Optionen und Empfehlung. Die Tasks
-stehen dabei auf `blocked`. Erst die Freigabe des Menschen führt zurück auf `in_progress`, und
-erst danach beginnt Phase 3 mit `/opsx:apply`. Kein Workflow darf diesen Halt ersetzen.
+**Checkpoint — Pflicht (LFH-588).** Nach den Design-Docs hältst du an und legst **alle
+Design-Docs des Laufs gesammelt** vor, samt offenen Optionen und Empfehlung. Die Tasks stehen
+dabei auf `blocked`. Erst die Freigabe des Menschen führt zurück auf `in_progress`, und erst
+danach beginnt Phase 3 mit `writing-plans`. Kein Workflow darf diesen Halt ersetzen.
 
 **Status:** Route `entwurf` → `blocked` am Checkpoint → nach Freigabe `in_progress`.
 
@@ -166,28 +173,28 @@ erst danach beginnt Phase 3 mit `/opsx:apply`. Kein Workflow darf diesen Halt er
 
 - **Sequenziell-interaktiv (Default, sicher):** Subtasks nacheinander. Pro Subtask rufst du
   **`dev-zunder-ausfuehren`** auf — das routet im Main-Loop in die Arbeitsdisziplin von
-  Superpowers (TDD/Debugging/…) und in den OpenSpec-Änderungszyklus (`/opsx:explore`,
-  `/opsx:propose`, `/opsx:apply`) und führt den Board-Status pro Subtask mit. Die Route aus
+  Superpowers (TDD/Debugging/…) und in dessen Änderungszyklus (`brainstorming`,
+  `writing-plans`, `subagent-driven-development`/`executing-plans`) und führt den Board-Status
+  pro Subtask mit. Die Route aus
   Phase 1 gilt dabei weiter, sie wird nicht neu geschätzt. Die einzige Ausnahme ist der
   Wechsel `bug-unklar` → `entwurf`, wenn die gefundene Ursache auf E1 oder E2 führt. Dann folgt
-  `/opsx:propose` im Main-Loop und ein eigener Halt vor `/opsx:apply` (Status `blocked` bis zur
-  Freigabe). Ein Subtask auf `entwurf`, dessen
-  Change in Phase 2 freigegeben wurde, steigt direkt bei `/opsx:apply` ein und bekommt **kein
-  zweites** `/opsx:propose`. Ein in Phase 1 geklärter `unklar`-Task bekommt kein zweites
-  `/opsx:explore`. Wähle das,
+  `brainstorming` im Main-Loop und ein eigener Halt vor `writing-plans` (Status `blocked` bis
+  zur Freigabe). Ein Subtask auf `entwurf`, dessen Design-Doc in Phase 2 freigegeben wurde,
+  steigt direkt bei `writing-plans` ein und bekommt **kein zweites** `brainstorming`. Ein in
+  Phase 1 geklärter `unklar`-Task bekommt kein zweites Klärgespräch. Wähle das,
   wenn Subtasks **gemeinsame Files** berühren, voneinander abhängen, oder während der
   Umsetzung interaktive Entscheidungen zu erwarten sind.
 - **Autonom / „automode":** nur wenn die Subtasks **nachweislich unabhängig** sind
   (disjunkte File-Mengen, keine Reihenfolge-Abhängigkeit) **und** die Spec eindeutig ist.
-  Subtasks **derselben gemeinsamen Change** gelten immer als abhängig, weil sie dieselbe
-  `tasks.md` abhaken. Sie laufen nie parallel autonom.
+  Subtasks **desselben gemeinsamen Plans** gelten immer als abhängig, weil sie denselben
+  Plan abhaken. Sie laufen nie parallel autonom.
   Dann fan-out per **Workflow mit `isolation: 'worktree'`**: jeder Agent implementiert+testet
   einen Subtask autonom. Schnell, aber ohne interaktives TDD/Review und mit Konfliktrisiko
   bei geteilten Files — deshalb die harte Unabhängigkeits-Bedingung. Ein Subtask auf
-  `entwurf` darf nur hinein, wenn seine Change **schon freigegeben** ist. Der Agent arbeitet
-  dann deren `tasks.md` ab und hakt ab, ändert aber weder Proposal noch Spec noch Design. Trägt
-  das Design nicht, ist das ein Blocker, den der Agent zurückgibt. Du klärst ihn mit dem
-  Menschen und passt die Change per `/opsx:update` an.
+  `entwurf` darf nur hinein, wenn sein Design-Doc **freigegeben** und sein Plan geschrieben
+  ist. Der Agent arbeitet dann den Plan ab und hakt ab, ändert aber weder Design-Doc noch Plan.
+  Trägt der Entwurf nicht, ist das ein Blocker, den der Agent zurückgibt. Du klärst ihn mit dem
+  Menschen und überarbeitest Design-Doc und Plan im Main-Loop.
 
 **„Bei Fragen melde dich":** Autonome Agents können mitten im Lauf **nicht** fragen. Instruiere
 sie, bei einem harten Blocker abzubrechen und den Blocker strukturiert zurückzugeben; du
@@ -207,9 +214,8 @@ wartest du ab wie in „Warten ohne Wecken“ dort.
 
 ## Phase 5 — Abschluss & Status
 
-- **OpenSpec-Changes vor dem PR archivieren**, im selben Branch (`/opsx:archive`, Einzelheiten
-  in `dev-zunder-ausfuehren`, Schritt 4). Kein Archiv-PR nach dem Merge; Schritt 13 von
-  `check-all.sh` hält eine abgehakte, nicht archivierte Change rot.
+- **Pläne vor dem PR vollständig abgehakt**; Design-Doc, Plan und Umsetzung gehen in einen PR
+  (Einzelheiten in `dev-zunder-ausfuehren`, Schritt 4). Einen Archivschritt gibt es nicht.
 - Integration → `superpowers:finishing-a-development-branch`, und zwar **ohne Menü mit der
   stehenden Wahl „Push + PR gegen `alpha`"** (Festlegung des Users, 22.09.2026; Details in
   `dev-zunder-ausfuehren`). Worktree/Branch dem Harness überlassen (nicht manuell removen).
@@ -234,7 +240,7 @@ wartest du ab wie in „Warten ohne Wecken“ dort.
 Der Board-Status wird grundsätzlich **automatisch und nur vorwärts** geführt (Spur + Regeln:
 `dev-zunder-ausfuehren`, „Board-Status mitführen“). Den User **nur an echten Verzweigungen**
 entscheiden lassen — nicht bei jedem Übergang. Die Route bestätigt er am Phase-1-Checkpoint,
-die Change am Freigabe-Checkpoint; als eigene Status-Frage bleibt nur:
+das Design-Doc am Freigabe-Checkpoint; als eigene Status-Frage bleibt nur:
 
 | Verzweigung | Wann fragen | Optionen |
 |---|---|---|
@@ -245,16 +251,17 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 ## Checkpoints & Entscheidungen
 
 - **Zwei feste Halte:** nach Phase 1 (Lösungsweg gemeinsam ausarbeiten; entfällt nur, wenn alle
-  Tasks auf `trivial` stehen) und nach Phase 2 (Freigabe, sobald dort eine Change entstanden ist).
+  Tasks auf `trivial` stehen) und nach Phase 2 (Freigabe, sobald dort ein Design-Doc entstanden
+  ist).
   Weitere Checkpoints sparsam, nur wenn eine Phase eine Unklarheit,
   einen Konflikt oder mehrere vertretbare Optionen aufwirft; sonst kurz zusammenfassen und
   weiterlaufen.
 - **Optionen anbieten, nicht offene Fragen stellen.** Wenn du fragst, leg konkrete Optionen
   mit Trade-offs vor und gib eine Empfehlung. Nutze dafür den interaktiven Frage-Mechanismus.
 - **Zwischenstand = Artefakt zeigen.** Präsentiere das, was die Phase produziert hat
-  (Scope-Map mit Routen, Changes, Findings), kompakt — nicht nur „bin fertig mit Phase X".
-- **Der Freigabe-Checkpoint nach `/opsx:propose` ist nie „sparsam“ auszulassen.** Er gilt,
-  sobald in Phase 2 eine Change entstanden ist.
+  (Scope-Map mit Routen, Design-Docs, Findings), kompakt — nicht nur „bin fertig mit Phase X".
+- **Der Freigabe-Checkpoint nach dem Design-Doc ist nie „sparsam“ auszulassen.** Er gilt,
+  sobald in Phase 2 ein Design-Doc entstanden ist.
 
 ## Don'ts
 
@@ -262,13 +269,13 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
   `dev-zunder-ausfuehren` delegieren.
 - **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Entscheidung über Review-Befunde) in
   einen Workflow oder Subagent stecken — beide können nicht fragen.
-- **Kein `/opsx:*` im Workflow oder Subagent** (`explore`, `propose`, `update`, `apply`,
-  `archive`) und kein Anlegen oder Ändern unter `openspec/changes/`. Einzige Ausnahme: Ein
-  autonomer Dev-Agent hakt Aufgaben einer freigegebenen Change ab. Ein Workflow-Agent oder
-  Subagent, der `/opsx:propose` ausführt, endet einfach an dessen Halt, und das sähe aus wie ein
-  Erfolg.
-- Keinen Plan-Workflow „je Subtask“ neben einer Change laufen lassen, denn die `tasks.md` ist
-  der Plan.
+- **Kein `brainstorming` und kein `writing-plans` im Workflow oder Subagent**, und kein
+  Design-Doc oder Plan, den ein Workflow oder Subagent unter `docs/superpowers/` anlegt oder
+  ändert. Einzige Ausnahme: Ein autonomer Dev-Agent hakt Aufgaben eines freigegebenen Plans ab.
+  Ein Workflow-Agent oder Subagent, der `brainstorming` ausführt, kann nicht fragen und baut
+  einen Entwurf auf Vermutungen, der aussieht wie ein abgestimmter.
+- Keinen Plan-Workflow „je Subtask“ neben dem Plan aus `writing-plans` laufen lassen.
+- Nichts unter `openspec/` anlegen; es ist eingefrorenes Archiv.
 - Einzelne Subtask-Code-Änderungen **nicht** zwanghaft in Workflows wickeln (Zeremonie) —
   Workflow für Scope/Design/Review und für echten autonomen Fan-out.
 - Autonomen Modus **nicht** bei geteilten Files / Abhängigkeiten wählen.

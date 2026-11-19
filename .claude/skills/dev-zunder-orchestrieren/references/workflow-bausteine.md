@@ -16,11 +16,12 @@ Grundregeln (aus der Workflow-Tool-Doku):
 - Mit `schema` gibt `agent()` ein validiertes Objekt zurück — kein Parsen nötig.
 - `meta` muss ein reines Literal sein (keine Variablen/Aufrufe).
 - Modell weglassen → Agent erbt das Session-Modell (fast immer richtig).
-- **Kein `/opsx:*` in einem Workflow** (`explore`, `propose`, `update`, `apply`, `archive`),
-  und kein Workflow legt unter `openspec/changes/` etwas an oder ändert dort etwas (LFH-589,
-  Spec `entwurfs-hoheit`). Die Skelette unten **lesen nur**. Die Change eines Tasks entsteht
-  im Main-Loop über `/opsx:propose`, danach folgt der Freigabe-Checkpoint. Einzige Ausnahme ist
-  der autonome Dev-Modus (Phase 3): Er hakt Aufgaben einer **freigegebenen** Change ab.
+- **Kein `brainstorming` und kein `writing-plans` in einem Workflow**, und kein Workflow legt
+  unter `docs/superpowers/` ein Design-Doc oder einen Plan an oder ändert ihn (LFH-589, Spec
+  `entwurfs-hoheit`; seit LLH-1967 mit Superpowers). Die Skelette unten **lesen nur**. Der
+  Entwurf eines Tasks entsteht im Main-Loop über `superpowers:brainstorming`, danach folgt der
+  Freigabe-Checkpoint. Einzige Ausnahme ist der autonome Dev-Modus (Phase 3): Er hakt Aufgaben
+  eines **freigegebenen** Plans ab. Unter `openspec/` legt niemand etwas an.
 
 ---
 
@@ -29,7 +30,7 @@ Grundregeln (aus der Workflow-Tool-Doku):
 Pro Subtask ein Reader-Agent; alle Ergebnisse für die Map zusammenführen (Barriere ist hier
 korrekt, weil die Map cross-subtask-Abhängigkeiten braucht). Jeder Reader schlägt die **Route**
 vor (Schlüssel aus dem Routing von `dev-zunder-ausfuehren`, Schritt 3). Die Route `entwurf` ist
-der einzige Weg zu einer OpenSpec-Change. Die Gründe E1–E3 stehen im Prompt, weil ein
+der einzige Weg zu einem Design-Doc und Plan. Die Gründe E1–E3 stehen im Prompt, weil ein
 Workflow-Agent den Skill nicht selbst liest. Ändert sich das Kriterium dort, hier nachziehen.
 
 ```js
@@ -47,7 +48,7 @@ const SCOPE = {
     depends_on: { type: 'array', items: { type: 'string' } }, // kurz der anderen Subtasks
     route: { enum: ['trivial', 'klar', 'bug-unklar', 'unklar', 'entwurf'] },
     entwurfsgruende: { type: 'array', items: { enum: ['E1', 'E2', 'E3'] } }, // leer außer bei 'entwurf'
-    faehigkeiten: { type: 'array', items: { type: 'string' } }, // Pfade unter openspec/specs/, deren Anforderungen der Subtask ändert oder neu anlegt
+    faehigkeiten: { type: 'array', items: { type: 'string' } }, // Spec unter openspec/specs/ oder Regel einer Bereichs-AGENTS.md, die der Subtask ändert oder neu anlegt
     open_questions: { type: 'array', items: { type: 'string' } },
     summary: { type: 'string' },
   },
@@ -68,9 +69,9 @@ const map = await parallel(SUBTASKS.map(st => () =>
     `Scope subtask ${st.kurz} "${st.name}" against this codebase.\n` +
     `Beschreibung:\n${st.description}\n\n` +
     `Finde: berührte Files, Abhängigkeiten zu anderen Subtasks (${SUBTASKS.map(s => s.kurz).join(', ')}), ` +
-    `Fähigkeiten unter openspec/specs/, deren Anforderungen der Subtask ändert oder neu anlegt (bloßes Berühren zählt nicht), ` +
+    `Fähigkeiten (Spec unter openspec/specs/ oder Regel einer Bereichs-AGENTS.md), die der Subtask ändert oder neu anlegt (bloßes Berühren zählt nicht), ` +
     `offene Fragen, und schlage die Route vor.\n${ROUTEN}\n` +
-    `Nichts ändern — nur lesen. Kein /opsx:* ausführen.`,
+    `Nichts ändern — nur lesen. Kein Skill brainstorming oder writing-plans ausführen.`,
     { label: `scope:${st.kurz}`, phase: 'Scope', schema: SCOPE }
   )
 ))
@@ -79,27 +80,29 @@ return map.filter(Boolean)
 
 Im Main-Loop danach:
 - **Routen bestätigen.** E3 an den `files` nachprüfen und strittige Routen korrigieren.
-- Für jeden Eintrag mit `route: 'unklar'` läuft **`/opsx:explore` im Main-Loop**, danach wird
-  neu geroutet.
+- Für jeden Eintrag mit `route: 'unklar'` läuft **`superpowers:brainstorming` im Main-Loop**
+  zum Klären, danach wird neu geroutet.
 - **Checkpoint, Pflicht:** Map samt Routen und Lösungsweg je Task vorlegen und auf die Antwort
   warten, auch ohne `open_questions`, File-Überschneidungen (→ relevant für den Phase-3-Modus)
   oder strittige Route; diese gehören dann mit Empfehlung dazu. Entfällt nur, wenn alle Tasks auf
   `trivial` stehen (`SKILL.md`, Phase 1). Ein Task auf `bug-unklar` bekommt nach der
   Ursachensuche in Phase 3 einen eigenen Halt mit Ursache und Fix.
-- Die Einträge mit `route: 'entwurf'` sind die Eingabe für Phase 2 (`/opsx:propose` je Task).
-  Überschneiden sich zwei Subtasks **auf `entwurf`** in `faehigkeiten`, bekommen sie eine
-  gemeinsame Change am Parent. Ein Subtask auf einer anderen Route bleibt ohne Change.
-  Subtasks einer gemeinsamen Change laufen in Phase 3 nie parallel autonom.
+- Die Einträge mit `route: 'entwurf'` sind die Eingabe für Phase 2 (`brainstorming` je Task).
+  Überschneiden sich zwei Subtasks **auf `entwurf`** in `faehigkeiten`, bekommen sie ein
+  gemeinsames Design-Doc und einen gemeinsamen Plan am Parent. Ein Subtask auf einer anderen
+  Route bleibt ohne Entwurf. Subtasks eines gemeinsamen Plans laufen in Phase 3 nie parallel
+  autonom.
 
 ---
 
-## 2. Design-Judge-Panel (Phase 2, Zulieferer für `/opsx:propose`)
+## 2. Design-Judge-Panel (Phase 2, Zulieferer für `brainstorming`)
 
 Mehrere konkurrierende Entwürfe → parallel bewerten → besten zurückgeben. Nur für einen
 **einzelnen** Task auf `route: 'entwurf'` mit weitem Lösungsraum (E1, mehr als zwei ernsthafte
-Wege). Das Panel **schreibt nichts**. Sein Ergebnis ist Eingabe für `/opsx:propose` im
-Main-Loop, das die Change schreibt. Für alle anderen Tasks gibt es in Phase 2 keinen Workflow:
-Die `tasks.md` der Change ist der Plan, und Tasks ohne `entwurf` brauchen keinen.
+Wege). Das Panel **schreibt nichts**. Sein Ergebnis ist Eingabe für `brainstorming` im
+Main-Loop, das das Design-Doc schreibt. Für alle anderen Tasks gibt es in Phase 2 keinen
+Workflow: Den Plan schreibt `writing-plans` nach der Freigabe, und Tasks ohne `entwurf` brauchen
+keinen.
 
 ```js
 export const meta = {
@@ -126,7 +129,7 @@ const SCORE = {
 }
 const drafts = await parallel(ANGLES.map(a => () =>
   agent(`Entwirf einen Umsetzungsplan für ${TASK.kurz} "${TASK.name}" aus Sicht „${a}".\n${TASK.description}\n` +
-    `Nur lesen: keine Datei anlegen oder ändern, kein /opsx:* ausführen.`,
+    `Nur lesen: keine Datei anlegen oder ändern, kein Skill brainstorming oder writing-plans.`,
     { label: `draft:${a}`, phase: 'Entwürfe', schema: PLAN })
 ))
 const valid = drafts.filter(Boolean)
@@ -137,8 +140,8 @@ const scores = await parallel(valid.map(d => () =>
 return { drafts: valid, scores: scores.filter(Boolean) }
 ```
 
-Im Main-Loop: **kein eigener Halt.** Sieger und Runner-ups gehen als Eingabe an
-`/opsx:propose`. Der Sieger wird die Entscheidung in `design.md`, die übrigen stehen dort als
-verworfene Alternativen samt Grund. Die Wahl trifft der Mensch am **Freigabe-Checkpoint** nach
-`/opsx:propose`, zusammen mit den übrigen Changes des Laufs. Will er einen anderen Weg, läuft
-`/opsx:update`.
+Im Main-Loop: **kein eigener Halt.** Sieger und Runner-ups gehen als Eingabe in
+`brainstorming`. Der Sieger wird die Empfehlung im Abschnitt „Ansätze“ des Design-Docs, die
+übrigen stehen dort als verworfene Alternativen samt Grund. Die Wahl trifft der Mensch am
+**Freigabe-Checkpoint** nach dem Design-Doc, zusammen mit den übrigen Design-Docs des Laufs. Will
+er einen anderen Weg, wird das Design-Doc im Main-Loop überarbeitet und erneut vorgelegt.

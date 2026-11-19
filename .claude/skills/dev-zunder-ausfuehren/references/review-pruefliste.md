@@ -163,9 +163,10 @@ Beispiele:
 
 ## 7. Verhalten gegen Spec und Projektregeln
 
-**Trifft zu, wenn** es zu dem geänderten Verhalten eine Spec unter `openspec/specs/`, eine
-Delta-Spec der Change oder ein Anwenderkapitel gibt, oder wenn eine `AGENTS.md` auf dem Weg zu
-den geänderten Dateien eine Regel für diese Art Code hat. Das ist fast immer der Fall.
+**Trifft zu, wenn** es zu dem geänderten Verhalten eine Spec unter `openspec/specs/`
+(eingefroren, gilt weiter), ein Design-Doc unter `docs/superpowers/specs/` oder ein
+Anwenderkapitel gibt, oder wenn eine `AGENTS.md` auf dem Weg zu den geänderten Dateien eine Regel
+für diese Art Code hat. Das ist fast immer der Fall.
 
 - Tut der Code, was dort steht, auch im leeren Fall, im Fehlerfall und am Rand (keiner, genau
   einer, mehr als einer)?
