@@ -663,7 +663,7 @@ Herleitung in
 ## Backend — Erfassungs-Gate (LLH-1817)
 
 Die Einsatzrolle Mitarbeit erfasst, ändert aber nichts. Regeln (MUST/MUST NOT) und Prüfung in
-[ADR-0070](../docs/architektur/entscheidungen/ADR-0070-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md);
+[ADR-0072](../docs/architektur/entscheidungen/ADR-0072-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md);
 sie stehen nur dort.
 
 - **Ein Handler trägt `EinsatzErfassungszugriff` oder `EinsatzErfassungsfreigabe`

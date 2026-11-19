@@ -31,7 +31,7 @@ zeigt nur an (Spec [`modul-freigabe`](../../openspec/specs/modul-freigabe/spec.m
 verwaltet, regelt Spec [`einsatz-zugriff`](../../openspec/specs/einsatz-zugriff/spec.md).
 Mitarbeit erfasst ohne Schreibrecht: `EinsatzErfassungszugriff` und `EinsatzErfassungsfreigabe`
 (`src/einsatz/kontext.rs`) stehen nur an einer Positivliste, Regeln in
-[ADR-0070](entscheidungen/ADR-0070-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md)
+[ADR-0072](entscheidungen/ADR-0072-erfassen-ohne-schreibrecht-hat-eigene-gate-typen-an-einer-positivliste.md)
 und [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Erfassungs-Gate (LLH-1817)“.
 
 ## 8.3 Fehlervertrag und Statuscodes

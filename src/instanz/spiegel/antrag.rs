@@ -67,7 +67,7 @@ pub struct Beantragbar {
 }
 
 /// Das Recht, das ein Antrag am Spiegel braucht: dieselbe Schranke wie die Route am Führer.
-/// `Erfassen` gilt genau für die Routen der Positivliste des Erfassungs-Gates (ADR-0070):
+/// `Erfassen` gilt genau für die Routen der Positivliste des Erfassungs-Gates (ADR-0072):
 /// ETB-Eintrag und Meldung; dort darf auch die Einsatzrolle Mitarbeit erfassen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Antragsrecht {

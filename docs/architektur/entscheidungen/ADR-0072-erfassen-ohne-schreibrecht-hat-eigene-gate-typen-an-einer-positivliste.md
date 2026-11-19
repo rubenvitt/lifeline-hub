@@ -1,5 +1,5 @@
 ---
-id: ADR-0070
+id: ADR-0072
 titel: Erfassen ohne Schreibrecht hat eigene Gate-Typen, die nur an einer Positivliste stehen
 status: akzeptiert
 datum: 2026-11-19
@@ -11,7 +11,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-19-yd9hmb6c-einsatzrolle-mitarbeit-design.md
 ---
 
-# ADR-0070: Erfassen ohne Schreibrecht hat eigene Gate-Typen, die nur an einer Positivliste stehen
+# ADR-0072: Erfassen ohne Schreibrecht hat eigene Gate-Typen, die nur an einer Positivliste stehen
 
 ## Regeln
 
