@@ -84,14 +84,24 @@ pub async fn anlegen_mit_mitgliedern(
     laden(pool, einsatz_id).await
 }
 
+/// Wer sich überhaupt aufnehmen lässt (Alias `b`): aktiv, kein Geräte-, Stellvertreter- oder
+/// Archivkonto. Die EINE Bedingung für die Auswahl ([`auswahl_sql`]) und den Schreibweg beim
+/// Anlegen ([`aufnehmbar_in`], ADR-0072); ein neuer Ausschluss gehört hierher.
+fn aufnehmbar_bedingung() -> String {
+    format!(
+        "b.aktiv = 1 AND {} AND {}",
+        crate::geraet::repo::OHNE_GERAETEKONTEN,
+        crate::instanz::spiegel::OHNE_STELLVERTRETER
+    )
+}
+
 /// Bedingung „Person `{b}` lässt sich in den Einsatz `?1` aufnehmen“: dieselbe Grundmenge wie
 /// [`auswahl_sql`], in der Org des Einsatzes.
 fn aufnehmbar_in(b: &str) -> String {
     format!(
         "EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
-                 WHERE b.id = {b} AND b.org_id = e.org_id AND b.aktiv = 1 AND {} AND {})",
-        crate::geraet::repo::OHNE_GERAETEKONTEN,
-        crate::instanz::spiegel::OHNE_STELLVERTRETER
+                 WHERE b.id = {b} AND b.org_id = e.org_id AND {})",
+        aufnehmbar_bedingung()
     )
 }
 
@@ -2085,10 +2095,9 @@ fn auswahl_sql(join: &str, bedingung: &str) -> String {
     format!(
         "SELECT b.id AS benutzer_id, b.anzeigename \
          FROM benutzer b {join} \
-         WHERE b.aktiv = 1 AND {} AND {} AND {bedingung} \
+         WHERE {} AND {bedingung} \
          ORDER BY b.anzeigename COLLATE NOCASE, b.id",
-        crate::geraet::repo::OHNE_GERAETEKONTEN,
-        crate::instanz::spiegel::OHNE_STELLVERTRETER
+        aufnehmbar_bedingung()
     )
 }
 
