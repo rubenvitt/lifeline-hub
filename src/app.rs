@@ -2796,14 +2796,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Fängt eine Handler-Panik und antwortet mit 500 + `{error}`, statt die Verbindung
         // abzureißen
         // (das hielte das Frontend für „kein Netz“).
-        .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
-        // ETB-Wächter (LLH-1976, `src/AGENTS.md`, „Backend — ETB live verteilen“): AUSSERHALB von
-        // CatchPanic, damit eine Lücke in Debug und Test als Panic bis in den Test durchschlägt
-        // statt als 500 zu enden. Im Release-Build reicht er nur durch.
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            crate::etb::nachlauf::waechter,
-        ))
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic));
+    let router = mit_etb_waechter(router, &state);
+    let router: Router = router
         // Stammdaten-Kataloge melden schreibende Erfolge an die eigene Org (LFH-734). Außerhalb
         // von CatchPanic: nach einer Handler-Panik sieht sie dessen 500 und meldet nichts.
         // `MatchedPath` ist beim Routing gesetzt.
@@ -3013,6 +3008,24 @@ impl tower_http::trace::OnFailure<tower_http::classify::ServerErrorsFailureClass
             }
             andere => tracing::error!(klasse = %andere, latenz_ms, "response failed"),
         }
+    }
+}
+
+/// ETB-Wächter (LLH-1976, `src/AGENTS.md`, „Backend — ETB live verteilen“): AUSSERHALB von
+/// CatchPanic, damit eine Lücke in Debug und Test als Panic bis in den Test durchschlägt statt als
+/// 500 zu enden. Im Release-Build fehlt die Schicht ganz und kostet nichts.
+fn mit_etb_waechter(router: Router, state: &AppState) -> Router {
+    #[cfg(debug_assertions)]
+    {
+        router.layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::etb::nachlauf::waechter,
+        ))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = state;
+        router
     }
 }
 
