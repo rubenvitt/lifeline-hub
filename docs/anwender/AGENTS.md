@@ -29,6 +29,7 @@ Design unter `/mnt/project-files/lfh-1127/design.md`, D1–D8).
   „: “ und „ #“ (die Website liest den Kopf als YAML, die App nicht); `quellen`
   nennt die Code-Pfade, deren Verhalten das Kapitel beschreibt. Fachquellen (Vorschriften,
   Normen) stehen im Text, nicht im Kopf.
+
 - **Nur reines GFM:** kein HTML, keine MDX-Importe; Bilder nur in der Form unten. Alle Renderer
   müssen dasselbe zeigen. Links nur auf ganze Kapitel (`[Ohne Netz](ohne-netz.md)`), ohne
   Sprungmarke: GitHub, Astro und die App bilden Überschriften-Anker verschieden. Der Titel steht
@@ -172,6 +173,22 @@ stehen im Hintergrund jedes Kapitels.
   Organisation); jedes weitere Kapitel einer Mappe beginnt auf neuer Seite
   (`data-lfh="druck-kapitel"`, Mechanik in `druck/druck.css`).
 - Der Dev-Server darf `docs/anwender/` lesen (`server.fs.allow` in `vite.config.ts`).
+- **Hilfe zur Seite** (LLH-1824): „?“ im Kopf, die Tasten ? (außerhalb von Eingabefeldern) und F1
+  und die Palettenbefehle „Hilfe zu dieser Seite“ und „Tastenkürzel“ öffnen die Seitenleiste
+  (`hilfe/HilfeSeitenleiste.tsx`) neben der Arbeit. Der Provider (`hilfe/HilfeSeitenleisteProvider.tsx`,
+  in `App.tsx` über der Sprungpalette) steht im Haupt-Chunk und lädt die Leiste nur per `import()`;
+  er ist aus auf dem gekoppelten Gerät, ohne Anmeldung und unter `/hilfe`. Wächter:
+  `hilfe/hauptChunk.guard.test.ts`.
+- **Jede Seite hat ein Kapitel:** Jedes Modul nennt es in `ModulEintrag.hilfeKapitel`, jede Seite
+  ohne Modul (und jede Unterseite mit eigenem Kapitel) steht in `KAPITEL_JE_PFAD`
+  (`hilfe/kontextKapitel.ts`, ohne Kapiteltexte); ohne Treffer gilt `einsatz-oberflaeche`. Wer ein
+  Kapitel umbenennt oder eine Seite anlegt, zieht die Zuordnung mit; Wächter
+  `hilfe/kontextKapitel.guard.test.ts`.
+- **Tastenkürzel** stehen in `hilfe/tastenkuerzel.ts`; die globalen kommen aus
+  `TASTATUR_AKTIONEN`, nicht abgeschrieben. Wer ein Kürzel einführt oder ändert, trägt es dort ein.
+- **Willkommenskarte** (`hilfe/WillkommenKarte.tsx`) auf der Einsatzliste, bis sie geschlossen
+  wird (Schlüssel `willkommen_geschlossen` im Benutzer-Einstellungsfach); unbekannter Stand zeigt
+  sie nicht.
 
 ## Website
 

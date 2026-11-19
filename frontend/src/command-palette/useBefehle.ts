@@ -12,6 +12,8 @@ import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
 import { leseZuletztModule, merkeModulBesuch } from '../einsatz/zuletztModule';
 import { modulAusPfad } from '../einsatz/modulRegistry';
+import { useHilfeSeitenleiste } from '../hilfe/HilfeSeitenleisteProvider';
+import { useViewport } from '../components/useViewport';
 import type { BefehlsGedaechtnis } from './useZuletztBefehle';
 import type { SchnellaktionZaehlung } from './useSchnellaktionZaehler';
 import type { Befehl, BefehlKontext, TastaturAktionen } from './typen';
@@ -52,6 +54,8 @@ export function useBefehle(
   // Wie `setDichte`: der Setter ist identitätsstabil, das Objekt von `useHelligkeit()` nicht.
   const { setHelligkeit } = useHelligkeit();
   const { pathname } = useLocation();
+  const { oeffneHilfe } = useHilfeSeitenleiste();
+  const { istBeruehrung } = useViewport();
   const einsatzId = einsatzIdAusPfad(pathname);
   /**
    * Die AKTUELLE ROUTE als Modulschlüssel, zerlegt über die Registry. Ein Primitiv in der
@@ -130,6 +134,8 @@ export function useBefehle(
         abmelden,
         tastaturAktionen,
         userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+        oeffneHilfe,
+        istBeruehrung,
       }),
     // `setDichte` ist identitätsstabil, das Objekt aus `useDichte()` NICHT (je Aufruf frisch).
     // `gedaechtnis` als Ganzes: es ist beim Aufrufer memoisiert.
@@ -151,6 +157,8 @@ export function useBefehle(
       merkeBesuch,
       gedaechtnisOderLeer,
       zaehlungOderLeer,
+      oeffneHilfe,
+      istBeruehrung,
     ],
   );
 }

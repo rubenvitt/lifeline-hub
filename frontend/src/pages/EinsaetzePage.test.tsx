@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import dayjs from 'dayjs';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
@@ -52,6 +52,16 @@ function setup() {
   );
   return renderMitProviders(<EinsaetzePage />);
 }
+
+// Die Willkommenskarte (LLH-1824) hat eigene Tests (`hilfe/WillkommenKarte.test.tsx`); hier ist
+// sie geschlossen, damit Tab-Reihenfolge und Hinweise der Seite unverändert geprüft werden.
+beforeEach(() => {
+  server.use(
+    http.get('/api/benutzer-einstellungen', () =>
+      HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 08:00:00' } }),
+    ),
+  );
+});
 
 describe('EinsaetzePage', () => {
   it('listet Einsätze mit Bezeichnung und eigener Rolle', async () => {

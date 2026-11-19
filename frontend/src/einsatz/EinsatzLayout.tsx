@@ -48,6 +48,7 @@ import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from './EinsatzRahmenK
 import { isUebung } from './einsatzart';
 import { NichtGefundenProvider, type NichtGefundenMarke } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
+import HilfeKnopf from '../hilfe/HilfeKnopf';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import AlarmZone from '../alarm/AlarmZone';
@@ -698,6 +699,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               <CommandPaletteTrigger />
             </div>
           )}
+          {/* Hilfe zur Seite (LLH-1824); am Handy steht sie im Fuß der Navigation. */}
+          {mittel && (
+            <div style={kopfZelleStil(zellToken)}>
+              <HilfeKnopf />
+            </div>
+          )}
           {mittel && (
             <div
               style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
@@ -835,7 +842,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           // Am Handy trägt die Navigation auch, was im Kopf keinen Platz hat (LLH-1728, D3).
           footer={
             mittel ? undefined : (
-              <BenutzerMenu funktion={einsatz?.meine_funktion} hilfeDaneben inNavigation />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+                <HilfeKnopf beschriftet onVorOeffnen={() => setNavOffen(false)} />
+                <BenutzerMenu funktion={einsatz?.meine_funktion} hilfeDaneben inNavigation />
+              </div>
             )
           }
         >
