@@ -1095,9 +1095,7 @@ function MaterialInhalt() {
        * Dialog mit Absende-Knopf im `<form>`. Vorher stand hier eine Maske, die direkt absendete.
        */
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Gruppierung (LLH-1225 D4): eine Segmentleiste darf im Kopf stehen
               (`frontend/AGENTS.md`, „Nebenwege im Kopf“); je Einsatz im State, ohne Speicher. */}
           <Segmentleiste<Gruppierung>
@@ -1114,7 +1112,7 @@ function MaterialInhalt() {
               <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Material</Button>
             </>
           )}
-        </Space>
+        </>
       }
     >
       {/* Der Status steht im `karte.status`-Slot mit der Vertragsrolle aus

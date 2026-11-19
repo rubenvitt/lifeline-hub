@@ -1280,9 +1280,7 @@ function FahrzeugeInhalt() {
             : [],
       }}
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. Am
               Handschirm hinter „Filter (n)“ (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig`
               D5), samt Sortierung und Status der Liste. */}
@@ -1306,7 +1304,7 @@ function FahrzeugeInhalt() {
               {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>}
             </>
           )}
-        </Space>
+        </>
       }
       hinweis={
         nurAnsicht ||

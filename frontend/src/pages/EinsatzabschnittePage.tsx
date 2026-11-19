@@ -793,9 +793,7 @@ export default function EinsatzabschnittePage() {
         />
       }
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
           <Segmentleiste<AbschnitteAnsicht>
             beschriftung="Ansicht"
@@ -808,7 +806,7 @@ export default function EinsatzabschnittePage() {
               Abschnitt anlegen
             </Button>
           )}
-        </Space>
+        </>
       }
       hinweis={
         // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei. Das Rückgängig aus
