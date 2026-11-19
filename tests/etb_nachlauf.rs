@@ -117,25 +117,32 @@ async fn ohne_klammer_kein_effekt() {
     .await;
 }
 
-/// Die Router-Schicht liegt außerhalb von `CatchPanicLayer`: eine Lücke macht den Test rot,
-/// statt als 500 zu enden. Vorübergehend über eine noch unverteilte Route (Zone anlegen);
-/// LLH-1976, Plan Task 5 stellt auf eine Testroute um.
+/// Die Router-Schicht `waechter` wirkt außerhalb von `CatchPanicLayer` (so steht sie in
+/// `app::build_router_mit`): eine Lücke macht den Test rot, statt als 500 zu enden.
 #[tokio::test]
 #[should_panic(expected = "ETB-Eintrag nicht live verteilt")]
 async fn panic_der_schicht_erreicht_den_test() {
-    let (app, _pool, _live) = setup_mit_pool_und_live().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let poly =
-        r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
-    let body = serde_json::json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":poly,"label":"Nord"})
-        .to_string();
-    anfrage(
-        &app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/zonen"),
-        &admin,
-        Some(&body),
-    )
-    .await;
+    use axum::extract::State;
+    use tower::ServiceExt;
+    let (pool, live, einsatz, erfasser) = vorbereiten().await;
+    let state = test_state(&pool, &live);
+    async fn unverteilt(
+        State(state): State<lifeline_hub::app::AppState>,
+        axum::extract::Path((einsatz, erfasser)): axum::extract::Path<(i64, i64)>,
+    ) -> &'static str {
+        schreiben(&state.pool, einsatz, erfasser, "Testroute").await;
+        "ok"
+    }
+    let app = axum::Router::new()
+        .route("/x/{einsatz}/{erfasser}", axum::routing::post(unverteilt))
+        .with_state(state.clone())
+        .layer(tower_http::catch_panic::CatchPanicLayer::new())
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            lifeline_hub::etb::nachlauf::waechter,
+        ));
+    let anfrage = axum::http::Request::post(format!("/x/{einsatz}/{erfasser}"))
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let _ = app.oneshot(anfrage).await;
 }

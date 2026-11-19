@@ -2,8 +2,8 @@ use axum::http::StatusCode;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup,
-    stammpersonal_disponieren, system_etb_anzahl,
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup, setup_mit_live,
+    stammpersonal_disponieren, system_etb_anzahl, EtbLive,
 };
 
 #[tokio::test]
@@ -819,4 +819,33 @@ async fn altwert_ohne_aenderung_ist_422_und_unbekannt_bleibt_404() {
     )
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// LLH-1976: Das Auflösen eines Abschnitts geht als Ereignis `etb` hinaus.
+#[tokio::test]
+async fn aufloesen_etb_geht_live_hinaus() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(r#"{"name":"Nord"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let aid = json["id"].as_i64().unwrap();
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/abschnitte/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    etb.pruefe(&app, &admin, einsatz, "auflösen").await;
 }

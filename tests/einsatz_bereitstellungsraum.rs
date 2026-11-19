@@ -8,7 +8,7 @@ use serde_json::json;
 mod common;
 use common::{
     anfrage_json, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie,
-    objekt_ereignisse, rolle_setzen, setup_mit_pool, setup_mit_pool_und_live,
+    objekt_ereignisse, rolle_setzen, setup_mit_pool, setup_mit_pool_und_live, EtbLive,
 };
 
 // ---------- Harness ----------
@@ -5084,4 +5084,15 @@ async fn austragen_zuruecknehmen() {
     // Fremder Raum oder unbekanntes Ereignis: 404.
     let (s, _) = anfrage_json(&app, "POST", &pfad(schule, &aus["id"]), &cookie, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// LLH-1976: Ein Statuswechsel des Bereitstellungsraums geht als Ereignis `etb` hinaus.
+#[tokio::test]
+async fn statuswechsel_etb_geht_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+    br_anlegen_und_aktivieren(&app, &admin, einsatz, "BR Nord").await;
+    etb.pruefe(&app, &admin, einsatz, "aktivieren").await;
 }
