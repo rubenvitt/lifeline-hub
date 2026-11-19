@@ -340,12 +340,10 @@ export default function SchaedenDetailPage() {
         bearbeiten
           ? {
               typ: {
-                feld: lockIfStorniert(<Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />),
+                feld: lockIfStorniert(<Select options={TYP_OPTIONS} />),
               },
               ausmass: {
-                feld: lockIfStorniert(
-                  <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
-                ),
+                feld: lockIfStorniert(<Select options={AUSMASS_OPTIONS} />),
               },
               gefahrenart: { feld: lockIfStorniert(<GefahrAuswahlImFormular />) },
               schadensgrad: { feld: lockIfStorniert(<SchadensgradAuswahl />) },

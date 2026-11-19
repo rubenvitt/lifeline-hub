@@ -599,7 +599,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       {zelle(
         'kapazitaet_personen',
         'Kapazität (Personen)',
-        <InputNumber min={1} precision={0} placeholder="keine Angabe" style={{ width: '100%' }} />,
+        <InputNumber min={1} precision={0} placeholder="keine Angabe" />,
         s.kapazitaet_personen != null ? personenZahl(s.kapazitaet_personen) : leer,
         { mono: true, rules: [hoechstensRegel] },
       )}
