@@ -2253,6 +2253,91 @@ describe('LagekartePage · Neuentwurf S5', () => {
     await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));
   });
 
+  // LLH-1953: ohne Punkt schweigt die Karte nicht, sie nennt den fehlenden Einsatzort im Fuß.
+  it('nennt den Einsatzort ohne Koordinate im Kartenfuß, mit Platzieren und Sprung', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
+      ),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    const region = await screen.findByRole('region', { name: 'Einsatzort' });
+    expect(region.closest('[data-lfh="einsatzort-band"]')).not.toBeNull();
+    expect(region).toHaveTextContent('Einsatzort nicht verortet');
+    expect(region).toHaveTextContent('ELW');
+    const band = document.querySelector<HTMLElement>('[data-lfh="einsatzort-band"]')!;
+    expect(await within(band).findByRole('link', { name: 'Adresse eintragen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einsatzdaten?paneel=einsatzort',
+    );
+    // Platzieren ist ein Kartenmodus: das Modus-Band übernimmt, der Hinweis tritt zurück.
+    await user.click(within(band).getByRole('button', { name: 'Auf der Karte setzen' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull(),
+    );
+  });
+
+  it('zeigt mit gesetztem Einsatzort kein Einsatzort-Band', async () => {
+    basisHandler();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull();
+  });
+
+  it('lässt den Sprung weg, wenn die Einsatzdaten gesperrt sind', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
+      ),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ einsatzdaten: { zugriff: false } })),
+      ),
+    ]);
+    renderSeite();
+    const band = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="einsatzort-band"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    await within(band).findByRole('button', { name: 'Auf der Karte setzen' });
+    expect(within(band).queryByRole('link')).toBeNull();
+  });
+
+  it('zeigt im gesicherten Stand kein Einsatzort-Band', async () => {
+    const ohneOrt = { ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null };
+    basisHandler([
+      http.get('/api/einsaetze/1', () => HttpResponse.json(ohneOrt)),
+      http.get('/api/einsaetze/1/lage-snapshots', () => HttpResponse.json([STAND_A])),
+      http.get('/api/einsaetze/1/lage-snapshots/3', () =>
+        HttpResponse.json({ ...STAND_A, daten: { einsatz: ohneOrt } }),
+      ),
+    ]);
+    renderSeite('/einsaetze/1/lagekarte?snapshot=3');
+    await screen.findByText('Historischer Stand — schreibgeschützt');
+    expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull();
+  });
+
+  it('nennt ohne Schreibrecht nur den fehlenden Einsatzort, ohne Knöpfe', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({
+          ...EINSATZ,
+          einsatzort: null,
+          einsatzort_lat: null,
+          einsatzort_lon: null,
+          status: 'abgeschlossen',
+        }),
+      ),
+    ]);
+    renderSeite();
+    const region = await screen.findByRole('region', { name: 'Einsatzort' });
+    expect(region).toHaveTextContent('Einsatzort fehlt');
+    const band = document.querySelector<HTMLElement>('[data-lfh="einsatzort-band"]')!;
+    expect(within(band).queryByRole('button')).toBeNull();
+    expect(within(band).queryByRole('link')).toBeNull();
+  });
+
   // LFH-723: die Karte führt ihren Datenstand wie jede Seite des Lagebilds — ohne Verbindung
   // mit „offline", damit ein vorgehaltener Stand nicht als aktueller gelesen wird.
   it('führt im Seitenkopf den Datenstand, ohne Verbindung mit „offline"', async () => {
