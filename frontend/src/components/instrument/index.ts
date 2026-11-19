@@ -92,3 +92,4 @@ export {
 export { default as Stapel, rasterAbstand, type Abstandsstufe, type StapelProps } from './Stapel';
 export { default as MetaZeile } from './MetaZeile';
 export { default as Feld, FELD_KLASSE, type FeldProps } from './Feld';
+export { default as GeaendertPunkt } from './GeaendertPunkt';

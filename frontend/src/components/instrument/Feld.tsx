@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react';
 import { Form, type FormItemProps } from 'antd';
+import type { NamePath } from 'antd/es/form/interface';
 import { FELDBREITE, type Feldbreite } from '../../theme/tokens';
+import GeaendertPunkt from './GeaendertPunkt';
 
 /**
  * Feld — ein Formularfeld mit benannter Obergrenze (Spec `feldbreiten`, LLH-1810). Hülle um antds
@@ -32,12 +34,22 @@ export interface FeldProps<Values = unknown> extends Omit<FormItemProps<Values>,
 export default function Feld<Values = unknown>({
   breite = 'voll',
   className,
+  label,
   ...props
 }: FeldProps<Values>) {
   const grenze = FELDBREITE[breite];
   return (
     <Form.Item<Values>
       {...props}
+      // Ein geändertes Feld trägt den Punkt am Etikett (LLH-1829); ohne Etikett kein Punkt.
+      label={
+        label === undefined ? undefined : (
+          <>
+            {label}
+            <GeaendertPunkt name={props.name as NamePath | undefined} />
+          </>
+        )
+      }
       className={className ? `${FELD_KLASSE} ${className}` : FELD_KLASSE}
       style={grenze === undefined ? undefined : ({ [FELD_GRENZE]: `${grenze}px` } as CSSProperties)}
     />
