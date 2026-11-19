@@ -79,6 +79,14 @@ export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
 }
 
 /**
+ * Personen, die sich schon beim Anlegen aufnehmen lassen (LLH-1820): dieselbe Grundmenge wie
+ * unter „Zugriff“, ohne die anlegende Person. Nur Kennung und Anzeigename.
+ */
+export function loadMitgliedAuswahlAnlage(): Promise<MitgliedAuswahl[]> {
+  return apiGet<MitgliedAuswahl[]>('/api/einsaetze/mitglied-auswahl');
+}
+
+/**
  * Führungsstelle als Paar (LFH-549): Katalogcode und Text werden zusammen gesetzt — der Text ist
  * Freitext ohne Code bzw. die Bezeichnung bei Führungshilfspersonal/Fachberater. `null` auf
  * beiden leert die Stelle.

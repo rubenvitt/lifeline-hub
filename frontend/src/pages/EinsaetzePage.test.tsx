@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { sichtbareFormfelder } from '../test/feldbudget';
 import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
@@ -139,7 +140,7 @@ describe('EinsaetzePage', () => {
     for (const feld of ['Bezeichnung', 'Stichwort', 'Einsatzart', 'Alarmzeit', 'Einsatzort']) {
       expect(screen.getByLabelText(feld)).toBeInTheDocument();
     }
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    expect(sichtbareFormfelder(dialog).length).toBe(5);
     // Der Ausschnitt erscheint erst nach der Wahl eines Treffers.
     expect(screen.queryByTestId('kartenausschnitt')).toBeNull();
   });
@@ -170,7 +171,7 @@ describe('EinsaetzePage', () => {
       await within(dialog).findByText('Schichtmodell: 12-h-Schicht (Vorgabe)'),
     ).toBeInTheDocument();
     // Feldbudget (LFH-1175): weiter fünf Felder.
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    expect(sichtbareFormfelder(dialog).length).toBe(5);
   });
 
   it('ohne Vorgabe der Organisation keine Schichtmodell-Zeile (LLH-1122)', async () => {

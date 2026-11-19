@@ -1184,6 +1184,9 @@ export const GLOBAL_KEYS = {
   // Bestand der Bereitschaft auf der Übersicht der Verwaltung (LLH-1820). Zählt Stammdaten und
   // folgt deshalb ihren Ereignissen; neue Benutzer sieht die Seite beim nächsten Öffnen.
   bereitschaft: 'bereitschaft',
+  // Personenauswahl im Anlegedialog (LLH-1820). Nicht live: sie lädt beim Aufklappen des Teils
+  // „Mitglieder“ und gilt nur für diesen einen Dialog.
+  mitgliedAuswahlAnlage: 'mitglied-auswahl-anlage',
   // Ortssuche ohne Einsatz (LFH-1175), etwa beim Anlegen. Nicht `ort-suche`: das ist der
   // Einsatz-Prefix der Lagekarte, ein gleicher Wire-String träfe dessen Fach.
   orgOrtSuche: 'org-ort-suche',
@@ -1321,6 +1324,7 @@ export const globalKeys = {
   stichwortVorschlaege: () => [GLOBAL_KEYS.stichwortVorschlaege] as const,
   einsatzVorlagen: () => [GLOBAL_KEYS.einsatzVorlagen] as const,
   bereitschaft: () => [GLOBAL_KEYS.bereitschaft] as const,
+  mitgliedAuswahlAnlage: () => [GLOBAL_KEYS.mitgliedAuswahlAnlage] as const,
   fuehrungsfunktionen: () => [GLOBAL_KEYS.fuehrungsfunktionen] as const,
   unterkunftRichtwerte: () => [GLOBAL_KEYS.unterkunftRichtwerte] as const,
   schichtmodelle: () => [GLOBAL_KEYS.schichtmodelle] as const,
@@ -1484,6 +1488,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  *   wäre schädlich (Nominatim-ToS).
  * - `planungDruck` (LLH-1593): derselbe Schnappschuss-Grundsatz wie `schichtplanDruck`; eine
  *   Änderung an der Planung darf Aushang und Zettel vor dem Druck nicht still ändern.
+ * - `mitgliedAuswahlAnlage` (LLH-1820): Personenauswahl im Anlegedialog, geladen beim Aufklappen;
+ *   wer inzwischen nicht mehr aufnehmbar ist, lehnt der Server beim Anlegen mit Namen ab.
  */
 export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
@@ -1509,6 +1515,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.orgOrtSuche,
   GLOBAL_KEYS.orgOrtVorschau,
   GLOBAL_KEYS.planungDruck,
+  GLOBAL_KEYS.mitgliedAuswahlAnlage,
 ] as const satisfies readonly GlobalKey[];
 
 /**

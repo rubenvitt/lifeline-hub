@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { sichtbareFormfelder } from '../test/feldbudget';
 import { listeVon, waehle } from '../test/auswahlListe';
 import type { EinsatzVorlage, StichwortVorschlag } from '../api/types';
 import EinsaetzePage from './EinsaetzePage';
@@ -117,7 +118,7 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375, LLH-1816)', () => {
     setup();
     const dialog = await oeffneDialog();
     expect(gewaehlt('Vorlage')).toBe('Alle Module');
-    const felder = dialog.querySelectorAll<HTMLElement>('.ant-form-item');
+    const felder = sichtbareFormfelder(dialog);
     // Feldbudget-Ausnahme (frontend/AGENTS.md, LLH-1816): sechs Felder, die Vorlage zuerst.
     expect(felder.length).toBe(6);
     expect(within(felder[0]).getByRole('combobox', { name: 'Vorlage' })).toBeInTheDocument();
@@ -180,7 +181,7 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375, LLH-1816)', () => {
     await waitFor(() => expect(beantwortet).toBe(true));
     await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(within(dialog).queryByRole('combobox', { name: 'Vorlage' })).toBeNull();
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(5);
+    expect(sichtbareFormfelder(dialog).length).toBe(5);
   });
 
   it('ohne Wahl geht kein `vorlage_id` hinaus', async () => {
@@ -315,7 +316,7 @@ describe('Anlegedialog · Schichtmodell der Vorlage (LLH-1313)', () => {
       await within(dialog).findByText('Schichtmodell: Sanitätsdienst 6 h (Vorgabe Vorlage)'),
     ).toBeInTheDocument();
     // Das Schichtmodell ist kein eigenes Feld: sechs Felder samt Vorlage (Feldbudget, LLH-1816).
-    expect(dialog.querySelectorAll('.ant-form-item').length).toBe(6);
+    expect(sichtbareFormfelder(dialog).length).toBe(6);
 
     await waehle('Vorlage', 'Kleinlage');
     expect(
