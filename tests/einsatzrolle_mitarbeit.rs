@@ -525,3 +525,337 @@ async fn mitarbeit_korrigiert_eigene_meldung_in_der_lage_nicht() {
     assert_eq!(liste[0]["prioritaet"], "normal");
     assert_eq!(liste[0]["lagerelevant"], serde_json::json!(true));
 }
+
+// ---- ETB (Task 5) ----
+
+fn etb_body(typ: &str, extra: serde_json::Value) -> String {
+    let mut v = serde_json::json!({
+        "typ": typ, "inhalt": "Pegel steigt", "von": "Mitarbeit", "an": "ELW 1",
+    });
+    for (k, w) in extra.as_object().unwrap() {
+        v[k] = w.clone();
+    }
+    v.to_string()
+}
+
+async fn etb_senden(
+    app: &axum::Router,
+    einsatz: i64,
+    cookie: &str,
+    typ: &str,
+    extra: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        Some(&etb_body(typ, extra)),
+    )
+    .await
+}
+
+async fn etb_anzahl(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn mitarbeit_erfasst_etb_meldung_und_lage() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    for typ in ["meldung", "lage"] {
+        let (s, v) = etb_senden(&app, einsatz, &mit, typ, serde_json::json!({})).await;
+        assert_eq!(s, StatusCode::CREATED, "{typ}: {v:?}");
+    }
+}
+
+#[tokio::test]
+async fn mitarbeit_erfasst_keine_anordnung_oder_entscheidung() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    for typ in ["anordnung", "entscheidung"] {
+        let (s, v) = etb_senden(&app, einsatz, &mit, typ, serde_json::json!({})).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{typ}: {v:?}");
+    }
+    assert_eq!(etb_anzahl(&pool, einsatz).await, 0);
+}
+
+#[tokio::test]
+async fn mitarbeit_berichtigt_eigenen_eintrag() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (_, e) = etb_senden(&app, einsatz, &mit, "meldung", serde_json::json!({})).await;
+    let eid = e["id"].as_i64().unwrap();
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": eid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+}
+
+#[tokio::test]
+async fn mitarbeit_berichtigt_fremden_eintrag_nicht() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    mitarbeit_anlegen_in(&app, &admin, anderer, &mit).await;
+    let (_, fremd) = etb_senden(&app, einsatz, &admin, "meldung", serde_json::json!({})).await;
+    let fid = fremd["id"].as_i64().unwrap();
+    let vorher = etb_anzahl(&pool, einsatz).await;
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": fid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+
+    // Ein eigener Eintrag aus einem anderen Einsatz zählt nicht für diesen Einsatz.
+    let (_, eigen_woanders) =
+        etb_senden(&app, anderer, &mit, "meldung", serde_json::json!({})).await;
+    let wid = eigen_woanders["id"].as_i64().unwrap();
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "berichtigung",
+        serde_json::json!({ "berichtigt_eintrag_id": wid }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+    assert_eq!(etb_anzahl(&pool, einsatz).await, vorher);
+}
+
+/// Gibt demselben Benutzer (Cookie `cookie`) in einem weiteren Einsatz die Rolle Mitarbeit.
+async fn mitarbeit_anlegen_in(app: &axum::Router, admin: &str, einsatz: i64, _cookie: &str) {
+    let (s, v) = anfrage(app, "GET", "/api/benutzer", admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let id = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["benutzername"] == "mitarbeiter")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    rolle_setzen(app, admin, einsatz, id, "mitarbeit").await;
+}
+
+async fn etb_foto_hochladen(
+    app: &axum::Router,
+    einsatz: i64,
+    cookie: &str,
+) -> (StatusCode, serde_json::Value) {
+    multipart_post(
+        app,
+        &format!("/api/einsaetze/{einsatz}/etb/anhaenge"),
+        cookie,
+        Some(("foto.png", MINI_PNG)),
+        &[],
+    )
+    .await
+}
+
+#[tokio::test]
+async fn mitarbeit_haengt_eigenes_foto_an_etb_eintrag() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (s, v) = etb_foto_hochladen(&app, einsatz, &mit).await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let aid = v[0]["id"].as_i64().unwrap();
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "meldung",
+        serde_json::json!({ "anhang_ids": [aid] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    assert_eq!(v["anhaenge"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn mitarbeit_haengt_fremden_anhang_nicht_an() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (s, v) = etb_foto_hochladen(&app, einsatz, &admin).await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let fremd = v[0]["id"].as_i64().unwrap();
+    let vorher = etb_anzahl(&pool, einsatz).await;
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "meldung",
+        serde_json::json!({ "anhang_ids": [fremd] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+    assert_eq!(etb_anzahl(&pool, einsatz).await, vorher);
+
+    // Auch ein eigener Anhang aus einem anderen Einsatz bleibt gesperrt.
+    mitarbeit_anlegen_in(&app, &admin, anderer, &mit).await;
+    let (s, v) = etb_foto_hochladen(&app, anderer, &mit).await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let woanders = v[0]["id"].as_i64().unwrap();
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "meldung",
+        serde_json::json!({ "anhang_ids": [woanders] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+    assert_eq!(etb_anzahl(&pool, einsatz).await, vorher);
+
+    // Ein eigener, schon an einen Eintrag gebundener Anhang lässt sich nicht noch einmal binden.
+    let (_, v) = etb_foto_hochladen(&app, einsatz, &mit).await;
+    let eigen = v[0]["id"].as_i64().unwrap();
+    let (s, _) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "meldung",
+        serde_json::json!({ "anhang_ids": [eigen] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "meldung",
+        serde_json::json!({ "anhang_ids": [eigen] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v:?}");
+}
+
+#[tokio::test]
+async fn mitarbeit_etb_offline_replay_gibt_gespeicherten_zurueck() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (id, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let uri = format!("/api/einsaetze/{einsatz}/etb");
+    let body = etb_body(
+        "meldung",
+        serde_json::json!({ "client_id": "offline-etb-1" }),
+    );
+
+    let (s1, erst) =
+        anfrage_mit_offline_queue_benutzer(&app, "POST", &uri, &mit, Some(&body), id).await;
+    assert_eq!(s1, StatusCode::CREATED, "{erst:?}");
+    let (s2, zweit) =
+        anfrage_mit_offline_queue_benutzer(&app, "POST", &uri, &mit, Some(&body), id).await;
+    assert_eq!(s2, StatusCode::CREATED, "{zweit:?}");
+    assert_eq!(erst["id"], zweit["id"]);
+    assert_eq!(etb_anzahl(&pool, einsatz).await, 1);
+
+    sqlx::query(
+        "UPDATE einsatz SET status = 'abgeschlossen', \
+         abgeschlossen_at = strftime('%Y-%m-%d %H:%M:%S','now') WHERE id = ?",
+    )
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s3, dritt) =
+        anfrage_mit_offline_queue_benutzer(&app, "POST", &uri, &mit, Some(&body), id).await;
+    assert_eq!(s3, StatusCode::CREATED, "{dritt:?}");
+    assert_eq!(erst["id"], dritt["id"]);
+}
+
+#[tokio::test]
+async fn mitarbeit_erfasst_nicht_wenn_etb_auf_fuehrung_im_einsatz_steht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/etb"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let (s, v) = etb_senden(&app, einsatz, &mit, "meldung", serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+    let (s, v) = etb_senden(&app, einsatz, &admin, "meldung", serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+}
+
+#[tokio::test]
+async fn mitarbeit_erteilt_keinen_etb_auftrag() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (_, e) = etb_senden(&app, einsatz, &mit, "meldung", serde_json::json!({})).await;
+    let eid = e["id"].as_i64().unwrap();
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/etb/{eid}/auftrag"),
+        &mit,
+        Some(
+            r#"{"auftrag_text":"x","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+}
+
+#[tokio::test]
+async fn mitarbeit_legt_ueber_den_etb_keine_lagemeldung_an() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "lage",
+        serde_json::json!({ "in_meldungseingang": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v:?}");
+    assert_eq!(etb_anzahl(&pool, einsatz).await, 0);
+    let (s, v) = etb_senden(
+        &app,
+        einsatz,
+        &mit,
+        "meldung",
+        serde_json::json!({ "in_meldungseingang": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+}
