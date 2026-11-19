@@ -16,7 +16,9 @@ import {
   useHatOffeneBearbeitung,
   useOffeneBearbeitungBelegung,
 } from '../offeneBearbeitung';
+import { AenderungsstandProvider, useAenderungsanzahl } from '../aenderungsstand';
 import { SpeicherFehler } from '../SpeicherHinweis';
+import SpeicherKnopf from '../SpeicherKnopf';
 import { useSpeicherLeiste } from '../speicherLeiste';
 import { useEditSitzung, type CasBasis, type MitGeaendertAt } from '../useEditSitzung';
 import Datenraster, { Datenfeld } from './Datenraster';
@@ -131,6 +133,12 @@ export function bearbeitetePatch<W extends object>(
   return patch;
 }
 
+/** Legt die Zahl der Änderungen in einen Ref des Paneels (der Tastenweg liegt über dem Provider). */
+function AnzahlMelden({ ziel }: { ziel: { current: number | null } }) {
+  ziel.current = useAenderungsanzahl();
+  return null;
+}
+
 function isLeer(patch: unknown): boolean {
   return patch == null || (typeof patch === 'object' && Object.keys(patch).length === 0);
 }
@@ -186,6 +194,7 @@ function Innen<W extends object, P = Partial<W>>({
   const knopfRef = useRef<HTMLButtonElement>(null);
   const rasterRef = useRef<HTMLDivElement>(null);
   const grundId = useId();
+  const anzahlRef = useRef<number | null>(null);
 
   const setOffen = useCallback(
     (wert: boolean) => {
@@ -264,17 +273,30 @@ function Innen<W extends object, P = Partial<W>>({
   };
 
   const onTaste = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || laeuft) return;
-    e.preventDefault();
-    melde('zu');
-    schliesse();
+    if (e.defaultPrevented || laeuft) return;
+    if (e.key === 'Escape' || (e.key === 'Enter' && isEnterOhneAenderung(e))) {
+      e.preventDefault();
+      melde('zu');
+      schliesse();
+    }
+  };
+
+  /**
+   * Enter ohne Änderung schließt wie bisher (LLH-1829, Design-Doc „Entscheidungen aus der
+   * Gegenlese“): der gesperrte `SpeicherKnopf` unterbindet das implizite Absenden, also trägt das
+   * der Tastenweg. Nicht im Textfeld (Zeilenumbruch), nicht auf einem Knopf (der löst selbst aus),
+   * nicht bei offener Auswahl (Enter wählt dort).
+   */
+  const isEnterOhneAenderung = (e: KeyboardEvent<HTMLDivElement>): boolean => {
+    if (anzahlRef.current !== 0) return false;
+    const ziel = e.target as HTMLElement;
+    if (ziel.tagName === 'TEXTAREA' || ziel.tagName === 'BUTTON') return false;
+    return ziel.getAttribute('aria-expanded') !== 'true';
   };
 
   const knoepfe = (
     <>
-      <Button type="primary" htmlType="submit" loading={laeuft}>
-        Speichern
-      </Button>
+      <SpeicherKnopf loading={laeuft} />
       <Button
         htmlType="button"
         disabled={laeuft}
@@ -351,7 +373,11 @@ function Innen<W extends object, P = Partial<W>>({
         onValuesChange={() => melde('geaendert')}
         scrollToFirstError={{ focus: true }}
       >
-        {inhalt}
+        {/* Ausgangsstand ist der Stand beim Öffnen (LLH-1829): Punkt und „N Änderungen“. */}
+        <AenderungsstandProvider ausgangswerte={sitzung?.werte}>
+          <AnzahlMelden ziel={anzahlRef} />
+          {inhalt}
+        </AenderungsstandProvider>
       </Form>
     </div>
   );

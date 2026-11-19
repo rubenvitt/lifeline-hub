@@ -1,7 +1,9 @@
 import { useId } from 'react';
 import { Button } from 'antd';
 import { useAenderungsanzahl } from './aenderungsstand';
-import { Textstufe } from './instrument';
+// Direkt, nicht über `instrument/index.ts`: `BearbeitbaresPaneel` (dort exportiert) nutzt diesen
+// Knopf, der Umweg schlösse einen Importkreis.
+import Textstufe from './instrument/Textstufe';
 
 /**
  * „Speichern“ einer Formularseite oder eines `BearbeitbaresPaneel` mit dem Änderungsstand daneben
