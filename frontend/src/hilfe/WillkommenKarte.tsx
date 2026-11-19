@@ -14,23 +14,54 @@ import { istApplePlattform } from '../command-palette/befehle';
 import { hilfePfad } from '../routing/deeplinks';
 import { SCHLUESSEL_WILLKOMMEN_GESCHLOSSEN, istWillkommenOffen } from './willkommen';
 
+/** Das Einstellungsfach der Person, an dem die Karte hängt; ohne Person (Gerät) keines. */
+function useWillkommenFach() {
+  const auth = useAuthOptional();
+  // Ein gekoppeltes Gerät hat keine Einsatzliste mit Hilfe (LFH-892).
+  const benutzerId = auth?.geraet ? null : ((auth?.benutzer as { id?: number } | null)?.id ?? null);
+  const key = useMemo(() => globalKeys.benutzerEinstellungenVon(benutzerId), [benutzerId]);
+  const abfrage = useQuery({
+    queryKey: key,
+    queryFn: ladeBenutzerEinstellungen,
+    enabled: benutzerId != null,
+    staleTime: Infinity,
+  });
+  return { benutzerId, key, abfrage };
+}
+
+/**
+ * Steht fest, ob die Karte erscheint? Die Einsatzliste zeichnet ihren Inhalt erst dann
+ * (`frontend/AGENTS.md`, „Modulwechsel zeigt sofort Kopf und Gerippe“: was erst mit den Daten
+ * kommt, steht nicht über dem, was schon steht). Käme die Karte nach dem Gerippe, schöbe sie es um
+ * ihre Höhe nach unten (183 px, `e2e/einsatzauswahl-cls.spec.ts`). Fest steht es mit dem Stand,
+ * ohne Person, oder nach dem ersten Fehlversuch: ohne Stand bleibt die Karte ohnehin weg, und die
+ * Liste wartet nicht auf die Wiederholungen.
+ */
+export function useWillkommenEntschieden(): boolean {
+  const { benutzerId, abfrage } = useWillkommenFach();
+  // `errorUpdateCount`, nicht `isError`: die Karte selbst abonniert dasselbe Fach, und ihr Einhängen
+  // ruft einen gescheiterten Stand neu ab. Mit `isError` hinge die Liste dann wieder aus, mit ihr
+  // die Karte, und der Abruf begänne von vorn.
+  return (
+    benutzerId == null ||
+    abfrage.data !== undefined ||
+    abfrage.errorUpdateCount > 0 ||
+    abfrage.failureCount > 0
+  );
+}
+
 /**
  * Willkommenskarte auf der Einsatzliste (LLH-1824): führt Erstnutzer an den Aufbau, die Hilfe zur
  * Seite und die Sprungpalette heran. Sie steht, bis man sie schließt; das merkt sich der Server je
  * Benutzer. Die anschauliche Einführung folgt als eigene Aufgabe (LLH-1990).
  */
 export default function WillkommenKarte() {
-  const auth = useAuthOptional();
-  // Ein gekoppeltes Gerät hat keine Einsatzliste mit Hilfe (LFH-892).
-  const benutzerId = auth?.geraet ? null : ((auth?.benutzer as { id?: number } | null)?.id ?? null);
+  const {
+    benutzerId,
+    key,
+    abfrage: { data },
+  } = useWillkommenFach();
   const client = useQueryClient();
-  const key = useMemo(() => globalKeys.benutzerEinstellungenVon(benutzerId), [benutzerId]);
-  const { data } = useQuery({
-    queryKey: key,
-    queryFn: ladeBenutzerEinstellungen,
-    enabled: benutzerId != null,
-    staleTime: Infinity,
-  });
   const [geschlossen, setGeschlossen] = useState(false);
   const { token } = theme.useToken();
   const { istBeruehrung } = useViewport();
