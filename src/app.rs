@@ -234,6 +234,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/auth/sitzungen/{kennung}",
             delete(routes::sitzung::eigene_beenden),
         )
+        .route(
+            "/api/verwaltung/bereitschaft",
+            get(routes::verwaltung::bereitschaft),
+        )
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route("/api/benutzer/{id}", patch(routes::benutzer::bearbeiten))
