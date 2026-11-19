@@ -3,6 +3,7 @@ import { Form } from 'antd';
 import type { FormItemProps, FormRule } from 'antd';
 import Augenbraue from './Augenbraue';
 import { FELD_KLASSE } from './Feld';
+import GeaendertPunkt from './GeaendertPunkt';
 import { useRollen } from './rollenwerte';
 import { datenfeldStil } from './datenrasterStil';
 
@@ -58,7 +59,10 @@ export default function DatenfeldEingabe({
   return (
     <div data-lfh="datenfeld" style={datenfeldStil(rollen, token, breit)}>
       <Augenbraue als="dt">
-        <label htmlFor={eingabeId}>{label}</label>
+        <label htmlFor={eingabeId}>
+          {label}
+          <GeaendertPunkt name={name} />
+        </label>
       </Augenbraue>
       <dd style={{ margin: 0, minWidth: 0 }}>
         <Form.Item

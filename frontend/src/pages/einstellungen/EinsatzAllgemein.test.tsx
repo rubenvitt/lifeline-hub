@@ -5,6 +5,7 @@ import { renderMitProviders } from '../../test/utils';
 import EinsatzAllgemein from './EinsatzAllgemein';
 import { modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
 import { mitVorgabe } from '../../components/vorgabeText';
+import { waehle } from '../../test/auswahlListe';
 
 // Systemrolle und Org sind umschaltbar, weil `darfEinsatzVerwalten` den System-Admin der
 // Einsatz-Org unabhängig von `meine_rolle` durchlässt — ein fest auf 'admin' verdrahteter Mock
@@ -54,6 +55,19 @@ const BASIS = {
   geaendert_at: null,
   geaendert_von: null,
 };
+
+/**
+ * „Speichern“ ist ohne Änderung gesperrt (LLH-1829). Die Tests ändern vorher ein Feld, das ihre
+ * Aussage nicht berührt: die Zeitzone oder das Einstiegsmodul.
+ */
+async function aendereZeitzone() {
+  fireEvent.change(await screen.findByRole('combobox', { name: 'Zeitzone' }), {
+    target: { value: 'Europe/Vienna' },
+  });
+}
+async function aendereEinstiegsmodul() {
+  await waehle('Einstiegsmodul', 'ETB');
+}
 
 function rendern() {
   return renderMitProviders(
@@ -119,6 +133,7 @@ describe('EinsatzAllgemein', () => {
     } as never);
 
     rendern();
+    await aendereZeitzone();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
@@ -150,6 +165,7 @@ describe('EinsatzAllgemein', () => {
     expect(screen.getByTitle('Imperial (ft, mi)')).toBeInTheDocument();
     expect(screen.getByTitle('MGRS')).toBeInTheDocument();
 
+    await aendereEinstiegsmodul();
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(
@@ -191,6 +207,7 @@ describe('EinsatzAllgemein', () => {
     expect(document.body.textContent).not.toMatch(/Standard|Default|Fallback/);
 
     // Der Org-Default darf NICHT in den Payload fließen — leer bleibt null (das Backend löst auf).
+    await aendereEinstiegsmodul();
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(
@@ -280,6 +297,7 @@ describe('EinsatzAllgemein', () => {
 
     rendern();
 
+    await aendereZeitzone();
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeEnabled();
     expect(
       screen.queryByText('nur Einsatzleitung, Führungspersonal oder Org-Admin'),
@@ -291,6 +309,7 @@ describe('EinsatzAllgemein', () => {
     vi.mocked(speichereEinstellungen).mockRejectedValue(new ApiError(422, 'Zeitzone unbekannt'));
 
     rendern();
+    await aendereZeitzone();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     // Der Alert hängt an `mutation.error`, nicht an einer Toast-Queue mit eigener Lebensdauer.

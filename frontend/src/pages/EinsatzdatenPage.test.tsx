@@ -1210,7 +1210,12 @@ describe('EinsatzdatenPage · Eigene Führungsstelle (LFH-849)', () => {
     await user.click(p.getByRole('button', { name: 'Standort speichern' }));
     // Den Grund nennt die Koordinateneingabe am Feld, die Zeile meldet „Nicht gespeichert“.
     expect(await p.findByText(/Ungültige Koordinate/)).toBeInTheDocument();
-    expect(await p.findByText('Nicht gespeichert')).toBeInTheDocument();
+    // Die Zeile meldet es als Hinweis; das offene Feld trägt dazu seine eigene Kennzeichnung (LLH-1829).
+    await waitFor(() =>
+      expect(
+        p.getAllByText('Nicht gespeichert').some((el) => el.classList.contains('ant-alert-title')),
+      ).toBe(true),
+    );
     expect(bodies).toEqual([]);
   });
 

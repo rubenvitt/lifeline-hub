@@ -1,4 +1,4 @@
-# Speicherleiste
+# Speicherleiste (SpeicherKnopf, Punkt am geänderten Feld)
 
 Speicher-Leiste am unteren Rand einer Sektion — sticky, mit Trennlinie und eigenem Grund.
 

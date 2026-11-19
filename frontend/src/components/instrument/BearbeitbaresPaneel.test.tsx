@@ -96,16 +96,16 @@ describe('BearbeitbaresPaneel · Umschalten', () => {
 
     const bearbeiten = within(paneel).getByRole('button', { name: 'Funk bearbeiten' });
     await user.click(bearbeiten);
-    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    const rufname = await screen.findByRole('textbox', { name: /^Rufname/ });
     expect(rufname).toHaveValue('Florian 1');
-    expect(screen.getByRole('spinbutton', { name: 'Kanal' })).toHaveValue('41');
+    expect(screen.getByRole('spinbutton', { name: /^Kanal/ })).toHaveValue('41');
     // Die Etiketten bleiben die Begriffe des Rasters.
     expect(screen.getByText('Rufname').closest('dt')).not.toBeNull();
     await waitFor(() => expect(rufname).toHaveFocus());
     expect(screen.queryByRole('button', { name: 'Funk bearbeiten' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /^Rufname/ })).toBeNull();
     expect(screen.getByText('Florian 1')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Funk bearbeiten' })).toHaveFocus(),
@@ -116,12 +116,12 @@ describe('BearbeitbaresPaneel · Umschalten', () => {
     const user = userEvent.setup();
     rendern(<FunkPaneel />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    const rufname = await screen.findByRole('textbox', { name: /^Rufname/ });
     await user.clear(rufname);
     await user.type(rufname, 'Florian 9');
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    expect(await screen.findByRole('textbox', { name: 'Rufname' })).toHaveValue('Florian 1');
+    expect(await screen.findByRole('textbox', { name: /^Rufname/ })).toHaveValue('Florian 1');
   });
 });
 
@@ -137,7 +137,7 @@ describe('BearbeitbaresPaneel · Zusatzhandlungen im Kopf (LLH-1920)', () => {
     ).toBeTruthy();
 
     await user.click(bearbeiten);
-    await screen.findByRole('textbox', { name: 'Rufname' });
+    await screen.findByRole('textbox', { name: /^Rufname/ });
     expect(screen.queryByRole('button', { name: 'Auf Karte verorten' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
@@ -157,7 +157,7 @@ describe('BearbeitbaresPaneel · Speichern', () => {
     const onSpeichern = vi.fn(async () => undefined);
     rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    const kanal = await screen.findByRole('spinbutton', { name: /^Kanal/ });
     await user.clear(kanal);
     await user.type(kanal, '42');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -166,14 +166,54 @@ describe('BearbeitbaresPaneel · Speichern', () => {
     await waitFor(() => expect(screen.queryByRole('spinbutton')).toBeNull());
   });
 
-  it('ohne Änderung kein Aufruf, das Paneel schließt', async () => {
+  it('Speichern ist ohne Änderung gesperrt und nennt „Keine Änderungen“ (LLH-1829)', async () => {
+    const user = userEvent.setup();
+    rendern(<FunkPaneel />);
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeDisabled();
+    expect(screen.getByText('Keine Änderungen')).toBeVisible();
+    await user.type(screen.getByRole('textbox', { name: /^Rufname/ }), 'x');
+    expect(await screen.findByText('1 Änderung')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled();
+  });
+
+  it('ein geändertes Feld trägt den Punkt (LLH-1829)', async () => {
+    const user = userEvent.setup();
+    rendern(<FunkPaneel />);
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    await user.type(await screen.findByRole('textbox', { name: /^Rufname/ }), 'x');
+    expect(await screen.findByRole('textbox', { name: /^Rufname\s*\(geändert\)$/ })).toHaveValue(
+      'Florian 1x',
+    );
+    expect(screen.getByRole('spinbutton', { name: /^Kanal/ })).toBeInTheDocument();
+  });
+
+  it('Enter ohne Änderung schließt das Paneel, ohne Aufruf (LLH-1829)', async () => {
     const user = userEvent.setup();
     const onSpeichern = vi.fn(async () => undefined);
     rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    const rufname = await screen.findByRole('textbox', { name: /^Rufname/ });
+    await waitFor(() => expect(rufname).toHaveFocus());
+    await user.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull());
     expect(onSpeichern).not.toHaveBeenCalled();
+  });
+
+  it('nach gescheitertem Speichern bleiben Punkt und „1 Änderung“ (LLH-1829)', async () => {
+    const user = userEvent.setup();
+    const onSpeichern = vi.fn(async () => {
+      throw new ApiError(422, 'Kanal unbekannt');
+    });
+    rendern(<FunkPaneel onSpeichern={onSpeichern} />);
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    const kanal = await screen.findByRole('spinbutton', { name: /^Kanal/ });
+    await user.clear(kanal);
+    await user.type(kanal, '99');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Kanal unbekannt')).toBeVisible();
+    expect(screen.getByText('1 Änderung')).toBeVisible();
+    expect(screen.getByRole('spinbutton', { name: /^Kanal\s*\(geändert\)$/ })).toBeInTheDocument();
   });
 
   it('Basis bleibt eingefroren, auch wenn der Datensatz im Hintergrund neuer wird', async () => {
@@ -181,7 +221,7 @@ describe('BearbeitbaresPaneel · Speichern', () => {
     const onSpeichern = vi.fn(async () => undefined);
     const { rerender } = rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    const rufname = await screen.findByRole('textbox', { name: /^Rufname/ });
     rerender(
       <FunkPaneel
         onSpeichern={onSpeichern}
@@ -204,7 +244,7 @@ describe('BearbeitbaresPaneel · Speichern', () => {
     const onSpeichern = vi.fn(async () => undefined);
     rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    await user.clear(await screen.findByRole('textbox', { name: 'Rufname' }));
+    await user.clear(await screen.findByRole('textbox', { name: /^Rufname/ }));
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     const meldung = await screen.findByText('Bitte einen Rufnamen angeben');
     // antd blendet die Meldung über eine Einblend-Animation ein (Höhe und Deckkraft 0 im ersten
@@ -213,7 +253,7 @@ describe('BearbeitbaresPaneel · Speichern', () => {
     expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(
       screen.getByText('Rufname').closest('[data-lfh="datenfeld"]'),
     );
-    expect(screen.getByRole('textbox', { name: 'Rufname' })).toHaveAttribute(
+    expect(screen.getByRole('textbox', { name: /^Rufname/ })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
@@ -227,12 +267,12 @@ describe('BearbeitbaresPaneel · Speichern', () => {
     });
     rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    const kanal = await screen.findByRole('spinbutton', { name: /^Kanal/ });
     await user.clear(kanal);
     await user.type(kanal, '99');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(await screen.findByText('Kanal unbekannt')).toBeVisible();
-    expect(screen.getByRole('spinbutton', { name: 'Kanal' })).toHaveValue('99');
+    expect(screen.getByRole('spinbutton', { name: /^Kanal/ })).toHaveValue('99');
   });
 });
 
@@ -245,7 +285,7 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
       .mockResolvedValueOnce(undefined);
     rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    const kanal = await screen.findByRole('spinbutton', { name: /^Kanal/ });
     await user.clear(kanal);
     await user.type(kanal, '43');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -267,13 +307,13 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
       />,
     );
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    const kanal = await screen.findByRole('spinbutton', { name: /^Kanal/ });
     await user.clear(kanal);
     await user.type(kanal, '43');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(await screen.findByText('Rufname schon vergeben')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Zwischenzeitlich geändert' })).toBeNull();
-    expect(screen.getByRole('spinbutton', { name: 'Kanal' })).toHaveValue('43');
+    expect(screen.getByRole('spinbutton', { name: /^Kanal/ })).toHaveValue('43');
   });
 
   it('mit `isSperrkonflikt`: der Sperrkonflikt fragt weiter nach', async () => {
@@ -287,7 +327,7 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
       />,
     );
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    const kanal = await screen.findByRole('spinbutton', { name: /^Kanal/ });
     await user.clear(kanal);
     await user.type(kanal, '43');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -308,7 +348,7 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
       />,
     );
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    const kanal = await screen.findByRole('spinbutton', { name: /^Kanal/ });
     await user.clear(kanal);
     await user.type(kanal, '43');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -372,18 +412,18 @@ describe('BearbeitbaresPaneel · Verlassen-Schutz', () => {
     const user = userEvent.setup();
     rendern(<Seite />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    await user.type(await screen.findByRole('textbox', { name: 'Rufname' }), 'x');
+    await user.type(await screen.findByRole('textbox', { name: /^Rufname/ }), 'x');
     await user.click(screen.getByRole('link', { name: 'Anderswo' }));
     await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await user.click(screen.getByRole('button', { name: 'Bleiben' }));
-    expect(screen.getByRole('textbox', { name: 'Rufname' })).toHaveValue('Florian 1x');
+    expect(screen.getByRole('textbox', { name: /^Rufname/ })).toHaveValue('Florian 1x');
   });
 
   it('offen ohne Änderung fragt nicht', async () => {
     const user = userEvent.setup();
     rendern(<Seite />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    await screen.findByRole('textbox', { name: 'Rufname' });
+    await screen.findByRole('textbox', { name: /^Rufname/ });
     await user.click(screen.getByRole('link', { name: 'Anderswo' }));
     expect(await screen.findByText('ANDERSWO')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -393,7 +433,7 @@ describe('BearbeitbaresPaneel · Verlassen-Schutz', () => {
     const user = userEvent.setup();
     rendern(<Seite />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    await user.type(await screen.findByRole('textbox', { name: 'Rufname' }), 'x');
+    await user.type(await screen.findByRole('textbox', { name: /^Rufname/ }), 'x');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     await screen.findByRole('button', { name: 'Funk bearbeiten' });
     await user.click(screen.getByRole('link', { name: 'Anderswo' }));
@@ -407,7 +447,7 @@ describe('BearbeitbaresPaneel · Tastaturweg', () => {
     const onSpeichern = vi.fn(async () => undefined);
     rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    const rufname = await screen.findByRole('textbox', { name: /^Rufname/ });
     await user.type(rufname, 'x{Enter}');
     await waitFor(() =>
       expect(onSpeichern).toHaveBeenCalledWith({ rufname: 'Florian 1x' }, '2026-10-22T10:00:00'),
@@ -419,10 +459,10 @@ describe('BearbeitbaresPaneel · Tastaturweg', () => {
     const onSpeichern = vi.fn(async () => undefined);
     rendern(<FunkPaneel onSpeichern={onSpeichern} />);
     await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
-    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    const rufname = await screen.findByRole('textbox', { name: /^Rufname/ });
     await user.type(rufname, 'x');
     await user.keyboard('{Escape}');
-    expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /^Rufname/ })).toBeNull();
     expect(onSpeichern).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Funk bearbeiten' })).toHaveFocus(),
@@ -461,9 +501,9 @@ describe('BearbeitbaresPaneel · Modus „ansicht“', () => {
     rendern(<Ansicht onSpeichern={onSpeichern} />);
     expect(screen.queryByRole('region', { name: 'Funk' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Ändern' }));
-    const rufname = await screen.findByRole('textbox', { name: 'Rufname' });
+    const rufname = await screen.findByRole('textbox', { name: /^Rufname/ });
     await waitFor(() => expect(rufname).toHaveFocus());
-    const leiste = screen.getByRole('button', { name: 'Speichern' }).parentElement!;
+    const leiste = screen.getByRole('button', { name: 'Speichern' }).closest('[data-lfh]')!;
     expect(leiste).toHaveAttribute('data-lfh', 'speicherleiste');
     await user.type(rufname, 'x');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));

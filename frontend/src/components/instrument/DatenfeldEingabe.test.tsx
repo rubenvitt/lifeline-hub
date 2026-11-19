@@ -6,6 +6,7 @@ import { renderMitProviders } from '../../test/utils';
 import { Select } from '../Select';
 import Datenraster from './Datenraster';
 import DatenfeldEingabe from './DatenfeldEingabe';
+import { AenderungsstandProvider } from '../aenderungsstand';
 
 function Maske({ onFinish = () => {} }: { onFinish?: (werte: unknown) => void }) {
   return (
@@ -100,5 +101,43 @@ describe('DatenfeldEingabe', () => {
     expect(screen.getByRole('spinbutton', { name: 'Betreute (EP)' })).toHaveAccessibleDescription(
       'Aktuell 70 — gemeldet',
     );
+  });
+});
+
+describe('DatenfeldEingabe: Punkt am geänderten Feld (LLH-1829)', () => {
+  function Paneel({ mitProvider = true }: { mitProvider?: boolean }) {
+    const raster = (
+      <Datenraster beschriftung="Daten">
+        <DatenfeldEingabe label="Ort" name="ort">
+          <Input />
+        </DatenfeldEingabe>
+      </Datenraster>
+    );
+    return (
+      <Form initialValues={{ ort: 'X' }}>
+        {mitProvider ? (
+          <AenderungsstandProvider ausgangswerte={{ ort: 'X' }}>{raster}</AenderungsstandProvider>
+        ) : (
+          raster
+        )}
+      </Form>
+    );
+  }
+
+  it('trägt am Etikett einen Punkt, wenn das Feld geändert ist', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<Paneel />);
+    await user.type(screen.getByLabelText('Ort'), 'Y');
+    expect(await screen.findByText('•')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByLabelText(/\(geändert\)/)).toHaveValue('XY');
+    await user.type(screen.getByLabelText(/Ort/), '{Backspace}');
+    await waitFor(() => expect(screen.queryByText('•')).toBeNull());
+  });
+
+  it('ohne Provider kein Punkt', async () => {
+    const user = userEvent.setup();
+    renderMitProviders(<Paneel mitProvider={false} />);
+    await user.type(screen.getByLabelText('Ort'), 'Y');
+    expect(screen.queryByText('•')).toBeNull();
   });
 });

@@ -49,6 +49,14 @@ const VOLL = {
   geaendert_von: null,
 };
 
+/**
+ * „Speichern“ ist ohne Änderung gesperrt (LLH-1829): eine kleine Änderung am ETB-Präfix, die die
+ * Aussage des jeweiligen Tests nicht berührt.
+ */
+async function aenderePraefixEtb() {
+  fireEvent.change(await screen.findByLabelText(/^Präfix ETB/), { target: { value: 'EB2-' } });
+}
+
 function alsAdmin() {
   vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
 }
@@ -65,6 +73,7 @@ describe('EinsatzDefaults', () => {
   it('sendet beim Speichern den VOLLEN Payload — Anzeige-Felder bleiben erhalten (Vollersatz)', async () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
@@ -78,7 +87,7 @@ describe('EinsatzDefaults', () => {
         retention_dauer_tage: 90,
         skelett_dauer_tage: null,
         nachbereitung_tage: 30,
-        etb_nummer_praefix: 'EB-',
+        etb_nummer_praefix: 'EB2-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
         einsatz_nummer_praefix: 'WF-',
@@ -149,7 +158,7 @@ describe('EinsatzDefaults', () => {
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
     await userEvent.type(await screen.findByLabelText('Dauer Personenauskunft (Tage)'), '0');
     await userEvent.type(
-      screen.getByLabelText('Rechtsgrundlage Personenauskunft'),
+      screen.getByLabelText(/^Rechtsgrundlage Personenauskunft/),
       ' § 46 Abs. 5 BHKG NRW ',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -244,6 +253,7 @@ describe('EinsatzDefaults', () => {
     client.setQueryData(['einsatz-meldungen', 7, 'intern'], []);
     renderMitProviders(<EinsatzDefaults />, { client, datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
@@ -606,6 +616,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     vi.mocked(speichereOrgEinstellungen).mockRejectedValue(new ApiError(422, 'Startwert zu groß'));
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     const treffer = await screen.findByText('Startwert zu groß');
     expect(treffer.closest('.ant-message')).toBeNull();
@@ -618,6 +629,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
       .mockResolvedValue({ ...VOLL } as never);
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Startwert zu groß');
 
@@ -653,6 +665,7 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
     vi.mocked(setzeOrgModulEinstellung).mockRejectedValue(new ApiError(409, 'Modul gesperrt'));
     renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
 
+    await aenderePraefixEtb();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Startwert zu groß');
 

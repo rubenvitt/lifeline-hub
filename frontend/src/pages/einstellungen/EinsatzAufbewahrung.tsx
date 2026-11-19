@@ -1,4 +1,4 @@
-import { App, Button, Form, InputNumber } from 'antd';
+import { App, Form, InputNumber } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
@@ -15,6 +15,11 @@ import {
   type FormWerteAufbewahrung,
 } from './einsatzEinstellungenForm';
 import { useSpeicherLeiste } from '../../components/speicherLeiste';
+import SpeicherKnopf from '../../components/SpeicherKnopf';
+import {
+  AenderungsstandProvider,
+  useAenderungsstandMerken,
+} from '../../components/aenderungsstand';
 import VerlassenRueckfrage from '../../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../../components/useFormularVerlassenSchutz';
 import { Feld, Formularpaneel } from '../../components/instrument';
@@ -39,6 +44,7 @@ export default function EinsatzAufbewahrung() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteAufbewahrung>();
   const speicherLeiste = useSpeicherLeiste();
+  const stand = useAenderungsstandMerken();
   const daten = useEinstellungenDaten(einsatzId);
   // Verlassen-Schutz (LFH-979, `frontend/AGENTS.md` „Formularseiten“): die Reiter sind eigene
   // Routen, ein Wechsel baut die Sektion ab und verwürfe die Eingabe still.
@@ -90,43 +96,51 @@ export default function EinsatzAufbewahrung() {
         onValuesChange={schutz.geaendert}
         onFinish={(werte) => {
           const fassung = schutz.fassung();
-          speichern.mutate(werte, { onSuccess: () => schutz.gespeichert(fassung) });
+          speichern.mutate(werte, {
+            onSuccess: () => {
+              schutz.gespeichert(fassung);
+              stand.merke(werte);
+            },
+          });
         }}
         disabled={!daten.darfBearbeiten}
       >
-        <Formularpaneel titel="Aufbewahrung & Archiv">
-          <Feld
-            breite="schmal"
-            label="Aufbewahrungs-Dauer (Tage)"
-            name="retention_dauer_tage"
-            // Abgeschlossen steht kein „Nur Ansicht“ im Seitenkopf (die Frist oben bleibt
-            // änderbar); der Grund der Sperre steht deshalb hier am Feld, unter der Vorgabe der
-            // Organisation (Spec `bedien-begriffe`).
-            extra={
-              daten.istAktiv ? (
-                orgHinweis
-              ) : (
-                <>
-                  {orgHinweis && <span style={{ display: 'block' }}>{orgHinweis}</span>}
-                  {EINSATZ_ABGESCHLOSSEN}
-                </>
-              )
-            }
-          >
-            <InputNumber
-              min={1}
-              max={3650}
-              // Einsatz ?? Org (`einsatz/effektiv.rs`): der Platzhalter nennt den wirksamen Wert.
-              placeholder={platzhalterVorgabe(orgDauer, 'keine')}
-            />
-          </Feld>
-        </Formularpaneel>
+        <AenderungsstandProvider
+          ausgangswerte={initialAufbewahrung(daten.einstellungen)}
+          merkeRef={stand.merkeRef}
+        >
+          <Formularpaneel titel="Aufbewahrung & Archiv">
+            <Feld
+              breite="schmal"
+              label="Aufbewahrungs-Dauer (Tage)"
+              name="retention_dauer_tage"
+              // Abgeschlossen steht kein „Nur Ansicht“ im Seitenkopf (die Frist oben bleibt
+              // änderbar); der Grund der Sperre steht deshalb hier am Feld, unter der Vorgabe der
+              // Organisation (Spec `bedien-begriffe`).
+              extra={
+                daten.istAktiv ? (
+                  orgHinweis
+                ) : (
+                  <>
+                    {orgHinweis && <span style={{ display: 'block' }}>{orgHinweis}</span>}
+                    {EINSATZ_ABGESCHLOSSEN}
+                  </>
+                )
+              }
+            >
+              <InputNumber
+                min={1}
+                max={3650}
+                // Einsatz ?? Org (`einsatz/effektiv.rs`): der Platzhalter nennt den wirksamen Wert.
+                placeholder={platzhalterVorgabe(orgDauer, 'keine')}
+              />
+            </Feld>
+          </Formularpaneel>
 
-        <div {...speicherLeiste}>
-          <Button type="primary" htmlType="submit" loading={speichern.isPending}>
-            Speichern
-          </Button>
-        </div>
+          <div {...speicherLeiste}>
+            <SpeicherKnopf loading={speichern.isPending} disabled={!daten.darfBearbeiten} />
+          </div>
+        </AenderungsstandProvider>
       </Form>
     </>
   );

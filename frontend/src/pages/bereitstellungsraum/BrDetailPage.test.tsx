@@ -1345,7 +1345,9 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
   }
   const paneel = () => screen.getByRole('region', { name: 'Raumdaten' });
   const bearbeiten = () => screen.findByRole('button', { name: 'Raumdaten bearbeiten' });
-  const feld = (name: string) => within(paneel()).getByLabelText(name);
+  // Ein geändertes Feld trägt „(geändert)“ im Namen (LLH-1829); sonst gilt der Name genau.
+  const feld = (name: string) =>
+    within(paneel()).getByLabelText(new RegExp(`^${name}(\\s*•?\\s*\\(geändert\\))?$`));
   const speichern = () => within(paneel()).getByRole('button', { name: 'Speichern' });
 
   it('bearbeitet an Ort und Stelle, schickt nur Geändertes mit Basisstand und zeigt danach den neuen Stand', async () => {
@@ -1489,7 +1491,9 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
     const { stand } = seite(brDetail({ status: 'geplant' }));
 
     await userEvent.click(await bearbeiten());
-    await userEvent.click(speichern());
+    // Ohne Änderung ist „Speichern“ gesperrt; Enter schließt das Paneel (LLH-1829).
+    expect(speichern()).toBeDisabled();
+    await userEvent.type(feld('Bezeichnung'), '{Enter}');
     expect(await bearbeiten()).toBeInTheDocument();
     expect(stand.bodies).toEqual([]);
   });

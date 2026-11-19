@@ -49,6 +49,16 @@ const BASIS = {
   geaendert_von: null,
 };
 
+/**
+ * „Speichern“ ist ohne Änderung gesperrt (LLH-1829): eine kleine Änderung am Präfix der Meldungen,
+ * das keiner der Tests prüft.
+ */
+async function aenderePraefixMeldungen() {
+  fireEvent.change(await screen.findByLabelText(/^Präfix Meldungen/), {
+    target: { value: 'MX-' },
+  });
+}
+
 function rendern() {
   return renderMitProviders(
     <Routes>
@@ -89,6 +99,7 @@ describe('EinsatzVerhalten', () => {
     expect(screen.getByLabelText('Präfix Meldungen')).toHaveAttribute('placeholder', 'z. B. M-');
     expect(screen.getByLabelText('Präfix Aufträge')).toHaveAttribute('placeholder', 'z. B. A-');
 
+    await aenderePraefixMeldungen();
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(
@@ -130,6 +141,7 @@ describe('EinsatzVerhalten', () => {
 
     expect(await screen.findByText('Vorgabe der Organisation: Aus')).toBeInTheDocument();
 
+    await aenderePraefixMeldungen();
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(
@@ -174,6 +186,7 @@ describe('EinsatzVerhalten', () => {
       /Standard|Default|Fallback/,
     );
 
+    await aenderePraefixMeldungen();
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(
@@ -212,6 +225,7 @@ describe('EinsatzVerhalten', () => {
     } as never);
 
     rendern();
+    await aenderePraefixMeldungen();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     await waitFor(() =>
