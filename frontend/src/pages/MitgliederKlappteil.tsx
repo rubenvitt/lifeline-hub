@@ -104,7 +104,7 @@ export default function MitgliederKlappteil({ offen, onOffenChange }: Props) {
                     return (
                       <div key={f.key}>
                         {/* Ohne eingetragenes Feld fiele die Kennung aus Werten und Rumpf. */}
-                        <Form.Item name={[f.name, 'benutzer_id']} hidden noStyle />
+                        <Feld name={[f.name, 'benutzer_id']} hidden noStyle />
                         <Feld
                           name={[f.name, 'rolle']}
                           label={name}
