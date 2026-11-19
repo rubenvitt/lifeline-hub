@@ -49,7 +49,7 @@ export default function FahrzeugAngabe({
       wert={wert}
       anzeige={
         <Space size={token.marginXS} wrap>
-          <span style={monoStil(13)}>{aktuell?.funkrufname ?? 'nicht geladen'}</span>
+          <span style={monoStil('mono')}>{aktuell?.funkrufname ?? 'nicht geladen'}</span>
           {fremd && <Marke>andere Einheit</Marke>}
         </Space>
       }

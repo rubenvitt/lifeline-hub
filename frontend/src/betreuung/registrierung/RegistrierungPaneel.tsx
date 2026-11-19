@@ -307,12 +307,12 @@ export default function RegistrierungPaneel({
           borderTop: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        <Link to={pfade.personDetail(einsatzId, p.id)} style={monoStil(14)}>
+        <Link to={pfade.personDetail(einsatzId, p.id)} style={monoStil('monoGross')}>
           {kennung}
         </Link>
         <span style={{ fontWeight: 600 }}>{name}</span>
         {istBezugsperson && <Typography.Text type="secondary">Bezugsperson</Typography.Text>}
-        {alterText(p, heute) && <span style={monoStil(14)}>{alterText(p, heute)}</span>}
+        {alterText(p, heute) && <span style={monoStil('monoGross')}>{alterText(p, heute)}</span>}
         <Typography.Text type="secondary">
           {p.kostform ? KOSTFORM_WORT[p.kostform] : 'Kostform ohne Angabe'}
         </Typography.Text>

@@ -183,7 +183,7 @@ function TextAngabe({
       vermerk={vermerk}
       etikett={etikett}
       wert={text}
-      anzeige={mono ? <span style={monoStil(13)}>{text}</span> : text}
+      anzeige={mono ? <span style={monoStil('mono')}>{text}</span> : text}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -1240,7 +1240,7 @@ function RufnameAngabe({
       vermerk={vermerk}
       etikett="Rufname"
       wert={rufname ?? ''}
-      anzeige={<span style={monoStil(13)}>{rufname}</span>}
+      anzeige={<span style={monoStil('mono')}>{rufname}</span>}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -1679,7 +1679,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Einsatznummer',
-                wert: <span style={monoStil(13)}>{einsatz.einsatznummer_intern ?? '—'}</span>,
+                wert: <span style={monoStil('mono')}>{einsatz.einsatznummer_intern ?? '—'}</span>,
               },
               {
                 etikett: 'Leitstellen-Nr.',
@@ -1699,7 +1699,7 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Angelegt',
                 wert: (
-                  <span style={monoStil(13)}>
+                  <span style={monoStil('mono')}>
                     <ZeitAnzeige wert={einsatz.angelegt_at} rolle="zeitpunkt" />
                   </span>
                 ),
@@ -1791,7 +1791,9 @@ export default function EinsatzdatenPage() {
                     etikett="Anzahl Betroffene (initial)"
                     vermerk={einsatz.vermerke?.anzahl_betroffene_initial}
                     wert={einsatz.anzahl_betroffene_initial ?? null}
-                    anzeige={<span style={monoStil(13)}>{einsatz.anzahl_betroffene_initial}</span>}
+                    anzeige={
+                      <span style={monoStil('mono')}>{einsatz.anzahl_betroffene_initial}</span>
+                    }
                     leer={(n) => n === null}
                     darfSchreiben={darfBearbeiten}
                     onSpeichern={(n, { beimOeffnen }) =>

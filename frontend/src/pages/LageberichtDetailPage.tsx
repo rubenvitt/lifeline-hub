@@ -463,7 +463,7 @@ function LageberichtDetail() {
             Uhrzeiten für denselben Wert. Der Lesezweig rendert über `ZeitAnzeige` in der
             taktischen DTG und der Anzeigezone (der Wirestring ist UTC ohne Zonenkennung). */}
         {!schreibtEntwurf && (
-          <Typography.Paragraph type="secondary" style={monoStil(12)}>
+          <Typography.Paragraph type="secondary" style={monoStil('monoKlein')}>
             Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
           </Typography.Paragraph>
         )}

@@ -94,7 +94,7 @@ export default function KartenDetailCard({
             {titel}
           </h3>
           {unterzeile != null && (
-            <div style={{ ...monoStil(11), color: rollen.gedaempft, overflowWrap: 'anywhere' }}>
+            <div style={{ ...monoStil('meta'), color: rollen.gedaempft, overflowWrap: 'anywhere' }}>
               {unterzeile}
             </div>
           )}

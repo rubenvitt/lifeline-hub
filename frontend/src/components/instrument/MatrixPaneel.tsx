@@ -108,7 +108,7 @@ export default function MatrixPaneel({
               </span>
               <span
                 style={{
-                  ...monoStil(11),
+                  ...monoStil('meta'),
                   textAlign: 'end',
                   color:
                     z.ton === 'alarm'
@@ -135,7 +135,10 @@ export default function MatrixPaneel({
           }}
         >
           <span className={MATRIX_KLASSE.fueller} />
-          <span className={MATRIX_KLASSE.stufen} style={{ ...monoStil(10), color: rollen.schwach }}>
+          <span
+            className={MATRIX_KLASSE.stufen}
+            style={{ ...monoStil('metaKlein'), color: rollen.schwach }}
+          >
             {stufen.map((l) => (
               <span
                 key={l}

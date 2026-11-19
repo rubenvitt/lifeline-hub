@@ -257,7 +257,7 @@ export default function StellenListe({
               <Stapel key={zf.id} richtung="zeile" abstand="xs" umbruch ausrichten="baseline">
                 <span>{`${zf.bezeichnung} ${uhrzeitenText(zf, konventionen)}`}</span>
                 <span style={{ color: rollen.text2 }}>·</span>
-                <span style={monoStil(13, 500)}>{`${ausgegeben} EP ausgegeben`}</span>
+                <span style={monoStil('mono', 500)}>{`${ausgegeben} EP ausgegeben`}</span>
               </Stapel>
             ))
           )}

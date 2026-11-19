@@ -122,11 +122,13 @@ function VerlaufZeile({ eintrag: e }: { eintrag: BrVerlaufEintrag }) {
         borderBottom: `1px solid ${rollen.linie}`,
       }}
     >
-      <span style={{ ...monoStil(13), color: rollen.gedaempft }}>
+      <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}>
         <ZeitAnzeige wert={e.zeitpunkt_at} rolle="kurz" />
       </span>
       <span>{verlaufText(e)}</span>
-      <span style={e.objekt_typ === 'fahrzeug' ? monoStil(13) : undefined}>{e.objekt_name}</span>
+      <span style={e.objekt_typ === 'fahrzeug' ? monoStil('mono') : undefined}>
+        {e.objekt_name}
+      </span>
       {e.notiz && (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           {e.notiz}

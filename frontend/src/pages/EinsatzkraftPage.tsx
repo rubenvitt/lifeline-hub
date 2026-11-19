@@ -489,7 +489,7 @@ export default function EinsatzkraftPage() {
       // Nur die Dauer bleibt immer beisammen.
       meta={
         metaTeile.length > 0 ? (
-          <span className="lfh-personenkopf-meta" style={monoStil(12)}>
+          <span className="lfh-personenkopf-meta" style={monoStil('monoKlein')}>
             {metaTeile.map((teil, i) => (
               <Fragment key={i}>
                 {i > 0 && ' · '}
@@ -756,7 +756,7 @@ export default function EinsatzkraftPage() {
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
-                  entlassen <span style={monoStil(13)}>{zeitKurz(ep.beendet_at)}</span>
+                  entlassen <span style={monoStil('mono')}>{zeitKurz(ep.beendet_at)}</span>
                 </span>
                 {imEinsatzSchreiben && (
                   <Button

@@ -157,7 +157,7 @@ function StelleZelle({ zeile: p }: { zeile: PlanZeile }) {
       {z.kanaele.length > 0 && (
         <Flex wrap data-lfh="stelle-kanaele" gap={token.marginXS}>
           {z.kanaele.map((k) => (
-            <span key={k} style={monoStil(12)}>
+            <span key={k} style={monoStil('monoKlein')}>
               <Gedaempft>{k}</Gedaempft>
             </span>
           ))}
@@ -180,12 +180,16 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
               // Ein Bedienziel wie die Zeilenziele des Stabs: Höhe aus `controlHeight` (Gate 3).
               <a
                 href={v.verweis}
-                style={{ ...linkZeilenzielStil(token), ...monoStil(14), overflowWrap: 'anywhere' }}
+                style={{
+                  ...linkZeilenzielStil(token),
+                  ...monoStil('monoGross'),
+                  overflowWrap: 'anywhere',
+                }}
               >
                 {v.wert}
               </a>
             ) : (
-              <span style={{ ...monoStil(14), overflowWrap: 'anywhere' }}>{v.wert}</span>
+              <span style={{ ...monoStil('monoGross'), overflowWrap: 'anywhere' }}>{v.wert}</span>
             ))}
           {v.hinweis && <Gedaempft>{v.hinweis}</Gedaempft>}
         </Flex>
@@ -717,7 +721,7 @@ export default function KommunikationsplanPage() {
                   ) : (
                     <>
                       <span>Leitstelle</span>
-                      <span style={monoStil(14, 500)}>—</span>
+                      <span style={monoStil('monoGross', 500)}>—</span>
                       {/* Ohne Stellen fehlt alles; sonst fehlt nur die Skizze (Spec-Delta). */}
                       <Gedaempft>
                         {stellen.zustand !== 'daten'

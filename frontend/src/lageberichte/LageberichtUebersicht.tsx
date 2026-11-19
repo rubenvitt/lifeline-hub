@@ -208,7 +208,7 @@ function InArbeitPaneel({
                 >
                   {b.titel}
                 </KennungsLink>
-                <div style={{ ...monoStil(11), color: rollen.gedaempft }}>
+                <div style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
                   {`${vorlageLabel(b.vorlage)} · v${b.version} · `}
                   <ZeitAnzeige wert={b.zeitstand} />
                   {` · ${b.ersteller_name}`}
@@ -219,7 +219,7 @@ function InArbeitPaneel({
                     flexWrap: 'wrap',
                     alignItems: 'center',
                     columnGap: token.marginSM,
-                    ...monoStil(11),
+                    ...monoStil('meta'),
                     color: rollen.text2,
                   }}
                 >
@@ -278,13 +278,13 @@ function VerlaufPaneel({
               borderBlockEnd: `1px solid ${rollen.flaeche3}`,
             }}
           >
-            <span style={{ ...monoStil(12, 500), color: rollen.text2 }}>
+            <span style={{ ...monoStil('monoKlein', 500), color: rollen.text2 }}>
               <ZeitAnzeige wert={b.zeitstand} />
             </span>
             <span style={{ flex: '1 1 12em', minWidth: 0 }}>
               <KennungsLink to={lageberichtDetailPfad(einsatzId, b.id)}>{b.titel}</KennungsLink>
             </span>
-            <span style={{ ...monoStil(11), color: rollen.gedaempft }}>v{b.version}</span>
+            <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>v{b.version}</span>
           </li>
         ))}
       </ol>

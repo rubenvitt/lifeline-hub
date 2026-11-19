@@ -113,7 +113,7 @@ export default function SchichtplanWechselLeiste({
                 borderColor: vorbei && offen > 0 ? rollen.achtung : undefined,
               }}
             >
-              <span style={monoStil(13, 500)}>{formatZeit(ms(w))}</span>
+              <span style={monoStil('mono', 500)}>{formatZeit(ms(w))}</span>
               <span aria-hidden="true">·</span>
               <span>
                 {w.eintraege.length === 1 ? '1 Wechsel' : `${w.eintraege.length} Wechsel`}

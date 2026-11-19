@@ -208,7 +208,7 @@ describe('Feld-Wächter: Felder im Verwaltungsteil und den umgestellten Einsatzm
     it('meldet eine Stil-Konstante am Eingabefeld, aber keinen Stil-Aufruf', () => {
       const text = [
         '<Select<number> options={o} style={SELECT_STYLE} />',
-        '<Input style={monoStil(14)} />',
+        "<Input style={monoStil('monoGross')} />",
       ].join('\n');
       const meldungen = feldBefunde(q(text), {});
       expect(meldungen).toEqual([

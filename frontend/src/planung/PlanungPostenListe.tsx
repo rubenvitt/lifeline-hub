@@ -126,7 +126,7 @@ export default function PlanungPostenListe({
       title: 'Schichtlänge',
       key: 'schichtlaenge',
       render: (_, p) => (
-        <span style={monoStil(12)}>
+        <span style={monoStil('monoKlein')}>
           {p.schichtlaenge_minuten != null ? dauer(p.schichtlaenge_minuten) : '—'}
         </span>
       ),
@@ -138,7 +138,7 @@ export default function PlanungPostenListe({
         const quali = qualiSollText(p.quali_soll);
         return (
           <>
-            <span style={monoStil(12)}>{p.soll_anzahl ?? '—'}</span>
+            <span style={monoStil('monoKlein')}>{p.soll_anzahl ?? '—'}</span>
             {quali ? ` · ${quali}` : null}
           </>
         );
