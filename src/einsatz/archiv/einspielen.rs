@@ -585,6 +585,8 @@ async fn uebernehmen_tx(
         kopplung_id: ZUORDNUNG_DATEI,
         kopplung_org_id: ZUORDNUNG_DATEI,
         meldend: true,
+        // Archiv und Ziel sind derselbe Stand: die Rolle `mitarbeit` geht unverändert über.
+        gegenueber_mitarbeit: true,
     };
     let empfaenger = Empfaenger {
         kopplung_id,
@@ -593,6 +595,7 @@ async fn uebernehmen_tx(
         meldend: false,
         // Keine Direktkopplung (LLH-1497): Abbildung wie bisher, Ursprung nur als letzter Versuch.
         vor_ort: false,
+        gegenueber_mitarbeit: true,
     };
     let kurz = kennung.trim_start_matches("archiv/");
     let mut konten: HashMap<i64, i64> = HashMap::new();

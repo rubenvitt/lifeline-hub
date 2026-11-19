@@ -222,6 +222,7 @@ async fn liefere_alle(
             kopplung_id: kopplung.id,
             kopplung_org_id: o.id,
             meldend,
+            gegenueber_mitarbeit: kopplung.gegenueber_rolle_mitarbeit,
         };
         let wire = org_wire(eigen, kopplung, o);
         let kennung = liefern::ensure_kennung(conn, &eigen.kennung, &e).await?;
@@ -275,6 +276,7 @@ async fn uebernehme_alle(
             org_id: o.org_id,
             meldend,
             vor_ort: kopplung.art() == crate::instanz::InstanzKopplungArt::VorOrt,
+            gegenueber_mitarbeit: kopplung.gegenueber_rolle_mitarbeit,
         };
         let vorher: Option<i64> =
             sqlx::query_scalar("SELECT einsatz_id FROM einsatz_spiegel WHERE fremde_kennung = ?")

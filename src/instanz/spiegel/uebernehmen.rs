@@ -31,6 +31,9 @@ pub struct Empfaenger {
     /// Direktkopplung vor Ort (LLH-1497): Stammdaten kommen mit den Kennungen des Absenders und
     /// werden allein über die Ursprungskennung abgebildet.
     pub vor_ort: bool,
+    /// Das Gegenüber kennt die Einsatzrolle `mitarbeit` (Kopplung `gegenueber_rolle_mitarbeit`,
+    /// LLH-1817, design.md D7). Ohne sie überschreibt sein `beobachter` keine hiesige `mitarbeit`.
+    pub gegenueber_mitarbeit: bool,
 }
 
 /// Ein Inhalt auf Abruf, den der Spiegel noch holen muss (D8).
@@ -329,7 +332,8 @@ async fn uebernehme_zeilen(
                         .erledigt
                         .push((z.art.clone(), z.schluessel.clone()));
                 }
-                Abgebildet::Fertig(werte, spaeter) => {
+                Abgebildet::Fertig(mut werte, spaeter) => {
+                    behalte_mitarbeit(conn, t, e, &mut werte).await?;
                     match zeile_schreiben(conn, t, einsatz_id, &z.schluessel, &werte).await {
                         Ok(lokal) => {
                             ergebnis.kategorien.insert(t.kategorie);
@@ -704,6 +708,54 @@ async fn ist_mitgliedschaft_eines_stellvertreters(
             .fetch_one(&mut *conn)
             .await?,
     )
+}
+
+/// Ein Gegenüber ohne die Einsatzrolle `mitarbeit` liefert sie als `beobachter` zurück (es hat
+/// sie so bekommen, etwa nach Notübernahme oder Rückgabe). Ist die Mitgliedschaft hier
+/// `mitarbeit`, bleibt die Rolle stehen: Die Spalte behält den hiesigen Wert, die übrigen gelten
+/// (LLH-1817, design.md D7). Ein Gegenüber mit der Fähigkeit stuft wirklich herab. Kein Echo:
+/// Der Spiegel liefert diesen Einsatz nicht zurück, und am Führer bleibt der Stand unberührt.
+async fn behalte_mitarbeit(
+    conn: &mut SqliteConnection,
+    t: &Tabelle,
+    e: &Empfaenger,
+    werte: &mut Vec<(String, Value)>,
+) -> Result<(), AppError> {
+    if t.name != "einsatz_mitgliedschaft" || e.gegenueber_mitarbeit {
+        return Ok(());
+    }
+    let wert = |name: &str| {
+        werte
+            .iter()
+            .find(|(s, _)| s == name)
+            .map(|(_, w)| w.clone())
+    };
+    if wert("einsatz_rolle").as_ref().and_then(Value::as_str) != Some("beobachter") {
+        return Ok(());
+    }
+    let (Some(einsatz), Some(benutzer)) = (
+        wert("einsatz_id").as_ref().and_then(Value::as_i64),
+        wert("benutzer_id").as_ref().and_then(Value::as_i64),
+    ) else {
+        return Ok(());
+    };
+    let hier: Option<String> = sqlx::query_scalar(
+        "SELECT einsatz_rolle FROM einsatz_mitgliedschaft WHERE einsatz_id = ? AND benutzer_id = ?",
+    )
+    .bind(einsatz)
+    .bind(benutzer)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if hier.as_deref() == Some("mitarbeit") {
+        // Den hiesigen Wert setzen statt die Spalte wegzulassen: `upsert` legt per `INSERT … ON
+        // CONFLICT` an, und SQLite prüft NOT NULL vor dem Konflikt.
+        for (s, w) in werte.iter_mut() {
+            if s == "einsatz_rolle" {
+                *w = Value::from("mitarbeit");
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Lokaler Schlüssel der Zeile `fremd` in `ziel` (der Einsatz selbst ist immer bekannt).

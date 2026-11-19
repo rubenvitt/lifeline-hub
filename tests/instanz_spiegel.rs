@@ -1305,6 +1305,7 @@ async fn eine_fremde_kopplung_erreicht_weder_anhaenge_noch_quittungen_noch_spieg
         org_id: org,
         meldend: false,
         vor_ort: false,
+        gegenueber_mitarbeit: true,
     };
     let mut conn = hub.pool.acquire().await.unwrap();
     let erg = uebernehmen::uebernehmen(&mut conn, &empf, &l)

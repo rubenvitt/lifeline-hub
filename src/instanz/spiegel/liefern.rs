@@ -23,6 +23,9 @@ pub struct Absender<'a> {
     pub kopplung_org_id: i64,
     /// Diese Instanz meldet sich; dann übersetzt sie Stammdaten lokal → fremd (D5).
     pub meldend: bool,
+    /// Das Gegenüber kennt die Einsatzrolle `mitarbeit` (Kopplung `gegenueber_rolle_mitarbeit`,
+    /// LLH-1817, design.md D7); sonst geht sie als `beobachter` hinaus.
+    pub gegenueber_mitarbeit: bool,
 }
 
 /// Platz für Zeilen in einem Paket.
@@ -368,6 +371,20 @@ async fn konten(
     Ok(ergebnis)
 }
 
+/// Ein Gegenüber ohne die Einsatzrolle `mitarbeit` lehnt sie an seinem CHECK ab: Eine
+/// Mitgliedschaft geht ihm als `beobachter` zu (LLH-1817, design.md D7). Nur der Inhalt, der
+/// hinausgeht, ändert sich; die Zeile hier und ihr Log bleiben `mitarbeit`.
+fn herabstufen_fuer(a: &Absender<'_>, t: &Tabelle, daten: &mut Map<String, Value>) {
+    if t.name != "einsatz_mitgliedschaft" || a.gegenueber_mitarbeit {
+        return;
+    }
+    if let Some(rolle) = daten.get_mut("einsatz_rolle") {
+        if rolle.as_str() == Some("mitarbeit") {
+            *rolle = Value::from("beobachter");
+        }
+    }
+}
+
 /// Eine Zeile als [`Zeile`], gelöscht oder mit Inhalt.
 async fn baue_zeile(
     conn: &mut SqliteConnection,
@@ -383,6 +400,7 @@ async fn baue_zeile(
     let mut ursprung = std::collections::BTreeMap::new();
     let (daten, blob, geloescht) = match geladen {
         Some((mut daten, blob)) => {
+            herabstufen_fuer(a, t, &mut daten);
             ursprung = ursprung_hinaus(conn, t, &daten).await?;
             if a.meldend {
                 stammdaten_hinaus(conn, a, t, &mut daten).await?;
