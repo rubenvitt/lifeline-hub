@@ -180,9 +180,17 @@ where
     }
 }
 
+/// Text jeder formal ungültigen JSON-Anfrage (400), für Anwender lesbar (LLH-1830, Regel:
+/// `frontend/AGENTS.md`, „Anrede“). Was axum oder serde genau bemängelt, steht nur im Log.
+pub const EINGABE_FORMAT_TEXT: &str = "Die Eingabe hat ein unerwartetes Format und wurde nicht \
+gespeichert. Seite neu laden; tritt es wieder auf, bitte über Rückmeldung melden.";
+
+/// Text einer Adresse, deren Kennung nicht passt (400, LLH-1830); serdes Wortlaut nur im Log.
+pub const PFAD_FORMAT_TEXT: &str = "Die Adresse ist ungültig. Den Eintrag aus der Liste öffnen.";
+
 /// Bildet eine `JsonRejection` auf einen `AppError` ab. Ein Body über dem `DefaultBodyLimit`
 /// der Route ist 413 (LFH-1074, `src/AGENTS.md`, Eingabegrenzen), alle übrigen Arme landen auf
-/// 400 (formal ungültig).
+/// 400 (formal ungültig) mit [`EINGABE_FORMAT_TEXT`]; was genau nicht passt, steht im Log.
 ///
 /// Bewusste Ungenauigkeit: `MissingJsonContentType` wäre HTTP-korrekt 415. `AppError` trägt den
 /// Code nicht; der Envelope zählt hier mehr als die Code-Nuance.
@@ -192,27 +200,21 @@ fn rejection_zu_app_error(rejection: JsonRejection) -> AppError {
     if rejection.status() == StatusCode::PAYLOAD_TOO_LARGE {
         return AppError::PayloadTooLarge("Anfrage ist zu groß.".into());
     }
-    match rejection {
-        JsonRejection::JsonSyntaxError(_) => {
-            AppError::Validation("Anfrage-Body ist kein gültiges JSON.".into())
-        }
-        JsonRejection::JsonDataError(e) => AppError::Validation(format!(
-            "Anfrage-Body passt nicht zum erwarteten Format: {e}"
-        )),
-        JsonRejection::MissingJsonContentType(_) => AppError::Validation(
-            "Anfrage-Body muss als 'Content-Type: application/json' gesendet werden.".into(),
-        ),
-        JsonRejection::BytesRejection(_) => {
-            AppError::Validation("Anfrage-Body konnte nicht gelesen werden.".into())
-        }
+    let art = match &rejection {
+        JsonRejection::JsonSyntaxError(_) => "kein gültiges JSON",
+        JsonRejection::JsonDataError(_) => "falsches Format",
+        JsonRejection::MissingJsonContentType(_) => "ohne Content-Type application/json",
+        JsonRejection::BytesRejection(_) => "nicht lesbar",
         // `JsonRejection` ist `#[non_exhaustive]`; dieser Arm fängt künftige Varianten. Nicht auf
-        // 400:
-        // ein unbekannter Arm soll im Log auffallen.
+        // 400: ein unbekannter Arm soll im Log auffallen.
         andere => {
             tracing::error!("Unbehandelte JsonRejection-Variante: {andere}");
-            AppError::Internal(format!("Unbehandelte Json-Rejection: {andere}"))
+            return AppError::Internal(format!("Unbehandelte Json-Rejection: {andere}"));
         }
-    }
+    };
+    // Die Einzelheiten (serde-Pfad und -Meldung) nur ins Log, nie zum Anwender (LLH-1830).
+    tracing::warn!(art, detail = %rejection, "JSON-Body abgelehnt");
+    AppError::Validation(EINGABE_FORMAT_TEXT.into())
 }
 
 /// Pfad-Parameter-Extractor mit deutschsprachiger Rejection im `{error}`-Format (LFH-317);
@@ -248,7 +250,8 @@ where
 fn pfad_rejection_zu_app_error(rejection: PathRejection) -> AppError {
     match rejection {
         PathRejection::FailedToDeserializePathParams(e) => {
-            AppError::Validation(format!("Ungültiger Pfad-Parameter: {e}"))
+            tracing::warn!(detail = %e, "Pfad-Parameter abgelehnt");
+            AppError::Validation(PFAD_FORMAT_TEXT.into())
         }
         // `MissingPathParams`: der Handler verlangt mehr Segmente als die Route trägt — ein
         // Programmierfehler, der als 500 im Log auffallen soll.
