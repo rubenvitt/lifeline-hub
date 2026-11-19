@@ -2083,3 +2083,125 @@ async fn am_spiegel_bleiben_kopplung_und_freigabe_nach_dem_wiederoeffnen_beendet
     }
     assert_eq!(freigaben().await, 0, "keine Freigabe lebt wieder auf");
 }
+
+/// Erika als Mitarbeit am Führer (ELW); der Hub spiegelt den Einsatz. Gibt Einsatz am ELW,
+/// Spiegel am Hub und Erikas Cookie am Hub zurück.
+async fn mitarbeit_am_spiegel(hub: &Instanz, elw: &Instanz) -> (i64, i64, String) {
+    let (_, erika, erika_elw) = gemeinsames_konto(hub, elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "mitarbeit").await;
+    abgleichen(elw).await;
+    (e, spiegel_von(hub).await, erika)
+}
+
+#[tokio::test]
+async fn mitarbeit_beantragt_etb_eintrag_am_spiegel() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (e, s, erika) = mitarbeit_am_spiegel(&hub, &elw).await;
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/etb"),
+        &erika,
+        Some(
+            &json!({ "typ": "meldung", "inhalt": "Von der Mitarbeit", "von": "A", "an": "B",
+                       "client_id": "m-1" }),
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{v}");
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let verfasser: String = eine(
+        &elw.pool,
+        &format!(
+            "SELECT b.benutzername FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
+             WHERE e.einsatz_id = {e} AND e.inhalt = 'Von der Mitarbeit'"
+        ),
+    )
+    .await;
+    assert_eq!(verfasser, "erika", "beim Führer im Namen der Mitarbeit");
+}
+
+#[tokio::test]
+async fn mitarbeit_beantragt_keine_person_am_spiegel() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, s, erika) = mitarbeit_am_spiegel(&hub, &elw).await;
+    let (st, _) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/personen"),
+        &erika,
+        Some(&json!({ "name": "Max", "client_id": "m-p-1" })),
+    )
+    .await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    let n: i64 = eine(&hub.pool, "SELECT COUNT(*) FROM spiegel_antrag").await;
+    assert_eq!(n, 0, "kein Antrag abgelegt");
+}
+
+#[tokio::test]
+async fn beobachter_beantragt_weiter_nichts() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "beobachter").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    for (pfad, body) in [
+        (
+            format!("/api/einsaetze/{s}/etb"),
+            json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "b-e" }),
+        ),
+        (
+            format!("/api/einsaetze/{s}/meldungen"),
+            json!({ "inhalt": "X", "client_id": "b-m" }),
+        ),
+    ] {
+        let (st, _) = common::anfrage_json(&hub.app, "POST", &pfad, &erika, Some(&body)).await;
+        assert_eq!(st, StatusCode::FORBIDDEN, "{pfad}");
+    }
+}
+
+/// Der Führer führt den Antrag als Konto der Mitarbeit aus (`AntragAkteur`, Rolle aus der
+/// Mitgliedschaft am Führer): Die Eigen-Prüfungen der Routen greifen dort, eine Lagemeldung
+/// und eine Anordnung der Mitarbeit werden abgelehnt und nie angelegt.
+#[tokio::test]
+async fn der_fuehrer_lehnt_lagemeldung_und_anordnung_der_mitarbeit_ab() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (e, s, erika) = mitarbeit_am_spiegel(&hub, &elw).await;
+    for (pfad, body) in [
+        (
+            format!("/api/einsaetze/{s}/etb"),
+            json!({ "typ": "anordnung", "inhalt": "Befehl", "von": "A", "an": "B",
+                    "client_id": "m-anordnung" }),
+        ),
+        (
+            format!("/api/einsaetze/{s}/meldungen"),
+            json!({ "inhalt": "Lage", "meldungsart": "lagemeldung",
+                    "ereigniszeit": "2026-11-10 08:00:00", "client_id": "m-lage" }),
+        ),
+    ] {
+        let (st, v) = common::anfrage_json(&hub.app, "POST", &pfad, &erika, Some(&body)).await;
+        assert_eq!(st, StatusCode::ACCEPTED, "{pfad}: {v}");
+    }
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let abgelehnt: i64 = eine(
+        &hub.pool,
+        "SELECT COUNT(*) FROM spiegel_antrag WHERE zustand = 'abgelehnt'",
+    )
+    .await;
+    assert_eq!(abgelehnt, 2);
+    let angelegt: i64 = eine(
+        &elw.pool,
+        &format!(
+            "SELECT (SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = {e} AND typ = 'anordnung') \
+             + (SELECT COUNT(*) FROM meldung WHERE einsatz_id = {e} AND meldungsart = 'lagemeldung')"
+        ),
+    )
+    .await;
+    assert_eq!(angelegt, 0);
+}
