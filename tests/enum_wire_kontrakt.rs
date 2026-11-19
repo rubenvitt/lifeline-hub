@@ -505,6 +505,7 @@ fn serde_wire_gleich_as_str() {
     enum_wire_as_str!(lifeline_hub::einsatz::EinsatzRolle {
         Einsatzleitung,
         Fuehrungspersonal,
+        Mitarbeit,
         Beobachter,
     });
     enum_wire_as_str!(lifeline_hub::einsatz::EinsatzStatus {

@@ -8,6 +8,7 @@ import type { EinsatzRolle } from '../api/types';
 export const EINSATZ_ROLLE_LABELS: Record<EinsatzRolle, string> = {
   einsatzleitung: 'Einsatzleitung',
   fuehrungspersonal: 'Führungspersonal',
+  mitarbeit: 'Mitarbeit',
   beobachter: 'Beobachter',
 };
 

@@ -31,7 +31,8 @@ import { anzahl } from '../anzeige/anzahl';
 const RANG: Record<EinsatzRolle, number> = {
   einsatzleitung: 0,
   fuehrungspersonal: 1,
-  beobachter: 2,
+  mitarbeit: 2,
+  beobachter: 3,
 };
 
 /** Eine gewählte, noch nicht bestätigte Herabstufung der eigenen Rolle (LFH-966). */
