@@ -2,13 +2,13 @@
 titel: Zeiten und Kürzel
 gruppen: [alle]
 reihenfolge: 90
-quellen: [frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/dauer.ts, frontend/src/components/Datenstand.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/anzeige/staerke.ts, frontend/src/anzeige/StaerkeAnzeige.tsx, frontend/src/anzeige/kuerzel.ts, frontend/src/kraefte/Verdichtungszeile.tsx]
+quellen: [frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/dauer.ts, frontend/src/components/Datenstand.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/anzeige/staerke.ts, frontend/src/anzeige/StaerkeAnzeige.tsx, frontend/src/anzeige/kuerzel.ts, frontend/src/anzeige/KuerzelErklaerung.tsx, frontend/src/kraefte/Verdichtungszeile.tsx]
 ---
 
 ## Überblick
 
 Lifeline Hub schreibt Zeiten, Dauern und die Stärke überall gleich. Dieses Kapitel ist das
-Nachschlagewerk dafür: welche Form eine Uhrzeit, ein Zeitpunkt, eine Dauer und der Datenstand
+Glossar der App und das Nachschlagewerk dafür: welche Form eine Uhrzeit, ein Zeitpunkt, eine Dauer und der Datenstand
 haben, wie die Stärke zu lesen ist und welche Kürzel die App ohne Erklärung verwendet. Es richtet
 sich an alle, die Lifeline Hub lesen oder bedienen.
 
@@ -23,7 +23,9 @@ sich an alle, die Lifeline Hub lesen oder bedienen.
 
 2. Die Zahlen vor dem Doppelstrich nennen Führer, Unterführer und Mannschaft, die Zahl dahinter die
    Summe. „1/2/5//8“ heißt: ein Führer, zwei Unterführer, fünf Helferinnen und Helfer, zusammen acht.
-3. Mit der Maus auf der Stärke steht die Schreibweise ausgeschrieben im Hinweis.
+3. „F/UF/M//Σ“ antippen oder anklicken: Ein Fenster nennt die Bedeutung und ein Beispiel und führt
+   mit „Zeiten und Kürzel“ in dieses Kapitel. Mit der Maus auf der Stärke steht die Schreibweise
+   zusätzlich ausgeschrieben im Hinweis.
 
 ### Den Datenstand lesen
 
@@ -58,8 +60,15 @@ eben“ bzw. „in < 1 min“. Eingaben in Dauerfeldern verstehen auch „7:30�
 
 Die Stärke folgt der BOS-Schreibweise „F/UF/M//Σ“. Jede Ansicht mit einer Stärke nennt diese
 Schreibweise einmal sichtbar, als Spaltenkopf, Feldbeschriftung oder Zeile über der Gliederung. Ohne
-erfasste Stärke steht „—“, nie „0/0/0//0“. Organisationen vergeben für Abschnitte eigene
-Kurzbezeichnungen wie „EA 1.1“; die App übernimmt sie unverändert.
+erfasste Stärke steht „—“, nie „0/0/0//0“. Steht die Schreibweise in einer Zeile, die als Ganzes zu
+einem Abschnitt führt, etwa im Überblick, erklärt sie sich einmal über der Liste.
+
+### Kurzbezeichnungen der Organisation
+
+Organisationen vergeben für ihre Einsatzabschnitte eigene Kurzbezeichnungen wie „EA 1“ oder
+„EA 1.1“. Das sind Angaben der Organisation, keine Kürzel der App: Lifeline Hub zeigt sie so, wie
+sie beim Abschnitt erfasst sind, und erklärt sie nicht. Der Name des Abschnitts steht immer dabei,
+im Überblick etwa „Nord“ und darunter die Kurzbezeichnung und die Abschnittsleitung.
 
 ### Eingeführte Kürzel
 

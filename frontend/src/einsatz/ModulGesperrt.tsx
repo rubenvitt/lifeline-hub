@@ -84,7 +84,9 @@ export default function ModulGesperrt({
           {/* Eine Sperrzeile (LFH-1078, Spec `modul-freigabe`): Modul und Grund stehen schon in h1 und
              Paneeltitel. Wo die Freigaben liegen, zeigt der Knopf statt eines Satzes. */}
           <Textstufe als="p" stufe="textKlein" ton="text2">
-            {ausgeblendet ? 'In diesem Einsatz ausgeblendet' : 'Für deine Rolle nicht freigegeben'}
+            {ausgeblendet
+              ? 'In diesem Einsatz ausgeblendet'
+              : 'Für die eigene Rolle nicht freigegeben'}
           </Textstufe>
           {/* Wen man fragt (LLH-1819). Wer die Freigaben selbst verwaltet, hat den Knopf statt
              eines Namens. */}

@@ -1,3 +1,4 @@
+import { aktionsKnoepfe } from '../../test/kuerzel';
 import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -441,7 +442,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
   it('ohne Schreibrecht: kein Stift, keine Stufenwahl, leer als „—“', () => {
     renderDetail(nord({ lagezustand: null }), { darfSchreiben: false });
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(aktionsKnoepfe()).toHaveLength(0);
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.getByText('nicht beurteilt')).toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(6);

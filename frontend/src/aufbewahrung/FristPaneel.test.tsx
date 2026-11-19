@@ -271,7 +271,7 @@ describe('FristPaneel', () => {
     await fristSetzen(dialog, '2020-01-01 12:00');
     const rueckfrage = await rueckfrageFinden();
     expect(rueckfrage).toHaveTextContent(/sofort/);
-    expect(rueckfrage).toHaveTextContent(/auch für Sie/);
+    expect(rueckfrage).toHaveTextContent(/auch für die eigene Rolle/);
     expect(gesendet).toHaveLength(0);
   });
 

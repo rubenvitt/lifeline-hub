@@ -26,8 +26,8 @@ rueckmeldung@lifeline-hub.de.
 4. „Art“ wählen: Fehler, Wunsch oder Frage.
 5. „Version“, „Oberfläche“ und „Bereich der App“ sind schon ausgefüllt. Sie stimmen, solange die
    Rückmeldung den Bereich betrifft, aus dem die Hilfe geöffnet wurde.
-6. Einen Titel eintragen und unter „Was ist passiert, was wünschst du dir?“ beschreiben, worum es
-   geht. Bei einem Fehler helfen „Schritte zum Nachstellen“ und „Erwartet“.
+6. Einen Titel eintragen und im ersten Textfeld beschreiben, was passiert ist und was gewünscht
+   wäre. Bei einem Fehler helfen „Schritte zum Nachstellen“ und „Erwartet“.
 7. Bestätigen, dass Text und Bilder keine Namen von Betroffenen oder Patienten und keine
    Einsatzinhalte enthalten.
 8. Das Formular absenden.

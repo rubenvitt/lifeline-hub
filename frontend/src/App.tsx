@@ -156,6 +156,7 @@ import { useOrgLiveStream } from './live/useOrgLiveStream';
 import { abgleichFuer, useOfflineSync } from './offline/useOfflineSync';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
+import { HilfeSeitenleisteProvider } from './hilfe/HilfeSeitenleisteProvider';
 
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
@@ -277,9 +278,12 @@ function BetriebsLayout() {
 function App() {
   return (
     <AuthProvider>
-      <CommandPaletteProvider>
-        <SitzungsLayout />
-      </CommandPaletteProvider>
+      {/* Über der Palette, damit sie „Hilfe zu dieser Seite“ anbietet (LLH-1824). */}
+      <HilfeSeitenleisteProvider>
+        <CommandPaletteProvider>
+          <SitzungsLayout />
+        </CommandPaletteProvider>
+      </HilfeSeitenleisteProvider>
     </AuthProvider>
   );
 }

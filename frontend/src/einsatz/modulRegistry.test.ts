@@ -32,6 +32,7 @@ const offen: ModulEintrag = {
   icon: modulRegistry[0].icon,
   route: 'x',
   status: 'geplant',
+  hilfeKapitel: 'einsatz-oberflaeche',
 };
 
 describe('modulName (LFH-965)', () => {
@@ -302,6 +303,7 @@ describe('modulRegistry', () => {
         icon: () => null,
         route: 'f',
         status: 'fertig',
+        hilfeKapitel: 'einsatz-oberflaeche',
       },
       {
         key: 'wip-modul',
@@ -310,6 +312,7 @@ describe('modulRegistry', () => {
         icon: () => null,
         route: 'w',
         status: 'wip',
+        hilfeKapitel: 'einsatz-oberflaeche',
       },
     ];
     expect(aufloeseStandardModul('wip-modul', stub)).toBe(redirectZiel(stub));
@@ -412,7 +415,15 @@ describe('erstesFreigegebenesModul (LFH-337)', () => {
   it('liefert null, wenn die Kategorie kein freigegebenes Modul hat', () => {
     // Gegenaussage: der Resolver KANN ablehnen — sonst navigierte der Aufrufer auf `undefined`.
     const nurGeplant: ModulEintrag[] = [
-      { key: 'x', kategorie: 'lage', label: 'X', icon: () => null, route: 'x', status: 'geplant' },
+      {
+        key: 'x',
+        kategorie: 'lage',
+        label: 'X',
+        icon: () => null,
+        route: 'x',
+        status: 'geplant',
+        hilfeKapitel: 'einsatz-oberflaeche',
+      },
     ];
     expect(erstesFreigegebenesModul('lage', freigabenFixture({ x: {} }), nurGeplant)).toBeNull();
   });

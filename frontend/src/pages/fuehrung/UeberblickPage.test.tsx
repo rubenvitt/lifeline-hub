@@ -584,6 +584,17 @@ describe('UeberblickPage', () => {
     expect(gebundenFarbe).not.toBe(rollenFarbe('bedien', standard));
     expect(within(p).queryByText(/Einheiten nach Status:/)).toBeNull();
     expect(within(p).getByText('1 Abschnitt · 1 Einheit')).toBeInTheDocument();
+    // LLH-1825: die Zeilen sind Links, die Schreibweise erklärt sich deshalb einmal über ihnen —
+    // nicht im Kopf-Meta, das auf schmalen Flächen abgeschnitten wird (Review B4).
+    const legende = within(p).getByRole('button', { name: /^F\/UF\/M\/\/Σ/ });
+    expect(legende.closest('[data-lfh="paneel-meta"]')).toBeNull();
+    expect(legende.closest('a')).toBeNull();
+    expect(legende.closest('[data-lfh="abschnitt-legende"]')).toHaveTextContent('Stärke F/UF/M//Σ');
+    // Die Legende fluchtet mit den Zeilen darunter, statt am Paneelrand zu kleben.
+    const ersteZeile = p.querySelector<HTMLElement>('[data-lfh="ueberblick-abschnitt"]');
+    const kasten = legende.closest<HTMLElement>('[data-lfh="abschnitt-legende"]');
+    expect(kasten?.style.paddingInline).not.toBe('');
+    expect(kasten?.style.paddingInline).toBe(ersteZeile?.style.paddingInline);
   });
 
   it('Abschnittszeile: letzte Rückmeldung im Teilbaum mit Zeit und Text (LFH-610)', async () => {

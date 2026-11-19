@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { IconPersonPlus } from '../../icons';
 import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
@@ -43,7 +44,7 @@ import UhsLagezeile from './UhsLagezeile';
 import BewegungenTab from './BewegungenTab';
 import UhsAnhaenge from './UhsAnhaenge';
 import UhsKraefte from './UhsKraefte';
-import { STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
+import { staerkeText } from '../../anzeige/staerke';
 import { qualiSollText } from '../../kraefte/qualiSoll';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -281,7 +282,9 @@ function UhsDetailInhalt() {
   const metaTeile = [
     uhsTyp[uhs.typ].label,
     uhs.standort ?? 'ohne Standort',
-    `Stärke ${STAERKE_SCHREIBWEISE} ${staerkeText(uhs.staerke)}`,
+    <>
+      Stärke <StaerkeSchreibweise /> {staerkeText(uhs.staerke)}
+    </>,
   ];
   // Die Materialzahl im Wortlaut des Bausteins („3 Posten · 1 Ausfall“, eine Heimat je Zahl,
   // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät), ohne Freigabe
@@ -295,7 +298,8 @@ function UhsDetailInhalt() {
   const meta = (
     <span style={{ whiteSpace: 'normal' }}>
       {metaTeile.map((teil, i) => (
-        <Fragment key={`${i}-${teil}`}>
+        // Teile sind fest in ihrer Folge; die Stärke ist ein Knoten, kein Text.
+        <Fragment key={i}>
           <span style={{ whiteSpace: 'nowrap' }}>
             {teil}
             {i < metaTeile.length - 1 || showMaterialzahl ? ' ·' : ''}

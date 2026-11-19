@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { useId, useState, type ReactNode } from 'react';
 import { App, Button, Form, Input, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +14,7 @@ import { PERSONAL_ADHOC_TEXT_MAX } from '../../api/eingabegrenzen';
 import { POSITION_LABELS, POSITION_OPTIONEN } from '../../api/personal';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { StaerkePosition, UhsDetail, UhsKraft } from '../../api/types';
-import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, staerkeText } from '../../anzeige/staerke';
 import { ErfassungsModal } from '../../components/Erfassung';
 import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
 import { Select } from '../../components/Select';
@@ -310,7 +311,14 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           />
         )}
       <Datenraster beschriftung="Stärke der UHS" spalten={2}>
-        <Datenfeld label={`Stärke (${STAERKE_SCHREIBWEISE})`} mono>
+        <Datenfeld
+          label={
+            <>
+              Stärke (<StaerkeSchreibweise />)
+            </>
+          }
+          mono
+        >
           <span data-testid="uhs-staerke" title={STAERKE_AUSGESCHRIEBEN}>
             {staerkeText(uhs.staerke)}
           </span>

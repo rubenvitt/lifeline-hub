@@ -1,4 +1,4 @@
-import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
+import { StaerkeSchreibweise } from '../../anzeige/KuerzelErklaerung';
 import { dauer } from '../../anzeige/dauer';
 import { Alert, App, Breadcrumb, Button, Space, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
@@ -885,7 +885,7 @@ export default function BrDetailPage() {
                 titel="Bereitgestellt"
                 groesse="klein"
                 wert={unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />}
-                einheit={unvollstaendig ? undefined : STAERKE_SCHREIBWEISE}
+                einheit={unvollstaendig ? undefined : <StaerkeSchreibweise />}
                 // Gesperrt ist kein Ausfall (LLH-1462): neutraler Ton, das Modul als Grund.
                 ton={unvollstaendig && einheitenFrei !== false ? 'achtung' : 'neutral'}
                 notiz={

@@ -29,7 +29,7 @@ test.describe(KAPITEL, () => {
     await dialog.getByLabel('URL').fill('https://kacheln.example.org/{z}/{x}/{y}.png');
     await dialog.getByLabel('Attribution').fill('© Landesamt für Vermessung');
     await dialog.getByText('Weitere Angaben').click();
-    await expect(dialog.getByLabel('Über Server proxen')).toBeVisible();
+    await expect(dialog.getByLabel('Über den Server abrufen')).toBeVisible();
     await dialog.getByLabel('Attribution').blur();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'online-quelle');

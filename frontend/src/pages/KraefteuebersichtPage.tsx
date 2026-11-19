@@ -1,3 +1,4 @@
+import { StaerkeSchreibweise } from '../anzeige/KuerzelErklaerung';
 import { IconPlus, IconTrichter } from '../icons';
 import { useModulFreigabenStand, useSprungSperre } from '../einsatz/useSprungSperre';
 import {
@@ -11,7 +12,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
-import React, { Fragment, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   auftraegePfad,
@@ -51,7 +52,7 @@ import {
   type LaufendeDauer,
 } from '../kraefte/zeitachse';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
-import { STAERKE_AUSGESCHRIEBEN, STAERKE_SCHREIBWEISE, staerkeText } from '../anzeige/staerke';
+import { STAERKE_AUSGESCHRIEBEN, staerkeText } from '../anzeige/staerke';
 import {
   baueKraeftebild,
   filtereKraefte,
@@ -95,7 +96,8 @@ import StatusWahl from '../components/StatusWahl';
 import { kategorieDarstellung, statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/SpaltenSchalter';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
+import { SeitenFehler } from '../components/SeitenZustand';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
@@ -391,13 +393,7 @@ function rasterSpalten(
       // verbreiterte sie die Spalte, und 40 Kräfte brauchten eine Seite mehr.
       title: (
         <>
-          Stärke{' '}
-          {STAERKE_SCHREIBWEISE.split(/(?=\/\/)/).map((teil, i) => (
-            <Fragment key={teil}>
-              {i > 0 && <wbr />}
-              <span style={{ whiteSpace: 'nowrap' }}>{teil}</span>
-            </Fragment>
-          ))}
+          Stärke <StaerkeSchreibweise umbruchVorSumme />
         </>
       ),
       key: 'staerke',
@@ -1313,7 +1309,8 @@ export default function KraefteuebersichtPage() {
     if (sprungZeile != null) scrolleZurZeile(sprungZeile);
   }, [sprungZeile]);
 
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  // Erstaufruf: Kopf sofort, damit er beim Eintreffen des Einsatzes nicht nachrutscht (LLH-1830).
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="kraefteuebersicht" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

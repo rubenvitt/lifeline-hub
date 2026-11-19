@@ -175,7 +175,7 @@ export default function OnlineQuelleFormModal({
                 {/* Proxy hält den Schlüssel server-seitig und cacht (LFH-182/190). Abgeschaltet
                     steht die Folge sichtbar am Feld, nicht im Tooltip (Touch). */}
                 <Feld
-                  label="Über Server proxen"
+                  label="Über den Server abrufen"
                   name="proxy"
                   valuePropName="checked"
                   extra={

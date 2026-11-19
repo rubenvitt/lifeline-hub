@@ -65,6 +65,7 @@ import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../einsatz/einsatzlei
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
+import WillkommenKarte from '../hilfe/WillkommenKarte';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 
@@ -175,7 +176,7 @@ const einsatzGruppe = (e: EinsatzAnzeige) => e.status;
  * Wer keinen Einsatz sieht, ist meist in keinem Einsatz Mitglied (LLH-1819): aufnehmen kann nur
  * die Einsatzleitung des jeweiligen Einsatzes. Ohne Namen, die Liste kennt keinen Einsatz.
  */
-const HINWEIS_KEINE_EINSAETZE = 'Zu einem Einsatz nimmt dich dessen Einsatzleitung auf.';
+const HINWEIS_KEINE_EINSAETZE = 'In einen Einsatz aufnehmen kann nur dessen Einsatzleitung.';
 
 /**
  * Die Einsatzliste liegt außerhalb jedes Einsatzes: Anzeige und „Einsatz anlegen“ nehmen die
@@ -503,7 +504,7 @@ function EinsaetzeInhalt() {
             )}
             {/* Mit Kontext: allein gelesen hielte man „Einsatzleitung“ für eine Eigenschaft des
                 Einsatzes, nicht für die eigene Rolle (LFH-946). */}
-            {e.meine_rolle && <Marke>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
+            {e.meine_rolle && <Marke>Eigene Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
           </Stapel>
           {/* Ort und Beginn beantworten „welcher ist meiner?". Das Icon trägt eine
               `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}
@@ -560,6 +561,8 @@ function EinsaetzeInhalt() {
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
+      {/* Willkommen vor Neuigkeiten (LLH-1824): für Erstnutzer das Wichtigere. */}
+      <WillkommenKarte />
       <NeuigkeitenHinweis />
 
       {/* Leer und anlegeberechtigt schließen sich nicht aus. Keine Primäraktion am Leerknoten:

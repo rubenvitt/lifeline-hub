@@ -12,6 +12,7 @@ mod common;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
+use lifeline_hub::extract::{EINGABE_FORMAT_TEXT, PFAD_FORMAT_TEXT};
 use serde_json::Value;
 use tower::ServiceExt;
 
@@ -52,6 +53,13 @@ async fn assert_fehler_envelope(resp: axum::response::Response, fall: &str) -> V
     json
 }
 
+/// Formatfehler zeigen den festen Text, nie den Wortlaut von serde oder axum (LLH-1830).
+fn assert_neutraler_formattext(json: &Value, fall: &str) {
+    let text = json["error"].as_str().unwrap();
+    assert_eq!(text, EINGABE_FORMAT_TEXT, "{fall}: fester Text");
+    assert!(!text.contains("deserialize"), "{fall}: kein serde-Wortlaut");
+}
+
 /// Baut einen POST auf einen Endpunkt, der ohne Session erreichbar ist (Login).
 /// `content_type = None` lässt den Header bewusst weg.
 fn login_request(body: &str, content_type: Option<&str>) -> Request<Body> {
@@ -75,10 +83,7 @@ async fn kaputtes_json_liefert_400_im_fehler_envelope() {
     let status = resp.status();
     let json = assert_fehler_envelope(resp, "Syntaxfehler").await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "Syntaxfehler ist 400");
-    assert!(
-        !json["error"].as_str().unwrap().is_empty(),
-        "Meldung darf nicht leer sein"
-    );
+    assert_neutraler_formattext(&json, "Syntaxfehler");
 }
 
 /// Falscher Skalartyp: axums `JsonDataError` wäre 422 + `text/plain`. Nach LFH-267 ist das
@@ -95,7 +100,8 @@ async fn falscher_feldtyp_liefert_400_im_fehler_envelope() {
         .unwrap();
 
     let status = resp.status();
-    assert_fehler_envelope(resp, "Typfehler").await;
+    let json = assert_fehler_envelope(resp, "Typfehler").await;
+    assert_neutraler_formattext(&json, "Typfehler");
     assert_eq!(
         status,
         StatusCode::BAD_REQUEST,
@@ -116,7 +122,8 @@ async fn fehlender_content_type_liefert_fehler_envelope() {
         .await
         .unwrap();
 
-    assert_fehler_envelope(resp, "kein Content-Type").await;
+    let json = assert_fehler_envelope(resp, "kein Content-Type").await;
+    assert_neutraler_formattext(&json, "kein Content-Type");
 }
 
 /// Regressionsschutz, KEIN Rot-Nachweis: `static_files::serve` prüft den `/api/`-Präfix
@@ -181,7 +188,8 @@ async fn nicht_numerische_route_id_liefert_400_im_fehler_envelope() {
         .unwrap();
 
     let status = resp.status();
-    assert_fehler_envelope(resp, "nicht-numerische Route-ID").await;
+    let json = assert_fehler_envelope(resp, "nicht-numerische Route-ID").await;
+    assert_eq!(json["error"], PFAD_FORMAT_TEXT, "fester Text (LLH-1830)");
     assert_eq!(
         status,
         StatusCode::BAD_REQUEST,

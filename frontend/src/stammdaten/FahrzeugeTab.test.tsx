@@ -352,6 +352,19 @@ describe('FahrzeugeTab · Sortieren und Filtern (LLH-1096)', () => {
     await waitFor(() => expect(folge()).toEqual(['1', '2']));
   });
 
+  // LLH-1825: die Schreibweise im Spaltenkopf erklärt sich auf Tippen; die Sortierung bleibt.
+  it('Tippen auf „F/UF/M//Σ“ im Spaltenkopf öffnet die Erklärung und sortiert nicht', async () => {
+    setzeViewportBreite(1600);
+    render(nichtAdmin, [fahrzeug, rtw]);
+    await screen.findByText('Florian 1');
+    expect(folge()).toEqual(['1', '2']);
+    const kopf = screen.getByRole('columnheader', { name: /^Stärke/ });
+    await userEvent.click(within(kopf).getByRole('button', { name: /^F\/UF\/M\/\/Σ/ }));
+    expect(await screen.findByRole('link', { name: 'Zeiten und Kürzel' })).toBeInTheDocument();
+    expect(folge()).toEqual(['1', '2']);
+    expect(ort.aktuell).toBe('/admin/stammdaten/fahrzeuge');
+  });
+
   it('eine Adresse mit Filter zeigt dieselbe Liste, auch bevor die Zeilen da sind', async () => {
     setzeViewportBreite(1600);
     render(nichtAdmin, [fahrzeug, rtw], '/admin/stammdaten/fahrzeuge?f.traeger=DRK');
