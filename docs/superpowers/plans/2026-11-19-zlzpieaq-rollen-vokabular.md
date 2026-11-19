@@ -125,10 +125,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
 - Create: `frontend/src/einsatz/rollenVokabular.guard.test.ts`
 - Modify: `frontend/AGENTS.md` („Begriffe“: Regel Rollen-Vokabular; „Texte: zeigen statt erklären“: Ausnahme Darf-Zeile)
 
-- [ ] **Step 1: Wächter** — liest alle `src/**/*.{ts,tsx}` ohne `*.test.*`, `types.generated.ts`, `rollenVokabular.ts`; entfernt Kommentare; Treffer für `System-Rolle`, `Org-Rolle`, `Org-Admin`, `Führungskraft (darf`, sowie `Führungskraft` als ganzer String-/JSX-Text (`['"\`>]Führungskraft['"\`<]`) und `'Admin'`/`"Admin"`/`>Admin<` → Liste muss leer sein.
-- [ ] **Step 2: Probe** — vorübergehend `'Org-Rolle'` in eine Datei schreiben, Wächter rot, zurücknehmen.
-- [ ] **Step 3: Regel** in `frontend/AGENTS.md`; Prettier.
-- [ ] **Step 4: Commit.**
+- [x] **Step 1: Wächter** — liest alle `src/**/*.{ts,tsx}` ohne `*.test.*`, `types.generated.ts`, `rollenVokabular.ts`; entfernt Kommentare; Treffer für `System-Rolle`, `Org-Rolle`, `Org-Admin`, `Führungskraft (darf`, sowie `Führungskraft` als ganzer String-/JSX-Text (`['"\`>]Führungskraft['"\`<]`) und `'Admin'`/`"Admin"`/`>Admin<` → Liste muss leer sein.
+- [x] **Step 2: Probe** — vorübergehend `'Org-Rolle'` in eine Datei schreiben, Wächter rot, zurücknehmen.
+- [x] **Step 3: Regel** in `frontend/AGENTS.md`; Prettier.
+- [x] **Step 4: Commit.**
 
 ### Task 8: Anwenderdoku
 
