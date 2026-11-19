@@ -68,7 +68,7 @@ export default function NeuigkeitenPage() {
         )}
 
         {seitLetzter.length > 0 && (
-          <Paneel titel="Seit deiner letzten Version" koerperPolster>
+          <Paneel titel="Seit der zuletzt gesehenen Version" koerperPolster>
             <Eintragsliste eintraege={seitLetzter} />
           </Paneel>
         )}

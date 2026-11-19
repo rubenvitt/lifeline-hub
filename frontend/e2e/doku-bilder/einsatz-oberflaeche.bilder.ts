@@ -34,7 +34,7 @@ test.describe(KAPITEL, () => {
     await expect(willkommen).toBeHidden();
     const kachel = page.locator('[data-lfh="einsatzkachel"]', { hasText: demo.bezeichnung });
     await expect(kachel).toBeVisible();
-    await expect(kachel).toContainText('Deine Rolle: Einsatzleitung');
+    await expect(kachel).toContainText('Eigene Rolle: Einsatzleitung');
     const raster = page.getByTestId('einsaetze-raster');
     await expect(raster.getByRole('button', { name: 'Neuer Einsatz' })).toBeVisible();
     await fotografiere(page, KAPITEL, 'einsatzliste');

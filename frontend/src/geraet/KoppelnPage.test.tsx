@@ -78,7 +78,7 @@ describe('KoppelnPage (LFH-892)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
     expect(
       await screen.findByText(
-        'Dieser Code gilt nicht (mehr). Lass dir bei der Einsatzleitung einen neuen geben.',
+        'Dieser Code gilt nicht (mehr). Einen neuen bei der Einsatzleitung holen.',
       ),
     ).toBeInTheDocument();
     expect(navigiere).not.toHaveBeenCalled();

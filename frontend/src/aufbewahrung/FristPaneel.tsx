@@ -200,7 +200,7 @@ export function useFristAenderung(
             </strong>{' '}
             vorverlegt.{' '}
             {liegtInDerVergangenheit(rueckfrage.neu, dayjs())
-              ? 'Der Zeitpunkt liegt in der Vergangenheit: der abgeschlossene Einsatz ist sofort für alle gesperrt, auch für Sie, und wird zur Löschung vorgemerkt.'
+              ? 'Der Zeitpunkt liegt in der Vergangenheit: der abgeschlossene Einsatz ist sofort für alle gesperrt, auch für die eigene Rolle, und wird zur Löschung vorgemerkt.'
               : 'Ab dann ist der abgeschlossene Einsatz für alle gesperrt und wird zur Löschung vorgemerkt.'}
           </Typography.Paragraph>
         )}

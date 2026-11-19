@@ -23,7 +23,7 @@ Nachschlagen.
 2. „Quelle hinzufügen“ wählen.
 3. „Name“ eintragen, unter „Typ“ „Vektor (Style-JSON)“ oder „Raster (XYZ-Kacheln)“ wählen und
    „URL“ und „Attribution“ eintragen.
-4. Bei Bedarf „Weitere Angaben“ aufklappen und „Sortierung“, „Aktiv“, „Über Server proxen“ und
+4. Bei Bedarf „Weitere Angaben“ aufklappen und „Sortierung“, „Aktiv“, „Über den Server abrufen“ und
    „Dunkle Karte“ einstellen.
 
    ![Dialog „Online-Quelle hinzufügen“ mit einer Rasterquelle und aufgeklappten weiteren Angaben](../bilder/karten/online-quelle.png)
@@ -72,7 +72,7 @@ die nächste Prüfung ansteht.
 
 - Jede aktive Quelle steht in der Grundlage-Wahl der Lagekarte; die „Sortierung“ bestimmt ihre
   Reihenfolge. Eine inaktive Quelle bleibt eingetragen, erscheint dort aber nicht.
-- **„Über Server proxen“** holt die Kacheln über den Server statt direkt im Browser. Ein
+- **„Über den Server abrufen“** holt die Kacheln über den Server statt direkt im Browser. Ein
   Zugangsschlüssel in der URL bleibt so auf dem Server; ist der Schalter aus, warnt der Dialog:
   „Schlüssel in der URL ist im Browser sichtbar.“ Über den Proxy speichert der Server Kacheln
   zwischen.

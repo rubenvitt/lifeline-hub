@@ -51,7 +51,8 @@ Vier Abschnitte, genau diese `##`, in dieser Reihenfolge, keine weiteren:
    DV 810.3, DIN 13050 …), **nur** wenn Code, Specs oder Bereichsregeln sie schon nennen. Fehlt
    ein Beleg, fehlt der Abschnitt. Erfundene Quellen gibt es nicht.
 
-- Unpersönlich und kurz („Die Einsatzleitung legt …“, „Nach dem Speichern …“), kein Du, kein Sie.
+- Unpersönlich und kurz („Die Einsatzleitung legt …“, „Nach dem Speichern …“), kein Du, kein Sie;
+  dieselbe Regel gilt für die App (`frontend/AGENTS.md`, „Anrede“).
 - Jede Aussage ist am Code belegt; der Pfad steht unter `quellen:`. Jeder Ablauf ist am laufenden
   System nachgeklickt. Was die App nicht kann, steht nicht drin, auch nicht als Ankündigung.
   Weicht das Verhalten vom Versprechen ab, beschreibt das Kapitel den Ist-Stand, und die Lücke

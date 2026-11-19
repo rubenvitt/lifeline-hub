@@ -16,7 +16,7 @@ async function einsatzAnlegen(page: Page): Promise<string> {
 }
 
 function abfrage(page: Page) {
-  return page.getByRole('group', { name: 'Mit welchem Rufnamen schreibst du ins ETB?' });
+  return page.getByRole('group', { name: 'Mit welchem Rufnamen ins ETB schreiben?' });
 }
 
 test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit dem Rufnamen', async ({

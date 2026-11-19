@@ -224,7 +224,7 @@ export default function EinheitVorlageDetailPage() {
       <AdminPage titel="Einheiten-Vorlage">
         <SeitenLeer
           titel="Einheiten-Vorlage nicht gefunden"
-          hinweis="Der Datensatz gehört zu einer anderen Organisation oder existiert nicht."
+          hinweis="Nicht gefunden: entfernt oder nicht in dieser Organisation."
           aktion={{ label: 'Zu den Einheiten-Vorlagen', pfad: einheitVorlageListPath() }}
         />
       </AdminPage>

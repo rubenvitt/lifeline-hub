@@ -226,7 +226,7 @@ export default function ProfilPage() {
                   Passwort
                 </Augenbraue>
                 <Typography.Paragraph type="secondary">
-                  Beendet alle anderen Anmeldungen deines Kontos.
+                  Beendet alle anderen Anmeldungen dieses Kontos.
                 </Typography.Paragraph>
                 <Button onClick={() => setPasswortDialogOffen(true)}>Passwort ändern</Button>
                 <PasswortAendernDialog
@@ -379,7 +379,7 @@ export default function ProfilPage() {
                       requiredMark={false}
                     >
                       <Feld
-                        label="Code aus deiner Authenticator-App"
+                        label="Code aus der Authenticator-App"
                         name="code"
                         rules={[{ required: true, message: 'Bitte Code eingeben' }]}
                       >

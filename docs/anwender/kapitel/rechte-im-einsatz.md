@@ -130,8 +130,8 @@ Wo ein Recht fehlt, steht die Seite auf „Nur Ansicht“ und nennt, wer schreib
 
 Die App sagt an jeder Stelle, wer den Zugriff vergibt:
 
-- Ist man in keinem Einsatz Mitglied, steht in der Einsatzliste unter „Keine Einsätze“: „Zu einem
-  Einsatz nimmt dich dessen Einsatzleitung auf.“
+- Ist man in keinem Einsatz Mitglied, steht in der Einsatzliste unter „Keine Einsätze“: „In einen
+  Einsatz aufnehmen kann nur dessen Einsatzleitung.“
 - Öffnet man einen Einsatz über einen Link, ohne Mitglied zu sein, steht dort „Kein Zugriff auf
   diesen Einsatz · Zugriff vergibt die Einsatzleitung dieses Einsatzes.“ Einen Namen nennt die
   Seite hier nicht, weil die Person den Einsatz nicht sehen darf. Der einzige Knopf führt zur

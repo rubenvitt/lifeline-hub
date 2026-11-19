@@ -87,7 +87,7 @@ test.describe(KAPITEL, () => {
     await fotografiere(sicherheit, KAPITEL, 'zweiter-faktor');
 
     // Nachgeklickt: der Code aus der „App“ (hier gerechnet) bestätigt mit der sechsten Ziffer.
-    const feld = sicherheit.getByLabel('Code aus deiner Authenticator-App');
+    const feld = sicherheit.getByLabel('Code aus der Authenticator-App');
     await feld.click();
     await page.keyboard.type(totpCode(schluessel));
     await expect(sicherheit.getByText('Wiederherstellungscodes jetzt sichern')).toBeVisible();

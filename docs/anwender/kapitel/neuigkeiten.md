@@ -18,7 +18,7 @@ braucht es dafür nicht.
 
 1. Das Benutzermenü öffnen.
 2. „Neuigkeiten“ wählen.
-3. Oben steht „Seit deiner letzten Version“, wenn es seit dem letzten Start eine neue Version
+3. Oben steht „Seit der zuletzt gesehenen Version“, wenn es seit dem letzten Start eine neue Version
    gab. Darunter steht das Archiv aller Versionen, neueste zuerst.
 4. Mit den Schaltflächen „Alle“, „Alpha“, „Beta“ oder „Stabil“ wird das Archiv auf einen Kanal
    beschränkt.

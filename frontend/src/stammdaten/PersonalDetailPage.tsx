@@ -114,7 +114,7 @@ export default function PersonalDetailPage() {
       <AdminPage titel="Person">
         <SeitenLeer
           titel="Person nicht gefunden"
-          hinweis="Der Datensatz wurde entfernt oder gehört zu einer anderen Organisation."
+          hinweis="Nicht gefunden: entfernt oder nicht in dieser Organisation."
           aktion={{ label: 'Zur Personalliste', pfad: personalListePfad() }}
         />
       </AdminPage>

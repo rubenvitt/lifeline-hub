@@ -68,7 +68,7 @@ describe('EinsaetzePage', () => {
     server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
-    expect(screen.getByText('Deine Rolle: Einsatzleitung')).toBeInTheDocument();
+    expect(screen.getByText('Eigene Rolle: Einsatzleitung')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
@@ -404,7 +404,7 @@ describe('EinsaetzePage', () => {
     expect(await screen.findByText('Keine Einsätze')).toBeInTheDocument();
     // LLH-1819: der Leerzustand sagt, wer zu einem Einsatz aufnimmt (ohne Namen).
     expect(
-      screen.getByText('Zu einem Einsatz nimmt dich dessen Einsatzleitung auf.'),
+      screen.getByText('In einen Einsatz aufnehmen kann nur dessen Einsatzleitung.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
     // Getauscht ist der Knoten, nicht der Wortlaut — die Textzeile darüber belegt allein nichts.
@@ -490,7 +490,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   it('die Karte nennt die eigene Rolle in Klartext und mit Kontext, nie den Rohwert', async () => {
     mockEinsaetze([e({ meine_rolle: 'fuehrungspersonal' })]);
     const { container } = render();
-    expect(await screen.findByText('Deine Rolle: Führungspersonal')).toBeInTheDocument();
+    expect(await screen.findByText('Eigene Rolle: Führungspersonal')).toBeInTheDocument();
     expect(container).not.toHaveTextContent('fuehrungspersonal');
   });
 
@@ -610,7 +610,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     expect(screen.queryByText('Einsatz 1')).not.toBeInTheDocument();
     expect(screen.getByText('Alter Einsatz')).toBeInTheDocument();
     // Eine Suche ohne Treffer ist kein fehlender Zugang (LLH-1819).
-    expect(screen.queryByText(/nimmt dich dessen Einsatzleitung auf/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/aufnehmen kann nur dessen Einsatzleitung/)).not.toBeInTheDocument();
   });
 
   it('fällt die Zahl aktiver Einsätze unter die Schwelle, bleibt kein leeres Raster ohne Ausweg stehen (M6)', async () => {

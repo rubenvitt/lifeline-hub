@@ -1057,7 +1057,7 @@ export const einsatzKeys = {
   etb: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId] as const,
   etbListe: <F>(einsatzId: number, filter: F) => [EINSATZ_KEYS.etb, einsatzId, filter] as const,
   // Eigene Lesemarke als Sub-Key unter DEMSELBEN Prefix wie die Liste: jedes `etb`-Ereignis zieht
-  // die Zahl „neu seit Ihrer letzten Sichtung“ mit. Ohne Systemeinträge gezählt ist ein eigenes Fach
+  // die Zahl „neu seit der letzten Sichtung“ mit. Ohne Systemeinträge gezählt ist ein eigenes Fach
   // darunter (Review S4); `etbLesemarke(id)` trifft als Präfix beide.
   etbLesemarke: (einsatzId: number, ohneSystem = false) =>
     ohneSystem

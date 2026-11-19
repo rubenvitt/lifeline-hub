@@ -1323,7 +1323,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: /Lagemeldungen/ }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Für deine Rolle nicht freigegeben')).toBeVisible();
+    expect(screen.getByText('Für die eigene Rolle nicht freigegeben')).toBeVisible();
     expect(screen.queryByText('Lagemeldungen-Inhalt')).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
   });
@@ -1356,7 +1356,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
       {},
       { benutzer: benutzerFixture({ anzeigename: 'Helfer' }), rolle: 'fuehrungspersonal' },
     );
-    expect(await screen.findByText('Für deine Rolle nicht freigegeben')).toBeInTheDocument();
+    expect(await screen.findByText('Für die eigene Rolle nicht freigegeben')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Überblick öffnen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Modulfreigaben öffnen' })).not.toBeInTheDocument();
   });
