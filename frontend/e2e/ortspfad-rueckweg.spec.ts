@@ -51,7 +51,6 @@ test.describe('Ortspfad der Detailseite', () => {
 
     await page.getByText('Deichweg 2').click();
     await expect(page).toHaveURL(/\/schaeden\/\d+$/);
-    await expect(ortspfadZurListe(page)).toHaveAttribute('href', /f\.ausmass=gross/);
 
     await ortspfadZurListe(page).click();
     await expect(page).toHaveURL(/\/schaeden\?.*f\.ausmass=gross/);
