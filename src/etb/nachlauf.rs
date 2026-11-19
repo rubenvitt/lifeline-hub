@@ -15,6 +15,15 @@
 use sqlx::SqlitePool;
 use std::future::Future;
 
+/// Ausnahmegrund: Demo-Import (`routes/demo_daten.rs`).
+pub const GRUND_DEMO: &str = "Demo-Import: Hunderte Einträge auf einmal";
+/// Ausnahmegrund: Abgleich mit einer gekoppelten Instanz (`routes/instanz.rs`).
+pub const GRUND_SPIEGEL: &str = "Instanz-Spiegel: Einträge kommen aus der Partnerinstanz";
+/// Ausnahmegrund: Archivieren, Soft-Delete und Schwärzen des ganzen Einsatzes im Löschlauf
+/// (Entscheidung 19.11.2026): offene Schirme erfahren es über `kopf_melden`, ein `etb` liefe in
+/// einen Refetch mit 403/404.
+pub const GRUND_BETRIEB_VERLASSEN: &str = "Einsatz verlässt den Betrieb; kopf_melden meldet es";
+
 /// Ein committeter ETB-Eintrag, der in einer [`klammer`] geschrieben, aber nicht verteilt wurde.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Luecke {
@@ -144,6 +153,20 @@ pub(crate) fn verteilt(etb_id: i64) {
     });
     #[cfg(not(debug_assertions))]
     let _ = etb_id;
+}
+
+/// Router-Schicht (`app::build_router_mit`, außerhalb von `CatchPanicLayer`): eine Lücke ist
+/// ein Panic, der den Test rot macht. Im Release-Build nur ein Durchreichen.
+pub async fn waechter(
+    axum::extract::State(state): axum::extract::State<crate::app::AppState>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let (antwort, luecken) = klammer(&state.pool, next.run(req)).await;
+    if !luecken.is_empty() {
+        panic!("{}", melde(&luecken));
+    }
+    antwort
 }
 
 /// Text für Panic oder Log: je Lücke Einsatz, Eintrag und Inhalt.

@@ -116,3 +116,26 @@ async fn ohne_klammer_kein_effekt() {
     )
     .await;
 }
+
+/// Die Router-Schicht liegt außerhalb von `CatchPanicLayer`: eine Lücke macht den Test rot,
+/// statt als 500 zu enden. Vorübergehend über eine noch unverteilte Route (Zone anlegen);
+/// LLH-1976, Plan Task 5 stellt auf eine Testroute um.
+#[tokio::test]
+#[should_panic(expected = "ETB-Eintrag nicht live verteilt")]
+async fn panic_der_schicht_erreicht_den_test() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let poly =
+        r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
+    let body = serde_json::json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":poly,"label":"Nord"})
+        .to_string();
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+}

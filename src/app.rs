@@ -2797,6 +2797,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // abzureißen
         // (das hielte das Frontend für „kein Netz“).
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
+        // ETB-Wächter (LLH-1976, `src/AGENTS.md`, „Backend — ETB live verteilen“): AUSSERHALB von
+        // CatchPanic, damit eine Lücke in Debug und Test als Panic bis in den Test durchschlägt
+        // statt als 500 zu enden. Im Release-Build reicht er nur durch.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::etb::nachlauf::waechter,
+        ))
         // Stammdaten-Kataloge melden schreibende Erfolge an die eigene Org (LFH-734). Außerhalb
         // von CatchPanic: nach einer Handler-Panik sieht sie dessen 500 und meldet nichts.
         // `MatchedPath` ist beim Routing gesetzt.
