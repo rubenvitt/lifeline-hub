@@ -16,6 +16,7 @@ import {
   typVorbelegung,
   type EinheitUebernahmeWerte,
 } from './einheitUebernahme';
+import { Feld } from '../components/instrument';
 
 type NachforderungImDialog = Pick<
   Nachforderung,
@@ -166,7 +167,7 @@ export default function EinheitUebernahmeModal({
       {nachforderung?.bezeichnung && (
         <Typography.Paragraph type="secondary">{nachforderung.bezeichnung}</Typography.Paragraph>
       )}
-      <Form.Item
+      <Feld
         label="Einheiten"
         name="einheiten"
         rules={einheitenRegeln(rest)}
@@ -182,25 +183,19 @@ export default function EinheitUebernahmeModal({
           tokenSeparators={[',']}
           options={vorschlaege}
           maxCount={rest > 0 ? rest : undefined}
-          style={{ width: '100%' }}
         />
-      </Form.Item>
-      <Form.Item
-        label="Typ"
-        name="typ_id"
-        style={nachforderung?.ziel_br_id == null ? { marginBottom: 0 } : undefined}
-      >
+      </Feld>
+      <Feld label="Typ" name="typ_id">
         <Select<number | null> aria-label="Typ" allowClear options={typOptionen} />
-      </Form.Item>
+      </Feld>
       {nachforderung?.ziel_br_id != null && (
-        <Form.Item
+        <Feld
           name="in_bereitstellungsraum"
           valuePropName="checked"
           extra={raumGesperrt ? KEINE_BERECHTIGUNG : undefined}
-          style={{ marginBottom: 0 }}
         >
           <Checkbox disabled={raumGesperrt}>{raumEtikett}</Checkbox>
-        </Form.Item>
+        </Feld>
       )}
     </ErfassungsModal>
   );

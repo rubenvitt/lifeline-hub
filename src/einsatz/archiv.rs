@@ -202,10 +202,12 @@ pub async fn archivieren(
     Ok(archiviert)
 }
 
-/// Löscht Blöcke, deren Frist zu `jetzt` abgelaufen ist, je mit einem ETB-Eintrag am Skelett.
-/// Liefert die Zahl gelöschter Blöcke.
+/// Löscht Blöcke, deren Frist zu `jetzt` abgelaufen ist, je mit einem ETB-Eintrag am Skelett,
+/// den sie nach dem Commit verteilt (LLH-1976, `src/AGENTS.md`, „Backend — ETB live
+/// verteilen“: das Skelett bleibt lesbar). Liefert die Zahl gelöschter Blöcke.
 pub async fn abgelaufene_bloecke_loeschen(
     pool: &SqlitePool,
+    live: &crate::live::LiveHub,
     jetzt: &str,
 ) -> Result<usize, AppError> {
     let faellig: Vec<(i64, i64, i64)> = sqlx::query_as(
@@ -228,18 +230,19 @@ pub async fn abgelaufene_bloecke_loeschen(
             .execute(&mut *conn)
             .await?;
             if r.rows_affected() == 0 {
-                return Ok(false);
+                return Ok(None);
             }
-            super::repo::system_audit_tx(
+            let etb_id = super::repo::system_audit_tx(
                 &mut *conn,
                 einsatz_id,
                 etb_startwert,
                 &format!("Archiv: Block {block} nach Ablauf seiner Frist gelöscht."),
             )
             .await?;
-            Ok(true)
+            Ok(Some(etb_id))
         })?;
-        if geloescht {
+        if let Some(etb_id) = geloescht {
+            live.publiziere(einsatz_id, etb_id);
             tracing::warn!(
                 einsatz_id,
                 block,

@@ -11,7 +11,7 @@ import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
-import { Datenfeld, Datenraster, Paneel } from '../components/instrument';
+import { Datenfeld, Datenraster, Feld, Paneel, Stapel } from '../components/instrument';
 import { darfFristSetzen, fristSperrGrund, liegtInDerVergangenheit } from './fristModell';
 
 /**
@@ -78,7 +78,7 @@ export default function NachbereitungPaneel({ einsatzId, einsatz }: Props) {
 
   return (
     <Paneel titel="Nachbereitung" koerperPolster style={{ marginBottom: token.marginLG }}>
-      <Flex vertical gap={token.marginSM}>
+      <Stapel abstand="sm">
         <RechteHinweis sichtbar={!darf} text={fristSperrGrund(einsatz)} />
         <SpeicherFehler fehler={offen ? null : mutation.error} />
         <Datenraster spalten={1} beschriftung="Nachbereitung">
@@ -103,7 +103,7 @@ export default function NachbereitungPaneel({ einsatzId, einsatz }: Props) {
             Nachbereitung ändern
           </Button>
         </Flex>
-      </Flex>
+      </Stapel>
       <ErfassungsModal<FormWerte>
         offen={offen}
         titel="Nachbereitung ändern"
@@ -123,17 +123,17 @@ export default function NachbereitungPaneel({ einsatzId, einsatz }: Props) {
         onFertig={schliessen}
         onAbbrechen={schliessen}
       >
-        <Form.Item
+        <Feld
           label="Ende der Nachbereitung"
           name="bis"
           rules={[{ required: !ohne, message: 'Zeitpunkt wählen' }]}
           dependencies={['ohne']}
         >
           <ZeitpunktEingabe art="frist" disabled={ohne} style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item label="Ohne Nachbereitung" name="ohne" valuePropName="checked">
+        </Feld>
+        <Feld label="Ohne Nachbereitung" name="ohne" valuePropName="checked">
           <Switch />
-        </Form.Item>
+        </Feld>
       </ErfassungsModal>
     </Paneel>
   );

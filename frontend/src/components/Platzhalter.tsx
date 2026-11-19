@@ -3,6 +3,8 @@ import { Button } from 'antd';
 import { useNavigate } from 'react-router';
 import Paneel from './instrument/Paneel';
 import { schriftStil, useRollen } from './instrument/rollenwerte';
+import Stapel from './instrument/Stapel';
+import Textstufe from './instrument/Textstufe';
 import { flaeche } from '../theme/tokens';
 
 /** Rückweg aus einer Sackgasse: Zielpfad und Beschriftung des Primärknopfes.
@@ -53,7 +55,7 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
       }}
       koerperPolster
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+      <Stapel abstand="sm">
         {/* Kein <h1>: die Überschrift der Fläche ist die Augenbraue im Paneelkopf, und die
             Seite um den Platzhalter trägt ihre eigene — zwei Hauptüberschriften wären falsch. */}
         <div
@@ -70,13 +72,13 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
           {titel}
         </div>
         {beschreibung && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
+          <Textstufe stufe="textKlein" ton="text2" als="p">
             {beschreibung}
-          </p>
+          </Textstufe>
         )}
-        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}>
+        <Textstufe stufe="textKlein" ton="gedaempft" als="p">
           {ERWARTUNGSHORIZONT}
-        </p>
+        </Textstufe>
         {rueckweg && (
           <div>
             <Button type="primary" onClick={() => navigate(rueckweg.pfad)}>
@@ -84,7 +86,7 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
             </Button>
           </div>
         )}
-      </div>
+      </Stapel>
     </Paneel>
   );
 }

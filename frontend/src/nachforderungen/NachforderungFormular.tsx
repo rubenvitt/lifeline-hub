@@ -27,7 +27,7 @@ import { MengenFeld } from '../components/MengenFeld';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Paneel } from '../components/instrument';
+import { Feld, Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
@@ -431,7 +431,7 @@ export default function NachforderungFormular({
       </Space>
       <Row gutter={token.marginLG}>
         <Col xs={24} sm={10}>
-          <Form.Item
+          <Feld
             name="art"
             label="Was"
             rules={[{ required: true, whitespace: true, message: 'Was ist erforderlich' }]}
@@ -443,19 +443,15 @@ export default function NachforderungFormular({
               placeholder="z. B. RTW, SEG, Sandsäcke"
               maxLength={NACHFORDERUNG_ART_MAX}
             />
-          </Form.Item>
+          </Feld>
         </Col>
         <Col xs={24} sm={4} ref={anzahlRef}>
-          <Form.Item name="anzahl" label="Anzahl">
-            <MengenFeld
-              beschriftung="Anzahl"
-              style={{ width: '100%' }}
-              disabled={personBezug != null}
-            />
-          </Form.Item>
+          <Feld name="anzahl" label="Anzahl">
+            <MengenFeld beschriftung="Anzahl" disabled={personBezug != null} />
+          </Feld>
         </Col>
         <Col xs={24} sm={10}>
-          <Form.Item name="wohin" label="Wohin">
+          <Feld name="wohin" label="Wohin">
             <AutoComplete
               aria-label="Wohin"
               options={wohinOptionen}
@@ -464,7 +460,7 @@ export default function NachforderungFormular({
               placeholder="z. B. BR Nord"
               maxLength={NACHFORDERUNG_ZIEL_TEXT_MAX}
             />
-          </Form.Item>
+          </Feld>
         </Col>
       </Row>
       {/* Feldbudget (LFH-974): sichtbar drei Felder. `forceRender`, damit Vorbelegung, Übernahme und
@@ -481,20 +477,20 @@ export default function NachforderungFormular({
             label: ['Weitere Angaben', ...abweichungen].join(' · '),
             children: (
               <>
-                <Form.Item name="bezeichnung" label="Details / Zweck">
+                <Feld name="bezeichnung" label="Details / Zweck">
                   <Input aria-label="Details / Zweck" maxLength={NACHFORDERUNG_BEZEICHNUNG_MAX} />
-                </Form.Item>
+                </Feld>
                 <Row gutter={token.marginLG}>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="adressatKategorie" label="Adressat">
+                    <Feld name="adressatKategorie" label="Adressat">
                       <Select<AdressatKategorie>
                         aria-label="Adressat"
                         options={ADRESSAT_OPTIONEN}
                       />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="adressatBezeichnung" label="Adressat-Bezeichnung">
+                    <Feld name="adressatBezeichnung" label="Adressat-Bezeichnung">
                       <AutoComplete
                         aria-label="Adressat-Bezeichnung"
                         options={stellenOptionen}
@@ -503,30 +499,30 @@ export default function NachforderungFormular({
                         placeholder="z. B. Leitstelle Nord"
                         maxLength={ETB_PARTEI_MAX}
                       />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                 </Row>
                 <Row gutter={token.marginLG}>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="prioritaet" label="Priorität">
+                    <Feld name="prioritaet" label="Priorität">
                       <Select<NachforderungPrioritaet>
                         aria-label="Priorität"
                         options={PRIORITAET_OPTIONEN}
                       />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                   <Col xs={24} sm={12}>
-                    <Form.Item name="benoetigtBis" label="Benötigt bis">
+                    <Feld name="benoetigtBis" label="Benötigt bis">
                       <ZeitpunktEingabe
                         art="frist"
                         aria-label="Benötigt bis"
                         placeholder="sofort"
                         style={{ width: '100%' }}
                       />
-                    </Form.Item>
+                    </Feld>
                   </Col>
                 </Row>
-                <Form.Item
+                <Feld
                   name="begruendung"
                   label="Begründung / Lagebezug"
                   // Eine Vorbelegung aus der Verpflegung kann länger sein: sie bleibt stehen und
@@ -539,7 +535,7 @@ export default function NachforderungFormular({
                     autoSize={{ minRows: 1, maxRows: 4 }}
                     count={zeichenGrenze(ETB_PARTEI_MAX)}
                   />
-                </Form.Item>
+                </Feld>
               </>
             ),
           },

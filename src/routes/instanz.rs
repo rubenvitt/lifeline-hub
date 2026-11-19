@@ -896,13 +896,16 @@ pub async fn spiegel_abgleich(
     anfrage: GekoppelteInstanz,
 ) -> Result<Response, AppError> {
     let body: crate::instanz::spiegel::paket::SpiegelPaket = anfrage.json()?;
-    let antwort = crate::instanz::spiegel::abgleich::handle_abgleich(
-        &state.pool,
-        &state.live,
-        platz.router().as_ref(),
-        &anfrage.identitaet,
-        &anfrage.kopplung,
-        &body,
+    let antwort = crate::etb::nachlauf::ohne_verteilung(
+        crate::etb::nachlauf::GRUND_SPIEGEL,
+        crate::instanz::spiegel::abgleich::handle_abgleich(
+            &state.pool,
+            &state.live,
+            platz.router().as_ref(),
+            &anfrage.identitaet,
+            &anfrage.kopplung,
+            &body,
+        ),
     )
     .await?;
     Ok(anfrage.antwort(StatusCode::OK, &antwort))

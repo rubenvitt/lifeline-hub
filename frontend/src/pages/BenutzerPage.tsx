@@ -41,14 +41,15 @@ import {
   useStammdatenHerkunft,
   VOM_HUB_TEXT,
 } from '../instanz/herkunft';
+import { EIGENES_KONTO, LETZTER_ADMIN } from '../stammdaten/rechteText';
+import { rollenOptionen, rollenOptionRender } from '../einsatz/rollenOption';
 import {
-  EIGENES_KONTO,
-  LETZTER_ADMIN,
-  ORG_ROLLE_FELD,
-  ORG_ROLLE_TEXT,
-  SYSTEM_ROLLE_FELD,
-  SYSTEM_ROLLE_TEXT,
-} from '../stammdaten/rechteText';
+  kontoRollenNamen,
+  ORG_ROLLE,
+  ROLLE_IN_ORG_FELD,
+  ROLLE_IN_VERWALTUNG_FELD,
+  SYSTEM_ROLLE,
+} from '../einsatz/rollenVokabular';
 
 interface BearbeitenWerte {
   anzeigename: string;
@@ -62,20 +63,15 @@ interface BearbeitenWerte {
  */
 const anzeigenameRegel = zeichenRegel(ANZEIGENAME_MAX, 'Anzeigename');
 
-const SYSTEM_ROLLEN = [
-  { value: 'keiner', label: SYSTEM_ROLLE_TEXT.keiner },
-  { value: 'admin', label: SYSTEM_ROLLE_TEXT.admin },
-];
+/** Rollen in Verwaltung und Organisation samt Darf-Zeile (Rollen-Vokabular, LLH-1818). */
+const SYSTEM_ROLLEN = rollenOptionen(SYSTEM_ROLLE);
 /** Die Einträge des Aktionsmenüs einer Zeile. */
 type ZeilenAktion = 'bearbeiten' | 'anmeldungen' | 'zweitfaktor' | 'aktiv';
 
 /** Nur der Menüauslöser: Steuerhöhe plus Zellpolster. */
 const AKTIONEN_BREITE = 80;
 
-const ORG_ROLLEN = [
-  { value: 'keine', label: ORG_ROLLE_TEXT.keine },
-  { value: 'fuehrungskraft', label: `${ORG_ROLLE_TEXT.fuehrungskraft} (darf Einsätze anlegen)` },
-];
+const ORG_ROLLEN = rollenOptionen(ORG_ROLLE);
 
 /**
  * Warnung vor dem Deaktivieren oder Herabstufen des letzten Schlüsselhalters (LLH-1605): die
@@ -380,7 +376,7 @@ export default function BenutzerPage() {
       mindestBreite: 160,
       abBreite: 'md',
       // Kennung in Mono.
-      render: (t) => <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>@{t}</span>,
+      render: (t) => <span style={{ ...monoStil('mono'), overflowWrap: 'anywhere' }}>@{t}</span>,
     },
     {
       title: 'Rollen',
@@ -391,13 +387,9 @@ export default function BenutzerPage() {
         // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage (Blau
         // hieße Bedienung).
         <Stapel richtung="zeile" umbruch abstand="xxs" ausrichten="mitte">
-          {b.system_rolle === 'admin' && <Status groesse="klein" ton="neutral" wort="Admin" />}
-          {b.org_rolle === 'fuehrungskraft' && (
-            <Status groesse="klein" ton="neutral" wort="Führungskraft" />
-          )}
-          {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && (
-            <Status groesse="klein" ton="neutral" wort="Benutzer" />
-          )}
+          {kontoRollenNamen(b).map((name) => (
+            <Status key={name} groesse="klein" ton="neutral" wort={name} />
+          ))}
         </Stapel>
       ),
     },
@@ -548,11 +540,11 @@ export default function BenutzerPage() {
               label: 'Weitere Angaben',
               children: (
                 <>
-                  <Feld label={SYSTEM_ROLLE_FELD} name="system_rolle">
-                    <Select options={SYSTEM_ROLLEN} />
+                  <Feld label={ROLLE_IN_VERWALTUNG_FELD} name="system_rolle">
+                    <Select options={SYSTEM_ROLLEN} optionRender={rollenOptionRender} />
                   </Feld>
-                  <Feld label={ORG_ROLLE_FELD} name="org_rolle">
-                    <Select options={ORG_ROLLEN} />
+                  <Feld label={ROLLE_IN_ORG_FELD} name="org_rolle">
+                    <Select options={ORG_ROLLEN} optionRender={rollenOptionRender} />
                   </Feld>
                 </>
               ),
@@ -617,11 +609,19 @@ export default function BenutzerPage() {
         >
           <Input count={zeichenGrenze(ANZEIGENAME_MAX)} disabled={kontoVomHub(zuBearbeiten)} />
         </Feld>
-        <Feld label={SYSTEM_ROLLE_FELD} name="system_rolle">
-          <Select options={SYSTEM_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
+        <Feld label={ROLLE_IN_VERWALTUNG_FELD} name="system_rolle">
+          <Select
+            options={SYSTEM_ROLLEN}
+            optionRender={rollenOptionRender}
+            disabled={kontoVomHub(zuBearbeiten)}
+          />
         </Feld>
-        <Feld label={ORG_ROLLE_FELD} name="org_rolle">
-          <Select options={ORG_ROLLEN} disabled={kontoVomHub(zuBearbeiten)} />
+        <Feld label={ROLLE_IN_ORG_FELD} name="org_rolle">
+          <Select
+            options={ORG_ROLLEN}
+            optionRender={rollenOptionRender}
+            disabled={kontoVomHub(zuBearbeiten)}
+          />
         </Feld>
         {zuBearbeiten &&
           bearbeitenRolle !== undefined &&

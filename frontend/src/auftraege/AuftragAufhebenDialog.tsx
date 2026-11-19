@@ -3,6 +3,7 @@ import { AUFTRAG_AUFHEBUNGSGRUND_MAX } from '../api/eingabegrenzen';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { AUFTRAG_HANDLUNG } from '../kommunikation';
+import { Feld } from '../components/instrument';
 
 interface AufhebenWerte {
   grund: string;
@@ -51,7 +52,7 @@ export default function AuftragAufhebenDialog({
       <Typography.Paragraph>
         {kennung} endet endgültig, Quittungen werden nicht mehr erwartet.
       </Typography.Paragraph>
-      <Form.Item<AufhebenWerte>
+      <Feld<AufhebenWerte>
         name="grund"
         label="Grund"
         rules={[
@@ -65,7 +66,7 @@ export default function AuftragAufhebenDialog({
           placeholder="z. B. Lage hat sich erledigt"
           count={zeichenGrenze(AUFTRAG_AUFHEBUNGSGRUND_MAX)}
         />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

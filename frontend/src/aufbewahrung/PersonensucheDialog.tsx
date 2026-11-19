@@ -1,4 +1,4 @@
-import { Button, Flex, Form, Input, Modal, Typography, theme } from 'antd';
+import { Button, Form, Input, Modal, Typography, theme } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { suchePersonen } from '../api/aufbewahrung';
 import type { PersonTreffer } from '../api/types';
@@ -6,9 +6,14 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { nachFolge, nachText, werteAusKatalog } from '../components/katalogVergleich';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { personStatus, schwaerzungsantragStand } from '../theme/statusFarben';
+import {
+  personStatus,
+  personStatusDarstellung,
+  schwaerzungsantragStand,
+} from '../theme/statusFarben';
 import { ZIEL_ART } from './archivText';
 import { Status } from '../components/instrument/Status';
+import { Feld, Stapel } from '../components/instrument';
 
 /**
  * Pseudonyme Personensuche für ein Löschersuchen (LFH-751, Spec `aufbewahrung-loeschersuchen`,
@@ -79,7 +84,7 @@ export default function PersonensucheDialog({
       width: 140,
       sorter: nachFolge(Object.keys(personStatus), (t: PersonTreffer) => t.person_status),
       render: (_, t) =>
-        t.person_status ? <Status darstellung={personStatus[t.person_status]} /> : leer,
+        t.person_status ? <Status darstellung={personStatusDarstellung(t.person_status)} /> : leer,
     },
     {
       key: 'antrag',
@@ -123,7 +128,7 @@ export default function PersonensucheDialog({
         onFinish={(werte) => suche.mutate((werte.suchtext ?? '').trim())}
         style={{ marginBottom: token.margin }}
       >
-        <Form.Item
+        <Feld
           name="suchtext"
           label="Name oder Rufnummer"
           rules={[
@@ -136,27 +141,29 @@ export default function PersonensucheDialog({
           ]}
         >
           <Input autoComplete="off" autoFocus placeholder="ganze Wörter, z. B. Nachname" />
-        </Form.Item>
-        <Form.Item>
+        </Feld>
+        <Feld>
           <Button type="primary" htmlType="submit" loading={suche.isPending}>
             Suchen
           </Button>
-        </Form.Item>
+        </Feld>
       </Form>
       <SpeicherFehler fehler={suche.error} titel="Suche fehlgeschlagen" />
       {suche.data && (
-        <Flex vertical gap={token.marginXS} data-lfh="personensuche-treffer">
-          <Typography.Text type="secondary" aria-live="polite">
-            {suche.data.length === 1 ? '1 Treffer' : `${suche.data.length} Treffer`}
-          </Typography.Text>
-          <KatalogTabelle<PersonTreffer>
-            rowKey={(t) => `${t.art}-${t.id}`}
-            pagination={false}
-            columns={spalten}
-            dataSource={suche.data}
-            locale={{ emptyText: 'Keine Person gefunden' }}
-          />
-        </Flex>
+        <div data-lfh="personensuche-treffer">
+          <Stapel abstand="xs">
+            <Typography.Text type="secondary" aria-live="polite">
+              {suche.data.length === 1 ? '1 Treffer' : `${suche.data.length} Treffer`}
+            </Typography.Text>
+            <KatalogTabelle<PersonTreffer>
+              rowKey={(t) => `${t.art}-${t.id}`}
+              pagination={false}
+              columns={spalten}
+              dataSource={suche.data}
+              locale={{ emptyText: 'Keine Person gefunden' }}
+            />
+          </Stapel>
+        </div>
       )}
     </Modal>
   );

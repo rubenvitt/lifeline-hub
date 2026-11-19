@@ -8,6 +8,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { useSavePersonEintrag } from './personEintragSpeichern';
 import { uebergabeBody } from './verbleibErfassungKern';
+import { Feld } from '../components/instrument';
 
 /**
  * „Übergabe quittieren“ (LLH-1332, Change `y4l621ih-patientenverbleib-uebergabe`, design.md D6):
@@ -37,12 +38,12 @@ const erfassenText = 'Übergabe quittieren';
 function felder() {
   return (
     <>
-      <Form.Item label="Übergeben um" name="zeitpunkt">
+      <Feld label="Übergeben um" name="zeitpunkt">
         <ZeitpunktEingabe art="ereignis" placeholder="jetzt" keineZukunftstage />
-      </Form.Item>
-      <Form.Item label="Ziel" name="ziel">
+      </Feld>
+      <Feld label="Ziel" name="ziel">
         <Input placeholder="z. B. Krankenhaus" />
-      </Form.Item>
+      </Feld>
     </>
   );
 }

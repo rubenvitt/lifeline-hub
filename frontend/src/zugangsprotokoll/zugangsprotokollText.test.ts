@@ -35,13 +35,13 @@ describe('anmeldewegText', () => {
 describe('rollenText', () => {
   it('nennt bei der Anlage beide Rollen wie der Benutzer-Dialog', () => {
     expect(rollenText({ system_rolle: 'keiner', org_rolle: 'keine' })).toBe(
-      'System-Rolle: Benutzer, Org-Rolle: Keine',
+      'Rolle in der Verwaltung: Keine, Rolle in der Organisation: Keine',
     );
   });
 
   it('nennt beim Wechsel alt → neu, nur die geänderte Rolle', () => {
     expect(rollenText({ org_rolle_vorher: 'keine', org_rolle: 'fuehrungskraft' })).toBe(
-      'Org-Rolle: Keine → Führungskraft',
+      'Rolle in der Organisation: Keine → Führungskraft der Organisation',
     );
     expect(
       rollenText({
@@ -50,7 +50,9 @@ describe('rollenText', () => {
         org_rolle_vorher: 'fuehrungskraft',
         org_rolle: 'keine',
       }),
-    ).toBe('System-Rolle: Benutzer → Admin, Org-Rolle: Führungskraft → Keine');
+    ).toBe(
+      'Rolle in der Verwaltung: Keine → System-Admin, Rolle in der Organisation: Führungskraft der Organisation → Keine',
+    );
   });
 
   it('ist leer ohne Rollen', () => {

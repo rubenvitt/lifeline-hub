@@ -2575,3 +2575,38 @@ async fn altwert_ohne_aenderung_der_angabe_ist_422() {
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
 }
+
+/// LLH-1976: Die Rücknahme eines Statuswechsels geht als Ereignis `etb` hinaus.
+#[tokio::test]
+async fn status_ruecknahme_etb_geht_live_hinaus() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = adhoc_disponieren(&app, &admin, einsatz, "83-1").await;
+    let s2 = status_nach_label(&app, &admin, "2 – Frei auf Wache").await;
+    let s4 = status_nach_label(&app, &admin, "4 – Am Einsatzort").await;
+    let (s, _) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, wechsel) = fahrzeug_patch(
+        &app,
+        &admin,
+        einsatz,
+        ef,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{wechsel}");
+    let mut etb = EtbLive::neu(&app, &admin, einsatz, &live).await;
+    let (s, json) =
+        status_zuruecknehmen(&app, &admin, einsatz, ef, &wechsel["status_ruecknahme"]).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    etb.pruefe(&app, &admin, einsatz, "Statuswechsel zurücknehmen")
+        .await;
+}

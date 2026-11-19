@@ -54,6 +54,7 @@ async fn stelle(
         t(jetzt),
     )
     .await
+    .map(|(antrag_id, _)| antrag_id)
 }
 
 fn betroffene(id: i64) -> AntragZiel {

@@ -1,0 +1,43 @@
+/**
+ * Schuld des Knopfreihen-Wächters (`knopfreihe.guard.test.ts`, LLH-1973, ADR-0070): je Datei die
+ * Zahl der waagerechten `<Space>` mit zwei oder mehr Knöpfen (Pfad relativ zu `src/`). Die Zahl
+ * sinkt nur; wer eine Reihe auf `Knopfreihe` umstellt, senkt sie im selben Commit, bei 0 fällt der
+ * Eintrag. Neue Einträge gibt es nicht. Ist die Liste leer, gehen Wächter und Liste.
+ */
+export const KNOPFREIHE_SCHULD: Readonly<Record<string, number>> = {
+  'abloesung/schichtplan/HelferListe.tsx': 1,
+  'admin/DemoDatenPage.tsx': 1,
+  'aufbewahrung/Loeschersuchen.tsx': 1,
+  'auftraege/BefehlDetail.tsx': 1,
+  'betreuung/unterkunft/GrundlageEingabe.tsx': 1,
+  'components/InlineAngabe.tsx': 1,
+  'components/SprechgruppenPicker.tsx': 1,
+  'components/druck/DruckKnopf.tsx': 1,
+  'etb/RufnameAbfrage.tsx': 1,
+  'etb/WiedervorlageModal.tsx': 1,
+  'instanz/FuehrungPaneel.tsx': 3,
+  'kraefte/MaterialAmOrt.tsx': 1,
+  'lagebesprechung/LagebesprechungModal.tsx': 1,
+  'meldungen/LageAngabenBearbeiten.tsx': 1,
+  'meldungen/LagerelevantModal.tsx': 1,
+  'meldungen/MeldungFormular.tsx': 1,
+  'meldungen/MeldungKarte.tsx': 1,
+  'meldungen/MeldungKorrektur.tsx': 1,
+  'pages/BefehlDetailPage.tsx': 1,
+  'pages/BetreuungsstelleDetailPage.tsx': 1,
+  'pages/FahrzeugePage.tsx': 1,
+  'pages/FunkplanPage.tsx': 1,
+  'pages/bereitstellungsraum/EintreffenDialog.tsx': 1,
+  'pages/einheit/FahrzeugeBesatzung.tsx': 1,
+  'pages/einsatzabschnitte/Organigramm.tsx': 1,
+  'pages/lagekarte/BearbeitenSteuerung.tsx': 2,
+  'pages/lagekarte/MessSteuerung.tsx': 1,
+  'pages/lagekarte/PlatzierSteuerung.tsx': 1,
+  'pages/lagekarte/ZeichnenSteuerung.tsx': 2,
+  'pages/uhs/Grundriss.tsx': 2,
+  'pages/uhs/UhsKraefte.tsx': 1,
+  'stammdaten/EinsatzVorlagenTab.tsx': 1,
+  'stammdaten/ExterneStellenTab.tsx': 1,
+  'stammdaten/OrganisationTab.tsx': 1,
+  'stammdaten/VerpflegungsplanTab.tsx': 1,
+};

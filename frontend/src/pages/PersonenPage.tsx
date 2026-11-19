@@ -27,7 +27,7 @@ import { druckansichtNebenweg } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { useViewport } from '../components/useViewport';
 import FilterKnopf from '../components/FilterKnopf';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { Segmentleiste, Stapel, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
@@ -1164,7 +1164,7 @@ export default function PersonenPage() {
           csvExport.fehler != null ||
           abgleichFort.length > 0 ||
           sichtungFort.length > 0) && (
-          <Flex vertical gap={token.marginSM}>
+          <Stapel abstand="sm">
             <SeitenHinweise
               rechteText={einsatzRechteGrund(einsatz)}
               rechteFehlt={nurAnsicht}
@@ -1183,7 +1183,7 @@ export default function PersonenPage() {
                 fallback={g.fallback}
               />
             ))}
-          </Flex>
+          </Stapel>
         )
       }
     >
@@ -1288,11 +1288,17 @@ export default function PersonenPage() {
                     <Sichtungszeile alle={alle} ohneAbstand />
                   ))}
                 {wahlenInLagezeile && (
-                  <Flex id={FILTERFLAECHE_ID} wrap align="center" gap={token.marginSM}>
+                  <Stapel
+                    id={FILTERFLAECHE_ID}
+                    richtung="zeile"
+                    umbruch
+                    ausrichten="mitte"
+                    abstand="sm"
+                  >
                     {istSchmal && ansichtWahl}
                     {!wahlenInListe && statusReiter}
                     {abgeschlossenSchalter}
-                  </Flex>
+                  </Stapel>
                 )}
               </Flex>
             )}

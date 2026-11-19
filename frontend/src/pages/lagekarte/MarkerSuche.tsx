@@ -2,10 +2,16 @@ import { IconLupe } from '../../icons';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MutableRefObject, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Input, Typography, theme } from 'antd';
+import { Button, Input, theme } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
-import { monoStil, SegmentUmschalter, useRollen } from '../../components/instrument';
+import {
+  monoStil,
+  SegmentUmschalter,
+  Stapel,
+  Textstufe,
+  useRollen,
+} from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { erkenneKoordinate } from '../../anzeige/koordinatenErkennung';
 import {
@@ -131,7 +137,7 @@ export default function MarkerSuche({
   angeheftet = null,
   zeilenAktion,
 }: MarkerSucheProps) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const [suche, setSuche] = useState('');
   const [nurNichtVerortet, setNurNichtVerortet] = useState(false);
   const [anfrage, setAnfrage] = useState<AdressAnfrage | null>(null);
@@ -214,9 +220,9 @@ export default function MarkerSuche({
       ) : ort.ausOfflineKarte ? (
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ overflowWrap: 'anywhere' }}>{ort.beschriftung}</span>
-          <span style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+          <Textstufe stufe="textKlein" ton="text2">
             {OFFLINE_KARTE_ZUSATZ}
-          </span>
+          </Textstufe>
         </span>
       ) : (
         ort.beschriftung
@@ -258,7 +264,7 @@ export default function MarkerSuche({
         />
         <div data-lfh="objekte-marke" style={{ marginBlockStart: token.marginXS }}>
           {allesVerortet ? (
-            <span style={{ color: rollen.gedaempft }}>Alles verortet</span>
+            <Textstufe ton="gedaempft">Alles verortet</Textstufe>
           ) : (
             <>
               {/* Fester Name, die Zahl als Beschreibung: ein wechselnder Name würde bei jeder
@@ -341,11 +347,13 @@ export default function MarkerSuche({
         fehler == null &&
         (ortsGruppen ? (
           // Über den Objekten steht schon ein Ort: nur der knappe Hinweis.
-          <Typography.Text type="secondary" style={{ display: 'block', padding: token.paddingXS }}>
-            {zaehlerUnbekannt
-              ? 'Objekte konnten nicht vollständig geladen werden'
-              : `Kein Kartenobjekt zu „${begriff}“`}
-          </Typography.Text>
+          <div style={{ padding: token.paddingXS }}>
+            <Textstufe ton="gedaempft">
+              {zaehlerUnbekannt
+                ? 'Objekte konnten nicht vollständig geladen werden'
+                : `Kein Kartenobjekt zu „${begriff}“`}
+            </Textstufe>
+          </div>
         ) : (
           <SeitenLeer
             titel={
@@ -499,13 +507,14 @@ function AdressGruppe({
       loading={adresse.isPending}
       emptyText={
         aussage && (
-          <span
-            style={{
-              display: 'inline-flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: token.marginXS,
-            }}
+          // Mittig wie antds Leertext, den vorher `inline-flex` in dessen `text-align` hielt.
+          <Stapel
+            als="span"
+            richtung="zeile"
+            umbruch
+            abstand="xs"
+            ausrichten="mitte"
+            verteilen="mitte"
           >
             {aussage}
             {/* Ein Fehlzustand nennt den Ausweg als Knopf statt als Satz (LFH-1083). */}
@@ -514,7 +523,7 @@ function AdressGruppe({
                 Erneut suchen
               </Button>
             )}
-          </span>
+          </Stapel>
         )
       }
       style={{ marginBottom: token.marginXS }}

@@ -1,5 +1,4 @@
 import { useId } from 'react';
-import { Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ordneFahrzeugZu, ordnePersonalZu } from '../../api/einheiten';
 import { disponiereFahrzeugeSammel, listEntlasseneFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -8,7 +7,7 @@ import { listeFahrzeuge } from '../../api/fahrzeuge';
 import { listePersonal } from '../../api/personal';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import type { EinsatzFahrzeug, EinsatzPersonal } from '../../api/types';
-import { useRollen } from '../../components/instrument';
+import { FELD_KLASSE, Textstufe, useRollen } from '../../components/instrument';
 import { MODUL_FAHRZEUGE_GESPERRT, MODUL_PERSONAL_GESPERRT } from '../../components/nurAnsicht';
 import { nichtGefundenInhalt } from '../../components/SeitenZustand';
 import { Select } from '../../components/Select';
@@ -176,9 +175,8 @@ export default function ZuordnenAuswahl(props: ZuordnenAuswahlProps) {
   const reason = errors.grund('zuordnen');
 
   return (
-    <div style={{ marginTop: token.marginSM }}>
+    <div className={FELD_KLASSE} style={{ marginTop: token.marginSM }}>
       <Select<string>
-        style={{ width: '100%' }}
         placeholder={placeholderText}
         aria-label={isPerson ? 'Person zuordnen' : 'Fahrzeug zuordnen'}
         value={null}
@@ -194,9 +192,9 @@ export default function ZuordnenAuswahl(props: ZuordnenAuswahlProps) {
         }}
       />
       {isLocked && (
-        <Typography.Text type="secondary" id={reasonId}>
+        <Textstufe ton="gedaempft" id={reasonId}>
           {lockedReason}
-        </Typography.Text>
+        </Textstufe>
       )}
       {reason && (
         <div style={{ marginTop: token.marginSM }}>

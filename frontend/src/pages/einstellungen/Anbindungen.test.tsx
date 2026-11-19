@@ -385,7 +385,8 @@ describe('Anbindung · Ansicht (LLH-1652)', () => {
     const user = userEvent.setup();
     renderSeiten('/admin/einstellungen/anbindungen/a');
     await user.click(await screen.findByRole('button', { name: 'Zugang bearbeiten' }));
-    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    await user.keyboard('{Enter}');
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Zugang bearbeiten' })).toBeInTheDocument(),
     );

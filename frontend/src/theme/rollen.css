@@ -202,8 +202,16 @@
   --lfh-typo-rail-etikett-groesse: 9px;
   --lfh-typo-rail-etikett-gewicht: 500;
   --lfh-typo-rail-etikett-sperrung: 0.06em;
+  --lfh-typo-meta-klein-groesse: 10px;
+  --lfh-typo-meta-klein-gewicht: 400;
   --lfh-typo-meta-groesse: 11px;
   --lfh-typo-meta-gewicht: 400;
+  --lfh-typo-mono-klein-groesse: 12px;
+  --lfh-typo-mono-klein-gewicht: 400;
+  --lfh-typo-mono-groesse: 13px;
+  --lfh-typo-mono-gewicht: 400;
+  --lfh-typo-mono-gross-groesse: 14px;
+  --lfh-typo-mono-gross-gewicht: 400;
   --lfh-typo-datenwert-klein-groesse: 22px;
   --lfh-typo-datenwert-klein-gewicht: 500;
   --lfh-typo-datenwert-klein-sperrung: -0.02em;

@@ -1,4 +1,4 @@
-import { Button, Flex, Typography, theme } from 'antd';
+import { Button, Flex, theme } from 'antd';
 import { EinsatzAnzeigeProvider, OrgAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
@@ -30,7 +30,9 @@ import {
   Datenraster,
   Paneel,
   Segmentleiste,
+  Stapel,
   Status,
+  Textstufe,
   Zeitachseneintrag,
 } from '../components/instrument';
 import { istAdmin } from '../einsatz/schreibrecht';
@@ -50,6 +52,7 @@ import {
   aufbewahrungZustand,
   etbTyp,
   personStatus,
+  personStatusDarstellung,
   schadenAusmass,
   schadenStatus,
   sichtung,
@@ -124,7 +127,7 @@ const personSpalten: KatalogSpalte<ArchivPerson>[] = [
     sorter: nachFolge(Object.keys(personStatus), (p: ArchivPerson) => p.status),
     filters: werteAusKatalog(personStatus),
     onFilter: (w, p) => p.status === w,
-    render: (_, p) => <Status darstellung={personStatus[p.status]} />,
+    render: (_, p) => <Status darstellung={personStatusDarstellung(p.status)} />,
   },
   {
     key: 'sichtung',
@@ -385,7 +388,11 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
       />
     );
   } else if (eintraege.length === 0) {
-    inhalt = <Typography.Text type="secondary">Keine Einträge.</Typography.Text>;
+    inhalt = (
+      <Textstufe stufe="textKlein" ton="gedaempft">
+        Keine Einträge.
+      </Textstufe>
+    );
   } else {
     inhalt = (
       <ol data-lfh="archiv-zeitachse" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -492,7 +499,7 @@ function AkteInhalt({
         ) : undefined
       }
     >
-      <Flex vertical gap={token.marginLG}>
+      <Stapel abstand="lg">
         <Paneel titel="Aufbewahrung" koerperPolster>
           <Datenraster spalten={3} beschriftung="Aufbewahrung">
             <Datenfeld label="Zustand">
@@ -582,7 +589,7 @@ function AkteInhalt({
         </Paneel>
 
         <ArchivEtb einsatzId={einsatzId} />
-      </Flex>
+      </Stapel>
       {frist.dialoge}
       {wiederherstellenOffen && (
         <WiederherstellenDialog

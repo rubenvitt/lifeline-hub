@@ -18,6 +18,7 @@ import { bandStil } from './KartenFuss';
 import { useViewport } from '../../components/useViewport';
 import { Select } from '../../components/Select';
 import { schriftStil } from '../../components/instrument/rollenwerte';
+import Feld from '../../components/instrument/Feld';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
@@ -311,9 +312,9 @@ export function SnapshotLeiste({
       onFertig={() => setSichernOffen(false)}
       onAbbrechen={() => setSichernOffen(false)}
     >
-      <Form.Item label="Bezeichnung (optional)" name="bezeichnung">
+      <Feld label="Bezeichnung (optional)" name="bezeichnung">
         <Input placeholder="z. B. Lage 08:00" aria-label="Snapshot-Bezeichnung" />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 

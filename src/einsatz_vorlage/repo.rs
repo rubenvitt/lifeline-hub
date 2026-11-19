@@ -298,6 +298,23 @@ pub async fn load_for_anlage_tx(
         .ok_or_else(|| AppError::Validation("Unbekannte Einsatz-Vorlage".into()))
 }
 
+/// Die Vorlage der Organisation mit genau dieser Bezeichnung (LLH-1816): Der Bootstrap
+/// koppelt die Start-Stichworte über den Namen der Startliste. Ein unbekannter Name ist kein Fehler, die
+/// Organisation darf ihre Vorlagen umbenennen oder löschen.
+pub async fn find_id_by_bezeichnung_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    bezeichnung: &str,
+) -> Result<Option<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT MIN(id) FROM einsatz_vorlage WHERE org_id = ? AND bezeichnung = ?",
+    )
+    .bind(org_id)
+    .bind(bezeichnung)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
 /// Legt die Startliste [`EINSATZ_VORLAGE_STARTLISTE`] für eine neue Organisation an
 /// (`bootstrap_admin`).
 pub async fn seed_startliste_tx(conn: &mut SqliteConnection, org_id: i64) -> Result<(), AppError> {

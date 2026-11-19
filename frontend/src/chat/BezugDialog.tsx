@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { BEZUG_TYP_OPTIONEN, type BezugOptionen } from './bezug';
+import { Feld } from '../components/instrument';
 
 interface FormWerte {
   typ?: BezugTyp;
@@ -71,21 +72,17 @@ export default function BezugDialog({
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}
     >
-      <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
+      <Feld label="Typ" name="typ" rules={[{ required: true, message: 'Typ wählen' }]}>
         <Select
           options={BEZUG_TYP_OPTIONEN}
           // Objekt-Auswahl bei Typ-Wechsel zurücksetzen (sie ist typ-spezifisch).
           onChange={() => form.setFieldsValue({ ziel_id: undefined })}
         />
-      </Form.Item>
+      </Feld>
       {/* Ohne Typ gesperrt: das zeigt die Reihenfolge, kein Satz (LFH-1078). */}
-      <Form.Item
-        label="Objekt"
-        name="ziel_id"
-        rules={[{ required: true, message: 'Objekt wählen' }]}
-      >
+      <Feld label="Objekt" name="ziel_id" rules={[{ required: true, message: 'Objekt wählen' }]}>
         <Select options={objektOptionen} disabled={!typ} notFoundContent="Keine Objekte" />
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

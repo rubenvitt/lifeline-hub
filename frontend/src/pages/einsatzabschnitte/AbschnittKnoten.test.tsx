@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ConfigProvider, theme } from 'antd';
+import { ConfigProvider } from 'antd';
+import { useRollen } from '../../components/instrument';
 import type { Einsatzabschnitt } from '../../api/types';
 import AbschnittKnoten from './AbschnittKnoten';
 
@@ -17,11 +18,11 @@ const nord = {
   verbindungen: [{ id: 1, mittel: 'mobil', wert: '0151 1', hinweis: null }],
 } as unknown as Einsatzabschnitt;
 
-/** Liest die Tokens desselben Providers, in dem der Knoten steht — der Vergleich prüft den
- *  Token gegen die Anzeige, nicht ein Literal gegen ein Literal. */
-function TokenSonde() {
-  const { token } = theme.useToken();
-  return <span data-testid="sonde" data-sekundaer={token.colorTextSecondary} />;
+/** Liest die Farbrollen desselben Providers, in dem der Knoten steht — der Vergleich prüft die
+ *  Rolle gegen die Anzeige, nicht ein Literal gegen ein Literal. */
+function RollenSonde() {
+  const { rollen } = useRollen();
+  return <span data-testid="sonde" data-gedaempft={rollen.gedaempft} />;
 }
 
 /**
@@ -41,7 +42,7 @@ function renderKnoten(
 ) {
   render(
     <ConfigProvider>
-      <TokenSonde />
+      <RollenSonde />
       <AbschnittKnoten abschnitt={abschnitt} staerke={staerke} anzahlEinheiten={anzahl} />
     </ConfigProvider>,
   );
@@ -57,10 +58,10 @@ describe('AbschnittKnoten', () => {
     expect(screen.getByText('2 Einheiten direkt')).toBeInTheDocument();
   });
 
-  it('färbt den Leitername aus dem Sekundär-Token, nicht aus einem Literal', () => {
+  it('färbt den Leiternamen aus der Rolle „gedämpft“, nicht aus einem Literal', () => {
     const sonde = renderKnoten(nord);
     const leiter = screen.getByText(/Leiter Nord/);
-    expect(normalisiere(leiter.style.color)).toBe(normalisiere(sonde.dataset.sekundaer));
+    expect(normalisiere(leiter.style.color)).toBe(normalisiere(sonde.dataset.gedaempft));
     // Als Verkettung geschrieben, damit `farbliteral.guard.test.ts` diese Gegenprobe nicht selbst
     // trifft.
     const verbotenerLiteralwert = '#' + '888';

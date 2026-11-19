@@ -53,9 +53,8 @@ test.describe(KAPITEL, () => {
     await expect(page.getByText('Automatisch aktualisieren')).toBeVisible();
     // Werkzeugleiste, Zeile „Automatisch aktualisieren“ und Tabelle: der Inhalt der Sektion
     // ohne Warnleiste und Navigation. Die Demo-Daten tragen keine Offline-Karte.
-    const inhalt = page
-      .getByRole('button', { name: 'Region aufs Gerät bringen' })
-      .locator('xpath=ancestor::div[contains(concat(" ", @class, " "), " ant-space ")][1]/..');
+    // Werkzeugleiste (Knopfreihe in einer Hülle mit Abstand nach unten) → Hülle → Sektion.
+    const inhalt = page.locator('[data-lfh="offline-karten-werkzeuge"]').locator('xpath=../..');
     await expect(inhalt.getByText('Noch keine Offline-Karten')).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(inhalt, KAPITEL, 'offline-karten');

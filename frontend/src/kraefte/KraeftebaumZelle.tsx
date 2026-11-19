@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { POSITION_KUERZEL, POSITION_LABELS } from '../api/personal';
 import { kraefteText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
-import { Augenbraue, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, monoStil, schriftStil, useRollen } from '../components/instrument';
 import { einheitDetailPfad, fahrzeugePfad, personalPfad } from '../routing/deeplinks';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 import { fremdText } from './kraeftebaumKern';
@@ -40,7 +40,7 @@ export function Marke({ text, titel }: { text: string; titel: string }) {
       data-lfh="kraeftebaum-marke"
       title={titel}
       style={{
-        ...monoStil(11),
+        ...monoStil('meta'),
         display: 'inline-flex',
         justifyContent: 'center',
         minWidth: 24,
@@ -113,7 +113,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
     return text ? (
       <span
         data-lfh="kraeftebaum-nebentext"
-        style={{ display: 'block', fontSize: 11, color: rollen.gedaempft }}
+        style={{ display: 'block', ...schriftStil('textKlein'), color: rollen.gedaempft }}
       >
         {text}
       </span>
@@ -161,7 +161,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         z.fahrzeugTz ? <FahrzeugZeichen tz={z.fahrzeugTz} /> : null,
         <>
-          <span style={monoStil(12)}>{name(z.bezeichnung, ziel)}</span>
+          <span style={monoStil('monoKlein')}>{name(z.bezeichnung, ziel)}</span>
           {nebentext([z.zusatz, z.besatzung ? fremdText(z.besatzung) : null])}
         </>,
       );
@@ -192,13 +192,13 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
             gap: token.marginXS,
           }}
         >
-          <Augenbraue style={{ fontSize: 11 }}>{z.bezeichnung}</Augenbraue>
+          <Augenbraue>{z.bezeichnung}</Augenbraue>
           {/* Zahlen in Mono (Regel „Zahlen immer Mono“), samt ihrem Zählwort. */}
-          <span style={{ ...monoStil(11), color: rollen.gedaempft }}>· {anzahl}</span>
+          <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>· {anzahl}</span>
           {ausfall && (
             <span
               data-lfh="kraeftebaum-ausfall"
-              style={{ ...monoStil(11), color: rollen.alarmText }}
+              style={{ ...monoStil('meta'), color: rollen.alarmText }}
             >
               · {ausfall}
             </span>
@@ -210,7 +210,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         // Das Kürzel schrumpft nicht: im Druck ließ die Zellregel `overflow-wrap: anywhere` es
         // sonst als „Mtl“ über „.“ brechen (LFH-1007).
-        <span style={{ ...monoStil(11), color: rollen.schwach, flexShrink: 0 }}>Mtl.</span>,
+        <span style={{ ...monoStil('meta'), color: rollen.schwach, flexShrink: 0 }}>Mtl.</span>,
         <>{z.bezeichnung}</>,
       );
   }

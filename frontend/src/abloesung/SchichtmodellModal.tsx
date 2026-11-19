@@ -10,7 +10,7 @@ import {
 } from '../api/eingabegrenzen';
 import type { SchichtmodellTyp, SchichtmodellWerteBody } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
-import { Segmentleiste } from '../components/instrument';
+import { Feld, Segmentleiste } from '../components/instrument';
 import { mitVorgabe } from '../components/vorgabeText';
 import { dauerRegel, uhrzeitenRegel } from './dauer';
 import {
@@ -43,7 +43,7 @@ const TYP_OPTIONEN = [
   { wert: 'wechselzeiten' as const, label: 'Wechselzeiten' },
 ];
 
-/** Die Segmentleiste als Formularfeld: `Form.Item` reicht `value`/`onChange` hinein. */
+/** Die Segmentleiste als Formularfeld: `Feld` reicht `value`/`onChange` hinein. */
 function TypField({
   value,
   onChange,
@@ -110,18 +110,18 @@ export default function SchichtmodellModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item<SchichtmodellFormWerte>
+      <Feld<SchichtmodellFormWerte>
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
       >
         <Input placeholder="z. B. 12-h-Schicht" maxLength={SCHICHTMODELL_BEZEICHNUNG_MAX} />
-      </Form.Item>
-      <Form.Item<SchichtmodellFormWerte> label="Typ" name="typ">
+      </Feld>
+      <Feld<SchichtmodellFormWerte> label="Typ" name="typ">
         <TypField />
-      </Form.Item>
+      </Feld>
       {typ === 'rhythmus' ? (
-        <Form.Item<SchichtmodellFormWerte>
+        <Feld<SchichtmodellFormWerte>
           label="Rhythmus"
           name="rhythmus"
           required
@@ -135,18 +135,18 @@ export default function SchichtmodellModal({
           ]}
         >
           <Input autoComplete="off" />
-        </Form.Item>
+        </Feld>
       ) : (
         <>
-          <Form.Item<SchichtmodellFormWerte>
+          <Feld<SchichtmodellFormWerte>
             label="Wechselzeiten"
             name="wechselzeiten"
             required
             rules={[uhrzeitenRegel(SCHICHTMODELL_WECHSELZEITEN_MAX)]}
           >
             <Input placeholder="z. B. 0600 1800" autoComplete="off" />
-          </Form.Item>
-          <Form.Item<SchichtmodellFormWerte>
+          </Feld>
+          <Feld<SchichtmodellFormWerte>
             label="Mindestdauer"
             name="mindestdauer"
             required
@@ -160,7 +160,7 @@ export default function SchichtmodellModal({
             ]}
           >
             <Input autoComplete="off" />
-          </Form.Item>
+          </Feld>
         </>
       )}
       <Collapse
@@ -176,7 +176,7 @@ export default function SchichtmodellModal({
             forceRender: true,
             children: (
               <>
-                <Form.Item<SchichtmodellFormWerte>
+                <Feld<SchichtmodellFormWerte>
                   label="Vorwarnung"
                   name="vorwarnung"
                   rules={[
@@ -187,8 +187,8 @@ export default function SchichtmodellModal({
                     placeholder={mitVorgabe(dauer(VORWARNUNG_VORGABE_MINUTEN))}
                     autoComplete="off"
                   />
-                </Form.Item>
-                <Form.Item<SchichtmodellFormWerte>
+                </Feld>
+                <Feld<SchichtmodellFormWerte>
                   label="Planungsvorlauf"
                   name="planungsvorlauf"
                   rules={[
@@ -199,7 +199,7 @@ export default function SchichtmodellModal({
                     placeholder={mitVorgabe(dauer(PLANUNGSVORLAUF_VORGABE_MINUTEN))}
                     autoComplete="off"
                   />
-                </Form.Item>
+                </Feld>
               </>
             ),
           },

@@ -19,7 +19,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { Paneel, Status, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Stapel, Status, monoStil, useRollen } from '../components/instrument';
 import type { StatusTon } from '../components/instrument/statusFlaeche';
 import { darfBeantragen } from '../einsatz/schreibrecht';
 import { IconPersonPlus } from '../icons';
@@ -96,7 +96,6 @@ export default function GeraetKontaktePage() {
   const einheitId = geraet?.stelle_id ?? null;
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const [offen, setOffen] = useState(false);
   // Ein Schlüssel je RTW-Anforderung: geht die Antwort verloren und wird erneut gesendet, legt
@@ -248,43 +247,47 @@ export default function GeraetKontaktePage() {
         ) : kontakte.length === 0 && eigeneVorgemerkt.length === 0 ? (
           <SeitenLeer titel="Noch keine Kontakte" />
         ) : (
-          <Flex vertical gap={token.marginXS} data-lfh="kontakt-liste">
-            {eigeneVorgemerkt.map((v) => (
-              <KontaktZeile
-                key={v.antrag ? `antrag-${v.antrag.id}` : (v.id ?? v.erstellt_at)}
-                reg="R-…"
-                zeit={
-                  v.aktion.daten.zeitpunkt_at
-                    ? zeitKurz(v.aktion.daten.zeitpunkt_at, konventionen)
-                    : v.antrag
-                      ? zeitKurz(v.erstellt_at, konventionen)
-                      : ''
-                }
-                anlass={v.aktion.daten.anlass ? ANLASS_WORT[v.aktion.daten.anlass] : undefined}
-                marke={{ ton: 'achtung', wort: v.antrag ? 'beantragt' : 'vorgemerkt' }}
-              />
-            ))}
-            {kontakte.map((p) => {
-              const meldung = p.meldung_id != null ? meldungen.get(p.meldung_id) : undefined;
-              const frist = meldung?.bestaetigung_frist_at
-                ? zeitKurz(meldung.bestaetigung_frist_at, konventionen)
-                : undefined;
-              return (
+          <div data-lfh="kontakt-liste">
+            <Stapel abstand="xs">
+              {eigeneVorgemerkt.map((v) => (
                 <KontaktZeile
-                  key={p.id}
-                  reg={registrierAnzeige(p.registrier_nr)}
-                  zeit={zeitKurz(p.erfasst_at, konventionen)}
-                  anlass={p.anlass ? ANLASS_WORT[p.anlass as keyof typeof ANLASS_WORT] : undefined}
-                  marke={kontaktMarke(
-                    p,
-                    meldung,
-                    p.aktuelle_uhs_id != null ? uhsNamen.get(p.aktuelle_uhs_id) : undefined,
-                    frist,
-                  )}
+                  key={v.antrag ? `antrag-${v.antrag.id}` : (v.id ?? v.erstellt_at)}
+                  reg="R-…"
+                  zeit={
+                    v.aktion.daten.zeitpunkt_at
+                      ? zeitKurz(v.aktion.daten.zeitpunkt_at, konventionen)
+                      : v.antrag
+                        ? zeitKurz(v.erstellt_at, konventionen)
+                        : ''
+                  }
+                  anlass={v.aktion.daten.anlass ? ANLASS_WORT[v.aktion.daten.anlass] : undefined}
+                  marke={{ ton: 'achtung', wort: v.antrag ? 'beantragt' : 'vorgemerkt' }}
                 />
-              );
-            })}
-          </Flex>
+              ))}
+              {kontakte.map((p) => {
+                const meldung = p.meldung_id != null ? meldungen.get(p.meldung_id) : undefined;
+                const frist = meldung?.bestaetigung_frist_at
+                  ? zeitKurz(meldung.bestaetigung_frist_at, konventionen)
+                  : undefined;
+                return (
+                  <KontaktZeile
+                    key={p.id}
+                    reg={registrierAnzeige(p.registrier_nr)}
+                    zeit={zeitKurz(p.erfasst_at, konventionen)}
+                    anlass={
+                      p.anlass ? ANLASS_WORT[p.anlass as keyof typeof ANLASS_WORT] : undefined
+                    }
+                    marke={kontaktMarke(
+                      p,
+                      meldung,
+                      p.aktuelle_uhs_id != null ? uhsNamen.get(p.aktuelle_uhs_id) : undefined,
+                      frist,
+                    )}
+                  />
+                );
+              })}
+            </Stapel>
+          </div>
         )}
       </Paneel>
       {stelle && (
@@ -326,8 +329,8 @@ function KontaktZeile({
         borderBottom: `1px solid ${rollen.linie}`,
       }}
     >
-      <span style={monoStil(14, 500)}>{reg}</span>
-      <span style={{ ...monoStil(13), color: rollen.gedaempft }}>{zeit}</span>
+      <span style={monoStil('monoGross', 500)}>{reg}</span>
+      <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}>{zeit}</span>
       {anlass && <span>{anlass}</span>}
       <Status groesse="klein" ton={marke.ton} wort={marke.wort} style={{ marginLeft: 'auto' }} />
     </Flex>

@@ -369,7 +369,9 @@ describe('EintreffenDialog — Aus den Stammdaten (LLH-1300, design.md D6)', () 
     const gruppe = await screen.findByRole('region', { name: 'Aus den Stammdaten' });
     expect(within(gruppe).getByText('Löschzug')).toBeInTheDocument();
     expect(within(gruppe).getByText('1-10-1 · 1-44-1')).toBeInTheDocument();
-    expect(within(gruppe).getByText('FL MUS 1 · mit 1 Untereinheit')).toBeInTheDocument();
+    // Hinweise als Metazeile: je Angabe ein Teil, der Trenner steht dazwischen.
+    expect(within(gruppe).getByText('FL MUS 1')).toBeInTheDocument();
+    expect(within(gruppe).getByText('mit 1 Untereinheit')).toBeInTheDocument();
     expect(suchen[suchen.length - 1]).toBe('musterstadt');
     const text = dialog().textContent ?? '';
     expect(text.indexOf('Im Einsatz')).toBeLessThan(text.indexOf('Aus den Stammdaten'));

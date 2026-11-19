@@ -1,6 +1,6 @@
 import { useId, type KeyboardEvent, type ReactNode } from 'react';
 import { theme } from 'antd';
-import { Augenbraue, Segmentleiste, type SegmentOption } from './instrument';
+import { Augenbraue, Segmentleiste, Stapel, type SegmentOption } from './instrument';
 import {
   useDichte,
   useHelligkeit,
@@ -95,7 +95,7 @@ export default function AnzeigeLeisten({ hasTitel = true }: { hasTitel?: boolean
   // (`beschriftung`), damit er nicht mit dem Warnhinweis wechselt.
   function renderLeiste(sichtbar: string, kind: ReactNode, hinweis?: string) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
+      <Stapel abstand="xxs">
         <span style={etikett}>{sichtbar}</span>
         {kind}
         {hinweis && (
@@ -103,7 +103,7 @@ export default function AnzeigeLeisten({ hasTitel = true }: { hasTitel?: boolean
             {hinweis}
           </span>
         )}
-      </div>
+      </Stapel>
     );
   }
 

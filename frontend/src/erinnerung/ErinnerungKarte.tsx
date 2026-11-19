@@ -13,7 +13,7 @@ import {
 import { ERINNERUNG_HANDLUNG, ERINNERUNG_STATUS, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { Status, monoStil } from '../components/instrument';
+import { Status, Textstufe, monoStil, schriftStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
 import { KennungsLink } from '../components/kennungsLink';
@@ -61,11 +61,11 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
   const eid = parseRouteId(einsatzId);
   if (!bezug || eid == null) {
     // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → Verweistext ohne Link.
-    return <span style={monoStil(11)}>{text}</span>;
+    return <span style={monoStil('meta')}>{text}</span>;
   }
   // Verweis als Link mit ↗-Zeichen, kein farbiges Etikett.
   return (
-    <KennungsLink to={bezug.pfad(eid, e.bezug_id)} style={monoStil(11)}>
+    <KennungsLink to={bezug.pfad(eid, e.bezug_id)} style={monoStil('meta')}>
       {text}
     </KennungsLink>
   );
@@ -142,9 +142,7 @@ export default function ErinnerungKarte({
         wrap
       >
         <Space size={token.marginSM} wrap>
-          <Text strong style={{ fontSize: 15, lineHeight: 1.4 }}>
-            {e.titel}
-          </Text>
+          <Textstufe stufe="kartentitel">{e.titel}</Textstufe>
           {istAbg && <StatusBadge phase={status.phase} label={status.label} />}
           {faellig && <Status groesse="klein" ton="alarm" wort="fällig" />}
           {e.intervall_minuten && (
@@ -158,7 +156,7 @@ export default function ErinnerungKarte({
         </Space>
         <Space size={token.margin} wrap>
           {e.faellig_at && (
-            <Text type={faellig ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
+            <Text type={faellig ? 'danger' : 'secondary'} style={schriftStil('textKlein')}>
               {faellig && (
                 <span aria-hidden="true">
                   <IconUhr />
@@ -176,26 +174,26 @@ export default function ErinnerungKarte({
         style={{ marginBottom: aktionen.length ? token.marginSM : 0 }}
       >
         {(e.empfaenger_anzeige ?? e.empfaenger_funktion) && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Textstufe ton="gedaempft">
             für:{' '}
             {mitBesetzung(
               e.empfaenger_anzeige ?? e.empfaenger_funktion ?? '',
               e.aktuelle_besetzung,
             )}
-          </Text>
+          </Textstufe>
         )}
-        {e.beschreibung && <Text style={{ fontSize: 13 }}>{e.beschreibung}</Text>}
+        {e.beschreibung && <Textstufe stufe="textKlein">{e.beschreibung}</Textstufe>}
         {istAbg && (
           <Space wrap size={[token.marginSM, token.marginXS]}>
             {e.status === 'erledigt' && e.erledigt_at && (
-              <Text type="secondary" style={{ fontSize: 13 }}>
+              <Textstufe stufe="textKlein" ton="gedaempft">
                 Erledigt: {zeitpunkt(e.erledigt_at)}
-              </Text>
+              </Textstufe>
             )}
             {e.status === 'quittiert' && e.quittiert_at && (
-              <Text type="secondary" style={{ fontSize: 13 }}>
+              <Textstufe stufe="textKlein" ton="gedaempft">
                 Erübrigt: {zeitpunkt(e.quittiert_at)}
-              </Text>
+              </Textstufe>
             )}
           </Space>
         )}

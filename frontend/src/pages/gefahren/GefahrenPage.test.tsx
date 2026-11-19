@@ -333,7 +333,11 @@ describe('GefahrenPage', () => {
     const feld = screen.getByRole('textbox', { name: 'Bezeichnung' });
     await user.clear(feld);
     await user.type(feld, 'Nord-Ost{Enter}');
-    expect(await screen.findByText(/Nicht gespeichert/)).toBeInTheDocument();
+    // Die Ablehnung als Meldung (`SpeicherFehler`); daneben steht der Hinweis am offenen Feld
+    // (LLH-1829) mit demselben Wort.
+    expect(
+      await screen.findByText(/Nicht gespeichert/, { selector: '.ant-alert-title' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Bezeichnung' })).toHaveValue('Nord-Ost');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });

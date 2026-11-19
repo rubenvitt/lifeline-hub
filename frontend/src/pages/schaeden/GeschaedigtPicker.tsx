@@ -7,6 +7,7 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { einsatzKeys } from '../../api/queryKeys';
 import { SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
 import { grenzeText, zeichenZahl } from '../../components/zeichenGrenze';
+import { FELD_KLASSE } from '../../components/instrument';
 import { personLabel as einsatzkraftLabel } from '../../kraefte/einsatzfunktionKern';
 
 /** Strukturierter Wert der Geschädigt-Combobox. Genau eine Variante (oder null = unbekannt/öffentlich). */
@@ -172,39 +173,41 @@ export default function GeschaedigtPicker({
     return gruppen as DefaultOptionType[];
   }, [suche, personenQuery.data, personalQuery.data, orgName, aktuellerKey, aktuellesLabel, value]);
 
+  // Die Feldklasse streckt die Auswahl auf die ganze Zeile, auch in einem Datenfeld ohne `Feld`.
   return (
-    <Select
-      id={id}
-      allowClear
-      placeholder="Person, Einsatzkraft, eigene Organisation oder Freitext …"
-      style={{ width: '100%' }}
-      value={aktuellerKey}
-      // Anzeige-Label aus dem Wert ableiten (extern hat keine Option im value-Key-Sinn).
-      labelRender={() => aktuellesLabel ?? ''}
-      // Eigene Filterung (useMemo) — antd-Filter würde die synthetische Freitext-Option verstecken.
-      showSearch={{ filterOption: false, onSearch: setSuche }}
-      options={optionen}
-      loading={personenQuery.isLoading || personalQuery.isLoading}
-      onChange={(_val, option) => {
-        setSuche('');
-        const roh = Array.isArray(option) ? option[0] : option;
-        const opt = roh as GeschaedigtOption | undefined;
-        if (!opt || !opt.typ) {
-          onChange?.(null);
-          return;
-        }
-        if (opt.typ === 'person' && opt.refId != null) {
-          onChange?.({ typ: 'person', refId: opt.refId, label: opt.label });
-        } else if (opt.typ === 'personal' && opt.refId != null) {
-          onChange?.({ typ: 'personal', refId: opt.refId, label: opt.label });
-        } else if (opt.typ === 'organisation') {
-          onChange?.({ typ: 'organisation', label: orgName });
-        } else if (opt.typ === 'extern' && opt.kontakt != null) {
-          onChange?.({ typ: 'extern', kontakt: opt.kontakt });
-        } else {
-          onChange?.(null);
-        }
-      }}
-    />
+    <div className={FELD_KLASSE}>
+      <Select
+        id={id}
+        allowClear
+        placeholder="Person, Einsatzkraft, eigene Organisation oder Freitext …"
+        value={aktuellerKey}
+        // Anzeige-Label aus dem Wert ableiten (extern hat keine Option im value-Key-Sinn).
+        labelRender={() => aktuellesLabel ?? ''}
+        // Eigene Filterung (useMemo) — antd-Filter würde die synthetische Freitext-Option verstecken.
+        showSearch={{ filterOption: false, onSearch: setSuche }}
+        options={optionen}
+        loading={personenQuery.isLoading || personalQuery.isLoading}
+        onChange={(_val, option) => {
+          setSuche('');
+          const roh = Array.isArray(option) ? option[0] : option;
+          const opt = roh as GeschaedigtOption | undefined;
+          if (!opt || !opt.typ) {
+            onChange?.(null);
+            return;
+          }
+          if (opt.typ === 'person' && opt.refId != null) {
+            onChange?.({ typ: 'person', refId: opt.refId, label: opt.label });
+          } else if (opt.typ === 'personal' && opt.refId != null) {
+            onChange?.({ typ: 'personal', refId: opt.refId, label: opt.label });
+          } else if (opt.typ === 'organisation') {
+            onChange?.({ typ: 'organisation', label: orgName });
+          } else if (opt.typ === 'extern' && opt.kontakt != null) {
+            onChange?.({ typ: 'extern', kontakt: opt.kontakt });
+          } else {
+            onChange?.(null);
+          }
+        }}
+      />
+    </div>
   );
 }

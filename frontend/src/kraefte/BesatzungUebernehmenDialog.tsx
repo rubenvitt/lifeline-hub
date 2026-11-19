@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { App, Checkbox, Form, Space, Typography, theme } from 'antd';
+import { App, Checkbox, Form, Space, Typography } from 'antd';
+import { Feld, Stapel } from '../components/instrument';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SAMMEL_MAX } from '../api/eingabegrenzen';
 import { zuordnenBesatzungMenge } from '../api/einsatzFahrzeuge';
@@ -56,7 +57,6 @@ export default function BesatzungUebernehmenDialog({
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<Werte>();
-  const { token } = theme.useToken();
   const fahrzeug = auftrag?.fahrzeug ?? null;
   const offen = auftrag !== null;
   /** Namen der zuletzt abgesendeten Auswahl: die Gründe nennen sie, auch wenn die Liste wechselt. */
@@ -131,7 +131,7 @@ export default function BesatzungUebernehmenDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Personen"
         name="ep_ids"
         rules={[
@@ -155,7 +155,7 @@ export default function BesatzungUebernehmenDialog({
         <Checkbox.Group style={{ display: 'block' }}>
           {/* Abstand der Zeilen aus der Dichte-Staffel (8 / 12 / 16 px): am Finger ≥ 8, im
               Handschuh ≥ 16 px zwischen zwei Kästchen (Bedien-Leitlinie, Kriterium 2). */}
-          <Space orientation="vertical" size={token.marginSM}>
+          <Stapel abstand="sm">
             {vorschlag.kandidaten.map((p) => {
               const angabe = angabeZurKraft(p);
               const grund = gruende.get(p.id);
@@ -175,9 +175,9 @@ export default function BesatzungUebernehmenDialog({
                 </div>
               );
             })}
-          </Space>
+          </Stapel>
         </Checkbox.Group>
-      </Form.Item>
+      </Feld>
     </ErfassungsModal>
   );
 }

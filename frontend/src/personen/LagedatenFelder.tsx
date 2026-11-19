@@ -1,10 +1,11 @@
-import { Form, Input, theme } from 'antd';
+import { Input, theme } from 'antd';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { serverJetzt } from '../offline/serveruhr';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { parseKoordinate } from './koordinate';
+import { Feld } from '../components/instrument';
 
 dayjs.extend(utc);
 
@@ -25,7 +26,7 @@ const ZUKUNFT_TOLERANZ_MS = 5 * 60_000;
 export function KoordinateFeld() {
   const { token } = theme.useToken();
   return (
-    <Form.Item
+    <Feld
       label="Koordinate"
       name="koordinate"
       rules={[
@@ -39,14 +40,14 @@ export function KoordinateFeld() {
       ]}
     >
       <Input placeholder="52.2691/9.1342" style={{ fontFamily: token.fontFamilyCode }} />
-    </Form.Item>
+    </Feld>
   );
 }
 
 /** `platzhalter` zeigt den wirksamen Wert eines leeren Felds (LFH-1078: zeigen statt erklären). */
 export function VermisstSeitFeld({ platzhalter }: { platzhalter?: string }) {
   return (
-    <Form.Item
+    <Feld
       label="vermisst seit"
       name="vermisst_seit"
       getValueProps={(wert?: string) => ({ value: alsZeitpunkt(wert) ?? null })}
@@ -62,6 +63,6 @@ export function VermisstSeitFeld({ platzhalter }: { platzhalter?: string }) {
       ]}
     >
       <ZeitpunktEingabe art="ereignis" placeholder={platzhalter} style={{ width: '100%' }} />
-    </Form.Item>
+    </Feld>
   );
 }

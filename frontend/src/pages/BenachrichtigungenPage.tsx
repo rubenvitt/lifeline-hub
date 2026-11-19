@@ -1,7 +1,7 @@
 import { Button, Switch, Typography, theme } from 'antd';
 import { useEffect, useState, type CSSProperties } from 'react';
 import AdminPage from '../components/AdminPage';
-import { Paneel, PaneelZeile, PaneelZustand } from '../components/instrument';
+import { Paneel, PaneelZeile, PaneelZustand, Stapel, Textstufe } from '../components/instrument';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { ALLE_ARTEN, BENACHRICHTIGUNG_ARTEN } from '../alarm/benachrichtigungKatalog';
 import {
@@ -48,6 +48,20 @@ export function pushUeberHub(name: string): string {
 /** Linktext zur Seite „Benachrichtigungen“ am Hub. */
 export const ZUM_HUB = 'Am Hub einschalten';
 
+/** Name eines Schalters, darunter „nicht gespeichert“, wenn das Setzen scheiterte. */
+function NameMitFehler({ name, fehler }: { name: string; fehler: boolean }) {
+  return (
+    <Stapel als="span" abstand="xxs">
+      <span>{name}</span>
+      {fehler && (
+        <Textstufe stufe="textKlein" ton="alarm">
+          nicht gespeichert
+        </Textstufe>
+      )}
+    </Stapel>
+  );
+}
+
 /** Eine Zeile mit Beschriftung, „nicht gespeichert“ bei Fehler, und dem Schalter rechts. */
 function SchalterZeile({
   zeile,
@@ -77,14 +91,9 @@ function SchalterZeile({
     >
       <div style={zeile} data-fehler={fehler ? 'true' : undefined}>
         <label htmlFor={feldId} style={{ cursor: 'pointer', minWidth: 0 }}>
-          {name}
-          {fehler && (
-            <Typography.Text type="danger" style={{ display: 'block', fontSize: token.fontSizeSM }}>
-              nicht gespeichert
-            </Typography.Text>
-          )}
+          <NameMitFehler name={name} fehler={fehler} />
         </label>
-        <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
+        <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="mitte">
           {marke && <Typography.Text type="warning">{marke}</Typography.Text>}
           <Switch
             id={feldId}
@@ -94,7 +103,7 @@ function SchalterZeile({
             disabled={laeuft || gesperrt}
             onChange={setze}
           />
-        </span>
+        </Stapel>
       </div>
     </PaneelZeile>
   );
@@ -276,7 +285,7 @@ export default function BenachrichtigungenPage() {
 
   return (
     <AdminPage titel="Benachrichtigungen" breite="schmal">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+      <Stapel abstand="md">
         <PushSchalter zeile={zeile} />
         <Paneel titel="Alarme">
           {ALARM_ARTEN.map((art) => (
@@ -308,15 +317,7 @@ export default function BenachrichtigungenPage() {
                 >
                   <div style={zeile} data-art={art} data-fehler={fehler ? 'true' : undefined}>
                     <label htmlFor={feldId} style={{ cursor: 'pointer', minWidth: 0 }}>
-                      {name}
-                      {fehler && (
-                        <Typography.Text
-                          type="danger"
-                          style={{ display: 'block', fontSize: token.fontSizeSM }}
-                        >
-                          nicht gespeichert
-                        </Typography.Text>
-                      )}
+                      <NameMitFehler name={name} fehler={fehler} />
                     </label>
                     <Switch
                       id={feldId}
@@ -335,7 +336,7 @@ export default function BenachrichtigungenPage() {
         <Paneel titel="Test">
           <Testbenachrichtigung zeile={zeile} />
         </Paneel>
-      </div>
+      </Stapel>
     </AdminPage>
   );
 }

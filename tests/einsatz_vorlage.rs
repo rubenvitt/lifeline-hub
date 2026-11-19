@@ -306,9 +306,13 @@ async fn stichwort_koppeln_loesen_und_vorlage_loeschen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let manv = vorlage_id(&app, &admin, "MANV").await;
     let (sw, kopplung) = stichwort(&app, &admin, "MANV15").await;
-    assert_eq!(kopplung, None, "keine mitgelieferte Kopplung");
+    // Ab Werk gekoppelt (LLH-1816, Design-Doc D1); für das Koppeln erst lösen.
+    assert_eq!(kopplung, Some(manv), "Start-Stichwort kommt gekoppelt");
 
     let pfad = format!("/api/stichwort-vorschlaege/{sw}/vorlage");
+    let (status, _) = anfrage(&app, "PUT", &pfad, &admin, Some(r#"{"vorlage_id":null}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(stichwort(&app, &admin, "MANV15").await.1, None);
     let (status, json) = anfrage(
         &app,
         "PUT",

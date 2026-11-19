@@ -1,7 +1,14 @@
 import type { EinheitZeichenPatch } from '../../api/einheiten';
 import type { Einheit } from '../../api/types';
 import { InlineAngabe } from '../../components/InlineAngabe';
-import { Datenfeld, Datenraster, Paneel, useRollen } from '../../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  FELD_KLASSE,
+  Paneel,
+  Stapel,
+  Textstufe,
+} from '../../components/instrument';
 import { Select } from '../../components/Select';
 import { orgVorgabe } from '../../components/vorgabeText';
 import EinheitZeichen from '../../kraefte/EinheitZeichen';
@@ -48,7 +55,6 @@ export default function EinheitZeichenPaneel({
   orgDefault: string | null;
   onPatchZeichen: EinheitZeichenHandler;
 }) {
-  const { token, rollen } = useRollen();
   const fachaufgabe = e.tz_fachaufgabe ?? null;
   const organisation = e.tz_organisation ?? null;
 
@@ -57,10 +63,12 @@ export default function EinheitZeichenPaneel({
     <EinheitZeichen tz={{ typLabel: e.typ_label ?? null, ...entwurf }} orgDefault={orgDefault} />
   );
   const zeile = (auswahl: React.ReactNode, zeichen: React.ReactNode) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: token.marginSM, minWidth: 0 }}>
-      <div style={{ flex: '1 1 auto', minWidth: 0 }}>{auswahl}</div>
+    <Stapel richtung="zeile" abstand="sm" ausrichten="mitte">
+      <div className={FELD_KLASSE} style={{ flex: '1 1 auto', minWidth: 0 }}>
+        {auswahl}
+      </div>
       {zeichen}
-    </div>
+    </Stapel>
   );
 
   return (
@@ -82,7 +90,6 @@ export default function EinheitZeichenPaneel({
                   {...feld}
                   {...popup}
                   allowClear
-                  style={{ width: '100%' }}
                   placeholder="Fachaufgabe wählen"
                   options={FACHAUFGABE_OPTIONS}
                   value={value ?? undefined}
@@ -109,7 +116,6 @@ export default function EinheitZeichenPaneel({
                   {...feld}
                   {...popup}
                   allowClear
-                  style={{ width: '100%' }}
                   placeholder="Organisation wählen"
                   options={ORGANISATION_OPTIONS}
                   value={value ?? undefined}
@@ -121,8 +127,10 @@ export default function EinheitZeichenPaneel({
           />
           {/* Leer gilt die Vorgabe der Organisation; das Zeichen im Kopf trägt sie schon. */}
           {organisation == null && orgDefault && (
-            <div data-lfh="zeichen-vorgabe" style={{ color: rollen.gedaempft, fontSize: 12 }}>
-              {orgVorgabe(labelOf(ORGANISATION_OPTIONS, orgDefault)!)}
+            <div data-lfh="zeichen-vorgabe">
+              <Textstufe stufe="textKlein" ton="gedaempft">
+                {orgVorgabe(labelOf(ORGANISATION_OPTIONS, orgDefault)!)}
+              </Textstufe>
             </div>
           )}
         </Datenfeld>

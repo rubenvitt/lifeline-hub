@@ -22,6 +22,7 @@ import { monitorAusschnitt } from './LagemonitorKarte';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
 import { GROSS_BEZUG, grossMass } from '../components/grossbild';
+import { pruefeKachelGrenzen } from '../test/kachelWaechter';
 
 // Ob der Monitor einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -182,6 +183,14 @@ describe('Lagemonitor — Großbild', () => {
     expect(await within(kraefte).findByText('4 an UHS')).toBeInTheDocument();
     const belegung = screen.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
     expect(within(belegung).getByText('UHS Süd')).toBeInTheDocument();
+  });
+
+  it('Wächter: jede Kachel des Lagemonitors steht in ihrer eigenen KachelGrenze (LLH-1958)', async () => {
+    bereit();
+    renderApp('/geraet');
+    const betroffene = await screen.findByRole('region', { name: 'Betroffene' });
+    // Alarmzeile, Lagekarte, Meldungen, Betroffene, Kräfte, Belegung.
+    pruefeKachelGrenzen(betroffene.closest('main')!, 6);
   });
 
   it('startet auf dem Großbild mit Kopfzahlen, Kräften und Belegung je UHS', async () => {

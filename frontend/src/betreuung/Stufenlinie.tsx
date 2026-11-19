@@ -62,7 +62,7 @@ export default function Stufenlinie({
   const zeit = (s: Stufe) => zeitKurz(wire(s.t), konventionen);
   const erste = stufen[0];
   const letzte = stufen[stufen.length - 1];
-  const beschriftung = { ...monoStil(11), color: rollen.schwach };
+  const beschriftung = { ...monoStil('meta'), color: rollen.schwach };
 
   return (
     <figure

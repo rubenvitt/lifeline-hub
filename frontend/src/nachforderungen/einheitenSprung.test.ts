@@ -15,8 +15,8 @@ describe('einheitenSprungAufbau', () => {
     lineHeight: ANTD_ZEILE,
   });
 
-  it('schreibt die Zeile in 13 px', () => {
-    expect(EINHEITEN_SCHRIFT).toBe(13);
+  it('schreibt die Zeile in der Stufe `text` (14 px)', () => {
+    expect(EINHEITEN_SCHRIFT).toBe(14);
   });
 
   it('kompakt: die Links fließen im Satz und tragen keinen Steuerboden', () => {
@@ -31,8 +31,8 @@ describe('einheitenSprungAufbau', () => {
     const aufbau = einheitenSprungAufbau(tokenFuer('kompakt'));
     if (aufbau.art !== 'fliessend') throw new Error('kompakt fließt');
     const polster = aufbau.link.paddingBlock as number;
-    // 13 × 22/14 ≈ 20,43 px Zeile; 2 × Polster ergänzt auf 24.
-    expect(13 * ANTD_ZEILE + 2 * polster).toBeCloseTo(24, 5);
+    // 14 × 22/14 = 22 px Zeile; 2 × Polster ergänzt auf 24.
+    expect(14 * ANTD_ZEILE + 2 * polster).toBeCloseTo(24, 5);
     // Höchstens 2 px je Seite: mehr griffe in die Nachbarzeile.
     expect(polster).toBeLessThanOrEqual(2);
   });

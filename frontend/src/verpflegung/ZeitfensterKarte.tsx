@@ -1,4 +1,4 @@
-import { Button, Collapse, Flex, Typography } from 'antd';
+import { Button, Collapse, Flex } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -18,6 +18,8 @@ import {
   Augenbraue,
   Kennzahl,
   Kennzahlenband,
+  Stapel,
+  Textstufe,
   Zeitachseneintrag,
   monoStil,
   useRollen,
@@ -44,8 +46,6 @@ import {
 } from './verpflegungText';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
-
-const { Text } = Typography;
 
 export interface ZeitfensterKarteProps {
   zeitfenster: VerpflegungZeitfenster;
@@ -295,11 +295,14 @@ export default function ZeitfensterKarte({
         wrap
         style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
       >
-        <Flex align="baseline" gap={token.marginSM} wrap style={{ minWidth: 0 }}>
-          <Text strong style={{ fontSize: 15, overflowWrap: 'anywhere' }}>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="baseline">
+          <Textstufe stufe="kartentitel" umbruch="ueberall">
             {zf.bezeichnung}
-          </Text>
-          <span data-lfh="verpflegung-zeitraum" style={{ ...monoStil(12), color: rollen.text2 }}>
+          </Textstufe>
+          <span
+            data-lfh="verpflegung-zeitraum"
+            style={{ ...monoStil('monoKlein'), color: rollen.text2 }}
+          >
             {zeitraumText(zf, konventionen)}
           </span>
           {zf.verpflegungsart && (
@@ -308,7 +311,7 @@ export default function ZeitfensterKarte({
               {VERPFLEGUNGSART_LABEL[zf.verpflegungsart]}
             </Marke>
           )}
-        </Flex>
+        </Stapel>
         <Status darstellung={darstellung} />
       </Flex>
 
@@ -396,7 +399,7 @@ export default function ZeitfensterKarte({
                         </span>
                       ))}
                       {' · '}
-                      <span style={monoStil(13, 500)}>{z.ausgegeben} EP</span>
+                      <span style={monoStil('mono', 500)}>{z.ausgegeben} EP</span>
                     </span>
                     {sprungJeStelle && waehlbar && (
                       <SprungKnopf
@@ -434,13 +437,13 @@ export default function ZeitfensterKarte({
                       }}
                     >
                       <span style={{ minWidth: '12ch' }}>{KOSTFORM_LABEL[k]}</span>
-                      <span style={{ ...monoStil(12), color: rollen.text2 }}>
+                      <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
                         Bedarf {zf.bedarf.sonderkost[k]} · ausgegeben {zf.ausgegeben.sonderkost[k]}
                       </span>
                       <span
                         data-lfh="sonderkost-fehlt"
                         style={{
-                          ...monoStil(12, fehlt > 0 ? 500 : 400),
+                          ...monoStil('monoKlein', fehlt > 0 ? 500 : 400),
                           color:
                             fehlt > 0 && stufe === 'unterdeckung' ? rollen.alarmText : rollen.text2,
                         }}
@@ -499,7 +502,7 @@ export default function ZeitfensterKarte({
                     }
                   >
                     <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
-                      <span style={monoStil(13, 500)}>{a.menge} EP</span>
+                      <span style={monoStil('mono', 500)}>{a.menge} EP</span>
                       {anText(a)}
                       {woText(a.verpflegungsstelle_id, a.ort)}
                       {sk ? ` · ${sk}` : ''}
@@ -527,7 +530,7 @@ export default function ZeitfensterKarte({
                     hinweis={v.antrag ? 'Beantragt' : 'Offline vorgemerkt'}
                   >
                     <span style={{ color: rollen.text2 }}>
-                      <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                      <span style={monoStil('mono', 500)}>{d.menge} EP</span>
                       {anText(d)}
                       {woText(d.verpflegungsstelle_id, d.ort)}
                       {sk ? ` · ${sk}` : ''}

@@ -1,5 +1,5 @@
 import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { App, Breadcrumb, Button, Modal, Space, Tree, type TreeDataNode } from 'antd';
+import { App, Breadcrumb, Button, Modal, Tree, type TreeDataNode } from 'antd';
 import {
   DndContext,
   DragOverlay,
@@ -40,7 +40,16 @@ import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Augenbraue, Paneel, Segmentleiste, monoStil, useRollen } from '../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  Segmentleiste,
+  Stapel,
+  Textstufe,
+  Knopfreihe,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, einheitenImAbschnitt } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
@@ -729,7 +738,7 @@ export default function EinsatzabschnittePage() {
         dataSource={zugeordneteEinheiten}
         renderItem={(e) => (
           <ListenEintrag>
-            <Space>
+            <Stapel richtung="zeile" abstand="xs" ausrichten="mitte">
               {darfSchreiben && (
                 <DragHandle
                   daten={{
@@ -744,15 +753,15 @@ export default function EinsatzabschnittePage() {
               )}
               <span>{e.name}</span>
               {e.typ_label && <Marke>{e.typ_label}</Marke>}
-              <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+              <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
                 eigene <StaerkeAnzeige wert={e.ist} />
               </span>
               {e.abschnitt_id == null && e.ueber_einheit_id != null && (
-                <span style={{ color: rollen.gedaempft }}>
+                <Textstufe ton="gedaempft">
                   über {einheitName.get(e.ueber_einheit_id) ?? 'Obereinheit'}
-                </span>
+                </Textstufe>
               )}
-            </Space>
+            </Stapel>
           </ListenEintrag>
         )}
       />
@@ -793,9 +802,7 @@ export default function EinsatzabschnittePage() {
         />
       }
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
           <Segmentleiste<AbschnitteAnsicht>
             beschriftung="Ansicht"
@@ -808,7 +815,7 @@ export default function EinsatzabschnittePage() {
               Abschnitt anlegen
             </Button>
           )}
-        </Space>
+        </>
       }
       hinweis={
         // Nur gesetzt, wenn er Inhalt hat: ein leerer Slot hielte Abstand frei. Das Rückgängig aus
@@ -960,14 +967,10 @@ export default function EinsatzabschnittePage() {
                             {wartet}
                           </Sammelbanner>
                         ) : (
-                          <span
-                            style={{
-                              alignSelf: 'center',
-                              fontSize: token.fontSizeSM,
-                              color: rollen.gedaempft,
-                            }}
-                          >
-                            {zufluss.offen ? 'Live' : 'Live pausiert'}
+                          <span style={{ alignSelf: 'center' }}>
+                            <Textstufe stufe="textKlein" ton="gedaempft">
+                              {zufluss.offen ? 'Live' : 'Live pausiert'}
+                            </Textstufe>
                           </span>
                         )}
                       </div>
@@ -1106,7 +1109,7 @@ export default function EinsatzabschnittePage() {
         afterClose={focusAbschnitt}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureAufloesen()) setAufloesenFuer(null);
@@ -1125,7 +1128,7 @@ export default function EinsatzabschnittePage() {
             >
               Abschnitt auflösen
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.

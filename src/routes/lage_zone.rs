@@ -178,7 +178,7 @@ pub async fn anlegen(
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für
     // ETB-Text (Typ-Label + Label) UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let z = crate::write_retry!(&state.pool, |conn| {
+    let (z, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let id = zone_repo::anlegen_tx(
             conn,
             einsatz_id,
@@ -204,9 +204,12 @@ pub async fn anlegen(
             }
             None => etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
         };
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(z)
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        Ok((z, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     sse_zone(&state, einsatz_id, z.id);
     if let Some(bid) = z.evakuierungsbezirk_id {
         sse_bezirk(&state, einsatz_id, bid);
@@ -539,11 +542,14 @@ pub async fn aufloesen(
     // Pool (zweiter Writer — darf nicht in die BEGIN-IMMEDIATE-Tx). SSE ebenfalls nach dem Commit.
     let text = etb_text(vorher.typ.as_str(), vorher.label.as_deref(), "aufgehoben");
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let weg = crate::write_retry!(&state.pool, |conn| {
+    let (weg, etb_id) = crate::write_retry!(&state.pool, |conn| {
         let weg = zone_repo::loese_auf_tx(conn, einsatz_id, zid).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok(weg)
+        let etb_id =
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        Ok((weg, etb_id))
     })?;
+    super::etb_verteilen(&state, einsatz_id, [etb_id]);
     if let Some(g) = weg.gefahrengebiet_id {
         crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(&state.pool, g).await?;
     }

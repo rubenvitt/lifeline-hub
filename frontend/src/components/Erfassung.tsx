@@ -1,4 +1,5 @@
-import { Button, Checkbox, ConfigProvider, Form, Modal, Space, Typography, theme } from 'antd';
+import { Button, Checkbox, ConfigProvider, Form, Modal, Typography, theme } from 'antd';
+import Knopfreihe from './instrument/Knopfreihe';
 import type { FormInstance, FormProps, GlobalToken } from 'antd';
 import {
   useCallback,
@@ -55,9 +56,9 @@ import './Erfassung.css';
  * Der Schalter startet **AUS**: ein Vorgabewert AN wäre benutzt, ohne gewählt zu sein. Er hält
  * für die Lebensdauer des Dialogs.
  *
- * Die Knöpfe der Aktion stehen mit `size="middle"` auseinander (`token.padding` = 12 / 20 / 24 px,
- * LFH-653): der Primärknopf kann rot sein (`unumkehrbar`), und im Handschuh-Betrieb verlangt die
- * Leitlinie ≥ 16 px zwischen zwei Zielen. antds Vorgabe wären 4 / 4 / 8 px (`paddingXS`).
+ * Die Knöpfe der Aktion stehen in einer `Knopfreihe fuss` (LLH-1973): Abstand `md` = 12 / 20 /
+ * 24 px (LFH-653), denn der Primärknopf kann rot sein (`unumkehrbar`), und im Handschuh-Betrieb
+ * verlangt die Leitlinie ≥ 16 px zwischen zwei Zielen.
  *
  * **Unter `md` stehen die Knöpfe untereinander** (LFH-953), in voller Breite: oben „Abbrechen“,
  * unten, dem Daumen am nächsten, der Primärknopf. Nebeneinander waren die drei Knöpfe der Serie
@@ -534,14 +535,7 @@ export function ErfassungsFormular<T extends object>({
               </Typography.Text>
             )}
             <ConfigProvider theme={AKTION_OHNE_BEWEGUNG}>
-              <Space
-                size="middle"
-                orientation={istSchmal ? 'vertical' : 'horizontal'}
-                wrap={!istSchmal}
-                style={
-                  istSchmal ? { display: 'flex' } : { display: 'flex', justifyContent: 'flex-end' }
-                }
-              >
+              <Knopfreihe fuss>
                 {onAbbrechen && (
                   <Button block={istSchmal} onClick={abbrechen} disabled={sperrtAbbruch}>
                     Abbrechen
@@ -591,7 +585,7 @@ export function ErfassungsFormular<T extends object>({
                 >
                   {erfassenText}
                 </Button>
-              </Space>
+              </Knopfreihe>
             </ConfigProvider>
           </div>
         </div>
