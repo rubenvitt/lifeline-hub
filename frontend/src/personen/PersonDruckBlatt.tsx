@@ -9,7 +9,7 @@ import {
   GESCHLECHT_WORT,
   MASSNAHME_WORT,
   SK_WORT,
-  STATUS_META,
+  personStatusDarstellung,
   gueltig,
   kurzVerbleib,
   transportText,
@@ -44,7 +44,7 @@ export default function PersonDruckBlatt({
     zeilen.filter((z): z is Zeile => z.wert != null && z.wert !== '');
 
   const person = ohneLeere([
-    { etikett: 'Status', wert: STATUS_META[p.status].label },
+    { etikett: 'Status', wert: personStatusDarstellung(p.status).label },
     { etikett: 'Name', wert: p.name },
     { etikett: 'Vorname', wert: p.vorname },
     { etikett: 'Geschlecht', wert: p.geschlecht ? GESCHLECHT_WORT[p.geschlecht] : null },

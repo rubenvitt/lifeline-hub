@@ -129,7 +129,7 @@ export default function GeraetBetreuungsstellePage() {
         darfErfassen &&
         stelle &&
         stelle.status !== 'geschlossen' && (
-          <Space size="middle" wrap>
+          <>
             <Button
               type="primary"
               disabled={namentlichGefuehrt}
@@ -144,7 +144,7 @@ export default function GeraetBetreuungsstellePage() {
                 {NAMENTLICH_SPERRE}
               </Typography.Text>
             )}
-          </Space>
+          </>
         )
       }
     >

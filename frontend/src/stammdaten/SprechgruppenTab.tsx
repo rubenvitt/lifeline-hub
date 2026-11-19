@@ -1,6 +1,6 @@
-import { Button, Modal, Space } from 'antd';
+import { Button, Modal } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { Status, monoStil, Stapel } from '../components/instrument';
+import { Knopfreihe, Status, monoStil, Stapel } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -147,7 +147,7 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.betriebsart),
       // Eine Betriebsart ist eine KENNUNG, kein Zustand — Mono statt einer Etikettfarbe, die
       // TMO und DMO Bedeutungen andichtete (blau = Bedienung, orange = Achtung).
-      render: (ba: string) => <span style={monoStil(12, 500)}>{ba}</span>,
+      render: (ba: string) => <span style={monoStil('monoKlein', 500)}>{ba}</span>,
     },
     // Netz und Sicherheit (LFH-1030): kurze Kennzeichnungen wie die Betriebsart, deshalb Mono.
     {
@@ -158,7 +158,7 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.netz),
       filters: netzWerte.length > 0 ? netzWerte : undefined,
       onFilter: (wert, sg) => sg.netz === wert,
-      render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
+      render: (n?: string) => (n ? <span style={monoStil('monoKlein', 500)}>{n}</span> : '—'),
     },
     {
       title: 'Sicherheit',
@@ -168,7 +168,7 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.sicherheit),
       filters: sicherheitWerte.length > 0 ? sicherheitWerte : undefined,
       onFilter: (wert, sg) => sg.sicherheit === wert,
-      render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
+      render: (n?: string) => (n ? <span style={monoStil('monoKlein', 500)}>{n}</span> : '—'),
     },
     {
       title: 'Hinweis',
@@ -225,14 +225,14 @@ export default function SprechgruppenTab() {
                 // Unter `md` passen zwei Knöpfe neben Kennung und Status nicht in 390 px.
                 <ZeilenMenueAusloeser menue={zeilenMenue} zeile={sg} />
               ) : (
-                <Space size="middle">
+                <Knopfreihe umbruch={false}>
                   <Button onClick={() => bearbeiten(sg)}>Bearbeiten</Button>
                   {sg.aktiv && (
                     <Button danger onClick={() => setZuDeaktivieren(sg)}>
                       Deaktivieren
                     </Button>
                   )}
-                </Space>
+                </Knopfreihe>
               ),
           },
         ]

@@ -1,6 +1,7 @@
-import { App, Button, theme } from 'antd';
+import { App, Button } from 'antd';
 import type { ReactNode } from 'react';
 import { IconKopieren } from '../icons';
+import Stapel from './instrument/Stapel';
 
 /**
  * Text mit einer Kopieraktion daneben (LFH-763).
@@ -26,7 +27,6 @@ export default function KopierbarerText({
   /** Sichtbarer Inhalt; ohne Angabe steht `text` selbst da. */
   children?: ReactNode;
 }) {
-  const { token } = theme.useToken();
   const { message } = App.useApp();
   const kopierenMoeglich = typeof navigator.clipboard?.writeText === 'function';
 
@@ -40,7 +40,7 @@ export default function KopierbarerText({
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
+    <Stapel richtung="zeile" abstand="xs" ausrichten="mitte">
       <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{children ?? text}</div>
       {kopierenMoeglich ? (
         <Button
@@ -52,6 +52,6 @@ export default function KopierbarerText({
           style={{ flex: 'none' }}
         />
       ) : null}
-    </div>
+    </Stapel>
   );
 }

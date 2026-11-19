@@ -19,6 +19,7 @@ import { sichtungsfarben } from '../../theme/tokens';
 import { NICHT_FREIGEGEBEN } from './fuehrungsZahlen';
 import type { KennzahlAnzeige } from './kennzahlAnzeige';
 import { KENNZAHL_PLAETZE, warnstufeTon, type Quellzustand } from './lagebild';
+import KachelGrenze from '../../components/KachelGrenze';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { VERLAUF_STUNDEN, type Verlauf } from './verlauf';
 
@@ -104,38 +105,47 @@ export default function LagebildGrossbild({
       einsatz={einsatz}
       onVerlassen={onVerlassen}
     >
-      <div style={{ flexShrink: 0 }}>
-        <AlarmZeile daten={alarm} groesse="grossbild" />
-      </div>
-      <div
-        role="group"
-        aria-label="Lage in Zahlen"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          columnGap: grossMass(GROSS_BEZUG.luft),
-          rowGap: grossMass(GROSS_BEZUG.fuge),
-          flexShrink: 0,
-        }}
+      <KachelGrenze titel="Was brennt" form="gross" neuversuch={meta}>
+        <div style={{ flexShrink: 0 }}>
+          <AlarmZeile daten={alarm} groesse="grossbild" />
+        </div>
+      </KachelGrenze>
+      <KachelGrenze
+        titel="Lage in Zahlen"
+        form="gross"
+        neuversuch={meta}
+        ersatzStil={{ flexShrink: 0 }}
       >
-        {kennzahlen == null
-          ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
-              <GrossKennzahl key={i} titel={' '} wert="" zustand="laden" />
-            ))
-          : kennzahlen.map((k) => (
-              <GrossKennzahl
-                key={k.titel}
-                titel={k.titel}
-                wert={k.wert}
-                einheit={k.einheit}
-                notiz={k.notiz}
-                notizBeschreibung={k.notizBeschreibung}
-                ton={k.ton}
-                zustand={k.zustand}
-                groesse={String(k.wert).length >= LANG_AB_ZEICHEN ? 'zahlKlein' : 'zahl'}
-              />
-            ))}
-      </div>
+        <div
+          role="group"
+          aria-label="Lage in Zahlen"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            columnGap: grossMass(GROSS_BEZUG.luft),
+            rowGap: grossMass(GROSS_BEZUG.fuge),
+            flexShrink: 0,
+          }}
+        >
+          {kennzahlen == null
+            ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
+                <GrossKennzahl key={i} titel={' '} wert="" zustand="laden" />
+              ))
+            : kennzahlen.map((k) => (
+                <GrossKennzahl
+                  key={k.titel}
+                  titel={k.titel}
+                  wert={k.wert}
+                  einheit={k.einheit}
+                  notiz={k.notiz}
+                  notizBeschreibung={k.notizBeschreibung}
+                  ton={k.ton}
+                  zustand={k.zustand}
+                  groesse={String(k.wert).length >= LANG_AB_ZEICHEN ? 'zahlKlein' : 'zahl'}
+                />
+              ))}
+        </div>
+      </KachelGrenze>
       <div
         style={{
           flex: 1,
@@ -145,33 +155,43 @@ export default function LagebildGrossbild({
           columnGap: grossMass(48),
         }}
       >
-        {sanitaetsdienst ? <VerlaufBlock {...verlauf} /> : <GefahrenBlock {...gefahren} />}
-        <SichtungsBlock {...sichtungsDaten} />
+        <KachelGrenze
+          titel={sanitaetsdienst ? 'Verlauf' : 'Gefahrenmatrix'}
+          form="gross"
+          neuversuch={meta}
+        >
+          {sanitaetsdienst ? <VerlaufBlock {...verlauf} /> : <GefahrenBlock {...gefahren} />}
+        </KachelGrenze>
+        <KachelGrenze titel="Sichtung" form="gross" neuversuch={meta}>
+          <SichtungsBlock {...sichtungsDaten} />
+        </KachelGrenze>
         {/* Stand: Lagebericht und UHS; Aufträge und Meldungen zeigt nur der Überblick (LLH-1743),
             ihr Überfällig-Signal trägt die Alarmzeile oben (LLH-1931). */}
-        <Block titel="Stand">
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-              columnGap: grossMass(GROSS_BEZUG.luft),
-              rowGap: grossMass(GROSS_BEZUG.fuge),
-            }}
-          >
-            {fuehrung.map((k) => (
-              <GrossKennzahl
-                key={k.titel}
-                titel={k.titel}
-                wert={k.wert}
-                notiz={k.notiz}
-                notizBeschreibung={k.notizBeschreibung}
-                ton={k.ton}
-                zustand={k.zustand}
-                groesse="zahlKlein"
-              />
-            ))}
-          </div>
-        </Block>
+        <KachelGrenze titel="Stand" form="gross" neuversuch={meta}>
+          <Block titel="Stand">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                columnGap: grossMass(GROSS_BEZUG.luft),
+                rowGap: grossMass(GROSS_BEZUG.fuge),
+              }}
+            >
+              {fuehrung.map((k) => (
+                <GrossKennzahl
+                  key={k.titel}
+                  titel={k.titel}
+                  wert={k.wert}
+                  notiz={k.notiz}
+                  notizBeschreibung={k.notizBeschreibung}
+                  ton={k.ton}
+                  zustand={k.zustand}
+                  groesse="zahlKlein"
+                />
+              ))}
+            </div>
+          </Block>
+        </KachelGrenze>
       </div>
     </GrossbildFlaeche>
   );

@@ -37,7 +37,7 @@ export default function StelleUnterkunft({
     >
       {kapazitaet != null ? (
         <Typography.Text>
-          Kapazität <span style={monoStil(14)}>{personenZahl(kapazitaet)}</span>
+          Kapazität <span style={monoStil('monoGross')}>{personenZahl(kapazitaet)}</span>
         </Typography.Text>
       ) : (
         <Typography.Text type="secondary">keine Kapazität festgelegt</Typography.Text>

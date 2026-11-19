@@ -15,7 +15,8 @@ export function RechteText({ scopes }: { scopes: readonly string[] }) {
       {scopes.map((s, i) => (
         <span key={s}>
           {i > 0 && ' · '}
-          {scopeText(s)} <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+          {scopeText(s)}{' '}
+          <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{s}</span>
         </span>
       ))}
     </span>
@@ -54,7 +55,7 @@ export function CodeDialog({
         <div data-lfh="anbindung-code">
           <Stapel abstand="sm">
             <KopierbarerText text={code.code} bezeichnung="Code">
-              <span data-lfh="anbindung-code-text" style={monoStil(22, 500)}>
+              <span data-lfh="anbindung-code-text" style={monoStil('datenwertKlein')}>
                 {code.code}
               </span>
             </KopierbarerText>
@@ -62,7 +63,9 @@ export function CodeDialog({
               gilt bis {zeitKurz(code.laeuft_ab_at, konv)}, einmal einlösbar · nur jetzt sichtbar
             </span>
             <KopierbarerText text={kommando} bezeichnung="Kommando">
-              <span style={{ ...monoStil(12, 500), wordBreak: 'break-all' }}>{kommando}</span>
+              <span style={{ ...monoStil('monoKlein', 500), wordBreak: 'break-all' }}>
+                {kommando}
+              </span>
             </KopierbarerText>
             <span style={{ color: rollen.gedaempft }}>
               Nach dem Einlösen steht der Fingerabdruck des Fremdsystems am Zugang. Das Kommando

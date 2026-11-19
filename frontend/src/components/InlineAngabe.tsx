@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { Button, Popover, Space } from 'antd';
 import { useAngabeForm, type OffeneAngabe } from './angabeForm';
-import { FeldFehler } from './instrument';
+import { FeldFehler, Stapel } from './instrument';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
 import { useSelbstanmeldung } from './offeneBearbeitung';
@@ -842,16 +842,8 @@ export function InlineAngabe<T>({
   if (bearbeitenDaneben) {
     return mitPopover(
       <>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'flex-start',
-            // Ziele stehen ≥ 8 / ≥ 16 px auseinander, auch umgebrochen (LFH-630): `padding` 12/20/24.
-            gap: token.padding,
-            minWidth: 0,
-          }}
-        >
+        {/* Ziele stehen ≥ 8 / ≥ 16 px auseinander, auch umgebrochen (LFH-630): `md` = 12/20/24. */}
+        <Stapel richtung="zeile" umbruch abstand="md" ausrichten="start">
           <div id={wertId} style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             {anzeige}
           </div>
@@ -864,7 +856,7 @@ export function InlineAngabe<T>({
           >
             Bearbeiten
           </Button>
-        </div>
+        </Stapel>
         {sperrHinweis}
         {hinweis}
       </>,

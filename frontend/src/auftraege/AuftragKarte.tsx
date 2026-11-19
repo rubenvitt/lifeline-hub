@@ -2,6 +2,7 @@ import { Collapse, Typography, theme } from 'antd';
 import { memo } from 'react';
 import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/types';
 import KommKarte from '../kommunikation/KommKarte';
+import { schriftStil } from '../components/instrument';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import {
   AuftragAufhebung,
@@ -109,7 +110,12 @@ function AuftragKarte({
 
       <Text
         strong
-        style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: token.marginSM }}
+        style={{
+          ...schriftStil('kartentitel'),
+          lineHeight: 1.4,
+          display: 'block',
+          marginBottom: token.marginSM,
+        }}
       >
         {a.auftrag_text}
       </Text>

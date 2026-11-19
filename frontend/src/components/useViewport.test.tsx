@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { renderToString } from 'react-dom/server';
 import { act, render, renderHook, screen } from '@testing-library/react';
 import { abBreiteAus, useViewport } from './useViewport';
 import Zeitachseneintrag from './instrument/Zeitachseneintrag';
@@ -152,5 +153,15 @@ describe('useViewport — ein Satz Hörer je Seite (LFH-947)', () => {
     const vorher = result.current;
     rerender();
     expect(result.current).toBe(vorher);
+  });
+});
+
+describe('useViewport ohne Fenster (Server-Rendering, LLH-1973)', () => {
+  it('rendert auf dem Server und meldet dort die breite Ansicht', () => {
+    function Anzeige() {
+      const { istSchmal, abBreite, istBeruehrung } = useViewport();
+      return <span>{`${istSchmal}/${abBreite('xl')}/${istBeruehrung}`}</span>;
+    }
+    expect(renderToString(<Anzeige />)).toContain('false/true/false');
   });
 });

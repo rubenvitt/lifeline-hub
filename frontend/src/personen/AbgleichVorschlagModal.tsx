@@ -2,6 +2,7 @@ import { Modal, Typography, theme } from 'antd';
 import { useEffect, useId, useState } from 'react';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { FELD_KLASSE } from '../components/instrument';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
 
@@ -63,18 +64,19 @@ export default function AbgleichVorschlagModal({
       <label htmlFor={feldId} style={{ display: 'block', marginBlockEnd: token.marginXS }}>
         Gefundene Person
       </label>
-      <Select<number>
-        id={feldId}
-        placeholder="gefundene Person …"
-        style={{ width: '100%' }}
-        value={gewaehlt}
-        onChange={(id) => setGewaehlt(id)}
-        options={gefundene.map((g) => ({
-          value: g.id,
-          label: `${registrierAnzeige(g.registrier_nr)} ${g.name ?? 'unbekannt'}`,
-        }))}
-        disabled={gefundene.length === 0}
-      />
+      <div className={FELD_KLASSE}>
+        <Select<number>
+          id={feldId}
+          placeholder="gefundene Person …"
+          value={gewaehlt}
+          onChange={(id) => setGewaehlt(id)}
+          options={gefundene.map((g) => ({
+            value: g.id,
+            label: `${registrierAnzeige(g.registrier_nr)} ${g.name ?? 'unbekannt'}`,
+          }))}
+          disabled={gefundene.length === 0}
+        />
+      </div>
       {gefundene.length === 0 && (
         <Typography.Paragraph
           type="secondary"

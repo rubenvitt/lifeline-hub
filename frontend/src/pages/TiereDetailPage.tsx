@@ -524,7 +524,7 @@ export default function TiereDetailPage() {
       titel={
         <Space wrap size={token.marginSM}>
           <span>
-            Tier <span style={monoStil(14, 500)}>{kennung}</span>
+            Tier <span style={monoStil('monoGross', 500)}>{kennung}</span>
           </span>
           <Status
             groesse="klein"
@@ -543,7 +543,7 @@ export default function TiereDetailPage() {
          * Liste“-Knopf gibt es nicht: die Brotkrume trägt denselben Weg.
          */
         plan && (
-          <Space wrap size="middle">
+          <>
             <Button
               type="primary"
               loading={laeuftStatus(plan.primaer)}
@@ -561,7 +561,7 @@ export default function TiereDetailPage() {
                 if (aktion) fuehreAus(aktion);
               }}
             />
-          </Space>
+          </>
         )
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.

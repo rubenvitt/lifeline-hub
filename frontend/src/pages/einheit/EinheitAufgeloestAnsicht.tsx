@@ -32,6 +32,8 @@ interface EinheitAufgeloestAnsichtProps {
   rechte: Pick<EinheitRechte, 'hasPersonalLink' | 'hasFahrzeugLink'>;
   /** `dataUpdatedAt` der Liste der aufgelösten Einheiten. */
   stand: number;
+  /** Hinweis über der Seite, etwa ein gescheiterter Neuabruf (LLH-1975). */
+  hinweis?: ReactNode;
 }
 
 /**
@@ -49,6 +51,7 @@ export default function EinheitAufgeloestAnsicht({
   einheit,
   rechte,
   stand,
+  hinweis,
 }: EinheitAufgeloestAnsichtProps) {
   const { token, rollen } = useRollen();
   const { zeitKurz } = useAnzeigeKonventionen();
@@ -78,7 +81,7 @@ export default function EinheitAufgeloestAnsicht({
         )}
       </span>
       {p.ist_fuehrer && (
-        <span style={{ ...monoStil(11), color: rollen.text2 }} title="Einheitsführer">
+        <span style={{ ...monoStil('meta'), color: rollen.text2 }} title="Einheitsführer">
           EF
         </span>
       )}
@@ -92,7 +95,7 @@ export default function EinheitAufgeloestAnsicht({
       </ul>
     );
   const fahrzeug = (f: LetztesFahrzeug) => (
-    <span style={monoStil(13)}>
+    <span style={monoStil('mono')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: f.ef_id })}>
           {f.funkrufname}
@@ -148,7 +151,7 @@ export default function EinheitAufgeloestAnsicht({
               {besetzung.material.map((m) => (
                 <li key={m.em_id} data-lfh="aufgeloest-material" style={zeile}>
                   {m.bezeichnung}
-                  <span style={monoStil(13)}>×{m.menge}</span>
+                  <span style={monoStil('mono')}>×{m.menge}</span>
                 </li>
               ))}
             </ul>
@@ -178,6 +181,8 @@ export default function EinheitAufgeloestAnsicht({
         </>
       }
       dataUpdatedAt={stand}
+      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
+      hinweis={hinweis ?? undefined}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
         <Paneel titel="Kopfdaten">

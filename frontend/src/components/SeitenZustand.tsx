@@ -6,7 +6,9 @@ import { useMarkNichtGefunden } from '../einsatz/nichtGefundenContext';
 import { flaeche } from '../theme/tokens';
 import type { PlatzhalterRueckweg } from './Platzhalter';
 import Paneel from './instrument/Paneel';
-import { schriftStil, useRollen } from './instrument/rollenwerte';
+import { useRollen } from './instrument/rollenwerte';
+import Stapel from './instrument/Stapel';
+import Textstufe from './instrument/Textstufe';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache (`.lfh-skelett`). Der Import gehört
 // HIERHER: Konsumenten in `AdminPage` montieren kein `EinsatzSeite`, ihre Balken wären sonst
 // 0 px hoch — und jsdom könnte das nicht zeigen.
@@ -239,6 +241,11 @@ interface SeitenSackgasseProps {
   ursache?: unknown;
   onWiederholen?: () => void;
   rueckweg?: PlatzhalterRueckweg;
+  /**
+   * Fehlendes Recht oder kein Objekt statt eines Abruffehlers (LLH-1819): keine Alarmkante, eine
+   * Sperre ist keine Gefahr (wie `einsatz/ModulGesperrt.tsx`).
+   */
+  neutral?: boolean;
 }
 
 /**
@@ -255,6 +262,7 @@ export function SeitenSackgasse({
   ursache,
   onWiederholen,
   rueckweg,
+  neutral = false,
 }: SeitenSackgasseProps) {
   const navigate = useNavigate();
   const { token: t, rollen } = useRollen();
@@ -270,29 +278,37 @@ export function SeitenSackgasse({
         maxWidth: flaeche.seiteSchmal,
         marginInline: 'auto',
         marginBlockStart: t.marginLG,
-        boxShadow: `inset 3px 0 0 0 ${rollen.alarm}`,
+        ...(!neutral && { boxShadow: `inset 3px 0 0 0 ${rollen.alarm}` }),
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: t.marginSM }}>
-        <div style={{ ...schriftStil('seitentitel'), color: rollen.text }}>{titel}</div>
+      <Stapel abstand="sm">
+        <Textstufe stufe="seitentitel" als="div">
+          {titel}
+        </Textstufe>
         {untertitel != null && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
+          <Textstufe stufe="textKlein" ton="text2" als="p">
             {untertitel}
-          </p>
+          </Textstufe>
         )}
         {(onWiederholen || rueckweg) && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: t.marginSM }}>
+          <Stapel richtung="zeile" umbruch abstand="sm">
             {onWiederholen && (
               <Button type="primary" onClick={onWiederholen}>
                 Erneut abrufen
               </Button>
             )}
             {rueckweg && (
-              <Button onClick={() => void navigate(rueckweg.pfad)}>{rueckweg.label}</Button>
+              // Ohne Neuversuch ist der Rückweg der eine Weg heraus und damit primär (LLH-1819).
+              <Button
+                type={onWiederholen ? 'default' : 'primary'}
+                onClick={() => void navigate(rueckweg.pfad)}
+              >
+                {rueckweg.label}
+              </Button>
             )}
-          </div>
+          </Stapel>
         )}
-      </div>
+      </Stapel>
     </Paneel>
   );
 }

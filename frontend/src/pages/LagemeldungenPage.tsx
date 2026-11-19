@@ -1,5 +1,5 @@
 import { IconPlus } from '../icons';
-import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Input, Spin } from 'antd';
 import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -27,6 +27,7 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
+  Knopfreihe,
   monoStil,
   Status,
   useRollen,
@@ -408,9 +409,7 @@ export default function LagemeldungenPage() {
       }
       aktionen={
         (l.is_neu && darfSchreiben) || (darfBearbeiten && bearbeitetId !== l.meldung_id) ? (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-          // `paddingXS` ließ 3 / 5 / 7 px.
-          <Space wrap size={token.marginSM}>
+          <Knopfreihe>
             {l.is_neu && darfSchreiben && (
               <Button
                 disabled={ohneVerbindung}
@@ -429,7 +428,7 @@ export default function LagemeldungenPage() {
                 Bearbeiten
               </Button>
             )}
-          </Space>
+          </Knopfreihe>
         ) : undefined
       }
       hinweis={zeilenHinweis(l)}
@@ -628,9 +627,9 @@ export default function LagemeldungenPage() {
             marginBlockEnd: token.margin,
           }}
         >
-          +<span style={monoStil(12)}>{nachtraege.length}</span>{' '}
+          +<span style={monoStil('monoKlein')}>{nachtraege.length}</span>{' '}
           {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
-          <span style={monoStil(12)}>
+          <span style={monoStil('monoKlein')}>
             {taktisch(letzteLb, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
           </span>{' '}
           übernommen ·{' '}

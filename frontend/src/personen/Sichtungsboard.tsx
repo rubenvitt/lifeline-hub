@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
 import { vorText } from '../anzeige/dauer';
-import { monoStil, useRollen } from '../components/instrument';
+import { MetaZeile, Stapel, monoStil, useRollen } from '../components/instrument';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import {
   useZuflussSchleuse,
@@ -108,7 +108,7 @@ export default function Sichtungsboard({
   };
 
   const karten = (k: SichtungsbildSchluessel) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+    <Stapel abstand="xs">
       {je.get(k)!.map((p) => (
         <BoardKarte
           key={p.id}
@@ -118,7 +118,7 @@ export default function Sichtungsboard({
           bedienung={bedienung}
         />
       ))}
-    </div>
+    </Stapel>
   );
 
   return (
@@ -213,7 +213,7 @@ function SpaltenKopf({
   return (
     <h2 style={stil}>
       <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{wort(k)}</span>
-      <span data-testid="board-zahl" style={monoStil(14, 500)}>
+      <span data-testid="board-zahl" style={monoStil('monoGross', 500)}>
         {zahl}
       </span>
     </h2>
@@ -259,7 +259,7 @@ function BoardKarte({
         minWidth: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: token.marginXS, minWidth: 0 }}>
+      <Stapel richtung="zeile" abstand="xs" ausrichten="start">
         {sichtungBedienbar ? (
           <ZeilenSichtung
             p={p}
@@ -283,28 +283,28 @@ function BoardKarte({
             color: rollen.text,
           }}
         >
-          <span style={{ display: 'flex', gap: token.marginXS, flexWrap: 'wrap' }}>
+          <Stapel als="span" richtung="zeile" umbruch abstand="xs">
             <span style={monoStil(token.fontSize, 500)}>{kennung}</span>
             {p.pat_nummer && (
               <span style={{ ...monoStil(token.fontSizeSM), color: rollen.text2 }}>
                 PAT {p.pat_nummer}
               </span>
             )}
-          </span>
+          </Stapel>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {name ?? 'unbekannt'}
           </span>
         </Link>
-      </div>
-      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-        {zeit}
-        {aufenthalt && ` · ${aufenthalt}`}
-      </Typography.Text>
+      </Stapel>
+      <MetaZeile>
+        <MetaZeile.Teil>{zeit}</MetaZeile.Teil>
+        {aufenthalt && <MetaZeile.Teil>{aufenthalt}</MetaZeile.Teil>}
+      </MetaZeile>
       {(p.transport_prioritaet || p.kontamination) && (
-        <span style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXXS }}>
+        <Stapel als="span" richtung="zeile" umbruch abstand="xxs">
           <PrioritaetMarke prioritaet={p.transport_prioritaet} />
           {p.kontamination && <Status darstellung={KONTAMINATION} />}
-        </span>
+        </Stapel>
       )}
     </article>
   );

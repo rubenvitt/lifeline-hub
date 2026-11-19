@@ -35,6 +35,7 @@ die Karten deckungsgleich.
 | Nebenangaben eines Datensatzes in einer Zeile                                                   | `MetaZeile`                                                                                                                                      | `MetaZeile`                        |
 | Text in einer Größe und Farbe                                                                   | `Textstufe` (Stufe der `schriftskala`, Ton)                                                                                                      | `Text`                             |
 | Elemente mit Abstand reihen                                                                     | `Stapel` (Rasterstufe)                                                                                                                           | `Stapel`                           |
+| Knöpfe nebeneinander (Kopf, Paneel, Dialogfuß)                                                  | `Knopfreihe` (Abstand `md`, Fuß mit `fuss`)                                                                                                      | `Knopfreihe`                       |
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
 | Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
@@ -93,6 +94,7 @@ die Karten deckungsgleich.
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **Textstufe (Stufen der Schriftskala und Töne)** (`components/Text/`, Gruppe Flächen)
 - **Stapel (Abstand als Rasterstufe, senkrecht und als Zeile)** (`components/Stapel/`, Gruppe Flächen)
+- **Knopfreihe (Knöpfe nebeneinander, Abstand md)** (`components/Knopfreihe/`, Gruppe Flächen)
 - **MetaZeile (Nebenangaben eines Datensatzes)** (`components/MetaZeile/`, Gruppe Daten)
 - **Status, Marke und Statusknopf (Rahmen heißt bedienbar)** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
@@ -168,10 +170,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
   Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
   30/48/72 gilt, nicht die Entwurfsskizze. Text setzt `Textstufe` (Stufe und Ton), Titel einer
-  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nicht. Die
-  Stufen wachsen nicht mit der Dichte. Neue `fontSize`-Zahlen
-  verbietet `theme/schriftgroesse.guard.test.ts`; die Altlast steht in `schriftgroesse.schuld.ts`
-  und sinkt wie beim Abstandsraster.
+  Karte oder eines Listeneintrags die Stufe `kartentitel` (15/600); 13 px gibt es nur als
+  Mono-Stufe `mono`. Mono-Text nimmt `monoStil(stufe)` mit `metaKlein` 10, `meta` 11, `monoKlein`
+  12, `mono` 13, `monoGross` 14 oder `datenwert*`, eine Zahl nur aus einer Variablen. Die Stufen wachsen nicht mit der Dichte. Neue
+  `fontSize`-Zahlen und `monoStil(<Zahl>)` verbietet `theme/schriftgroesse.guard.test.ts`; die
+  Altlast steht in `schriftgroesse.schuld.ts` und sinkt wie beim Abstandsraster.
 - **Abstandsraster**: Abstände kommen aus dem Raster der aktiven
   Dichte (`dichten[*].abstand` in `theme/tokens.ts`), Stufen `xxs`·`xs`·`sm`·`md`·`lg`·`xl` auf
   Vielfachen von 4. Die Werte sind kompakt 4·4·8·12·16·24, komfortabel 4·4·12·20·28·40 und
@@ -297,6 +300,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
     neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
     Nachweis `e2e/fehlergrenze.spec.ts`.
+  - **Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze** (Entwurf
+    `docs/superpowers/specs/2026-11-19-ft74hjiv-fehlergrenze-je-kachel-design.md`): Auf
+    Überblick, Lagebild, Lagebild-Großbild und Lagemonitor steht jede Kachel (Alarmzeile,
+    Startliste, Paneel, Kennzahlenband, Monitorkachel) einzeln in `KachelGrenze`
+    (`components/KachelGrenze.tsx`), damit ein Wurf nur sie ersetzt und nicht über die
+    Rahmengrenze die ganze Seite. Form `paneel` mit „Neu laden“ auf Flächen mit Bedienung, Form
+    `gross` ohne Knopf auf Großbild und Lagemonitor, dort mit dem Datenstand als `neuversuch`. Wie
+    die Rahmengrenze zeigt sie nie Meldung oder Stack und meldet über `meldeClientFehler`. Sie
+    fängt nur Würfe beim Zeichnen: Abfragefehler zeigt `PaneelZustand`, ein Wurf im Rumpf der
+    Seite bleibt bei der Rahmengrenze. Wächter `pruefeKachelGrenzen` (`test/kachelWaechter.ts`)
+    in den Seitentests von Überblick, Lagebild und Lagemonitor; Nachweis
+    `components/KachelGrenze.test.tsx`.
   - **Ortsmarke in der Bedienfarbe**: die aktive
     Rail-Kategorie (`rahmenFarben.bedien`), die offene Kategorie im Navigations-Drawer und der
     aktive Reiter der Gerätehülle tragen ihre Marke in `bedien` wie das aktive Modul im
@@ -467,12 +482,16 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Breite (Schloss in `AppLayout.tsx`). Jede Textfarbe im Rahmen steht in
   `theme/rahmenKontrast.test.ts` und wird dort gerechnet (der Test sieht keine Verwendung, nur
   die Liste). Gilt für jede weitere dauerdunkle Fläche.
-- **Ein `<Space>` in `aktionen` nennt seinen Abstand**: ohne `size` stehen die Knöpfe
-  4 / 4 / 8 px auseinander, auch im Seitenkopf, dessen Hülle selbst `marginSM` hält. Vorgabe
-  `size={token.marginSM}` (8 / 12 / 16); Wächter `components/aktionenSpace.guard.test.ts`.
-- **Rot steht nicht bündig neben Neutralem:** `<Space>` mit `danger` und weiterer Aktion trägt
-  `size="middle"`. Dialogfüße halten dieselbe Stufe (12/20/24 px, Leitlinie ≥ 8 / ≥ 16): der Fuß der Erfassungs-Hülle über `size="middle"`, antds
-  eigene Füße (Modal, `modal.confirm`, `Popconfirm`) über eine Regel in `index.css` mit
+- **Knopfreihen über `Knopfreihe`**: zwei oder mehr Knöpfe nebeneinander
+  stehen in `Knopfreihe` mit dem festen Abstand `md` (12 / 20 / 24 px), so steht auch Rot nie
+  bündig neben Neutralem; kein `<Space>`, kein eigener Abstand. Dialogfüße nehmen `fuss` (ab `md`
+  rechtsbündig, darunter untereinander in voller Breite). Primär steht im Kopf, im Paneel und in
+  der Zeile vorn, im Fuß hinten; die Reihe ordnet nicht um. In Tabellenzellen und Zeilen, die ihre
+  Höhe halten, `umbruch={false}`. Ein `<Space>` in `aktionen` der `EinsatzSeite` wird zum
+  Fragment, denn die Kopfhülle ist selbst eine Knopfreihe; nur eine Reihe mit Druckklasse oder
+  Hülle bleibt eine eigene `Knopfreihe` (Kräfte, Lagebericht). Bestand in
+  `components/knopfreihe.schuld.ts` (Ratsche). antds eigene Füße
+  (Modal, `modal.confirm`, `Popconfirm`) halten dieselbe Stufe über eine Regel in `index.css` mit
   `var(--ant-padding)`. **Kein Komponenten-Token `marginXS`:** jeder antd-Knopf setzt die Variable
   mit seiner `css-var-…`-Klasse zurück, die Überschreibung kommt am Knopf nie an (gemessen 7 px).
   Nachweis `e2e/dialogfuss-dichte.spec.ts`, `e2e/dokumente.spec.ts`.

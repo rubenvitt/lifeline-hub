@@ -292,9 +292,10 @@ describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
     expect(eintraege.indexOf(profil)).toBe(0);
     const kopf = screen.getByTestId('benutzermenue-kopf');
     expect(kopf.textContent).toContain(`@${benutzer.benutzername}`);
+    // Benutzername und Version stehen als MetaZeile: zwei Teile mit „·“ dazwischen.
     expect(
-      within(kopf).queryByText(`@${benutzer.benutzername} · Version ${__APP_VERSION__}`),
-    ).toEqual(knapp ? expect.anything() : null);
+      kopf.textContent?.includes(`@${benutzer.benutzername} · Version ${__APP_VERSION__}`),
+    ).toBe(knapp);
     expect(within(kopf).getAllByText(new RegExp(`Version ${__APP_VERSION__}`))).toHaveLength(1);
   });
 

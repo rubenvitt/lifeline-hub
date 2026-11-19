@@ -5,13 +5,14 @@ import { ohneKommentare } from '../test/ohneKommentare';
 import { quellwurzel } from '../test/ratsche';
 
 /**
- * Feld-Wächter des Verwaltungsteils (Spec `feldbreiten`, „Keine feste Feldbreite im
- * Verwaltungsteil", Change `hzru8iq7-text-stapel-meta-feld`, design.md D7). Löst den
+ * Feld-Wächter (Spec `feldbreiten`, „Keine feste Feldbreite im Verwaltungsteil", Change
+ * `hzru8iq7-text-stapel-meta-feld`, design.md D7; auf die Führungsmodule ausgeweitet mit
+ * LLH-1969, auf Personen, Betreuung, Verpflegung, Kräfte und Ablösung mit LLH-1970). Löst den
  * Feldbreiten-Guard aus LFH-329 · B1 ab.
  *
  * Ein Eingabefeld bekommt seine Breite nur über `Feld` (`components/instrument/Feld.tsx`) mit einer
  * benannten Obergrenze; dann ist es fluid und ragt am schmalen Schirm nicht über den Rand. Der
- * Wächter prüft in den vier Bereichen:
+ * Wächter prüft in den Bereichen aus {@link BEREICHE}:
  *
  * 1. kein `<Form.Item` — Formularfelder sind `Feld`;
  * 2. keine Breite (`width`, `maxWidth`, `minWidth`, als Zahl, String oder Konstante) im `style`
@@ -24,14 +25,36 @@ import { quellwurzel } from '../test/ratsche';
  * ── BEKANNTE GRENZEN ──
  * 1. Regel 2 sieht das Eingabefeld nur, solange zwischen Elementname und `style=` kein `>` steht
  *    (Pfeilfunktion in einer Prop davor).
- * 2. Der Scan hört an den vier Bereichen auf; außerhalb gilt die Regel ebenso, wird aber erst mit
- *    der Umstellung des Bereichs erzwungen.
+ * 2. Der Scan hört an den Bereichen aus {@link BEREICHE} auf; außerhalb gilt die Regel ebenso,
+ *    wird aber erst mit der Umstellung des Bereichs erzwungen.
  */
 
 const SRC = quellwurzel('Feld-Wächter');
 
-/** Die Bereiche des Verwaltungsteils: Stammdaten, Karten, globale Einstellungen, Benutzer. */
-const BEREICHE = ['stammdaten', 'karten', 'pages/einstellungen', 'pages/BenutzerPage.tsx'];
+/**
+ * Die geprüften Bereiche: der Verwaltungsteil (Stammdaten, Karten, globale Einstellungen,
+ * Benutzer; LLH-1810), die Führungsmodule ETB, Aufträge, Meldungen, Nachforderungen,
+ * Lageberichte, Erinnerungen und Chat (LLH-1969) und die Einsatzmodule Personen, Betreuung,
+ * Verpflegung, Kräfte und Ablösung (LLH-1970).
+ */
+const BEREICHE = [
+  'stammdaten',
+  'karten',
+  'pages/einstellungen',
+  'pages/BenutzerPage.tsx',
+  'etb',
+  'auftraege',
+  'meldungen',
+  'nachforderungen',
+  'lageberichte',
+  'erinnerung',
+  'chat',
+  'personen',
+  'betreuung',
+  'verpflegung',
+  'kraefte',
+  'abloesung',
+];
 
 /** Was eine feste Zahlbreite behalten darf, wie oft — und warum. Keine davon ist ein Eingabefeld. */
 const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = {
@@ -42,6 +65,38 @@ const ZUGELASSEN: Readonly<Record<string, { anzahl: number; grund: string }>> = 
   'pages/BenutzerPage.tsx': {
     anzahl: 2,
     grund: 'Spaltenbreiten der Benutzertabelle neben ihrer Fließspalte',
+  },
+  'chat/KanalListe.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbSpaltenzeile.tsx': { anzahl: 1, grund: 'visuell verborgene Vorleserfläche (Clip)' },
+  'etb/EtbEintragVorschau.tsx': { anzahl: 1, grund: '2-px-Typkante der Vorschau' },
+  'etb/EtbFeldzeile.tsx': {
+    anzahl: 3,
+    grund: '6-px-Typpunkt in Menü und Typ-Knopf, 32-px-Spalte des Feldworts am Handschirm',
+  },
+  // Einsatzmodule (LLH-1970).
+  'personen/personenSpalten.tsx': {
+    anzahl: 9,
+    grund: 'Spaltenbreiten der Betroffenenliste und der nur vorgelesene Spaltenkopf (1 px)',
+  },
+  'personen/BetroffeneZeile.tsx': { anzahl: 1, grund: 'nur vorgelesener Text (1 px)' },
+  'personen/BetroffenenSeitenleiste.tsx': {
+    anzahl: 1,
+    grund: 'Kürzelspalte der Sichtungsliste',
+  },
+  'personen/Sichtungszeile.tsx': { anzahl: 1, grund: 'Farbfeld der Sichtungskategorie' },
+  'personen/ZeilenSichtung.tsx': {
+    anzahl: 1,
+    grund: 'Popover-Breite aus drei Sichtungsflächen je Reihe',
+  },
+  'kraefte/DauerMitEinstufung.tsx': { anzahl: 1, grund: 'nur vorgelesener Text (1 px)' },
+  'kraefte/EinheitZeichen.tsx': { anzahl: 1, grund: 'Kästchen des taktischen Zeichens' },
+  'abloesung/schichtplan/SchichtplanRaster.tsx': {
+    anzahl: 1,
+    grund: 'senkrechte Jetzt-Linie im Raster',
+  },
+  'abloesung/schichtplan/planEditor.cases.tsx': {
+    anzahl: 3,
+    grund: 'Rechtecke als Testfälle des Planeditors',
   },
 };
 
@@ -117,7 +172,7 @@ function sammleDateien(bereich: string): Quelle[] {
 
 const QUELLEN = BEREICHE.flatMap(sammleDateien);
 
-describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => {
+describe('Feld-Wächter: Felder im Verwaltungsteil und den umgestellten Einsatzmodulen (Spec `feldbreiten`)', () => {
   it('kein Form.Item, keine Breite am Eingabefeld, keine feste Zahlbreite außer zugelassen', () => {
     const meldungen = feldBefunde(QUELLEN, ZUGELASSEN);
     expect(meldungen, meldungen.join('\n')).toEqual([]);
@@ -126,6 +181,7 @@ describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => 
   it('sieht die Bereiche wirklich — sonst ist der Wächter eine Attrappe', () => {
     expect(QUELLEN.length).toBeGreaterThan(50);
     expect(QUELLEN.some((q) => q.pfad === 'stammdaten/FahrzeugDetailPage.tsx')).toBe(true);
+    expect(QUELLEN.some((q) => q.pfad === 'personen/AufnahmeFelder.tsx')).toBe(true);
   });
 
   describe('Regeln an Texten', () => {
@@ -152,7 +208,7 @@ describe('Feld-Wächter: Felder im Verwaltungsteil (Spec `feldbreiten`)', () => 
     it('meldet eine Stil-Konstante am Eingabefeld, aber keinen Stil-Aufruf', () => {
       const text = [
         '<Select<number> options={o} style={SELECT_STYLE} />',
-        '<Input style={monoStil(14)} />',
+        "<Input style={monoStil('monoGross')} />",
       ].join('\n');
       const meldungen = feldBefunde(q(text), {});
       expect(meldungen).toEqual([

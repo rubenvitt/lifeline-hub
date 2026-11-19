@@ -57,7 +57,7 @@ import {
   verteilerNamesFromForm,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
-import { Paneel, monoStil } from '../components/instrument';
+import { Knopfreihe, Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
 import { flaeche } from '../theme/tokens';
 
@@ -404,9 +404,7 @@ function LageberichtDetail() {
         }}
         aktionen={
           <div className="lagebericht-no-print">
-            {/* Zielabstand aus der Dichte-Staffel (LFH-968): `marginSM` = 8 / 12 / 16 px, antds
-                Vorgabe `paddingXS` ließ 3 / 5 / 7 px. */}
-            <Space wrap size={token.marginSM}>
+            <Knopfreihe>
               {!istEntwurf && darfSchreiben && (
                 <Button
                   onClick={() => fortschreibenMutation.mutate()}
@@ -442,7 +440,7 @@ function LageberichtDetail() {
                   </Button>
                 </>
               )}
-            </Space>
+            </Knopfreihe>
           </div>
         }
       >
@@ -465,7 +463,7 @@ function LageberichtDetail() {
             Uhrzeiten für denselben Wert. Der Lesezweig rendert über `ZeitAnzeige` in der
             taktischen DTG und der Anzeigezone (der Wirestring ist UTC ohne Zonenkennung). */}
         {!schreibtEntwurf && (
-          <Typography.Paragraph type="secondary" style={monoStil(12)}>
+          <Typography.Paragraph type="secondary" style={monoStil('monoKlein')}>
             Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
           </Typography.Paragraph>
         )}

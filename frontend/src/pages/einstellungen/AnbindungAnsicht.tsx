@@ -192,7 +192,7 @@ export default function AnbindungAnsicht() {
             {SCOPES.map((s) => (
               <Checkbox key={s} value={s}>
                 {SCOPE_TEXT[s]}{' '}
-                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+                <span style={{ ...monoStil('meta', 500), color: rollen.schwach }}>{s}</span>
               </Checkbox>
             ))}
           </Stapel>
@@ -295,7 +295,7 @@ export default function AnbindungAnsicht() {
             )}
             {zugang.fingerabdruck_neu && (
               <Datenfeld label="Neuer Schlüssel" breit>
-                <span style={monoStil(13)}>{zugang.fingerabdruck_neu}</span>
+                <span style={monoStil('mono')}>{zugang.fingerabdruck_neu}</span>
                 <span style={{ color: rollen.gedaempft }}>
                   {' · gilt ab der ersten Anfrage damit'}
                 </span>

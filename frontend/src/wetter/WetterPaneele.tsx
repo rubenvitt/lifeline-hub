@@ -169,7 +169,7 @@ function WarnungEintrag({
         <Status groesse="klein" ton={tonVonRolle(d.rolle) ?? 'achtung'} wort={d.label} />
         <b style={{ color: rollen.text, fontSize: 13 }}>{titelSchreibung(w.ereignis)}</b>
       </div>
-      <span style={{ ...monoStil(12), color: rollen.text2 }}>
+      <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
         {warnZeitraum(w.beginn, w.ende, jetzt, konv)}
       </span>
       <span style={{ color: rollen.text2, fontSize: 12 }}>{w.ueberschrift}</span>
@@ -393,7 +393,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
                       paddingBlock: token.paddingXS,
                       paddingInline: token.padding,
                       borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-                      ...monoStil(12),
+                      ...monoStil('monoKlein'),
                       color: rollen.text2,
                     }}
                   >

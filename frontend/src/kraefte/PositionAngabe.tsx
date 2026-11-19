@@ -42,7 +42,7 @@ export default function PositionAngabe({
         wert == null ? null : ausgeschrieben ? (
           POSITION_LABELS[wert]
         ) : (
-          <span style={monoStil(13)} title={POSITION_LABELS[wert]}>
+          <span style={monoStil('mono')} title={POSITION_LABELS[wert]}>
             {POSITION_KUERZEL[wert]}
           </span>
         )

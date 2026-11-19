@@ -85,7 +85,7 @@ export default function ListenPaneel<T>({
           aria-label={`${rest} weitere ${weitere.name}`}
           style={{
             ...listenZeileStil(rollen, token),
-            ...monoStil(11),
+            ...monoStil('meta'),
             color: rollen.bedienText,
             borderBlockEnd: 0,
           }}
@@ -113,7 +113,7 @@ export function LadePlatzhalterZeile({ stil, text }: { stil: CSSProperties; text
         <span style={{ fontSize: 12, lineHeight: 1.45, color: rollen.gedaempft }}>
           {text ? PANEEL_LADEN_TEXT : '\u00a0'}
         </span>
-        <span aria-hidden="true" style={monoStil(10)}>
+        <span aria-hidden="true" style={monoStil('metaKlein')}>
           {'\u00a0'}
         </span>
       </span>
@@ -278,12 +278,17 @@ export function ListenAbschnitt<T>({
         <span data-lfh="abschnitt-zahl" style={{ ...monoStil(15, 500), color: rollen.text }}>
           {gesperrt || zahl == null ? '—' : zahl}
           {zahlWort && !gesperrt && zahl != null && (
-            <span style={{ ...monoStil(10), color: rollen.schwach }}> {zahlWort}</span>
+            <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}> {zahlWort}</span>
           )}
         </span>
         <span
           data-lfh="abschnitt-notiz"
-          style={{ flex: '1 1 auto', minWidth: 0, ...monoStil(10), color: rollen.gedaempft }}
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            ...monoStil('metaKlein'),
+            color: rollen.gedaempft,
+          }}
         >
           {gesperrt ? null : notiz}
         </span>
@@ -298,7 +303,7 @@ export function ListenAbschnitt<T>({
               gap: token.marginXXS,
               minHeight: token.controlHeight,
               paddingInline: token.paddingXS,
-              ...monoStil(11),
+              ...monoStil('meta'),
               color: rollen.bedienText,
               textDecoration: 'none',
             }}

@@ -155,7 +155,7 @@ function BruchZeile({
         borderBlockStart: `1px solid ${rollen.bannerLinie}`,
       }}
     >
-      <span style={monoStil(12)}>{zeitKurz(zeit, konventionen)}</span>
+      <span style={monoStil('monoKlein')}>{zeitKurz(zeit, konventionen)}</span>
       <strong>{bruchArtWort(e)}</strong>
       {!e.verborgen && e.von && (
         <span style={{ color: rollen.text2 }}>

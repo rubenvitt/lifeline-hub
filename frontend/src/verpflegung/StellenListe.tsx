@@ -13,15 +13,13 @@ import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue
 import { useKontextMenue } from '../components/useKontextMenue';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import { monoStil, useRollen } from '../components/instrument';
+import { Stapel, Textstufe, monoStil, useRollen } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { verpflegungsstelleStatus } from '../theme/statusFarben';
 import { laufendeZeitfensterDerStelle } from './stellenKern';
 import { Rueckfrage } from './VerpflegungDialoge';
 import { STELLE_ART_LABEL, uhrzeitenText, zitat } from './verpflegungText';
 import { Status } from '../components/instrument/Status';
-
-const { Text } = Typography;
 
 export interface StellenListeProps {
   einsatzId: number;
@@ -237,12 +235,12 @@ export default function StellenListe({
         }}
       >
         <Flex justify="space-between" align="center" gap={token.marginXS} wrap>
-          <Flex align="baseline" gap={token.marginSM} wrap style={{ minWidth: 0 }}>
-            <Text strong style={{ fontSize: 15, overflowWrap: 'anywhere' }}>
+          <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="baseline">
+            <Textstufe stufe="kartentitel" umbruch="ueberall">
               {s.bezeichnung}
-            </Text>
-            <span style={{ color: rollen.text2 }}>{STELLE_ART_LABEL[s.art]}</span>
-          </Flex>
+            </Textstufe>
+            <Textstufe ton="text2">{STELLE_ART_LABEL[s.art]}</Textstufe>
+          </Stapel>
           <Status darstellung={verpflegungsstelleStatus[s.status]} />
         </Flex>
         {s.standort && (
@@ -256,11 +254,11 @@ export default function StellenListe({
             <span style={{ color: rollen.text2 }}>kein laufendes Zeitfenster</span>
           ) : (
             laufend.map(({ zeitfenster: zf, ausgegeben }) => (
-              <Flex key={zf.id} gap={token.marginXS} wrap align="baseline">
+              <Stapel key={zf.id} richtung="zeile" abstand="xs" umbruch ausrichten="baseline">
                 <span>{`${zf.bezeichnung} ${uhrzeitenText(zf, konventionen)}`}</span>
                 <span style={{ color: rollen.text2 }}>·</span>
-                <span style={monoStil(13, 500)}>{`${ausgegeben} EP ausgegeben`}</span>
-              </Flex>
+                <span style={monoStil('mono', 500)}>{`${ausgegeben} EP ausgegeben`}</span>
+              </Stapel>
             ))
           )}
         </div>

@@ -66,6 +66,7 @@ import {
   Segmentleiste,
   Marke,
   Stapel,
+  Knopfreihe,
   Status,
   StatusBlock,
   StatusKnopf,
@@ -1591,6 +1592,37 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         </Stapel>
       );
     },
+  },
+  {
+    name: 'Knopfreihe',
+    title: 'Knopfreihe (Knöpfe nebeneinander, Abstand md)',
+    group: 'Flächen',
+    height: 260,
+    source: 'components/instrument/Knopfreihe.tsx',
+    content: () => (
+      <Stapel abstand="lg">
+        <Stapel abstand="xs">
+          <Textstufe stufe="meta" ton="schwach">
+            Kopf, Paneel, Zeile: Primär vorn
+          </Textstufe>
+          <Knopfreihe>
+            <Button type="primary">Personal disponieren</Button>
+            <Button>Ad-hoc-Person</Button>
+          </Knopfreihe>
+        </Stapel>
+        <Stapel abstand="xs">
+          <Textstufe stufe="meta" ton="schwach">
+            fuss: rechtsbündig, Primär hinten
+          </Textstufe>
+          <Knopfreihe fuss>
+            <Button>Abbrechen</Button>
+            <Button type="primary" danger>
+              Abschnitt auflösen
+            </Button>
+          </Knopfreihe>
+        </Stapel>
+      </Stapel>
+    ),
   },
   {
     name: 'MetaZeile',

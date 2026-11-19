@@ -108,7 +108,7 @@ export default function EinsatzVorlagenTab() {
       key: 'module',
       sorter: (a, b) => sichtbarAnzahl(a.ausgeblendet) - sichtbarAnzahl(b.ausgeblendet),
       // Zahlen in Mono, die Spalte wird zeilenweise verglichen.
-      render: (_, v) => <span style={monoStil(12)}>{moduleText(v.ausgeblendet)}</span>,
+      render: (_, v) => <span style={monoStil('monoKlein')}>{moduleText(v.ausgeblendet)}</span>,
     },
     ...(istAdmin
       ? ([

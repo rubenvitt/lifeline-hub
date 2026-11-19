@@ -153,7 +153,7 @@ export default function FahrzeugDetailPage() {
         breite="schmal"
         titel={
           <Stapel als="span" richtung="zeile" abstand="sm" ausrichten="mitte">
-            <span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>
+            <span style={monoStil('monoGross', 500)}>{fahrzeug.funkrufname}</span>
             {fahrzeug.ist_demo && <DemoMarke />}
           </Stapel>
         }

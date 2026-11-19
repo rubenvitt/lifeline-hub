@@ -635,7 +635,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
         <Datenfeld label="Koordinate">
           {verortet ? (
             <Space wrap size="small">
-              <span style={monoStil(14)}>
+              <span style={monoStil('monoGross')}>
                 {s.lat!.toFixed(5)}, {s.lon!.toFixed(5)}
               </span>
               {!karteGesperrt && (
@@ -869,9 +869,10 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
             <Typography.Text type="secondary">keine Meldung</Typography.Text>
           ) : (
             <Typography.Text>
-              Belegt <span style={monoStil(14)}>{personenZahl(s.belegung.belegt)}</span> von{' '}
-              <span style={monoStil(14)}>{personenZahl(gesamt ?? s.belegung.belegt)}</span> in
-              Betreuung
+              Belegt <span style={monoStil('monoGross')}>{personenZahl(s.belegung.belegt)}</span>{' '}
+              von{' '}
+              <span style={monoStil('monoGross')}>{personenZahl(gesamt ?? s.belegung.belegt)}</span>{' '}
+              in Betreuung
             </Typography.Text>
           )}
         </Paneel>

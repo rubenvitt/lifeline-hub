@@ -63,7 +63,7 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
     border: rand,
     padding: `${token.paddingXXS}px ${token.paddingXS}px`,
     textAlign: 'center',
-    ...monoStil(13, 500),
+    ...monoStil('mono', 500),
   };
 
   return (

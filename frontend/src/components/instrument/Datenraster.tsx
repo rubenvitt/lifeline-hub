@@ -65,7 +65,7 @@ export function Datenfeld({ label, children, mono = false, breit = false }: Date
           minWidth: 0,
           overflowWrap: 'anywhere',
           color: rollen.text,
-          ...(mono ? monoStil(13) : { fontSize: 13 }),
+          ...(mono ? monoStil('mono') : { fontSize: 13 }),
         }}
       >
         {children}

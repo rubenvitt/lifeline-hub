@@ -2,6 +2,7 @@ import { cloneElement, useId, type ReactElement, type ReactNode } from 'react';
 import { Form } from 'antd';
 import type { FormItemProps, FormRule } from 'antd';
 import Augenbraue from './Augenbraue';
+import { FELD_KLASSE } from './Feld';
 import GeaendertPunkt from './GeaendertPunkt';
 import { useRollen } from './rollenwerte';
 import { datenfeldStil } from './datenrasterStil';
@@ -22,7 +23,8 @@ import { datenfeldStil } from './datenrasterStil';
  *   `scrollToFirstError={{ focus: true }}` am Formular der Seite bleibt also wirksam.
  *
  * Kein unterer Rand am `Form.Item`: die Zelle trägt ihr Polster selbst, eine Meldung macht sie
- * höher.
+ * höher. Die Klasse von `Feld` (`FELD_KLASSE`) zieht auch `InputNumber`, `DatePicker` und
+ * `Select` auf die Zellbreite, ohne Breite an der Eingabe (Feld-Wächter, LLH-1970).
  */
 export interface DatenfeldEingabeProps {
   /** Begriff — Augenbraue und zugänglicher Name der Eingabe. */
@@ -63,7 +65,13 @@ export default function DatenfeldEingabe({
         </label>
       </Augenbraue>
       <dd style={{ margin: 0, minWidth: 0 }}>
-        <Form.Item name={name} rules={rules} extra={hilfe} style={{ marginBottom: 0 }}>
+        <Form.Item
+          name={name}
+          rules={rules}
+          extra={hilfe}
+          className={FELD_KLASSE}
+          style={{ marginBottom: 0 }}
+        >
           {cloneElement(children, { id: eingabeId })}
         </Form.Item>
       </dd>

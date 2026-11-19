@@ -43,7 +43,12 @@ import {
   SpeicherFehler,
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
-import { SeitenFehler, SeitenNichtGefunden, SeitenSkeleton } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import {
   Datenfeld,
   Datenraster,
@@ -315,7 +320,10 @@ export default function EinsatzkraftPage() {
   if (einsatzQuery.isLoading || epQuery.isLoading || periodenQuery.isLoading) {
     return <SeitenSkeleton />;
   }
-  if (einsatzQuery.isError || !einsatzQuery.data) {
+  // Die Fehlerseite nur ohne Daten (LLH-1975, wie LLH-1947): React Query setzt `error` auch, wenn
+  // nur ein Neuabruf scheitert (SSE, Fokus, Reconnect) und der Stand noch im Zwischenspeicher
+  // liegt. Dann bleibt die Seite stehen; der Hinweis `veraltet` sagt es.
+  if (!einsatzQuery.data) {
     return (
       <SeitenFehler
         text="Einsatz nicht gefunden oder kein Zugriff"
@@ -329,7 +337,8 @@ export default function EinsatzkraftPage() {
   const entlassen = aktiv ? undefined : entlasseneQuery.data?.find((x) => x.id === epId);
   if (!aktiv && !entlassen) {
     // Ein Abruffehler, auch ein angehaltener Abruf ohne Netz und ohne Stand, bietet den neuen
-    // Versuch an: ohne beide Listen steht nicht fest, dass es die Kraft nicht (mehr) gibt.
+    // Versuch an: ohne beide Listen steht nicht fest, dass es die Kraft nicht (mehr) gibt. Das gilt
+    // auch mit altem Stand: aus ihm folgt nicht, dass es die Kraft nicht (mehr) gibt (LLH-1975).
     if (epQuery.isError || !epQuery.data) {
       return (
         <SeitenFehler
@@ -354,6 +363,9 @@ export default function EinsatzkraftPage() {
   }
   const ep = (aktiv ?? entlassen)!;
   const isEntlassen = !aktiv;
+  // Gescheitert ist ein Neuabruf, der Stand im Zwischenspeicher trägt die Seite weiter (LLH-1975).
+  const listeQuery = isEntlassen ? entlasseneQuery : epQuery;
+  const veraltet = einsatzQuery.isError || listeQuery.isError;
   const imEinsatzSchreiben = darfImEinsatzSchreiben(einsatz);
   /**
    * Eine entlassene Kraft lehnt der Server bei jedem Schreibweg ab (409, D12), außer an ihrer
@@ -477,7 +489,7 @@ export default function EinsatzkraftPage() {
       // Nur die Dauer bleibt immer beisammen.
       meta={
         metaTeile.length > 0 ? (
-          <span className="lfh-personenkopf-meta" style={monoStil(12)}>
+          <span className="lfh-personenkopf-meta" style={monoStil('monoKlein')}>
             {metaTeile.map((teil, i) => (
               <Fragment key={i}>
                 {i > 0 && ' · '}
@@ -511,8 +523,16 @@ export default function EinsatzkraftPage() {
         fahrzeugeQuery.dataUpdatedAt,
       )}
       hinweis={
-        !darfSchreiben || rueckgaengigFehler != null || ausgelassenText != null ? (
+        veraltet || !darfSchreiben || rueckgaengigFehler != null || ausgelassenText != null ? (
           <Space orientation="vertical" style={{ width: '100%' }}>
+            {veraltet && (
+              <SeitenStandVeraltet
+                onWiederholen={() => {
+                  if (einsatzQuery.isError) void einsatzQuery.refetch();
+                  if (listeQuery.isError) void listeQuery.refetch();
+                }}
+              />
+            )}
             <RechteHinweis text={rechteText} sichtbar={!darfSchreiben} />
             <SeitenHinweise
               fehler={rueckgaengigFehler}
@@ -736,7 +756,7 @@ export default function EinsatzkraftPage() {
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
-                  entlassen <span style={monoStil(13)}>{zeitKurz(ep.beendet_at)}</span>
+                  entlassen <span style={monoStil('mono')}>{zeitKurz(ep.beendet_at)}</span>
                 </span>
                 {imEinsatzSchreiben && (
                   <Button

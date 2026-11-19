@@ -19,7 +19,8 @@ import { SCHULD } from './schriftgroesse.schuld';
  *
  * Gezählt wird außerhalb von Kommentaren:
  * - TS/TSX: `fontSize` mit einer Zahl oder einem px-String, als JSX-Attribut (`fontSize={9}`) und
- *   CSS in Strings (`'font-size:10px'`, `font: 600 13px/…`);
+ *   CSS in Strings (`'font-size:10px'`, `font: 600 13px/…`), dazu `monoStil(<Zahl>)` (LLH-1972:
+ *   Mono nimmt eine Stufe, `monoStil('mono')`);
  * - CSS: `font-size` und die Kurzform `font` mit einem px-Wert, außer in der Rollenquelle.
  *
  * ── SCHULD (`schriftgroesse.schuld.ts`) ──
@@ -27,7 +28,8 @@ import { SCHULD } from './schriftgroesse.schuld';
  * auch: wer abbaut, senkt die Zahl im selben Commit. Bei 0 fällt der Eintrag.
  *
  * ── BEKANNTE GRENZEN (Teil des Vertrags) ──
- * 1. `monoStil(<Zahl>)` zählt nicht (Folgeaufgabe Mono-Stufe); ebenso Werte aus Variablen.
+ * 1. Werte aus Variablen und Ausdrücken zählen nicht (`monoStil(token.fontSize)`,
+ *    `monoStil(a ? 18 : 14)`).
  * 2. `fontSize` als antd-Token (`token: { fontSize: 12 }`) zählt mit — es ist dieselbe freie Größe.
  * 3. Testdateien zählen nicht, Druckansichten auch außerhalb von `druck/` nicht.
  */
@@ -49,13 +51,15 @@ const JSX_ATTR = /\bfontSize=(?:\{\s*|["'])(\d+(?:\.\d+)?)(?:px)?(?:\s*\}|["'])/
 const CSS_DEKL = /(?:^|[\s;{'"`])font-size\s*:\s*(\d+(?:\.\d+)?)px\b/g;
 /** Kurzform `font: 600 13px/1.4 …` — die Größe ist der px-Wert vor `/` oder der Familie. */
 const CSS_KURZ = /(?:^|[\s;{'"`])font\s*:[^;}'"`]*?(\d+(?:\.\d+)?)px\b/g;
+/** `monoStil(13)` oder `monoStil(13, 500)` — eine Zahl statt einer Mono-Stufe (LLH-1972). */
+const MONO_ZAHL = /\bmonoStil\(\s*(\d+(?:\.\d+)?)\s*[,)]/g;
 
 /** Alle Schriftgrößen-Literale einer Datei (`.css` oder TS/TSX) außerhalb von Kommentaren. */
 export function schriftgroessen(pfad: string, inhalt: string): Fund[] {
   const text = ohneKommentare(inhalt).join('\n');
   const muster = pfad.endsWith('.css')
     ? [CSS_DEKL, CSS_KURZ]
-    : [TS_ZAHL, TS_TEXT, JSX_ATTR, CSS_DEKL, CSS_KURZ];
+    : [TS_ZAHL, TS_TEXT, JSX_ATTR, CSS_DEKL, CSS_KURZ, MONO_ZAHL];
   const funde: Fund[] = [];
   for (const m of muster) {
     for (const t of text.matchAll(m)) {
@@ -110,11 +114,26 @@ describe('Schriftstufen: keine neue freie Schriftgröße (Spec `schriftstufen`)'
         'const a = { fontSize: 13, lineHeight: 1.5 };',
         "const b = { fontSize: '15px' };",
         'const c = { fontSize: token.fontSizeSM, ...schriftStil("text") };',
-        'const d = monoStil(11);',
+        "const d = monoStil('meta');",
       ].join('\n');
       expect(schriftgroessen('a.tsx', ts)).toEqual([
         { zeile: 1, wert: 13 },
         { zeile: 2, wert: 15 },
+      ]);
+    });
+
+    it('meldet monoStil mit Zahl, keine Stufe und keine Variable (LLH-1972)', () => {
+      const ts = [
+        'monoStil(11);',
+        'monoStil( 12 , 500);',
+        'monoStil(12.5);',
+        "monoStil('mono');",
+        'monoStil(token.fontSize);',
+      ].join('\n');
+      expect(schriftgroessen('a.tsx', ts)).toEqual([
+        { zeile: 1, wert: 11 },
+        { zeile: 2, wert: 12 },
+        { zeile: 3, wert: 12.5 },
       ]);
     });
 
