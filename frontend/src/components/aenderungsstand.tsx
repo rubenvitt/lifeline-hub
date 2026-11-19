@@ -35,7 +35,10 @@ import type { NamePath } from 'antd/es/form/interface';
 type Werte = Record<string, unknown>;
 
 interface Stand {
+  /** Geänderte oberste Feldnamen; ihre Zahl ist „N Änderungen“. */
   geaendert: readonly string[];
+  /** Geänderte Pfade samt ihrer Vorfahren, als Schlüssel (`pfadSchluessel`). */
+  pfade: ReadonlySet<string>;
 }
 
 const StandKontext = createContext<Stand | null>(null);
@@ -53,8 +56,30 @@ export function gleichFuerStand(a: unknown, b: unknown): boolean {
   return JSON.stringify(x) === JSON.stringify(y);
 }
 
-function obersterName(name: NamePath): string {
-  return String(Array.isArray(name) ? name[0] : name);
+function pfadSchluessel(name: NamePath): string {
+  return (Array.isArray(name) ? name : [name]).map(String).join('\u0000');
+}
+
+function istSchlichtesObjekt(wert: unknown): wert is Werte {
+  if (wert === null || typeof wert !== 'object') return false;
+  const proto = Object.getPrototypeOf(wert);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Sammelt die geänderten Blätter und ihre Vorfahren. Nur schlichte Objekte werden geöffnet:
+ * Listen (Mehrfachauswahl) und Zeitpunkte sind ein Wert. So trägt in einer Gruppe mit vollen
+ * Pfaden (`['kategorien', k, 'rechtsgrundlage']`) nur das geänderte Feld den Punkt.
+ */
+function sammlePfade(a: unknown, b: unknown, pfad: string[], ziel: Set<string>): void {
+  if (istSchlichtesObjekt(a) && istSchlichtesObjekt(b)) {
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      sammlePfade(a[k], b[k], [...pfad, k], ziel);
+    }
+    return;
+  }
+  if (gleichFuerStand(a, b)) return;
+  for (let i = 1; i <= pfad.length; i += 1) ziel.add(pfad.slice(0, i).join('\u0000'));
 }
 
 type Merken = (werte: object) => void;
@@ -78,15 +103,12 @@ export function AenderungsstandProvider({
   const aktuell = Form.useWatch((werte: Werte) => werte, { form, preserve: true }) as
     Werte | undefined;
 
-  const namen: string[] = [];
-  if (ausgang !== undefined && aktuell !== undefined) {
-    for (const n of new Set([...Object.keys(ausgang), ...Object.keys(aktuell)])) {
-      if (!gleichFuerStand(ausgang[n], aktuell[n])) namen.push(n);
-    }
-  }
-  const schluessel = namen.join('\u0000');
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Identität folgt der Menge, nicht dem Array
-  const stand = useMemo<Stand>(() => ({ geaendert: namen }), [schluessel]);
+  const pfade = new Set<string>();
+  if (ausgang !== undefined && aktuell !== undefined) sammlePfade(ausgang, aktuell, [], pfade);
+  const namen = [...pfade].filter((p) => !p.includes('\u0000'));
+  const schluessel = [...pfade].sort().join('\u0001');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Identität folgt der Menge, nicht den Objekten
+  const stand = useMemo<Stand>(() => ({ geaendert: namen, pfade }), [schluessel]);
 
   const merke = useCallback((werte: object) => {
     setAusgang((vorher) => ({ ...vorher, ...(werte as Werte) }));
@@ -111,7 +133,7 @@ export function AenderungsstandProvider({
 export function useFeldGeaendert(name: NamePath | undefined): boolean {
   const stand = useContext(StandKontext);
   if (!stand || name === undefined) return false;
-  return stand.geaendert.includes(obersterName(name));
+  return stand.pfade.has(pfadSchluessel(name));
 }
 
 /** Zahl der geänderten Felder; `null` ohne Provider. */

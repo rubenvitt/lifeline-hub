@@ -15,8 +15,12 @@ export default function GeaendertPunkt({ name }: { name: NamePath | undefined })
   if (!geaendert) return null;
   return (
     <>
-      <span aria-hidden="true" style={{ color: rollen.bedienText }}>
-        {' •'}
+      {/* Abstand statt Leerzeichen: antds Etikett ist ein Flex-Container und verschluckt es. */}
+      <span
+        aria-hidden="true"
+        style={{ color: rollen.bedienText, marginInlineStart: 'var(--lfh-luft-1)' }}
+      >
+        •
       </span>
       <span style={NUR_VORLESER}> (geändert)</span>
     </>

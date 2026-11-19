@@ -67,6 +67,14 @@ const tierBasis: Tier = {
   halter_storniert_at: null,
 };
 
+/**
+ * Kleine Änderung an der Notiz: ohne Änderung ist „Speichern“ gesperrt (LLH-1829). Wo sie steht,
+ * prüft der Test die Notiz nicht.
+ */
+async function aendereNotiz() {
+  await userEvent.type(await screen.findByRole('textbox', { name: 'Notiz' }), 'x');
+}
+
 function render(
   einsatzObj: typeof einsatzAktiv,
   tier: Tier,
@@ -162,7 +170,9 @@ describe('TiereDetailPage — Stammdaten', () => {
       expect(
         await screen.findByText('Aktualisierung fehlgeschlagen · Stand womöglich veraltet'),
       ).toBeInTheDocument();
-      expect(screen.getByRole('textbox', { name: 'Notiz' })).toHaveValue('Halsband rot');
+      expect(screen.getByRole('textbox', { name: /^Notiz\s*\(geändert\)$/ })).toHaveValue(
+        'Halsband rot',
+      );
       expect(screen.queryByText('Tier konnte nicht geladen werden')).toBeNull();
       expect(screen.queryByText('Einsatz nicht gefunden oder kein Zugriff')).toBeNull();
     },
@@ -178,6 +188,7 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.halter_person_id).toBeNull();
@@ -210,6 +221,7 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
@@ -241,6 +253,7 @@ describe('TiereDetailPage — Stammdaten', () => {
       ),
     );
 
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
@@ -259,6 +272,7 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
@@ -281,6 +295,7 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
@@ -675,6 +690,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Rufname zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     expect(await within(formular()).findByRole('alert')).toHaveTextContent('Rufname zu lang');
@@ -686,6 +702,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/tiere/10', erstAblehnenDannWarten('Rufname zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Vorher greifen: solange gespeichert wird, heißt der Knopf anders (Ladesymbol).
     const form = formular();
@@ -702,6 +719,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Rufname zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await within(formular()).findByRole('alert');
 
@@ -716,6 +734,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Zwischenzeitlich geändert', 409)),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     expect(
@@ -733,6 +752,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       ),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Meine Änderung übernehmen' }));
 
@@ -1027,7 +1047,7 @@ describe('TiereDetailPage — Verlassen-Schutz (LLH-1101)', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Tiere' }));
     const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
-    expect(screen.getByLabelText('Rufname')).toHaveValue('Rexi');
+    expect(screen.getByLabelText(/^Rufname\b.*\(geändert\)$/)).toHaveValue('Rexi');
     expect(screen.queryByText('LISTE')).toBeNull();
 
     await userEvent.click(screen.getByRole('link', { name: 'Tiere' }));
@@ -1114,6 +1134,7 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await aendereNotiz();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.antreff_lat).toBe(51.5);
@@ -1190,7 +1211,7 @@ describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () 
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.tier(1, 10) }));
 
     expect(await screen.findByText(/^Storniert von Anna Beispiel/)).toBeInTheDocument();
-    const gesperrt = screen.getByRole('textbox', { name: 'Rufname' });
+    const gesperrt = screen.getByRole('textbox', { name: /^Rufname\s*\(geändert\)$/ });
     expect(gesperrt).toHaveValue('Bello');
     expect(gesperrt).toHaveAttribute('readonly');
     // Auch der Fundort: lesbar, ohne Suche und Karte (Ortsfeld `readOnly`).
@@ -1199,7 +1220,7 @@ describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () 
     expect(screen.queryByRole('button', { name: 'Auf Karte wählen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Schließen' }));
-    expect(screen.queryByRole('textbox', { name: 'Rufname' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /^Rufname/ })).toBeNull();
   });
 
   it('ein offener Dialog schließt beim Storno', async () => {

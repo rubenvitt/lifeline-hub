@@ -144,7 +144,7 @@ describe('PersonalDetailPage (LFH-346 · A7)', () => {
     renderRoute('/admin/stammdaten/personal/5');
 
     await nutzer.clear(await screen.findByLabelText('Telefon'));
-    await nutzer.type(screen.getByLabelText('Telefon'), '0171 9');
+    await nutzer.type(screen.getByLabelText(/^Telefon/), '0171 9');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));

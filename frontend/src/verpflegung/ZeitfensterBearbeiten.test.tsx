@@ -153,7 +153,9 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
   it('unverändert wird nichts gesendet, die Karte schließt', async () => {
     const { onBedarfSpeichern } = zeigeKarte();
     await oeffneBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    // Ohne Änderung ist „Speichern“ gesperrt; Enter schließt die Karte (LLH-1829).
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeDisabled();
+    await userEvent.type(await screen.findByLabelText('Betreute (EP)'), '{Enter}');
     await waitFor(() => expect(screen.queryByRole('form')).toBeNull());
     expect(onBedarfSpeichern).not.toHaveBeenCalled();
   });
@@ -184,7 +186,7 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
     await waitFor(() =>
       expect(screen.getByText('Sonderkost übersteigt den Gesamtbedarf')).toBeVisible(),
     );
-    expect(screen.getByLabelText('davon vegan')).toHaveValue('400');
+    expect(screen.getByLabelText(/^davon vegan\b.*\(geändert\)$/)).toHaveValue('400');
     expect(onBedarfSpeichern).toHaveBeenCalledWith(
       expect.anything(),
       { sonderkost: { vegan: 400 } },

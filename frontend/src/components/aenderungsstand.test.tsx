@@ -181,3 +181,31 @@ describe('EnterOhneAenderung (LLH-1829)', () => {
     expect(zu).toBe(0);
   });
 });
+
+describe('aenderungsstand: verschachtelte Feldnamen (LLH-1829)', () => {
+  function Nachbarn() {
+    const a = useFeldGeaendert(['kategorien', 'x', 'dauer']);
+    const b = useFeldGeaendert(['kategorien', 'x', 'grund']);
+    const anzahl = useAenderungsanzahl();
+    return <output data-testid="nest">{`a:${String(a)} b:${String(b)} n:${String(anzahl)}`}</output>;
+  }
+  const ausgang = { kategorien: { x: { dauer: 10, grund: 'G' } } };
+
+  it('markiert nur das geänderte Blatt, nicht seine Nachbarn', async () => {
+    renderMitProviders(
+      <Form initialValues={ausgang}>
+        <AenderungsstandProvider ausgangswerte={ausgang}>
+          <Form.Item name={['kategorien', 'x', 'grund']} label="Grund">
+            <Input />
+          </Form.Item>
+          <Form.Item name={['kategorien', 'x', 'dauer']} label="Dauer">
+            <Input />
+          </Form.Item>
+          <Nachbarn />
+        </AenderungsstandProvider>
+      </Form>,
+    );
+    tippe('Grund', 'H');
+    expect(await screen.findByText('a:false b:true n:1')).toBeInTheDocument();
+  });
+});
