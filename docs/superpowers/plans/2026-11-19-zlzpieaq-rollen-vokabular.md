@@ -136,9 +136,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
 - Modify: `docs/anwender/kapitel/rechte-im-einsatz.md`, `benutzer.md`, `einsatz-einstellungen.md` und weitere Kapitel mit „System-Rolle“, „Org-Rolle“, „Org-Admin“ oder Rollenname „Admin“/„Führungskraft“ (`grep`)
 - `quellen:` um `frontend/src/einsatz/rollenVokabular.ts` ergänzen, wo die Rollen erklärt werden
 
-- [ ] **Step 1:** Wortlaute angleichen, Darf-Texte in „Was die Rollen dürfen“ und „Rollen“ übernehmen.
-- [ ] **Step 2:** Doku-Wächter laut `docs/anwender/AGENTS.md` laufen lassen.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1:** Wortlaute angleichen, Darf-Texte in „Was die Rollen dürfen“ und „Rollen“ übernehmen.
+- [x] **Step 2:** Doku-Wächter laut `docs/anwender/AGENTS.md` laufen lassen.
+- [x] **Step 3: Commit.**
 
 ### Task 9: Gate
 

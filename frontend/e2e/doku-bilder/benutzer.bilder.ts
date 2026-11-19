@@ -73,7 +73,7 @@ test.describe(KAPITEL, () => {
     await dialog.getByLabel('Benutzername').fill('a.muster');
     await dialog.getByLabel('Passwort').fill('anfangs-passwort-123');
     await dialog.getByText('Weitere Angaben').click();
-    await expect(dialog.getByLabel('Org-Rolle')).toBeVisible();
+    await expect(dialog.getByLabel('Rolle in der Organisation')).toBeVisible();
     await dialog.getByLabel('Passwort').blur();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'benutzer-anlegen');

@@ -2,7 +2,7 @@
 titel: Rechte im Einsatz
 gruppen: [fuehrung, administration]
 reihenfolge: 40
-quellen: [src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs, src/fuehrung/aufloesung.rs, src/benachrichtigung/aufloesung.rs, src/einsatz/funktion.rs, frontend/src/fuehrung/besetzungAusMitgliedern.ts]
+quellen: [src/einsatz/berechtigung.rs, frontend/src/einsatz/rollenVokabular.ts, src/einsatz/kontext.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/MitgliederAbschnitt.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/command-palette/befehle.ts, src/routes/einsatz.rs, src/fuehrung/aufloesung.rs, src/benachrichtigung/aufloesung.rs, src/einsatz/funktion.rs, frontend/src/fuehrung/besetzungAusMitgliedern.ts]
 ---
 
 ## Überblick
@@ -21,7 +21,7 @@ Für die Einsatzleitung:
 1. In der Sprungpalette „Mitglied aufnehmen“ wählen. Die Einstellungen öffnen sich im Reiter
    „Zugriff“, die Auswahl „Benutzer …“ ist aufgeklappt. Alternativ im Einsatz „Einstellungen“
    und dort den Reiter „Zugriff“ öffnen, oder in den „Einsatzdaten“ „Zugriff verwalten“ wählen.
-2. Unter „Benutzer …“ die Person wählen und daneben ihre Rolle; vorgewählt ist
+2. Unter „Benutzer …“ die Person wählen und daneben ihre „Rolle im Einsatz“; vorgewählt ist
    „Führungspersonal“.
 3. „Hinzufügen“ wählen. Die Person steht danach in der Liste, mit ihrer Rolle in einem
    Auswahlfeld.
@@ -53,9 +53,9 @@ Für die Einsatzleitung:
 
 ### Die Mitglieder sortieren und filtern
 
-1. Im Reiter „Zugriff“ auf den Kopf „Name“, „Führungsstelle“ oder „Rolle“ klicken. Ein zweiter
+1. Im Reiter „Zugriff“ auf den Kopf „Name“, „Führungsstelle“ oder „Rolle im Einsatz“ klicken. Ein zweiter
    Klick kehrt die Folge um.
-2. Für nur bestimmte Rollen das Trichterzeichen am Kopf „Rolle“ wählen und die Rollen ankreuzen.
+2. Für nur bestimmte Rollen das Trichterzeichen am Kopf „Rolle im Einsatz“ wählen und die Rollen ankreuzen.
    Die Zahl hinter jeder Rolle nennt, wie viele Mitglieder sie tragen.
 
 Sortierung und Filter stehen in der Adresse: ein geteilter Link öffnet die Liste im selben Stand.
@@ -63,6 +63,10 @@ Sortierung und Filter stehen in der Adresse: ein geteilter Link öffnet die List
 ## Hintergrund
 
 ### Was die Rollen dürfen
+
+Die Auswahl der Rolle nennt aufgeklappt unter jedem Namen in einer Zeile, was die Rolle darf:
+„Einsatzleitung“ schreibt überall, verwaltet Zugriff und Geräte; „Führungspersonal“ schreibt in
+Modulen, Kopfdaten und Einstellungen; „Beobachter“ liest nur. Im Einzelnen:
 
 - **Einsatzleitung** und **Führungspersonal** schreiben in den Modulen, ändern Kopfdaten,
   Einstellungen und die eigene Führungsstelle.

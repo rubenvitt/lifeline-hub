@@ -55,7 +55,7 @@ Kapitel [Aufbewahrung](aufbewahrung.md).
 2. Im Paneel „Module für alle Einsätze“ unter „Modul filtern“ einen Teil des Modulnamens
    eintippen.
 3. In der Zeile des Moduls „Sichtbar“ ausschalten, um es auszublenden, oder unter „Benötigte
-   Rolle (Vorgabe)“ „Führung im Einsatz“, „Führungskraft der Organisation“ oder „Admin“ wählen,
+   Rolle (Vorgabe)“ „Führung im Einsatz“, „Führungskraft der Organisation“ oder „System-Admin“ wählen,
    zum Aufheben „Frei (alle)“.
 
    ![Paneel „Module für alle Einsätze“, gefiltert auf „Lage“: Lageberichte ausgeblendet, alle Module frei](../bilder/verwaltung/module-vorgabe.png)
@@ -89,7 +89,7 @@ Das „Präfix Einsatznummer“ gilt nur für neue Einsätze; vergebene Einsatzn
 
 Die Rolle wirkt wie die „Benötigte Rolle“ im Einsatz: „Führung im Einsatz“ lässt Einsatzleitung
 und Führungspersonal jedes Einsatzes sowie Führungskräfte der Organisation hinein, „Führungskraft
-der Organisation“ nur Führungskräfte der Organisation, „Admin“ nur System-Admins; System-Admins
+der Organisation“ nur Führungskräfte der Organisation, „System-Admin“ nur System-Admins; System-Admins
 kommen immer hinein. Was die Stufen im Einzelnen bedeuten, beschreibt das Kapitel
 [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md) unter „Was ‚Sichtbar‘ und
 ‚Benötigte Rolle‘ bewirken“. Die Einsatzleitung eines Einsatzes kann die Vorgabe für ihren Einsatz

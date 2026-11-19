@@ -2,7 +2,7 @@
 titel: Benutzer
 gruppen: [administration]
 reihenfolge: 650
-quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/instanz/herkunft.tsx, frontend/src/auth/EinmalpasswortVergeben.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs, src/auth/oidc/provisioning.rs, src/instanz/stammdaten/uebernehmen.rs]
+quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/einsatz/rollenVokabular.ts, frontend/src/instanz/herkunft.tsx, frontend/src/auth/EinmalpasswortVergeben.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs, src/auth/oidc/provisioning.rs, src/instanz/stammdaten/uebernehmen.rs]
 ---
 
 ## Überblick
@@ -23,7 +23,8 @@ Für System-Admins:
 1. Oben „Verwaltung“ öffnen und „Benutzer“ wählen.
 2. „Benutzer anlegen“ wählen.
 3. „Anzeigename“, „Benutzername“ und ein „Passwort“ mit mindestens acht Zeichen eintragen.
-4. Unter „Weitere Angaben“ bei Bedarf die „System-Rolle“ und die „Org-Rolle“ wählen.
+4. Unter „Weitere Angaben“ bei Bedarf die „Rolle in der Verwaltung“ und die „Rolle in der
+   Organisation“ wählen. Aufgeklappt steht unter jeder Rolle, was sie darf.
 
    ![Dialog „Neuen Benutzer anlegen“ mit Anzeigename, Benutzername, Passwort und den aufgeklappten Rollen](../bilder/benutzer/benutzer-anlegen.png)
 
@@ -33,7 +34,8 @@ Für System-Admins:
 ### Rollen eines Benutzers ändern
 
 1. Unter „Benutzer“ im Aktionsmenü der Zeile der Person „Bearbeiten“ wählen.
-2. Im Dialog „Benutzer bearbeiten“ „Anzeigename“, „System-Rolle“ oder „Org-Rolle“ ändern.
+2. Im Dialog „Benutzer bearbeiten“ „Anzeigename“, „Rolle in der Verwaltung“ oder „Rolle in der
+   Organisation“ ändern.
 3. „Speichern“ wählen.
 
 Der Benutzername lässt sich nicht ändern.
@@ -81,13 +83,15 @@ Wann das nötig ist und was danach zu tun ist, beschreibt [Gerät verloren](gera
 
 ### Rollen
 
-- **System-Rolle „Admin“**: verwaltet Stammdaten, Einstellungen, Karten, Benutzer und
+- **Rolle in der Verwaltung „System-Admin“** (verwaltet Benutzer, Stammdaten und Einstellungen,
+  liest jeden Einsatz): verwaltet Stammdaten, Einstellungen, Karten, Benutzer und
   Aufbewahrung, liest jeden Einsatz und ändert an Einsätzen der eigenen Organisation die
   Verwaltungsangaben.
-- **Org-Rolle „Führungskraft (darf Einsätze anlegen)“**: legt Einsätze an, liest jeden Einsatz
+- **Rolle in der Organisation „Führungskraft der Organisation“** (legt Einsätze an, liest jeden
+  Einsatz der Organisation): legt Einsätze an, liest jeden Einsatz
   der eigenen Organisation und sieht die Verwaltung zum Nachschlagen. In Modulen, die
   „Führungskraft der Organisation“ oder „Führung im Einsatz“ verlangen, ist sie zugelassen.
-- **System-Rolle „Benutzer“ und Org-Rolle „Keine“** (die Vorgabe): arbeitet nur in Einsätzen,
+- **Beide Rollen „Keine“** (die Vorgabe; die Benutzerliste zeigt „Keine Rolle“): arbeitet nur in Einsätzen,
   in die die Einsatzleitung die Person aufgenommen hat.
 
 Ein neues Konto gehört zur Organisation des System-Admins, der es anlegt. Die Liste zeigt nur
@@ -117,7 +121,7 @@ das bei einem verlorenen Gerät hilft, beschreibt [Gerät verloren](geraet-verlo
 Nicht deaktivieren lassen sich:
 
 - der letzte aktive System-Admin der Organisation („Deaktivieren gesperrt: letzter aktiver
-  Admin“), damit ihre Verwaltung nie ohne Admin bleibt,
+  System-Admin“), damit ihre Verwaltung nie ohne System-Admin bleibt,
 - das eigene Konto („Deaktivieren gesperrt: eigenes Konto“).
 
 Für ein deaktiviertes Konto gibt es keine „Anmeldungen“. Konten gekoppelter Geräte erscheinen
