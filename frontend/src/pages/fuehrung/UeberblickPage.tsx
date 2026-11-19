@@ -25,7 +25,7 @@ import {
   ListenPaneel,
   NUR_VORLESER,
   PaneelReihe,
-  StatusChip,
+  Status,
   StromPaneel,
   Verteilungsliste,
   WarnstufenHinweis,
@@ -91,7 +91,6 @@ import {
   rollenFarbe,
   statusKategorie,
 } from '../../theme/statusFarben';
-import StatusTag from '../../components/StatusTag';
 import { grundWort } from '../../kraefte/meldebildRaster';
 import {
   abschnittGruende,
@@ -1125,7 +1124,7 @@ function abschnittGliederung(
       zeile.abschnittId != null
         ? einsatzabschnittePfad(einsatzId, { abschnitt: zeile.abschnittId })
         : einheitenPfad(einsatzId),
-    // Lagekante: Farbe nur als Rand, das Wort steht im StatusTag daneben.
+    // Lagekante: Farbe nur als Rand, das Wort steht im `Status` daneben.
     kante: lage ? { farbe: rollenFarbe(lage.rolle, token), rolle: lage.rolle } : null,
     kopf: (
       <>
@@ -1147,21 +1146,20 @@ function abschnittGliederung(
             data-lfh="abschnitt-zustand"
             style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginSM }}
           >
-            {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
+            {lage && <Status darstellung={lage} />}
             {/* Ein schlechter beurteilter Unterabschnitt bekommt dieselbe Form wie der eigene
                 Zustand (Rollenrand + Wort), sonst stünde „Unterabschnitt kritisch“ leiser da als ein grünes
                 „planmäßig“. */}
             {zeile.unterLage && (
-              <StatusTag
+              <Status
                 darstellung={{
                   ...abschnittLagezustand[zeile.unterLage],
                   label: `Unterabschnitt ${abschnittLagezustand[zeile.unterLage].label}`,
                 }}
-                darstellungsart="rand"
               />
             )}
             {gruende.map((g) => (
-              <StatusChip key={g.art} ton="alarm" wort={grundWort(g)} />
+              <Status groesse="klein" key={g.art} ton="alarm" wort={grundWort(g)} />
             ))}
           </span>
         )}

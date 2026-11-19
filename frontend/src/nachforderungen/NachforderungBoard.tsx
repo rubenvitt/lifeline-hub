@@ -16,13 +16,7 @@ import type {
 } from '../api/types';
 import type { Speicherung } from '../components/Erfassung';
 import { SeitenLeer } from '../components/SeitenZustand';
-import {
-  Sammelbanner,
-  Segmentleiste,
-  StatusChip,
-  monoStil,
-  useRollen,
-} from '../components/instrument';
+import { Sammelbanner, Segmentleiste, Status, monoStil, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { useZuflussSchleuse, type ZuflussSteuerung } from '../components/useZuflussSchleuse';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
@@ -417,7 +411,7 @@ export default function NachforderungBoard({
       )}
       {ueberfaellig > 0 && (
         <div data-lfh="board-ueberfaellig" style={{ marginBottom: token.marginXS }}>
-          <StatusChip ton="achtung" code={ueberfaellig} wort="überfällig" />
+          <Status groesse="klein" ton="achtung" code={ueberfaellig} wort="überfällig" />
         </div>
       )}
       {leer && <SeitenLeer titel="Keine Nachforderungen" />}

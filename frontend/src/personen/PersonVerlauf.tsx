@@ -1,5 +1,5 @@
 import SichtungsTag from '../components/SichtungsTag';
-import { Tag, Typography, theme } from 'antd';
+import { Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import type { PersonDetail } from '../api/types';
@@ -13,6 +13,7 @@ import {
   transportText,
 } from './personMeta';
 import VerbleibText from './VerbleibText';
+import { Marke } from '../components/instrument/Marke';
 
 const { useToken } = theme;
 
@@ -72,7 +73,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: n.erfasst_at,
       node: (
         <span>
-          <Tag>Notiz</Tag> {n.text}
+          <Marke>Notiz</Marke> {n.text}
           <Nachgetragen erfassung={n.erfasst_at} eingang={n.eingegangen_at} />
         </span>
       ),
@@ -82,7 +83,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: v.zeitpunkt_at,
       node: (
         <span>
-          <Tag>Verbleib</Tag> <VerbleibText verbleib={v} />
+          <Marke>Verbleib</Marke> <VerbleibText verbleib={v} />
           <Bestaetigt name={v.bestaetigt_name} />
           <Nachgetragen erfassung={v.zeitpunkt_at} eingang={v.eingegangen_at} />
         </span>
@@ -94,7 +95,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: a.zeitpunkt_at,
       node: (
         <span>
-          <Tag>Anlass</Tag> {a.anlass ? ANLASS_WORT[a.anlass] : 'aufgehoben'}
+          <Marke>Anlass</Marke> {a.anlass ? ANLASS_WORT[a.anlass] : 'aufgehoben'}
           <Nachgetragen erfassung={a.zeitpunkt_at} eingang={a.erfasst_at} />
         </span>
       ),
@@ -104,7 +105,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: t.zeitpunkt_at,
       node: (
         <span>
-          <Tag>Transport</Tag>{' '}
+          <Marke>Transport</Marke>{' '}
           {transportText({
             transport_prioritaet: t.prioritaet,
             transport_art: t.art,
@@ -120,7 +121,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: m.zeitpunkt_at,
       node: (
         <span data-aufgehoben={m.aufgehoben_at ? '' : undefined}>
-          <Tag>Maßnahme</Tag> {MASSNAHME_WORT[m.art]}
+          <Marke>Maßnahme</Marke> {MASSNAHME_WORT[m.art]}
           <Bestaetigt name={m.bestaetigt_name} />
           <Aufgehoben am={m.aufgehoben_at} />
           <Nachgetragen erfassung={m.zeitpunkt_at} eingang={m.erfasst_at} />
@@ -132,7 +133,7 @@ export default function PersonVerlauf({ person }: { person: PersonDetail }) {
       at: v.zeitpunkt_at,
       node: (
         <span data-aufgehoben={v.aufgehoben_at ? '' : undefined}>
-          <Tag>Verletzung</Tag> {nummer} {regionName(v.ansicht, v.region)} ·{' '}
+          <Marke>Verletzung</Marke> {nummer} {regionName(v.ansicht, v.region)} ·{' '}
           {VERLETZUNG_ART_WORT[v.art]}
           {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`}
           {v.notiz && <Typography.Text type="secondary"> — {v.notiz}</Typography.Text>}

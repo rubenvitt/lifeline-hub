@@ -327,6 +327,10 @@ export type FahrzeugStatus = S['FahrzeugStatus'];
 export type EinsatzFahrzeug = S['EinsatzFahrzeugAnzeige'];
 export type EntlassungVorzustand = S['EntlassungVorzustand'];
 export type EntlassungAntwort = S['EntlassungAntwort'];
+/** Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781). */
+export type StatusRuecknahmeBeleg = S['StatusRuecknahmeBeleg'];
+/** Antwort des Status-PATCH: das Fahrzeug, dazu der Beleg bei einem echten Wechsel. */
+export type FahrzeugPatchAntwort = S['FahrzeugPatchAntwort'];
 export type EntlassungRuecknahmeAntwort = S['EntlassungRuecknahmeAntwort'];
 export type RuecknahmeAusgelassen = S['RuecknahmeAusgelassen'];
 export type PersonalEntlassungVorzustand = S['PersonalEntlassungVorzustand'];

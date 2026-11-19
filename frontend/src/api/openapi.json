@@ -9469,6 +9469,29 @@
           }
         }
       },
+      "FahrzeugPatchAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinsatzFahrzeugAnzeige"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status_ruecknahme": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/StatusRuecknahmeBeleg"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der\nBeleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781)."
+      },
       "FahrzeugStatus": {
         "type": "object",
         "description": "Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert\n(Listen-Endpunkt liefert ohnehin nur aktive).",
@@ -20188,6 +20211,33 @@
           "gebunden",
           "nicht_verfuegbar"
         ]
+      },
+      "StatusRuecknahmeBeleg": {
+        "type": "object",
+        "description": "Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,\nChange `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,\nwenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er\nträgt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "required": [
+          "status_id",
+          "status_seit"
+        ],
+        "properties": {
+          "status_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Der gesetzte Status; die Rücknahme gelingt nur, solange er noch steht."
+          },
+          "status_seit": {
+            "type": "string",
+            "description": "„Status seit“ des Wechsels; Kennung, an der die Rücknahme ihn wiedererkennt."
+          },
+          "vorher_status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Status vor dem Wechsel, nur für die Quittung („S2 → S3“); die Rücknahme nimmt den Wert,\nden der Server beim Wechsel festgehalten hat."
+          }
+        }
       },
       "StatusWert": {
         "type": "object",

@@ -1173,7 +1173,9 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     // (3) Filter setzen — der Suchfilter kommt als einziger ohne Stammdaten aus.
     await page.getByPlaceholder('Suche...').fill('Messkraft');
-    const marke = page.locator('.ant-tag').filter({ hasText: 'Suche:' });
+    const marke = page
+      .locator(':is([data-lfh="status"],[data-marke])')
+      .filter({ hasText: 'Suche:' });
     await expect(marke).toHaveCount(1);
 
     // (4) Der Zweitweg, an dem die Ausnahme der Marke hängt: zuerst DA, dann groß genug.
@@ -1182,7 +1184,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
 
     // (5) Die Marke selbst, protokolliert statt gepinnt.
     const markenKasten = (await marke.boundingBox())!;
-    const kreuz = (await marke.locator('.ant-tag-close-icon').boundingBox())!;
+    const kreuz = (await marke.locator('button').boundingBox())!;
 
     gemessen.push(
       `${dichte} (Soll ≥ ${soll}): Umschalter-Segment ${segment}, ` +
@@ -1253,7 +1255,9 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
       `Filter-Suchfeld (${dichte})`,
     );
     await page.getByPlaceholder('Suche...').fill('Messkraft');
-    await expect(page.locator('.ant-tag').filter({ hasText: 'Suche:' })).toHaveCount(1);
+    await expect(
+      page.locator(':is([data-lfh="status"],[data-marke])').filter({ hasText: 'Suche:' }),
+    ).toHaveCount(1);
     const knopf = await haeltStufe(
       page.getByRole('button', { name: 'Filter zurücksetzen', exact: true }),
       soll,
@@ -1401,6 +1405,33 @@ test('Fahrzeuge: der Besatzungs-Auslöser folgt in Tabelle und Karte der Dichte-
   const einsatzId = await besatzungEinsatz(page, `E2E Gate3 ${Date.now()} Besatzung`);
 
   const gemessen = await messeBesatzungsAusloeser(page, einsatzId, true);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Fahrzeuge: der Statusknopf ist sichtbar so hoch wie die Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  // LLH-1780 (Change `eon26eat-status-und-bedienung`, D4): der Rahmen des Statusknopfs ist
+  // die Trefffläche, also misst die sichtbare Höhe — nicht ein unsichtbar vergrößerter Kasten.
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Statusknopf`);
+  const funkrufname = 'Florian Musterstadt 3/83-1';
+  await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, 'Fahrzeug');
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
+    const knopf = page.getByRole('button', { name: `Status von ${funkrufname} ändern` });
+    // Vorbedingung: es ist der bedienbare Knopf, nicht die randlose Anzeige.
+    await expect(knopf).toHaveAttribute('data-lfh', 'status-knopf');
+    const hoehe = await haeltStufe(knopf, soll, `Statusknopf (${dichte})`);
+    // Sichtbar = Rahmen: der Rand liegt auf dem gemessenen Kasten.
+    const rand = await knopf.evaluate((k) => getComputedStyle(k).borderTopWidth);
+    expect(rand, `Statusknopf (${dichte}) trägt einen Rahmen`).not.toBe('0px');
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${hoehe}`);
+  }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 

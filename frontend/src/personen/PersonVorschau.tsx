@@ -1,5 +1,4 @@
-import StatusTag from '../components/StatusTag';
-import { Space, Spin, Tag, Typography, theme } from 'antd';
+import { Space, Spin, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { ladePerson } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
@@ -9,6 +8,7 @@ import Patientenkopf from './Patientenkopf';
 import PersonVerlauf from './PersonVerlauf';
 import StammdatenRaster from './StammdatenRaster';
 import { SeitenFehler } from '../components/SeitenZustand';
+import { Status } from '../components/instrument/Status';
 
 /**
  * NUR-LESEN-Inhalt einer Person — ein Bauteil für `PersonDetailDrawer` (Personenmarke im
@@ -48,8 +48,8 @@ export default function PersonVorschau({
       {p && (
         <Space orientation="vertical" style={{ width: '100%' }} size="large">
           <Space wrap>
-            <StatusTag darstellung={STATUS_META[p.status]} />
-            {p.storniert_at && <Tag color="default">storniert</Tag>}
+            <Status darstellung={STATUS_META[p.status]} />
+            {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
           </Space>
 
           <Patientenkopf einsatzId={einsatzId} person={p} modus="lesen" />

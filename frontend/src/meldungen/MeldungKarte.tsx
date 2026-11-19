@@ -17,7 +17,7 @@ import {
 } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Status, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -115,7 +115,8 @@ function bestaetigungsAchse(m: Meldung, zeitpunkt: (wire?: string | null) => str
   }
   if (m.ist_ueberfaellig || m.eskaliert) {
     return (
-      <StatusChip
+      <Status
+        groesse="klein"
         ton="alarm"
         code={
           <span aria-hidden="true">
@@ -127,7 +128,8 @@ function bestaetigungsAchse(m: Meldung, zeitpunkt: (wire?: string | null) => str
     );
   }
   return (
-    <StatusChip
+    <Status
+      groesse="klein"
       ton="achtung"
       wort={`Bestätigung offen bis ${zeitpunkt(m.bestaetigung_frist_at)}`}
     />
@@ -352,12 +354,12 @@ function MeldungKarte({
             label={status.label}
             unbearbeitet={!!status.unbearbeitet}
           />
-          {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
-          {m.lagerelevant && <StatusChip ton="bedien" wort="In der Lage ✓" />}
+          {m.richtung === 'extern' && <Status groesse="klein" ton="neutral" wort="Extern" />}
+          {m.lagerelevant && <Status groesse="klein" ton="bedien" wort="In der Lage ✓" />}
           {m.auftrag_id != null &&
             darf('fremde-module') &&
             (m.is_auftrag_aufgehoben ? (
-              <StatusChip ton="neutral" wort="Auftrag aufgehoben" />
+              <Status groesse="klein" ton="neutral" wort="Auftrag aufgehoben" />
             ) : (
               <KennungsLink to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>
                 ↗ Auftrag

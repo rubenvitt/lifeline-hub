@@ -1,15 +1,4 @@
-import {
-  App,
-  Breadcrumb,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Space,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
+import { App, Breadcrumb, Button, Form, Input, InputNumber, Space, Typography, theme } from 'antd';
 import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -94,7 +83,6 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import StelleNichtGefunden from '../betreuung/StelleNichtGefunden';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { StornoBanner, entwurfNurLesen } from '../components/StornoBanner';
-import StatusTag from '../components/StatusTag';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
@@ -106,6 +94,8 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import { betreuungPfad, lagekartePfad, parseRouteId, verpflegungPfad } from '../routing/deeplinks';
 import { betreuungsstelleStatus } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
+import { Marke } from '../components/instrument/Marke';
 
 type KopfMenue = 'karte' | 'verorten' | 'stornieren';
 
@@ -697,8 +687,8 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       titel={
         <Space wrap size={token.marginSM}>
           <span>Betreuungsstelle {s.bezeichnung}</span>
-          <Tag>{ART_LABEL[s.art]}</Tag>
-          <StatusTag darstellung={betreuungsstelleStatus[s.status]} />
+          <Marke>{ART_LABEL[s.art]}</Marke>
+          <Status darstellung={betreuungsstelleStatus[s.status]} />
         </Space>
       }
       dataUpdatedAt={betreuungQuery.dataUpdatedAt}

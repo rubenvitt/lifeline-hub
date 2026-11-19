@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, Tag } from 'antd';
+import { App, AutoComplete, Button } from 'antd';
 import {
   useId,
   useMemo,
@@ -22,6 +22,7 @@ import {
   type Vorschlag,
   type Vorschlagsquelle,
 } from './stammdatenFeldKern';
+import { Marke } from './instrument/Marke';
 
 export type {
   StammdatenRef,
@@ -446,14 +447,14 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
         }}
       />
       {herkunft && (
-        <Tag
+        <Marke
           id={markeId}
           data-lfh="quellenmarke"
           data-herkunft={herkunft}
           style={{ marginInlineEnd: 0 }}
         >
           {HERKUNFT_WORT[herkunft]}
-        </Tag>
+        </Marke>
       )}
       {zeigeUebernahme && (
         <>

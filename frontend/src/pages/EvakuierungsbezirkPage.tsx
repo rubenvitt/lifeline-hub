@@ -23,7 +23,6 @@ import {
   SeitenStandVeraltet,
 } from '../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
-import StatusTag from '../components/StatusTag';
 import { Paneel, useRollen } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useViewport } from '../components/useViewport';
@@ -32,6 +31,7 @@ import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht'
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { evakuierungPfad, parseRouteId } from '../routing/deeplinks';
 import { raeumungszustand } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
 
 /** Schlüssel eines Menüeintrags im Kopf: ein Räumungsschritt (`raeumung:<ziel>`) oder `stornieren`. */
 type MenueAktion = string;
@@ -173,7 +173,7 @@ export default function EvakuierungsbezirkPage() {
       titel={
         <Space wrap size={token.marginSM}>
           <span>{`Bezirk ${bezirk.bezeichnung}`}</span>
-          <StatusTag darstellung={raeumungszustand[bezirk.raeumung]} />
+          <Status darstellung={raeumungszustand[bezirk.raeumung]} />
         </Space>
       }
       dataUpdatedAt={evakuierungQuery.dataUpdatedAt}

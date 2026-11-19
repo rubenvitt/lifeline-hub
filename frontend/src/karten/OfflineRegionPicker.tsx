@@ -22,9 +22,9 @@ import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
-import StatusTag from '../components/StatusTag';
 import { Textstufe } from '../components/instrument';
 import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
 
 /** Bau-Status, während derer gepollt wird (2 s). */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -263,7 +263,7 @@ export default function OfflineRegionPicker({
     if (baut) {
       const phase = job ? BAU_PHASE_LABEL[job.status.status] : 'baut';
       return (
-        <StatusTag
+        <Status
           icon={<Spin size="small" style={{ marginInlineEnd: token.marginXS }} />}
           darstellung={{ ...kartenBauStatus.building, label: `Baut… ${phase}` }}
         />
@@ -273,11 +273,11 @@ export default function OfflineRegionPicker({
     const k = z.karte;
     if (k && k.status !== 'fehler') {
       if (k.status === 'laedt' || k.geladen != null) {
-        return <StatusTag darstellung={{ ...offlineKarteStatus.laedt, label: 'Lädt…' }} />;
+        return <Status darstellung={{ ...offlineKarteStatus.laedt, label: 'Lädt…' }} />;
       }
       // bereit
       return (
-        <StatusTag
+        <Status
           darstellung={{
             ...offlineKarteStatus.bereit,
             label: `Auf dem Gerät${k.update_verfuegbar && !istRasterKarte(k) ? ' · Update verfügbar' : ''}`,

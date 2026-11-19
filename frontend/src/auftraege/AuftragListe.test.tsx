@@ -123,7 +123,7 @@ describe('AuftragKarte — Eingangszustand', () => {
       'data-unbearbeitet',
       'true',
     );
-    expect(screen.getByText('Offen').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+    expect(screen.getByText('Offen').closest('[data-lfh="status"]')).toHaveAttribute(
       'data-ton',
       'neutral',
     );
@@ -136,9 +136,10 @@ describe('AuftragKarte — Eingangszustand', () => {
     expect(container.querySelector('[data-lfh="komm-karte"]')).not.toHaveAttribute(
       'data-unbearbeitet',
     );
-    expect(
-      screen.getByText('In Bearbeitung').closest('[data-lfh="status-chip"]'),
-    ).not.toHaveAttribute('data-ton', 'achtung');
+    expect(screen.getByText('In Bearbeitung').closest('[data-lfh="status"]')).not.toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
   });
 
   it('lässt Überfällig den Rand gewinnen, behält aber das Etikett', () => {
@@ -151,7 +152,7 @@ describe('AuftragKarte — Eingangszustand', () => {
     const karte = container.querySelector('[data-lfh="komm-karte"]')!;
     expect(karte).toHaveAttribute('data-ueberfaellig', 'true');
     expect(karte).not.toHaveAttribute('data-unbearbeitet');
-    expect(screen.getByText('Offen').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+    expect(screen.getByText('Offen').closest('[data-lfh="status"]')).toHaveAttribute(
       'data-ton',
       'neutral',
     );

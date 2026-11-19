@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Tag } from 'antd';
+import { Marke } from '../components/instrument/Marke';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
 import { renderMitProviders } from '../test/utils';
@@ -130,7 +130,7 @@ describe('EinheitAngabe (LLH-1060, LLH-1073 D3, LLH-1093)', () => {
   });
 
   it('ohne Schreibrecht: Name und Marke als Text, ohne Auslöser', () => {
-    angabe({ wert: 3, darfSchreiben: false, marke: <Tag>Einheitsführer</Tag> });
+    angabe({ wert: 3, darfSchreiben: false, marke: <Marke>Einheitsführer</Marke> });
     expect(screen.getByText('Staffel A')).toBeVisible();
     expect(screen.getByText('Einheitsführer')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();

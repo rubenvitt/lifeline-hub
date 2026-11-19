@@ -1,6 +1,6 @@
-# StatusZelle, StatusChip und StatusTag
+# Status, Marke und Statusknopf (Rahmen heißt bedienbar)
 
-StatusZelle und StatusChip — Status als getönte Fläche (Neuentwurf S1 „Statuszelle",
+StatusZelle und Status — Status als getönte Fläche (Neuentwurf S1 „Statuszelle",
 S2 Abschnittsraster, S6 Einheitenliste). Die Farbwerte und ihre Kontrastrechnung stehen
 in `statusFlaeche`; hier wird nur angeordnet.
 

@@ -212,18 +212,11 @@ for (const modus of ['light', 'dark'] as const) {
           .toBeGreaterThanOrEqual(ZUSTAND);
       }
 
-      const etikett = karte.locator('.ant-tag');
+      const etikett = karte.locator(':is([data-lfh="status"],[data-marke])');
       await expect(etikett).toHaveCount(1);
       await expect(etikett).toHaveText(k.wort);
-      const tagRand = await randKontrast(etikett, 'top');
-      messwerte.push({ modus, karte: k.stufe, art: 'etikettrand', ...tagRand });
-      const kontext = `${modus}, ${k.stufe}, Etikettrand ${JSON.stringify(tagRand)}`;
-      expect
-        .soft(tagRand.gegenAussen, `${kontext} gegen Kartenfläche`)
-        .toBeGreaterThanOrEqual(ZUSTAND);
-      expect
-        .soft(tagRand.gegenInnen, `${kontext} gegen eigene Tönung`)
-        .toBeGreaterThanOrEqual(ZUSTAND);
+      // Das Etikett ist ein randloser `Status` (LLH-1780, „Rahmen heißt bedienbar“): kein Rand
+      // mehr zu messen; Wort und Tönung tragen den Zustand, der Text ist oben gemessen.
     }
     // Planmäßig trägt keinen Zustand am Rand — dann darf er auch keinem gleichen.
     expect(raender.planmaessig).not.toBe(raender.ueberfaellig);

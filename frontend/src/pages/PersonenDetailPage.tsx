@@ -2,7 +2,6 @@ import { useRollen } from '../components/instrument/rollenwerte';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { abgleichStatus } from '../theme/statusFarben';
-import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import {
   Alert,
@@ -14,7 +13,6 @@ import {
   Modal,
   Space,
   Spin,
-  Tag,
   Typography,
 } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
@@ -69,6 +67,7 @@ import {
 } from '../components/useZeilenFehler';
 import { registrierNummer } from '../anzeige/registrierNummer';
 import { flaeche } from '../theme/tokens';
+import { Status } from '../components/instrument/Status';
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
@@ -497,7 +496,7 @@ export default function PersonenDetailPage() {
             <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
               {person.abgleiche.map((a) => (
                 <li key={a.id} style={{ padding: `${token.paddingXS}px 0` }}>
-                  <StatusTag darstellung={abgleichStatus[a.status]} />
+                  <Status darstellung={abgleichStatus[a.status]} />
                   <Typography.Text>
                     {registrierNummer(
                       'R',
@@ -832,9 +831,9 @@ export default function PersonenDetailPage() {
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
-          <StatusTag darstellung={STATUS_META[p.status]} />
+          <Status darstellung={STATUS_META[p.status]} />
           {p.aktuelle_sichtung && <SichtungsTag kategorie={p.aktuelle_sichtung} />}
-          {p.storniert_at && <Tag color="default">storniert</Tag>}
+          {p.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
         </Space>
       }
       breadcrumb={

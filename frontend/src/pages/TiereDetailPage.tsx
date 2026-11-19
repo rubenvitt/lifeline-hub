@@ -9,7 +9,6 @@ import {
   Modal,
   Space,
   Spin,
-  Tag,
   Typography,
   theme,
 } from 'antd';
@@ -20,7 +19,7 @@ import {
   DatenfeldEingabe,
   Datenraster,
   Paneel,
-  StatusChip,
+  Status,
   monoStil,
 } from '../components/instrument';
 import { SPEZIES_META, TIER_STATUS, TIER_VERBLEIB, halterVorbelegung } from './tiere/tierHelfer';
@@ -64,6 +63,7 @@ import { useSpeicherLeiste } from '../components/speicherLeiste';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
 import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 import { flaeche } from '../theme/tokens';
+import { Marke } from '../components/instrument/Marke';
 
 /**
  * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
@@ -158,7 +158,7 @@ function halterAnzeige(t: Tier): ReactNode {
     return t.halter_storniert_at ? (
       <Typography.Text type="secondary">Halter (storniert): {label}</Typography.Text>
     ) : (
-      <Tag>{label}</Tag>
+      <Marke>{label}</Marke>
     );
   }
   if (t.halter_kontakt) return <Typography.Text>{t.halter_kontakt}</Typography.Text>;
@@ -524,9 +524,13 @@ export default function TiereDetailPage() {
           <span>
             Tier <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
-          <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
-          <Tag>{SPEZIES_META[t.spezies]}</Tag>
-          {t.storniert_at && <StatusChip ton="neutral" wort="storniert" />}
+          <Status
+            groesse="klein"
+            ton={STATUS_META[t.status].ton}
+            wort={STATUS_META[t.status].label}
+          />
+          <Marke>{SPEZIES_META[t.spezies]}</Marke>
+          {t.storniert_at && <Status groesse="klein" ton="neutral" wort="storniert" />}
         </Space>
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}

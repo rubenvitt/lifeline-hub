@@ -11,7 +11,7 @@ import {
   Datenraster,
   Paneel,
   Stapel,
-  StatusChip,
+  Status,
   monoStil,
   useRollen,
   type BearbeitbaresFeld,
@@ -211,7 +211,7 @@ export default function AnbindungAnsicht() {
           data-lfh="anbindung-titel"
         >
           {zugang.name}
-          <StatusChip ton={zustand.ton} wort={zustand.wort} />
+          <Status groesse="klein" ton={zustand.ton} wort={zustand.wort} />
         </span>
       }
       aktionen={

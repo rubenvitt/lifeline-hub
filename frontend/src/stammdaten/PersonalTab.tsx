@@ -1,4 +1,4 @@
-import { Button, Tag } from 'antd';
+import { Button } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import { Stapel } from '../components/instrument';
 import AdminPage from '../components/AdminPage';
@@ -34,6 +34,7 @@ import {
 } from './dienststatus';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { KennungsLink } from '../components/kennungsLink';
+import { Marke } from '../components/instrument/Marke';
 
 const POSITION_FOLGE = Object.keys(POSITION_LABELS) as StaerkePosition[];
 
@@ -129,7 +130,7 @@ export default function PersonalTab() {
         p.qualifikationen.length ? (
           <Stapel richtung="zeile" abstand="xs" umbruch>
             {p.qualifikationen.map((q) => (
-              <Tag key={q.id}>{q.label}</Tag>
+              <Marke key={q.id}>{q.label}</Marke>
             ))}
           </Stapel>
         ) : (

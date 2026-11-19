@@ -335,7 +335,7 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
   const knotenFrom = (name: string) =>
     screen.getByRole('link', { name }).closest('[data-lfh="org-knoten"]') as HTMLElement;
   const lageTag = (knoten: HTMLElement) =>
-    knoten.querySelector('[data-lfh="org-lagezustand"] [data-rolle]') as HTMLElement | null;
+    knoten.querySelector('[data-lfh="org-lagezustand"] [data-lfh="status"]') as HTMLElement | null;
 
   it('zeigt den eigenen Lagezustand als Etikett am Abschnitt, nicht beurteilt ohne', () => {
     renderBild(
@@ -348,8 +348,7 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
     );
     const uhs = lageTag(knotenFrom('UHS Turnhalle'));
     expect(uhs).toHaveTextContent('kritisch');
-    expect(uhs).toHaveAttribute('data-rolle', 'alarm');
-    expect(uhs).toHaveAttribute('data-darstellung', 'rand');
+    expect(uhs).toHaveAttribute('data-ton', 'alarm');
     // Nur der eigene Zustand: der kritische Unterabschnitt färbt seinen Abschnitt nicht.
     expect(lageTag(knotenFrom('EA Nord'))).toHaveTextContent('planmäßig');
     expect(lageTag(knotenFrom('EA West'))).toBeNull();
@@ -371,7 +370,7 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
     expect(getComputedStyle(wort).color).toBe(getComputedStyle(rufname).color);
     // Keine eigene Farbe am Wort: es erbt die gedämpfte Metazeile.
     expect(wort.style.color).toBe('');
-    expect(container.querySelector('[data-lfh="status-chip"]')).toBeNull();
+    expect(container.querySelector('[data-lfh="status"]')).toBeNull();
   });
 });
 
@@ -558,7 +557,7 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     const z = zeile(container)!;
     expect(z).toHaveTextContent('2 Abschnitte ohne Leitung');
     expect(z).toHaveTextContent('2 Einheiten ohne Führer');
-    const chips = z.querySelectorAll('[data-lfh="status-chip"]');
+    const chips = z.querySelectorAll('[data-lfh="status"]');
     expect([...chips].map((c) => c.getAttribute('data-ton'))).toEqual(['achtung', 'achtung']);
     // Feste Höhe ohne Umbruch: wird ein Chip auf schmalem Schirm gekappt, nennt der Titel ihn ganz.
     expect([...chips].map((c) => c.getAttribute('title'))).toEqual([
@@ -583,7 +582,7 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     );
     const z = zeile(container)!;
     expect(z.textContent).toBe('Leitung überall besetzt');
-    expect(z.querySelector('[data-lfh="status-chip"]')).toBeNull();
+    expect(z.querySelector('[data-lfh="status"]')).toBeNull();
   });
 
   it('zählt bei fehlenden Einheiten nur die Abschnitte, ohne „0“', () => {

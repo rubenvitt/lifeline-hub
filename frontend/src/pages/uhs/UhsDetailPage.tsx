@@ -33,7 +33,6 @@ import {
 } from '../../components/SeitenZustand';
 import { useRollen } from '../../components/instrument/rollenwerte';
 import { useViewport } from '../../components/useViewport';
-import StatusTag from '../../components/StatusTag';
 import { Segmentleiste } from '../../components/instrument';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
 import UhsSwitcher from './UhsSwitcher';
@@ -57,6 +56,7 @@ import {
   useWechselNachRueckfrage,
 } from '../../components/offeneBearbeitung';
 import { flaeche } from '../../theme/tokens';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Die Bereiche der Seite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
@@ -332,7 +332,7 @@ function UhsDetailInhalt() {
           ) : (
             uhs.bezeichnung
           )}
-          <StatusTag darstellung={uhsStatus[uhs.status]} />
+          <Status darstellung={uhsStatus[uhs.status]} />
         </Space>
       }
       meta={meta}

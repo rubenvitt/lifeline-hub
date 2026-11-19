@@ -3,20 +3,20 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { EinsatzFahrzeug } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import StatusTag from '../components/StatusTag';
 import { Datenfeld, Datenraster } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { fahrzeugStatusDarstellung } from './mittelStatus';
 import { globalKeys } from '../api/queryKeys';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Lese-Vorschau eines disponierten Fahrzeugs in der Sprungpalette.
  *
  * DATEN: das Listenfach der Palette mit `select` auf die `id` — nach einem Treffer warm und am
  * Live-Stream, ein Statuswechsel kommt ohne Neuöffnen an.
- * NUR LESEN: Status als `StatusTag` mit Wort; die Mandantenfarbe erzwingt die Rand-Form.
+ * NUR LESEN: Status als `Status` mit Wort; die Mandantenfarbe erzwingt die Rand-Form.
  * WEGGELASSEN, was die Liste nicht trägt (Einheitsname, Ist-Besatzung, Position). Leere
  * optionale Angaben fehlen ganz.
  */
@@ -36,7 +36,7 @@ export default function FahrzeugVorschau({ einsatzId, id }: { einsatzId: number;
             {f.funkrufname}
           </Datenfeld>
           <Datenfeld label="Status">
-            <StatusTag
+            <Status
               darstellung={fahrzeugStatusDarstellung(f, ankerVon(f))}
               farbe={f.status_farbe}
             />

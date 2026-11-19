@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import type { Einsatzabschnitt } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import FunkUndTelefon from '../../components/FunkUndTelefon';
-import StatusTag from '../../components/StatusTag';
 import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import type { AbschnittStaerken } from './abschnittStaerke';
+import { Status } from '../../components/instrument/Status';
 
 /**
  * Die Angaben eines Einsatzabschnitts zum Lesen — ein Bauteil für den Lesezweig der Abschnittsseite
@@ -36,7 +36,7 @@ export default function AbschnittDaten({
           „vergessen anzuzeigen“ nicht zu trennen. */}
       <Datenfeld label="Lagezustand">
         {a.lagezustand ? (
-          <StatusTag darstellung={abschnittLagezustand[a.lagezustand]} darstellungsart="rand" />
+          <Status darstellung={abschnittLagezustand[a.lagezustand]} />
         ) : (
           <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
         )}

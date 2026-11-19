@@ -2,7 +2,7 @@ import { Button, Flex } from 'antd';
 import { useId } from 'react';
 import type { SchichtplanBlock, SchichtplanWechselpunkt } from '../../api/types';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
-import { Augenbraue, StatusChip, monoStil, useRollen } from '../../components/instrument';
+import { Augenbraue, Status, monoStil, useRollen } from '../../components/instrument';
 import type { StatusTon } from '../../components/instrument/statusFlaeche';
 
 /**
@@ -121,7 +121,7 @@ export default function SchichtplanWechselLeiste({
               {offen > 0 && offen < w.eintraege.length && (
                 <span style={{ color: rollen.gedaempft }}>({offen} offen)</span>
               )}
-              {vorbei && offen > 0 && <StatusChip ton="achtung" wort="überfällig" />}
+              {vorbei && offen > 0 && <Status groesse="klein" ton="achtung" wort="überfällig" />}
             </Button>
           );
         })}
@@ -179,7 +179,11 @@ export default function SchichtplanWechselLeiste({
                     {artWort(e)}
                   </span>
                 </span>
-                <StatusChip ton={standTon(e, ms(punkt) < jetzt)} wort={STAND_WORT[e.stand]} />
+                <Status
+                  groesse="klein"
+                  ton={standTon(e, ms(punkt) < jetzt)}
+                  wort={STAND_WORT[e.stand]}
+                />
                 {griff && <Button onClick={griff.los}>{griff.text}</Button>}
               </li>
             );

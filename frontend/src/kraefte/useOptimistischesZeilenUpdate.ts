@@ -11,7 +11,8 @@ interface Optionen<T extends { id: number }, V> {
   /** Trägt die Zeile noch den optimistischen Stand? Nur dann wird zurückgenommen. */
   nochOptimistisch: (zeile: T, v: V) => boolean;
   zuruecknehmen: (zeile: T, vorher: T) => T;
-  onErfolg?: () => void;
+  /** Der Server hat angenommen; mit seinem Stand und den Variablen (Quittung, LLH-1781). */
+  onErfolg?: (serverStand: T, v: V) => void;
   /**
    * Eine Änderung an der Zeile beginnt; mit den Variablen, damit der Aufrufer den alten Grund
    * GENAU dieser Zeile räumt (`components/useZeilenFehler.ts`, `beginne`).
@@ -54,11 +55,11 @@ export function useOptimistischesZeilenUpdate<T extends { id: number }, V>({
       qc.setQueryData<T[]>(queryKey, (alt) => alt?.map((z) => (z.id === id ? anwenden(z, v) : z)));
       return { vorher };
     },
-    onSuccess: (serverStand: T) => {
+    onSuccess: (serverStand: T, v: V) => {
       qc.setQueryData<T[]>(queryKey, (alt) =>
         alt?.map((z) => (z.id === serverStand.id ? serverStand : z)),
       );
-      onErfolg?.();
+      onErfolg?.(serverStand, v);
     },
     onError: (e, v, kontext) => {
       const vorher = kontext?.vorher;

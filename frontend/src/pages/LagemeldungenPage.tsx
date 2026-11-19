@@ -28,7 +28,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
   monoStil,
-  StatusChip,
+  Status,
   useRollen,
   Zeitachseneintrag,
 } from '../components/instrument';
@@ -365,7 +365,12 @@ export default function LagemeldungenPage() {
         // „neu“ ist (die Marke „Neu“ ist die Kenntnisnahme der Lage, nicht der Meldungsstatus).
         <>
           {l.is_neu && (
-            <StatusChip ton="bedien" wort="Neu" style={{ marginInlineEnd: token.marginSM }} />
+            <Status
+              groesse="klein"
+              ton="bedien"
+              wort="Neu"
+              style={{ marginInlineEnd: token.marginSM }}
+            />
           )}
           {l.prioritaet !== 'normal' && (
             <span style={{ marginInlineEnd: token.marginSM }}>
@@ -373,7 +378,12 @@ export default function LagemeldungenPage() {
             </span>
           )}
           {l.richtung === 'extern' && (
-            <StatusChip ton="neutral" wort="Extern" style={{ marginInlineEnd: token.marginSM }} />
+            <Status
+              groesse="klein"
+              ton="neutral"
+              wort="Extern"
+              style={{ marginInlineEnd: token.marginSM }}
+            />
           )}
           {/* Der Text bleibt Lage-Text oder Wortlaut, die Berichtigung steht im ETB (LLH-1382, D1). */}
           <BerichtigtMarke

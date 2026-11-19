@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/useBemerkungMitAltwert.ts, frontend/src/components/FilterKnopf.tsx]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/useBemerkungMitAltwert.ts, frontend/src/components/FilterKnopf.tsx, frontend/src/kraefte/useFahrzeugStatusQuittung.ts, frontend/src/components/StatusWahl.tsx]
 ---
 
 ## Überblick
@@ -123,17 +123,26 @@ Stamm.
 Für Einsatzleitung und Führungspersonal:
 
 1. In „Fahrzeuge“ die Ansicht „FMS-Tableau“ wählen, oder in der Seitenleiste „FMS-Tableau“.
-2. Die Kacheln stehen nach Abschnitt und Einheit geordnet, nie nach Status. Jede nennt Funkrufname,
-   Status, „seit“ wann er gilt und die Einheit. Eine unterstellte Einheit ohne eigenen Abschnitt
-   steht im Abschnitt ihrer Über-Einheit.
+2. Die Kacheln stehen nach Abschnitt und Einheit geordnet, nie nach Status. Jede nennt groß den
+   Funkrufname, darunter Fahrzeugtyp und Einheit, „seit“ wann der Status gilt und darunter den
+   Status als großen Block mit der FMS-Ziffer, lesbar auch aus einem Meter Abstand. Eine
+   unterstellte Einheit ohne eigenen Abschnitt steht im Abschnitt ihrer Über-Einheit.
 
-   ![FMS-Tableau mit den Abschnitten Betreuung, Logistik, Sanitätsdienst und UHS Turnhalle und je einer Kachel pro Fahrzeug mit Status und Einheit](../bilder/fahrzeuge/fms-tableau.png)
+   ![FMS-Tableau mit den Abschnitten Betreuung, Logistik, Sanitätsdienst und UHS Turnhalle; je Fahrzeug eine Kachel mit großem Funkrufnamen, Typ und Einheit und einem großen Statusblock mit der FMS-Ziffer](../bilder/fahrzeuge/fms-tableau.png)
 
-3. Den Status einer Kachel anklicken und den neuen Status wählen. Schneller mit der Tastatur: mit
-   der Tabulatortaste auf die Kachel gehen und die FMS-Ziffer tippen, etwa „4“ für „S4 · Am
-   Einsatzort“.
+3. Den Statusblock einer Kachel anklicken und den neuen Status wählen. Das Menü nennt oben den
+   Funkrufnamen. Schneller mit der Tastatur: mit der Tabulatortaste auf die Kachel gehen und die
+   FMS-Ziffer tippen, etwa „4“ für „S4 · Am Einsatzort“.
+4. Unten erscheint kurz „85-1: S2 → S4 · Rückgängig“. War es das falsche Fahrzeug oder der falsche
+   Status, „Rückgängig“ wählen: Das Fahrzeug steht wieder auf dem Status davor, mit seiner alten
+   „seit“-Zeit, und ein Ereignis der Kräfte-Zeitachse aus dem Wechsel ist gestrichen. Das geht nur
+   direkt danach (höchstens zehn Minuten), nur für die Person, die gewechselt hat, und nur, solange
+   niemand den Status inzwischen wieder geändert hat; sonst meldet der Hinweis „Nicht mehr
+   zurückzunehmen, inzwischen geändert“.
 
-In der Liste setzt die Spalte „Status“ den Status auf dieselbe Weise.
+In der Liste und in der Einheit setzt die Spalte „Status“ den Status auf dieselbe Weise, mit
+derselben Rückmeldung. Wer den Status ändern darf, sieht ihn als Knopf mit Rahmen und Pfeil; ohne
+dieses Recht steht er ohne Rahmen da.
 
 ### Die Besatzung eines Fahrzeugs zuordnen
 

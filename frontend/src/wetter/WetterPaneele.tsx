@@ -27,7 +27,7 @@ import {
   Kennzahlenband,
   Paneel,
   PaneelZustand,
-  StatusChip,
+  Status,
   tonVonRolle,
   monoStil,
   useRollen,
@@ -166,7 +166,7 @@ function WarnungEintrag({
       }}
     >
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginXS }}>
-        <StatusChip ton={tonVonRolle(d.rolle) ?? 'achtung'} wort={d.label} />
+        <Status groesse="klein" ton={tonVonRolle(d.rolle) ?? 'achtung'} wort={d.label} />
         <b style={{ color: rollen.text, fontSize: 13 }}>{titelSchreibung(w.ereignis)}</b>
       </div>
       <span style={{ ...monoStil(12), color: rollen.text2 }}>

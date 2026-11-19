@@ -3,12 +3,12 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import DemoMarke from '../components/DemoMarke';
 import {
-  FELD_KLASSE,
   Paneel,
   PaneelZeile,
-  Stapel,
-  StatusChip,
+  Status,
   monoStil,
+  FELD_KLASSE,
+  Stapel,
 } from '../components/instrument';
 import { KennungsLink } from '../components/kennungsLink';
 import { Select } from '../components/Select';
@@ -102,7 +102,9 @@ function Warnings({
 }) {
   return (
     <>
-      {dienststatus === 'ausser_dienst' && <StatusChip ton="achtung" wort="außer Dienst" />}
+      {dienststatus === 'ausser_dienst' && (
+        <Status groesse="klein" ton="achtung" wort="außer Dienst" />
+      )}
       {auchIn.length > 0 && (
         <Typography.Text type="secondary">
           auch in {auchIn.map((id) => names.get(id) ?? `Vorlage ${id}`).join(', ')}
@@ -145,7 +147,7 @@ export function UntereinheitenSection({
             <KennungsLink to={einheitVorlageDetailPath(c.id)}>{c.name}</KennungsLink>
             <span>{c.typ_label}</span>
             {c.ist_demo && <DemoMarke />}
-            {!c.aktiv && <StatusChip ton="neutral" wort="Inaktiv" />}
+            {!c.aktiv && <Status groesse="klein" ton="neutral" wort="Inaktiv" />}
           </Row>
         ))
       )}
@@ -571,7 +573,7 @@ export function MaterialSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
               <Typography.Text type="secondary">{ART_LABEL[m.art]}</Typography.Text>
               {m.ist_demo && <DemoMarke />}
               {m.dienststatus === 'ausser_dienst' && (
-                <StatusChip ton="achtung" wort="außer Dienst" />
+                <Status groesse="klein" ton="achtung" wort="außer Dienst" />
               )}
             </Row>
           );

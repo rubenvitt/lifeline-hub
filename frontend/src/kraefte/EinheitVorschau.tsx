@@ -4,11 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkUndTelefon from '../components/FunkUndTelefon';
-import StatusTag from '../components/StatusTag';
 import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { einheitStatusAnzeige } from './meldebildRaster';
+import { Status } from '../components/instrument/Status';
 
 function gleicheStaerke(a: Staerke, b: Staerke): boolean {
   return (
@@ -28,7 +28,7 @@ function mittelText(e: Einheit): string {
  * DATEN: das Listenfach der Palette (`datensatzAbfrage.einheiten`) mit `select` auf die `id`.
  *
  * STATUS aus `einheitStatusAnzeige` wie im Meldebild: „S2 · Frei auf Wache"; bei „gemischt"
- * steht die Verteilung darunter, statt einen Status zu erfinden. Als `StatusTag`, weil ein
+ * steht die Verteilung darunter, statt einen Status zu erfinden. Als `Status`, weil ein
  * HANDstatus die Mandantenfarbe seines Katalogeintrags trägt, die die Rand-Form erzwingt.
  *
  * STÄRKE F/UF/M//Σ; die Soll-Stärke nur, wenn gesetzt. Die Stärke inklusive Unterstellter nur,
@@ -51,7 +51,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
               <span
                 style={{ display: 'inline-flex', flexDirection: 'column', gap: token.marginXXS }}
               >
-                <StatusTag
+                <Status
                   darstellung={{
                     rolle: status.ton,
                     label: status.code ? `${status.code} · ${status.wort}` : status.wort,

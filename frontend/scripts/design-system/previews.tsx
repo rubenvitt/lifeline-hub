@@ -64,8 +64,11 @@ import {
   Sammelbanner,
   SegmentFeld,
   Segmentleiste,
+  Marke,
   Stapel,
-  StatusChip,
+  Status,
+  StatusBlock,
+  StatusKnopf,
   StatusZelle,
   StromPaneel,
   Textstufe,
@@ -77,7 +80,6 @@ import {
   useRollen,
 } from '../../src/components/instrument';
 import { GrossKennzahl, GrossZeile, GrossZeilen } from '../../src/components/grossbild';
-import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
 import BreiteHalten from '../../src/components/BreiteHalten';
 import { InlineAngabe } from '../../src/components/InlineAngabe';
@@ -1606,28 +1608,57 @@ export const PREVIEWS: readonly PreviewSpec[] = [
   },
   {
     name: 'Status',
-    title: 'StatusZelle, StatusChip und StatusTag',
+    title: 'Status, Marke und Statusknopf (Rahmen heißt bedienbar)',
     group: 'Status',
-    height: 340,
+    height: 520,
     source: 'components/instrument/Status.tsx',
     content: () => (
       <div className="ds-stapel">
         <div className="ds-fugenraster" data-fugenraster="">
           <StatusZelle ton="normal" wert={12} wort="bereit" />
           <StatusZelle ton="bedien" wert={4} wort="unterwegs" />
-          <StatusZelle ton="achtung" wert={3} wort="gebunden" />
+          <StatusZelle ton="achtung" wert={3} wort="Sprechwunsch" />
           <StatusZelle ton="alarm" wert={1} wort="ausgefallen" />
-          <StatusZelle ton="neutral" wert={0} wort="außer Dienst" />
+          <StatusZelle ton="neutral" wert={0} wort="gebunden" />
         </div>
         <div className="ds-reihe">
-          <StatusChip ton="normal" code="2" trenner wort="Einsatzbereit Wache" />
-          <StatusChip ton="bedien" code="3" trenner wort="Einsatz übernommen" />
-          <StatusChip ton="achtung" code="4" trenner wort="Am Einsatzort" />
+          <Status groesse="klein" ton="normal" code="S2" trenner wort="Einsatzbereit Wache" />
+          <Status groesse="klein" ton="neutral" code="S3" trenner wort="Einsatz übernommen" />
+          <Status groesse="klein" ton="achtung" code="S5" trenner wort="Sprechwunsch" />
+          <Status groesse="klein" ton="alarm" code="S6" trenner wort="außer Dienst" />
         </div>
         <div className="ds-reihe">
           {Object.values(statusKategorie).map((darstellung) => (
-            <StatusTag key={darstellung.label} darstellung={darstellung} />
+            <Status key={darstellung.label} darstellung={darstellung} />
           ))}
+          <Status ton="alarm" wort="unterbesetzt" />
+        </div>
+        <div className="ds-reihe">
+          <Marke>ad-hoc</Marke>
+          <Marke>Einheitsführer</Marke>
+          <Marke>RTW</Marke>
+          <Marke onEntfernen={() => {}}>Suche: „85“</Marke>
+        </div>
+        <div className="ds-reihe">
+          <StatusKnopf
+            darstellung={{ rolle: 'normal', label: 'Einsatzbereit Wache' }}
+            code="S2"
+            aria-label="Status von 85-1 ändern"
+          />
+          <StatusKnopf
+            darstellung={{ rolle: 'achtung', label: 'Sprechwunsch' }}
+            code="S5"
+            aria-label="Status von 85-2 ändern"
+          />
+        </div>
+        <div className="ds-reihe" style={{ width: 260 }}>
+          <StatusKnopf
+            variante="gross"
+            darstellung={{ rolle: 'normal', label: 'Einsatzbereit Wache' }}
+            code="2"
+            aria-label="Status von 85-1 ändern"
+          />
+          <StatusBlock darstellung={{ rolle: 'neutral', label: 'Einsatz übernommen' }} code="3" />
         </div>
       </div>
     ),

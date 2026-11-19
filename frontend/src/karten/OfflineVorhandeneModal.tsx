@@ -1,4 +1,4 @@
-import { App, Button, Input, Modal, Spin, Tag } from 'antd';
+import { App, Button, Input, Modal, Spin } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
+import { Marke } from '../components/instrument/Marke';
 import { Textstufe } from '../components/instrument';
 
 /** Dateiname → lesbarer Default-Name: `.mbtiles` weg, `osm.`-Präfix + `.YYYY-MM-DD`-Datum weg. */
@@ -120,7 +121,7 @@ export default function OfflineVorhandeneModal({
                   description={
                     <>
                       <Textstufe stufe="textKlein" ton="gedaempft">
-                        {v.dateiname} <Tag>{formatGroesse(v.groesse)}</Tag>
+                        {v.dateiname} <Marke>{formatGroesse(v.groesse)}</Marke>
                       </Textstufe>
                       {grund && (
                         <div>

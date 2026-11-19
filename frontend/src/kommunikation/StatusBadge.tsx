@@ -1,5 +1,5 @@
 import { Tooltip } from 'antd';
-import { StatusChip, type StatusTon } from '../components/instrument';
+import { Status, type StatusTon } from '../components/instrument';
 import { phaseTon } from './kartenKante';
 import type { KommPhase } from './phase';
 
@@ -27,7 +27,8 @@ export default function StatusBadge({
 }) {
   const chip = (
     <span data-lfh="komm-status" data-phase={phase} style={{ display: 'inline-flex' }}>
-      <StatusChip
+      <Status
+        groesse="klein"
         ton={ton ?? phaseTon(phase, unbearbeitet)}
         wort={label}
         style={unbearbeitet ? { fontWeight: 600 } : undefined}

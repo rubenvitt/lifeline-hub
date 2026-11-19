@@ -232,8 +232,10 @@ for (const modus of ['light', 'dark']) {
             name: `Status von ${fall.kennung} ändern`,
             exact: true,
           });
-          const etikett = knopf.locator('.ant-tag');
-          await expect(etikett).toHaveAttribute('data-rolle', fall.rolle);
+          // Der Statusknopf selbst trägt Fläche, Rahmen und Wort (LLH-1780, „Rahmen heißt
+          // bedienbar“): gemessen wird sein Rahmen, nicht mehr der eines Etiketts darin.
+          const etikett = knopf;
+          await expect(etikett).toHaveAttribute('data-ton', fall.rolle);
           // Kein Hovergrund aus einer vorausgehenden Interaktion in die Messung mischen.
           await page.mouse.move(0, 0);
           const werte = await kontrastVon(etikett);

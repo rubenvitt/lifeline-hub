@@ -637,9 +637,9 @@ describe('EinsatzSeite · Orientierung (LFH-954)', () => {
     expect(screen.getByTestId('einsatzstatus')).toHaveTextContent('Einsatzstatus');
     expect(screen.getByTestId('einsatzstatus')).toHaveTextContent('Abgeschlossen');
     // Wort aus dem Statusfarb-Vertrag, nicht der Wire-Wert: `data-rolle` belegt den Weg über
-    // `einsatzStatus` und `StatusTag`.
-    expect(screen.getByText('Abgeschlossen').closest('[data-rolle]')).toHaveAttribute(
-      'data-rolle',
+    // `einsatzStatus` und `Status`.
+    expect(screen.getByText('Abgeschlossen').closest('[data-lfh="status"]')).toHaveAttribute(
+      'data-ton',
       'neutral',
     );
   });

@@ -154,10 +154,9 @@ test('DWD: abgelaufen fehlt, angekündigt gestrichelt, Inspector nennt „angek�
   await page.mouse.click(p.x, p.y);
   const auswahl = page.locator('[data-lfh="auswahl"]');
   await expect(auswahl).toContainText('angekündigt · ab');
-  await expect(auswahl.getByText('Wetterwarnung', { exact: true })).toHaveAttribute(
-    'data-rolle',
-    'achtung',
-  );
+  await expect(
+    auswahl.locator('[data-lfh="status"]').filter({ hasText: /^Wetterwarnung$/ }),
+  ).toHaveAttribute('data-ton', 'achtung');
   await test.info().attach('dwd-angekuendigt', {
     body: await page.screenshot(),
     contentType: 'image/png',

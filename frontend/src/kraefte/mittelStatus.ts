@@ -10,7 +10,7 @@ import { fmsEtikett } from './meldebildRaster';
  * Statusanzeige eines disponierten Mittels (Fahrzeug, Personal) als `StatusDarstellung` — EINE
  * Stelle für Fachseiten und Sprungpalette.
  * Die Mandantenfarbe (`status_farbe`) steckt NICHT in der Darstellung: sie geht beim Aufrufer
- * an `StatusTag farbe=…`, das dann die Rand-Form erzwingt.
+ * an `Status farbe=…` bzw. `StatusKnopf farbe=…`, die sie als Punkt neben das Wort setzen.
  * Nicht zu verwechseln mit `MittelStatus` in `meldebildRaster.ts` (Chip-Beschreibung des
  * Meldebilds).
  */
@@ -19,8 +19,8 @@ import { fmsEtikett } from './meldebildRaster';
  * Statusanzeige eines disponierten Fahrzeugs — und die GRENZE des Statusfarb-Vertrags.
  *
  * 1. `status_farbe` ist mandantengepflegter Freitext; das Backend prüft kein Format. Diese
- *    Farbe bleibt erhalten, geht aber nur auf Rand und Text (`StatusTag farbe`), nie auf eine
- *    Fläche: ihren Kontrast kann niemand zusichern.
+ *    Farbe bleibt erhalten, geht aber nur auf einen Punkt neben dem Wort (`Status farbe`), nie
+ *    auf eine Fläche: ihren Kontrast kann niemand zusichern.
  * 2. Ohne Mandantenfarbe kommt die Darstellung aus `statusKategorie`.
  *
  * Nicht über antds `color`-Prop: ein Nicht-Preset-Wert würde dort eine Vollfläche mit

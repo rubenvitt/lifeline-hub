@@ -13,7 +13,7 @@ import {
   Paneel,
   PaneelZeile,
   Stapel,
-  StatusChip,
+  Status,
   type BearbeitbaresFeld,
   useRollen,
 } from '../../components/instrument';
@@ -326,7 +326,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
       <BearbeitbaresPaneel<WebhookWerte, WebhookPatch>
         key={webhook.id}
         titel="Webhook"
-        meta={<StatusChip ton={zustand.ton} wort={zustand.wort} />}
+        meta={<Status groesse="klein" ton={zustand.ton} wort={zustand.wort} />}
         datensatz={webhook}
         werte={{
           url: webhook.url ?? '',

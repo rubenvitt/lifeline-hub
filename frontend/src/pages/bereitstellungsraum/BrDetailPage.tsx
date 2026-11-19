@@ -1,6 +1,6 @@
 import { STAERKE_SCHREIBWEISE } from '../../anzeige/staerke';
 import { dauer } from '../../anzeige/dauer';
-import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -57,7 +57,6 @@ import {
   sammelbannerKurz,
   useRollen,
 } from '../../components/instrument';
-import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brAbgerufen, brStatus } from '../../theme/statusFarben';
 import BrSwitcher from './BrSwitcher';
@@ -103,6 +102,8 @@ import NichtUebernommenMarke, { UnangemeldetMarke } from '../../kraefte/NichtUeb
 import { useVorgemerkteEintreffen } from '../../offline/useVorgemerkteSchreibaktionen';
 import dayjs from 'dayjs';
 import { flaeche as flaechenMass } from '../../theme/tokens';
+import { Status } from '../../components/instrument/Status';
+import { Marke } from '../../components/instrument/Marke';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
@@ -704,7 +705,7 @@ export default function BrDetailPage() {
       ) : (
         e.unangemeldet && <UnangemeldetMarke />
       )}
-      {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
+      {einheitVon.get(e.id)?.typ_label && <Marke>{einheitVon.get(e.id)!.typ_label}</Marke>}
       <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
         <StaerkeAnzeige
           wert={staerkeDerEinheitImRaum(e.id, einheitIdsImRaum, einheitenQuery.data)}
@@ -720,7 +721,7 @@ export default function BrDetailPage() {
   const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
     <>
       <span style={monoStil(13)}>{f.funkrufname}</span>
-      {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
+      {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Marke>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Marke>}
     </>
   );
   /** Name der Einheit, mit der eine Untereinheit abgerufen wurde (Verband). */
@@ -747,7 +748,7 @@ export default function BrDetailPage() {
           ) : (
             <span>{br.bezeichnung}</span>
           )}
-          <StatusTag darstellung={brStatus[br.status]} />
+          <Status darstellung={brStatus[br.status]} />
         </Space>
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
@@ -947,7 +948,7 @@ export default function BrDetailPage() {
                         </Space>
                         <div data-lfh="br-abruf">
                           <Space wrap size={token.marginXS}>
-                            <StatusTag darstellung={brAbgerufen} />
+                            <Status darstellung={brAbgerufen} />
                             <span style={monoStil(12)}>
                               {abrufAngabe(zeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
                             </span>

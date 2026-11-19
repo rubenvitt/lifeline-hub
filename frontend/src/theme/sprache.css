@@ -528,3 +528,37 @@
     inset -2px 0 0 0 var(--lfh-steuer-rahmen),
     inset -10px 0 8px -8px var(--lfh-steuer-rahmen);
 }
+
+/* Statusmenü (LLH-1781, Change `eon26eat-status-und-bedienung`, D7): passt im Handschuh-Betrieb
+   eine Spalte nicht ins Fenster, stehen die Einträge in zwei, sonst in drei Spalten. Die
+   Klassen und die Rechnung (`menueLage`, Kopf höchstens 40 px) setzt
+   `components/StatusWahl.tsx`. Der Kopf ist kein Ziel und bleibt flach. */
+.lfh-statusmenue .ant-dropdown-menu-item-group-title {
+  padding-block: var(--lfh-luft-0);
+}
+.lfh-statusmenue--spalten-2 .ant-dropdown-menu-item-group-list,
+.ant-dropdown-menu.lfh-statusmenue--spalten-2:not(:has(.ant-dropdown-menu-item-group-list)) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lfh-statusmenue--spalten-3 .ant-dropdown-menu-item-group-list,
+.ant-dropdown-menu.lfh-statusmenue--spalten-3:not(:has(.ant-dropdown-menu-item-group-list)) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Formzeichen eines Zustands (LLH-1779, Spec `status-darstellung`): als erzeugter Inhalt, damit
+   es weder im Text (Kopieren, Vorlesen) noch im zugänglichen Namen steht; `/ ""` ist der leere
+   Alternativtext. `data-form` setzen `Status`, `StatusKnopf` und `StatusBlock`. */
+.lfh-form[data-form]::before {
+  margin-inline-end: var(--lfh-luft-0);
+}
+.lfh-form[data-form='dreieck']::before {
+  content: '▲' / '';
+}
+.lfh-form[data-form='balken']::before {
+  content: '▮' / '';
+}
+.lfh-form[data-form='kreis']::before {
+  content: '●' / '';
+}

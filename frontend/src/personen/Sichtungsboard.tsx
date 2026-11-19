@@ -5,7 +5,6 @@ import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
 import { vorText } from '../anzeige/dauer';
 import { monoStil, useRollen } from '../components/instrument';
-import StatusTag from '../components/StatusTag';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import {
   useZuflussSchleuse,
@@ -22,6 +21,7 @@ import { rasterSchluessel } from './personenFilter';
 import { nameText, seitWert, SkTag, verbleibText, type PersonenBedienung } from './personenSpalten';
 import PrioritaetMarke from './PrioritaetMarke';
 import ZeilenSichtung from './ZeilenSichtung';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Sichtungsboard (LLH-1332, Change `y4l621ih-patientenverbleib-uebergabe`, design.md D9, Spec
@@ -303,7 +303,7 @@ function BoardKarte({
       {(p.transport_prioritaet || p.kontamination) && (
         <span style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXXS }}>
           <PrioritaetMarke prioritaet={p.transport_prioritaet} />
-          {p.kontamination && <StatusTag darstellung={KONTAMINATION} />}
+          {p.kontamination && <Status darstellung={KONTAMINATION} />}
         </span>
       )}
     </article>

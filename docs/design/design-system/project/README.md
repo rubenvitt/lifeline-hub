@@ -38,7 +38,9 @@ die Karten deckungsgleich.
 | Eine Zahl, die führt                                                                            | `Kennzahl`/`Kennzahlenband`                                                                                                                      | `Kennzahl`                         |
 | Kennzahlen über einer Liste, einklappbar                                                        | `KlappBand`                                                                                                                                      | `KlappBand`                        |
 | „Welcher von diesen?“                                                                           | `KatalogTabelle`, `Datensicht form="tabelle"` („Die Liste ist die zweite Frage“)                                                                 | `Tabelle`                          |
-| Status eines Datensatzes                                                                        | `StatusZelle`/`StatusChip`/`StatusTag` (Farbachsen)                                                                                              | `Status`                           |
+| Zustand eines Datensatzes (Status, Urteil, storniert)                                           | `Status`, im Raster `StatusZelle` (Farbachsen, „Rahmen heißt bedienbar“)                                                                         | `Status`                           |
+| Status, den man wechseln kann                                                                   | `StatusWahl` (rendert `StatusKnopf`; Tableau `variante="gross"`)                                                                                 | `Status`                           |
+| Kennzeichnung ohne Zustand (ad-hoc, Rolle, Typ, Herkunft)                                       | `Marke` (entfernbar mit `onEntfernen`), nie rohes `Tag`                                                                                          | `Status`                           |
 | Sichtungskategorie                                                                              | `SichtungsTag`                                                                                                                                   | `Sichtung`                         |
 | Zeitpunkt oder Dauer                                                                            | `anzeige/zeitDarstellung.ts`, Dauer `anzeige/dauer.ts` („Zeitdarstellung“, „Uhr, Dauer und Datenstand“)                                          | `Zeitdarstellung`                  |
 | Funk- und Telefonverbindungen                                                                   | `VerbindungenAngabe`, `FunkUndTelefon`                                                                                                           | `Verbindungen`                     |
@@ -92,7 +94,7 @@ die Karten deckungsgleich.
 - **Textstufe (Stufen der Schriftskala und Töne)** (`components/Text/`, Gruppe Flächen)
 - **Stapel (Abstand als Rasterstufe, senkrecht und als Zeile)** (`components/Stapel/`, Gruppe Flächen)
 - **MetaZeile (Nebenangaben eines Datensatzes)** (`components/MetaZeile/`, Gruppe Daten)
-- **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
+- **Status, Marke und Statusknopf (Rahmen heißt bedienbar)** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
 - **Klappbares Kennzahlenband** (`components/KlappBand/`, Gruppe Daten)
 - **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
@@ -315,7 +317,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 
 (Vertrag `theme/statusFarben.ts`)
 
-- **Betroffene** (`StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
+- **Betroffene** (`Status`): Personenstatus neutral, „vermisst" `achtung`; Schaden
   „offen" neutral (Eingang), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (`abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
@@ -348,10 +350,17 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `text` (`sichtungsKante`), gewählt mit ✓ und 3-px-Rahmen. Nach einer Wahl behalten die übrigen
   ihre Farbe als 4-px-Innenrahmen in `punkt` auf getönter Fläche, keine Randform; „tot“ trägt in
   jedem Zustand eine Schraffur, „unverletzt“ keine Fläche; der Startfokus liegt auf der Gruppe,
-  nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein `color` an antds `Tag`** außer `"default"`: kein Preset hält
-  den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
-  Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
-  Demo-Marke, Blau bedient.
+  nicht auf SK I. 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung. **Kein rohes antds `Tag`**
+  (ESLint `no-restricted-imports`; Ausnahme nur
+  `SichtungsTag`): ein Zustand steht in `Status` mit einer Rolle aus dem Vertrag; eine
+  Kennzeichnung ohne Zustand (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist eine neutrale `Marke`,
+  Blau bedient. Urteile („unterbesetzt“, „Soll erfüllt“) sind Zustände, keine Marken.
+- **Rahmen heißt bedienbar**: einen Rahmen trägt nur, was
+  man bedienen kann. `Status` und `Marke` sind randlos; der bedienbare Status ist der
+  `StatusKnopf` (Fläche der Rolle, Rahmen in ihrer Kante, Pfeil ▾, 14 px, sichtbar so hoch wie
+  die Dichtehöhe 30/48/72), eine entfernbare Marke trägt Rahmen und ✕. Die Sichtung bleibt das
+  umrandete BBK-Feld; wo sie bedienbar ist, legt sich der Knopfrahmen außen darum. Nachweis
+  `theme/statusKnopfKontrast.test.ts`.
   Übergabe, Geschädigt-Bezug, UHS-Verortung tragen `bedien`. Personenstatus und Sichtung sind
   unabhängig.
 - **Blauer Bedien-TEXT nimmt `rollen.bedienText`**; antds `colorLink` (Ruhe, Zeiger, gedrückt)

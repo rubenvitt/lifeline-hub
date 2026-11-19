@@ -711,11 +711,11 @@ describe('Spalte „Transport“ (LLH-1325, design.md D10)', () => {
   it('zeigt die Priorität als neutrale Marke mit Wort und die Art dahinter', () => {
     const [transport] = spalte('transport');
     const { container, rerender } = render(<>{transport.render!(undefined, zeilen[2], 0)}</>);
-    expect(screen.getByText('sofort').closest('.ant-tag')).not.toBeNull();
+    expect(screen.getByText('sofort').closest('[data-lfh="status"], [data-marke]')).not.toBeNull();
     expect(container).toHaveTextContent('sofort liegend');
     rerender(<>{transport.render!(undefined, zeilen[3], 0)}</>);
     expect(container).toHaveTextContent('mit Notarzt');
-    expect(container.querySelector('.ant-tag')).toBeNull();
+    expect(container.querySelector('[data-lfh="status"], [data-marke]')).toBeNull();
     rerender(<>{transport.render!(undefined, zeilen[0], 0)}</>);
     expect(container).toHaveTextContent('—');
     expect(transport.suchText!(zeilen[2])).toBe('sofort liegend');
@@ -733,7 +733,7 @@ describe('Marke „kontaminiert“ (LLH-1326, design.md D11)', () => {
       <>{render_(undefined, { ...basis, kontamination: true }, 0)}</>,
     );
     const marke = screen.getByText('kontaminiert');
-    expect(marke.closest('[data-rolle="achtung"]')).not.toBeNull();
+    expect(marke.closest('[data-ton="achtung"]')).not.toBeNull();
     for (const kontamination of [false, undefined]) {
       rerender(<>{render_(undefined, { ...basis, kontamination }, 0)}</>);
       expect(container).not.toHaveTextContent('kontaminiert');

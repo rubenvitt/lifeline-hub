@@ -8,10 +8,10 @@ import { InlineAngabe } from '../components/InlineAngabe';
 import { useFeldKonflikt } from '../components/useFeldKonflikt';
 import { monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
-import StatusTag from '../components/StatusTag';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { kontamination as KONTAMINATION } from '../theme/statusFarben';
+import { Status } from '../components/instrument/Status';
 
 /**
  * Die Kopfzeile des Patientenkopfs (LLH-1326, design.md D3/D14): PAT-Nummer und Kontamination.
@@ -152,7 +152,7 @@ export default function PatKennzeichen({
           etikett="Kontamination"
           wert={k}
           anzeige={
-            k === 'ja' ? <StatusTag darstellung={KONTAMINATION} /> : <span>nicht kontaminiert</span>
+            k === 'ja' ? <Status darstellung={KONTAMINATION} /> : <span>nicht kontaminiert</span>
           }
           leer={(w) => w == null}
           darfSchreiben
@@ -170,7 +170,7 @@ export default function PatKennzeichen({
           )}
         />
       ) : (
-        k === 'ja' && <StatusTag darstellung={KONTAMINATION} />
+        k === 'ja' && <Status darstellung={KONTAMINATION} />
       )}
       {bedienbar && ohneVerbindung && (
         <span role="status" style={{ color: rollen.text2 }}>

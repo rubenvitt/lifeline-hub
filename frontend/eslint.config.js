@@ -86,6 +86,15 @@ export default tseslint.config(
               message:
                 "Select über den Wrapper importieren: import { Select } from '…/components/Select' — er schaltet die Combobox-Suche standardmäßig an (LFH-288).",
             },
+            {
+              // LLH-1779, Spec `status-darstellung`: ein Zustand steht im Baustein `Status`, eine
+              // Kennzeichnung in `Marke`. Ausnahme nur die Sichtung (BBK-Feld, zeilengenaues
+              // eslint-disable in `components/SichtungsTag.tsx`).
+              name: 'antd',
+              importNames: ['Tag'],
+              message:
+                'Kein rohes antd-Tag: ein Zustand → Status, eine Kennzeichnung → Marke (components/instrument; frontend/AGENTS.md, Bausteinwahl).',
+            },
           ],
         },
       ],

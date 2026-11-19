@@ -305,6 +305,8 @@ use utoipa::OpenApi;
         crate::fahrzeug::EinsatzFahrzeugAnzeige,
         crate::fahrzeug::EntlassungAntwort,
         crate::fahrzeug::EntlassungRuecknahmeAntwort,
+        crate::fahrzeug::StatusRuecknahmeBeleg,
+        crate::fahrzeug::FahrzeugPatchAntwort,
         crate::fahrzeug::EntlassungVorzustand,
         crate::entlassung::RuecknahmeAusgelassen,
         crate::fahrzeug::FahrzeugAnzeige,
