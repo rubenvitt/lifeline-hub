@@ -495,3 +495,33 @@ async fn mitarbeit_verortet_normale_meldung_wie_alle_nicht() {
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v:?}");
 }
+
+#[tokio::test]
+async fn mitarbeit_korrigiert_eigene_meldung_in_der_lage_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
+    let (_, m) = meldung_senden(&app, einsatz, &mit, serde_json::json!({})).await;
+    let mid = m["id"].as_i64().unwrap();
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}/lagerelevant"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+
+    for body in [
+        serde_json::json!({ "prioritaet": "dringend" }),
+        serde_json::json!({ "meldungsart": "sonstige" }),
+    ] {
+        let (s, v) = meldung_korrigieren(&app, einsatz, mid, &mit, body.clone()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{body}: {v:?}");
+    }
+    let liste = meldungen_liste(&app, einsatz, &admin).await;
+    assert_eq!(liste[0]["prioritaet"], "normal");
+    assert_eq!(liste[0]["lagerelevant"], serde_json::json!(true));
+}

@@ -158,13 +158,15 @@ pub async fn korrigieren(
     let jetzt = jetzt();
     let vorher =
         repo::laden_im_einsatz(&state.pool, ctx.einsatz.id, meldung_id, None, &jetzt).await?;
-    // Die Lage bleibt der Einsatzleitung: die Mitarbeit setzt weder `lagerelevant` noch Lage-Text
-    // noch Verortung einer Lagemeldung und stellt keine Meldung auf Lagemeldung um.
+    // Die Lage bleibt der Einsatzleitung: die Mitarbeit korrigiert keine Meldung, die in der Lage
+    // steht oder eine Lagemeldung ist (was auch immer der Body ändert), setzt weder `lagerelevant`
+    // noch Lage-Text und stellt keine Meldung auf Lagemeldung um.
     if mitarbeit
-        && (aenderung.lagerelevant.is_some()
+        && (vorher.lagerelevant
+            || vorher.meldungsart == Meldungsart::Lagemeldung
+            || aenderung.lagerelevant.is_some()
             || aenderung.lage_text.is_some()
-            || aenderung.meldungsart == Some(Meldungsart::Lagemeldung)
-            || (vorher.lagerelevant && aenderung.geo.is_some()))
+            || aenderung.meldungsart == Some(Meldungsart::Lagemeldung))
     {
         return Err(AppError::Forbidden);
     }
