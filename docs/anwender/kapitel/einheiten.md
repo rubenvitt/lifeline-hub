@@ -338,6 +338,9 @@ Unter jeder geänderten Angabe steht leise, wer sie zuletzt geändert hat und wa
 Paneele „Kopfdaten“ und „Telefon und weitere Verbindungen“ die jüngste Änderung. Diese Vermerke
 schreiben nichts ins Einsatztagebuch.
 
+Hat ein anderer Arbeitsplatz eine Angabe der Kopfdaten gerade offen, steht an Stelle des Vermerks
+„Wird gerade bearbeitet von …“, bis er speichert oder abbricht. Der Hinweis sperrt nichts.
+
 ### Unangemeldete Einheiten
 
 „nicht übernommen“ steht an der Einheit in der Gliederung, in der Kräfteübersicht, im Kopf ihrer Seite und

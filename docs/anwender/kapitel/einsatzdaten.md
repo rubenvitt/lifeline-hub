@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/feld_cas.rs, src/einsatz/feld_vermerk.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/fernmeldewesen/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/einsatz/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/FeldVermerkAnzeige.tsx, src/feld_cas.rs, src/einsatz/feld_vermerk.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/fernmeldewesen/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/einsatz/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs, frontend/src/programmpunkt/AblaufPaneel.tsx, src/routes/programmpunkt.rs, frontend/src/live/praesenz.ts, src/live/praesenz.rs, src/routes/praesenz.rs]
 ---
 
 ## Überblick
@@ -157,6 +157,11 @@ Für die Einsatzleitung:
 - Unter jeder geänderten Angabe steht leise, wer sie zuletzt geändert hat und wann („Geändert von
   …“), im Kopf jedes Paneels die jüngste Änderung („Zuletzt geändert von …“). Eine Angabe, die seit
   dem Anlegen niemand geändert hat, trägt keinen Vermerk.
+- Hat eine andere Person eine Angabe gerade offen, steht an deren Stelle „Wird gerade bearbeitet
+  von …“, bis sie speichert oder abbricht, spätestens eine Minute nach dem Schließen ihres Tabs.
+  Ist es das eigene Konto in einem anderen Fenster, heißt es „Wird gerade von dir in einem anderen
+  Fenster bearbeitet“. Der Hinweis sperrt nichts: speichern kann jeder, die Rückfrage
+  „Zwischenzeitlich geändert“ bleibt das Netz. Gekoppelte Geräte zeigen und melden ihn nicht.
 - „Bezeichnung“ und „Alarmzeit“ sind Pflicht: leer gespeichert bleibt der bisherige Wert stehen,
   und die Zeile sagt, dass die Angabe Pflicht ist.
 - Änderungen an Angaben und eigener Führungsstelle erscheinen sofort an allen anderen Geräten. Sie

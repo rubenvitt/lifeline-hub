@@ -140,6 +140,29 @@ sequenceDiagram
   Sitzungswache. Bleibt eine offene Verbindung 45 s ohne Ereignis (halboffenes TCP im Funkloch),
   meldet `liveVerbindung.ts` den Wiederaufbau und baut selbst neu auf, mit Vollabgleich. Spec: [`openspec/specs/live-abgleich/`](../../openspec/specs/live-abgleich/spec.md).
 
+### 6.3a Präsenz an einer Angabe
+
+```mermaid
+sequenceDiagram
+  participant A as frontend Tab A (InlineAngabe)
+  participant BE as lifeline-hub (src/routes/praesenz.rs)
+  participant Hub as LiveHub (src/live)
+  participant B as frontend Tab B (useEinsatzLiveStream)
+  B->>BE: GET /api/einsaetze/{id}/live
+  BE-->>B: event: praesenz (Stand beim Verbinden, ohne id)
+  A->>BE: PUT /api/einsaetze/{id}/praesenz beim Öffnen, dann alle 15 s
+  BE->>Hub: praesenz_setzen, verteilt nur bei Änderung
+  Hub-->>B: event: praesenz (ganzer Stand, je Eintrag gefiltert)
+  A->>BE: DELETE …/praesenz beim Schließen (pagehide mit keepalive)
+```
+
+- Der Stand lebt nur im Speicher (`src/live/praesenz.rs`, Ablauf 45 s, Aufräumtakt 5 s) und geht
+  am Replay-Ring vorbei als eigener Teilstrom in den Einsatzstrom (`src/routes/live.rs`,
+  `routes::support::sse_praesenz_stream`). Entscheidung: ADR-0072.
+- Der Client hält ihn in `frontend/src/live/praesenz.ts`; `InlineAngabe` zeigt „Wird gerade
+  bearbeitet von …“ an Stelle der Vermerkzeile. Herleitung:
+  `docs/superpowers/specs/2026-11-19-errkrb6m-praesenzanzeige-design.md`.
+
 ## 6.4 Schreiben ohne Netz und Nachsenden
 
 ```mermaid
