@@ -390,12 +390,16 @@ async fn abgelaufener_block_geht_und_der_naechste_gilt() {
     assert!(vorher.gueltig_bis.is_some());
 
     assert_eq!(
-        abgelaufene_bloecke_loeschen(&pool, &jetzt).await.unwrap(),
+        abgelaufene_bloecke_loeschen(&pool, &crate::live::LiveHub::new(), &jetzt)
+            .await
+            .unwrap(),
         0
     );
     let spaeter = crate::zeit::formatiere_utc(Utc::now() + chrono::Duration::days(61));
     assert_eq!(
-        abgelaufene_bloecke_loeschen(&pool, &spaeter).await.unwrap(),
+        abgelaufene_bloecke_loeschen(&pool, &crate::live::LiveHub::new(), &spaeter)
+            .await
+            .unwrap(),
         1
     );
     let danach = angabe(&pool, id, &spaeter).await.unwrap().unwrap();
@@ -606,11 +610,27 @@ async fn abgelaufener_block_verteilt_seinen_etb_eintrag() {
     frist(&pool, id, K::Personenauskunft, 60).await;
     assert!(archivieren(&pool, id, Utc::now()).await.unwrap());
     let spaeter = crate::zeit::formatiere_utc(Utc::now() + chrono::Duration::days(61));
-    let (anzahl, luecken) = crate::etb::nachlauf::klammer(
-        &pool,
-        abgelaufene_bloecke_loeschen(&pool, &spaeter),
-    )
-    .await;
+    let live = crate::live::LiveHub::new();
+    let mut rx = live.abonniere(id);
+    let (anzahl, luecken) =
+        crate::etb::nachlauf::klammer(&pool, abgelaufene_bloecke_loeschen(&pool, &live, &spaeter))
+            .await;
     assert_eq!(anzahl.unwrap(), 1);
-    assert!(luecken.is_empty(), "{}", crate::etb::nachlauf::melde(&luecken));
+    assert!(
+        luecken.is_empty(),
+        "{}",
+        crate::etb::nachlauf::melde(&luecken)
+    );
+    let etb_id: i64 = sqlx::query_scalar("SELECT MAX(id) FROM etb_eintrag WHERE einsatz_id = ?")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let nachricht = rx.try_recv().expect("etb-Ereignis");
+    assert_eq!(nachricht.event, crate::live::LiveEvent::Etb);
+    assert!(
+        nachricht.data.contains(&format!(r#""etb_id":{etb_id}"#)),
+        "{}",
+        nachricht.data
+    );
 }

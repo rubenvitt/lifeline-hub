@@ -148,7 +148,7 @@ async fn tick_rumpf(
         }
         Err(e) => tracing::warn!("Purge Phase N: Abfrage fehlgeschlagen: {e}"),
     }
-    match super::archiv::abgelaufene_bloecke_loeschen(pool, &jetzt_s).await {
+    match super::archiv::abgelaufene_bloecke_loeschen(pool, live, &jetzt_s).await {
         Ok(0) => {}
         Ok(n) => {
             anzahl += n;

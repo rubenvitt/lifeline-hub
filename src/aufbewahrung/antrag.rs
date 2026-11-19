@@ -912,7 +912,7 @@ pub async fn vollziehe_faellige(
             }
             Ok((Vollzug::Person(einsatz_id), etb_id)) => {
                 geschwaerzt += 1;
-                for etb_id in etb_id {
+                if let Some(etb_id) = etb_id {
                     live.publiziere(einsatz_id, etb_id);
                 }
                 crate::live::org::kopf_melden(pool, live, einsatz_id, &[]).await;

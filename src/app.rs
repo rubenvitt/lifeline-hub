@@ -2765,7 +2765,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
 
     let heic_decoder = opt.heic_decoder_verzeichnis.clone().map(Arc::new);
     let router_platz = crate::instanz::spiegel::antrag::RouterPlatz::default();
-    let router: Router = router
+    let router = router
         // Öffentliche API v1 (LLH-1653): Routen nur über `public_api::router()`, jede mit ihrem
         // Eintrag im Dokument; Body-Grenze und Fehlercode an den Routen bringt `mount` mit.
         .merge(crate::public_api::mount(crate::public_api::router()))
@@ -3014,7 +3014,7 @@ impl tower_http::trace::OnFailure<tower_http::classify::ServerErrorsFailureClass
 /// ETB-Wächter (LLH-1976, `src/AGENTS.md`, „Backend — ETB live verteilen“): AUSSERHALB von
 /// CatchPanic, damit eine Lücke in Debug und Test als Panic bis in den Test durchschlägt statt als
 /// 500 zu enden. Im Release-Build fehlt die Schicht ganz und kostet nichts.
-fn mit_etb_waechter(router: Router, state: &AppState) -> Router {
+fn mit_etb_waechter(router: Router<AppState>, state: &AppState) -> Router<AppState> {
     #[cfg(debug_assertions)]
     {
         router.layer(axum::middleware::from_fn_with_state(
