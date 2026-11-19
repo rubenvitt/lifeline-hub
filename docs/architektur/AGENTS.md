@@ -11,8 +11,9 @@ arc42, von Agenten geschrieben und laufend fortgeführt; ADRs nach
 - **Ein arc42-Kapitel je Datei**, `01-…` bis `12-…`, Einstieg `README.md`. Kein Kapitel fällt
   weg; ein Kapitel ohne eigenen Inhalt sagt das in einem Satz und verweist.
 - **Verweisen statt kopieren.** Eine Regel steht genau einmal (Wurzel-`AGENTS.md`). Kapitel 8
-  nennt das Konzept und zeigt auf die Bereichs-`AGENTS.md`, `openspec/specs/<name>/` oder ein
-  Archiv-`design.md`; es wiederholt deren Regeln nicht. Pfade stehen in Backticks, relative
+  nennt das Konzept und zeigt auf die Bereichs-`AGENTS.md`, ein Design-Doc unter
+  `docs/superpowers/specs/`, `openspec/specs/<name>/` oder ein Archiv-`design.md` (beide
+  eingefroren, ADR-0065); es wiederholt deren Regeln nicht. Pfade stehen in Backticks, relative
   Links müssen auflösen (Wächter).
 - **Diagramme als Mermaid** in ```` ```mermaid ````, keine Bilddateien. Knoten heißen wie die
   Bausteine in Kapitel 5.
@@ -36,7 +37,7 @@ Der PR, der die Architektur ändert, zieht die Doku im selben Branch mit:
 | neues übergreifendes Konzept oder neue Bereichs-`AGENTS.md` | Kapitel 8 |
 | Entscheidung (Route `entwurf`, E1) oder Abkehr von einer ADR | neue ADR (Kapitel 9 führt kein Verzeichnis) |
 | neues Risiko, behobene Schuld | Kapitel 11 |
-| neuer Fachbegriff | Kapitel 12 (Fachbegriffe der Oberfläche stehen in `openspec/specs/bedien-begriffe/`) |
+| neuer Fachbegriff | Kapitel 12 (die bis 18.11.2026 festgelegten Fachbegriffe der Oberfläche stehen im eingefrorenen `openspec/specs/bedien-begriffe/`) |
 
 ## Entscheidungen (ADRs)
 
@@ -63,8 +64,8 @@ Vorlage `entscheidungen/VORLAGE.md`. Geschrieben für Agenten, die sie vor einer
   `set -e` nicht ab: dafür `verbiete` nehmen. Wo keine Maschine prüfen kann, steht statt des
   Blocks eine Zeile `manuell: <warum>`.
 - **`## Kontext`** und **`## Konsequenzen`** je zwei bis fünf Sätze; die lange Begründung
-  steht in `herleitung` (Archiv-`design.md`, Superpowers-Spec, Zunder-Aufgabe) und wird nicht
-  abgeschrieben. Eine ADR bleibt unter 80 Zeilen (Wächter).
+  steht in `herleitung` (Design-Doc unter `docs/superpowers/specs/`, Archiv-`design.md`,
+  Zunder-Aufgabe) und wird nicht abgeschrieben. Eine ADR bleibt unter 80 Zeilen (Wächter).
 - **Unveränderlich, sobald `akzeptiert`:** Regeln und Kontext ändern sich nicht mehr. Eine
   Abkehr ist eine neue ADR mit `ersetzt: ADR-…`; die alte bekommt `status: ersetzt` und
   `ersetzt_durch`. Erlaubt bleiben Pfadnachzüge in `gilt_fuer` und in der Prüfung nach einem

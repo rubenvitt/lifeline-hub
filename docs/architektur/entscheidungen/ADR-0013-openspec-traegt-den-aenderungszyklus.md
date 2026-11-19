@@ -1,11 +1,12 @@
 ---
 id: ADR-0013
 titel: OpenSpec trägt den Änderungszyklus, Fähigkeits-Specs liegen unter openspec/specs
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0065
 datum: 2026-09-20
 gilt_fuer:
   - openspec/**
-  - scripts/check-openspec-archiv.sh
+  - scripts/check-openspec-eingefroren.sh
 herleitung:
   - openspec/changes/archive/2026-09-30-lfh-589-entwurfs-hoheit-orchestrierung/design.md
 ---

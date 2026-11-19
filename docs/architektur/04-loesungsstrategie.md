@@ -1,6 +1,6 @@
 # 4. Lösungsstrategie
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 18.11.2026 (Superpowers statt OpenSpec, LLH-1967).
 
 Dieses Kapitel fasst die tragenden Entscheidungen in Tabellen zusammen: zuerst die
 Technologiewahl, dann je Qualitätsziel aus [Kapitel 1](01-einfuehrung-und-ziele.md) die Ansätze,
@@ -68,5 +68,5 @@ ADRs in [Kapitel 9](09-architekturentscheidungen.md), die Bausteine in
 | --- | --- | --- |
 | Eine Durchsetzungsinstanz | `scripts/check-all.sh` vor jedem Merge, die CI ruft es unverändert. | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Qualitäts-Gates“; [`scripts/AGENTS.md`](../../scripts/AGENTS.md) |
 | Regeln beim Code | `AGENTS.md` je Bereich, eine Regel steht genau einmal. | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Wo die Regeln stehen“ |
-| Nachvollziehbare Änderungen | OpenSpec-Changes mit `design.md`, Fähigkeits-Specs unter `openspec/specs/`, ADRs mit maschineller Prüfung. | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Planung und Ausführung“; [`AGENTS.md`](AGENTS.md) dieses Verzeichnisses |
+| Nachvollziehbare Änderungen | Design-Docs und Pläne unter `docs/superpowers/`, ältere Herleitungen und Fähigkeits-Specs im eingefrorenen Archiv `openspec/`, ADRs mit maschineller Prüfung. | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Planung und Ausführung“; [`AGENTS.md`](AGENTS.md) dieses Verzeichnisses |
 | Lesbarer Code | Fachbegriffe deutsch, Technik englisch. | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Bezeichner-Sprache“ |

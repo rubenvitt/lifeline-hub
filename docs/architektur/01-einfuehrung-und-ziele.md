@@ -1,6 +1,6 @@
 # 1. Einführung und Ziele
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 18.11.2026 (Superpowers statt OpenSpec, LLH-1967).
 
 Lifeline Hub ist eine Anwendung zur Führungsunterstützung in Einsatzlagen des
 Bevölkerungsschutzes. Sie bündelt Einsatztagebuch, Lagekarte, Kräfteübersicht, Betroffenen- und
@@ -59,4 +59,4 @@ stehen in [Kapitel 4](04-loesungsstrategie.md).
 | Betroffene Personen | Ihre Daten werden nur so lange und so weit verarbeitet, wie die Aufbewahrungsregeln es erlauben; Datenschutz-Auskünfte sind ohne Datenbankzugriff möglich | Specs [`aufbewahrung`](../../openspec/specs/aufbewahrung/spec.md), [`aufbewahrung-loeschersuchen`](../../openspec/specs/aufbewahrung-loeschersuchen/spec.md), [`personen-zugriffsprotokoll`](../../openspec/specs/personen-zugriffsprotokoll/spec.md) |
 | Betreiber einer Instanz | Startet Container oder Binary, setzt TLS, Anmeldeverfahren, Offline-Karten und Sicherung auf | [`docs/betrieb/packaging.md`](../betrieb/packaging.md), [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md) |
 | Anbieter externer Daten | Erwarten die Einhaltung ihrer Lizenzauflagen, etwa Pflicht-Attribution | [`docs/fachebenen-quellen.md`](../fachebenen-quellen.md) |
-| Entwicklung (Maintainer und Coding-Agenten) | Ändern das System nach den Regeln in den `AGENTS.md`, planen über OpenSpec, prüfen mit einem Gate; Aufgaben in Zunder | [`AGENTS.md`](../../AGENTS.md); [`scripts/AGENTS.md`](../../scripts/AGENTS.md); [Kapitel 2](02-randbedingungen.md) |
+| Entwicklung (Maintainer und Coding-Agenten) | Ändern das System nach den Regeln in den `AGENTS.md`, planen mit Superpowers, prüfen mit einem Gate; Aufgaben in Zunder | [`AGENTS.md`](../../AGENTS.md); [`scripts/AGENTS.md`](../../scripts/AGENTS.md); [Kapitel 2](02-randbedingungen.md) |

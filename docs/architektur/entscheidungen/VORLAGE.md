@@ -6,7 +6,7 @@ datum: JJJJ-MM-TT
 gilt_fuer:
   - src/modul/**
 herleitung:
-  - openspec/changes/archive/<datum>-<name>/design.md
+  - docs/superpowers/specs/<datum>-<kurz>-<slug>-design.md
 ---
 
 # ADR-0000: Entscheidung in einem Satz, als Aussage
