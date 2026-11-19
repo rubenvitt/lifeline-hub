@@ -15,6 +15,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { lagekartePfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import { FakeEventSource } from '../test/eventSource';
+import { beendeHuelle, type IosNachricht, starteIosHuelle } from '../test/huelle';
 import { waehleMenueEintrag, warteAufMenueFokus } from '../test/menue';
 
 /**
@@ -187,6 +188,89 @@ describe('Sichtung aus der Zeile (LLH-1130, 2.1)', () => {
     render(() => [{ ...r007, status: 'vermisst', aktuelle_sichtung: null }]);
     await screen.findByText('R-007');
     expect(screen.queryByRole('button', { name: /Sichtung R-007/ })).toBeNull();
+  });
+});
+
+/**
+ * Haptik der iOS-Hülle (Change t39ltxxi, Spec `huellen-vertrag`, „Erfassungen geben haptische
+ * Rückmeldung“): die Zeile meldet erst mit der Antwort, und das Popover schließt trotzdem sofort.
+ */
+describe('Sichtung aus der Zeile — Haptik in der Hülle', () => {
+  afterEach(beendeHuelle);
+
+  function mitIosHuelle() {
+    const nachrichten: IosNachricht[] = [];
+    starteIosHuelle({ bruecke: { postMessage: (n) => nachrichten.push(n) } });
+    return () => nachrichten.filter((n) => n.cmd === 'haptics').map((n) => n.kind);
+  }
+
+  async function sichteSk1(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole('button', { name: /^Sichtung R-007 ändern/ }));
+    const flaeche = await screen.findByRole('region', { name: 'Sichtung R-007' });
+    await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
+  }
+
+  it('meldet `success` erst mit der Annahme, genau einmal; das Popover ist schon zu', async () => {
+    const haptik = mitIosHuelle();
+    let freigeben: () => void = () => {};
+    const antwort = new Promise<void>((r) => (freigeben = r));
+    let stand: Person[] = [r007];
+    server.use(
+      http.post('/api/einsaetze/1/personen/70/sichtung', async () => {
+        await antwort;
+        stand = [{ ...r007, aktuelle_sichtung: 'sk1' }];
+        return HttpResponse.json(sichtungAntwort('sk1'), { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(() => stand);
+
+    await sichteSk1(user);
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Sichtung R-007' })).toBeNull(),
+    );
+    expect(haptik()).toEqual([]);
+
+    await act(async () => freigeben());
+    expect(
+      await screen.findByRole('button', { name: 'Sichtung R-007 ändern, aktuell SK I' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(haptik()).toEqual(['success']));
+  });
+
+  it('meldet ohne Netz `tap`, nicht `success`: die Sichtung ist nur vorgemerkt', async () => {
+    const haptik = mitIosHuelle();
+    const user = userEvent.setup();
+    render(() => [r007]);
+
+    await user.click(await screen.findByRole('button', { name: /^Sichtung R-007 ändern/ }));
+    setzeOnline(false);
+    const flaeche = await screen.findByRole('region', { name: 'Sichtung R-007' });
+    await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
+
+    expect(await within(zeile('R-007')).findByText('Offline vorgemerkt')).toBeInTheDocument();
+    await waitFor(() => expect(haptik()).toEqual(['tap']));
+  });
+
+  it('meldet `error` bei Ablehnung; der Grund steht weiter an der Zeile, kein Toast', async () => {
+    const haptik = mitIosHuelle();
+    server.use(
+      http.post('/api/einsaetze/1/personen/70/sichtung', () => abgelehnt('Person ist storniert')),
+    );
+    const user = userEvent.setup();
+    render(() => [r007]);
+
+    await sichteSk1(user);
+    expect(await within(zeile('R-007')).findByText('Person ist storniert')).toHaveAttribute(
+      'data-fehler',
+    );
+    await waitFor(() => expect(haptik()).toEqual(['error']));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Sichtung R-007' })).toBeNull(),
+    );
+    expect(document.querySelector('.ant-message')).toBeNull();
   });
 });
 

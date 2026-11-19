@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import {
@@ -28,6 +29,7 @@ const repo = join(frontend, '..');
 const oeffentlich = join(frontend, 'public');
 const huellenSymbole = join(repo, 'src-tauri', 'icons');
 const quellen = join(repo, 'scripts', 'marke');
+const iosAssets = join(repo, 'ios', 'App', 'Assets.xcassets');
 
 const pwaManifest = JSON.parse(readFileSync(join(hier, 'pwaManifest.json'), 'utf8')) as {
   theme_color: string;
@@ -119,6 +121,73 @@ describe('Bildmarke — Nenngrößen (LFH-837)', () => {
       expect(kante, `${name}: unbekanntes Namensschema`).not.toBeNull();
       expect(pngMasse(join(huellenSymbole, name)), name).toEqual({ breite: kante, hoehe: kante });
     }
+  });
+});
+
+/** Farbtyp aus dem IHDR-Block (2 = RGB ohne Alpha, 6 = RGBA). */
+function pngFarbtyp(pfad: string): number {
+  return readFileSync(pfad).readUInt8(25);
+}
+
+/**
+ * Farbe des Pixels links oben als `#rrggbb` (8 Bit, RGB oder RGBA). Für die erste Zeile ist die
+ * Vorgängerzeile null; jeder Filter liefert das erste Pixel deshalb unverändert.
+ */
+function pngEckfarbe(pfad: string): string {
+  const daten = readFileSync(pfad);
+  const idat: Buffer[] = [];
+  for (let pos = 8; pos < daten.length;) {
+    const laenge = daten.readUInt32BE(pos);
+    if (daten.subarray(pos + 4, pos + 8).toString('ascii') === 'IDAT') {
+      idat.push(daten.subarray(pos + 8, pos + 8 + laenge));
+    }
+    pos += 12 + laenge;
+  }
+  const roh = inflateSync(Buffer.concat(idat));
+  return `#${[...roh.subarray(1, 4)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+}
+
+describe('Bildmarke — iOS-App (LLH-1978)', () => {
+  const symbolSatz = join(iosAssets, 'AppIcon.appiconset');
+  const symbol = join(symbolSatz, 'AppIcon.png');
+
+  it('das App-Symbol hat 1024 px und keine Transparenz', () => {
+    expect(pngMasse(symbol)).toEqual({ breite: 1024, hoehe: 1024 });
+    expect(pngFarbtyp(symbol), 'Farbtyp 2 = RGB ohne Alpha').toBe(2);
+  });
+
+  it('das App-Symbol steht auf Kopf-Schwarz', () => {
+    expect(pngEckfarbe(symbol)).toBe(KOPF_SCHWARZ);
+  });
+
+  it('der Symbolsatz führt genau das eine Symbol für alle Geräte', () => {
+    const satz = JSON.parse(readFileSync(join(symbolSatz, 'Contents.json'), 'utf8')) as {
+      images: unknown[];
+    };
+    expect(satz.images).toEqual([
+      { filename: 'AppIcon.png', idiom: 'universal', platform: 'ios', size: '1024x1024' },
+    ]);
+  });
+
+  it('der Startbildschirm hat die Farbe Kopf-Schwarz', () => {
+    const farbe = JSON.parse(
+      readFileSync(join(iosAssets, 'Kopfschwarz.colorset', 'Contents.json'), 'utf8'),
+    ) as { colors: { color: { components: Record<string, string> } }[] };
+    expect(farbe.colors).toHaveLength(1);
+    const { red, green, blue, alpha } = farbe.colors[0].color.components;
+    const hex = [red, green, blue].map((k) => k.replace(/^0x/i, '').toLowerCase()).join('');
+    expect(`#${hex}`).toBe(KOPF_SCHWARZ);
+    expect(alpha).toBe('1.000');
+  });
+
+  it('das App-Symbol stammt aus der aktuellen Quelle (Stempel von erzeuge-symbol.sh)', () => {
+    const stempel = readFileSync(join(repo, 'scripts', 'ios', 'symbol.sha256'), 'utf8')
+      .trim()
+      .split(/\s+/);
+    const summe = createHash('sha256')
+      .update(readFileSync(join(quellen, 'symbol.svg')))
+      .digest('hex');
+    expect(stempel).toEqual([summe, 'symbol.svg']);
   });
 });
 

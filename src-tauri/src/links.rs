@@ -79,160 +79,120 @@ pub fn entscheide_navigation(server: Option<&Url>, ziel: &Url) -> Ziel {
 
 #[cfg(test)]
 mod tests {
+    use serde::Deserialize;
+
     use super::*;
+
+    /// Gemeinsame Fälle beider Hüllen (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“): dieselbe
+    /// Datei prüft der Swift-Kern der iOS-Hülle (`ios/LifelineKern`).
+    const FAELLE: &str = include_str!("../faelle/links.json");
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Datei {
+        #[allow(dead_code)]
+        zweck: String,
+        neues_fenster: Vec<ZielFall>,
+        navigation: Vec<ZielFall>,
+        gehoert_zum_server: Vec<ServerFall>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct ZielFall {
+        beschreibung: String,
+        server: Option<String>,
+        ziel: String,
+        erwartet: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct ServerFall {
+        beschreibung: String,
+        server: String,
+        seite: String,
+        erwartet: bool,
+    }
 
     fn url(s: &str) -> Url {
         Url::parse(s).unwrap()
     }
 
-    fn server() -> Url {
-        url("https://elw.local:8443/")
+    fn datei() -> Datei {
+        serde_json::from_str(FAELLE).expect("faelle/links.json ist lesbar")
     }
 
-    fn fenster(ziel: &str) -> Ziel {
-        entscheide_neues_fenster(Some(&server()), &url(ziel))
+    /// Kennwort eines Ziels in den gemeinsamen Fällen.
+    fn kennwort(ziel: Ziel) -> &'static str {
+        match ziel {
+            Ziel::Huelle => "huelle",
+            Ziel::Nebenfenster => "nebenfenster",
+            Ziel::Download => "download",
+            Ziel::System => "system",
+            Ziel::Verwerfen => "verwerfen",
+        }
     }
 
-    fn navigation(ziel: &str) -> Ziel {
-        entscheide_navigation(Some(&server()), &url(ziel))
-    }
-
-    #[test]
-    fn eigene_seite_oeffnet_ein_nebenfenster() {
-        assert_eq!(
-            fenster("https://elw.local:8443/einsaetze/1/etb?eintrag=4"),
-            Ziel::Nebenfenster
-        );
-        assert_eq!(fenster("https://elw.local:8443/"), Ziel::Nebenfenster);
-    }
-
-    #[test]
-    fn dateiroute_der_eigenen_origin_wird_heruntergeladen() {
-        let anhang = "https://elw.local:8443/api/einsaetze/1/anhaenge/7";
-        assert_eq!(fenster(anhang), Ziel::Download);
-        assert_eq!(navigation(anhang), Ziel::Download);
-        assert_eq!(
-            navigation("https://elw.local:8443/api/einsaetze/1/schaeden/3/anhaenge/2/datei"),
-            Ziel::Download
-        );
-    }
-
-    /// Die OIDC-Anmeldung navigiert im Fenster über diese beiden Routen — ein Download hier
-    /// hieße: niemand kommt mehr per OIDC hinein.
-    #[test]
-    fn anmelderouten_laufen_im_fenster() {
-        for pfad in [
-            "https://elw.local:8443/api/auth/oidc/start?von=%2Feinsaetze",
-            "https://elw.local:8443/api/auth/oidc/callback?code=x&state=y",
-        ] {
-            assert_eq!(navigation(pfad), Ziel::Huelle, "{pfad}");
-            assert_eq!(fenster(pfad), Ziel::Nebenfenster, "{pfad}");
+    fn pruefe(faelle: Vec<ZielFall>, entscheide: fn(Option<&Url>, &Url) -> Ziel) {
+        for fall in faelle {
+            let server = fall.server.as_deref().map(url);
+            assert_eq!(
+                kennwort(entscheide(server.as_ref(), &url(&fall.ziel))),
+                fall.erwartet,
+                "{}",
+                fall.beschreibung
+            );
         }
     }
 
     #[test]
-    fn nur_der_pfadanfang_api_zaehlt() {
-        assert_eq!(navigation("https://elw.local:8443/apiarchiv"), Ziel::Huelle);
-        assert_eq!(
-            fenster("https://elw.local:8443/einsaetze/api/1"),
-            Ziel::Nebenfenster
-        );
-        assert_eq!(navigation("https://elw.local:8443/api"), Ziel::Huelle);
+    fn jeder_gemeinsame_fall_fuer_neue_fenster_gilt() {
+        let faelle = datei().neues_fenster;
+        assert!(faelle.len() >= 22, "nur {} Fälle gelesen", faelle.len());
+        pruefe(faelle, entscheide_neues_fenster);
     }
 
     #[test]
-    fn fremde_ziele_gehen_ans_system() {
-        assert_eq!(fenster("https://www.govdata.de/dl-de/by-2-0"), Ziel::System);
-        assert_eq!(fenster("http://example.org/"), Ziel::System);
-        assert_eq!(fenster("mailto:lage@example.org"), Ziel::System);
-        assert_eq!(fenster("tel:+4930123"), Ziel::System);
-    }
-
-    /// Anderer Port oder anderes Schema ist eine fremde Origin — auch auf demselben Host.
-    #[test]
-    fn origin_heisst_schema_host_und_port() {
-        assert_eq!(fenster("https://elw.local/einsaetze"), Ziel::System);
-        assert_eq!(fenster("http://elw.local:8443/einsaetze"), Ziel::System);
-        assert_eq!(
-            fenster("https://elw.local/api/einsaetze/1/anhaenge/7"),
-            Ziel::System
-        );
-        assert_eq!(
-            navigation("https://elw.local/api/einsaetze/1/anhaenge/7"),
-            Ziel::Huelle
-        );
-        // Standardport und ausgeschriebener Port sind dieselbe Origin.
-        let server = url("https://elw.local/");
-        assert_eq!(
-            entscheide_neues_fenster(Some(&server), &url("https://elw.local:443/x")),
-            Ziel::Nebenfenster
-        );
+    fn jeder_gemeinsame_fall_fuer_die_navigation_gilt() {
+        let faelle = datei().navigation;
+        assert!(faelle.len() >= 17, "nur {} Fälle gelesen", faelle.len());
+        pruefe(faelle, entscheide_navigation);
     }
 
     #[test]
-    fn andere_schemata_werden_verworfen() {
-        for ziel in [
-            "file:///etc/passwd",
-            "javascript:alert(1)",
-            "data:text/html,x",
-            "blob:https://elw.local:8443/1b2c",
-            "tauri://localhost/index.html",
-            "lifeline://verbinden?server=https://boese.example",
-            "about:blank",
-        ] {
-            assert_eq!(fenster(ziel), Ziel::Verwerfen, "{ziel}");
+    fn jeder_gemeinsame_fall_fuer_die_zugehoerigkeit_gilt() {
+        let faelle = datei().gehoert_zum_server;
+        assert!(faelle.len() >= 5, "nur {} Fälle gelesen", faelle.len());
+        for fall in faelle {
+            assert_eq!(
+                gehoert_zum_server(&url(&fall.server), &url(&fall.seite)),
+                fall.erwartet,
+                "{}",
+                fall.beschreibung
+            );
         }
     }
 
     #[test]
-    fn navigation_bleibt_sonst_im_fenster() {
-        // Eigene Seiten, der Weg zum Identitätsanbieter, die Maske, leere Seite.
-        for ziel in [
-            "https://elw.local:8443/einsaetze/1",
-            "https://login.example.org/authorize?client_id=x",
-            "tauri://localhost/index.html",
-            "http://tauri.localhost/index.html",
-            "about:blank",
-        ] {
-            assert_eq!(navigation(ziel), Ziel::Huelle, "{ziel}");
+    fn jedes_ziel_hat_einen_fall() {
+        let datei = datei();
+        let alle = [
+            Ziel::Huelle,
+            Ziel::Nebenfenster,
+            Ziel::Download,
+            Ziel::System,
+            Ziel::Verwerfen,
+        ];
+        for ziel in alle {
+            assert!(
+                datei
+                    .neues_fenster
+                    .iter()
+                    .chain(&datei.navigation)
+                    .any(|fall| fall.erwartet == kennwort(ziel)),
+                "kein Fall für {ziel:?}"
+            );
         }
-        assert_eq!(navigation("mailto:lage@example.org"), Ziel::System);
-        assert_eq!(navigation("tel:+4930123"), Ziel::System);
-    }
-
-    /// Der CSV-Export bietet seine Datei als `blob:` der Serverseite an (LFH-914). Erreicht so
-    /// eine Navigation den Handler, läuft sie weiter und der Webview lädt herunter.
-    #[test]
-    fn blob_der_serverseite_bleibt_im_fenster() {
-        let blob = "blob:https://elw.local:8443/6f1c2a9e-8d3b-4e7a-9c55-0b1d2e3f4a5b";
-        assert_eq!(navigation(blob), Ziel::Huelle);
-        assert!(!gehoert_zum_server(&server(), &url(blob)));
-    }
-
-    #[test]
-    fn nebenfenster_gehoert_zum_server_derselben_origin() {
-        let seite = url("https://elw.local:8443/einsaetze/1/lageberichte/3");
-        assert!(gehoert_zum_server(&server(), &seite));
-        assert!(gehoert_zum_server(
-            &url("https://elw.local:8443/einsaetze"),
-            &seite
-        ));
-        assert!(!gehoert_zum_server(
-            &url("https://fuekw.local:8443/"),
-            &seite
-        ));
-        assert!(!gehoert_zum_server(&server(), &url("about:blank")));
-    }
-
-    /// Ohne verbundenen Server (Erststart-Maske) gibt es keine eigene Origin.
-    #[test]
-    fn ohne_server_gibt_es_keine_eigene_origin() {
-        let ziel = url("https://elw.local:8443/api/einsaetze/1/anhaenge/7");
-        assert_eq!(entscheide_navigation(None, &ziel), Ziel::Huelle);
-        assert_eq!(entscheide_neues_fenster(None, &ziel), Ziel::System);
-        assert_eq!(
-            entscheide_navigation(None, &url("tauri://localhost/index.html")),
-            Ziel::Huelle
-        );
     }
 }

@@ -122,13 +122,17 @@ export default function ZeilenSichtung({
       <ErfassungsFormular<SichtungEingabe>
         form={form}
         erfassenText="Übernehmen"
-        // Kein Warten auf die Antwort: das Popover schließt, die Ablehnung steht an der Zeile
-        // (design.md D1/D5). Die Hülle leert danach nur ein Formular, das ohnehin verschwindet.
+        // Kein Warten auf die Antwort: das Popover schließt sofort, die Ablehnung steht an der
+        // Zeile (design.md D1/D5). Die Zusage geht trotzdem an die Hülle, damit die Haptik der
+        // Antwort folgt (Spec `huellen-vertrag`: angenommen `success`, vorgemerkt `tap`,
+        // abgelehnt `error`); den Grund meldet `onError` der Mutation.
         onErfassen={(v) => {
-          mutation.mutate({ einsatzId, kategorie: v.kategorie });
-          return Promise.resolve();
+          setOffen(false);
+          return mutation.mutateAsync({ einsatzId, kategorie: v.kategorie });
         }}
-        onFertig={() => setOffen(false)}
+        // Schon beim Absenden zu: eine späte Antwort schlösse sonst ein inzwischen neu geöffnetes
+        // Popover.
+        onFertig={() => {}}
         onAbbrechen={() => setOffen(false)}
       >
         <Form.Item

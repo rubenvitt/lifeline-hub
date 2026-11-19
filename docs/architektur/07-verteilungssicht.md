@@ -1,9 +1,9 @@
 # 7. Verteilungssicht
 
-Stand: 15.11.2026 (ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 18.11.2026 (iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
-SQLite. Die Endgeräte greifen über Browser, installierte PWA oder Desktop-App darauf zu. Einen
+SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App oder iOS-App darauf zu. Einen
 festen Einsatzrechner gibt es nicht ([`docs/betrieb/packaging.md`](../betrieb/packaging.md),
 „Datenträger: Mindest-Schreibrate“). Den Server trägt ein Mini-PC oder Notebook im
 Einsatzleitwagen genauso wie ein Container beim Hoster. Gebaut werden vier Server-Plattformen
@@ -16,6 +16,7 @@ flowchart LR
   subgraph EG["Endgeräte (beliebig viele)"]
     BR["Browser / PWA<br/>frontend + Service Worker<br/>IndexedDB"]
     DT["Desktop-App src-tauri<br/>(Webview, macOS/Windows)"]
+    IOS["iOS-App ios<br/>(WKWebView, iPhone/iPad)"]
     GK["Gekoppeltes Gerät<br/>(Browser, Funktionsansicht)"]
   end
   subgraph SR["Server-Rechner (Mini-PC, Notebook, VM oder Container)"]
@@ -33,9 +34,11 @@ flowchart LR
     OS[("Objektspeicher S3/R2<br/>MBTiles + Manifest")]
     KS["karten-service<br/>+ karten-build (Docker)"]
     GH["GitHub Releases + GHCR"]
+    TF["App Store Connect<br/>+ TestFlight"]
   end
   BR -->|"HTTPS (SSE, REST)"| RP
   DT -->|HTTPS| RP
+  IOS -->|"HTTPS, GET /api/shell"| RP
   GK -->|HTTPS| RP
   RP --> LH
   BR -.->|"direkt ohne Proxy"| LH
@@ -50,6 +53,7 @@ flowchart LR
   LH -.->|"POST /builds (Token)"| KS
   KS --> OS
   DT -.->|"Update latest.json"| GH
+  TF -.->|"Build installieren"| IOS
 ```
 
 Gestrichelte Pfeile sind optional oder brauchen Internet. Ohne Internet läuft der Server weiter:
@@ -63,6 +67,7 @@ Offline-Karten liegen in `karten/`, der Rest scheitert still oder ist abgeschalt
 | Container-Abbild `ghcr.io/rubenvitt/lifeline-hub` | dieselbe Linux-Binary auf `distroless/cc-debian13:nonroot`, `linux/amd64` und `linux/arm64`, kein Build im Abbild | `Dockerfile`, Job `docker` in `artefakte.yml` |
 | PWA im Browser | dasselbe Frontend, vom Server ausgeliefert; installierbar und offline nur im sicheren Kontext | `frontend/vite.config.ts` (`VitePWA`), [`packaging.md`](../betrieb/packaging.md), „Lokaler Betrieb“ |
 | Desktop-App | Tauri-Hülle ohne Anwendungslogik, lädt die https-Adresse des Servers; macOS ab 14 arm64 (`.dmg`, signiert und notarisiert), Windows 10/11 x64 (`-setup.exe`, nicht signiert); Linux wird nur übersetzt | `src-tauri/tauri.conf.json`, `.github/workflows/desktop.yml`, [`desktop-app.md`](../betrieb/desktop-app.md) |
+| iOS-App | Swift-App (SwiftUI und WKWebView) ohne Anwendungslogik, lädt die Oberfläche des gewählten Servers; iPhone und iPad ab iOS 17.4, Bundle-ID `dev.rubeen.lifeline.ios`; nur über TestFlight an Tags der Kanäle `beta` und `main`, nicht im App Store | `ios/project.yml`, `.github/workflows/ios.yml`, `scripts/ios/testflight.sh`, [`ios-app.md`](../betrieb/ios-app.md) |
 | `karten-service` | Region-Build-Dienst; Linux-Binary und Abbild `ghcr.io/rubenvitt/lifeline-hub-karten-service` auf `debian:13-slim` mit `make`, `sqlite3` und Docker-CLI | `karten-service/Dockerfile`, Job `docker-karten` in `artefakte.yml`, [Runbook](../ops/lfh-204-karten-service-ops-runbook.md) |
 | `website` | statische Astro-Seite auf Cloudflare Pages, Produktions-Branch `alpha`, nicht im Binary | [`website/AGENTS.md`](../../website/AGENTS.md) |
 
@@ -96,6 +101,7 @@ oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler Betr
 | `--backup-verzeichnis` | automatische Sicherungen, Vorgabe alle 360 min, 7 behalten, mit `--backup-empfaenger` per age verschlüsselt | `src/config.rs`, [`backup-restore.md`](../betrieb/backup-restore.md) |
 | Endgerät, Browserprofil oder Webview | IndexedDB `lifeline-lagebild`, `lifeline-offline`, `lifeline-ortcache`, ETB-Entwürfe; Liste aller Orte in `GERAETESPEICHER` | `frontend/src/offline/geraetRaeumung.ts`, [`endgeraete.md`](../betrieb/endgeraete.md) |
 | Desktop-App | `verbindung.json` (Server, `bekannt`), `kanal.json` (Update-Kanal) im App-Konfigurationsverzeichnis (`app_config_dir`, Kennung `dev.rubeen.lifeline.desktop`) | `src-tauri/src/verbindung.rs`, `src-tauri/src/kanal.rs`, [`desktop-app.md`](../betrieb/desktop-app.md) |
+| iOS-App | Serverliste `server.json` in Application Support, Schalter „Haptik“ in `UserDefaults`; je Server ein eigener `WKWebsiteDataStore` mit der UUID des Eintrags (Cookies, IndexedDB, Cache) | `ios/LifelineKern/Sources/LifelineKern/Huellenhilfen.swift` (`Serverablage`), `ios/App/Webview.swift` (`Webviewfabrik`), [`ios-app.md`](../betrieb/ios-app.md) |
 | `karten-service` | Volume `/opt/karten-build/out`, Ergebnis im Objektspeicher | `karten-service/Dockerfile`, `karten-service/src/storage/s3.rs` |
 
 Das Abbild legt Datenbank und `karten/` auf **ein** Volume `/data`, weil der Kartenpfad aus dem
@@ -113,7 +119,11 @@ verschlüsselten Datenträger; die Anwendung verschlüsselt nicht selbst und pr�
 | Klartext-HTTP | funktioniert, aber ohne Service Worker, PWA, Passkey, Eigenposition und Einwurf | [`packaging.md`](../betrieb/packaging.md), „Lokaler Betrieb“ |
 
 Die Desktop-App nimmt nur `https` mit Hostnamen an ([`desktop-app.md`](../betrieb/desktop-app.md),
-„Erster Start“). Ohne HTTP/2 teilen sich alle Tabs eines Profils etwa sechs Verbindungen je Origin; jede offene
+„Erster Start“), die iOS-App ebenso (gemeinsame Fälle `src-tauri/faelle/`). Sie prüft Zertifikate
+wie das System ohne Ausnahme: ein Server im Einsatz-LAN braucht ein Zertifikat aus mkcert oder
+einer eigenen CA, deren Profil auf dem Gerät eingeschaltet ist; das selbst signierte
+Rückfall-Zertifikat aus `src/tls/mod.rs` reicht dafür nicht ([`ios-app.md`](../betrieb/ios-app.md),
+„CA-Profil für das Einsatz-LAN“). Ohne HTTP/2 teilen sich alle Tabs eines Profils etwa sechs Verbindungen je Origin; jede offene
 SSE-Verbindung belegt eine davon ([`betrieb-tls.md`](../betrieb-tls.md), LFH-264).
 
 ## 7.6 Konfiguration
@@ -160,6 +170,7 @@ flowchart LR
   F --> PUB["Release veröffentlicht,<br/>latest, alpha oder beta am Abbild"]
   F -->|alpha| DEP["deployment.yml<br/>→ Pull-Agent am Server"]
   F -->|alpha, beta| DA["desktop-alpha<br/>→ desktop-kanal"]
+  F -->|beta, stabil| IOSJ["ios → ios.yml<br/>→ TestFlight"]
 ```
 
 Jeder Workflow hört entweder auf einen PR oder auf einen Push, damit ein PR keine Jobs der
@@ -189,6 +200,10 @@ Brüche, die erst der Build oder ein Test zeigt, fallen so auf `alpha` auf (11.2
 - Ein Release erscheint erst, wenn alle Bau-, Abbild- und bei stabilen Tags auch Desktop-Jobs
   grün sind (Job `freigeben`, Kopf von `artefakte.yml`). Die Desktop-Pakete einer Alpha
   entstehen danach und halten nichts auf (Job `desktop-alpha` in `artefakte.yml`, `desktop.yml`).
+- Die iOS-App geht nach der Freigabe eines Beta- oder stabilen Tags zu TestFlight (Job `ios` in
+  `artefakte.yml`, `ios.yml`, `scripts/ios/testflight.sh`), nie bei Alpha; ein roter Upload hält
+  das Release nicht auf. `ios.yml` lässt sich auch von Hand mit einem Tag starten. Signiert wird
+  automatisch über einen App-Store-Connect-API-Schlüssel ([`ios-app.md`](../betrieb/ios-app.md)).
 - Beta (LLH-1545, [ADR-0019](entscheidungen/ADR-0019-beta-zaehlt-neben-alpha-und-zieht-nur-alpha-tags-nach.md)):
   `kanal-nachziehen.yml` bringt einen veröffentlichten Alpha-Tag nach `beta`
   (`scripts/release/kanal-nachziehen.sh`, Angleich-Commit gegen die Konflikte des

@@ -110,6 +110,10 @@ fall 'Frontend-Pfad zählt nicht fürs Backend' rot 'schreibe src/offline/mod.rs
 fall 'neues Frontend-Verzeichnis ohne Zeile' rot 'schreibe frontend/src/druck/a.ts x' 'nennt `frontend/src/druck` nicht'
 fall 'neues Crate ohne Zeile' rot 'schreibe crates/neu/Cargo.toml x' 'nennt `crates/neu` nicht'
 fall 'Teilprojekt ohne Zeile' rot 'schreibe karten-service/Cargo.toml x' 'nennt `karten-service` nicht'
+# Die iOS-Hülle (LLH-1978): das Teilprojekt `ios` und seine Teile `ios/<teil>` je mit Zeile.
+fall 'iOS-Hülle ohne Zeile' rot 'schreibe ios/project.yml x' 'nennt `ios` nicht'
+fall 'Teil der iOS-Hülle ohne Zeile' rot 'schreibe ios/LifelineKern/Package.swift x; echo "| ios | iOS-Hülle |" >> docs/architektur/05-bausteinsicht.md' 'nennt `ios/LifelineKern` nicht'
+fall 'iOS-Hülle mit Zeilen' gruen 'schreibe ios/LifelineKern/Package.swift x; schreibe ios/project.yml x; echo "| ios mit ios/LifelineKern | iOS-Hülle |" >> docs/architektur/05-bausteinsicht.md'
 fall 'Dateien im Wurzelverzeichnis des Frontends brauchen keine Zeile' gruen 'schreibe frontend/src/main.tsx x'
 fall 'ignorierte Dateien zählen nicht' gruen 'schreibe .gitignore "src/tmp/"; schreibe src/tmp/a.rs x'
 fall 'ADR: Prüfung scheitert' rot 'schreibe src/live/ws.rs "use WebSocket;"' 'ADR-0001-live.md: Prüfung scheitert' 'verboten: WebSocket'

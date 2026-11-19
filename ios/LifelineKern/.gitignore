@@ -1,0 +1,3 @@
+# Bauausgabe von `swift build`/`swift test` und Xcodes Paketzustand.
+/.build/
+/.swiftpm/

@@ -22,6 +22,9 @@ E2E="$WF/e2e.yml"
 MIG="$WF/migrationen.yml"
 MIGK="$WF/migrationen-kanal.yml"
 RULESET="$WF/ruleset.yml"
+IOS="$WF/ios-pruefung.yml"
+IOSREL="$WF/ios.yml"
+ART="$WF/artefakte.yml"
 fehler=0
 
 ok() { echo "  ok   $1"; }
@@ -31,7 +34,7 @@ pruefe() { # <name> <bedingung …>
   if "$@"; then ok "$name"; else fehl "$name"; fi
 }
 
-for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET"; do
+for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET" "$IOS" "$IOSREL" "$ART"; do
   [ -f "$datei" ] || { echo "FEHLER: $datei fehlt." >&2; fehler=$((fehler + 1)); }
 done
 [ "$fehler" = 0 ] || { echo "==> FEHLER: $fehler Datei(en) fehlen im Selbsttest ci-stufen." >&2; exit 1; }
@@ -158,8 +161,8 @@ pruefe "env in ci.yml und pr.yml gleich" \
 pruefe "keine Auswahl nach Bereichen in der CI" fehlt "$(cat "$CI" "$PR" "$SUITEN" "$E2E")" "ci-auswahl.sh"
 
 echo "==> ci-stufen: suiten.yml"
-pruefe "suiten.yml: Jobs rust, frontend, e2e, berichte" gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e berichte"
-for id in rust frontend e2e; do
+pruefe "suiten.yml: Jobs rust, frontend, e2e, ios, berichte" gleich "$(job_ids "$SUITEN" | tr '\n' ' ')" "rust frontend e2e ios berichte"
+for id in rust frontend e2e ios; do
   pruefe "$id: kein if (der Aufrufer entscheidet)" test -z "$(job_if "$SUITEN" "$id")"
 done
 pruefe "berichte nur ohne Abbruch" gleich "$(job_if "$SUITEN" berichte)" "\${{ !cancelled() }}"
@@ -172,6 +175,13 @@ pruefe "frontend: Gruppe je Anteil und Branch mit Abbruch" \
   gleich "$(job_gruppe "$SUITEN" frontend)" "ci-frontend-\${{ matrix.shard }}-$JE_BRANCH|true"
 pruefe "e2e: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" e2e)" "ci-e2e-$JE_BRANCH|true"
 pruefe "berichte: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" berichte)" "ci-berichte-$JE_BRANCH|true"
+pruefe "ios: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$SUITEN" ios)" "ci-ios-$JE_BRANCH|true"
+# Der Swift-Kern der iOS-Hülle (LLH-1978): in der CI ist eine fehlende Toolchain rot, nie eine
+# Lücke, und die Swift-Version ist dieselbe wie lokal.
+pruefe "ios: Swift-Kern über check-all.sh" enthaelt "$(job "$SUITEN" ios)" "run: ./scripts/check-all.sh --nur ios"
+pruefe "ios: Toolchain Pflicht" enthaelt "$(job "$SUITEN" ios)" 'IOS_SWIFT_PFLICHT: "1"'
+pruefe "ios: Swift gepinnt (Image per Digest)" enthaelt "$(job "$SUITEN" ios)" 'image: swift@sha256:'
+pruefe "ios: keine Fremd-Action für Swift" fehlt "$(job "$SUITEN" ios)" 'setup-swift'
 pruefe "e2e ruft e2e.yml" enthaelt "$(job "$SUITEN" e2e)" "uses: ./.github/workflows/e2e.yml"
 pruefe "suiten.yml kennt das Label voll nicht (der Aufrufer entscheidet)" fehlt "$(code_ohne_kommentar "$SUITEN")" "'voll'"
 for datei in "$CI" "$PR"; do
@@ -196,6 +206,51 @@ pruefe "e2e.yml kennt das Label e2e nicht mehr" fehlt "$(code_ohne_kommentar "$E
 pruefe "Binary heißt e2e-Binary" enthaelt "$(job "$E2E" binaer)" "name: e2e-Binary"
 pruefe "Anteile heißen e2e k/4" enthaelt "$(job "$E2E" e2e)" "name: e2e \${{ matrix.shard }}/4"
 pruefe "Anteile nur nach grünem Binary" enthaelt "$(job_if "$E2E" e2e)" "needs.binaer.result == 'success'"
+
+echo "==> ci-stufen: ios-pruefung.yml"
+# Der macOS-Lauf der iOS-Hülle (LLH-1978): nur am PR, nur bei Änderungen an der Hülle oder den
+# gemeinsamen Fällen, und nie Pflicht (Spec `ios-auslieferung`).
+pruefe "ios-pruefung.yml hört nur auf pull_request" nur_ausloeser "$IOS" "pull_request "
+for pfad in '"ios/**"' '"src-tauri/faelle/**"' '"scripts/ios/**"' '".github/workflows/ios-pruefung.yml"'; do
+  pruefe "ios-pruefung.yml: Pfadfilter $pfad" enthaelt "$(kopf_code "$IOS")" "      - $pfad"
+done
+pruefe "ios-pruefung.yml liest nur" test "$(code_ohne_kommentar "$IOS" | grep -cE ': write')" = 0
+pruefe "ios-pruefung.yml fährt scripts/ios/simulator-pruefung.sh" \
+  enthaelt "$(job "$IOS" simulator)" "run: ./scripts/ios/simulator-pruefung.sh"
+pruefe "ios-pruefung.yml installiert XcodeGen nur über das Skript" \
+  fehlt "$(code_ohne_kommentar "$IOS")" "brew install"
+pruefe "simulator-pruefung.sh testet die Simulatoren nacheinander" \
+  enthaelt "$(code_ohne_kommentar "$SKRIPTE/ios/simulator-pruefung.sh")" "-disable-concurrent-destination-testing"
+pruefe "iOS-Simulator ist kein Pflicht-Check" fehlt "$(cat "$SKRIPTE/ruleset-pruefen.sh")" "iOS-Simulator"
+
+echo "==> ci-stufen: ios.yml (TestFlight)"
+# Der Upload der iOS-App (LLH-1978, Spec `ios-auslieferung`, „TestFlight erhält Beta- und stabile
+# Stände“): aus artefakte.yml nach der Freigabe, nur für beta und main, oder per Handstart; ein
+# roter Upload hält das Release nicht auf. Ein Fehler fiele erst am nächsten Beta-Tag auf.
+pruefe "ios.yml: Aufruf und Handstart" nur_ausloeser "$IOSREL" "workflow_call workflow_dispatch "
+pruefe "ios.yml: Eingabe tag bei beiden Auslösern" test \
+  "$(kopf_code "$IOSREL" | grep -cE '^      tag:')" = 2
+pruefe "ios.yml liest nur" test "$(code_ohne_kommentar "$IOSREL" | grep -cE ': write')" = 0
+pruefe "ios.yml fährt scripts/ios/testflight.sh" \
+  enthaelt "$(job "$IOSREL" testflight)" "./scripts/ios/testflight.sh --tag"
+pruefe "ios.yml installiert XcodeGen nur über das Skript" \
+  enthaelt "$(job "$IOSREL" testflight)" "run: ./scripts/ios/xcodegen-installieren.sh"
+pruefe "ios.yml: kein brew install" fehlt "$(code_ohne_kommentar "$IOSREL")" "brew install"
+for geheim in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8; do
+  pruefe "ios.yml reicht $geheim an das Skript" \
+    enthaelt "$(job "$IOSREL" testflight)" "$geheim: \${{ secrets.$geheim }}"
+done
+pruefe "artefakte.yml: Job ios ruft ios.yml" enthaelt "$(job "$ART" ios)" "uses: ./.github/workflows/ios.yml"
+pruefe "artefakte.yml: ios erbt die Secrets" enthaelt "$(job "$ART" ios)" "secrets: inherit"
+pruefe "artefakte.yml: ios nach freigeben" enthaelt "$(job "$ART" ios)" "needs: [vorbereiten, freigeben]"
+ios_if="$(job_if "$ART" ios)"
+for teil in "!cancelled()" "inputs.freigeben" "needs.freigeben.result == 'success'" \
+  "needs.vorbereiten.outputs.vorab != 'true'" "contains(needs.vorbereiten.outputs.tag, '-beta.')"; do
+  pruefe "artefakte.yml: ios nur wenn $teil" enthaelt "$ios_if" "$teil"
+done
+pruefe "artefakte.yml: ios nie für Alpha" fehlt "$ios_if" "-alpha."
+pruefe "artefakte.yml: freigeben wartet nicht auf ios" \
+  fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "ios"
 
 echo "==> ci-stufen: ruleset.yml"
 pruefe "ruleset.yml: Push auf alpha, Zeitplan, Anstoß" nur_ausloeser "$RULESET" "push schedule workflow_dispatch "

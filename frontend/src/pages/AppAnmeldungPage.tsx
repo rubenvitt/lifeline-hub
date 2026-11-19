@@ -8,10 +8,11 @@ import { Bildmarke } from '../marke/Bildmarke';
 import './LoginPage.css';
 
 /**
- * Bestätigung „In der Mac-App anmelden als …“ (LFH-818,
+ * Bestätigung „In der Lifeline-App anmelden als …“ (LFH-818,
  * `openspec/changes/archive/2026-09-30-lfh-818-anmeldung-im-systembrowser/design.md`, Entscheidung 2).
+ * Plattformneutral (t39ltxxi): derselbe Weg dient der macOS- und der iOS-Hülle.
  *
- * Die macOS-Hülle öffnet diese Seite im Systembrowser (`ASWebAuthenticationSession`) mit der
+ * Die Hülle öffnet diese Seite im Systembrowser (`ASWebAuthenticationSession`) mit der
  * `challenge` ihres PKCE-Geheimnisses. Ohne Sitzung führt `RequireAuth` zur Anmeldung und mit der
  * vollen Adresse zurück — jeder Anmeldeweg des Browsers trägt so auch in die App. Den Code gibt es
  * erst nach dem Klick; er geht nur als `lifeline://anmeldung?code=…` zurück in die App und steht
@@ -46,7 +47,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
       navigiere(`lifeline://anmeldung?code=${encodeURIComponent(code)}`);
       setZurueck(true);
     } catch (e) {
-      setFehler(fehlerText(e, 'Die Anmeldung für die Mac-App ist fehlgeschlagen.'));
+      setFehler(fehlerText(e, 'Die Anmeldung für die Lifeline-App ist fehlgeschlagen.'));
     } finally {
       sendetRef.current = false;
       setLaeuft(false);
@@ -59,27 +60,29 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
       <Alert
         type="error"
         showIcon
-        title="Dieser Link ist unvollständig. Starte die Anmeldung in der Mac-App erneut."
+        title="Dieser Link ist unvollständig. Starte die Anmeldung in der Lifeline-App erneut."
       />
     );
   } else if (zurueck) {
     inhalt = (
-      <Typography.Paragraph>An die Mac-App übergeben. Dieses Fenster kann zu.</Typography.Paragraph>
+      <Typography.Paragraph>
+        An die Lifeline-App übergeben. Dieses Fenster kann zu.
+      </Typography.Paragraph>
     );
   } else {
     inhalt = (
       <>
         <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
-          In der Mac-App anmelden als {benutzer?.anzeigename}
+          In der Lifeline-App anmelden als {benutzer?.anzeigename}
         </Typography.Title>
         <Typography.Paragraph type="secondary">Konto {benutzer?.benutzername}</Typography.Paragraph>
-        {/* Gegen untergeschobene Links: der Code geht an die Mac-App auf DIESEM Gerät, eine
+        {/* Gegen untergeschobene Links: der Code geht an die Lifeline-App auf DIESEM Gerät, eine
             Bestätigung ohne eigenen Anstoß aus der App meldet womöglich eine fremde App an. */}
         <Alert
           type="warning"
           showIcon
           style={{ marginBottom: token.marginLG }}
-          title="Bestätige nur, wenn du gerade in der Mac-App auf „Im Browser anmelden“ geklickt hast."
+          title="Bestätige nur, wenn du gerade in der Lifeline-App auf „Im Browser anmelden“ gewählt hast."
         />
         {fehler && (
           <Alert type="error" showIcon title={fehler} style={{ marginBottom: token.marginLG }} />
@@ -104,7 +107,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
             <Bildmarke hoehe={20} linienFarbe="var(--lfh-text)" quadratFarbe="var(--lfh-marke)" />
             <h1 className="login-marke__name">lifeline-hub</h1>
           </div>
-          <p className="login-marke__untertitel">Anmeldung für die Mac-App</p>
+          <p className="login-marke__untertitel">Anmeldung für die Lifeline-App</p>
         </div>
         {inhalt}
       </div>

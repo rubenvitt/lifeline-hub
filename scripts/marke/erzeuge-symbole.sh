@@ -5,7 +5,8 @@
 #
 # Quellen (nur Pfade, kein <text>; Geometrie = frontend/src/marke/bildmarkeGeometrie.ts):
 #   symbol.svg           vollflächig, eckig     → favicon.svg, pwa-192/512, apple-touch-icon,
-#                                                 Hüllensymbole außer icon.icns
+#                                                 Hüllensymbole außer icon.icns, iOS-App-Symbol
+#                                                 (scripts/ios/erzeuge-symbol.sh, rsvg-convert)
 #   symbol-macos.svg     Raster von macOS       → nur src-tauri/icons/icon.icns
 #   symbol-maskable.svg  Marke im sicheren Kreis → pwa-maskable-512.png
 #
@@ -76,5 +77,8 @@ cp "$quellen/symbol.svg" "$oeffentlich/favicon.svg"
 # 5. Stempel: Prüfsummen der Quellen, gegen die der Guard prüft, ob das Skript nach der letzten
 #    Quelländerung gelaufen ist.
 (cd "$quellen" && shasum -a 256 symbol.svg symbol-maskable.svg symbol-macos.svg) > "$quellen/quellen.sha256"
+
+# 6. Symbol der iOS-App (LLH-1978): 1024 px ohne Transparenz, eigener Stempel.
+"$wurzel/scripts/ios/erzeuge-symbol.sh"
 
 echo "Symbole erzeugt. Prüfen: mise exec -- pnpm -C \"$wurzel/frontend\" vitest run src/marke"

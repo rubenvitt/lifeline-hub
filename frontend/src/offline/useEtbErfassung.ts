@@ -6,6 +6,7 @@ import { erfasseEtb, type NeuerEintrag } from '../api/etb';
 import type { EtbEintragAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
+import { huelleHaptics } from '../huelle/faehigkeiten';
 import {
   OFFLINE_QUEUE_EVENT,
   abgelehntEntfernen,
@@ -248,6 +249,9 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
             offlineQueueBenutzerId: benutzerId,
           },
         );
+        // Haptik der Hülle (Spec `huellen-vertrag`): der Server hat angenommen — auch ein Antrag
+        // am Spiegel ist angenommen, nur noch ohne Nummer.
+        huelleHaptics('success');
         // Am Spiegel (LLH-1492): ein Antrag, noch ohne Nummer. Die Zeitachse zeigt ihn aus der
         // Antragsliste wie einen ausstehenden; Liste und Kopf gleichen über `ANTRAG_EREIGNIS` ab.
         if (isAntragAngenommen(angenommen)) return null;
@@ -259,10 +263,12 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
         if (istOfflineTransient(e)) {
           if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
           await queueEinreihen(benutzerId, einsatzId, mitId);
+          // Vorgemerkt, nicht angenommen: `tap` statt `success`, es gibt noch keine Nummer.
+          huelleHaptics('tap');
           await ladeAusstehend();
-          // Vorgemerkt, nicht angenommen: es gibt noch keine Nummer.
           return null;
         } else {
+          huelleHaptics('error');
           throw e; // fachliche Ablehnung an den Aufrufer reichen
         }
       }

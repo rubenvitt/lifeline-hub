@@ -1692,7 +1692,7 @@
       },
       "AppCode": {
         "type": "object",
-        "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die Mac-App.",
+        "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS).",
         "required": [
           "code"
         ],
@@ -19396,6 +19396,26 @@
           "positionen:write",
           "rechner:use"
         ]
+      },
+      "ShellInfo": {
+        "type": "object",
+        "description": "Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`).",
+        "required": [
+          "version",
+          "shell_contract"
+        ],
+        "properties": {
+          "shell_contract": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Hüllen-Vertrag des Servers, eine ganze Zahl ≥ 1 ([`SHELL_CONTRACT`]).",
+            "minimum": 0
+          },
+          "version": {
+            "type": "string",
+            "description": "Laufende Anwendungsversion, dieselbe wie in `GET /api/health`."
+          }
+        }
       },
       "SichtungAnzeige": {
         "type": "object",
