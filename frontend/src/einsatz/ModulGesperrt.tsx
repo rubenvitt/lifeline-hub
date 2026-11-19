@@ -64,7 +64,9 @@ export default function ModulGesperrt({ modul, ausgeblendet, rueckweg, freigaben
           {/* Eine Sperrzeile (LFH-1078, Spec `modul-freigabe`): Modul und Grund stehen schon in h1 und
              Paneeltitel. Wo die Freigaben liegen, zeigt der Knopf statt eines Satzes. */}
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
-            {ausgeblendet ? 'In diesem Einsatz ausgeblendet' : 'Für deine Rolle nicht freigegeben'}
+            {ausgeblendet
+              ? 'In diesem Einsatz ausgeblendet'
+              : 'Für die eigene Rolle nicht freigegeben'}
           </p>
           {(rueckweg || freigabenPfad) && (
             <Space wrap>

@@ -161,7 +161,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     renderMitProviders(<FuehrungPaneel fuehrung={konflikt} darfBedienen />);
     expect(
       screen.getByText(
-        'Deine Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
+        'Die Notübernahme dieser Instanz hat am Hub nicht gegriffen, die Führung liegt bei ELW 1',
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Widersprechen' })).toBeNull();

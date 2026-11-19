@@ -68,7 +68,7 @@ describe('Statusband (Verteilungspaneele, LLH-1140)', () => {
       />,
     );
     const p = paneel('Personal nach Status');
-    expect(within(p).getByText('12 Kräfte')).toBeInTheDocument();
+    expect(within(p).getByText('12 Personen')).toBeInTheDocument();
     expect(p.querySelector('[data-lfh="statusband-personal-wert"]')).toHaveTextContent(/^12$/);
   });
 

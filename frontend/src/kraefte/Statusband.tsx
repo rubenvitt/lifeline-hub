@@ -160,7 +160,7 @@ export default function Statusband({
           kennung="statusband-personal"
           dichte="kompakt"
           zustand={personalZustand === 'daten' && personal.length === 0 ? 'leer' : personalZustand}
-          meta={kopf(personalZustand, zaehler(personal, 'Kraft', 'Kräfte'))}
+          meta={kopf(personalZustand, zaehler(personal, 'Person', 'Personen'))}
           leerText="Kein Personal erfasst."
           gesperrtText={MODUL_PERSONAL_GESPERRT}
           onNeuladen={onNeuladen}

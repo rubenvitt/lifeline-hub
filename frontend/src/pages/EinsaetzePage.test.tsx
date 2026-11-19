@@ -58,7 +58,7 @@ describe('EinsaetzePage', () => {
     server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
-    expect(screen.getByText('Deine Rolle: Einsatzleitung')).toBeInTheDocument();
+    expect(screen.getByText('Eigene Rolle: Einsatzleitung')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
   });
 
@@ -476,7 +476,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   it('die Karte nennt die eigene Rolle in Klartext und mit Kontext, nie den Rohwert', async () => {
     mockEinsaetze([e({ meine_rolle: 'fuehrungspersonal' })]);
     const { container } = render();
-    expect(await screen.findByText('Deine Rolle: Führungspersonal')).toBeInTheDocument();
+    expect(await screen.findByText('Eigene Rolle: Führungspersonal')).toBeInTheDocument();
     expect(container).not.toHaveTextContent('fuehrungspersonal');
   });
 

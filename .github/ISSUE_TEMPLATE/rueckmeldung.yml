@@ -37,7 +37,7 @@ body:
   - type: textarea
     id: beschreibung
     attributes:
-      label: Was ist passiert, was wünschst du dir?
+      label: Was ist passiert, was wäre gewünscht?
     validations:
       required: true
   - type: textarea

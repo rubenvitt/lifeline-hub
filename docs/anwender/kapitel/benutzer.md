@@ -125,7 +125,7 @@ nicht in der Liste.
 
 ### Passwort und zweiter Faktor
 
-Die Anmeldeseite sagt „Passwort vergessen? Die Administration deiner Organisation setzt es
+Die Anmeldeseite sagt „Passwort vergessen? Die Administration der Organisation setzt es
 zurück.“ Das geschieht mit „Einmalpasswort vergeben“:
 
 - Der Server erzeugt das Einmalpasswort, drei Vierergruppen aus Kleinbuchstaben und Ziffern ohne

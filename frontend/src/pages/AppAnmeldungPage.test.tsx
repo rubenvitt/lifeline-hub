@@ -70,7 +70,7 @@ describe('AppAnmeldungPage (LFH-818)', () => {
     expect(screen.getByRole('button', { name: 'Mit anderem Konto' })).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Bestätige nur, wenn du gerade in der Lifeline-App auf „Im Browser anmelden“ gewählt hast.',
+        'Nur bestätigen, wenn gerade in der Lifeline-App „Im Browser anmelden“ gewählt wurde.',
       ),
     ).toBeInTheDocument();
     expect(ausgestellt).not.toHaveBeenCalled();

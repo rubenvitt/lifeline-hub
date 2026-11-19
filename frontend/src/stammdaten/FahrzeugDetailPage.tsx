@@ -123,7 +123,7 @@ export default function FahrzeugDetailPage() {
       <AdminPage titel="Fahrzeug">
         <SeitenLeer
           titel="Fahrzeug nicht gefunden"
-          hinweis="Der Datensatz wurde entfernt oder gehört zu einer anderen Organisation."
+          hinweis="Nicht gefunden: entfernt oder nicht in dieser Organisation."
           aktion={{ label: 'Zur Fahrzeugliste', pfad: fahrzeugListePfad() }}
         />
       </AdminPage>

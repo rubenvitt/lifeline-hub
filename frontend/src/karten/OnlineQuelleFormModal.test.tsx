@@ -210,7 +210,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     renderMitProviders(<Harness bestand={quelle} />);
     await screen.findByLabelText('Name');
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
-    await nutzer.click(await screen.findByLabelText('Über Server proxen'));
+    await nutzer.click(await screen.findByLabelText('Über den Server abrufen'));
     await nutzer.click(screen.getByLabelText('Dunkle Karte'));
     await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -256,7 +256,7 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
     );
 
     await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
-    const schalter = await screen.findByLabelText('Über Server proxen');
+    const schalter = await screen.findByLabelText('Über den Server abrufen');
     expect(dialog.querySelectorAll('.ant-form-item-tooltip')).toHaveLength(0);
     expect(within(dialog).queryByText(/im Browser sichtbar/)).toBeNull();
 

@@ -306,7 +306,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     expect(screen.getByText(/Schlüssel zur manuellen Eingabe/)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/TOTP|Secret|2FA/);
 
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '123456');
 
     expect(await screen.findByText('Wiederherstellungscodes jetzt sichern')).toBeInTheDocument();
     expect(screen.getByText(/aaaa-1111/)).toBeInTheDocument();
@@ -346,7 +346,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '12345');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '12345');
     expect(gesendet).toEqual([]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
@@ -385,7 +385,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
-    const feld = screen.getByLabelText('Code aus deiner Authenticator-App');
+    const feld = screen.getByLabelText('Code aus der Authenticator-App');
     await userEvent.type(feld, '123456');
 
     await screen.findByText('Wiederherstellungscodes jetzt sichern');
@@ -413,7 +413,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
 
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '000000');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '000000');
 
     expect(await screen.findByText('Code ungültig')).toBeInTheDocument();
   });
@@ -443,7 +443,7 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
     // prüft dieser Test.
     server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(true))));
 
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '123456');
 
     expect(await screen.findByText('Zweiter Faktor aktiv')).toBeInTheDocument();
     expect(screen.getByText(/CODE-1111/)).toBeInTheDocument();
@@ -578,7 +578,7 @@ describe('ProfilPage — Recovery-Codes kopieren (LFH-370)', () => {
     );
     await einrichtungMitPasswort();
     await screen.findByText('JBSWY3DPEHPK3PXP');
-    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.type(screen.getByLabelText('Code aus der Authenticator-App'), '123456');
     await screen.findByText('Wiederherstellungscodes jetzt sichern');
   }
 

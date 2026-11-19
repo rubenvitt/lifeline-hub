@@ -472,7 +472,7 @@ function EinsaetzeInhalt() {
             )}
             {/* Mit Kontext: allein gelesen hielte man „Einsatzleitung“ für eine Eigenschaft des
                 Einsatzes, nicht für die eigene Rolle (LFH-946). */}
-            {e.meine_rolle && <Marke>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
+            {e.meine_rolle && <Marke>Eigene Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Marke>}
           </div>
           {/* Ort und Beginn beantworten „welcher ist meiner?". Das Icon trägt eine
               `aria-hidden`-Hülle, sonst brächte sie ein englisches `role="img"`-Label mit. */}

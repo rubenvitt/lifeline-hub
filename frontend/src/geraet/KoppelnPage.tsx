@@ -60,7 +60,7 @@ export default function KoppelnPage({ navigiere = (a) => window.location.assign(
       // Der Server antwortet einheitlich 401, ob der Code falsch, verbraucht oder abgelaufen ist.
       setFehler(
         e instanceof ApiError && e.status === 401
-          ? 'Dieser Code gilt nicht (mehr). Lass dir bei der Einsatzleitung einen neuen geben.'
+          ? 'Dieser Code gilt nicht (mehr). Einen neuen bei der Einsatzleitung holen.'
           : fehlerText(e, 'Das Koppeln ist fehlgeschlagen.'),
       );
       sendetRef.current = false;
