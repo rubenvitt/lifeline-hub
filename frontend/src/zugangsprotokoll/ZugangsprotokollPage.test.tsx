@@ -89,7 +89,7 @@ function zeige(
     <>
       <Routes>
         <Route path="/admin/zugangsprotokoll" element={<ZugangsprotokollPage />} />
-        <Route path="/admin/stammdaten/stichworte" element={<span>Stichworte</span>} />
+        <Route path="/admin/uebersicht" element={<span>Übersicht</span>} />
       </Routes>
       <Ort />
     </>,
@@ -293,7 +293,7 @@ describe('ZugangsprotokollPage', () => {
 
   it('leitet die Führungskraft in die Verwaltung zurück', async () => {
     zeige(ME_FK);
-    expect(await screen.findByText('Stichworte')).toBeInTheDocument();
+    expect(await screen.findByText('Übersicht')).toBeInTheDocument();
   });
 });
 

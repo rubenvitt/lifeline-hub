@@ -34,7 +34,7 @@ describe('adminNav — Pfad-Builder', () => {
   });
 
   it('Default- und Gruppen-Erst-Pfade', () => {
-    expect(defaultAdminPfad()).toBe('/admin/stammdaten/stichworte');
+    expect(defaultAdminPfad()).toBe('/admin/uebersicht');
     expect(ersteSektionPfad('einstellungen')).toBe('/admin/einstellungen/anzeige');
     expect(ersteSektionPfad('karten')).toBe('/admin/karten/online');
   });

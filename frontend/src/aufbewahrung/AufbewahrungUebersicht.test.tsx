@@ -94,7 +94,7 @@ function zeige(me: BenutzerAnzeige = ME_ADMIN, route = '/admin/aufbewahrung') {
       <Routes>
         <Route path="/admin/aufbewahrung" element={<AufbewahrungUebersicht />} />
         <Route path="/admin/aufbewahrung/:einsatzId" element={<Ort />} />
-        <Route path="/admin/stammdaten/stichworte" element={<Ort />} />
+        <Route path="/admin/uebersicht" element={<Ort />} />
       </Routes>
     </>,
     { route },
@@ -206,7 +206,7 @@ describe('AufbewahrungUebersicht', () => {
 
   it('die Führungskraft landet in der Verwaltung, nicht im Archiv', async () => {
     zeige(ME_FK);
-    expect(await screen.findByLabelText('Ort')).toHaveTextContent('/admin/stammdaten/stichworte');
+    expect(await screen.findByLabelText('Ort')).toHaveTextContent('/admin/uebersicht');
   });
 
   it('die fixierte Kennung ist ein Link in die Akte — auch ohne Einsatznummer nie „—“', async () => {

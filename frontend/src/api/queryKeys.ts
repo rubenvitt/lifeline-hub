@@ -1181,6 +1181,9 @@ export const GLOBAL_KEYS = {
   // Katalog „Einsatz-Vorlagen“ (LLH-1375). Nicht im Lagebild: gewählt wird eine Vorlage nur beim
   // Anlegen, und das geht nur mit Netz.
   einsatzVorlagen: 'einsatz-vorlagen',
+  // Bestand der Bereitschaft auf der Übersicht der Verwaltung (LLH-1820). Zählt Stammdaten und
+  // folgt deshalb ihren Ereignissen; neue Benutzer sieht die Seite beim nächsten Öffnen.
+  bereitschaft: 'bereitschaft',
   // Ortssuche ohne Einsatz (LFH-1175), etwa beim Anlegen. Nicht `ort-suche`: das ist der
   // Einsatz-Prefix der Lagekarte, ein gleicher Wire-String träfe dessen Fach.
   orgOrtSuche: 'org-ort-suche',
@@ -1317,6 +1320,7 @@ export const globalKeys = {
   etbBausteine: () => [GLOBAL_KEYS.etbBausteine] as const,
   stichwortVorschlaege: () => [GLOBAL_KEYS.stichwortVorschlaege] as const,
   einsatzVorlagen: () => [GLOBAL_KEYS.einsatzVorlagen] as const,
+  bereitschaft: () => [GLOBAL_KEYS.bereitschaft] as const,
   fuehrungsfunktionen: () => [GLOBAL_KEYS.fuehrungsfunktionen] as const,
   unterkunftRichtwerte: () => [GLOBAL_KEYS.unterkunftRichtwerte] as const,
   schichtmodelle: () => [GLOBAL_KEYS.schichtmodelle] as const,
@@ -1423,6 +1427,7 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.etbBausteine,
     GLOBAL_KEYS.stichwortVorschlaege,
     GLOBAL_KEYS.einsatzVorlagen,
+    GLOBAL_KEYS.bereitschaft,
     GLOBAL_KEYS.externeStellen,
     GLOBAL_KEYS.fuehrungsfunktionen,
     GLOBAL_KEYS.unterkunftRichtwerte,
