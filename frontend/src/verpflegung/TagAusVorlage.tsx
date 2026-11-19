@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Checkbox, Flex, Form, InputNumber, Typography } from 'antd';
+import { App, Breadcrumb, Checkbox, Form, InputNumber, Typography } from 'antd';
 import type { FormInstance } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -18,7 +18,7 @@ import { listVerpflegungVorlagen } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { ErfassungsFormular } from '../components/Erfassung';
-import { Paneel, monoStil, useRollen } from '../components/instrument';
+import { Feld, Paneel, Stapel, monoStil, useRollen } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
@@ -97,7 +97,6 @@ function TagAusVorlageInhalt({
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { benutzer } = useAuth();
-  const { token } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useUhr();
   const [form] = Form.useForm<Werte>();
@@ -192,16 +191,15 @@ function TagAusVorlageInhalt({
 
   const tagFeld = (
     <Form layout="vertical" component="div">
-      <Form.Item label="Tag" htmlFor="verpflegung-tag" style={{ maxWidth: 280 }}>
+      <Feld label="Tag" htmlFor="verpflegung-tag" breite="mittel">
         <ZeitpunktEingabe
           id="verpflegung-tag"
           nurTag
           allowClear={false}
           value={tagWert}
           onChange={(z) => z && onTag(tagInZone(z, zone))}
-          style={{ width: '100%' }}
         />
-      </Form.Item>
+      </Feld>
     </Form>
   );
 
@@ -276,7 +274,7 @@ function TagAusVorlageInhalt({
           </>
         }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+        <Stapel abstand="sm">
           {fenster.map((f) => (
             <FensterPaneel
               key={f.vorlage.id}
@@ -298,7 +296,7 @@ function TagAusVorlageInhalt({
               }
             />
           ))}
-        </div>
+        </Stapel>
       </ErfassungsFormular>
     );
   }
@@ -399,7 +397,6 @@ function FensterPaneel({
           pflicht={gewaehlt}
           freigaben={freigaben}
           jetzt={jetzt}
-          abstand={token.margin}
         />
       )}
     </Paneel>
@@ -415,7 +412,6 @@ function BedarfsFelder({
   pflicht,
   freigaben,
   jetzt,
-  abstand,
 }: {
   form: FormInstance<Werte>;
   einsatzId: number;
@@ -424,7 +420,6 @@ function BedarfsFelder({
   pflicht: boolean;
   freigaben: ModulFreigaben | undefined;
   jetzt: ReturnType<typeof useUhr>;
-  abstand: number;
 }) {
   const id = String(f.vorlage.id);
   const name = f.vorlage.bezeichnung;
@@ -451,28 +446,28 @@ function BedarfsFelder({
   };
 
   const feld = (feldName: Bedarfsfeld, label: string, hinweis: string | null) => (
-    <Form.Item
-      name={['fenster', id, feldName]}
-      label={label}
-      extra={hinweis ?? undefined}
-      rules={[{ required: pflicht, message: ANZAHL_PFLICHT }]}
-      style={{ flex: '1 1 160px', marginBottom: 0 }}
-    >
-      <InputNumber
-        min={0}
-        precision={0}
-        disabled={!aktiv}
-        aria-label={`${label} zu ${name}`}
-        style={{ width: '100%' }}
-        onChange={merke(feldName)}
-      />
-    </Form.Item>
+    <div style={{ flex: '1 1 160px' }}>
+      <Feld
+        name={['fenster', id, feldName]}
+        label={label}
+        extra={hinweis ?? undefined}
+        rules={[{ required: pflicht, message: ANZAHL_PFLICHT }]}
+      >
+        <InputNumber
+          min={0}
+          precision={0}
+          disabled={!aktiv}
+          aria-label={`${label} zu ${name}`}
+          onChange={merke(feldName)}
+        />
+      </Feld>
+    </div>
   );
 
   return (
-    <Flex gap={abstand} wrap>
+    <Stapel richtung="zeile" umbruch abstand="md">
       {feld('bedarf_kraefte', 'Einsatzkräfte (EP)', kraefteHinweis)}
       {feld('bedarf_betreute', 'Betreute (EP)', betreuteHinweis)}
-    </Flex>
+    </Stapel>
   );
 }
