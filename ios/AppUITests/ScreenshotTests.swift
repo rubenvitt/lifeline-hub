@@ -9,10 +9,11 @@ import XCTest
 /// (`LifelineKern.Testzustand`): die App zeigt sie dann mit Beispieldaten, ohne Netz und ohne die
 /// gespeicherte Serverliste.
 final class ScreenshotTests: XCTestCase {
-    /// Warten auf Inhalt im Webview und auf einen Dialog darüber. Im CI laufen iPhone und iPad
-    /// nebeneinander auf einem Runner; dort brauchte schon der Start der App bis zu 117 s, und die
-    /// Beispielseite stand auf dem iPhone nach 10 s noch nicht im Webview (Lauf 44419406791).
-    /// Ein Zeitlimit ist keine Anforderung der Spec: geprüft wird, dass es erscheint.
+    /// Warten auf Inhalt im Webview und auf einen Dialog darüber. Liefen iPhone und iPad
+    /// nebeneinander auf einem Runner, brauchte schon der Start der App bis zu 117 s, und die
+    /// Beispielseite stand auf dem iPhone nach 10 s noch nicht im Webview (Lauf 44419406791);
+    /// seither testet `scripts/ios/simulator-pruefung.sh` die Geräte nacheinander. Ein Zeitlimit
+    /// ist keine Anforderung der Spec: geprüft wird, dass es erscheint.
     let webTimeout: TimeInterval = 30
 
     override func setUp() {
@@ -92,7 +93,9 @@ final class ScreenshotTests: XCTestCase {
         let entfernen = app.buttons["Entfernen"]
         XCTAssertTrue(entfernen.waitForExistence(timeout: 5))
         entfernen.tap()
-        let bestaetigen = app.buttons["entfernen-bestaetigen"]
+        // Auf dem iPad steht die Rückfrage in einem Popover, und dort trägt die Hierarchie den Knopf
+        // zweimal ineinander (Button in Button, gleiche Kennung, Lauf 44427089802): ein Knopf.
+        let bestaetigen = app.buttons.matching(identifier: "entfernen-bestaetigen").firstMatch
         XCTAssertTrue(bestaetigen.waitForExistence(timeout: 5))
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'noch nicht übertragen'"))
@@ -234,7 +237,9 @@ final class ScreenshotTests: XCTestCase {
     /// Wischt die Zeile, in der `text` steht, nach links, über gut 250 Punkte. `swipeLeft()` auf dem
     /// Text wischt nur über dessen eigene Breite (bei „Lager“ ein paar Punkte); das kam im CI zweimal
     /// als Tippen an, und die App verband sich mit dem Server, statt die Aktionen zu zeigen
-    /// (Läufe 44419406791 und davor). Start rechts vom Text, noch in der Zeile.
+    /// (Läufe 44419406791 und davor). Start rechts vom Text, noch in der Zeile. Auf dem iPhone sind
+    /// 250 Punkte gut zwei Drittel der Zeile; die Liste wischt deshalb nicht durch
+    /// (`allowsFullSwipe: false` in `ServerlisteView`), die Aktionen bleiben offen.
     @MainActor
     private func swipeRowLeft(containing text: XCUIElement) {
         XCTAssertTrue(text.waitForExistence(timeout: 5))

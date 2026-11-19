@@ -117,7 +117,10 @@ struct ServerlisteView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(istAktiv ? .isSelected : [])
-        .swipeActions(edge: .trailing) {
+        // Ohne Durchwischen: nach einem langen Wisch über zwei Drittel der Zeile waren auf dem iPhone
+        // weder die Aktionen offen noch die Rückfrage da (UI-Hierarchie im xcresult, Lauf
+        // 44427089802). So bleiben die Aktionen nach jedem Wisch offen, Entfernen ist ein Tipp.
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             // Kein `role: .destructive`: der Eintrag verschwindet erst nach der Rückfrage.
             if modell.isEntfernbar(eintrag) {
                 Button("Entfernen") { entfernen = eintrag }
