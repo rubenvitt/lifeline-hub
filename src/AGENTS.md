@@ -701,6 +701,23 @@ sie stehen nur dort.
   Rolle. Ihr Client-Spiegel `darfImEinsatzSchreiben`/`darfEinsatzLeiten` nimmt darum keinen
   Benutzer; eine Admin-Ausnahme gehört in eine Verwaltungsprüfung, nie in diese beiden.
 
+## Backend — Einsatz anlegen mit Mitgliedern (LLH-1820)
+
+Entwurf `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md`;
+`routes::einsatz::anlegen`, `einsatz::repo::anlegen_mit_mitgliedern`, Nachweis
+`tests/einsatz_anlegen_mitglieder.rs`.
+- **Mitglieder kommen atomar mit dem Einsatz:** `NeuerEinsatz.mitglieder` wird in derselben
+  `write_retry!`-Transaktion wie `anlegen_tx` geschrieben. Ist eine Person nicht aufnehmbar, ist
+  das 400, und es entsteht nichts. Prüfen und Schreiben laufen je in einer Anweisung über
+  `json_each` (Eingabegrenzen), gedeckelt durch `einsatz::MITGLIEDER_MAX`.
+- **Die anlegende Person ist immer Einsatzleitung** und steht nicht in der Liste (sonst 400).
+- **Dieselbe Menge wie unter „Zugriff“:** aufnehmbar ist, was `einsatz::repo::auswahl_sql` liefert
+  (aktiv, eigene Org, ohne Geräte-, Stellvertreter- und Archivkonten). Die Auswahl beim Anlegen
+  (`GET /api/einsaetze/mitglied-auswahl`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
+  Eine fremde oder unbekannte Person nennt die Meldung nur mit Kennung.
+- **Jede aufgenommene Person bekommt nach dem Commit den Hinweis `einsatz_aufnahme`** wie bei
+  `mitglied_setzen`; die anlegende Person nicht.
+
 ## Backend — Org-Ereignisse (LFH-734)
 
 Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzliste` und

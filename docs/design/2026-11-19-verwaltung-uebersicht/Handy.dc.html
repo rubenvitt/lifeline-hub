@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Verwaltung, Übersicht, Handy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:390px;height:844px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;overflow:hidden}
+.kopf{height:48px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:10px;padding:0 12px;box-sizing:border-box}
+.menue{width:48px;height:48px;margin-left:-12px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-right:1px solid #22262b;color:#e8ebee}
+.inhalt{padding:0 16px 16px;display:flex;flex-direction:column;gap:14px}
+.seitenkopf{min-height:52px;display:flex;align-items:center;border-bottom:1px solid #22262b}
+h1{margin:0;font-size:18px;font-weight:600}
+.meta{font-size:12px;color:#9aa2ab}
+.hinweis{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #6b5a0f;background:#1a1606;color:#e8cc3a;font-size:15px;font-weight:600;line-height:1.35}
+.hinweis .zeichen{width:8px;height:8px;margin-top:6px;background:#e8cc3a;flex-shrink:0}
+.paneel{background:#0a0c0e;border:1px solid #2e343a}
+.paneelkopf{height:40px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #22262b}
+h2{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#9aa2ab}
+.zeile{display:flex;align-items:center;gap:10px;min-height:56px;padding:0 12px;border-bottom:1px solid #22262b;text-decoration:none;color:inherit}
+.zeile:last-child{border-bottom:none}
+.zeile .name{flex:1;min-width:0;font-size:15px}
+.zahl{font-family:"LFH Mono",monospace;font-weight:500;font-size:17px;font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
+.chip{display:inline-flex;align-items:center;height:24px;padding:0 8px;font-size:12px;border:1px solid}
+.chip.ok{background:#0d1a0a;color:#7ddc4a;border-color:#52c41a}
+.chip.fehlt{background:#1a1606;color:#e8cc3a;border-color:#6b5a0f}
+.chip.empfohlen{background:#16191d;color:#c6ccd2;border-color:#2e343a}
+.pfeil{color:#8ec2f0;font-size:15px}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="kopf">
+    <button class="menue" type="button" aria-label="Menü der Verwaltung">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 4h14M2 9h14M2 14h14"></path></svg>
+    </button>
+    <span style="font-size:14px;font-weight:600">Verwaltung</span>
+  </div>
+  <main class="inhalt">
+    <div class="seitenkopf"><h1>Übersicht</h1></div>
+    <div class="hinweis" role="status"><span class="zeichen" aria-hidden="true"></span>Für einen Einsatz fehlt: weitere Benutzer, Fahrzeuge oder Personal.</div>
+    <section class="paneel" aria-labelledby="bestand-handy">
+      <div class="paneelkopf"><h2 id="bestand-handy">Bereitschaft</h2></div>
+      <a class="zeile" href="#"><span class="name">Benutzer</span><span class="zahl">1</span><span class="chip fehlt">fehlt</span><span class="pfeil" aria-hidden="true">↗</span></a>
+      <a class="zeile" href="#"><span class="name">Fahrzeuge</span><span class="zahl">0</span><span class="chip fehlt">fehlt</span><span class="pfeil" aria-hidden="true">↗</span></a>
+      <a class="zeile" href="#"><span class="name">Personal</span><span class="zahl">0</span><span class="chip fehlt">fehlt</span><span class="pfeil" aria-hidden="true">↗</span></a>
+      <a class="zeile" href="#"><span class="name">Einheiten-Vorlagen</span><span class="zahl">0</span><span class="chip empfohlen">empfohlen</span><span class="pfeil" aria-hidden="true">↗</span></a>
+      <a class="zeile" href="#"><span class="name">Einsatz-Vorlagen</span><span class="zahl">2</span><span class="chip ok">vorhanden</span><span class="pfeil" aria-hidden="true">↗</span></a>
+    </section>
+    <p class="meta" style="margin:0">Pflicht: ein weiterer Benutzer und Fahrzeuge oder Personal. Demo-Daten zählen nicht mit.</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

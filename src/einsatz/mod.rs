@@ -47,6 +47,10 @@ pub const EINSATZ_ROLLE_BEOBACHTER: &str = EinsatzRolle::Beobachter.as_str();
 /// (`src/AGENTS.md`, Eingabegrenzen; Spiegel `frontend/src/api/eingabegrenzen.ts`).
 pub const EINSATZORT_MAX: usize = 500;
 
+/// Höchstzahl der Mitglieder, die beim Anlegen mitkommen (LLH-1820), gezählt vor jeder Prüfung
+/// (`src/AGENTS.md`, Eingabegrenzen).
+pub const MITGLIEDER_MAX: usize = 500;
+
 /// Status eines aktiven Einsatzes.
 pub const STATUS_AKTIV: &str = EinsatzStatus::Aktiv.as_str();
 /// Status eines abgeschlossenen (read-only) Einsatzes.

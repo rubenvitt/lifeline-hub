@@ -104,6 +104,7 @@ pub mod unterkunft_richtwerte;
 pub mod verpflegung;
 pub mod verpflegung_vorlage;
 pub mod versionsstand;
+pub mod verwaltung;
 pub mod vorlagendokument;
 pub mod web_push;
 pub mod wetter;

@@ -398,6 +398,20 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau, Funkplan und Fernmeldeskizze
   (`baueFuehrungsorganisation(…, { detachAbgestellte: false })`) behalten den Verband.
 
+## Frontend — Verwaltung: Einstieg (LLH-1820)
+
+Entwurf `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md`,
+Zeichenflächen `docs/design/2026-11-19-verwaltung-uebersicht/`.
+
+- **`/admin` führt immer auf die Übersicht** (`admin/BereitschaftUebersicht.tsx`,
+  `defaultAdminPfad()`), den ersten Menüpunkt vor den Gruppen. Wer auf „die Verwaltung“ umleitet,
+  nimmt `defaultAdminPfad()`, nie eine Stammdaten-Seite.
+- **Was „fehlt“, bestimmt allein `admin/bereitschaft.ts`** (`bewerteBereitschaft`); der Server
+  zählt nur (`GET /api/verwaltung/bereitschaft`). Pflicht: ein weiterer Benutzer und Fahrzeuge
+  oder Personal; Vorlagen sind Empfehlung.
+- **Die Übersicht zeigt Zahlen, keine Namen; Demo-Daten zählen nicht mit.** Auch die
+  Führungskraft sieht sie; der Sprung zur Benutzerseite steht nur für System-Admins.
+
 ## Frontend — Bausteinwahl (wann nehme ich was)
 
 Die erste Frage beim Bauen und beim Entwerfen: Welcher Baustein trägt den Bedarf? Eine Zeile je
@@ -1675,7 +1689,10 @@ Spec `bedien-arbeitsplatz`).
   „Neuen Einsatz anlegen“ (LFH-1175, Entscheidung 11.10.2026; LLH-1816, Entscheidung
   19.11.2026): sechs Felder. Zuerst die Einsatz-Vorlage, weil sie das Menü des ganzen Einsatzes
   bestimmt und das Stichwort sie einstellt (Modulzahl darunter, Vorgabe „Alle Module“); das letzte
-  ist der optionale Einsatzort; ein siebtes gehört in die Kopfdaten. Ausnahme
+  ist der optionale Einsatzort; ein siebtes gehört in die Kopfdaten. Darunter der eingeklappte
+  Teil „Mitglieder“ (LLH-1820, `pages/MitgliederKlappteil.tsx`): zählt nicht zu den sechs, sein
+  Kopf nennt die Wahl („nur Einsatzleitung“, „Einsatzleitung + 2 Personen“), die Auswahl lädt erst beim
+  Aufklappen; eine Ablehnung des Servers nennt die Person in der Fehlerzeile des Dialogs. Ausnahme
   „Lagemeldung erfassen“ (LLH-1921, Entscheidung 17.11.2026, Change
   `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
   Empfängerfunktion bestimmt, wer „Neue Meldung“ bekommt.

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Verwaltung, Übersicht</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.schirm{width:1280px;height:800px;background:#08090b;font-family:"LFH Archivo",system-ui,sans-serif;color:#e8ebee;display:flex;flex-direction:column;overflow:hidden}
+.kopf{height:44px;background:#0c0e11;border-bottom:1px solid #22262b;display:flex;align-items:center;gap:12px;padding:0 12px 0 0;box-sizing:border-box;flex-shrink:0}
+.markenzelle{width:56px;height:44px;display:flex;align-items:center;justify-content:center;border-right:1px solid #22262b}
+.marke{width:14px;height:14px;background:#a8071a}
+.mono{font-family:"LFH Mono",monospace;font-weight:500;font-variant-numeric:tabular-nums}
+.koerper{display:flex;flex:1;min-height:0}
+.nav{width:220px;border-right:1px solid #22262b;background:#0a0c0e;padding:16px 0;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.augenbraue{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa2ab;padding:10px 16px 6px}
+.navlink{display:block;padding:7px 16px;font-size:13px;color:#c6ccd2;text-decoration:none;border-left:2px solid transparent}
+.navlink.aktiv{background:#16191d;color:#e8ebee;border-left-color:#4d94d6}
+.inhalt{flex:1;min-width:0;padding:0 24px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+.seitenkopf{height:56px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #22262b}
+h1{margin:0;font-size:18px;font-weight:600}
+.meta{font-size:12px;color:#9aa2ab}
+.hinweis{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #6b5a0f;background:#1a1606;color:#e8cc3a;font-size:14px;font-weight:600}
+.hinweis .zeichen{width:8px;height:8px;background:#e8cc3a;flex-shrink:0}
+.paneel{background:#0a0c0e;border:1px solid #2e343a;max-width:760px}
+.paneelkopf{height:36px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #22262b;gap:8px}
+h2{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:#9aa2ab}
+.zeile{display:grid;grid-template-columns:minmax(0,1fr) 72px 120px 180px;align-items:center;gap:12px;padding:0 12px;height:44px;border-bottom:1px solid #22262b;font-size:13px}
+.zeile:last-child{border-bottom:none}
+.zahl{font-family:"LFH Mono",monospace;font-weight:500;font-size:16px;text-align:right;font-variant-numeric:tabular-nums}
+.demo{display:block;font-size:11px;color:#838b94;text-align:right}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;font-size:12px;border:1px solid;justify-self:start}
+.chip.ok{background:#0d1a0a;color:#7ddc4a;border-color:#52c41a}
+.chip.fehlt{background:#1a1606;color:#e8cc3a;border-color:#6b5a0f}
+.chip.empfohlen{background:#16191d;color:#c6ccd2;border-color:#2e343a}
+.sprung{color:#8ec2f0;text-decoration:none;justify-self:end}
+.sprung:hover{color:#b6d8f6}
+</style>
+</helmet>
+<div class="schirm">
+  <div class="kopf">
+    <div class="markenzelle"><div class="marke"></div></div>
+    <span style="font-size:13px;font-weight:600">Verwaltung</span>
+    <span class="meta">DRK Kreisverband Musterstadt</span>
+    <div style="flex:1"></div>
+    <span class="meta">Admin · R. Vitt</span>
+  </div>
+  <div class="koerper">
+    <nav class="nav" aria-label="Verwaltung">
+      <a class="navlink aktiv" href="#" aria-current="page">Übersicht</a>
+      <div class="augenbraue">Stammdaten</div>
+      <a class="navlink" href="#">Einsatz-Stichworte</a>
+      <a class="navlink" href="#">Einsatz-Vorlagen</a>
+      <a class="navlink" href="#">Fahrzeuge</a>
+      <a class="navlink" href="#">Personal</a>
+      <a class="navlink" href="#">Einheiten-Vorlagen</a>
+      <span class="meta" style="padding:4px 16px">… 13 weitere</span>
+      <div class="augenbraue">Einstellungen</div>
+      <a class="navlink" href="#">Anzeige</a>
+      <a class="navlink" href="#">Einsatz-Vorgaben</a>
+      <div class="augenbraue">Karten</div>
+      <a class="navlink" href="#">Online-Quellen</a>
+      <div style="height:8px"></div>
+      <a class="navlink" href="#">Benutzer</a>
+      <a class="navlink" href="#">Aufbewahrung</a>
+    </nav>
+    <main class="inhalt">
+      <div class="seitenkopf">
+        <h1>Übersicht</h1>
+        <span class="meta">Bestand der Bereitschaft</span>
+      </div>
+      <div class="hinweis" role="status"><span class="zeichen" aria-hidden="true"></span>Für einen Einsatz fehlt: weitere Benutzer.</div>
+      <section class="paneel" aria-labelledby="bestand">
+        <div class="paneelkopf"><h2 id="bestand">Bereitschaft</h2></div>
+        <div class="zeile">
+          <span>Benutzer</span>
+          <span class="zahl">1</span>
+          <span class="chip fehlt">fehlt</span>
+          <a class="sprung" href="#">Benutzer ↗</a>
+        </div>
+        <div class="zeile">
+          <span>Fahrzeuge</span>
+          <span class="zahl">4</span>
+          <span class="chip ok">vorhanden</span>
+          <a class="sprung" href="#">Fahrzeuge ↗</a>
+        </div>
+        <div class="zeile">
+          <span>Personal</span>
+          <span class="zahl">23</span>
+          <span class="chip ok">vorhanden</span>
+          <a class="sprung" href="#">Personal ↗</a>
+        </div>
+        <div class="zeile">
+          <span>Einheiten-Vorlagen</span>
+          <span class="zahl">0</span>
+          <span class="chip empfohlen">empfohlen</span>
+          <a class="sprung" href="#">Einheiten-Vorlagen ↗</a>
+        </div>
+        <div class="zeile">
+          <span>Einsatz-Vorlagen</span>
+          <span class="zahl">2</span>
+          <span class="chip ok">vorhanden</span>
+          <a class="sprung" href="#">Einsatz-Vorlagen ↗</a>
+        </div>
+      </section>
+      <p class="meta" style="margin:0;max-width:760px">Pflicht für einen Einsatz: mindestens ein weiterer Benutzer und Fahrzeuge oder Personal. Vorlagen sind empfohlen. Demo-Daten zählen nicht mit.</p>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

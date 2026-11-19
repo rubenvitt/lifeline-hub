@@ -1568,6 +1568,40 @@ export interface components {
             geaendert_at?: string | null;
         };
         /**
+         * @description Bestand der Bereitschaft. Demo-Zeilen (`demo_herkunft`, LFH-733) zählen nicht zum Bestand.
+         *     Sie stehen getrennt in den `*_demo`-Feldern.
+         */
+        Bereitschaft: {
+            /**
+             * Format: int64
+             * @description Aktive Personenkonten der Org, ohne Geräte-, Stellvertreter- und Archivkonten.
+             */
+            benutzer: number;
+            /**
+             * Format: int64
+             * @description Aktive Einheiten-Vorlagen.
+             */
+            einheit_vorlagen: number;
+            /** Format: int64 */
+            einheit_vorlagen_demo: number;
+            /** Format: int64 */
+            einsatz_vorlagen: number;
+            /**
+             * Format: int64
+             * @description Fahrzeuge im Dienst.
+             */
+            fahrzeuge: number;
+            /** Format: int64 */
+            fahrzeuge_demo: number;
+            /**
+             * Format: int64
+             * @description Personal im Dienst.
+             */
+            personal: number;
+            /** Format: int64 */
+            personal_demo: number;
+        };
+        /**
          * @description Verweis auf eine Berichtigung eines ETB-Eintrags (LFH-689): `id` für den Deeplink, `lfd_nr`
          *     für den Namen („berichtigt durch Nr. 9“). Anders als beim Auftrag ist die Nummer eines
          *     ETB-Eintrags nie leer.

@@ -47,6 +47,7 @@ function setup(me: BenutzerAnzeige, route = defaultAdminPfad()) {
         <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<Pfad />} />
         <Route path="stammdaten/personal/:personalId" element={<Pfad />} />
         <Route path="benutzer" element={<Pfad />} />
+        <Route path="uebersicht" element={<Pfad />} />
       </Route>
       <Route path="/einsaetze" element={<div>Einsätze</div>} />
     </Routes>,
@@ -58,6 +59,8 @@ describe('AdminLayout — Sidebar', () => {
   it('Fuehrungskraft: Gruppen + Sektions-Einträge sichtbar, KEIN Benutzer-Eintrag', async () => {
     setup(fuehrungskraft);
     expect(await screen.findByText('Stammdaten')).toBeInTheDocument();
+    // Die Übersicht steht als erster Eintrag vor den Gruppen (LLH-1820).
+    expect(screen.getAllByRole('menuitem')[0]).toHaveTextContent('Übersicht');
     expect(screen.getByText('Einstellungen')).toBeInTheDocument();
     expect(screen.getByText('Karten')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Fahrzeuge' })).toBeInTheDocument();
@@ -104,7 +107,8 @@ describe('AdminLayout — Sidebar', () => {
 
   it('Default- und Bestands-Redirects landen richtig', async () => {
     setup(fuehrungskraft, '/admin');
-    expect(await screen.findByText('PFAD:/admin/stammdaten/stichworte')).toBeInTheDocument();
+    // Seit LLH-1820 führt `/admin` immer auf die Übersicht.
+    expect(await screen.findByText('PFAD:/admin/uebersicht')).toBeInTheDocument();
   });
 
   it('/stammdaten leitet auf die erste Stammdaten-Sektion', async () => {
@@ -167,6 +171,13 @@ describe('AdminLayout — unter lg (Handschirm)', () => {
     const knopf = screen.getByRole('button', { name: /Verwaltung: Fahrzeuge/ });
     expect(knopf).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('menuitem', { name: 'Fahrzeuge' })).not.toBeInTheDocument();
+  });
+
+  it('auf der Übersicht nennt der Knopf sie auch (LLH-1820)', async () => {
+    setzeViewportBreite(390);
+    setup(fuehrungskraft);
+    await screen.findByText(`PFAD:${defaultAdminPfad()}`);
+    expect(screen.getByRole('button', { name: /Verwaltung: Übersicht/ })).toBeInTheDocument();
   });
 
   it('aufklappen, wählen → navigiert und klappt wieder zu', async () => {

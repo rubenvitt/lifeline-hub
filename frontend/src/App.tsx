@@ -126,6 +126,7 @@ import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import AdminLayout from './admin/AdminLayout';
 import { VerlaufMerken } from './routing/VerlaufMerken';
 import DemoDatenPage from './admin/DemoDatenPage';
+import BereitschaftUebersicht from './admin/BereitschaftUebersicht';
 import AufbewahrungUebersicht from './aufbewahrung/AufbewahrungUebersicht';
 import ZugangsprotokollPage from './zugangsprotokoll/ZugangsprotokollPage';
 import NurMitPlanungsrecht from './planung/NurMitPlanungsrecht';
@@ -440,6 +441,7 @@ export const appRouten = createRoutesFromElements(
               {/* Fehlergrenze je Rahmen (LLH-1822, D1): pfadlos, das Verwaltungsmenü bleibt stehen. */}
               <Route errorElement={<Fehlergrenze rahmen="verwaltung" />}>
                 <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
+                <Route path="uebersicht" element={<BereitschaftUebersicht />} />
                 {adminGruppen.map((g) => (
                   <Fragment key={g.key}>
                     {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}

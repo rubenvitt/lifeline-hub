@@ -888,6 +888,8 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'stichwort-vorschlaege',
         // Einsatz-Vorlagen (LLH-1375).
         'einsatz-vorlagen',
+        // Bestand der Bereitschaft (LLH-1820).
+        'bereitschaft',
         'externe-stellen',
         'fuehrungsfunktionen',
         'schichtmodelle',
