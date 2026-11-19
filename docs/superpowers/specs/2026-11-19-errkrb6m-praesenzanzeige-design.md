@@ -49,8 +49,9 @@ und keine Sperre.
 ## Rahmen (Befund)
 
 - `LiveHub` (`src/live/mod.rs`) hat je Einsatz einen `broadcast` mit Replay-Ring 256 und
-  Nachrichten-Ids. `kopplung_ende` und `sitzung_ende` sind eigene Broadcasts am Ring vorbei, und
-  daran knüpft dieser Entwurf an.
+  Nachrichten-Ids. Vorbild für Ereignisse ohne `id:` und ohne Replay ist der Org-Anteil, den
+  `routes/live.rs::stream` schon in den Einsatzstrom mischt (`einsatz_strom.merge(org_strom)`,
+  LFH-734 D4). Präsenz wird ein dritter Teilstrom in diesem `merge`.
 - `LiveEvent::modul_keys()` gatet je **Variante**. Präsenz braucht ein Gate je **Objekt**: Einsatz
   und Führungsstelle sind so offen wie `LiveEvent::Einsatz` (`&[]`), eine Einheit so offen wie
   `LiveEvent::Einheit` (`einheiten`, `lagekarte`, `verpflegung`).
@@ -62,8 +63,9 @@ und keine Sperre.
 - Frontend: `InlineAngabe` hat `onOeffnen` und `onSchliessen`, aber keine Objektkennung. Der
   Vermerk kommt als `vermerk` herein, `VermerkZeile` zeigt ihn leise unter dem Wert
   (`components/FeldVermerkAnzeige.tsx`).
-- `benachrichtigung` ist ein Ereignis außerhalb der Cache-Registry (`NICHT_REGISTRY` im
-  Kontrakttest) und speist einen eigenen Empfänger. Präsenz folgt diesem Muster.
+- `benachrichtigung` ist im Frontend ein Ereignis außerhalb der Cache-Registry (`NICHT_REGISTRY`
+  im Kontrakttest) mit eigenem Empfänger. Präsenz folgt diesem Muster **nur im Frontend**; im
+  Backend läuft `benachrichtigung` durch den Ring, Präsenz nicht.
 
 ## Ansätze
 
@@ -91,15 +93,19 @@ Ein Präsenz-Eintrag hat:
   (ADR-0006, Wire-Kontrakt in `tests/enum_wire_kontrakt.rs`). Die Werte gleichen `objekt_art` des
   Vermerks.
 - `einheit_id`: nur bei `einheit`.
-- `feld`: Wire-Feldname aus der **festen Liste** des Objekts, dieselbe Liste, aus der der Vermerk
-  schreibt. Ein unbekanntes Feld ergibt 400 (`src/AGENTS.md`, Statuscodes). Gibt es noch keine
-  geteilte Liste je Objekt, entsteht sie hier als Konstante neben `feld_vermerk`, und die
-  Vermerk-Schreibwege prüfen dagegen nicht neu (nur Lesen).
+- `felder`: 1 bis 4 Wire-Feldnamen aus der **festen Liste** des Objekts (Vermerk-Feldnamen). Eine
+  Liste, weil eine Eingabe mehrere Angaben bearbeiten kann: Die Einsatzort-Adresse bearbeitet die
+  Koordinate mit, `StandortAngabe` trägt Adresse und Koordinate. Eine Zeile zeigt den Hinweis, wenn
+  ihr Feld in `felder` eines fremden Eintrags steht. Ein unbekanntes Feld, eine leere oder zu lange
+  Liste ergibt 400 (`src/AGENTS.md`, Statuscodes). Die Präsenz-Feldliste je Objekt entsteht als
+  Konstante neben `feld_vermerk`; sie enthält nur Felder, die der PATCH des Objekts schreibt, nicht
+  die Felder, die andere Wege setzen (Disposition, `mitglied_repo`). *Meine Wahl (Builder-Check):
+  Liste statt eines Leitfelds, damit B an „Koordinate“ sieht, dass A die Adresse bearbeitet.*
 - `benutzer_id`, `von` (Anzeigename, wie `FeldVermerk.von`) und `fenster` (zufällige Kennung des
   Tabs, vom Client erzeugt, höchstens 64 Zeichen `[A-Za-z0-9_-]`).
 
 Ereignis auf dem Einsatzstrom, Wire-Name `praesenz`, Daten:
-`{"einsatz_id":…, "eintraege":[{objekt, einheit_id?, feld, benutzer_id, von, fenster}]}`, immer der
+`{"einsatz_id":…, "eintraege":[{objekt, einheit_id?, felder, benutzer_id, von, fenster}]}`, immer der
 **ganze** sichtbare Stand des Einsatzes für diese Verbindung. Volle Liste statt Delta: kein
 Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3).
 
@@ -129,7 +135,7 @@ Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3)
 
 - Der Zustand liegt im `LiveHub` (ein neues `AppState`-Feld bräche jede Testkonstruktion):
   `Mutex<HashMap<einsatz_id, Vec<Eintrag>>>` oder gleichwertig. Ein Eintrag ist eindeutig über
-  `(benutzer_id, fenster, objekt, einheit_id, feld)`.
+  `(benutzer_id, fenster)`; er trägt `objekt`, `einheit_id` und `felder`.
 - Ein Fenster hat höchstens **einen** Eintrag. Öffnet es eine andere Angabe, ersetzt sie den alten
   Eintrag, denn je Seite ist ohnehin nur eine Bearbeitung offen (`frontend/AGENTS.md`, offene
   Bearbeitung).
@@ -144,9 +150,9 @@ Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3)
 ### D4 Schreibwege
 
 - `PUT /api/einsaetze/{id}/praesenz` für `einsatz` und `fuehrungsstelle`, Gate
-  `EinsatzVerwaltungszugriff` (wie deren PATCH). Body `{objekt, feld, fenster}`.
+  `EinsatzVerwaltungszugriff` (wie deren PATCH). Body `{objekt, felder, fenster}`.
 - `PUT /api/einsaetze/{id}/einheiten/{eid}/praesenz` für `einheit`, Gate
-  `EinsatzSchreibzugriff<Einheiten>` (wie deren PATCH). Body `{feld, fenster}`. Eine Einheit, die
+  `EinsatzSchreibzugriff<Einheiten>` (wie deren PATCH). Body `{felder, fenster}`. Eine Einheit, die
   nicht zum Einsatz gehört, ergibt 404.
 - `PUT` beginnt oder verlängert. Die Antwort ist 204.
 - `DELETE` auf denselben Pfaden mit `{fenster}` beendet den Eintrag dieses Fensters. Die Antwort
@@ -165,13 +171,17 @@ Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3)
 
 - **Fensterkennung:** einmal je Tab erzeugt (`crypto.randomUUID`) und im Speicher gehalten. Sie
   wird nicht gespeichert, ein Neuladen ergibt ein neues Fenster.
-- **Senden:** Neue optionale Prop `praesenz?: { objekt, einheitId?, feld }` an `InlineAngabe`.
+- **Senden:** Neue optionale Prop `praesenz?: { objekt, einheitId?, felder }` an `InlineAngabe`.
   Solange die Eingabe offen ist, gilt: beim Öffnen `PUT`, danach alle 15 s `PUT`, beim Schließen
-  (auch Aushängen und Sperre) `DELETE`. Ein `pagehide` sendet das `DELETE` mit `keepalive`. Ohne
+  (auch Aushängen und Sperre) `DELETE`. Ein `pagehide` sendet das `DELETE` mit `keepalive`. Dafür
+  bekommt `api/client.ts` einen neuen Helfer: `apiSend` kennt kein `keepalive`, und
+  `apiSendKeepalive` kann nur POST und prüft den Erwarteter-Benutzer-Kopf nicht. Der Helfer schickt
+  den Kopf mit, und `schreibwege.guard.test.ts` deckt ihn ab. Ohne
   Netz (`useOhneVerbindung`) wird nichts gesendet und nichts in die Warteschlange gelegt; der
   Server lässt den Eintrag ablaufen (ADR-0008). Fehler der Präsenzaufrufe werden still verworfen,
   ohne Meldung an der Zeile.
-- Gesendet wird über `apiSend` (Erwarteter-Benutzer-Kopf). Ein 412 beendet die Präsenz still.
+- Gesendet wird über `apiSend` (Erwarteter-Benutzer-Kopf). Ein 412 beendet die Präsenz; die
+  allgemeine Benutzerprüfung (`BENUTZER_PRUEFEN`), die `apiSend` dabei immer auslöst, bleibt.
 - **Empfangen:** Ein Listener für `praesenz` in `live/` (Muster `benachrichtigungListener`) legt den
   Stand in einen kleinen Store je Einsatz (`useSyncExternalStore`), nicht in den Query-Cache und
   nicht als Query-Key. Ein Abbruch des Stroms leert den Stand des Einsatzes. Nach dem Neuaufbau
@@ -182,20 +192,22 @@ Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3)
 
 ### D6 Anzeige
 
-- Der Ort ist dieselbe leise Stelle wie der Vermerk: unter dem Wert, Rolle `meta`. Sie ist aber
-  **nicht** gedämpft, sondern in der Hinweis-Rolle der Gestaltungssprache, ohne Warnfarbe und ohne
-  Symbol, das blinkt.
+- Schrift: Rolle `meta`, Farbrolle `text` (nicht `gedaempft` wie der Vermerk, nicht `achtung`).
+  Keine neue Farbrolle, kein Symbol, das blinkt. *Meine Wahl (Builder-Check): Es gibt keine
+  Hinweis-Rolle; `text` hebt den Hinweis vom gedämpften Vermerk ab, ohne zu warnen.*
 - Wortlaut:
   - eine fremde Person: „Wird gerade bearbeitet von Anna“
   - mehrere: „Wird gerade bearbeitet von Anna und Ben“, ab drei „von Anna und 2 weiteren“
   - eigenes Konto anderswo: „Wird gerade von dir in einem anderen Fenster bearbeitet“
   - beides: „Wird gerade bearbeitet von Anna und von dir in einem anderen Fenster“
-- Der Hinweis steht im geschlossenen Zustand (über dem Vermerk, der Vermerk bleibt) und im offenen
-  Feld (neben dem bestehenden „Inzwischen geändert von …“).
-- Er reserviert keinen Platz, solange er fehlt. Erscheint er, schiebt er nur, was unter **dieser**
-  Zeile steht. Er erscheint nicht innerhalb der Eingabe, die der Nutzer gerade tippt, sondern
-  darunter (`frontend/AGENTS.md`, „Live-Updates springen nicht unter dem Cursor“; der Builder
-  prüft die Regel dort).
+- **Platz: statt des Vermerks** (entschieden von Ruben, 19.11.2026). Solange jemand anderes die
+  Angabe bearbeitet, nimmt der Hinweis die Zeile von „Geändert von …“ ein; danach kehrt der Vermerk
+  zurück. So springt in der Regel nichts. Hat die Angabe noch keinen Vermerk, kommt eine Zeile
+  dazu. Das ist eine zweite, festgeschriebene Ausnahme von „Live-Updates springen nicht unter dem
+  Cursor“ neben der Alarmzone; sie wird in `frontend/AGENTS.md` an dieser Regel ergänzt. Im offenen
+  Feld steht er neben dem bestehenden „Inzwischen geändert von …“, unter der Eingabe und nie in
+  ihr.
+- Der Hinweis reserviert keinen Platz, solange er fehlt.
 - `data-lfh="feld-praesenz"` für Tests und Bildlauf. Barrierefreiheit: Der Text hängt über
   `aria-describedby` am Wertknopf. Er ist keine Live-Region, damit Screenreader ihn nicht bei
   jedem Wechsel ansagen.
@@ -205,9 +217,12 @@ Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3)
 
 `praesenz` bekommen die Angaben, die heute `vermerk` tragen: `pages/EinsatzdatenPage.tsx`
 (Einsatzkopf, Einsatzort, Koordinate, Führungsstelle), `pages/einheit/EinheitKopf.tsx`,
-`pages/einheit/EinheitFunk.tsx`, `pages/EinsatzleiterAngabe.tsx` und `components/VerbindungenFeld.tsx`,
-soweit sie dort für diese drei Objekte stehen. Der Schlüssel ist jeweils der Vermerk-Feldname.
-Angaben ohne `vermerk` bleiben ohne Präsenz.
+`pages/einheit/EinheitFunk.tsx` und `pages/EinsatzleiterAngabe.tsx`, soweit sie dort für diese drei
+Objekte über `InlineAngabe` laufen. `StandortAngabe` bekommt die Prop, wenn sie über `InlineAngabe`
+läuft. Zusammengesetzte Eingaben mit eigenem Editor ohne `InlineAngabe` (Verbindungen über
+`VerbindungenFeld`, Führungsfahrzeuge `fahrzeug_ids`) bleiben in diesem Schritt ohne Präsenz.
+Angaben ohne `vermerk` bleiben ebenfalls ohne. *Meine Wahl (Builder-Check): Die Prop bleibt an
+einem Baustein, damit Takt und Abmelden nur an einer Stelle leben.*
 
 ### D8 Regeln und Doku
 
