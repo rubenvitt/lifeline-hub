@@ -160,3 +160,49 @@ export function useAdressSuche(schluessel = 'q'): [string, (text: string) => voi
   );
   return [text, setze];
 }
+
+/**
+ * Wie {@link useAdressWert}, aber für eine Ansicht, deren Wechsel eine offene Bearbeitung aushängt
+ * (LLH-1415): die eigene Wahl geht über `nachRueckfrage`, und eine FREMDE Änderung der Adresse (eine
+ * Sprungmarke auf demselben Pfad, `useBlocker` hält sie nicht an) wird erst nach der Rückfrage
+ * übernommen. „Bleiben“ führt die Adresse auf die gezeigte Ansicht zurück. Gezeigt wird der
+ * bestätigte Wert, nicht der rohe Adresswert. Der dritte Wert setzt ohne Rückfrage, für einen
+ * Wechsel, den die Seite selbst verantwortet (ein Deeplink, der eine Zeile braucht).
+ */
+export function useAdressWertNachRueckfrage<T extends string>(
+  schluessel: string,
+  erlaubt: Record<T, true>,
+  vorgabe: NoInfer<T>,
+  nachRueckfrage: (wechsel: () => void) => void,
+): [T, (neu: T) => void, (neu: T) => void] {
+  const [adresse, setzeAdresse] = useAdressWert(schluessel, erlaubt, vorgabe);
+  const [gezeigt, setGezeigt] = useState(adresse);
+  const vorher = useRef(adresse);
+
+  useEffect(() => {
+    if (adresse === vorher.current) return;
+    vorher.current = adresse;
+    if (adresse === gezeigt) return;
+    // Fremde Änderung: die Adresse bleibt bei der gezeigten Ansicht, bis die Rückfrage entscheidet.
+    setzeAdresse(gezeigt);
+    nachRueckfrage(() => {
+      setGezeigt(adresse);
+      setzeAdresse(adresse);
+    });
+    // Getaktet nur über den Adresswert; die übrigen Werte gelten zum Zeitpunkt der Änderung.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adresse]);
+
+  const setzeSofort = useCallback(
+    (neu: T) => {
+      setGezeigt(neu);
+      setzeAdresse(neu);
+    },
+    [setzeAdresse],
+  );
+  const setze = useCallback(
+    (neu: T) => nachRueckfrage(() => setzeSofort(neu)),
+    [nachRueckfrage, setzeSofort],
+  );
+  return [gezeigt, setze, setzeSofort];
+}

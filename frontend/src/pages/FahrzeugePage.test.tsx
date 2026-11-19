@@ -2125,29 +2125,36 @@ describe('FahrzeugePage — FMS-Tableau', () => {
       daneben: <Link to="/einsaetze/7/fahrzeuge?ansicht=tableau">Sprungmarke</Link>,
     });
     expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
+    expect(screen.getByTestId('ort').textContent).toBe('?ansicht=tableau');
     const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
     await userEvent.click(within(ansicht).getByRole('radio', { name: 'Liste' }));
     await waitFor(() => expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull());
 
     await userEvent.click(screen.getByRole('link', { name: 'Sprungmarke' }));
     expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
+    expect(screen.getByTestId('ort').textContent).toBe('?ansicht=tableau');
   });
 
-  it('übernimmt ?ansicht=tableau und räumt den Parameter (apply-then-clean)', async () => {
+  it('?ansicht=tableau ist Zustand der Adresse und bleibt stehen (LLH-1826)', async () => {
     renderTableau();
     const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
     expect(await within(tableau).findByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
-    // Der Auftrag ist verbraucht, die Ansicht bleibt Seitenzustand.
-    expect(screen.getByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+    expect(screen.getByTestId('ort').textContent).toBe('?ansicht=tableau');
   });
 
-  it('räumt einen unbekannten Wert ebenfalls und bleibt bei der Liste', async () => {
+  it('die Wahl der Liste löscht den Parameter, die Wahl des Tableaus schreibt ihn (LLH-1826)', async () => {
+    renderTableau();
+    await screen.findByRole('region', { name: 'FMS-Tableau' });
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Liste' }));
+    await waitFor(() => expect(screen.getByTestId('ort').textContent).toBe(''));
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'FMS-Tableau' }));
+    await waitFor(() => expect(screen.getByTestId('ort').textContent).toBe('?ansicht=tableau'));
+  });
+
+  it('ein unbekannter Wert gilt als Liste', async () => {
     renderTableau(undefined, '/einsaetze/7/fahrzeuge?ansicht=kachel');
     await screen.findByText('Florian 1');
-    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
     expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull();
   });
 
@@ -2818,8 +2825,8 @@ describe('FahrzeugePage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)',
     await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
     expect(segment('Liste')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('combobox', { name: FELD })).toBeInTheDocument();
-    // Die Vorgabe ist geräumt, auch wenn die Ansicht bleibt.
-    expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge');
+    // „Bleiben“ führt die Adresse auf die gezeigte Ansicht zurück (LLH-1826).
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge'));
 
     await userEvent.click(screen.getByRole('link', { name: 'Sprungmarke' }));
     await userEvent.click(
@@ -2828,6 +2835,7 @@ describe('FahrzeugePage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)',
       }),
     );
     expect(segment('FMS-Tableau')).toHaveAttribute('aria-checked', 'true');
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge?ansicht=tableau'));
   });
 
   it('ohne Änderung wechseln Segment und Route still', async () => {

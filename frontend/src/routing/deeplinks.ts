@@ -1007,7 +1007,7 @@ export function einheitAusVorlagePfad(einsatzId: number, vorlageId: number): str
  */
 export type FahrzeugeAnsicht = 'liste' | 'tableau';
 
-/** `ansicht` ist ein AUFTRAG wie bei {@link personenPfad} (apply-then-clean). */
+/** `ansicht` ist Zustand der Adresse wie bei {@link personenPfad} (LLH-1826). */
 export function fahrzeugePfad(
   einsatzId: number,
   opts: { fahrzeug?: number; ansicht?: FahrzeugeAnsicht } = {},
@@ -1019,7 +1019,7 @@ export function fahrzeugePfad(
 }
 
 /** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
-const FAHRZEUGE_ANSICHT_ERLAUBT: Record<FahrzeugeAnsicht, true> = {
+export const FAHRZEUGE_ANSICHT_ERLAUBT: Record<FahrzeugeAnsicht, true> = {
   liste: true,
   tableau: true,
 };
@@ -1041,7 +1041,7 @@ export type AbschnitteAnsicht = 'gliederung' | 'organigramm';
 
 /**
  * Einsatzabschnitte; `?abschnitt=` selektiert, `?neu=1` öffnet den Entwurf eines neuen.
- * `ansicht` ist ein AUFTRAG wie bei {@link fahrzeugePfad} (apply-then-clean).
+ * `ansicht` ist Zustand der Adresse wie bei {@link fahrzeugePfad} (LLH-1826).
  */
 export function einsatzabschnittePfad(
   einsatzId: number,
@@ -1055,7 +1055,7 @@ export function einsatzabschnittePfad(
 }
 
 /** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
-const ABSCHNITTE_ANSICHT_ERLAUBT: Record<AbschnitteAnsicht, true> = {
+export const ABSCHNITTE_ANSICHT_ERLAUBT: Record<AbschnitteAnsicht, true> = {
   gliederung: true,
   organigramm: true,
 };
