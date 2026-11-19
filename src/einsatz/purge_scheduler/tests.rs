@@ -2247,6 +2247,7 @@ async fn antrag_r001(pool: &SqlitePool, b: &testdaten::Bestand, jetzt: &str) -> 
     )
     .await
     .unwrap()
+    .0
 }
 
 #[tokio::test]

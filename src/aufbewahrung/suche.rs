@@ -326,7 +326,8 @@ mod tests {
             t0,
         )
         .await
-        .unwrap();
+        .unwrap()
+        .0;
         let t = personensuche(&pool, b.e1, "Yilmaz").await.unwrap();
         assert_eq!(t[0].antrag, Some(AntragStand::Offen));
         super::super::antrag::vollziehen(&pool, a, t0 + chrono::Duration::hours(24))

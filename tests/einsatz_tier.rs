@@ -10,7 +10,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, person_anlegen, rolle_setzen,
-    setup, system_etb_inhalte,
+    setup, setup_mit_live, system_etb_inhalte, EtbLive,
 };
 
 // ---------- Domänen-Helfer ----------
@@ -1063,4 +1063,35 @@ async fn beobachter_kann_nicht_verorten() {
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// LLH-1976: Anlegen, Statuswechsel und Storno eines Tiers gehen als Ereignis `etb` hinaus.
+#[tokio::test]
+async fn tier_etb_eintraege_gehen_live_hinaus() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut etb = EtbLive::neu(&app, &admin, e, &live).await;
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
+    etb.pruefe(&app, &admin, e, "anlegen").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/tiere/{t}/status"),
+        &admin,
+        Some(&json!({"status":"vermisst"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    etb.pruefe(&app, &admin, e, "Statuswechsel").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s}");
+    etb.pruefe(&app, &admin, e, "stornieren").await;
 }

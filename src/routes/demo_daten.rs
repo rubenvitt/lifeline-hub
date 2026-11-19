@@ -177,7 +177,11 @@ pub async fn importieren(
     let lage = lage_aus_pfad(&segment)?;
     let (org_id, admin_id, jetzt) = (benutzer.org_id, benutzer.id, jetzt());
     let (neu, status) = crate::write_retry!(&state.pool, |conn| {
-        let neu = import::importieren_tx(conn, org_id, admin_id, lage, jetzt).await?;
+        let neu = crate::etb::nachlauf::ohne_verteilung(
+            crate::etb::nachlauf::GRUND_DEMO,
+            import::importieren_tx(conn, org_id, admin_id, lage, jetzt),
+        )
+        .await?;
         Ok((neu.einsatz_id, status_tx(conn, org_id).await?))
     })?;
     org_ereignisse_senden(&state, org_id, None, Some(neu)).await;
@@ -209,7 +213,11 @@ pub async fn neu_importieren(
         } else {
             None
         };
-        let neu = import::importieren_tx(conn, org_id, admin_id, lage, jetzt).await?;
+        let neu = crate::etb::nachlauf::ohne_verteilung(
+            crate::etb::nachlauf::GRUND_DEMO,
+            import::importieren_tx(conn, org_id, admin_id, lage, jetzt),
+        )
+        .await?;
         Ok((alt, neu.einsatz_id, status_tx(conn, org_id).await?))
     })?;
     resync_senden(&state, alt.as_ref().map(|a| a.0));

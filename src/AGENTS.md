@@ -689,6 +689,24 @@ Spec `org-live`; `src/live/org.rs`, `src/routes/live.rs`. Ereignisse `einsatzlis
   `stammdaten_live`); ein neuer Katalogpfad braucht einen Eintrag, Guard
   `tests/stammdaten_live_guard.rs`.
 
+## Backend — ETB live verteilen (LLH-1976)
+
+Herleitung: `docs/superpowers/specs/2026-11-19-ywhuzag7-etb-system-live-verteilen-design.md`;
+`src/etb/nachlauf.rs`.
+- **Jeder ETB-Eintrag, den eine Route oder ein Hintergrundlauf schreibt, geht nach dem Commit per
+  `LiveHub::publiziere(einsatz_id, etb_id)` hinaus**, je ID, außerhalb der `write_retry!`-Closure,
+  mit den IDs, die die Closure zurückgibt (Routen: `routes::etb_verteilen`). Ein
+  `publiziere_einsatz(…, LiveEvent::Etb)` ohne ID ersetzt das nicht.
+- **Der Wächter `etb::nachlauf` prüft das in Debug und Test**: Router-Schicht `waechter`
+  (außerhalb von `CatchPanicLayer`) und `purge_scheduler::tick_mit_rueckschrieb`. Eine Lücke ist
+  ein Panic. Eine Ausnahme nur über `nachlauf::ohne_verteilung` oder `nachlauf::ausnehmen` mit
+  Grundkonstante; heute für Demo-Import (`GRUND_DEMO`), Instanz-Spiegel (`GRUND_SPIEGEL`) und
+  Läufe, die einen Einsatz aus dem Betrieb nehmen (`GRUND_BETRIEB_VERLASSEN`: Archivieren,
+  Soft-Delete, Schwärzen des ganzen Einsatzes, Vollzug eines Einsatz-Löschersuchens). Eine neue
+  Ausnahme ist eine Entscheidung des Menschen.
+- **Ein neuer Scheduler-Lauf, der ETB schreibt, kommt unter die Klammer** (`nachlauf::klammer`).
+  Was in einem per `tokio::spawn` gestarteten Task geschieht, sieht der Wächter nicht.
+
 ## Backend — Benachrichtigungen (LLH-1207)
 
 Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjecn9e-benachrichtigungskonzept/design.md`

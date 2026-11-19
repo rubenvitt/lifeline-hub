@@ -372,3 +372,26 @@ async fn admin_einer_fremden_org_ist_403() {
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert_eq!(stand(&pool, id).await, vorher);
 }
+
+/// LLH-1976: Eine geänderte Kategorie-Frist geht mit ihrem System-Eintrag als Ereignis `etb`
+/// hinaus, nicht nur als Auffrischung der Liste.
+#[tokio::test]
+async fn kategorie_frist_etb_geht_live_hinaus() {
+    let (app, _pool, live) = common::setup_mit_pool_und_live().await;
+    let (admin, id) = abgeschlossener_einsatz(&app).await;
+    let mut etb = common::EtbLive::neu(&app, &admin, id, &live).await;
+    let neu = (chrono::Utc::now() + chrono::Duration::days(90))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let (s, v) = kategorie_frist(
+        &app,
+        &admin,
+        id,
+        "personenauskunft",
+        json!({"retention_bis": neu}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    etb.pruefe(&app, &admin, id, "Kategorie-Frist verlängern")
+        .await;
+}
