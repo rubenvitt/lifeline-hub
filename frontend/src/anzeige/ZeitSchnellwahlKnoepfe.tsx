@@ -1,4 +1,5 @@
-import { Button, Flex } from 'antd';
+import { Button } from 'antd';
+import { Stapel } from '../components/instrument';
 import type { Dayjs } from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
 import type { ZeitArt } from './zeitParser';
@@ -27,7 +28,7 @@ export function ZeitSchnellwahlKnoepfe({
   onWahl: (zeitpunkt: Dayjs) => void;
 }) {
   return (
-    <Flex wrap gap="small" role="group" aria-label="Schnellwahl">
+    <Stapel richtung="zeile" umbruch abstand="xs" role="group" aria-label="Schnellwahl">
       {schnellwahlFuer(art).map((e) => (
         <Button
           key={e.label}
@@ -37,6 +38,6 @@ export function ZeitSchnellwahlKnoepfe({
           {e.label}
         </Button>
       ))}
-    </Flex>
+    </Stapel>
   );
 }

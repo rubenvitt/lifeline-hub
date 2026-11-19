@@ -1,6 +1,7 @@
-import { InputNumber, Space, Typography, theme } from 'antd';
+import { InputNumber, Typography, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import type { Staerke } from '../api/types';
+import { Stapel, Textstufe } from '../components/instrument';
 
 type Feld = number | null;
 
@@ -32,7 +33,7 @@ const SPALTE: React.CSSProperties = { display: 'inline-flex', flexDirection: 'co
 
 /**
  * Kontrollierte Eingabe einer taktischen Stärke (F/UF/M) mit Live-Gesamtanzeige, einhängbar als
- * `<Form.Item name="…"><StaerkeEingabe /></Form.Item>`.
+ * `<Feld name="…"><StaerkeEingabe /></Feld>`.
  *
  * Die Felder bleiben während der Eingabe frei leerbar; {@link koerziere} setzt die Regel im
  * onChange durch. Der Echo-Guard im useEffect spiegelt nur eine wirklich externe
@@ -63,11 +64,11 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
   const gesamt = (f ?? 0) + (uf ?? 0) + (m ?? 0);
 
   return (
-    <Space align="end" size={token.marginSM} wrap>
+    <Stapel richtung="zeile" abstand="sm" ausrichten="ende" umbruch>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           Führer
-        </Typography.Text>
+        </Textstufe>
         <InputNumber
           min={0}
           value={f}
@@ -80,9 +81,9 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
         />
       </span>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           Unterführer
-        </Typography.Text>
+        </Textstufe>
         <InputNumber
           min={0}
           value={uf}
@@ -94,9 +95,9 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
         />
       </span>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           Mannschaft
-        </Typography.Text>
+        </Textstufe>
         <InputNumber
           min={0}
           value={m}
@@ -110,6 +111,6 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
       <Typography.Text type="secondary" style={{ paddingBottom: token.paddingXS }}>
         = {begonnen ? gesamt : '—'}
       </Typography.Text>
-    </Space>
+    </Stapel>
   );
 }

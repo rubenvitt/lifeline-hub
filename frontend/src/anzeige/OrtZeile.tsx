@@ -1,4 +1,6 @@
 import { Typography } from 'antd';
+import { Textstufe } from '../components/instrument';
+import { schriftskala } from '../theme/tokens';
 import type { LatLon } from './koordinaten';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { useOrtVorschau } from './useOrtVorschau';
@@ -29,9 +31,9 @@ export function OrtZeile({
 
   if (!data) {
     return isFetching ? (
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Textstufe stufe="textKlein" ton="gedaempft">
         Ort wird ermittelt …
-      </Typography.Text>
+      </Textstufe>
     ) : null;
   }
 
@@ -51,7 +53,7 @@ export function OrtZeile({
     return (
       <Typography.Paragraph
         type="secondary"
-        style={{ fontSize: 12, marginBottom: 0 }}
+        style={{ fontSize: schriftskala.textKlein.groesse, marginBottom: 0 }}
         ellipsis={{ rows: maxZeilen, tooltip: text }}
       >
         {text}
@@ -59,8 +61,8 @@ export function OrtZeile({
     );
   }
   return (
-    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+    <Textstufe stufe="textKlein" ton="gedaempft">
       {text}
-    </Typography.Text>
+    </Textstufe>
   );
 }

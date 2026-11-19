@@ -8,10 +8,10 @@
  * `uhrzeitAmTag` (eine Sommerzeitregel für Feld und Kalender). antds `Calendar` sieht nur ein
  * browserlokales `Dayjs` dieses Tages, nie einen Zeitpunkt.
  */
-import { Button, Calendar, Flex, Input, type InputRef } from 'antd';
+import { Button, Calendar, Input, type InputRef } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, Stapel, useRollen } from '../components/instrument';
 import { IconChevronRechts } from '../icons';
 import './dayjsSprache';
 import { ZeitSchnellwahlKnoepfe } from './ZeitSchnellwahlKnoepfe';
@@ -147,7 +147,7 @@ export function ZeitKalender({
           if (nurTag && info.source === 'date') uebernehmen(neu);
         }}
         headerRender={() => (
-          <Flex align="center" justify="space-between" gap="small">
+          <Stapel richtung="zeile" ausrichten="mitte" verteilen="between" abstand="xs">
             <Button
               type="text"
               aria-label="Vormonat"
@@ -162,11 +162,11 @@ export function ZeitKalender({
               icon={<IconChevronRechts />}
               onClick={() => blaettern(1)}
             />
-          </Flex>
+          </Stapel>
         )}
       />
       {!nurTag && (
-        <Flex gap="small" align="center" wrap>
+        <Stapel richtung="zeile" ausrichten="mitte" umbruch abstand="xs">
           <Input
             ref={uhrRef}
             aria-label="Uhrzeit"
@@ -193,7 +193,7 @@ export function ZeitKalender({
               {grund}
             </span>
           )}
-        </Flex>
+        </Stapel>
       )}
       {nurTag && grund && (
         <span id={grundId} style={{ color: rollen.alarmText }}>
@@ -206,12 +206,19 @@ export function ZeitKalender({
         </span>
       )}
       {/* Die Fußzeile klebt im Blatt unten, wenn der Inhalt rollt (`ZeitpunktEingabe.css`). */}
-      <Flex className={ZEIT_FUSS} gap="small" align="center" justify="space-between" wrap>
+      <Stapel
+        className={ZEIT_FUSS}
+        richtung="zeile"
+        ausrichten="mitte"
+        verteilen="between"
+        umbruch
+        abstand="xs"
+      >
         <ZeitSchnellwahlKnoepfe art={art} onWahl={onUebernehmen} />
         <Button type="primary" onClick={() => uebernehmen()}>
           Übernehmen
         </Button>
-      </Flex>
+      </Stapel>
     </div>
   );
 }
