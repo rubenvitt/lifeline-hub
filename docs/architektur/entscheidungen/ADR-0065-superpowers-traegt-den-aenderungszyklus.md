@@ -20,8 +20,10 @@ herleitung:
 - MUST: Eine Änderung auf der Route `entwurf` entsteht als Design-Doc unter
   `docs/superpowers/specs/` und Plan unter `docs/superpowers/plans/`, mit Freigabe-Halt nach dem
   Design-Doc; Ablauf: Wurzel-`AGENTS.md`, „Planung und Ausführung — Superpowers“.
-- MUST NOT: nichts Neues unter `openspec/`; Archiv und Fähigkeits-Specs bleiben lesbar und
-  unverändert (Wächter: Schritt 13 von `scripts/check-all.sh`).
+- MUST NOT: keine neue Change unter `openspec/changes/` und kein OpenSpec-Werkzeug
+  (`openspec/config.yaml`, `/opsx`-Befehle, `openspec-*`-Skills); Wächter: Schritt 13 von
+  `scripts/check-all.sh`.
+- SHOULD NOT: Archiv und Fähigkeits-Specs unter `openspec/` ändern; sie bleiben lesbar.
 - MUST: Superpowers ist als Plugin in `.claude/settings.json` eingetragen; seine Skills werden
   nicht ins Repo kopiert.
 - MUST: Neue verbindliche Regeln stehen in der Bereichs-`AGENTS.md` oder einer ADR, die
@@ -35,8 +37,8 @@ herleitung:
 test ! -e openspec/config.yaml
 test -x scripts/check-openspec-eingefroren.sh
 verlange 'check-openspec-eingefroren\.sh' scripts/check-all.sh
-verlange 'superpowers@superpowers-marketplace' .claude/settings.json
-verbiete '/opsx:' AGENTS.md '.claude/**'
+verlange '"superpowers@superpowers-marketplace": true' .claude/settings.json
+verbiete '/opsx:' '**/AGENTS.md' '.claude/**'
 ```
 
 ## Kontext

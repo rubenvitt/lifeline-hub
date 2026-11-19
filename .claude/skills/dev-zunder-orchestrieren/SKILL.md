@@ -160,6 +160,13 @@ Design-Doc im Main-Loop und legst es erneut vor.
 **Größere UI:** Regel und Pflichten (Entwurf mit `/design`, Design System neu erzeugen und nach
 dem Merge veröffentlichen): `frontend/AGENTS.md`, „Größere UI-Entwürfe über das Design System“.
 
+**`brainstorming` im Orchestrator:** Die Ansatzwahl, die `brainstorming` vor dem Design-Doc
+verlangt, hat der Phase-1-Checkpoint schon getroffen (Lösungsweg je Task); weicht der Weg davon
+ab, legst du ihn wie oben erneut vor. `brainstorming` **endet je Task mit dem geschriebenen
+Design-Doc**, ohne dessen eigene Freigabefrage und ohne Übergang in `writing-plans`: die
+Freigabe holt der gesammelte Checkpoint unten, `writing-plans` folgt erst in Phase 3. Bei nur
+einem Task auf `entwurf` ist die Freigabe in `brainstorming` dieser Checkpoint.
+
 **Checkpoint — Pflicht (LFH-588).** Nach den Design-Docs hältst du an und legst **alle
 Design-Docs des Laufs gesammelt** vor, samt offenen Optionen und Empfehlung. Die Tasks stehen
 dabei auf `blocked`. Erst die Freigabe des Menschen führt zurück auf `in_progress`, und erst

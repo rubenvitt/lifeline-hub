@@ -245,6 +245,16 @@ zurück auf `in_progress` und `writing-plans`. Nicht umgehen, nicht im selben Zu
 (Dieselbe Reihenfolge wie in `dev-zunder-orchestrieren`, Phase 2. Dort werden mehrere
 Design-Docs eines Laufs gesammelt vorgelegt, aber auch dann gilt: kein Workflow schreibt sie.)
 
+**Projektregeln gehen den Superpowers-Skills vor** (deren eigene Regel: Anweisungen aus
+`AGENTS.md` haben Vorrang). Für die Umsetzung heißt das: Standard ist `executing-plans`
+(Main-Loop setzt selbst um); `subagent-driven-development` nur, wenn der Mensch es wählt oder
+der Plan so lang ist, dass späte Aufgaben auf verdichtetem Kontext liefen. In beiden Fällen ist
+der Abschlussreview des Skills der Review aus „Review nach Ermessen“: er läuft nur bei einem
+Anlass von dort, als ein Agent mit `references/review-pruefliste.md`; ohne Anlass genügt die
+Selbstprüfung des Skills, im Ledger vermerkt. Unter `subagent-driven-development` entfallen die
+Reviewer je Aufgabe (keine Gegenprüfer), und jeder Implementer-Prompt trägt die Pflichtpunkte aus
+„Agenten nach Bedarf“.
+
 Den Plan legt `writing-plans` dem Menschen mit der Frage nach der Ausführungsart vor
 (`subagent-driven-development` oder `executing-plans`); das ist kein zweiter Freigabe-Halt für
 den Weg, nur die Wahl der Art. Die **Art zu arbeiten** bleibt: jede Aufgabe per
