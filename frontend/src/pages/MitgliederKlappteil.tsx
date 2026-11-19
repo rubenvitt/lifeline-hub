@@ -16,16 +16,22 @@ export interface AnlageMitglied {
   rolle: EinsatzRolle;
 }
 
+/** Schlüssel des Klappteils; nicht `mitglieder`, das ist ein Einsatz-Query-Key. */
+const KLAPP_KEY = 'anlage-personen';
+
 /** Rolle einer neu gewählten Person (Design-Doc LLH-1820, „Dialog“). */
 const VORGABE_ROLLE: EinsatzRolle = 'fuehrungspersonal';
 
 /**
  * Kopf des Teils: er nennt die Wahl immer, auch zugeklappt (`frontend/AGENTS.md`, Feldbudget,
- * Klappteil-Ausnahme). Die anlegende Person ist stets Einsatzleitung und zählt nicht mit.
+ * Klappteil-Ausnahme). „Einsatzleitung“ ist die anlegende Person; sie zählt nicht mit. Ohne Du
+ * (`frontend/AGENTS.md`, „Anrede“).
  */
 export function mitgliederKopf(gewaehlt: number): string {
   const wahl =
-    gewaehlt === 0 ? 'nur du (Einsatzleitung)' : `du + ${anzahl(gewaehlt, 'Person', 'Personen')}`;
+    gewaehlt === 0
+      ? 'nur Einsatzleitung'
+      : `Einsatzleitung + ${anzahl(gewaehlt, 'Person', 'Personen')}`;
   return `Mitglieder · ${wahl}`;
 }
 
@@ -68,11 +74,11 @@ export default function MitgliederKlappteil({ offen, onOffenChange }: Props) {
     <Collapse
       ghost
       style={{ marginInline: -token.paddingSM }}
-      activeKey={offen ? ['mitglieder'] : []}
-      onChange={(k) => onOffenChange(k.includes('mitglieder'))}
+      activeKey={offen ? [KLAPP_KEY] : []}
+      onChange={(k) => onOffenChange(k.includes(KLAPP_KEY))}
       items={[
         {
-          key: 'mitglieder',
+          key: KLAPP_KEY,
           forceRender: true,
           label: <span data-lfh="anlage-mitglieder-kopf">{mitgliederKopf(gewaehlt.length)}</span>,
           children: (
@@ -95,7 +101,7 @@ export default function MitgliederKlappteil({ offen, onOffenChange }: Props) {
                 />
               </Feld>
               <div style={{ marginBlockEnd: token.margin, color: rollen.gedaempft }}>
-                du — Einsatzleitung
+                Eigene Rolle: Einsatzleitung
               </div>
               <Form.List name="mitglieder">
                 {(felder) =>

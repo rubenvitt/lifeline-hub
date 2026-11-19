@@ -41,6 +41,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/efvk5rbs30e82bwhir4hlxjl
   - „+ N aus der Demo“
   - „nur du (Einsatzleitung)“
   - „du + N Personen“ (bei N = 1: „du + 1 Person“)
+  - Nachtrag 19.11.2026: Seit der Anrede-Regel (LLH-1830, `frontend/AGENTS.md`, „Anrede“) ohne
+    Du: „nur Einsatzleitung“, „Einsatzleitung + N Personen“, feste Zeile „Eigene Rolle:
+    Einsatzleitung“.
 - Node und pnpm nur über `mise exec -- …`.
 - **Reihenfolge:** Task 7 (Dialog) beginnt erst, wenn LLH-1816 auf `alpha` gemergt ist. Dann
   vorher `git fetch origin alpha && git merge origin/alpha`. Der PR entsteht erst nach Task 9.

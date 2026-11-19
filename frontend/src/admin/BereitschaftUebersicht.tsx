@@ -88,7 +88,7 @@ export default function BereitschaftUebersicht() {
                     <tr key={z.key} data-lfh={`bereitschaft-${z.key}`}>
                       <td style={zelle}>{z.label}</td>
                       <td style={{ ...zelle, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <span style={monoStil(16, 500)}>{z.zahl}</span>
+                        <span style={monoStil('monoGross', 500)}>{z.zahl}</span>
                         {z.demo > 0 && (
                           <Textstufe stufe="meta" ton="schwach" als="div">
                             {`+ ${z.demo} aus der Demo`}

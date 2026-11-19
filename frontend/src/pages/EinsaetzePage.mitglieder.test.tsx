@@ -78,10 +78,10 @@ async function klappeAuf() {
 }
 
 describe('mitgliederKopf', () => {
-  it('nennt die Wahl: nur du, eine Person, mehrere Personen', () => {
-    expect(mitgliederKopf(0)).toBe('Mitglieder · nur du (Einsatzleitung)');
-    expect(mitgliederKopf(1)).toBe('Mitglieder · du + 1 Person');
-    expect(mitgliederKopf(3)).toBe('Mitglieder · du + 3 Personen');
+  it('nennt die Wahl: nur Einsatzleitung, eine Person, mehrere Personen', () => {
+    expect(mitgliederKopf(0)).toBe('Mitglieder · nur Einsatzleitung');
+    expect(mitgliederKopf(1)).toBe('Mitglieder · Einsatzleitung + 1 Person');
+    expect(mitgliederKopf(3)).toBe('Mitglieder · Einsatzleitung + 3 Personen');
   });
 });
 
@@ -89,10 +89,10 @@ describe('Anlegedialog · Mitglieder (LLH-1820)', () => {
   it('der Kopf nennt die Wahl', async () => {
     setup();
     await oeffneDialog();
-    expect(klappkopf()).toHaveTextContent('nur du (Einsatzleitung)');
+    expect(klappkopf()).toHaveTextContent('nur Einsatzleitung');
     await klappeAuf();
     await waehle('Personen', 'Anna Beispiel', 'Bernd Muster');
-    await waitFor(() => expect(klappkopf()).toHaveTextContent('du + 2 Personen'));
+    await waitFor(() => expect(klappkopf()).toHaveTextContent('Einsatzleitung + 2 Personen'));
   });
 
   it('eine neu gewählte Person steht auf „Führungspersonal“ und lässt sich umstellen', async () => {
@@ -109,11 +109,11 @@ describe('Anlegedialog · Mitglieder (LLH-1820)', () => {
     expect(stand.rumpf!.mitglieder).toEqual([{ benutzer_id: 7, rolle: 'beobachter' }]);
   });
 
-  it('zeigt die anlegende Person als feste Zeile „du — Einsatzleitung“', async () => {
+  it('zeigt die anlegende Person als feste Zeile „Eigene Rolle: Einsatzleitung“', async () => {
     setup();
     await oeffneDialog();
     await klappeAuf();
-    expect(screen.getByText('du — Einsatzleitung')).toBeInTheDocument();
+    expect(screen.getByText('Eigene Rolle: Einsatzleitung')).toBeInTheDocument();
   });
 
   it('lädt die Auswahl erst beim Aufklappen', async () => {
@@ -174,6 +174,6 @@ describe('Anlegedialog · Mitglieder (LLH-1820)', () => {
       await within(dialog).findByText(/Mitglieder: Anna Beispiel kann nicht aufgenommen werden\./),
     ).toBeInTheDocument();
     // Die Wahl bleibt im Kopf sichtbar, ohne aufzuklappen.
-    expect(klappkopf()).toHaveTextContent('du + 1 Person');
+    expect(klappkopf()).toHaveTextContent('Einsatzleitung + 1 Person');
   });
 });

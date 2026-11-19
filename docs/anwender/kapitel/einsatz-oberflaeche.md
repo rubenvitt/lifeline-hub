@@ -66,7 +66,7 @@ Für System-Admins und Führungskräfte der Organisation:
    getippte Koordinate gilt gleich als Punkt.
 5. Sollen gleich weitere Personen mitarbeiten, „Mitglieder“ aufklappen und sie unter „Personen“
    wählen. Jede steht zuerst auf „Führungspersonal“; die Rolle lässt sich je Person ändern. Der
-   Kopf zeigt die Wahl auch zugeklappt, etwa „du + 2 Personen“.
+   Kopf zeigt die Wahl auch zugeklappt, etwa „Einsatzleitung + 2 Personen“.
 6. „Anlegen“ wählen. Die App öffnet den neuen Einsatz.
 
 Wer anlegt, ist immer Einsatzleitung. Die gewählten Personen sind gleich Mitglied und bekommen

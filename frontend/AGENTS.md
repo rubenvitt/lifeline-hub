@@ -1675,7 +1675,7 @@ Spec `bedien-arbeitsplatz`).
   bestimmt und das Stichwort sie einstellt (Modulzahl darunter, Vorgabe „Alle Module“); das letzte
   ist der optionale Einsatzort; ein siebtes gehört in die Kopfdaten. Darunter der eingeklappte
   Teil „Mitglieder“ (LLH-1820, `pages/MitgliederKlappteil.tsx`): zählt nicht zu den sechs, sein
-  Kopf nennt die Wahl („nur du (Einsatzleitung)“, „du + 2 Personen“), die Auswahl lädt erst beim
+  Kopf nennt die Wahl („nur Einsatzleitung“, „Einsatzleitung + 2 Personen“), die Auswahl lädt erst beim
   Aufklappen; eine Ablehnung des Servers nennt die Person in der Fehlerzeile des Dialogs. Ausnahme
   „Lagemeldung erfassen“ (LLH-1921, Entscheidung 17.11.2026, Change
   `asthqrqj-anlegen-vereinheitlichen`, design.md D4): vier Felder untereinander, weil die
