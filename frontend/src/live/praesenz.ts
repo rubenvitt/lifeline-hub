@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { ApiError, apiSend, apiSendKeepalive } from '../api/client';
 import type { PraesenzObjekt, PraesenzStand } from '../api/types';
 import { useAuthOptional } from '../auth/AuthContext';
+import { neueClientId } from '../offline/clientId';
 import { useOhneVerbindung } from '../offline/verbindung';
 
 /**
@@ -21,10 +22,7 @@ export const PRAESENZ_EREIGNIS = 'praesenz' as const;
 export const PRAESENZ_TAKT_MS = 15_000;
 
 /** Kennung dieses Tabs, einmal je Laden; nie gespeichert. */
-export const FENSTER_ID: string =
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `f-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+export const FENSTER_ID: string = neueClientId();
 
 /** Welche Angaben eine Eingabe bearbeitet. */
 export type PraesenzSchluessel = {
@@ -69,28 +67,28 @@ export function praesenzListener(einsatzId: number): [string, EventListener][] {
 
 /**
  * Wer außer diesem Fenster die Angabe gerade bearbeitet. `feld` grenzt auf eine Zeile ein; ohne
- * zählt jede Überschneidung mit `s.felder`. Das eigene Konto in einem anderen Fenster ist `du`.
+ * zählt jede Überschneidung mit `s.felder`. Das eigene Konto in einem anderen Fenster ist `eigenesKonto`.
  */
 export function praesenzAnderer(
   stand: PraesenzStand | undefined,
   s: PraesenzSchluessel,
   feld: string | undefined,
   benutzerId: number | undefined,
-): { andere: string[]; du: boolean } {
+): { andere: string[]; eigenesKonto: boolean } {
   const andere: string[] = [];
-  let du = false;
+  let eigenesKonto = false;
   for (const e of stand?.eintraege ?? []) {
     if (e.objekt !== s.objekt) continue;
     if ((e.einheit_id ?? undefined) !== s.einheitId) continue;
     const trifft = feld ? e.felder.includes(feld) : e.felder.some((f) => s.felder.includes(f));
     if (!trifft) continue;
     if (e.benutzer_id === benutzerId) {
-      if (e.fenster !== FENSTER_ID) du = true;
+      if (e.fenster !== FENSTER_ID) eigenesKonto = true;
       continue;
     }
     if (!andere.includes(e.von)) andere.push(e.von);
   }
-  return { andere, du };
+  return { andere, eigenesKonto };
 }
 
 function abonnieren(h: () => void): () => void {
@@ -105,7 +103,7 @@ function abonnieren(h: () => void): () => void {
 export function usePraesenzAnderer(
   s: PraesenzSchluessel | undefined,
   feld?: string,
-): { andere: string[]; du: boolean } {
+): { andere: string[]; eigenesKonto: boolean } {
   const benutzerId = useAuthOptional()?.benutzer?.id;
   const ohneNetz = useOhneVerbindung();
   const stand = useSyncExternalStore(abonnieren, () => (s ? staende.get(s.einsatzId) : undefined));
@@ -113,22 +111,23 @@ export function usePraesenzAnderer(
   return praesenzAnderer(stand, s, feld, benutzerId);
 }
 
-const KEINE = { andere: [] as string[], du: false };
+const KEINE = { andere: [] as string[], eigenesKonto: false };
 
 /**
  * Der Satz am Feld (Entwurf D6); `null`, wenn niemand sonst bearbeitet.
  */
-export function praesenzSatz(andere: readonly string[], du: boolean): string | null {
-  const dich = 'von dir in einem anderen Fenster';
-  if (andere.length === 0) return du ? `Wird gerade ${dich} bearbeitet` : null;
+export function praesenzSatz(andere: readonly string[], eigenesKonto: boolean): string | null {
+  // Ohne Anrede (LLH-1830, `src/anredeText.guard.test.ts`).
+  const anderesFenster = 'in einem anderen Fenster dieses Kontos';
+  if (andere.length === 0) return eigenesKonto ? `Wird gerade ${anderesFenster} bearbeitet` : null;
   const namen =
     andere.length === 1
       ? andere[0]
       : andere.length === 2
         ? `${andere[0]} und ${andere[1]}`
         : `${andere[0]} und ${andere.length - 1} weiteren`;
-  return du
-    ? `Wird gerade bearbeitet von ${namen} und ${dich}`
+  return eigenesKonto
+    ? `Wird gerade bearbeitet von ${namen} und ${anderesFenster}`
     : `Wird gerade bearbeitet von ${namen}`;
 }
 

@@ -7,14 +7,14 @@ import { einsatzPerApi } from './einsatz-kern';
  * `docs/superpowers/specs/2026-11-19-errkrb6m-praesenzanzeige-design.md`): A öffnet eine Angabe,
  * B sieht daran „Wird gerade … bearbeitet“; schließt A, verschwindet der Hinweis bei B. Über zwei
  * Browserkontexte mit demselben Konto: das ist der Ablauf über Live-Strom und zwei Tabs, den nur
- * der Browser zeigt (Wortlaut „von dir in einem anderen Fenster“).
+ * der Browser zeigt (Wortlaut „in einem anderen Fenster dieses Kontos“).
  *
  * Diskriminierend: ohne Meldung beim Öffnen oder ohne Verteilung im Strom erscheint bei B nichts;
  * ohne Ende beim Abbrechen bliebe der Hinweis 45 s stehen und die Frist unten liefe ab.
  */
 const ADMIN = 'admin';
 const ADMIN_PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const HINWEIS = 'Wird gerade von dir in einem anderen Fenster bearbeitet';
+const HINWEIS = 'Wird gerade in einem anderen Fenster dieses Kontos bearbeitet';
 
 async function zweiterKontext(
   browser: Browser,

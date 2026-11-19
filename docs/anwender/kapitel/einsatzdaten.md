@@ -159,8 +159,8 @@ Für die Einsatzleitung:
   dem Anlegen niemand geändert hat, trägt keinen Vermerk.
 - Hat eine andere Person eine Angabe gerade offen, steht an deren Stelle „Wird gerade bearbeitet
   von …“, bis sie speichert oder abbricht, spätestens eine Minute nach dem Schließen ihres Tabs.
-  Ist es das eigene Konto in einem anderen Fenster, heißt es „Wird gerade von dir in einem anderen
-  Fenster bearbeitet“. Der Hinweis sperrt nichts: speichern kann jeder, die Rückfrage
+  Ist es das eigene Konto in einem anderen Fenster, heißt es „Wird gerade in einem anderen Fenster
+  dieses Kontos bearbeitet“. Der Hinweis sperrt nichts: speichern kann jeder, die Rückfrage
   „Zwischenzeitlich geändert“ bleibt das Netz. Gekoppelte Geräte zeigen und melden ihn nicht.
 - „Bezeichnung“ und „Alarmzeit“ sind Pflicht: leer gespeichert bleibt der bisherige Wert stehen,
   und die Zeile sagt, dass die Angabe Pflicht ist.

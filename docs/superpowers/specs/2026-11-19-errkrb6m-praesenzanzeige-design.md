@@ -21,7 +21,7 @@ und keine Sperre.
   (`einsatz`), eigene Führungsstelle (`fuehrungsstelle`) und Einheit (`einheit`). Die Feldnamen
   sind dieselben Wire-Namen wie beim Vermerk.
 - Dasselbe Konto in einem anderen Fenster oder auf einem anderen Gerät erscheint als „Wird gerade
-  von dir in einem anderen Fenster bearbeitet“.
+  in einem anderen Fenster dieses Kontos bearbeitet“.
 
 ## Nicht-Ziele
 
@@ -188,7 +188,7 @@ Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3)
   kommt der Stand beim Verbinden.
 - **Lesen:** Der Hook `usePraesenz(einsatzId, schluessel)` liefert die fremden Bearbeiter dieser
   Angabe. Das eigene Fenster ist ausgenommen. Dasselbe Konto in einem anderen Fenster wird als
-  „du“ markiert.
+  eigenes Konto (`eigenesKonto`) markiert.
 
 ### D6 Anzeige
 
@@ -198,8 +198,9 @@ Reihenfolgeproblem, kein Nachreichen, und die Liste ist klein (Grenzen unter D3)
 - Wortlaut:
   - eine fremde Person: „Wird gerade bearbeitet von Anna“
   - mehrere: „Wird gerade bearbeitet von Anna und Ben“, ab drei „von Anna und 2 weiteren“
-  - eigenes Konto anderswo: „Wird gerade von dir in einem anderen Fenster bearbeitet“
-  - beides: „Wird gerade bearbeitet von Anna und von dir in einem anderen Fenster“
+  - eigenes Konto anderswo: „Wird gerade in einem anderen Fenster dieses Kontos bearbeitet“
+  - beides: „Wird gerade bearbeitet von Anna und in einem anderen Fenster dieses Kontos“
+  *Wortlaut angepasst am 19.11.2026: ohne Anrede (LLH-1830, `frontend/src/anredeText.guard.test.ts`).*
 - **Platz: statt des Vermerks** (entschieden von Ruben, 19.11.2026). Solange jemand anderes die
   Angabe bearbeitet, nimmt der Hinweis die Zeile von „Geändert von …“ ein; danach kehrt der Vermerk
   zurück. So springt in der Regel nichts. Hat die Angabe noch keinen Vermerk, kommt eine Zeile
@@ -246,7 +247,7 @@ einem Baustein, damit Takt und Abmelden nur an einer Stelle leben.*
   Präsenzrahmen mit `id:`.
 - Kontrakte: `live_event_wire`, `liveEvent.contract.test.ts` (`NICHT_REGISTRY` um `praesenz`),
   Wire-Kontrakt des neuen Enums, Gate-Pins.
-- Frontend: Hook und Store (eigenes Fenster ausgenommen, „du“ erkannt, Leeren beim Abbruch), Takt
+- Frontend: Hook und Store (eigenes Fenster ausgenommen, eigenes Konto erkannt, Leeren beim Abbruch), Takt
   von `InlineAngabe` (PUT bei Öffnen, alle 15 s, DELETE bei Schließen, nichts ohne Netz) mit
   Fake-Timern, Wortlaute.
 - e2e: zwei Kontexte, A öffnet „Leitstellen-Nr.“, B sieht den Hinweis, A schließt, der Hinweis

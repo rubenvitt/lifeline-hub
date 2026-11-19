@@ -21,7 +21,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/errkrb6mxojuxpps7hljdbtt
 - Feldlisten: `einsatz` = `bezeichnung, stichwort, einsatzart, leitstellen_nr, einsatzort, einsatzort_koordinate, meldende_stelle, sachverhalt`; `einheit` = `name, typ_id, funkrufname, abschnitt_id, ueber_einheit_id, fuehrer_id, soll, quali_soll, bemerkung, verbindungen`; `fuehrungsstelle` = `art, bezeichnung, standort_adresse, standort_koordinate, rufname, verbindungen, fahrzeug_ids, einsatzleiter`.
 - Wire-Name `praesenz`, SSE-Frame **ohne** `id:`; Daten `{"einsatz_id":…,"eintraege":[{objekt,einheit_id?,felder,benutzer_id,von,fenster}]}`.
 - Geräte senden (Route verboten) und empfangen (kein Teilstrom) keine Präsenz; Org-Strom bekommt keine.
-- Wortlaute exakt: „Wird gerade bearbeitet von Anna“, „… von Anna und Ben“, „… von Anna und 2 weiteren“, „Wird gerade von dir in einem anderen Fenster bearbeitet“, „Wird gerade bearbeitet von Anna und von dir in einem anderen Fenster“.
+- Wortlaute exakt: „Wird gerade bearbeitet von Anna“, „… von Anna und Ben“, „… von Anna und 2 weiteren“, „Wird gerade in einem anderen Fenster dieses Kontos bearbeitet“, „Wird gerade bearbeitet von Anna und in einem anderen Fenster dieses Kontos“ (ohne Anrede, LLH-1830).
 - Anzeige: Rolle `meta`, Farbrolle `text`; ersetzt die `VermerkZeile`, solange Präsenz besteht; `data-lfh="feld-praesenz"`; keine Live-Region.
 - Bezeichner: Fachbegriffe deutsch, Technik englisch (`AGENTS.md`, LFH-1312); Prosa deutsch.
 - Gate vor dem PR: `./scripts/check-all.sh --geaendert --ohne-e2e`; nach DTO-/Enum-Änderung `scripts/check-typ-codegen.sh`.
@@ -31,7 +31,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/errkrb6mxojuxpps7hljdbtt
 1. **Tab stürzt ab, ohne `pagehide`:** Der Hinweis bei anderen verschwindet nach höchstens 45 s + 5 s. Test in Task 1 (`raeume_entfernt_abgelaufene_und_meldet_einsatz`).
 2. **Strom bricht ab und baut neu auf:** Der Store wird geleert, und der Stand beim Verbinden füllt ihn neu. Kein Geisterhinweis aus der alten Verbindung. Tests in Task 4 (`leert_stand_bei_abbruch`) und Task 2 (`neuer_strom_bekommt_stand_beim_verbinden`).
 3. **Leser ohne Modul `einheiten`:** Er bekommt keinen Einheit-Eintrag, auch nicht im Stand beim Verbinden. Test in Task 2 (`ohne_einheiten_kein_einheit_eintrag`).
-4. **Dasselbe Konto in zwei Fenstern an derselben Angabe:** Das eigene Fenster sieht „von dir in einem anderen Fenster“ und nie sich selbst. Test in Task 4 (`eigenes_fenster_ausgenommen_anderes_ist_du`).
+4. **Dasselbe Konto in zwei Fenstern an derselben Angabe:** Das eigene Fenster sieht „in einem anderen Fenster dieses Kontos“ und nie sich selbst. Test in Task 4 (`eigenes_fenster_ausgenommen_anderes_ist_du`).
 5. **Fenster wechselt die Angabe, ohne zu schließen** (Sperre, Navigation): Der alte Eintrag verschwindet, weil das Fenster nur einen Eintrag hat. Test in Task 1 (`zweites_put_ersetzt_eintrag_des_fensters`).
 
 ---
@@ -134,9 +134,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/errkrb6mxojuxpps7hljdbtt
   - `export const FENSTER_ID: string` (einmal je Tab, `crypto.randomUUID()`)
   - `export function praesenzListener(einsatzId: number): [string, EventListener][]`
   - `export function leerePraesenz(einsatzId: number): void`
-  - `export function usePraesenzAnderer(s: PraesenzSchluessel, feld?: string): { andere: string[]; du: boolean }` (`feld` grenzt auf eine Zeile ein; ohne `feld` zählt jede Überschneidung mit `s.felder`; eigener Eintrag = `benutzer_id === me && fenster === FENSTER_ID` ausgenommen; `du` = `benutzer_id === me && fenster !== FENSTER_ID`; Namen eindeutig, Reihenfolge wie Wire)
+  - `export function usePraesenzAnderer(s: PraesenzSchluessel, feld?: string): { andere: string[]; eigenesKonto: boolean }` (`feld` grenzt auf eine Zeile ein; ohne `feld` zählt jede Überschneidung mit `s.felder`; eigener Eintrag = `benutzer_id === me && fenster === FENSTER_ID` ausgenommen; `eigenesKonto` = `benutzer_id === me && fenster !== FENSTER_ID`; Namen eindeutig, Reihenfolge wie Wire)
   - `export function meldePraesenz(s: PraesenzSchluessel): Promise<void>` (PUT über `apiSend`, Fehler verschluckt) und `export function beendePraesenz(s: PraesenzSchluessel, beimVerlassen?: boolean): void` (DELETE über `apiSend` bzw. `apiSendKeepaliveMethode`)
-  - `export function praesenzSatz(andere: string[], du: boolean): string | null` (Wortlaute aus Global Constraints)
+  - `export function praesenzSatz(andere: string[], eigenesKonto: boolean): string | null` (Wortlaute aus Global Constraints)
 
 - [ ] **Step 1: Tests schreiben** (`praesenz.test.ts`)
   - `praesenzSatz`: alle fünf Wortlaute exakt, `([], false)` → `null`.

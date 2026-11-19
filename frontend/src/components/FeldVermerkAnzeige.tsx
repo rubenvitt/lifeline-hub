@@ -30,8 +30,8 @@ export function VermerkZeile({
 }) {
   const satz = useVermerkSatz();
   const { rollen } = useRollen();
-  const { andere, du } = usePraesenzAnderer(praesenz, feld);
-  if (!vermerk || praesenzSatz(andere, du) !== null) return null;
+  const { andere, eigenesKonto } = usePraesenzAnderer(praesenz, feld);
+  if (!vermerk || praesenzSatz(andere, eigenesKonto) !== null) return null;
   return (
     <div style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
       <span data-lfh="feld-vermerk">{satz('Geändert', vermerk)}</span>
@@ -65,8 +65,8 @@ export function PraesenzZeile({
   feld?: string;
 }) {
   const { rollen } = useRollen();
-  const { andere, du } = usePraesenzAnderer(praesenz, feld);
-  const satz = praesenzSatz(andere, du);
+  const { andere, eigenesKonto } = usePraesenzAnderer(praesenz, feld);
+  const satz = praesenzSatz(andere, eigenesKonto);
   if (satz === null) return null;
   return (
     <div id={id} data-lfh="feld-praesenz" style={{ ...schriftStil('meta'), color: rollen.text }}>

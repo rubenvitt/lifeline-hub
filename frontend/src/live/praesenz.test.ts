@@ -56,20 +56,25 @@ describe('praesenzSatz', () => {
     expect(praesenzSatz(['Anna', 'Ben', 'Cem'], false)).toBe(
       'Wird gerade bearbeitet von Anna und 2 weiteren',
     );
-    expect(praesenzSatz([], true)).toBe('Wird gerade von dir in einem anderen Fenster bearbeitet');
+    expect(praesenzSatz([], true)).toBe(
+      'Wird gerade in einem anderen Fenster dieses Kontos bearbeitet',
+    );
     expect(praesenzSatz(['Anna'], true)).toBe(
-      'Wird gerade bearbeitet von Anna und von dir in einem anderen Fenster',
+      'Wird gerade bearbeitet von Anna und in einem anderen Fenster dieses Kontos',
     );
   });
 });
 
 describe('praesenzAnderer', () => {
-  it('nimmt das eigene Fenster aus und erkennt das eigene Konto in einem anderen als „du“', () => {
+  it('nimmt das eigene Fenster aus und erkennt das eigene Konto in einem anderen Fenster', () => {
     const s = stand([
       eintrag(ICH, FENSTER_ID, ['leitstellen_nr']),
       eintrag(ICH, 'anderes-fenster', ['leitstellen_nr']),
     ]);
-    expect(praesenzAnderer(s, leitstelle, undefined, ICH)).toEqual({ andere: [], du: true });
+    expect(praesenzAnderer(s, leitstelle, undefined, ICH)).toEqual({
+      andere: [],
+      eigenesKonto: true,
+    });
   });
 
   it('trifft eine Zeile, deren Feld in den Feldern eines Eintrags steht', () => {

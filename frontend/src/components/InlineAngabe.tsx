@@ -544,8 +544,9 @@ export function InlineAngabe<T>({
   }, [bearbeitet, praesenzText, ohneNetz]);
   const praesenzId = useId();
   const praesenzZeile = <PraesenzZeile id={praesenzId} praesenz={praesenz} />;
-  const { andere: praesenzAndere, du: praesenzDu } = usePraesenzAnderer(praesenz);
-  const praesenzAktiv = praesenzSatz(praesenzAndere, praesenzDu) !== null;
+  const { andere: praesenzAndere, eigenesKonto: praesenzEigenesKonto } =
+    usePraesenzAnderer(praesenz);
+  const praesenzAktiv = praesenzSatz(praesenzAndere, praesenzEigenesKonto) !== null;
 
   // Ein Ziel im Wertknopf ist verschachteltes Markup; der Aufrufer braucht `bearbeitenDaneben`.
   // Gelesen am DOM, weil die Anzeige ein beliebiger Knoten ist; je Instanz nur einmal.
