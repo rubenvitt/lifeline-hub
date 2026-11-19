@@ -97,6 +97,11 @@ impl EinsatzKontext {
         berechtigung::fordere_schreibrecht(self.rolle)
     }
 
+    /// Erfassungs-Gate: Einsatzleitung, Führungspersonal oder Mitarbeit (LLH-1817).
+    pub fn fordere_erfassungsrecht(&self) -> Result<(), AppError> {
+        berechtigung::fordere_erfassungsrecht(self.rolle)
+    }
+
     /// Schreib-Gate ODER System-Admin der Einsatz-Org (Kopfdaten, Einstellungen, Führungsstelle).
     pub fn fordere_schreibrecht_oder_admin(&self) -> Result<(), AppError> {
         berechtigung::fordere_schreibrecht_oder_admin(
@@ -262,6 +267,64 @@ impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzSchreibfreigabe<M> {
 }
 
 impl<M: ModulMarker> Deref for EinsatzSchreibfreigabe<M> {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}
+
+/// Erfassungs-Gate-Extractor (LLH-1817): wie [`EinsatzSchreibzugriff`], nur mit
+/// `fordere_erfassungsrecht` statt `fordere_schreibrecht`: Org-Floor → Erfassungsrecht →
+/// Modul-Gate `M` → `fordere_aktiv`. Lässt zusätzlich die Rolle Mitarbeit durch, die erfassen,
+/// aber nichts ändern darf. Nur an Handlern der Positivliste, siehe `src/AGENTS.md`,
+/// „Erfassungs-Gate (LLH-1817)“.
+pub struct EinsatzErfassungszugriff<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
+
+impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzErfassungszugriff<M> {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_erfassungsrecht()?;
+        if let Some(key) = M::KEY {
+            ctx.fordere_modul_zugriff(&state.pool, key).await?;
+        }
+        ctx.fordere_aktiv()?;
+        Ok(Self(ctx, PhantomData))
+    }
+}
+
+impl<M: ModulMarker> Deref for EinsatzErfassungszugriff<M> {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}
+
+/// Wie [`EinsatzSchreibfreigabe`] (idempotenter Replay ohne vorgezogene Aktiv-Prüfung, mit
+/// voller Lese-Policy), nur mit `fordere_erfassungsrecht`: Org-Floor → Erfassungsrecht →
+/// Modul-Gate `M` → `fordere_lesezugriff`. Der Handler ruft `fordere_aktiv` nach seinem
+/// Replay-Lookup und vor jedem echten Insert selbst auf.
+pub struct EinsatzErfassungsfreigabe<M: ModulMarker = OhneModul>(
+    pub EinsatzKontext,
+    PhantomData<M>,
+);
+
+impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzErfassungsfreigabe<M> {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_erfassungsrecht()?;
+        if let Some(key) = M::KEY {
+            ctx.fordere_modul_zugriff(&state.pool, key).await?;
+        }
+        ctx.fordere_lesezugriff()?;
+        Ok(Self(ctx, PhantomData))
+    }
+}
+
+impl<M: ModulMarker> Deref for EinsatzErfassungsfreigabe<M> {
     type Target = EinsatzKontext;
     fn deref(&self) -> &EinsatzKontext {
         &self.0

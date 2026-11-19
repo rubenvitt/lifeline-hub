@@ -42,6 +42,9 @@ const SANKTIONIERTE_GATES: &[&str] = &[
     "EinsatzFuehrungszugriff",
     // LLH-1814: Wiederöffnen, Einsatzleitung oder Admin der Einsatz-Org ohne `fordere_aktiv`.
     "EinsatzWiedereroeffnungszugriff",
+    // LLH-1817: Erfassen ohne Schreibrecht (Mitarbeit), nur an der Positivliste.
+    "EinsatzErfassungszugriff",
+    "EinsatzErfassungsfreigabe",
 ];
 
 /// Handler, die BEWUSST nur den Org-Floor (`EinsatzKontext`) ziehen, ohne Read-/Write-
