@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs, frontend/src/stammdaten/SprechgruppenTab.tsx, src/sprechgruppe/repo.rs]
+quellen: [frontend/src/admin/BereitschaftUebersicht.tsx, frontend/src/admin/bereitschaft.ts, src/routes/verwaltung.rs, frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs, frontend/src/stammdaten/SprechgruppenTab.tsx, src/sprechgruppe/repo.rs]
 ---
 
 ## Überblick
@@ -17,9 +17,20 @@ seiner Stammbesetzung. Der Verpflegungsplan nennt die Mahlzeiten eines Einsatzta
 werden aus den Stammdaten Kräfte disponiert und Einträge vorbelegt.
 
 Gepflegt werden die Stammdaten in der Verwaltung unter „Stammdaten“, und zwar nur von
-System-Admins. Führungskräfte der Organisation sehen sie zum Nachschlagen.
+System-Admins. Führungskräfte der Organisation sehen sie zum Nachschlagen. Die Verwaltung öffnet
+mit der „Übersicht“: Sie zählt den Bestand und sagt, was für einen Einsatz noch fehlt.
 
 ## Abläufe
+
+### Prüfen, was für einen Einsatz fehlt
+
+1. Die Verwaltung öffnen. Sie beginnt mit der „Übersicht“.
+2. Den Satz über der Tabelle lesen: „Für einen Einsatz fehlt: …“ nennt die offenen Pflichtpunkte,
+   „Bereit für einen Einsatz.“ heißt, dass keiner offen ist.
+3. In der Tabelle „Bereitschaft“ je Bestand die Zahl und den Zustand ablesen: „fehlt“,
+   „empfohlen“ oder „vorhanden“.
+4. Über den Verweis am Ende der Zeile, etwa „Fahrzeuge ↗“, die passende Seite öffnen und dort
+   anlegen, was fehlt.
 
 ### Ein Fahrzeug anlegen
 
@@ -266,6 +277,19 @@ Die Werte gelten für jeden Einsatz der Organisation, der für diesen Wert nicht
 hat. Wie der Rechner sie nutzt, beschreibt [Betreuung](betreuung.md).
 
 ## Hintergrund
+
+### Was die Übersicht zählt
+
+- **Pflicht für einen Einsatz** sind mindestens ein Benutzer neben der eigenen Person sowie
+  Fahrzeuge oder Personal; eines von beiden genügt.
+- **Empfohlen** sind Einheiten-Vorlagen und Einsatz-Vorlagen. Ist nur Fahrzeuge oder nur Personal
+  vorhanden, steht das andere ebenfalls auf „empfohlen“.
+- Gezählt werden aktive Benutzerkonten ohne gekoppelte Geräte, Fahrzeuge und Personal im Dienst
+  und aktive Einheiten-Vorlagen der eigenen Organisation.
+- **Demo-Daten zählen nicht mit.** Was die Demo-Ausstattung angelegt hat, steht gedämpft als
+  „+ N aus der Demo“ in der Zeile. Eine Organisation mit nur Demo-Daten ist also nicht bereit.
+- Führungskräfte sehen die Übersicht mit allen Zahlen, aber ohne Verweis auf die Benutzer; die
+  Benutzerverwaltung bleibt System-Admins vorbehalten.
 
 ### Wer was darf
 
