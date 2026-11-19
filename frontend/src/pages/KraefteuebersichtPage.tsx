@@ -95,7 +95,8 @@ import StatusWahl from '../components/StatusWahl';
 import { kategorieDarstellung, statusKategorie } from '../theme/statusFarben';
 import Datensicht, { HERVORGEHOBEN, scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { SpaltenSchalter, useSpaltenSchalterZustand } from '../components/SpaltenSchalter';
-import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { ModulGerippeSeite } from '../einsatz/ModulWechselGerippe';
+import { SeitenFehler } from '../components/SeitenZustand';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
@@ -1300,7 +1301,8 @@ export default function KraefteuebersichtPage() {
     if (sprungZeile != null) scrolleZurZeile(sprungZeile);
   }, [sprungZeile]);
 
-  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  // Erstaufruf: Kopf sofort, damit er beim Eintreffen des Einsatzes nicht nachrutscht (LLH-1830).
+  if (einsatzQuery.isLoading) return <ModulGerippeSeite modulKey="kraefteuebersicht" />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
       <SeitenFehler

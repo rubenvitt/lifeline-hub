@@ -1,3 +1,4 @@
+import { modulName } from '../einsatz/modulRegistry';
 import { http, HttpResponse, type RequestHandler } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -192,6 +193,14 @@ function setup(route = '/einsaetze/7/etb', zusatz: RequestHandler[] = []) {
 }
 
 describe('EtbPage', () => {
+  it('LLH-1830: zeigt, solange der Einsatz lädt, schon den Seitenkopf mit Modulnamen', async () => {
+    setup('/einsaetze/7/etb', [http.get('/api/einsaetze/7', () => new Promise<never>(() => {}))]);
+    const gerippe = await screen.findByTestId('modul-gerippe');
+    expect(
+      within(gerippe).getByRole('heading', { level: 1, name: modulName('etb') }),
+    ).toBeInTheDocument();
+  });
+
   it('LFH-611: zeigt die Lesemarke im Rahmen der Zeitachse, über ihr', async () => {
     setupMSW();
     server.use(
@@ -200,7 +209,7 @@ describe('EtbPage', () => {
       ),
     );
     setup();
-    const text = await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    const text = await screen.findByText('4 noch nicht gesichtete Einträge');
     const rahmen = document.querySelector('[data-lfh="etb-zeitachse-rahmen"]')!;
     const banner = text.closest('[data-lfh="sammelbanner"]')!;
     expect(rahmen.contains(banner)).toBe(true);
@@ -221,14 +230,14 @@ describe('EtbPage', () => {
       }),
     ];
     const { unmount } = setup('/einsaetze/7/etb', handler);
-    await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    await screen.findByText('4 noch nicht gesichtete Einträge');
     expect(abrufe.length).toBeGreaterThan(0);
     expect(abrufe.every((s) => s === '?ohne_system=true')).toBe(true);
     unmount();
 
     abrufe.length = 0;
     setup('/einsaetze/7/etb?system=an', handler);
-    await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    await screen.findByText('4 noch nicht gesichtete Einträge');
     expect(abrufe.length).toBeGreaterThan(0);
     expect(abrufe.every((s) => s === '')).toBe(true);
   });
@@ -253,7 +262,7 @@ describe('EtbPage', () => {
     unmount();
 
     setup('/einsaetze/7/etb?typ=meldung', handler);
-    const banner = await screen.findByText(/^1 neuer Eintrag seit Ihrer letzten Sichtung/);
+    const banner = await screen.findByText(/^1 neuer Eintrag seit der letzten Sichtung/);
     expect(screen.getByRole('region', { name: 'Einsatztagebuch' }).contains(banner)).toBe(false);
   });
 
@@ -373,7 +382,7 @@ describe('EtbPage', () => {
     ]);
     const user = userEvent.setup();
     const abfrage = await screen.findByRole('group', {
-      name: 'Mit welchem Rufnamen schreibst du ins ETB?',
+      name: 'Mit welchem Rufnamen ins ETB schreiben?',
     });
     expect(within(abfrage).getByRole('combobox', { name: 'Rufname für Von und An' })).toHaveValue(
       'Florian Leitung',
@@ -417,6 +426,7 @@ describe('EtbPage', () => {
     setup();
     // Der Seitenkopf trägt den Modultitel. Den Einsatz nennt der Pfad nicht, sonst bräche der Kopf
     // bei 1440 px um (Spec `seiten-orientierung`, Ortspfad; gemessen in `e2e/etb-zeilenhoehe`).
+    await waitFor(() => expect(screen.queryByTestId('modul-gerippe')).not.toBeInTheDocument());
     expect(await screen.findByRole('heading', { name: 'ETB' })).toBeInTheDocument();
     const pfad = document.querySelector('.lfh-seitenkopf__pfad')!;
     expect(pfad).toHaveTextContent('Einsätze');

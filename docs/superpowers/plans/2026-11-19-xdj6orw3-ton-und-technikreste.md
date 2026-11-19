@@ -68,23 +68,23 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xdj6orw3n3wzx7b7rb543ihi
 
 **Interfaces:** keine.
 
-- [ ] **Step 1: Wächtertest schreiben**: `anredeText.guard.test.ts` liest per `import.meta.glob`
+- [x] **Step 1: Wächtertest schreiben**: `anredeText.guard.test.ts` liest per `import.meta.glob`
   (`?raw`) alle `.ts/.tsx` unter `src/` außer Tests und `api/types.generated.ts`. Er entfernt
   Kommentare (`//…`, `/* … */`) und prüft, dass in Zeichenketten- und JSX-Text kein Treffer auf
   `/\b(du|dein\w*|dich|dir|Sie|Ihr(e[nmrs]?)?|Ihnen)\b/` steht. Eine Ausnahmeliste gibt es nur
   für ein „Sie“ am Satzanfang, das sich auf eine Sache bezieht (die zwei Stellen in
   `ExterneStellenTab.tsx`, `AnbindungWebhook.tsx:424`), je mit Begründung.
-- [ ] **Step 2: Test rot sehen**: `mise exec -- pnpm -C frontend exec vitest run src/anredeText.guard.test.ts`. Erwartet: FAIL mit der Liste der Stellen aus der Tabelle des Design-Docs.
-- [ ] **Step 3: Texte ändern** nach der Tabelle des Design-Docs und den Begriffen oben.
+- [x] **Step 2: Test rot sehen**: `mise exec -- pnpm -C frontend exec vitest run src/anredeText.guard.test.ts`. Erwartet: FAIL mit der Liste der Stellen aus der Tabelle des Design-Docs.
+- [x] **Step 3: Texte ändern** nach der Tabelle des Design-Docs und den Begriffen oben.
   lesemarkeModell: `1 noch nicht gesichteter Eintrag` / `${n} noch nicht gesichtete Einträge`,
   `${menge} seit der letzten Sichtung ${wann}`.
-- [ ] **Step 4: Regel eintragen** in `frontend/AGENTS.md` (Text aus dem Design-Doc, Teil 1,
+- [x] **Step 4: Regel eintragen** in `frontend/AGENTS.md` (Text aus dem Design-Doc, Teil 1,
   „Regel“, mit Verweis auf den Wächter). In `docs/anwender/AGENTS.md:53` auf diese Regel
   verweisen.
-- [ ] **Step 5: Tests grün**: Wächter plus die betroffenen Unit-Tests (`vitest run` auf die
+- [x] **Step 5: Tests grün**: Wächter plus die betroffenen Unit-Tests (`vitest run` auf die
   geänderten Dateien), dazu `grep -rn` auf die alten Texte in `frontend/e2e` und den Docs. Alle
   Treffer sind nachgezogen.
-- [ ] **Step 6: Commit** `feat: unpersönliche Anrede und einheitliche Begriffe (LLH-1830)`
+- [x] **Step 6: Commit** `feat: unpersönliche Anrede und einheitliche Begriffe (LLH-1830)`
 
 ### Task 2: Neutrale JSON-Ablehnung
 
@@ -96,20 +96,20 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xdj6orw3n3wzx7b7rb543ihi
 - Produces: `pub const EINGABE_FORMAT_TEXT: &str` in `src/extract.rs` (der Text aus Global
   Constraints)
 
-- [ ] **Step 1: Test schreiben**: In `falscher_feldtyp_liefert_400_im_fehler_envelope` und
+- [x] **Step 1: Test schreiben**: In `falscher_feldtyp_liefert_400_im_fehler_envelope` und
   `kaputtes_json_liefert_400_im_fehler_envelope` jeweils
   `assert_eq!(json["error"], EINGABE_FORMAT_TEXT)` und
   `assert!(!json["error"].as_str().unwrap().contains("deserialize"))`. Dasselbe für
   `fehlender_content_type_liefert_fehler_envelope`.
-- [ ] **Step 2: Rot sehen**: `cargo test --test fehler_vertrag`. Erwartet: FAIL, weil der Text
+- [x] **Step 2: Rot sehen**: `cargo test --test fehler_vertrag`. Erwartet: FAIL, weil der Text
   abweicht.
-- [ ] **Step 3: Umbauen**: Alle vier 400-Arme geben `AppError::Validation(EINGABE_FORMAT_TEXT.into())`
+- [x] **Step 3: Umbauen**: Alle vier 400-Arme geben `AppError::Validation(EINGABE_FORMAT_TEXT.into())`
   zurück, vorher `tracing::warn!(art = "<Variante>", detail = %rejection, "JSON-Body abgelehnt")`.
   Der 413-Arm und der `Internal`-Arm bleiben. Den Doc-Kommentar anpassen. `PfadParam` und
   Query-Extraktor prüfen: Bleibt deren Text deutsch und ohne serde-Inhalt, keine Änderung, sonst
   gleich behandeln.
-- [ ] **Step 4: Grün**: `cargo test --test fehler_vertrag --test client_fehler --test body_limit`.
-- [ ] **Step 5: Commit** `fix: JSON-Ablehnung ohne serde-Text (LLH-1830)`
+- [x] **Step 4: Grün**: `cargo test --test fehler_vertrag --test client_fehler --test body_limit`.
+- [x] **Step 5: Commit** `fix: JSON-Ablehnung ohne serde-Text (LLH-1830)`
 
 ### Task 3: e2e-Messung für den Erstaufruf (rot)
 
@@ -120,7 +120,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xdj6orw3n3wzx7b7rb543ihi
 - Consumes: `beobachteShifts`, `ruheShifts`, `bericht` aus `e2e/cls-kern.ts`;
   `anmeldenAlsAdmin` aus `e2e/rollen-kern.ts`.
 
-- [ ] **Step 1: Spec schreiben**:
+- [x] **Step 1: Spec schreiben**:
   - Einsatz per API anlegen. Dazu Daten säen, damit die Inhalte Höhe haben: 3 ETB-Einträge,
     2 Betroffene und eine Einheit samt Personal, über die vorhandenen API-Routen, wie es andere
     Specs tun.
@@ -130,8 +130,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xdj6orw3n3wzx7b7rb543ihi
     `rahmen-cls-dichte.spec.ts` `measure`.
   - `expect.soft(m.summe).toBeLessThan(0.1)`.
   - Zweiter Test bei 1024×768 nur für `personen`.
-- [ ] **Step 2: Rot sehen**: `cargo build`, dann im Ordner `frontend/` `mise exec -- pnpm exec playwright test e2e/erstaufruf-cls.spec.ts --trace off`. Erwartet: FAIL. Den Bericht der Quellen ins Ledger übernehmen, er zeigt, was springt.
-- [ ] **Step 3: Commit** (rot ist erlaubt, nur lokal; zusammen mit Task 4 pushen) `test: CLS beim Erstaufruf messen (LLH-1830)`
+- [x] **Step 2: Rot sehen**: `cargo build`, dann im Ordner `frontend/` `mise exec -- pnpm exec playwright test e2e/erstaufruf-cls.spec.ts --trace off`. Erwartet: FAIL. Den Bericht der Quellen ins Ledger übernehmen, er zeigt, was springt.
+- [x] **Step 3: Commit** (rot ist erlaubt, nur lokal; zusammen mit Task 4 pushen) `test: CLS beim Erstaufruf messen (LLH-1830)`
 
 ### Task 4: Kopf sofort und Gerippe in Zielgröße
 
@@ -150,10 +150,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xdj6orw3n3wzx7b7rb543ihi
   `zielhoehe` setzt `min-height: calc(100dvh - var(--lfh-kopf-oben) - <Seitenkopfhöhe>)` über
   eine CSS-Klasse mit Luft-Token. Der Wert kommt aus dem gemessenen Kopf, nicht als Zahl im TSX.
 
-- [ ] **Step 1: Unit-Test**: Die drei Seiten zeigen bei ladendem Einsatz `data-testid="modul-gerippe"`
+- [x] **Step 1: Unit-Test**: Die drei Seiten zeigen bei ladendem Einsatz `data-testid="modul-gerippe"`
   mit `h1` = Modulname (`Meldebild`/`ETB`/`Betroffene`, wie `modulName`).
-- [ ] **Step 2: Rot sehen** (vitest auf die drei Seiten-Tests).
-- [ ] **Step 3: Umsetzen**:
+- [x] **Step 2: Rot sehen** (vitest auf die drei Seiten-Tests).
+- [x] **Step 3: Umsetzen**:
   - Frühausstiege geben `<ModulGerippeSeite modulKey="kraefteuebersicht|etb|personen" />`
     zurück.
   - Die inneren Ladezustände bekommen `zielhoehe`: `EtbZeitachse` ladend und die Karten- und
@@ -162,12 +162,12 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/xdj6orw3n3wzx7b7rb543ihi
   - Betroffene bekommt `metaPlatzhalter` wie das ETB (`EtbPage.tsx:1132-1140`).
   - Die Lesemarke-Zeile im ETB wird reserviert, solange die Abfrage lädt.
   - Die Sichtungszeile in Betroffene steht ab dem ersten Bild.
-- [ ] **Step 4: Grün**: vitest auf die geänderten Dateien, dann die e2e-Specs aus Task 3 sowie
+- [x] **Step 4: Grün**: vitest auf die geänderten Dateien, dann die e2e-Specs aus Task 3 sowie
   `rahmen-cls-dichte`, `betroffene-layout`, `modulwechsel*` (vorhandene Gerippe-Specs per
   `ls e2e | grep -i gerippe`).
-- [ ] **Step 5: Regel**: `frontend/AGENTS.md` nach Design-Doc Teil 3, Punkt 4. Zunder-Nachzug
+- [x] **Step 5: Regel**: `frontend/AGENTS.md` nach Design-Doc Teil 3, Punkt 4. Zunder-Nachzug
   für die übrigen Modulseiten mit nacktem Frühausstieg (Skill `zunder-task-anlegen`).
-- [ ] **Step 6: Commit** `fix: Seitenkopf und Gerippe in Zielgröße beim Erstaufruf (LLH-1830)`
+- [x] **Step 6: Commit** `fix: Seitenkopf und Gerippe in Zielgröße beim Erstaufruf (LLH-1830)`
 
 ### Task 5: Abschluss
 
