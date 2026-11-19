@@ -100,26 +100,6 @@ export function sichtFuerNeuePerson(sicht: PersonenSicht, p: Person): PersonenSi
   return { ...sicht, filter, nurLuecken };
 }
 
-/**
- * Die Sicht nach einem Sprung von außen (Sprungmarken „Patienten"/„Vermisste", `?abgeschlossen=1`).
- * Übernommen wird nur, was die Vorgabe nennt. Der Lücken-Filter fällt IMMER: ein stehen
- * gebliebenes „nur offene Felder" zeigte still eine Teilmenge, und der Schalter ist unter `xl`
- * nicht im Blick. „Abgeschlossene zeigen“ steht nach einem Sprung nur, wenn die Vorgabe es nennt.
- * Ohne Vorgabe bleibt die Sicht identisch, damit kein Render entsteht.
- */
-export function sichtNachSprung(
-  sicht: PersonenSicht,
-  vorgabe: { filter?: PersonenFilter; ansicht?: PersonenAnsicht; abgeschlossen?: boolean },
-): PersonenSicht {
-  if (!vorgabe.filter && !vorgabe.ansicht && !vorgabe.abgeschlossen) return sicht;
-  return {
-    ansicht: vorgabe.ansicht ?? sicht.ansicht,
-    filter: vorgabe.filter ?? sicht.filter,
-    nurLuecken: false,
-    abgeschlossen: vorgabe.abgeschlossen ?? false,
-  };
-}
-
 /** Rasterschlüssel einer Person: ihre Sichtung oder `'ohne'`. */
 export function rasterSchluessel(p: Pick<Person, 'aktuelle_sichtung'>): string {
   return p.aktuelle_sichtung ?? 'ohne';

@@ -78,7 +78,9 @@ const lage = (over: Partial<LageMeldung> = {}): LageMeldung => ({
 
 /** Die Adresse der Seite, für den Zeitraum (LLH-1322). */
 function Adresse() {
-  return <output data-testid="adresse">{decodeURIComponent(useLocation().search)}</output>;
+  // `URLSearchParams` schreibt das Leerzeichen als `+` (Filter in der Adresse, LLH-1826).
+  const search = useLocation().search.replace(/\+/g, ' ');
+  return <output data-testid="adresse">{decodeURIComponent(search)}</output>;
 }
 
 function renderPage(
@@ -897,5 +899,45 @@ describe('LagemeldungenPage', () => {
       expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /bearbeiten/i })).toBeNull();
     });
+  });
+});
+
+/** LLH-1826: Ort, Herkunft und Suche stehen neben dem Zeitraum in der Adresse. */
+describe('LagemeldungenPage — Filter in der Adresse (LLH-1826)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ladeEinsatz.mockResolvedValue(einsatz('beobachter'));
+    ladeModulFreigaben.mockResolvedValue({});
+    listeLageMeldungen.mockResolvedValue([lage()]);
+  });
+  const adresse = () => screen.getByTestId('adresse').textContent;
+
+  it('Ort und Herkunft stehen nach der Wahl in der Adresse', async () => {
+    renderPage();
+    await waehle('Ort', 'Mit Koordinaten');
+    await vi.waitFor(() => expect(adresse()).toBe('?ort=mit'));
+    await waehle('Herkunft', 'Übernommen');
+    await vi.waitFor(() => expect(adresse()).toBe('?ort=mit&herkunft=uebernommen'));
+  });
+
+  it('eine Adresse mit Ort, Herkunft und Suche zeigt sie gesetzt', async () => {
+    renderPage('/einsaetze/1/lagemeldungen?ort=ohne&herkunft=geraet&q=Deich');
+    expect(await screen.findByRole('searchbox', { name: 'Suche in Lagemeldungen' })).toHaveValue(
+      'Deich',
+    );
+    expect(screen.getByRole('combobox', { name: 'Ort' }).closest('.ant-select')).toHaveTextContent(
+      'Ohne Koordinaten',
+    );
+    expect(
+      screen.getByRole('combobox', { name: 'Herkunft' }).closest('.ant-select'),
+    ).toHaveTextContent('Gerät');
+  });
+
+  it('die Wahl eines Zeitraums lässt den Ort in der Adresse stehen', async () => {
+    renderPage('/einsaetze/1/lagemeldungen?ort=mit');
+    await screen.findByRole('searchbox', { name: 'Suche in Lagemeldungen' });
+    await userEvent.click(screen.getByRole('button', { name: 'Zeitraum' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Letzte Stunde' }));
+    await vi.waitFor(() => expect(adresse()).toMatch(/^\?ort=mit&von=/));
   });
 });

@@ -1414,3 +1414,19 @@ describe('TierePage · Sortieren und Filtern (LLH-1096)', () => {
     expect(screen.queryByText('T-001')).toBeNull();
   });
 });
+
+/** LLH-1826: der Reiter steht in der Adresse und überlebt Weg und Zurück. */
+describe('TierePage — Reiter in der Adresse (LLH-1826)', () => {
+  it('die Wahl „Vermisst“ steht in der Adresse, die Vorgabe nicht', async () => {
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('radio', { name: 'Vermisst' }));
+    await waitFor(() => expect(screen.getByTestId('suche').textContent).toBe('?sicht=vermisst'));
+    await userEvent.click(screen.getByRole('radio', { name: 'Offen' }));
+    await waitFor(() => expect(screen.getByTestId('suche').textContent).toBe(''));
+  });
+
+  it('?sicht=alle zeigt den Reiter „Alle“', async () => {
+    render(einsatzAktiv, [], '/einsaetze/1/tiere?sicht=alle');
+    expect(await screen.findByRole('radio', { name: 'Alle' })).toBeChecked();
+  });
+});

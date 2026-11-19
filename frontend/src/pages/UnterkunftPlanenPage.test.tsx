@@ -222,3 +222,45 @@ describe('UnterkunftPlanenPage', () => {
     expect(zeile).toHaveTextContent('Einsatz · 4 m² (Vorgabe)');
   });
 });
+
+/** LLH-1826: die Ansicht steht in der Adresse und überlebt Weg und Zurück. */
+describe('UnterkunftPlanenPage — Ansicht in der Adresse (LLH-1826)', () => {
+  function Suche() {
+    return <span data-testid="suche">{useLocation().search}</span>;
+  }
+  function mitSuche(route: string) {
+    return renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/betreuung/:stelleId/unterkunft"
+          element={
+            <>
+              <Suche />
+              <UnterkunftPlanenPage />
+            </>
+          }
+        />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it('„Richtwerte“ steht in der Adresse, „Rechner“ nicht', async () => {
+    stelleBereit();
+    mitSuche('/einsaetze/1/betreuung/8/unterkunft');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Richtwerte' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche').textContent).toBe('?ansicht=richtwerte'),
+    );
+    await userEvent.click(screen.getByRole('tab', { name: 'Rechner' }));
+    await waitFor(() => expect(screen.getByTestId('suche').textContent).toBe(''));
+  });
+
+  it('?ansicht=richtwerte zeigt die Richtwerte', async () => {
+    stelleBereit();
+    mitSuche('/einsaetze/1/betreuung/8/unterkunft?ansicht=richtwerte');
+    expect(
+      await screen.findByRole('tab', { name: 'Richtwerte', selected: true }),
+    ).toBeInTheDocument();
+  });
+});

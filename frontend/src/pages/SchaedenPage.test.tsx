@@ -1094,3 +1094,44 @@ describe('SchaedenPage — Gefahr und CSV (LLH-1115)', () => {
     expect(speichern).not.toHaveBeenCalled();
   });
 });
+
+/** LLH-1826: der Reiter steht in der Adresse und überlebt Weg und Zurück. */
+describe('SchaedenPage — Reiter in der Adresse (LLH-1826)', () => {
+  function Ort() {
+    return <output data-testid="ort">{useLocation().search}</output>;
+  }
+  function renderMitOrt(route = '/einsaetze/1/schaeden') {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      ...schaedenAttrappe(1, () => []).handler,
+    );
+    return renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/schaeden"
+          element={
+            <>
+              <Ort />
+              <SchaedenPage />
+            </>
+          }
+        />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it('die Wahl „Übergeben“ steht in der Adresse, die Vorgabe nicht', async () => {
+    renderMitOrt();
+    await userEvent.click(await screen.findByRole('radio', { name: /^Übergeben/ }));
+    await waitFor(() => expect(screen.getByTestId('ort').textContent).toBe('?sicht=uebergeben'));
+    await userEvent.click(screen.getByRole('radio', { name: /^Offen/ }));
+    await waitFor(() => expect(screen.getByTestId('ort').textContent).toBe(''));
+  });
+
+  it('?sicht=alle zeigt den Reiter „Alle“', async () => {
+    renderMitOrt('/einsaetze/1/schaeden?sicht=alle');
+    expect(await screen.findByRole('radio', { name: /^Alle/ })).toBeChecked();
+  });
+});

@@ -1218,11 +1218,11 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
   });
 
-  it('?ansicht=organigramm öffnet das Organigramm und räumt den Parameter', async () => {
+  it('?ansicht=organigramm öffnet das Organigramm und bleibt in der Adresse (LLH-1826)', async () => {
     server.use(...handlers(), ...organigrammHandler);
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
     expect(await screen.findByRole('region', { name: 'Organigramm' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+    expect(screen.getByTestId('suche').textContent).toBe('?ansicht=organigramm');
     expect(
       within(screen.getByRole('radiogroup', { name: 'Ansicht' })).getByRole('radio', {
         name: 'Organigramm',
@@ -1230,12 +1230,23 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     ).toBeChecked();
   });
 
-  it('ein unbrauchbarer Wert wird nur geräumt, die Ansicht bleibt Gliederung', async () => {
+  it('ein unbrauchbarer Wert gilt als Gliederung', async () => {
     server.use(...handlers(), ...organigrammHandler);
     rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=quatsch');
-    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
     expect(await screen.findByTestId('abschnitte-gliederung')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Organigramm' })).not.toBeInTheDocument();
+  });
+
+  it('die Wahl des Organigramms steht in der Adresse, die Gliederung nicht (LLH-1826)', async () => {
+    server.use(...handlers(), ...organigrammHandler);
+    rendereMit('/einsaetze/1/einsatzabschnitte');
+    const ansicht = await screen.findByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Organigramm' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche').textContent).toBe('?ansicht=organigramm'),
+    );
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Gliederung' }));
+    await waitFor(() => expect(screen.getByTestId('suche').textContent).toBe(''));
   });
 
   it('der Name eines Abschnitts führt in die Gliederung mit diesem Abschnitt gewählt', async () => {
