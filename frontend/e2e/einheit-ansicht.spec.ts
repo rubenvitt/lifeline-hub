@@ -157,7 +157,8 @@ for (const dichte of DICHTEN) {
       expect(bodies).toEqual([
         {
           pfad: `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/position`,
-          body: { tz_organisation: 'thw' },
+          // Feldvergleich (LLH-1831): der Wert beim Öffnen geht als `erwartet` mit.
+          body: { tz_organisation: 'thw', erwartet: { tz_organisation: null } },
         },
       ]);
 
