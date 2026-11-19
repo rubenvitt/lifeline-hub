@@ -161,6 +161,12 @@ for (const viewport of [
     test('ein Tipp neben das Menü schließt es, ohne zu zeichnen', async ({ page }) => {
       await anmelden(page);
       const einsatzId = await einsatzAnlegen(page, `E2E Werkzeugmenü Außen ${Date.now()}`);
+      // Mit verortetem Einsatzort: sonst läge das Band „Einsatzort fehlt“ (LLH-1953) bei 390 px
+      // auf der freien Karte, die der Tipp hier sucht.
+      const ort = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
+        data: { einsatzort: 'Marktplatz', einsatzort_lat: 53.0775, einsatzort_lon: 8.8 },
+      });
+      expect(ort.ok(), `Einsatzort: ${ort.status()}`).toBeTruthy();
       await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
       const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
       await expect(canvas).toHaveCount(1, { timeout: 60_000 });
