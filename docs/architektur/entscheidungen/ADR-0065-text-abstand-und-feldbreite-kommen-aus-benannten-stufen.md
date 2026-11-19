@@ -1,7 +1,8 @@
 ---
 id: ADR-0065
 titel: Text, Abstand und Feldbreite kommen aus benannten Stufen, die Bausteine nehmen keine Zahl an
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0070
 datum: 2026-11-18
 gilt_fuer:
   - frontend/src/theme/tokens.ts
