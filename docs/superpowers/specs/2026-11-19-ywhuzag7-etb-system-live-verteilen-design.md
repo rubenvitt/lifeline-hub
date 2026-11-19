@@ -190,3 +190,17 @@ Builder je Treffer.
   `publiziere`.
 - Die Reihenfolge: zuerst den Wächter, dann den vollen Testlauf als Liste der Lücken, dann je
   Moduldatei nachziehen.
+
+## Abweichungen in der Umsetzung (19.11.2026)
+
+- Der Wächter heißt `etb::nachlauf::klammer` (statt `pruefe`); seine Tests liegen in
+  `tests/etb_nachlauf.rs`. Der Sammler merkt sich nur ETB-IDs, die Einsatz-ID liest er beim
+  Prüfen aus `etb_eintrag`.
+- Für Ausnahmen, die erst das Ergebnis eines Laufs zeigt (Vollzug eines Einsatz-Löschersuchens),
+  gibt es `nachlauf::ausnehmen` neben `ohne_verteilung`.
+- Die Router-Schicht gibt es nur im Debug-Build (`app::mit_etb_waechter`).
+- Spiegel: Nur der Abgleich (`routes/instanz.rs`, `spiegel_abgleich`) ist ausgenommen. Der
+  Umnummerierungs-Eintrag beim Führungswechsel (`instanz/spiegel/fuehrung.rs`) wird verteilt,
+  über `instanz::fuehrung::notify_wechsel`: der Einsatz ist dann eigen und lesbar.
+- Wo bisher ein Listen-Refresh `LiveEvent::Etb` ohne ID ging (Kategorie-Frist, Löschlauf K1/K2),
+  geht jetzt nur noch das Ereignis mit ID.
