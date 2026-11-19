@@ -10,7 +10,8 @@
 # neuesten iOS-Laufzeit wählen → `xcodebuild test` mit dem Schema `LifelineHub`: App-Tests
 # (ios/AppTests), UI-Tests (ios/AppUITests) und die Suite des Swift-Kerns auf iOS → die
 # Bildschirmbilder der UI-Tests (XCTAttachment) aus dem Ergebnisbündel nach <ausgabe>/bilder
-# (scripts/ios/bilder-ablegen.sh: nur Bilder, Namen ohne Zeichen, die das Artefakt abweist).
+# (scripts/ios/bilder-ablegen.sh: nur Bilder, Namen ohne Zeichen, die das Artefakt abweist). Nach
+# roten Tests stehen sie mit Grund und Gerät im Protokoll (scripts/ios/fehlgruende.sh).
 #
 # Der Simulator braucht keine Signatur (CODE_SIGNING_ALLOWED=NO); signiert wird erst beim
 # Archivieren für TestFlight. Die Bilder werden auch nach roten Tests exportiert; der Exit-Code
@@ -63,9 +64,7 @@ if [ -d "$ERGEBNIS" ]; then
     # Liste hilft nur das herunterzuladende Ergebnisbündel. Scheitert die Ausgabe, bleibt rc.
     echo "==> Fehlgeschlagene Tests (xcresulttool get test-results tests)"
     xcrun xcresulttool get test-results tests --path "$ERGEBNIS" --format json 2> /dev/null \
-      | jq -r '.. | objects | select(.result? == "Failed" and .nodeType? == "Test Case")
-          | "FEHLGESCHLAGEN: \(.nodeIdentifier // .name)",
-            (.children[]? | select(.nodeType? == "Failure Message") | "  \(.name)")' \
+      | "$WURZEL/scripts/ios/fehlgruende.sh" \
       || echo "(Liste nicht lesbar; siehe Artefakt ios-xcresult)"
   fi
   # `export attachments` gibt es ab Xcode 16.3; die Namen stehen in manifest.json.

@@ -342,6 +342,9 @@ schritt_8() {
   # `actions/upload-artifact` das ganze Artefakt abweisen, und eine Debug-Beschreibung ist kein
   # Bild — beides fiele erst auf dem macOS-Runner auf. Ohne Xcode.
   "$ROOT/scripts/ios/bilder-ablegen.test.sh"
+  # Gründe roter Simulator-Tests (LLH-1978): mit iPhone und iPad hängen die Meldungen eine Ebene
+  # tiefer, das Protokoll nannte dann nur die Namen. Ohne Xcode.
+  "$ROOT/scripts/ios/fehlgruende.test.sh"
 }
 
 schritt_9() {
