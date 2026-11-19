@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Flex, Typography, theme } from 'antd';
+import { Button, Flex } from 'antd';
+import { Stapel, Textstufe } from '../components/instrument';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { IconKreuz, IconStandortZiel } from '../icons';
 import {
@@ -32,7 +33,6 @@ export default function StandortFeld({
   disabled?: boolean;
   sofort?: boolean;
 }) {
-  const { token } = theme.useToken();
   const { formatKoordinate, formatDistanz } = useAnzeigeKonventionen();
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -87,7 +87,9 @@ export default function StandortFeld({
       <Flex align="center" gap="small" wrap data-lfh="meldung-standort">
         <IconStandortZiel size={18} />
         <span>{formatKoordinate(value.lat, value.lon)}</span>
-        <Typography.Text type="secondary">± {formatDistanz(value.genauigkeit)}</Typography.Text>
+        <Textstufe stufe="textKlein" ton="gedaempft">
+          ± {formatDistanz(value.genauigkeit)}
+        </Textstufe>
         <Button
           type="text"
           aria-label="Standort entfernen"
@@ -99,7 +101,7 @@ export default function StandortFeld({
     );
   }
   return (
-    <Flex vertical gap={token.marginXS}>
+    <Stapel abstand="xs">
       <Button
         icon={<IconStandortZiel size={18} />}
         loading={laeuft}
@@ -109,8 +111,10 @@ export default function StandortFeld({
         Mein Standort
       </Button>
       {(sperrgrund ?? fehler) && (
-        <Typography.Text type="secondary">{sperrgrund ?? fehler}</Typography.Text>
+        <Textstufe stufe="textKlein" ton="gedaempft">
+          {sperrgrund ?? fehler}
+        </Textstufe>
       )}
-    </Flex>
+    </Stapel>
   );
 }

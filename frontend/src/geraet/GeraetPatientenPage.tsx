@@ -11,7 +11,7 @@ import type { Person, UhsDetail } from '../api/types';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { useRollen } from '../components/instrument';
+import { schriftStil, useRollen } from '../components/instrument';
 import {
   personenKarte,
   personenSpalten,
@@ -41,7 +41,10 @@ function ZustandKurz({ zustand }: { zustand: string | null | undefined }) {
   const { rollen } = useRollen();
   if (!zustand) return <span style={{ color: rollen.schwach }}>—</span>;
   return (
-    <Typography.Text ellipsis={{ tooltip: zustand }} style={{ fontSize: 12, color: rollen.text2 }}>
+    <Typography.Text
+      ellipsis={{ tooltip: zustand }}
+      style={{ ...schriftStil('textKlein'), color: rollen.text2 }}
+    >
       {zustand}
     </Typography.Text>
   );

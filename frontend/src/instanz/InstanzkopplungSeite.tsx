@@ -3,7 +3,14 @@ import { Alert, App, Button, Form, Input, Modal, Space, Spin, Tooltip, Typograph
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
-import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  Feld,
+  Paneel,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import KopierbarerText from '../components/KopierbarerText';
@@ -555,20 +562,20 @@ export default function InstanzkopplungSeite() {
           onSuchen={() => imNetz.mutate()}
           onWahl={(adresse) => einloesenForm.setFieldValue('adresse', adresse)}
         />
-        <Form.Item
+        <Feld
           label="Adresse der anderen Instanz"
           name="adresse"
           rules={[{ required: true, whitespace: true, message: 'Adresse angeben' }]}
         >
           <Input placeholder="https://hub.example.org" inputMode="url" />
-        </Form.Item>
-        <Form.Item
+        </Feld>
+        <Feld
           label="Kopplungscode"
           name="code"
           rules={[{ required: true, whitespace: true, message: 'Code angeben' }]}
         >
           <Input placeholder="ABCD-EFGH-JKMN-PQRS" style={monoStil(14)} autoComplete="off" />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={einloesen.error} titel="Nicht gekoppelt" />
       </ErfassungsModal>
 
@@ -623,18 +630,20 @@ export default function InstanzkopplungSeite() {
                 {bestaetigenSchluessel.erklaert_at ? zeit(bestaetigenSchluessel.erklaert_at) : '—'}
               </Datenfeld>
             </Datenraster>
-            <Form.Item
-              label="Letzte vier Zeichen des Fingerabdrucks"
-              name="ende"
-              style={{ marginBlockStart: token.marginMD }}
-              rules={[
-                { required: true, whitespace: true, message: 'Vier Zeichen angeben' },
-                { len: 4, message: 'Genau vier Zeichen' },
-              ]}
-              normalize={(w: string) => w.toUpperCase()}
-            >
-              <Input maxLength={4} style={monoStil(14)} autoComplete="off" />
-            </Form.Item>
+            <div style={{ marginBlockStart: token.marginMD }}>
+              <Feld
+                label="Letzte vier Zeichen des Fingerabdrucks"
+                name="ende"
+                breite="kurz"
+                rules={[
+                  { required: true, whitespace: true, message: 'Vier Zeichen angeben' },
+                  { len: 4, message: 'Genau vier Zeichen' },
+                ]}
+                normalize={(w: string) => w.toUpperCase()}
+              >
+                <Input maxLength={4} style={monoStil(14)} autoComplete="off" />
+              </Feld>
+            </div>
           </>
         )}
       </ErfassungsModal>
@@ -680,7 +689,7 @@ export default function InstanzkopplungSeite() {
           setRegistrierenOffen(false);
         }}
       >
-        <Form.Item
+        <Feld
           label="Bezeichnung"
           name="bezeichnung"
           rules={[
@@ -689,7 +698,7 @@ export default function InstanzkopplungSeite() {
           ]}
         >
           <Input placeholder="Sicherheitsschlüssel blau" maxLength={BEZEICHNUNG_MAX} />
-        </Form.Item>
+        </Feld>
         <SpeicherFehler fehler={registrieren.error} titel="Nicht registriert" />
       </ErfassungsModal>
 

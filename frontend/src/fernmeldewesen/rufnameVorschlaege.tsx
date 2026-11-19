@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { EinsatzFahrzeug, Fahrzeug } from '../api/types';
-import { monoStil, useRollen } from '../components/instrument/index';
+import { Stapel, monoStil, useRollen } from '../components/instrument/index';
 import { DEMO_GROUP, DemoLabel, splitDemo } from '../stammdaten/demoAuswahl';
 import { isFuehrungsfahrzeug } from './fernmeldeskizze';
 
@@ -117,12 +117,12 @@ export interface RufnameOptionGroup {
 }
 
 function VorschlagLabel({ vorschlag }: { vorschlag: RufnameVorschlag }) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   return (
-    <span style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS, minWidth: 0 }}>
+    <Stapel als="span" richtung="zeile" abstand="xs" ausrichten="baseline">
       <span style={monoStil(13)}>{vorschlag.funkrufname}</span>
       {vorschlag.typ && <span style={{ color: rollen.text2 }}>{vorschlag.typ}</span>}
-    </span>
+    </Stapel>
   );
 }
 

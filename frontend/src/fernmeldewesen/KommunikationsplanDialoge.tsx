@@ -26,6 +26,7 @@ import {
   verbindungAusRufnummer,
   type VerbindungsAnzeige,
 } from './kommunikationsplan';
+import { Feld } from '../components/instrument';
 
 /**
  * Masken des Kommunikationsplans (LFH-848, design.md D5). Jede Maske wird nur montiert, solange
@@ -135,20 +136,20 @@ export function StelleAnlegenModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item label="Art" name="stellenart" rules={[{ required: true }]}>
+      <Feld label="Art" name="stellenart" rules={[{ required: true }]}>
         <Select options={STELLENART_OPTIONEN} />
-      </Form.Item>
+      </Feld>
       {art === 'funktion' && (
-        <Form.Item
+        <Feld
           label="Funktion"
           name="funktion"
           rules={[{ required: true, message: 'Funktion wählen' }]}
         >
           <Select options={funktionsOptionen} loading={katalog.isLoading} />
-        </Form.Item>
+        </Feld>
       )}
       {mitBezeichnung && (
-        <Form.Item
+        <Feld
           label="Bezeichnung"
           name="bezeichnung"
           rules={[{ required: true, whitespace: true, message: 'Bezeichnung angeben' }, LAENGE]}
@@ -167,12 +168,12 @@ export function StelleAnlegenModal({
           ) : (
             <Input placeholder="z. B. THW" />
           )}
-        </Form.Item>
+        </Feld>
       )}
       {extern && (
-        <Form.Item label="Rufnummer" name="rufnummer" rules={[LAENGE]}>
+        <Feld label="Rufnummer" name="rufnummer" rules={[LAENGE]}>
           <Input placeholder="z. B. 0421 123456" />
-        </Form.Item>
+        </Feld>
       )}
       <SpeicherFehler fehler={fehler} />
     </ErfassungsModal>
@@ -211,13 +212,13 @@ export function BezeichnungModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[{ required: true, whitespace: true, message: 'Bezeichnung angeben' }, LAENGE]}
       >
         <Input />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={fehler} />
     </ErfassungsModal>
   );
@@ -283,14 +284,10 @@ export function VerbindungModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item
-        label="Mittel"
-        name="mittel"
-        rules={[{ required: true, message: 'Mittel wählen' }]}
-      >
+      <Feld label="Mittel" name="mittel" rules={[{ required: true, message: 'Mittel wählen' }]}>
         <Select options={VERBINDUNGSMITTEL_OPTIONEN} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Nummer/Adresse"
         name="wert"
         rules={[
@@ -299,10 +296,10 @@ export function VerbindungModal({
         ]}
       >
         <Input placeholder="z. B. 0421 123456" />
-      </Form.Item>
-      <Form.Item label="Hinweis" name="hinweis" rules={[LAENGE]}>
+      </Feld>
+      <Feld label="Hinweis" name="hinweis" rules={[LAENGE]}>
         <Input placeholder="z. B. Lagedienst, nur tagsüber" />
-      </Form.Item>
+      </Feld>
       <SpeicherFehler fehler={fehler} />
     </ErfassungsModal>
   );

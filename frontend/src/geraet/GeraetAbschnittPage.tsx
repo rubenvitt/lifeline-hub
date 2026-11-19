@@ -1,5 +1,5 @@
 import { STAERKE_SCHREIBWEISE } from '../anzeige/staerke';
-import { Alert, Flex, Spin } from 'antd';
+import { Alert, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -9,7 +9,7 @@ import type { Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Paneel, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Stapel, monoStil, useRollen } from '../components/instrument';
 import { abschnittDerEinheit } from '../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../kraefte/meldebildRaster';
 import AbschnittDaten from '../pages/einsatzabschnitte/AbschnittDaten';
@@ -57,7 +57,7 @@ function EinheitZeile({
         borderBottom: `1px solid ${rollen.linie}`,
       }}
     >
-      <Flex justify="space-between" align="center" gap={token.marginSM} wrap>
+      <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte" verteilen="between">
         <span>
           <strong>{e.name}</strong>
           {e.funkrufname && (
@@ -73,7 +73,7 @@ function EinheitZeile({
           }}
           farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
         />
-      </Flex>
+      </Stapel>
       {/* Eigene Stärke wie „Zugeordnete Einheiten“ der Abschnittsseite (LLH-1744): die Zeilen
           ergeben die Stärke im Kopf, eine Untereinheit zählt nicht zusätzlich bei ihrem Zug. */}
       <span style={monoStil(13)}>
@@ -90,7 +90,6 @@ function EinheitZeile({
  * zugeschnitten; die Seite zeigt es nur.
  */
 export default function GeraetAbschnittPage() {
-  const { token } = useRollen();
   const { geraet } = useAuth();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const abschnittId = geraet?.stelle_id ?? null;
@@ -132,7 +131,7 @@ export default function GeraetAbschnittPage() {
       ) : !abschnitt ? (
         <Alert type="warning" showIcon title="Abschnitt nicht mehr vorhanden" />
       ) : (
-        <Flex vertical gap={token.margin}>
+        <Stapel abstand="md">
           <Paneel titel="Abschnitt" koerperPolster>
             <AbschnittDaten
               abschnitt={abschnitt}
@@ -165,7 +164,7 @@ export default function GeraetAbschnittPage() {
               </ul>
             )}
           </Paneel>
-        </Flex>
+        </Stapel>
       )}
     </EinsatzSeite>
   );

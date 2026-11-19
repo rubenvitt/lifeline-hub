@@ -23,7 +23,7 @@ import {
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import SpiegelBand from '../einsatz/spiegel/SpiegelBand';
-import { EINSATZKOPF_REFETCH_MS, UebungsBand } from '../components/instrument';
+import { EINSATZKOPF_REFETCH_MS, UebungsBand, schriftStil } from '../components/instrument';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import {
   EinsatzPfadeProvider,
@@ -276,7 +276,7 @@ function NavZiel({
         minHeight: Math.max(56, token.controlHeight),
         paddingBlock: token.paddingXS,
         textDecoration: 'none',
-        fontSize: 13,
+        ...schriftStil('textKlein'),
         background: isActive ? rahmenFarben.aktiv : 'transparent',
         // Ortsmarke in der Bedienfarbe wie Rail und Modulpanel (eon26eat D7).
         boxShadow: isActive ? `inset 0 3px 0 ${rahmenFarben.bedien}` : 'none',
