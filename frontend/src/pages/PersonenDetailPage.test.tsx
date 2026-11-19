@@ -399,9 +399,8 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   });
 
   /**
-   * Der Abstand zwischen „Rot" und dem Rest: `aktionsabstand.guard.test.ts` sieht einen
-   * `danger`-Menüeintrag nicht (sein Scanner matcht `<Button` mit `danger`). Geprüft wird hier,
-   * dass das Löschen hinter einem Trenner steht.
+   * Der Abstand zwischen „Rot" und dem Rest: im ⋮-Menü trägt ihn keine `Knopfreihe`, sondern der
+   * Trenner. Geprüft wird hier, dass das Löschen hinter einem Trenner steht.
    */
   it('trennt „Stornieren" durch einen Menü-Trenner vom Rest', async () => {
     render(einsatzAktiv, detail);

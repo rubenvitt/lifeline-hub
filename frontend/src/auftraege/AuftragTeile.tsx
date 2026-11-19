@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { Status, monoStil, useRollen } from '../components/instrument';
+import { Knopfreihe, Status, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -428,7 +428,7 @@ export function AuftragHandlungen({
         <Flex justify={ausrichtung} style={{ marginTop: token.marginSM }}>
           {/* `middle`: Rot steht nicht bündig neben Neutralem (LFH-363). Der Abstands-Guard sieht
              diese gespreizte Reihe nicht und führt die Teile unter BEWERTET_OHNE_SCANNER_DECKUNG. */}
-          <Space size="middle" wrap>
+          <Knopfreihe>
             {aktionen}
             {buendeln ? (
               <MenueAusloeser
@@ -448,7 +448,7 @@ export function AuftragHandlungen({
                 </Button>
               ))
             )}
-          </Space>
+          </Knopfreihe>
         </Flex>
       )}
     </>

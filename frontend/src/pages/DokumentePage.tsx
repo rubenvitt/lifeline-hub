@@ -2,7 +2,7 @@ import { IconMuelleimer, IconStift } from '../icons';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Breadcrumb, Button, Modal, Popconfirm, Space, Typography } from 'antd';
+import { App, Breadcrumb, Button, Modal, Popconfirm, Typography } from 'antd';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { dokumentDownloadPfad, entferneDokument, listeDokumente } from '../api/dokumente';
@@ -23,6 +23,7 @@ import DownloadAnker from '../components/DownloadAnker';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
+import Knopfreihe from '../components/instrument/Knopfreihe';
 
 /**
  * Dokumentenablage eines Einsatzes (LFH-632), strukturgleich zu `SchaedenPage`.
@@ -188,7 +189,7 @@ const dokumentSpalten = (
             width: 100,
             immerSichtbar: true,
             render: (_: unknown, d: Dokument) => (
-              <Space size="middle">
+              <Knopfreihe>
                 <Button
                   type="text"
                   icon={<IconStift />}
@@ -211,7 +212,7 @@ const dokumentSpalten = (
                     aria-label={`Dokument ${d.titel} entfernen`}
                   />
                 </Popconfirm>
-              </Space>
+              </Knopfreihe>
             ),
           },
         ]

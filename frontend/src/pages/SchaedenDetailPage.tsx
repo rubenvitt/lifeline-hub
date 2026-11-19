@@ -423,7 +423,7 @@ export default function SchaedenDetailPage() {
         aktionenPlan && (
           // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
-          <Space wrap size={token.marginSM}>
+          <>
             {primaer && (
               <Button type="primary" onClick={() => fuehreKopfaktionAus(primaer)}>
                 {primaer.label}
@@ -455,7 +455,7 @@ export default function SchaedenDetailPage() {
                 if (eintrag) fuehreKopfaktionAus(eintrag);
               }}
             />
-          </Space>
+          </>
         )
       }
     >

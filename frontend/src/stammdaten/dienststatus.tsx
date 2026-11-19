@@ -1,4 +1,4 @@
-import { Button, Space } from 'antd';
+import { Button } from 'antd';
 import { useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import type { KatalogSpalte } from '../components/KatalogTabelle';
 import { nachZahl } from '../components/katalogVergleich';
@@ -8,6 +8,7 @@ import type { Dienststatus } from '../api/types';
 import { VomHubGesperrt } from '../instanz/herkunft';
 import { dienststatus } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
+import Knopfreihe from '../components/instrument/Knopfreihe';
 
 interface DienststatusVariablen {
   id: number;
@@ -154,7 +155,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
         const laeuft = mutation.isPending && mutation.variables?.id === t.id;
         const inDienst = t.dienststatus === 'in_dienst';
         return (
-          <Space size="middle">
+          <Knopfreihe>
             <Button disabled={laeuft} onClick={() => onBearbeiten(t)}>
               Bearbeiten
             </Button>
@@ -166,7 +167,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
                 derselben Zelle. Seine Bedingung (409, wenn Funkrufname, Personal- oder
                 Bestandsnummer inzwischen aktiv neu vergeben ist) entsteht erst durch eine
                 eigene, spätere Anlage — nie durch einen Fehlklick hier. Deshalb `danger` und
-                Abstand (`size="middle"`), aber keine Reibung. Gilt für Fahrzeuge, Personal und
+                den Abstand der `Knopfreihe`, aber keine Reibung. Gilt für Fahrzeuge, Personal und
                 Material zugleich: alle drei Tabs rendern diese eine Spalte. */}
             {inDienst ? (
               <Button
@@ -190,7 +191,7 @@ export function dienststatusSpalten<T extends { id: number; dienststatus: Dienst
                 {DIENSTSTATUS_HANDLUNG.in_dienst}
               </Button>
             )}
-          </Space>
+          </Knopfreihe>
         );
       },
     },

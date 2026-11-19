@@ -227,7 +227,8 @@ Intensitäten teilen, ist der **zweite Kanal Pflicht, nicht Kür** — `Flaechen
 steht im Auslöser, das Stufenwort im zugänglichen Namen. Ihr **Kontrast** ist eine begründete
 Setzung und kein Messwert (jsdom rechnet keine Farbmischung): der Nachweis steht offen und
 gehört in den Playwright-Topf von **LFH-370/B5j**, der ihn heute noch nicht führt.
-**Rot steht auch nicht bündig neben Neutralem** (LFH-363): eine `<Space>`-Aktionsreihe mit
+**Rot steht auch nicht bündig neben Neutralem** (LFH-363; seit LLH-1973 trägt das der Baustein
+`Knopfreihe` mit festem Abstand `md`, der Wächter unten ist entfernt, ADR-0070): eine `<Space>`-Aktionsreihe mit
 einem `danger`-Knopf und mindestens einer weiteren Aktion trägt `size="middle"`. Der
 Vorgabewert ist hier **nicht** antds 8 px — antd mappt `spaceGapSmallSize` auf `paddingXS`,
 und das steht auf `abstand.xs` = 3/5/7 px je Stufe; `middle` führt auf `abstand.md` =

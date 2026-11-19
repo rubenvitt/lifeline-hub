@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Space } from 'antd';
+import { Button, Popconfirm } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -14,7 +14,7 @@ import { globalKeys } from '../api/queryKeys';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
-import { Stapel } from '../components/instrument';
+import { Knopfreihe, Stapel } from '../components/instrument';
 
 /** Schalter einer Quelle (LFH-1022: Statusrolle statt antd-Preset `green`). */
 const QUELLE_AKTIV: StatusDarstellung = { rolle: 'normal', label: 'aktiv' };
@@ -147,9 +147,7 @@ export default function OnlineQuellenVerwaltung() {
               const grund = zeilen.grund(q.id);
               return (
                 <Stapel abstand="xxs" ausrichten="start">
-                  {/* `size="middle"` trennt die destruktive von der neutralen Aktion
-                    (`components/aktionsabstand.guard.test.ts`). */}
-                  <Space size="middle">
+                  <Knopfreihe>
                     <Button
                       onClick={() => {
                         zeilen.beginne(q.id);
@@ -167,7 +165,7 @@ export default function OnlineQuellenVerwaltung() {
                     >
                       <Button danger>Löschen</Button>
                     </Popconfirm>
-                  </Space>
+                  </Knopfreihe>
                   {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
                 </Stapel>
               );
@@ -180,18 +178,20 @@ export default function OnlineQuellenVerwaltung() {
   return (
     <>
       {istAdmin && (
-        <Space style={{ marginBottom: 'var(--lfh-luft-3)' }}>
-          <Button
-            type="primary"
-            onClick={() => {
-              setBearbeite(null);
-              setFormOffen(true);
-            }}
-          >
-            Quelle hinzufügen
-          </Button>
-          <Button onClick={() => setKatalogOffen(true)}>Aus Katalog hinzufügen</Button>
-        </Space>
+        <div style={{ marginBottom: 'var(--lfh-luft-3)' }}>
+          <Knopfreihe>
+            <Button
+              type="primary"
+              onClick={() => {
+                setBearbeite(null);
+                setFormOffen(true);
+              }}
+            >
+              Quelle hinzufügen
+            </Button>
+            <Button onClick={() => setKatalogOffen(true)}>Aus Katalog hinzufügen</Button>
+          </Knopfreihe>
+        </div>
       )}
       {/* Wiederholt wird GENAU diese Query: `invalidiereKarte` zöge Katalog und Karten-Config mit, die
          nicht gescheitert sind. */}
