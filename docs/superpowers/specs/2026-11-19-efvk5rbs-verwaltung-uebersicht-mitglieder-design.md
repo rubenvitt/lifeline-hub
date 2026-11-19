@@ -125,6 +125,13 @@ Organisation kommt aus der Sitzung. Antwort `Bereitschaft`, Feldnamen sind Vorsc
 
 Nur Zahlen, keine Namen. Die Abfrage ist eine `SELECT` mit Unterabfragen, ohne Schreibvorgang.
 
+**Demo-Daten zählen nicht** (Ruben, 19.11.2026). Fahrzeuge, Personal und Einheiten-Vorlagen,
+die über `demo_herkunft` (LFH-733) als Demo markiert sind, zählen nicht zu den drei Zahlen oben.
+Sie kommen getrennt zurück als `fahrzeuge_demo`, `personal_demo` und `einheit_vorlagen_demo`.
+Die Zeile zeigt sie gedämpft, zum Beispiel „+ 12 aus der Demo“. Eine Organisation, die nur
+Demo-Daten hat, liest deshalb „Für einen Einsatz fehlt: …“. Einsatz-Vorlagen und Benutzer haben
+keine Demo-Marke. Die Tests brauchen einen Fall mit eingespielter Demo.
+
 **Wertung im Client** in einer reinen Funktion (Vorschlag `admin/bereitschaft.ts`). Das ist die
 einzige Stelle, die „fehlt“ bestimmt:
 
@@ -208,8 +215,9 @@ BEREITSCHAFT
   geprüft (ADR-0006).
 - Fehlt das Feld oder ist die Liste leer, ist alles wie heute.
 
-**Prüfungen vor jedem Schreiben.** Jeder Verstoß ergibt 400 mit Feldfehler `mitglieder`, und es
-entsteht kein Einsatz:
+**Prüfungen vor jedem Schreiben.** Jeder Verstoß ergibt 400 (`AppError::Validation`), und es
+entsteht kein Einsatz. Die Meldung nennt die Person, wenn sie bekannt ist. Ein strukturierter
+Feldfehler auf dem Wire ist nicht nötig (siehe „Dialog“):
 
 - Rolle unbekannt.
 - `benutzer_id` doppelt in der Liste.
@@ -233,8 +241,9 @@ entsteht kein Einsatz:
 - wie heute `publish_neuer_einsatz`;
 - dazu je aufgenommener Person `benachrichtigung::melden` mit Art `EinsatzAufnahme`,
   `.von(anlegende Person)` und `.an(Adressat::Nutzer(id))`, genau wie `mitglied_setzen`;
-- und `kopf_melden` für jede aufgenommene Person, damit deren Einsatzliste und Kopf sofort
-  stimmen. Das ist der personenbezogene Teil von `mitglieder_geaendert`.
+- kein eigenes `kopf_melden` je Person: `publish_neuer_einsatz` erreicht nach dem Commit jeden
+  Leser des neuen Einsatzes, die Aufgenommenen eingeschlossen. Der Spiegel übernimmt neue
+  Mitgliedschaften über seine Trigger (Migration 0314).
 - `LiveEvent::Mitglieder` braucht es nicht, denn den neuen Einsatz hat noch niemand abonniert.
 - Ist eine aufgenommene Person auch Führungskraft, bekommt sie „Neuer Einsatz“ und „Aufgenommen
   in …“. Beide bleiben, weil sie Verschiedenes sagen.
@@ -249,8 +258,13 @@ entsteht kein Einsatz:
     `EINSATZ_ROLLE_OPTIONEN`, Vorgabe Führungspersonal;
   - die anlegende Person als feste Zeile „du — Einsatzleitung“.
 - Die Auswahl wird erst geladen, wenn der Teil aufgeht.
-- Ein Prüffehler für `mitglieder` öffnet den Teil selbst (`onPruefungGescheitert`), wie es die
-  Regel für Klappteile verlangt.
+- Was der Browser vorab prüfen kann (doppelt, man selbst, Rolle gewählt), prüft das Formular.
+  Ein Fehler darin öffnet den Teil selbst (`onPruefungGescheitert`), wie es die Regel für
+  Klappteile verlangt.
+- Eine Ablehnung durch den Server, etwa weil jemand inzwischen deaktiviert wurde, erscheint in
+  der allgemeinen Fehlerzeile des Dialogs, mit dem Namen der Person. Der Kopf des Teils nennt die
+  Wahl immer („du + 3 Personen“), also bleibt sie sichtbar, ohne aufzuklappen. Das ist meine
+  Entscheidung: Ein Feldfehler-Format für den ganzen Server wäre für diesen einen Fall zu breit.
 - Die sichtbare Feldzahl bleibt fünf. Der Wächter zum Feldbudget zählt mit `forceRender` und
   macht die Gegenprobe „Aufklappen → Zahl steigt“.
 
@@ -258,11 +272,12 @@ entsteht kein Einsatz:
 
 - `frontend/AGENTS.md`, „Feldbudget“: Bei der Ausnahme „Neuen Einsatz anlegen“ kommt der
   eingeklappte Teil „Mitglieder“ dazu. Er zählt nicht zu den fünf Feldern, sein Kopf nennt die
-  Abweichung.
+  Abweichung. Eine Ablehnung durch den Server meldet die allgemeine Fehlerzeile mit dem Namen der
+  Person.
 - `frontend/AGENTS.md`: Neue Zeile oder neuer Absatz „Verwaltung — Einstieg“.
   - `/admin` führt auf die Übersicht.
   - „Fehlt“ bestimmt nur `admin/bereitschaft.ts`.
-  - Die Übersicht zeigt Zahlen, keine Namen.
+  - Die Übersicht zeigt Zahlen, keine Namen; Demo-Daten zählen nicht mit.
 - `src/AGENTS.md`: Neuer Absatz bei „Admin-Spur“ oder als eigener Abschnitt „Einsatz anlegen mit
   Mitgliedern“.
   - Mitglieder kommen atomar mit dem Einsatz.
