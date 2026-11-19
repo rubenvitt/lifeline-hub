@@ -44,7 +44,6 @@ export const SCHULD: Readonly<Record<string, number>> = {
   'einsatz/AlarmZentrale.tsx': 3,
   'einsatz/EinsatzLayout.tsx': 1,
   'einsatz/EinsatzSwitcher.tsx': 2,
-  'einsatz/ModulGesperrt.tsx': 1,
   'einsatz/ModulPanel.tsx': 4,
   'erinnerung/ErinnerungKarte.tsx': 6,
   'etb/EtbFeldzeile.tsx': 1,
