@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Space } from 'antd';
-import { monoStil, useRollen } from '../../components/instrument';
+import { monoStil, Stapel } from '../../components/instrument';
 import { ladeSchaden, schadenRegistrierAnzeige } from '../../api/einsatzSchaden';
 import { einsatzKeys } from '../../api/queryKeys';
 import { FRISCH_MS } from '../../command-palette/datensatzAbfrage';
@@ -16,7 +15,6 @@ import { Status } from '../../components/instrument/Status';
  * Eingaben, ohne „Auf Karte verorten" und ohne Ort-Zeile (eigener Serverabruf).
  */
 export default function SchadenVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
-  const { token } = useRollen();
   const abfrage = useQuery({
     queryKey: einsatzKeys.schaedenEinzeln(einsatzId, id),
     queryFn: () => ladeSchaden(einsatzId, id),
@@ -26,14 +24,14 @@ export default function SchadenVorschau({ einsatzId, id }: { einsatzId: number; 
   return (
     <VorschauZustand abfrage={abfrage} sorte="Der Schaden">
       {(s) => (
-        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-          <Space wrap size={token.marginSM}>
+        <Stapel abstand="md">
+          <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
             <span style={monoStil(14, 500)}>{schadenRegistrierAnzeige(s.registrier_nr)}</span>
             <Status darstellung={STATUS_META[s.status]} />
             {s.storniert_at && <Status ton="neutral" wort="storniert" groesse="klein" />}
-          </Space>
+          </Stapel>
           <SchadenDaten schaden={s} einsatzId={einsatzId} ortZeile={false} spalten={2} />
-        </Space>
+        </Stapel>
       )}
     </VorschauZustand>
   );

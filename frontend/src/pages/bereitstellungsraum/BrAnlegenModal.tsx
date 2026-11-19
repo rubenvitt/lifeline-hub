@@ -1,4 +1,5 @@
-import { Form, Input } from 'antd';
+import { Input } from 'antd';
+import { Feld } from '../../components/instrument';
 import { BR_BEZEICHNUNG_MAX, BR_NOTIZ_MAX, BR_STANDORT_MAX } from '../../api/eingabegrenzen';
 import { ortZeichenRegel, zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import AnlegenModal, { type AnlegenModalSlot } from '../../components/AnlegenModal';
@@ -35,7 +36,7 @@ export default function BrAnlegenModal(props: AnlegenModalSlot<Bereitstellungsra
       legeAn={(einsatzId, w) => legeBrAn(einsatzId, brEingabe(w))}
       listenKey={einsatzKeys.br}
     >
-      <Form.Item
+      <Feld
         label="Bezeichnung"
         name="bezeichnung"
         rules={[
@@ -44,8 +45,8 @@ export default function BrAnlegenModal(props: AnlegenModalSlot<Bereitstellungsra
         ]}
       >
         <Input placeholder="z. B. BR Ost" count={zeichenGrenze(BR_BEZEICHNUNG_MAX)} />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Standort (optional)"
         name="standort"
         rules={[ortZeichenRegel(BR_STANDORT_MAX, 'Standort')]}
@@ -55,14 +56,10 @@ export default function BrAnlegenModal(props: AnlegenModalSlot<Bereitstellungsra
           etikett="Standort"
           count={zeichenGrenze(BR_STANDORT_MAX)}
         />
-      </Form.Item>
-      <Form.Item
-        label="Notiz (optional)"
-        name="notiz"
-        rules={[zeichenRegel(BR_NOTIZ_MAX, 'Notiz')]}
-      >
+      </Feld>
+      <Feld label="Notiz (optional)" name="notiz" rules={[zeichenRegel(BR_NOTIZ_MAX, 'Notiz')]}>
         <Input.TextArea rows={3} count={zeichenGrenze(BR_NOTIZ_MAX)} />
-      </Form.Item>
+      </Feld>
     </AnlegenModal>
   );
 }

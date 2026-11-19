@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Collapse, Form, Input } from 'antd';
+import { Feld } from '../../components/instrument';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
 import { istZuLang, zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { Select } from '../../components/Select';
@@ -172,15 +173,15 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       uebernahme={['ort']}
     >
       <FormularEingehaengt onWechsel={formular.melde} />
-      <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
+      <Feld label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
         <Select
           options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
             value: t,
             label: TYP_LABEL[t],
           }))}
         />
-      </Form.Item>
-      <Form.Item
+      </Feld>
+      <Feld
         label="Ausmaß"
         name="ausmass"
         rules={[{ required: true, message: 'Ausmaß ist Pflicht' }]}
@@ -191,9 +192,9 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
             label: AUSMASS_META[a].label,
           }))}
         />
-      </Form.Item>
+      </Feld>
       {/* `required` zeigt das Pflichtzeichen; geprüft wird über die Regel am Text des Werts. */}
-      <Form.Item
+      <Feld
         label="Ort"
         name="ort"
         required
@@ -204,31 +205,31 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
           etikett="Schadensort"
           count={zeichenGrenze(SCHADEN_ORT_MAX)}
         />
-      </Form.Item>
+      </Feld>
       {/* Mit Zeichenvorschau in Ausmaßfarbe und gewähltem Schadensgrad (LLH-1115): die Vorschau
           zeigt das Zeichen, das der Schaden auf der Karte bekommt. */}
-      <Form.Item label="Gefahr" name="gefahrenart">
+      <Feld label="Gefahr" name="gefahrenart">
         <GefahrAuswahlImFormular />
-      </Form.Item>
+      </Feld>
       <WeitereAngaben>
-        <Form.Item
+        <Feld
           label="Beschreibung"
           name="beschreibung"
           rules={[zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')]}
         >
           <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />
-        </Form.Item>
-        <Form.Item label="Schadensgrad" name="schadensgrad">
+        </Feld>
+        <Feld label="Schadensgrad" name="schadensgrad">
           <SchadensgradAuswahl />
-        </Form.Item>
-        <Form.Item label="Geschädigt">
+        </Feld>
+        <Feld label="Geschädigt">
           <GeschaedigtPicker
             einsatzId={einsatzId}
             orgName={orgName}
             value={geschaedigt}
             onChange={setGeschaedigt}
           />
-        </Form.Item>
+        </Feld>
       </WeitereAngaben>
     </ErfassungsModal>
   );

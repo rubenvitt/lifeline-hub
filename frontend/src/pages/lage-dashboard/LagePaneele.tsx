@@ -20,6 +20,9 @@ import {
   VerteilungsPaneel,
   Zeitachseneintrag,
   monoStil,
+  schriftStil,
+  Stapel,
+  Textstufe,
   useRollen,
 } from '../../components/instrument';
 import type { LiveVerbindungsStatus } from '../../live/liveVerbindung';
@@ -82,7 +85,10 @@ export function GefahrenmatrixPaneel({
       sprung={{ label: 'Gefahren', onKlick: onGefahren }}
       fuss={
         (zustand === 'daten' || zustand === 'leer') && !gesperrt && beurteilung ? (
-          <span data-lfh="gefahren-beurteilung" style={{ fontSize: 11, color: rollen.achtungText }}>
+          <span
+            data-lfh="gefahren-beurteilung"
+            style={{ ...schriftStil('textKlein'), color: rollen.achtungText }}
+          >
             {beurteilung}
           </span>
         ) : undefined
@@ -156,26 +162,28 @@ export function SichtungsPaneel({
       // schob die live kommende und gehende Zeile das Paneel.
       fuss={
         zustand === 'daten' ? (
-          <span style={{ display: 'grid', gap: token.paddingXS }}>
+          <Stapel als="span" abstand="xs">
             <span
               data-lfh="ohne-sichtung"
               style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
             >
-              <span style={{ fontSize: 11, color: rollen.schwach }}>Ohne Sichtung</span>
+              <Textstufe stufe="textKlein" ton="schwach">
+                Ohne Sichtung
+              </Textstufe>
               <span style={{ ...monoStil(12), color: rollen.text2 }}>{ohneSichtung}</span>
             </span>
             <span
               data-lfh="transport-bilanz"
               style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
             >
-              <span style={{ fontSize: 11, color: rollen.schwach }}>
+              <Textstufe stufe="textKlein" ton="schwach">
                 Unterwegs / offen / abgeschlossen
-              </span>
+              </Textstufe>
               <span style={{ ...monoStil(12), color: rollen.text2 }}>
                 {versorgung.unterwegs} / {versorgung.offen} / {versorgung.abgeschlossen}
               </span>
             </span>
-          </span>
+          </Stapel>
         ) : undefined
       }
       leerText="Noch keine Personen erfasst."
@@ -332,7 +340,8 @@ export function MeldungsstromPaneel({
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              fontSize: 12,
+              // Zeilenbegrenzung braucht `-webkit-box`: die Stufe kommt als Stil, nicht als Baustein.
+              ...schriftStil('textKlein'),
               lineHeight: 1.4,
             }}
             title={e.inhalt}
@@ -387,7 +396,9 @@ export function VerlaufPaneel({
             data-lfh="verlauf-spitze"
             style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
           >
-            <span style={{ fontSize: 11, color: rollen.schwach }}>Spitze</span>
+            <Textstufe stufe="textKlein" ton="schwach">
+              Spitze
+            </Textstufe>
             <span style={{ ...monoStil(12), color: rollen.text2 }}>
               {verlauf.spitze.stunde} Uhr · {verlauf.spitze.gesamt}
             </span>
@@ -495,7 +506,7 @@ export function VerlaufPaneel({
                 display: 'flex',
                 alignItems: 'center',
                 gap: token.marginXS,
-                fontSize: 11,
+                ...schriftStil('textKlein'),
                 color: rollen.gedaempft,
               }}
             >
