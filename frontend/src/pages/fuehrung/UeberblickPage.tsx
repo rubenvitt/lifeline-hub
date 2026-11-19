@@ -979,7 +979,9 @@ export default function UeberblickPage() {
                               style={{
                                 ...schriftStil('meta'),
                                 color: rollen.gedaempft,
-                                paddingBlockEnd: token.marginXS,
+                                // fluchtet mit den Zeilen (`listenZeileStil`)
+                                paddingInline: token.padding,
+                                paddingBlock: token.paddingXS,
                               }}
                             >
                               Stärke <StaerkeSchreibweise />
