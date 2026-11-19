@@ -17,7 +17,6 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::org::einsatzliste_melden;
-use crate::live::LiveEvent;
 use crate::org::modul_einstellung::{self as org_modul_einstellung, OrgModulEinstellung};
 use crate::routes::support::{self, pflicht};
 use axum::extract::State;
@@ -608,7 +607,8 @@ pub async fn kategorie_frist_setzen(
     .await?;
     if let kat::FristErgebnis::Geaendert { etb_id } = ergebnis {
         kopf_geaendert(&state, id).await;
-        state.live.publiziere_einsatz(id, LiveEvent::Etb);
+        // Das Ereignis mit der Kennung frischt das ETB auf wie zuvor die Listenauffrischung
+        // (LLH-1976).
         super::etb_verteilen(&state, id, [etb_id]);
     }
     let einsatz = repo::laden(&state.pool, id).await?;
