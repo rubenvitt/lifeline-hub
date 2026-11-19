@@ -67,11 +67,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
   - `rollenOptionen<K extends string>(record: Record<K, RollenBegriff>, reihenfolge?: readonly K[]): { value: K; label: string; darf: string }[]`
   - `rollenOptionRender: SelectProps['optionRender']` — Name, darunter `Textstufe stufe="textKlein" ton="gedaempft"` mit `darf`.
 
-- [ ] **Step 1: Test** — ein `Select` mit `rollenOptionen(EINSATZ_ROLLE)` und `rollenOptionRender`, `value="beobachter"`: geschlossen steht „Beobachter“, aber nicht „liest nur“; nach Öffnen stehen „Führungspersonal“ und „schreibt in Modulen, Kopfdaten und Einstellungen“ in der Liste.
-- [ ] **Step 2: rot.**
-- [ ] **Step 3: implementieren** (Muster `pages/lagekarte/SnapshotLeiste.tsx`, `optionRender={({ data }) => …}`).
-- [ ] **Step 4: grün.**
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Test** — ein `Select` mit `rollenOptionen(EINSATZ_ROLLE)` und `rollenOptionRender`, `value="beobachter"`: geschlossen steht „Beobachter“, aber nicht „liest nur“; nach Öffnen stehen „Führungspersonal“ und „schreibt in Modulen, Kopfdaten und Einstellungen“ in der Liste.
+- [x] **Step 2: rot.**
+- [x] **Step 3: implementieren** (Muster `pages/lagekarte/SnapshotLeiste.tsx`, `optionRender={({ data }) => …}`).
+- [x] **Step 4: grün.**
+- [x] **Step 5: Commit.**
 
 ### Task 3: Rolle im Einsatz (Reiter Zugriff, Einsatzliste)
 
