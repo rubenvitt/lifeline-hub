@@ -795,10 +795,18 @@ anwendbar), „nicht geprüft" ist keins.
   neues Kürzel kommt in die Liste und in die Tabelle des Kapitels `zeiten-und-kuerzel.md`
   (`anzeige/kuerzel.test.ts` hält beide gleich). Kurzbezeichnungen der Organisation („EA 1.1“) sind
   Daten und bleiben. **Die Stärke** schreibt nur `anzeige/staerke.ts` (`staerkeText`, Wert
-  „1/2/5//8“); jede Fläche mit Stärke nennt `STAERKE_SCHREIBWEISE` („F/UF/M//Σ“) einmal sichtbar
+  „1/2/5//8“); jede Fläche mit Stärke nennt die Schreibweise „F/UF/M//Σ“ einmal sichtbar
   (Spaltenkopf, Feldetikett, Legende), der Wert trägt `STAERKE_AUSGESCHRIEBEN` als `title`
   (`StaerkeAnzeige`, `Kennzahl notizBeschreibung`). „Ges“, „Gesamt“ und eine Stärke ohne Summe gibt
-  es nicht (Wächter `anzeige/staerke.guard.test.ts`).
+  es nicht (Wächter `anzeige/staerke.guard.test.ts`). **Die Schreibweise erklärt sich auf Tippen**
+  (LLH-1825, `docs/superpowers/specs/2026-11-19-f71gxt0s-kuerzel-legende-design.md`): in Komponenten
+  steht sie nur über `anzeige/KuerzelErklaerung.tsx` (`StaerkeSchreibweise`, schmale Spalte
+  `umbruchVorSumme`), einen Knopf ohne Knopfoptik mit Popover aus Bedeutung, Beispiel und dem Link
+  „Zeiten und Kürzel“; ein Tooltip allein trägt auf Touch nicht. Der Knopf hält seine Klicks, Zeile
+  und Tabellenkopf darum lösen nicht aus. Nie in einem Link: dort bleibt die Schreibweise Text, und
+  die Erklärung steht einmal im Kopf der Fläche (Überblick, Paneelkopf). Ausnahmen mit Grund und der
+  Wächter: `anzeige/kuerzelErklaerung.guard.test.ts`; in Leseansichten zählt der Erklär-Knopf nicht
+  als Aktion (`test/kuerzel.ts`, `aktionsKnoepfe`).
 
 **Tabelle und Dichte**
 
