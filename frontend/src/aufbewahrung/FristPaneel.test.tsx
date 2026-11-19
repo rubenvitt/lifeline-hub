@@ -207,7 +207,7 @@ describe('FristPaneel', () => {
       meine_rolle: 'beobachter',
       retention_bis: '2030-10-01 10:00:00',
     });
-    expect(await screen.findByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung oder System-Admin der Organisation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Frist ändern' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
   });
@@ -219,7 +219,7 @@ describe('FristPaneel', () => {
       retention_bis: '2030-10-01 10:00:00',
       org_id: 2,
     });
-    expect(await screen.findByText('nur Einsatzleitung oder Org-Admin')).toBeInTheDocument();
+    expect(await screen.findByText('nur Einsatzleitung oder System-Admin der Organisation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Frist ändern' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
   });

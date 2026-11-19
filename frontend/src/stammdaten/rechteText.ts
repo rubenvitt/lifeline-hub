@@ -1,4 +1,5 @@
 import { NUR_ADMIN } from '../components/nurAnsicht';
+import { SYSTEM_ROLLE } from '../einsatz/rollenVokabular';
 
 /**
  * EIN Grund für alle Verwaltungssektionen (LFH-346, Befund M45): wer ohne Admin-Rolle eine
@@ -27,7 +28,7 @@ export const LETZTE_EINSATZLEITUNG_TEXT = 'Gesperrt: letzte Einsatzleitung';
 /** Das eigene Konto — Deaktivieren beendete die eigene Sitzung. */
 export const EIGENES_KONTO = 'eigenes Konto';
 /** Der letzte aktive Admin (Server: 409, `routes/benutzer.rs`). */
-export const LETZTER_ADMIN = 'letzter aktiver Admin';
+export const LETZTER_ADMIN = `letzter aktiver ${SYSTEM_ROLLE.admin.name}`;
 
 /**
  * „Einmalpasswort vergeben“ im Bearbeiten-Dialog (LFH-1121): der Server lehnt das eigene Konto

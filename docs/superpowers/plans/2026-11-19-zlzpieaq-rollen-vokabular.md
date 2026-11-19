@@ -115,9 +115,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/zlzpieaqevkovh5k8hi99tkp
 - Modify: `frontend/src/stammdaten/rechteText.ts` (`LETZTER_ADMIN` = „letzter aktiver System-Admin“)
 - Test: `nurAnsicht.test.ts`, `EinsatzAllgemein.test.tsx`, `EinsatzModule.test.tsx`, Tests mit „letzter aktiver Admin“
 
-- [ ] **Step 1: Test** — `NUR_LEITUNG_ORG_ADMIN` = `'nur Einsatzleitung oder System-Admin der Organisation'`, `NUR_LEITUNG_FUEHRUNG_ORG_ADMIN` = `'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation'`, `NUR_ADMIN` = `'nur System-Admin'`.
-- [ ] **Step 2–4: rot, umsetzen, grün.**
-- [ ] **Step 5: Commit.**
+- [x] **Step 1: Test** — `NUR_LEITUNG_ORG_ADMIN` = `'nur Einsatzleitung oder System-Admin der Organisation'`, `NUR_LEITUNG_FUEHRUNG_ORG_ADMIN` = `'nur Einsatzleitung, Führungspersonal oder System-Admin der Organisation'`, `NUR_ADMIN` = `'nur System-Admin'`.
+- [x] **Step 2–4: rot, umsetzen, grün.**
+- [x] **Step 5: Commit.**
 
 ### Task 7: Wächter und Regel
 
