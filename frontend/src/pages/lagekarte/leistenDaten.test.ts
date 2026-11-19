@@ -69,6 +69,10 @@ const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
   farbe: farbenDunkel.bedien,
 });
 
+/** Das sichtbare Etikett: Text und das antippbar erklärte Kürzel dahinter (LLH-1825). */
+const etikett = (f: { label: string; labelKuerzel?: string }) =>
+  f.labelKuerzel ? `${f.label} ${f.labelKuerzel}` : f.label;
+
 describe('ebenenZeilen', () => {
   it('führt dieselben Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
     const keys = EBENEN.map((e) => e.key).sort();
@@ -416,7 +420,7 @@ describe('auswahlRaster — Betreuungsstelle (LFH-673)', () => {
   const roh: AuswahlRoh = { ...ROH, betreuungsstellen: [STELLE] };
   it('Status, Belegung „belegt / Kapazität" mit Auslastung, Abschnitt', () => {
     const raster = auswahlRaster(marker('betreuungsstelle', 7), roh, zeit);
-    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+    expect(raster.map((f) => [etikett(f), f.wert])).toEqual([
       ['Status', 'in Betrieb'],
       ['Belegung', '140 / 150'],
       ['Abschnitt', 'Nord'],
@@ -465,7 +469,7 @@ describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
   const roh: AuswahlRoh = { ...ROH, einheiten: [einheit], bereitstellungsraeume: [RAUM] };
   it('Status, Stärke über die Einheitenliste, Zahlen der Belegung vom Server, Abschnitt', () => {
     const raster = auswahlRaster(marker('bereitstellungsraum', 7), roh, zeit);
-    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+    expect(raster.map((f) => [etikett(f), f.wert])).toEqual([
       ['Status', 'aktiv'],
       ['Stärke F/UF/M//Σ', '0/2/9//11'],
       ['Fahrzeuge', '3'],
@@ -477,7 +481,7 @@ describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
   });
   it('fehlt eine Einheit in der Liste, steht „—" statt einer zu kleinen Stärke', () => {
     const raster = auswahlRaster(marker('bereitstellungsraum', 7), { ...roh, einheiten: [] }, zeit);
-    expect(raster.find((f) => f.label === 'Stärke F/UF/M//Σ')?.wert).toBe('—');
+    expect(raster.find((f) => etikett(f) === 'Stärke F/UF/M//Σ')?.wert).toBe('—');
   });
   it('leerer Raum: keine Stärke, keine Wartezeit — „—", nichts erfunden', () => {
     const leer = {
@@ -490,7 +494,7 @@ describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
       { ...roh, bereitstellungsraeume: [leer] },
       zeit,
     );
-    expect(raster.find((f) => f.label === 'Stärke F/UF/M//Σ')?.wert).toBe('—');
+    expect(raster.find((f) => etikett(f) === 'Stärke F/UF/M//Σ')?.wert).toBe('—');
     expect(raster.find((f) => f.label === 'Wartet seit')?.wert).toBe('—');
   });
   it('Unterzeile nennt die Objektart', () => {
@@ -513,7 +517,7 @@ describe('auswahlRaster — Schaden (LLH-1115)', () => {
       ],
     };
     const raster = auswahlRaster(marker('schaden', 9), roh, zeit);
-    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+    expect(raster.map((f) => [etikett(f), f.wert])).toEqual([
       ['Status', 'offen'],
       ['Ausmaß', 'groß'],
       ['Gefahr', 'Elektrizität'],
@@ -531,7 +535,7 @@ describe('auswahlRaster — Schaden (LLH-1115)', () => {
 describe('auswahlRaster', () => {
   it('Einheit: Stärke in BOS-Schreibweise, Status mit Code, Seit, Abschnitt, Führer (LFH-609)', () => {
     const raster = auswahlRaster(marker('einheit', 1), ROH, zeit);
-    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+    expect(raster.map((f) => [etikett(f), f.wert])).toEqual([
       ['Stärke F/UF/M//Σ', '1/2/9//12'],
       ['Status', 'S4 · Am Einsatzort'],
       ['Seit', 'Z(2026-09-21 09:12:00)'],
@@ -619,7 +623,7 @@ describe('auswahlRaster', () => {
 
   it('Abschnitt: Leiter und Zahl der zugeordneten Einheiten', () => {
     const raster = auswahlRaster(marker('abschnitt', 4), ROH, zeit);
-    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+    expect(raster.map((f) => [etikett(f), f.wert])).toEqual([
       ['Leiter', 'Schulz'],
       ['Einheiten', '1'],
     ]);
@@ -968,7 +972,7 @@ describe('auswahlRaster — Tier (LLH-1123)', () => {
   const roh: AuswahlRoh = { ...ROH, tiere: [TIER] };
   it('Status mit Rolle, Tierart, Rufname und Fundort — der Rufname nur hier, nicht auf der Karte', () => {
     const raster = auswahlRaster(marker('tier', 7), roh, zeit);
-    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+    expect(raster.map((f) => [etikett(f), f.wert])).toEqual([
       ['Status', 'vermisst'],
       ['Tierart', 'Hund'],
       ['Rufname', 'Bello'],
@@ -1009,7 +1013,7 @@ describe('auswahlRaster — Sammelstelle (LLH-1393)', () => {
   const roh: AuswahlRoh = { ...ROH, bezirke: [bezirk] };
   it('Räumung mit Rolle, Stand und Abschnitt des Bezirks', () => {
     const raster = auswahlRaster(marker('sammelstelle', 4), roh, zeit);
-    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+    expect(raster.map((f) => [etikett(f), f.wert])).toEqual([
       ['Räumung', 'läuft'],
       ['Evakuiert', '40 · von 120 geplant'],
       ['Abschnitt', 'EA Süd'],

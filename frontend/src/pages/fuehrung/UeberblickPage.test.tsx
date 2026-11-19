@@ -1,3 +1,4 @@
+import { ganzerText } from '../../test/kuerzel';
 import { theme as antdTheme } from 'antd';
 import { rollenFarbe } from '../../theme/statusFarben';
 import { farbenHell } from '../../theme/tokens';
@@ -573,7 +574,9 @@ describe('UeberblickPage', () => {
     expect(gebundenFarbe).toBe(rollenFarbe('neutral', standard).replace(/ /g, ''));
     expect(gebundenFarbe).not.toBe(rollenFarbe('bedien', standard));
     expect(within(p).queryByText(/Einheiten nach Status:/)).toBeNull();
-    expect(within(p).getByText('1 Abschnitt · 1 Einheit')).toBeInTheDocument();
+    expect(
+      within(p).getByText(ganzerText('1 Abschnitt · 1 Einheit · Stärke F/UF/M//Σ')),
+    ).toBeInTheDocument();
   });
 
   it('Abschnittszeile: letzte Rückmeldung im Teilbaum mit Zeit und Text (LFH-610)', async () => {

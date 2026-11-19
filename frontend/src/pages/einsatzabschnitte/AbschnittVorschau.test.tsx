@@ -1,3 +1,4 @@
+import { aktionsKnoepfe, ganzerText } from '../../test/kuerzel';
 import { act, screen } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import { QueryClient } from '@tanstack/react-query';
@@ -58,7 +59,7 @@ function liefere(
 }
 
 const feldwert = (label: string) =>
-  screen.getByText(label).closest('[data-lfh="datenfeld"]')!.querySelector('dd')!;
+  screen.getByText(ganzerText(label)).closest('[data-lfh="datenfeld"]')!.querySelector('dd')!;
 
 describe('AbschnittVorschau (LFH-664)', () => {
   it('zeigt die Angaben des Abschnitts samt Lagezustand mit Wort', async () => {
@@ -75,7 +76,7 @@ describe('AbschnittVorschau (LFH-664)', () => {
     expect(feldwert('Funk')).toHaveTextContent('—');
     expect(feldwert('Telefon')).toHaveTextContent('—');
     expect(screen.getByText('Zufahrt nur über Norden')).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(aktionsKnoepfe()).toEqual([]);
   });
 
   it('rechnet die Stärke wie die Seite: eigene und inkl. Unterabschnitte', async () => {
