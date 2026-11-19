@@ -98,6 +98,7 @@ import {
   monoStil,
   useRollen,
 } from '../../components/instrument';
+import KachelGrenze from '../../components/KachelGrenze';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import {
   KENNZAHL_PLAETZE,
@@ -477,10 +478,12 @@ export default function LageDashboardPage() {
         <DashboardFlaeche kennung="lagebild">
           {/* Alarmzeile „Was brennt“ (LLH-1743, Spec `lage-alarmzeile`): das erste Element unter
             dem Seitenkopf, dieselbe wie im Überblick. */}
-          <AlarmZeile
-            daten={wasBrenntDaten}
-            ziel={(e) => alarmZiel(e, einsatzId, wasBrenntDaten.freigaben)}
-          />
+          <KachelGrenze titel="Was brennt">
+            <AlarmZeile
+              daten={wasBrenntDaten}
+              ziel={(e) => alarmZiel(e, einsatzId, wasBrenntDaten.freigaben)}
+            />
+          </KachelGrenze>
           {wechsel && (
             <Sammelbanner
               aktion={{
@@ -499,111 +502,123 @@ export default function LageDashboardPage() {
             Notizplatz: unter `md` zwei Zeilen Boden (LFH-629), ab `md` drei Zeilen Boden und
             Deckel (LFH-691) — sonst sprängen die Paneele mit „· 1 ohne Meldung“ oder der
             Pegel-Prognose. */}
-          <Kennzahlenband
-            beschriftung="Lage in Zahlen"
-            spalten={bandSpalten}
-            notizZeilenSchmal={2}
-            notizZeilen={3}
-            style={{ border: 'none' }}
-          >
-            {lagebild == null
-              ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
-                  <Kennzahl key={i} titel={'\u00a0'} wert="" zustand="laden" />
-                ))
-              : lagebild.kennzahlen.map((k) => {
-                  // Ziel nur in ein freies Modul (LFH-888, design.md D4): Wert bleibt, Link entfällt.
-                  const zielPfad = k.ohneZiel
-                    ? undefined
-                    : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route));
-                  const a = bandKennzahl(
-                    k,
-                    kennzahlZustand[k.etikett],
-                    zielPfad != null && !istPfadGesperrt(zielPfad, freigabenQuery.data)
-                      ? zielPfad
-                      : undefined,
-                  );
-                  return (
-                    <Kennzahl
-                      key={k.etikett}
-                      titel={a.titel}
-                      wert={a.wert}
-                      einheit={a.einheit}
-                      notiz={a.notiz}
-                      notizBeschreibung={a.notizBeschreibung}
-                      ton={a.ton}
-                      zustand={a.zustand}
-                      ziel={a.ziel}
-                    />
-                  );
-                })}
-          </Kennzahlenband>
+          <KachelGrenze titel="Lage in Zahlen">
+            <Kennzahlenband
+              beschriftung="Lage in Zahlen"
+              spalten={bandSpalten}
+              notizZeilenSchmal={2}
+              notizZeilen={3}
+              style={{ border: 'none' }}
+            >
+              {lagebild == null
+                ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
+                    <Kennzahl key={i} titel={'\u00a0'} wert="" zustand="laden" />
+                  ))
+                : lagebild.kennzahlen.map((k) => {
+                    // Ziel nur in ein freies Modul (LFH-888, design.md D4): Wert bleibt, Link entfällt.
+                    const zielPfad = k.ohneZiel
+                      ? undefined
+                      : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route));
+                    const a = bandKennzahl(
+                      k,
+                      kennzahlZustand[k.etikett],
+                      zielPfad != null && !istPfadGesperrt(zielPfad, freigabenQuery.data)
+                        ? zielPfad
+                        : undefined,
+                    );
+                    return (
+                      <Kennzahl
+                        key={k.etikett}
+                        titel={a.titel}
+                        wert={a.wert}
+                        einheit={a.einheit}
+                        notiz={a.notiz}
+                        notizBeschreibung={a.notizBeschreibung}
+                        ton={a.ton}
+                        zustand={a.zustand}
+                        ziel={a.ziel}
+                      />
+                    );
+                  })}
+            </Kennzahlenband>
+          </KachelGrenze>
 
           <PaneelReihe kennung="lagebild-paneele">
             {sanitaetsdienst ? (
-              <VerlaufPaneel
-                zustand={zBetroffene}
-                verlauf={verlauf}
+              <KachelGrenze titel="Verlauf">
+                <VerlaufPaneel
+                  zustand={zBetroffene}
+                  verlauf={verlauf}
+                  onNeuladen={() => nachladen('personen')}
+                  onPersonen={() => waehle(personenPfad(einsatzId))}
+                  onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}
+                />
+              </KachelGrenze>
+            ) : (
+              <KachelGrenze titel="Gefahrenmatrix">
+                <GefahrenmatrixPaneel
+                  zustand={zMatrix}
+                  zeilen={matrix.zeilen}
+                  beurteilung={beurteilungHinweis(daten.gefahren ?? [])}
+                  gebiete={anzahlGebiete}
+                  onNeuladen={() => {
+                    nachladen('gefahren');
+                    for (const q of matrixQueries) void q.refetch();
+                  }}
+                  onGefahren={() => waehle(gefahrenPfad(einsatzId))}
+                />
+              </KachelGrenze>
+            )}
+            <KachelGrenze titel="Sichtung">
+              <SichtungsPaneel
+                zustand={zSichtung}
+                zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
+                erfasst={lagebild?.betroffeneGesamt ?? 0}
+                ohneSichtung={lagebild?.sk.ohne ?? 0}
+                versorgung={versorgungsBilanz(daten.personen ?? [])}
                 onNeuladen={() => nachladen('personen')}
                 onPersonen={() => waehle(personenPfad(einsatzId))}
                 onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}
               />
-            ) : (
-              <GefahrenmatrixPaneel
-                zustand={zMatrix}
-                zeilen={matrix.zeilen}
-                beurteilung={beurteilungHinweis(daten.gefahren ?? [])}
-                gebiete={anzahlGebiete}
-                onNeuladen={() => {
-                  nachladen('gefahren');
-                  for (const q of matrixQueries) void q.refetch();
-                }}
-                onGefahren={() => waehle(gefahrenPfad(einsatzId))}
+            </KachelGrenze>
+            <KachelGrenze titel="Jüngste ETB-Einträge">
+              <MeldungsstromPaneel
+                einsatzId={einsatzId}
+                zustand={zStrom}
+                sichtbar={strom.sichtbar}
+                neu={strom.neu}
+                neuMindestens={strom.neuMindestens}
+                liveStatus={liveStatus}
+                konv={konv}
+                onAnzeigen={() => setAngezeigtBis(strom.hoechste)}
+                onNeuladen={() =>
+                  // `refetch` umginge `enabled`: ohne Freigaben erst die Freigaben.
+                  void (freigabenQuery.data === undefined ? freigabenQuery : etbQuery).refetch()
+                }
+                onEtb={() => waehle(etbPfad(einsatzId))}
+                onErfassen={() => waehle(etbPfad(einsatzId, { neu: true }))}
               />
-            )}
-            <SichtungsPaneel
-              zustand={zSichtung}
-              zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
-              erfasst={lagebild?.betroffeneGesamt ?? 0}
-              ohneSichtung={lagebild?.sk.ohne ?? 0}
-              versorgung={versorgungsBilanz(daten.personen ?? [])}
-              onNeuladen={() => nachladen('personen')}
-              onPersonen={() => waehle(personenPfad(einsatzId))}
-              onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}
-            />
-            <MeldungsstromPaneel
-              einsatzId={einsatzId}
-              zustand={zStrom}
-              sichtbar={strom.sichtbar}
-              neu={strom.neu}
-              neuMindestens={strom.neuMindestens}
-              liveStatus={liveStatus}
-              konv={konv}
-              onAnzeigen={() => setAngezeigtBis(strom.hoechste)}
-              onNeuladen={() =>
-                // `refetch` umginge `enabled`: ohne Freigaben erst die Freigaben.
-                void (freigabenQuery.data === undefined ? freigabenQuery : etbQuery).refetch()
-              }
-              onEtb={() => waehle(etbPfad(einsatzId))}
-              onErfassen={() => waehle(etbPfad(einsatzId, { neu: true }))}
-            />
+            </KachelGrenze>
           </PaneelReihe>
 
           {/* Stand (siehe Dateikopf): Lagebericht und Unfallhilfsstellen. Aufträge und Meldungen
             haben ihre Heimat im Überblick (LLH-1743). */}
-          <Kennzahlenband beschriftung="Stand" spalten={2} style={{ border: 'none' }}>
-            {fuehrungsstand.map((a) => (
-              <Kennzahl
-                key={a.titel}
-                titel={a.titel}
-                groesse="klein"
-                wert={a.wert}
-                notiz={a.notiz}
-                ton={a.ton}
-                zustand={a.zustand}
-                ziel={a.ziel}
-              />
-            ))}
-          </Kennzahlenband>
+          <KachelGrenze titel="Stand">
+            <Kennzahlenband beschriftung="Stand" spalten={2} style={{ border: 'none' }}>
+              {fuehrungsstand.map((a) => (
+                <Kennzahl
+                  key={a.titel}
+                  titel={a.titel}
+                  groesse="klein"
+                  wert={a.wert}
+                  notiz={a.notiz}
+                  ton={a.ton}
+                  zustand={a.zustand}
+                  ziel={a.ziel}
+                />
+              ))}
+            </Kennzahlenband>
+          </KachelGrenze>
         </DashboardFlaeche>
       </EinsatzSeite>
       {isGrossbild && (

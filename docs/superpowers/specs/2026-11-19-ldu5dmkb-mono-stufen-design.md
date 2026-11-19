@@ -99,7 +99,7 @@ in `schriftgroesse.schuld.ts`.
 ### Regeln: ADR und `AGENTS.md`
 
 - ADR-0065 verbietet, dass die Schuld wächst oder einen neuen Eintrag bekommt. Die Ausreißer
-  einzubuchen widerspricht dem. Deshalb kommt **ADR-0070** „Mono-Größen kommen aus Stufen der
+  einzubuchen widerspricht dem. Deshalb kommt **ADR-0071** „Mono-Größen kommen aus Stufen der
   `schriftskala`“ mit `ersetzt: ADR-0065`. Sie übernimmt deren Regeln, ergänzt
   „`monoStil` nimmt eine Stufe, ein Zahl-Literal zählt die Ratsche“ und erlaubt die einmalige
   Einbuchung beim Einführen der Mono-Zählung. ADR-0065 bekommt `status: ersetzt`. Die Nummer

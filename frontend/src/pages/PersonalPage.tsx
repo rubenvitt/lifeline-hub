@@ -673,16 +673,14 @@ export default function PersonalPage() {
       }}
       aktionen={
         darfSchreiben && (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-          // `paddingXS` ließ 3 / 5 / 7 px.
-          <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+          <>
             <Button type="primary" onClick={() => setDisponierenOffen(true)}>
               Personal disponieren
             </Button>
             {/* Am Handschirm steht genau eine Erfassung sichtbar (`frontend/AGENTS.md`,
                 „Nebenwege im Kopf“); die zweite geht hinter „Weitere“ (LLH-1786). */}
             {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Person</Button>}
-          </Space>
+          </>
         )
       }
       hinweis={nurAnsicht ? <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} /> : null}

@@ -10,7 +10,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { monoStil, useRollen } from '../../components/instrument';
+import { monoStil, schriftStil, useRollen } from '../../components/instrument';
 import { KontextMenue, type KontextMenueOffen } from '../../components/KontextMenue';
 import type { MenueEintrag } from '../../components/MenueAusloeser';
 import { useKontextMenue, type KontextHandler } from '../../components/useKontextMenue';
@@ -732,7 +732,9 @@ function BlockKachel({
       </span>
       <span
         style={{
-          fontSize: 12,
+          // Das Gewicht erbt vom Block: ein laufender Block steht fett.
+          ...schriftStil('textKlein'),
+          fontWeight: 'inherit',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',

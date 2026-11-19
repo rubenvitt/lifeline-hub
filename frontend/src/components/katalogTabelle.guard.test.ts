@@ -570,7 +570,7 @@ describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
   it('die Gefahrenmatrix hat die stehende Kopfzeile, die ihre Ausnahme verspricht', () => {
     /**
      * Geprüft wird der Prop-Wert im QUELLTEXT, kein Pixel: jsdom rechnet kein Layout. Bauart wie
-     * `aktionsabstand.guard.test.ts`. Hält die Aussage bei {@link AUSNAHMEN} fest, dass die Matrix
+     * `knopfreihe.guard.test.ts`. Hält die Aussage bei {@link AUSNAHMEN} fest, dass die Matrix
      * ihre stehende Kopfzeile selbst trägt.
      *
      * `ohneKommentare` ist nötig, weil {@link KORPUS} ROHTEXT trägt und über dem Prop ein

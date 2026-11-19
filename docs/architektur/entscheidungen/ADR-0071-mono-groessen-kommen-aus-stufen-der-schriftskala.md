@@ -1,5 +1,5 @@
 ---
-id: ADR-0070
+id: ADR-0071
 titel: Text, Mono, Abstand und Feldbreite kommen aus benannten Stufen, die Bausteine nehmen keine Zahl an
 status: akzeptiert
 datum: 2026-11-19
@@ -22,7 +22,7 @@ herleitung:
   - Zunder LLH-1972 (Mono-Stufen und 13 px abgestimmt mit Ruben am 19.11.2026)
 ---
 
-# ADR-0070: Text, Mono, Abstand und Feldbreite kommen aus benannten Stufen, die Bausteine nehmen keine Zahl an
+# ADR-0071: Text, Mono, Abstand und Feldbreite kommen aus benannten Stufen, die Bausteine nehmen keine Zahl an
 
 ## Regeln
 

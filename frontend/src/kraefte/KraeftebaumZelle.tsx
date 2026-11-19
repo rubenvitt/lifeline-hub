@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { POSITION_KUERZEL, POSITION_LABELS } from '../api/personal';
 import { kraefteText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
-import { Augenbraue, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, monoStil, schriftStil, useRollen } from '../components/instrument';
 import { einheitDetailPfad, fahrzeugePfad, personalPfad } from '../routing/deeplinks';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 import { fremdText } from './kraeftebaumKern';
@@ -113,7 +113,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
     return text ? (
       <span
         data-lfh="kraeftebaum-nebentext"
-        style={{ display: 'block', fontSize: 11, color: rollen.gedaempft }}
+        style={{ display: 'block', ...schriftStil('textKlein'), color: rollen.gedaempft }}
       >
         {text}
       </span>
@@ -192,7 +192,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
             gap: token.marginXS,
           }}
         >
-          <Augenbraue style={{ fontSize: 11 }}>{z.bezeichnung}</Augenbraue>
+          <Augenbraue>{z.bezeichnung}</Augenbraue>
           {/* Zahlen in Mono (Regel „Zahlen immer Mono“), samt ihrem Zählwort. */}
           <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>· {anzahl}</span>
           {ausfall && (

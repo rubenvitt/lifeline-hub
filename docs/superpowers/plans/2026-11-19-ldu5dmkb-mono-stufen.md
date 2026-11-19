@@ -7,7 +7,7 @@
 **Architecture:** Die Skala in `theme/tokens.ts` bekommt vier Mono-Stufen, die `rollen.css`
 spiegelt. `monoStil` nimmt eine Stufe oder eine Zahl aus einer Variablen. Ein Wegwerf-Skript
 stellt die Aufrufe pixelgleich um. Die Ratsche zählt Zahl-Literale in `monoStil`, und die
-Ausreißer kommen einmalig in die Schuld (ADR-0070 ersetzt ADR-0065).
+Ausreißer kommen einmalig in die Schuld (ADR-0071 ersetzt ADR-0065).
 
 **Tech Stack:** TypeScript, React, Vitest (Frontend unter `frontend/`, `mise exec -- pnpm …`).
 
@@ -92,14 +92,14 @@ Ausreißer kommen einmalig in die Schuld (ADR-0070 ersetzt ADR-0065).
 ### Task 5: Regeln nachziehen
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0070-mono-groessen-kommen-aus-stufen-der-schriftskala.md` (Nummer vorher gegen `origin/alpha` prüfen)
-- Modify: `docs/architektur/entscheidungen/ADR-0065-*.md` (nur Kopf: `status: ersetzt`, `ersetzt_durch: ADR-0070`)
+- Create: `docs/architektur/entscheidungen/ADR-0071-mono-groessen-kommen-aus-stufen-der-schriftskala.md` (Nummer vorher gegen `origin/alpha` prüfen)
+- Modify: `docs/architektur/entscheidungen/ADR-0065-*.md` (nur Kopf: `status: ersetzt`, `ersetzt_durch: ADR-0071`)
 - Modify: `frontend/AGENTS.md`, „`schriftskala`“
 
-- [x] **Step 1:** ADR-0070 nach `VORLAGE.md`, `ersetzt: ADR-0065`. Übernimmt alle Regeln von ADR-0065; neu: MUST `monoStil` nimmt eine Stufe (`Monostufe`), MUST NOT `monoStil` mit Zahl-Literal; die Schuld-Regel erlaubt die einmalige Einbuchung der Mono-Ausreißer vom 19.11.2026. Die Prüfung übernimmt die von ADR-0065 und dazu `verlange "monoStil\\\\\\(" frontend/src/theme/schriftgroesse.guard.test.ts` sowie `verlange 'mono: \{ groesse: 13' frontend/src/theme/tokens.ts`. Unter 80 Zeilen.
+- [x] **Step 1:** ADR-0071 nach `VORLAGE.md`, `ersetzt: ADR-0065`. Übernimmt alle Regeln von ADR-0065; neu: MUST `monoStil` nimmt eine Stufe (`Monostufe`), MUST NOT `monoStil` mit Zahl-Literal; die Schuld-Regel erlaubt die einmalige Einbuchung der Mono-Ausreißer vom 19.11.2026. Die Prüfung übernimmt die von ADR-0065 und dazu `verlange "monoStil\\\\\\(" frontend/src/theme/schriftgroesse.guard.test.ts` sowie `verlange 'mono: \{ groesse: 13' frontend/src/theme/tokens.ts`. Unter 80 Zeilen.
 - [x] **Step 2:** `frontend/AGENTS.md`: „13 px gibt es nicht“ wird zu „13 px gibt es nur als Mono-Stufe `mono`“. Dazu ein Satz: Mono-Größen nimmt `monoStil(stufe)` (`metaKlein` 10 bis `monoGross` 14, `datenwert*`), eine Zahl nur aus Variablen.
-- [x] **Step 3:** `scripts/adr-fuer.sh frontend/src/theme/tokens.ts` nennt ADR-0070; `./scripts/check-all.sh --nur schnell` (ADR-Wächter, Prettier) ist grün.
-- [x] **Step 4:** Commit `docs: ADR-0070 Mono-Stufen ersetzt ADR-0065, frontend/AGENTS.md`.
+- [x] **Step 3:** `scripts/adr-fuer.sh frontend/src/theme/tokens.ts` nennt ADR-0071; `./scripts/check-all.sh --nur schnell` (ADR-Wächter, Prettier) ist grün.
+- [x] **Step 4:** Commit `docs: ADR-0071 Mono-Stufen ersetzt ADR-0065, frontend/AGENTS.md`.
 
 ### Task 6: Pixelgleichheit belegen und Gates
 

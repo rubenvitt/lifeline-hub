@@ -1,6 +1,6 @@
-import { Button, Modal, Space } from 'antd';
+import { Button, Modal } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { Status, monoStil, Stapel } from '../components/instrument';
+import { Knopfreihe, Status, monoStil, Stapel } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -225,14 +225,14 @@ export default function SprechgruppenTab() {
                 // Unter `md` passen zwei Knöpfe neben Kennung und Status nicht in 390 px.
                 <ZeilenMenueAusloeser menue={zeilenMenue} zeile={sg} />
               ) : (
-                <Space size="middle">
+                <Knopfreihe umbruch={false}>
                   <Button onClick={() => bearbeiten(sg)}>Bearbeiten</Button>
                   {sg.aktiv && (
                     <Button danger onClick={() => setZuDeaktivieren(sg)}>
                       Deaktivieren
                     </Button>
                   )}
-                </Space>
+                </Knopfreihe>
               ),
           },
         ]

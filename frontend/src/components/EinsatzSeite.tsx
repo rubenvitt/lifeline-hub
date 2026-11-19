@@ -24,6 +24,7 @@ import { useEinsatzRahmen, useImEinsatzRahmen } from '../einsatz/EinsatzRahmenKo
 import { einsatzStatus } from '../theme/statusFarben';
 import type { EinsatzAnzeige } from '../api/types';
 import { Status } from './instrument/Status';
+import Knopfreihe from './instrument/Knopfreihe';
 
 /** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — in
  *  `komfortabel`/`handschuh` wächst sie mit der Staffel (48/72, {@link titelblockStil}), eine
@@ -674,14 +675,10 @@ export default function EinsatzSeite({
             global gezählt fiele eine Seite mit Formular im Inhalt zu Unrecht durch. Die
             Dev-Warnung oben zählt denselben Teilbaum. */}
         {(aktionen || (weitere && weitere.eintraege.length > 0)) && (
-          <div
-            ref={aktionenRef}
-            data-lfh="seitenkopf-aktionen"
-            // Zielabstand der Dichte-Staffel (LFH-968: `marginSM` = 8 / 12 / 16 px): ab `md` stehen
-            // Nebenwege hier als Geschwister nebeneinander, mit `marginXS * 2` fehlten im Handschuh
-            // 2 px zwischen zwei Knöpfen (LFH-1079).
-            style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}
-          >
+          // Eine Knopfreihe (LLH-1973): Abstand `md` je Dichte; ab `md` stehen Nebenwege hier als
+          // Geschwister der Aktionen. Ein `<Space>` in `aktionen` wäre ein zweiter Abstand, die
+          // Seiten reichen ihre Knöpfe deshalb als Fragment.
+          <Knopfreihe ref={aktionenRef} data-lfh="seitenkopf-aktionen">
             {/* Unter `md` steht der Auslöser „Weitere“ VORN (LFH-963): hinten bräche er bei 390 px in
                 eine eigene Zeile und kostete die erste Personenzeile ihren Platz; vorn teilt er die
                 Zeile mit der Segmentleiste. Ab `md` folgen Knöpfe bzw. Auslöser (Stufen 48 / 72)
@@ -690,7 +687,7 @@ export default function EinsatzSeite({
             {weitere && istSchmal && <NebenwegeImKopf {...weitere} />}
             {aktionen}
             {weitere && !istSchmal && <NebenwegeImKopf {...weitere} />}
-          </div>
+          </Knopfreihe>
         )}
       </div>
       {(beschreibung || hinweis) && (

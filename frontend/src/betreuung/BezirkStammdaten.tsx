@@ -132,7 +132,7 @@ export default function BezirkStammdaten({
       {zelle(
         'plan_personen',
         'Plangröße (Personen)',
-        <InputNumber precision={0} style={{ width: '100%' }} />,
+        <InputNumber precision={0} />,
         mengeText(bezirk.plan_personen, bezirk.plan_erhebung),
         { mono: true, rules: PLAN_REGELN },
       )}

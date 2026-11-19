@@ -95,8 +95,8 @@ const OFFEN: string[] = [
   // Dichte kennt. Sie fiele erst, wenn die Zeilenform volle Steuerhöhe trüge, und die passt nicht
   // in den festen Innenraum der Karte (Rechnung im Dateikopf von `uhs/Grundriss.tsx`).
   '/src/pages/uhs/Grundriss.tsx',
-  // Wer eine Klein-Angabe entfernt, prüft `aktionsabstand.guard.test.ts` mit: der Abbau kann eine
-  // danger-Nachbarschaft erst entstehen lassen.
+  // Wer eine Klein-Angabe entfernt, prüft die Reihe mit: zwei Knöpfe nebeneinander stehen in
+  // `Knopfreihe` (Abstand `md`, `knopfreihe.guard.test.ts`).
 ];
 
 function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, string> {

@@ -17,7 +17,14 @@ import {
 } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { Status, monoStil, useRollen } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  Status,
+  Textstufe,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -394,18 +401,18 @@ function MeldungKarte({
 
       {/* Absender und Empfänger sind Metadaten, nicht Inhalt — Metazeilen-Größe. */}
       <Space size={token.marginSM} wrap style={{ marginBottom: token.marginSM }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        <Textstufe stufe="textKlein" ton="gedaempft">
           {m.absender}
-        </Text>
+        </Textstufe>
         {m.empfaenger && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             → {m.empfaenger}
-          </Text>
+          </Textstufe>
         )}
         {/* Standort der Meldung (Einheitengerät auf Knopfdruck, LLH-1579 F9); die Führung springt
            damit auf die Karte, ein Gerät sieht ihn nur. */}
         {m.lat != null && m.lon != null && (
-          <Text type="secondary" style={{ fontSize: 12 }} data-lfh="meldung-standort">
+          <Text type="secondary" style={schriftStil('textKlein')} data-lfh="meldung-standort">
             {darf('fremde-module') ? (
               <KennungsLink to={lagekartePfad(einsatzId, { zentrum: { lat: m.lat, lon: m.lon } })}>
                 {formatKoordinate(m.lat, m.lon)}
@@ -417,10 +424,10 @@ function MeldungKarte({
         )}
       </Space>
 
-      {/* Der Wortlaut ist der Grund der Karte und trägt den größten Schriftgrad (wie `AuftragKarte`);
-         Zeilenhöhe 1.5, weil er regelmäßig mehrzeilig ist. Er folgt direkt auf Absender und
+      {/* Der Wortlaut ist der Grund der Karte und trägt ihren größten Schriftgrad, die Stufe `text`
+         (Lauftext, kein Kartentitel); Zeilenhöhe 1.5, weil er regelmäßig mehrzeilig ist. Er folgt direkt auf Absender und
          Empfänger, die Verwaltung steht danach (LFH-974): am Handy liegt er so im ersten Schirm. */}
-      <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block' }}>{m.inhalt}</Text>
+      <Textstufe als="div">{m.inhalt}</Textstufe>
 
       <Flex align="center" gap={token.marginSM} wrap style={{ marginTop: token.marginSM }}>
         <Text type="secondary" style={{ ...monoStil('meta'), color: rollen.gedaempft }}>
@@ -433,9 +440,9 @@ function MeldungKarte({
           </Text>
         )}
         {m.bearbeiter_name && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Textstufe stufe="textKlein" ton="gedaempft">
             Bearbeiter: {m.bearbeiter_name}
-          </Text>
+          </Textstufe>
         )}
       </Flex>
 
@@ -470,18 +477,20 @@ function MeldungKarte({
           style={{ marginTop: token.marginSM }}
         >
           {zuweisbar ? (
-            <Select<number | null>
-              allowClear
-              style={{ minWidth: 180 }}
-              placeholder="Bearbeiter zuweisen"
-              value={m.bearbeiter_id ?? undefined}
-              onChange={(v) => onZuweisen?.(m.id, v ?? null)}
-              options={(mitglieder ?? []).map((mi) => ({
-                value: mi.benutzer_id,
-                label: mi.anzeigename,
-              }))}
-              aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
-            />
+            // Mindestbreite über die Hülle; die Auswahl füllt sie.
+            <div className={FELD_KLASSE} style={{ minWidth: 'var(--lfh-feld-schmal)' }}>
+              <Select<number | null>
+                allowClear
+                placeholder="Bearbeiter zuweisen"
+                value={m.bearbeiter_id ?? undefined}
+                onChange={(v) => onZuweisen?.(m.id, v ?? null)}
+                options={(mitglieder ?? []).map((mi) => ({
+                  value: mi.benutzer_id,
+                  label: mi.anzeigename,
+                }))}
+                aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
+              />
+            </div>
           ) : (
             <span />
           )}

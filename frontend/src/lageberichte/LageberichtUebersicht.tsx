@@ -16,6 +16,8 @@ import {
   Paneel,
   PaneelLink,
   PaneelZustand,
+  Stapel,
+  Textstufe,
   monoStil,
   useRollen,
 } from '../components/instrument';
@@ -105,7 +107,7 @@ function AktuellPaneel({
   detail: LageberichtAnzeige | undefined;
   fortschreiben: Props['fortschreiben'];
 }) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const navigate = useNavigate();
   const kern = kernAbschnitt(bericht.vorlage);
   const kernText = kern && detail?.abschnitte.find((a) => a.schluessel === kern.schluessel)?.text;
@@ -122,45 +124,44 @@ function AktuellPaneel({
       }
       koerperPolster
     >
-      <div
-        data-lfh="lagebericht-aktuell"
-        style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
-      >
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: rollen.text }}>
-          {bericht.titel}
-        </h3>
-        <Datenraster spalten={2}>
-          <Datenfeld label="Zeitstand" mono>
-            <ZeitAnzeige wert={bericht.zeitstand} />
-          </Datenfeld>
-          <Datenfeld label="Freigegeben" mono>
-            {bericht.freigegeben_von_name ?? '—'}
-            {bericht.freigegeben_at && (
-              <>
-                {' · '}
-                <ZeitAnzeige wert={bericht.freigegeben_at} />
-              </>
-            )}
-          </Datenfeld>
-        </Datenraster>
-        {kern && auszug && (
-          <div data-lfh="lagebericht-auszug">
-            <Augenbraue als="div" style={{ marginBlockEnd: token.marginXXS }}>
-              {kern.label}
-            </Augenbraue>
-            {/* Unter dem Titel (h3) — `#` im Text wird h4. */}
-            <Markdown variante="kompakt" unterEbene={3}>
-              {auszug.gekuerzt ? `${auszug.text} …` : auszug.text}
-            </Markdown>
-          </div>
-        )}
-        {fortschreiben && (
-          <span>
-            <Button onClick={fortschreiben.onKlick} loading={fortschreiben.laeuft}>
-              Fortschreiben
-            </Button>
-          </span>
-        )}
+      <div data-lfh="lagebericht-aktuell">
+        <Stapel abstand="sm">
+          <Textstufe als="h3" stufe="kartentitel">
+            {bericht.titel}
+          </Textstufe>
+          <Datenraster spalten={2}>
+            <Datenfeld label="Zeitstand" mono>
+              <ZeitAnzeige wert={bericht.zeitstand} />
+            </Datenfeld>
+            <Datenfeld label="Freigegeben" mono>
+              {bericht.freigegeben_von_name ?? '—'}
+              {bericht.freigegeben_at && (
+                <>
+                  {' · '}
+                  <ZeitAnzeige wert={bericht.freigegeben_at} />
+                </>
+              )}
+            </Datenfeld>
+          </Datenraster>
+          {kern && auszug && (
+            <div data-lfh="lagebericht-auszug">
+              <Augenbraue als="div" style={{ marginBlockEnd: token.marginXXS }}>
+                {kern.label}
+              </Augenbraue>
+              {/* Unter dem Titel (h3) — `#` im Text wird h4. */}
+              <Markdown variante="kompakt" unterEbene={3}>
+                {auszug.gekuerzt ? `${auszug.text} …` : auszug.text}
+              </Markdown>
+            </div>
+          )}
+          {fortschreiben && (
+            <span>
+              <Button onClick={fortschreiben.onKlick} loading={fortschreiben.laeuft}>
+                Fortschreiben
+              </Button>
+            </span>
+          )}
+        </Stapel>
       </div>
     </Paneel>
   );

@@ -1,5 +1,5 @@
 import { IconChevronRunter, IconLadekreis } from '../icons';
-import { App, Button, Dropdown, Popconfirm, Progress, Space, theme, Tooltip } from 'antd';
+import { App, Button, Dropdown, Popconfirm, Progress, theme, Tooltip } from 'antd';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -22,7 +22,7 @@ import {
   type OfflineKarte,
 } from '../api/offlineKarten';
 import AutoAktualisierungZeile from './AutoAktualisierungZeile';
-import { Stapel, Textstufe } from '../components/instrument';
+import { Knopfreihe, Stapel, Textstufe } from '../components/instrument';
 import { listenTakt, statusTakt } from './aktualisierungTakt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { invalidiereKarte } from './invalidiereKarte';
@@ -343,9 +343,7 @@ export default function OfflineKartenVerwaltung() {
               const grund = zeilen.grund(k.id);
               return (
                 <Stapel abstand="xxs" ausrichten="start">
-                  {/* `size="middle"` trennt „Löschen" von der neutralen Nachbaraktion
-                      (`components/aktionsabstand.guard.test.ts`). */}
-                  <Space size="middle">
+                  <Knopfreihe umbruch={false}>
                     {k.status === 'bereit' && k.aktualisierbar && !laeuft && !phase && (
                       <Button
                         aria-label={`Jetzt aktualisieren: ${k.name}`}
@@ -368,7 +366,7 @@ export default function OfflineKartenVerwaltung() {
                         <Button danger>Löschen</Button>
                       </Popconfirm>
                     )}
-                  </Space>
+                  </Knopfreihe>
                   {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
                 </Stapel>
               );
@@ -381,29 +379,31 @@ export default function OfflineKartenVerwaltung() {
   return (
     <>
       {istAdmin && (
-        <Space style={{ marginBottom: 'var(--lfh-luft-3)' }}>
-          {/* Ein Weg für den Regelfall: bauen (falls nötig) + laden hinter einem Button. */}
-          <Button type="primary" onClick={() => setPickerOffen(true)}>
-            Region aufs Gerät bringen
-          </Button>
-          {/* Spezialfälle (eigene URL, lokal gebaute Datei) unter „Erweitert". */}
-          <Dropdown
-            menu={{
-              items: [
-                { key: 'url', label: 'Per URL herunterladen', onClick: () => setUrlOffen(true) },
-                {
-                  key: 'lokal',
-                  label: 'Gebaute Region übernehmen',
-                  onClick: () => setVorhandenOffen(true),
-                },
-              ],
-            }}
-          >
-            <Button>
-              Erweitert <IconChevronRunter />
+        <div style={{ marginBottom: 'var(--lfh-luft-3)' }}>
+          <Knopfreihe data-lfh="offline-karten-werkzeuge">
+            {/* Ein Weg für den Regelfall: bauen (falls nötig) + laden hinter einem Button. */}
+            <Button type="primary" onClick={() => setPickerOffen(true)}>
+              Region aufs Gerät bringen
             </Button>
-          </Dropdown>
-        </Space>
+            {/* Spezialfälle (eigene URL, lokal gebaute Datei) unter „Erweitert". */}
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'url', label: 'Per URL herunterladen', onClick: () => setUrlOffen(true) },
+                  {
+                    key: 'lokal',
+                    label: 'Gebaute Region übernehmen',
+                    onClick: () => setVorhandenOffen(true),
+                  },
+                ],
+              }}
+            >
+              <Button>
+                Erweitert <IconChevronRunter />
+              </Button>
+            </Dropdown>
+          </Knopfreihe>
+        </div>
       )}
       {statusQuery.data && (
         <AutoAktualisierungZeile status={statusQuery.data} istAdmin={istAdmin} />

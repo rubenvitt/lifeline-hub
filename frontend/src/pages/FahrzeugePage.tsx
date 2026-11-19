@@ -34,7 +34,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, EntlassungVorzustand, Staerke } 
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { monoStil, Segmentleiste } from '../components/instrument';
+import { Knopfreihe, monoStil, Segmentleiste } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   parseFahrzeugeAnsicht,
@@ -1280,9 +1280,7 @@ function FahrzeugeInhalt() {
             : [],
       }}
       aktionen={
-        // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
-        // `paddingXS` ließ 3 / 5 / 7 px.
-        <Space wrap size={token.marginSM} style={{ minWidth: 0 }}>
+        <>
           {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. Am
               Handschirm hinter „Filter (n)“ (LLH-1786, Change `z137bgm5-seitenkopf-einzeilig`
               D5), samt Sortierung und Status der Liste. */}
@@ -1306,7 +1304,7 @@ function FahrzeugeInhalt() {
               {!istSchmal && <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>}
             </>
           )}
-        </Space>
+        </>
       }
       hinweis={
         nurAnsicht ||
@@ -1566,7 +1564,7 @@ function FahrzeugeInhalt() {
         }}
         destroyOnHidden
         footer={
-          <Space size="middle">
+          <Knopfreihe fuss>
             <Button
               onClick={() => {
                 if (isNewGestureStorno()) setStornoFuer(null);
@@ -1584,7 +1582,7 @@ function FahrzeugeInhalt() {
             >
               Stornieren
             </Button>
-          </Space>
+          </Knopfreihe>
         }
       >
         Das Fahrzeug erscheint danach in keiner Liste und keinem Nachweis.

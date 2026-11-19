@@ -9,6 +9,7 @@ import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { istLeer, lageAenderung } from './meldungKorrekturKern';
+import { Feld } from '../components/instrument';
 
 interface Props {
   einsatzId: number;
@@ -80,7 +81,7 @@ export default function LageAngabenBearbeiten({ einsatzId, lage, onFertig }: Pro
       aria-label={`Lage-Angaben zu Meldung #${lage.meldung_lfd_nr}`}
       style={{ width: '100%' }}
     >
-      <Form.Item name="text" label="Lage-Text" rules={[zeichenRegel(ETB_INHALT_MAX, 'Lage-Text')]}>
+      <Feld name="text" label="Lage-Text" rules={[zeichenRegel(ETB_INHALT_MAX, 'Lage-Text')]}>
         {/* Leer gilt der Wortlaut: der Platzhalter sagt es, wie „jetzt“ an der Ereigniszeit. */}
         <Input.TextArea
           aria-label="Lage-Text"
@@ -88,7 +89,7 @@ export default function LageAngabenBearbeiten({ einsatzId, lage, onFertig }: Pro
           placeholder="Wortlaut der Meldung"
           count={zeichenGrenze(ETB_INHALT_MAX)}
         />
-      </Form.Item>
+      </Feld>
       <KoordinatenFeld
         name="koord"
         label="Verortung"

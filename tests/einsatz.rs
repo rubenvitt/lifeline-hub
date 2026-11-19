@@ -194,6 +194,10 @@ async fn detail_fuer_nicht_mitglied_ist_403() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    // LLH-1819: der Grund nennt den Weg heraus, ohne mehr über den Einsatz zu verraten.
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["grund"], "kein_mitglied");
 }
 
 #[tokio::test]
@@ -1558,6 +1562,12 @@ async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
             StatusCode::FORBIDDEN,
             "Tombstone muss {uri} sperren (auch für Admin)"
         );
+        if uri == format!("/api/einsaetze/{id}") {
+            // LLH-1819: wer den Einsatz grundsätzlich sehen dürfte, erfährt den Grund.
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(json["grund"], "nicht_mehr_lesbar");
+        }
     }
 }
 

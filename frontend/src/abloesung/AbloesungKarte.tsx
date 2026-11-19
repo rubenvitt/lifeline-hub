@@ -1,5 +1,5 @@
 import { dauer, relativ } from '../anzeige/dauer';
-import { Button, Flex, Space, Typography } from 'antd';
+import { Button, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
 import type { Abloesung, BeendetGrund, RhythmusQuelle } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -8,7 +8,7 @@ import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, Stapel, Textstufe, useRollen } from '../components/instrument';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -241,64 +241,39 @@ export default function AbloesungKarte({
         <span style={{ ...monoStil('metaKlein'), color: rollen.schwach }}>{spalte.wort}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: token.paddingSM }}>
-        <Flex justify="space-between" align="center" gap={token.marginXS} wrap>
-          <Text strong style={{ fontSize: 15 }}>
-            {s.einheit_name}
-          </Text>
-          {darstellung && <Status darstellung={darstellung} />}
-        </Flex>
-        <Space orientation="vertical" size={2} style={{ width: '100%', marginTop: token.marginXS }}>
-          {laufend && <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>}
-          <Text type="secondary">
-            {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}
-            {/* Die Herkunft im Wort vor der Zeit (LLH-1312), keine eigene Zeile. */}
-            {beginnWort(s.beginn_quelle)}{' '}
-            {/* Zeiten in Mono mit festen Ziffern, in der Größe der Zeile (LFH-771): in der
+        <Stapel abstand="xs">
+          <Stapel richtung="zeile" umbruch abstand="xs" ausrichten="mitte" verteilen="between">
+            <Textstufe stufe="kartentitel">{s.einheit_name}</Textstufe>
+            {darstellung && <Status darstellung={darstellung} />}
+          </Stapel>
+          <Stapel abstand="xxs">
+            {laufend && (
+              <Text data-lfh="abloesung-abstand">{abstandText(s.faellig_at, jetzt)}</Text>
+            )}
+            <Text type="secondary">
+              {s.abschnitt_name ? `${s.abschnitt_name} · ` : ''}
+              {/* Die Herkunft im Wort vor der Zeit (LLH-1312), keine eigene Zeile. */}
+              {beginnWort(s.beginn_quelle)}{' '}
+              {/* Zeiten in Mono mit festen Ziffern, in der Größe der Zeile (LFH-771): in der
                 Textschrift hinge die Breite und damit der Umbruch an den Ziffern. */}
-            <span
-              data-lfh="abloesung-beginn"
-              style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}
-            >
-              <ZeitAnzeige wert={s.beginn_at} rolle="kurz" />
-            </span>
-          </Text>
-          {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
+              <span
+                data-lfh="abloesung-beginn"
+                style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}
+              >
+                <ZeitAnzeige wert={s.beginn_at} rolle="kurz" />
+              </span>
+            </Text>
+            {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
               Zeile darf sie berühren; sie bleibt deshalb immer einzeilig (LFH-708). Den Abschnitt
               nennt die Zeile darüber, seine Vorgabe heißt nur „Vorgabe“. „Vorgabe Einsatz“
               (LLH-1122) passt auf 390 px für die meisten Werte; beim längsten („167 h 59 min“,
               LLH-1750) und im Handschuh-Betrieb kürzt die Zeile das Quellenwort mit „…“, nie den
               Wert, und der ganze Text steht im `title` (gemessen in
               `e2e/abloesung-zufluss.spec.ts`). */}
-          <Text
-            type="secondary"
-            data-lfh="abloesung-rhythmus"
-            title={planZeile ?? rhythmusZeile}
-            style={{
-              display: 'block',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {/* Laut Plan (LLH-1555) steht hier der Folgeblock statt des Rhythmus, in derselben
-                einzeiligen Zeile: ein geänderter Block ändert die Höhe der Karte nicht. */}
-            {planZeile != null ? (
-              <span data-lfh="abloesung-laut-plan">{planZeile}</span>
-            ) : (
-              <>
-                <span data-lfh="abloesung-rhythmus-wert">Rhythmus {dauer(s.rhythmus_minuten)}</span>{' '}
-                ({QUELLE_WORT[s.rhythmus_quelle]})
-              </>
-            )}
-          </Text>
-          {/* Knoten-Modell (LLH-1118 Punkt 1): die Erben nennt der Server, der Client rechnet
-              nichts nach. Einzeilig wie der Rhythmus: kommt ein Erbe hinzu oder fällt einer weg,
-              ändert das die Höhe nur, wenn die Zeile erscheint oder verschwindet. */}
-          {laufend && erben && (
             <Text
               type="secondary"
-              data-lfh="abloesung-erben"
-              title={erben}
+              data-lfh="abloesung-rhythmus"
+              title={planZeile ?? rhythmusZeile}
               style={{
                 display: 'block',
                 whiteSpace: 'nowrap',
@@ -306,83 +281,27 @@ export default function AbloesungKarte({
                 textOverflow: 'ellipsis',
               }}
             >
-              {erben}
+              {/* Laut Plan (LLH-1555) steht hier der Folgeblock statt des Rhythmus, in derselben
+                einzeiligen Zeile: ein geänderter Block ändert die Höhe der Karte nicht. */}
+              {planZeile != null ? (
+                <span data-lfh="abloesung-laut-plan">{planZeile}</span>
+              ) : (
+                <>
+                  <span data-lfh="abloesung-rhythmus-wert">
+                    Rhythmus {dauer(s.rhythmus_minuten)}
+                  </span>{' '}
+                  ({QUELLE_WORT[s.rhythmus_quelle]})
+                </>
+              )}
             </Text>
-          )}
-          {/* Folgeschicht eines Besatzungswechsels (LLH-1319): die Besatzung beim Wechsel, nicht
-              die heutige Zuordnung; einzeilig, der ganze Text im Titel, ohne Einstufung. */}
-          {nachWechsel && (
-            <Text
-              type="secondary"
-              data-lfh="abloesung-nach-besatzungswechsel"
-              title={`nach Besatzungswechsel · Besatzung: ${nachWechsel}`}
-              style={EINZEILIG}
-            >
-              nach Besatzungswechsel · Besatzung: {nachWechsel}
-            </Text>
-          )}
-          {/* Geplanter Besatzungswechsel (LLH-1319) an der Stelle der Ablöser: eine Schicht plant
-              das eine oder das andere. Einzeilig, samt Verteilung im Titel. */}
-          {plan && (
-            <Text
-              type="secondary"
-              data-lfh="abloesung-besatzung-plan"
-              title={`Besatzungswechsel geplant · neu: ${plan.voll}`}
-              style={EINZEILIG}
-            >
-              Besatzungswechsel geplant · neu: {plan.kurz}
-            </Text>
-          )}
-          {/* Die Ablöser als Liste (LLH-1132), eine übernommene Schicht mit Vermerk. Einzeilig
-              wie die Erben: eine fremde Planung ändert die Höhe nur, wenn die Zeile erscheint
-              oder verschwindet; der ganze Text steht im Titel. */}
-          {stand ? (
-            <Text
-              type="secondary"
-              data-lfh="abloesung-abloeser"
-              title={abloeserStandText(stand, konventionen)}
-              style={EINZEILIG}
-            >
-              Ablösung:{' '}
-              {stand.map((a, i) => (
-                <span key={a.einheit_id}>
-                  {i > 0 && '; '}
-                  {a.einheit_name}
-                  {a.alarmiert_at && (
-                    <>
-                      {' · alarmiert '}
-                      <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
-                        <ZeitAnzeige wert={a.alarmiert_at} rolle="kurz" />
-                      </span>
-                    </>
-                  )}
-                  {a.eingetroffen_at && (
-                    <>
-                      {' · eingetroffen '}
-                      <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
-                        <ZeitAnzeige wert={a.eingetroffen_at} rolle="kurz" />
-                      </span>
-                    </>
-                  )}
-                  {a.abgerufen_at && (
-                    <>
-                      {' · abgerufen '}
-                      <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
-                        <ZeitAnzeige wert={a.abgerufen_at} rolle="kurz" />
-                      </span>
-                    </>
-                  )}
-                  {a.br_name && ` (${a.br_name})`}
-                </span>
-              ))}
-            </Text>
-          ) : (
-            durch &&
-            s.status !== 'beendet' && (
+            {/* Knoten-Modell (LLH-1118 Punkt 1): die Erben nennt der Server, der Client rechnet
+              nichts nach. Einzeilig wie der Rhythmus: kommt ein Erbe hinzu oder fällt einer weg,
+              ändert das die Höhe nur, wenn die Zeile erscheint oder verschwindet. */}
+            {laufend && erben && (
               <Text
                 type="secondary"
-                data-lfh="abloesung-abloeser"
-                title={`${laufend ? 'Ablösung geplant durch' : 'Abgelöst durch'} ${durch}`}
+                data-lfh="abloesung-erben"
+                title={erben}
                 style={{
                   display: 'block',
                   whiteSpace: 'nowrap',
@@ -390,120 +309,203 @@ export default function AbloesungKarte({
                   textOverflow: 'ellipsis',
                 }}
               >
-                {laufend ? 'Ablösung geplant durch ' : 'Abgelöst durch '}
-                {durch}
+                {erben}
               </Text>
-            )
-          )}
-          {/* Entfallene Planung (LLH-1309): nur an einer laufenden Schicht ohne Ablöser, das
+            )}
+            {/* Folgeschicht eines Besatzungswechsels (LLH-1319): die Besatzung beim Wechsel, nicht
+              die heutige Zuordnung; einzeilig, der ganze Text im Titel, ohne Einstufung. */}
+            {nachWechsel && (
+              <Text
+                type="secondary"
+                data-lfh="abloesung-nach-besatzungswechsel"
+                title={`nach Besatzungswechsel · Besatzung: ${nachWechsel}`}
+                style={EINZEILIG}
+              >
+                nach Besatzungswechsel · Besatzung: {nachWechsel}
+              </Text>
+            )}
+            {/* Geplanter Besatzungswechsel (LLH-1319) an der Stelle der Ablöser: eine Schicht plant
+              das eine oder das andere. Einzeilig, samt Verteilung im Titel. */}
+            {plan && (
+              <Text
+                type="secondary"
+                data-lfh="abloesung-besatzung-plan"
+                title={`Besatzungswechsel geplant · neu: ${plan.voll}`}
+                style={EINZEILIG}
+              >
+                Besatzungswechsel geplant · neu: {plan.kurz}
+              </Text>
+            )}
+            {/* Die Ablöser als Liste (LLH-1132), eine übernommene Schicht mit Vermerk. Einzeilig
+              wie die Erben: eine fremde Planung ändert die Höhe nur, wenn die Zeile erscheint
+              oder verschwindet; der ganze Text steht im Titel. */}
+            {stand ? (
+              <Text
+                type="secondary"
+                data-lfh="abloesung-abloeser"
+                title={abloeserStandText(stand, konventionen)}
+                style={EINZEILIG}
+              >
+                Ablösung:{' '}
+                {stand.map((a, i) => (
+                  <span key={a.einheit_id}>
+                    {i > 0 && '; '}
+                    {a.einheit_name}
+                    {a.alarmiert_at && (
+                      <>
+                        {' · alarmiert '}
+                        <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
+                          <ZeitAnzeige wert={a.alarmiert_at} rolle="kurz" />
+                        </span>
+                      </>
+                    )}
+                    {a.eingetroffen_at && (
+                      <>
+                        {' · eingetroffen '}
+                        <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
+                          <ZeitAnzeige wert={a.eingetroffen_at} rolle="kurz" />
+                        </span>
+                      </>
+                    )}
+                    {a.abgerufen_at && (
+                      <>
+                        {' · abgerufen '}
+                        <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
+                          <ZeitAnzeige wert={a.abgerufen_at} rolle="kurz" />
+                        </span>
+                      </>
+                    )}
+                    {a.br_name && ` (${a.br_name})`}
+                  </span>
+                ))}
+              </Text>
+            ) : (
+              durch &&
+              s.status !== 'beendet' && (
+                <Text
+                  type="secondary"
+                  data-lfh="abloesung-abloeser"
+                  title={`${laufend ? 'Ablösung geplant durch' : 'Abgelöst durch'} ${durch}`}
+                  style={{
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {laufend ? 'Ablösung geplant durch ' : 'Abgelöst durch '}
+                  {durch}
+                </Text>
+              )
+            )}
+            {/* Entfallene Planung (LLH-1309): nur an einer laufenden Schicht ohne Ablöser, das
               entscheidet der Server. Dezent in der Rolle Achtung wie die Warnungen, einzeilig. */}
-          {laufend && entfallen && (
-            <Text
-              data-lfh="abloesung-planung-entfallen"
-              title={entfallen}
-              style={{ ...EINZEILIG, color: rollen.achtungText }}
-            >
-              {entfallen}
-            </Text>
-          )}
-          {/* Plausibilität beim Planen (LLH-1131): dezent, Rolle Achtung, nie Rot; die Planung
+            {laufend && entfallen && (
+              <Text
+                data-lfh="abloesung-planung-entfallen"
+                title={entfallen}
+                style={{ ...EINZEILIG, color: rollen.achtungText }}
+              >
+                {entfallen}
+              </Text>
+            )}
+            {/* Plausibilität beim Planen (LLH-1131): dezent, Rolle Achtung, nie Rot; die Planung
               gilt trotzdem. Einzeilig wie die Ablöser, der ganze Text im Titel. */}
-          {warnungen && (
-            <Text
-              data-lfh="abloesung-planung-warnung"
-              title={warnungen}
-              style={{ ...EINZEILIG, color: rollen.achtungText }}
-            >
-              {/* Wortlaut aus `planungWarnungText`; die Uhrzeit in Mono wie jede Zeit der Karte. */}
-              {s.planung_warnungen.map((w, i) => (
-                <span key={`${w.art}-${w.einheit_id}-${w.abloesung_id ?? ''}`}>
-                  {i > 0 && ' · '}
-                  {w.art === 'im_einsatz' && w.seit_at ? (
-                    <>
-                      {w.einheit_name} steht selbst im Einsatz seit{' '}
-                      <span data-lfh="abloesung-warnung-zeit" style={ZAHL}>
-                        <ZeitAnzeige wert={w.seit_at} rolle="kurz" />
-                      </span>
-                    </>
-                  ) : (
-                    planungWarnungText(w, konventionen)
-                  )}
-                </span>
-              ))}
-            </Text>
-          )}
-          {s.status === 'abgeloest' && s.abschnitt_uebergeben && (
-            <Text type="secondary" data-lfh="abloesung-abschnitt-uebergeben">
-              Abschnitt {s.uebergebener_abschnitt_name ?? ''} übergeben
-            </Text>
-          )}
-          {s.status === 'abgeloest' && verbleibText(s) != null && (
-            <Text type="secondary" data-lfh="abloesung-verbleib">
-              {verbleibText(s)}
-            </Text>
-          )}
-          {/* Besatzungswechsel (LLH-1150): Einheit und Fahrzeug blieben, die neue Besatzung steht
+            {warnungen && (
+              <Text
+                data-lfh="abloesung-planung-warnung"
+                title={warnungen}
+                style={{ ...EINZEILIG, color: rollen.achtungText }}
+              >
+                {/* Wortlaut aus `planungWarnungText`; die Uhrzeit in Mono wie jede Zeit der Karte. */}
+                {s.planung_warnungen.map((w, i) => (
+                  <span key={`${w.art}-${w.einheit_id}-${w.abloesung_id ?? ''}`}>
+                    {i > 0 && ' · '}
+                    {w.art === 'im_einsatz' && w.seit_at ? (
+                      <>
+                        {w.einheit_name} steht selbst im Einsatz seit{' '}
+                        <span data-lfh="abloesung-warnung-zeit" style={ZAHL}>
+                          <ZeitAnzeige wert={w.seit_at} rolle="kurz" />
+                        </span>
+                      </>
+                    ) : (
+                      planungWarnungText(w, konventionen)
+                    )}
+                  </span>
+                ))}
+              </Text>
+            )}
+            {s.status === 'abgeloest' && s.abschnitt_uebergeben && (
+              <Text type="secondary" data-lfh="abloesung-abschnitt-uebergeben">
+                Abschnitt {s.uebergebener_abschnitt_name ?? ''} übergeben
+              </Text>
+            )}
+            {s.status === 'abgeloest' && verbleibText(s) != null && (
+              <Text type="secondary" data-lfh="abloesung-verbleib">
+                {verbleibText(s)}
+              </Text>
+            )}
+            {/* Besatzungswechsel (LLH-1150): Einheit und Fahrzeug blieben, die neue Besatzung steht
               hier; einzeilig, beide Besatzungen im Titel. */}
-          {s.status === 'abgeloest' && s.art === 'besatzung' && (
-            <Text
-              type="secondary"
-              data-lfh="abloesung-besatzung"
-              title={`Besatzungswechsel. Neue Besatzung: ${besatzungText(s, 'neu') ?? 'keine'}. Bisherige: ${besatzungText(s, 'alt') ?? 'keine'}`}
-              style={{
-                display: 'block',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              Besatzungswechsel · neu: {besatzungText(s, 'neu') ?? 'keine'}
-            </Text>
-          )}
-          {/* Ende ohne Ablösung (LLH-1128): kein „abgelöst“, der Grund als Wort. Die Uhrzeit
+            {s.status === 'abgeloest' && s.art === 'besatzung' && (
+              <Text
+                type="secondary"
+                data-lfh="abloesung-besatzung"
+                title={`Besatzungswechsel. Neue Besatzung: ${besatzungText(s, 'neu') ?? 'keine'}. Bisherige: ${besatzungText(s, 'alt') ?? 'keine'}`}
+                style={{
+                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                Besatzungswechsel · neu: {besatzungText(s, 'neu') ?? 'keine'}
+              </Text>
+            )}
+            {/* Ende ohne Ablösung (LLH-1128): kein „abgelöst“, der Grund als Wort. Die Uhrzeit
               nur bei der Entlassung, wie die Einsatzkräfte sie melden; die Zeitspalte trägt das
               Ende in jedem Fall. */}
-          {s.status === 'beendet' && (
-            <Text type="secondary" data-lfh="abloesung-ende">
-              beendet
-              {s.beendet_grund ? ` · ${GRUND_WORT[s.beendet_grund]}` : ''}
-              {s.beendet_grund === 'entlassung' && s.beendet_at && (
-                <>
-                  {' '}
-                  <span style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}>
-                    <ZeitAnzeige wert={s.beendet_at} rolle="kurz" />
-                  </span>
-                </>
-              )}
-            </Text>
-          )}
-        </Space>
-        {darfSchreiben && laufend && (
-          // `marginSM` = 8 / 12 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen
-          // (MIL-STD-1472F Fig. 24).
-          <Flex justify="flex-end" gap={token.marginSM} style={{ marginTop: token.marginXS }}>
-            {vollziehen && (
-              // Kein `type="primary"`: die eine Primäraktion der Seite steht im Kopf; n blaue Kartenknöpfe
-              // nähmen der Einstufung am Rand die Aufmerksamkeit.
-              <Button onClick={vollziehen.onWahl}>{vollziehen.label}</Button>
+            {s.status === 'beendet' && (
+              <Text type="secondary" data-lfh="abloesung-ende">
+                beendet
+                {s.beendet_grund ? ` · ${GRUND_WORT[s.beendet_grund]}` : ''}
+                {s.beendet_grund === 'entlassung' && s.beendet_at && (
+                  <>
+                    {' '}
+                    <span style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' }}>
+                      <ZeitAnzeige wert={s.beendet_at} rolle="kurz" />
+                    </span>
+                  </>
+                )}
+              </Text>
             )}
-            <MenueAusloeser
-              eintraege={menueAktionen}
-              zugaenglicherName={`Aktionen zu ${s.einheit_name}`}
-              onWahl={(key) => menueAktionen.find((a) => a.key === key)?.onWahl()}
-            />
-          </Flex>
-        )}
-        {/* Grund einer abgelehnten Rücknahme über dem Knopf, bis zur nächsten (LFH-1077). */}
-        {fehlerGrund && (
-          <div style={{ marginTop: token.marginXS }}>
+          </Stapel>
+          {darfSchreiben && laufend && (
+            // `sm` = 8 / 12 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen
+            // (MIL-STD-1472F Fig. 24).
+            <Stapel richtung="zeile" abstand="sm" verteilen="ende">
+              {vollziehen && (
+                // Kein `type="primary"`: die eine Primäraktion der Seite steht im Kopf; n blaue Kartenknöpfe
+                // nähmen der Einstufung am Rand die Aufmerksamkeit.
+                <Button onClick={vollziehen.onWahl}>{vollziehen.label}</Button>
+              )}
+              <MenueAusloeser
+                eintraege={menueAktionen}
+                zugaenglicherName={`Aktionen zu ${s.einheit_name}`}
+                onWahl={(key) => menueAktionen.find((a) => a.key === key)?.onWahl()}
+              />
+            </Stapel>
+          )}
+          {/* Grund einer abgelehnten Rücknahme über dem Knopf, bis zur nächsten (LFH-1077). */}
+          {fehlerGrund && (
             <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
-          </div>
-        )}
-        {zuruecknehmen && (
-          <Flex justify="flex-end" style={{ marginTop: token.marginXS }}>
-            <Button onClick={zuruecknehmen.onWahl}>{zuruecknehmen.label}</Button>
-          </Flex>
-        )}
+          )}
+          {zuruecknehmen && (
+            <Stapel richtung="zeile" verteilen="ende">
+              <Button onClick={zuruecknehmen.onWahl}>{zuruecknehmen.label}</Button>
+            </Stapel>
+          )}
+        </Stapel>
       </div>
       {kontextMenue}
     </article>

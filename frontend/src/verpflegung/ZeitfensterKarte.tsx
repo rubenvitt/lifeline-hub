@@ -1,4 +1,4 @@
-import { Button, Collapse, Flex, Typography } from 'antd';
+import { Button, Collapse, Flex } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -18,6 +18,8 @@ import {
   Augenbraue,
   Kennzahl,
   Kennzahlenband,
+  Stapel,
+  Textstufe,
   Zeitachseneintrag,
   monoStil,
   useRollen,
@@ -44,8 +46,6 @@ import {
 } from './verpflegungText';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
-
-const { Text } = Typography;
 
 export interface ZeitfensterKarteProps {
   zeitfenster: VerpflegungZeitfenster;
@@ -295,10 +295,10 @@ export default function ZeitfensterKarte({
         wrap
         style={{ paddingBlock: token.paddingSM, paddingInline: token.padding }}
       >
-        <Flex align="baseline" gap={token.marginSM} wrap style={{ minWidth: 0 }}>
-          <Text strong style={{ fontSize: 15, overflowWrap: 'anywhere' }}>
+        <Stapel richtung="zeile" abstand="sm" umbruch ausrichten="baseline">
+          <Textstufe stufe="kartentitel" umbruch="ueberall">
             {zf.bezeichnung}
-          </Text>
+          </Textstufe>
           <span
             data-lfh="verpflegung-zeitraum"
             style={{ ...monoStil('monoKlein'), color: rollen.text2 }}
@@ -311,7 +311,7 @@ export default function ZeitfensterKarte({
               {VERPFLEGUNGSART_LABEL[zf.verpflegungsart]}
             </Marke>
           )}
-        </Flex>
+        </Stapel>
         <Status darstellung={darstellung} />
       </Flex>
 

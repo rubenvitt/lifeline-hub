@@ -1,6 +1,6 @@
 import { Button } from 'antd';
 import { IconHaken } from '../icons';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, schriftStil, useRollen } from '../components/instrument';
 import { statusFlaeche } from '../components/instrument/statusFlaeche';
 import type { PufferZustand } from './zeitachseModell';
 
@@ -28,7 +28,7 @@ export default function EtbSendestatus({ puffer, onSprung }: Props) {
           display: 'inline-flex',
           alignItems: 'center',
           gap: token.marginXXS,
-          fontSize: 12,
+          ...schriftStil('textKlein'),
           color: rollen.normalText,
           whiteSpace: 'nowrap',
         }}

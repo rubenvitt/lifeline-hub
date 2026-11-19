@@ -31,6 +31,7 @@ import {
 } from './verbleibErfassungKern';
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 import RettungsmittelFeld from './RettungsmittelFeld';
+import { Feld } from '../components/instrument';
 
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl. */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
@@ -111,7 +112,7 @@ export function useVerbleibFelder(
 
   const elemente = (
     <>
-      <Form.Item label="Art" name="art" rules={[{ required: true, message: 'Art wählen' }]}>
+      <Feld label="Art" name="art" rules={[{ required: true, message: 'Art wählen' }]}>
         <Select
           options={VERBLEIB_ART_OPTIONEN}
           onChange={(neueArt: VerbleibFormWerte['art']) => {
@@ -126,9 +127,9 @@ export function useVerbleibFelder(
             }
           }}
         />
-      </Form.Item>
+      </Feld>
       {felder.stelle && (
-        <Form.Item
+        <Feld
           label={stellePflicht ? 'Betreuungsstelle' : 'Betreuungsstelle (optional)'}
           name="betreuungsstelle_id"
           rules={stellePflicht ? [{ required: true, message: 'Stelle wählen' }] : undefined}
@@ -158,19 +159,19 @@ export function useVerbleibFelder(
               gewaehlt.current = neu;
             }}
           />
-        </Form.Item>
+        </Feld>
       )}
-      <Form.Item label="Ziel" name="ziel">
+      <Feld label="Ziel" name="ziel">
         <Input placeholder={art === 'transport' ? 'z. B. Krankenhaus' : 'Freitext'} />
-      </Form.Item>
+      </Feld>
       {/* Wer fährt (LLH-1332): Wahl aus „Im Einsatz“ heißt Eigentransport, sonst fremd. */}
       {felder.transportmittel && (
         <RettungsmittelFeld einsatzId={einsatzId} form={form} fokus={artVorbelegt} />
       )}
       {angaben.entlassenAn && (
-        <Form.Item label="Entlassen an" name="entlassen_an">
+        <Feld label="Entlassen an" name="entlassen_an">
           <Select allowClear options={ENTLASSEN_AN_OPTIONEN} />
-        </Form.Item>
+        </Feld>
       )}
       <Collapse
         ghost
@@ -185,23 +186,23 @@ export function useVerbleibFelder(
                     schon füllen. */}
                 <BestaetigtVonFeld einsatzId={einsatzId} />
                 {angaben.einsatznummer && (
-                  <Form.Item label="Einsatznummer Leitstelle" name="leitstelle_einsatznummer">
+                  <Feld label="Einsatznummer Leitstelle" name="leitstelle_einsatznummer">
                     <Input maxLength={EINSATZNUMMER_MAX} />
-                  </Form.Item>
+                  </Feld>
                 )}
                 {angaben.gegenRat && (
-                  <Form.Item label="Gegen Rat" name="gegen_rat">
+                  <Feld label="Gegen Rat" name="gegen_rat">
                     <Select allowClear options={GEGEN_RAT_OPTIONEN} />
-                  </Form.Item>
+                  </Feld>
                 )}
                 {angaben.unterschrift && (
-                  <Form.Item label="Unterschrift" name="unterschrift">
+                  <Feld label="Unterschrift" name="unterschrift">
                     <Select allowClear options={UNTERSCHRIFT_OPTIONEN} />
-                  </Form.Item>
+                  </Feld>
                 )}
-                <Form.Item label="Notiz" name="notiz" style={{ marginBottom: 0 }}>
+                <Feld label="Notiz" name="notiz">
                   <Input.TextArea rows={2} />
-                </Form.Item>
+                </Feld>
               </>
             ),
           },

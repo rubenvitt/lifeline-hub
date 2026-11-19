@@ -7,7 +7,7 @@ import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import { Zeichenzaehler } from '../components/zeichenGrenze';
 import SichtungsTag from '../components/SichtungsTag';
 import { useViewport } from '../components/useViewport';
-import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
+import { Schnellerfassungszeile, Textstufe, monoStil, useRollen } from '../components/instrument';
 import { formatKoordinate } from './koordinate';
 import {
   ANLASS_KUERZEL,
@@ -76,11 +76,11 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
     case 'name':
       // Zähler je Teil ab 80 % der Grenze (LLH-1329); darüber nennt die Zeile den Grund beim Senden.
       return (
-        <span style={{ fontSize: 13, color: rollen.text }}>
+        <Textstufe>
           {teil.name == null && teil.vorname == null ? 'unbekannt' : teil.text}
           {teil.name != null && <Zeichenzaehler wert={teil.name} max={PERSON_NAME_MAX} />}
           {teil.vorname != null && <Zeichenzaehler wert={teil.vorname} max={PERSON_NAME_MAX} />}
-        </span>
+        </Textstufe>
       );
     case 'geschlecht':
     case 'alter':
@@ -88,17 +88,9 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
     case 'sichtung':
       return <SichtungsTag kategorie={teil.wert} style={{ marginInlineEnd: 0 }} />;
     case 'anlass':
-      return (
-        <span style={{ fontSize: 13, color: rollen.text }} title="Anlass">
-          {ANLASS_WORT[teil.wert]}
-        </span>
-      );
+      return <Textstufe title="Anlass">{ANLASS_WORT[teil.wert]}</Textstufe>;
     case 'massnahme':
-      return (
-        <span style={{ fontSize: 13, color: rollen.text }} title="Maßnahme">
-          + {MASSNAHME_WORT[teil.wert]}
-        </span>
-      );
+      return <Textstufe title="Maßnahme">+ {MASSNAHME_WORT[teil.wert]}</Textstufe>;
     case 'entlassen':
       return (
         <span style={{ ...monoStil('monoKlein'), color: rollen.bedien }} title="Verbleib">
@@ -312,7 +304,9 @@ export default function BetroffeneZeile({
   );
 
   return (
-    <Schnellerfassungszeile praefix="/person" hinweiszeile={hinweiszeile}>
+    // `feldFuellt` lässt das Feld wachsen und unter seine Inhaltsbreite schrumpfen (sonst drückte es
+    // am Handschirm den Knopf hinaus); der Knopf hält sich mit `flex: 0 0 auto` heraus.
+    <Schnellerfassungszeile praefix="/person" hinweiszeile={hinweiszeile} feldFuellt>
       <Input
         ref={setzeFeld}
         value={text}
@@ -320,9 +314,6 @@ export default function BetroffeneZeile({
         aria-describedby={leer ? kuerzelId : erkanntId}
         placeholder="Kowalski, Anna w 34 sk3"
         enterKeyHint="send"
-        // Ohne `minWidth: 0` schrumpfte das Flex-Kind nicht unter seine Inhaltsbreite und drückte am
-        // Handschirm den Knopf hinaus.
-        style={{ flex: '1 1 auto', minWidth: 0 }}
         autoComplete="off"
         spellCheck={false}
         onChange={(e) => {

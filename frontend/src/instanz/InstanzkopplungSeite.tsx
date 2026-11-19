@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { Alert, App, Button, Form, Input, Modal, Space, Spin, Tooltip, Typography } from 'antd';
+import { Alert, App, Button, Form, Input, Modal, Spin, Tooltip, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
-import { Datenfeld, Datenraster, Paneel, monoStil, useRollen } from '../components/instrument';
+import {
+  Datenfeld,
+  Knopfreihe,
+  Datenraster,
+  Paneel,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import KopierbarerText from '../components/KopierbarerText';
@@ -202,7 +209,7 @@ export default function InstanzkopplungSeite() {
       breite="schmal"
       aktionen={
         isAdmin && (
-          <Space wrap size={token.marginSM}>
+          <Knopfreihe>
             <Tooltip title={sperre}>
               <Button
                 type="primary"
@@ -236,7 +243,7 @@ export default function InstanzkopplungSeite() {
             <Button onClick={() => setEinloesenOffen(true)} data-lfh="instanz-code-einloesen">
               Code einlösen
             </Button>
-          </Space>
+          </Knopfreihe>
         )
       }
       hinweis={<SeitenHinweise rechteFehlt={!isAdmin} rechteText={NUR_ADMIN} />}

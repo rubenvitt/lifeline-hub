@@ -26,7 +26,7 @@ import LageplanAnlageDialog, {
 } from './lagekarte/LageplanAnlageDialog';
 import { useModusFarben } from '../components/rahmenStil';
 import { useViewport } from '../components/useViewport';
-import { useRollen } from '../components/instrument';
+import { Knopfreihe, useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import {
@@ -1544,10 +1544,7 @@ export default function LagekartePage() {
       </div>
       {/* Ab `lg` sitzt der Umschalter im Knopfblock der Karte (s. `KartenUeberlagerung`). Die
           Nebenwege wie in `EinsatzSeite`: unter `md` der Auslöser „Weitere“ vorn, sonst hinten. */}
-      <div
-        data-lfh="seitenkopf-aktionen"
-        style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}
-      >
+      <Knopfreihe data-lfh="seitenkopf-aktionen">
         {istSchmal && nebenwegeImKopf}
         {!breit && (
           <Button
@@ -1567,7 +1564,7 @@ export default function LagekartePage() {
           </Button>
         )}
         {!istSchmal && nebenwegeImKopf}
-      </div>
+      </Knopfreihe>
     </div>
   );
 
