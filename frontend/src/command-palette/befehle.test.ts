@@ -1057,6 +1057,7 @@ describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
       merkeBefehl: vi.fn(),
       merkeModulBesuch: vi.fn(),
       tastaturAktionen: { speichern: vi.fn() },
+      oeffneHilfe: vi.fn(),
     });
   }
 
@@ -1086,7 +1087,11 @@ describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
     const ohneZiel = baueBefehle(vollerKontext()).filter((b) => b.ziel === undefined);
     for (const b of ohneZiel) {
       expect(
-        b.gruppe === 'aktionen' || b.gruppe === 'einstellungen' || b.id === 'nav:abmelden',
+        b.gruppe === 'aktionen' ||
+          b.gruppe === 'einstellungen' ||
+          b.id === 'nav:abmelden' ||
+          // Die Hilfe-Seitenleiste öffnet sich neben der Seite, sie ist kein Sprung (LLH-1824).
+          b.id.startsWith('hilfe:'),
         b.id,
       ).toBe(true);
     }
@@ -1245,5 +1250,40 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
       .find((b) => b.id === 'ansicht:kommunikationsplan')!
       .ausfuehren();
     expect(k.merkeBefehl).toHaveBeenCalledWith('ansicht:kommunikationsplan');
+  });
+});
+
+describe('baueBefehle — Hilfe zur Seite (LLH-1824)', () => {
+  it('bietet „Hilfe zu dieser Seite“ und „Tastenkürzel“ an und öffnet den Reiter', () => {
+    const oeffneHilfe = vi.fn();
+    const b = baueBefehle(kontext({ oeffneHilfe }));
+    const seite = b.find((x) => x.id === 'hilfe:seite');
+    const kuerzel = b.find((x) => x.id === 'hilfe:kuerzel');
+    expect(seite?.label).toBe('Hilfe zu dieser Seite');
+    expect(kuerzel?.label).toBe('Tastenkürzel');
+    seite!.ausfuehren();
+    expect(oeffneHilfe).toHaveBeenLastCalledWith('seite');
+    kuerzel!.ausfuehren();
+    expect(oeffneHilfe).toHaveBeenLastCalledWith('kuerzel');
+  });
+
+  it('ohne Hilfe-Leiste (Hilfeseite, Gerät) fehlen beide', () => {
+    const ids = baueBefehle(kontext()).map((x) => x.id);
+    expect(ids).not.toContain('hilfe:seite');
+    expect(ids).not.toContain('hilfe:kuerzel');
+  });
+
+  it('bei Berührung gibt es keine Tastenkürzel', () => {
+    const ids = baueBefehle(kontext({ oeffneHilfe: vi.fn(), istBeruehrung: true })).map(
+      (x) => x.id,
+    );
+    expect(ids).toContain('hilfe:seite');
+    expect(ids).not.toContain('hilfe:kuerzel');
+  });
+
+  it('„hilfe“ findet erst die Hilfe, dann die Hilfe zu dieser Seite', () => {
+    const b = baueBefehle(kontext({ oeffneHilfe: vi.fn() }));
+    const ids = ordneTreffer(filtereBefehle(b, 'hilfe'), 'hilfe').map((x) => x.id);
+    expect(ids.slice(0, 2)).toEqual(['nav:hilfe', 'hilfe:seite']);
   });
 });

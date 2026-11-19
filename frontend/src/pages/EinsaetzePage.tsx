@@ -65,6 +65,7 @@ import { einsatzleiterAusAngabe, einsatzleiterKurz } from '../einsatz/einsatzlei
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
 import NeuigkeitenHinweis from '../neuigkeiten/NeuigkeitenHinweis';
+import WillkommenKarte from '../hilfe/WillkommenKarte';
 import { Status } from '../components/instrument/Status';
 import { Marke } from '../components/instrument/Marke';
 
@@ -560,6 +561,8 @@ function EinsaetzeInhalt() {
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
+      {/* Willkommen vor Neuigkeiten (LLH-1824): für Erstnutzer das Wichtigere. */}
+      <WillkommenKarte />
       <NeuigkeitenHinweis />
 
       {/* Leer und anlegeberechtigt schließen sich nicht aus. Keine Primäraktion am Leerknoten:
