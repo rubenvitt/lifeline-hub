@@ -567,6 +567,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 <Button
                   type="text"
                   ref={navGriff}
+                  data-lfh="navigation-oeffnen"
                   aria-label="Navigation öffnen"
                   // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
                   // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.

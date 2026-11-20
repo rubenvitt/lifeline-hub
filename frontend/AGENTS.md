@@ -832,6 +832,12 @@ anwendbar), „nicht geprüft" ist keins.
 - Wächter: `components/erklaertext.guard.test.ts` sucht Erklärmuster („Leer:“, „Klick auf“,
   „Enter sendet“, „sobald wieder Verbindung“, „read-only“ …) in sichtbaren Texten. Die Schuldmenge
   `OFFEN` ist leer (seit LFH-1078 P7); neue Einträge gibt es nicht, ein Treffer wird umgebaut.
+- **Ausnahme Rundgang** (LLH-1990, Entscheidung 20.11.2026): Der Rundgang für Erstnutzer darf
+  die Bedienung erklären. Seine Texte stehen nur in `hilfe/rundgang/rundgangTexte.ts`, die der
+  Wächter als einzige Datei ausnimmt (`AUSNAHMEN`); die Anrede-Regel gilt dort weiter. Er startet
+  von selbst nur für Erstnutzer und im Einsatz nur in einer Übung, nie am Handschirm oder auf einem
+  gekoppelten Gerät, und öffnet weder Paneel noch Schublade. Herleitung:
+  `docs/superpowers/specs/2026-11-20-kgsx7ta3-einfuehrung-erstnutzer-design.md`.
 - **Anrede: niemand wird angesprochen** (LLH-1830, Entscheidung 19.11.2026). Kein Du, kein Sie,
   auch nicht in Servertexten, die bis zum Anwender durchkommen. Texte nennen die Sache („Eigene
   Rolle“, „Code aus der Authenticator-App“) oder den Handgriff im Infinitiv („Nur bestätigen,

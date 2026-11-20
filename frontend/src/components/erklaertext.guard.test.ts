@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,6 +78,13 @@ const MUSTER: readonly { name: string; muster: RegExp; beispiel: string }[] = [
  * neuer Treffer ist rot und wird umgebaut, nicht hier eingetragen.
  */
 const OFFEN: Record<string, number> = {};
+
+/**
+ * Ausnahmen (relativ zu `src/`): Dateien, die die Bedienung erklären DÜRFEN. Einzige ist die des
+ * Rundgangs für Erstnutzer (LLH-1990, `frontend/AGENTS.md`, „Texte: zeigen statt erklären“). Die
+ * Anrede-Regel gilt dort weiter (`anredeText.guard.test.ts` nimmt sie nicht aus).
+ */
+const AUSNAHMEN: ReadonlySet<string> = new Set(['hilfe/rundgang/rundgangTexte.ts']);
 
 /** Sichtbare Zeichenketten einer Quelle: Literale, Template-Teile, JSX-Text. Ohne Importpfade. */
 function texteAus(quelle: string, dateiname = 'x.tsx'): { text: string; zeile: number }[] {
@@ -160,11 +167,17 @@ describe('Erklärtext-Guard (LFH-1078)', () => {
       expect(erklaerTreffer(`const t = ${JSON.stringify(erlaubt)};`), erlaubt).toEqual([]);
   });
 
+  it('Ausnahme: nur die Rundgang-Texte, und die Datei gibt es', () => {
+    expect([...AUSNAHMEN]).toEqual(['hilfe/rundgang/rundgangTexte.ts']);
+    for (const datei of AUSNAHMEN) expect(existsSync(join(SRC, datei)), datei).toBe(true);
+  });
+
   it('keine Datei hat mehr Erklärsätze als ihre Schuld, und die Schuld ist nicht zu groß', () => {
     const ist: Record<string, number> = {};
     const fundorte: string[] = [];
     for (const pfad of quelldateien(SRC)) {
       const datei = relative(SRC, pfad).split('\\').join('/');
+      if (AUSNAHMEN.has(datei)) continue;
       const treffer = erklaerTreffer(readFileSync(pfad, 'utf8'), datei);
       if (treffer.length === 0) continue;
       ist[datei] = treffer.length;
