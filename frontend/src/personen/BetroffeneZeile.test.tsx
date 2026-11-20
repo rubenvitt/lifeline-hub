@@ -18,8 +18,14 @@ import BetroffeneZeile from './BetroffeneZeile';
 afterEach(() => setzeViewportZurueck());
 
 function zeige(onErfassen = vi.fn()) {
-  renderMitProviders(<BetroffeneZeile uhsListe={[]} onErfassen={onErfassen} />);
-  return { onErfassen, feld: screen.getByRole('textbox', { name: 'Kurzeingabe Person' }) };
+  const { container } = renderMitProviders(
+    <BetroffeneZeile uhsListe={[]} onErfassen={onErfassen} />,
+  );
+  return {
+    onErfassen,
+    container,
+    feld: screen.getByRole('textbox', { name: 'Kurzeingabe Person' }),
+  };
 }
 
 const legende = () => document.querySelector<HTMLElement>('[data-lfh="kuerzel"]')!;
