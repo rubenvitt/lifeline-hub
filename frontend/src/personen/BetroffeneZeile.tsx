@@ -303,10 +303,30 @@ export default function BetroffeneZeile({
     </>
   );
 
+  // Unter `md` gestapelt (LLH-1762): das Feld allein auf voller Breite, „/person“ und der Knopf
+  // in der zweiten Zeile der Box. Einzeilig blieben am Handy 96 px, etwa elf Zeichen, und die
+  // Eingabe ließ sich vor dem Senden nicht gegenlesen.
+  const erfassenKnopf = (
+    <Button
+      type="primary"
+      loading={laeuft}
+      onClick={() => void senden()}
+      style={istSchmal ? undefined : { marginInline: token.marginXS, flex: '0 0 auto' }}
+    >
+      Person erfassen
+    </Button>
+  );
+
   return (
     // `feldFuellt` lässt das Feld wachsen und unter seine Inhaltsbreite schrumpfen (sonst drückte es
     // am Handschirm den Knopf hinaus); der Knopf hält sich mit `flex: 0 0 auto` heraus.
-    <Schnellerfassungszeile praefix="/person" hinweiszeile={hinweiszeile} feldFuellt>
+    <Schnellerfassungszeile
+      praefix="/person"
+      hinweiszeile={hinweiszeile}
+      feldFuellt
+      gestapelt={istSchmal}
+      hinweis={istSchmal ? erfassenKnopf : undefined}
+    >
       <Input
         ref={setzeFeld}
         value={text}
@@ -331,14 +351,7 @@ export default function BetroffeneZeile({
           }
         }}
       />
-      <Button
-        type="primary"
-        loading={laeuft}
-        onClick={() => void senden()}
-        style={{ marginInline: token.marginXS, flex: '0 0 auto' }}
-      >
-        Person erfassen
-      </Button>
+      {!istSchmal && erfassenKnopf}
     </Schnellerfassungszeile>
   );
 }
