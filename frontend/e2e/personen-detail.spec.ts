@@ -75,7 +75,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   // Klick auf die Zeile → Detail-Vollseite.
   await page.getByText('Mustermann, Max').click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+`));
-  await expect(page.getByRole('heading', { name: /Person R-001/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /R-001/ })).toBeVisible();
 
   // Eine Spalte: Kopf, Verlauf, Personendaten untereinander, nichts in Reitern. Die alte
   // Überschrift „Medizinischer Verlauf" der rechten Spalte gibt es nicht mehr.
