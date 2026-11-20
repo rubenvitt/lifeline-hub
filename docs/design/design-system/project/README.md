@@ -275,7 +275,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`. Der Knopf „?“ (Hilfe zur
     Seite) steht im Einsatz-Kopf erst ab `xl`, im App-Rahmen ab `md`; wo er die eine Zeile
     bräche, steht „Hilfe zu dieser Seite“ im Benutzermenü (`hilfeZurSeite`), am Handy im Einsatz im
-    Fuß der Navigation.
+    Fuß der Navigation. Unter `md` ersetzt dieser Eintrag „Hilfe“ (die Seitenleiste verlinkt die
+    volle Hilfe), und der Menükopf trägt keine Versionszeile, wie im Handschuh-Betrieb; sonst
+    ragte „Abmelden“ in `komfortabel` unter den Fensterrand (e2e `benutzermenue`, Entscheidung
+    20.11.2026).
   - **Übung**: Jede Fläche, die einen Einsatz zeigt,
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,
     Planungsübernahme, externes Lagebild, „Zurück zu …“, Tab-Titel, Druck, Lageplan-Anlage,
